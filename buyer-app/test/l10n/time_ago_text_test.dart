@@ -39,7 +39,6 @@ void main() {
   });
 
   test('history label: yesterday is decided by the Taipei calendar day', () {
-    // 2026-07-31 00:10 Taipei.
     final now = DateTime.utc(2026, 7, 30, 16, 10);
     expect(
       historyViewedText(zh, DateTime.utc(2026, 7, 29, 16, 5), now: now),

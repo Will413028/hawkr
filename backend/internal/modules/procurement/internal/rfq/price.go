@@ -38,7 +38,6 @@ func (s Service) PreviewPrice(ctx context.Context, in PriceInput) (model.PriceQu
 	return out, err
 }
 
-// quote 由需求版本的單位與數量算出單價區間的計價基準與總額區間；沒有單位回 REQUIREMENT_NOT_READY。
 func quote(rev store.ProcurementRequestRevision, lower, upper int64) (model.PriceQuote, error) {
 	if rev.Unit == nil {
 		return model.PriceQuote{}, notReady("需求還沒有單位，算不出計價基準")

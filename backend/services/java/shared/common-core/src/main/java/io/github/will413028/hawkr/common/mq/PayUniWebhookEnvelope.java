@@ -52,7 +52,6 @@ public record PayUniWebhookEnvelope(
             JsonNode root = MAPPER.readTree(new String(body, StandardCharsets.UTF_8));
 
             if (root.has("event_id")) {
-                // 標準 envelope 格式（36 §7.4 Conformance Contract snake_case）
                 String eventId = root.path("event_id").asText("");
                 String provider = root.path("provider").asText("");
                 String webhookType = root.path("webhook_type").asText("");
@@ -72,7 +71,6 @@ public record PayUniWebhookEnvelope(
 
                 return new PayUniWebhookEnvelope(eventId, provider, webhookType, merId, eventKey, occurredAt, payload, meta);
             } else {
-                // 裸 payload（向下兼容）
                 Map<String, String> payload = MAPPER.convertValue(root, MAP_TYPE);
                 return new PayUniWebhookEnvelope("", "", "", "", "", "", payload, Collections.emptyMap());
             }

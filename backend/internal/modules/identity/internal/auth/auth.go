@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// errSessionInvalid 是認證失敗時給使用者的錯誤，與 session 無效時相同：client 一律回到登入。
 func errSessionInvalid() error { return session.Invalid() }
 
 // Authenticate 驗證顧客的 session token 或後台 Access/dev token，回傳呼叫者。
@@ -49,7 +48,6 @@ func (m *Service) Authenticate(ctx context.Context, token string) (model.Authent
 	return m.d.Sessions.Resolve(ctx, token)
 }
 
-// unverifiedIssuer 讀出 JWT 的 iss，只用來選擇驗證它的 application；簽章與 issuer 由那個 application 驗證。
 func unverifiedIssuer(token string) string {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
@@ -68,8 +66,6 @@ func unverifiedIssuer(token string) string {
 	return c.Issuer
 }
 
-// authenticateAdmin 回傳 Access subject 對應的管理員與他目前的角色；還沒有管理員時建立（零角色）。角色每個請求讀一次，不快取
-// （ADR 2026-10-04-admin-roles）：撤銷在下一個請求生效。
 func (m *Service) authenticateAdmin(ctx context.Context, a model.AdminIdentity) (model.Authenticated, error) {
 	row, err := m.q(ctx).ResolveAdmin(ctx, a.Subject)
 	switch {
@@ -82,7 +78,6 @@ func (m *Service) authenticateAdmin(ctx context.Context, a model.AdminIdentity) 
 		AccessSubject: a.Subject, Email: a.Email, Now: m.d.Now(),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		// 同一位管理員同時的另一個請求剛建好
 		if row, err = m.q(ctx).ResolveAdmin(ctx, a.Subject); err != nil {
 			return model.Authenticated{}, fmt.Errorf("identity：讀取剛建立的管理員：%w", err)
 		}

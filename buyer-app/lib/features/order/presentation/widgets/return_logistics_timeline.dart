@@ -498,10 +498,6 @@ class ReturnLogisticsTimeline extends StatelessWidget {
   List<AfterSaleTimelineStep> _buildCvsSteps() {
     final s = caseData.status;
     final hasCode = caseData.returnShipmentNo.isNotEmpty;
-    // status >= 25 不代表買家已寄 — backend 在拋單成功時就會把 status 推到 25，
-    // 但買家可能還沒去 7-11。改用 providerStatus / providerMessage 判斷物流商
-    // 是否真的收件（hasShipped）。歷史 case 已關案/收到時無物流訊息，回退到
-    // status 比對。
     final shipped =
         AfterSaleReturnProgress.hasShipped(caseData) ||
         _reachedOrPast(s, '30') ||
@@ -617,7 +613,6 @@ class RefundProgressTimeline extends StatelessWidget {
         ? caseData.resolutions.first.refundAmount
         : caseData.refundableAmount;
 
-    // 決定當前 step（0-3）與摘要卡內容
     int currentStep;
     String summaryTitle;
     String summarySub;

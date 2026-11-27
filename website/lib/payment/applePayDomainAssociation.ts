@@ -1,8 +1,3 @@
-// Apple Pay merchant domain-association blobs, served verbatim at
-// /.well-known/apple-developer-merchantid-domain-association per environment.
-// These are PUBLIC verification files (also fetchable from the live endpoint),
-// committed as static data rather than a runtime secret. Source of truth lives
-// here; no env var / GitHub secret needed.
 import type { Flavor } from "@/lib/config/flavor";
 
 export const APPLE_PAY_DOMAIN_ASSOCIATION: Record<Flavor, string> = {

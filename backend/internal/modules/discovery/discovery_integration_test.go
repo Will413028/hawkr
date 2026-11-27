@@ -24,7 +24,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// setup 起一個只套用了本模組 migration 的空 database：integration 測試只跑在自己的 schema 上。
 func setup(t *testing.T) *db.DB {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "discovery", Dir: Migrations()}))
@@ -33,26 +32,21 @@ func setup(t *testing.T) *db.DB {
 
 var clock = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 
-// fakes 是四個 port 的替身。每個 port 有自己的錯誤開關。
 type fakes struct {
 	mu sync.Mutex
 
-	public     []int64               // product port 的回傳
-	exposable  map[int64]time.Time   // seller：可曝光的店家與第一次可曝光的時間
-	orders     map[int64]OrderStats  // order port
-	ratings    map[int64]RatingStats // review port：只有放進來的店有評價
+	public     []int64
+	exposable  map[int64]time.Time
+	orders     map[int64]OrderStats
+	ratings    map[int64]RatingStats
 	productErr error
-	// productAt 是 product port 每次被問的時間。
 	productAt []time.Time
 	orderErr  error
 	sellerErr error
-	ratingErr map[int64]error // 針對單一店家：批次裡含有它就失敗
-	// ratingExtra 是 review port 額外回傳的（沒被詢問的）店家，用來模擬違反契約。
+	ratingErr map[int64]error
 	ratingExtra map[int64]RatingStats
 
-	// onOrders 在 order port 被呼叫時執行一次（在 mutex 之外），用來製造重算的交錯。
 	onOrders func()
-	// onSeller 在 seller port 第一次被呼叫時執行一次（在 mutex 之外）。
 	onSeller func()
 
 	orderDays     []int
@@ -65,7 +59,6 @@ func newFakes() *fakes {
 	return &fakes{exposable: map[int64]time.Time{}, orders: map[int64]OrderStats{}, ratings: map[int64]RatingStats{}, ratingErr: map[int64]error{}, ratingExtra: map[int64]RatingStats{}}
 }
 
-// add 加一家有公開商品且可曝光的店。
 func (f *fakes) add(id int64, opened time.Time) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -165,7 +158,6 @@ type fixture struct {
 	now     time.Time
 }
 
-// logCapture 收集 log 紀錄，讓測試檢查層級與屬性。
 type logCapture struct {
 	mu      sync.Mutex
 	records []slog.Record
@@ -181,7 +173,6 @@ func (c *logCapture) Handle(_ context.Context, r slog.Record) error {
 func (c *logCapture) WithAttrs([]slog.Attr) slog.Handler { return c }
 func (c *logCapture) WithGroup(string) slog.Handler      { return c }
 
-// attr 回傳層級是 level 的紀錄裡，鍵為 key 的屬性值（找不到是空字串）。
 func (c *logCapture) attr(level slog.Level, key string) []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -206,7 +197,6 @@ func (x *fixture) clock() time.Time {
 	return x.now
 }
 
-// advance 讓時鐘前進：每次重算的開始時間都要晚於上一次成功的那次（重算以開始時間排序，同一個時間點的第二次會被丟棄）。
 func (x *fixture) advance(d time.Duration) {
 	x.clockMu.Lock()
 	defer x.clockMu.Unlock()
@@ -225,7 +215,6 @@ func newFixture(t *testing.T) *fixture {
 	return x
 }
 
-// recompute 先讓時鐘前進一分鐘再重算，所以連續呼叫是依序的、各自有更晚的開始時間。
 func (x *fixture) recompute(t *testing.T) int {
 	t.Helper()
 	x.advance(time.Minute)
@@ -270,13 +259,13 @@ func days(n int) time.Time { return clock.AddDate(0, 0, -n) }
 func TestRecomputeWritesTheSnapshotAndReadFollowsScoreOrder(t *testing.T) {
 	t.Parallel()
 	x := newFixture(t)
-	x.f.add(1, days(200)) // 老店，有大量成交與好評
-	x.f.add(2, days(200)) // 老店，沒有任何資料
-	x.f.add(3, days(1))   // 新店，沒有任何資料
-	x.f.add(4, days(200)) // 老店，取消很多
+	x.f.add(1, days(200))
+	x.f.add(2, days(200))
+	x.f.add(3, days(1))
+	x.f.add(4, days(200))
 	x.f.orders[1] = OrderStats{StoreID: 1, DistinctBuyers: 40, QualifyingOrders: 60}
 	x.f.orders[4] = OrderStats{StoreID: 4, DistinctBuyers: 3, QualifyingOrders: 3, SellerCancelledOrders: 30}
-	x.f.orders[99] = OrderStats{StoreID: 99, DistinctBuyers: 500, QualifyingOrders: 500} // 沒有公開商品的店：不是候選
+	x.f.orders[99] = OrderStats{StoreID: 99, DistinctBuyers: 500, QualifyingOrders: 500}
 	x.f.ratings[1] = RatingStats{Count: 50, Average: 4.8}
 
 	if n := x.recompute(t); n != 4 {
@@ -298,7 +287,6 @@ func TestRecomputeWritesTheSnapshotAndReadFollowsScoreOrder(t *testing.T) {
 	if x.count(t, "SELECT count(*) FROM discovery.seller_scores WHERE store_id = 99") != 0 {
 		t.Fatal("store without public products must not be stored")
 	}
-	// 店 1 需求滿分且評價最好；店 3 有新店加分；店 2 什麼都沒有；店 4 被取消扣分壓在最後。
 	rec, err := x.module.RecommendedSellers(context.Background(), 10)
 	if err != nil {
 		t.Fatal(err)
@@ -323,9 +311,8 @@ func TestStoresWithoutPublicProductsOrExposureAreNotCandidates(t *testing.T) {
 	x := newFixture(t)
 	x.f.add(1, days(5))
 	x.f.add(2, days(5))
-	x.f.exposable[3] = days(5) // 可曝光但沒有公開商品
+	x.f.exposable[3] = days(5)
 	x.f.public = append(x.f.public, 4)
-	// 4 有公開商品但 seller 說不可曝光（不在 exposable）
 	if n := x.recompute(t); n != 2 {
 		t.Fatalf("candidates = %d", n)
 	}
@@ -372,13 +359,12 @@ func TestUpstreamFailureKeepsThePreviousSnapshot(t *testing.T) {
 			x.recompute(t)
 			before := x.recommended(t, 10)
 
-			// 世界變了（新增一家店、停掉一家），但上游壞掉：快照不能被改。
 			x.f.add(3, days(1))
 			breakIt(x.f)
 			if _, err := x.module.RecomputeSellerScores(context.Background()); !errors.Is(err, boom) {
 				t.Fatalf("err = %v", err)
 			}
-			x.f.sellerErr = nil // 讀取也會問 seller；這裡要驗的是快照
+			x.f.sellerErr = nil
 			if got := x.recommended(t, 10); !slices.Equal(got, before) {
 				t.Fatalf("snapshot changed: %v -> %v", before, got)
 			}
@@ -497,7 +483,6 @@ func TestLimitMustBeBetweenOneAndFifty(t *testing.T) {
 func TestReadPagesPastManyFilteredTopRows(t *testing.T) {
 	t.Parallel()
 	x := newFixture(t)
-	// 沒有任何訂單與評價：店 i 開店 i 小時前，i 越小分數越高。前 150 名都在重算後失去資格。
 	const total = 260
 	for i := int64(1); i <= total; i++ {
 		x.f.add(i, clock.Add(-time.Duration(i)*time.Hour))
@@ -519,7 +504,6 @@ func TestReadPagesPastManyFilteredTopRows(t *testing.T) {
 		t.Fatalf("eligibility batches = %v", x.f.sellerBatch)
 	}
 
-	// 全部都失去資格：讀到快照的盡頭就停，回空清單（有界），不是無限翻頁。
 	for i := int64(151); i <= total; i++ {
 		x.f.suspend(i)
 	}
@@ -535,7 +519,6 @@ func TestReadPagesPastManyFilteredTopRows(t *testing.T) {
 func TestEqualScoresOrderByPublishedAtThenStoreIDDescending(t *testing.T) {
 	t.Parallel()
 	x := newFixture(t)
-	// 都超過 30 天、沒有資料：分數完全相同。
 	x.f.add(5, days(100))
 	x.f.add(9, days(100))
 	x.f.add(2, days(50))
@@ -565,7 +548,6 @@ func TestEligibilityErrorAtReadTimeFailsTheRead(t *testing.T) {
 	}
 }
 
-// insertScore 直接寫一列（略過公式），用來驗 schema 的 CHECK。
 func (x *fixture) insertScore(id int64, score, demand string, ratingCount int, ratingAverage string) error {
 	_, err := x.d.Pool().Exec(context.Background(), fmt.Sprintf(`INSERT INTO discovery.seller_scores
 		(store_id, score, demand, quality, reliability_penalty, newness, distinct_buyers, qualifying_orders, seller_cancelled_orders, rating_count, rating_average, published_at, formula_version, computed_at)
@@ -587,7 +569,6 @@ func TestSchemaChecksComponentsAndFiniteScoreButNotTheFormulaWeights(t *testing.
 			t.Fatalf("score %s accepted", bad)
 		}
 	}
-	// 範圍取決於公式版本的權重（在程式裡），資料庫不寫死：換一版公式的分數不該被擋。
 	for i, ok := range []string{"-3", "0", "7.5"} {
 		if err := x.insertScore(int64(10+i), ok, "0", 0, "NULL"); err != nil {
 			t.Fatalf("finite score %s rejected: %v", ok, err)
@@ -617,8 +598,8 @@ func TestSchemaBoundsTheRecordedError(t *testing.T) {
 func TestNewnessCountsFromTheFirstExposableDay(t *testing.T) {
 	t.Parallel()
 	x := newFixture(t)
-	runAt := x.clock().Add(time.Minute) // recompute 開始的時間
-	x.f.add(1, runAt)                   // 申請後 25 天才核准：seller 回的 PublishedAt 是今天（公開時間，不是核准時間）（這次重算的時間）
+	runAt := x.clock().Add(time.Minute)
+	x.f.add(1, runAt)
 	x.f.add(2, runAt.AddDate(0, 0, -29))
 	x.f.add(3, runAt.AddDate(0, 0, -400))
 	x.f.add(4, runAt.AddDate(0, 0, -200))
@@ -629,7 +610,6 @@ func TestNewnessCountsFromTheFirstExposableDay(t *testing.T) {
 	if x.count(t, "SELECT count(*) FROM discovery.seller_scores WHERE store_id = 2 AND newness > 0 AND newness < 0.1") != 1 {
 		t.Fatal("a store 29 days into its exposure must have almost none left")
 	}
-	// 3、4 都過了新店期、分數相同：最近才可曝光的（4）在前。
 	if got := x.recommended(t, 10); !slices.Equal(got, []int64{1, 2, 4, 3}) {
 		t.Fatalf("got %v", got)
 	}
@@ -673,7 +653,6 @@ func TestFreshnessDistinguishesNeverComputedFromNoEligibleStores(t *testing.T) {
 		t.Fatalf("never attempted: %+v err=%v", rec, err)
 	}
 
-	// 只有失敗的嘗試：還是沒有快照，狀態列記下失敗與原因。
 	x.f.productErr = errors.New("catalog is down")
 	x.advance(time.Minute)
 	if _, err := x.module.RecomputeSellerScores(ctx); err == nil {
@@ -695,7 +674,6 @@ func TestFreshnessDistinguishesNeverComputedFromNoEligibleStores(t *testing.T) {
 		t.Fatalf("error logs name the upstream: %v", got)
 	}
 
-	// 成功但沒有任何合格店家：ComputedAt 有值，清單空。
 	x.f.productErr = nil
 	x.recompute(t)
 	succeededAt := x.clock()
@@ -704,7 +682,6 @@ func TestFreshnessDistinguishesNeverComputedFromNoEligibleStores(t *testing.T) {
 		t.Fatalf("computed with no stores: %+v err=%v", rec, err)
 	}
 
-	// 之後又失敗：快照與 ComputedAt 不變；錯誤文字是有界的（超長、多位元組的訊息被截斷成合法的字串）。
 	x.f.orderErr = errors.New(strings.Repeat("訂單服務壞了", 400))
 	x.advance(time.Minute)
 	if _, err := x.module.RecomputeSellerScores(ctx); err == nil {
@@ -733,9 +710,8 @@ func TestAnOlderRunFinishingLaterDoesNotOverwriteANewerSnapshot(t *testing.T) {
 	for id := int64(1); id <= 3; id++ {
 		x.f.add(id, days(100))
 	}
-	x.f.ratings[1] = RatingStats{Count: 10, Average: 5} // 舊的世界：店 1 第一
+	x.f.ratings[1] = RatingStats{Count: 10, Average: 5}
 
-	// 第一次重算（A）讀完資料前卡在 order port，等第二次（B）完成。
 	entered, release := make(chan struct{}), make(chan struct{})
 	x.f.onOrders = func() {
 		close(entered)
@@ -752,9 +728,8 @@ func TestAnOlderRunFinishingLaterDoesNotOverwriteANewerSnapshot(t *testing.T) {
 		r, err := x.module.RecomputeSellerScores(ctx)
 		doneA <- outcome{r, err}
 	}()
-	<-entered // A 已經取了開始時間、也讀過 product、seller。
+	<-entered
 
-	// 世界改變：店 3 變成第一。B 在 A 之後開始、先完成。
 	x.f.mu.Lock()
 	delete(x.f.ratings, 1)
 	x.f.ratings[3] = RatingStats{Count: 10, Average: 5}
@@ -790,7 +765,6 @@ func TestAnOlderRunFinishingLaterDoesNotOverwriteANewerSnapshot(t *testing.T) {
 		t.Fatal("rows from two runs mixed")
 	}
 
-	// 反過來（較早開始的先完成）兩次都寫入，最後是較晚開始的那份。
 	x.f.mu.Lock()
 	x.f.ratings = map[int64]RatingStats{1: {Count: 10, Average: 1}, 2: {Count: 10, Average: 5}}
 	x.f.mu.Unlock()
@@ -807,15 +781,13 @@ func TestReadSeesOneSnapshotEvenWhenARecomputeCommitsBetweenPages(t *testing.T) 
 	ctx := context.Background()
 	const total = 150
 	for i := int64(1); i <= total; i++ {
-		x.f.add(i, x.clock().Add(-time.Duration(i)*time.Hour)) // i 越小越新、分數越高
+		x.f.add(i, x.clock().Add(-time.Duration(i)*time.Hour))
 	}
 	x.recompute(t)
 	snapshotA := *mustComputedAt(t, x, ctx)
-	// 前 100 名在讀取時都失去資格：讀完第一頁還湊不到 limit，要翻到第二頁。
 	for i := int64(1); i <= 100; i++ {
 		x.f.suspend(i)
 	}
-	// 讀第一頁問 seller 的當下，另一個重算提交了新的快照：店 120 成為第一名（原本在第二頁）。
 	x.f.onSeller = func() {
 		x.f.mu.Lock()
 		x.f.orders[120] = OrderStats{StoreID: 120, DistinctBuyers: 500, QualifyingOrders: 500}
@@ -840,7 +812,6 @@ func TestReadSeesOneSnapshotEvenWhenARecomputeCommitsBetweenPages(t *testing.T) 
 	if rec.ComputedAt == nil || !rec.ComputedAt.Equal(snapshotA) {
 		t.Fatalf("ComputedAt=%v belongs to a different snapshot than the rows (want %v)", rec.ComputedAt, snapshotA)
 	}
-	// 下一次讀取看見新的快照：店 120 第一。
 	next, err := x.module.RecommendedSellers(ctx, 5)
 	if err != nil {
 		t.Fatal(err)

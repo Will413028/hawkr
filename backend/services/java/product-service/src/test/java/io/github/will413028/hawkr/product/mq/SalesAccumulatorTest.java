@@ -62,7 +62,6 @@ class SalesAccumulatorTest {
     @Test
     @DisplayName("同 order_no 連續兩次：sales_count 只累計一次")
     void sameOrderNoTwiceAccumulatesOnce() {
-        // 第一次 claim 成功、第二次（redelivery）NO-OP
         when(dedupRepository.insertIfAbsent(ORDER_NO)).thenReturn(1, 0);
 
         boolean first = accumulator.applyAll(ORDER_NO, ITEMS);
@@ -70,7 +69,6 @@ class SalesAccumulatorTest {
 
         assertThat(first).isTrue();
         assertThat(second).isFalse();
-        // 每個商品僅被累計一次（第二次 redelivery 完全不觸及 increment）
         verify(productRepository, times(1)).incrementSalesCount(eq(100L), anyInt());
         verify(productRepository, times(1)).incrementSalesCount(eq(200L), anyInt());
     }

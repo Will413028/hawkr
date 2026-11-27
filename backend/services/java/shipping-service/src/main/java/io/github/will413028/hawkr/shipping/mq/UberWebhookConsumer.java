@@ -70,13 +70,10 @@ public class UberWebhookConsumer {
 
             byte[] rawBody = env.rawBody();
             if (rawBody == null || rawBody.length == 0) {
-                // 🔴 這不是「內容為空」而是「契約壞了」：JSON provider 的信封一定帶 raw body。
-                //    丟出去 → 重試 → DLQ，而不是靜默 ACK —— 靜默 ACK 的症狀是「事件消失且無人知曉」。
                 throw new IllegalStateException("Uber envelope 缺少 raw body，eventKey=" + env.eventKey());
             }
             InboundPayload payload = InboundPayload.ofJson(rawBody, env.headers());
 
-            // 我方識別碼 → 定位配送單 → 取該 provider 的 inbound 能力（與 PayUni 同一個入口）。
             String externalId = UberWebhookCorrelation.externalIdOf(rawBody);
             if (externalId.isEmpty()) {
                 throw new IllegalStateException(
@@ -86,9 +83,6 @@ public class UberWebhookConsumer {
 
             Optional<InboundCapability> inbound = shippingService.inboundFor(externalId);
             if (inbound.isEmpty()) {
-                // 兩種可能：① 配送單還沒建（回調早於建單的 race）② 該 provider 沒有 inbound 能力。
-                // 🔴 都<b>不</b>能靜默 ACK：①要重試、②是我方漏接線。
-                //    交給 MqErrorHandler：重試 3 次仍不行就進 DLQ（可 re-drive、且 DLQ 有告警）。
                 throw new IllegalStateException(
                         "查無配送單或該 provider 無 inbound 能力，externalId=" + externalId
                                 + " eventKey=" + env.eventKey());
@@ -102,8 +96,6 @@ public class UberWebhookConsumer {
                 return;
             }
 
-            // 正規化由 adapter 做；未知值的 fail-closed 由 ShippingService 統一處置。
-            // 狀態轉移合法性（含亂序）由 applyInboundStatus 內的 isValidTransition 判定。
             shippingService.applyInboundStatus(externalId, ingress.parseStatusEvent(payload));
             recordDedup(eventKey, externalId);
 

@@ -216,7 +216,6 @@ void main() {
     final indicator = tester.getRect(
       find.byKey(const ValueKey('buyer-bottom-nav-indicator')),
     );
-    // The Web-matched spring is intentionally allowed a small overshoot.
     expect(indicator.center.dx, closeTo(orderItem.center.dx, 8));
 
     await tester.pump(const Duration(milliseconds: 1));

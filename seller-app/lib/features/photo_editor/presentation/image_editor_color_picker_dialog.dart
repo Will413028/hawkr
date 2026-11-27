@@ -44,7 +44,6 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 標題列
             Padding(
               padding: EdgeInsets.fromLTRB(20.w, 16.h, 12.w, 12.h),
               child: Row(
@@ -66,7 +65,6 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                 ],
               ),
             ),
-            // 色板標籤（單色）
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20.w),
               child: Row(
@@ -93,7 +91,6 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
               ),
             ),
             SizedBox(height: 16.h),
-            // 飽和度/亮度選擇區域
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20.w),
               child: _SaturationBrightnessPicker(
@@ -109,7 +106,6 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
               ),
             ),
             SizedBox(height: 16.h),
-            // 色相滑桿
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20.w),
               child: _HueSlider(
@@ -118,7 +114,6 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
               ),
             ),
             SizedBox(height: 16.h),
-            // 當前顏色預覽
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20.w),
               child: Row(
@@ -147,7 +142,6 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
               ),
             ),
             SizedBox(height: 20.h),
-            // 確認按鈕
             Padding(
               padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
               child: SizedBox(
@@ -256,15 +250,12 @@ class _SaturationBrightnessPainter extends CustomPainter {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(12.r));
 
-    // 裁剪為圓角矩形
     canvas.save();
     canvas.clipRRect(rrect);
 
-    // 繪製純色背景
     final baseColor = HSVColor.fromAHSV(1.0, hue, 1.0, 1.0).toColor();
     canvas.drawRect(rect, Paint()..color = baseColor);
 
-    // 繪製水平白色漸層（從白到透明）
     canvas.drawRect(
       rect,
       Paint()
@@ -275,7 +266,6 @@ class _SaturationBrightnessPainter extends CustomPainter {
         ).createShader(rect),
     );
 
-    // 繪製垂直黑色漸層（從透明到黑）
     canvas.drawRect(
       rect,
       Paint()
@@ -288,7 +278,6 @@ class _SaturationBrightnessPainter extends CustomPainter {
 
     canvas.restore();
 
-    // 繪製邊框
     canvas.drawRRect(
       rrect,
       Paint()
@@ -368,7 +357,6 @@ class _HueSliderPainter extends CustomPainter {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(16.r));
 
-    // 繪製彩虹漸層
     final colors = List.generate(
       7,
       (i) => HSVColor.fromAHSV(1.0, i * 60.0, 1.0, 1.0).toColor(),
@@ -379,7 +367,6 @@ class _HueSliderPainter extends CustomPainter {
       Paint()..shader = LinearGradient(colors: colors).createShader(rect),
     );
 
-    // 繪製邊框
     canvas.drawRRect(
       rrect,
       Paint()

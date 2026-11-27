@@ -14,5 +14,5 @@ public record SellerShippingMethodSlot(
         boolean onboardingRequired,
         String onboardingStatus,
         Long onboardingId,
-        String enabled        // "true" / "false" / ""（未建店）
+        String enabled
 ) {}

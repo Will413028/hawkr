@@ -45,11 +45,8 @@ export default function AppProviders({
 	messages,
 }: AppProvidersProps) {
 	const appLocale = isAppLocale(locale) ? locale : defaultLocale;
-	// 瀏覽器端 React 之外的程式（沒傳語系的 Connect 呼叫、硬導覽）讀這個；idempotent，server 端是空操作。
 	setActiveLocale(appLocale);
 	const [queryClient] = React.useState(createAppQueryClient);
-	// connect-query 的讀取（useQuery(方法, 輸入)）走這個 transport：依 service 分派，*AppService 帶登入
-	// 憑證，公開的 service 不帶（lib/connect/transport.ts 的 browserTransport）。
 	const [transport] = React.useState(() =>
 		browserTransport({ locale: appLocale }),
 	);
@@ -69,15 +66,12 @@ export default function AppProviders({
 							<TransportProvider transport={transport}>
 								{children}
 							</TransportProvider>
-							{/* AppOverlayHost 讀 usePathname()（render 期讀路由屬 dynamic）——
-						    比照 components/shared/RootDocument.tsx 其他 usePathname chrome，包 <Suspense> 讓
-						    靜態外殼可 prerender，dynamic 部分延後，避免 prerender 失敗。 */}
+
 							<React.Suspense fallback={null}>
 								<AppOverlayHost />
 							</React.Suspense>
 							<AppToaster />
-							{/* 掛載條件走共用開關而非各自寫 NODE_ENV：本機 E2E 要能把所有
-						    dev-only 浮動工具一次關掉，量到與 CI 相同的 DOM（web#425）。 */}
+
 							{DEV_OVERLAYS_ENABLED && (
 								<ReactQueryDevtools initialIsOpen={false} />
 							)}

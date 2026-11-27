@@ -36,7 +36,6 @@ type appIdentity interface {
 	CurrentSuspension(ctx context.Context, accountID int64) (identity.AccountSuspension, bool, error)
 }
 
-// buyerProfiles 是頁首顯示資料的來源：買家模組的公開讀取。
 type buyerProfiles interface {
 	Profile(ctx context.Context, accountID int64) (buyer.Profile, error)
 }
@@ -69,7 +68,6 @@ func NewApp(m appIdentity, deletion *accountdeletion.Module, login *AppLogin, no
 	return &App{m: m, deletion: deletion, login: login, now: now, profiles: profiles, images: images, log: log}, nil
 }
 
-// 列表的每頁筆數：一個帳號的有效 session 通常只有幾個。
 const (
 	defaultSessionPageSize = 20
 	maxSessionPageSize     = 100
@@ -108,7 +106,6 @@ func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRe
 		resp.Suspension = h.suspension(ctx, p.ID, at)
 	}
 	if profile, err := h.profiles.Profile(ctx, p.ID); err != nil {
-		// 買家紀錄已關閉（帳號刪除中）是預期狀態：不帶顯示資料，不是錯誤。
 		if apperr.KindOf(err) != apperr.KindNotFound {
 			h.log.ErrorContext(ctx, "GetSession 讀取買家資料失敗，回應不帶顯示資料", "account_id", p.ID, "error", err)
 		}
@@ -121,8 +118,6 @@ func (h *App) GetSession(ctx context.Context, _ *connect.Request[pb.GetSessionRe
 	return connect.NewResponse(resp), nil
 }
 
-// suspension 組停權狀態：時間來自入口認證（A7-D17），政策分類與理由是帳號擁有者有權讀的停權紀錄（A7-D9）。讀不到紀錄（解除與讀取之間的空檔、
-// 讀取失敗）時只帶時間，不讓登入狀態失敗。
 func (h *App) suspension(ctx context.Context, accountID int64, at time.Time) *pb.Suspension {
 	out := &pb.Suspension{SuspendedAt: timestamppb.New(at)}
 	rec, ok, err := h.m.CurrentSuspension(ctx, accountID)
@@ -137,7 +132,6 @@ func (h *App) suspension(ctx context.Context, accountID int64, at time.Time) *pb
 	return out
 }
 
-// caller 回傳登入的帳號與它這次請求所用的 session；interceptor 保證登入的帳號有，沒有是組裝錯誤。
 func caller(ctx context.Context) (identity.Principal, rpc.Session, error) {
 	p, ok := rpc.PrincipalFrom(ctx)
 	s, hasSession := rpc.SessionFrom(ctx)
@@ -179,7 +173,6 @@ func (h *App) LinkIdentity(ctx context.Context, req *connect.Request[pb.LinkIden
 	return connect.NewResponse(&pb.LinkIdentityResponse{}), nil
 }
 
-// sessionCursor 是 ListSessions 上一頁最後一筆的排序鍵（建立時間新到舊，同時間以 ID）。
 type sessionCursor struct {
 	Time time.Time `json:"t"`
 	ID   uuid.UUID `json:"i"`
@@ -187,7 +180,6 @@ type sessionCursor struct {
 
 func (c sessionCursor) Valid() bool { return !c.Time.IsZero() && c.ID != uuid.Nil() }
 
-// after 回報 s 在排序上是不是排在 c 之後（建立時間較舊，或同時間而 ID 較小）。
 func (c sessionCursor) after(s identity.SessionInfo) bool {
 	return s.CreatedAt.Before(c.Time) || s.CreatedAt.Equal(c.Time) && s.ID.Compare(c.ID) < 0
 }
@@ -298,7 +290,6 @@ func (h *App) GetContactEmail(ctx context.Context, _ *connect.Request[pb.GetCont
 	return connect.NewResponse(resp), nil
 }
 
-// setContactEmailPaths 把模組回報的欄位對應到 SetContactEmailRequest 的路徑。
 var setContactEmailPaths = rpc.FieldPaths{"Email": "email"}
 
 // SetContactEmail 設定呼叫者自填的聯絡信箱；帳號已有 provider 驗證過的 email 時回 failed_precondition。
@@ -326,7 +317,6 @@ func contactEmail(c identity.ContactEmail) (*pb.ContactEmail, error) {
 	return &pb.ContactEmail{Email: c.Address, Source: source}, nil
 }
 
-// requireRecentAuthentication 要求最近一次以 provider 驗證的時間 authTime 不早於 now 之前的 ReauthWindow（ASVS；ADR docs/adr/2026-10-30-identity-self-hosted-federated-login.md D7）：不符回 failed_precondition 與 REAUTHENTICATION_REQUIRED。
 func requireRecentAuthentication(authTime, now time.Time) error {
 	if now.Sub(authTime) > identity.ReauthWindow {
 		return apperr.FailedPrecondition("這個操作需要重新登入確認身分").WithReason(apperr.ReasonReauthenticationRequired)

@@ -106,8 +106,6 @@ export function toEpochMs(raw: DateLike): number | null {
 
 	const text = raw.trim();
 
-	// 純數字字串是 epoch（走同一條秒／毫秒判別）。
-	// 先分流才正確：`new Date("1785000000")` 不是 epoch 解析。
 	if (/^-?\d+$/.test(text)) return toEpochMs(Number(text));
 
 	const wall = WALL_CLOCK_RE.exec(text);
@@ -118,10 +116,6 @@ export function toEpochMs(raw: DateLike): number | null {
 		const hour = Number(wall[4] ?? 0);
 		const minute = Number(wall[5] ?? 0);
 		const second = Number(wall[6] ?? 0);
-		// 語法對但值不存在（`2026-02-30` / `2026-13-01` / `08:99`）時 `Date.UTC`
-		// 會靜默進位成另一個看起來很合理的時刻，而舊路徑的 `Date.parse` 對這些
-		// 一律回 NaN。範圍先擋掉時分秒，日期進位再靠下面回讀一次擋掉 —— 兩者
-		// 都做才與舊行為一致，只做一半會讓 `08:99` 悄悄渲染成 `09:39`。
 		if (hour > 23 || minute > 59 || second > 59) return null;
 		const utcMs =
 			Date.UTC(

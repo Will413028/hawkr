@@ -36,8 +36,6 @@ func (s *InvoiceServer) CreateInvoiceCorrection(
 		return nil, status.Errorf(codes.InvalidArgument, "expected_snapshot_version: %v", err)
 	}
 	if req.GetIdempotencyKey() == "" {
-		// 一路傳到 ORD.ReviseOrderInvoiceSnapshotInternal 當冪等鍵；order-service 側
-		// 的 partial unique index 對 NULL 不生效 ⇒ 空的會讓每次重送變成一次新的更正。
 		return nil, status.Errorf(codes.InvalidArgument, "idempotency_key: %v", errEmptyID)
 	}
 
@@ -59,23 +57,15 @@ func (s *InvoiceServer) CreateInvoiceCorrection(
 			CorrectionId: fmtID(out.CorrectionID),
 			HandlingMode: out.HandlingMode,
 			Status:       out.Status,
-			// #3031：端點 11 的回應就是 B06「成功 toast」的來源（58A §B06 逐字：
-			// statusNotice → toast 的 body）。兩個生產者共用同一張表，
-			// 不在這裡另寫一句——兩份文案必然漂移。
 			StatusNotice:     usecase.CorrectionStatusNotices[out.Status],
 			RejectReasonCode: out.RejectReason,
 		},
 	}, nil
 }
 
-// correctionError 把三種可辨識失敗折成業務碼，其餘走既有的 bizOf／internal。
-//
-// 🔴 **不要全塞 internal**：這三種買家自己就能處理（稍後再送／重新載入／稍後再送），
-// 而 internal 會讓 B06 只顯示「系統忙碌」——那句話對他沒有任何下一步。
 func (s *InvoiceServer) correctionError(ctx context.Context, err error) (*pb.InvoiceCorrectionResponse, error) {
 	switch {
 	case errors.Is(err, usecase.ErrCorrectionAlreadyInProgress):
-		// 序列閘門（I5）擋下：這張發票已有進行中的修改請求。
 		return &pb.InvoiceCorrectionResponse{
 			Code:    bizcode.InvoiceOperationInProgress,
 			Message: "此發票有處理中的調整，請稍後再試",
@@ -86,16 +76,11 @@ func (s *InvoiceServer) correctionError(ctx context.Context, err error) (*pb.Inv
 			Message: "發票資料已被更新，請重新整理後再試",
 		}, nil
 	case errors.Is(err, usecase.ErrCorrectionDocumentInProgress):
-		// 憑證層：document 在 ISSUING／VOIDING。**不是**婉拒——買家等幾秒再送就能受理。
-		// 2026-09-02 之前這一格會落到 decideCorrectionRoute 的 fallback，
-		// 回 REJECTED ＋ PAST_VOID_DEADLINE（#3020）。
 		return &pb.InvoiceCorrectionResponse{
 			Code:    bizcode.InvoiceOperationInProgress,
 			Message: "此發票正在處理中，請稍後再試",
 		}, nil
 	case errors.Is(err, usecase.ErrCorrectionSendInFlight):
-		// R03 來不及（operation 已 SENDING）、R04 又還不適用（document 尚未 ISSUED）。
-		// §7.3.5 沒有這一格；買家稍後再送就會落到其中一邊。
 		return &pb.InvoiceCorrectionResponse{
 			Code:    bizcode.InvoiceOperationInProgress,
 			Message: "此發票正在開立中，請稍後再試",
@@ -107,13 +92,6 @@ func (s *InvoiceServer) correctionError(ctx context.Context, err error) (*pb.Inv
 	return nil, s.internal(ctx, "invoice.correction.create.failed", err)
 }
 
-// toCheckoutInvoiceSpec 把 proto 的買家發票輸入折成 usecase 的形狀。
-//
-// 沿用 checkout 的型別而不是另立一份：那是本服務唯一一份買家發票輸入的形狀，
-// 兩份會讓驗證規則漂移（而漂移的症狀是「常用資料存得進去，結帳時被擋」）。
-//
-// ⚠️ disclosure 兩欄已於 2026-08-31 從 proto 移除（DEC-20260831-210934），
-// 這裡不再有對應欄位。
 func toCheckoutInvoiceSpec(s *pb.InvoiceInputSpec) usecase.CheckoutInvoiceSpec {
 	if s == nil {
 		return usecase.CheckoutInvoiceSpec{}

@@ -88,7 +88,6 @@ public class SellerSuspendedConsumer {
                         cancelled++;
                     }
                 } catch (Exception e) {
-                    // 單筆失敗記錄續跑其餘，不因單一訂單異常中斷整批（03 §5.1a.2）
                     log.error("SellerSuspendedConsumer.cancelOrder.error",
                             "取消單筆訂單失敗，繼續處理其餘: orderNo=" + orderNo, e);
                 }

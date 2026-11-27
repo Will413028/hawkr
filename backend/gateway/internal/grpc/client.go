@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// getEnvOrDefault delegates to the shared config package.
 func getEnvOrDefault(key, defaultVal string) string {
 	return config.GetEnvOrDefault(key, defaultVal)
 }

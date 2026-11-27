@@ -162,7 +162,6 @@ test("a hard navigation goes through commitDocumentNavigation, which adds the la
 test("no plain anchor, form action, window.open or history write holds a literal root-relative page path", async () => {
 	const offenders: string[] = [];
 	for (const { file, code } of await allSources()) {
-		// cheap filter before parsing the whole tree
 		if (
 			!/<a\b|<form\b|\bopen\s*\(|history\s*\.\s*(?:push|replace)State/.test(
 				code,
@@ -184,7 +183,6 @@ test("no plain anchor, form action, window.open or history write holds a literal
 });
 
 test("the literal-path scan catches every spelling it is meant to catch, and only page paths", () => {
-	// `@{` stands for a template placeholder (a literal one in a plain string trips a lint rule)
 	const scan = (code: string) =>
 		findLiteralPathSinks("probe.tsx", code.replaceAll("@{", "${"));
 	const caught = [

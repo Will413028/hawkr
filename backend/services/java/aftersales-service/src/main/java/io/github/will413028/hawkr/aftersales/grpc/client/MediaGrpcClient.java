@@ -67,7 +67,6 @@ public class MediaGrpcClient {
 
     public LinkImagesResponse linkImages(String refType, String refId, List<Long> assetIds) {
         log.info("MediaGrpcClient.linkImages.start", "連結圖片, refType=" + refType, "refId", refId);
-        // LinkImagesRequest.asset_ids 為 repeated string（Proto 數字欄位一律 string）
         List<String> assetIdStrings = assetIds.stream()
                 .map(String::valueOf)
                 .toList();

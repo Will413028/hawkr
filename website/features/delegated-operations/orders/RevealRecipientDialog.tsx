@@ -38,8 +38,6 @@ export default function RevealRecipientDialog({
 	const tooLong = trimmed.length > OPERATION_REASON_MAX;
 	const canSubmit = trimmed.length > 0 && !tooLong && !submitting;
 
-	// 每次開啟都從空白開始：理由是逐次揭露的，沿用上一次的字串等於讓稽核紀錄
-	// 記下一個操作者這一次並沒有想過的理由。
 	React.useEffect(() => {
 		if (open) setReason("");
 	}, [open]);
@@ -74,9 +72,7 @@ export default function RevealRecipientDialog({
 			}
 		>
 			<div className="adm-reveal-form">
-				{/* ⚠️ 整句放進字串表達式，不要直接寫成跨行的 JSX 文字節點：JSX 會把兩行
-				    之間的換行＋縮排折成一個半形空白，於是全形逗號後面憑空多一個空格
-				    （「寫入代行紀錄，␣並計入」）。中文沒有詞間空白，多出來的那一個看得出來。 */}
+
 				<p className="adm-reveal-form__hint">
 					{
 						"這是本次代行唯一會取得未遮罩收件資訊的動作，會以高風險等級寫入代行紀錄，並計入結束摘要的風險操作次數。請寫下需要查看的理由。"

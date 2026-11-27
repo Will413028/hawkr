@@ -24,7 +24,6 @@ const manifest = loadManifest();
 const SELLER = "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 const MEASURE_KIND = "hawkr.seller.v1alpha1.MeasureKind";
 
-// 單端的 enum：不在目錄、不是伺服器擁有的。
 const single = manifest.find(
 	(e) => !e.inCatalog && !e.serverOwned && e.tsModule && e.tsName,
 );
@@ -163,7 +162,6 @@ describe("規則 E：三元式與短路", () => {
 export const b = (k: E) => k !== E.SUSPENSION || "停權";
 export const c = (k: E) => <p>{k === E.TERMINATION && <b>終止</b>}</p>;`),
 		).toEqual(["and:WARNING@1", "or:SUSPENSION@2", "and:TERMINATION@3"]);
-		// 補集：=== 的 ||、!== 的 &&。
 		expect(
 			scan(`export const a = (k: E) => k === E.WARNING || "其他";
 export const b = (k: E) => k !== E.SUSPENSION && "其他";`),
@@ -425,7 +423,6 @@ export const c = (k: E) => (k === E.TERMINATION ? M : "");`,
 				consts,
 			),
 		).toEqual(["ternary:WARNING@1"]);
-		// 沒有 resolver：只看同檔，匯入的不算。
 		expect(
 			scan(`export const a = (k: E) => (k === E.WARNING ? T : "");`, pre),
 		).toEqual([]);

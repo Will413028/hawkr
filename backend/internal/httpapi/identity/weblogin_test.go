@@ -25,7 +25,6 @@ type storedFlow struct {
 	flow     identity.LoginFlow
 }
 
-// fakeModule 照 identity 模組的契約實作登入流程：state 單次使用，不論成敗都已刪除；provider 與登入前 cookie 不符回 Unauthenticated。
 type fakeModule struct {
 	n          int
 	flows      map[string]storedFlow
@@ -87,7 +86,6 @@ func (m *fakeModule) Login(_ context.Context, in identity.LoginInput) (identity.
 type fakeProvider struct {
 	p      identity.Provider
 	issuer string
-	// requiresIssuer 是這家的授權回應一定帶 iss（Google）。
 	requiresIssuer bool
 	identity       identity.ProviderIdentity
 	err            error
@@ -195,7 +193,6 @@ func wantError(t *testing.T, rec *httptest.ResponseRecorder, code string) {
 	}
 }
 
-// startFlow 走一次 start，回傳 provider 授權網址上的 state 與登入前 cookie。
 func (e *env) startFlow(t *testing.T, provider, returnTo string) (state string, binding *http.Cookie) {
 	t.Helper()
 	target := "GET /api/auth/" + provider + "/start"
@@ -211,7 +208,6 @@ func (e *env) startFlow(t *testing.T, provider, returnTo string) (state string, 
 	return u.Query().Get("state"), binding
 }
 
-// callbackURL 組 callback 的請求；Google 的授權回應一定帶 iss，q 沒有時補上正確的。
 func callbackURL(provider string, q url.Values) string {
 	if provider == "google" && !q.Has("iss") {
 		q = maps.Clone(q)
@@ -248,7 +244,6 @@ func TestStartRedirectsToTheProviderWithAShortLivedPreLoginCookie(t *testing.T) 
 	if got := e.m.flows["state-1"].flow.LinkAccountID; got != nil {
 		t.Fatalf("登入的流程不帶連結帳號：%v", *got)
 	}
-	// 每家 provider 用自己的路徑與授權端點。
 	if u := location(t, e.do(t, "GET /api/auth/line/start", nil)); u.Host != "line.test" {
 		t.Fatalf("LINE 的授權網址 = %s", u)
 	}
@@ -407,7 +402,6 @@ func TestCallbackRefusesAMissingOrWrongPreLoginCookie(t *testing.T) {
 		if len(e.google.exchanges) != 0 || len(e.m.logins) != 0 {
 			t.Errorf("%s：拒絕前不能換 token 或登入", name)
 		}
-		// 流程已作廢：同一個 state 配上正確的 cookie 也不行。
 		retry := e.do(t, callbackURL("google", url.Values{"state": {state}, "code": {"c"}}), func(r *http.Request) { r.AddCookie(binding) })
 		wantError(t, retry, ErrorInvalidFlow)
 	}
@@ -584,7 +578,6 @@ func TestEachProviderSignsInThroughItsOwnRoutes(t *testing.T) {
 	}
 }
 
-// asAccount 讓請求帶著 withSession 解析好的登入帳號。
 func asAccount(id int64) func(*http.Request) {
 	return func(r *http.Request) {
 		*r = *r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: id}))

@@ -44,7 +44,6 @@ class AuthController extends _$AuthController {
     }
   }
 
-  // ─────────────────────── internals ───────────────────────
 
   /// 登入之後：GetSession 取得帳號、寫入 session。
   Future<void> _completeSignIn(AuthSession authSession) async {
@@ -73,7 +72,6 @@ class AuthController extends _$AuthController {
     await ref
         .read(sessionProvider.notifier)
         .login(userId: account.accountId, suspension: account.suspension);
-    // GetSession 沒有個人資料，暱稱從 GET /app/buyers/me 讀 — 失敗不影響登入。
     try {
       final nickname = await ref.read(sessionProvider.notifier).fetchNickname();
       if (nickname != null) {

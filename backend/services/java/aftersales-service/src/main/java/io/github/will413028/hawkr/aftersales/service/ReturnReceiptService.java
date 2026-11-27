@@ -89,7 +89,6 @@ public class ReturnReceiptService {
             AfterSaleCaseStatus.RETURN_FAILED.value()
     );
 
-    // ==================== tx 外的身分反解（issue #2294 B5/B6/B7） ====================
 
     /**
      * 排程路徑用：在<b>進 tx 之前</b>解析事件身分欄位，strict 語意。
@@ -139,10 +138,8 @@ public class ReturnReceiptService {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_NOT_OWNER);
         }
 
-        // §10 凍結檢查：申訴中禁止賣家確認收貨
         caseService.assertNotUnderAppeal(caseEntity);
 
-        // §5.3.7 前置：必須 PayUni 通知送達後才能 confirm（status=27）
         if (!AfterSaleCaseStatus.RETURN_DELIVERED.value().equals(caseEntity.getStatus())) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
         }
@@ -157,11 +154,9 @@ public class ReturnReceiptService {
             hasDeduction = actualRefundAmount < originalRefundAmount;
         }
 
-        // Media finalize（TX 外 side-effect，失敗則整個請求失敗）
         evidenceService.finalizeAndInsert(caseNo, storeId, inspectionPhotoTokens,
                 AfterSaleEvidenceType.INSPECTION_PHOTO.value());
 
-        // §2.1 INV-3 樂觀鎖：WHERE status='27'
         if (caseMapper.markReturnReceived(caseNo) == 0) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
         }
@@ -170,13 +165,11 @@ public class ReturnReceiptService {
             insertInspectionDeduction(caseNo, finalRefundAmount, deductionReason, inspectionNote, storeId);
         }
 
-        // outcome 由 caller scope 已決定：扣款 → PARTIAL_REFUND；無扣款 → FULL_REFUND
         AfterSalePlatformDecisionOutcome outcome = hasDeduction
                 ? AfterSalePlatformDecisionOutcome.PARTIAL_REFUND
                 : AfterSalePlatformDecisionOutcome.FULL_REFUND;
         String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, finalRefundAmount, outcome);
 
-        // §5.3.7 audit + event（SELLER 路徑）
         Map<String, Object> auditExtra = baseAuditExtra(originalRefundAmount, finalRefundAmount, hasDeduction,
                 deductionReason, inspectionPhotoTokens, caseEntity);
         auditService.log(caseNo, null, storeId, AfterSaleAuditActor.SELLER.value(),
@@ -186,9 +179,6 @@ public class ReturnReceiptService {
                 "賣家確認收貨完成, finalRefundAmount=" + finalRefundAmount
                         + ", hasDeduction=" + hasDeduction, "caseNo", caseNo);
 
-        // issue #2294 B5/B6/B7：改用帶 principals 的零 gRPC 多載（反解已在 tx 外做完）。
-        // 回傳值<b>刻意忽略</b>＝維持既有 best-effort 語意：CASE_RETURN_RECEIVED 遺失只是少一則通知，
-        // 不值得讓賣家的確認收貨整筆失敗。
         afterSalesEventPublisher.tryPublishCaseTransitionWithContext(
                 AfterSalesEventType.CASE_RETURN_RECEIVED.value(),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_RECEIVED,
@@ -230,7 +220,6 @@ public class ReturnReceiptService {
             return false;
         }
 
-        // 系統自動確認固定全額退款（§5.3.10.1）
         String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, originalRefundAmount,
                 AfterSalePlatformDecisionOutcome.FULL_REFUND);
 
@@ -249,9 +238,6 @@ public class ReturnReceiptService {
         extra.put("shipping_method", caseEntity.getReturnShippingMethod());
         extra.put("deadline_at", caseEntity.getAutoConfirmAt() != null ? caseEntity.getAutoConfirmAt().toString() : null);
 
-        // issue #2294 B5：status='32' 是永久轉換，publish 失敗即事件永久遺失
-        // ⇒ 改用會傳遞失敗的變體，失敗即拋 → 本方法的 @Transactional rollback → 下一 tick 重來。
-        // 帶 principals 的多載＝tx 內零 gRPC（反解由 scheduler 在 tx 外先做）。
         boolean published = afterSalesEventPublisher.tryPublishCaseTransitionWithContext(
                 AfterSalesEventType.CASE_AUTO_COMPLETED_CONFIRM_RECEIPT_TIMEOUT.value(),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_AUTO_COMPLETED_CONFIRM_RECEIPT_TIMEOUT,
@@ -295,7 +281,6 @@ public class ReturnReceiptService {
             return false;
         }
 
-        // 超商門市逾時自動完成固定全額退款（§5.3.10.2）
         String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, originalRefundAmount,
                 AfterSalePlatformDecisionOutcome.FULL_REFUND);
 
@@ -317,8 +302,6 @@ public class ReturnReceiptService {
         extra.put("deadline_at",
                 caseEntity.getStorePickupDeadlineAt() != null ? caseEntity.getStorePickupDeadlineAt().toString() : null);
 
-        // issue #2294 B6：與 B5 逐字同形（status='31' 永久轉換），兩處必須一起改，
-        // 否則同一支 service 會出現兩種保證等級
         boolean published = afterSalesEventPublisher.tryPublishCaseTransitionWithContext(
                 AfterSalesEventType.CASE_AUTO_COMPLETED_STORE_PICKUP_TIMEOUT.value(),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_AUTO_COMPLETED_STORE_PICKUP_TIMEOUT,
@@ -370,7 +353,6 @@ public class ReturnReceiptService {
             insertInspectionDeduction(caseNo, finalRefundAmount, deductionReason, null, adminAccountId);
         }
 
-        // Admin 強制確認：扣款 → PARTIAL_REFUND；無扣款 → FULL_REFUND
         AfterSalePlatformDecisionOutcome outcome = hasDeduction
                 ? AfterSalePlatformDecisionOutcome.PARTIAL_REFUND
                 : AfterSalePlatformDecisionOutcome.FULL_REFUND;
@@ -390,7 +372,6 @@ public class ReturnReceiptService {
                 "Admin 強制確認收貨, priorStatus=" + priorStatus
                         + ", finalRefundAmount=" + finalRefundAmount, "caseNo", caseNo);
 
-        // issue #2294 B5/B6/B7：同 confirmReceipt——零 gRPC 多載 ＋ 回傳值刻意忽略（維持 best-effort）
         afterSalesEventPublisher.tryPublishCaseTransitionWithContext(
                 AfterSalesEventType.CASE_RETURN_RECEIVED.value(),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_RECEIVED,
@@ -405,7 +386,6 @@ public class ReturnReceiptService {
     public record ForceConfirmResult(String caseNo, String priorStatus,
                                       String refundTaskId, Long finalRefundAmount) {}
 
-    // ==================== private helpers ====================
 
     private AfterSaleCaseEntity loadCase(String caseNo) {
         AfterSaleCaseEntity caseEntity = caseMapper.selectOne(

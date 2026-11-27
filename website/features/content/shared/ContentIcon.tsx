@@ -11,7 +11,6 @@ export default function ContentIcon({
 	icon: string;
 	stroke?: string;
 }) {
-	// aria-hidden is written literally on each <svg> rather than spread in:
 	// Biome's noSvgWithoutTitle only sees statically-present attributes.
 	const common = {
 		width: 20,

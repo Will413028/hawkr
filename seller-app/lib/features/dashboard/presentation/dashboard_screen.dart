@@ -75,9 +75,6 @@ class DashboardScreen extends HookConsumerWidget {
           .refresh(fresh: fresh, maxAge: maxAge);
     }
 
-    // 畫面是否看得到由 widget 樹決定（主導航的分頁被隱藏、或被不透明頁面蓋住時看不到）。第一次開啟與從看不到變成
-    // 看得到時重讀，30 秒內讀過就不讀（同錢包的 statusStaleTime）。
-    // 隱藏期間收到訂單推播時記下「儀表板已過期」，變成看得到時就讀最新的（不套用 30 秒略過）。
     final staleWhileHidden = useRef(false);
     final visible = useOnBecameVisible(() {
       final stale = staleWhileHidden.value;
@@ -94,7 +91,6 @@ class DashboardScreen extends HookConsumerWidget {
         (event) {
           debugPrint('[Dashboard] Order event received: ${event.eventType}');
           ref.invalidate(dashboardChatUnreadProvider);
-          // 看得到就立刻讀最新的；被隱藏的分頁（IndexedStack 仍在）不讀，等變成看得到時再讀。
           if (visibleNow.value) {
             unawaited(latestReload.value(fresh: true));
           } else {
@@ -129,7 +125,6 @@ class DashboardScreen extends HookConsumerWidget {
       ref.invalidate(dashboardChatUnreadProvider);
       ref.invalidate(dashboardNotificationUnreadProvider);
       ref.invalidate(shipmentAnomalyStatsProvider);
-      // 終止預告卡讀預定生效的措施（帳號層級）：下拉時一併重讀，伺服器剛撤銷或生效的預告才會消失。
       final accountId = signedInAccountId(ref.read(sessionProvider));
       final scheduledProvider = accountId == null
           ? null
@@ -139,7 +134,6 @@ class DashboardScreen extends HookConsumerWidget {
         HKLog.logW('[Dashboard] pull refresh: dashboard read threw: $error');
         return false;
       });
-      // 其他資料讀不到不影響儀表板的提示，也不讓 refresh() 丟出例外（下拉只要等它們讀完）。
       try {
         await Future.wait([
           ref.read(sellerStatusRefreshProvider.notifier).refresh(),
@@ -151,7 +145,6 @@ class DashboardScreen extends HookConsumerWidget {
       } catch (error) {
         HKLog.logW('[Dashboard] pull refresh: other reads failed: $error');
       }
-      // 下拉讀取失敗才提示（null 是店家還沒讀到、沒有東西可讀，不是失敗）；背景重讀與第一次讀取失敗另有頂端的錯誤區塊，不提示。
       if (await dashboardRead == false && context.mounted) {
         FloatingToast.error(context, dashboardRefreshFailedNotice);
       }
@@ -161,7 +154,6 @@ class DashboardScreen extends HookConsumerWidget {
       await context.push(ProductRoutes.picker);
     }
 
-    // 店家還沒讀到（沒有 storeId）時儀表板也還沒開始讀：和第一次讀取一樣顯示讀取中，不是一頁「—」。
     final Widget? status = dashboard != null
         ? null
         : dashboardAsync != null &&
@@ -537,8 +529,6 @@ class DashboardOverviewContent extends StatelessWidget {
                 icon: HkIconName.truck,
                 onTap: () => onOpenOrderTab(1),
               ),
-              // 「已結束」不是「已完成」：這個數字含已取消、全額退款，不是成交數。
-              // 顯示名與訂單列表 tab 共用 sellerOrderTabLabels（理由見 order_tab_mapper.dart）。
               _OrderData(
                 label: sellerOrderTabLabels[2],
                 value: count((c) => c.closedCount),
@@ -760,8 +750,6 @@ class _RevenueCard extends StatelessWidget {
               textDirection: Directionality.of(context),
               textScaler: MediaQuery.textScalerOf(context),
             )..layout();
-            // The amount and weekly comparison must each retain their natural
-            // width. A phone, large text, or a longer amount can trigger reflow.
             final inlineWidth =
                 44 +
                 HkSpace.md +

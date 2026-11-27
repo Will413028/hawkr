@@ -26,7 +26,6 @@ type Buyers interface {
 	Existing(ctx context.Context, ids []int64) ([]int64, error)
 }
 
-// buyerExists 回報買家是否存在；寫入在 ctx 的 transaction 內讀取，與刪帳的提交排序。
 func (s *Service) buyerExists(ctx context.Context, buyerID int64) (bool, error) {
 	got, err := s.d.Buyers.Existing(ctx, []int64{buyerID})
 	if err != nil {
@@ -40,7 +39,6 @@ func (s *Service) buyerExists(ctx context.Context, buyerID int64) (bool, error) 
 	return false, nil
 }
 
-// requireBuyer 在買家不存在（已刪帳或從未存在）時回 InvalidInput。
 func (s *Service) requireBuyer(ctx context.Context, buyerID int64) error {
 	ok, err := s.buyerExists(ctx, buyerID)
 	if err != nil {
@@ -76,8 +74,6 @@ func (s *Service) logOp(ctx context.Context, q *store.Queries, p store.InsertLog
 	return q.InsertLog(ctx, p)
 }
 
-// isOrderNoConflict 回報 err 是不是 vouchers_order_no_key 的唯一鍵衝突：同一筆訂單並發鎖兩張不同的券時，後到的撞上它。
-// 衝突發生在 lockVoucher 的 savepoint 內，回滾到 savepoint 後呼叫方的 transaction 仍可使用。
 func isOrderNoConflict(err error) bool {
 	var pg *pgconn.PgError
 	return errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == "vouchers_order_no_key"
@@ -144,8 +140,6 @@ func (s *Service) Claim(ctx context.Context, campaignID uuid.UUID, buyerID int64
 	return res, err
 }
 
-// create 遞增發行數並建立一張券；呼叫方已鎖住活動列。遞增的 WHERE 條件（ACTIVE、不超過總量）是唯一的上限守門：
-// 回 0 列就是 ReasonIssueLimitReached。
 func (s *Service) create(ctx context.Context, q *store.Queries, campaignID uuid.UUID, buyerID int64, origin model.Origin, srcType, srcID *string, now time.Time) (model.Voucher, error) {
 	n, err := q.IncrementIssued(ctx, store.IncrementIssuedParams{ID: campaignID, Count: 1, Now: now})
 	if err != nil {
@@ -458,7 +452,6 @@ func (s *Service) Quote(ctx context.Context, in LockInput) (LockResult, error) {
 	return res, err
 }
 
-// availability 對已經不是 AVAILABLE 的券回對應的原因：被別的訂單鎖著、已核銷或已作廢。AVAILABLE 回 nil。
 func availability(ctx context.Context, v store.CouponCouponVoucher) error {
 	if st := model.VoucherStatus(v.Status); st == model.VoucherAvailable {
 		return nil
@@ -551,8 +544,6 @@ func (s *Service) lock(ctx context.Context, in LockInput) (LockResult, error) {
 	return LockResult{Voucher: rows.Voucher(fresh), Discount: discount}, nil
 }
 
-// lockVoucher 在 savepoint 內執行鎖定的 UPDATE：失敗（含 order_no 的唯一鍵衝突）就回滾到 savepoint，
-// 呼叫方的 transaction 不會被 Postgres 中止，之後還能下 SQL 或 commit。
 func (s *Service) lockVoucher(ctx context.Context, p store.LockVoucherParams) (store.LockVoucherRow, error) {
 	tx, ok := db.TxFrom(ctx)
 	if !ok {
@@ -575,7 +566,6 @@ func (s *Service) lockVoucher(ctx context.Context, p store.LockVoucherParams) (s
 	return v, nil
 }
 
-// lostLock 處理條件式 UPDATE 沒有更新任何列：重讀券，同一筆訂單已持有（並發的重送）是冪等成功，否則回券現在的狀態對應的原因。
 func (s *Service) lostLock(ctx context.Context, q *store.Queries, id uuid.UUID, in LockInput, discount int64) (LockResult, error) {
 	cur, err := q.GetVoucher(ctx, id)
 	if err != nil {

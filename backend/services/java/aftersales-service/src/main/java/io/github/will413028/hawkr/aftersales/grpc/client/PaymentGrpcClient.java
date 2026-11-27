@@ -93,8 +93,6 @@ public class PaymentGrpcClient {
 
     public CreateRefundResponse createRefund(String tradeNo, String amount, String reason, String refundNo) {
         log.info("PaymentGrpcClient.createRefund.start", "執行退款", "tradeNo", tradeNo);
-        // deadline 加在**呼叫點**而非 GrpcStubFactory：後者是 observability-common 的共用元件，
-        // 動它會一次改掉全 repo 所有 Java gRPC 呼叫的逾時語意（遠超本 issue 範圍）。
         var stub = grpcStubFactory.blocking("payment", PaymentServiceGrpc::newBlockingStub)
                 .withDeadlineAfter(CREATE_REFUND_DEADLINE_SEC, TimeUnit.SECONDS);
         var resp = stub.createRefund(

@@ -48,14 +48,11 @@ ShippingPresentation shippingPresentationOf(String? rawShippingMethod) {
       ShippingMethod.fromValue(raw) ??
       ShippingMethod.fromCode(raw.toUpperCase());
 
-  // 🔴 刻意不寫 `default` / `_`：CodeMeta 新增成員時這裡要編譯失敗。
   return switch (method) {
     ShippingMethod.taqbin => ShippingPresentation.homeDelivery,
     ShippingMethod.sevenElevenStorePickup =>
       ShippingPresentation.cvsStorePickup,
-    // 3003 Uber 即時配送：功能已刪除（ADR 2026-10-27-general-ecommerce-scope-cut D4）。
     ShippingMethod.uberInstant => ShippingPresentation.unsupported,
-    // 3005 商家自行配送：RFQ 訂單的站外業者自行出貨，無外部 provider API。
     ShippingMethod.merchantDelivery => ShippingPresentation.unsupported,
     null => ShippingPresentation.unsupported,
   };

@@ -26,7 +26,6 @@ import {
  *   反向 — 舊欄位名在 wire 上**確實不存在**（否則「兩個名字都讀」的相容層照樣會通過）
  */
 
-// 申訴案：appeal_state=10，2 張買家舉證（8601），無賣家驗貨照。
 const APPEAL_CASE = {
 	adminContext: {
 		buyerAppealReason: "不同意賣家拒絕理由",
@@ -127,7 +126,6 @@ const APPEAL_CASE = {
 	},
 } as unknown as DisputeDetail;
 
-// 售後案：無申訴，1 張買家舉證（8601）+ 2 張賣家驗貨照（8602）。
 const INSPECTION_CASE = {
 	adminContext: {
 		buyerAppealReason: "",
@@ -310,7 +308,6 @@ test("申訴時間只能從 arbitration.timeline 取 —— caseDetail 沒有這
 		selectAppealSubmittedAt(APPEAL_CASE.arbitration),
 		"2026-08-04T08:04:51.011503Z",
 	);
-	// 沒有 timeline / arbitration 時不炸，回空字串讓畫面顯示 "-"。
 	assert.equal(selectAppealSubmittedAt(undefined), "");
 });
 
@@ -350,9 +347,6 @@ test("頭像/logo 有成對的 Key 欄位可讀（避免拿 /i/original/ URL 再
 	assert.ok(ctx.logoUrl.includes(`/i/original/${ctx.logoKey}`));
 });
 
-// 反向：頭像欄位收斂（49 §6.6）後，帶主體前綴的舊名在 wire 上必須真的消失。
-// 少了這條，把頁面改回讀 buyerAvatarKey 仍會全綠（型別是我們自己宣告的），
-// 而畫面上的買家頭像會是空框 —— 正是本檔開頭那個 bug 的形狀。
 test("adminContext 的頭像只有 avatarKey/avatarUrl —— buyerAvatar* 舊名不存在", () => {
 	for (const ctx of [APPEAL_CASE.adminContext, INSPECTION_CASE.adminContext]) {
 		assert.ok("avatarKey" in ctx, "缺 avatarKey（SSOT objectKey）");
@@ -363,7 +357,6 @@ test("adminContext 的頭像只有 avatarKey/avatarUrl —— buyerAvatar* 舊�
 			"wire 竟然有 buyerAvatarKey —— 舊欄位復活了",
 		);
 		assert.equal("buyerAvatarUrl" in ctx, false);
-		// 同物件裡的賣家 logo 維持 logoKey/logoUrl，收斂不該把兩個主體撞在一起。
 		assert.notEqual(ctx.avatarKey, ctx.logoKey);
 	}
 });

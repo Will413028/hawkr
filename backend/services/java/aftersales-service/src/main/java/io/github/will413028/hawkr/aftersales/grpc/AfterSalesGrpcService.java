@@ -98,13 +98,10 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         this.orderGrpcClient = orderGrpcClient;
     }
 
-    // ==================== 買家端 ====================
 
     @Override
     public void createAfterSaleCase(CreateAfterSaleCaseRequest request,
                                      StreamObserver<CreateAfterSaleCaseResponse> observer) {
-        // #1871 OBS-09：order_no 進 MDC，讓這個方法內所有 log 行都能被 Loki structured
-        // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml）。
         MDC.put("order_no", request.getOrderNo());
         try {
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
@@ -166,7 +163,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .setPage(String.valueOf(result.getCurrent()))
                     .setPageSize(String.valueOf(result.getSize()));
 
-            // 收斂規範 §6.3：批次解析 provider 狀態（REFUND_PROCESSING 讀本地 / RETURN_SHIPPING 呼 Shipping batch）
             Map<String, ProviderStatusPair> providerMap =
                     batchResolveCaseProviderStatus(result.getRecords());
             for (AfterSaleCaseEntity entity : result.getRecords()) {
@@ -253,7 +249,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         }
     }
 
-    // ==================== 賣家端 ====================
 
     @Override
     public void getSellerAfterSaleCases(GetSellerAfterSaleCasesRequest request,
@@ -280,7 +275,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .setPage(String.valueOf(result.getCurrent()))
                     .setPageSize(String.valueOf(result.getSize()));
 
-            // 批次取得買家頭像（不快照，列表時即時查詢，與 order-service 列表邏輯一致）
             List<Long> buyerIds = result.getRecords().stream()
                     .map(AfterSaleCaseEntity::getBuyerId)
                     .filter(java.util.Objects::nonNull)
@@ -290,7 +284,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     ? java.util.Collections.emptyMap()
                     : buyerGrpcClient.batchGetBuyerDisplayByBuyerIds(buyerIds);
 
-            // 收斂規範 §6.3：批次解析 provider 狀態
             Map<String, ProviderStatusPair> providerMap =
                     batchResolveCaseProviderStatus(result.getRecords());
             for (AfterSaleCaseEntity entity : result.getRecords()) {
@@ -360,7 +353,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     request.getCouponMessage()
             );
 
-            // 重新查詢最新狀態
             AfterSaleCaseEntity updatedCase = caseService.getCase(request.getCaseNo());
 
             observer.onNext(ResolveAfterSaleCaseResponse.newBuilder()
@@ -386,15 +378,12 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             GrpcAuthContext.requireAccountType(AccountType.SELLER);
             long storeId = request.getStoreId();
 
-            // 解析 optional actualRefundAmount（空字串 = 未傳 = 全額退款）
             Long actualRefundAmount = null;
             String actualRaw = request.getActualRefundAmount();
             if (actualRaw != null && !actualRaw.isBlank()) {
                 actualRefundAmount = ProtoConversionUtils.parseLongRequired(actualRaw, "actualRefundAmount");
             }
 
-            // issue #2294 B7：事件身分反解（無 deadline gRPC）必須發生在 service 的 @Transactional 之外。
-            // API 路徑走 best-effort——賣家按一次「確認收貨」不該因 buyer-service 抖一下就整筆失敗。
             io.github.will413028.hawkr.aftersales.service.EventPrincipals principals =
                     returnReceiptService.resolvePrincipalsForCaseBestEffort(request.getCaseNo());
 
@@ -423,7 +412,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     public void retryPrintReturnLabel(io.github.will413028.hawkr.aftersales.grpc.RetryPrintReturnLabelRequest request,
                                        StreamObserver<io.github.will413028.hawkr.aftersales.grpc.RetryPrintReturnLabelResponse> observer) {
         try {
-            // §5.3.6：admin/ops 介入重試 7-11 退貨出貨便代碼
             GrpcAuthContext.requireAccountType(AccountType.ADMIN);
             long accountId = request.getAccountId();
             String caseNo = request.getCaseNo();
@@ -445,8 +433,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     @Override
     public void cancelShipment(CancelShipmentRequest request,
                                 StreamObserver<CancelShipmentResponse> observer) {
-        // #1871 OBS-09：order_no 進 MDC，讓這個方法內所有 log 行都能被 Loki structured
-        // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml）。
         MDC.put("order_no", request.getOrderNo());
         try {
             GrpcAuthContext.requireAccountType(AccountType.SELLER);
@@ -459,7 +445,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     request.getRemark()
             );
 
-            // 查詢取消請求結果
             SellerCancelRequestEntity cancelEntity = cancelMapper.selectOne(
                     new LambdaQueryWrapper<SellerCancelRequestEntity>()
                             .eq(SellerCancelRequestEntity::getOrderNo, request.getOrderNo())
@@ -486,7 +471,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         }
     }
 
-    // ==================== 私有方法 ====================
 
     /**
      * 組裝案件列表摘要。
@@ -502,7 +486,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                 .setRefundableAmount(ProtoConversionUtils.formatLong(entity.getRefundableAmount()))
                 .setCreatedAt(ProtoConversionUtils.formatIso8601(entity.getCreatedAt()))
                 .setBuyerName(nullToEmpty(entity.getBuyerName()))
-                .setBuyerAvatarKey(nullToEmpty(buyerAvatarKey)) // 49 §6.6 S2+S9：只填 key，Gateway 組
+                .setBuyerAvatarKey(nullToEmpty(buyerAvatarKey))
                 .setShippingAddress(composeShippingAddress(entity))
                 .setReturnShippingMethod(nullToEmpty(entity.getReturnShippingMethod()))
                 .setTemperatureCode(nullToEmpty(entity.getDeliveryTemp()))
@@ -514,11 +498,9 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                 .setAutoConfirmAt(entity.getAutoConfirmAt() != null
                         ? ProtoConversionUtils.formatIso8601(entity.getAutoConfirmAt())
                         : "")
-                // 2026-05-22 逆物流退貨政策修訂：自動完成原因由 status 31/32 直接表達，前端從 AfterSaleCaseStatus.label lookup
                 .setStorePickupDeadlineAt(entity.getStorePickupDeadlineAt() != null
                         ? ProtoConversionUtils.formatIso8601(entity.getStorePickupDeadlineAt())
                         : "")
-                // 2026-06-15 待寄回逾時政策修訂
                 .setShipBackDeadlineAt(entity.getShipBackDeadlineAt() != null
                         ? ProtoConversionUtils.formatIso8601(entity.getShipBackDeadlineAt())
                         : "")
@@ -547,12 +529,10 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             }
         }
 
-        // Bucket 1: REFUND_PROCESSING — 批次讀 refund_tasks.provider_*（本地 snapshot）
         if (!refundCaseNos.isEmpty()) {
             List<RefundTaskEntity> tasks = refundTaskMapper.selectList(
                     new LambdaQueryWrapper<RefundTaskEntity>()
                             .in(RefundTaskEntity::getCaseNo, refundCaseNos));
-            // 一個 case 可能有多筆 refund_task（重試等），取最新一筆
             Map<String, RefundTaskEntity> latestByCase = new HashMap<>();
             for (RefundTaskEntity t : tasks) {
                 RefundTaskEntity prev = latestByCase.get(t.getCaseNo());
@@ -573,7 +553,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             }
         }
 
-        // Bucket 2: RETURN_SHIPPING — 一次 batch RPC 到 Shipping
         if (!returnCases.isEmpty()) {
             out.putAll(resolveReturnShippingProviderStatus(returnCases));
         }
@@ -604,20 +583,17 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     private AfterSaleCaseDetailView buildDetailView(AfterSaleCaseEntity caseEntity) {
         String caseNo = caseEntity.getCaseNo();
 
-        // 商品明細
         List<AfterSaleCaseItemEntity> items = caseItemMapper.selectList(
                 new LambdaQueryWrapper<AfterSaleCaseItemEntity>()
                         .eq(AfterSaleCaseItemEntity::getCaseNo, caseNo)
         );
 
-        // 舉證
         List<AfterSaleEvidenceEntity> evidenceList = evidenceMapper.selectList(
                 new LambdaQueryWrapper<AfterSaleEvidenceEntity>()
                         .eq(AfterSaleEvidenceEntity::getCaseNo, caseNo)
                         .orderByAsc(AfterSaleEvidenceEntity::getCreatedAt)
         );
 
-        // 決議歷程
         List<AfterSaleResolutionEntity> resolutions = resolutionMapper.selectList(
                 new LambdaQueryWrapper<AfterSaleResolutionEntity>()
                         .eq(AfterSaleResolutionEntity::getCaseNo, caseNo)
@@ -645,7 +621,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             detailBuilder.setClosedAt(ProtoConversionUtils.formatIso8601(caseEntity.getClosedAt()));
         }
 
-        // 賣家出貨照片（從 Order Service 透傳 objectKey；Gateway 組 URL。失敗降級為空陣列，不影響主資料）
         try {
             var orderResp = orderGrpcClient.getOrderForAfterSales(caseEntity.getOrderNo());
             if (orderResp.getCode() == GrpcResponseCode.SUCCESS.code()
@@ -658,9 +633,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     "order_no", caseEntity.getOrderNo(), e);
         }
 
-        // 商品明細
         for (AfterSaleCaseItemEntity item : items) {
-            // 49 §6.6：只填 objectKey，Gateway 組 imageUrl
             String imageKey = item.getImageObjectKey() != null ? item.getImageObjectKey() : "";
             detailBuilder.addItems(AfterSaleCaseItemView.newBuilder()
                     .setOrderItemId(ProtoConversionUtils.formatLong(item.getOrderItemId()))
@@ -673,9 +646,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .build());
         }
 
-        // 舉證圖片
         for (AfterSaleEvidenceEntity evidence : evidenceList) {
-            // 49 §6.6：只填 objectKey，Gateway 組 imageUrl
             String imageKey = evidence.getObjectKey() != null ? evidence.getObjectKey() : "";
             detailBuilder.addEvidence(EvidenceView.newBuilder()
                     .setAssetId(ProtoConversionUtils.formatLong(evidence.getAssetId()))
@@ -685,7 +656,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .build());
         }
 
-        // 決議歷程
         for (AfterSaleResolutionEntity resolution : resolutions) {
             detailBuilder.addResolutions(ResolutionView.newBuilder()
                     .setResolutionType(nullToEmpty(resolution.getResolutionType()))
@@ -705,7 +675,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .build());
         }
 
-        // §10 appeal 狀態欄位
         detailBuilder.setAppealState(nullToEmpty(caseEntity.getAppealState()));
         java.time.LocalDateTime deadline = appealService.computeAppealDeadline(caseEntity);
         if (deadline != null
@@ -715,17 +684,14 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         }
         detailBuilder.setCanAppeal(appealService.canAppeal(caseEntity));
 
-        // §2.2 退款任務欄位（snapshot from refund_tasks）
         RefundTaskSnapshot snapshot = loadRefundTaskSnapshot(caseEntity.getCaseNo());
         detailBuilder.setRefundTaskStatus(snapshot.status());
         detailBuilder.setRefundFailureMessage(snapshot.failureMessage());
 
-        // 收斂規範 §6.2：依 case 當下 status 決定 provider 取源
         ProviderStatusPair providerPair = resolveCaseProviderStatus(caseEntity, snapshot);
         detailBuilder.setProviderStatus(providerPair.status);
         detailBuilder.setProviderMessage(providerPair.message);
 
-        // §5.10 賣家處理期限欄位（僅 status=PENDING 時 process_deadline 才有值）
         if (caseEntity.getProcessDeadline() != null) {
             detailBuilder.setProcessDeadline(
                     ProtoConversionUtils.formatIso8601(caseEntity.getProcessDeadline()));
@@ -734,7 +700,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         detailBuilder.setProcessDeadlineHours(
                 afterSalesProperties.getCaseConfig().getProcessDeadlineHours());
 
-        // §5.3.10 / §5.3.11 退貨送達自動確認 + 物流失敗欄位
         if (caseEntity.getAutoConfirmAt() != null) {
             detailBuilder.setAutoConfirmAt(
                     ProtoConversionUtils.formatIso8601(caseEntity.getAutoConfirmAt()));
@@ -749,7 +714,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         if (caseEntity.getReturnProviderMessage() != null) {
             detailBuilder.setReturnProviderMessage(caseEntity.getReturnProviderMessage());
         }
-        // 2026-05-22 逆物流退貨政策修訂欄位
         if (caseEntity.getStoreArrivedAt() != null) {
             detailBuilder.setStoreArrivedAt(
                     ProtoConversionUtils.formatIso8601(caseEntity.getStoreArrivedAt()));
@@ -766,13 +730,10 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             detailBuilder.setAutoCompleteAtStamp(
                     ProtoConversionUtils.formatIso8601(caseEntity.getAutoCompleteAtStamp()));
         }
-        // 2026-06-15 待寄回逾時政策修訂
         if (caseEntity.getShipBackDeadlineAt() != null) {
             detailBuilder.setShipBackDeadlineAt(
                     ProtoConversionUtils.formatIso8601(caseEntity.getShipBackDeadlineAt()));
         }
-        // 自動完成原因由 status 31/32 表達；前端從 AfterSaleCaseStatus.label lookup
-        // 賣家「確認收貨」按鈕：前端直接以 status === "27" 判斷，後端不再回 can_confirm_receipt 冗餘 boolean
 
         return detailBuilder.build();
     }
@@ -792,7 +753,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                                                           RefundTaskSnapshot snapshot) {
         String status = caseEntity.getStatus();
         if (AfterSaleCaseStatus.REFUND_PROCESSING.value().equals(status)) {
-            // 從 refund_tasks 讀 provider_status / provider_message 的 raw 值（不挑失敗才透傳）
             RefundTaskEntity task = refundTaskMapper.selectOne(
                     new LambdaQueryWrapper<RefundTaskEntity>()
                             .eq(RefundTaskEntity::getCaseNo, caseEntity.getCaseNo())
@@ -860,7 +820,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         if (task == null) {
             return RefundTaskSnapshot.EMPTY;
         }
-        // refund_failure_message 只在終態失敗（FAILED）透傳 provider 訊息；其他狀態的訊息不是失敗原因。
         String failureMessage = WorkerTaskStatus.FAILED.value().equals(task.getStatus())
                 ? nullToEmpty(task.getProviderMessage())
                 : "";
@@ -871,7 +830,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         return value != null ? value : "";
     }
 
-    // ==================== §10 申訴與平台裁決 ====================
 
     @Override
     public void submitAppeal(SubmitAppealRequest request,
@@ -947,7 +905,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             var result = appealService.listAppealsForAdmin(
                     request.getAppealState(), page, pageSize);
 
-            // §10.6.6 批次查 buyer + seller profile（降級：失敗回空字串）
             java.util.List<Long> buyerIds = new java.util.ArrayList<>();
             java.util.List<Long> sellerIds = new java.util.ArrayList<>();
             for (AfterSaleCaseEntity entity : result.getRecords()) {
@@ -980,9 +937,9 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                                 ? ProtoConversionUtils.formatIso8601(entity.getLastRejectedAt()) : "")
                         .setRefundableAmount(ProtoConversionUtils.formatLong(entity.getRefundableAmount()))
                         .setBuyerName(nullToEmpty(entity.getBuyerName()))
-                        .setBuyerAvatarKey(buyer != null ? nullToEmpty(buyer.getAvatarKey()) : "") // 49 §6.6 S2+S9
+                        .setBuyerAvatarKey(buyer != null ? nullToEmpty(buyer.getAvatarKey()) : "")
                         .setSellerName(seller != null ? nullToEmpty(seller.getName()) : "")
-                        .setSellerAvatarKey(seller != null ? nullToEmpty(seller.getLogoKey()) : "") // 49 §6.6 S2+S9
+                        .setSellerAvatarKey(seller != null ? nullToEmpty(seller.getLogoKey()) : "")
                         .build());
             }
             observer.onNext(ListAppealsForAdminResponse.newBuilder()
@@ -1075,7 +1032,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                 .build();
     }
 
-    // ==================== §10.6.6 Admin 單案詳情 ====================
 
     @Override
     public void getAppealDetailForAdmin(GetAppealDetailForAdminRequest request,
@@ -1087,10 +1043,8 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             var result = appealService.getAppealDetailForAdmin(caseNo);
             AfterSaleCaseEntity caseEntity = result.getCaseEntity();
 
-            // 1) caseDetail 重用 buildDetailView
             AfterSaleCaseDetailView caseDetail = buildDetailView(caseEntity);
 
-            // 2) arbitration 重用組裝（appeal_state=NONE 時 state="0"、timeline/decision 空）
             ArbitrationData.Builder arbBuilder = ArbitrationData.newBuilder()
                     .setState(nullToEmpty(caseEntity.getAppealState()));
             if (result.getAppealEvents() != null) {
@@ -1114,7 +1068,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                         .build());
             }
 
-            // 3) adminContext — profile + 從最新 REJECT resolution 與 decision 抽取
             io.github.will413028.hawkr.buyer.grpc.BuyerDisplay buyerDisplay = null;
             if (caseEntity.getBuyerId() != null) {
                 var m = safeBatchGetBuyerDisplay(java.util.List.of(caseEntity.getBuyerId()));
@@ -1130,9 +1083,9 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .setBuyerAppealReason(nullToEmpty(caseEntity.getAppealReason()))
                     .setBuyerAppealDescription(nullToEmpty(caseEntity.getAppealDescription()))
                     .setBuyerName(nullToEmpty(caseEntity.getBuyerName()))
-                    .setBuyerAvatarKey(buyerDisplay != null ? nullToEmpty(buyerDisplay.getAvatarKey()) : "") // 49 §6.6 S2+S9
+                    .setBuyerAvatarKey(buyerDisplay != null ? nullToEmpty(buyerDisplay.getAvatarKey()) : "")
                     .setSellerName(sellerInfo != null ? nullToEmpty(sellerInfo.getName()) : "")
-                    .setSellerAvatarKey(sellerInfo != null ? nullToEmpty(sellerInfo.getLogoKey()) : ""); // 49 §6.6 S2+S9
+                    .setSellerAvatarKey(sellerInfo != null ? nullToEmpty(sellerInfo.getLogoKey()) : "");
 
             if (result.getLatestRejectResolution() != null) {
                 var rej = result.getLatestRejectResolution();
@@ -1144,7 +1097,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                         ProtoConversionUtils.formatLong(result.getDecision().getDecidedByAdminId()));
             }
 
-            // 4) providerContext — 依 case.status 聚合 Payment / Shipping SoT（§29）
             AdminProviderContext providerContext = buildProviderContextForCase(caseEntity);
 
             AppealDetailForAdminData.Builder dataBuilder = AppealDetailForAdminData.newBuilder()
@@ -1167,7 +1119,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         }
     }
 
-    // ==================== §29 Admin 異常列表 ====================
 
     @Override
     public void listAfterSaleCasesForAdmin(ListAfterSaleCasesForAdminRequest request,
@@ -1179,7 +1130,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
             var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AfterSaleCaseEntity>();
 
-            // 異常 filter：REFUND_PROCESSING(40) / RETURN_SHIPPING(25) / RETURN_PENDING(20) 為主要異常候選狀態
             if (request.getAbnormalOnly()) {
                 wrapper.in(AfterSaleCaseEntity::getStatus, java.util.List.of(
                         io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.REFUND_PROCESSING.value(),
@@ -1218,7 +1168,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
             var result = caseMapper.selectPage(page, wrapper);
 
-            // 批次聚合 refund provider_* （僅對 REFUND_PROCESSING 的 case 調用 Payment.BatchGetRefundProviderStatusByCaseIds）
             java.util.List<String> refundCaseNos = new java.util.ArrayList<>();
             String refundStatusVal = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.REFUND_PROCESSING.value();
             for (AfterSaleCaseEntity e : result.getRecords()) {
@@ -1238,7 +1187,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                             "批次聚合退款 provider 狀態失敗: " + ex.getMessage());
                 }
             }
-            // 物流 provider 聚合（退貨物流異常狀態）— 以 order_no 為 key，is_return=true
             java.util.List<String> shippingOrderNos = new java.util.ArrayList<>();
             String returnPendingVal = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.RETURN_PENDING.value();
             String returnShippingVal = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.RETURN_SHIPPING.value();
@@ -1331,7 +1279,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                 actualRefundAmount = ProtoConversionUtils.parseLongRequired(actualRaw, "actualRefundAmount");
             }
 
-            // issue #2294 B7：同 confirmReturnReceipt——反解在 tx 外、API 路徑 best-effort
             io.github.will413028.hawkr.aftersales.service.EventPrincipals principals =
                     returnReceiptService.resolvePrincipalsForCaseBestEffort(caseNo);
 
@@ -1385,7 +1332,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                         "查詢退款 provider 狀態失敗: " + ex.getMessage());
             }
         } else if (returnPending.equals(status) || returnShipping.equals(status)) {
-            // 退貨物流：用批次 RPC（傳單一 order_no）
             try {
                 var resp = shippingGrpcClient.batchGetProviderStatusByOrderIds(
                         java.util.List.of(caseEntity.getOrderNo()), true);
@@ -1563,7 +1509,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             Set<String> overrideOrderNos = new LinkedHashSet<>();
             for (SellerCaseRef ref : refs) {
                 if (!AfterSaleCaseStatus.isValidValue(ref.status())) {
-                    // 髒資料 fail-loud：拋出讓上層記錄，不靜默漏算（docs/開發規範/Java 微服務開發規範.md §13.4）
                     throw new IllegalArgumentException("Unknown aftersale case status: " + ref.status()
                             + ", orderNo=" + ref.orderNo());
                 }
@@ -1575,7 +1520,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     overrideOrderNos.add(ref.orderNo());
                 }
             }
-            // active 優先：同訂單若同時有 active 與 terminal-override case，歸 active
             overrideOrderNos.removeAll(activeOrderNos);
 
             observer.onNext(io.github.will413028.hawkr.aftersales.grpc.GetSellerCaseClassificationResponse.newBuilder()

@@ -83,7 +83,6 @@ export function InvoiceDocumentCard({
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), COPY_RESET_MS);
 		} catch {
-			/* clipboard may be denied — silently no-op */
 		}
 	};
 
@@ -91,9 +90,7 @@ export function InvoiceDocumentCard({
 		<li className="rounded-hkui-md border border-divider bg-content2 p-4">
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<h3 className="m-0 text-sm font-semibold text-hk-heading">{kind}</h3>
-				{/* 作廢／被重開取代用實心 danger 大標籤（不加刪除線）。這是**強調**
-				    不是第二張碼表——中文仍然來自折疊表；而 tone 相同的
-				    RESOLVED_EXTERNALLY 不該被強調成失敗，所以判的是 status 本身。 */}
+
 				<Chip
 					variant={voided ? "solid" : "flat"}
 					color={voided ? "danger" : status.tone}
@@ -139,9 +136,7 @@ export function InvoiceDocumentCard({
 				<dd className={`${DD_CLASS} tabular-nums`}>
 					NT$ {Number(document.totalAmount || 0).toLocaleString()}
 				</dd>
-				{/* backend#3084：carrierSummary 在沒有載具時裝的是**買受人統編**。
-				    這張卡沒有專屬的統編列，所以改標籤而不是不渲染 ——
-				    標成「載具」會在沒有載具的 B2B 上說謊。 */}
+
 				<dt className={DT_CLASS}>
 					{carrierRowKindOf(document.carrierSummary, document.carrierType) ===
 					"recipientTaxId"
@@ -192,8 +187,6 @@ export function InvoiceDocumentCard({
 					{T.viewDocument}
 				</Link>
 				{isCurrent && document.fileAvailable ? (
-					// 預取好的 `<a>` 而不是「點擊 → await → window.open」：`await` 之後
-					// 的 `window.open` 會被 Safari 的彈窗攔截器擋掉。
 					<a
 						href={invoiceFileUrl(orderNo, document.documentId)}
 						target="_blank"

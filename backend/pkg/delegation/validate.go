@@ -51,8 +51,6 @@ var AllCapabilities = []Capability{
 	CapOrdersRead,
 }
 
-// knownCapabilities is the S2 allow-list. Deny by default: a token absent from
-// this map is rejected even if it looks well formed.
 var knownCapabilities = func() map[Capability]struct{} {
 	m := make(map[Capability]struct{}, len(AllCapabilities))
 	for _, c := range AllCapabilities {
@@ -68,12 +66,6 @@ func IsKnown(cap Capability) bool {
 	return ok
 }
 
-// requiresAuditLogID reports whether S1b applies to cap. The input is the verb
-// segment: .write / .publish always carry a two-phase audit intent, .read never
-// does (a successful read writes no audit row at all, §7.1.2). Making the field
-// unconditionally mandatory would take every delegated read endpoint down with
-// 9260 while each service's own unit tests — fed only write fixtures — stayed
-// green.
 func requiresAuditLogID(cap Capability) bool {
 	switch cap {
 	case CapStorefrontWrite, CapProductsWrite, CapProductsPublish, CapPostsWrite, CapPostsPublish:
@@ -107,13 +99,6 @@ func WithRequestIdempotencyKey(key string) Option {
 	}
 }
 
-// bizStatus builds a gRPC status whose message carries the "[NNNN] " business
-// code prefix the Gateway parses (§6.5.2, gateway handler GrpcDomainErr). Go
-// services have no exception advice to prepend it for them the way the Java side
-// does, and errors.NewBusiness is not a substitute: ErrorInterceptor's
-// domainCodeToGRPC has no entry for the 9xxx range, so a business error would
-// arrive as codes.Internal and lose both the status code §6.2.4 mandates and the
-// business code the Gateway needs.
 func bizStatus(c codes.Code, code int32, msg string) error {
 	return status.Error(c, fmt.Sprintf("[%d] %s", code, msg))
 }
@@ -131,27 +116,6 @@ func InvalidCommand(msg string) error {
 	return bizStatus(codes.InvalidArgument, bizcode.DelegationInvalidCommand, msg)
 }
 
-// contractMismatch is every rejection Validate itself produces (#2744).
-//
-// None of S1a–S5 can be caused by an operator: DelegationContext is assembled by
-// the Gateway from the session, never from anything a person types. A missing
-// session_id, a capability outside the closed enumeration, a capability that
-// disagrees with the RPC's own declaration — each of those means the Gateway
-// built a context that contradicts its own contract, and no amount of retrying
-// or re-filling a form changes it. The operator's next step is "tell an
-// engineer", which differs from both 9260 (you sent a bad value) and 9280 (try
-// again shortly) — and that difference is the whole reason the three codes exist
-// separately.
-//
-// ⚠️ This is NOT InvalidCommand below: that one is a domain service rejecting a
-// field the operator really did fill in wrong, and it stays 9260. The split is
-// "who can fix this", not "which layer noticed".
-//
-// ⚠️ The gRPC status codes stay as they were. The Gateway parses the "[NNNN] "
-// prefix first and only falls back to the status (admin_delegated_common.go
-// denialFromGrpcErr) — and codes.Internal is in that function's transport-failure
-// list, so switching to "the honest status" would short-circuit to 9280 before
-// the honest code is ever read.
 func contractMismatch(c codes.Code, msg string) error {
 	return bizStatus(c, bizcode.DelegationInternalContractMismatch, msg)
 }
@@ -182,39 +146,31 @@ func Validate(_ context.Context, d *commonpb.DelegationContext, storeID int64, c
 		opt(&o)
 	}
 
-	// S1a: the three always-required fields.
 	if d.GetSessionId() == "" || d.GetOperatorAdminId() == "" || d.GetCapability() == "" {
 		return contractMismatch(codes.InvalidArgument,
 			"delegation context is missing session_id / operator_admin_id / capability")
 	}
 
-	// S1b: audit_log_id, only where an audit intent must already exist.
 	if requiresAuditLogID(cap) && d.GetAuditLogId() == "" {
 		return contractMismatch(codes.InvalidArgument,
 			"delegation context is missing audit_log_id for a mutating capability")
 	}
 
-	// S2: capability is inside the closed enumeration.
 	if !IsKnown(Capability(d.GetCapability())) {
 		return contractMismatch(codes.PermissionDenied,
 			"delegation capability is not recognised")
 	}
 
-	// S3: capability matches what this RPC declares.
 	if Capability(d.GetCapability()) != cap {
 		return contractMismatch(codes.PermissionDenied,
 			"delegation capability does not match the capability this RPC requires")
 	}
 
-	// S4: ownership key present.
 	if storeID <= 0 {
 		return contractMismatch(codes.InvalidArgument,
 			"delegation request is missing its owner store id")
 	}
 
-	// S5: the request's own idempotency key must agree with the context's.
-	// Either side being empty means there is nothing to compare — picking one of
-	// two differing keys is never correct, so only a real disagreement fails.
 	if o.requestIdempotencyKeySet &&
 		o.requestIdempotencyKey != "" && d.GetIdempotencyKey() != "" &&
 		o.requestIdempotencyKey != d.GetIdempotencyKey() {
@@ -231,7 +187,6 @@ func Validate(_ context.Context, d *commonpb.DelegationContext, storeID int64, c
 // its own.
 func IsDelegated(d *commonpb.DelegationContext) bool { return d != nil }
 
-// ctxKey is the private context key for the validated delegation context.
 type ctxKey struct{}
 
 // NewContext stores an already-validated delegation context for the usecase and

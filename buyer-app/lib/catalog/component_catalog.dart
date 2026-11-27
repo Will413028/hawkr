@@ -86,8 +86,6 @@ class _BuyerComponentCatalogAppState extends State<BuyerComponentCatalogApp> {
   @override
   void initState() {
     super.initState();
-    // Catalog-only: expose real Flutter controls to browser tools
-    // without first requiring a visitor to activate the accessibility overlay.
     if (kIsWeb) _semanticsHandle = WidgetsBinding.instance.ensureSemantics();
     final params = (widget.initialUri ?? Uri.base).queryParameters;
     _textSize = AppTextSize.fromStorage(params['textSize']);

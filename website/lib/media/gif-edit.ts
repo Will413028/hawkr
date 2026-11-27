@@ -84,8 +84,6 @@ function makeHoldsPlayable(
 					? next
 					: null;
 		if (donor) {
-			// Moving one boundary by 10 ms preserves both authored poses and the
-			// selected duration, without triggering the browser's 100 ms clamp.
 			donor.delayMs -= missingDelayMs;
 			frame.delayMs += missingDelayMs;
 			index += 1;
@@ -96,7 +94,6 @@ function makeHoldsPlayable(
 			next.delayMs += frame.delayMs;
 			playable.splice(index, 1);
 		} else {
-			// The selected-range check normally catches this before planning.
 			throw new Error("GIF 至少需保留 0.02 秒，請延長選取範圍。");
 		}
 	}
@@ -139,7 +136,6 @@ export function planGifEdits(
 	) {
 		throw new Error("請填寫有效的 GIF 開始與結束時間。");
 	}
-	// GIF stores delays in centiseconds. Snap boundaries once, never per frame.
 	const startTimeMs = Math.round(requestedStart / 10) * 10;
 	const endTimeMs = Math.round(requestedEnd / 10) * 10;
 	if (
@@ -169,16 +165,12 @@ export function planGifEdits(
 			if (maxFps === undefined) {
 				frames.push({ sourceFrameIndex, delayMs: clippedDelayMs });
 			} else if (nextSampleTimeMs < clipEnd) {
-				// Sample within a source hold too: dropping a frame merely because its
-				// start precedes a tick could otherwise hide a long still pose entirely.
 				if (frames.length > 0) {
 					frames[frames.length - 1].delayMs =
 						nextSampleTimeMs - lastRetainedTimeMs;
 				}
 				frames.push({ sourceFrameIndex, delayMs: 0 });
 				lastRetainedTimeMs = nextSampleTimeMs;
-				// Jump directly past all sampling ticks inside this same source frame.
-				// No repeated frames and no loop proportional to a long GIF delay.
 				const elapsedCentiseconds = (clipEnd - startTimeMs) / 10;
 				const nextTick =
 					Math.floor(((elapsedCentiseconds - 1) * maxFps) / 100) + 1;

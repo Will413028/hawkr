@@ -15,9 +15,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// fakeSeller 是一個真的 gRPC server（跑在 bufconn 上），不是 stub interface 的假物件：
-// 只有真的過一趟 gRPC，「deadline 有沒有被設上」才驗得到——那個值是用 wire 上的
-// grpc-timeout header 傳的，換成 interface 假物件就完全測不到。
 type fakeSeller struct {
 	pb.UnimplementedSellerServiceServer
 
@@ -66,7 +63,6 @@ func newTestClient(t *testing.T, srv *fakeSeller, deadline time.Duration) *Clien
 	return NewClientWithStub(pb.NewSellerServiceClient(conn), deadline)
 }
 
-// TSID 量級的 account_id：用小數字測不出 int64 有沒有在某一層被截斷。
 const tsidAccountID int64 = 2685914682123456
 const tsidStoreID int64 = 2685914682
 
@@ -81,7 +77,6 @@ func TestResolveSellerAccountID_Success(t *testing.T) {
 	if got != tsidAccountID {
 		t.Fatalf("account_id = %d, want %d", got, tsidAccountID)
 	}
-	// 身分不可混用：送出去的必須是 store_id 本身，不是 account_id。
 	if srv.gotStoreID != tsidStoreID {
 		t.Fatalf("server saw store_id = %d, want %d", srv.gotStoreID, tsidStoreID)
 	}
@@ -98,8 +93,6 @@ func TestResolveSellerAccountID_DeadlineReachesServer(t *testing.T) {
 	if !srv.hadDeadline {
 		t.Fatal("server context 沒有 deadline —— per-call deadline 沒有被設上")
 	}
-	// 允許傳輸損耗，但必須落在「這個 client 設的那個值」附近，
-	// 而不是別人（呼叫端 ctx）碰巧帶進來的某個值。
 	if srv.gotDeadline <= 1*time.Second || srv.gotDeadline > 2*time.Second {
 		t.Fatalf("server 收到的剩餘 deadline = %v，want (1s, 2s]", srv.gotDeadline)
 	}
@@ -187,14 +180,8 @@ func TestNewClientWithStub_ZeroDeadlineFallsBackToDefault(t *testing.T) {
 	}
 }
 
-// sellerAccountResolver 是 internal/worker.SellerAccountResolver 的逐字複本。
-//
-// 在這裡複製一份而不是 import worker：client 是 Layer 3、worker 是 Layer 4.5，
-// 反向 import 是層級倒置。複本的維護成本由這支斷言本身承擔——worker 那邊改了簽章，
-// 接線的那一行會編譯錯，這裡則會在下一次有人看時對不上，兩者不會同時無聲。
 type sellerAccountResolver interface {
 	ResolveSellerAccountID(ctx context.Context, storeID int64) (int64, error)
 }
 
-// 編譯期斷言：*Client 必須能直接當成 worker 的 SellerAccountResolver 接上去。
 var _ sellerAccountResolver = (*Client)(nil)

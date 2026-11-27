@@ -46,7 +46,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   StreamSubscription<pb.ChatEvent>? _eventSub;
   Timer? _refreshDebounce;
   final _latestRefresh = LatestRequest();
-  // keepAlive provider，於 initState（widget 存活期）capture 一次；dispose() 改用這個實例呼叫。
   late final ChatRealtime _realtime;
 
   final TextEditingController _searchController = TextEditingController();
@@ -55,11 +54,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   @override
   void initState() {
     super.initState();
-    // 進場零動畫
     WidgetsBinding.instance.addPostFrameCallback((_) => _skipRouteTransition());
     _realtime = ref.read(chatRealtimeProvider);
     _refresh(showLoading: true);
-    // 列表駐留期間保持串流連線；新訊息、串流重連的 Ready 與 Resync 都重取列表。
     _realtime.acquire();
     _eventSub = _realtime.events.listen(_onEvent);
   }
@@ -67,7 +64,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   void _onEvent(pb.ChatEvent event) {
     switch (event.whichEvent()) {
       case pb.ChatEvent_Event.message:
-        // 防抖：短時間多則訊息只重取一次。
         _refreshDebounce?.cancel();
         _refreshDebounce = Timer(const Duration(milliseconds: 400), () {
           if (mounted) unawaited(_refresh());
@@ -165,7 +161,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Column(
         children: [
-          // 與全站一致的 Header，搜尋欄維持 48dp 觸控高度。
           CategoryTopBar(
             backgroundColor: AppColors.topBarBackground,
             systemOverlayStyle: AppColors.topBarOverlay,
@@ -332,7 +327,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                           'merchantName': name,
                                         },
                                       );
-                                      // 從聊天室回來：伺服器的未讀已清，重取列表。
                                       if (mounted) await _refresh();
                                     },
                                   );

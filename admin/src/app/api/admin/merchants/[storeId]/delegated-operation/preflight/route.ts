@@ -59,12 +59,6 @@ export async function GET(request: NextRequest, context: Context) {
 
 		const data = unwrapUpstreamData(payload);
 		if (isDelegatedOperationPreflightDenied(data)) {
-			// 原因由後端下發（deniedLabel），不在這裡改寫也不在前端建對照表：
-			// 9269「已有其他管理員正在代行」、9286「從未開通」、9264「已撤回或已到期」、
-			// 9272「已停權或關閉」的下一步完全不同，壓成同一句等於把後端已經講清楚的事丟掉。
-			// 這是 `safeUpstreamError`「不透傳上游訊息」的**例外**，界線是：這一欄
-			// 屬於已定義的 preflight 契約、且經過 parser 的長度／控制字元校驗，
-			// 不是任意服務的自由錯誤字串。
 			const denial = parseDelegatedOperationPreflightDenial(data);
 			return NextResponse.json(
 				{

@@ -246,14 +246,6 @@ void main() {
   });
 
   group('lib/ 內不得殘留已退役的頭像 wire key', () {
-    // 讀取點散落在 widget 私有函式裡（
-    // page_home_feed `_CommentVM.fromRaw`、page_echo_tab、comments_bottom_sheet、
-    // product_reviews_screen），無法從測試直接呼叫。這裡改用來源掃描把它們一起
-    // 釘住：把任何一處改回舊名，這條就轉紅。
-    //
-    // 白名單只有 FCM／通知中心那條路——它們讀的是 notification-service 的
-    // MQ 模板輸出（`sender_avatar` / `buyerAvatar` …），**不是** Gateway HTTP
-    // 契約，本批沒動、也不該動。
     const allowedFiles = {
       'lib/features/notification/data/push/manager.dart',
       'lib/features/notification/presentation/notifications_screen.dart',

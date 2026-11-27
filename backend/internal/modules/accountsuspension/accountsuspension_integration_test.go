@@ -116,7 +116,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// account 走正式的建帳事件建立帳號與它唯一的買家。
 func (f *fixture) account(t *testing.T) int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -189,7 +188,6 @@ func TestSuspendRecordsTheReasonAndPublishesTheEvent(t *testing.T) {
 		f.suspended[0].SuspensionID != s.ID || !f.suspended[0].SuspendedAt.Equal(s.SuspendedAt) {
 		t.Fatalf("Suspended = %+v", f.suspended)
 	}
-	// 重複停權：回傳原本的紀錄，沒有第二筆紀錄、沒有第二個事件。
 	again, err := f.module.Suspend(ctx, id, Record{Category: policy.Spam})
 	if err != nil || again.ID != s.ID {
 		t.Fatalf("重複停權 = %+v, %v", again, err)
@@ -306,7 +304,6 @@ func TestUnsuspendReleasesAndPublishesTheEventOnlyWhenSuspended(t *testing.T) {
 	}
 }
 
-// waitForLockWaiter 等到資料庫裡有一個連線正在等鎖。
 func waitForLockWaiter[T any](t *testing.T, f *fixture, done <-chan T) {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)

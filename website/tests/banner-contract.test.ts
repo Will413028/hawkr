@@ -109,7 +109,6 @@ test("a banner without a slide image is not shown", () => {
 });
 
 test("resolves banner actions to safe web routes", () => {
-	// ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind D5）：只編碼，不檢查格式。
 	assert.equal(
 		resolveBannerActionHref({ type: "product", id: "a/b" }),
 		"/products/a%2Fb",
@@ -182,7 +181,6 @@ test("fetchBanners drops banners without a slide image", async () => {
 	);
 });
 
-// 瀏覽器端：網路錯誤與 unavailable 最多重試兩次、退避等待（共 3 次請求；lib/connect/transport.ts）。
 test("fetchBanners rejects a network failure after the browser retries", async () => {
 	respond = () => {
 		throw new TypeError("fetch failed");

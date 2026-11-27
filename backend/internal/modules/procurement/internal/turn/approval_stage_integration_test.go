@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// runTurn 送出一輪、以替身模型回 patch 並執行，回這一輪助理的回覆。
 func (f *fixture) runTurn(patch string) string {
 	f.t.Helper()
 	id := f.submit("m", uitext.ZhTW)
@@ -31,7 +30,6 @@ func (f *fixture) runTurn(patch string) string {
 	return last.AssistantReply
 }
 
-// approve 為現行版本寫一份發布核准（預設 PENDING、nowAt 起算 ttl 後到期）。
 func (f *fixture) approve(ttl time.Duration, state string) uuid.UUID {
 	f.t.Helper()
 	ctx := context.Background()
@@ -68,7 +66,7 @@ func TestPlannerStageFollowsTheUnexpiredPendingApproval(t *testing.T) {
 		ttl       time.Duration
 		state     string
 		patch     string
-		wantReply string // 回覆要包含的句子；空字串表示不得包含任何核准階段的句子
+		wantReply string
 	}{
 		{"pending and unexpired on the current revision, nothing changed", time.Hour, "PENDING", `{}`, approved},
 		{"pending but expiring exactly now is expired", 0, "PENDING", `{}`, ""},
@@ -97,8 +95,8 @@ func TestPlannerStageIsStaleWhenTheApprovalIsOnAnEarlierRevision(t *testing.T) {
 	f := newFixture(t)
 	f.runTurn(ok)
 	f.approve(time.Hour, "PENDING")
-	f.runTurn(`{"packaging":"箱"}`) // 內容改了：新的一版，核准還在舊版上
-	reply := f.runTurn(`{}`)       // 這一輪沒有改內容，但核准對的不是現行版本
+	f.runTurn(`{"packaging":"箱"}`)
+	reply := f.runTurn(`{}`)
 	if !strings.Contains(reply, text.ReplyReconfirmWarning(uitext.ZhTW).Text) {
 		t.Errorf("核准在舊版上，要請買家重新確認：%q", reply)
 	}

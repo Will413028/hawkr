@@ -65,24 +65,19 @@ public class GrpcAuthClientInterceptor implements ClientInterceptor {
 
             @Override
             public void start(Listener<RespT> responseListener, Metadata headers) {
-                // 1. 標記內部微服務呼叫（caller 名，資訊用途）
                 headers.put(KEY_INTERNAL_SERVICE, serviceName);
 
-                // 2. 傳播 x-account-id（從當前 gRPC Context，若存在）
                 Long accountId = GrpcAuthContext.ACCOUNT_ID.get();
                 String accountIdOrEmpty = (accountId != null && accountId > 0) ? String.valueOf(accountId) : "";
                 if (!accountIdOrEmpty.isEmpty()) {
                     headers.put(KEY_ACCOUNT_ID, accountIdOrEmpty);
                 }
 
-                // 3. 傳播 x-account-type（從當前 gRPC Context，若存在）
                 String accountType = GrpcAuthContext.ACCOUNT_TYPE.get();
                 if (accountType != null && !accountType.isBlank()) {
                     headers.put(KEY_ACCOUNT_TYPE, accountType);
                 }
 
-                // 4. 內部身分 HMAC 簽章（#1366）：綁定傳播的 accountId，防窗內身分抽換。
-                //    permissive/off 缺 secret 時不簽（過渡期靠 server WARN 觀察）；有 secret 才簽。
                 if (InternalAuthConfig.hasSecret()) {
                     String ts = InternalAuthSigner.currentTs();
                     String nonce = InternalAuthSigner.newNonce();

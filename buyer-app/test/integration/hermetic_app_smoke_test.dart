@@ -204,9 +204,6 @@ void main() {
             'LATEST',
           );
 
-          // Repeating the same destination catches stale root URIs: if the
-          // PageView switched without updating `?tab=`, this second CTA would
-          // target the location GoRouter already believes is active.
           await tester.tap(
             find.byKey(const ValueKey('buyer-bottom-nav-item-0')),
           );

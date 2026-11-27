@@ -73,7 +73,7 @@ const Badge: React.FC<BadgeProps> = ({ status, type }) => {
 			case 0:
 				text = "已停用";
 				variant = "gray";
-				break; // Using gray or pending
+				break;
 			default:
 				text = "未知";
 				variant = "gray";

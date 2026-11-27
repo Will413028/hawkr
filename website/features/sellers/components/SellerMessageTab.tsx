@@ -80,13 +80,10 @@ export default function SellerMessageTab({
 	>(() => new Set());
 	const busyRef = React.useRef(false);
 
-	// 單一討論串頁：沒有指定回覆對象時，留言框是回覆這串的頂層項目，能不能回覆照伺服器的 `viewerCanReply`
-	// （SSR 的匿名資料在掛載時被 viewer 讀取取代）。頂層是佔位項目時留言框只在指定回覆對象時出現。
 	const threadTop = threadId
 		? forum.comments.find((c) => c.id === threadId && c.viewerCanReply)
 		: undefined;
 	const target = replyingTo ?? threadTop ?? null;
-	// 單一討論串頁：只有討論串查詢實際回 NotFound 才是「這串不存在」。
 	const threadGone =
 		threadId !== undefined &&
 		forum.error != null &&
@@ -172,7 +169,6 @@ export default function SellerMessageTab({
 		try {
 			if (target) {
 				await forum.reply(target, content);
-				// Reveal the thread so the new reply is visible.
 				const revealId = String(target.parentId ?? target.id);
 				setExpandedIds((prev) => new Set(prev).add(revealId));
 				setReplyingTo(null);
@@ -189,7 +185,6 @@ export default function SellerMessageTab({
 
 	const startReply = (target: SellerForumComment) => {
 		setReplyingTo(target);
-		// Defer focus to the next paint so the banner has rendered.
 		queueMicrotask(() => composeRef.current?.focus());
 	};
 

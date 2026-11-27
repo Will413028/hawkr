@@ -95,7 +95,6 @@ class InvoiceIntakeResolverTest {
             assertThat(s.carrierSelectionMode()).isEqualTo(InvoiceCarrierSelectionMode.NONE.value());
             assertThat(s.buyerTaxId()).isEqualTo("12345678");
             assertThat(s.buyerTitle()).isEqualTo("範例生鮮股份有限公司");
-            // chk_ois_exclusive：另外兩個目標必須為 null
             assertThat(s.buyerInvoicePreferenceId()).isNull();
             assertThat(s.donationCode()).isNull();
         }

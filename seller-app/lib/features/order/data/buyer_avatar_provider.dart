@@ -24,6 +24,5 @@ Future<String?> buyerAvatarByOrder(Ref ref, String orderNo) async {
   final buyerId = detail.buyerId;
   if (buyerId == null) return null;
 
-  // 複用 buyerAvatarProvider 的快取
   return ref.watch(buyerAvatarProvider(buyerId).future);
 }

@@ -79,7 +79,6 @@ function SellerReplyBlock({
 		}
 	};
 
-	// Enter 送出、Shift+Enter 換行；IME 組字中跳過避免送出半字。
 	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (
 			event.key === "Enter" &&
@@ -215,7 +214,6 @@ export default function ProductReviewsPanel({
 		initialPageParam: "",
 		getNextPageParam: (lastPage) => lastPage.nextPageToken || undefined,
 	});
-	// 評價總數只取自統計 RPC，不加總已載入的頁。
 	const statsQuery = useQuery({
 		queryKey: [...queryKeys.products.reviews(productId), "stats"],
 		queryFn: () => fetchProductReviewStats(productId),

@@ -166,8 +166,8 @@
    "id": "announcement-fanout-notify-dropped",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/announce/fanout.go",
-   "old": "\t\tif s.d.Signals != nil {\n\t\t\t// 與收件匣列同一個 transaction",
-   "new": "\t\tif false && s.d.Signals != nil {\n\t\t\t// 與收件匣列同一個 transaction",
+   "old": "\t\tif s.d.Signals != nil {\n\t\t\tif err := s.d.Signals.InboxChanged(ctx, r.AccountID, aud, r.StoreID, model.StateHintNone, id)",
+   "new": "\t\tif false && s.d.Signals != nil {\n\t\t\tif err := s.d.Signals.InboxChanged(ctx, r.AccountID, aud, r.StoreID, model.StateHintNone, id)",
    "test": "internal/modules/notification ^TestAnnouncementFanOutSignalsTheRecipientsStream$",
    "why": "The announcement fan-out writes inbox rows without pg_notify, so stream subscribers never learn about announcements."
   },

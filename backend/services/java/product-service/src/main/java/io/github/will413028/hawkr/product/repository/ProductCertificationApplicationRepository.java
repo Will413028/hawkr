@@ -42,7 +42,6 @@ public interface ProductCertificationApplicationRepository
 
     String RESULT_MAP = "mybatis-plus_ProductCertificationApplicationEntity";
 
-    // ==================== §6.3 同步規則：Step 1 / 2 / 3 ====================
 
     /**
      * 依 (product, type, certNo, statuses) 查申請 —— §6.3 Step 1（APPROVED 命中即 no-op）、
@@ -69,7 +68,6 @@ public interface ProductCertificationApplicationRepository
             @Param("certificateNo") String certificateNo,
             @Param("statuses") List<String> statuses);
 
-    // ==================== §6.3 Step 4：SUPERSEDE 同 type 的異號待審 ====================
 
     /**
      * 鎖定同 (product, type) 但號碼不同的待審申請 —— §6.3 Step 4 的第一步。
@@ -137,7 +135,6 @@ public interface ProductCertificationApplicationRepository
                                    @Param("toStatus") String toStatus,
                                    @Param("reviewedAt") LocalDateTime reviewedAt);
 
-    // ==================== §6.3 Step 5：ON CONFLICT DO NOTHING ====================
 
     /**
      * 建立申請 —— <b>一律以 {@code status = 'SUBMITTED'} 插入</b>（§6.3 Step 5）。
@@ -179,7 +176,6 @@ public interface ProductCertificationApplicationRepository
             @Param("govVerifiedAt") LocalDateTime govVerifiedAt,
             @Param("submittedAt") LocalDateTime submittedAt);
 
-    // ==================== §6.6 核准 transaction ====================
 
     /** 鎖定單筆申請（§6.6 第一步：lock application ＋ product）。 */
     @ResultMap(RESULT_MAP)
@@ -249,7 +245,6 @@ public interface ProductCertificationApplicationRepository
                             @Param("publicReason") String publicReason,
                             @Param("internalNote") String internalNote);
 
-    // ==================== §8.3 背景查驗回寫 ====================
 
     /**
      * 回寫政府查驗結果（背景查驗 consumer ／ ADM「重新查驗」）。
@@ -275,7 +270,6 @@ public interface ProductCertificationApplicationRepository
                                  @Param("govVerifyPayload") GovVerifyPayload govVerifyPayload,
                                  @Param("govVerifiedAt") LocalDateTime govVerifiedAt);
 
-    // ==================== §6.4 全量取代：該 type 完全沒送 ====================
 
     /**
      * 該商品目前有 APPROVED 但 type 不在本次清單內的申請（§6.4 → WITHDRAWN 的對象）。
@@ -329,7 +323,6 @@ public interface ProductCertificationApplicationRepository
     List<ProductCertificationApplicationEntity> lockSubmittedByProductId(
             @Param("productId") Long productId);
 
-    // ==================== §9.1 賣家查詢 ====================
 
     /** 賣家查自己商品的申請（§9.1）；{@code status} 為 null 時不篩。 */
     @ResultMap(RESULT_MAP)
@@ -366,7 +359,6 @@ public interface ProductCertificationApplicationRepository
                                 @Param("storeId") Long storeId,
                                 @Param("status") String status);
 
-    // ==================== §9.2 Admin 佇列 ====================
 
     /**
      * ADM 審核佇列（§9.2）。keyword 同時比對商品名與證書編號 ⇒ JOIN product，

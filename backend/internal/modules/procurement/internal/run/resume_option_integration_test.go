@@ -13,7 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-func TestResumeStoresTheOptionAndReplaysOnlyTheSameAnswer(t *testing.T) { // A9-D30 默認：agent_run_inputs.option_id
+func TestResumeStoresTheOptionAndReplaysOnlyTheSameAnswer(t *testing.T) {
 	ctx := context.Background()
 	d := newDB(t)
 	s := submitter(d, &recordingJobs{}, wide())

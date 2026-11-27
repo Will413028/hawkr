@@ -97,7 +97,6 @@ func openCard(id int64, name string) seller.StoreCard {
 	return seller.StoreCard{StoreID: id, StoreCode: 2600000000 + id, Name: &name, Status: seller.CardOpen}
 }
 
-// storeSource 是 Stores port 的替身，讀 source 裡設定的店家：stores 是有卡片的店，owners 是可以追蹤的店與它的擁有者帳號。
 type storeSource struct{ *source }
 
 func (s storeSource) StoreCards(_ context.Context, ids []int64) ([]seller.StoreCard, error) {
@@ -154,7 +153,6 @@ type fixture struct {
 	seller     *seller.Module
 }
 
-// switchStores 讓測試把 Stores port 從替身換成 seller 模組的實作。
 type switchStores struct{ current httpbuyer.Stores }
 
 func (s *switchStores) StoreCards(ctx context.Context, ids []int64) ([]seller.StoreCard, error) {
@@ -197,9 +195,6 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	characterize.GrantAdminOwner(t, id, adminToken)
-	// 與正式組裝相同：買家在建帳的 transaction 內由 AccountCreated 建立（cmd/hawkr 的 subscribeBuyerLifecycle），
-	// 測試不自己建買家、也不在 ctx 手塞 principal。buyer_id 的序列先推開，讓 buyer_id 與 account_id 不同值，
-	// 誤把帳號 ID 當買家 ID 的程式會失敗。
 	if _, err := d.Pool().Exec(ctx, `ALTER TABLE buyer.buyers ALTER COLUMN buyer_id RESTART WITH 5000`); err != nil {
 		t.Fatal(err)
 	}
@@ -239,8 +234,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// noProducts 是 seller 的商品所屬店家 port 的替身：這裡的測試不彙總瀏覽事件。
-// noRegistry 是登記資料來源的替身：這個測試不送公司型申請，來源不會被呼叫。
 type noRegistry struct{}
 
 func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
@@ -253,7 +246,6 @@ func (noProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, e
 	return nil, nil
 }
 
-// rows 回傳一句 count 查詢的結果。
 func (f *fixture) rows(t *testing.T, query string, args ...any) int64 {
 	t.Helper()
 	var n int64
@@ -318,8 +310,6 @@ func TestConnectAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 帳號活著 ⇔ 買家活著，正式流程不會留下沒有買家的存活帳號；這裡只關閉買家、不刪帳號，模擬不變量被破壞：
-	// 回 internal，不當成「不是買家」（permission_denied）或「沒有買家」。
 	noBuyerID, err := f.module.CurrentBuyerID(ctx, auth.Principal.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -682,7 +672,6 @@ func TestConnectDeleteAccount(t *testing.T) {
 	if account, err := f.id.Account(context.Background(), f.accountID); err != nil || !account.Deleted {
 		t.Fatalf("account=%+v err=%v", account, err)
 	}
-	// 關閉買家唯一的路徑是 accountdeletion 在刪帳的 transaction 內呼叫 CloseForDeletion（buyer 不訂閱 AccountDeleted）。
 	if ds, err := f.module.BatchDisplay(context.Background(), []int64{f.buyerID}); err != nil || len(ds) != 1 || !ds[0].Deleted {
 		t.Fatalf("帳號刪了、買家沒關：display=%+v err=%v", ds, err)
 	}
@@ -783,7 +772,6 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 	}
 }
 
-// noDashboardOrders 是這個測試不讀儀表板的訂單時的替身：NewHandler 要求提供儀表板訂單的來源。
 type noDashboardOrders struct{}
 
 func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWindow) ([]httpseller.SalesStats, error) {

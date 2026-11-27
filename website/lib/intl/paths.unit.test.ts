@@ -273,7 +273,6 @@ describe("STRIP_LOCALE_SCRIPT", () => {
 	afterEach(() => __setFlavorForTest(null));
 
 	it("is the inline-script twin of stripLocale: the same answer for every path", () => {
-		// the inline scripts strip every supported locale's prefix; stripLocale strips the routable ones
 		__setFlavorForTest("dev");
 		const strip = new Function(`return (${STRIP_LOCALE_SCRIPT})`)() as (
 			pathname: string,

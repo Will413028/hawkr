@@ -14,7 +14,6 @@ import (
 // ErrImageDisabled 是圖片模型尚未開通時呼叫端得到的錯誤。
 var ErrImageDisabled = apperr.Unavailable("AI 修圖尚未開通，請稍後再試")
 
-// imageCallTimeout 是一次圖片生成呼叫的 deadline：呼叫端的 ctx 沒有更短的 deadline 時用它。
 const imageCallTimeout = 60 * time.Second
 
 // ImageRequest 是一次修圖：一張原圖加一段提示詞。
@@ -57,7 +56,6 @@ func (m ImageModel) Generator() ImageGenerator {
 	return boundedImage{inner: m.gen, timeout: t}
 }
 
-// withTimeout 換掉 deadline，只給測試縮短等待。
 func (m ImageModel) withTimeout(d time.Duration) ImageModel {
 	m.timeout = d
 	return m
@@ -97,7 +95,6 @@ func disabledImage(status Status) ImageModel {
 	return ImageModel{gen: disabledImageGenerator{}, status: status}
 }
 
-// buildImage 是圖片 client 唯一的建構點；baseURLOverride 只給測試把 genai 指到替身 server。
 func buildImage(cfg Config, log *slog.Logger, baseURLOverride string) ImageModel {
 	name, _, key, status := resolve(ImageAI, cfg, log)
 	if status != StatusEnabled {

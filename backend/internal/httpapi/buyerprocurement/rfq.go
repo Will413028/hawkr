@@ -19,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// RFQ 發布鏈三支方法的欄位違規對照：模組的欄位名對到請求的 proto 路徑。
 var (
 	pricePaths   = rpc.FieldPaths{"LowerBoundAmount": "buyer_requested_range.lower_bound_amount", "UpperBoundAmount": "buyer_requested_range.upper_bound_amount"}
 	publishPaths = rpc.FieldPaths{
@@ -176,7 +175,6 @@ func publicationStateToProto(code string) (pb.PublicationState, error) {
 	return pb.PublicationState(v), nil
 }
 
-// dateFromProto 把 google.type.Date 轉成當日 UTC 午夜；nil 是沒設，不合法的日曆日期是請求錯誤。
 func dateFromProto(path string, d *date.Date) (*time.Time, error) {
 	if d == nil {
 		return nil, nil

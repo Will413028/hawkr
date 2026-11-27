@@ -68,7 +68,6 @@ func (d Dispatcher) Run(ctx context.Context, args RunArgs) error {
 	return d.settleFailure(context.WithoutCancel(ctx), run, ctx.Err(), execErr)
 }
 
-// claimResult 把領取（轉 RUNNING）的結果分類：領到了、不該執行（已被領走、已終結、已被刪除）或真正的錯誤。
 func claimResult(err error) (claimed bool, ret error) {
 	var invalid *InvalidTransitionError
 	switch {
@@ -81,8 +80,6 @@ func claimResult(err error) (claimed bool, ret error) {
 	}
 }
 
-// settleOutcome 決定 executor 失敗後 run 怎麼收斂：已要求取消的收斂到 CANCELLED（不退額度）；
-// job 的 ctx 被關機或 Timeout 取消（不是買家取消）是 WORKER_LOST；其餘是該 run 類型的 pipeline 失敗。失敗都退額度。
 func settleOutcome(status, runType string, jobCtxErr, execErr error) outcome {
 	switch {
 	case status == StatusCancelRequested:
@@ -112,7 +109,6 @@ func failureReasonOf(execErr error, runType string) string {
 	return failureFor(runType)
 }
 
-// settleFailure 在 executor 失敗後收斂 run；已在終態或已被刪除什麼都不做。
 func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgentRun, jobCtxErr, execErr error) error {
 	return d.DB.InTx(ctx, func(ctx context.Context) error {
 		cur, err := d.Ledger.lockRun(ctx, run.ID)

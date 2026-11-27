@@ -10,15 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔是「重新寄送發票通知」的三個入口（端點 32 賣家／49 ADM／71 買家）的 Layer 5。
-//
-// 三支回**同一個** proto message，因為它們是同一件事的三個身分入口。差別只有兩處：
-// 身分欄（store_id／buyer_id／actor_account_id）與歸屬述詞，而後者在 usecase／SQL 裡。
-//
-// 🔴 **9352 走 codes.ResourceExhausted**（§6.1.10 逐字）而不是 envelope 的非零碼：
-// 它要對應到 HTTP 429，而 Gateway 的 `envelopeCodeToGRPC` 是以 gRPC status 判定的。
-// 回成 `Code: 9352` 的成功回應會變成 HTTP 200，前端的「請稍候再試」永遠不會出現。
-// bizOf 走的是 DomainError → envelope 那條路，所以本檔必須自己攔 9352。
 
 // ResendInvoiceNotification 是端點 32（賣家重新寄送）。
 func (s *InvoiceServer) ResendInvoiceNotification(
@@ -74,14 +65,11 @@ func (s *InvoiceServer) ResendInvoiceNotificationForAdmin(
 	return s.resendResponse(ctx, "invoice.admin.notification_resend.failed", res, err)
 }
 
-// resendResponse 是三支共用的錯誤分流與回應組裝。
 func (s *InvoiceServer) resendResponse(
 	ctx context.Context, event string, res usecase.ResendResult, err error,
 ) (*pb.ResendInvoiceNotificationResponse, error) {
 	if err != nil {
 		if code, msg, ok := bizOf(err); ok {
-			// 9352 → ResourceExhausted（HTTP 429）。message 帶 `[9352] ` 前綴讓
-			// Gateway 的 envelopeCodeToGRPC 認得出是哪一個業務碼。
 			if code == bizcode.InvoiceNotificationResendTooFrequent {
 				return nil, status.Errorf(codes.ResourceExhausted, "[%d] %s", code, msg)
 			}
@@ -94,8 +82,6 @@ func (s *InvoiceServer) resendResponse(
 		Data: &pb.ResendInvoiceNotificationData{
 			Resent: res.Resent,
 			SentAt: fmtTimeValue(res.SentAt),
-			// 沒有 email 的文件（載具發票／收據）回空字串——誠實的「沒有寄件對象」，
-			// 不是遮罩失敗。
 			ToMasked: res.ToMasked,
 		},
 	}, nil

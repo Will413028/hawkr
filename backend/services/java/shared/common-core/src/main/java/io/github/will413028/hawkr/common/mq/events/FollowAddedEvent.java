@@ -23,7 +23,7 @@ public class FollowAddedEvent extends BaseEvent {
     private Long followerId;
     private String followerName;
     private Long followeeId;
-    private String followeeType;  // USER, SELLER
+    private String followeeType;
 
     public static FollowAddedEvent create(Long followId, Long followerId, String followerName,
                                            Long followeeId, String followeeType) {

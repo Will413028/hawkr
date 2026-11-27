@@ -25,7 +25,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// parties 是舊訂單服務的替身：單號 → (買家, 店家)。
 type parties map[string][2]int64
 
 func (p parties) OrderParties(_ context.Context, orderNo string) (orderservice.OrderParties, error) {
@@ -36,7 +35,6 @@ func (p parties) OrderParties(_ context.Context, orderNo string) (orderservice.O
 	return orderservice.OrderParties{OrderNo: orderNo, BuyerID: v[0], StoreID: v[1], Status: "50"}, nil
 }
 
-// openGuards 是 crm 的守門 port 的替身：買家與店家都營運中（這組測試驗證消費端的冪等，守門本身由 crm 的整合測試驗證）。
 type openGuards struct{}
 
 func (openGuards) LockNotClosed(context.Context, int64) error  { return nil }
@@ -69,7 +67,6 @@ func setup(t *testing.T, p parties) *env {
 	return &env{t: t, d: d, crm: m, q: q, c: Consumer{CRM: m, Orders: p, Jobs: q}}
 }
 
-// run 把 handler 排出的 job 全部交給 worker 各執行一次（模擬 River），再清空佇列。
 func (e *env) run() {
 	e.t.Helper()
 	for _, a := range e.q.args {
@@ -126,17 +123,16 @@ func TestReplaysThroughConsumerAreIdempotent(t *testing.T) {
 	}
 	for _, body := range []string{
 		refundBody("uuid-a", "C1", "O1", "PARTIAL_REFUND", 300, "REF-1"),
-		refundBody("uuid-b", "C1", "O1", "PARTIAL_REFUND", 300, "REF-1"), // 每小時重發：新的 event_id
+		refundBody("uuid-b", "C1", "O1", "PARTIAL_REFUND", 300, "REF-1"),
 		refundBody("uuid-c", "C1", "O1", "PARTIAL_REFUND", 300, "REF-1"),
-		refundBody("uuid-a", "C1", "O1", "PARTIAL_REFUND", 300, "REF-1"), // 同一個 event_id 再送
+		refundBody("uuid-a", "C1", "O1", "PARTIAL_REFUND", 300, "REF-1"),
 	} {
 		if err := e.c.RefundCompleted(ctx, []byte(body)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	e.run()
-	e.run() // 同樣的 job 再跑一輪（River 重試或兩份 queue）。
-	// 全部處理完之後又來一次重放。
+	e.run()
 	if err := e.c.OrderCompleted(ctx, []byte(orderBody("evt-1", "O1", 71, 1000))); err != nil {
 		t.Fatal(err)
 	}

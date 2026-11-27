@@ -9,11 +9,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// fakeIdem 是冪等表的記憶體替身，**忠實重現 (scope, actor_id, idem_key) 這個主鍵**。
-//
-// 🔴 少了任何一段主鍵，測試就驗不到它存在的理由：
-//   - 少 scope  ⇒ 同一把鍵在不同端點之間互撞（前端常對整個頁面用同一把鍵）
-//   - 少 actorID ⇒ A 買家的鍵擋住 B 買家，而鍵是前端產生的、不保證全域唯一
 type fakeIdem struct {
 	rows map[[3]string]*domain.IdempotencyRecord
 }
@@ -136,18 +131,17 @@ func TestClaimIdempotency(t *testing.T) {
 func TestRequestFingerprint(t *testing.T) {
 	base := RequestFingerprint("MOBILE", "/ABC1234", "", "", "label", "false")
 	for _, m := range [][]string{
-		{"EMAIL", "/ABC1234", "", "", "label", "false"},          // carrierType
-		{"MOBILE", "/XYZ9999", "", "", "label", "false"},         // value
-		{"MOBILE", "/ABC1234", "77777177", "", "label", "false"}, // buyerTaxID
-		{"MOBILE", "/ABC1234", "", "抬頭", "label", "false"},       // buyerName
-		{"MOBILE", "/ABC1234", "", "", "別的", "false"},            // label
-		{"MOBILE", "/ABC1234", "", "", "label", "true"},          // setDefault
+		{"EMAIL", "/ABC1234", "", "", "label", "false"},
+		{"MOBILE", "/XYZ9999", "", "", "label", "false"},
+		{"MOBILE", "/ABC1234", "77777177", "", "label", "false"},
+		{"MOBILE", "/ABC1234", "", "抬頭", "label", "false"},
+		{"MOBILE", "/ABC1234", "", "", "別的", "false"},
+		{"MOBILE", "/ABC1234", "", "", "label", "true"},
 	} {
 		if RequestFingerprint(m...) == base {
 			t.Errorf("改了 %v 指紋卻沒變 —— 那一種改法會繞過「同鍵不同內容」的判定", m)
 		}
 	}
-	// 分隔符必須擋得住「欄位值本身含分隔字元」造成的碰撞。
 	if RequestFingerprint("a", "b") == RequestFingerprint("ab", "") {
 		t.Error("欄位邊界沒守住：不同的輸入折成了同一個字串")
 	}

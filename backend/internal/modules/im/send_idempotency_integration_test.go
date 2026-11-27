@@ -46,7 +46,6 @@ func TestResendReturnsTheFirstMessageWithoutSideEffects(t *testing.T) {
 	conv := first.ConversationID
 	unread := f.unread(t, f.storeParty(t, s1))
 	events := len(f.sent)
-	// 以對話 ID 與以對方 ID 重送、文字空白不同但正規化後相同，都回第一則。
 	for _, again := range []im.SendInput{
 		in,
 		{RequestID: in.RequestID, Sender: buyer, ConversationID: conv, Type: im.TypeText, Text: "你好"},
@@ -315,7 +314,6 @@ func TestSecondSendOfTheSameRequestWaitsOnTheEntryLock(t *testing.T) {
 	held, rel := make(chan struct{}), make(chan struct{})
 	var releaseOnce sync.Once
 	release := func() { releaseOnce.Do(func() { close(rel) }) }
-	// 失敗路徑（沒有等在入口鎖上）也要放行停住的第一個 Send，否則它的 transaction 一直不結束，資料庫清理會卡住。
 	t.Cleanup(release)
 	var first atomic.Bool
 	f.stores.afterLock = func() {

@@ -44,7 +44,6 @@ class AuthRepository {
     required DefaultErrorText defaults,
   }) : _defaults = defaults;
 
-  // ─────────────────── 帳號（IdentityAppService） ───────────────────
 
   /// 目前登入的帳號（GetSession）：帳號 ID 與停權狀態。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
   /// 錯誤轉成 [AppException]：文字取自伺服器的 LocalizedMessage。
@@ -119,7 +118,6 @@ class AuthRepository {
     }
   }
 
-  // ─────────────────── Profile / media ───────────────────
 
   Future<T> _writeWithEtag<T>(Future<T> Function() write) async {
     try {
@@ -218,7 +216,6 @@ class AuthRepository {
         ? profile.avatar.uri(ImagePreset.avatar)
         : '',
     phone: profile.phone,
-    // optional enum：不認得的值與沒有設值無法分辨（API 規範），UNSPECIFIED 同樣當作沒有填。
     gender: profile.hasGender() && profile.gender != Gender.GENDER_UNSPECIFIED
         ? profile.gender
         : null,

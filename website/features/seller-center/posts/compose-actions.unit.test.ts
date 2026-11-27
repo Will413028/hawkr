@@ -66,13 +66,10 @@ describe("代行建立貼文：兩條路徑都要顯性", () => {
 			rendered.lastIndexOf("<Button", publish),
 			publish,
 		);
-		// 主要按鈕不帶 variant（預設 solid）。
 		expect(button).not.toContain("variant=");
 	});
 
 	it("缺 posts.publish 時「暫不發布」升為主要，不留一顆孤零零的次要按鈕", () => {
-		// 發布鍵在缺 capability 時不渲染 ⇒ 若草稿鍵恆為 bordered，畫面上只剩一顆
-		// 次要樣式的按鈕，看起來像被停用的殘骸。條件式 variant 就是這條退化的實作。
 		expect(rendered).toMatch(
 			/variant=\{canPublishPosts && !isEdit \? "bordered" : "solid"\}/,
 		);
@@ -89,14 +86,11 @@ describe("代行建立貼文：兩條路徑都要顯性", () => {
 	});
 
 	it("兩顆按鈕各自帶 loading，不共用一個布林", () => {
-		// 共用布林時，「儲存並發布」的等待轉圈會畫在「暫不發布」那顆上。
 		expect(rendered).toContain('isLoading={submittingIntent === "draft"}');
 		expect(rendered).toContain('isLoading={submittingIntent === "publish"}');
 	});
 
 	it("只有已確認的 imagePreview 能解除發布照片閘門", () => {
-		// pendingImage 只是尚未確認裁切的來源檔；把它算成有圖會讓使用者取消裁切後
-		// 仍能發布。create/edit 共用的權威狀態是畫面真正正在預覽的 imagePreview。
 		expect(rendered).toMatch(
 			/const\s+\w*[Hh]as(?:Publish)?Image\w*\s*=\s*Boolean\(imagePreview\)/,
 		);

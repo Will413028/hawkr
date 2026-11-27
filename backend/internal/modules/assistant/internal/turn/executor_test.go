@@ -20,7 +20,6 @@ import (
 
 const buyer = int64(4242)
 
-// gatedLLM 在第一次被呼叫時通知 started，然後等 release 關閉才回答；之後的呼叫不再等。
 type gatedLLM struct {
 	started chan struct{}
 	release chan struct{}
@@ -60,12 +59,11 @@ func TestSecondSubmitOnSameSessionIsRejectedWhileATurnIsInFlight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-g.started // 第一輪的 LLM 呼叫已開始，對話被佔用
+	<-g.started
 
 	if _, err := submitChat(t, e, first.SessionID, "再問一次"); !errors.Is(err, model.ErrTurnInProgress) {
 		t.Fatalf("進行中再送出 = %v，要 ErrTurnInProgress", err)
 	}
-	// 不同的對話不受影響。
 	other, err := submitChat(t, e, "", "另一個對話")
 	if err != nil {
 		t.Fatalf("另一個對話被擋：%v", err)
@@ -79,7 +77,6 @@ func TestSecondSubmitOnSameSessionIsRejectedWhileATurnIsInFlight(t *testing.T) {
 			t.Fatalf("結束事件 = %+v", last)
 		}
 	}
-	// 看到結束事件就代表佔用已釋放：同一個對話可以開下一輪。
 	next, err := submitChat(t, e, first.SessionID, "第二輪")
 	if err != nil {
 		t.Fatalf("結束後再送出：%v", err)
@@ -110,7 +107,7 @@ func (panicLLM) GenerateContent(context.Context, *adkmodel.LLMRequest, bool) ite
 }
 
 func TestGuardIsReleasedWhenTheTurnContextIsCancelled(t *testing.T) {
-	g := newGatedLLM() // release 永不關閉：只有取消能讓它結束
+	g := newGatedLLM()
 	e := newExecutor(t, g, &fakeOrders{}, nil)
 	first, err := submitChat(t, e, "", "你好")
 	if err != nil {
@@ -154,13 +151,11 @@ func TestToolErrorIsReportedAsAFailedToolResultAndTheTurnStillFinishes(t *testin
 	if len(fed) != 1 {
 		t.Fatalf("回給 LLM 的 tool 結果 = %v", fed)
 	}
-	// 模型只看到不帶語言的代碼，看不到下游的錯誤文字。
 	if resp, _ := fed[0]["response"].(map[string]any); resp["error"] != "upstream_unavailable" || len(resp) != 1 {
 		t.Fatalf("tool 的錯誤要以代碼回給 LLM：%v", fed)
 	}
 }
 
-// tamperedSessions 把新建 session 的 buyer_id 改成別人，模擬 session state 與這一輪的買家不一致。
 type tamperedSessions struct{ session.Service }
 
 func (s tamperedSessions) Create(ctx context.Context, req *session.CreateRequest) (*session.CreateResponse, error) {
@@ -249,7 +244,6 @@ func TestEventsCarryTheBuyersTurnOnly(t *testing.T) {
 	}
 }
 
-// manyPartials 讓一輪產生 n 個 text 事件。
 func manyPartials(n int) *scriptedLLM {
 	var chunks []chunk
 	full := ""
@@ -269,7 +263,7 @@ func TestWatchReplaysFromACursor(t *testing.T) {
 		t.Fatal(err)
 	}
 	all := collect(t, e, buyer, ref.TurnID, "")
-	if len(all) != 6 { // 5 個 text 加 finished
+	if len(all) != 6 {
 		t.Fatalf("事件數 = %d", len(all))
 	}
 	for i, ev := range all {
@@ -281,7 +275,6 @@ func TestWatchReplaysFromACursor(t *testing.T) {
 	if len(rest) != 3 || rest[0].Text != all[3].Text || rest[2].Kind != model.EventFinished {
 		t.Fatalf("從第 3 個事件之後接續：%+v", rest)
 	}
-	// 從最後一個事件之後接續：沒有新事件，也沒有錯誤；一輪已結束，迭代器立刻結束。
 	seq, err := e.Watch(context.Background(), buyer, ref.TurnID, all[5].Cursor)
 	if err != nil {
 		t.Fatal(err)
@@ -297,8 +290,7 @@ func TestWatchCursorAhead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.wg.Wait() // 這一輪已結束，終止事件已寫入
-	// 共 11 個事件；緩衝不覆蓋舊事件，任何 0 到 11 的 cursor 都接得上。
+	e.wg.Wait()
 	for _, c := range []string{"", "0", "6", "11"} {
 		if _, err := e.Watch(context.Background(), buyer, ref.TurnID, c); err != nil {
 			t.Fatalf("cursor %q = %v", c, err)
@@ -315,7 +307,6 @@ func TestWatchCursorAhead(t *testing.T) {
 }
 
 func TestATurnThatOverflowsTheBufferEndsWithAnErrorAndReleasesTheSession(t *testing.T) {
-	// 上限 4：前 3 格給一般事件，第 4 格留給終止事件。10 個 text 增量寫不下。
 	e := newExecutor(t, manyPartials(10), &fakeOrders{}, func(c *Config) { c.BufferCapacity = 4 })
 	ref, err := submitChat(t, e, "", "你好")
 	if err != nil {
@@ -333,7 +324,6 @@ func TestATurnThatOverflowsTheBufferEndsWithAnErrorAndReleasesTheSession(t *test
 	if last := evs[3]; last.Kind != model.EventError || last.Failure != model.FailureInterrupted {
 		t.Fatalf("寫滿後要以 interrupted 的 error 結束：%+v", last)
 	}
-	// 終止事件之後佔用已釋放。
 	e.wg.Wait()
 	next, err := submitChat(t, e, ref.SessionID, "再問")
 	if err != nil {
@@ -376,7 +366,7 @@ func TestWatchEndsQuietlyWhenItsContextEnds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cancel() // 呼叫者的期限到了（例如 100 秒）：迭代器正常結束，輪次不受影響
+	cancel()
 	for ev, err := range seq {
 		t.Fatalf("不該有事件或錯誤：%+v %v", ev, err)
 	}

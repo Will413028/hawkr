@@ -71,7 +71,6 @@ func TestListInboxItemsPaginatesNewestFirstAndTotalFollowsTheFilter(t *testing.T
 	if ids, totals := listAll(t, s, 7, buyer, &account, 2); !slices.Equal(ids, want) || totals[0] != 5 {
 		t.Fatalf("ACCOUNT 篩選：%v %v", ids, totals)
 	}
-	// 篩選到沒有型別的分類：沒有列，total_size 是 0（不是整個收件匣的 5）。
 	chat := pb.NotificationCategory_NOTIFICATION_CATEGORY_CHAT
 	if ids, totals := listAll(t, s, 7, buyer, &chat, 2); len(ids) != 0 || totals[0] != 0 {
 		t.Fatalf("CHAT 篩選：%v %v，預期沒有列、total_size 0", ids, totals)
@@ -101,7 +100,6 @@ func TestListInboxItemsRejectsBadRequests(t *testing.T) {
 			t.Errorf("%s：欄位 = %q，預期 %q", name, got, tc.field)
 		}
 	}
-	// page_token 換了 audience 或 category 就不能沿用。
 	for i := range 3 {
 		s.item(t, 9, "STORE", 90, "account_suspended", paramsSusp, i, nil)
 		s.item(t, 9, "BUYER", 0, "account_suspended", paramsSusp, i, nil)
@@ -333,7 +331,6 @@ func TestStoreAudienceNeedsACurrentStoreAndIsIsolated(t *testing.T) {
 		wantCode(t, call(), connect.CodeNotFound)
 		_ = name
 	}
-	// 沒有店的帳號 7 的 STORE 列（舊店）沒有被動到。
 	if s.count(t, `SELECT count(*) FROM notification.inbox_items WHERE account_id = 7 AND read_at IS NOT NULL`) != 0 {
 		t.Fatal("沒有店時 MarkAll 不能動到任何列")
 	}
@@ -424,7 +421,6 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 		}
 		return resp.Msg.GetEntry(), nil
 	}
-	// 關掉公告推播：回傳更新後的那一項，之後的列表是關；重複設定成功。
 	for range 2 {
 		e, err := update(buyer, ann, push, false)
 		if err != nil || e.GetEnabled() || !e.GetCanDisable() || e.GetCategory() != ann || e.GetChannel() != push {
@@ -440,14 +436,12 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 	if get(9, store)[pair{ann, push}].GetEnabled() != true {
 		t.Fatal("買家的偏好不能影響店家受眾")
 	}
-	// 設回預設值不留覆寫列。
 	if e, err := update(buyer, ann, push, true); err != nil || !e.GetEnabled() {
 		t.Fatalf("打開：%v %v", e, err)
 	}
 	if s.count(t, `SELECT count(*) FROM notification.preference_overrides`) != 0 {
 		t.Fatal("設回預設值不該留覆寫列")
 	}
-	// 不可關閉的組合：關閉是 invalid_argument、打開成功。
 	if got := invalidField(t, func() error { _, err := update(buyer, acct, inbox, false); return err }()); got != "enabled" {
 		t.Fatalf("欄位 = %q", got)
 	}
@@ -455,7 +449,6 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 	if e, err := update(buyer, acct, email, true); err != nil || !e.GetEnabled() || e.GetCanDisable() {
 		t.Fatalf("不可關閉的組合打開：%v %v", e, err)
 	}
-	// 註冊表不會送達的組合：公告沒有 email、CHAT 只有推播；受眾沒有的分類。
 	chat, payout := chatC, payC
 	for name, c := range map[string]struct {
 		aud pb.NotificationAudience
@@ -517,7 +510,6 @@ func TestDeviceTokensRebindToTheCallerAndDeleteOnlyOwn(t *testing.T) {
 	if a, app, _ := owner("tok"); a != 8 || app != "SELLER" || s.count(t, `SELECT count(*) FROM notification.device_tokens`) != 1 {
 		t.Fatalf("換帳號登入時改綁給呼叫者：%d %s", a, app)
 	}
-	// 別人的 token 與不存在的 token：成功，且別人的 token 還在。
 	if err := del(7, "tok"); err != nil {
 		t.Fatalf("刪別人的 token 也回成功：%v", err)
 	}
@@ -530,7 +522,6 @@ func TestDeviceTokensRebindToTheCallerAndDeleteOnlyOwn(t *testing.T) {
 	if err := del(8, "tok"); err != nil || s.count(t, `SELECT count(*) FROM notification.device_tokens`) != 0 {
 		t.Fatalf("刪自己的 token：%v", err)
 	}
-	// 輸入檢查。
 	for name, c := range map[string]struct {
 		err   error
 		field string

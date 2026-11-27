@@ -8,7 +8,6 @@
  *   - Email / phone use lightweight format checks (server is the truth)
  */
 
-/* ===== Email / Phone ===== */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

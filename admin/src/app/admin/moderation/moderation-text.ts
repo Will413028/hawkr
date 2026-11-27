@@ -20,8 +20,6 @@ import {
 } from "@/lib/policy-category";
 import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-// 社群檢舉案件的名稱。檢舉對象種類與檢舉結果取目錄的後台受眾文字；其餘列舉只有 admin 用，是 admin 的單端表（UNSPECIFIED 不在表裡）；
-// 不認得的值與 UNSPECIFIED 顯示「未知」。
 
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,

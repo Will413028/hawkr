@@ -294,7 +294,6 @@ describe("徽章讀帳戶狀態，說明句與按鈕只讀任務", () => {
 			fireEvent.click(screen.getByText("重新整理"));
 		});
 		expect(mocks.refetch).toHaveBeenCalledTimes(1);
-		// 只有進入頁面的那一次自動重讀，「重新整理」沒有再呼叫它。
 		expect(mocks.refreshAndReload).toHaveBeenCalledTimes(1);
 	});
 
@@ -431,7 +430,6 @@ describe("EMBEDDED：內嵌元件", () => {
 		await act(async () => {
 			fireEvent.click(screen.getByText("前往設定收款帳戶"));
 		});
-		// 進入頁面的自動重讀已經一次；離開元件再一次。
 		expect(mocks.refreshAndReload).toHaveBeenCalledTimes(1);
 		await act(async () => {
 			fireEvent.click(screen.getByText("exit-embedded"));

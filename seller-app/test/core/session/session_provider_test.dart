@@ -40,13 +40,9 @@ void main() {
     setUpAll(() async {
       if (!F.isInitialized) F.init(Flavor.dev);
 
-      // logout() → PushNotificationManager.instance 的欄位初始化會呼叫
-      // FirebaseMessaging.instance（→ Firebase.app()），沒有註冊 app 會拋
-      // `core/no-app`。
       setupFirebaseCoreMocks();
       await Firebase.initializeApp();
 
-      // AuthStorage 走 FlutterSecureStorage → native MethodChannel。
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
             const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
@@ -103,7 +99,6 @@ void main() {
       final notifier = container.read(sessionProvider.notifier);
       await notifier.login(accountId: 'acc-1');
 
-      // 第二次呼叫落在第一次的第一個 await 之前 → 必須被旗標擋下。
       final first = notifier.logout();
       final second = notifier.logout();
       await Future.wait([first, second]);
@@ -116,8 +111,6 @@ void main() {
       final chat = _CountingChatSession();
       final container = containerWith(chat);
       final notifier = container.read(sessionProvider.notifier);
-      // 模擬 401 interceptor：在第一輪登出的副作用執行途中再次呼叫 logout。
-      // 上限 5 次只是避免守衛失效時測試無限跑，斷言仍是「恰好一次」。
       chat.onStop = () {
         if (chat.stopCalls < 5) unawaited(notifier.logout());
       };
@@ -148,7 +141,6 @@ void main() {
       );
       final container = containerWith(_CountingChatSession());
 
-      // 沒有 login()：session 沒有登入，等同「state 已被清空後再被觸發」。
       await container.read(sessionProvider.notifier).logout();
 
       expect(gateway.removeCalls, isEmpty);

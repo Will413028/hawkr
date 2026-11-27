@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/grpcclient"
 )
 
-// timeout 是一次推送的 deadline：一批約 430 天區間的假日（約 120 列）加一個交易，不在任何使用者的請求路徑上。
 const timeout = 10 * time.Second
 
 const dateLayout = "2006-01-02"

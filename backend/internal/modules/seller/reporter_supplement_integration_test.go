@@ -28,7 +28,6 @@ func (f *fixture) reporterReport(t *testing.T, storeID int64) SubmitReportResult
 	return r
 }
 
-// addSupplement 以檢舉人的身分補充；每個 name 放一份機敏佐證（上傳者是檢舉人的帳號）。
 func (f *fixture) addSupplement(t *testing.T, reportID uuid.UUID, description string, names ...string) (Report, error) {
 	t.Helper()
 	return f.module.AddReportSupplement(context.Background(), AddSupplementInput{

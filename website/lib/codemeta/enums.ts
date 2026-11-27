@@ -1,12 +1,3 @@
-// CodeMeta 生成部分：re-export 自 ./generated。
-//
-// ./generated.ts 由 `backend/docs/代碼管理（CodeMeta）/scripts/generate.sh --web`
-// 直接從 CodeMeta Markdown 生成（CI 檢查 drift；buyer/seller app 的 code_meta.dart 同）。
-// DO NOT 手動修改 ./generated.ts；要修改代碼值請改 backend 的
-// 業務狀態碼.md / 業務類型碼.md / 內部技術碼.md 後重新生成。
-//
-// 本檔（enums.ts）是穩定的公開入口：既有 import 路徑不需變動，CodeMeta 生成內容
-// re-export 於此，手寫的工具函式（非 CodeMeta 範疇）也放在本檔繼續維護。
 export * from "./generated";
 
 import {
@@ -71,10 +62,6 @@ export const SELLER_CANCEL_REASON_LABEL: Record<
 	"9299": "其他原因",
 };
 
-// 賣家停權原因（46 §7.2 停權公告頁顯示用）— issue #1514 後端傳輸值已統一改送
-// CodeMeta Value 數字碼（"9601" 等），與 ./generated 的數字碼鍵版本一致，移除
-// 先前為了 shadow 舊 Name 傳輸值而手寫的覆蓋版本，改用 `export * from "./generated"`
-// （檔案頂部）帶出的 SellerSuspensionReason / SELLER_SUSPENSION_REASON_LABEL。
 
 /**
  * 售後證據類型（CodeMeta `AfterSaleEvidenceType`，backend `內部技術碼.md`）。
@@ -99,9 +86,6 @@ export type AfterSaleEvidenceTypeCode = keyof typeof AfterSaleEvidenceType;
 export type AfterSaleEvidenceTypeValue =
 	(typeof AfterSaleEvidenceType)[AfterSaleEvidenceTypeCode];
 
-/* ============================================================
-   ShippingMethod：正規化與顯示（全站唯一入口）
-   ============================================================ */
 
 /**
  * 把後端送來的配送方式值正規化成 CodeMeta `ShippingMethod` value。
@@ -125,7 +109,6 @@ export function normalizeShippingMethod(
 	const allowed = new Set<string>(Object.values(ShippingMethod));
 	if (allowed.has(v)) return v as ShippingMethodValue;
 	switch (v.toUpperCase().replace(/[\s-]/g, "_")) {
-		// 黑貓宅配的歷史別名（含賣家端 fixture 用的 "home"／"宅配"）
 		case "TAQBIN":
 		case "TCAT":
 		case "HOME_DELIVERY":

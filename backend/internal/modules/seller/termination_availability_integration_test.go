@@ -33,7 +33,6 @@ func TestTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T) {
 			withoutNotice = append(withoutNotice, g)
 		}
 	}
-	// 每個狀態先在開著的店留下一筆認定（之後 MATERIAL_BREACH 引用它），再走到要驗的狀態。
 	finding := func(storeID int64) uuid.UUID {
 		warn := f.violate(t, storeID, SeverityLow, MeasureWarning, nil)
 		return warn.Findings[0].ID
@@ -149,7 +148,6 @@ func TestLinkedTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T)
 				t.Errorf("%s：帳號 %d 清單說 %v，CreateMeasure 回 %v", label, l.AccountID, l.CanCreateLinkedTermination, err)
 			}
 			if err == nil {
-				// 清掉剛建立的關聯終止，讓同一個狀態可以再驗。
 				created := f.measureOf(t, source.ID).LinkedAccounts
 				for _, c := range created {
 					if c.AccountID == l.AccountID && c.LinkedMeasureID != nil {
@@ -160,7 +158,6 @@ func TestLinkedTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T)
 		}
 	}
 
-	// 停權當來源：身分快照在，但不是 21.3 事由的終止 → 不能建立。
 	suspension := f.suspend(t, sA.StoreID)
 	if got := f.measureOf(t, suspension.ID).LinkedAccounts; len(got) != 1 || got[0].AccountID != accountB {
 		t.Fatalf("停權來源要列出帳號 B：%+v", got)
@@ -169,7 +166,6 @@ func TestLinkedTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T)
 	endRisk := f.endRisk(t, suspension)
 	_ = endRisk
 
-	// 21.3 終止當來源：可以；建立之後（已有生效中的關聯終止）不行；撤銷之後回到可以。
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	parity("21.3 來源", source, map[int64]bool{accountB: true})
 	src := source.ID
@@ -183,7 +179,6 @@ func TestLinkedTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T)
 		t.Fatalf("同來源第二筆：%v", err)
 	}
 
-	// 關聯終止當來源：不成鏈 → 帳號 A 那一列是 false。
 	parity("關聯終止當來源", f.measureOf(t, lm.Measure.ID), map[int64]bool{accountA: false})
 
 	f.revoke(t, f.measureOf(t, lm.Measure.ID))
@@ -192,7 +187,6 @@ func TestLinkedTerminationAvailabilityIsTheSameRuleAsCreateMeasure(t *testing.T)
 		t.Fatalf("關聯終止撤銷之後回到可建立：%+v", got)
 	}
 
-	// 目標店家已關閉（賣家自己關店）：關聯帳號是 21.3 事由，仍可建立。
 	_, err = f.module.CloseCurrent(ctx, accountB)
 	must(t, err)
 	parity("目標店家已關閉", source, map[int64]bool{accountB: true})
@@ -228,21 +222,18 @@ func TestApplyStoreSeparatesSuspensionFromTermination(t *testing.T) {
 	_, err = f.module.Apply(ctx, validApply(terminatedAccount))
 	check("終止", err, apperr.ReasonStoreOpeningTerminated, terminatedText)
 
-	// 同時有停權：仍是終止（解除停權也開不了）。
 	both, bs := f.open(t)
 	f.suspend(t, bs.StoreID)
 	f.effect(t, f.terminate(t, bs.StoreID, GroundFraud))
 	_, err = f.module.Apply(ctx, validApply(both))
 	check("終止加停權", err, apperr.ReasonStoreOpeningTerminated, terminatedText)
 
-	// 終止撤銷、店家恢復之後帳號有目前的店家：AlreadyExists（不是這兩個 reason）；撤銷發生在清理之後才是「可以再開」，由既有測試涵蓋。
 	f.revoke(t, m)
 	_, err = f.module.Apply(ctx, validApply(terminatedAccount))
 	if apperr.KindOf(err) != apperr.KindAlreadyExists {
 		t.Fatalf("恢復之後：%v", err)
 	}
 
-	// KYC 的身分比對維持通用錯誤。
 	blockedAccount, blockedStore, _ := f.submittedCompany(t, taxIDOne)
 	f.effect(t, f.terminate(t, blockedStore.StoreID, GroundFraud))
 	_ = blockedAccount
@@ -370,7 +361,6 @@ func TestRetentionFollowsTheLatestAppealDeadlineAmongAllTerminations(t *testing.
 		t.Fatal("剛好是最晚的申覆期限不清（要嚴格超過）")
 	}
 
-	// 最晚的那一筆上有待處理的申覆：期限過了也不清；裁定之後下一輪清。
 	f.now = secondDeadline.Add(-time.Hour)
 	f.appeal(t, accountID, f.measureOf(t, second.ID), "我不同意")
 	f.now = secondDeadline.Add(time.Hour)
@@ -384,7 +374,6 @@ func TestRetentionFollowsTheLatestAppealDeadlineAmongAllTerminations(t *testing.
 		t.Fatal("裁定之後、最晚的申覆期限已過：清理")
 	}
 
-	// 已撤銷的終止不延長保留：撤銷第二筆之後回到關店那筆的期限。
 	g := setup(t)
 	purgeG := func() int {
 		n, err := g.module.PurgePII(context.Background())
@@ -605,7 +594,6 @@ func TestStoreOpeningAvailabilityIsTheSameRuleAsApplyStore(t *testing.T) {
 			}
 		})
 	}
-	// 停權到期之後兩邊同時放行。
 	accountID, s := f.open(t)
 	ends := f.now.Add(time.Hour)
 	f.violate(t, s.StoreID, SeverityLow, MeasureSuspension, &ends)
@@ -623,7 +611,6 @@ func TestStoreOpeningAvailabilityIsTheSameRuleAsApplyStore(t *testing.T) {
 	}
 }
 
-// openingBlockers 取出可用性清單的原因（依序）。
 func openingBlockers(o StoreOpening) []OpeningBlocker {
 	var out []OpeningBlocker
 	for _, u := range o.Unavailable {
@@ -632,7 +619,6 @@ func openingBlockers(o StoreOpening) []OpeningBlocker {
 	return out
 }
 
-// terminationGrounds 是 state.Terminations 的事由（依清單順序）。
 func terminationGrounds(state StoreMeasures) []TerminationGround {
 	out := make([]TerminationGround, len(state.Terminations))
 	for i, o := range state.Terminations {

@@ -21,7 +21,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 class SellerPhotoToolsScreen extends ConsumerStatefulWidget {
   final Uint8List? imagePreview;
   final Uint8List? mediaBytes;
-  final String contentType; // 'image' | 'video'
+  final String contentType;
   const SellerPhotoToolsScreen({
     super.key,
     this.imagePreview,
@@ -43,17 +43,15 @@ class _SellerPhotoToolsScreenState
   final TransformationController _transformController =
       TransformationController();
   Size? _imageSize;
-  double? _viewportSize; // square viewport dimension in logical pixels
+  double? _viewportSize;
   double _minScale = 1.0;
   static const double _maxScale = 5.0;
   bool _transformInitialized = false;
   bool _userInteracted = false;
 
-  // Local mutable state for image editing/preview
   Uint8List? _previewBytes;
   Uint8List? _mediaBytes;
   String _contentType = 'image';
-  // UI state for AI options under the preview
   bool _showAiOptions = false;
 
   @override
@@ -239,7 +237,6 @@ class _SellerPhotoToolsScreenState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // AI Editor with tap handler
           Expanded(
             child: InkWell(
               onTap: _onAiEditorTapped,
@@ -273,18 +270,15 @@ class _SellerPhotoToolsScreenState
 
   Future<void> _runAiEdit({String? prompt}) async {
     if (_contentType != 'image') {
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('目前只支援圖片 AI 編輯')));
       FloatingToast.error(context, '目前只支援圖片 AI 編輯');
       return;
     }
     final src = _mediaBytes ?? _previewBytes;
     if (src == null || src.isEmpty) {
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('沒有可處理的圖片')));
       FloatingToast.error(context, '沒有可處理的圖片');
       return;
     }
 
-    // Show loading dialog
     TruckLoadingOverlay.show(context);
 
     try {
@@ -296,7 +290,7 @@ class _SellerPhotoToolsScreenState
 
       setState(() {
         _previewBytes = edited;
-        _mediaBytes = edited; // bubble back as the media to upload
+        _mediaBytes = edited;
         _contentType = 'image';
         _transformInitialized = false;
       });
@@ -307,8 +301,6 @@ class _SellerPhotoToolsScreenState
         FloatingToast.error(context, e.message);
       }
     } on AiTransformException catch (e) {
-      // 後端已依業務碼分好類（沒產圖 / 未過安全審查 / 版權相似 / 上游不可用），
-      // 直接顯示它的文案，不要蓋成一句泛用的「AI 編輯失敗」。
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         FloatingToast.error(context, e.message);
@@ -316,7 +308,6 @@ class _SellerPhotoToolsScreenState
     } catch (e) {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
-        // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AI 編輯失敗，請稍後再試')));
         FloatingToast.error(context, 'AI 編輯失敗，請稍後再試');
       }
     }
@@ -324,20 +315,16 @@ class _SellerPhotoToolsScreenState
 
   Future<void> _onAiEditorTapped() async {
     if (_contentType != 'image') {
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('目前只支援圖片 AI 編輯')));
       FloatingToast.error(context, '目前只支援圖片 AI 編輯');
       return;
     }
 
-    // 跳轉到圖片編輯器頁面，帶上當前圖片
     final imageBytes = _mediaBytes ?? _previewBytes;
     if (imageBytes == null || imageBytes.isEmpty) {
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('沒有可編輯的圖片')));
       FloatingToast.error(context, '沒有可編輯的圖片');
       return;
     }
 
-    // 將 bytes 寫入臨時檔案
     final tempFile = File(
       '${Directory.systemTemp.path}/edit_image_${DateTime.now().millisecondsSinceEpoch}.jpg',
     );
@@ -350,7 +337,6 @@ class _SellerPhotoToolsScreenState
       extra: PhotoEditorArgs(file: tempFile, category: 'post'),
     );
 
-    // 如果編輯完成並返回了檔案，更新預覽
     if (result != null && mounted) {
       final editedBytes = await result.readAsBytes();
       setState(() {
@@ -798,7 +784,6 @@ class _DashGridPainter extends CustomPainter {
       }
     }
 
-    // Draw 3x3 grid dashed lines
     final double w = size.width;
     final double h = size.height;
     final List<double> verticals = [w / 4, w / 2, 3 * w / 4];

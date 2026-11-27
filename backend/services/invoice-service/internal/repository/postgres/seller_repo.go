@@ -69,7 +69,6 @@ func (r *IssuerRepository) Create(ctx context.Context, in domain.NewIssuer) (dom
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// RETURNING 沒有列 ＝ ON CONFLICT DO NOTHING 生效。這不是錯誤。
 			return domain.Issuer{}, false, nil
 		}
 		return domain.Issuer{}, false, err
@@ -159,14 +158,6 @@ func (r *SellerTaxProfileRepository) ConfirmReceiptAuthorization(
 	return rows > 0, err
 }
 
-// ---------------------------------------------------------------------------
-// 寫入面：M3 稅務資格狀態機（§7.3.3 T01–T16）
-//
-// 每一支都是一句 CAS，回的 bool ＝ rows>0。allowed-from、expectedVersion、7 天冷卻與
-// 「只能延一次」全部住在 db/queries/seller_tax_profiles.sql 的 WHERE 裡——本層一個
-// 判斷都不加。加了就會有兩份 allowed-from，而它們必然漂移（漂移的症狀是 CAS rows=0
-// 靜默失敗，不是編譯錯）。
-// ---------------------------------------------------------------------------
 
 // Create 建 DRAFT（T01 的 `[*]` 形態）。
 func (r *SellerTaxProfileRepository) Create(
@@ -179,7 +170,6 @@ func (r *SellerTaxProfileRepository) Create(
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// uq_seller_tax_profiles_issuer 已有一列 ⇒ 呼叫端改讀 GetByIssuer。
 			return domain.SellerTaxProfile{}, false, nil
 		}
 		return domain.SellerTaxProfile{}, false, err
@@ -476,8 +466,6 @@ func (r *BuyerPreferenceRepository) Create(
 		PreferenceKind:         in.PreferenceKind,
 		CarrierType:            snp(in.CarrierType),
 		CarrierValueCiphertext: ciphertext,
-		// chk_bip_hash_pair 是雙向等式（密文與 hash 同時 NULL 或同時非 NULL）⇒
-		// 兩者必須由同一個輸入決定，不能一個看 CarrierValue、另一個看別的欄位。
 		CarrierValueHash: r.keys.hashOptional(in.CarrierValue),
 		CarrierValueMask: snp(in.CarrierMask),
 		TaxID:            snp(in.TaxID),
@@ -489,7 +477,6 @@ func (r *BuyerPreferenceRepository) Create(
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// RETURNING 沒有列 ＝ ON CONFLICT DO NOTHING 生效。這不是錯誤。
 			return domain.BuyerPreference{}, false, nil
 		}
 		return domain.BuyerPreference{}, false, err

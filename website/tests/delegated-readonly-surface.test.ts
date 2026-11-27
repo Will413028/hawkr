@@ -91,9 +91,6 @@ function openingTags(text: string, name: string): string[] {
 	return out;
 }
 
-/* ============================================================
-   一、換頭像／換封面：真的渲染，不是讀原始碼
-   ============================================================ */
 
 /**
  * 一份夠用的注入 scope。`SellerProfileBranding` 只讀 `mode`／`hasCapability`
@@ -171,7 +168,6 @@ test("唯讀工作階段：商店設定的兩顆換圖入口與檔案輸入完�
 		"products.read",
 		"posts.read",
 	]);
-	// 預覽本身必須還在 —— 唯讀工作階段要看的正是這個。
 	assert.ok(html.includes("商店外觀預覽"), "預覽被一起拿掉了");
 	assert.ok(
 		!html.includes(AVATAR_CTA),
@@ -181,7 +177,6 @@ test("唯讀工作階段：商店設定的兩顆換圖入口與檔案輸入完�
 		!html.includes(COVER_CTA),
 		"缺 storefront.write 卻仍畫「點此換背景」",
 	);
-	// 兩顆鈕只是觸發器，真正的入口是那兩個 file input；留著它們等於留著 handler。
 	assert.ok(
 		!html.includes('type="file"'),
 		"寫入 handler（file input）仍在 ⇒ §5.3 的「不出現 handler」沒有做到",
@@ -194,7 +189,6 @@ test("具備 storefront.write 的代行工作階段：兩顆換圖入口照舊",
 		"storefront.write",
 		"products.read",
 	]);
-	// 反向鑑別：把判斷寫死成 false（＝有權限的人也被拿掉功能）會在這裡紅。
 	assert.ok(
 		html.includes(AVATAR_CTA),
 		"有 storefront.write 卻拿不到換頭像入口",
@@ -212,9 +206,6 @@ test("賣家自己的 /seller-center：沒有 provider 就沒有 capability 這�
 	assert.ok(html.includes('type="file"'));
 });
 
-/* ============================================================
-   二、商店設定表單本體（效果驅動的 state，無法 SSR 渲染 ⇒ 逐個標籤比對源碼）
-   ============================================================ */
 
 test("商店設定：每個可編輯欄位在無 storefront.write 時都不可輸入", () => {
 	const text = source(PROFILE);
@@ -224,7 +215,6 @@ test("商店設定：每個可編輯欄位在無 storefront.write 時都不可�
 		"canWrite 代行路徑必須來自 storefront.write，賣家路徑來自 GetMyStore 的 STOREFRONT_WRITE",
 	);
 
-	// 登入資訊那兩格本來就是 readOnly（唯讀常數），它們不參與這條判準。
 	const editable = [
 		...openingTags(text, "Input"),
 		...openingTags(text, "Textarea"),
@@ -233,12 +223,6 @@ test("商店設定：每個可編輯欄位在無 storefront.write 時都不可�
 		editable.length >= 6,
 		`可編輯欄位只找到 ${editable.length} 個，解析壞了`,
 	);
-	// `readOnly={!canWrite}` 或 `readOnly={!canWrite || <更多限制>}` 都算過關 ——
-	// 後者是**更嚴**（鎖定單一欄位的條件就是這一種），代行唯讀的保證不變。
-	//
-	// 只放行 `||` 不放行 `&&`：`!canWrite && x` 會讓沒權限的人在 x 為 false 時
-	// 反而可以輸入，那正是這條判準要擋的東西。開頭的 `!canWrite` 也不能省，
-	// 否則整個代行唯讀契約就沒了。
 	const READ_ONLY_AT_LEAST_CAN_WRITE = /readOnly=\{!canWrite\s*(\}|\|\|)/;
 	for (const tag of editable) {
 		assert.match(
@@ -248,8 +232,6 @@ test("商店設定：每個可編輯欄位在無 storefront.write 時都不可�
 		);
 	}
 
-	// 下拉不是 <input>，沒有 readOnly；唯讀下只能 disabled。縣市／鄉鎮市區兩個下拉由
-	// TownFields 渲染：這一頁要把 disabled 交給它，它要把 disabled 交給兩個下拉。
 	const townFields = openingTags(text, "TownFields");
 	assert.equal(townFields.length, 1, "縣市／鄉鎮市區由一個 TownFields 渲染");
 	for (const tag of townFields) {
@@ -272,7 +254,6 @@ test("商店設定：每個可編輯欄位在無 storefront.write 時都不可�
 		);
 	}
 
-	// 送出路徑本身也要擋：儲存鍵不渲染之後，表單的隱式送出仍到得了 handleSubmit。
 	assert.match(
 		text,
 		/e\.preventDefault\(\);[\s\S]{0,240}?if \(!canWrite\) return;/,
@@ -286,7 +267,6 @@ test("商店設定：唯讀時不渲染儲存鍵，提示也不再承諾寫入",
 		tag.includes('type="submit"'),
 	);
 	assert.equal(submit.length, 1, "商店設定只有一顆送出鍵");
-	// **不渲染**而不是 disabled：disabled 與「尚未修改」在畫面上完全一樣。
 	assert.ok(
 		!submit[0].includes("disabled={!canWrite"),
 		"儲存鍵用 disabled 表達沒權限 ⇒ 與「還沒改東西」分不出來",
@@ -299,7 +279,6 @@ test("商店設定：唯讀時不渲染儲存鍵，提示也不再承諾寫入",
 		"儲存鍵必須整顆包在 {canWrite && (…)} 之內",
 	);
 
-	// 旁邊那句提示不得再指向一個不存在的動作。
 	assert.match(
 		text,
 		/\{!canWrite\s*\?\s*delegated\s*\?\s*"本工作階段沒有核發店面編輯權限[^"]*"/,
@@ -307,9 +286,6 @@ test("商店設定：唯讀時不渲染儲存鍵，提示也不再承諾寫入",
 	);
 });
 
-/* ============================================================
-   三、商品頁：副標與每一列的動作字（純函式，逐組合驗）
-   ============================================================ */
 
 test("商品頁副標：四種 capability 組合各說各的實話", () => {
 	assert.equal(
@@ -321,7 +297,6 @@ test("商品頁副標：四種 capability 組合各說各的實話", () => {
 		"本工作階段僅可檢視商品",
 		"唯讀工作階段仍宣稱可編輯與發布 ⇒ 截圖 C-readonly-W3-products.png 的那一句",
 	);
-	// 兩個 capability 是分開核發的，只講其中一個就會在另一半上說謊。
 	assert.equal(
 		delegatedProductsSubtitle(true, false),
 		"本工作階段可編輯商品，不可上架或下架",
@@ -330,7 +305,6 @@ test("商品頁副標：四種 capability 組合各說各的實話", () => {
 		delegatedProductsSubtitle(false, true),
 		"本工作階段可上架或下架商品，不可編輯內容",
 	);
-	// 四句互不相同，否則上面四條有一半是白測的。
 	assert.equal(
 		new Set(
 			[
@@ -345,10 +319,8 @@ test("商品頁副標：四種 capability 組合各說各的實話", () => {
 });
 
 test("商品列的動作字：權限與商品狀態是兩把獨立的鎖", () => {
-	// 賣家路徑／全權代行：只有上架中的商品因為 3019 而變成「檢視」。
 	assert.equal(productRowActionLabel(true, false), "編輯");
 	assert.equal(productRowActionLabel(true, true), "檢視");
-	// 缺 products.write：草稿與未啟用也進不了編輯，字面不得再寫「編輯」。
 	assert.equal(
 		productRowActionLabel(false, false),
 		"檢視",
@@ -356,7 +328,6 @@ test("商品列的動作字：權限與商品狀態是兩把獨立的鎖", () =>
 	);
 	assert.equal(productRowActionLabel(false, true), "檢視");
 
-	// 說明要講對原因：「請先下架」在一個連下架都做不到的工作階段是一句撞牆的指示。
 	assert.equal(productRowActionHint(true, false), undefined);
 	assert.equal(
 		productRowActionHint(true, true),
@@ -377,7 +348,6 @@ test("商品頁：勾選欄只在具備 products.publish 時渲染", () => {
 		"canPublish 必須以 !delegated 短路，賣家路徑才會逐位元不變",
 	);
 
-	// 表頭與資料列各一格，兩格都要被同一個條件包住。
 	const cells = [
 		...text.matchAll(/<(th|td)\s+className="seller-products-table__check"/g),
 	];
@@ -391,18 +361,15 @@ test("商品頁：勾選欄只在具備 products.publish 時渲染", () => {
 			"勾選欄沒有被 {canPublish && (…)} 包住 ⇒ 勾了不會有任何東西出現（批次列的條件同樣是 canPublish）",
 		);
 	}
-	// 停用的框仍在宣稱「勾選這件事有意義」——不得退回那個寫法。
 	assert.ok(
 		!text.includes("disabled={delegated && !canPublish}"),
 		"勾選框改回 disabled ⇒ 又是一條死路 affordance",
 	);
-	// 少畫一欄，空狀態的跨欄數要跟著少一欄。
 	assert.match(
 		text,
 		/colSpan=\{\(delegated \? 8 : 10\) \+ \(canPublish \? 1 : 0\)\}/,
 		"空狀態的 colSpan 沒有跟著勾選欄走",
 	);
-	// 表寬與捲動提示的門檻靠這個 class 分辨兩種欄數。
 	assert.ok(
 		text.includes("seller-products-table--noselect"),
 		"少一欄卻沒有掛 --noselect ⇒ 表格底線多留 56px，捲動提示會說一句不成立的話",
@@ -410,8 +377,6 @@ test("商品頁：勾選欄只在具備 products.publish 時渲染", () => {
 });
 
 test("賣家路徑：預覽與商品頁短路成現況，商店設定看 GetMyStore 的能力", () => {
-	// 商店設定與商品頁走 `!delegated ||`；預覽元件沒有 `delegated` 這個區域變數，
-	// 用 `scope.mode !== "delegated"` 表達同一件事。
 	assert.match(
 		source(BRANDING),
 		/const canWrite =\s*!readOnly &&\s*\(scope\.mode !== "delegated" \|\| scope\.hasCapability\("storefront\.write"\)\)/,
@@ -430,7 +395,6 @@ test("賣家路徑：預覽與商品頁短路成現況，商店設定看 GetMySt
 			`${file}：以 !delegated 短路的 capability 判斷數量變了`,
 		);
 	}
-	// 賣家路徑的答案就是現況：可編輯與發布、非上架中的列給「編輯」。
 	assert.equal(
 		delegatedProductsSubtitle(true, true),
 		"本工作階段可編輯與發布商品",

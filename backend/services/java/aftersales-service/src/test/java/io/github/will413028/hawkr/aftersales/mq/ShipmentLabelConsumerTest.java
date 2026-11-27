@@ -34,7 +34,7 @@ class ShipmentLabelConsumerTest {
     @Test
     void publishPayUniLgsNoCodeAnomaly_resolvesStoreIdToAccountIdInShipmentAnomalyPayload() throws Exception {
         long storeId = 7001L;
-        long resolvedAccountId = 42L; // 不同於 storeId：模擬已重新上架的賣家
+        long resolvedAccountId = 42L;
         long buyerId = 2001L;
 
         AfterSaleCaseEntity acase = new AfterSaleCaseEntity();
@@ -63,7 +63,6 @@ class ShipmentLabelConsumerTest {
                 "shipment anomaly payload 的 seller_account_id 必須是反解後的 account_id(" + resolvedAccountId + ")，不是 store_id(" + storeId + ")：" + json);
         assertFalse(json.contains("\"seller_account_id\":" + storeId),
                 "shipment anomaly payload 不應直接帶未反解的 store_id：" + json);
-        // issue #2707 Phase A：新增 storeId 欄位必須是未反解的原始值，與 seller_account_id 分開帶。
         assertTrue(json.contains("\"store_id\":" + storeId),
                 "shipment anomaly payload 必須帶原始 store_id(" + storeId + ")：" + json);
     }
@@ -72,7 +71,7 @@ class ShipmentLabelConsumerTest {
     void publishPayUniLgsNoCodeAnomaly_resolvesBuyerIdToAccountIdInShipmentAnomalyPayload() throws Exception {
         long storeId = 7001L;
         long buyerId = 2001L;
-        long resolvedBuyerAccountId = 88L; // 刻意 != buyerId
+        long resolvedBuyerAccountId = 88L;
 
         AfterSaleCaseEntity acase = new AfterSaleCaseEntity();
         acase.setCaseNo("A001");
@@ -113,7 +112,6 @@ class ShipmentLabelConsumerTest {
 
         when(caseMapper.selectOne(any())).thenReturn(acase);
         when(sellerGrpcClient.resolveAccountIdForStore(7001L)).thenReturn(42L);
-        // 查無存活買家：單體不回填 principals；舊 buyer-service 會回填，但 unresolved_ids 有它。
         when(buyerGrpcClient.resolvePrincipals(java.util.List.of(buyerId)))
                 .thenReturn(new PrincipalResolution(Map.of(buyerId, buyerId), Set.of(buyerId)));
 
@@ -139,7 +137,7 @@ class ShipmentLabelConsumerTest {
         acase.setBuyerId(buyerId);
 
         when(caseMapper.selectOne(any())).thenReturn(acase);
-        when(sellerGrpcClient.resolveAccountIdForStore(7001L)).thenReturn(0L); // 查無存活賣家
+        when(sellerGrpcClient.resolveAccountIdForStore(7001L)).thenReturn(0L);
         when(buyerGrpcClient.resolvePrincipals(java.util.List.of(buyerId)))
                 .thenReturn(new PrincipalResolution(Map.of(), Set.of(buyerId)));
 

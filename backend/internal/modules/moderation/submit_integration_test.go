@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// world 是一家可曝光的店、一篇貼文與一位寫了留言的買家。
 type world struct {
 	storeID, storeAccount int64
 	post                  social.Post
@@ -340,7 +339,6 @@ func TestSubmitValidatesTheTargetAndForbidsSelfReports(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM moderation.reporter_daily_counts"); n != 0 {
 		t.Fatalf("被拒絕的檢舉不能吃額度：%d", n)
 	}
-	// 被隱藏的內容不能再被檢舉（對檢舉人等於不存在）。
 	reporter, _ := f.newBuyer(t)
 	c := f.submit(t, reporter, commentTarget(w.comment), policy.Spam).Case
 	mustV[CaseDetail](t)(f.decideHide(t, c.ID, 1))
@@ -349,7 +347,6 @@ func TestSubmitValidatesTheTargetAndForbidsSelfReports(t *testing.T) {
 	}
 }
 
-// storeOwnerBuyer 讓店家所屬的帳號也有一位買家：店家本人用買家身分檢舉自己店的貼文要被擋。
 func (f *fixture) storeOwnerBuyer(t *testing.T, w world) int64 {
 	t.Helper()
 	if err := f.buyer.OnAccountCreated(context.Background(), identityCreated(w.storeAccount)); err != nil {

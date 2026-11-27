@@ -137,7 +137,7 @@ export function preflightAnimatedGif(buffer: ArrayBuffer): GifPreflightResult {
 		resourceLimit();
 	}
 	const logicalPacked = readByte();
-	skip(2); // background colour index + pixel aspect ratio
+	skip(2);
 	const hasGlobalColorTable = skipColorTable(logicalPacked);
 
 	let sawTrailer = false;
@@ -158,9 +158,9 @@ export function preflightAnimatedGif(buffer: ArrayBuffer): GifPreflightResult {
 
 			if (label === 0xf9) {
 				if (firstBlockLength !== 4) invalid();
-				skip(1); // packed disposal/transparency flags
+				skip(1);
 				pendingDelayMs = readUint16() * 10;
-				skip(1); // transparent colour index
+				skip(1);
 				if (readByte() !== 0) invalid();
 				continue;
 			}
@@ -171,10 +171,7 @@ export function preflightAnimatedGif(buffer: ArrayBuffer): GifPreflightResult {
 				applicationId = readAscii(firstBlockLength);
 			} else {
 				skip(firstBlockLength);
-				// A plain-text rendering block consumes the preceding GCE too.
 				if (label === 0x01) pendingDelayMs = 0;
-				// Comment/unknown extensions are themselves a sub-block chain.
-				// A zero-sized first block already terminated that chain.
 				if (firstBlockLength === 0) continue;
 			}
 

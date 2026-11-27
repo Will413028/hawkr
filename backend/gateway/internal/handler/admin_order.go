@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== §29 Admin 異常訂單列表 ====================
 
 // AdminAbnormalOrderSummaryResp 異常訂單列表單筆
 type AdminAbnormalOrderSummaryResp struct {
@@ -58,8 +57,6 @@ func (h *Holder) ListAbnormalOrdersForAdmin(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// ② store_id 同為 admin 搜尋 filter，鏡像上面的買家端解析（D7，
-	// section D：本篩選先前漏改，與 SearchOrders 同批修正）。
 	storeIDFilter, ok := h.resolveOptionalSellerFilterQuery(c, c.Query("store_id"))
 	if !ok {
 		return
@@ -113,7 +110,6 @@ func (h *Holder) ListAbnormalOrdersForAdmin(c *gin.Context) {
 	})
 }
 
-// ==================== Admin 撥款重發（收斂規範 §8.4 人工介入閉環）====================
 
 // RetryGrantRequest Admin 重發撥款請求
 type RetryGrantRequest struct {
@@ -153,7 +149,7 @@ func (h *Holder) RetryGrant(c *gin.Context) {
 	}
 
 	var req RetryGrantRequest
-	_ = c.ShouldBindJSON(&req) // body 全選填
+	_ = c.ShouldBindJSON(&req)
 
 	operatorID := c.GetHeader("x-account-id")
 	if operatorID == "" {

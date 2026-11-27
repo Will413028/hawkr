@@ -112,7 +112,6 @@ func selectAct(in Input, rejected, corrected bool) Act {
 	return RequestBasicsReady
 }
 
-// splitRejections 把值有保留的截斷分出來：它不丟棄任何內容，不該讓整輪變成「輸入被拒」。
 func splitRejections(in []slots.Rejection) (rejected, adjusted []slots.Rejection) {
 	for _, r := range in {
 		if r.Reason == slots.ReasonTruncated {
@@ -124,7 +123,6 @@ func splitRejections(in []slots.Rejection) (rejected, adjusted []slots.Rejection
 	return rejected, adjusted
 }
 
-// splitCorrected 把這一輪記下的欄位分成「Current 已有值（更正）」與「第一次填」，各自維持 recorded 的順序。
 func splitCorrected(in Input) (corrected, others []slots.Recorded) {
 	for _, r := range in.Recorded {
 		if wasSet(in.Current, r.Key) {
@@ -136,7 +134,6 @@ func splitCorrected(in Input) (corrected, others []slots.Recorded) {
 	return corrected, others
 }
 
-// wasSet 不含 ItemResolution：它由伺服器而不是買家填入，第一次填與換掉都不算買家更正。
 func wasSet(s slots.Set, key model.SlotKey) bool {
 	switch key {
 	case slots.Item:

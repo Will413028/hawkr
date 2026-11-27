@@ -65,3 +65,61 @@ condition = "AND"
 paths = ['''^backend/internal/modules/notification/suppression_integration_test\.go$''']
 regexTarget = "line"
 regexes = ['''const resendSecret = ''']
+
+[[allowlists]]
+description = "代行操作測試裡的 Idempotency-Key 是固定 UUID 或操作識別值，不是授權憑證；只放行對應欄位與格式"
+condition = "AND"
+paths = [
+  '''^admin/tests/delegated-operation-upstream\.test\.ts$''',
+  '''^backend/gateway/internal/handler/admin_delegation_contract_test\.go$''',
+  '''^backend/services/invoice-service/internal/usecase/admin_manual_unlock_test\.go$''',
+  '''^backend/services/invoice-service/internal/usecase/seller_write_test\.go$''',
+  '''^website/lib/api/delegated\.unit\.test\.ts$''',
+]
+regexTarget = "line"
+regexes = [
+  '''(?i)(idempotencyKey|IdempotencyKey):\s*"[A-Za-z0-9-]{1,36}"''',
+  '''Header\.Set\("Idempotency-Key", "[0-9a-fA-F-]{36}"\)''',
+  '''const goodKey = "[0-9a-fA-F-]{36}"''',
+]
+rules = ["generic-api-key"]
+
+[[allowlists]]
+description = "gateway logger integration 測試中的 20 字元 auth 遮蔽 canary；只在斷言未洩漏的測試行放行"
+condition = "AND"
+paths = ['''^backend/gateway/internal/middleware/logger_integration_test\.go$''']
+regexTarget = "line"
+regexes = ['''strings\.Contains\(auth,\s*"[A-Za-z0-9_-]{20}"\)''']
+rules = ["generic-api-key"]
+
+[[allowlists]]
+description = "rate limit subject 測試的 CI secret 明確標成 for-tests 並用數字尾碼，不是 CI 憑證"
+condition = "AND"
+paths = ['''^backend/gateway/internal/middleware/ratelimit_subject_test\.go$''']
+regexTarget = "line"
+regexes = ['''testOriginCISecret\s*=\s*"[a-z-]*tests-[0-9]{10}"''']
+rules = ["generic-api-key"]
+
+[[allowlists]]
+description = "logger URL redaction 測試用 18 字元、帶連續序列的 Google-key 樣式 canary；此測試不發出網路請求"
+condition = "AND"
+paths = ['''^backend/pkg/logger/redact_test\.go$''']
+regexTarget = "line"
+regexes = ['''input:.*[?&]key=AIza[A-Za-z0-9_-]{14}''']
+rules = ["generic-api-key"]
+
+[[allowlists]]
+description = "PayUni client 測試中的固定 32 位十六進位 hash key fixture"
+condition = "AND"
+paths = ['''^backend/pkg/payuni/client_test\.go$''']
+regexTarget = "line"
+regexes = ['''testHashKey\s*=\s*"[0-9a-fA-F]{32}"''']
+rules = ["generic-api-key"]
+
+[[allowlists]]
+description = "AMEGO sign 測試引用廠商官方文件的公開 AppKey fixture；此規則只匹配該測試常數與 20 位字母數字格式"
+condition = "AND"
+paths = ['''^backend/services/invoice-service/internal/client/amego/sign_test\.go$''']
+regexTarget = "line"
+regexes = ['''officialAppKey\s*=\s*"[A-Za-z0-9]{20}"''']
+rules = ["generic-api-key"]

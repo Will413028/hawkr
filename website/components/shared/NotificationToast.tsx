@@ -27,15 +27,9 @@ import { whenDocumentSettled } from "@/lib/hydration/document-settled";
 import { buildImageUrl } from "@/lib/media/cdn";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 
-/* ── GSAP 延後載入 ───────────────────────────────────────────── */
 
 type Gsap = typeof import("gsap")["gsap"];
 
-// 本元件掛在 root layout，靜態 import 會讓 gsap（gzip 約 46KB）進到每一頁的
-// layout chunk，而它只在有通知卡片時才會動。改為在 whenDocumentSettled 之後
-// 才下載，並且由 NotificationToastViewport 把「模組已載入」當成 portal 的前置
-// 條件：任何 ToastCard / ToastStack 被渲染時 gsap 一定已經在記憶體裡，下面每個
-// 呼叫點都走同步路徑，進場、倒數、滑動、堆疊動畫的時序與改動前完全相同。
 let gsapModule: Gsap | null = null;
 let gsapLoading: Promise<Gsap> | null = null;
 
@@ -118,8 +112,6 @@ export interface ToastView {
 
 const DEFAULT_DURATION = 5000;
 
-/* Stack geometry (px) — how far each card behind the front one peeks out, how
- * many peek, the gap once fanned out, and the per-step scale / opacity falloff. */
 const PEEK = 10;
 const MAX_PEEK = 2;
 const EXPANDED_GAP = 10;
@@ -158,7 +150,6 @@ const SONNER_CLEARANCE_PX = 8;
 const NAVBAR_CLEARANCE_CLASS =
 	"pt-[calc(var(--floating-nav-height,84px)+var(--floating-nav-top-gap,16px)+12px)]";
 
-/* ── type → icon ─────────────────────────────────────────────── */
 
 const KIND_ICON: Record<ToastKind, ToastIconKind> = {
 	order: "order",
@@ -174,8 +165,6 @@ interface VariantStyle {
 	barClass: string;
 }
 
-// default 留空走原 caller-decided kind icon + 主色容器,維持既有行為。
-// 其餘 variant 覆蓋 icon + 容器色 + countdown bar 色。
 const VARIANT_STYLE: Record<Exclude<ToastVariant, "default">, VariantStyle> = {
 	success: {
 		icon: "success",
@@ -202,7 +191,6 @@ const DEFAULT_CONTAINER_CLASS =
 const DEFAULT_BAR_CLASS =
 	"bg-[color-mix(in_srgb,var(--hkui-primary)_55%,transparent)]";
 
-/* ── single toast card ───────────────────────────────────────── */
 
 interface ToastCardProps {
 	toast: ToastView;
@@ -260,8 +248,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 			);
 		}, [onDismiss, toast.id]);
 
-		// Countdown bar doubles as the auto-dismiss timer — when it empties the
-		// card closes. Pausing the tween pauses both at once (no drift).
 		const pausedRef = React.useRef(paused);
 		pausedRef.current = paused;
 
@@ -271,10 +257,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 			let cancelled = false;
 			withGsap((g) => {
 				if (cancelled) return;
-				// The bar IS the timer, so it stays a tween even under reduced
-				// motion — a linear 5s scaleX is a progress indicator, not
-				// decoration, and killing it would remove auto-dismiss entirely.
-				// What reduced motion drops is the bar's visibility, below.
 				const tween = g.fromTo(
 					bar,
 					{ scaleX: 1 },
@@ -285,7 +267,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 						onComplete: close,
 					},
 				);
-				// 建立當下已處於暫停狀態（堆疊展開中）就直接停住，不留一段漂移。
 				if (pausedRef.current) tween.pause();
 				tweenRef.current = tween;
 			});
@@ -303,7 +284,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 			else tween.resume();
 		}, [paused]);
 
-		/* ── flick-to-dismiss ─────────────────────────────────────── */
 		const dragRef = React.useRef<{
 			id: number;
 			startX: number;
@@ -323,7 +303,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 				try {
 					e.currentTarget.setPointerCapture(d.id);
 				} catch {
-					/* older Safari may refuse capture for touch */
 				}
 			}
 			const el = elRef.current;
@@ -361,9 +340,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 		const isTap = () => Math.abs(dragRef.current?.dx ?? 0) < 6;
 
 		return (
-			// No per-card live region: a three-card stack meant three regions
-			// announcing at once, including the cards hidden behind the collapsed
-			// pile. The viewport owns one shared announcer instead.
 			// biome-ignore lint/a11y/noStaticElementInteractions: the card is a swipe surface; every action inside it (open, close) is a real button, and this handler only adds Escape as a shortcut.
 			<div
 				ref={setRefs}
@@ -372,8 +348,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 				data-toast-kind={toast.kind ?? "system"}
 				style={{ transformOrigin: "top center", touchAction: "pan-y" }}
 				onKeyDown={(event) => {
-					// Escape while focus is inside the card dismisses it — the only
-					// keyboard exit used to be tabbing to a 24px close button.
 					if (event.key !== "Escape" || event.defaultPrevented) return;
 					event.preventDefault();
 					close();
@@ -422,8 +396,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 						type="button"
 						aria-label="關閉通知"
 						onClick={close}
-						// `before:-inset-[10px]` lifts the 24px control to a 44×44 hit
-						// area without changing a painted pixel.
 						className="relative grid shrink-0 place-items-center self-center rounded-md p-1 text-hk-muted/70 transition-colors before:absolute before:-inset-[10px] before:content-[''] hover:bg-hk-primary/8 hover:text-hk-heading motion-reduce:transition-none"
 					>
 						<svg
@@ -454,7 +426,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 	},
 );
 
-/* ── grouped stack ───────────────────────────────────────────── */
 
 function ToastStack({
 	items,
@@ -479,14 +450,8 @@ function ToastStack({
 	const multi = count > 1;
 	const open = multi && (expanded || hovered);
 
-	// Position every card for the current (collapsed / open) state. Newly
-	// arrived cards drop in from above; the rest tween to their slot. Driving
-	// all transforms from one place keeps the swipe `x` and stack `y/scale`
-	// from fighting (GSAP composes per-property on the same target).
 	const layout = React.useCallback(() => {
 		const g = gsapModule;
-		// Viewport 只在 gsap 載入後才 portal（見 NotificationToastViewport），所以
-		// 這裡不會是 null；留守衛只是不讓一個理論上的競態變成例外。
 		if (!g) return;
 		const heights = items.map(
 			(t) => cardEls.current.get(t.id)?.offsetHeight ?? 0,
@@ -534,7 +499,6 @@ function ToastStack({
 		layout();
 	}, [layout]);
 
-	// Re-flow if a card's content reflows after mount (body wrap / late avatar).
 	React.useEffect(() => {
 		if (typeof ResizeObserver === "undefined") return;
 		const ro = new ResizeObserver(() => layout());
@@ -542,18 +506,11 @@ function ToastStack({
 		return () => ro.disconnect();
 	}, [layout]);
 
-	// Hover fans the stack out and pauses the countdown — a desktop-only
-	// enhancement, so it's wired as native listeners on the container rather
-	// than interactive handlers on a static element (the count badge is the
-	// keyboard / touch path). Touch users tap the badge instead.
 	React.useEffect(() => {
 		const el = stackRef.current;
 		if (!el) return;
 		const onEnter = () => setHovered(true);
 		const onLeave = () => setHovered(false);
-		// Keyboard parity: tabbing into a card must stop the countdown too,
-		// otherwise the control being read closes itself mid-read. Focus only
-		// pauses (it does not fan the stack out) so Tab order stays stable.
 		const onFocusIn = () => setFocused(true);
 		const onFocusOut = () => setFocused(false);
 		el.addEventListener("mouseenter", onEnter);
@@ -568,8 +525,6 @@ function ToastStack({
 		};
 	}, []);
 
-	// Stable ref callback per id so a re-render doesn't churn the element map
-	// (a transient null between commits could desync the GSAP layout).
 	const registerCard = (id: number) => {
 		let cb = cardRefCbs.current.get(id);
 		if (!cb) {
@@ -592,7 +547,6 @@ function ToastStack({
 			return;
 		}
 		if (toast.href) router.push(toast.href);
-		// Opening one clears the whole source — matches tapping into the thread.
 		for (const t of items) onDismiss(t.id);
 	};
 
@@ -618,9 +572,6 @@ function ToastStack({
 					type="button"
 					onClick={() => setExpanded((v) => !v)}
 					aria-label={open ? "收合通知" : `展開 ${count} 則通知`}
-					// The badge is the ONLY touch path into a collapsed stack (hover
-					// is desktop-only), so its 22px box gets a 44×44 hit area from
-					// `before:-inset-[11px]` while staying visually 22px.
 					className="absolute right-2 top-2 z-[200] grid h-[22px] min-w-[22px] place-items-center rounded-full bg-hk-primary px-1.5 text-xs font-bold leading-none text-white shadow-sm transition-transform before:absolute before:-inset-[11px] before:content-[''] hover:scale-105 motion-reduce:transition-none"
 				>
 					{open ? "收合" : count}
@@ -630,7 +581,6 @@ function ToastStack({
 	);
 }
 
-/* ── viewport (portal) ───────────────────────────────────────── */
 
 /** Group toasts by `groupKey` (singletons get their own key), newest card
  *  first within a group, newest group on top. */
@@ -658,11 +608,6 @@ export function NotificationToastViewport({
 	React.useEffect(() => {
 		let active = true;
 
-		// Realtime events can arrive immediately after authentication. Keep their
-		// queue in context, but do not portal a new child into <body> until React
-		// has finished claiming the initial streamed document.
-		// settle 之後才開始下載 gsap（不進首屏的 layout chunk、不與初始載入搶頻寬），
-		// 而 portal 要等它到齊才掛：卡片渲染時動畫引擎一定就緒。
 		const ready = whenDocumentSettled().then(loadGsap);
 		void ready.then(() => {
 			if (active) setDocumentSettled(true);
@@ -673,10 +618,6 @@ export function NotificationToastViewport({
 		};
 	}, []);
 
-	// One shared polite announcer for every stack (see the region below).
-	// Ids are a monotonic counter, so "already announced" is a set of ids; it
-	// is cleared wholesale once it grows past the cap rather than tracked
-	// per-toast, which cannot resurrect an announcement for a live toast.
 	const [announcement, setAnnouncement] = React.useState("");
 	const announcedIdsRef = React.useRef<Set<number>>(new Set());
 	React.useEffect(() => {
@@ -687,22 +628,12 @@ export function NotificationToastViewport({
 		setAnnouncement(fresh.map((t) => t.title).join("；"));
 	}, [toasts]);
 
-	// 佔位協調：通知堆疊與 sonner Toaster 同佔 top-center（0151c0ec 統一視覺
-	// 語言），通知 z-[1100] 會完整蓋住 sonner（z=--z-toast:700）——error toast
-	// 被推播蓋掉時使用者會誤以為操作成功。把堆疊實際內容高度寫進
-	// `--hk-notif-toast-h`，AppToaster 的 offset 以 calc(var()) 讀取即時下移，
-	// 兩者同時可見。ResizeObserver 的 contentRect 不含 padding（safe-area 上緣
-	// 不重複計入）；GSAP 展開/收合 tween 期間父容器高度跟著子層變化，RO 逐幀
-	// 回報。清空 → 本元件 return null 卸載 portal → React 19 ref cleanup →
-	// 變數歸零，sonner 滑回原位（過渡在 ui-kit.css 的 toaster 上）。
 	const setStackContainer = React.useCallback((node: HTMLElement) => {
 		if (typeof ResizeObserver === "undefined") return;
 		const observer = new ResizeObserver((entries) => {
 			const height = entries[entries.length - 1]?.contentRect.height ?? 0;
 			document.documentElement.style.setProperty(
 				"--hk-notif-toast-h",
-				// SONNER_CLEARANCE_PX：堆疊底緣到 sonner 首卡的間距，對齊容器的
-				// Tailwind gap-2（8px）。
 				height > 0 ? `${Math.round(height) + SONNER_CLEARANCE_PX}px` : "0px",
 			);
 		});
@@ -718,17 +649,12 @@ export function NotificationToastViewport({
 	const groups = groupToasts(toasts);
 
 	return createPortal(
-		// One labelled region (`section` + label = role="region") for the whole
-		// notification area. Cards used to carry `role="status"` each, so a
-		// three-card stack announced three times over — including the two hidden
-		// behind the collapsed pile.
 		<section
 			ref={setStackContainer}
 			aria-label="通知"
 			className={`pointer-events-none fixed inset-x-0 top-0 z-[1100] flex flex-col items-center gap-2 px-3 ${NAVBAR_CLEARANCE_CLASS}`}
 		>
-			{/* The single announcer for every stack: only titles that have not
-			    been read out yet reach it. */}
+
 			<span className="sr-only" aria-live="polite">
 				{announcement}
 			</span>

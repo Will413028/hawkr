@@ -7,14 +7,12 @@ SELECT * FROM content.app_version_gates
 ORDER BY app_type;
 
 -- name: InsertAppVersionGate :one
--- 只建立：那一組已經存在時不寫入、沒有回傳列（pgx.ErrNoRows）。
 INSERT INTO content.app_version_gates (app_type, minimum_version, store_url, notice_title, notice_body)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (app_type) DO NOTHING
 RETURNING *;
 
 -- name: UpdateAppVersionGate :one
--- 條件式 UPDATE：不存在或版本不符時沒有回傳列（pgx.ErrNoRows），由呼叫方分辨。
 UPDATE content.app_version_gates
 SET minimum_version = $2,
     store_url       = $3,

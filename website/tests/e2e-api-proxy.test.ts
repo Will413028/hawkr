@@ -209,8 +209,6 @@ test("API proxy handler preserves its HTTP contract", async (t) => {
 						"http://localhost:3213/api/v1/public/categories/tree?cache-test=1",
 						{
 							headers: {
-								// Playwright APIRequestContext uses */* for fixture
-								// discovery, so it must share the same JSON snapshot.
 								accept: "*/*",
 								"accept-language": "zh-TW",
 							},
@@ -391,8 +389,6 @@ test("API proxy handler preserves its HTTP contract", async (t) => {
 });
 
 test("Connect proxy forwards the credentials and every Set-Cookie", async () => {
-	// 登入的憑證是同源的 `__Host-hk_session` cookie：本機代理要原樣轉給單體；回應的多個 Set-Cookie 逐筆傳回
-	// （new Headers 會把它們併成一個）。
 	const originalFetch = globalThis.fetch;
 	const originalNodeEnv = process.env.NODE_ENV;
 	const originalProxyFlag = process.env.PLAYWRIGHT_E2E_API_PROXY;

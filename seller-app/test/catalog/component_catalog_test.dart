@@ -218,9 +218,6 @@ void main() {
         final bytes = (await image.toByteData(
           format: ui.ImageByteFormat.rawRgba,
         ))!;
-        // Sample beside the title, on either side of the status/toolbar edge.
-        // A glass gradient may change slightly; a separately painted strip
-        // must not create a visible color jump at y=62.
         for (var channel = 0; channel < 3; channel++) {
           final inset = bytes.getUint8((60 * image.width + 10) * 4 + channel);
           final toolbar = bytes.getUint8((64 * image.width + 10) * 4 + channel);
@@ -394,7 +391,6 @@ void main() {
             expect(button.width, lessThan(available / 2));
             expect(button.width, greaterThanOrEqualTo(48));
             expect(button.height, greaterThanOrEqualTo(48));
-            // The invisible padding above the visual pill remains tappable.
             await tester.tapAt(button.topCenter + const Offset(0, 1));
             await tester.pump();
           }

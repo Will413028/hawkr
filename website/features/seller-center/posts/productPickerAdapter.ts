@@ -38,8 +38,6 @@ export function mapProductRecord(
 	return {
 		id: String(idRaw),
 		name: str(p.name) ?? "未命名商品",
-		// `imageUrl` 由 Gateway 用 `imageKey` 組好（49 §6.1 唯一入口），前端不自己
-		// 組路徑；imageKey 為空時 Gateway 回的就是空字串。
 		imageUrl: str(p.imageUrl),
 		price: getProductPriceDisplay(p as PriceFields),
 	};

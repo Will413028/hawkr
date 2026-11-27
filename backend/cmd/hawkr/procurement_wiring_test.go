@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// sellersParamIndex 回傳 procurement.go 裡建構函式 fn 的 sellers 參數位置。
 func sellersParamIndex(t *testing.T, fn string) int {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), "procurement.go", nil, 0)

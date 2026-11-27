@@ -135,7 +135,6 @@ func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if err != nil {
 			return nil, err
 		}
-		// 請求成功才算活動：被拒絕或失敗的請求（含 handler 與元件內的拒絕）不順延閒置逾時；順延失敗不改變已完成的請求結果。
 		if c, cerr := CallerFrom(ctx); cerr == nil {
 			Touch(ctx, i.sessions, i.logger, c.Session.ID)
 		}

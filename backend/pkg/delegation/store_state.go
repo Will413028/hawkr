@@ -2,7 +2,6 @@ package delegation
 
 import "github.com/Will413028/hawkr/go-pkg/errors/bizcode"
 
-// sellers.status lifecycle values (seller module schema chk_sellers_status).
 const (
 	storeStatusActive              = "active"
 	storeStatusSuspended           = "suspended"
@@ -34,10 +33,6 @@ func StoreOperable(lifecycleStatus string, deleted bool) (ok bool, deniedCode in
 	case storeStatusSuspended, storeStatusSuspendedGovernance, storeStatusClosed:
 		return false, bizcode.DelegationStoreNotOperable
 	default:
-		// Unknown lifecycle value. 9272 ("currently not operable") rather than
-		// 9265 ("not delegable / does not exist"): the honest statement about a
-		// value we do not recognise is that the store's current state does not
-		// permit the operation, not that the store is absent.
 		return false, bizcode.DelegationStoreNotOperable
 	}
 }

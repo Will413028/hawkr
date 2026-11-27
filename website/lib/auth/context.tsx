@@ -124,7 +124,6 @@ export function AuthProvider({
 		null,
 	);
 	const leaving = React.useRef(false);
-	// 停權事件觸發的重讀還沒有答案時為 true：一次重讀只排一次，答案回來（不論結果）才再接受下一次。
 	const suspensionRefreshPending = React.useRef(false);
 	React.useEffect(() => {
 		let live = true;
@@ -144,7 +143,6 @@ export function AuthProvider({
 		serverSession?.status === "signedIn" ? serverSession.identity : null;
 	const latestIdentity = React.useRef(identity);
 	latestIdentity.current = identity;
-	// 工作區：只有 localStorage 知道賣家上次停在哪個工作區，effect 之後才讀它；之前用伺服器答案的預設值。
 	const [storedActive, setActive] = React.useState<RoleSlot | null>(null);
 	const active = identity
 		? (storedActive ?? effectiveActiveRole(identity, null))
@@ -175,9 +173,7 @@ export function AuthProvider({
 
 	const leaveDocument = React.useCallback(
 		async (to: string | null, replace: boolean, onCancelled?: () => void) => {
-			// 換文件前的空檔：舊答案不能再改這個文件的身分。
 			leaving.current = true;
-			// beforeunload 的提示被使用者取消時文件留下來，要讓這個文件繼續接收伺服器的答案。
 			const onBeforeUnload = (event: BeforeUnloadEvent) => {
 				if (!event.defaultPrevented) return;
 				setTimeout(() => {
@@ -189,7 +185,6 @@ export function AuthProvider({
 			try {
 				await teardownPrivateCache();
 			} catch {
-				// 清不掉也要換文件：留著舊文件才是風險。
 			}
 			if (to === null) window.location.reload();
 			else commitDocumentNavigation(to, replace);
@@ -273,8 +268,6 @@ export function AuthProvider({
 						tags: { trigger_path: templatePath(detail?.path) },
 					});
 				}
-				// 單體說 unauthenticated：session 已經不在（過期、撤銷、帳號停權或刪除）。文件上沒有身分可清
-				// （根層不是 signedIn，也沒有掛著由伺服器確認身分的受保護區）就不換文件，否則只會循環。
 				if (statusRef.current !== "signedIn" && mountedZones.current === 0) {
 					return;
 				}
@@ -290,8 +283,6 @@ export function AuthProvider({
 		return () => window.removeEventListener(AUTH_EXPIRED_EVENT, listener);
 	}, [leaveDocument]);
 
-	// 帳號停權（受限登入）：使用者主動的寫入被擋，代表這個文件載入後才被停權。重讀一次登入狀態讓橫幅出現，
-	// 不登出、不導頁；重讀進行中重複的事件不再重讀，已經知道停權的文件不需要。
 	React.useEffect(() => {
 		const listener = () => {
 			if (statusRef.current !== "signedIn") return;
@@ -312,7 +303,6 @@ export function AuthProvider({
 		const channel = openSessionChannel((announcement) => {
 			const action = peerAction(announcement, peerView.current);
 			if (action === "refresh") refreshFromServer();
-			// 這個分頁已登入而別的分頁換了帳號或登出：整頁重載，不讓舊身分留在畫面上。
 			if (action === "reload") void leaveDocument(null, true);
 		});
 		channelRef.current = channel;
@@ -342,7 +332,6 @@ export function AuthProvider({
 		return () => window.removeEventListener("storage", onStorage);
 	}, [identity]);
 
-	// 從 bfcache 還原的已登入頁面沒有重新問伺服器，可能還帶著登出前的身分；訪客頁沒有身分要清，留給 bfcache。
 	React.useEffect(() => {
 		const onPageShow = (event: PageTransitionEvent) => {
 			if (event.persisted && statusRef.current === "signedIn") {
@@ -383,7 +372,6 @@ export function AuthProvider({
 			const run = apiLogout().then(
 				() =>
 					leaveDocument(to, replace, () => {
-						// 工作階段已撤銷、文件被留下：放行下一次登出，並請伺服器重答（訪客）。
 						signingOut.current = undefined;
 						refreshFromServer();
 					}),

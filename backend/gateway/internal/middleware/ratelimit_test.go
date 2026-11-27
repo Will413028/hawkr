@@ -13,35 +13,28 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// rlRoutes registers a representative route for every tier using the SAME
-// FullPath patterns as production, so classifyTier is exercised black-box.
 func rlEngine(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.TieredRateLimiter(limiter, policy))
 	ok := func(c *gin.Context) { c.String(http.StatusOK, "ok") }
 
-	// exempt — SSE / WS / beacon / health / store-map callbacks.
 	r.GET("/api/v1/health", ok)
 	r.POST("/store_map/return", ok)
 
-	// tiered
-	r.GET("/api/v1/public/products", ok) // moderate
-	r.GET("/api/v1/app/orders", ok)      // default
+	r.GET("/api/v1/public/products", ok)
+	r.GET("/api/v1/app/orders", ok)
 	return r
 }
 
 func doReq(r *gin.Engine, method, path string) int {
 	req := httptest.NewRequest(method, path, nil)
-	// Stable client IP so counting is deterministic across a test's requests.
 	req.RemoteAddr = "203.0.113.7:5555"
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w.Code
 }
 
-// newLimiter builds a limiter over an in-process miniredis (shared cross-pod
-// counting). Returns the mr so a test can Close() it to simulate a Redis outage.
 func newLimiter(t *testing.T, capacity int) (*ratelimit.Limiter, *miniredis.Miniredis) {
 	t.Helper()
 	mr := miniredis.RunT(t)
@@ -52,7 +45,6 @@ func newLimiter(t *testing.T, capacity int) (*ratelimit.Limiter, *miniredis.Mini
 
 func TestRateLimiter_ExemptPathsNeverLimited(t *testing.T) {
 	limiter, _ := newLimiter(t, 1000)
-	// Tightest possible non-exempt quotas — exempt routes must ignore them.
 	policy := middleware.RateLimitPolicy{
 		ModeratePerWindow: 1, DefaultPerWindow: 1,
 		ModerateSSRPerWindow: 1, ModerateCIPerWindow: 1,
@@ -82,7 +74,6 @@ func TestRateLimiter_TierEnforces429(t *testing.T) {
 	}
 	r := rlEngine(limiter, policy)
 
-	// moderate quota = 3: first 3 pass, 4th is 429.
 	for i := 1; i <= 3; i++ {
 		if code := doReq(r, "GET", "/api/v1/public/products"); code != http.StatusOK {
 			t.Fatalf("moderate request #%d: got %d, want 200", i, code)
@@ -116,8 +107,6 @@ func TestRateLimiter_TiersHaveSeparateBuckets(t *testing.T) {
 }
 
 func TestRateLimiter_RedisSharedAcrossPods(t *testing.T) {
-	// Two limiters over the SAME Redis simulate two pods. A per-pod limiter would
-	// let each pod allow the full quota; a shared counter must not.
 	mr := miniredis.RunT(t)
 	rdbA := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	rdbB := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -131,8 +120,6 @@ func TestRateLimiter_RedisSharedAcrossPods(t *testing.T) {
 	podA := rlEngine(ratelimit.New(rdbA, 1000, nil), policy)
 	podB := rlEngine(ratelimit.New(rdbB, 1000, nil), policy)
 
-	// Same client IP, moderate quota 4: 2 via pod A + 2 via pod B = 4 (all OK),
-	// then the 5th (either pod) is blocked by the shared counter.
 	if c := doReq(podA, "GET", "/api/v1/public/products"); c != http.StatusOK {
 		t.Fatalf("podA #1: got %d, want 200", c)
 	}
@@ -152,7 +139,7 @@ func TestRateLimiter_RedisSharedAcrossPods(t *testing.T) {
 
 func TestRateLimiter_FallbackWhenRedisDown(t *testing.T) {
 	limiter, mr := newLimiter(t, 1000)
-	mr.Close() // simulate Redis outage → Eval errors → in-memory fallback
+	mr.Close()
 
 	policy := middleware.RateLimitPolicy{
 		ModeratePerWindow: 2, DefaultPerWindow: 100,
@@ -161,8 +148,6 @@ func TestRateLimiter_FallbackWhenRedisDown(t *testing.T) {
 	}
 	r := rlEngine(limiter, policy)
 
-	// Fallback must still serve traffic (degrade-open, not hard-block) AND still
-	// enforce the quota per-pod.
 	if c := doReq(r, "GET", "/api/v1/public/products"); c != http.StatusOK {
 		t.Fatalf("fallback #1: got %d, want 200 (Redis down must not block)", c)
 	}
@@ -186,7 +171,6 @@ func TestTrustedProxies_ForgedXFFIgnored(t *testing.T) {
 	}
 	r.GET("/whoami", func(c *gin.Context) { c.String(http.StatusOK, c.ClientIP()) })
 
-	// (1) Untrusted peer forging XFF → ClientIP stays the socket peer.
 	req := httptest.NewRequest("GET", "/whoami", nil)
 	req.RemoteAddr = "203.0.113.9:5555"
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
@@ -196,7 +180,6 @@ func TestTrustedProxies_ForgedXFFIgnored(t *testing.T) {
 		t.Fatalf("forged XFF from untrusted peer: ClientIP=%q, want socket peer 203.0.113.9", got)
 	}
 
-	// (2) Trusted proxy (Traefik CIDR) setting XFF → that XFF is honoured.
 	req = httptest.NewRequest("GET", "/whoami", nil)
 	req.RemoteAddr = "10.1.2.3:5555"
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
@@ -206,7 +189,6 @@ func TestTrustedProxies_ForgedXFFIgnored(t *testing.T) {
 		t.Fatalf("XFF from trusted proxy: ClientIP=%q, want 1.2.3.4", got)
 	}
 
-	// (3) Cloudflare platform header wins for normal ingress.
 	req = httptest.NewRequest("GET", "/whoami", nil)
 	req.RemoteAddr = "203.0.113.9:5555"
 	req.Header.Set("CF-Connecting-IP", "5.6.7.8")
@@ -247,7 +229,6 @@ func TestTrustedProxies_InClusterPeerIsAlwaysTrusted(t *testing.T) {
 		c.String(http.StatusOK, c.ClientIP()+"|"+subject+"|"+kind.String())
 	})
 
-	// 10.42.0.1 is the klipper-lb SNAT address every real request arrives from.
 	fire := func(header, value string) string {
 		req := httptest.NewRequest("GET", "/whoami", nil)
 		req.RemoteAddr = "10.42.0.1:5555"
@@ -257,16 +238,10 @@ func TestTrustedProxies_InClusterPeerIsAlwaysTrusted(t *testing.T) {
 		return w.Body.String()
 	}
 
-	// (1) The hole: a forged XFF from the SNAT peer IS honoured, because that
-	// peer is inside the trusted CIDR — as every request's peer always is.
 	if got, want := fire("X-Forwarded-For", "1.2.3.4"), "1.2.3.4|v:1.2.3.4|visitor"; got != want {
 		t.Fatalf("got %q, want %q — SetTrustedProxies does not (and here cannot) stop a forged XFF; if this ever starts passing again, re-read whether traefik still overwrites the header", got, want)
 	}
 
-	// (2) The guarantee that must survive it: gin does NOT validate the
-	// Cloudflare platform header, so an origin-direct caller can put any string
-	// in it. Charging that string straight to a quota key would let it name the
-	// SSR axis (20x quota). The "v:" namespace plus the parse is what stops it.
 	if got, want := fire("CF-Connecting-IP", "s:ssr"), "s:ssr|v:invalid|visitor"; got != want {
 		t.Fatalf("got %q, want %q — ClientIP=s:ssr is expected (gin passes the platform header through unvalidated); the subject must still be v:invalid / visitor, never the SSR axis", got, want)
 	}

@@ -35,7 +35,6 @@ func (m *Model) funcByID(id string) *Func {
 	return nil
 }
 
-// usedParams 回 case 的所有訊息（各受眾、語系）用到的參數與（select 的）分支。
 func (c *Case) usedParams() map[string][]string {
 	out := map[string][]string{}
 	for _, byLoc := range c.Msgs {
@@ -101,13 +100,11 @@ func (m *Model) Golden() ([]GoldenCase, error) {
 
 type paramValue struct {
 	param Param
-	// json 是 golden 檔裡的值：字串、整數，或 enum／名詞的值名。
 	json any
 }
 
 func (m *Model) goldenValues(p Param, used map[string][]string) []paramValue {
 	if _, ok := used[p.Name]; !ok {
-		// 這個 key 不用這個參數：只給一個值，避免組合爆炸。
 		switch p.Kind { //nolint:exhaustive // 其餘種類走預設分支
 		case ParamInteger:
 			return []paramValue{{p, goldenIntegers[0]}}
@@ -143,7 +140,6 @@ func (m *Model) goldenValues(p Param, used map[string][]string) []paramValue {
 		for _, s := range names {
 			out = append(out, paramValue{p, s})
 		}
-		// 不在任何分支裡的值（走 other）：UNSPECIFIED。
 		out = append(out, paramValue{p, string(p.Enum.Desc.Values().ByNumber(0).Name())})
 	case ParamNoun:
 		for _, v := range p.Enum.Values {
@@ -154,7 +150,6 @@ func (m *Model) goldenValues(p Param, used map[string][]string) []paramValue {
 	return out
 }
 
-// formatCase 用參考格式器算期望值。
 func (m *Model) formatCase(f *Func, c *Case, aud Audience, loc string, combo []paramValue) (*string, error) {
 	msg := f.Effective(m, c, aud, loc)
 	if msg == nil {
@@ -179,7 +174,7 @@ func (m *Model) formatCase(f *Func, c *Case, aud Audience, loc string, combo []p
 				}
 			}
 			if noun == nil {
-				return nil, nil // UNSPECIFIED 或不認得：整個建構函式沒有文字
+				return nil, nil
 			}
 			nm := nf.Effective(m, noun, aud, loc)
 			if nm == nil {

@@ -28,7 +28,6 @@ class GrantPaymentTaskRepositoryCleanupScopeTest {
 
         repo.deleteCompletedBefore(before);
 
-        // 簽章只有一個 status 參數，MANUAL_INTERVENTION 無處可入 → 結構性排除
         verify(repo).deleteCompletedBeforeByStatus(eq(before), eq(WorkerTaskStatus.DONE.value()));
     }
 }

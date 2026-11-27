@@ -63,22 +63,10 @@ class AfterSaleCaseMapperIT {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // common-core DatabaseBootstrapAutoConfiguration 預設 enabled=true 且
-        // hawkr.db.bootstrap.target-database=${DB_NAME}（無預設值，本機/CI 未
-        // export DB_NAME 時直接 IllegalStateException）。本測試用 testcontainers 全新
-        // container，DB 已存在、不需要「確保 DB 存在」的 bootstrap 邏輯，關掉即可。
         registry.add("hawkr.db.bootstrap.enabled", () -> "false");
-        // application.yml 的 spring.flyway.url/user/password 是獨立於 spring.datasource.*
-        // 的硬編碼預設值（指向本機真實 hawkr_aftersales DB）。本測試已在 @BeforeAll 手動
-        // 對 testcontainers 跑過一次 migration，這裡索性關掉 Spring 自己的 FlywayAutoConfiguration，
-        // 避免它改用真實本機 DB 的帳密連線（會因密碼不符而噴 BeanCreationException）。
         registry.add("spring.flyway.enabled", () -> "false");
         registry.add("hawkr.tsid.enabled", () -> "false");
-        // gRPC server port=0 = 隨機 port，避免與本機 dev container（9923）衝突
-        // -1 關掉對外 gRPC server（本測試用不到）。0 是「先找空 port 再綁」，
-        // 中間可能被 testcontainers 的 port 映射搶走（CI 實測 Address already in use）。
         registry.add("grpc.server.port", () -> "-1");
-        // 跳過 Nacos / Spring Cloud（測試不需要服務註冊）
         registry.add("spring.cloud.nacos.discovery.enabled", () -> "false");
         registry.add("spring.cloud.discovery.enabled", () -> "false");
         registry.add("spring.cloud.service-registry.auto-registration.enabled", () -> "false");
@@ -116,7 +104,6 @@ class AfterSaleCaseMapperIT {
         jdbc.execute("TRUNCATE TABLE aftersale_cases RESTART IDENTITY CASCADE");
     }
 
-    // ==================== markReturnAtStore（20/25→26）====================
 
     @Test
     @DisplayName("markReturnAtStore: 25→26 成功 + stamp store_arrived_at / store_pickup_deadline_at")
@@ -160,7 +147,6 @@ class AfterSaleCaseMapperIT {
         assertNotNull(loaded.getStorePickupDeadlineAt());
     }
 
-    // ==================== markReturnDelivered（20/25/26→27）====================
 
     @Test
     @DisplayName("markReturnDelivered: from 25（宅配）成功")
@@ -200,7 +186,6 @@ class AfterSaleCaseMapperIT {
         assertNotNull(loaded.getAutoConfirmAt());
     }
 
-    // ==================== markReturnFailed（20/25/26/27→28）====================
 
     @Test
     @DisplayName("markReturnFailed: from 20/25/26/27 都成功")
@@ -224,7 +209,6 @@ class AfterSaleCaseMapperIT {
         assertEquals(0, affected);
     }
 
-    // ==================== markAutoCompletedFromAtStore（26→31，STORE_PICKUP_TIMEOUT）====================
 
     @Test
     @DisplayName("markAutoCompletedFromAtStore: 26→31 + stamp auto_complete_at_stamp（原因由 status 區分）")
@@ -248,7 +232,6 @@ class AfterSaleCaseMapperIT {
         assertEquals("27", loaded.getStatus());
     }
 
-    // ==================== markAutoCompletedFromDelivered（27→32，CONFIRM_RECEIPT_TIMEOUT）====================
 
     @Test
     @DisplayName("markAutoCompletedFromDelivered: 27→32 + stamp auto_complete_at_stamp（原因由 status 區分）")
@@ -272,7 +255,6 @@ class AfterSaleCaseMapperIT {
         assertEquals("30", loaded.getStatus());
     }
 
-    // ==================== markReturnReceivedByAdmin（擴增 26 允許）====================
 
     @Test
     @DisplayName("markReturnReceivedByAdmin: from 26 允許（2026-05-22 擴增）")
@@ -294,7 +276,6 @@ class AfterSaleCaseMapperIT {
         }
     }
 
-    // ==================== stampReturnProviderInfo（碼 55 路徑，不變狀態）====================
 
     @Test
     @DisplayName("stampReturnProviderInfo: 任意 status 都成功 stamp 訊息、不變 status")
@@ -310,7 +291,6 @@ class AfterSaleCaseMapperIT {
         }
     }
 
-    // ==================== stamp*24hWarned CAS 條件（非系統去重保證，見 issue #2294 A1–A3） ====================
 
     @Test
     @DisplayName("stampStorePickup24hWarned: 第一次=1，第二次=0（CAS 條件，非系統去重保證）")
@@ -342,7 +322,6 @@ class AfterSaleCaseMapperIT {
         assertEquals(0, mapper.stampStorePickup24hWarned("A022", LocalDateTime.now()));
     }
 
-    // ==================== findBuyerIdByCaseNo（issue #1626）====================
 
     @Test
     @DisplayName("findBuyerIdByCaseNo: 查得到 case 回傳 buyer_id")
@@ -362,7 +341,6 @@ class AfterSaleCaseMapperIT {
         assertNull(buyerId);
     }
 
-    // ==================== 部分索引存在（V1 migration 完整性）====================
 
     @Test
     @DisplayName("6 個新部分索引存在於 PostgreSQL（V1 migration 結構驗證）")
@@ -371,18 +349,14 @@ class AfterSaleCaseMapperIT {
                 SELECT indexname FROM pg_indexes
                  WHERE tablename = 'aftersale_cases'
                 """, String.class);
-        // 2026-05-22 新增的 3 個部分索引
         assertTrue(indexes.contains("idx_aftersale_cases_store_pickup_deadline"));
         assertTrue(indexes.contains("idx_aftersale_cases_warn_store_24h"));
         assertTrue(indexes.contains("idx_aftersale_cases_warn_confirm_24h"));
-        // 既有的 auto_confirm 索引仍存在
         assertTrue(indexes.contains("idx_aftersale_cases_auto_confirm"));
-        // 既有的退貨逾時/處理逾時索引仍存在
         assertTrue(indexes.contains("idx_aftersale_cases_return_timeout"));
         assertTrue(indexes.contains("idx_aftersale_cases_process_deadline"));
     }
 
-    // ==================== V6: seller_account_id → store_id rename（Plan C Phase 3）====================
 
     @Test
     @DisplayName("V6 migration: aftersale_cases.store_id 存在、seller_account_id 真的消失、值健在、索引改名")
@@ -437,7 +411,6 @@ class AfterSaleCaseMapperIT {
         assertFalse(indexes.contains("idx_seller_cancel_seller"), "舊索引名不應存在");
     }
 
-    // ==================== helpers ====================
 
     /**
      * 直接 SQL insert（避免走 MyBatis-Plus auto-fill，方便精確控制 status / 欄位）。

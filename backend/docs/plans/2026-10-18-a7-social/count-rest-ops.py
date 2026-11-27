@@ -9,8 +9,8 @@ import pathlib
 import yaml
 
 BRIEF_TAGS = {"Post", "Comment", "Forum", "Moderation", "AdminModeration", "AdminPost", "PostHashtag", "Hashtag", "CommentRealtime"}
-PRODUCT_TAGS = {"Hashtag"}  # /public/hashtags、/public/hashtags/popular：handler 呼叫 product-service
-KEEP_UNTIL_A6 = set()  # S3（2026-10-18）之後 /app/blocks* 也在 A7-4e 刪除；舊口徑是這兩條路徑（3 個 operation）
+PRODUCT_TAGS = {"Hashtag"}
+KEEP_UNTIL_A6 = set()
 
 spec = yaml.safe_load(open(pathlib.Path(__file__).resolve().parents[3] / "api/openapi/openapi.yaml", encoding="utf-8"))
 rows = []

@@ -29,7 +29,6 @@ func TestBypass01_ImportAlias(t *testing.T) {
 				rsp.GrpcErr(c, "invoice", err)
 				return
 			}
-			// 完全沒有 resp.GetCode() 檢查，且成功出口以別名呼叫。
 			rsp.OK(c, convInvSellerProviderAccountData(resp.GetData()))
 		}
 	})

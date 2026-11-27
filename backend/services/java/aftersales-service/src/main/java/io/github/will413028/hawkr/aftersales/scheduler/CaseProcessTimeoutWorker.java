@@ -98,9 +98,6 @@ public class CaseProcessTimeoutWorker {
             try {
                 handleOne(caseEntity, policy);
             } catch (PrincipalResolutionFailedException e) {
-                // issue #2294 P1-2：tx 尚未開始 ⇒ 沒有 CAS、沒有事件、沒有 row lock。
-                // 候選述詞（status / appeal_state / process_deadline / auto_escalated）完全未觸碰，
-                // 下一 tick 必然重撈同一筆——是可觀測的重試，不是靜默跳過。
                 log.error("CaseProcessTimeoutWorker.resolve_principals.failed",
                         "身分反解失敗，本輪跳過（未進 tx、未 CAS），下一 tick 重試, caseNo="
                                 + caseEntity.getCaseNo() + ", policy=" + policy, e);
@@ -132,14 +129,10 @@ public class CaseProcessTimeoutWorker {
         LocalDateTime now = DateTimeUtils.nowUtc();
         int hours = properties.getCaseConfig().getProcessDeadlineHours();
 
-        // issue #2294 P1-2：身分反解（兩次無 deadline 的 gRPC）在**進 tx 之前**做完；
-        // 失敗 → 拋 PrincipalResolutionFailedException → 由 scanProcessTimeouts 的 per-item
-        // catch 記 error 並繼續下一筆。此時尚未 CAS，四個候選條件全部未變，下一 tick 重撈。
         EventPrincipals principals =
                 eventPublisher.resolveEventPrincipals(caseEntity.getStoreId(), caseEntity.getBuyerId());
 
         try {
-            // issue #2294 B2：CAS ＋ audit ＋ publish 全在 service 的同一個 tx 內
             autoRejectService.autoReject(caseNo, now, hours,
                     caseEntity.getOrderNo(), caseEntity.getBuyerId(), caseEntity.getStoreId(),
                     principals);
@@ -160,11 +153,9 @@ public class CaseProcessTimeoutWorker {
         String caseNo = caseEntity.getCaseNo();
         LocalDateTime now = DateTimeUtils.nowUtc();
 
-        // issue #2294 P1-2：身分反解在進 tx 之前（理由與失敗語意同 autoRejectOne）
         EventPrincipals principals =
                 eventPublisher.resolveEventPrincipals(caseEntity.getStoreId(), caseEntity.getBuyerId());
 
-        // issue #2294 B3：CAS ＋ appeal_event ＋ publish 全在 service 的同一個 tx 內
         boolean escalated = escalationService.escalate(caseNo, now,
                 caseEntity.getOrderNo(), caseEntity.getBuyerId(), caseEntity.getStoreId(),
                 principals);

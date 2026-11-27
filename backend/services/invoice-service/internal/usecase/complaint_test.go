@@ -14,35 +14,22 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔驗 B07 寫入面的**業務規則**（§6.1.6 端點 13／63／64／65 ＝ §7.3.5 K01／K07／K11／K13）。
-// 型別邊界與 Tier A 的回應形狀在 internal/grpc/complaint_test.go。
-//
-// 🔴 三個 fake 的述詞**逐字照 SQL 寫**（allowed-from、complainant_buyer_id、version、
-// reopen_count、reopen_allowed_after）。fake 寫寬鬆一點，這裡的所有守衛測試就只是在
-// 驗 fake 自己，而正式路徑的 rows=0 一個都不會被抓到。
 
 const (
 	cBuyerA int64 = 2623900520
 	cBuyerB int64 = 2688637900
 	cDocID  int64 = 7001
-	// cIssuer 是 invoice_issuers 的 PK（TSID），cStoreID 是同一列的 issuer_ref_id
-	// （＝ sellers.store_id）。**兩者刻意不同**：相同的話，「payload 的 store_id 填了
-	// 哪一個」這件事在測試裡不可觀測。
 	cIssuer  int64 = 5001
 	cStoreID int64 = 2685914682
 	cOrder         = "O20260830000001"
 )
 
-// cNow 固定成週一，讓 3 工作天落在同一週（週二起算 → 週五）。
 var cNow = time.Date(2026, 3, 2, 6, 0, 0, 0, time.UTC)
 
-// ---------------------------------------------------------------------------
-// fakes
-// ---------------------------------------------------------------------------
 
 type cDocs struct {
 	domain.DocumentRepository
-	docs map[int64][]domain.Document // buyerID → docs（新到舊）
+	docs map[int64][]domain.Document
 }
 
 func (f cDocs) ListOrderDocumentsForBuyer(_ context.Context, sourceRef string, buyerID int64) ([]domain.Document, error) {
@@ -81,23 +68,15 @@ type cComplaints struct {
 	appended []domain.NewComplaintEvent
 	nextID   int64
 
-	// K04（#3055 的橫向稽查）：overdueRows 是 MarkOverdue 這一輪要回的列，
-	// overdueCalls 記它被呼叫幾次、markErr 讓它失敗。
 	overdueRows  []domain.Complaint
 	overdueCalls int
 	overdueErr   error
 
-	// K05（2026-09-08 的零呼叫端稽核）：escalateBefore 記下呼叫端算出來的窗口上界，
-	// 那是本 fake 唯一有鑑別力的地方——只記 calls 的替身對「窗口算錯」完全無感，
-	// 而算錯的後果是「剛進 OVERDUE 的申訴立刻被升級」或「永遠升級不了」。
 	escalateRows   []domain.Complaint
 	escalateCalls  int
 	escalateBefore time.Time
 	escalateErr    error
 
-	// K06（同一輪稽核，修正 adapter 自呼叫的假陰性後才看見）：
-	// reviewReopenAfter／reviewResolution 是本 fake 唯一有鑑別力的兩格——
-	// 冷卻窗口算錯、或結案理由填成 VIOLATION（會計進賣家違規窗口）都只有它們抓得到。
 	reviewRows        []domain.Complaint
 	reviewCalls       int
 	reviewReopenAfter time.Time
@@ -258,9 +237,6 @@ func (r *cComplaints) AppendEvent(_ context.Context, in domain.NewComplaintEvent
 	return e, nil
 }
 
-// ---------------------------------------------------------------------------
-// fixture
-// ---------------------------------------------------------------------------
 
 type cFixture struct {
 	uc      *Complaint
@@ -271,7 +247,6 @@ type cFixture struct {
 	audit   *fakeAudit
 }
 
-// newComplaintUC 造一個「文件已建立 48 小時、行事曆已同步且無國定假日」的環境。
 func newComplaintUC(t *testing.T, rows ...domain.Complaint) *cFixture {
 	t.Helper()
 	docCreated := cNow.Add(-48 * time.Hour)
@@ -282,8 +257,6 @@ func newComplaintUC(t *testing.T, rows ...domain.Complaint) *cFixture {
 	ob := &fakeOutbox{}
 	synced := cNow
 	var seq int64 = 9000000000
-	// 🔴 issuer.ID（PK）與 issuer.IssuerRefID（＝store_id）刻意給**不同**的值：
-	// 兩者相同的 fixture 對「填錯了哪一個」零鑑別力。
 	issuers := &fakeIssuerRepo{issuer: domain.Issuer{
 		ID: cIssuer, IssuerType: "SELLER", IssuerRefID: cStoreID,
 	}}
@@ -316,9 +289,6 @@ func bizCodeOf(t *testing.T, err error) int32 {
 	return code
 }
 
-// ---------------------------------------------------------------------------
-// K01 建案（端點 13）
-// ---------------------------------------------------------------------------
 
 func TestFileComplaintCreatesCaseWithSlaEventAndOutbox(t *testing.T) {
 	fx := newComplaintUC(t)
@@ -335,12 +305,10 @@ func TestFileComplaintCreatesCaseWithSlaEventAndOutbox(t *testing.T) {
 	if got := res.View.Complaint.Status; got != codemeta.InvoiceComplaintStatusOpen.Value {
 		t.Fatalf("status = %s, want OPEN", got)
 	}
-	// 起算週二 00:00（台北）→ 推 3 個工作天 → 週五 00:00 台北 ＝ 03-05T16:00Z。
 	wantDue := time.Date(2026, 3, 5, 16, 0, 0, 0, time.UTC)
 	if !res.View.Complaint.SlaDueAt.Equal(wantDue) {
 		t.Fatalf("sla_due_at = %s, want %s", res.View.Complaint.SlaDueAt, wantDue)
 	}
-	// 時間軸：CREATED ＋ actor BUYER ＋ action 必須留空（買家的動作不進 action 軸）。
 	if len(fx.repo.appended) != 1 {
 		t.Fatalf("appended = %d 列，want 1", len(fx.repo.appended))
 	}
@@ -348,7 +316,6 @@ func TestFileComplaintCreatesCaseWithSlaEventAndOutbox(t *testing.T) {
 	if ev.EventType != codemeta.InvoiceComplaintEventTypeCreated.Value || ev.ActorType != "BUYER" || ev.Action != "" {
 		t.Fatalf("event = %+v", ev)
 	}
-	// outbox：通知賣家，與建案同交易。
 	if len(fx.outbox.inserted) != 1 {
 		t.Fatalf("outbox = %d 列，want 1", len(fx.outbox.inserted))
 	}
@@ -439,19 +406,15 @@ func TestFileComplaintWithStaleCalendarUsesHardCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("File: %v", err)
 	}
-	wantCap := time.Date(2026, 3, 16, 0, 0, 0, 0, time.UTC).Add(-8 * time.Hour) // 03-16 00:00 台北
+	wantCap := time.Date(2026, 3, 16, 0, 0, 0, 0, time.UTC).Add(-8 * time.Hour)
 	if !res.View.Complaint.SlaDueAt.Equal(wantCap) {
 		t.Fatalf("sla_due_at = %s, want 硬上限 %s", res.View.Complaint.SlaDueAt, wantCap)
 	}
-	// 倒數算不出來就明說算不出來——回 0 會被前端讀成「今天到期」。
 	if res.View.RemainingBusinessDays != nil {
 		t.Fatalf("remaining = %d，行事曆未涵蓋時應保持未計算", *res.View.RemainingBusinessDays)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// K07／K11／K13 三支動作端點（63／64／65）
-// ---------------------------------------------------------------------------
 
 func TestRejectEscalatesToAdm(t *testing.T) {
 	row := complaintRow(5001, cBuyerA, codemeta.InvoiceComplaintStatusSellerResponded.Value, 3)
@@ -493,7 +456,6 @@ func TestWithdrawFromEachAllowedStatus(t *testing.T) {
 			if view.Complaint.Status != codemeta.InvoiceComplaintStatusWithdrawn.Value {
 				t.Fatalf("status = %s", view.Complaint.Status)
 			}
-			// 撤回不寫 resolved_at（chk_invcomp_resolved_pair 只綁 RESOLVED／VIOLATION_CONFIRMED）。
 			if view.Complaint.ResolvedAt != nil {
 				t.Fatal("撤回不得寫 resolved_at")
 			}
@@ -524,7 +486,6 @@ func TestReopenResetsSlaAndBumpsCount(t *testing.T) {
 	if view.Complaint.ResolvedAt != nil {
 		t.Fatal("離開 RESOLVED 必須清空 resolved_at（chk_invcomp_resolved_pair 雙向等式）")
 	}
-	// SLA 必須重置：不重置的話這一列一進 OPEN 就落回逾期掃描的候選集合。
 	wantDue := time.Date(2026, 3, 5, 16, 0, 0, 0, time.UTC)
 	if !view.Complaint.SlaDueAt.Equal(wantDue) {
 		t.Fatalf("sla_due_at = %s, want 重置為 %s", view.Complaint.SlaDueAt, wantDue)
@@ -679,11 +640,7 @@ func TestRejectRequiresReasonAndWithdrawDoesNot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 交易邊界
-// ---------------------------------------------------------------------------
 
-// failingTx 讓 callback 跑完之後整筆失敗，模擬 rollback。
 type failingTx struct{ err error }
 
 func (f failingTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
@@ -717,7 +674,6 @@ func longText(n int) string {
 	return string(b)
 }
 
-// errAsBiz 把 DomainError 的業務碼拆出來（bizOf 住在 internal/grpc，這裡不能用）。
 func errAsBiz(err error) (int32, string, bool) {
 	var de *pkgerrors.DomainError
 	if !errors.As(err, &de) {
@@ -726,9 +682,6 @@ func errAsBiz(err error) (int32, string, bool) {
 	return int32(de.Code), de.DomainMessage(), true
 }
 
-// ---------------------------------------------------------------------------
-// K05：申訴逾期掃描（P10，#3055 的橫向稽查）
-// ---------------------------------------------------------------------------
 
 // 逾期的申訴必須標成 OVERDUE **並**通知賣家。
 //
@@ -758,16 +711,12 @@ func TestEscalateOverdueComplaints_TransitionsAndLeavesTrail(t *testing.T) {
 		t.Fatalf("EscalateOverdue 被呼叫 %d 次，want 1", f.repo.escalateCalls)
 	}
 
-	// 🔴 窗口上界硬寫 24h，**不引用 escalateOverdueWindow**：期望值取自被測物的常數
-	// 等於「它改成多少都會過」，那是自己跟自己對。24 小時的來源是 SQL 註解與 CodeMeta
-	// 對 OVERDUE 的描述（「24 小時後自動升級 ADM」），三處必須同值。
 	wantBefore := cNow.Add(-24 * time.Hour)
 	if !f.repo.escalateBefore.Equal(wantBefore) {
 		t.Fatalf("escalate_before = %s，want %s（OVERDUE 之後再等 24 小時）",
 			f.repo.escalateBefore, wantBefore)
 	}
 
-	// I7：每一筆升級都要留痕，而且要落在 COMPLAINT 軸上。
 	if len(f.audit.entries) != 2 {
 		t.Fatalf("應留 2 列狀態歷程，實得 %d", len(f.audit.entries))
 	}
@@ -806,16 +755,11 @@ func TestResolveExpiredBuyerReviews_ResolvesAndLeavesTrail(t *testing.T) {
 		t.Fatalf("應呼叫 1 次，實得 %d", f.repo.reviewCalls)
 	}
 
-	// 🔴 冷卻窗口硬寫 24h，**不引用 reopenCooldownWindow**（期望值取自被測物等於自己跟自己對）。
-	// 24 小時的來源是 ResolveExpiredBuyerReviews 的 SQL 註解「reopen_allowed_after = now + 24h」。
 	wantReopen := cNow.Add(24 * time.Hour)
 	if !f.repo.reviewReopenAfter.Equal(wantReopen) {
 		t.Fatalf("reopen_allowed_after = %s，want %s", f.repo.reviewReopenAfter, wantReopen)
 	}
 
-	// 🔴 結案理由必須是 NO_VIOLATION：填成 VIOLATION 會讓賣家平白進 90 天違規窗口
-	// （CountConfirmedViolationOrders 只計 VIOLATION_CONFIRMED，但 resolution_code
-	// 是 ADM 判讀的依據）。買家只是沒表態，不是賣家違規。
 	if f.repo.reviewResolution != "NO_VIOLATION" {
 		t.Fatalf("resolution_code = %q，want NO_VIOLATION", f.repo.reviewResolution)
 	}
@@ -872,8 +816,6 @@ func TestSweepOverdueComplaints_EmitsOnePerRow(t *testing.T) {
 			ev.EventType != string(pkgmq.EventTypeInvoiceComplaintOverdue) {
 			t.Fatalf("routing key／event_type = %q／%q", ev.RoutingKey, ev.EventType)
 		}
-		// 🔴 store_id 必須是 issuer_ref_id：模板的收件人是賣家，dispatcher 拿這個值
-		// 去解析帳號。填成 issuer PK 的症狀是通知靜默不送，全程零錯誤零 DLQ。
 		if !containsBytes(ev.Payload, `"store_id":"`+strconv.FormatInt(cStoreID, 10)+`"`) {
 			t.Errorf("store_id 不是 issuer_ref_id：%s", ev.Payload)
 		}
@@ -881,8 +823,6 @@ func TestSweepOverdueComplaints_EmitsOnePerRow(t *testing.T) {
 			t.Error("store_id 取到 issuer PK 了")
 		}
 	}
-	// 冪等鍵的 phase 必須是 overdue：與同一件案子的 created／responded 共用一個鍵的話，
-	// notification 端的唯一鍵會把三則去重成一則。
 	if !containsBytes(f.outbox.inserted[0].Payload, `"notification_ref_id":"INVCPL:7001:overdue"`) {
 		t.Errorf("冪等鍵的 phase 不是 overdue：%s", f.outbox.inserted[0].Payload)
 	}
@@ -941,11 +881,9 @@ func TestComplaintTransition_WritesStatusHistory(t *testing.T) {
 	if derefString(e.FromStatus) != codemeta.InvoiceComplaintStatusOpen.Value {
 		t.Fatalf("from 應是轉移**前**的狀態，實得 %v", e.FromStatus)
 	}
-	// to 取自重讀後的實際值，不是 Go 端依 eventType 推導的期望值。
 	if e.ToStatus == "" || e.ToStatus == derefString(e.FromStatus) {
 		t.Fatalf("to 必須是實際落地的新狀態，實得 %q", e.ToStatus)
 	}
-	// 買家可見時間軸仍要寫——兩張表用途不同，不是二選一。
 	if len(fx.repo.events[4242]) == 0 {
 		t.Fatal("invoice_complaint_events 也要寫（買家時間軸）")
 	}

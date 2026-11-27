@@ -48,8 +48,6 @@ export async function GET(request: NextRequest, context: Context) {
 		const parsed = parseDelegatedSessionReport(unwrapUpstreamData(payload));
 		if (!parsed) return contractViolation("代行工作階段摘要回應無法驗證");
 		if (parsed.sessionId !== sessionId) {
-			// 回的是另一個工作階段的摘要：撤銷按鈕與稽核紀錄都掛在畫面上的這個 id
-			// 之下，讓兩者脫鉤等於把治理動作指向一個沒人看過的對象。
 			return contractViolation("代行工作階段摘要與查詢對象不符");
 		}
 		return ok(parsed);

@@ -44,8 +44,6 @@ class _ForceLogoutListenerState extends ConsumerState<ForceLogoutListener> {
   }
 
   Future<void> _showDialog() async {
-    // MaterialApp.builder 位於 Router / Navigator 上方，不能用本 widget 的
-    // context 呼叫 showDialog。改從 root Navigator 的 Overlay 取得有效 context。
     await Future<void>.delayed(Duration.zero);
     if (!mounted) {
       _dialogShowing = false;
@@ -55,7 +53,6 @@ class _ForceLogoutListenerState extends ConsumerState<ForceLogoutListener> {
     final dialogContext = widget.navigatorKey.currentState?.overlay?.context;
     if (dialogContext == null || !dialogContext.mounted) {
       _dialogShowing = false;
-      // Router 尚未完成第一幀時保留 force-logout 旗標，下一幀再嘗試。
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && ref.read(forceLogoutProvider)) _showDialog();
       });
@@ -66,7 +63,6 @@ class _ForceLogoutListenerState extends ConsumerState<ForceLogoutListener> {
     final continuePath = widget.currentPath();
     final goLogin = await showLoginRequiredDialog(dialogContext);
     if (!mounted) return;
-    // 不論取消或前往登入，失效憑證都必須清除，後續行為與訪客一致。
     await ref.read(sessionProvider.notifier).logout();
     if (!mounted) return;
     ref.read(forceLogoutProvider.notifier).consume();

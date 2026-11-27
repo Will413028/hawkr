@@ -190,7 +190,6 @@ describe("uploadPublicFile", () => {
 		await expect(
 			uploadPublicFile(client, file, {
 				put: async () => ok(),
-				// 逾時判斷失效時輪詢永不結束：超過預期的輪數就丟錯，讓測試失敗而不是卡住。
 				sleep: async () => {
 					sleeps += 1;
 					if (sleeps > 10) throw new Error("poll did not time out");
@@ -423,7 +422,6 @@ describe("uploadSecureFile", () => {
 				},
 			}),
 		).rejects.toMatchObject({ kind: "chunk_failed", status: 409 });
-		// 立刻放棄：不靠續傳次數上限才停下來。
 		expect(puts).toBe(1);
 	});
 

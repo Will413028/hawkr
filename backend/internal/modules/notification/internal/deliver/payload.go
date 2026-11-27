@@ -17,7 +17,6 @@ const (
 	StateRefreshHintPrefix = "STATE_REFRESH_HINT_"
 )
 
-// pushMessage 組出推播：可見的 notification 是收件人語系的標題與內文；data 只放有值的 key。imageURL 空表示沒有圖。
 func pushMessage(p plan, inboxItemID *uuid.UUID, imageURL string) fcm.Message {
 	data := map[string]string{}
 	if p.rendered.DeepLink != "" {
@@ -32,7 +31,6 @@ func pushMessage(p plan, inboxItemID *uuid.UUID, imageURL string) fcm.Message {
 	return fcm.Message{Title: p.rendered.Title, Body: p.rendered.Body, ImageURL: imageURL, Data: data}
 }
 
-// hints 是以逗號分隔的 proto enum 名稱；沒有提示回空字串。
 func hints(h model.StateHint) string {
 	if h == model.StateHintNone {
 		return ""

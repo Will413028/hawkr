@@ -166,7 +166,6 @@ describe("SellerMeasureDetailPage", () => {
 					APPEAL_SENTENCE.APPEAL_WINDOW_ENDED,
 				),
 			],
-			// 2026-10-01 02:00 UTC = 台北 10:00
 			appealDeadlineTime: timestampFromDate(new Date("2026-10-01T02:00:00Z")),
 		});
 		render(React.createElement(SellerMeasureDetailPage, { measureId: "t1" }));

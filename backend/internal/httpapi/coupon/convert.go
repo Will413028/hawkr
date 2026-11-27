@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// specOf 把請求的活動內容轉成模組的規則：折抵必須設 cash 或 percent 其中一個；時間必填。欄位格式的細節由模組檢查。
 func specOf(in *pb.CampaignInput) (coupon.CampaignSpec, error) {
 	spec := coupon.CampaignSpec{Title: in.GetTitle(), ThresholdAmount: in.GetThresholdAmount()}
 	switch d := in.GetDiscount().(type) {
@@ -39,7 +38,6 @@ func specOf(in *pb.CampaignInput) (coupon.CampaignSpec, error) {
 	return spec, nil
 }
 
-// parseBuyerIDs 解析名單裡的買家 ID；格式錯誤指出是第幾個。
 func parseBuyerIDs(raw []string) ([]int64, error) {
 	out := make([]int64, 0, len(raw))
 	for i, r := range raw {
@@ -72,7 +70,6 @@ func campaignStoreIDs(cs []coupon.Campaign) []int64 {
 	return ids
 }
 
-// storeCards 讀取店家卡片（key 是 store_id），沒有卡片（從沒公開過或不存在）的店家不在 map 裡。讀取失敗整個請求失敗（Unavailable），不降級成沒有店家。
 func (h *App) storeCards(ctx context.Context, ids []int64) (map[int64]*commonpb.StoreCard, error) {
 	out := make(map[int64]*commonpb.StoreCard, len(ids))
 	for start := 0; start < len(ids); start += seller.MaxBatchSize {
@@ -91,8 +88,6 @@ func (h *App) storeCards(ctx context.Context, ids []int64) (map[int64]*commonpb.
 	return out, nil
 }
 
-// designated 把名單的買家 ID 補上暱稱（buyer 的顯示資料）；讀取失敗（Unavailable）與買家模組沒有回的買家（名單裡的人必定存在，沒有就是資料不一致）都讓整個請求失敗。
-// buyer 標記為已刪除（Deleted）的買家是契約允許的狀態：不設名稱。
 func (h *App) designated(ctx context.Context, ids []int64) ([]*pb.DesignatedBuyer, error) {
 	displays := make(map[int64]buyer.Display, len(ids))
 	for start := 0; start < len(ids); start += buyer.MaxBatchSize {
@@ -152,7 +147,6 @@ func toVoucher(v coupon.VoucherView, cards map[int64]*commonpb.StoreCard, checko
 	return out
 }
 
-// toSellerCampaign 轉成店家看到的活動。店家看的都是自己的活動，不附店家卡片（只有 store_id）；expired 由模組用自己的時鐘判斷（到期的唯一定義）。
 func toSellerCampaign(c coupon.Campaign, expired bool) *pb.SellerCampaign {
 	out := &pb.SellerCampaign{
 		Campaign: toCampaign(c, nil), Status: rpc.EnumToProto[pb.CampaignStatus](c.Status),

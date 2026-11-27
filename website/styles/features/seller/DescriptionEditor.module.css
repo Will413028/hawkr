@@ -31,9 +31,6 @@
 	--desc-editor-action-color: var(--hkui-primary);
 	--desc-editor-icon-primary: var(--color-brand-primary-strong);
 	--desc-editor-icon-secondary: var(--color-brand-secondary);
-	/* No `overflow: hidden` here — it would clip Editor.js's block-tunes
-	   popover (the ⋮⋮ "settings" menu) at the shell edge. The rounded corners
-	   are instead applied to the toolbar (top) and canvas (bottom) below. */
 	border: 1px solid var(--desc-editor-border);
 	border-radius: 10px;
 	background: var(--desc-editor-shell-bg);
@@ -71,8 +68,6 @@
 		0 16px 36px -32px rgb(var(--color-ink-800-rgb) / 0.58);
 }
 
-/* 外殼是 <dialog>：inline（non-modal open）時重設 UA 樣式讓它看起來就是
-   原本的區塊；放大時 showModal() 抬進 top layer（見 editorShell_expanded）。 */
 dialog.editorShell {
 	position: static;
 	width: 100%;
@@ -93,8 +88,6 @@ dialog.editorShell {
 	background: rgba(0, 0, 0, 0.58);
 }
 
-/* Scrollable toolbar + pinned expand button share one sticky row; the row now
-   owns the top radii / bottom border / blur that used to live on .toolbar. */
 .toolbarRow {
 	position: sticky;
 	top: 0;
@@ -284,14 +277,8 @@ dialog.editorShell {
 	content: "";
 }
 
-/* Excel/Notion 式表格尺寸挑選器 —— .tableTriggerAnchor 只用來量測觸發鈕的
-   實際 box（給 popover 定位），不影響版面；popover 本身 portal 進
-   <dialog>（而非 document.body），position:fixed 的座標才不會被
-   .toolbarRow 的 backdrop-filter 重設 containing block，展開全螢幕
-   （dialog showModal 的 top layer）時也才蓋得住畫布。 */
 .tableTriggerAnchor {
 	display: inline-flex;
-	/* 按住直接拖曳選尺寸 — 觸控時不能被瀏覽器攔去捲動 */
 	touch-action: none;
 }
 
@@ -349,9 +336,6 @@ dialog.editorShell {
 
 .canvas {
 	position: relative;
-	/* Bottom corners rounded to match the shell. Overflow stays visible so the
-	   block-tunes popover can extend past the canvas edge when it opens near
-	   the bottom of a short document. */
 	border-bottom-left-radius: 9px;
 	border-bottom-right-radius: 9px;
 	background: var(--desc-editor-canvas-bg);
@@ -359,9 +343,6 @@ dialog.editorShell {
 
 .holder {
 	min-height: 230px;
-	/* Asymmetric gutters: left holds the +/⋮⋮ controls, right holds the ↕ drag
-	   handle. Both controls live just outside the centred content box, so the
-	   padding must reserve room for them inside the frame (no overflow). */
 	padding: 20px 44px 28px 64px;
 }
 
@@ -369,12 +350,8 @@ dialog.editorShell {
 	opacity: 0.45;
 }
 
-/* ---- 放大編輯彈窗：同一個 shell 原地升級成置中 fixed 面板 ---- */
 
-/* dialog.editorShell（上方的 inline reset）同為 (0,1,1) 特異度 —
-   此區塊必須帶 dialog 前綴且位於其後，展開時才能贏過 reset。 */
 dialog.editorShell_expanded {
-	/* top-layer modal：inset:0 + margin:auto 置中，只需給尺寸 */
 	position: fixed;
 	inset: 0;
 	display: flex;
@@ -385,8 +362,6 @@ dialog.editorShell_expanded {
 	max-height: none;
 	margin: auto;
 	border-radius: 14px;
-	/* 外殼色是半透明（inline 時墊在表單卡上）；彈窗下方只有 backdrop，
-	   必須先鋪一層實色 page surface，深色模式才不會整片透出背景。 */
 	background:
 		linear-gradient(var(--desc-editor-shell-bg), var(--desc-editor-shell-bg)),
 		var(--theme-surface-page);
@@ -471,7 +446,6 @@ dialog.editorShell_expanded {
 	}
 }
 
-/* Product editing: restrained chrome, persistent action labels and clear selection. */
 .editorShell {
 	--desc-editor-shell-bg: var(--theme-surface-card);
 	--desc-editor-toolbar-bg: var(--theme-surface-card);
@@ -549,7 +523,6 @@ dialog.editorShell_expanded {
 	padding: 12px 16px;
 	color: var(--theme-text-muted);
 }
-/* A caret in a long list should not paint the entire document as selected. */
 .editorShell [class~="ce-block--focused"]:not([class~="ce-block--selected"])
 	[class~="ce-block__content"],
 .editorShell
@@ -629,8 +602,6 @@ dialog.editorShell_expanded {
 	display: none;
 }
 
-/* Image blocks share the seller canvas: one clear upload target, then image
-   and persistent actions. Caption data remains accessible alt, never a field. */
 .editorShell .holder :global(.hk-description-image) {
 	display: flex;
 	flex-direction: column;
@@ -736,7 +707,6 @@ dialog.editorShell_expanded {
 	height: auto;
 	border-radius: 0;
 	object-fit: contain;
-	/* Editor.js dims selected images; retain product colors and mark the frame. */
 	opacity: 1;
 }
 

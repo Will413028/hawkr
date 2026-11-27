@@ -14,10 +14,8 @@ import java.util.Map;
  */
 public class CvsShipMapTest {
 
-    // ===== 可替換變數 =====
     private static final String MER_ID = "HAWK9";
 
-    // ===== PayUni 代理商金鑰（sandbox） =====
     private static final String HASH_KEY = "TestOnlyFakeHashKey0123456789AB1";
     private static final String HASH_IV = "TestOnlyFakeIV00";
     private static final String BASE_URL = "https://sandbox-api.payuni.com.tw";
@@ -37,7 +35,6 @@ public class CvsShipMapTest {
         params.put("MapType", "1");
         params.put("Tag", "2");
         params.put("MobileTag", "N");
-        // 前景導回 URL（測試時由環境變數填入）
         String mapReturnUrl = System.getenv().getOrDefault("PAYUNI_MAP_RETURN_URL", "");
         if (!mapReturnUrl.isEmpty()) {
             params.put("MapReturnURL", mapReturnUrl);

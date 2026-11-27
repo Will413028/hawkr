@@ -25,33 +25,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A05｜發票工作與異常佇列（58A §A05，端點 50 `GET /api/v1/admin/invoices/jobs`）。
-//
-// 唯讀頁。四件刻意不做的事（全部寫進 PR body）：
-//   - **不做批次重試**：端點 52 是單筆，`reason` / `expectedVersion` / `Idempotency-Key`
-//     三個都不能跨筆共用，而 `canRetry` 是逐筆由後端算的布林 ⇒「批次」在語意上不成立。
-//     真要做，前置是一支批次端點 ＋ 一支 preflight 端點，不是在前端跑 N 次迴圈。
-//   - **不做勾選欄、不做任何「開票」鍵**。
-//   - **不做表頭排序**：端點 50 沒有 sort query。
-//   - **不做自動輪詢**：一律「手動更新」。
-//
-// ⚠️ **每個 tab 不顯示筆數 badge**：六個 tab 各有獨立查詢，要顯示六個數字就得同時打
-// 六支端點搶同一個限流桶。跨分頁的量看 A01 的 KPI。
-//
-// ## 7 欄與 58A 的差異
-//
-// 58A 的第 5 欄是「法定期限」（`statutoryDeadlineAt`，它稱之為「唯一錯過就無法補救的
-// 欄位」），而端點 50 的 DTO（Gateway `InvoiceJobInfo`）**沒有這個欄位**——逐欄核對
-// 過，它連同 `storeName` 一起不在契約上。憑語意造欄名的症狀是渲染 `undefined`
-// （陷阱 T15）⇒ 該欄以 `lastAttemptAt`（最近嘗試）替代，法定期限俟後端補欄再加。
-//
-// 另外四個欄位（付款時間／發票模式／金額／出貨狀態）58A 已定版本波不畫，理由同樣是
-// DTO 沒有；它們在 A12 的列表 DTO 上都有，需要它們的稽核情境走 A12。
-// **不要從 `summary` 解析**——那是一個人類可讀的句子，解析它是反契約的。
-//
-// ⚠️ **分頁名不是狀態值**（陷阱 T17）：`COMPLETED` / `CANCELLED` / `NEEDS_MANUAL` 這些字
-// 只能當 `tab` query 用。拿去比對 `job.status` 一定得到空集合，而空集合看起來就像
-// 「今天沒有這類案件」。本檔全域只在 `params.set("tab", ...)` 出現這些字面值。
 
 const JOBS_ENDPOINT = "/api/v1/admin/invoices/jobs";
 const PAGE_SIZE = 20;
@@ -87,7 +60,6 @@ function JobsTable({ tab }: { tab: string }) {
 			});
 			if (storeId) params.set("store_id", storeId);
 			if (orderNo) params.set("order_no", orderNo);
-			// manual_reason 只有「需人工」分頁送得出去，其他分頁的值域本來就不適用。
 			if (isNeedsManual && manualReason) {
 				params.set("manual_reason", manualReason);
 			}
@@ -210,7 +182,7 @@ function JobsTable({ tab }: { tab: string }) {
 										<div className="cell-sub">{job.jobId}</div>
 									</td>
 									<td>
-										{/* 這支端點的 DTO 沒有 storeName，只有 storeId。 */}
+
 										<div className="cell-main">{job.storeId}</div>
 									</td>
 									<td>
@@ -299,10 +271,7 @@ export default function InvoiceJobsPage() {
 				</div>
 			</div>
 
-			{/*
-			 * 固定資訊條放**頁面級**不逐列重複：逐列重複會讓它變成背景噪音，而它要對抗的
-			 * 正是「看到發票紅字就不敢放行出貨」這個直覺。
-			 */}
+
 			<p className="invoice-page-notice" role="note">
 				<MaterialSymbol name="local_shipping" />
 				<span>
@@ -331,10 +300,7 @@ export default function InvoiceJobsPage() {
 				))}
 			</div>
 
-			{/*
-			 * key 讓切換分頁時整個子樹重建 ⇒ 六組篩選與分頁不會互相污染。
-			 * 這也是「一個分頁一個獨立 useQuery」在 React 這一側的實現方式。
-			 */}
+
 			<JobsTable key={tab} tab={tab} />
 		</div>
 	);

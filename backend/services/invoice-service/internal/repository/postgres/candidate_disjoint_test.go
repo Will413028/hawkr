@@ -11,13 +11,7 @@ import (
 	"testing"
 )
 
-// 設計書 §5.4 的不變式表逐條指名了守護者。以下兩條的「落點」欄寫的是
-// `operation_predicate_disjoint_test.go` 與 `db/sqlc_override_test.go`
-// —— 2026-09-05 第 6 輪稽核實查：**那兩個檔案不存在**，兩條不變式今天都成立，
-// 但沒有任何東西會因為它們被破壞而變紅。本檔補上它們。
 
-// queriesFile 讀 db/queries 下的一支檔案。找不到一律 t.Fatalf 不 t.Skip：
-// 檔案被搬走時 SKIP 會讓這道檢查靜默消失，而它守的正是「沒有人在看」。
 func queriesFile(t *testing.T, name string) string {
 	t.Helper()
 	path := filepath.Join("..", "..", "..", "db", "queries", name)
@@ -28,7 +22,6 @@ func queriesFile(t *testing.T, name string) string {
 	return string(raw)
 }
 
-// statusSetOf 取某支 query 的 `status IN ('A','B',…)` 值集合。
 func statusSetOf(t *testing.T, body, queryName string) map[string]struct{} {
 	t.Helper()
 	marker := "-- name: " + queryName + " "
@@ -80,7 +73,6 @@ func TestOperationCandidateSetsAreDisjoint(t *testing.T) {
 			"⇒ 交集裡的列會在 INV.op 還在打 f0401 的途中被 INV.rc 合法搶走 ⇒ 重複開票（§4.6 W-03）",
 			both)
 	}
-	// 陰性對照：兩邊都非空才代表這支測試真的在比對東西。
 	if len(op) == 0 || len(rc) == 0 {
 		t.Fatalf("解析結果不合理：op=%d rc=%d", len(op), len(rc))
 	}
@@ -95,7 +87,6 @@ func TestEveryJsonbColumnHasSqlcOverride(t *testing.T) {
 	schema := repoFile(t, "..", "..", "..", "db", "schema", "schema.sql")
 	cfg := repoFile(t, "..", "..", "..", "db", "sqlc.yaml")
 
-	// 目前所在的表：schema.sql 的 CREATE TABLE "x" ( … );
 	tableRe := regexp.MustCompile(`(?m)^CREATE TABLE(?: IF NOT EXISTS)?\s+"?([a-z_]+)"?`)
 	colRe := regexp.MustCompile(`(?m)^\s+"([a-z_]+)"\s+jsonb\b`)
 

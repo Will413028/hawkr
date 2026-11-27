@@ -40,7 +40,6 @@ type App struct {
 	m      Module
 	images rpc.Images
 	ports  Ports
-	// stats 是店家卡片評分的組裝（與店面頁同一份 *StatsSource，只用到評價與 logger）。
 	stats    *httpseller.StatsSource
 	blocking blocks.Sources
 }
@@ -62,12 +61,10 @@ func NewApp(m Module, images rpc.Images, ports Ports, stats *httpseller.StatsSou
 // ErrBlockingRequired 是 NewApp 沒有封鎖入口的來源時的錯誤。
 var ErrBlockingRequired = errors.New("httpapi/buyer：封鎖需要內容作者的來源與跨身分規則的身分來源")
 
-// caller 解析呼叫者的 buyer_id：每個帳號都是買家，每個請求只查 buyer_id，不讀 profile 個資。
 func (h *App) caller(ctx context.Context) (int64, error) {
 	return rpc.AccountBuyerID(ctx, h.m)
 }
 
-// callerProfile 以一次查詢讀取呼叫者的現任 profile；錯誤語意與 caller 相同。
 func (h *App) callerProfile(ctx context.Context) (model.Profile, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {

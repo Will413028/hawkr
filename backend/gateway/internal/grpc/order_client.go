@@ -44,7 +44,6 @@ func (c *OrderClient) Close() error {
 	return nil
 }
 
-// ==================== 買家端 ====================
 
 // CreateOrder 建立訂單
 func (c *OrderClient) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
@@ -88,7 +87,6 @@ func (c *OrderClient) ConfirmReceipt(ctx context.Context, req *pb.ConfirmReceipt
 	return c.orderClient.ConfirmReceipt(ctx, req)
 }
 
-// ==================== 賣家端 ====================
 
 // GetSellerOrders 查詢賣家訂單列表
 func (c *OrderClient) GetSellerOrders(ctx context.Context, req *pb.GetSellerOrdersRequest) (*pb.GetSellerOrdersResponse, error) {
@@ -111,7 +109,6 @@ func (c *OrderClient) GetBuyerOrdersForSeller(ctx context.Context, req *pb.GetBu
 	return c.orderClient.GetBuyerOrdersForSeller(ctx, req)
 }
 
-// ==================== 管理端 ====================
 
 // SearchOrders 後台搜尋訂單
 func (c *OrderClient) SearchOrders(ctx context.Context, req *pb.SearchOrdersRequest) (*pb.SearchOrdersResponse, error) {
@@ -127,7 +124,6 @@ func (c *OrderClient) GetAdminOrderDetail(ctx context.Context, req *pb.GetAdminO
 	return c.orderClient.GetAdminOrderDetail(ctx, req)
 }
 
-// ==================== 結帳模組 ====================
 
 // CheckoutValidate 結帳即時驗證
 func (c *OrderClient) CheckoutValidate(ctx context.Context, req *pb.CheckoutValidateRequest) (*pb.CheckoutValidateResponse, error) {

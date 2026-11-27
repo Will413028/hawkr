@@ -65,18 +65,6 @@ func (c *OrderPaidConsumer) WithClock(now func() time.Time) *OrderPaidConsumer {
 func (c *OrderPaidConsumer) Handle(ctx context.Context, routingKey string, body []byte) error {
 	var p orderPaidPayload
 	if err := json.Unmarshal(body, &p); err != nil {
-		// 🔴 **回 error 而不是 ACK 丟棄**（58 §6.3.5.4 慣例① 已同步修正；與 C2 同一條理由）。
-		//
-		// 一則被丟棄的 order.paid ＝ 一張已收款的訂單永遠不開發票，那是法定義務未履行，
-		// 而且**不會在任何一張表上留下痕跡**（連 inbox 列都沒有）—— M8
-		// invoice_paid_orders_without_operation 的基準是「inbox 裡有這一列」，同樣看不到。
-		// 回 error 之後訊息原文留在 invoice.order.paid.dlq，可查可重放。
-		//
-		// 上界由 MaxRetries=3 保證（di.go 的 ConsumerMaxRetries）；只有 MaxRetries==0
-		// 才會退化成 pkg/mq 的 legacy 無限 requeue。
-		//
-		// M30 照樣遞增：它守的是「這則事件在 invoice_inbox_events 沒有留下任何一列」。
-		// 用 Error 而不是 Warn：payload 壞掉代表上游契約出事，不是常態。
 		observeEventDropped(string(pkgmq.EventTypeOrderPaid), "unmarshal_failed")
 		c.log.Error("invoice.order_paid.unmarshal_failed",
 			zap.String("routing_key", routingKey), zap.Error(err))
@@ -107,9 +95,6 @@ func (c *OrderPaidConsumer) Handle(ctx context.Context, routingKey string, body 
 		AggregateRef:     &aggregateRef,
 		Payload:          json.RawMessage(body),
 		Status:           inboxStatusReceived,
-		// 🔴 **不是 `now`**：這一列在 handler 還沒跑完之前就已經在兜底候選集合裡了，
-		// 寫 now ⇒ INV.dl 的下一輪會合法搶走一列**正在被處理**的事件。
-		// 落庫當下先給自己 handlerLease 這麼長的租約，見該常數的註解。
 		NextAttemptAt: now.Add(handlerLease),
 		OccurredAt:    occurredAt,
 		Now:           now,
@@ -118,10 +103,6 @@ func (c *OrderPaidConsumer) Handle(ctx context.Context, routingKey string, body 
 		return fmt.Errorf("invoice: order.paid %s: insert inbox: %w", p.OrderNo, err)
 	}
 	if !inserted {
-		// 正常的去重結果不是錯誤 ⇒ 直接 ACK，不重做業務。
-		//
-		// ⚠️ 這一行同時是「pkg/mq 的重試對本 handler 無效」的來源：重投的第二次會停在
-		// 這裡什麼都不做。所以失敗的歸宿**不是** DLQ 而是 inbox 的兜底掃描（見 handedOff）。
 		return nil
 	}
 
@@ -131,7 +112,6 @@ func (c *OrderPaidConsumer) Handle(ctx context.Context, routingKey string, body 
 		return err
 	}
 
-	// 慣例③：真的寫入了才記 Info。
 	c.log.Info("invoice.order_paid.prepared",
 		zap.String("order_no", p.OrderNo),
 		zap.Int64("document_id", res.DocumentID),
@@ -145,20 +125,7 @@ func (c *OrderPaidConsumer) Handle(ctx context.Context, routingKey string, body 
 	return nil
 }
 
-// prepareFromPayload 是 §7.1.2 步驟 5–9：讀三份事實、跑決策樹、落庫。
-//
-// 抽成具名函式而不是留在 Handle 內：**兜底掃描（INV.dl）要重跑的就是這一段**。留在
-// Handle 裡的話，重跑的唯一辦法是「把原始訊息再送一次 MQ」，而那條路被 Insert 的去重
-// 擋死（第二次進 handler 就 return nil）——也就是說，那樣寫出來的兜底掃描不會有任何效果。
-//
-// 這裡刻意不碰 invoice_inbox_events 的任何狀態：兩個呼叫端對「這一列接下來怎麼標」的
-// 答案不同（handler 自己標 PROCESSED；worker 交給 pkg/outbox.Worker 標），把標記寫進
-// 這裡會讓 worker 那半在 MarkDone 之前就先動過狀態。
 func (c *OrderPaidConsumer) prepareFromPayload(ctx context.Context, p orderPaidPayload) (usecase.PrepareResult, error) {
-	// 步驟 5：讀三份事實。前兩份走 gRPC（品項與買家發票偏好刻意不上 MQ，§6.3.2.6），
-	// 第三份（seller_tax_profiles ＋ invoice_provider_accounts）由 Prepare 自己讀。
-	// buyer_id 取自 payload（其值由 order-service 自 orders.buyer_id 寫出）＝「取自訂單」，
-	// 這是 I-47 歸屬驗證唯一合法的來源。
 	facts, err := c.orderFact.GetOrderInvoiceSnapshot(ctx, p.OrderNo, p.BuyerID)
 	if err != nil {
 		return usecase.PrepareResult{}, fmt.Errorf("invoice: order.paid %s: order snapshot: %w", p.OrderNo, err)
@@ -209,8 +176,6 @@ func (c *OrderPaidConsumer) ReprocessFromInbox(ctx context.Context, ev domain.In
 		return fmt.Errorf("invoice: inbox %d: unmarshal payload: %w", ev.ID, err)
 	}
 	if p.OrderNo == "" {
-		// payload 被 90 天保留規則覆寫成 `{}` 之後會走到這裡 ⇒ fail-loud。
-		// 同 refundFromInbox：不得當成「一張沒有訂單的發票」開下去。
 		return fmt.Errorf("invoice: inbox %d has no order_no (payload purged?)", ev.ID)
 	}
 
@@ -229,23 +194,10 @@ func (c *OrderPaidConsumer) ReprocessFromInbox(ctx context.Context, ev domain.In
 		zap.String("operation_status", res.OperationStatus),
 		zap.Bool("already_existed", res.AlreadyExisted))
 
-	// 與 Handle 同一條路徑：付款事件補跑成功之後，先到的退款事件才有 document 可以掛。
-	// 少了它，被兜底掃描救回來的訂單其 DEFERRED 退款列會永遠留在 DEFERRED——因為反向
-	// 認領只在 Handle 內跑，而 Handle 對這筆訂單永遠不會再跑第二次（去重擋住）。
-	//
-	// ⚠️ 已知限制（v2 前置）：ListDeferredByAggregateRef 只看 status='DEFERRED' 不看租約，
-	// 所以它與 Handle 併發時沒有 CAS 保護。v1 的兜底掃描只掃 ORDER_PAID、不掃 DEFERRED，
-	// 窗口與「兩個 consumer 副本同時處理同一筆」等價，不是本波新增的形狀。
 	c.reclaimDeferred(ctx, p.OrderNo)
 	return nil
 }
 
-// handedOff 記下「這一列的歸宿是兜底掃描」。
-//
-// 🔴 它不是裝飾性的 log：pkg/mq 的重試對本 handler **無效**（重投的第二次會被 Insert 的
-// 去重擋掉並 return nil），所以 `mq_consume_total{result="dlq"}` 對 order.paid 結構上
-// 恆為 0 ——失敗在 MQ 那一側完全看不見。在補上 INV.dl 的兜底掃描之前，這條路徑的實際
-// 結果是「該列永遠停在 RECEIVED、發票永遠不會開、沒有任何告警」（dev 上實際卡了 4 筆）。
 func (c *OrderPaidConsumer) handedOff(_ context.Context, inboxID int64, orderNo string, now time.Time, cause error) {
 	c.log.Error("invoice.order_paid.handed_off_to_deadline_scan",
 		zap.Int64("inbox_id", inboxID),
@@ -255,12 +207,6 @@ func (c *OrderPaidConsumer) handedOff(_ context.Context, inboxID int64, orderNo 
 		zap.Error(cause))
 }
 
-// markInboxProcessed 把這一列推出兜底候選集合。
-//
-// 🔴 這裡刻意**不回 error**，理由與 reclaimDeferred 同源：業務已經完成（document 建好了），
-// 回 error 只會讓 pkg/mq 重投，而重投會在 Insert 的去重那一步 return nil、什麼都不重做，
-// 該列照樣停在 RECEIVED。標記失敗的正確歸宿是「留在 RECEIVED」——它仍在 idx_invinbox_due
-// 的候選集合內由兜底掃描重試（Prepare 冪等），所以這裡的責任只有一個：記成 Error 讓它看得見。
 func (c *OrderPaidConsumer) markInboxProcessed(ctx context.Context, inboxID int64, orderNo string) {
 	ok, err := c.inbox.MarkProcessed(ctx, inboxID, c.now())
 	if err != nil {
@@ -269,21 +215,11 @@ func (c *OrderPaidConsumer) markInboxProcessed(ctx context.Context, inboxID int6
 		return
 	}
 	if !ok {
-		// allowed-from 是 RECEIVED／DEFERRED／FAILED。走到這裡代表有別的路徑先動過它。
 		c.log.Error("invoice.order_paid.mark_inbox_processed_no_rows",
 			zap.String("order_no", orderNo), zap.Int64("inbox_id", inboxID))
 	}
 }
 
-// reclaimDeferred 是 §6.3.6 的**反向認領**：付款事件後到時，把先到的退款事件從 DEFERRED
-// 撈回來依 received_at 序套用。
-//
-// 🔴 這裡刻意**不回 error**。document 已經建好、inbox 的 ORDER_PAID 列也已經寫入 ⇒ 回
-// error 只會讓 pkg/mq 重投，而重投會在 Insert 的去重那一步 return nil，什麼都不會重做。
-// 反向認領失敗的正確歸宿是「那幾列留在 DEFERRED」——它們仍在 idx_invinbox_due 的候選集合
-// 內，由兜底掃描（§7.2.5 第二列）重試，且有 `invoice_inbox_stranded_rows`（M30）
-// ＋ InvoiceInboxStranded 的 7 天告警守著。
-// 所以這裡的責任只有一個：**把它記成 Error，讓它看得見**。
 func (c *OrderPaidConsumer) reclaimDeferred(ctx context.Context, orderNo string) {
 	pending, err := c.inbox.ListDeferredByAggregateRef(ctx, orderNo)
 	if err != nil {
@@ -317,8 +253,6 @@ func (c *OrderPaidConsumer) reclaimDeferred(ctx context.Context, orderNo string)
 			continue
 		}
 		if skip != nil {
-			// 認領回來卻判定不需要調整（例如那張 document 是 PLATFORM_RECEIPT）
-			// ⇒ SKIPPED ＋ disposition，不是 PROCESSED。
 			if _, merr := c.inbox.MarkSkipped(ctx, ev.ID, skip.Disposition, skip.Reason, c.now()); merr != nil {
 				c.log.Error("invoice.order_paid.reclaim_mark_skipped_failed",
 					zap.String("order_no", orderNo), zap.Int64("inbox_id", ev.ID), zap.Error(merr))
@@ -341,10 +275,6 @@ func (c *OrderPaidConsumer) reclaimDeferred(ctx context.Context, orderNo string)
 	}
 }
 
-// refundFromInbox 把一列已落庫的 inbox payload 還原成 RefundFinalized。
-//
-// payload 被 90 天保留規則覆寫成 `{}` 之後這裡會拿到空的 refund_ref ⇒ fail-loud，
-// 不得當成「金額 0 的退款」套用下去。
 func refundFromInbox(ev domain.InboxEvent) (RefundFinalized, error) {
 	var p orderRefundFinalizedPayload
 	if err := json.Unmarshal(ev.Payload, &p); err != nil {
@@ -353,8 +283,6 @@ func refundFromInbox(ev domain.InboxEvent) (RefundFinalized, error) {
 	if p.RefundRef == "" {
 		return RefundFinalized{}, fmt.Errorf("invoice: inbox %d has no refund_ref (payload purged?)", ev.ID)
 	}
-	// 走與 handler 完全同一支轉換（payload.go 的 toRefundFinalized）：兩份各自組裝
-	// 的話，新增 payload 欄位只會被接上其中一條路徑，而漏掉的那條正是這一條。
 	return p.toRefundFinalized(ev.OccurredAt)
 }
 

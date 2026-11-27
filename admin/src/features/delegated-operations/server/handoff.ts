@@ -40,12 +40,9 @@ export function resolveWebOrigin(
 	} catch {
 		return null;
 	}
-	// 只允許 origin 本身：帶路徑／查詢／片段的值會讓 `${origin}/adm/enter` 組出
-	// 一個看起來合法、實際打到別處的 URL。
 	if (parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
 	if (parsed.username || parsed.password) return null;
 	if (parsed.protocol === "https:") return parsed.origin;
-	// 本機 website dev server 才可能是 http；部署環境一律 https。
 	return parsed.protocol === "http:" && env.NODE_ENV !== "production"
 		? parsed.origin
 		: null;

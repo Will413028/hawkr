@@ -11,14 +11,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// sessionTestRedis returns a client backed by a per-test in-process miniredis.
-//
-// It used to dial a real 127.0.0.1:6379 and t.Skip when that failed, which on
-// any machine whose Redis has a password — the normal state here and in CI —
-// meant every session test in this file reported success while asserting
-// nothing. Same fix as the gateway middleware suite (commit 1128811d7): remove
-// the skip by removing its cause, never by loosening its condition. Per-test
-// isolation is a bonus: tokens no longer have to be unique across the package.
 func sessionTestRedis(t *testing.T) *redis.Client {
 	t.Helper()
 	mr := miniredis.RunT(t)
@@ -94,7 +86,6 @@ func TestGetSessionWithTTL_ReportsRemainingWithoutSliding(t *testing.T) {
 	if remaining <= 0 || remaining > 10*time.Second {
 		t.Fatalf("remaining = %v, want (0, 10s]", remaining)
 	}
-	// Untouched: the read must not extend the key.
 	if ttl := rdb.TTL(ctx, pkgredis.SessionKey(token)).Val(); ttl > 10*time.Second {
 		t.Fatalf("read extended the TTL to %v — the read half must not slide", ttl)
 	}
@@ -153,7 +144,6 @@ func TestRefreshSessionTTL_ExtendsLiveKey(t *testing.T) {
 	if ttl := rdb.TTL(ctx, pkgredis.SessionKey(token)).Val(); ttl <= 50*time.Second {
 		t.Fatalf("TTL not slid to ~60s, got %v", ttl)
 	}
-	// The value must still be there — a slide is not a re-write.
 	if sess, err := pkgredis.GetSession(ctx, rdb, token); err != nil || sess == nil || sess.AccountID != 888 {
 		t.Fatalf("session after slide = %+v (err %v), want AccountID 888", sess, err)
 	}
@@ -215,7 +205,6 @@ func TestSessionKeyForHash_MatchesTheKeyWrittenByPutSession(t *testing.T) {
 		t.Fatalf("PutSession: %v", err)
 	}
 
-	// Everything the identity module has is the hash — this is that path exactly.
 	tokenHash := pkgredis.HashToken(token)
 	if got := rdb.Exists(ctx, pkgredis.SessionKeyForHash(tokenHash)).Val(); got != 1 {
 		t.Fatalf("the key derived from token_hash alone does not exist (Exists=%d); "+
@@ -285,7 +274,6 @@ func TestDeleteSessionsByTokenHash_EmptyAndNilAreNoOps(t *testing.T) {
 // web_sessions.token_hash all share. Pin the value, not just the shape: a change
 // here silently orphans every live session AND every stored token_hash at once.
 func TestHashToken_IsStableSHA256Hex(t *testing.T) {
-	// echo -n "abc" | shasum -a 256
 	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 	if got := pkgredis.HashToken("abc"); got != want {
 		t.Fatalf("HashToken(\"abc\") = %q, want %q", got, want)
@@ -304,7 +292,7 @@ func TestGenerateSessionToken_UniqueAndLong(t *testing.T) {
 	if a == b {
 		t.Fatal("tokens must be unique")
 	}
-	if len(a) < 40 { // 32 random bytes, base64url (no padding) ≈ 43 chars
+	if len(a) < 40 {
 		t.Fatalf("token too short (%d chars) — insufficient entropy", len(a))
 	}
 }

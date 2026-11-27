@@ -71,7 +71,6 @@ type Recipient struct {
 	StoreID   int64
 }
 
-// validate 檢查收件人的形狀：呼叫端（handler）依登入帳號與受眾組出來，不合法是呼叫端的程式錯誤，不是使用者的錯。
 func (r Recipient) validate() error {
 	switch {
 	case r.AccountID <= 0:
@@ -84,7 +83,6 @@ func (r Recipient) validate() error {
 	return fmt.Errorf("收件人的受眾 %q 與店家 %d 不合法", r.Audience, r.StoreID)
 }
 
-// storeID 是查詢用的店家 ID：BUYER 是 nil。
 func (r Recipient) storeID() *int64 {
 	if r.StoreID > 0 {
 		return &r.StoreID
@@ -104,7 +102,6 @@ func (s *Service) ValidateAudience(ctx context.Context, a model.Audience) error 
 	return nil
 }
 
-// inboxChanged 在 ctx 帶的 transaction 內通知收件人的串流訂閱者（未讀數變了）；沒有串流的組裝（Signals 為 nil）不通知。
 func (s *Service) inboxChanged(ctx context.Context, accountID int64, audience string, storeID *int64) error {
 	if s.d.Signals == nil {
 		return nil

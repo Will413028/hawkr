@@ -93,8 +93,6 @@ GoRouter appRouter(Ref ref) {
         ? '/'
         : _appStoreScreenshotRoute,
     observers: ref.watch(appRouterObserversProvider),
-    // 判斷邏輯全在 [resolveBuyerRedirect]（純函式，可單元測試）；這裡只負責
-    // 把 compile-time const / provider / GoRouter state 取出來餵給它。
     redirect: (context, state) {
       final session = ref.read(sessionProvider).value;
       return resolveBuyerRedirect(
@@ -107,22 +105,16 @@ GoRouter appRouter(Ref ref) {
       );
     },
     routes: [
-      // ── App 強制更新（不可跳過的攔截頁；訪客也必須看得到）──
       GoRoute(
         path: '/force-update',
         builder: (_, __) => const ForceUpdateScreen(),
       ),
 
-      // ── 帳號停權的受限狀態頁（登入後才有內容，沒有停權時回首頁）──
       GoRoute(
         path: AccountRestrictedScreen.path,
         builder: (_, __) => const AccountRestrictedScreen(),
       ),
 
-      // ── Auth ──
-      // Keep old links compatible without restoring the retired cow welcome
-      // screen. App startup itself now goes directly from BrandStartupGate to
-      // the requested application route.
       GoRoute(path: '/welcome', redirect: (_, __) => '/'),
       GoRoute(
         path: '/login',
@@ -130,7 +122,6 @@ GoRouter appRouter(Ref ref) {
             AuthScreen(continueUrl: state.uri.queryParameters['continue']),
       ),
 
-      // ── Main (tabs) ──
       GoRoute(
         path: '/',
         builder: (_, state) {
@@ -155,10 +146,8 @@ GoRouter appRouter(Ref ref) {
         },
       ),
 
-      // ── Search ──
       GoRoute(path: '/search', builder: (_, __) => const SearchScreen()),
 
-      // ── Product ──
       GoRoute(
         path: '/merchant-product',
         redirect: (_, state) =>
@@ -173,20 +162,17 @@ GoRouter appRouter(Ref ref) {
         },
       ),
 
-      // ── Seller/Merchant ──
       GoRoute(
         path: '/merchant/:storeCode',
         builder: (_, state) =>
             MerchantScreen(storeCode: state.pathParameters['storeCode'] ?? ''),
       ),
 
-      // ── Category ──
       GoRoute(
         path: '/category',
         redirect: (_, state) => canonicalMarketLocation(state.uri),
       ),
 
-      // ── Cart ──
       GoRoute(
         path: '/cart',
         builder: (_, state) {
@@ -196,10 +182,6 @@ GoRouter appRouter(Ref ref) {
         },
       ),
 
-      // ── Orders ──
-      // OrderListScreen 設計為 MainNavigationScreen 的 tab 子頁，
-      // 獨立 push 會失去 shell 的 AppBar / bottom nav。統一 redirect 到
-      // /?tab=3，由 shell 負責渲染。
       GoRoute(path: '/orders', redirect: (_, __) => '/?tab=3'),
       GoRoute(
         path: '/orders/detail',
@@ -219,13 +201,10 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/orders/matched',
-        // Retired prototype: it rendered fixed order data and no-op controls.
-        // Send old deep links back to the server-backed order list.
         redirect: (_, __) => '/?tab=3',
       ),
       GoRoute(
         path: '/orders/order-dispute',
-        // Disputes now live in the authenticated after-sale workflow.
         redirect: (_, __) => '/settings/after-sale',
       ),
       GoRoute(
@@ -272,7 +251,6 @@ GoRouter appRouter(Ref ref) {
         },
       ),
 
-      // ── Chat ──
       GoRoute(path: '/chat', builder: (_, __) => const ChatListScreen()),
       GoRoute(
         path: '/chat/room',
@@ -290,7 +268,6 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const AiAssistantScreen(),
       ),
 
-      // ── Settings ──
       GoRoute(
         path: '/settings/profile',
         builder: (_, __) => const ProfileEditScreen(),
@@ -321,7 +298,6 @@ GoRouter appRouter(Ref ref) {
           );
         },
       ),
-      // PR #983：申訴表單頁
       GoRoute(
         path: '/settings/after-sale/appeal',
         builder: (_, state) {
@@ -329,7 +305,6 @@ GoRouter appRouter(Ref ref) {
           return SubmitAppealScreen(caseNo: (extra['caseNo'] as String?) ?? '');
         },
       ),
-      // PR #983：仲裁進度查詢頁
       GoRoute(
         path: '/settings/after-sale/arbitration',
         builder: (_, state) {
@@ -379,13 +354,11 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const BlockedUsersScreen(),
       ),
 
-      // ── Notifications ──
       GoRoute(
         path: '/notifications',
         builder: (_, __) => const NotificationsScreen(),
       ),
 
-      // ── 通知深連結（website 路徑；以路徑上的 ID 載入，不靠 extra）──
       GoRoute(
         path: '/account/orders/:orderNo',
         pageBuilder: (context, state) => floatingDetailPage<void>(
@@ -416,7 +389,6 @@ GoRouter appRouter(Ref ref) {
             ),
       ),
 
-      // ── Wallet ──
       GoRoute(
         path: '/wallet/spending',
         builder: (_, state) {
@@ -432,7 +404,6 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const WalletScreen(showTopBar: true, initialTab: 1),
       ),
 
-      // ── Review ──
       GoRoute(
         path: '/review',
         builder: (_, state) {
@@ -473,13 +444,11 @@ GoRouter appRouter(Ref ref) {
         },
       ),
 
-      // ── Marketplace ──
       GoRoute(
         path: '/marketplace',
         redirect: (_, state) => canonicalMarketLocation(state.uri),
       ),
 
-      // ── Member Cards ──
       GoRoute(
         path: '/member-cards',
         builder: (_, __) => const WalletScreen(showTopBar: true, initialTab: 0),
@@ -492,7 +461,6 @@ GoRouter appRouter(Ref ref) {
         ),
       ),
 
-      // ── Social ──
       GoRoute(
         path: '/social/posts',
         pageBuilder: (_, state) {
@@ -528,55 +496,41 @@ GoRouter appRouter(Ref ref) {
         },
       ),
 
-      // ── Grouped sub-pages; the global Navbar is owned by MaterialApp frame ──
       ShellRoute(
         builder: (_, __, child) => child,
         routes: [
-          // Home tab (0)
           GoRoute(
             path: '/search/results',
             builder: (_, state) => SearchResultsScreen(
               query: state.uri.queryParameters['q'] ?? '',
             ),
           ),
-          // Category tab (1)
           GoRoute(
             path: '/category-landing',
             builder: (_, __) => const CategoryLandingScreen(),
           ),
-          // Wallet tab (2)
           GoRoute(
             path: '/wallet/coupon-detail',
-            // Retired static coupon mock; the wallet coupon tab is backed by
-            // the real buyer coupon provider and must remain authoritative.
             redirect: (_, __) => '/wallet/coupons',
           ),
-          // Order tab (3)
           GoRoute(
             path: '/orders/reserve',
-            // Retired static catalogue mock. Use the real marketplace data.
             redirect: (_, __) => '/?tab=1',
           ),
           GoRoute(
             path: '/orders/payment-details',
-            // Retired hard-coded payment mock; authoritative amounts live on
-            // each server-backed order detail surface.
             redirect: (_, __) => '/?tab=3',
           ),
           GoRoute(
             path: '/orders/tracking',
-            // Retired English map mock. Until a server-backed tracking
-            // contract exists, return buyers to their authoritative orders.
             redirect: (_, __) => '/?tab=3',
           ),
           GoRoute(
             path: '/orders/dispute',
-            // Retired English mock form; never expose fake submission success.
             redirect: (_, __) => '/settings/after-sale',
           ),
           GoRoute(
             path: '/orders/payment',
-            // Retired hard-coded payment mock. Never display invented totals.
             redirect: (_, __) => '/?tab=3',
           ),
         ],
@@ -596,7 +550,6 @@ class _RouterNotifier extends ChangeNotifier {
       sessionProvider,
       (_, __) => notifyListeners(),
     );
-    // 前景恢復重檢後結果變動，要立刻觸發 redirect 重判（`packages/hawkr_app_update/docs/spec.md`）。
     ref.listen<CheckAppVersionResponse>(
       forceUpdateProvider,
       (_, __) => notifyListeners(),

@@ -91,7 +91,6 @@ Future<({List<Headers> seen, ProviderContainer c})> _call(
       transport,
     ).checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
   } on ConnectException {
-    // 失敗的情境由各測試檢查結果。
   }
   return (seen: seen, c: container);
 }

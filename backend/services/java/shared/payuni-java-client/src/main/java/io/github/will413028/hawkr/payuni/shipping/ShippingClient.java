@@ -76,12 +76,10 @@ public class ShippingClient {
         params.put("LgsType", "HOME");
         params.put("ShipType", "2");
         params.put("ServiceType", "3");
-        // 寄件人資訊（PayUni v1.2 必填）
         putIfNotNull(params, "SenderName", req.senderName());
         putIfNotNull(params, "SenderMobile", toLocalPhone(req.senderPhone()));
         putIfNotNull(params, "SenderZipCode", req.senderZipCode());
         putIfNotNull(params, "SenderAddress", req.senderAddress());
-        // 收件人資訊
         params.put("Consignee", req.receiverName());
         params.put("ConsigneeMobile", toLocalPhone(req.receiverPhone()));
         params.put("ConsigneeAddress", req.receiverAddress());
@@ -112,15 +110,12 @@ public class ShippingClient {
         params.put("ShipType", "2");
         params.put("ServiceType", "3");
         params.put("DeliveryTimeTag", req.deliveryTimeTag());
-        // 收件人（賣家退貨聯絡人）
         params.put("Consignee", req.consigneeName());
         params.put("ConsigneeMobile", toLocalPhone(req.consigneePhone()));
         params.put("ConsigneeAddress", req.consigneeAddress());
-        // 退貨人（買家）
         params.put("Consignor", req.consignorName());
         params.put("ConsignorMobile", toLocalPhone(req.consignorPhone()));
         params.put("ConsignorAddress", req.consignorAddress());
-        // 退貨專屬參數
         params.put("Spec", req.spec());
         params.put("ShipDate", req.shipDate());
         params.put("ProdDesc", req.goodsName());
@@ -198,7 +193,6 @@ public class ShippingClient {
         String html = httpClient.callApiHtml(
                 merId, PayUniShippingEndpoint.PATH_PRINT_CVS_LABEL, params, PayUniShippingEndpoint.VERSION_PRINT_CVS_LABEL);
 
-        // 檢查 PayUni 是否回傳處理中錯誤
         Matcher alertMatcher = ALERT_PATTERN.matcher(html);
         if (alertMatcher.find()) {
             String alertMsg = alertMatcher.group(1);
@@ -206,7 +200,6 @@ public class ShippingClient {
             throw new PayUniApiException("LABEL_PROCESSING", "標籤尚在處理中: " + alertMsg, 200);
         }
 
-        // 解析 <img src="..."> 提取圖片路徑
         Matcher imgMatcher = IMG_SRC_PATTERN.matcher(html);
         if (!imgMatcher.find()) {
             log.error("PayUni print_label 回傳 HTML 中找不到 <img> 標籤, html={}", html);
@@ -214,7 +207,6 @@ public class ShippingClient {
         }
 
         String imgSrc = imgMatcher.group(1);
-        // 相對路徑拼接 baseUrl
         String imageUrl;
         if (imgSrc.startsWith("http")) {
             imageUrl = imgSrc;
@@ -249,7 +241,6 @@ public class ShippingClient {
         String html = httpClient.callApiHtml(
                 merId, PayUniShippingEndpoint.PATH_PRINT_CVS_LABEL, params, PayUniShippingEndpoint.VERSION_PRINT_CVS_LABEL);
 
-        // 僅檢查 alert（處理中錯誤），不解析 img
         Matcher alertMatcher = ALERT_PATTERN.matcher(html);
         if (alertMatcher.find()) {
             String alertMsg = alertMatcher.group(1);

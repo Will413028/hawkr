@@ -30,8 +30,6 @@ describe("B04 修改申請的持久可見性", () => {
 
 	it("correction id 取自端點 8 的 latestCorrectionId，不是前端自己記的 state", () => {
 		expect(section).toMatch(/invoice\?\.latestCorrectionId/);
-		// 後端真的有回這一欄，前端才拿得到。少了 normalizer 那一行，
-		// 值恆為 undefined ⇒ 整段靜默不渲染（TS 不會叫，因為型別是 string）。
 		expect(repo).toMatch(/latestCorrectionId: str\(data\.latestCorrectionId\)/);
 	});
 

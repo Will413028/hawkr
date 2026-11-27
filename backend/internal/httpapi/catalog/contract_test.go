@@ -8,7 +8,6 @@ import (
 	catalogv1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/catalog/v1alpha1"
 )
 
-// reachable 回傳從 root 訊息能走到的每個訊息與 enum 全名（遞迴）。
 func reachable(root protoreflect.MessageDescriptor) (messages, enums map[string]bool) {
 	messages, enums = map[string]bool{}, map[string]bool{}
 	var walk func(m protoreflect.MessageDescriptor)
@@ -61,7 +60,6 @@ func TestPublicMessagesCarryNoSellerStatusEnum(t *testing.T) {
 	if !sawAvailability {
 		t.Error("公開訊息應該帶 availability，檢查範圍不對")
 	}
-	// 反向確認檢查本身有效：賣家的讀取訊息確實帶 ProductStatus。
 	_, enums := reachable((&catalogv1.SellerProduct{}).ProtoReflect().Descriptor())
 	if !enums[status] {
 		t.Error("SellerProduct 應該帶 ProductStatus，走訪邏輯有誤")

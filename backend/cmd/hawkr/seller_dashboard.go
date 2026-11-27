@@ -7,8 +7,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 )
 
-// sellerDashboardOrders 以舊的 order-service 實作賣家儀表板的訂單 port（httpseller.DashboardOrders）：成立訂單的口徑與營收由
-// order-service 定義，見 orderservice.StorePeriodOrderStats；訂單狀態的四桶見 orderservice.SellerOrderStatusCounts。
 type sellerDashboardOrders struct{ client *orderservice.Client }
 
 func (o sellerDashboardOrders) SalesStats(ctx context.Context, storeID int64, windows []httpseller.SalesWindow) ([]httpseller.SalesStats, error) {

@@ -55,9 +55,6 @@ class UberCheckoutWiringTest {
     @BeforeEach
     void setUp() {
         feeCache = mock(ShippingFeeCacheClient.class);
-        // 對**每一種** method 都給得出 config 與費率：讓「Uber 被排除」只可能來自閘門，
-        // 不可能來自「剛好查不到資料」——今天 repo 上 Uber 被跳過的真正原因正是後者
-        // （shipping_method_configs 沒有 3003 列），若不 stub 成可用，本測試對閘門零鑑別力。
         when(feeCache.getConfig(anyString(), anyString()))
                 .thenReturn(new ShippingFeeCacheClient.ConfigEntry(
                         "any", "any", 200, 150, 20000L, 2, 7));
@@ -69,7 +66,7 @@ class UberCheckoutWiringTest {
 
     private ResolvedItem itemSupporting(String... methodCodes) {
         List<SkuShippingOption> options = java.util.Arrays.stream(methodCodes)
-                .map(m -> new SkuShippingOption(m, AMBIENT, 0L, "3101")) // BUYER 付運費，避開免運分支
+                .map(m -> new SkuShippingOption(m, AMBIENT, 0L, "3101"))
                 .toList();
         return new ResolvedItem(
                 TestIds.id(1L), "sku-1", 1, 500L, 500L, 99L,
@@ -77,7 +74,6 @@ class UberCheckoutWiringTest {
                 options, "img", true);
     }
 
-    // ===== 接點 A：validate 的選項列表（顯示層）=====
 
     @Test
     @DisplayName("🔴 validate：3003 不進 availableOptions（即使 config 與費率都查得到）")
@@ -115,7 +111,6 @@ class UberCheckoutWiringTest {
                 .contains("ALL_SHIPPING_EXCEEDED");
     }
 
-    // ===== 接點 B：lookupSingleOption（買家指名該方式）=====
 
     private static UberOrderEligibilityGuard.Context methodOnly(ShippingMethod method) {
         return UberOrderEligibilityGuard.Context.methodOnly(method.value());
@@ -138,7 +133,6 @@ class UberCheckoutWiringTest {
     @Test
     @DisplayName("🔴 lookupSingleOption(3003) 帶報價 context 且 shipping 判定可用：回報價運費，**不查費率表**")
     void lookupSingleOptionUsesQuoteFeeForUber() {
-        // 費率表 stub 的是 120——若 Uber 誤走費率表，下面的 250 就會變成 120。
         CheckoutValidator withQuote = new CheckoutValidator(
                 feeCache, new UberOrderEligibilityGuard(
                         probe -> UberOrderEligibilityGuard.Assessment.eligible(
@@ -154,7 +148,6 @@ class UberCheckoutWiringTest {
         assertThat(option.rawFee()).isEqualTo(250L);
         assertThat(option.fee()).isEqualTo(250L);
         assertThat(option.freeShippingEligible()).isFalse();
-        // confirm 要拿它去 CAS 成 CHECKOUT_ACCEPTED；空字串＝建單時找不到報價。
         assertThat(option.uberQuoteId()).isEqualTo("dqt_wired");
     }
 

@@ -32,7 +32,6 @@ afterEach(() => {
 	else delete process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
 });
 
-// GET /api/v1/admin/after_sales/appeals?appeal_state=all&page=1&page_size=3
 const APPEAL_LIST_BODY = {
 	data: {
 		records: [
@@ -81,7 +80,6 @@ const APPEAL_LIST_BODY = {
 	code: 0,
 } as const;
 
-// GET /api/v1/admin/orders?page=1&page_size=2（items 已裁掉，本檔不驗）
 const ADMIN_ORDERS_BODY = {
 	data: {
 		records: [
@@ -132,8 +130,6 @@ const ADMIN_ORDERS_BODY = {
 	code: 0,
 } as const;
 
-// 收斂掉的舊名，一個都不准回到 wire 上。與 backend
-// gateway/internal/handler/avatar_jsonkey_test.go 的 banned 清單同一份意圖。
 const BANNED_AVATAR_KEYS = [
 	"buyerAvatarKey",
 	"buyerAvatarUrl",
@@ -168,7 +164,6 @@ test("爭議列表每筆的買家頭像是扁平成對 avatarKey/avatarUrl", () 
 		assertFlatAvatarPair(r, `appeal ${r.caseNo}`);
 		assert.ok(r.avatarKey.length > 0);
 		assert.ok(r.avatarUrl.includes(`/i/original/${r.avatarKey}`));
-		// 同一筆裡賣家 logo 維持 logoKey/logoUrl —— 拉平不該讓兩個主體撞名。
 		assert.notEqual(r.avatarKey, r.logoKey);
 	}
 });
@@ -190,8 +185,6 @@ test("merchants 頁的取值運算：avatarKey 過 buildImageUrl 拿到 avatar p
 		buildImageUrl(o.avatarKey, "avatar"),
 		`${MEDIA_BASE}/i/avatar/${o.avatarKey}`,
 	);
-	// 讀 avatarUrl 會拿到 /i/original/ 原圖再被剝回 key，繞一圈才回到同一張圖；
-	// 這條釘住「該讀 Key 不該讀 Url」的理由，而不只是宣告它。
 	assert.equal(
 		buildImageUrl(o.avatarUrl, "avatar"),
 		`${MEDIA_BASE}/i/avatar/${o.avatarKey}`,

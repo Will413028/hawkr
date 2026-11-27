@@ -15,10 +15,8 @@ import java.util.Map;
  */
 public class HomeDeliverySettingTest {
 
-    // ===== 可替換變數 =====
     private static final String MER_ID = "HAWK9";
 
-    // ===== PayUni 代理商金鑰（sandbox） =====
     private static final String HASH_KEY = "TestOnlyFakeHashKey0123456789AB1";
     private static final String HASH_IV = "TestOnlyFakeIV00";
     private static final String BASE_URL = "https://sandbox-api.payuni.com.tw";
@@ -28,7 +26,6 @@ public class HomeDeliverySettingTest {
         PayUniCryptoService cryptoService = new PayUniCryptoService(HASH_KEY, HASH_IV);
         PayUniHttpClient httpClient = new PayUniHttpClient(cryptoService, BASE_URL);
 
-        // 內層加密參數
         Map<String, String> params = new LinkedHashMap<>();
         params.put("MerID", MER_ID);
         params.put("Timestamp", String.valueOf(System.currentTimeMillis() / 1000));

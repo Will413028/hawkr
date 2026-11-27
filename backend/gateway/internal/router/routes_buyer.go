@@ -6,8 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// registerBuyerRoutes retains paths owned by other modules while the buyer
-// profile, address, favorite, follow, visit, and restock clients use Connect.
 func registerBuyerRoutes(app *gin.RouterGroup, h *handler.Holder) {
 	buyers := app.Group("/buyers/me")
 	buyers.Use(middleware.JWTAuth())

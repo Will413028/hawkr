@@ -54,8 +54,6 @@ func TestGrpcErr_FailedPrecondition_BizCodePassthrough(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/app/checkout/validate", nil)
 
-	// 一般業務碼（非停權家族）：4015 SELF_PURCHASE_NOT_ALLOWED，過去會被舊白名單
-	// 排除、塌縮成 {code:409, message:"[4015] ..."}；統一後應還原業務碼。
 	err := grpcstatus.Error(codes.FailedPrecondition, "[4015] 不可購買自己上架的商品")
 	GrpcErr(c, "order", err)
 
@@ -238,13 +236,11 @@ func TestOKProto_WrapsProtoInEnvelope(t *testing.T) {
 // rendered as JSON string + zero values emitted. Flipping UseProtoNames or
 // dropping EmitUnpopulated breaks every passthrough endpoint silently.
 func TestProtoToRaw_MarshalerContract(t *testing.T) {
-	// camelCase (UseProtoNames=false) AND int64-as-string.
 	got := string(ProtoToRaw(&accountpb.AccountInfo{CreatedAt: 123}))
 	if !strings.Contains(got, `"createdAt":"123"`) {
 		t.Errorf("want camelCase int64-as-string `\"createdAt\":\"123\"`; got %s", got)
 	}
 
-	// EmitUnpopulated: a zero-value bool field is still present (camelCase too).
 	gotZero := string(ProtoToRaw(&buyerpb.AddressInfo{}))
 	if !strings.Contains(gotZero, `"isDefault":false`) {
 		t.Errorf("want emit-unpopulated `\"isDefault\":false`; got %s", gotZero)

@@ -74,8 +74,8 @@ class ShippingEventConsumerRecoveryTest {
         verify(orderRepository).updateStatusIfMatchAny(
                 eq("O123"), eq(OrderStatus.IN_TRANSIT.value()), captor.capture());
         assertThat(captor.getValue()).contains(
-                OrderStatus.SHIPPING_ABNORMAL.value(),   // 35 恢復軌道
-                OrderStatus.PENDING_SHIPMENT.value());   // 20 正常推進不變
+                OrderStatus.SHIPPING_ABNORMAL.value(),
+                OrderStatus.PENDING_SHIPMENT.value());
         verify(channel).basicAck(7L, false);
     }
 
@@ -93,15 +93,14 @@ class ShippingEventConsumerRecoveryTest {
         verify(orderRepository).updateStatusIfMatchAny(
                 eq("O456"), eq(OrderStatus.WAITING_PICKUP.value()), captor.capture());
         assertThat(captor.getValue()).contains(
-                OrderStatus.SHIPPING_ABNORMAL.value(),   // 35 恢復軌道
-                OrderStatus.IN_TRANSIT.value());         // 30 正常推進不變
+                OrderStatus.SHIPPING_ABNORMAL.value(),
+                OrderStatus.IN_TRANSIT.value());
         verify(channel).basicAck(8L, false);
     }
 
     @Test
     @DisplayName("shipment.delivered：allowed-from 含 PAID(10)，訂單自 PAID 直達 DELIVERED(40)（#1644 主症狀修復）")
     void onShipmentDelivered_fromPaid_advancesToDelivered() throws Exception {
-        // allowed 含 PAID(10) → DB CAS（status IN(...)）命中 → rows=1，模擬訂單自 PAID 成功推進送達
         when(orderRepository.updateOrderDelivered(
                 eq("O789"), eq(OrderStatus.DELIVERED.value()),
                 anyString(), anyString(), any(), anyList())).thenReturn(1);
@@ -114,9 +113,8 @@ class ShippingEventConsumerRecoveryTest {
                 eq("O789"), eq(OrderStatus.DELIVERED.value()),
                 anyString(), anyString(), any(), captor.capture());
         assertThat(captor.getValue()).contains(
-                OrderStatus.PAID.value(),                 // 10 起點——#1644 修復核心（PAID 直接送達不再卡住）
-                OrderStatus.SHIPPING_ABNORMAL.value());   // 35 異常恢復軌道
-        // rows>0 成功路徑：order.delivered 同事務落 outbox（例外 A，不再 tx 外 best-effort 直發）+ ACK
+                OrderStatus.PAID.value(),
+                OrderStatus.SHIPPING_ABNORMAL.value());
         verify(orderOutboxMapper).insert(any());
         verify(channel).basicAck(9L, false);
     }
@@ -135,11 +133,11 @@ class ShippingEventConsumerRecoveryTest {
         verify(orderRepository).updateStatusIfMatchAny(
                 eq("O777"), eq(OrderStatus.SHIPPING_ABNORMAL.value()), captor.capture());
         assertThat(captor.getValue()).contains(
-                OrderStatus.PAID.value(),                 // 10 起點——付款後未出貨即遇物流異常也能推進
-                OrderStatus.PENDING_SHIPMENT.value());    // 20 在途主線
+                OrderStatus.PAID.value(),
+                OrderStatus.PENDING_SHIPMENT.value());
         assertThat(captor.getValue()).doesNotContain(
-                OrderStatus.DELIVERED.value(),            // 40 已送達不被異常事件拖回
-                OrderStatus.SHIPPING_ABNORMAL.value());   // 35 自身不列（防自迴圈）
+                OrderStatus.DELIVERED.value(),
+                OrderStatus.SHIPPING_ABNORMAL.value());
         verify(channel).basicAck(10L, false);
     }
 }

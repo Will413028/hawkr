@@ -73,19 +73,6 @@ export function amegoSetupState(
 				credentialEditable: false,
 				canVerify: true,
 			};
-		// 🔴 文案是「待測試」不是「測試中」（2026-09-05 第 6 輪稽核）。
-		//
-		// 端點 24（送出 AppKey）**不會觸發驗證**：它把 P01＋P02 合併，直接落
-		// CREDENTIAL_VERIFYING 就返回，真正打 AMEGO 的是端點 25（賣家按「測試連線」）。
-		// 所以這個狀態在絕大多數時間的意思是「憑證已收下、等你按那顆按鈕」，
-		// 而「測試中」讀起來是「系統正在跑，你等就好」——賣家因此不會去按。
-		// dev 實測：4 個帳號停在這個狀態 1~3 天，歷程上有 SELLER_PROVIDER_CREDENTIAL_SUBMITTED
-		// 卻沒有任何一筆 PROVIDER_VERIFICATION_STARTED，其中一個連按三次送出。
-		//
-		// ⚠️ 驗證**真的**在跑的那幾秒也落在同一個 status（端點 25 的三段式：開始→打
-		// AMEGO→落地，全在一個請求內）。那一段不靠 pill 表達——按鈕自己有
-		// loadingLabel「測試連線中…」，而它只有在使用者剛按下時才出現。
-		// 兩個讀法擇一時取**持續得久的那個**：停在這裡好幾天的是前者。
 		case S.CREDENTIAL_VERIFYING:
 			return {
 				...base,
@@ -120,7 +107,6 @@ export function amegoSetupState(
 				canVerify: true,
 			};
 
-		// 🔴 ACTIVE／DEGRADED 的分界看切點，不看 status——見檔頭。
 		case S.ACTIVE:
 			return activeLike(base, hasCutover, "測試成功", "已啟用", "ok");
 		case S.DEGRADED:
@@ -150,7 +136,6 @@ export function amegoSetupState(
 			};
 
 		default:
-			// 值域外：維持在最保守的一格，什麼都不讓按，但**不擋畫面**。
 			return {
 				...base,
 				pillLabel: "狀態更新中",

@@ -42,12 +42,9 @@ export default function MerchantManagement() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 
-	// 翻頁 / 選取。page token 綁定篩選條件與搜尋字串，換條件時回到第一頁。
 	const [pageTokens, setPageTokens] = useState(firstPage);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
-	// 篩選狀態（searchKeyword = 輸入框；appliedKeyword = 真正送出查詢的值，
-	// 只在按搜尋 / Enter 時更新，避免逐鍵 refetch）
 	const [searchKeyword, setSearchKeyword] = useState("");
 	const [appliedKeyword, setAppliedKeyword] = useState("");
 	const [filterTab, setFilterTab] = useState<FilterTab>(
@@ -61,7 +58,6 @@ export default function MerchantManagement() {
 		pageSize: PAGE_SIZE,
 	});
 
-	// 統計卡片不隨列表分頁/篩選改變，獨立查詢、獨立快取。
 	const statsQuery = useConnectQuery(
 		SellerAdminService.method.getStoreStats,
 		{},
@@ -73,41 +69,35 @@ export default function MerchantManagement() {
 	const merchants = list.items;
 	const page = currentPage(pageTokens);
 
-	// 切換篩選 Tab
 	const handleFilterTabChange = (tab: FilterTab) => {
 		setFilterTab(tab);
 		setPageTokens(firstPage());
 	};
 
-	// 搜尋處理
 	const handleSearch = () => {
 		setPageTokens(firstPage());
 		setAppliedKeyword(searchKeyword);
 	};
 
-	// 格式化日期
 	const formatDate = (item: StoreItem) => {
 		const createTime = item.store?.createTime;
 		return createTime ? formatIsoDate(timestampDate(createTime)) : "-";
 	};
 
-	// 操作按鈕 - 顏色依狀態區分
 	const getActionButtons = (m: StoreItem) => {
 		const storeId = m.store?.id ?? "";
 		const { isPending, isRejected, isActive } = rowState(m);
-		// 代行入口的資格只看伺服器：delegationUnavailabilities 是店家狀態的原因（已關閉、等待刪除、停權），句子由伺服器給；
-		// 空不表示能代行，授權與管理員資格在點下去時由 preflight 判斷。client 不從 status、suspended 推導。
 		const delegationBlockedReason =
 			m.delegationUnavailabilities.length > 0
 				? unavailableLabels(m.delegationUnavailabilities)[0]
 				: undefined;
 
-		let btnClass = "btn-action gray"; // 灰色 default (inactive/unknown)
+		let btnClass = "btn-action gray";
 		if (isPending)
-			btnClass = "btn-action warning"; // 橘色
+			btnClass = "btn-action warning";
 		else if (isRejected)
-			btnClass = "btn-action danger"; // 紅色
-		else if (isActive) btnClass = "btn-action success"; // 綠色
+			btnClass = "btn-action danger";
+		else if (isActive) btnClass = "btn-action success";
 
 		return (
 			<div className="adm-merchant-row-actions" data-row-action>
@@ -121,10 +111,7 @@ export default function MerchantManagement() {
 				>
 					{isPending ? "審核" : "查看詳情"}
 				</button>
-				{/* 入口永遠佔位，不合格時是一顆寫著原因的停用按鈕（設計書 6.1 圖 3）。
-				    `enabled` 是操作者自己的 session-create capability，目前這一側沒有
-				    可信的前端來源（權威在伺服器的 preflight，9265 會擋下），有了之後
-				    接到這個 prop —— 不得併進 blockedReason，那等於用 disabled 掩飾權限。 */}
+
 				<MerchantOperationEntry
 					storeId={storeId}
 					enabled
@@ -136,7 +123,6 @@ export default function MerchantManagement() {
 		);
 	};
 
-	// 表格的狀態列：載入中、讀取失敗、信箱對不到帳號、沒有資料。
 	const renderTableState = () => {
 		if (list.isLoading) {
 			return (
@@ -170,7 +156,7 @@ export default function MerchantManagement() {
 
 	return (
 		<div className="merchant-management">
-			{/* Page Header */}
+
 			<div className="page-header">
 				<div>
 					<h1 className="page-title">賣家管理</h1>
@@ -196,7 +182,7 @@ export default function MerchantManagement() {
 				</span>
 			</aside>
 
-			{/* Stats Cards - 5 columns - 點擊篩選（本月增加沒有對應的篩選，只顯示數字） */}
+
 			<div className="stats-row-v2 merchant-stats-grid">
 				<button
 					type="button"
@@ -256,7 +242,7 @@ export default function MerchantManagement() {
 				</div>
 			</div>
 
-			{/* Search and Filter Row */}
+
 			<div className="merchant-toolbar">
 				<div className="merchant-search-input">
 					<MaterialSymbol name="search" size={18} className="search-icon" />
@@ -283,9 +269,9 @@ export default function MerchantManagement() {
 				</div>
 			</div>
 
-			{/* Table Container */}
+
 			<div className="merchant-table-container">
-				{/* Data Table */}
+
 				<table className="merchant-table">
 					<thead>
 						<tr>
@@ -328,7 +314,7 @@ export default function MerchantManagement() {
 											setSelectedId(selectedId === storeId ? null : storeId);
 										}}
 									>
-										{/* 賣家資訊 */}
+
 										<td>
 											<div className="merchant-info-cell">
 												<div className="merchant-avatar">
@@ -353,20 +339,20 @@ export default function MerchantManagement() {
 													</span>
 												</div>
 												<div className="merchant-details">
-													{/* CSS 以 ellipsis 截斷（窄視窗下更短），完整值只剩 title 拿得到。 */}
+
 													<div className="merchant-name" title={shopName}>
 														{shopName}
 													</div>
 												</div>
 											</div>
 										</td>
-										{/* 商店代號 */}
+
 										<td>
 											<span className="merchant-shop-code">
 												{store?.storeCode || "-"}
 											</span>
 										</td>
-										{/* 地點 */}
+
 										<td>
 											<div className="merchant-type-cell">
 												<div className="merchant-location">
@@ -375,17 +361,17 @@ export default function MerchantManagement() {
 												</div>
 											</div>
 										</td>
-										{/* 狀態:停權優先於申請狀態 */}
+
 										<td>
 											<StatusBadge variant={badge.variant}>
 												{badge.label}
 											</StatusBadge>
 										</td>
-										{/* 加入日期 */}
+
 										<td>
 											<span className="merchant-date">{formatDate(m)}</span>
 										</td>
-										{/* 操作 */}
+
 										<td>{getActionButtons(m)}</td>
 									</tr>
 								);
@@ -395,7 +381,7 @@ export default function MerchantManagement() {
 				</table>
 			</div>
 
-			{/* Pagination：keyset，不顯示總數 */}
+
 			{(page > 1 || list.nextPageToken) && (
 				<div className="merchant-pagination">
 					<button

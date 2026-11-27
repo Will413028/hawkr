@@ -259,7 +259,6 @@ func (s *Service) RecordView(ctx context.Context, c model.Caller, postID uuid.UU
 	return counted, err
 }
 
-// salt 讀當日的 salt；第一次需要時寫入（ON CONFLICT DO NOTHING 後讀回，跨實例一致）。
 func (s *Service) salt(ctx context.Context, q *store.Queries, day time.Time) ([]byte, error) {
 	salt, err := q.GetViewSalt(ctx, day)
 	if err == nil {
@@ -282,7 +281,6 @@ func (s *Service) salt(ctx context.Context, q *store.Queries, day time.Time) ([]
 	return salt, nil
 }
 
-// viewerKey 是 HMAC-SHA256(當日 salt, 訊息)：登入者 "a:" ‖ account_id；匿名 "v:" ‖ post_id ‖ ip ‖ ua（以 NUL 分隔，不會因串接而混淆）。
 func viewerKey(salt []byte, postID uuid.UUID, v Viewer) []byte {
 	mac := hmac.New(sha256.New, salt)
 	if v.AccountID > 0 {

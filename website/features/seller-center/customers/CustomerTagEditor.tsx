@@ -48,14 +48,10 @@ export default function CustomerTagEditor({
 }: Props) {
 	const { storeId } = useCrmStoreId();
 	const defaults = useDefaultErrorText();
-	// The buyer's applied tags: seeded from the row / detail, replaced by the customer each
-	// mutation returns, and re-seeded when the host hands over a fresher list.
 	const [tags, setTags] = React.useState<CustomerTag[]>(initialTags ?? []);
 	React.useEffect(() => {
 		if (initialTags) setTags(initialTags);
 	}, [initialTags]);
-	// The seller's tag pool (suggestions) is display-only and shared with the
-	// list filter chips → one cached query.
 	const { tags: pool, error: poolError } = useSellerTags();
 	const [input, setInput] = React.useState("");
 	const [pendingAction, setPendingAction] =
@@ -63,7 +59,6 @@ export default function CustomerTagEditor({
 	const [error, setError] = React.useState<string | null>(null);
 	const busy = pendingAction !== null;
 
-	// 每次寫入回傳貼完（或移除完）之後的客戶：它的標籤成為新的列表。
 	const applyCustomer = React.useCallback(
 		(customer: { tags: CustomerTag[] }) => setTags(customer.tags),
 		[],
@@ -108,7 +103,6 @@ export default function CustomerTagEditor({
 		}
 	};
 
-	// Suggestions = quick presets + seller's own pool, minus what's applied.
 	const suggestions = React.useMemo(() => {
 		const seen = new Set(tags.map((t) => t.name.toLowerCase()));
 		const out: string[] = [];

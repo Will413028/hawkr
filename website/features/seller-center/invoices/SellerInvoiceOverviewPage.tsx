@@ -158,23 +158,16 @@ export function SellerInvoiceOverviewPage() {
 								overview.invoiceMode ??
 								"尚未設定"
 							}
-							// S05 入口。審核進行中的賣家也看得到（判準見 `showsReceiptAuth`）：
-							// 核定之前就先簽，核定之後才不會有一段沒授權的空窗。
 							href={showsReceiptAuth(overview) ? RECEIPT_AUTH_HREF : undefined}
 							hrefLabel={showsReceiptAuth(overview) ? "收據授權" : undefined}
 						/>
 						<StatusCard
 							label="AMEGO 串接"
 							value={
-								// 上線當天全體賣家是 NOT_STARTED，文案必須是「尚未設定」而
-								// 不是「設定錯誤」（§S01 的 DTO 欄位表）。
 								INVOICE_PROVIDER_ACCOUNT_STATUS_LABEL[
 									overview.providerStatus
 								] ?? "尚未設定"
 							}
-							// S03 已上線（端點 23–27 於 2026-09-01 重查已在 origin/dev）。
-							// 🔴 這是整條發票鏈唯一的入口：賣家沒串 AMEGO ⇒ 訂單一張發票
-							// 都開不出來，所以 CTA 一律給，不依 providerStatus 隱藏。
 							href={AMEGO_HREF}
 							hrefLabel="前往設定"
 						/>
@@ -365,7 +358,7 @@ function RecentDocumentsCard({
 										<td data-label="開立時間">
 											{formatTaipeiDateTime(doc.issuedAt) || "—"}
 										</td>
-										{/* 遮罩值用 <span> 而非 <code>，避免螢幕閱讀器逐字讀 `*`。 */}
+
 										<td data-label="發票號碼">
 											<span>{doc.invoiceNumber || "—"}</span>
 										</td>
@@ -382,11 +375,7 @@ function RecentDocumentsCard({
 											</Chip>
 										</td>
 										<td data-label="操作">
-											{/*
-											 * `recentDocuments[]` 用的是 `InvoiceDocumentSummary`，
-											 * **沒有 `orderNo`** ⇒ 只能導到 S06 並帶 `?document=`，
-											 * 不得從 `documentId` 反推訂單編號（§S01 DTO 表）。
-											 */}
+
 											<Link
 												href={`${DOCUMENTS_HREF}?document=${encodeURIComponent(doc.documentId)}`}
 												className="text-sm underline"

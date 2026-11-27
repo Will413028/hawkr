@@ -25,11 +25,8 @@ bool isAccountSuspendedError(Object error) =>
 const backgroundConnectProcedures = {
   '/hawkr.buyer.v1alpha1.BuyerAppService/RecordVisit',
   '/hawkr.buyer.v1alpha1.BuyerAppService/ClearVisits',
-  // 進入對話與收到訊息時自動標記已讀。
   '/hawkr.chat.v1alpha1.ChatAppService/MarkConversationRead',
-  // 開啟通知自動標記已讀（全部已讀是使用者點的，不在這裡）。
   '/hawkr.notification.v1alpha1.NotificationAppService/MarkInboxItemRead',
-  // 推播裝置 token 的註冊與註銷。
   '/hawkr.notification.v1alpha1.NotificationAppService/RegisterDeviceToken',
   '/hawkr.notification.v1alpha1.NotificationAppService/DeleteDeviceToken',
 };

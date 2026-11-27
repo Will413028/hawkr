@@ -13,11 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// 本檔驗端點 32／49／71 的重寄窗口。
-//
-// 最重要的一條在 TestResend_WindowIsSharedAcrossEntrances：三個入口**共用同一個計數器**
-// （key ＝ document_id，不是 document_id × actor）。少了它，ADM 幫忙點一次、賣家再點
-// 一次，買家會在十分鐘內收到兩封——而那不會有任何東西轉紅。
 
 var resendNow = time.Date(2026, 8, 30, 6, 0, 0, 0, time.UTC)
 
@@ -76,8 +71,6 @@ func TestResend_SellerSuccess(t *testing.T) {
 	if ev.RoutingKey != pkgmq.RoutingKeyInvoiceIssued {
 		t.Fatalf("routing key 應沿用 P1，實得 %q", ev.RoutingKey)
 	}
-	// 🔴 notification_ref_id 必須換新：沿用開立當下的 INV:{id}，
-	// notification-service 會依 reference_id 靜默吞掉這一封，而按下去的人看到的是成功。
 	var payload map[string]any
 	if err := json.Unmarshal(ev.Payload, &payload); err != nil {
 		t.Fatalf("payload 不是合法 JSON：%v", err)
@@ -88,7 +81,6 @@ func TestResend_SellerSuccess(t *testing.T) {
 	if payload["invoice_no"] != "ZA10068421" {
 		t.Fatalf("invoice_no 應取 provider_invoice_no，實得 %v", payload["invoice_no"])
 	}
-	// store_id 走 issuer_ref_id 不是 issuer_id：後者是 PK，下游拿去查賣家會查不到。
 	if payload["store_id"] != "2685914682" {
 		t.Fatalf("store_id 應為 issuer_ref_id，實得 %v", payload["store_id"])
 	}
@@ -101,10 +93,8 @@ func TestResend_WindowIsSharedAcrossEntrances(t *testing.T) {
 	if _, err := fx.uc.ResendForAdmin(context.Background(), resendDocID); err != nil {
 		t.Fatalf("ADM 第一次應成功：%v", err)
 	}
-	// 換一個身分（賣家）立刻再按 ⇒ 仍然是 9352。
 	_, err := fx.uc.ResendForSeller(context.Background(), resendStoreID, resendDocID)
 	assertBizCode(t, err, bizcode.InvoiceNotificationResendTooFrequent)
-	// 買家也一樣。
 	_, err = fx.uc.ResendForBuyer(context.Background(), resendBuyerID, resendDocID)
 	assertBizCode(t, err, bizcode.InvoiceNotificationResendTooFrequent)
 
@@ -119,7 +109,6 @@ func TestResend_WindowReopensAfterTenMinutes(t *testing.T) {
 		t.Fatalf("第一次失敗：%v", err)
 	}
 
-	// 剛好 10 分鐘：窗口述詞是 `<= now - 10min` ⇒ 邊界值放行。
 	fx.uc.WithClock(func() time.Time { return resendNow.Add(resendWindow) })
 	if _, err := fx.uc.ResendForSeller(context.Background(), resendStoreID, resendDocID); err != nil {
 		t.Fatalf("滿 10 分鐘應可重寄：%v", err)
@@ -127,7 +116,6 @@ func TestResend_WindowReopensAfterTenMinutes(t *testing.T) {
 	if len(fx.outbox.inserted) != 2 {
 		t.Fatalf("應發兩則事件，實得 %d", len(fx.outbox.inserted))
 	}
-	// 第二次的 ref id 必須是新的（seq 取自 DB 遞增後的次數）。
 	var p2 map[string]any
 	_ = json.Unmarshal(fx.outbox.inserted[1].Payload, &p2)
 	if p2["notification_ref_id"] != "INVRS:8001:2" {
@@ -201,24 +189,18 @@ func TestResend_ExternalIssuanceUsesExternalNumber(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 31 的 nextResendAvailableAt
-// ---------------------------------------------------------------------------
 
 func TestNextResendAvailableAt(t *testing.T) {
 	justNow := resendNow.Add(-3 * time.Minute)
 	longAgo := resendNow.Add(-30 * time.Minute)
 
-	// 從未重寄過 ⇒ nil（前端語意：現在就可以按）。
 	if got := NextResendAvailableAt(domain.Document{}, resendNow); got != nil {
 		t.Fatalf("從未重寄過應回 nil，實得 %v", got)
 	}
-	// 窗口內 ⇒ 回倒數終點。少了它，按鈕永遠可按而 429 拿不到倒數。
 	got := NextResendAvailableAt(domain.Document{NotificationResentAt: &justNow}, resendNow)
 	if got == nil || !got.Equal(justNow.Add(resendWindow)) {
 		t.Fatalf("窗口內應回 resentAt+10min，實得 %v", got)
 	}
-	// 窗口已過 ⇒ nil（不要回一個過去的時間，前端會顯示負數倒數）。
 	if got := NextResendAvailableAt(domain.Document{NotificationResentAt: &longAgo}, resendNow); got != nil {
 		t.Fatalf("窗口已過應回 nil，實得 %v", got)
 	}

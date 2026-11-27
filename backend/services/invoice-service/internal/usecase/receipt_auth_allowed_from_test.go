@@ -14,11 +14,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 端點 29 的 allowed-from 在兩個地方各寫了一次：SQL 的 WHERE（真正生效的守衛）與
-// receiptAuthEligibleStatuses（決定 UI 看到 eligible 與否）。兩份漂移不會編譯錯、
-// 不會有任何測試自然轉紅，而兩個方向的症狀都很難查（見那個 var 的註解）。
-//
-// 這支測試**從 SQL 解析**出清單，不手寫第二份 —— 手寫的話它就只是第三份會漂移的拷貝。
 const receiptAuthQueryName = "ConfirmSellerReceiptAuthorization"
 
 var reviewStatusInRe = regexp.MustCompile(`(?s)AND\s+review_status\s+IN\s*\(([^)]*)\)`)
@@ -32,7 +27,6 @@ func sqlReceiptAuthAllowedFrom(t *testing.T) []string {
 	}
 	src := string(raw)
 
-	// 先切出那一句，否則會抓到同檔別句的 IN(...)。
 	head := "-- name: " + receiptAuthQueryName + " :execrows"
 	i := strings.Index(src, head)
 	if i < 0 {
@@ -77,7 +71,6 @@ func TestReceiptAuthEligibleStatusesMatchSQL(t *testing.T) {
 			"  SQL: %v\n  Go : %v", want, got)
 	}
 
-	// 鑑別力：解析器真的看得到那五個值，而不是回了一個剛好也等於空集合的東西。
 	if len(want) < 2 {
 		t.Fatalf("解析結果只有 %d 個值，這支測試等於沒在比對：%v", len(want), want)
 	}
@@ -91,8 +84,6 @@ func TestReceiptEligibility_AllTenStatuses(t *testing.T) {
 		eligible bool
 		reason   string
 	}{
-		// NOT_STARTED 是「還沒有 profile 列」的虛擬態，正常路徑走不到 receiptEligibility；
-		// 仍逐字列出，才不會在它哪天變成真狀態時靜默落進 NOT_APPROVED 而沒人發現。
 		"NOT_STARTED":               {false, receiptIneligibleNotApproved},
 		"DRAFT":                     {false, receiptIneligibleNotApproved},
 		"SUBMITTED":                 {true, ""},
@@ -122,8 +113,6 @@ func TestReceiptEligibility_AllTenStatuses(t *testing.T) {
 		})
 	}
 
-	// APPROVAL_EXPIRED 只對已核定成立；審核中的賣家 approval_valid_until 恆為 NULL，
-	// 拿它去判會把「還沒核定」誤報成「已過期」。
 	t.Run("已核定但屆期", func(t *testing.T) {
 		past := tNow.Add(-time.Hour)
 		p := domain.SellerTaxProfile{
@@ -150,8 +139,7 @@ func TestTaxProfile_Decide_ApproveExemptRequiresReceiptAuthorization(t *testing.
 
 	t.Run("未授權_必須擋下且不得改動狀態", func(t *testing.T) {
 		p := profileAt("UNDER_REVIEW")
-		p.TaxID = nil // chk_stp_exempt_no_taxid
-		// 刻意不給 ReceiptAuthorizedAt —— 這就是被測的情境。
+		p.TaxID = nil
 		e := newTaxEnv(t, p)
 
 		_, err := e.uc.Decide(context.Background(), newExemptDecision())
@@ -186,9 +174,8 @@ func TestTaxProfile_Decide_ApproveExemptRequiresReceiptAuthorization(t *testing.
 		}
 	})
 
-	// 鏡像的另一半：核定「應開統一發票」與收據授權無關，不得被這道守衛波及。
 	t.Run("核定應開發票_不受授權守衛拘束", func(t *testing.T) {
-		e := newTaxEnv(t, profileAt("UNDER_REVIEW")) // 有統編、無授權
+		e := newTaxEnv(t, profileAt("UNDER_REVIEW"))
 		in := newExemptDecision()
 		in.Decision = codemeta.SellerTaxReviewDecisionApproveInvoiceRequired.Value
 		if _, err := e.uc.Decide(context.Background(), in); err != nil {

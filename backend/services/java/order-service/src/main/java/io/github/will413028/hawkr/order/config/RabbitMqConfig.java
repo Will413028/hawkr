@@ -19,7 +19,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-    // ==================== Exchange ====================
 
     @Bean
     public TopicExchange paymentEventsExchange() {
@@ -31,7 +30,6 @@ public class RabbitMqConfig {
         return new TopicExchange(MqConstants.EXCHANGE_PAYMENT_DLX, true, false);
     }
 
-    // ==================== Queue（含 DLQ 配置） ====================
 
     @Bean
     public Queue orderPaymentResultQueue() {
@@ -59,7 +57,6 @@ public class RabbitMqConfig {
         return QueueBuilder.durable(MqConstants.QUEUE_ORDER_REFUND_RESULT_DLQ).build();
     }
 
-    // ==================== Binding ====================
 
     @Bean
     public Binding bindPaymentSuccess(Queue orderPaymentResultQueue, TopicExchange paymentEventsExchange) {
@@ -110,7 +107,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.ROUTING_KEY_REFUND_FAILED);
     }
 
-    // ==================== Shipping Events ====================
 
     @Bean
     public TopicExchange shippingExchange() {
@@ -197,7 +193,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.ROUTING_KEY_SHIPMENT_PHOTO_UPDATED);
     }
 
-    // §5.9 賣家完成處理事件（CVS 取號 / 宅配叫件）→ 清空 orders.processing_deadline
     @Bean
     public Queue orderShipmentProcessingClearedQueue() {
         return QueueBuilder.durable(MqConstants.QUEUE_ORDER_SHIPMENT_PROCESSING_CLEARED)
@@ -213,7 +208,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.ROUTING_KEY_SHIPMENT_PROCESSING_CLEARED);
     }
 
-    // ==================== Shipping DLQ ====================
 
     @Bean
     public Queue orderShippingCreatedDlq() {
@@ -275,7 +269,6 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(orderShipmentProcessingClearedDlq).to(orderDlxExchange).with(MqConstants.QUEUE_ORDER_SHIPMENT_PROCESSING_CLEARED_DLQ);
     }
 
-    // ==================== Order Exchange（發布確認收貨事件用）====================
 
     @Bean
     public TopicExchange orderExchange() {
@@ -292,7 +285,6 @@ public class RabbitMqConfig {
         return new TopicExchange(MqConstants.EXCHANGE_SELLER_WORKSPACE, true, false);
     }
 
-    // ==================== AfterSales Events ====================
 
     @Bean
     public TopicExchange aftersalesExchange() {
@@ -329,7 +321,6 @@ public class RabbitMqConfig {
                 .with(AfterSalesEventType.CANCEL_COMPLETED.value());
     }
 
-    // 60h 自動完成倒數的暫停/恢復事件（03 §5.8）
     @Bean
     public Queue orderAftersalesCountdownQueue() {
         return QueueBuilder.durable(MqConstants.QUEUE_ORDER_AFTERSALES_COUNTDOWN)
@@ -378,9 +369,6 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(orderAftersalesCountdownQueue).to(aftersalesExchange).with(AfterSalesEventType.PLATFORM_DECISION_MADE.value());
     }
 
-    // aftersales.refund.completed 不再 binding 本 queue（ORD-02 雙 queue 收斂，03 §5.7.1）：
-    // 倒數恢復已併入 AfterSalesEventConsumer.onRefundCompleted 同事務處理。
-    // 注意：移除 @Bean 不會刪 broker 上既存 binding，需維運手動移除（見 36 號）。
 
     /**
      * 2026-06-15 §5.3.8 待寄回逾時自動關案（status 20→33）→ order-service 嘗試恢復倒數。
@@ -391,7 +379,6 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(orderAftersalesCountdownQueue).to(aftersalesExchange).with(AfterSalesEventType.CASE_AUTO_COMPLETED_RETURN_PENDING_TIMEOUT.value());
     }
 
-    // ==================== AfterSales DLQ ====================
 
     @Bean
     public Queue orderAftersalesRefundCompletedDlq() {
@@ -423,7 +410,6 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(orderAftersalesCountdownDlq).to(orderDlxExchange).with(MqConstants.QUEUE_ORDER_AFTERSALES_COUNTDOWN_DLQ);
     }
 
-    // ==================== Review Events ====================
 
     @Bean
     public TopicExchange reviewExchange() {
@@ -455,7 +441,6 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(orderReviewCreatedDlq).to(orderDlxExchange).with(MqConstants.QUEUE_ORDER_REVIEW_CREATED_DLQ);
     }
 
-    // ==================== 消費端（來自 Seller Service — 賣家停權連動批次取消未付款單，03 §5.1a.2 / 36 §3.6f） ====================
 
     /**
      * hawkr.seller exchange（既有 {@link MqConstants#EXCHANGE_SELLER_BIZ}，product-service 已宣告過）。
@@ -495,7 +480,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_ORDER_SELLER_SUSPENDED_DLQ);
     }
 
-    // ==================== DLQ Binding ====================
 
     @Bean
     public Binding bindPaymentResultDlq(Queue orderPaymentResultDlq, TopicExchange paymentDlxExchange) {

@@ -40,31 +40,19 @@ func TestModule_GraphResolves(t *testing.T) {
 			func() *usecase.Issuance { return nil },
 			func() *usecase.Voiding { return nil },
 			func() *invoicemq.EventPublisher { return nil },
-			// SEL peer client 由 internal/client.Module 提供；本測試只驗 worker 的圖，
-			// 供一個 nil 讓型別對得上即可（ValidateApp 不呼叫建構函式）。
 			func() *seller.Client { return nil },
-			// INV.dl 的兩個跨層依賴：inbox repository（Layer 2）與 order.paid handler
-			// （Layer 3.5，兜底掃描要重跑的就是它的步驟 5–9）。
 			func() domain.InboxRepository { return nil },
 			func() *invoicemq.OrderPaidConsumer { return nil },
-			// 退款重跑入口（#3073）：INV.dl 的第二條分派。
 			func() *invoicemq.RefundFinalizedConsumer { return nil },
-			// INV.trk 的 usecase（Layer 4）。與上面幾支同理：ValidateApp 不呼叫建構函式，
-			// 供一個 nil 讓型別對得上即可。
 			func() *usecase.Track { return nil },
 			func() *usecase.HealthCheck { return nil },
 			func() *usecase.Recheck { return nil },
 			func() *usecase.Governance { return nil },
 			func() *usecase.PDF { return nil },
-			// K05 的 sweeper 綁到它（#3055 的橫向稽查）。
 			func() *usecase.Complaint { return nil },
-			// 折讓軸（#3073）：IssueWorker 的第三條分派。
 			func() *usecase.Allowance { return nil },
 		),
 		Module,
-		// 🔴 每一支 worker 都要列出來：fx.ValidateApp 只驗**被要求到的**那一段子圖，
-		// 少列一支等於那支的接線完全沒被驗（DeadlineWorker 就是這樣才需要補進來，
-		// trackWorker 於 2026-08-31 補上時同理）。
 		fx.Invoke(func(*IssueWorker, *OutboxWorker, *DeadlineWorker, *trackWorker, *healthCheckWorker, *recheckWorker, *governanceWorker) {
 		}),
 	); err != nil {

@@ -32,14 +32,11 @@ type permanentError struct{ error }
 
 func invalid(format string, args ...any) error { return permanentError{fmt.Errorf(format, args...)} }
 
-// isPermanent：解碼失敗、必要欄位缺漏或格式不合、catalog 判定輸入不合法（含銷量指到不存在的商品、歸還超過原扣減量）都是 permanent（進 dead-letter queue、不重試）；
-// 其餘（資料庫）照常重排。
 func isPermanent(err error) bool {
 	var p permanentError
 	return errors.As(err, &p)
 }
 
-// number 接受 JSON 字串或數字（Java 的 quantity 在 order.cancelled 是字串、在銷量事件是數字）。
 type number string
 
 func (n *number) UnmarshalJSON(b []byte) error {

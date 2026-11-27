@@ -109,8 +109,6 @@ export default function AuthorityOrderDetailPage() {
 	useScrollToHash(!detail.isLoading && !!order);
 	const derived = useAllMeasures({ sourceAuthorityOrderId: id });
 
-	// 建立措施的店家：只列伺服器旗標為真的店（措施：can_create_measure；終止合作：can_create_termination）。
-	// 只有一家可選就直接用；多家時不預設，先選（L20）。
 	const measureOptions = order
 		? measureStoreOptions(order, "canCreateMeasure")
 		: [];
@@ -131,7 +129,6 @@ export default function AuthorityOrderDetailPage() {
 	const terminationReady = terminationOptions.some(
 		(o) => o.storeId === storeId,
 	);
-	// 終止合作的事由與生效時機讀選定店家的 GetStore。
 	const store = useStoreDetail(terminationReady ? storeId : "");
 	const termination = terminationAvailability(store.data);
 

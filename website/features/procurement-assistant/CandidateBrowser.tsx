@@ -116,8 +116,6 @@ function CandidateRow({
 	onOpen: () => void;
 }) {
 	const checkboxId = `procurement-candidate-${candidate.candidateId}`;
-	// 這個工作台只靠 server 已提供的 public facts 說真話；既然沒有可打開的
-	// typed seller artifact，就不能再用卡片摘要的 slice 隱藏其餘查核結果。
 	const matchedFacts = candidate.matchedFacts;
 	const unverifiableFacts = candidate.unverifiableFacts;
 	return (
@@ -256,8 +254,6 @@ function SellerRow({
 	const checked = selection === "all";
 	const inputRef = React.useRef<HTMLInputElement>(null);
 
-	// indeterminate 只有 DOM property，沒有對應的 HTML attribute，React 也不會幫忙設，
-	// 只能在 ref 上寫。漏掉的話「部分勾選」會顯示成完全未選，使用者以為自己沒選到。
 	React.useEffect(() => {
 		if (inputRef.current) {
 			inputRef.current.indeterminate = selection === "partial";
@@ -311,8 +307,7 @@ function SellerRow({
 						{group.candidates.length} 項符合的商品
 					</span>
 				</span>
-				{/* storeCode 缺值時不給連結——`/sellers/{storeId}` 那條路徑正在被收掉，
-				    用 storeId 頂替會產生一個會壞掉的連結。 */}
+
 			</td>
 
 			<td className="assistant-candidate-row__actions">
@@ -425,10 +420,6 @@ function CandidatePanel({
 		/>
 	);
 
-	// 勾選一家商家＝逐筆切換它底下需要改變狀態的候選。這一層刻意不新增「批次 toggle」
-	// 的 API：勾選的持久化契約是 per-candidate 的
-	// （POST .../selections 帶單一 candidateId），前端自己展開才不會在 wire 上多開一條
-	// 語意重複的路徑。
 	const onToggleSeller = (group: CandidateSellerGroup) => {
 		for (const candidate of candidatesToToggleForSeller(group).candidates) {
 			onToggleSelection(candidate);
@@ -439,8 +430,7 @@ function CandidatePanel({
 		<div className="assistant-lane">
 			<div className="assistant-lane__intro">
 				<div>
-					{/* 收斂成商家之後，「幾筆」講的必須是商家數——沿用候選數會讓標題與
-					    畫面上看得到的列數對不起來。 */}
+
 					<strong>
 						{grouped
 							? `${grouped.groups.length + grouped.ungrouped.length} 家商家`
@@ -482,9 +472,7 @@ function CandidatePanel({
 							<th scope="col">操作</th>
 						</tr>
 					</thead>
-					{/* 收斂成商家是資料驅動的（見 candidate-grouping.ts）：候選實際帶得出
-					    商家身分才收斂，帶不出就是原本這張候選平表。沒有任何模式開關，
-					    所以不會出現「看起來有、點進去空」的分頁。 */}
+
 					<tbody className="assistant-candidate-table__body">
 						{grouped
 							? [
@@ -499,7 +487,6 @@ function CandidatePanel({
 											onToggle={() => onToggleSeller(group)}
 										/>
 									)),
-									// 部署窗口內混到的舊候選：照樣完整列出，不靜默丟掉。
 									...grouped.ungrouped.map(renderRow),
 								]
 							: visibleCandidates.map(renderRow)}
@@ -551,7 +538,7 @@ export default function CandidateBrowser({
 				<div className="assistant-invalidated" role="alert">
 					<AppIcon name="danger" size={20} aria-hidden="true" />
 					<div>
-						{/* failureReason 的文字來自共用文案目錄；沒有值（UNSPECIFIED）時只留標題。 */}
+
 						<strong>
 							{optionalText(
 								ut,
@@ -571,9 +558,6 @@ export default function CandidateBrowser({
 		(candidate) => candidate.selected,
 	);
 	const selectedCount = selectedCandidates.length;
-	// 行動列講「家」，勾選契約講「筆」：同一家商家底下勾了三個候選，畫面上是一列、
-	// 打出去是三次 POST .../selections。兩個數字都要有——`selectedCount` 管按鈕能不能按
-	// （一筆都沒有就不能），`selectedRecipientCount` 管說出來的話跟看到的列數對得上。
 	const selectedRecipientCount = countSelectedRecipients(selectedCandidates);
 
 	return (

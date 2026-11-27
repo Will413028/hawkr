@@ -52,7 +52,6 @@ class OrderCreationTxHandlerRfqLineTest {
         try {
             TsidUtil.init(302, 0);
         } catch (IllegalStateException ignored) {
-            // 已初始化
         }
     }
 
@@ -63,7 +62,6 @@ class OrderCreationTxHandlerRfqLineTest {
         OrderNoGenerator orderNoGenerator = mock(OrderNoGenerator.class);
         when(orderNoGenerator.generateOrderNo()).thenReturn("RFQ20260921001");
 
-        // 兩個值刻意不同：相同的話，「讀錯設定」這個變異就測不出來。
         OrderConfig orderConfig = mock(OrderConfig.class);
         when(orderConfig.getPaymentDeadlineSeconds()).thenReturn(CATALOG_DEADLINE_SECONDS);
         when(orderConfig.getRfqPaymentDeadlineSeconds()).thenReturn(RFQ_DEADLINE_SECONDS);
@@ -74,8 +72,6 @@ class OrderCreationTxHandlerRfqLineTest {
     }
 
     private OrderEntity createRfq() {
-        // ⛔ 走 canonical constructor 而不是 CreateOrderItemParam.catalog：這一列就是
-        //    non-catalog line，工廠方法的 primitive long 傳不進 null。
         List<OrderService.CreateOrderItemParam> items = List.of(
                 new OrderService.CreateOrderItemParam(
                         null, "文旦柚 200 公斤", 1, 30000L, 30000L, 0L, "", null, null));
@@ -94,11 +90,9 @@ class OrderCreationTxHandlerRfqLineTest {
         OrderEntity order = createRfq();
 
         LocalDateTime after = DateTimeUtils.nowUtc();
-        // 斷言成區間而不是精確等值：nowUtc() 在受測程式碼裡呼叫，測試取不到同一個瞬間。
         assertThat(order.getPaymentDeadline())
                 .isAfterOrEqualTo(before.plusSeconds(RFQ_DEADLINE_SECONDS))
                 .isBeforeOrEqualTo(after.plusSeconds(RFQ_DEADLINE_SECONDS));
-        // 鑑別力：12h 與 24h 相差 12 小時，遠大於上面那個區間的寬度 ⇒ 讀錯設定一定落在區間外。
         assertThat(Duration.between(before, order.getPaymentDeadline()))
                 .isLessThan(Duration.ofSeconds(CATALOG_DEADLINE_SECONDS));
     }
@@ -112,7 +106,6 @@ class OrderCreationTxHandlerRfqLineTest {
         verify(orderItemRepository).insert(captor.capture());
         OrderItemEntity item = captor.getValue();
         assertThat(item.getSkuId()).isNull();
-        // 品名仍是真品名：放寬的是參照，不是 sku_name 的禁 sentinel 規則（64 號 §6.4.3）。
         assertThat(item.getSkuName()).isEqualTo("文旦柚 200 公斤");
     }
 }

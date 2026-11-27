@@ -5,7 +5,7 @@ import "testing"
 func TestUntaxAndTaxOf(t *testing.T) {
 	cases := []struct{ gross, untax, tax int64 }{
 		{0, 0, 0},
-		{-5, 0, -5}, // 負數不會單獨呼叫，但行為必須是定義好的
+		{-5, 0, -5},
 		{168, 160, 8},
 		{900, 857, 43},
 		{300, 286, 14},

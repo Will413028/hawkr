@@ -29,12 +29,6 @@ Future<bool> showReportSheet(
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
-    // 必須掛根 Navigator。本 sheet 有三個開啟點，其中留言 tab（`PageEchoTab`，
-    // `StatefulShellRoute` 的分支路由）位於浮動導覽列**之下**的分支 Navigator：
-    // 不掛根 Navigator 時 sheet 底部的「送出檢舉」鈕會整顆被導覽列蓋住，
-    // 該路徑的檢舉永遠送不出去（hawkr_seller#132）。另兩個開啟點
-    // （`page_home_feed_screen` / `chat_thread_screen`）是 `rootNavigatorKey`
-    // 的根路由所以一直正常——這個層級差就是本 bug 的交叉驗證。
     useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: AppColors.bgCard,

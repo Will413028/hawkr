@@ -58,9 +58,6 @@ class OrderBottomRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final displayId = _orderId();
-    // 🔴 出貨動作依配送方式**明確分派**。原本是 `isTaqbin` 以外一律走超商，
-    // 於是 3003/3005 與任何後端新碼值都會被畫出「預約取號」，
-    // 點下去打的是 POST /app/shipments/{no}/print_cvs_label。
     final shipping = shippingPresentationOf(order.shippingMethod);
 
     void onDetailTap() => context.push('/orders/matched/detail', extra: order);
@@ -194,7 +191,6 @@ class OrderBottomRow extends ConsumerWidget {
     );
   }
 
-  // ── 出貨按鈕 ────────────────────────────────────────────────────────────
   List<Widget> _buildShippingButtons(
     BuildContext context,
     WidgetRef ref,
@@ -202,8 +198,6 @@ class OrderBottomRow extends ConsumerWidget {
   ) {
     final ss = order.shipmentStatus;
 
-    // 未知 / 本版未支援的配送方式：不得退回超商流程去打 print_cvs_label。
-    // 不憑空消失（§1.8）—— 用既有的 meta 樣式說明為什麼沒有按鈕。
     if (!shipping.isSupported) {
       return [
         Text(
@@ -213,10 +207,7 @@ class OrderBottomRow extends ConsumerWidget {
       ];
     }
 
-    // 黑貓：核心判斷是 labelUrl 有沒有值（建單 vs 呼叫司機 vs 下載 PDF），
-    // 不靠 shippingStatus 細分以免落到非預期值（如 ss=92 但 labelUrl 空）造成沒按鈕。
     if (shipping == ShippingPresentation.homeDelivery) {
-      // 已呼叫黑貓
       if (ss == ShippingStatus.tcatCalled.value) {
         if (order.labelUrl.isNotEmpty) {
           return [
@@ -227,10 +218,8 @@ class OrderBottomRow extends ConsumerWidget {
             ),
           ];
         }
-        // tcatCalled 但沒 labelUrl 是異常（webhook 還沒回），等後端補拉，不重複呼叫
         return [];
       }
-      // labelUrl 有值 = 已建立託運單，下一步是呼叫黑貓
       if (order.labelUrl.isNotEmpty) {
         return [
           PillButton(
@@ -240,7 +229,6 @@ class OrderBottomRow extends ConsumerWidget {
           ),
         ];
       }
-      // labelUrl 空 = 還沒建立託運單，要先預約出貨（不論 shippingStatus 是什麼）
       return [
         PillButton(
           label: '預約出貨',
@@ -250,13 +238,6 @@ class OrderBottomRow extends ConsumerWidget {
       ];
     }
 
-    // 超商（走到這裡 shipping 必為 cvsStorePickup）：
-    // 核心判斷是 odno 有沒有值（取號 vs 出貨確認），不看 shippingStatus
-    // 之前用 _isShipmentUnprocessed 判斷會漏掉「shippingStatus=92 但 odno=空」
-    // 這種 backend 中間態（後端先升 ss 再取號），導致賣家看不到任何按鈕。
-    //
-    // odno 取值優先「後端」→「本地 override」（B-147 workaround：
-    // print_cvs_label 成功後 odno 已在前端，但 list endpoint 還沒同步）。
     final statusCode = order.statusCode ?? int.tryParse(order.subtitle) ?? -1;
     if (statusCode >= 30) return [];
     final activeOdno = effectiveOdno(_orderId(), order.odno);
@@ -269,7 +250,6 @@ class OrderBottomRow extends ConsumerWidget {
         ),
       ];
     }
-    // 沒 odno 一律顯示「預約取號」（包含 ss=空 / 91 / 92 沒取到號的情境）
     return [
       PillButton(
         label: '預約取號',
@@ -279,7 +259,6 @@ class OrderBottomRow extends ConsumerWidget {
     ];
   }
 
-  // ── Action Handlers ─────────────────────────────────────────────────────
 
   /// 售後申請 — 內聯彈 resolve sheet，提交決策後刷新列表與 lookup 快取。
   /// 複製自 after_sales_screen._AfterSaleCard._showResolve，改用 [onReload]
@@ -313,7 +292,6 @@ class OrderBottomRow extends ConsumerWidget {
             buyerReceiptPhotoUrls = orderDetail.receiptPhotoUrls;
           }
         } catch (_) {
-          // 售後決策仍可進行；配送照片缺漏時只隱藏照片對比區。
         }
       }
     } catch (_) {
@@ -349,7 +327,6 @@ class OrderBottomRow extends ConsumerWidget {
                 rejectReason: data['rejectReason'] as String?,
                 rejectMessage: data['rejectMessage'] as String?,
               );
-          // 刷新訂單列表與售後 lookup（決策後 case status 會變動，按鈕應隨之消失）
           ref.invalidate(sellerAfterSaleLookupProvider);
           onReload();
           if (context.mounted) {
@@ -446,7 +423,6 @@ class OrderBottomRow extends ConsumerWidget {
     WidgetRef ref,
   ) async {
     final orderNo = _orderId();
-    // 5046 防護：上次成功建立物流單後 30 秒內不重發，直接 toast 告知
     if (guardShipmentCooldown(context, orderNo)) return;
 
     final result = await showDialog<TcatReservationResult>(
@@ -477,9 +453,7 @@ class OrderBottomRow extends ConsumerWidget {
             stagedTokens: stagedTokens,
           );
       if (!context.mounted) return;
-      // 5046 防護：標記建立成功，30 秒內不允許再次發 API
       markShipmentCreated(orderNo);
-      // 操作成功，重置連續失敗計數（避免後續操作仍被誤認為 backend 卡住）
       resetShipmentRetryCount(orderNo);
       onSetLoading(orderNo, false);
       FloatingToast.success(context, '預約出貨成功，記得下載列印「寄件單.PDF」，並預約黑貓司機上門取件');
@@ -553,7 +527,6 @@ class OrderBottomRow extends ConsumerWidget {
     WidgetRef ref,
   ) async {
     final orderNo = _orderId();
-    // 5046 防護：上次成功建立物流單後 30 秒內不重發
     if (guardShipmentCooldown(context, orderNo)) return;
 
     onSetLoading(orderNo, true);
@@ -563,8 +536,6 @@ class OrderBottomRow extends ConsumerWidget {
           .printCvsLabel(orderNo);
       if (!context.mounted) return;
       onSetLoading(orderNo, false);
-      // backend-payuni#666: webhook 55 秒內未收到代碼，後台會自動補拉，
-      // 提示用戶稍後刷新即可，不要報錯。
       if (!label.webhookReceived) {
         FloatingToast.show(
           context,
@@ -578,12 +549,8 @@ class OrderBottomRow extends ConsumerWidget {
         FloatingToast.error(context, '無法取得交貨便代碼');
         return;
       }
-      // 5046 防護：標記建立成功，30 秒內不允許再次發 API
       markShipmentCreated(orderNo);
-      // 操作成功，重置連續失敗計數
       resetShipmentRetryCount(orderNo);
-      // B-147 workaround：list endpoint 沒立即同步 odno，先在 client 暫存
-      // 讓卡片按鈕馬上從「預約取號」變「出貨確認」，不用等 backend 修好。
       setLocalOdnoOverride(
         orderNo,
         odno: label.odno,
@@ -612,8 +579,6 @@ class OrderBottomRow extends ConsumerWidget {
       context: context,
       barrierColor: AppColors.textPrimary.withValues(alpha: 0.8),
       builder: (_) => SevenElevenShipDialog(
-        // B-147 workaround：order.odno / validationNo 可能還沒從後端同步，
-        // 先用 effective helper 取本地 override fallback，dialog 才能顯示完整 8+4 碼
         odno: effectiveOdno(orderNo, order.odno),
         validationNo: effectiveValidationNo(orderNo, order.validationNo),
       ),
@@ -728,8 +693,6 @@ class OrderBottomRow extends ConsumerWidget {
     BuildContext context,
     ShippingPresentation shipping,
   ) {
-    // 未知 / 本版未支援的配送方式不得看到別家物流商的寄件說明（7-11 ibon 步驟）；
-    // 呼叫端已用 `shipping.isSupported` 擋住，這裡是第二道防線。
     if (!shipping.isSupported) return;
     final isHomeDelivery = shipping == ShippingPresentation.homeDelivery;
     showDialog(

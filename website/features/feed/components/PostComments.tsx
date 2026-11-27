@@ -58,11 +58,6 @@ function formatTime(unixSeconds: number): string {
 	return formatTaipeiShortDate(ms);
 }
 
-/* ── deep-link to a specific comment (通知「跳到該留言」) ──────────────────
- * A notification deep link lands on `…?post=<id>&comment=<id>`. Once the post
- * detail opens, the matching `<PostComments>` reads those params and reveals
- * the target row. Comments load async (REST + SSE) and replies lazy-expand, so
- * we poll for the anchor briefly, then fall back to the comment section. */
 
 /** Nearest scrollable ancestor — the surface that actually scrolls around this
  *  comments list (the viewer aside, the bottom sheet body, the seller modal).
@@ -191,7 +186,6 @@ function ReplyComposer({
 		void submit();
 	};
 
-	// Enter 送出、Shift+Enter 換行；IME 組字中（注音/中文）跳過避免送出半字
 	const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (
 			event.key === "Enter" &&
@@ -318,10 +312,7 @@ function ReplyItem({
 }) {
 	const [liked, setLiked] = React.useState(reply.isLiked === true);
 	const [likeCount, setLikeCount] = React.useState(reply.likeCount ?? 0);
-	// Local content mirror — optimistic edit shows immediately, refresh from
-	// parent list will overwrite if backend differs.
 	const [content, setContent] = React.useState(reply.content);
-	// 修改成功後伺服器換新版本：之後的修改與刪除要帶新的 etag。
 	const [etag, setEtag] = React.useState(reply.etag);
 	const [editing, setEditing] = React.useState(false);
 	const [editDraft, setEditDraft] = React.useState("");
@@ -463,13 +454,8 @@ function ReplyItem({
 							color="default"
 							size="sm"
 							aria-pressed={liked}
-							/* Liked reds come from `text-hk-like`, not `color="danger"` —
-						   danger is 柿橘 orange and is the error role. */
 							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${liked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
 							disabled={deleting}
-							/* Optimistic-only: `handleLike` flips the shared heart before
-						   the request and rolls back on failure; `likePendingRef` drops
-						   overlapping taps, so the fill animation is the feedback. */
 							aria-busy={likePendingAction !== null || undefined}
 							onClick={() => void handleLike()}
 						>
@@ -528,7 +514,6 @@ function CommentItem({
 	const [replyOpen, setReplyOpen] = React.useState(false);
 	const replyCount = comment.replyCount ?? 0;
 	const [rowError, setRowError] = React.useState<string | null>(null);
-	// Local content mirror — optimistic edit shows immediately
 	const [content, setContent] = React.useState(comment.content);
 	const [etag, setEtag] = React.useState(comment.etag);
 	const [editing, setEditing] = React.useState(false);
@@ -679,10 +664,8 @@ function CommentItem({
 							color="default"
 							size="sm"
 							aria-pressed={comment.isLiked === true}
-							/* See the reply row's note — liked red is `text-hk-like`. */
 							className={`h-auto min-w-0 gap-1 px-[6px] py-[2px] text-[length:var(--hkui-text-tiny)] ${comment.isLiked ? "font-bold text-hk-like" : "font-normal text-[var(--hkui-foreground-soft)]"}`}
 							disabled={deleting}
-							/* Optimistic-only — see the reply row's note above. */
 							aria-busy={likePendingAction !== null || undefined}
 							onClick={() => void handleLike()}
 						>
@@ -844,9 +827,6 @@ export default function PostComments({
 	const rootRef = React.useRef<HTMLElement | null>(null);
 	const deepLinkDoneRef = React.useRef(false);
 
-	/* Deep-link: notification → `…?post=<id>&comment=<id>` reveals the target
-	 * row once this post's detail is open. Comments stream in async, so poll the
-	 * anchor for ~3s before degrading to the comment section. */
 	React.useEffect(() => {
 		if (deepLinkDoneRef.current || typeof window === "undefined") return;
 		const params = new URLSearchParams(window.location.search);
@@ -855,8 +835,6 @@ export default function PostComments({
 		if (!targetPost || !targetComment) return;
 		if (String(postId) !== targetPost) return;
 		deepLinkDoneRef.current = true;
-		// Effect is client-only (guarded above), so CSS.escape is available;
-		// comment ids are numeric TSIDs but escape keeps the selector safe.
 		const selector = `[data-comment-anchor="${CSS.escape(targetComment)}"]`;
 		let tries = 0;
 		const reveal = () => {
@@ -880,7 +858,6 @@ export default function PostComments({
 		}, 150);
 		return () => window.clearInterval(timer);
 	}, [postId]);
-	// 留言身分由伺服器的 `viewer_actor` 決定（店主在自己店的貼文是店家），不看現在在哪個畫面。
 	const actor = viewer?.actor;
 	const storeName = storeActorName(viewer);
 	const composerAvatar: ComposerAvatar =
@@ -934,7 +911,6 @@ export default function PostComments({
 		setSubmitting(true);
 		setSubmitError(null);
 		try {
-			// optimistic 顯示 composer 的名稱與頭像；留言身分由伺服器決定。
 			await list.post(draft, {
 				authorName: composerAvatar.alt,
 				authorAvatar: composerAvatar.src ?? undefined,
@@ -952,7 +928,6 @@ export default function PostComments({
 		void submitDraft();
 	};
 
-	// Enter 送出、Shift+Enter 換行；IME 組字中跳過避免送出半字
 	const handleDraftKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
 			e.preventDefault();

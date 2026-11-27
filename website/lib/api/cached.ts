@@ -94,9 +94,6 @@ export const CACHE_TTL = {
  * Server-only — never import from a 'use client' module.
  */
 
-// `meta` carries the attribution a miss needs to point at a specific upstream
-// query: `key` is the fetcher's cache key (which id/page), `endpoint` the
-// public API path it hit. Both ride on the span as searchable attributes.
 type CacheMissMeta = { key?: string[]; endpoint?: string };
 
 /** 上游讀取的逾時：快取 scope 內的抓取一律帶，卡住的上游不能拖住整個渲染。 */
@@ -345,9 +342,6 @@ export interface ProductReviewsResult {
 
 async function readProductReviews(id: string, pageSize: number) {
 	"use cache";
-	// Review bodies are not price/stock — the REVIEWS tier (long window) avoids
-	// the per-minute regeneration the shared product:id tag would otherwise
-	// force; the product:id tag still busts this entry on a write-side change.
 	cacheTag(productTag(id));
 	applyCacheTier("REVIEWS");
 	return fillFetch(
@@ -369,21 +363,12 @@ async function readProductReviews(id: string, pageSize: number) {
 	);
 }
 
-// 星等篩選的評價不在這裡快取：直接呼叫 fetchProductReviewsPage（不經標籤失效）。
-// 只快取第一頁；後面的頁由 page_token 在瀏覽器逐頁讀。
 export function getCachedProductReviews(id: string, pageSize = 10) {
 	return readProductReviews(id, pageSize).then(settled);
 }
 
 async function readSellerProducts(id: string, page: number, pageSize: number) {
 	"use cache";
-	// A storefront's product cards carry price/stock/promotion state, so they
-	// use the live-list window rather than the much longer seller-profile
-	// window. Both seller and aggregate-product events can invalidate the page:
-	// the `products:list` tag is busted by POST /api/revalidate for ANY product
-	// mutation (parseRevalidateRequest expands product:<id> → products:list),
-	// so a per-page product change refreshes this entry without needing the
-	// result-derived per-product tags a cache scope cannot attach.
 	cacheTag(sellerTag(id), PUBLIC_CACHE_TAGS.products);
 	applyCacheTier("COMMERCE_LIVE");
 	return fillFetch(
@@ -400,17 +385,6 @@ export function getCachedSellerProducts(id: string, page = 1, pageSize = 12) {
 	return readSellerProducts(id, page, pageSize).then(settled);
 }
 
-/*
- * Anonymous landing-list reads.
- *
- * These are credentials:"omit" public reads with no viewer-specific fields, so
- * the entries are safe to share across sessions. Each entry is tagged with the
- * data domains it embeds, so POST /api/revalidate refreshes an aggregate only
- * when a record it actually renders changed; the cacheLife windows remain the
- * safety net. Aggregate cache owners pass `strict` to their fetcher so a
- * transient backend outage throws (keeping the prior stale entry) instead of
- * committing a synthetic empty payload as fresh.
- */
 
 async function readHotProducts(limit: number) {
 	"use cache";
@@ -692,15 +666,6 @@ async function readSellerStorefrontProducts(
 	pageSize: number,
 ): Promise<StorefrontProducts | BuildReadFailed> {
 	"use cache";
-	// `products:list` is busted by POST /api/revalidate for ANY product mutation
-	// (parseRevalidateRequest expands product:<id> → products:list), so the fixed
-	// seller + products tags cover "a product on this page changed" without the
-	// result-derived per-product tags a cache scope cannot attach. `strict`
-	// lets an outage (5xx / network) throw OUT of the cache body so the prior stale
-	// grid is kept (StorefrontPage's .catch(prerenderSafe) soft-fails the build
-	// prerender only — at runtime it re-throws to the error boundary); a genuine
-	// filter miss stays a 200-empty grid (no throw) so StorefrontPage still falls
-	// back to the leaner seller endpoint — an outage no longer masquerades as empty.
 	cacheTag(sellerTag(id), PUBLIC_CACHE_TAGS.products);
 	applyCacheTier("COMMERCE_LIVE");
 	const json = await fillFetch(

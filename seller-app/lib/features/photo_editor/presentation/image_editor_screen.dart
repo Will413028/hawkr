@@ -48,12 +48,11 @@ class ImageEditorScreen extends ConsumerStatefulWidget {
 class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   File? _currentImage;
   Uint8List? _imageBytes;
-  int _imageVersion = 0; // 用於強制 Image.memory 重建
+  int _imageVersion = 0;
   Color _dominantColor = AppColors.bgPrimary;
 
   Future<void> _updateDominantColor() async {
     if (_imageBytes == null) return;
-    // 延遲一幀，確保圖片已渲染後再取色，避免阻塞頁面轉場
     await Future.delayed(const Duration(milliseconds: 100));
     if (!mounted || _imageBytes == null) return;
     try {
@@ -78,53 +77,40 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   final List<EditHistory> _history = [];
   int _historyIndex = -1;
 
-  // 用於截圖的 GlobalKey
   final GlobalKey _repaintBoundaryKey = GlobalKey();
 
-  // 調整參數
   double _brightness = 0;
   double _contrast = 0;
   double _saturation = 0;
   double _temperature = 0;
   double _blur = 0;
 
-  // 文字圖層
   final List<TextLayer> _textLayers = [];
 
-  // 貼圖圖層
   final List<StickerLayer> _stickerLayers = [];
 
-  // AI 選中的風格
   String? _selectedAiStyle;
   String? _selectedAiMode;
 
-  // AI 使用量計數以後端為準；歷史紀錄由 controller/repository 持久化。
   int _aiUsageCount = 0;
   int _aiMaxUsage = 10;
 
-  // 從後端取得的 AI 風格
   List<AiStyle>? _apiStyles;
   String _defaultPrompt = '';
 
-  // 選中的圖層索引（用於拖曳）
   int? _selectedTextIndex;
   int? _selectedStickerIndex;
 
-  // 當前選中的 tab 索引（-1 表示無選中）
   int _selectedTabIndex = -1;
 
-  // 雙指手勢追蹤變數（用於記錄縮放/旋轉的初始值）
   double _baseScale = 1.0;
   double _baseRotation = 0.0;
 
-  // InteractiveViewer 控制器（用於整張圖片縮放平移）
   final TransformationController _transformationController =
       TransformationController();
 
-  // AI 處理中狀態（用於蒙版動畫）
   bool _isAiProcessing = false;
 
-  // 主預覽區實際渲染尺寸（用於縮圖對應）
   double _previewRenderWidth = 0;
   double _previewRenderHeight = 0;
 
@@ -133,7 +119,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     super.initState();
     _currentImage = widget.initialImage;
     if (_currentImage != null) {
-      // 延遲載入，讓頁面先渲染再處理圖片
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadImageBytes());
     }
     _fetchAiStyles();
@@ -164,10 +149,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   Future<void> _loadImageBytes() async {
     if (_currentImage == null) return;
-    // 在 isolate 讀檔，避免阻塞主線程轉場動畫
     final bytes = await compute(_readFileSync, _currentImage!.path);
     if (!mounted) return;
-    // 解碼圖片以取得尺寸
     setState(() => _imageBytes = bytes);
     if (_history.isEmpty) {
       _addHistory('載入圖片', saveImage: true);
@@ -189,25 +172,23 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     FontWeight fontWeight = FontWeight.normal,
     FontStyle fontStyle = FontStyle.normal,
   }) {
-    // iOS: PingFang TC 系列
-    // 使用 fontFamilyFallback 確保兩平台都有中文字型
     String fontFamily;
     switch (fontId) {
       case 'notoSerifTC':
-        fontFamily = 'Songti TC'; // iOS 宋體
+        fontFamily = 'Songti TC';
         break;
       case 'maShanZheng':
-        fontFamily = 'Kaiti TC'; // iOS 楷體
+        fontFamily = 'Kaiti TC';
         break;
       case 'zhiMangXing':
-        fontFamily = 'STXingkai'; // iOS 行書
+        fontFamily = 'STXingkai';
         break;
       case 'longCang':
-        fontFamily = 'Baoli TC'; // iOS 報隸
+        fontFamily = 'Baoli TC';
         break;
       case 'notoSansTC':
       default:
-        fontFamily = 'PingFang TC'; // iOS 黑體
+        fontFamily = 'PingFang TC';
         break;
     }
     return TextStyle(
@@ -229,7 +210,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
-      // 清空歷史記錄，重新開始
       _history.clear();
       _historyIndex = -1;
       setState(() {
@@ -258,12 +238,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           blur: _blur,
           textLayers: List.from(_textLayers.map((l) => l.copyWith())),
           stickerLayers: List.from(_stickerLayers.map((l) => l.copyWith())),
-          // 只在需要時保存圖片（如 AI 編輯），避免記憶體過度使用
           imageBytes: saveImage
               ? (_imageBytes != null ? Uint8List.fromList(_imageBytes!) : null)
               : null,
           imageVersion: _imageVersion,
-          // 保存整張圖片的縮放/平移變換矩陣
           transformMatrix: saveTransform
               ? _transformationController.value.clone()
               : null,
@@ -271,7 +249,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       );
       _historyIndex = _history.length - 1;
 
-      // 限制歷史記錄數量，避免記憶體溢出（最多保留 20 筆）
       if (_history.length > 20) {
         _history.removeAt(0);
         _historyIndex--;
@@ -309,13 +286,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       _stickerLayers.clear();
       _stickerLayers.addAll(h.stickerLayers);
 
-      // 如果有保存圖片，則還原圖片
       if (h.imageBytes != null) {
         _imageBytes = Uint8List.fromList(h.imageBytes!);
         _imageVersion = h.imageVersion;
       }
 
-      // 如果有保存變換矩陣，則還原縮放/平移狀態
       if (h.transformMatrix != null) {
         _transformationController.value = h.transformMatrix!.clone();
       }
@@ -324,28 +299,21 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   Future<void> _saveImage() async {
     if (_currentImage == null || _imageBytes == null) {
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   const SnackBar(content: Text('沒有可儲存的圖片')),
-      // );
       FloatingToast.error(context, '沒有可儲存的圖片');
       return;
     }
 
-    // 儲存前先取消所有選中狀態，避免邊框被截圖保存
     setState(() {
       _selectedTextIndex = null;
       _selectedStickerIndex = null;
     });
 
-    // 等待一幀讓 UI 更新完成
     await Future.delayed(const Duration(milliseconds: 50));
     if (!mounted) return;
 
-    // 顯示儲存中的提示
     TruckLoadingOverlay.show(context);
 
     try {
-      // 使用 RepaintBoundary 截圖，將所有編輯效果合成到圖片上
       final boundary =
           _repaintBoundaryKey.currentContext?.findRenderObject()
               as RenderRepaintBoundary?;
@@ -353,7 +321,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         throw Exception('無法取得圖片渲染區域');
       }
 
-      // 截圖並轉換為 PNG bytes
       final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) {
@@ -361,43 +328,33 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       }
       final Uint8List pngBytes = byteData.buffer.asUint8List();
 
-      // 寫入檔案
       await _currentImage!.writeAsBytes(pngBytes);
 
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop(); // 關閉載入對話框
-      context.pop(_currentImage); // 返回編輯後的檔案
+      Navigator.of(context, rootNavigator: true).pop();
+      context.pop(_currentImage);
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop(); // 關閉載入對話框
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   const SnackBar(content: Text('儲存失敗，請稍後再試')),
-      // );
+      Navigator.of(context, rootNavigator: true).pop();
       FloatingToast.error(context, '儲存失敗，請稍後再試');
     }
   }
 
   /// 執行 AI 圖片編輯（使用 Gemini API）
   Future<void> _runAiEdit({String? prompt, String? styleName}) async {
-    // debugPrint('[AI] _runAiEdit called, prompt: $prompt, styleName: $styleName');
     if (_imageBytes == null || _imageBytes!.isEmpty) {
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('沒有可處理的圖片')));
       FloatingToast.error(context, '沒有可處理的圖片');
       return;
     }
 
-    // AI 編輯前先保存當前圖片狀態（以便 undo 回到編輯前）
     _addHistory('AI 編輯前', saveImage: true);
 
-    // debugPrint('[AI] Starting AI processing, imageBytes length: ${_imageBytes!.length}');
-    // 開始 AI 處理，顯示蒙版動畫
     setState(() => _isAiProcessing = true);
 
     try {
       final edited = await ref
           .read(aiImageServiceProvider)
           .transformWithGemini(imageBytes: _imageBytes!, prompt: prompt);
-      // debugPrint('[AI] API returned, edited is null: ${edited == null}, length: ${edited?.length ?? 0}');
       if (!mounted) return;
 
       setState(() {
@@ -405,13 +362,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         _imageVersion++;
         _isAiProcessing = false;
       });
-      // 更新檔案
       if (_currentImage != null) {
         await _currentImage!.writeAsBytes(edited);
       }
-      // AI 編輯後保存新圖片狀態
       _addHistory('AI 編輯完成', saveImage: true);
-      // 計數以後端為準：先同步最新額度，再寫入本地更改紀錄
       await _fetchAiStyles();
       if (!mounted) return;
       _addAiHistoryRecord(styleName ?? 'AI 編輯');
@@ -419,18 +373,14 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     } on AiQuotaExceededException catch (e) {
       if (mounted) {
         setState(() => _isAiProcessing = false);
-        // 額度用盡不算失敗編輯，移除剛才保存的「AI 編輯前」記錄
         if (_history.isNotEmpty && _history.last.action == 'AI 編輯前') {
           _history.removeLast();
           _historyIndex--;
         }
         FloatingToast.error(context, e.message);
       }
-      // 同步後端最新使用量，讓「已用完」狀態即時反映在按鈕上
       await _fetchAiStyles();
     } on AiTransformException catch (e) {
-      // 後端已依業務碼分好類（沒產圖 / 未過安全審查 / 版權相似 / 上游不可用），
-      // 直接顯示它的文案，不要再蓋成一句泛用的「AI 編輯失敗」。
       if (mounted) {
         setState(() => _isAiProcessing = false);
         if (_history.isNotEmpty && _history.last.action == 'AI 編輯前') {
@@ -442,12 +392,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isAiProcessing = false);
-        // AI 編輯失敗，移除剛才保存的「AI 編輯前」記錄
         if (_history.isNotEmpty && _history.last.action == 'AI 編輯前') {
           _history.removeLast();
           _historyIndex--;
         }
-        // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AI 編輯失敗，請稍後再試')));
         FloatingToast.error(context, 'AI 編輯失敗，請稍後再試');
       }
     }
@@ -588,11 +536,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       ),
       body: Column(
         children: [
-          // 功能列（TabBar）
           _buildTabBar(),
-          // 圖片預覽區（固定 4:3 高度 + 主色背景延伸，不因 tab 切換而跳動）
           AspectRatio(aspectRatio: 4 / 3, child: _buildImagePreview()),
-          // Tab 內容區 / 主色背景填充
           Expanded(
             child: _selectedTabIndex >= 0
                 ? _buildInlineTabContent(_selectedTabIndex, aiHistory)
@@ -625,7 +570,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   Widget _buildInlineTabBody(int tabIndex, List<AiEditHistoryEntry> aiHistory) {
     switch (tabIndex) {
-      case 0: // AI
+      case 0:
         return SingleChildScrollView(
           padding: EdgeInsets.only(bottom: 24.h),
           child: ImageEditorAiTab(
@@ -658,7 +603,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           ),
         );
 
-      case 1: // 調整
+      case 1:
         return SingleChildScrollView(
           padding: EdgeInsets.only(bottom: 24.h),
           child: ImageEditorAdjustTab(
@@ -689,7 +634,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           ),
         );
 
-      case 2: // 文字
+      case 2:
         return SingleChildScrollView(
           padding: EdgeInsets.only(bottom: 24.h),
           child: ImageEditorTextTab(
@@ -714,7 +659,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           ),
         );
 
-      case 3: // 標籤
+      case 3:
         return SingleChildScrollView(
           padding: EdgeInsets.only(bottom: 24.h),
           child: ImageEditorStickerTab(
@@ -745,7 +690,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Widget _buildImagePreview() {
-    // 沒有圖片時顯示上傳按鈕
     if (_imageBytes == null) {
       return Container(
         margin: EdgeInsets.all(16.w),
@@ -777,16 +721,13 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       );
     }
 
-    // 有圖片時：主色背景填滿整個預覽空間，4:3 圖片居中（IG 風格）
     return LayoutBuilder(
       builder: (context, constraints) {
         final double areaWidth = constraints.maxWidth;
         final double areaHeight = constraints.maxHeight;
-        // 4:3 預覽區尺寸（居中在整個空間裡）
         final double renderWidth = areaWidth;
         final double renderHeight = renderWidth * 3 / 4;
 
-        // 保存實際渲染尺寸供縮圖使用
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_previewRenderWidth != renderWidth ||
               _previewRenderHeight != renderHeight) {
@@ -795,16 +736,13 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           }
         });
 
-        // 外層：主色背景填滿整個區域（延伸到 4:3 外面）
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           width: areaWidth,
           height: areaHeight,
           color: _dominantColor.withValues(alpha: 0.45),
-          // 內層：4:3 圖片預覽居中
           child: Center(
             child: GestureDetector(
-              // 點擊空白處取消選中
               onTap: () {
                 setState(() {
                   _selectedTextIndex = null;
@@ -821,7 +759,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                     color: _dominantColor.withValues(alpha: 0.45),
                     child: Stack(
                       children: [
-                        // 主圖（完整顯示，同選擇照片風格）
                         Positioned.fill(
                           child: ColorFiltered(
                             colorFilter: ColorFilter.matrix(
@@ -835,7 +772,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                             ),
                           ),
                         ),
-                        // 文字圖層（支援雙指縮放旋轉）
                         ..._textLayers
                             .asMap()
                             .entries
@@ -940,7 +876,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                                 ),
                               );
                             }),
-                        // 貼圖圖層（支援雙指縮放旋轉）
                         ..._stickerLayers
                             .asMap()
                             .entries
@@ -1043,81 +978,76 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                                 ),
                               );
                             }),
-                        // AI 處理中的蒙版動畫
                         if (_isAiProcessing)
                           Positioned.fill(child: _AiProcessingOverlay()),
                       ],
                     ),
-                  ), // inner Container (dominant color)
-                ), // outer Container (page 背景) in RepaintBoundary
-              ), // RepaintBoundary
-            ), // GestureDetector
-          ), // Center
-        ); // AnimatedContainer
-      }, // LayoutBuilder builder
-    ); // LayoutBuilder
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   List<double> _buildColorMatrix() {
-    // 基礎調整參數
     final double b = _brightness / 100;
     final double c = 1 + (_contrast / 100);
     final double s = 1 + (_saturation / 100);
-    final double t = _temperature / 100; // 色溫：正值偏暖，負值偏冷
+    final double t = _temperature / 100;
 
-    // AI 風格額外調整
-    double aiB = 0; // AI 亮度
-    double aiC = 1; // AI 對比度
-    double aiS = 1; // AI 飽和度
-    double aiWarm = 0; // AI 色溫
+    double aiB = 0;
+    double aiC = 1;
+    double aiS = 1;
+    double aiWarm = 0;
 
     switch (_selectedAiStyle) {
-      case 'natural': // 新鮮自然 - 柔和自然光
+      case 'natural':
         aiB = 0.05;
         aiS = 1.15;
         aiWarm = 0.05;
         break;
-      case 'warm': // 陽光暖色 - 金黃暖調
+      case 'warm':
         aiWarm = 0.25;
         aiB = 0.03;
         aiS = 1.0;
         aiC = 0.95;
         break;
-      case 'crisp': // 清脆鮮豔 - 高對比高飽和
+      case 'crisp':
         aiS = 1.3;
         aiC = 1.15;
         aiB = 0.05;
         break;
-      case 'giftbox': // 高級禮盒 - 精緻柔和
+      case 'giftbox':
         aiC = 1.1;
         aiS = 1.1;
         aiB = 0.03;
         aiWarm = 0.08;
         break;
-      case 'documentary': // 自然寫真 - 樸實低飽和
+      case 'documentary':
         aiS = 0.9;
         aiC = 1.05;
         aiWarm = 0.05;
         break;
-      case 'kitchen': // 料理素材 - 柔和暖調
+      case 'kitchen':
         aiWarm = 0.12;
         aiS = 1.05;
         aiB = 0.02;
         break;
-      case 'clean': // 白底極淨 - 高亮高對比
+      case 'clean':
         aiB = 0.1;
         aiC = 1.2;
         aiS = 1.1;
         break;
     }
 
-    // 合併調整
     final double finalB = b + aiB;
     final double finalC = c * aiC;
     final double finalS = s * aiS;
     final double finalWarm = t + aiWarm;
 
-    // 色溫調整（紅色通道增加/減少，藍色通道相反）
     final double rAdj = finalWarm * 30;
     final double bAdj = -finalWarm * 30;
 
@@ -1156,13 +1086,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       ),
       child: Row(
         children: [
-          // Tab 按鈕（方形）
           _buildTabButton(0, AppIcons.autoAwesomeOutlined, 'AI'),
           _buildTabButton(1, AppIcons.tune, '調整'),
           _buildTabButton(2, AppIcons.title, '文字'),
           _buildTabButton(3, AppIcons.tagFacesOutlined, '標籤'),
           const Spacer(),
-          // Undo/Redo 按鈕
           Material(
             color: Colors.transparent,
             child: InkWell(
@@ -1242,7 +1170,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          // 再次點擊已選中的 tab → 收起；否則切換到新 tab
           _selectedTabIndex = isSelected ? -1 : index;
         });
       },

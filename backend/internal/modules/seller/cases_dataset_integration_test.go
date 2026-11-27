@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// allReports 讀出全部通報（後台清單的所有頁）。
 func (f *fixture) allReports(t *testing.T, in ReportListInput) []AdminReport {
 	t.Helper()
 	in.PageSize = 3
@@ -34,7 +33,6 @@ func (f *fixture) allReports(t *testing.T, in ReportListInput) []AdminReport {
 	}
 }
 
-// allCases 讀出全部案件（後台清單的所有頁）。
 func (f *fixture) allCases(t *testing.T, in CaseListInput) []AdminCase {
 	t.Helper()
 	in.PageSize = 3
@@ -92,7 +90,6 @@ func TestListMembershipEqualsTheStatePredicates(t *testing.T) {
 	for _, r := range everything {
 		byID[r.ID] = f.reportOf(t, r.ID)
 	}
-	// 狀態：清單的集合 = 判定式的集合，三種狀態都有成員。
 	seen := map[ReportState]int{}
 	for _, state := range ReportStateValues() {
 		var want []uuid.UUID
@@ -111,7 +108,6 @@ func TestListMembershipEqualsTheStatePredicates(t *testing.T) {
 	if len(seen) != 3 {
 		t.Fatalf("seen=%v", seen)
 	}
-	// 待分案（Report.State()）與列表的集合一致，且依建立時間舊到新（等最久的在最前面）。
 	awaiting := ReportStateAwaitingTriage
 	list := f.allReports(t, ReportListInput{State: &awaiting})
 	for i, r := range list {
@@ -119,7 +115,6 @@ func TestListMembershipEqualsTheStatePredicates(t *testing.T) {
 			t.Errorf("待分案的順序或判定式不一致：%+v", r.Report)
 		}
 	}
-	// 生效的類別、店家、案件篩選。
 	for _, category := range policy.ReporterSelectable() {
 		var want []uuid.UUID
 		for id, r := range byID {
@@ -157,7 +152,6 @@ func TestListMembershipEqualsTheStatePredicates(t *testing.T) {
 			t.Errorf("案件成員（舊到新）：%+v", r.Report)
 		}
 	}
-	// 案件：狀態篩選與判定式一致；待決定的判定式 = 進行中。
 	cases := f.allCases(t, CaseListInput{})
 	if len(cases) != 5 {
 		t.Fatalf("cases=%d", len(cases))
@@ -205,26 +199,25 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 	c1, m1 := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 3)
 	c2, m2 := f.newCase(t, s.StoreID, policy.Counterfeit, SeverityLow, 2)
 
-	linked := f.riskFromCase(t, s.StoreID, c1.ID)              // 明確連結，沒有來源通報
-	viaFinding := f.warningCiting(t, s.StoreID, m1[0].ID)      // 認定的來源通報在 c1
-	cited := f.warningCitingExisting(t, s.StoreID, viaFinding) // 引用既有的認定（沒有新的認定）
-	revoked := f.warningCiting(t, s.StoreID, m1[1].ID)         // 來源通報在 c1，已撤銷
+	linked := f.riskFromCase(t, s.StoreID, c1.ID)
+	viaFinding := f.warningCiting(t, s.StoreID, m1[0].ID)
+	cited := f.warningCitingExisting(t, s.StoreID, viaFinding)
+	revoked := f.warningCiting(t, s.StoreID, m1[1].ID)
 	f.revoke(t, revoked)
-	shared := f.warningCiting(t, s.StoreID, m1[2].ID, m2[0].ID) // 一個認定的來源通報在兩個案件
-	linked2 := f.riskFromCase(t, s.StoreID, c2.ID)              // c2 的明確連結，之後撤銷
+	shared := f.warningCiting(t, s.StoreID, m1[2].ID, m2[0].ID)
+	linked2 := f.riskFromCase(t, s.StoreID, c2.ID)
 	f.revoke(t, linked2)
-	unrelated := f.warningCiting(t, s.StoreID) // 沒有來源通報、沒有連結
+	unrelated := f.warningCiting(t, s.StoreID)
 	unrelatedRisk := f.riskSuspend(t, s.StoreID)
 	f.now = start.Add(3 * 24 * time.Hour)
-	notDue := f.riskFromCase(t, s.StoreID, c1.ID) // 連到 c1，複審期限（十天後）比 linked 的（七天後）晚
-	// 待處理的請求：每個請求提出的時間依序遞增（收件匣依提出時間舊到新）；notDue 是解除請求，其餘是申覆。
+	notDue := f.riskFromCase(t, s.StoreID, c1.ID)
 	for _, m := range []Measure{linked, viaFinding, shared, unrelated} {
 		f.now = f.now.Add(time.Minute)
 		f.appeal(t, accountID, m, "申覆")
 	}
 	f.now = f.now.Add(time.Minute)
 	f.remediate(t, accountID, notDue.ID, "已改善")
-	f.now = start.Add(8 * 24 * time.Hour) // linked 與 unrelatedRisk 的複審期限（七天）已到，notDue 的（十天）還沒有
+	f.now = start.Add(8 * 24 * time.Hour)
 
 	ids := func(ms []Measure) []uuid.UUID {
 		out := make([]uuid.UUID, len(ms))
@@ -238,7 +231,6 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 		slices.SortFunc(out, uuid.UUID.Compare)
 		return out
 	}
-	// list 讀一條路徑的全部頁（每頁 2 筆，翻頁不漏不重）。
 	list := func(in AdminMeasureListInput) []uuid.UUID {
 		t.Helper()
 		in.PageSize = 2
@@ -264,7 +256,6 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 		{"待處理請求的收件匣", func(in *AdminMeasureListInput) { in.RequestState = &pending }},
 		{"複審到期", func(in *AdminMeasureListInput) { in.ReviewDue = true }},
 	}
-	// 沒有來源篩選時，三條路徑各自的成員：確認路徑本身有效，下面的篩選才有意義。
 	baseline := [][]Measure{
 		{linked, viaFinding, cited, revoked, shared, linked2, unrelated, unrelatedRisk, notDue},
 		{linked, viaFinding, shared, unrelated, notDue},
@@ -277,7 +268,6 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 			t.Errorf("%s（沒有來源篩選）：%d 筆，預期 %d 筆", p.name, len(got), len(want))
 		}
 	}
-	// 每個篩選在每條路徑上的預期：清單與複審到期比集合，收件匣依請求提出的時間（linked、viaFinding、shared、notDue）。
 	for _, c := range []struct {
 		name                  string
 		in                    AdminMeasureListInput
@@ -297,7 +287,7 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 			in := c.in
 			paths[i].apply(&in)
 			got, wantIDs := list(in), ids(want)
-			if i != 1 { // 收件匣的順序是路徑自己的語意（請求提出時間舊到新），要逐筆一致；其餘比集合。
+			if i != 1 {
 				got, wantIDs = sorted(got), sorted(wantIDs)
 			}
 			if !slices.Equal(got, wantIDs) {
@@ -306,7 +296,6 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 		}
 	}
 
-	// 第四處：CaseMeasureCounts 的導出措施數與其中未撤銷的數目；沒有導出措施的案件不在結果裡（呼叫方當成 0）。
 	for caseID, want := range map[uuid.UUID][]Measure{
 		c1.ID: {linked, viaFinding, cited, revoked, shared, notDue},
 		c2.ID: {shared, linked2},
@@ -327,7 +316,6 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 	if rows, err := store.New(f.db.Conn(ctx)).CaseMeasureCounts(ctx, []uuid.UUID{other.ID}); err != nil || len(rows) != 0 {
 		t.Fatalf("rows=%+v err=%v", rows, err)
 	}
-	// 兩個篩選可以和其他篩選組合。
 	state := StateRevoked
 	page, err := f.module.AdminMeasures(ctx, AdminMeasureListInput{SourceCaseID: &c1.ID, State: &state, PageSize: 100})
 	must(t, err)
@@ -336,7 +324,6 @@ func TestDerivedMeasuresHaveOneDefinitionInAllFourQueries(t *testing.T) {
 	}
 }
 
-// warningCitingExisting 建立一個警告，依據是引用 from 的既有認定（沒有新的認定）。
 func (f *fixture) warningCitingExisting(t *testing.T, storeID int64, from Measure) Measure {
 	t.Helper()
 	r, err := f.module.CreateMeasure(context.Background(), CreateMeasureInput{
@@ -369,7 +356,7 @@ func TestCreateMeasureCanLinkAnyKindToAnOpenCaseOfTheSameStore(t *testing.T) {
 	for name, in := range inputs {
 		in.AdminID, in.StoreID, in.StatementToSeller, in.Note, in.SourceCaseID = 7, s.StoreID, "理由", "註記", &c.ID
 		if name == "終止（事由）" {
-			continue // 終止會讓店家停權與關店，最後單獨測
+			continue
 		}
 		r, err := f.module.CreateMeasure(ctx, in)
 		if err != nil {
@@ -385,7 +372,6 @@ func TestCreateMeasureCanLinkAnyKindToAnOpenCaseOfTheSameStore(t *testing.T) {
 	if len(page.Items) != len(linked) {
 		t.Fatalf("導出的措施 %d 筆，預期 %d", len(page.Items), len(linked))
 	}
-	// 別家店的案件、不存在的案件、已結案的案件。
 	base := inputs["警告（違規）"]
 	base.AdminID, base.StoreID, base.StatementToSeller, base.Note = 7, s.StoreID, "理由", "註記"
 	wrong := base
@@ -411,7 +397,6 @@ func TestCreateMeasureCanLinkAnyKindToAnOpenCaseOfTheSameStore(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.measures"); n != int64(len(linked)+1) {
 		t.Fatalf("被拒絕的建立不得留下任何列：measures=%d", n)
 	}
-	// 同一個 request_id 換了案件是不同的請求；同一個案件重送回原本的措施。
 	requestID := uuid.New()
 	first := base
 	first.RequestID, first.SourceCaseID = &requestID, &c.ID
@@ -435,7 +420,6 @@ func TestCreateMeasureCanLinkAnyKindToAnOpenCaseOfTheSameStore(t *testing.T) {
 	if got := invalidFields(t, err); !slices.Equal(got, []string{"RequestID"}) {
 		t.Fatalf("同一個 request_id 拿掉案件要回「內容不同」：%v", err)
 	}
-	// 終止合作也可以連到案件（任何依據）；案件因此有導出的措施。
 	ter := inputs["終止（事由）"]
 	ter.AdminID, ter.StoreID, ter.StatementToSeller, ter.Note, ter.SourceCaseID = 7, s.StoreID, "理由", "註記", &third.ID
 	if _, err := f.module.CreateMeasure(ctx, ter); err != nil {
@@ -548,7 +532,6 @@ func TestReportAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 	}
 	reasons := map[ReportBlock]bool{}
 	for _, sc := range scenarios {
-		// 在同一個資料庫裡，每個動作各建一份新的情境。
 		f := setup(t)
 		probe := func(action string, available func(AdminReport) bool, run func(id uuid.UUID) error) {
 			id := sc.build(t, f)
@@ -566,7 +549,6 @@ func TestReportAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 			if want := available(r); (err == nil) != want {
 				t.Errorf("%s／%s：可用性 %v，指令 %v", sc.name, action, want, err)
 			}
-			// 被前置條件擋下的一律是 failed_precondition（店家已關閉時建立措施也是，句子同 CreateMeasure 的 STORE_CLOSED）。
 			if !blockedProperly(err) {
 				t.Errorf("%s／%s：被擋下要是 failed_precondition：%v", sc.name, action, err)
 			}
@@ -591,7 +573,6 @@ func TestReportAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 			_, err := f.module.CreateMeasure(context.Background(), f.warningFrom(r.StoreID, id))
 			return err
 		})
-		// 回傳的 can_* 與清單裡同一筆的相同。
 		id := sc.build(t, f)
 		single := f.reportOf(t, id)
 		var listed AdminReport
@@ -603,7 +584,6 @@ func TestReportAvailabilityIsExactlyWhatTheCommandsAccept(t *testing.T) {
 		if fmt.Sprint(listed.Availability) != fmt.Sprint(single.Availability) {
 			t.Errorf("%s：清單與單筆的可用性不同：%v / %v", sc.name, listed.Availability, single.Availability)
 		}
-		// 「可以當認定的來源」篩選（SQL）與 Availability 的 CiteAsSource（Go）是同一個定義：這家店的清單帶上篩選，剛好留下沒有原因的通報。
 		citable := idsOfReports(f.allReports(t, ReportListInput{StoreID: single.StoreID, CitableAsSource: true}))
 		if in, can := slices.Contains(citable, id), len(single.Availability.CiteAsSource) == 0; in != can {
 			t.Errorf("%s：篩選留下=%v，Availability 可以當來源=%v（原因 %v）", sc.name, in, can, single.Availability.CiteAsSource)
@@ -786,7 +766,6 @@ func TestRandomCommandSequencesKeepTheInvariantsAndAvailabilityHonest(t *testing
 			mismatches++
 			t.Errorf("步驟 %d／%s：可用性 %v，指令 %v", step, action, available, err)
 		}
-		// 被前置條件擋下的一律是 failed_precondition，店家已關閉時建立措施也是。
 		if !blockedProperly(err) {
 			t.Errorf("步驟 %d／%s：被擋下要是 failed_precondition：%v", step, action, err)
 		}
@@ -895,7 +874,6 @@ func TestRandomCommandSequencesKeepTheInvariantsAndAvailabilityHonest(t *testing
 	}
 }
 
-// blockedProperly 回報指令的結果是否合乎「被擋下」的約定：沒有錯誤（做成了），或前置條件擋下的 failed_precondition（店家已關閉時建立措施也是）。
 func blockedProperly(err error) bool {
 	return err == nil || apperr.KindOf(err) == apperr.KindFailedPrecondition
 }

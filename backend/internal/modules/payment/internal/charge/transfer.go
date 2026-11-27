@@ -91,8 +91,6 @@ type transferTermsResult struct {
 	destination string
 }
 
-// transferTerms 算出這筆付款現在可以轉的金額與賣家帳戶的外部 ID。現在不能轉是 refusal（FailedPrecondition），DB 錯誤是 err：呼叫方在 err 時立刻返回，
-// 因為失敗的查詢已讓 transaction 進入錯誤狀態，不能再下 SQL。
 func (s *Service) transferTerms(ctx context.Context, q *store.Queries, pay store.PaymentPayment, order store.PaymentPaymentOrder) (terms transferTermsResult, refusal error, err error) {
 	if pay.Status != string(model.PaymentSucceeded) {
 		return terms, apperr.FailedPrecondition("付款尚未入帳，不能轉帳"), nil
@@ -221,7 +219,6 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 	return s.acceptTransfer(ctx, *called, snap)
 }
 
-// lookupTransfer 是過了 ResendWindow 的轉帳：不再呼叫 provider，只依嘗試 ID 查回。
 func (s *Service) lookupTransfer(ctx context.Context, row store.PaymentTransfer, pay store.PaymentPayment, order store.PaymentPaymentOrder, now time.Time) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
@@ -242,7 +239,6 @@ func (s *Service) lookupTransfer(ctx context.Context, row store.PaymentTransfer,
 	return s.failTransfer(ctx, row.ID, failedNotFound)
 }
 
-// acceptTransfer 驗證 provider 回的轉帳（建立的回應或查回找到的）與列相符後記成功；不符進 ANOMALY。
 func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer, snap TransferSnapshot) error {
 	if snap.ExternalID == "" || snap.Amount != row.Amount {
 		return s.anomalyTransfer(ctx, row, "reply_mismatch", snap.ExternalID)
@@ -282,9 +278,6 @@ func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer,
 	return err
 }
 
-// claimTransfer 是這把冪等鍵第一次送出前的承諾（D11、ADR D69）：在獨立的 transaction 內依序鎖付款列、轉帳列，called_at 為空時（這把鍵還沒送過）以「付款金額減非失敗退款」算定金額，
-// 與 called_at 一起寫入；called_at 已有值（同一把鍵的重送）金額不變。算定金額時等待中的預留都釋出（退款已從金額扣掉，不必再撤回）；算出不大於 0 時不呼叫 provider：退款全部終局（SUCCEEDED）才進 FAILED（fully_refunded，回 nil）；
-// 還有進行中的退款（PENDING、REFUNDING、ANOMALY）時回 errRefundsInFlight、什麼都不寫，轉帳保持 PENDING 等它們終局，它們之後失敗金額就大於 0、賣家照常收到。列已不是 PENDING 時回 nil。呼叫 provider 之前提交，之後進來的退款看得到「金額已承諾」。
 func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now time.Time) (*store.PaymentTransfer, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -359,7 +352,6 @@ func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now t
 	return row, err
 }
 
-// rotateTransferKey 在 provider 已知拒絕之後換新冪等鍵；已被別的呼叫換過或列已不是 PENDING 時什麼都不做。
 func (s *Service) rotateTransferKey(ctx context.Context, transferID, oldKey uuid.UUID, now time.Time) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -372,7 +364,6 @@ func (s *Service) rotateTransferKey(ctx context.Context, transferID, oldKey uuid
 	})
 }
 
-// transferLookupFailed 記一次查回失敗；連續失敗到上限進 ANOMALY（回 nil），否則回錯誤由 River 重試。
 func (s *Service) transferLookupFailed(ctx context.Context, row store.PaymentTransfer, cause error) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -406,8 +397,6 @@ func (s *Service) clearTransferLookupFailures(ctx context.Context, row store.Pay
 	})
 }
 
-// anomalyTransfer 讓 PENDING 的轉帳進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不是 PENDING 時什麼都不做。
-// 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件（failure_reason 上限 200 字）。
 func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer, reason, detail string) error {
 	s.d.Logger.ErrorContext(ctx, "payment：轉帳進 ANOMALY，待人工核對 provider", "transfer_id", row.ID.String(), "payment_order_id", row.PaymentOrderID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
@@ -425,7 +414,6 @@ func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer
 	})
 }
 
-// failTransfer 讓 PENDING 的轉帳進終局 FAILED（不佔有效轉帳的位置），並在同一個 transaction 釋出等待中的撤回預留（錢本來就在平台手上）；列已不是 PENDING 時什麼都不做。鎖順序：付款列、轉帳列、退款列。
 func (s *Service) failTransfer(ctx context.Context, transferID uuid.UUID, reason string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()

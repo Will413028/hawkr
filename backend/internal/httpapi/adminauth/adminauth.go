@@ -33,11 +33,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// auditMode 是一支 admin 方法在後台動作紀錄（platform/adminaudit，D62）上的宣告，每支方法都必須明列：
-//   - auditAudited：寫入方法，use case 在領域變更的同一個 transaction 內呼叫 adminaudit.Record；
-//   - auditReadOnly：不改領域狀態（讀取，或只重讀 provider 刷新快取、結束自己的 session），不留紀錄；
-//   - auditPending：既有的寫入方法還沒遷移（D62 延後項，觸發條件是上線前），新的寫入方法不得宣告它；
-//     能宣告它的 procedure 由 adminauth_test.go 的 frozenAuditPending 凍結，只能縮小。
 type auditMode string
 
 const (
@@ -46,10 +41,8 @@ const (
 	auditPending  auditMode = "auditPending"
 )
 
-// declaration 是一支 admin 方法的授權宣告：要不然需要一個權限，要不然明列豁免與理由；另外必須有紀錄模式。
 type declaration struct {
 	permission adminperm.Permission
-	// exemptReason 非空表示豁免。
 	exemptReason string
 	audit        auditMode
 }
@@ -62,10 +55,8 @@ func exempt(reason string, audit auditMode) declaration {
 	return declaration{exemptReason: reason, audit: audit}
 }
 
-// sessionReason 是 GetSession 與 SignOut 豁免的理由：「我是誰」與登出對任何已登入的管理員都允許，不屬於任何權限。
 const sessionReason = "回答「我是誰」與登出，對任何已通過驗證的管理員都允許，不屬於任何權限"
 
-// declarations 是每個 admin 方法的宣告，key 是生成的 procedure 常數。方法與宣告必須一一對應（Check 在啟動時檢查）。
 var declarations = map[string]declaration{
 	bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure:      requires(adminperm.BizcalendarHolidayCalendarsImport, auditAudited),
 	bizcalendarv1alpha1connect.BizCalendarAdminServicePreviewHolidayCalendarProcedure:     requires(adminperm.BizcalendarHolidayCalendarsPreview, auditReadOnly),
@@ -196,8 +187,6 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerProspectAdminServiceMarkProspectsDistinctProcedure:    requires(adminperm.SellerProspectDistinctPairsCreate, auditPending),
 }
 
-// checkDeclarations 雙向對照宣告表與 admin service 的方法（rpc.CheckDeclarations），並檢查每個宣告恰好是一個目錄裡的
-// 權限或一個有理由的豁免。
 func checkDeclarations(table map[string]declaration, svcs []protoreflect.ServiceDescriptor) error {
 	return rpc.CheckDeclarations("httpapi/adminauth", table, svcs, func(d declaration) string {
 		switch {
@@ -265,7 +254,6 @@ type interceptor struct {
 	log   *slog.Logger
 }
 
-// errDenied 是給使用者的拒絕，文字是共用文案目錄的 PERMISSION_DENIED（rpc.CommonText，語系取自 ctx）。
 func errDenied(ctx context.Context) error {
 	return apperr.PermissionDenied("%s", rpc.CommonText(ctx, connect.CodePermissionDenied).Text)
 }

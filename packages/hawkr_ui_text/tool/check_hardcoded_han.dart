@@ -82,7 +82,6 @@ class _LiteralVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitAdjacentStrings(AdjacentStrings node) {
     _record(node);
-    // 插值裡的運算式可能還有字面值；字串片段本身已經算進整筆，不重複算。
     for (final s in node.strings) {
       if (s is StringInterpolation) _visitInterpolated(s);
     }

@@ -55,13 +55,9 @@ public class GrpcAuthServerInterceptor implements ServerInterceptor {
 
         Context ctx = Context.current();
 
-        // 提取 x-internal-service（微服務間呼叫標記）並依 mode 驗簽（#1366 HMAC）。
-        // 相容關鍵：只對「帶 x-internal-service」的呼叫驗簽；不帶的（gateway→service 使用者呼叫）
-        // 走原 requireAccountType 使用者面授權路徑，不受此邏輯影響。
         String internalService = headers.get(KEY_INTERNAL_SERVICE);
         if (internalService != null && !internalService.isBlank()) {
             if (InternalAuthConfig.isOff()) {
-                // off：回到明文信任的舊行為。
                 ctx = ctx.withValue(GrpcAuthContext.INTERNAL_CALL, Boolean.TRUE);
             } else {
                 String sig = headers.get(KEY_INTERNAL_SIG);
@@ -69,7 +65,6 @@ public class GrpcAuthServerInterceptor implements ServerInterceptor {
                 String accountIdOrEmpty = accountIdRaw == null ? "" : accountIdRaw.trim();
 
                 if (sig == null || sig.isBlank()) {
-                    // 無簽章的內部呼叫。
                     if (InternalAuthConfig.isEnforcing()) {
                         return reject(call, "internal call missing signature");
                     }
@@ -88,7 +83,6 @@ public class GrpcAuthServerInterceptor implements ServerInterceptor {
                     } else if (InternalAuthConfig.isEnforcing()) {
                         return reject(call, "internal call signature invalid");
                     } else {
-                        // permissive：簽章無效仍放行（過渡期兜底），記 WARN 供觀察。
                         log.warn("internal.auth.invalid caller={} method={}",
                                 internalService, call.getMethodDescriptor().getFullMethodName());
                         ctx = ctx.withValue(GrpcAuthContext.INTERNAL_CALL, Boolean.TRUE);
@@ -97,13 +91,11 @@ public class GrpcAuthServerInterceptor implements ServerInterceptor {
             }
         }
 
-        // 提取 x-account-id
         Long accountId = parseLong(headers.get(KEY_ACCOUNT_ID));
         if (accountId != null) {
             ctx = ctx.withValue(GrpcAuthContext.ACCOUNT_ID, accountId);
         }
 
-        // 提取 x-account-type（正規化為小寫）
         String accountType = headers.get(KEY_ACCOUNT_TYPE);
         if (accountType != null && !accountType.isBlank()) {
             ctx = ctx.withValue(GrpcAuthContext.ACCOUNT_TYPE, accountType.trim().toLowerCase());

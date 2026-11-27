@@ -18,7 +18,6 @@ const SELLER_STORE: MockStore = {
 	storeName: "手機版型測試商店",
 };
 
-// CrmAppService 的客戶（protobuf JSON：int64 是字串、enum 是名稱）。
 const CUSTOMER = {
 	buyerId: CUSTOMER_ID,
 	display: { nickname: "版型測試客戶" },
@@ -68,8 +67,6 @@ async function prepareSellerFixtures(
 	page: Page,
 	baseURL: string,
 ): Promise<void> {
-	// Lowest-priority safety net for secondary seller-shell queries. Exact
-	// fixtures are registered afterwards and therefore win in Playwright.
 	await page.route("**/api/v1/**", (route) =>
 		route.fulfill({
 			status: 200,
@@ -175,9 +172,6 @@ async function railGeometry(rail: Locator): Promise<RailGeometry> {
 				(rect) =>
 					rect.left >= railRect.left - 1 && rect.right <= railRect.right + 1,
 			).length,
-			// Chromium on Linux reserves a physical scrollbar gutter, so an
-			// overflow-free document can report scrollWidth - clientWidth = -15.
-			// Only a positive range is user-scrollable horizontal overflow.
 			documentOverflow: Math.max(
 				0,
 				document.documentElement.scrollWidth -
@@ -279,9 +273,6 @@ async function expectCardTextFullyVisible(card: Locator): Promise<void> {
 			box.scrollWidth,
 			`${box.text} must not be clipped horizontally`,
 		).toBeLessThanOrEqual(box.clientWidth + 1);
-		// Chromium rounds the font's ink box separately from its CSS line box;
-		// allow one rounded glyph pixel at each vertical edge. The production
-		// rule uses overflow: visible, so this ink is painted rather than clipped.
 		expect(
 			box.scrollHeight,
 			`${box.text} must not be clipped vertically`,
@@ -568,8 +559,6 @@ test.describe("賣家中心手機摘要卡滑軌", { tag: ["@ui"] }, () => {
 				expect(action.controlHeight, action.label).toBeGreaterThanOrEqual(44);
 			}
 
-			// 公開前必須的條件都滿足（店家資料齊全、KYC 已通過）時任務卡預設收合；
-			// 這裡要量的是任務名稱，先展開。
 			await expect(page.locator(".seller-onboarding-progress")).toBeVisible();
 			const expandTasks = page.getByRole("button", { name: "展開任務" });
 			if ((await expandTasks.count()) > 0) await expandTasks.click();
@@ -777,8 +766,6 @@ test.describe("賣家中心手機摘要卡滑軌", { tag: ["@ui"] }, () => {
 	}) => {
 		await page.setViewportSize({ width: 320, height: 800 });
 		await page.goto("/seller-center/customers");
-		// Exercise the actual phone interaction: reveal the single-line record,
-		// then use its detail action to open the customer drawer.
 		const customerList = page.getByRole("list", { name: "客戶清單" });
 		await customerList
 			.getByRole("button", { name: "展開客戶：版型測試客戶" })

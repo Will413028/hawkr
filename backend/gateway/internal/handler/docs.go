@@ -16,7 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// docsBaseDir 文件根目錄（相對於工作目錄）
 const docsBaseDir = "docs"
 
 const (
@@ -93,7 +92,6 @@ func (d *Docs) Logout(c *gin.Context) {
 func (d *Docs) Viewer(c *gin.Context) {
 	reqPath := c.Param("filepath")
 
-	// 登入/登出
 	if reqPath == "/login" {
 		d.Login(c)
 		return
@@ -103,31 +101,26 @@ func (d *Docs) Viewer(c *gin.Context) {
 		return
 	}
 
-	// 根路徑 → Docsify index.html
 	if reqPath == "" || reqPath == "/" {
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.String(http.StatusOK, docsifyIndexHTML)
 		return
 	}
 
-	// 其餘：提供 docs/ 下的原始檔案（.md 或其他）
 	cleanPath := filepath.Clean(strings.TrimPrefix(reqPath, "/"))
 	fullPath := filepath.Join(docsBaseDir, cleanPath)
 
-	// 安全性：防止路徑穿越
 	if !strings.HasPrefix(filepath.Clean(fullPath), docsBaseDir) {
 		c.String(http.StatusForbidden, "forbidden")
 		return
 	}
 
-	// 檢查檔案是否存在
 	info, err := os.Stat(fullPath)
 	if err != nil || info.IsDir() {
 		c.String(http.StatusNotFound, "not found")
 		return
 	}
 
-	// Docsify 透過 AJAX 讀取 .md，Content-Type 用 text/plain 避免瀏覽器干擾
 	switch {
 	case strings.HasSuffix(fullPath, ".md"):
 		c.Header("Content-Type", "text/plain; charset=utf-8")
@@ -138,7 +131,6 @@ func (d *Docs) Viewer(c *gin.Context) {
 	c.File(fullPath)
 }
 
-// --- Session 管理 ---
 
 func (d *Docs) credentialsMatch(username, password string) bool {
 	userOK := subtle.ConstantTimeCompare([]byte(username), []byte(d.username)) == 1

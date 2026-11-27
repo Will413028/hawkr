@@ -144,7 +144,6 @@ class ChatSession with WidgetsBindingObserver {
         rememberConversations(page.items);
         conv = _conversations[m.conversationId];
       } on Object {
-        // 沒有買家資料時仍通知，只是沒有名稱。
       }
     }
     if (_notifications.isClosed) return;

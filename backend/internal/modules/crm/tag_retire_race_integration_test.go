@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// lockWaiters 數目前等在鎖上的連線（每個整合測試有自己的資料庫，不受平行測試影響）。
 func (f *fixture) lockWaiters() int64 {
 	f.t.Helper()
 	return f.scalar("SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'")
@@ -66,7 +65,6 @@ func TestTagWriteInFlightAcrossStoreRetirementLeavesNothing(t *testing.T) {
 		}
 		erased = true
 	}
-	// 退場要不是立刻提交（現況：寫入不擋它），就是等在寫入的守門鎖上（兩個連線在等）。前者在寫入繼續之前先跑抹除。
 	for !erased {
 		select {
 		case err := <-retired:

@@ -166,7 +166,6 @@ func TestGetShareURL_Unauthorized(t *testing.T) {
 	router := setupShareRouter(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/share_url?type=product&id=123", nil)
-	// No X-Account-Id header
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

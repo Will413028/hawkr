@@ -23,7 +23,7 @@ func TestRateLimiterDegradeAndLinearRecovery(t *testing.T) {
 	}
 
 	*clock = now.Add(rateRecoveryWindow / 2)
-	_ = r.Wait(context.Background()) // Wait 內部觸發 recover
+	_ = r.Wait(context.Background())
 	if got := r.currentQPS(); got <= 5 || got >= 10 {
 		t.Fatalf("回升中的 QPS = %v, want 介於 5 與 10 之間", got)
 	}
@@ -43,7 +43,6 @@ func TestRateLimiterDegradeAndLinearRecovery(t *testing.T) {
 func TestRateLimiterWaitHonoursCallerContext(t *testing.T) {
 	t.Parallel()
 	r := newRateLimiter(1, time.Now)
-	// 先把桶用光。
 	if err := r.Wait(context.Background()); err != nil {
 		t.Fatalf("第一次 Wait 不該排隊: %v", err)
 	}

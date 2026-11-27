@@ -46,16 +46,6 @@ type Checker struct {
 	errs       []error
 }
 
-// txState 是一個 transaction 到目前為止的加鎖：排最後的那一次，以及鎖過哪些模組。
-//
-// 判定的單位是「每個模組第一次加鎖」：一個模組第一次被鎖時，不能已經鎖過排在它後面的模組。同一個模組之後再鎖
-// 不算倒退，因為規則 4 的做法是先鎖下層的根列（例如 identity 帳號列），同一個帳號的其他 transaction 都排在它
-// 後面，之後回頭寫同一個模組的其他列不會形成等待的環。這也表示：在同一個模組裡鎖到「另一個根」的列（例如另一個
-// 帳號）不會被抓到，那要靠模組內的順序與個案的死鎖測試。
-//
-// 測試檔自己開的 transaction（fixture 直接呼叫只該在別人的 transaction 裡用的方法、並行測試故意持有鎖來模擬交錯）
-// 不檢查：那是測試自己組出來的順序，不是單體的 use case。判斷方式是開 transaction 的呼叫者在 _test.go 裡；
-// platform 自己的測試不算（呼叫處會略過 platform 的 frame），所以這個套件與 testdb 的測試照常檢查。
 type txState struct {
 	top     Acquisition
 	topRank int
@@ -110,7 +100,6 @@ func (c *Checker) Errors() []error {
 	return append([]error(nil), c.errs...)
 }
 
-// observe 處理 key（一條連線）上的一句 SQL。
 func (c *Checker) observe(key any, sql string) {
 	switch txBoundary(sql) {
 	case "begin":
@@ -152,8 +141,6 @@ func (c *Checker) observe(key any, sql string) {
 		if st.held && rank < st.topRank && l.Waits && !st.locked[rank] {
 			c.record(Violation{Held: st.top, Then: acq})
 		}
-		// 只有會等的鎖算「這個模組已經鎖過」：SKIP LOCKED、NOWAIT 可能一列都沒鎖到，也不是等待的那一邊，
-		// 不能讓同一個模組之後真正會等的鎖逃過檢查。
 		if l.Waits {
 			st.locked[rank] = true
 		}
@@ -164,7 +151,6 @@ func (c *Checker) observe(key any, sql string) {
 	}
 }
 
-// record 在持有 c.mu 時呼叫。
 func (c *Checker) record(v Violation) {
 	k := v.Held.Statement + "\x00" + v.Held.Site + "\x00" + v.Then.Statement + "\x00" + v.Then.Site
 	if c.seen[k] {
@@ -174,7 +160,6 @@ func (c *Checker) record(v Violation) {
 	c.violations = append(c.violations, v)
 }
 
-// txBoundary 認出 pgx 送出的 transaction 邊界語句。
 func txBoundary(sql string) string {
 	s := strings.ToLower(strings.TrimSpace(sql))
 	switch {
@@ -186,7 +171,6 @@ func txBoundary(sql string) string {
 	return ""
 }
 
-// statementName 回傳 sqlc 寫在 query 第一行的名稱（-- name: Foo :one）；其他的 SQL 取壓縮空白後的前 80 個字。
 func statementName(sql string) string {
 	s := strings.TrimSpace(sql)
 	if rest, ok := strings.CutPrefix(s, "-- name: "); ok {
@@ -203,7 +187,6 @@ func statementName(sql string) string {
 
 const modulePath = "github.com/Will413028/hawkr/backend/"
 
-// skipFrames 是不算「呼叫處」的套件：交易與 tracer 本身、pgx、生成的 store 與 jet 程式。
 var skipFrames = []string{
 	modulePath + "internal/platform/",
 	"github.com/jackc/",
@@ -211,7 +194,6 @@ var skipFrames = []string{
 	"/jet/",
 }
 
-// callSite 回傳單體程式裡最近的呼叫者；找不到時回傳空字串。
 func callSite() string {
 	pcs := make([]uintptr, 64)
 	n := runtime.Callers(3, pcs)

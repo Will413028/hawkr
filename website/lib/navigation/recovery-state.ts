@@ -62,7 +62,6 @@ function emitLifecycle(event: NavigationLifecycleEvent): void {
 	try {
 		lifecycleObserver?.(event);
 	} catch {
-		/* Observability cannot own navigation. */
 	}
 }
 
@@ -73,7 +72,6 @@ function cancelForLifecycle(event: NavigationLifecycleEvent): void {
 	try {
 		notify?.(event.reason);
 	} catch {
-		/* Observability is fail-open. */
 	}
 }
 
@@ -101,8 +99,6 @@ export function observeNavigationLifecycle(
 	let keyboardClickDeadline = 0;
 	let keyboardGesture: "Enter" | " " | null = null;
 	const interaction = (event: Event) => {
-		// Capture listeners run before a click/key handler creates its NEW intent.
-		// Installing them from that handler cannot cancel the originating event.
 		if (!event.isTrusted) return;
 		if (event.type === "click") {
 			const detail = (event as MouseEvent).detail;
@@ -117,9 +113,6 @@ export function observeNavigationLifecycle(
 			pointerGesture = false;
 			keyboardClickDeadline = 0;
 			keyboardGesture = null;
-			// A swipe can navigate in pointerup; Enter can navigate in keydown.
-			// Their subsequent release/activation click is the SAME user action.
-			// A standalone assistive-technology click still starts a new action.
 			if (samePointerGesture || sameKeyboardGesture) return;
 		} else if (event.type === "pointerdown") {
 			pointerGesture = true;
@@ -132,15 +125,12 @@ export function observeNavigationLifecycle(
 			keyboardClickDeadline = keyboardGesture ? performance.now() + 1_500 : 0;
 			pointerGesture = false;
 		}
-		// A beforeunload prompt can cancel an attempted document navigation with
-		// no subsequent pagehide/pageshow. A new visible interaction starts fresh.
 		if (!documentPageHidden && document.visibilityState !== "hidden")
 			documentLeaving = false;
 		recoveryUsed = false;
 		try {
 			window.sessionStorage.removeItem(RECOVERY_STORAGE_KEY);
 		} catch {
-			/* optional */
 		}
 		cancelForLifecycle({ reason: "interaction" });
 	};
@@ -170,7 +160,6 @@ export function observeNavigationLifecycle(
 	listen(window, "pageshow", (event) => {
 		documentLeaving = false;
 		documentPageHidden = false;
-		// A BFCache restore must not revive a timeout from the document's previous visit.
 		cancelForLifecycle({
 			reason: "pageshow",
 			persisted: (event as PageTransitionEvent).persisted,
@@ -210,8 +199,6 @@ export function claimNavigationRecovery(): boolean {
 	try {
 		if (window.sessionStorage.getItem(RECOVERY_STORAGE_KEY)) return false;
 		window.sessionStorage.setItem(RECOVERY_STORAGE_KEY, "1");
-		// Some restricted stores silently discard writes. Without a durable marker,
-		// skip automatic recovery; an explicit user navigation still works normally.
 		if (window.sessionStorage.getItem(RECOVERY_STORAGE_KEY) !== "1")
 			return false;
 	} catch {
@@ -243,7 +230,6 @@ export function scheduleNavigationRecovery(options: {
 						: "hidden",
 			);
 		} catch {
-			/* optional */
 		}
 		return;
 	}

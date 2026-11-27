@@ -186,7 +186,6 @@ class ChatStreamClient {
       if (!_running || gen != _generation) return;
       switch (outcome) {
         case _Ended(:final sawReady):
-          // 伺服器正常結束（壽命到）：立刻重連；沒收到 Ready 就結束算失敗，避免緊密迴圈。
           if (sawReady) {
             failures = 0;
             continue;
@@ -228,7 +227,6 @@ class ChatStreamClient {
       floorMs,
       math.min(exp, cap.inMilliseconds.toDouble()),
     );
-    // Full Jitter：在 [0, ceiling] 內均勻取值；有下限時落在 [floor, ceiling]。
     final ms = floorMs + _random.nextDouble() * (ceiling - floorMs);
     final delay = Duration(milliseconds: ms.round());
     _setStatus(ChatStreamReconnecting(failures, delay));
@@ -273,7 +271,6 @@ class ChatStreamClient {
             _events.add(ChatReady(e.ready.unreadCount.toInt()));
             return;
           }
-          // 任何 frame 都重置存活計時：用 Ready 的間隔。
           armLiveness(liveFor);
           _dispatch(e);
         },
@@ -295,7 +292,6 @@ class ChatStreamClient {
 
   Map<String, int> _snapshotCursors() {
     if (_cursors.length <= maxCursors) return Map.of(_cursors);
-    // 超過上限只送最近有動靜的（seq 最大者無法代表最近，保守取 map 尾端的）。
     final entries = _cursors.entries.toList();
     return {
       for (final e in entries.sublist(entries.length - maxCursors))
@@ -318,7 +314,6 @@ class ChatStreamClient {
       final r = e.resync;
       _events.add(ChatResync(r.hasConversationId() ? r.conversationId : null));
     }
-    // Heartbeat：只用來重置存活計時。
   }
 
   void _teardown() {

@@ -58,8 +58,6 @@ export default function CustomersClient() {
 	const ut = useUiText();
 	const t = useTranslations("sellerCenter.customers");
 	const openChat = useChatDrawerStore((state) => state.openChat);
-	// Server-driven segmentation: classification tab, single tag filter, and
-	// sort key. Changing any of these refetches from the first page.
 	const customerType = useSellerCustomersUiStore((state) => state.customerType);
 	const setCustomerType = useSellerCustomersUiStore(
 		(state) => state.setCustomerType,
@@ -68,14 +66,10 @@ export default function CustomersClient() {
 	const setTagId = useSellerCustomersUiStore((state) => state.setTagId);
 	const sort = useSellerCustomersUiStore((state) => state.sort);
 	const setSort = useSellerCustomersUiStore((state) => state.setSort);
-	// Tag pool powers the filter chips; shared with the tag editor's suggestions.
 	const { tags: tagPool, error: tagPoolError } = useSellerTags();
 	const [lastPurchaseByCustomerId, setLastPurchaseByCustomerId] =
 		React.useState<Record<string, number>>({});
 	const requestedPurchaseIds = React.useRef(new Set<string>());
-	// Drawer state — clicking a row opens the detail in a right-side Sheet so
-	// the seller stays on the list and can flick between customers. The full
-	// `/customers/[id]` route remains the deep-link / refresh fallback.
 	const activeCustomerId = useSellerCustomersUiStore(
 		(state) => state.activeCustomerId,
 	);
@@ -83,8 +77,6 @@ export default function CustomersClient() {
 		(state) => state.setActiveCustomerId,
 	);
 
-	// Server-driven segmentation lives in the queryKey; changing any param
-	// refetches the list (its own cache entry — other consumers use other sizes).
 	const params = React.useMemo(
 		() => ({
 			type:
@@ -106,9 +98,6 @@ export default function CustomersClient() {
 	const invalidateCustomers = useInvalidateSellerCustomers();
 	const rows = React.useMemo(() => items ?? [], [items]);
 
-	// N-row enrichment fan-out for the last-purchase date (CRM has no such field;
-	// the store order list filtered by buyer does). Only rows not yet requested are
-	// fetched, so loading another page does not re-fire the earlier rows.
 	React.useEffect(() => {
 		const fresh = rows.filter((c) => !requestedPurchaseIds.current.has(c.id));
 		if (fresh.length === 0) return;
@@ -130,7 +119,6 @@ export default function CustomersClient() {
 			const next: Record<string, number> = {};
 			for (const [i, result] of results.entries()) {
 				if (result.status !== "fulfilled") {
-					// 失敗的列下次還要再試。
 					requestedPurchaseIds.current.delete(fresh[i].id);
 					continue;
 				}
@@ -473,7 +461,6 @@ export default function CustomersClient() {
 				open={activeCustomer !== null}
 				customer={activeCustomer}
 				onClose={closeDrawer}
-				// 分類 / 標籤變更當下即時 invalidate 清單（含 badge / chip），不再等關閉。
 				onMutated={invalidateCustomers}
 			/>
 		</SellerPageShell>

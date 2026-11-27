@@ -38,7 +38,6 @@ class CartCacheServiceSellerMetaTest {
     @Test
     @DisplayName("舊 schema（沒有 storeCode 欄位）的快取條目視為 Cache Miss，讓呼叫端回源")
     void staleSchemaEntryWithoutStoreCode_isTreatedAsCacheMiss() {
-        // 這串就是 586ac3ea7 之前的寫入格式，Jackson 讀得進來、storeCode 會是 null。
         String staleJson = "{\"name\":\"陳記蔬果\",\"logoUrl\":\"seller/logo/a.jpg\","
                 + "\"city\":\"台北市\",\"district\":\"大安區\"}";
         StringRedisTemplate redis = Mockito.mock(StringRedisTemplate.class);

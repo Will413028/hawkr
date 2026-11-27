@@ -14,12 +14,9 @@ import java.util.Map;
  */
 public class CvsSettingTest {
 
-    // ===== 可替換變數 =====
     private static final String MER_ID = "HAWK9";
-    // C2C 或 B2C
     private static final String LGS_TYPE = "B2C";
 
-    // ===== PayUni 代理商金鑰（sandbox） =====
     private static final String HASH_KEY = "TestOnlyFakeHashKey0123456789AB1";
     private static final String HASH_IV = "TestOnlyFakeIV00";
     private static final String BASE_URL = "https://sandbox-api.payuni.com.tw";
@@ -37,16 +34,13 @@ public class CvsSettingTest {
         params.put("ShipType", "1");
         params.put("LabelCompanyName", "Hawkr");
 
-        // 共用必填欄位
         params.put("ContactName", "王小明");
         params.put("ContactTel", "0912345678");
         params.put("ContactMail", "test@example.com");
 
         if ("C2C".equals(LGS_TYPE)) {
-            // C2C 需要退貨門市
             params.put("StoreID", "991182");
         } else {
-            // B2C 專用必填
             params.put("ServiceTel", "0223456789");
             params.put("MerURL", "https://www.example.com");
             params.put("ReturnCycle", "2");

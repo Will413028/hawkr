@@ -18,7 +18,6 @@ test("payload 帶得出「這個 PoP 供的內容有多舊」", () => {
 	assert.equal(body.generatedAt, 1_000);
 	assert.equal(body.ageMs, 2_500);
 	assert.equal(body.tag, CANARY_TAG);
-	// 時鐘倒退（跨機器/跨 PoP）不得產生負數 age 汙染統計。
 	assert.equal(buildSentinelBody(entry, 500).ageMs, 0);
 	assert.equal(buildSentinelEntry(1_000, undefined).buildId, "unknown");
 });
@@ -37,7 +36,6 @@ test("robots 明確 disallow sentinel，且 sitemap 不會收錄它", () => {
 	__setFlavorForTest("prod");
 	const rules = buildRobots(true).rules as { disallow: string[] };
 	assert.ok(rules.disallow.includes(CANARY_PATH));
-	// 關閉態（未上線 / 非 prod）本來就全站封鎖。
 	assert.deepEqual(buildRobots(false).rules, { userAgent: "*", disallow: "/" });
 
 	const urls = staticSitemapEntries().map((entry) => entry.url);

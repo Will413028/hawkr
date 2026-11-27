@@ -67,7 +67,6 @@ class ProductRevalidationServiceTest {
         return captor.getValue();
     }
 
-    // ---- 商品集合不變：只發 product entity tag ----
 
     @Test
     @DisplayName("欄位編輯：revalidateProduct 只含 product，不含 seller / home")
@@ -92,7 +91,6 @@ class ProductRevalidationServiceTest {
         verifyNoInteractions(revalidateClient);
     }
 
-    // ---- 商品集合變動 / 賣家實體變動：共發 seller tag ----
 
     @Test
     @DisplayName("建立即上架 / 上下架跨 ACTIVE / 刪除前為 ACTIVE：revalidateProductAndSeller 含 product + seller")
@@ -126,7 +124,6 @@ class ProductRevalidationServiceTest {
                         "product:1001", "product:1002", "seller:2001", "seller:900002001");
     }
 
-    // ---- 賣家 tag 必須同時涵蓋店面頁與 PDP 兩把 cache key ----
 
     /**
      * web 以 URL 路徑片段當 cache key，而同一個賣家有兩個片段各自活著：店面頁被 308 收斂到
@@ -159,7 +156,6 @@ class ProductRevalidationServiceTest {
         assertThat(captureTags()).containsExactlyInAnyOrder("product:1001", "seller:2001");
     }
 
-    // ---- 分類：分類樹 surface（#1919）----
 
     @Test
     @DisplayName("分類新增 / 還原：revalidateCategory 只含 category")
@@ -174,7 +170,6 @@ class ProductRevalidationServiceTest {
         service.revalidateCategories(List.of(9001L, 9002L, 9001L));
 
         assertThat(captureTags()).containsExactly("category:9001", "category:9002");
-        // 前置驗證保證分類底下無商品，故不該反查商品
         verifyNoInteractions(productRepository);
     }
 
@@ -228,7 +223,6 @@ class ProductRevalidationServiceTest {
                 .allSatisfy(tags -> assertThat(tags).doesNotContain("categories", "home"));
     }
 
-    // ---- 全變體共同約束：不得再發 legacy home ----
 
     @Test
     @DisplayName("所有變體都不再發 legacy home tag")

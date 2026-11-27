@@ -8,11 +8,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔驗 INV.rc 的 I7 留痕（#3109）。
-//
-// 🔴 `applyDecision` 在 2026-09-04 之前**完全沒有測試**——`recheck_decide_test.go`
-// 只測純函式 `decide`，而寫回那一段沒有任何覆蓋。這正是「六條轉移一列 history
-// 都不寫」能活到 dev 才被發現的原因：缺陷不在難測的地方，是那裡根本沒有測試。
 
 type fakeRecheckOps struct {
 	RecheckOperationStore
@@ -137,14 +132,12 @@ func TestRecheck_ClaimTransition_RecordsEntryIntoRecheckLoop(t *testing.T) {
 	cases := []struct {
 		name string
 		from string
-		want bool // 是否應留痕
+		want bool
 	}{
 		{"J22 強制最終查詢（ADM 取消在途）", "CANCEL_REQUESTED", true},
 		{"J20 週期重查", "FAILED_UNKNOWN", true},
 		{"J27 退避週期到期", "CANCEL_BLOCKED_UNKNOWN", true},
-		// J15 是 30 秒一輪的輪詢對，逐輪留痕會把真正的狀態變化淹掉（同 fsm.TransitionSelfLoop 的理由）。
 		{"J15 輪詢對的一半（刻意不記）", "WAITING_CONFIRMATION", false},
-		// J16：租約到期後被重新 Claim，from == to。
 		{"J16 自轉移（租約回收）", "PROVIDER_STATUS_RECHECK", false},
 	}
 	for _, c := range cases {
@@ -186,7 +179,6 @@ func TestRecheck_ClaimTransition_RecordsEntryIntoRecheckLoop(t *testing.T) {
 // 而它正是 A10 稽核與 AuditTrailDrawer 呈現給人看的東西。
 func TestRecheck_ClaimTransition_RejectsEdgeNotInM2(t *testing.T) {
 	uc, _, audit := rcFixture(t, true)
-	// SUCCEEDED → PROVIDER_STATUS_RECHECK 不在 M2 表上（終態不回頭）。
 	if err := uc.recordClaimTransition(context.Background(), 8001, "SUCCEEDED", adminNow); err == nil {
 		t.Fatal("fsm 不認得的邊應回 error")
 	}
@@ -195,16 +187,6 @@ func TestRecheck_ClaimTransition_RejectsEdgeNotInM2(t *testing.T) {
 	}
 }
 
-// --- 從 claim 走起的行為測試 -------------------------------------------------
-//
-// 🔴 為什麼一定要從 reconcileOperations 走：既有的
-// TestRecheck_ApplyDecision_RecordsHistory 直接呼叫 applyDecision，而且**把 from
-// 手動設成 PROVIDER_STATUS_RECHECK** —— 它假設了正好壞掉的那件事。
-// 真實流程是 FetchPendingRechecks 撈出 claim **之前**的狀態，claim 把 DB 改掉之後
-// 記憶體那一份沒跟上，於是 applyDecision 拿舊值當 from。
-// dev 實證（2026-09-05）：全表 `reason_code='INV_RECHECK'` 0 列、
-// `to_status='PROVIDER_STATUS_RECHECK'` 0 列，而同表有 37 種其他 reason_code。
-// 從入口走起，前提才會被真的執行到（`.claude/rules/06-no-small-tails.md` §3.13）。
 
 type rcReconcileOps struct {
 	RecheckOperationStore
@@ -222,7 +204,6 @@ func (f *rcReconcileOps) ClaimRecheck(_ context.Context, id int64, _, _ time.Tim
 	return f.claimOK, nil
 }
 
-// rcAllowanceSpy 記下**交給它的那個 op**——本測試要驗的就是那一份的 Status。
 type rcAllowanceSpy struct{ got []domain.Operation }
 
 func (s *rcAllowanceSpy) ConfirmAllowance(_ context.Context, op domain.Operation) error {
@@ -244,8 +225,8 @@ func TestRecheck_ReconcileSyncsStatusAfterClaim(t *testing.T) {
 		claimOK: true,
 		due: []domain.Operation{{
 			ID:            8101,
-			Status:        "FAILED_UNKNOWN", // ← 撈出來時的狀態（claim 之前）
-			OperationType: "ALLOWANCE",      // 走 ConfirmAllowance 那條分支，不需要 provider 依賴
+			Status:        "FAILED_UNKNOWN",
+			OperationType: "ALLOWANCE",
 		}},
 	}
 	spy := &rcAllowanceSpy{}
@@ -259,7 +240,6 @@ func TestRecheck_ReconcileSyncsStatusAfterClaim(t *testing.T) {
 		t.Fatalf("ClaimRecheck 應被呼叫一次，實得 %d", len(ops.claimArgs))
 	}
 
-	// ① 下游拿到的必須是 claim 之後的狀態。
 	if len(spy.got) != 1 {
 		t.Fatalf("ConfirmAllowance 應被呼叫一次，實得 %d", len(spy.got))
 	}
@@ -269,7 +249,6 @@ func TestRecheck_ReconcileSyncsStatusAfterClaim(t *testing.T) {
 			"多半不在 M2 表上 ⇒ 回 error ⇒ 整條 INV.rc 軸一列 history 都不寫", got)
 	}
 
-	// ② claim 那一步的 history（J20）。
 	if len(audit.entries) != 1 {
 		t.Fatalf("claim 應留 1 列 history，實得 %d —— 少了它，軌跡上「進入重查迴圈」那一步整段消失",
 			len(audit.entries))

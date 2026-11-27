@@ -23,7 +23,6 @@ const (
 	// DefaultPageSize 與 MaxPageSize 是列表一頁的預設與上限。
 	DefaultPageSize = 20
 	MaxPageSize     = 100
-	// scanBatch 是需要在 Go 端以 qualify 過濾時，每一輪向 SQL 取的筆數。
 	scanBatch = 100
 )
 
@@ -65,7 +64,6 @@ func size(n int32) int {
 	return int(n)
 }
 
-// rowLimit 是 SQL 的 LIMIT：多取一筆來判斷有沒有下一頁（頁大小最多 MaxPageSize，不會溢位）。
 func rowLimit(want int) int32 { return int32(want + 1) } //nolint:gosec // want 最多 MaxPageSize
 
 // Checkout 是結帳的情境：只留這張訂單現在用得上的券，並算預估折抵。
@@ -177,8 +175,6 @@ func (s *Service) campaigns(ctx context.Context, q *store.Queries, vs []store.Co
 	return out, nil
 }
 
-// usable 回報這張券（的活動）在結帳情境下現在能不能用：與鎖券同一組檢查（Check、Fit、折抵大於 0）。業務上的不合格是 ok=false，
-// 讀不到資料（port 失敗）回錯誤，整個請求失敗。
 func usable(ctx context.Context, qualifier *qualify.Service, c model.Campaign, buyerID int64, co Checkout, now time.Time) (int64, bool, error) {
 	if err := qualifier.Check(ctx, c, buyerID, now); err != nil {
 		return 0, false, rejection(err)
@@ -193,7 +189,6 @@ func usable(ctx context.Context, qualifier *qualify.Service, c model.Campaign, b
 	return discount, true, nil
 }
 
-// rejection 把業務原因造成的不合格（有 coupon 原因的錯誤）轉成 nil，其他錯誤原樣回傳。
 func rejection(err error) error {
 	if model.ReasonOf(err) != "" {
 		return nil
@@ -362,7 +357,6 @@ func (s *Service) GetCampaign(ctx context.Context, id uuid.UUID) (CampaignDetail
 	return s.detail(ctx, id, func(model.Campaign) bool { return false })
 }
 
-// detail 在一致的快照內讀活動、名單與各狀態的券數；hidden 回 true 的活動回 NotFound（防枚舉：與不存在同一個錯誤）。
 func (s *Service) detail(ctx context.Context, id uuid.UUID, hidden func(model.Campaign) bool) (CampaignDetail, error) {
 	var out CampaignDetail
 	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {

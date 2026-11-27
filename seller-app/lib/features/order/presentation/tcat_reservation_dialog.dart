@@ -69,9 +69,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
   }
 
   Future<void> _pickPhoto() async {
-    // iOS image_picker 對某些 iCloud 還沒下載完的 PNG/HEIC 會拋
-    // PlatformException(invalid_image, Cannot load representation of type public.png)。
-    // 包 try-catch + imageQuality 降低觸發機率 + requestFullMetadata=false 避免 PHAsset 全載。
     try {
       final picked = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -102,7 +99,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
     setState(() => _submitting = true);
 
     final selectedDay = days[_selectedDateIndex];
-    // 轉為 yyyyMMdd 格式
     final shipDate = selectedDay.date.replaceAll('-', '');
 
     Navigator.pop(
@@ -133,7 +129,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 黑貓 logo
                   Container(
                     width: 45.w,
                     height: 45.w,
@@ -152,7 +147,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
                   ),
                   SizedBox(height: 12.h),
 
-                  // Title
                   Text(
                     '預約黑貓上門取件',
                     style: TextStyle(
@@ -172,13 +166,11 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
                   ),
                   SizedBox(height: 12.h),
 
-                  // ── 期望取件日期 ──
                   _sectionLabel(HkIconName.calendar, '期望取件日期'),
                   SizedBox(height: 10.h),
                   _buildDatePicker(),
                   SizedBox(height: 12.h),
 
-                  // ── 期望取件時段 ──
                   _sectionLabel(HkIconName.clock, '期望取件時段'),
                   SizedBox(height: 10.h),
                   Row(
@@ -221,7 +213,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
                   ),
                   SizedBox(height: 12.h),
 
-                  // ── 上傳照片 ──
                   Semantics(
                     button: true,
                     label: '上傳產品或包裝照片',
@@ -236,8 +227,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
                             color: _gray100.withValues(alpha: 0.5),
                           ),
                         ),
-                        // BoxFit.contain — 高度 fit 父容器、寬度按比例縮，
-                        // 寬螢幕橫圖左右會留白、不會裁切原圖。
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16.r),
                           child: _photo != null
@@ -272,7 +261,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // ── 預約出貨按鈕 ──
                   Semantics(
                     button: true,
                     enabled:
@@ -327,7 +315,6 @@ class _TcatReservationDialogState extends ConsumerState<TcatReservationDialog> {
                 ],
               ),
             ),
-            // X close button
             Positioned(
               top: -8.h,
               right: -8.w,

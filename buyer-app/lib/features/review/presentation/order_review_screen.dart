@@ -37,7 +37,6 @@ class OrderReviewScreen extends ConsumerStatefulWidget {
     super.key,
     required this.orderSn,
     this.items = const [],
-    // Legacy: 舊路由用 skuId 進入
     this.skuId = 0,
   });
 
@@ -50,13 +49,9 @@ class OrderReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
-  // 每個 item 的評分 (1-5)
   final Map<int, int> _ratings = {};
-  // 每個 item 的評價文字
   final Map<int, TextEditingController> _contentCtrls = {};
-  // 每個 item 的上傳圖片
   final Map<int, List<File>> _images = {};
-  // 每個 item 的提交狀態
   final Map<int, bool> _submitted = {};
 
   List<Map<String, dynamic>> _resolvedItems = [];
@@ -69,13 +64,11 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
   }
 
   Future<void> _loadOrderItems() async {
-    // 如果已有 items 且包含 id，直接使用
     if (widget.items.isNotEmpty &&
         widget.items.first.containsKey('id') &&
         (widget.items.first['id']?.toString() ?? '').isNotEmpty) {
       _resolvedItems = widget.items;
     } else if (widget.orderSn.isNotEmpty) {
-      // 從 order detail API 取得完整 items（含 id/orderItemId）
       try {
         final order = await ref
             .read(orderRepositoryProvider)
@@ -106,7 +99,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
       ];
     }
 
-    // 用 product API 補齊商品名稱（skuName 可能只是規格名如 "D"）
     final productRepo = ref.read(productRepositoryProvider);
     for (var i = 0; i < _resolvedItems.length; i++) {
       final skuId = (_resolvedItems[i]['skuId'] ?? '').toString();
@@ -185,7 +177,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
     setState(() => _submitted[index] = true);
 
     try {
-      // 上傳圖片，收集 stagedToken（由後端呼叫 FinalizeImages 轉正）
       final imageFiles = _images[index] ?? [];
       final List<String> stagedTokens = [];
       if (imageFiles.isNotEmpty) {
@@ -204,7 +195,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
         }
       }
 
-      // 提交評價
       final item = _items[index];
       final orderItemId = (item['id'] ?? item['orderItemId'] ?? '').toString();
       final content = _contentCtrls[index]?.text.trim() ?? '';
@@ -222,7 +212,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
         showCommonSnackBar(context, '評價已提交');
         setState(() {});
 
-        // 全部商品都已提交 → 刷新訂單列表狀態，停留在當前頁面
         final allDone = _items.asMap().keys.every((i) => _submitted[i] == true);
         if (allDone) {
           ref.read(orderListControllerProvider.notifier).refresh();
@@ -231,7 +220,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
     } catch (e) {
       HKLog.logD('[OrderReviewScreen]', e);
       if (!mounted) return;
-      // 已評價：標記為已提交，不當成失敗。
       if (errorReasonOf(e) == ErrorReason.REVIEW_ALREADY_EXISTS) {
         showCommonSnackBar(
           context,
@@ -276,7 +264,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
     );
   }
 
-  // ── AppBar ──────────────────────────────────────────────────────────────
   Widget _buildAppBar(BuildContext context) {
     return commonTitleTopBar(
       context,
@@ -291,7 +278,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
     );
   }
 
-  // ── 訂單編號卡片 ────────────────────────────────────────────────────────
   Widget _buildOrderNumberCard() {
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -340,7 +326,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
     );
   }
 
-  // ── 商品評價卡片 ────────────────────────────────────────────────────────
   Widget _buildItemReviewCard(int index) {
     final item = _items[index];
     final name = (item['productName'] ?? '商品').toString();
@@ -369,7 +354,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section title
           Row(
             children: [
               Icon(AppIcons.localFloristOutlined, size: 24.sp),
@@ -387,7 +371,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
           ),
           SizedBox(height: 12.h),
 
-          // Product info row
           Row(
             children: [
               Container(
@@ -449,7 +432,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
           ),
           SizedBox(height: 16.h),
 
-          // 商品評分
           Text(
             '商品評分',
             style: TextStyle(
@@ -504,7 +486,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
           ),
           SizedBox(height: 16.h),
 
-          // 商品評價
           Text(
             '商品評價',
             style: TextStyle(
@@ -549,7 +530,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
           ),
           SizedBox(height: 16.h),
 
-          // 上傳圖片
           Text(
             '上傳圖片（最多4張）',
             style: TextStyle(
@@ -578,7 +558,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
           ),
           SizedBox(height: 16.h),
 
-          // 提交按鈕
           SizedBox(
             width: double.infinity,
             height: 40.h,
@@ -632,7 +611,6 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
     );
   }
 
-  // ── 圖片 tile ──
   Widget _buildImageTile({required Widget child, VoidCallback? onRemove}) {
     return Stack(
       children: [

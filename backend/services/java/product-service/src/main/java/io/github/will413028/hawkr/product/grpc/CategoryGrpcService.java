@@ -35,13 +35,10 @@ public class CategoryGrpcService extends CategoryServiceGrpc.CategoryServiceImpl
         this.productService = productService;
     }
 
-    // ==================== 讀取 ====================
 
     @Override
     public void getCategoryTree(GetCategoryTreeRequest request, StreamObserver<GetCategoryTreeResponse> responseObserver) {
         try {
-            // status="active" 或 includeDeleted=false → 僅 ACTIVE
-            // includeDeleted=true → 全部含 INACTIVE（admin 用）
             boolean activeOnly = request.getIncludeDeleted()
                     ? false
                     : (request.getStatus().isEmpty() || "active".equalsIgnoreCase(request.getStatus()) || "9004".equals(request.getStatus()));
@@ -93,7 +90,6 @@ public class CategoryGrpcService extends CategoryServiceGrpc.CategoryServiceImpl
         responseObserver.onCompleted();
     }
 
-    // ==================== 寫入：賣家新增 ====================
 
     @Override
     public void createCategory(CreateCategoryRequest request, StreamObserver<CreateCategoryResponse> responseObserver) {
@@ -116,7 +112,6 @@ public class CategoryGrpcService extends CategoryServiceGrpc.CategoryServiceImpl
         responseObserver.onCompleted();
     }
 
-    // ==================== 寫入：Admin 新增（與賣家共用 service.createCategory） ====================
 
     @Override
     public void createCategoryForAdmin(CreateCategoryForAdminRequest request, StreamObserver<CreateCategoryForAdminResponse> responseObserver) {
@@ -139,7 +134,6 @@ public class CategoryGrpcService extends CategoryServiceGrpc.CategoryServiceImpl
         responseObserver.onCompleted();
     }
 
-    // ==================== 寫入：Admin 改名 ====================
 
     @Override
     public void updateCategoryForAdmin(UpdateCategoryForAdminRequest request, StreamObserver<UpdateCategoryForAdminResponse> responseObserver) {
@@ -172,7 +166,6 @@ public class CategoryGrpcService extends CategoryServiceGrpc.CategoryServiceImpl
         responseObserver.onCompleted();
     }
 
-    // ==================== 寫入：Admin 批次軟刪除 ====================
 
     @Override
     public void batchSoftDeleteCategoryForAdmin(BatchSoftDeleteCategoryForAdminRequest request, StreamObserver<BatchSoftDeleteCategoryForAdminResponse> responseObserver) {
@@ -201,7 +194,6 @@ public class CategoryGrpcService extends CategoryServiceGrpc.CategoryServiceImpl
         responseObserver.onCompleted();
     }
 
-    // ==================== 寫入：Admin 還原 ====================
 
     @Override
     public void restoreCategoryForAdmin(RestoreCategoryForAdminRequest request, StreamObserver<RestoreCategoryForAdminResponse> responseObserver) {
@@ -233,7 +225,6 @@ public class CategoryGrpcService extends CategoryServiceGrpc.CategoryServiceImpl
         responseObserver.onCompleted();
     }
 
-    // ==================== 私有轉換方法 ====================
 
     private CategoryNode convertToNode(CategoryEntity entity) {
         CategoryNode.Builder builder = CategoryNode.newBuilder()

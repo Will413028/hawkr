@@ -25,7 +25,6 @@ func (f *chargeFixture) exec(t *testing.T, sql string, args ...any) {
 	must(t, err)
 }
 
-// attemptIDs 是某個種類的 job 排入過的嘗試 ID（依排入順序，不去重）。
 func (f *chargeFixture) attemptIDs(t *testing.T, kind string) []string {
 	t.Helper()
 	f.jobs.mu.Lock()
@@ -56,7 +55,6 @@ func (f *chargeFixture) effectiveExternal(t *testing.T, orderNo string) string {
 	return f.text(t, "SELECT a.external_payment_id FROM payment.payment_attempts a JOIN payment.payment_orders o ON o.payment_id = a.payment_id WHERE o.order_no = $1 AND a.superseded_at IS NULL", orderNo)
 }
 
-// repay 把付款建立、讓舊的 PaymentIntent 在 provider 那邊取消並同步到本地、再讓買家重付：回傳付款、舊與新的外部 ID。
 func (f *chargeFixture) repay(t *testing.T, orderNo string) (Payment, string, string) {
 	t.Helper()
 	f.order(orderNo, 11, 7, 100)

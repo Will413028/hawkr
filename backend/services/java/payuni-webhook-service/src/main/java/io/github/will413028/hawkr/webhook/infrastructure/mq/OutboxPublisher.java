@@ -54,8 +54,6 @@ public class OutboxPublisher {
                     event.getTopic(),
                     message);
 
-            // 更新為 SENT（issue #2294 H3：具名守衛 UPDATE，避免 updateById 全欄覆寫掉
-            // 另一個 pod 剛寫入的 claim 租約／狀態）
             outboxMapper.markSent(event.getId(), DateTimeUtils.nowUtc());
 
             log.info("OutboxPublisher.publish.success",
@@ -78,7 +76,6 @@ public class OutboxPublisher {
      */
     private void markFailed(OutboxEvent event, String error) {
         int retryCount = event.getRetryCount() + 1;
-        // 指數退避：5s, 15s, 45s, 135s, 405s
         long delaySec = (long) (5 * Math.pow(3, retryCount - 1));
         outboxMapper.markFailedGuarded(event.getId(), retryCount, error,
                 DateTimeUtils.nowUtc().plusSeconds(delaySec));

@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// txCtxKey is the context key for storing transactions.
 type txCtxKey struct{}
 
 // TxManager provides transaction management functionality.
@@ -20,12 +19,10 @@ type TxManager interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// pgxTxManager implements TxManager using pgx.
 type pgxTxManager struct {
 	pool txBeginner
 }
 
-// txBeginner is the part of *pgxpool.Pool that WithTx needs.
 type txBeginner interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
@@ -38,24 +35,17 @@ func NewTxManager(pool *pgxpool.Pool) TxManager {
 // WithTx executes the function within a transaction.
 // Supports nested transactions by reusing an existing transaction from context.
 func (m *pgxTxManager) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
-	// Check if already in a transaction (nested call)
 	if _, ok := ctx.Value(txCtxKey{}).(pgx.Tx); ok {
-		// Execute within existing transaction
 		return fn(ctx)
 	}
 
-	// Start a new transaction
 	tx, err := m.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Store transaction in context
 	txCtx := context.WithValue(ctx, txCtxKey{}, tx)
 
-	// Roll back unless Commit was reached, so an error, a panic or a
-	// runtime.Goexit (t.Fatalf) in fn never leaks the pool connection.
-	// The context is detached so a cancelled ctx cannot skip the rollback.
 	committed := false
 	defer func() {
 		if !committed {

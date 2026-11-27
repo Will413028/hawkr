@@ -19,16 +19,9 @@ export default function AppOverlayHost() {
 	const closeOverlay = useAppUiStore((state) => state.closeOverlay);
 	const pathname = usePathname() ?? "";
 
-	// This host lives in the persistent AppProviders, so it survives ordinary
-	// soft navigations. The login CTA now crosses the auth boundary with a hard
-	// navigation (which resets this in-memory store), but every other route change
 	// still needs this cleanup so a global overlay never outlives its source page.
-	// `pathname` is the trigger (not a value read): it must stay in the deps so
-	// the effect re-runs on navigation; dropping it would only run on mount.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: pathname is an intentional re-run trigger
 	React.useEffect(() => {
-		// Skip the mount pass and any run where nothing is open: the store write
-		// is otherwise repeated on every single navigation for no reason.
 		if (!useAppUiStore.getState().overlay) return;
 		closeOverlay();
 	}, [pathname, closeOverlay]);

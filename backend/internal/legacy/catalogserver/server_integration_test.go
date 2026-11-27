@@ -57,7 +57,6 @@ func setup(t *testing.T) (*fixture, context.Context) {
 	return &fixture{t: t, m: m, srv: New(m, slog.New(slog.NewTextHandler(io.Discard, nil)))}, context.Background()
 }
 
-// product 建立並上架一個商品：一個 SKU，庫存 stock，有原價 compare 時帶上。
 func (f *fixture) product(ctx context.Context, title string, stock int32, compare *int64) catalog.Product {
 	f.t.Helper()
 	f.seq++

@@ -90,7 +90,6 @@ describe("商品編輯頁：上／下架確認抽屜", () => {
 	it("提示卡指名目標店家，不寫「本店」", () => {
 		expect(source).toContain("targetStoreLabel(");
 		expect(source).toMatch(/替「\$\{targetStore\}」/);
-		// 註解裡照樣不准出現：這個字串是本項要消滅的對象，留在檔內只會被下一個人抄走。
 		expect(source).not.toContain("替本店");
 	});
 });

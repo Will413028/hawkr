@@ -104,7 +104,6 @@ func (h *Holder) GetSellerCategoryTree(c *gin.Context) {
 		response.Err(c, http.StatusUnauthorized, 401, "未授權：缺少賣家身份")
 		return
 	}
-	// 新政策：賣家分類樹僅 ACTIVE，取消 self-pending 邏輯
 	resp, err := h.Category.GetCategoryTree(c.Request.Context(), "active", false)
 	if err != nil {
 		pkglogger.Info(c.Request.Context(), "Failed to get seller category tree", zap.Error(err))
@@ -427,7 +426,6 @@ func (h *Holder) RestoreCategoryAdmin(c *gin.Context) {
 	response.OK(c, protoToCategory(resp.Category))
 }
 
-// ==================== 輔助方法 ====================
 
 func writeBackendError(c *gin.Context, resp interface {
 	GetCode() int32
@@ -454,7 +452,6 @@ func protoToCategory(item *pb.CategoryItem) Category {
 	}
 }
 
-// convertCategoryNodeTree converts protobuf CategoryNode to Category
 func convertCategoryNodeTree(nodes []*pb.CategoryNode) []*Category {
 	result := make([]*Category, len(nodes))
 	for i, node := range nodes {
@@ -471,7 +468,6 @@ func convertCategoryNodeTree(nodes []*pb.CategoryNode) []*Category {
 	return result
 }
 
-// flattenCategoryTree 將樹狀結構扁平化
 func flattenCategoryTree(nodes []*pb.CategoryNode) []Category {
 	result := make([]Category, 0)
 	var flatten func([]*pb.CategoryNode)
@@ -494,7 +490,6 @@ func flattenCategoryTree(nodes []*pb.CategoryNode) []Category {
 	return result
 }
 
-// findCategoryInTree 在樹狀結構中尋找指定 ID 的分類
 func findCategoryInTree(nodes []*pb.CategoryNode, id string) *pb.CategoryNode {
 	for _, node := range nodes {
 		if node.Id == id {
@@ -510,10 +505,8 @@ func findCategoryInTree(nodes []*pb.CategoryNode, id string) *pb.CategoryNode {
 	return nil
 }
 
-// findCategoryPath 在樹狀結構中尋找從根到指定 ID 的路徑
 func findCategoryPath(nodes []*pb.CategoryNode, targetID string, currentPath []*pb.CategoryNode) []*pb.CategoryNode {
 	for _, node := range nodes {
-		// 對 sibling 各自 clone 一份 path，避免共用 underlying array 互相覆蓋
 		newPath := make([]*pb.CategoryNode, len(currentPath), len(currentPath)+1)
 		copy(newPath, currentPath)
 		newPath = append(newPath, node)

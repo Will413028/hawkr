@@ -46,72 +46,31 @@ type ActionInput struct {
 	ActorAccountTypes []string
 }
 
-// routeKey 是 (action, provider) —— 🔴 **provider 是不可省略的維度**。
-//
-// 修復前這張表只以 action 為 key，而端點是 per-provider 的：
-//   - 3002 超商單拿到 dispatch → href 指向黑貓 /call_tcat
-//   - 3001 黑貓單拿到 print_label → href 指向超商 /print_cvs_label
-//
-// 後者在 dev 上造成實際損害：賣家跟隨該 href，訂單被推進 label_print_status=4104（列印失敗），
-// 而 4104 落在對帳排程的索引述詞內 ⇒ 反覆重試、每次都因缺參數而失敗。
-//
-// 當時的辯護是「前端契約在 href 出現的那一刻就已經 provider-neutral 了」——
-// 那個論證只在「名字」這一層成立：neutral 的是名字，錯的是目的地。
 type routeKey struct {
 	action   string
-	provider string // ShippingMethod 值域（"3001" 黑貓／"3002" 超商／…）
+	provider string
 }
 
 type routeTarget struct {
 	method string
-	path   string // {order_no} 會被替換
+	path   string
 }
 
-// 配送方式（ShippingMethod 值域）——與 CodeMeta 同一組值。
 const (
-	providerTaqbin   = "3001" // 黑貓宅配
-	providerCvs      = "3002" // 7-11 交貨便 C2C
-	providerMerchant = "3005" // 商家自行配送（RFQ 訂單的站外業者自行出貨）
+	providerTaqbin   = "3001"
+	providerCvs      = "3002"
+	providerMerchant = "3005"
 )
 
-// actionRoute：(action, provider) → (HTTP method, 路徑樣板)。
-//
-// 🔴 這張表為什麼在 Gateway 而不在 shipping-service：
-// 「這顆按鈕現在能不能按、誰能按」是業務判斷（微服務算，含 actor），
-// 「它對應哪支 URL」是**路由知識**。Gateway 是唯一對外入口、路由表在它身上。
-//
-// ⚠️ 路徑樣板仍映射到現況的 provider-specific 端點。65 的目標是 neutral 端點
-// （S-10 /dispatch、S-11 /cancel、S-12 /pod），那需要 shipping-service 先有對應的 RPC。
-// 在那之前，**正確性由這張表的 provider 維度承擔**：沒有登錄的組合一律丟棄，不猜路徑。
 var actionRoute = map[routeKey]routeTarget{
-	// ── 黑貓宅配 ──────────────────────────────────────────────
 	{"dispatch", providerTaqbin}: {"POST", "/api/v1/app/shipments/{order_no}/call_tcat"},
-	// 🔴 黑貓有**自己的**標籤端點（`sellerHandle(... CapOrderFulfill ...)` 掛在
-	//    `/generate_home_label`）。第一版把 print_label@3001 整格拿掉，理由是
-	//    「不登錄比登錯好」——那擋住了「黑貓單拿到超商端點」，卻同時造成
-	//    **賣家拿不到自己該執行的列印動作**，而那正是 BLOCKER 2 明列要消滅的另一半。
-	//    正解是登錄到對的端點，不是不登錄。
 	{"print_label", providerTaqbin}: {"POST", "/api/v1/app/shipments/{order_no}/generate_home_label"},
 
-	// ── 7-11 交貨便 C2C ──────────────────────────────────────
 	{"handover", providerCvs}:    {"POST", "/api/v1/app/shipments/{order_no}/confirm"},
 	{"print_label", providerCvs}: {"POST", "/api/v1/app/shipments/{order_no}/print_cvs_label"},
-	// ⚠️ 3002 **沒有** dispatch：7-11 C2C 沒有派車 API（adapter 的 dispatch() 回 empty）。
 
-	// ── 追蹤與兜底 ────────────────────────────────────────────
-	// 🔴 這兩個動作**買賣雙方都有**，但 href 不同端點：
-	//    買家走 `/app/orders/{no}/logistics`（JWTAuth），賣家走 `/app/shipments/{no}/tracking`
-	//    （requireSeller + CapOrderFulfill）。第一版把它們一律標成 actor=買家，
-	//    後果是**賣家端永遠沒有唯讀 fallback**——而 `view_only` 的定義逐字是
-	//    「兜底值：永遠可用」。dev 實測：3001 賣家的 allowedActions 只剩一條 dispatch。
-	//    ⇒ 兜底動作的 href 必須依 viewer 決定，不是把 actor 綁死。
 }
 
-// viewerScopedRoute 是「同一個 action 對不同身分指向不同端點」的那一類。
-//
-// 它與 actionRoute 分開，是因為兩者的失效方式不同：
-//   - actionRoute 漏一格 ⇒ 動作消失（可見、可回報）
-//   - 這一張漏一格 ⇒ 動作指到**另一個身分的端點** ⇒ 403（看起來像權限壞了）
 var viewerScopedRoute = map[routeKey]map[string]routeTarget{
 	{"track", providerTaqbin}:   trackTargets(),
 	{"track", providerCvs}:      trackTargets(),
@@ -147,7 +106,6 @@ const (
 // 丟棄的項目回在 dropped 供呼叫端決定要不要告警——靜默丟棄與「本來就不該出現」長得一樣。
 func BuildAllowedActions(orderNo, provider, viewer string, availability []ActionInput) (actions []AllowedAction, dropped []string) {
 	for _, a := range availability {
-		// ① actor eligibility —— **唯一**判定，來源是 shipping 的宣告，不是本檔的路由表。
 		if len(a.ActorAccountTypes) == 0 {
 			dropped = append(dropped, a.Action+"(missing_actor)")
 			continue
@@ -157,8 +115,6 @@ func BuildAllowedActions(orderNo, provider, viewer string, availability []Action
 			continue
 		}
 
-		// ② 路由 —— 純轉譯。雙身分動作在 viewerScopedRoute 依 viewer 取 href，
-		//    單身分動作在 actionRoute。兩張表都只回答「href 是什麼」，不回答「誰能做」。
 		key := routeKey{a.Action, provider}
 		target, ok := resolveTarget(key, viewer)
 		if !ok {
@@ -166,7 +122,6 @@ func BuildAllowedActions(orderNo, provider, viewer string, availability []Action
 			continue
 		}
 
-		// ③ 不可用必須帶原因碼，否則按鈕會憑空消失。
 		if !a.Enabled && a.DisabledReasonCode == "" {
 			dropped = append(dropped, a.Action+"(missing_reason)")
 			continue
@@ -178,18 +133,12 @@ func BuildAllowedActions(orderNo, provider, viewer string, availability []Action
 			Method:             target.method,
 			Enabled:            a.Enabled,
 			DisabledReasonCode: a.DisabledReasonCode,
-			// 回應已依 viewer 過濾，這裡填 viewer 即「這條動作是給你的」。
 			Actor: viewer,
 		})
 	}
 	return actions, dropped
 }
 
-// resolveTarget 只回答 href——**純路由，不做資格判定**。
-//
-// 呼叫端必須已經確認 viewer 有資格（BuildAllowedActions 的 ①）。這個分工是 R4 的重點：
-// 先前這兩件事綁在 viewerScopedRoute 的 key 上，於是「查不到路由」與「你沒資格」
-// 是同一個判斷，而後者本該由領域決定。
 func resolveTarget(key routeKey, viewer string) (routeTarget, bool) {
 	if byViewer, dual := viewerScopedRoute[key]; dual {
 		target, ok := byViewer[viewer]
@@ -206,8 +155,6 @@ func KnownFulfillmentActionRoutes() []string {
 	for k := range actionRoute {
 		out = append(out, k.action+"@"+k.provider)
 	}
-	// 🔴 雙身分那張表也要列進來：漏了的話「路由表形狀」的契約測試看不到它們，
-	//    而它們正是最容易指錯端點的一類（指到另一個身分的端點 ⇒ 403）。
 	for k := range viewerScopedRoute {
 		out = append(out, k.action+"@"+k.provider)
 	}

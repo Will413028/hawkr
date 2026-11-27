@@ -22,9 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// socialProducts 以 catalog 模組實作 social 的商品驗證 port：商品要存在、上架中（店家可曝光）而且屬於這家店。
-// 回 social 的 ErrProductNotAvailable、ErrProductNotOwned，查詢失敗回原錯誤（social 轉成 Unavailable）：
-// 不把「查不到」當成「商品不存在」。使用者面的句子在 social 的目錄，這裡不寫。
 type socialProducts struct{ catalog *catalog.Module }
 
 func (a socialProducts) VerifyProduct(ctx context.Context, productID uuid.UUID, storeID int64) error {
@@ -42,7 +39,6 @@ func (a socialProducts) VerifyProduct(ctx context.Context, productID uuid.UUID, 
 	return nil
 }
 
-// socialCards 以 catalog 模組實作貼文卡片的商品顯示資料 port。
 type socialCards struct{ catalog *catalog.Module }
 
 func (a socialCards) Cards(ctx context.Context, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]httpsocial.ProductInfo, error) {
@@ -61,27 +57,21 @@ func (a socialCards) Cards(ctx context.Context, ids []uuid.UUID, includeInactive
 	return out, nil
 }
 
-// noStoreBlocks 是不做買家身分寫入的組裝（social-recount）給 social 的店家封鎖依賴：被呼叫就是接線錯了，回錯誤而不是回「沒有封鎖」。
 type noStoreBlocks struct{}
 
 func (noStoreBlocks) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) {
 	return false, errors.New("此組裝不做買家身分的寫入，沒有店家封鎖的來源")
 }
 
-// scheduleAuthorizers 是 social 的排程授權實作，依發起者種類登記（缺一種 social.New 就 panic）。代行（DELEGATION）的實作由 delegation 提供
-// （delegation.NewScheduleAuthorizer），每一個組裝 social 的地方都傳真的實作，沒有「一律拒絕」的佔位。
 func scheduleAuthorizers(delegationAuthorizer social.ScheduleAuthorizer) map[social.ScheduleKind]social.ScheduleAuthorizer {
 	return map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: delegationAuthorizer}
 }
 
-// socialSellers 是 social 對 seller 的兩個依賴：讀店家與店家封鎖檢查；正式組裝傳 *seller.Module。
 type socialSellers interface {
 	social.Stores
 	social.StoreBlocks
 }
 
-// newSocial 組裝 social 模組。serve 與 worker 都需要它：serve 要訂閱買家與店家的事件（買家的刪除事件在發布方的 transaction 內記複本並重新求值、排清除 job；店家退場只排清除 job），worker 執行
-// 它的 job（圖片引用、清除、瀏覽資料清理、每日對帳；排程的是 PeriodicJobs）。
 func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers socialSellers, med mediaPort, products socialProducts, delegationAuthorizer social.ScheduleAuthorizer, log *slog.Logger) *social.Module {
 	m := social.New(social.Deps{
 		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: buyers, Stores: sellers, StoreBlocks: sellers, Products: products,
@@ -92,8 +82,6 @@ func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module
 	return m
 }
 
-// subscribeSocial 讓買家進入刪除中與關閉在同一個 transaction 寫 social 的複本、重新求值並排清除 job（單體規則 4 的原子狀態變更），
-// 店家退場只排清除 job（訂閱者只 Enqueue），seller 建立與撤銷內容下架措施在同一個 transaction 寫複本、重新求值並排快取失效。
 func subscribeSocial(bus *events.Bus, m *social.Module) {
 	events.Subscribe(bus, m.OnBuyerDeletionRequested)
 	events.Subscribe(bus, m.OnBuyerDeleted)
@@ -102,8 +90,6 @@ func subscribeSocial(bus *events.Bus, m *social.Module) {
 	events.Subscribe(bus, m.OnMeasureRevoked)
 }
 
-// runSocialRecount 是子命令 social-recount：對全部可重算的計數（貼文的讚、留言與分享數，留言的讚與回覆數，討論區留言的回覆數）跑重算與覆寫，
-// 印出數量與漂移（手動全量重算；改了計數定義的 migration 在同一步跑一次）。只需要 DATABASE_URL。
 func runSocialRecount(ctx context.Context, out io.Writer) error {
 	e := config.NewEnv()
 	dbc := dbConfig(e)

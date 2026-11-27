@@ -26,8 +26,6 @@ import {
 	transferResolveTargets,
 } from "./resolve-anomaly";
 
-// 異常監控的付款、退款、轉帳三個分頁（PaymentAdminService.ListPayments、ListPaymentRefunds、
-// ListPaymentTransfers）的請求與列顯示。page token 綁定篩選條件，換條件時呼叫端回到第一頁。
 
 export const PAYMENT_LIST_PAGE_SIZE = 20;
 
@@ -47,7 +45,6 @@ export interface TransferFilters {
 	orderNo: string;
 }
 
-// 預設沿用舊頁「只看異常」的語意；狀態選「全部」才看所有。
 export const DEFAULT_PAYMENT_FILTERS: PaymentFilters = {
 	status: PaymentStatus.ANOMALY,
 	orderNo: "",

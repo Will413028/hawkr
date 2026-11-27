@@ -63,6 +63,6 @@ func Sign(secret, service, ts, nonce, accountID string) string {
 
 func newNonce() string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b) // crypto/rand 不會失敗
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }

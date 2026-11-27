@@ -17,7 +17,6 @@ describe("manualReasonNotice", () => {
 		const got = manualReasonNotice("SELLER_TRACK_INSUFFICIENT");
 		expect(got.label).toBe("賣家字軌不足");
 		expect(got.hint).toMatch(/財政部/);
-		// 這一格的重點是「不要叫他按重試」——處置與其他失敗相反。
 		expect(got.hint).toMatch(/不需要你按重試|自動繼續/);
 	});
 
@@ -47,9 +46,6 @@ describe("manualReasonNotice", () => {
 		expect(src).toMatch(/manualReasonNotice\(job\.manualReasonCode\)/);
 		expect(src).toMatch(/reason\.label/);
 		expect(src).toMatch(/reason\.hint/);
-		// 🔴 已完成的作業不得顯示上一次的失敗理由。後端已在 MarkInvoiceDocumentIssued
-		// 清掉，這裡是第二道防線——那條路只要漏一個清除者，畫面就會出現
-		// 「已開立 ＋ 原因：賣家字軌不足」，而沒有任何東西會發現。
 		expect(src).toMatch(/reason\.label && !done/);
 	});
 });

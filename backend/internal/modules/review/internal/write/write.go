@@ -63,7 +63,6 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// orderNotFound 是訂單不存在與訂單屬於別人的共同回應，呼叫端分不出兩者。
 func orderNotFound(l uitext.Locale) error {
 	return model.WithReason(apperr.NotFound("%s", text.ReviewOrderNotFound(l)), model.ReasonOrderNotFound)
 }
@@ -218,7 +217,6 @@ func findItem(items []model.OrderItem, id int64) (model.OrderItem, bool) {
 	return model.OrderItem{}, false
 }
 
-// bust 排入店面頁與商品頁的快取失效（評價數與評分在這兩頁）；必須在 transaction 內呼叫。
 func (s *Service) bust(ctx context.Context, storeID int64, productID uuid.UUID) error {
 	tags := []string{revalidate.ProductTag(productID)}
 	st, err := s.d.Stores.Store(ctx, storeID)

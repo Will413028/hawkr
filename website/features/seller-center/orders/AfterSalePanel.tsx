@@ -162,7 +162,6 @@ export function AfterSalePanel({
 		null,
 	);
 
-	// Auto-open the drawer when arrived via ?caseNo= deep-link.
 	const consumedRef = React.useRef<string | null>(null);
 	React.useEffect(() => {
 		if (!initialCaseNo || consumedRef.current === initialCaseNo) return;

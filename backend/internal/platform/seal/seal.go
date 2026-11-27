@@ -19,7 +19,6 @@ type Hash struct {
 	Sum   []byte
 }
 
-// minMACKeyLen 是 HMAC 金鑰的最短長度（與 SHA-256 的輸出同長）。
 const minMACKeyLen = 32
 
 // MAC 是有序的 HMAC 金鑰：第一把計算新的 hash，全部都能計算以便查詢輪替前寫入的 hash。

@@ -117,12 +117,6 @@ func (w *Worker[T]) RunOnce(ctx context.Context) error {
 	return nil
 }
 
-// processRow claims row, then runs its side effect. tickNow is the batch's
-// start instant and is only used as the CAS upper bound (mirroring the
-// candidate predicate) — the lease baseline itself is taken per row, not per
-// tick, because sharing one baseline would let later rows in a large batch
-// inherit an already-eroded effective lease (docs/開發規範/多副本排程搶佔規範.md
-// §三 第 6 點).
 func (w *Worker[T]) processRow(ctx context.Context, row T, tickNow time.Time) {
 	claimed, err := w.repo.Claim(ctx, row.OutboxID(), time.Now().Add(w.cfg.ClaimLease), tickNow)
 	if err != nil {
@@ -148,11 +142,6 @@ func (w *Worker[T]) processRow(ctx context.Context, row T, tickNow time.Time) {
 	}
 }
 
-// bumpAttempt increments the attempt count and either schedules the next
-// retry with exponential backoff, or terminally fails the row once
-// Config.MaxAttempts is reached. cause/causeErr identify which call in
-// processRow triggered this (Process or MarkDone) and are forwarded to
-// OnAttemptFailed.
 func (w *Worker[T]) bumpAttempt(ctx context.Context, row T, cause string, causeErr error) {
 	lastErr := causeErr.Error()
 	if cause == "mark_done" {
@@ -173,11 +162,6 @@ func (w *Worker[T]) bumpAttempt(ctx context.Context, row T, cause string, causeE
 
 	delay := backoffFor(newAttempt, w.cfg.BaseBackoff, w.cfg.MaxBackoff)
 	if err := w.repo.UpdateAttempt(ctx, row.OutboxID(), newAttempt, now.Add(delay), lastErr); err != nil {
-		// This write is the row's own retry bookkeeping. Failing it leaves
-		// the row at its previous next_attempt_at, so the next tick reclaims
-		// it immediately instead of after backoff — a distinct, previously
-		// invisible failure mode, so it gets its own OnAttemptFailed fire
-		// rather than being folded into cause's own report above.
 		w.fireAttemptFailed(ctx, row, "update_attempt", err)
 	}
 }
@@ -188,7 +172,6 @@ func (w *Worker[T]) fireAttemptFailed(ctx context.Context, row T, cause string, 
 	}
 }
 
-// backoffFor returns 2^attempt * base, capped at max.
 func backoffFor(attempt int, base, max time.Duration) time.Duration {
 	d := base
 	for i := 0; i < attempt; i++ {

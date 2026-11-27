@@ -173,8 +173,6 @@ export default function DelegationAuthorizationDialog({
 			return;
 		}
 		if (unknown.length > 0) {
-			// 版本落差：既有授權列帶著本版目錄沒有的能力。靜默送出會把它們一併撤掉，
-			// 而畫面從未顯示過它們 —— 操作者不會知道自己縮小了範圍。
 			setError(
 				`目前的授權含有這個版本無法辨識的能力（${unknown.join("、")}），已停止送出，請聯絡技術人員確認 ADM 版本。`,
 			);
@@ -226,8 +224,6 @@ export default function DelegationAuthorizationDialog({
 				scope,
 				idempotencyKey,
 			});
-			// created／reinstated 由伺服端依實際走到的 CAS 分支填入，不由這裡推定
-			// ——畫面說「已重新開通」而後端其實是首建，兩者的稽核意義不同。
 			onSaved(
 				granted.outcome === "reinstated"
 					? "已重新開通代行授權。"

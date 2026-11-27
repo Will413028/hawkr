@@ -12,8 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// makeSeededStoresExposable 讓 seedHistory 的店家（store_code > 2900000000）滿足與時間無關的曝光條件：logo、鄉鎮市區、核准的 KYC 申請、
-// 轉帳能力啟用的收款帳戶。是否可曝光只剩帳號有沒有生效中的措施。
 func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -45,7 +43,6 @@ func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 	}
 }
 
-// measureScans 回傳 EXPLAIN (FORMAT JSON) 計畫裡每個讀 seller.measures 的節點（掃描方式、索引、Index Cond）。
 func measureScans(t *testing.T, plan []byte) []map[string]any {
 	t.Helper()
 	var doc []struct {
@@ -140,13 +137,10 @@ func TestExposableStoresJoinProbesMeasuresByAccount(t *testing.T) {
 			cond := strings.Join(indexConds(s), " ")
 			probed := strings.Contains(cond, "account_id = ")
 			loops, _ := s["Actual Loops"].(float64)
-			// 以帳號探測（measures_enforced_suspension 上 account_id 為 Index Cond），或整個生效集合只讀一次（外層很大時 hash anti join
-			// 合理）；不能是沒有帳號條件的掃描被重複執行（UNION ALL 時每個探測重掃全平台的生效中措施）。
 			if !probed && loops > 1 {
 				t.Errorf("%s：讀 measures 沒有以外層的 account_id 為 Index Cond，卻執行了 %v 次（%v，Index Cond %q）：\n%s",
 					name, loops, s["Node Type"], cond, plan)
 			}
-			// 外層小（49 筆商品、Classify 的 100 家）時一定是以帳號探測。
 			if !strings.Contains(name, "2000") && (!probed || !strings.Contains(cond, "measures_enforced_suspension")) {
 				t.Errorf("%s：讀 measures 要是 measures_enforced_suspension 上以外層的 account_id 為 Index Cond 的探測，實際是 %v（%q）：\n%s",
 					name, s["Node Type"], cond, plan)
@@ -155,7 +149,6 @@ func TestExposableStoresJoinProbesMeasuresByAccount(t *testing.T) {
 	}
 }
 
-// indexConds 回傳節點與它底下的 Bitmap Index Scan 的「索引名稱: Index Cond」。
 func indexConds(n map[string]any) []string {
 	var out []string
 	if c, ok := n["Index Cond"].(string); ok {

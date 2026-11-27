@@ -72,8 +72,6 @@ public class OrderRefundFinalizedOutboxWriter {
                       String refundOutcome,
                       String caseNo,
                       String cancelId) {
-        // fail-loud：空的 refund_ref = 下游拿不到冪等鍵 ⇒ 只能退回 event_id，而 event_id 每小時換一次
-        // ⇒ 同一筆退款每小時開一張新折讓單。寧可 rollback 重試也不能發出一則無鍵事件。
         if (refundRef == null || refundRef.isBlank()) {
             throw new IllegalStateException(
                     "order.refund.finalized 的 refund_ref 為空, orderNo=" + orderNo
@@ -88,20 +86,14 @@ public class OrderRefundFinalizedOutboxWriter {
 
         OrderEntity order = orderRepository.findByOrderNo(orderNo);
         if (order == null) {
-            // fail-loud：訂單不存在＝資料完整性問題，靜默補零會讓下游把發票開給錯的賣家
             throw new IllegalStateException(
                     "order.refund.finalized 找不到訂單, orderNo=" + orderNo
                             + ", refundRef=" + refundRef);
         }
 
-        // 累計退款一律由 financial_logs 重算（僅 REFUND_ORIGINAL）。
-        // 不能讀 orders.refund_total_amount——那欄只有 PARTIAL 路徑維護，全額退款讀它會拿到 0。
         long cumulative = financialLogRepository.sumAmountByType(
                 orderNo, FinancialLogType.REFUND_ORIGINAL.value());
 
-        // occurred_at 與 refunded_at 同值：order-service 是「退款落定」這個事實的權威，
-        // 落定時點就是本交易。上游 aftersales 的 occurred_at 不可用——RefundSyncWorker 重發時
-        // 整個 payload 重建，那個時間是「重發時刻」而非「退款時刻」。
         String nowIso = DateTimeUtils.formatIso8601(DateTimeUtils.nowUtc());
         OrderRefundFinalizedPayload payload = new OrderRefundFinalizedPayload(
                 orderNo, nowIso,
@@ -112,7 +104,6 @@ public class OrderRefundFinalizedOutboxWriter {
                 String.valueOf(cumulative),
                 blankToNull(caseNo), blankToNull(cancelId),
                 order.getPaymentMethod(), nowIso,
-                // 58 §6.3.2.1：與 order.paid 同一條理由；取不到就是 null，不補假 UUID
                 obsContext.getCorrelationIdOrNull());
 
         OrderOutboxEntity outbox = new OrderOutboxEntity();
@@ -125,7 +116,6 @@ public class OrderRefundFinalizedOutboxWriter {
         try {
             outbox.setPayload(MAPPER.writeValueAsString(payload));
         } catch (JsonProcessingException e) {
-            // 固定結構序列化理論上不會失敗；拋出讓事務 rollback，避免退款已記但事件遺失
             throw new IllegalStateException(
                     "order.refund.finalized payload 序列化失敗 orderNo=" + orderNo, e);
         }

@@ -66,9 +66,6 @@ export default function RecentClient() {
 		}
 	};
 
-	// Hide products that are no longer visible: backend flags them with
-	// `available === false`, or returns them with an empty productName
-	// (deleted/unpublished — the row that used to render "商品 #<id>").
 	const visibleItems = items.filter(
 		(it) => it.available !== false && (it.productName?.trim() ?? "") !== "",
 	);
@@ -142,8 +139,7 @@ export default function RecentClient() {
 									key={String(it.id)}
 									className="relative bg-content1 border border-divider rounded-hkui-lg transition-[border-color] duration-200 ease-[var(--hkui-ease)] hover:border-hkui-primary-200"
 								>
-									{/* Stretched link: the whole card navigates to the product,
-									    while the seller link sits on top as a sibling (not nested). */}
+
 									<Link
 										href={`/products/${it.productId}?from=recent`}
 										aria-label={it.productName || `商品 #${it.productId}`}

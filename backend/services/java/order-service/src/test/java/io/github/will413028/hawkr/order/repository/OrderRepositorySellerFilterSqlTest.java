@@ -58,7 +58,6 @@ class OrderRepositorySellerFilterSqlTest {
                 .contains("recipient_name ILIKE ?")
                 .contains("oi.product_name ILIKE ?")
                 .contains("oi.sku_name ILIKE ?")
-                // 半連接：一單多品時不得讓訂單重複出現在列表
                 .contains("EXISTS")
                 .contains("oi.order_no = orders.order_no");
         assertThat(sql)
@@ -88,7 +87,6 @@ class OrderRepositorySellerFilterSqlTest {
         assertThat(onlyFrom).contains("created_at >= ?").doesNotContain("created_at <=");
     }
 
-    // ==================== helpers ====================
 
     private static SellerOrderQuery query(long buyerId, List<String> statusList, String keywordPattern,
                                           LocalDateTime dateFrom, LocalDateTime dateTo) {

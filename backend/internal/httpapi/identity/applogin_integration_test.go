@@ -22,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
-// App 的 ID token：Google 的原生 SDK 簽 RS256（azp 是 Android／iOS client），LINE 原生 SDK 簽 ES256（JWKS）。
 func (f *fakeIdP) appToken(nonce string, extra map[string]any) string {
 	f.t.Helper()
 	now := time.Now()
@@ -64,7 +63,6 @@ func protoProvider(p identity.Provider) pb.LoginProvider {
 	return rpc.EnumToProto[pb.LoginProvider](p)
 }
 
-// ipHeader 指定來源 IP：各測試用自己的 IP，不互相佔用限流。
 func ipHeader(ip string) connect.ClientOption { return headersOf("X-Test-Client-IP", ip) }
 
 func (f *webFixture) public(opts ...connect.ClientOption) identityv1alpha1connect.IdentityPublicServiceClient {
@@ -77,7 +75,6 @@ func (f *webFixture) app(opts ...connect.ClientOption) identityv1alpha1connect.I
 
 func bearer(token string) connect.ClientOption { return headersOf("Authorization", "Bearer "+token) }
 
-// cookieOpt 是瀏覽器以 session cookie 呼叫的同源請求（D6）。
 func cookieOpt(token string) connect.ClientOption {
 	return headersOf("Cookie", rpc.SessionCookie+"="+token, "Sec-Fetch-Site", "same-origin")
 }
@@ -94,7 +91,6 @@ func (f *webFixture) issueNonce(t *testing.T, ip string) string {
 	return resp.Msg.GetNonce()
 }
 
-// exchange 發 nonce、讓 provider 簽一個帶它的 ID token（extra 覆寫 claims，nil 表示刪掉），再交換。
 func (f *webFixture) exchange(t *testing.T, ip string, p identity.Provider, extra map[string]any, opts ...connect.ClientOption) (*pb.ExchangeIdTokenResponse, error) {
 	t.Helper()
 	nonce := f.issueNonce(t, ip)
@@ -330,7 +326,6 @@ func TestAppLoginProceduresAreRateLimitedPerIP(t *testing.T) {
 		_, limited = f.public(ipHeader("198.51.100.80")).IssueAppLoginNonce(t.Context(), connect.NewRequest(&pb.IssueAppLoginNonceRequest{}))
 	}
 	wantCode(t, limited, connect.CodeResourceExhausted)
-	// ExchangeIdToken 與 IssueAppLoginNonce 共用同一個額度；另一個 IP 不受影響。
 	_, err := f.exchangeToken(t, "198.51.100.80", identity.ProviderGoogle, "x", "y")
 	wantCode(t, err, connect.CodeResourceExhausted)
 	f.issueNonce(t, "198.51.100.81")
@@ -374,7 +369,6 @@ func TestSignOutRevokesTheCurrentSession(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM identity.sessions"); n != 0 {
 		t.Fatalf("sessions = %d", n)
 	}
-	// 沒有登入時 SignOut 是 unauthenticated。
 	_, err = f.app().SignOut(t.Context(), connect.NewRequest(&pb.SignOutRequest{}))
 	wantCode(t, err, connect.CodeUnauthenticated)
 }
@@ -424,8 +418,8 @@ func TestSuspendedAccountsCanStillManageTheirSessions(t *testing.T) {
 	if _, err := f.db.Pool().Exec(t.Context(), `UPDATE identity.accounts SET suspended_at = $2 WHERE id = $1`, a.Principal.ID, f.clock.Now()); err != nil {
 		t.Fatal(err)
 	}
-	second := f.mustExchange(t, ip, identity.ProviderGoogle, bearer(first)) // 停權的帳號照樣登入，登入換發 session
-	other := f.mustExchange(t, ip, identity.ProviderGoogle)                 // 另一個 session
+	second := f.mustExchange(t, ip, identity.ProviderGoogle, bearer(first))
+	other := f.mustExchange(t, ip, identity.ProviderGoogle)
 	c := f.app(bearer(second))
 	list, err := c.ListSessions(t.Context(), connect.NewRequest(&pb.ListSessionsRequest{}))
 	if err != nil || len(list.Msg.GetSessions()) != 2 {
@@ -477,7 +471,6 @@ func TestLinkIdentityOverApp(t *testing.T) {
 	if got := f.sessionAccountID(t, line); got != owner {
 		t.Fatalf("連結的 LINE 登入到帳號 %s，預期 %s", got, owner)
 	}
-	// 重複連結自己的身分：成功。
 	if err := f.linkOverApp(t, client, ip, identity.ProviderLine); err != nil {
 		t.Fatalf("重複連結 = %v", err)
 	}
@@ -503,7 +496,6 @@ func TestLinkIdentityConflictsOverApp(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			// 另一個帳號（Google）想連結 LINE-user-1。
 			alice := f.mustExchange(t, ip, identity.ProviderGoogle)
 			err = f.linkOverApp(t, f.app(bearer(alice)), ip, identity.ProviderLine)
 			wantCode(t, err, connect.CodeAlreadyExists)
@@ -617,7 +609,6 @@ func TestWebLinkRefusals(t *testing.T) {
 		loc := start.Header.Get("Location")
 		code := f.idp[identity.ProviderLine].authorize(loc, nil)
 		u, _ := url.Parse(loc)
-		// 瀏覽器在 provider 頁面時，session 換成另一個帳號（LINE 先建的帳號）。
 		other := f.mustExchange(t, "198.51.100.132", identity.ProviderLine)
 		b.cookies[rpc.SessionCookie] = other
 		done := b.get("/api/auth/line/callback?" + url.Values{"state": {u.Query().Get("state")}, "code": {code}}.Encode())
@@ -657,7 +648,7 @@ func TestListSessionsMarksTheCurrentSession(t *testing.T) {
 	web := setCookie(cb, rpc.SessionCookie).Value
 	f.clock.Advance(time.Hour)
 	app := f.mustExchange(t, ip, identity.ProviderGoogle)
-	_ = f.mustExchange(t, ip, identity.ProviderLine) // 別的帳號
+	_ = f.mustExchange(t, ip, identity.ProviderLine)
 
 	check := func(client identityv1alpha1connect.IdentityAppServiceClient, current pb.ClientKind, want int) {
 		t.Helper()
@@ -691,13 +682,11 @@ func TestListSessionsMarksTheCurrentSession(t *testing.T) {
 	check(f.app(bearer(app)), pb.ClientKind_CLIENT_KIND_APP, 2)
 	check(f.app(cookieOpt(web)), pb.ClientKind_CLIENT_KIND_WEB, 2)
 
-	// web 閒置超過 7 天就失效，不再列出；App 的 14 天還沒到。
 	f.clock.Advance(7 * 24 * time.Hour)
 	resp, err := f.app(bearer(app)).ListSessions(t.Context(), connect.NewRequest(&pb.ListSessionsRequest{}))
 	if err != nil || len(resp.Msg.GetSessions()) != 1 || resp.Msg.GetSessions()[0].GetClientKind() != pb.ClientKind_CLIENT_KIND_APP {
 		t.Fatalf("閒置逾時後 = %v, %v", resp, err)
 	}
-	// ListSessions 可以用 GET（NO_SIDE_EFFECTS），cookie 認證也行。
 	if _, err := f.app(connect.WithHTTPGet(), bearer(app)).ListSessions(t.Context(), connect.NewRequest(&pb.ListSessionsRequest{})); err != nil {
 		t.Fatalf("GET ListSessions = %v", err)
 	}
@@ -738,11 +727,10 @@ func TestRevokeSessionNeedsRecentAuthentication(t *testing.T) {
 		return err
 	}
 
-	// 登入後 14 分鐘：放行的邊界內；先用不存在的 ID 確認通過重新驗證之後才查擁有者。
 	f.clock.Advance(14 * time.Minute)
 	wantCode(t, revoke(app, "01930000-0000-7000-8000-00000000dead"), connect.CodeNotFound)
 
-	f.clock.Advance(2 * time.Minute) // 16 分鐘
+	f.clock.Advance(2 * time.Minute)
 	err := revoke(app, target)
 	wantCode(t, err, connect.CodeFailedPrecondition)
 	if got := reasonOf(err); got != "REAUTHENTICATION_REQUIRED" {
@@ -752,7 +740,6 @@ func TestRevokeSessionNeedsRecentAuthentication(t *testing.T) {
 		t.Fatalf("sessions = %d，未重新驗證不能終止", n)
 	}
 
-	// 重新登入（換發新 session，auth_time 是現在）之後放行。
 	fresh := f.mustExchange(t, ip, identity.ProviderGoogle, bearer(app))
 	if err := revoke(fresh, target); err != nil {
 		t.Fatalf("重新驗證後的 RevokeSession = %v", err)
@@ -761,7 +748,6 @@ func TestRevokeSessionNeedsRecentAuthentication(t *testing.T) {
 	wantCode(t, err, connect.CodeUnauthenticated)
 	f.sessionAccountID(t, fresh)
 
-	// 別人的 session 與不存在的 ID：NotFound，不洩漏存在與否。
 	other := f.mustExchange(t, ip, identity.ProviderLine)
 	otherCurrent, _ := f.sessionIDs(t, other)
 	wantCode(t, revoke(fresh, otherCurrent), connect.CodeNotFound)
@@ -776,7 +762,7 @@ func TestRevokeSessionAfterWebReauthentication(t *testing.T) {
 	ip := "198.51.100.151"
 	b := f.browser(t, ip)
 	_, first := b.login(identity.ProviderGoogle, loginOpts{})
-	f.mustExchange(t, ip, identity.ProviderGoogle) // 另一個 session（App）
+	f.mustExchange(t, ip, identity.ProviderGoogle)
 	f.clock.Advance(20 * time.Minute)
 
 	revokeOthers := func(token string) error {

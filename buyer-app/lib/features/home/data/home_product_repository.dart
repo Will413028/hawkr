@@ -80,14 +80,11 @@ class DioHomeProductRepository implements HomeProductRepository {
         final product = HomeProduct.fromJson(Map<String, dynamic>.from(raw));
         if (seenIds.add(product.id)) products.add(product);
       } on FormatException {
-        // A malformed record must not make valid cards on the same page
-        // unusable. Page-level schema failures still surface explicitly.
       }
     }
 
     final responsePage =
         int.tryParse(data['page']?.toString() ?? '') ?? requestedPage;
-    // 分頁四欄一律 camelCase（`records`／`total`／`page`／`pageSize`，10 檔 §2）。
     final responsePageSize =
         int.tryParse(data['pageSize']?.toString() ?? '') ?? pageSize;
     final total = int.tryParse(data['total']?.toString() ?? '');

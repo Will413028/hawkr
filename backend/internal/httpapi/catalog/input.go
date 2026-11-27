@@ -10,8 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// toInput 把請求的 ProductInput 轉成模組的輸入。轉換只負責形狀：欄位的內容與上限由模組驗證並以欄位錯誤回報（failure 對到請求路徑）。
-// 沒有設的 oneof（圖片沒有來源、描述區塊沒有內容）轉成模組認得的「空值」，由模組回 INVALID／UNKNOWN，不在這裡猜。
 func toInput(in *pb.ProductInput) (catalog.ProductInput, error) {
 	out := catalog.ProductInput{Title: in.GetTitle(), Hashtags: in.GetHashtagInputs(), LowStockThreshold: in.LowStockThreshold}
 	if raw := in.GetCategoryId(); raw != "" {
@@ -46,7 +44,6 @@ func toInput(in *pb.ProductInput) (catalog.ProductInput, error) {
 	return out, nil
 }
 
-// toImageInput：staged_token 是新圖，asset_id 是商品現有的圖；兩者都沒設時回空的 Image（模組回 INVALID）。
 func toImageInput(in *pb.ImageInput, path string) (catalog.Image, error) {
 	img := catalog.Image{Alt: in.GetAlt()}
 	switch src := in.GetSource().(type) {
@@ -84,7 +81,6 @@ func toBlockInput(in *pb.DescriptionBlock) (catalog.Block, error) {
 	return catalog.Block{}, nil
 }
 
-// publicFilter 把公開列表與搜尋共用的篩選轉成模組的篩選，並回傳綁定 page token 的篩選片段（順序固定）。
 func publicFilter(in *pb.ProductFilter) (catalog.PublicFilter, []string, error) {
 	if in == nil {
 		in = &pb.ProductFilter{}
@@ -130,7 +126,6 @@ func optInt(v *int64) string {
 	return rpc.FormatID(*v)
 }
 
-// requestID 解析必填的 request_id（UUIDv4）；缺少回欄位錯誤。
 func requestID(raw string) (uuid.UUID, error) {
 	id, err := rpc.ParseRequestID(raw)
 	if err != nil {
@@ -142,5 +137,4 @@ func requestID(raw string) (uuid.UUID, error) {
 	return *id, nil
 }
 
-// normalizeQuery 是關鍵字去頭尾空白後的值（trimtext 是頭尾空白的唯一定義）。
 func normalizeQuery(q string) string { return trimtext.Trim(q) }

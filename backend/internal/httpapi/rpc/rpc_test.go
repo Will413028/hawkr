@@ -34,7 +34,6 @@ func TestAudienceFollowsTheServiceName(t *testing.T) {
 		{"/hawkr.ordering.v1alpha1.OrderingAppService/GetOrder", AudienceApp, true},
 		{"/hawkr.admin.content.v1alpha1.ContentAdminService/UpdateBanner", AudienceAdmin, true},
 		{"/hawkr.ordering.v1alpha1.OrderingInviteeService/GetOrder", 0, false},
-		// 後台的 service 不在 hawkr.admin.*，或 hawkr.admin.* 裡放了別的 service：名稱錯了就不掛。
 		{"/hawkr.content.v1alpha1.ContentAdminService/UpdateBanner", 0, false},
 		{"/hawkr.admin.content.v1alpha1.ContentPublicService/ListLiveBanners", 0, false},
 		{"/hawkr.content.v1alpha1.ContentService/GetBanner", 0, false},
@@ -59,7 +58,7 @@ func TestAuthorizeChecksTheCallerAgainstTheAudience(t *testing.T) {
 		name      string
 		procedure string
 		caller    *identity.Principal
-		want      connect.Code // 0 表示通過
+		want      connect.Code
 	}{
 		{"public 不需要身分", public, nil, 0},
 		{"public 帶了身分也通過", public, buyer, 0},
@@ -68,7 +67,6 @@ func TestAuthorizeChecksTheCallerAgainstTheAudience(t *testing.T) {
 		{"admin 是管理員", admin, staff, 0},
 		{"app 沒有身分", app, nil, connect.CodeUnauthenticated},
 		{"app 是帳號", app, buyer, 0},
-		// 管理員與帳號的 ID 各自發號：同號的管理員不能當成帳號。
 		{"app 是同號的管理員", app, staff, connect.CodePermissionDenied},
 		{"不符合命名規則", "/hawkr.content.v1alpha1.ContentService/GetBanner", staff, connect.CodePermissionDenied},
 	}
@@ -89,7 +87,6 @@ func TestAuthorizeChecksTheCallerAgainstTheAudience(t *testing.T) {
 	}
 }
 
-// detailsOf 取出錯誤的 ErrorInfo.reason、LocalizedMessage 的文字與 BadRequest 的欄位路徑。
 func detailsOf(t *testing.T, err *connect.Error) (reason, localized string, fields []string) {
 	t.Helper()
 	for _, d := range err.Details() {
@@ -142,8 +139,6 @@ func TestToConnectMapsErrors(t *testing.T) {
 		{"Unavailable", apperr.Unavailable("此登入方式目前無法使用"), connect.CodeUnavailable, "", "此登入方式目前無法使用", false},
 		{"ResourceExhausted", apperr.ResourceExhausted(0, "今天的次數已用完"), connect.CodeResourceExhausted, "", "今天的次數已用完", false},
 		{"沒有分類：訊息固定、不外洩", errors.New("pq: connection refused 10.0.0.3"), connect.CodeInternal, "", "", true},
-		// 下游 client 回的錯誤（例如 media-service 的 unauthenticated）不能原樣轉給 client：App 會把它當成
-		// 自己的登入失效而登出使用者。
 		{"下游的 Connect 錯誤變成 internal", fmt.Errorf("content：轉正圖片：%w", downstream), connect.CodeInternal, "", "", true},
 		{"傳輸層的錯誤：只給開發者看", Error(connect.CodeInvalidArgument, "id %q 不是有效的 ID", "x"), connect.CodeInvalidArgument, "", "", false},
 		{"傳輸層的錯誤：給使用者看", userError(connect.CodeUnauthenticated, CommonText(context.Background(), connect.CodeUnauthenticated)), connect.CodeUnauthenticated, "", "未登入", false},
@@ -431,7 +426,6 @@ func TestApplyUpdateMask(t *testing.T) {
 	}
 }
 
-// codeOf 是 client 收到的錯誤碼：經過唯一的轉換點之後的 code。
 func codeOf(err error) connect.Code {
 	ce := toConnect(context.Background(), err).err
 	if ce == nil {
@@ -599,7 +593,6 @@ func TestAppErrLocalizedMessageKeepsTheMessageLocale(t *testing.T) {
 }
 
 func TestCommonFailureKeepsTheRequestLocale(t *testing.T) {
-	// en 目錄沒有 common.error.*：文字退回 zh-TW，標籤必須同樣是 zh-TW（文字與語系一致）。
 	for l, want := range map[uitext.Locale]string{uitext.EN: "zh-TW", uitext.ZhTW: "zh-TW"} {
 		ctx := uitext.WithLocale(context.Background(), l)
 		msg, locales := localesOf(t, toConnect(ctx, CommonFailure(ctx, connect.CodePermissionDenied)).err)

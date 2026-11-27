@@ -59,22 +59,16 @@ export default function AiImageEnhanceDialog({
 	const [originalUrl, setOriginalUrl] = React.useState<string | null>(null);
 	const [resultBlob, setResultBlob] = React.useState<Blob | null>(null);
 	const [resultUrl, setResultUrl] = React.useState<string | null>(null);
-	// Style ids whose example thumbnail failed to load fall back to the sparkle
-	// placeholder instead of a broken image icon.
 	const [brokenThumbs, setBrokenThumbs] = React.useState<
 		Record<string, boolean>
 	>({});
 	const [mounted, setMounted] = React.useState(false);
 	const abortRef = React.useRef<AbortController | null>(null);
 
-	// Portal target — the overlay must escape the seller shell's stacking
-	// context (the sticky nav wrapper is transformed, so an inline z-index can
-	// never beat it) and mount straight onto <body>.
 	React.useEffect(() => {
 		setMounted(true);
 	}, []);
 
-	// Build a preview URL for the source whenever it changes; reset state.
 	React.useEffect(() => {
 		if (!open || !source) return;
 		const url = URL.createObjectURL(source);
@@ -85,9 +79,6 @@ export default function AiImageEnhanceDialog({
 		return () => URL.revokeObjectURL(url);
 	}, [open, source]);
 
-	// Load the live style list + weekly quota when the dialog opens (or the
-	// category changes). Keep the bundled fallback on failure so the user can
-	// still enhance.
 	React.useEffect(() => {
 		if (!open) return;
 		setStyles(AI_IMAGE_STYLES_BY_CATEGORY[category]);
@@ -101,19 +92,16 @@ export default function AiImageEnhanceDialog({
 				}
 			})
 			.catch(() => {
-				/* keep the category's bundled fallback */
 			});
 		return () => ctrl.abort();
 	}, [open, category]);
 
-	// Keep the selected style valid as the list swaps from fallback → backend.
 	React.useEffect(() => {
 		if (!styles.some((s) => s.id === styleId)) {
 			setStyleId(styles[0]?.id ?? "");
 		}
 	}, [styles, styleId]);
 
-	// Revoke the result preview URL when it changes or on unmount.
 	React.useEffect(() => {
 		return () => {
 			if (resultUrl) URL.revokeObjectURL(resultUrl);
@@ -124,7 +112,6 @@ export default function AiImageEnhanceDialog({
 		return () => abortRef.current?.abort();
 	}, []);
 
-	// Close on Escape — mirrors components/ui/Dialog.tsx.
 	React.useEffect(() => {
 		if (!open) return;
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -167,21 +154,12 @@ export default function AiImageEnhanceDialog({
 			setError(
 				e instanceof AiEnhanceError ? e.message : errorText(e, defaultErrors),
 			);
-			// Quota state otherwise only advances on success (dialog-open fetch or a
-			// prior successful transform) — a quota-exceeded failure never told us
-			// the real count, so the "本週已用完" button state went stale until the
-			// dialog was reopened. We already know usage >= limit by definition here;
-			// pin usage to the last known limit so quotaReached flips immediately.
 			if (e instanceof AiQuotaExceededError) {
 				setQuota((prev) =>
 					prev?.limit != null ? { limit: prev.limit, usage: prev.limit } : prev,
 				);
 			}
 		} finally {
-			// Only the run that is still current may clear the spinner — a run
-			// superseded by 重新美化 settles (as an AbortError) *after* its
-			// replacement has already set loading, and would otherwise blank the
-			// 美化中 state while the new request is still in flight.
 			if (abortRef.current === ctrl) setLoading(false);
 		}
 	};
@@ -200,24 +178,12 @@ export default function AiImageEnhanceDialog({
 
 	return createPortal(
 		<div
-			// Top-anchored (not vertically centred): the dialog grows downward as
-			// content height changes — switching 預設風格/自訂提示詞, showing an
-			// error, or filling the result — so the whole popup never re-centres
-			// and jumps. The top offset clears the floating nav capsule (same
-			// expression as ProductModal) so the panel never opens underneath it;
-			// `--floating-nav-*` already collapse to the flat 56px bar on mobile.
-			// Scrim: the shared overlay treatment from components/ui/Dialog.tsx —
-			// ink-tinted rather than flat black, and blurred, so the panel edge
-			// isn't a hard bright-on-black seam.
 			className="fixed inset-0 z-[1200] flex items-start justify-center bg-[rgb(var(--color-neutral-ink-rgb)_/_0.46)] backdrop-blur-sm p-4 pt-[calc(var(--floating-nav-top-gap,16px)+var(--floating-nav-height,84px)+16px)] overflow-y-auto"
 			role="dialog"
 			aria-modal="true"
 			aria-label="AI 圖片美化"
 		>
-			{/* Frosted panel — the seller-side glass treatment already used by
-			 * SellerProfileBranding's header: cream→sage wash (never pure white,
-			 * which glares against the dimmed page), heavy blur + saturation, a
-			 * white rim light on top and a soft primary drop shadow. */}
+
 			<div className="w-full max-w-2xl max-h-[calc(100dvh-var(--floating-nav-top-gap,16px)-var(--floating-nav-height,84px)-32px)] overflow-auto rounded-[var(--hkui-radius-2xl)] border border-white/55 bg-[linear-gradient(135deg,rgba(255,253,247,0.82),rgb(var(--color-ink-50-rgb)/0.66))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_24px_60px_-28px_rgb(var(--color-ink-950-rgb)/0.55)] backdrop-blur-[24px] backdrop-saturate-[130%] dark:border-[rgba(245,222,165,0.16)] dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] dark:shadow-[inset_0_1px_0_rgba(245,222,165,0.06),0_24px_60px_-28px_rgba(0,0,0,0.6)]">
 				<header className="flex items-center justify-between mb-4 gap-3">
 					<h2 className="font-display text-xl text-foreground m-0 inline-flex items-center gap-2">
@@ -265,8 +231,7 @@ export default function AiImageEnhanceDialog({
 						<figcaption className="text-xs text-foreground-soft mb-1">
 							美化後
 						</figcaption>
-						{/* Inset plates stay translucent so they read as recesses in
-						 * the glass rather than opaque white patches on top of it. */}
+
 						<div className="w-full aspect-[4/3] rounded-hkui-md border border-white/50 bg-white/40 dark:border-[rgba(245,222,165,0.12)] dark:bg-white/5 flex flex-col items-center justify-center gap-1.5 overflow-hidden">
 							{loading ? (
 								<>
@@ -373,7 +338,7 @@ export default function AiImageEnhanceDialog({
 					)}
 				</div>
 
-				{/* Reserve a row so showing/hiding the error doesn't shift the footer. */}
+
 				<div className="min-h-5 mb-3">
 					{error && (
 						<p className="text-danger-700 text-sm font-semibold" role="alert">

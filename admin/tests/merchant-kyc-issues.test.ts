@@ -114,8 +114,6 @@ function issue(patch: Partial<KycIssueDraft> = {}): KycIssueDraft {
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 原因碼
 
 test("原因碼的文字窮舉 KYCIssueCode：每個非 UNSPECIFIED 的值都有文字，下拉選項與 enum 完全相同，新增 enum 值時這裡會失敗", () => {
 	const all = Object.values(KYCIssueCode).filter(
@@ -139,8 +137,6 @@ test("原因碼的文字窮舉 KYCIssueCode：每個非 UNSPECIFIED 的值都有
 	assert.equal(kycIssueCodeLabel(9999 as KYCIssueCode), "未知");
 });
 
-// ---------------------------------------------------------------------------
-// 可以指出問題的欄位
 
 test("可以指出問題的欄位由伺服器給（issuable_fields）：選項照它的順序，只加上呈現文字與「是不是文件」；UNSPECIFIED 不列", () => {
 	const ind = issuableFieldOptions(individual());
@@ -149,7 +145,6 @@ test("可以指出問題的欄位由伺服器給（issuable_fields）：選項�
 	assert.deepEqual(fields(ind), INDIVIDUAL_ISSUABLE);
 	assert.deepEqual(fields(biz), BUSINESS_ISSUABLE);
 	assert.ok(ind.every((o) => o.label !== "-" && o.label !== ""));
-	// 沒有寫死的型態對欄位表：伺服器給什麼就是什麼（個人的清單裡沒有統編只是伺服器的輸出）。
 	assert.deepEqual(
 		fields(
 			issuableFieldOptions(
@@ -167,15 +162,12 @@ test("可以指出問題的欄位由伺服器給（issuable_fields）：選項�
 		issuableFieldOptions(individual({ issuableFields: [] })),
 		[],
 	);
-	// 文件類欄位只有補充文件，其餘都不是文件。
 	assert.deepEqual(
 		biz.filter((o) => o.document).map((o) => o.field),
 		[KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS],
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 指定文件
 
 test("可以指定的文件取自申請上的文件：asset_id 來自 KYCDocument，沒有 asset_id 的不列，補充文件依順序編號", () => {
 	assert.deepEqual(documentChoices(individual()), [], "沒有文件：不能指定");
@@ -195,8 +187,6 @@ test("可以指定的文件取自申請上的文件：asset_id 來自 KYCDocumen
 	]);
 });
 
-// ---------------------------------------------------------------------------
-// 加入一項問題前的檢查
 
 const BIZ_OPTIONS = issuableFieldOptions(business());
 const CHOICES: DocumentChoice[] = [
@@ -239,7 +229,6 @@ test("加入一項問題：欄位、原因、說明都要有效；原因碼是 U
 		),
 		"請選擇有問題的欄位。",
 	);
-	// 不是這份申請的欄位（個人欄位出現在企業申請）也擋下。
 	assert.equal(
 		validateIssueDraft(
 			{ ...base, field: KYCField.KYC_FIELD_WEBSITE_URL },
@@ -249,7 +238,6 @@ test("加入一項問題：欄位、原因、說明都要有效；原因碼是 U
 		),
 		"請選擇有問題的欄位。",
 	);
-	// 每個有效的原因碼都過。
 	for (const code of KYC_ISSUE_CODE_OPTIONS) {
 		assert.equal(
 			validateIssueDraft({ ...base, code }, BIZ_OPTIONS, CHOICES, []),
@@ -284,7 +272,6 @@ test("文件：只有文件類欄位能指定一張，而且那一張要屬於�
 		validateIssueDraft(withAsset, BIZ_OPTIONS, CHOICES, []),
 		undefined,
 	);
-	// 缺少文件：只標欄位，不帶 asset。
 	assert.equal(
 		validateIssueDraft(
 			{ ...base, field: docField, code: KYCIssueCode.KYC_ISSUE_CODE_MISSING },
@@ -294,7 +281,6 @@ test("文件：只有文件類欄位能指定一張，而且那一張要屬於�
 		),
 		undefined,
 	);
-	// 非文件欄位不能帶文件。
 	assert.equal(
 		validateIssueDraft(
 			{ ...base, documentAssetId: "a-c0" },
@@ -304,7 +290,6 @@ test("文件：只有文件類欄位能指定一張，而且那一張要屬於�
 		),
 		"這個欄位不是文件，不能指定文件。",
 	);
-	// 不存在、或屬於別的欄位的文件。
 	assert.equal(
 		validateIssueDraft(
 			{ ...withAsset, documentAssetId: "nope" },
@@ -329,7 +314,6 @@ test("文件：只有文件類欄位能指定一張，而且那一張要屬於�
 		),
 		"找不到指定的文件，請重新選擇。",
 	);
-	// 同一個欄位（同一張）已經有一項；同一個欄位的另一張可以。
 	const existing = [issue({ field: docField, documentAssetId: "a-c0" })];
 	assert.match(
 		validateIssueDraft(withAsset, BIZ_OPTIONS, CHOICES, existing) ?? "",
@@ -380,7 +364,6 @@ test("文件類欄位依原因碼（與伺服器同一條規則）：看不清�
 			`${KYCIssueCode[code]} 帶 asset 可以`,
 		);
 	}
-	// 申請上沒有文件可選：同一個錯誤，不另寫說明怎麼辦。
 	assert.equal(
 		validateIssueDraft(
 			{ ...base, field: docField, code: required[0] },
@@ -390,7 +373,6 @@ test("文件類欄位依原因碼（與伺服器同一條規則）：看不清�
 		),
 		ISSUE_ASSET_REQUIRED_TEXT,
 	);
-	// 缺少：不可以帶 asset；不帶可以。
 	assert.equal(
 		validateIssueDraft(
 			{
@@ -414,7 +396,6 @@ test("文件類欄位依原因碼（與伺服器同一條規則）：看不清�
 		),
 		undefined,
 	);
-	// 其他：兩者皆可。
 	for (const documentAssetId of ["", "a-c0"]) {
 		assert.equal(
 			validateIssueDraft(
@@ -431,7 +412,6 @@ test("文件類欄位依原因碼（與伺服器同一條規則）：看不清�
 			undefined,
 		);
 	}
-	// 非文件欄位不受這條規則影響：看不清楚不需要 asset。
 	assert.equal(
 		validateIssueDraft(
 			{ ...base, code: KYCIssueCode.KYC_ISSUE_CODE_UNREADABLE },
@@ -443,8 +423,6 @@ test("文件類欄位依原因碼（與伺服器同一條規則）：看不清�
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 送出前的檢查與請求
 
 function draft(patch: Partial<ReviewDraft> = {}): ReviewDraft {
 	return {
@@ -543,14 +521,11 @@ test("RejectKYC 的請求：帶讀到的 etag、依加入順序的 issues（欄�
 		],
 		internalNote: "電話確認過",
 	});
-	// 草稿裡的 key、顯示名稱不送出。
 	assert.ok(
 		request.issues.every((i) => !("key" in i) && !("documentLabel" in i)),
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 退回對話框
 
 function renderDialog(patch: Record<string, unknown> = {}): string {
 	return render(dialogModule.default, {
@@ -615,8 +590,6 @@ test("退回對話框：沒有問題時說還沒有；沒有可指定的文件�
 	assert.doesNotMatch(open, /type="submit"[^>]*disabled/u);
 });
 
-// ---------------------------------------------------------------------------
-// 賣家尚未處理的問題與審核紀錄
 
 const SERVER_ISSUES = [
 	{
@@ -690,7 +663,6 @@ test("被退回的申請顯示總理由，加上賣家尚未處理的問題（�
 	});
 	assert.match(handled, /賣家已處理退回的所有項目，還沒有重新送出/u);
 	assert.doesNotMatch(handled, /賣家尚未處理的問題/u);
-	// 沒有退回紀錄的理由時用固定說法。
 	assert.match(
 		render(cards.KycRejectionNotice, {
 			application: individual({ status: KYCStatus.KYC_STATUS_REJECTED }),

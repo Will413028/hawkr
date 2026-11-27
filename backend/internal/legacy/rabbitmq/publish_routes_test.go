@@ -19,18 +19,6 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// 單體裡每個把事件交給本 package 的 Publisher 的地方（PublishArgs 字面值），送出的每個 (exchange, routing key)，
-// 都要落在 infra/mq/topology/topology.yaml 宣告的 queue。清單由 internal/ 與 cmd/ 底下的原始碼導出，不手抄，也不寫死 package 名單：
-// 新增一個發送者就多一列。
-//
-// 掃不全就失敗，不靜默略過：
-//   - PublishArgs 只允許出現在「字面值」與「函式參數型別」兩種位置。
-//   - 字面值的 Exchange、RoutingKey 必須是字串字面值或同 package 的 package 層 const，或是轉手函式（以函式參數填入）的參數。
-//   - 轉手函式必須是未匯出的、在 package 內名稱唯一的函式或方法（同名的不同 receiver 無法不靠型別資訊分辨）；
-//     函式本體不得以閉包參數或區域宣告遮蔽那兩個參數；它的每個引用都要是直接呼叫（不得被當成值傳遞）。
-//   - 引用 legacy/rabbitmq 的檔案不得直接呼叫 Publish（四個參數），任何 package 也不得宣告帶 []byte 的四參數 Publish 方法或介面。
-//
-// 欄位正確性不在這裡（那是各 package 的 wire_test）。終點：最後一個舊 Publisher 使用者刪除時刪掉。
 
 const (
 	topologyFile  = "../../../infra/mq/topology/topology.yaml"
@@ -70,7 +58,6 @@ func loadTopologyDoc(t *testing.T) topologyDoc {
 	return doc
 }
 
-// boundQueues 回傳 topology.yaml 裡綁到 (exchange, key) 的 queue 名稱（排序）。
 func (d topologyDoc) boundQueues(exchange, key string) []string {
 	var out []string
 	for _, q := range d.Queues {
@@ -102,7 +89,6 @@ var (
 	scanErr  error
 )
 
-// publishRoutes 回傳 scanRoots 底下每個 package（略過 publisherSelf、testdata 與 _test.go）的發送點；每個 test binary 只算一次。
 func publishRoutes(t *testing.T) []routeRow {
 	t.Helper()
 	scanOnce.Do(func() { scanRows, scanErr = scanAll() })
@@ -237,7 +223,6 @@ func scanPackageRoutes(dir string) []routeRow {
 	}
 	pkg := filepath.ToSlash(rel)
 
-	// 直接呼叫 Publisher.Publish 的檢查：沒有型別資訊，所以用「引用本 package」與「方法簽章」兩個訊號，寧可誤報。
 	for _, f := range files {
 		importsPublisher := false
 		for _, im := range f.Imports {
@@ -266,7 +251,6 @@ func scanPackageRoutes(dir string) []routeRow {
 		})
 	}
 
-	// 只解析 package 層的 const：函式內的同名 const 不算。
 	consts := map[string]string{}
 	declCount := map[string]int{}
 	for _, f := range files {
@@ -307,7 +291,6 @@ func scanPackageRoutes(dir string) []routeRow {
 	var rows []routeRow
 	forwarders := map[string]forwarder{}
 	for _, f := range files {
-		// PublishArgs 只能出現在字面值的型別與函式參數型別。
 		total, allowed := 0, 0
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch v := n.(type) {
@@ -440,7 +423,6 @@ func scanPackageRoutes(dir string) []routeRow {
 				return true
 			})
 		}
-		// 識別字出現次數 = 一個宣告 + 每個呼叫；多出來的是被當成值傳遞（method value）或被其他方式引用。
 		if idents != calls+1 {
 			failf("%s：%s 有 %d 處引用不是直接呼叫（被當成值傳遞、同名欄位或區域變數？），掃描看不到那些送出點", pkg, fw.name, idents-calls-1)
 		}
@@ -451,8 +433,6 @@ func scanPackageRoutes(dir string) []routeRow {
 	return rows
 }
 
-// checkNoShadow：轉手函式本體裡，閉包參數、:=、var、range 都不得重新宣告 exchange 或 routing key 參數的名字，
-// 否則字面值裡的同名識別字指的不是外層參數，位置對應會錯。
 func checkNoShadow(pkg string, fn *ast.FuncDecl, names ...string) {
 	if fn.Body == nil {
 		return
@@ -494,7 +474,6 @@ func checkNoShadow(pkg string, fn *ast.FuncDecl, names ...string) {
 	})
 }
 
-// topicMatch 是 AMQP topic exchange 的比對：* 一個字，# 零個以上的字。
 func topicMatch(pattern, key string) bool {
 	var match func(p, k []string) bool
 	match = func(p, k []string) bool {

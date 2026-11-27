@@ -95,7 +95,6 @@ export function SellerGroupCard({
 				.filter((it) => selected[it.id] && it.purchasable !== false)
 				.reduce((s, it) => s + it.priceValue * it.quantity, 0);
 
-	// Per-seller shipping options for this seller's selected items.
 	const checkoutItems = React.useMemo(
 		() =>
 			group.items

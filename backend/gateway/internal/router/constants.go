@@ -1,6 +1,5 @@
 package router
 
-// ==================== Namespace 路徑 ====================
 
 const (
 	// API 基礎路徑
@@ -12,7 +11,6 @@ const (
 	AdminPath  = "/admin"  // 管理員專用
 )
 
-// ==================== 超商門市地圖（/app/store_map_sessions + 頂層回調）====================
 
 const (
 	StoreMapSessionsPath = "/store_map_sessions"
@@ -20,14 +18,12 @@ const (
 	StoreMapReturnPath   = "/store_map/return"
 )
 
-// ==================== 買家常用門市（/app/store_pickups）====================
 
 const (
 	StorePickupsPath = "/store_pickups"
 	StorePickupID    = "/:store_pickup_id"
 )
 
-// ==================== Product（/public/products + /app/products）====================
 
 const (
 	ProductsPath            = "/products"
@@ -57,7 +53,6 @@ const (
 	ProductCertificationApplicationWithdraw = "/:id/certification_applications/:application_id/withdraw"
 )
 
-// ==================== Category（/public/categories + /app/categories）====================
 
 const (
 	CategoriesPath         = "/categories"
@@ -70,7 +65,6 @@ const (
 	ProductsBatchChangeCat = "/products/batch-change-category"
 )
 
-// ==================== Order（/app/orders）====================
 
 const (
 	OrdersPath               = "/orders"
@@ -83,7 +77,6 @@ const (
 	OrderRetryGrant          = "/:order_no/retry_grant"
 )
 
-// ==================== Shipments（/app/shipments）====================
 
 const (
 	ShipmentsPath                   = "/shipments"
@@ -100,7 +93,6 @@ const (
 	ShipmentsAnomalyIgnore      = "/anomalies/:shipment_id/:anomaly_type/ignore"
 )
 
-// ==================== Shipping Onboardings（/app/shipping_onboardings）====================
 
 const (
 	ShippingOnboardingsPath         = "/shipping_onboardings"
@@ -110,19 +102,16 @@ const (
 	ShippingOnboardingToggle        = "/:onboarding_id/toggle"
 )
 
-// ==================== 賣家配送方式（/app/shipping_methods）====================
 
 const (
 	ShippingMethodsPath = "/shipping_methods"
 )
 
-// ==================== 出貨工作天（/app/shipping_business_days）====================
 
 const (
 	ShippingBusinessDaysPath = "/shipping_business_days"
 )
 
-// ==================== Cart（/public/carts + /app/carts）====================
 
 const (
 	CartsPath        = "/carts"
@@ -132,7 +121,6 @@ const (
 	CartsMerge       = "/merge"
 )
 
-// ==================== 結帳（/app/checkout）====================
 
 const (
 	CheckoutPath        = "/checkout"
@@ -142,13 +130,11 @@ const (
 	CheckoutConfirm     = "/confirm"
 )
 
-// ==================== 配送報價（/app/shipping-quotes）====================
 
 const (
 	ShippingQuotesPath = "/shipping_quotes"
 )
 
-// ==================== Admin Product ====================
 
 const (
 	AdminProductsPath  = "/products"
@@ -158,7 +144,6 @@ const (
 	AdminProductCache  = "/products/cache"
 )
 
-// ==================== Admin Product Certification（19 號設計書 §9.2 / §9.3）====================
 
 // ⚠️ 路徑刻意是 product_certification_applications 而不是 certifications：
 // /admin/certifications* 是商家實名認證（KYC，`docs/modules/seller.md` §13）的前綴，兩者是不同的東西；KYC 審核在單體
@@ -175,7 +160,6 @@ const (
 	AdminProductCertificationReverify = "/product_certification_applications/:id/reverify"
 )
 
-// ==================== Admin Shipping（§29 + §5.21 配送異常）====================
 
 const (
 	AdminShipmentsPath              = "/shipments"
@@ -187,7 +171,6 @@ const (
 	AdminShipmentsAnomalyIgnore      = "/shipments/anomalies/:shipment_id/:anomaly_type/ignore"
 )
 
-// ==================== 搜尋相關 ====================
 
 const (
 	SearchPath     = "/search"
@@ -203,13 +186,11 @@ const (
 	SellersProducts = "/sellers/:id/products"
 )
 
-// ==================== 買家相關（/app/buyers/me）====================
 
 const (
 	BuyersPath = "/buyers/me"
 )
 
-// ==================== 優惠券 Coupon ====================
 
 const (
 	// 共用 Resource
@@ -240,11 +221,7 @@ const (
 	AdminCouponQuotaSeller = "/:store_id"
 )
 
-// 物流 wildcard 死代理 /app/shipping/*path 已於能力層 PR 刪除（46 §3.7）：
-// shipping-service 無 HTTP 面且 port 錯配，為 404 死路由；刪除後 engine.Routes()
-// 即完整攻擊面，boot 斷言才成立。
 
-// ==================== 售後服務相關 ====================
 
 const (
 	AfterSalesPath                       = "/after_sales"
@@ -264,11 +241,6 @@ const (
 	AdminAfterSalesForceConfirmReceipt   = "/:case_no/force_confirm_receipt"    // §5.3.12 Admin 強制確認收貨
 )
 
-// ==================== 電子發票 Invoice（58 號設計書 §6.1）====================
-//
-// 路徑與 path param 一律 snake_case：gin tree 同層不允許不同名 wildcard（`:storeId` 與
-// 既有 `:store_id` 同段註冊即 panic），且 metric 的 path label 取自 c.FullPath，寫錯
-// 名字會讓 PromQL 恆零命中。
 
 const (
 	// 群組根路徑
@@ -358,13 +330,11 @@ const (
 	AdminInvoiceTaxDocumentContent   = "/tax_reviews/:store_id/documents/:document_id/content"  // ADM 稅籍佐證檔二進位子路由（plan 8f-1）
 )
 
-// ==================== 分享（/app/share_url）====================
 
 const (
 	ShareURLPath = "/share_url"
 )
 
-// ==================== 開發工具（/public/caches）====================
 
 const (
 	CachesPath         = "/caches"
@@ -372,7 +342,6 @@ const (
 	CachesFlushService = "/flush/:service"
 )
 
-// ==================== 聊天相關 ====================
 
 const (
 

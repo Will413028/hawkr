@@ -104,16 +104,8 @@ func (c *Client) BatchGetBuyerDisplay(ctx context.Context, buyerIDs []int64) (ma
 
 	out := make(map[int64]Display, len(resp.GetBuyers()))
 	for id, v := range resp.GetBuyers() {
-		// ⚠️ **`v == nil` 在 wire 上不會發生**：protobuf 的 map<int64, Message> 送出
-		// nil 值之後，接收端解出來是一個**空 message** 而不是 nil（實測，
-		// client_test.go 的 id 13 那一格就是為此存在）。所以判準必須是「有沒有名字」，
-		// 不能是「指標是不是 nil」——後者在單元測試的 in-process 假物件上看起來有效，
-		// 一上 wire 就永遠不成立。
 		name := v.GetDisplayName()
 		if name == "" {
-			// 沒有名字的項目不是答案。proto 逐字「查無的 id 不出現」⇒ 出現卻沒名字
-			// 屬於異常，讓它留在 map 裡會讓「解析成功但沒名字」與「解析成功」
-			// 在呼叫端無從區分。
 			continue
 		}
 		out[id] = Display{DisplayName: name, Deleted: v.GetDeleted()}

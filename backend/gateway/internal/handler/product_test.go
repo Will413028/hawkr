@@ -22,15 +22,11 @@ import (
 	"google.golang.org/grpc"
 )
 
-// favoriteTestAccountID / favoriteTestBuyerID are deliberately DIFFERENT values:
-// the product overlay must send the resolved buyer_id downstream, never the raw
-// account_id, and equal fixtures would hide that mistake.
 const (
 	favoriteTestAccountID int64 = 42
 	favoriteTestBuyerID   int64 = 777
 )
 
-// ==================== Router Setup ====================
 
 func setupProductRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -45,8 +41,6 @@ func setupProductRouter(h *Holder) *gin.Engine {
 	return r
 }
 
-// fakeOptionalAuth 模擬 middleware.OptionalJWTAuth()：X-Account-Id/X-Account-Type
-// header 有帶才寫入 context，缺席時直接放行（公開路由匿名可訪問，不像 fakeJWTAuth 那樣 401）。
 func fakeOptionalAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if idStr := c.GetHeader("X-Account-Id"); idStr != "" {
@@ -86,7 +80,6 @@ func setupProductRouterWithAuth(h *Holder) *gin.Engine {
 	return r
 }
 
-// ==================== GetProductList ====================
 
 func TestGetProductList_Success(t *testing.T) {
 	mock := &mockProductServiceClient{
@@ -188,7 +181,6 @@ func TestGetProductList_GrpcError(t *testing.T) {
 	assertCode(t, resp, 503)
 }
 
-// ==================== GetProductList followed_* gating (ViewerBuyerId) ====================
 
 // TestGetProductList_FollowedFilterGating pins the behavior change reviewed
 // in phase 2: h.resolveBuyerID(c) is only consulted when followed_product_only
@@ -273,7 +265,6 @@ func TestGetProductList_FollowedFilterGating(t *testing.T) {
 	})
 }
 
-// ==================== GetProductList favorites aggregation (buyer_id soft-fail) ====================
 
 // TestGetProductList_FavoritesAggregation proves the isFavorited aggregation
 // in GetProductList resolves account_id -> buyer_id via the soft-fail path
@@ -400,10 +391,6 @@ func TestGetProductList_RestockSubscribedAggregation(t *testing.T) {
 
 	t.Run("ResolvedBuyerIDForwarded", func(t *testing.T) {
 		buyerMock := &mockBuyerServiceClient{
-			// GetProductList 現在共用同一個 buyerID 做收藏+補貨訂閱兩個聚合，即使本
-			// 測試只關心補貨訂閱，收藏那條路徑仍會被觸發，要給一個有效回應（否則
-			// mock 預設的 (nil, nil) 會讓 BuyerClient.BatchCheckFavorites 對 nil
-			// resp 解參考 panic）。
 			BatchCheckFavoritesFn: func(context.Context, *buyerpb.BatchCheckFavoritesRequest, ...grpc.CallOption) (*buyerpb.BatchCheckFavoritesResponse, error) {
 				return &buyerpb.BatchCheckFavoritesResponse{Code: 0}, nil
 			},
@@ -477,7 +464,6 @@ func TestGetProductList_RestockSubscribedAggregation(t *testing.T) {
 	})
 }
 
-// ==================== GetProductDetailByID ====================
 
 func TestGetProductDetailByID_Success(t *testing.T) {
 	mock := &mockProductServiceClient{
@@ -537,7 +523,6 @@ func TestGetProductDetailByID_Success(t *testing.T) {
 	}
 }
 
-// ==================== Seller nested logoKey/logoUrl (B-238 / issue #1782) ====================
 
 // TestGetProductList_SellerLogoURLField proves the nested seller object in
 // /public/products list responses exposes the seller logo as the canonical
@@ -652,7 +637,6 @@ func TestGetProductDetailByID_SellerLogoURLField(t *testing.T) {
 // objectKey 是 public/ 前綴的公開路徑，同一份回應的 imageKeys 早已列出全部 gallery objectKey，
 // 清掉它保護不到任何東西，卻讓前端（尤其 objectKey 不在 imageKeys 內的描述內嵌圖）只能載原圖。
 func TestGalleryAssetIDVisibility(t *testing.T) {
-	// 49 §6.6：gallery/description url 改由 Gateway 從 objectKey 組（proto Url 不再由服務側填、Gateway 忽略之）。
 	const base = "https://media.test"
 	galleryURL := mediaurl.BuildURL(base, "public/p/1.jpg")
 	blockURL := mediaurl.BuildURL(base, "public/d/1.jpg")
@@ -670,7 +654,6 @@ func TestGalleryAssetIDVisibility(t *testing.T) {
 		},
 	}
 
-	// 賣家 / Admin 端：保留 assetId / objectKey；url 由 Gateway 組
 	seller := convertToProductDetail(base, data)
 	if len(seller.Gallery) != 1 || seller.Gallery[0].AssetID != "asset-1" || seller.Gallery[0].ImageKey != "public/p/1.jpg" {
 		t.Fatalf("seller gallery should keep assetId/objectKey, got %+v", seller.Gallery)
@@ -682,8 +665,6 @@ func TestGalleryAssetIDVisibility(t *testing.T) {
 		seller.Description.Blocks[0].AssetID != "asset-desc-1" || seller.Description.Blocks[0].ImageKey != "public/d/1.jpg" {
 		t.Fatalf("seller description should keep assetId/objectKey, got %+v", seller.Description)
 	}
-	// 賣家 / Admin 端 round-trip 的 wire 層證據：assetId 必須真的序列化出去（gallery 與描述
-	// 區塊各一個），否則賣家只調圖片順序時就會丟圖（既有圖靠 assetId 認）。
 	sellerBlob, err := json.Marshal(seller)
 	if err != nil {
 		t.Fatal(err)
@@ -696,8 +677,6 @@ func TestGalleryAssetIDVisibility(t *testing.T) {
 		t.Errorf("seller JSON must keep description assetId: %s", sellerJS)
 	}
 
-	// 公開端：gallery 走 PublicGalleryItem、description.blocks 走 PublicDescriptionBlock，
-	// 兩者型別上就沒有 assetId；objectKey / url 保留
 	pub := convertToPublicProductDetail(base, data)
 	if len(pub.Gallery) != 1 {
 		t.Fatalf("public gallery length = %d, want 1", len(pub.Gallery))
@@ -718,7 +697,6 @@ func TestGalleryAssetIDVisibility(t *testing.T) {
 		t.Errorf("public description url must be kept, got %q want %q", pub.Description.Blocks[0].ImageURL, blockURL)
 	}
 
-	// 序列化層級：assetId key 完全不得出現；gallery / description 的 objectKey 必須在
 	blob, err := json.Marshal(pub)
 	if err != nil {
 		t.Fatal(err)
@@ -733,7 +711,6 @@ func TestGalleryAssetIDVisibility(t *testing.T) {
 	if !strings.Contains(js, `"imageKey":"public/d/1.jpg"`) {
 		t.Errorf("public JSON must keep description imageKey: %s", js)
 	}
-	// 舊欄名不得殘留——只斷言新名存在的話，同時吐兩組也會綠。
 	for _, stale := range []string{`"objectKey"`, `"url":`} {
 		if strings.Contains(js, stale) {
 			t.Errorf("public JSON 不得再出現舊欄名 %s: %s", stale, js)
@@ -742,9 +719,6 @@ func TestGalleryAssetIDVisibility(t *testing.T) {
 	if !strings.Contains(js, galleryURL) {
 		t.Errorf("public JSON must keep gallery url: %s", js)
 	}
-	// 遮蔽驗證：內嵌 ProductDetailItem 的 Gallery / Description（含 assetId 的賣家形狀）
-	// 不得漏進公開 JSON。這兩行釘住的是 encoding/json 的同名欄位取較淺層規則——若哪天有人
-	// 把外層欄位拿掉，內嵌欄位會立刻接手序列化並把 assetId 一起吐出去。
 	if strings.Count(js, `"gallery"`) != 1 {
 		t.Errorf("public JSON must contain exactly one gallery key: %s", js)
 	}
@@ -763,12 +737,10 @@ func TestPublicDTOFieldParity(t *testing.T) {
 		name        string
 		sellerShape interface{}
 		publicShape interface{}
-		omitted     []string // 公開端刻意不帶的 json key
+		omitted     []string
 	}{
 		{"gallery", GalleryItem{}, PublicGalleryItem{}, []string{"assetId"}},
 		{"descriptionBlock", DescriptionBlockResponse{}, PublicDescriptionBlock{}, []string{"assetId"}},
-		// 容器層也要釘：在賣家側的 description 容器加欄位（而非 block 內）同樣會漂移，
-		// 只是高一層。公開端與賣家端的容器 key 應完全相同——差別只在 blocks 的元素型別。
 		{"descriptionContainer", ProductDescriptionResponse{}, PublicProductDescription{}, nil},
 	}
 
@@ -777,7 +749,6 @@ func TestPublicDTOFieldParity(t *testing.T) {
 			sellerKeys := jsonFieldKeys(t, tc.sellerShape)
 			publicKeys := jsonFieldKeys(t, tc.publicShape)
 
-			// 先證明取得出欄位——空集合對空集合會無聲通過，那是假綠。
 			if len(sellerKeys) == 0 || len(publicKeys) == 0 {
 				t.Fatalf("json field keys must be non-empty: seller=%v public=%v", sellerKeys, publicKeys)
 			}
@@ -803,7 +774,6 @@ func TestPublicDTOFieldParity(t *testing.T) {
 	}
 }
 
-// jsonFieldKeys 取出 struct 每個匯出欄位的 json key（去掉 ,omitempty 之類的選項），依宣告順序。
 func jsonFieldKeys(t *testing.T, v interface{}) []string {
 	t.Helper()
 	rt := reflect.TypeOf(v)
@@ -813,7 +783,7 @@ func jsonFieldKeys(t *testing.T, v interface{}) []string {
 	keys := make([]string, 0, rt.NumField())
 	for i := 0; i < rt.NumField(); i++ {
 		f := rt.Field(i)
-		if f.PkgPath != "" { // 未匯出欄位不會序列化
+		if f.PkgPath != "" {
 			continue
 		}
 		tag := f.Tag.Get("json")
@@ -840,7 +810,7 @@ func TestGetProductDetailByID_SellerRoleResolvesToCurrentSurrogate(t *testing.T)
 	h := &Holder{Product: grpcclient.NewProductClientForTest(mock), Store: storeResolverForTest(rekeyTestSurrogate)}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/public/products/prod-1", nil)
 	req.Header.Set("X-Account-Id", "2600000001")
-	req.Header.Set("X-Account-Type", "2") // SELLER
+	req.Header.Set("X-Account-Type", "2")
 	w := httptest.NewRecorder()
 	setupProductRouterWithAuth(h).ServeHTTP(w, req)
 
@@ -863,7 +833,7 @@ func TestGetProductDetailByID_BuyerViewer_UsesPublicPublicationContract(t *testi
 	h := &Holder{Product: grpcclient.NewProductClientForTest(mock), Store: resolverThatFailsTest(t)}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/public/products/prod-1", nil)
 	req.Header.Set("X-Account-Id", "3600000002")
-	req.Header.Set("X-Account-Type", "1") // BUYER
+	req.Header.Set("X-Account-Type", "1")
 	w := httptest.NewRecorder()
 	setupProductRouterWithAuth(h).ServeHTTP(w, req)
 
@@ -884,7 +854,7 @@ func TestGetProductDetailByID_SellerWithNoCurrentStore_FallsBackToRawAccountID(t
 	h := &Holder{Product: grpcclient.NewProductClientForTest(mock), Store: noStoreResolverForTest()}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/public/products/prod-1", nil)
 	req.Header.Set("X-Account-Id", "2600000001")
-	req.Header.Set("X-Account-Type", "2") // SELLER，但已刪店
+	req.Header.Set("X-Account-Type", "2")
 	w := httptest.NewRecorder()
 	setupProductRouterWithAuth(h).ServeHTTP(w, req)
 
@@ -894,7 +864,6 @@ func TestGetProductDetailByID_SellerWithNoCurrentStore_FallsBackToRawAccountID(t
 	}
 }
 
-// ==================== GetProductDetailByID favorite aggregation (buyer_id soft-fail) ====================
 
 // TestGetProductDetailByID_FavoriteAggregation proves the isFavorited and
 // isRestockSubscribed aggregations in the PDP share a single soft-fail
@@ -1040,7 +1009,6 @@ func TestGetProductDetailByID_GrpcError(t *testing.T) {
 	assertCode(t, resp, 503)
 }
 
-// ==================== GetProductRating ====================
 
 func TestGetProductRating_Success(t *testing.T) {
 	mock := &mockProductServiceClient{
@@ -1080,7 +1048,6 @@ func TestGetProductRating_Success(t *testing.T) {
 	}
 }
 
-// ==================== PurgeProductCache ====================
 
 func purgeCacheRequest(t *testing.T, body string) *http.Request {
 	t.Helper()
@@ -1191,11 +1158,7 @@ func TestPurgeProductCache_ListScope_NoCurrentSeller_ReturnsZeroPurged(t *testin
 	}
 }
 
-// ==================== VerifyCertification：cert_no 字元白名單 ====================
 
-// setupCertificationRouter 只掛 VerifyCertification 一條路由。真實路由（routes_product.go）
-// 前面還有 JWT 與 requireSeller，但這裡要釘的是「非法字元有沒有在送進 gRPC 之前被擋下」，
-// 與身分無關，掛裸 handler 才不會讓 auth 的 401 蓋掉要觀察的訊號。
 func setupCertificationRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	r.GET("/api/v1/app/products/certifications/verify", h.VerifyCertification)
@@ -1291,14 +1254,14 @@ func TestVerifyCertification_RejectsEmptyCertNo(t *testing.T) {
 // 樣本取自設計書 19 §3/§7.1 與 infra/seed-data/04-product.sql 的實際認證編號。
 func TestVerifyCertification_AcceptsWhitelistedCertNo(t *testing.T) {
 	for _, certNo := range []string{
-		"1-008-131005",                       // 有機
-		"1-009-300022",                       // 有機（設計書時序圖樣本）
-		"TAP-2025-0032",                      // 產銷履歷
-		"CAS-2025-1234",                      // CAS
-		"ALI-TEA-2026-015",                   // seed data 產地證明
-		"abc_123",                            // 底線
-		"A",                                  // 單字元下界
-		strings.Repeat("A", certNoMaxLength), // 長度上界
+		"1-008-131005",
+		"1-009-300022",
+		"TAP-2025-0032",
+		"CAS-2025-1234",
+		"ALI-TEA-2026-015",
+		"abc_123",
+		"A",
+		strings.Repeat("A", certNoMaxLength),
 	} {
 		t.Run(certNo, func(t *testing.T) {
 			var got string

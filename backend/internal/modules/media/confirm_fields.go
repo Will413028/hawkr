@@ -19,7 +19,6 @@ type Confirmer interface {
 // ConfirmItem 是請求裡一個要確認的 staged token，Field 是它在輸入的欄位名（清單元素帶索引）。
 type ConfirmItem struct{ Field, Token string }
 
-// defaultRejectedMessage 是多個欄位不合格、訊息不同時整體的一句。
 func defaultRejectedMessage(ctx context.Context) string {
 	return text.MediaConfirmSomeUnusable(uitext.LocaleFrom(ctx)).Text
 }

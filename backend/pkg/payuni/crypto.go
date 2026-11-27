@@ -34,14 +34,12 @@ func EncryptString(plainText, key, iv string) (string, error) {
 	keyBytes := []byte(key)
 	ivBytes := []byte(iv)
 
-	// Ensure Key is 32 bytes
 	var keyArr [32]byte
 	copy(keyArr[:], keyBytes)
 	if len(keyBytes) > 32 {
 		copy(keyArr[:], keyBytes[:32])
 	}
 
-	// Ensure IV is 16 bytes (PAYUNi uses 16 bytes, not standard 12)
 	var nonceArr [16]byte
 	copy(nonceArr[:], ivBytes)
 	if len(ivBytes) > 16 {
@@ -53,7 +51,6 @@ func EncryptString(plainText, key, iv string) (string, error) {
 		return "", err
 	}
 
-	// AES-GCM with 16-byte nonce
 	aesgcm, err := cipher.NewGCMWithNonceSize(block, 16)
 	if err != nil {
 		return "", err
@@ -61,8 +58,6 @@ func EncryptString(plainText, key, iv string) (string, error) {
 
 	ciphertextWithTag := aesgcm.Seal(nil, nonceArr[:], []byte(plainText), nil)
 
-	// Split ciphertext and tag
-	// Tag size is 16 bytes for GCM
 	if len(ciphertextWithTag) < 16 {
 		return "", errors.New("ciphertext too short")
 	}
@@ -71,7 +66,6 @@ func EncryptString(plainText, key, iv string) (string, error) {
 	ciphertext := ciphertextWithTag[:tagStart]
 	tag := ciphertextWithTag[tagStart:]
 
-	// "hex(base64(ciphertext) + ':::' + base64(tag))"
 	cipherBase64 := base64.StdEncoding.EncodeToString(ciphertext)
 	tagBase64 := base64.StdEncoding.EncodeToString(tag)
 
@@ -82,14 +76,12 @@ func EncryptString(plainText, key, iv string) (string, error) {
 
 // Decrypt decrypts the specialized PAYUNi format
 func Decrypt(encryptStr, key, iv string) (string, error) {
-	// 1. Hex Decode
 	decodedHex, err := hex.DecodeString(encryptStr)
 	if err != nil {
 		return "", fmt.Errorf("hex decode error: %w", err)
 	}
 	combined := string(decodedHex)
 
-	// 2. Split ":::"
 	parts := strings.Split(combined, ":::")
 	if len(parts) != 2 {
 		return "", errors.New("invalid format: missing ':::'")
@@ -97,7 +89,6 @@ func Decrypt(encryptStr, key, iv string) (string, error) {
 	cipherBase64 := parts[0]
 	tagBase64 := parts[1]
 
-	// 3. Base64 Decode
 	ciphertext, err := base64.StdEncoding.DecodeString(cipherBase64)
 	if err != nil {
 		return "", fmt.Errorf("base64 decode ciphertext error: %w", err)
@@ -107,10 +98,8 @@ func Decrypt(encryptStr, key, iv string) (string, error) {
 		return "", fmt.Errorf("base64 decode tag error: %w", err)
 	}
 
-	// 4. Reconstruct ciphertext + tag
 	ciphertext = append(ciphertext, tag...)
 
-	// 5. Decrypt
 	keyBytes := []byte(key)
 	ivBytes := []byte(iv)
 

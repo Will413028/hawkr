@@ -12,7 +12,6 @@ var (
 	sqlComment  = regexp.MustCompile(`--[^\n]*`)
 )
 
-// buyerIDTables 列出 schema 文字中含 buyer_id 欄位的表。
 func buyerIDTables(schema string) []string {
 	schema = sqlComment.ReplaceAllString(schema, "")
 	var out []string

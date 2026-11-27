@@ -26,13 +26,12 @@ func TestAddressConversionAndUnknownCode(t *testing.T) {
 	s := New(nil)
 	ctx := t.Context()
 
-	// 正常代碼轉換為內政部名稱（含「臺」字）
 	info, err := s.address(ctx, buyer.Address{
 		AddressID:     101,
 		BuyerID:       201,
 		ReceiverName:  "王小明",
 		ReceiverPhone: "0912345678",
-		TownCode:      "63000050", // 臺北市中正區
+		TownCode:      "63000050",
 		AddressDetail: "忠孝東路一段 1 號",
 		IsDefault:     true,
 	})
@@ -46,7 +45,6 @@ func TestAddressConversionAndUnknownCode(t *testing.T) {
 		t.Fatalf("label = %q, want empty", info.GetLabel())
 	}
 
-	// 未知代碼回報 CodeInternal
 	_, err = s.address(ctx, buyer.Address{
 		AddressID:     102,
 		BuyerID:       201,

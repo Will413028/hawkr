@@ -52,61 +52,10 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { request } from "@/services/api";
 import { ApiClientError } from "@/services/api-error";
-// 對話框骨架（overlay、面板、標題列）在共用 Dialog 自己的 Dialog.css；這裡的 DelegatedOperations.css 只放
-// `.adm-operation-field*` 等欄位與版面 class（58A 陷阱 C07：少 import 不會報錯也不會轉紅）。
 import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A08｜申訴詳情（58A §A08，端點 59 `GET /api/v1/admin/invoices/complaints/{complaint_id}`）。
-//
-// ## 五個決策動作已接上（2026-09-02）
-//
-// 端點 60 的真實路徑是 `POST /admin/invoices/complaints/{complaint_id}/actions`
-// （gateway `AdminInvoiceComplaintActions`），RPC 在
-// `services/invoice-service/internal/grpc/complaint.go` 的
-// `ActOnInvoiceComplaintForAdmin`。舊版這裡寫「沒有實作」，那個結論來自拿猜的路徑名
-// （`.../decisions`）去打 dev 拿到 404 —— **路徑名猜錯不等於後端沒做**。
-//
-// 五個 action（`REMIND_SELLER` / `REQUEST_REWORK` / `DECIDE_RESOLVED` /
-// `DECIDE_VIOLATION` / `RECOMMEND_SUSPENSION`）的值域與 allowed-from 住在
-// `features/invoices/admin-actions.ts`，逐列對應 `admin_complaint.go` 的常數與
-// `invoice_complaints.sql` 的 CAS 述詞。
-//
-// ## 停權路線：本頁不呼叫發票模組或舊的停權端點，措施只經建立措施對話框的 CreateMeasure 建立
-//
-// 58A 的「停權三步」第一步是送出 `DECIDE_VIOLATION` 或 `RECOMMEND_SUSPENSION` 拿回應
-// 裡的 `recommendation`（90 天違規件數 ＋ 是否達門檻 ＋ 建議天數），第二步才在本頁開
-// 「建立措施」對話框。**發票模組只提建議、不執行處分**（`admin_complaint.go` 的 ③
-// 「沒有第三件」：不蓋 suspended_at、不發停權事件、不排恢復 job）——所以建議卡上那顆
-// 鍵只是開對話框，真正的措施要在對話框填完並送出，由賣家治理模組
-// （`SellerGovernanceAdminService.CreateMeasure`）建立，期間與自動解除也由它處理。
-//
-// ## 與 58A 的落差（兩個 Section 畫不出來）
-//
-// 端點 59 的回應（Gateway `InvoiceComplaintInfo`，與列表同一型別）沒有：
-//   - `invoiceSnapshot`　　　→「發票現況」Section 無資料來源
-//   - `notificationHistory[]`→「通知寄送歷程」Section 無資料來源
-//   - `violationCountIn90Days`→ 右欄「賣家風險」無資料來源
-// 第二項最要緊：58A 稱它是「A08 能不能裁決的關鍵」——申訴內容是「我沒收到發票」，而
-// 「有沒有開」與「有沒有寄到」是兩件事。沒有它，ADM 判不出是賣家沒開還是信被退回。
-// ⇒ 本頁明寫這件事，不畫一張空表格假裝有資料。
-//
-// ## 仍然照 58A 做的事
-//
-//   - **副標必寫「開啟本頁會記錄一筆存取紀錄」**：端點 59 會寫 `INVOICE_PII_REVEAL`
-//     稽核並有異常尖峰告警。讓人知道自己被記錄，是這套稽核能發揮嚇阻作用的前提。
-//     （對照 A06：那一頁的主資料端點不落這筆稽核，所以那裡**不能**寫這句話。）
-//   - **往來紀錄追加不覆蓋**，UI 不提供編輯任何一筆。
-//
-// ## 建立措施鍵的兩個落點
-//
-// 58A 把建立處分的入口掛在 `RECOMMEND_SUSPENSION` 的回應之後——現在那個掛點
-// 走得到了，所以**建議卡底下有一顆**：開啟時帶入剛拿到的建議（種類＝停權、結束時間＝
-// 現在加建議天數、理由＝建議理由的原文，`measureInitialFromSuggestion`），類別不預填，
-// 由管理員選，每一欄都可以改。右欄那顆常駐鍵仍然保留、不帶預填：沒有它的話，一個還沒
-// 送出任何動作的管理員從這一頁到處分之間沒有任何路徑。
-// 兩顆都只是開對話框，不寫入任何東西；寫入發生在對話框送出的 `CreateMeasure`。
 function Section({
 	title,
 	hint,
@@ -151,7 +100,6 @@ export default function InvoiceComplaintDetailPage() {
 	const complaintId = String(params?.complaintId ?? "");
 
 	const [openAction, setOpenAction] = useState<string | null>(null);
-	// 「建立措施」對話框要建立在哪家店、開啟時帶什麼初始值（只有「依建議建立措施」帶）；null 是沒開。
 	const [measureTarget, setMeasureTarget] = useState<{
 		storeId: string;
 		initial?: CreateMeasureInitial;
@@ -222,8 +170,6 @@ export default function InvoiceComplaintDetailPage() {
 		}
 		if (ACTION_CONFLICT_CODES.has(code)) {
 			setOpenAction(null);
-			// 不透傳後端 message：9336 的定版文案講的是申訴狀態、9322 講的是稅務資料，
-			// 兩者在這一頁上要說的下一步是同一句。
 			setBanner({ tone: "warning", text: actionConflictText(code) });
 			void refetch();
 			return true;
@@ -317,7 +263,7 @@ export default function InvoiceComplaintDetailPage() {
 								</>
 							) : null}
 						</h1>
-						{/* 這句話不是裝飾：端點 59 會寫一筆 PII 存取稽核並有尖峰告警。 */}
+
 						<p className="page-subtitle">開啟本頁會記錄一筆存取紀錄。</p>
 						<div className="invoice-meta">
 							{complaint?.orderNo ? (
@@ -432,9 +378,6 @@ export default function InvoiceComplaintDetailPage() {
 										entries={complaint.responses.map((item, index) => ({
 											id: item.responseId || `response-${index}`,
 											time: formatDateTime(item.occurredAt),
-											// actor／action 是碼值而且**沒有對應的 CodeMeta 碼表**：
-											// 58A 規劃由後端逐列下發 `eventLabel`，但 DTO 上沒有那個欄位。
-											// 兩條路都沒有中文 ⇒ 原樣顯示碼值，不自己補一張碼表。
 											title: item.action || "—",
 											actor: item.actor ? `來源：${item.actor}` : undefined,
 											body: item.note,
@@ -521,11 +464,7 @@ export default function InvoiceComplaintDetailPage() {
 								{recommendation ? (
 									<section className="invoice-section">
 										<h2 className="invoice-section__title">停權建議</h2>
-										{/*
-										 * 🔴 這一段必須讓人看得出「沒有人因此被停權」。發票模組只提建議：
-										 * 不蓋 suspended_at、不發停權事件、不排恢復 job。寫成「已停權」
-										 * 會讓 ADM 以為處分生效而不去治理頁，於是誰都沒有被處分。
-										 */}
+
 										<p className="invoice-section__hint">
 											這是一份建議，**還沒有任何人被停權**。建立措施之後，處分才會生效。
 										</p>

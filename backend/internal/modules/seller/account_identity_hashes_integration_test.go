@@ -34,7 +34,6 @@ func TestIdentityHashesOutliveThePIIPurgeAndFeedLaterSnapshots(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.account_identity_hashes WHERE source_store_id = $1", s.StoreID); n != 1 {
 		t.Fatalf("防詐保存的 hash 不隨個資清理刪除：%d", n)
 	}
-	// 清理之後才建立的處分：快照含舊 stint 的統編。
 	m := f.terminate(t, s.StoreID, GroundFraud)
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_identities WHERE measure_id = $1 AND kind = 'TAX_ID'", m.ID); n != 1 {
 		t.Fatalf("快照要含已清理的舊 stint 的統編：%d", n)

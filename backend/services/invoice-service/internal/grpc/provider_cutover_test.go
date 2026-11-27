@@ -13,11 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔驗端點 46（A09 自動開立切點歷史）。
-//
-// 兩件事在這裡才看得到：
-//   ① 查無 provider account 回 **9330** 而不是空清單
-//   ② `deactivatedAt` 為空字串 ＝ 至今仍有效（proto3 沒有 null），前端據此區分現行與歷史
 
 const (
 	pcStoreID   = int64(2685914682)
@@ -71,7 +66,6 @@ func TestListProviderCutovers_Success(t *testing.T) {
 	if len(got) != 2 || resp.GetData().GetTotal() != "2" {
 		t.Fatalf("應回兩列，實得 %d 列 total=%s", len(got), resp.GetData().GetTotal())
 	}
-	// 現行有效那一列的 deactivatedAt 必須是空字串——前端靠它辨識「現在生效的切點是哪一個」。
 	if got[0].GetDeactivatedAt() != "" {
 		t.Fatalf("現行列的 deactivatedAt 應為空字串，實得 %q", got[0].GetDeactivatedAt())
 	}

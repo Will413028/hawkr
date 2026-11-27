@@ -21,7 +21,6 @@ import (
 	"time"
 )
 
-// timeNowPlus2Days 是 B2C／B2B 的法定期限佔位值。
 func timeNowPlus2Days() time.Time { return time.Now().Add(48 * time.Hour) }
 
 // TestReceiptTaxMustBeZero 驗 chk_invdoc_receipt_tax 真的擋得住。
@@ -86,12 +85,6 @@ func TestReceiptTaxMustBeZero(t *testing.T) {
 	})
 }
 
-// deadlineFor 回傳該 document_kind 合法的 statutory_deadline_at。
-//
-// `chk_invdoc_deadline_presence` 是**雙向等式**：
-// `(document_kind IN ('B2C','B2B')) = (statutory_deadline_at IS NOT NULL)`
-// —— 收據不是統一發票，沒有法定上傳期限，給它一個時間戳當場 23514。
-// （這一格是寫本測試時踩到的，正好說明那些 CHECK 真的在守東西。）
 func deadlineFor(kind string) any {
 	if kind == "RECEIPT" {
 		return nil
@@ -99,7 +92,6 @@ func deadlineFor(kind string) any {
 	return timeNowPlus2Days()
 }
 
-// modeOf 回傳該 document_kind 合法的 fulfillment_mode（chk_invdoc_kind_mode）。
 func modeOf(kind string) string {
 	if kind == "RECEIPT" {
 		return "PLATFORM_RECEIPT"

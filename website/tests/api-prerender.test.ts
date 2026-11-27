@@ -18,7 +18,6 @@ test("build phase: swallows error, returns fallback", async () => {
 });
 
 test("runtime production: rethrows", async () => {
-	// runtime server has NEXT_PHASE=phase-production-server (not -build)
 	delete process.env.NEXT_PHASE;
 	(process.env as Record<string, string>).NODE_ENV = "production";
 	const { prerenderSafe } = await import("../lib/api/prerender");
@@ -40,10 +39,6 @@ test("runtime production: definitive 4xx (ApiClientError) still soft-fails", asy
 });
 
 test("runtime production: a rate-limited read rethrows, it is not a null", async () => {
-	// 429 says "retry later", so it can never justify the definitive-4xx
-	// soft-fail. Swallowing it made getCachedSeller return null, the storefront
-	// layout call notFound(), and ISR cache that 404 for its full 1800s
-	// revalidate window — a live store reading as deleted for 30 minutes.
 	delete process.env.NEXT_PHASE;
 	(process.env as Record<string, string>).NODE_ENV = "production";
 	const { prerenderSafe } = await import("../lib/api/prerender");

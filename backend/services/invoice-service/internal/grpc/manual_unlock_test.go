@@ -17,8 +17,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// 本檔驗端點 54／55／46 的 Layer 5：碼與 data 的對應、缺身分的 400、
-// 以及「不存在」與「不屬於本 job」逐位元相同。
 
 var muNow = time.Date(2026, 8, 30, 6, 0, 0, 0, time.UTC)
 
@@ -30,9 +28,6 @@ const (
 	muCanceller = int64(4203)
 )
 
-// ---------------------------------------------------------------------------
-// fakes
-// ---------------------------------------------------------------------------
 
 type muOps struct {
 	domain.OperationRepository
@@ -123,8 +118,6 @@ func (muAudit) AppendAdminAuditLog(context.Context, domain.NewAdminAuditLogEntry
 
 func muServer(op domain.Operation, unlocks *muUnlocks) (*InvoiceServer, *muOps) {
 	ops := &muOps{op: op}
-	// adjustments 傳 nil：本檔驗的是雙人解鎖（端點 54／55），那條路徑不碰 adjustment
-	// ——advanceAdjustmentForAdmin 對 nil 直接 return（同 op.AdjustmentID 為 nil）。
 	uc := usecase.NewAdminJob(nopTx{}, ops, nil, nil, muAudit{}, nil, unlocks, nil, nil,
 		nil, usecase.IssuanceConfig{}, func() int64 { return muUnlockID }, zap.NewNop()).
 		WithClock(func() time.Time { return muNow })
@@ -135,8 +128,6 @@ func muCancelledOp() domain.Operation {
 	canceller := muCanceller
 	at := muNow.Add(-time.Hour)
 	return domain.Operation{
-		// OperationType 必填：DB 的 chk_invop_type 不接受空字串，而空字串會讓
-		// 「只有開立類能解鎖」那道守衛在測試裡失明（#3112）。
 		ID: muJobID, DocumentID: 8001, Status: "CANCELLED_BY_ADMIN", Version: 5,
 		OperationType:     codemeta.InvoiceOperationTypeIssue.Value,
 		CancelRequestedBy: &canceller, CancelRequestedAt: &at,
@@ -154,9 +145,6 @@ func muRequestReq() *pb.RequestManualUnlockForAdminRequest {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 54
-// ---------------------------------------------------------------------------
 
 func TestRequestManualUnlock_Success(t *testing.T) {
 	s, _ := muServer(muCancelledOp(), &muUnlocks{})
@@ -175,14 +163,12 @@ func TestRequestManualUnlock_Success(t *testing.T) {
 	if d.GetStatus() != domain.ManualUnlockAwaitingSecondApproval {
 		t.Fatalf("status 不符：%q", d.GetStatus())
 	}
-	// 24 小時窗口必須送到前端：58A 的倒數只有這一個來源。
 	if d.GetExpiresAt() != "2026-08-31T06:00:00Z" {
 		t.Fatalf("expiresAt 應為發起後 24 小時，實得 %q", d.GetExpiresAt())
 	}
 	if d.GetRequestedByAccountId() != "4201" {
 		t.Fatalf("requestedBy 不符：%q", d.GetRequestedByAccountId())
 	}
-	// 尚未覆核 ⇒ approvedBy 必須是空字串（proto3 沒有 null）。
 	if d.GetApprovedByAccountId() != "" {
 		t.Fatalf("尚未覆核時 approvedBy 必須空，實得 %q", d.GetApprovedByAccountId())
 	}
@@ -249,9 +235,6 @@ func TestRequestManualUnlock_RejectsBadInput(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 55
-// ---------------------------------------------------------------------------
 
 func muApproveReq(actor int64, approved bool) *pb.ApproveManualUnlockForAdminRequest {
 	return &pb.ApproveManualUnlockForAdminRequest{

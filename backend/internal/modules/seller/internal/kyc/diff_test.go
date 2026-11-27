@@ -47,7 +47,6 @@ func TestDiffRowsReportsOnlyTheFieldsThatChanged(t *testing.T) {
 	if f := changed(next); !slices.Equal(f, []string{"business.company_name"}) {
 		t.Errorf("改公司名稱：%v", f)
 	}
-	// 統編直接比明文（D42）：改值算有變，清掉也算。
 	next = base
 	next.TaxID = &otherTax
 	if f := changed(next); !slices.Equal(f, []string{"business.tax_id"}) {

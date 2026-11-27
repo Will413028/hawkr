@@ -122,7 +122,6 @@ type ModuleInput struct {
 
 var paramName = regexp.MustCompile(`^[a-z][A-Za-z0-9]*$`)
 
-// reservedParams 是各目標語言裡會和生成碼的區域名稱或關鍵字相撞的參數名稱。
 var reservedParams = map[string]bool{
 	"v": true, "t": true, "l": true, "ok": true, "a": true, "values": true, "locale": true, "key": true, "code": true,
 	"value": true, "default": true, "func": true, "var": true, "type": true, "switch": true, "case": true,
@@ -233,9 +232,7 @@ type builder struct {
 	m     *Model
 	errs  *errList
 	funcs map[string]*Func
-	// decls 是來源語系宣告的變體：FuncID → 宣告。
 	decls map[string]VariantDecl
-	// broken 是已經回報過錯誤的 key（語系|受眾|key）；完整性檢查不再為它們重複回報「缺」。
 	broken map[string]bool
 }
 
@@ -292,11 +289,9 @@ func (b *builder) parseKey(where, raw string) *Key {
 	return k
 }
 
-// collect 讀所有語系的 key，建立函式與 case，並解析、驗證訊息。
 func (b *builder) collect(in Inputs) {
 	src := in.Catalog[in.Config.SourceLocale]
 	b.decls = map[string]VariantDecl{}
-	// 變體宣告。
 	for raw, d := range src.Variants {
 		k := b.parseVariantDecl(raw)
 		if k == nil {
@@ -327,7 +322,6 @@ func (b *builder) collect(in Inputs) {
 }
 
 func (b *builder) parseVariantDecl(raw string) *Key {
-	// 變體宣告的 key 是 <型別路徑>.<variant>：借用 ParseKey 的列舉解析，補一個假的值名。
 	i := strings.LastIndex(raw, ".")
 	if i < 0 {
 		b.errs.addf("variants %s：要是 <型別路徑>.<variant>", raw)
@@ -442,7 +436,6 @@ func (b *builder) declareParams(c *Case, where, raw string, e Entry) {
 	}
 }
 
-// recordUses 檢查訊息用到的參數與宣告一致（來源語系）或與來源語系相同（其他語系）、型別與用法相符、plural 分支合乎語系。
 func (b *builder) recordUses(in Inputs, c *Case, loc string, aud Audience, where, raw string, ast *icu.Message) {
 	uses, conflict := ast.Uses()
 	if conflict != "" {
@@ -460,7 +453,6 @@ func (b *builder) recordUses(in Inputs, c *Case, loc string, aud Audience, where
 			}
 		}
 	}
-	// 以來源語系預設受眾的宣告為準；staff 與其他語系的參數集合必須相同。
 	srcMsg, ok := in.Catalog[in.Config.SourceLocale].Default[raw]
 	if !ok {
 		srcMsg = in.Catalog[in.Config.SourceLocale].Staff[raw]
@@ -479,7 +471,6 @@ func (b *builder) recordUses(in Inputs, c *Case, loc string, aud Audience, where
 			b.errs.addf("%s %s：宣告了參數 %s 但訊息沒有用到（每個語系的參數集合必須與來源相同）", where, raw, name)
 		}
 	}
-	// 型別與用法。
 	for _, u := range uses {
 		p, ok := c.Params[u.Name]
 		if !ok {
@@ -525,7 +516,6 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// checkFuncs 檢查函式層級的一致性：參數聯集、名詞參數的目標、變體宣告與 omit。
 func (b *builder) checkFuncs() {
 	for _, f := range b.funcs {
 		union := map[string]Param{}
@@ -541,7 +531,6 @@ func (b *builder) checkFuncs() {
 			}
 		}
 		sort.Slice(f.Cases, func(i, j int) bool { return caseLess(f, f.Cases[i], f.Cases[j]) })
-		// 參數依在來源訊息裡第一次出現的順序排列（簽章讀起來和句子一致）。
 		for _, c := range f.Cases {
 			for _, msg := range []*Msg{c.Msgs[AudDefault][b.m.Config.SourceLocale], c.Msgs[AudStaff][staffLocale]} {
 				if msg == nil {
@@ -571,7 +560,6 @@ func (b *builder) checkFuncs() {
 			b.errs.addf("variants %s：宣告了變體但沒有任何 key", id)
 		}
 	}
-	// 名詞參數的目標必須是目錄裡沒有參數的名詞。
 	for _, f := range b.funcs {
 		for _, p := range f.Params {
 			if p.Kind != ParamNoun {
@@ -585,7 +573,6 @@ func (b *builder) checkFuncs() {
 			}
 		}
 	}
-	// omit 宣告的受眾與值。
 	for id, d := range b.decls {
 		for aud := range d.Omit {
 			a := Audience(aud)
@@ -647,12 +634,10 @@ func (b *builder) sorted() []*Func {
 	return out
 }
 
-// omitted 回這個受眾是否把 value 列為「沒有文字」。
 func (f *Func) omitted(a Audience, value string) bool {
 	return f.Omit[a][value]
 }
 
-// completeness 是 §2.2 第 3、4、7 條。
 func (b *builder) completeness(in Inputs) {
 	for _, loc := range in.Config.Required {
 		if b.funcs["common.unknown"] == nil || b.funcs["common.unknown"].Cases[0].Msgs[AudDefault][loc] == nil {

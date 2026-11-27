@@ -220,8 +220,6 @@ class ShipmentCreationBackstopSchedulerClaimTest {
         when(repo.findPaidOrdersWithoutShipmentPastGrace(any(), any(), anyInt()))
                 .thenReturn(List.of(order("ORD_A", 1), order("ORD_B", 1)));
         when(repo.bumpShipmentCreateAttempt(anyString(), any(), any())).thenReturn(1);
-        // 模擬「單筆工作耗時」：真實世界是 publish（毫秒）＋未來可能加進來的 gRPC，
-        // 這裡只需要一段可量測的時間。
         org.mockito.Mockito.doAnswer(inv -> {
             Thread.sleep(40L);
             return null;

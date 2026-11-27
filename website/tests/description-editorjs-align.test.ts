@@ -7,10 +7,6 @@ import {
 	toEditorData,
 } from "../lib/products/descriptionEditorJs";
 
-// Paragraph alignment travels as the "align" block tune in Editor.js and as
-// `style.textAlign` in the backend's shared { version, blocks } shape. The
-// bridge must keep the two in sync — and must NOT store the default "left",
-// so existing descriptions stay byte-identical after a no-op edit.
 
 test("fromEditorData maps the align tune to style.textAlign", () => {
 	const saved = fromEditorData({
@@ -30,7 +26,6 @@ test("fromEditorData maps the align tune to style.textAlign", () => {
 		],
 	} as OutputData);
 	assert.equal(saved.blocks[0].style?.textAlign, "center");
-	// Headers keep their fixed heading style alongside the alignment.
 	assert.deepEqual(saved.blocks[1].style, {
 		fontSize: "26px",
 		fontWeight: 700,

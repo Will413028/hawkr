@@ -14,8 +14,6 @@ describe("the test guard in a Vitest worker", () => {
 	});
 
 	it("refuses node:http to a host that is not loopback", () => {
-		// (WebSocket is covered by tests/hermetic-guard.test.ts: msw wraps the constructor here and
-		// hands the refusal back asynchronously.)
 		expect(() => http.request("http://api.hawkr.example/x")).toThrow(
 			/hermetic test: refusing http\.request/,
 		);

@@ -109,7 +109,6 @@ class _SubscriptionGlassBackdrop extends StatelessWidget {
   }
 }
 
-// ===== 魚骨圖載入效果元件 =====
 class _SkeletonBar extends StatelessWidget {
   const _SkeletonBar({
     required this.width,
@@ -149,7 +148,6 @@ class _FollowingSkeletonCard extends StatelessWidget {
             padding: const EdgeInsets.all(HkSpace.md),
             child: Row(
               children: [
-                // 頭像骨架
                 Container(
                   width: 56.w,
                   height: 56.h,
@@ -159,7 +157,6 @@ class _FollowingSkeletonCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 12.w),
-                // 資訊骨架
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +171,6 @@ class _FollowingSkeletonCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 12.w),
-                // 按鈕骨架
                 _SkeletonBar(width: 80, height: 32.h, radius: 16),
               ],
             ),
@@ -318,7 +314,7 @@ class _FollowingSkeletonList extends StatelessWidget {
 
 class MySubscriptionScreen extends ConsumerStatefulWidget {
   const MySubscriptionScreen({super.key, this.initialTab = 0});
-  final int initialTab; // 0: 訂閱, 1: 收藏, 2: 瀏覽
+  final int initialTab;
 
   @override
   ConsumerState<MySubscriptionScreen> createState() =>
@@ -340,8 +336,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
   bool _showSkeletonRecent = false;
   Timer? _skeletonTimerRecent;
   bool _refreshingInPlace = false;
-  // cursor 分頁：token 空字串表示沒有下一頁；generation 讓重新整理之後才回來的
-  // 舊 loadMore 結果直接丟掉，不會接到新列表後面。
   String _followingPageToken = '';
   bool _loadingMoreFollowing = false;
   int _followingTotal = 0;
@@ -401,7 +395,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
 
   void _normalizeProductReviewStats(Map<String, dynamic> item) {
     var rating = 0.0;
-    // 收藏卡片吐 ratingX10（十倍整數），其他卡片吐 rating（浮點）。
     for (final key in const ['rating', 'ratingX10']) {
       rating = _parseRatingValue(item[key]);
       if (rating > 0) break;
@@ -429,7 +422,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
       if (!hasReviewCount) item['reviewCount'] = summary.count;
       if (!hasRating) item['rating'] = summary.average;
     } catch (_) {
-      // 補充統計失敗時保留卡片原有的值，不當成沒有評價。
     }
   }
 
@@ -587,7 +579,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         _followingTotal = page.total;
       });
     } catch (_) {
-      // 保留 token，下次捲到底再試。
     } finally {
       if (mounted && generation == _followingGeneration) {
         setState(() => _loadingMoreFollowing = false);
@@ -635,7 +626,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
       if (!mounted || generation != _likesGeneration) return;
       setState(() {
         _likes = page.items;
-        // 收藏 tab 的商品全部都是已收藏的，同步 _favoriteIds
         _favoriteIds = _productIdsOf(page.items);
         _likesPageToken = page.next;
         _likesTotal = page.total;
@@ -672,7 +662,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         _likesTotal = page.total;
       });
     } catch (_) {
-      // 保留 token，下次捲到底再試。
     } finally {
       if (mounted && generation == _likesGeneration) {
         setState(() => _loadingMoreLikes = false);
@@ -686,8 +675,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     final page = await ref
         .read(visitRepositoryProvider)
         .listVisits(pageToken: pageToken);
-    // 去除重複的商品（根據 seller_id + product_id 組合判斷，跨頁也算）
-    // seller_id == 0 為已刪除商品的幽靈紀錄（欄位全空），直接排除
     final uniqueVisits = <Map<String, dynamic>>[];
     for (final visit in page.visits) {
       final m = _visitItem(visit);
@@ -722,7 +709,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         final pid = (m['productId'] ?? '').toString().trim();
         if (mid.isEmpty || pid.isEmpty) return;
 
-        // 載入商品圖片（若 API 未回傳則補抓）；49 號成對契約 key 優先。
         if ((m['imageKey'] ?? m['imageUrl'] ?? m['productImage'] ?? '')
             .toString()
             .isEmpty) {
@@ -806,7 +792,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         _recentPageToken = page.next;
       });
     } catch (_) {
-      // 保留 token，下次捲到底再試。
     } finally {
       if (mounted && generation == _recentGeneration) {
         setState(() => _loadingMoreRecent = false);
@@ -862,7 +847,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     final bool wasFavorite = _favoriteIds.contains(pid);
     final bool target = !wasFavorite;
 
-    // 樂觀 UI 更新
     setState(() {
       if (target) {
         _favoriteIds.add(pid);
@@ -883,7 +867,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
             .removeFavoriteProduct(pid);
       }
       if (!ok && mounted) {
-        // API 失敗 → 回滾
         setState(() {
           if (wasFavorite) {
             _favoriteIds.add(pid);
@@ -893,7 +876,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         });
         showFloatingToast(context, '收藏狀態更新失敗', isSuccess: false);
       }
-      // 收藏 tab：取消收藏成功時，從列表中移除該商品
       if (!target && ok && mounted) {
         HapticFeedback.lightImpact();
         setState(() => _removeLike(pid));
@@ -926,7 +908,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         _favoriteIds.add(pid);
       } else {
         _favoriteIds.remove(pid);
-        // 收藏 tab：取消收藏時，從列表中移除
         _removeLike(pid);
       }
     });
@@ -1016,7 +997,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     _ => '瀏覽紀錄',
   };
 
-  // 訂閱與收藏用 API 的 total_size（分頁只載入一部分）；瀏覽紀錄沒有總數，顯示已載入的筆數。
   int get _currentItemCount => switch (_tabIndex) {
     0 => _followingTotal,
     1 => _likesTotal,
@@ -1086,8 +1066,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
                 children: [
                   _buildTabSelector(),
                   const SizedBox(height: HkSpace.sm),
-                  // Persistent shell tabs swap in place without a page-like
-                  // fade; item-level feedback animations remain local.
                   Expanded(
                     child: KeyedSubtree(
                       key: ValueKey('subscription-tab-content-$_tabIndex'),
@@ -1433,10 +1411,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
 
   Widget _buildAvatar(String avatarUrl) {
     final url = avatarUrl.trim();
-    // 後端回的是裸 objectKey（49 §6.1，例 `public/user_avatar/…png`），不是 http
-    // URL。原本拿 `startsWith('http')` 當有效性判準 → objectKey 一律被判無效而
-    // 落到預設圖。下方 AppCachedImage 帶了 scene，會自己走 ImageConfig.urlFor
-    // 把 objectKey / 完整 URL 都組成顯示 URL，這裡只需擋空字串。
     if (url.isEmpty) {
       return const HkPlaceholder(HkPlaceholderKind.merchantAvatar);
     }
@@ -1507,8 +1481,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
   }
 
   String _priceDisplay(Map<String, dynamic> item) {
-    // 判準走 PriceDisplay：`"0"` 是後端「無價格」的表達，
-    // `int.tryParse("0")` 拿到 0 會印成 `NT$ 0`。
     final label = PriceDisplay.formatPriceRange(
       item['minPrice'] ?? item['priceMin'],
       item['maxPrice'] ?? item['priceMax'],

@@ -66,7 +66,6 @@ func accountHeader[T any](req *connect.Request[T], buyerID int64) *connect.Reque
 	return req
 }
 
-// orderTime 解析 order-service 的時間字串：ISO 8601（RFC 3339，含或不含小數秒），舊 adapter 也接受的 Unix 毫秒當後備。
 func orderTime(raw string) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
 		return t.UTC(), nil

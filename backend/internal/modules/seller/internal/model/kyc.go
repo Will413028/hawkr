@@ -421,7 +421,6 @@ type KYCCancelled struct {
 	StoreID, AccountID int64
 }
 
-// 以下是 KYC 欄位的正規化與驗證：寫入端先檢查，DB 的 CHECK 是保底（同一組規則）。
 
 var (
 	taxIDRe  = regexp.MustCompile(`^[0-9]{8}$`)

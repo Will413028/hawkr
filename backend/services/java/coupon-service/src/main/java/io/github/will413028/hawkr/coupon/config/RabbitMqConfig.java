@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-    // ==================== 消費端：來自 buyer-service ====================
 
     /**
      * hawkr.buyer exchange。由 coupon-service（consumer）宣告，原因同
@@ -71,7 +70,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_COUPON_BUYER_DELETED_DLQ);
     }
 
-    // ==================== 消費端：來自 seller-service（賣家停權連動模板停用/還原，07 §5.20 / 36 §3.6f） ====================
 
     /**
      * hawkr.seller exchange（既有 {@link MqConstants#EXCHANGE_SELLER_BIZ}，product-service 已宣告過）。

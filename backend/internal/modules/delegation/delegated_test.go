@@ -16,14 +16,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
-// 拒絕路徑的單元測試：session 與能力、店家狀態的拒絕發生在任何資料庫存取之前，所以用替身的 seller 與 FAILED 紀錄器就能驗證「被拒絕就寫一列 FAILED、不執行讀寫」。
-// 成功路徑與 transaction 內的行為（SUCCEEDED、冪等、rollback）在 integration 測試。
 
-// recorder 是稽核子領域的替身（Module.audit 的唯一欄位）：嵌入 auditor，只實作 RecordFailure 與 LookupOperation。
 type recorder struct {
 	auditor
 	got []model.FailureAuditInput
-	// LookupOperation：記下收到的輸入；replayed 為真時第一次查就回第一次的列。
 	opsGot     []model.OperationAuditInput
 	replayed   bool
 	ran        bool
@@ -59,7 +55,6 @@ func openStore() seller.Store   { return storeIn(seller.Active) }
 func closedStore() seller.Store { return storeIn(seller.Closed) }
 func notFound() error           { return apperr.NotFound("店家不存在") }
 
-// failureReasonOf 與 FailureReason 是失敗列的 failure_reason：拒絕對應的代碼，與 FAILED 列實際寫的值（model.FailureReasonOf）要一致。
 func failureReasonOf(d DelegationDenial) string { return DenialCodes()[d] }
 
 func FailureReason(t *testing.T, cause error) string {
@@ -156,7 +151,6 @@ func TestDelegatedReadRecordsDenialsAndSkipsTheRead(t *testing.T) {
 		func(_ context.Context, st seller.Store) error { read = st.StoreID == 5; return nil }); err != nil || !read || len(rec.got) != 0 {
 		t.Fatalf("成功的讀取：err=%v 讀到店家=%v FAILED 紀錄=%d，預期成功、拿到 session 的店家、不稽核", err, read, len(rec.got))
 	}
-	// 讀取自己的失敗（找不到等）原樣回傳，不寫稽核。
 	rec = &recorder{}
 	boom := errors.New("not found")
 	if err := newTestModule(rec, fixedSeller{store: openStore()}).DelegatedRead(t.Context(), caller(DelegationActive, readMethod, CapabilityPostsRead),
@@ -176,7 +170,6 @@ func (r *recorder) LookupOperation(_ context.Context, in model.OperationAuditInp
 	if r.lookupErr != nil {
 		return model.AuditLog{}, false, r.lookupErr
 	}
-	// 重送：第一次查就有列；一般寫入：do 跑過之後（訂閱者寫了 SUCCEEDED）才有列，除非 noAuditRow。
 	if r.replayed || r.ran && !r.noAuditRow {
 		id := "res-1"
 		return model.AuditLog{ResourceID: &id}, true, nil
@@ -245,7 +238,6 @@ func TestDelegatedWriteReplayReturnsTheFirstResultWhateverTheStoreState(t *testi
 			t.Fatalf("%s：重送不該寫 FAILED：%+v", name, rec.got)
 		}
 	}
-	// 讀不到店家的重送失敗也不為這把 request_id 寫 FAILED（它已經有 SUCCEEDED 的列）。
 	rec := &recorder{replayed: true}
 	if _, err := (&Module{seller: fixedSeller{err: notFound()}, audit: rec}).DelegatedWrite(t.Context(), c, w, nil); err == nil || len(rec.got) != 0 {
 		t.Fatalf("店家不存在的重送：err=%v FAILED=%d", err, len(rec.got))
@@ -288,7 +280,7 @@ func TestDelegatedWriteConvergesOnAConcurrentReplay(t *testing.T) {
 	rec := &recorder{}
 	res, err := (&Module{seller: fixedSeller{store: openStore()}, audit: rec}).DelegatedWrite(t.Context(), caller(DelegationActive, writeMethod, CapabilityPostsWrite), w,
 		func(context.Context, seller.Store, *delegatedactor.Actor) error {
-			rec.ran = true // 對方的 transaction commit 了
+			rec.ran = true
 			return fmt.Errorf("events：處理：%w", model.ErrOperationKeyTaken)
 		})
 	if err != nil || !res.Replayed || res.ResourceID != "res-1" || len(rec.got) != 0 {

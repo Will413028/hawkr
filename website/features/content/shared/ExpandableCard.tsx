@@ -60,7 +60,6 @@ export default function ExpandableCard({
 
 		const gsap = gsapRef.current;
 		if (!gsap) {
-			// GSAP not ready — open/close instantly so content stays usable.
 			outer.style.height = next ? "auto" : "0px";
 			inner.style.opacity = next ? "1" : "0";
 			inner.style.transform = next ? "none" : "rotateX(-92deg)";

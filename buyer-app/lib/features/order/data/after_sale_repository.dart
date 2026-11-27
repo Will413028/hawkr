@@ -82,7 +82,6 @@ class AfterSaleRepository {
       return (records: records, total: total);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) throw const UnauthorizedException();
-      // 404 = API 尚未部署，回傳空列表
       if (e.response?.statusCode == 404) {
         return (records: <AfterSaleCase>[], total: 0);
       }
@@ -220,8 +219,6 @@ class AfterSaleRepository {
 
   String _appealErrorMessage(dynamic code, dynamic fallbackMsg) {
     final codeStr = code?.toString() ?? '';
-    // 後端錯誤碼可能是純字串 code（透過 envelope message），亦可能是數字 code。
-    // 統一以字串比對；若不在已知列表則回傳 fallback。
     if (codeStr.contains('AFTERSALE_APPEAL_NOT_APPEALABLE')) {
       return '當前案件狀態不允許申訴';
     }
@@ -234,7 +231,6 @@ class AfterSaleRepository {
     if (codeStr.contains('AFTERSALE_CASE_UNDER_APPEAL')) {
       return '案件正在處理中，請稍後再試';
     }
-    // 後端可能將錯誤訊息塞在 msg 欄位，含對應的中文錯誤碼
     final msgStr = fallbackMsg?.toString() ?? '';
     if (msgStr.contains('AFTERSALE_APPEAL_NOT_APPEALABLE')) {
       return '當前案件狀態不允許申訴';

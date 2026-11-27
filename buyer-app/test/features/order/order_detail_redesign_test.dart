@@ -80,7 +80,6 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump();
-      // 詳情資料建立 ListView 後，付款歷程卡才會發出第二個 request。
       await tester.pump(const Duration(milliseconds: 1));
 
       expect(find.text('訂單細節'), findsOneWidget);
@@ -115,7 +114,6 @@ void main() {
         find.byType(ListView).first,
         const Offset(0, -220),
       );
-      // 滾動後付款歷程卡才建立，等待該次 mock Dio request 與 FutureBuilder 完成。
       await tester.pumpAndSettle(const Duration(milliseconds: 1));
       expect(find.text('收件與配送'), findsOneWidget);
       expect(find.text('付款'), findsOneWidget);

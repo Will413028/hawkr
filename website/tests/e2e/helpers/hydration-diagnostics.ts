@@ -83,7 +83,6 @@ export function captureHydrationDiagnostics(page: Page): void {
 					contentType: "text/plain",
 				});
 			} catch {
-				// Diagnostics must never affect the test outcome.
 			}
 		})();
 	};

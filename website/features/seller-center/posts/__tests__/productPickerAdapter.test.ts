@@ -46,7 +46,6 @@ describe("mapProductRecord — 實錄 wire", () => {
 			expect(row.id).toMatch(/^\d+$/);
 			expect(row.name).not.toBe("未命名商品");
 			expect(row.imageUrl).toMatch(/^https?:\/\//);
-			// 價格必須是實際數字，不能是空字串（空＝讀錯欄位的症狀）。
 			expect(row.price.effectiveText).toMatch(/^NT\$ \d/);
 		}
 	});

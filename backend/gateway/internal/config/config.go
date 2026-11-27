@@ -132,30 +132,12 @@ func Load() (*Config, error) {
 		WebBaseURL:   pkgconfig.GetEnvOrDefault("WEB_BASE_URL", "http://localhost:3000"),
 
 		RateLimitWindowSeconds: pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_WINDOW_SECONDS", 60),
-		// 600 = 實測上界（瀏覽器直連尖峰 25/分 + 網頁 middleware／route handler
-		// 與 admin BFF 代打，保守估上界約 200/分）的 3 倍，並對 NAT／CGNAT 後多
-		// 真人共用一個位址留餘裕。舊值 120 只放寬不收緊。
 		RateLimitModeratePerWindow: pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_MODERATE_PER_WINDOW", 600),
-		// 12000/60s = 200 req/s。定位是**失控保險絲不是日常節流閥**：目錄長滿且扇出
-		// 修復後單訪客 SSR 需求 200–240/分，×10 個並發重度瀏覽訪客 = 2,400/分，
-		// 3 倍門檻 7,200 ⇒ 供需差 5.0 倍。40%（4,800/分）發告警。
 		RateLimitModerateSSRPerWindow: pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_MODERATE_SSR_PER_WINDOW", 12000),
-		// 300/60s：7 天實測 CI 單分鐘尖峰 84（該期間零筆被擋，故 84 是真實需求而非
-		// 被 120 擋出來的天花板），×3 = 252 ⇒ 取 300。加第二台 website-heavy runner
-		// 後推估約 105/分，仍有 2.9 倍——真的加了要重量。
 		RateLimitModerateCIPerWindow: pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_MODERATE_CI_PER_WINDOW", 300),
 		RateLimitDefaultPerWindow:    pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_DEFAULT_PER_WINDOW", 300),
 		RateLimitFallbackCapacity:    pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_FALLBACK_CAPACITY", 10000),
-		// 100/分鐘。計數單位是 IP，但一個 IP 背後常是整間辦公室（NAT）、整個共用
-		// 出口，或一台 CI runner；門檻要能容納「多人同時 session 過期」的合理尖峰
-		// ——單一使用者開 App 撞到過期 session，就可能一次噴出近十個並行 401。
-		// 20 太低（原值）：十來個人同分鐘過期就足以連坐整個位址。
-		// 100 仍能即時擋下本軸要防的機器迴圈：#106 那種 4.8 req/s 全 401 的 loop
-		// 約 21 秒撞頂（20 時約 4 秒），而該事故實際跑了數小時——兩者差距在防護
-		// 價值上等價。登入端點在單體，登入的暴力嘗試由單體的限流處理，與此值無關。
 		RateLimitAuthFailurePerWindow: pkgconfig.GetEnvAsIntOrDefault("RATE_LIMIT_AUTH_FAILURE_PER_WINDOW", 100),
-		// 預設信任 RFC1918 私有網段（叢集內 Traefik 來源）。origin 直連的公網 peer
-		// 不在此列，其 XFF 會被忽略。
 		TrustedProxyCIDRs: splitCSV(pkgconfig.GetEnvOrDefault("TRUSTED_PROXY_CIDRS", "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16")),
 
 		OriginAuthSecret:     os.Getenv("ORIGIN_AUTH_SECRET"),
@@ -193,8 +175,6 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// splitCSV parses a comma-separated env value into a trimmed, non-empty slice.
-// An empty string yields nil (no trusted proxies configured).
 func splitCSV(v string) []string {
 	if strings.TrimSpace(v) == "" {
 		return nil
@@ -211,32 +191,17 @@ func splitCSV(v string) []string {
 
 // Validate checks required configuration fields.
 func (c *Config) Validate() error {
-	// MEDIA_BASE_URL 無預設域名，缺值即 fail-fast（backend#2283）：dev 一律 test-media、
-	// prod 一律 media，不做新舊相容也不猜域名——漏設就啟動失敗，不允許靜默吐出死連結。
 	if c.MediaBaseURL == "" {
 		return fmt.Errorf("missing required config: MEDIA_BASE_URL")
 	}
 	return c.validateDelegation()
 }
 
-// 代行寫入的 handler 總預算（56 號設計書 §7.3.1）。外層逾時是前端 AbortController
-// 的值，其中還要扣掉 BFF、網路與 CF 的開銷，所以這裡用的是 handler 預算而不是外層值
-// ——拿外層值當上界＝把餘裕當預算用，而逾時發生在前端時 Gateway 收不到取消訊號，
-// 稽核列會停在一個沒有人去 confirm 的狀態。
 const (
 	delegationSingleWriteBudgetMs = 12000
 	delegationBatchWriteBudgetMs  = 50000
 )
 
-// validateDelegation asserts the two budget inequalities of §8.5.1 (A).
-// Per-variable ranges hold individually but do not add up: every single-item
-// deadline at its own upper bound sums to 27s, far past this path's outer
-// timeout. Both assertions fail-fast, never log a warning.
-//
-// confirm 那一項直接取 _TOTAL_BUDGET_MS，不寫成 min(單次 × 次數)：後者漏算重試
-// 之間的退避，MAX_ATTEMPTS 調到 5 時退避總和達 1500 ms，會系統性低估。
-// STORE_STATE 在兩式各只出現一次——它是 per-request 的判定跳，批次的 target store
-// 恰好一個，與 items 筆數無關。
 func (c *Config) validateDelegation() error {
 	d := &c.Delegation
 

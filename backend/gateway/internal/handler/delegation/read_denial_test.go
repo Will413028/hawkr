@@ -9,11 +9,6 @@ import (
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 )
 
-// 讀取拒絕列是「有人試圖跨店讀取」唯一的痕跡（56 號 §6.5.3 的三個 READ action）。它壞掉的方式全部
-// 無聲：成功的讀取本來就不落稽核，這一列若寫錯面、寫錯 capability、或三個 transport 欄位
-// 空著，稽核表看起來仍然完全正常——每一列都合法，只是再也分不出哪一列是攻擊嘗試。
-//
-// 直接驅動 Orchestrator 而不是打 HTTP：要斷言的是「Gateway 送了什麼給 delegation 模組」。
 
 func denialSession() *accountpb.OperationSessionSummary {
 	return &accountpb.OperationSessionSummary{SessionId: "2701445588392017"}
@@ -27,7 +22,6 @@ func TestRecordReadDenialShape(t *testing.T) {
 		wantCapability string
 	}{
 		{
-			// Q4：capability 是有的，被拒的是資源歸屬 ⇒ 空 Capability 落回該面的 read。
 			name: "capability 留空 → 落回該面的 read",
 			in: ReadDenial{
 				Session: denialSession(), ResourceType: "product", ResourceID: "77",
@@ -36,7 +30,6 @@ func TestRecordReadDenialShape(t *testing.T) {
 			wantAction: "PRODUCT_READ", wantCapability: "products.read",
 		},
 		{
-			// Q3：被拒的正是這個 capability，記它本身（§7.1.3）。
 			name: "帶 capability → 原樣記錄",
 			in: ReadDenial{
 				Session: denialSession(), ResourceType: "product", ResourceID: "77",
@@ -85,13 +78,10 @@ func TestRecordReadDenialShape(t *testing.T) {
 				t.Errorf("resourceType/resourceId = %q/%q，預期 %q/%q",
 					got.GetResourceType(), got.GetResourceId(), tc.in.ResourceType, tc.in.ResourceID)
 			}
-			// 這四項是鎖在函式內、不交給呼叫端決定的：拒絕列沒有使用者輸入可記，
-			// 而 notify_seller=true 的那一天會把「有人試圖跨店讀你的資料」推播給第三方。
 			if got.GetOperationReason() != "" || got.GetNotifySeller() || got.GetOrigin() != "interactive" {
 				t.Errorf("operationReason=%q notifySeller=%v origin=%q，預期 \"\"／false／interactive",
 					got.GetOperationReason(), got.GetNotifySeller(), got.GetOrigin())
 			}
-			// transport 三欄漏掉不會有任何錯誤，只會讓稽核面板對這一類列顯示「—」。
 			if got.GetRequestId() != "req-1" || got.GetCorrelationId() != "corr-1" ||
 				got.GetUserAgent() != "ADM-E2E/1.0" {
 				t.Errorf("transport 欄位 = %q/%q/%q，預期 req-1/corr-1/ADM-E2E/1.0",

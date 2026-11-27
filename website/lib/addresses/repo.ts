@@ -41,8 +41,6 @@ function fromConnect(a: BuyerAddress): Address {
 	};
 }
 
-// 每位買家的地址有上限（buyer 模組在新增時驗證，目前 20 筆），通常一頁就是完整清單。
-// 伺服器調整上限時仍會回 next_page_token，照著讀完，不無聲截斷。
 const ADDRESS_PAGE_SIZE = 20;
 
 export async function fetchAddresses(): Promise<Address[]> {

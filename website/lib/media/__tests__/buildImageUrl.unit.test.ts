@@ -20,7 +20,7 @@ function setGate(
 }
 
 afterEach(() => {
-	__setEnvForTest(null); // restore real env resolution
+	__setEnvForTest(null);
 });
 
 describe("buildImageUrl — no media origin configured", () => {
@@ -59,8 +59,6 @@ describe("buildImageUrl — no media origin configured", () => {
 			"/defaults/buyer_avatar.png",
 		);
 		expect(buildImageUrl("/brand/logo.svg", "avatar")).toBe("/brand/logo.svg");
-		// Any rooted path that is not a backend namespace is local — folders added
-		// to public/ later must work without touching the classifier.
 		expect(buildImageUrl("/generated/lucky-badge.png", "avatar")).toBe(
 			"/generated/lucky-badge.png",
 		);

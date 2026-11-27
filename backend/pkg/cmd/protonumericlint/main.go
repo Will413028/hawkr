@@ -40,9 +40,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// bannedKinds are the numeric scalar kinds §6.1 forbids on exposed fields.
-// Enums (EnumKind) and bool are intentionally absent. int64/uint64/... lose
-// precision past 2^53 as JSON numbers; int32/double are banned by §6.1 too.
 var bannedKinds = map[protoreflect.Kind]bool{
 	protoreflect.Int32Kind: true, protoreflect.Sint32Kind: true, protoreflect.Sfixed32Kind: true,
 	protoreflect.Uint32Kind: true, protoreflect.Fixed32Kind: true,
@@ -122,8 +119,6 @@ func main() {
 	os.Exit(1)
 }
 
-// findViolations walks every message reachable from an RPC output type and
-// returns banned numeric fields, sorted by fully-qualified name.
 func findViolations(files *protoregistry.Files) []violation {
 	visited := make(map[protoreflect.FullName]bool)
 	var queue []protoreflect.MessageDescriptor
@@ -133,7 +128,7 @@ func findViolations(files *protoregistry.Files) []violation {
 			return
 		}
 		if strings.HasPrefix(string(m.ParentFile().Package()), "google.") {
-			return // well-known types (Timestamp.seconds etc.) are not our contract
+			return
 		}
 		visited[m.FullName()] = true
 		queue = append(queue, m)
@@ -169,7 +164,7 @@ func findViolations(files *protoregistry.Files) []violation {
 				enqueue(f.Message())
 				continue
 			}
-			if bannedKinds[f.Kind()] && string(f.Name()) != "code" { // §6.2 #2
+			if bannedKinds[f.Kind()] && string(f.Name()) != "code" {
 				out = append(out, mkViolation(m, f, f.Kind()))
 			}
 		}
@@ -181,7 +176,7 @@ func findViolations(files *protoregistry.Files) []violation {
 func mkViolation(m protoreflect.MessageDescriptor, f protoreflect.FieldDescriptor, k protoreflect.Kind) violation {
 	v := violation{key: string(f.FullName()), file: m.ParentFile().Path(), kind: k.String()}
 	if loc := m.ParentFile().SourceLocations().ByDescriptor(f); len(loc.Path) > 0 {
-		v.line = loc.StartLine + 1 // StartLine is 0-based
+		v.line = loc.StartLine + 1
 	}
 	return v
 }
@@ -190,7 +185,7 @@ func loadAllowlist(path string) map[string]bool {
 	allow := make(map[string]bool)
 	file, err := os.Open(path)
 	if err != nil {
-		return allow // first run / no allowlist yet
+		return allow
 	}
 	defer func() { _ = file.Close() }()
 	sc := bufio.NewScanner(file)

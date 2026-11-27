@@ -72,8 +72,6 @@ function readDart(source, key, property, seen = new Set()) {
 function cssRootTokens(source, path) {
 	const values = new Map();
 	postcss.parse(source, { from: path }).walkRules((rule) => {
-		// Deliberately default root only. Never blend dark, media or route rules
-		// into a nominal light-theme token assertion.
 		if (
 			rule.parent?.type !== "root" ||
 			!rule.selector

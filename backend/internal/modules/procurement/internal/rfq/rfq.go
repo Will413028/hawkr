@@ -69,7 +69,6 @@ func notReady(msg string) error {
 	return apperr.FailedPrecondition("%s", msg).WithReason(apperr.ReasonRequirementNotReady)
 }
 
-// checkPublishable 要求需求在 REQUIREMENT_READY 或 MATCHING（與 search.Start 同一個判斷）。需求狀態改變不產生新版本，所以預覽與執行都要查。
 func checkPublishable(req store.ProcurementRequest) error {
 	if !search.Searchable(req.Status) {
 		return notReady("需求還沒有備妥，不能發布詢價")
@@ -77,7 +76,6 @@ func checkPublishable(req store.ProcurementRequest) error {
 	return nil
 }
 
-// checkOwner 要求需求與它的對話屬於買家（NOT_FOUND）。
 func checkOwner(ctx context.Context, q *store.Queries, buyerID int64, requestID uuid.UUID) (store.ProcurementRequest, error) {
 	buyer := buyerID
 	req, err := q.GetRequestForBuyer(ctx, store.GetRequestForBuyerParams{ID: requestID, BuyerID: &buyer})
@@ -95,7 +93,6 @@ func checkOwner(ctx context.Context, q *store.Queries, buyerID int64, requestID 
 	return req, nil
 }
 
-// settle 在讀到現行版本之後做兩個檢查：讀到的版本仍是現行版本（request_revision），需求狀態可發布。
 func settle(req store.ProcurementRequest, active store.ProcurementRequestRevision, hasActive bool, expected uuid.UUID) (store.ProcurementRequest, store.ProcurementRequestRevision, error) {
 	if !hasActive || active.ID != expected {
 		return store.ProcurementRequest{}, store.ProcurementRequestRevision{}, versionConflict("需求已被改版，請重新載入", TargetRequestRevision)
@@ -106,7 +103,6 @@ func settle(req store.ProcurementRequest, active store.ProcurementRequestRevisio
 	return req, active, nil
 }
 
-// readRequest 讀現況（不鎖，給純計算用）：需求與對話屬於買家、讀到的版本是現行版本、需求狀態可發布。
 func readRequest(ctx context.Context, q *store.Queries, buyerID int64, requestID, expected uuid.UUID) (store.ProcurementRequest, store.ProcurementRequestRevision, error) {
 	req, err := checkOwner(ctx, q, buyerID, requestID)
 	if err != nil {
@@ -120,8 +116,6 @@ func readRequest(ctx context.Context, q *store.Queries, buyerID int64, requestID
 	return settle(req, active, err == nil, expected)
 }
 
-// lockRequest 鎖住並讀現況（寫入用）：需求與對話屬於買家（NOT_FOUND）、鎖現行版本與需求列（順序同 turn.Direct，與搜尋提交、回答串行）、
-// 讀到的版本仍是現行版本、需求狀態可發布。
 func lockRequest(ctx context.Context, q *store.Queries, buyerID int64, requestID, expected uuid.UUID) (store.ProcurementRequest, store.ProcurementRequestRevision, error) {
 	if _, err := checkOwner(ctx, q, buyerID, requestID); err != nil {
 		return store.ProcurementRequest{}, store.ProcurementRequestRevision{}, err
@@ -139,8 +133,6 @@ func lockRequest(ctx context.Context, q *store.Queries, buyerID int64, requestID
 	return settle(req, active, hasActive, expected)
 }
 
-// checkStores 在預覽與執行時重查受眾：任何一家封鎖這位買家或不是營業中，整筆回 VERSION_CONFLICT（candidate_set），訊息不透露是哪一家，也不叫買家重新載入（重載得到同一個有效集合）：請買家重新搜尋候選或調整選擇（A9-D45(4)）。
-// 任何一個查詢失敗都回一般錯誤（fail-closed），不放行。
 func (s Service) checkStores(ctx context.Context, buyerID int64, storeIDs []int64) error {
 	if s.Blocks == nil || s.Open == nil {
 		return errors.New("rfq：Service.Blocks 與 Service.Open 必填：發布要檢查封鎖與營業中")

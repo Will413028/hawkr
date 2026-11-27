@@ -19,12 +19,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 訂單面在代行下**唯讀**：無 POST／PUT／PATCH／DELETE、無取號、無託運單、無預約取件、
-// 無叫件、無確認出貨、無取消、無退款。
-//
-// 這些 DTO 的排除清單不是路徑禁字斷言擋得住的——那條斷言只掃**路徑**。DTO 層漏掉
-// shipmentNo／labelKey／odno／validationNo 這類欄位不會 panic、不會有測試轉紅，
-// 只會靜默把託運單資訊交給代行者。契約測試（admin_delegated_contract_test.go）補這一刀。
 
 // DelegatedOrderBuyer carries the買家顯示名 only.
 type DelegatedOrderBuyer struct {
@@ -266,21 +260,10 @@ func (h *Holder) ListDelegatedOrders(c *gin.Context) {
 			},
 		})
 	}
-	// PageMeta 回的是 total_items / current_page；每頁筆數是我們送出去的那個值，
-	// 不從回應反推——回應沒有這一欄，而前端據回應的 pageSize 算總頁數。
 	meta := resp.GetMeta()
 	response.Page(c, records, meta.GetTotalItems(), meta.GetCurrentPage(), strconv.FormatInt(int64(pageSize), 10))
 }
 
-// firstDelegatedProductName 取第一件品項的顯示名，讓列表的商品欄能自我解釋 keyword
-// 命中的是哪一件。**只回第一件**：其餘品名不是這一欄要承載的東西，逐列展開全部品項
-// 會讓列表 DTO 的大小隨單筆訂單的品項數成長，而畫面上只印得下一行。
-//
-// product_name 為空時退回 sku_name 而不是回空字串：`order_items.product_name` 可為
-// NULL（V1__init_order_tables.sql:103 無 NOT NULL），`sku_name` 則是 NOT NULL(:105)
-// ⇒ 對一筆只有規格名的舊訂單，回空字串等於讓畫面顯示「—」，而搜尋恰恰比對得到
-// sku_name（OrderRepository.SELLER_ORDER_FILTER）—— 那正是「命中了卻看不出為什麼」
-// 的同一個病。
 func firstDelegatedProductName(items []*orderpb.OrderItemView) string {
 	if len(items) == 0 {
 		return ""
@@ -331,7 +314,6 @@ func (h *Holder) RevealDelegatedRecipientContact(c *gin.Context) {
 		return
 	}
 	orderNo := c.Param("order_no")
-	// GET 沒有 body，理由走 query（snake_case）。
 	reason, ok := validateOperationReason(c, c.Query("operation_reason"))
 	if !ok {
 		return
@@ -344,25 +326,15 @@ func (h *Holder) RevealDelegatedRecipientContact(c *gin.Context) {
 		ResourceType: "order",
 		ReadCap:      authz.AdminCapOrdersRead,
 		WriteCap:     authz.AdminCapOrdersRead,
-		// 訂單的規則表是空的，加上 SnapshotOverride 讓兩側快照恆等 ⇒ 這一欄填什麼都
-		// 產不出 changed_fields。明寫 nil 是為了讓「這個端點想過這件事」留在版控裡，
-		// 而不是靠讀者去推斷。
 		SnapshotFields:  nil,
 		OperationReason: reason,
 		NotifySeller:    false,
-		// 本端點刻意不去重：稽核表的唯一索引是 partial WHERE idempotency_key IS NOT
-		// NULL，正是為了讓 GET 類揭露每一次都留下自己的一列。
 		IdempotencyKey: "",
 		RequestID:      req.RequestID,
 		CorrelationID:  req.CorrelationID,
 		UserAgent:      req.UserAgent,
 		ResourceID:     orderNo,
-		// 訂單編號同時填進 resource_name：稽核表的 resource_id 是 bigint，`O` 開頭的
-		// 訂單編號存不進去（§11 ADR 的償還方向都要動 schema，不在本期）。本欄是這一列
-		// 唯一指得回具體訂單的地方——稽核抽屜的「目標」欄與維運查詢都讀它。
 		ResourceName: orderNo,
-		// 快照一律不存 PII 值本身，只存揭露了哪些欄位。揭露欄位集合是白名單：
-		// 不得順手多回 email、身分證、付款資訊。
 		SnapshotOverride: map[string]any{"revealedFields": []string{"phone", "fullAddress"}},
 		Write: func(ctx context.Context, dctx *commonpb.DelegationContext) (*delegation.Resource, *delegation.Denial) {
 			detail, denial := h.readDelegatedOrder(ctx, req, orderNo, true, dctx)
@@ -450,9 +422,6 @@ func delegatedOrderDetailDTO(d *orderpb.OrderDetailView) DelegatedOrderDetail {
 		Buyer:               DelegatedOrderBuyer{DisplayName: d.GetBuyerNickname()},
 		Recipient: DelegatedOrderRecipient{
 			Name: d.GetRecipientName(),
-			// order-service 已在代行讀取時遮罩（前 4 碼＋後 3 碼，長度 < 8 全遮）。
-			// 這裡拿到的就是遮罩後的值——遮罩不在 Gateway，放這裡等於完整號碼跨
-			// gRPC 傳過來再遮掉。
 			MaskedPhone: d.GetRecipientPhone(),
 			City:        city,
 			District:    district,
@@ -464,21 +433,6 @@ func delegatedOrderDetailDTO(d *orderpb.OrderDetailView) DelegatedOrderDetail {
 	}
 }
 
-// buildOrderTimeline turns the scalar timestamp columns into the status timeline.
-//
-// **訂單當下的 status 才是權威，時間戳只是裝飾。** 舊版逐欄判「這個時間戳非空就加一個
-// 節點」，於是一筆 `status=80`（已取消）、`pay_time IS NULL`、`ship_time` 有值的訂單被
-// 渲染成「待付款 → 配送中」：既宣告了一個它從來沒到過的狀態，又完全不提它已經取消。
-// 對代行者而言那是實質誤導——他看到「配送中」會以為賣家已出貨。
-//
-// 兩條規則：
-//
-//  1. **里程碑必須連續，且不得越過當下狀態**。一筆訂單不可能沒付款就出貨，所以任一
-//     里程碑缺時間戳，其後的里程碑一律不再輸出；而當下狀態仍在正向流程上時，它同時
-//     是一道上界（`status=20 待出貨` 帶著 `ship_time` ＝ 資料雜訊，不是它到過的狀態）。
-//  2. **最後永遠補上當下狀態**，除非它剛好就是最後一個里程碑。終態（已取消／已完成／
-//     全額退款）與分支態（待出貨／物流異常…）都只有這一條路能出現在時間軸上。這個節點
-//     的時間走 `terminalStatusTime`：有權威時間欄就帶上，沒有就仍是空字串（見型別註解）。
 func buildOrderTimeline(d *orderpb.OrderDetailView) []DelegatedOrderTimelineEntry {
 	entries := make([]DelegatedOrderTimelineEntry, 0, 4)
 	entry := func(status, at string) DelegatedOrderTimelineEntry {
@@ -500,31 +454,21 @@ func buildOrderTimeline(d *orderpb.OrderDetailView) []DelegatedOrderTimelineEntr
 		{codemeta.OrderStatusInTransit, d.GetShipTime()},
 	} {
 		if reach >= 0 && i > reach {
-			break // 規則 1 的上界
+			break
 		}
 		at := normalizeOrderTime(milestone.at)
 		if at == "" {
-			break // 規則 1：斷了就停，不跳過缺口往後撿
+			break
 		}
 		entries = append(entries, entry(strconv.Itoa(milestone.status), at))
 	}
 
-	// 規則 2。status 為空（上游沒填）時不補——補了會渲染成一個沒有標籤的節點。
 	if current != "" && (len(entries) == 0 || entries[len(entries)-1].Status != current) {
 		entries = append(entries, entry(current, terminalStatusTime(d, current)))
 	}
 	return entries
 }
 
-// terminalStatusTime 回答「訂單走到這個狀態的時刻」，只認 orders 表**專屬於該狀態**的
-// 時間欄；沒有的狀態回空字串。
-//
-// 這裡刻意不做 fallback 到 `updated_at`：那一欄會被任何後續寫入推走，dev 實測 95 筆有
-// outbox 佐證的取消單裡 11 筆已經漂掉、最大漂 22.7 天 —— 拿它冒充業務時間，畫面上會出現
-// 一個看起來精確、實際錯了三週的時刻，比不顯示時間更糟。
-//
-// 20 待出貨／32 待取貨／35 物流異常／60 部分退款／70 全額退款沒有專屬時間欄（它們的轉換
-// 走共用的狀態更新路徑），所以仍是空字串，前端不渲染時間那一行。
 func terminalStatusTime(d *orderpb.OrderDetailView, status string) string {
 	switch status {
 	case strconv.Itoa(codemeta.OrderStatusDelivered):
@@ -538,12 +482,6 @@ func terminalStatusTime(d *orderpb.OrderDetailView, status string) string {
 	}
 }
 
-// happyPathReach 回答「當下狀態足以證明訂單最遠走到 buildOrderTimeline 的第幾個里程碑」
-// （0 建立／1 付款／2 出貨）。
-//
-// 回傳 -1 代表這個狀態不在正向流程上（已取消／退款／物流異常）——它可能是從任何一個
-// 階段離開流程的，狀態本身推不出走到哪，此時只剩時間戳可當證據。這正是「已取消」需要
-// 特別處理的原因：它既不是 0 也不是 2。
 func happyPathReach(status string) int {
 	switch status {
 	case strconv.Itoa(codemeta.OrderStatusPendingPayment):
@@ -561,19 +499,11 @@ func happyPathReach(status string) int {
 	}
 }
 
-// splitMaskedAddress separates the已遮罩地址 into city + district.
-//
-// order-service masks the address down to district level with a prefix rule; the
-// city half is a closed 22-value enumeration, so matching it here is exact rather
-// than a parser. What is left over is the district. No match means the address did
-// not start with a Taiwanese city — then everything goes to district, which errs
-// toward showing less structure rather than inventing a city.
 func splitMaskedAddress(masked string) (city, district string) {
 	trimmed := strings.TrimSpace(masked)
 	if trimmed == "" {
 		return "", ""
 	}
-	// 郵遞區號前綴（若有）不屬於 city 也不屬於 district。
 	trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, leadingZipCode(trimmed)))
 	for _, candidate := range twaddr.TaiwanCities {
 		if strings.HasPrefix(trimmed, candidate) {
@@ -589,7 +519,6 @@ func splitMaskedAddress(masked string) (city, district string) {
 	return "", trimmed
 }
 
-// leadingZipCode returns the 3–5 digit postal prefix of an address, or "".
 func leadingZipCode(addr string) string {
 	trimmed := strings.TrimSpace(addr)
 	end := 0
@@ -602,14 +531,6 @@ func leadingZipCode(addr string) string {
 	return trimmed[:end]
 }
 
-// normalizeOrderTime renders an order-service timestamp as the contract's
-// second-precision UTC string.
-//
-// It accepts both shapes on purpose. The proto comments say "Unix timestamp (ms)，
-// 數字字串", but OrderProtoConverter actually calls formatIso8601() — the comment is
-// stale. Reading only one of the two produces an EMPTY createdAt on every row, which
-// renders as a blank column rather than as an error; that is exactly what the first
-// local run showed.
 func normalizeOrderTime(v string) string {
 	if v == "" || v == "0" {
 		return ""

@@ -172,9 +172,6 @@ export default function SellerProfileV2({
 	const location = sellerProfileLocation(s);
 	const description = s.description || "";
 	const prize = String(s.prize || "").trim();
-	// 明列欄位而不是把整個物件丟進去：這一頁的來源是 `PublicStoreView`（顯示欄位 `logo_url`），
-	// seller-center 那張卡的來源是 `GetMyStore` 的店家（圖片經 `imageUri` 組成 `logoUrl`）。
-	// 兩邊形狀不同，讓對映在呼叫點看得見。
 	const shareCard = buildSellerShareCardData(
 		sellerId,
 		{
@@ -189,15 +186,9 @@ export default function SellerProfileV2({
 		},
 		s.storeCode,
 	);
-	// `websiteUrl` only earns the 官網 affordance when it points off-platform —
-	// the registration flow seeds it with the seller's own storefront URL, which
-	// would make "訪問官網" a circular self-link.
 	const websiteUrl = isExternalWebsiteUrl(s.websiteUrl ?? "")
 		? (s.websiteUrl ?? "")
 		: "";
-	// The canonical storefront route uses storeCode, while chat history,
-	// presence and websocket state use the internal storeId. Do not pass the
-	// route id into chat; if public seller data lacks storeId, withhold the CTA.
 	const chatSellerId = resolveSellerChatTargetId(s);
 
 	return (
@@ -208,10 +199,6 @@ export default function SellerProfileV2({
 						src={coverImageSrc}
 						quality={70}
 						loading="eager"
-						/* Banner is centered with max-width:1440px, so cap the
-						   size basis there — otherwise wide external monitors
-						   (1440p/4K) fetch the 1920–3840 variant for a strip
-						   that never renders past 1440px. */
 						sizes="(min-width: 1456px) 1440px, 100vw"
 					/>
 				) : (
@@ -240,9 +227,7 @@ export default function SellerProfileV2({
 				</div>
 
 				<div className="hkui-seller-profile__title">
-					{/* The route subtree owns the single semantic <h1>; this
-					    persistent visible store name stays a non-heading so tab
-					    changes cannot duplicate or remount the page heading. */}
+
 					<div className="hkui-seller-profile__name-row">
 						<p className="hkui-seller-profile__name">{name}</p>
 						{prize && (

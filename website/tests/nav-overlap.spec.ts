@@ -103,8 +103,6 @@ test.describe("Nav / content overlap regression", {
 		await page.goto(await getLiveSellerPath(request));
 
 		const navBottom = await getNavBottom(page);
-		// The navbar is part of the static shell; wait for the streamed seller
-		// surface to commit before measuring a control owned by that surface.
 		await expect(page.locator(".hkui-seller-profile__cover")).toBeVisible();
 		const backBtn = page.locator(".hkui-seller-profile__back");
 		await expect(backBtn).toBeVisible();
@@ -121,7 +119,6 @@ test.describe("Nav / content overlap regression", {
 		page,
 		viewport,
 	}) => {
-		// 排序列在 ≤768px 是 display:none，這條斷言在手機寬度沒有標的可量。
 		test.skip(
 			!viewport || viewport.width < SORT_NAV_MIN_WIDTH,
 			`排序列在 <${SORT_NAV_MIN_WIDTH}px 是 display:none（market-products-list.css @media max-width:768px）`,
@@ -130,9 +127,6 @@ test.describe("Nav / content overlap regression", {
 		await page.goto("/products");
 
 		const navBottom = await getNavBottom(page);
-		// Anchor this regression to the semantic sort navigation instead of the
-		// retired `.market-list-main__head` migration class. Its parent <header>
-		// is still the first visible content block in the main column.
 		const listHead = page
 			.getByRole("navigation", { name: "排序" })
 			.locator("..");
@@ -140,16 +134,9 @@ test.describe("Nav / content overlap regression", {
 		const headBox = await listHead.boundingBox();
 		if (!headBox) throw new Error("List head bounding box not found");
 
-		// Content within the list head should not be obscured by the nav
 		expect(
 			headBox.y + headBox.height,
 			"List head must have content below the nav",
 		).toBeGreaterThan(navBottom);
 	});
 });
-
-/* 這裡原本有一個 `Nav / content overlap regression (mobile)` describe，內容與上面
- * 「seller page: hero cover is below nav bottom」**逐字相同**（同樣不設 viewport、
- * 同樣的斷言），只是名字寫了 mobile。它不是額外覆蓋：在 mobile project 下兩支跑
- * 的是同一件事，在 chromium project 下那支「mobile」測試其實跑在 1280px。
- * 兩個 project 都會跑本檔，手機寬度的覆蓋由 `--project=mobile` 提供，所以刪除。 */

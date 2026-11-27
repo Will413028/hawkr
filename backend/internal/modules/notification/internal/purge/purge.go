@@ -15,10 +15,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// retentionDays 是收件匣、投遞紀錄與意圖的保留天數。
 const retentionDays = 180
 
-// batchSize 是每一批刪除或清洗的列數。
 const batchSize = 500
 
 // SweepInterval 是保留期清除的間隔。
@@ -71,7 +69,6 @@ func (s *Service) Sweep(ctx context.Context) (Swept, error) {
 	return out, nil
 }
 
-// batches 反覆執行 run（每次一個 transaction）直到一批不滿 batchSize，回傳總列數。
 func (s *Service) batches(ctx context.Context, run func(q *store.Queries) (int64, error)) (int64, error) {
 	var total int64
 	for {

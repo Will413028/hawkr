@@ -52,7 +52,6 @@ class OrderPolicyPersistenceOnCreationPathsTest {
         try {
             TsidUtil.init(300, 0);
         } catch (Exception ignored) {
-            // 已初始化
         }
     }
 
@@ -112,7 +111,6 @@ class OrderPolicyPersistenceOnCreationPathsTest {
         assertSixColumns(capturedOrder(), "SELLER_MANAGED");
     }
 
-    // ==================== helpers ====================
 
     private OrderEntity capturedOrder() {
         ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);

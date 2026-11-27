@@ -15,19 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// 發票 PDF 授權下載（58 §6.1.4 的三條二進位子路由 ＋ 端點 10／70 的中介資料）
-//
-// 🔴 **本檔的存在理由是授權，不是取檔。** 取檔本身只有兩行（讀 pdf_object_key、
-// 向 media 換 bytes）；難的是「誰能拿哪一份」。這條路徑在 2026-09-02 之前是完全
-// 壞掉的（三條路徑分別回 501／503／404，#3008），而「壞掉」讓越權問題看起來不存在。
-// 修好取檔卻沒同時補歸屬判定，會從「都拿不到」變成「誰都拿得到」——而發票 PDF 上
-// 印著完整的買受人姓名、統編與金額。
-//
-// 🔴 **越權與不存在必須走同一個出口**（§6.1.4「這條通道上必做的四件事」第 1 條）：
-// 兩者可分辨時，這條路由就變成一台可枚舉的 oracle——攻擊者拿一串 document_id 打過去，
-// 403 與 404 的差別就是「這張發票存在」。所以本檔**沒有任何一條路徑回 403**。
-// ---------------------------------------------------------------------------
 
 // FileActorKind 是三個合法讀者面。值域刻意封閉：新增第四個讀者要回來改這裡，
 // 而不是在某個 handler 裡多寫一個 if。
@@ -92,10 +79,6 @@ func NewDocumentFile(
 	return &DocumentFile{documents: documents, media: media, now: time.Now, log: log}
 }
 
-// allowedStyles 是 §6.1.4 鐵則 3 的白名單。
-//
-// 🔴 AMEGO 對 download_style **無值域驗證**（傳 9 仍回 code:0 並產出 URL）
-// ⇒ 我方必須自驗。這裡是「往下傳之前」那一道。
 var allowedStyles = map[string]struct{}{
 	"0": {}, "1": {}, "2": {}, "3": {}, "5": {},
 }
@@ -111,8 +94,6 @@ func (u *DocumentFile) Resolve(ctx context.Context, req FileRequest) (FileResult
 		return FileResult{}, err
 	}
 
-	// 🔴 fileAvailable=false 的文件在這裡就要停，且回**業務碼**而不是 bytes
-	// （§6.1.4 第 4 條）。9312 是正常業務分支不是錯誤：載具發票中獎前我方拿不到 PDF。
 	if doc.PdfObjectKey == nil || *doc.PdfObjectKey == "" {
 		return FileResult{}, fileUnavailableError(doc, u.reasonFor(doc))
 	}
@@ -141,15 +122,9 @@ func (u *DocumentFile) Read(ctx context.Context, req FileRequest) (FileResult, [
 	}
 	data, contentType, name, err := u.media.ReadSecure(ctx, res.ObjectKey, strconv.FormatInt(res.DocumentID, 10))
 	if err != nil {
-		// M15：**只在 media 明確說「這份資產不存在」時**遞增，不是任何讀取失敗都算。
-		// 它守的是 §8.1.5(e) 的 asset_reference 有沒有真的建立——沒建的話 GC 會在
-		// 7 天後刪掉實體，而 AMEGO 的 invoice_file 只查得到 180 天內。把 media 當機
-		// 一起算進去，這條線索就會被雜訊蓋掉；只算不存在，它每一次遞增都是真的缺件。
 		if errors.Is(err, media.ErrAssetNotFound) {
 			observeDocumentPDFMissing()
 		}
-		// media 取不到**不能**折成 404：那會把「我方系統故障」講成「你這張發票不存在」，
-		// 而買家的下一步完全不同（前者是稍後再試，後者是去申訴）。
 		u.log.Error("invoice.document_file.media_read_failed",
 			zap.Int64("document_id", res.DocumentID),
 			zap.String("object_key", res.ObjectKey),
@@ -165,9 +140,6 @@ func (u *DocumentFile) Read(ctx context.Context, req FileRequest) (FileResult, [
 	return res, data, contentType, nil
 }
 
-// authorize 依 actor 走各自的述詞，**述詞寫在 SQL 裡**（GetForBuyerByID／GetForSeller）。
-//
-// 🔴 三條分支的失敗一律折成同一個 ErrNotFound：見本檔頂端的紅線。
 func (u *DocumentFile) authorize(ctx context.Context, req FileRequest) (domain.Document, error) {
 	if req.DocumentID == 0 {
 		return domain.Document{}, errDocumentNotFound()
@@ -175,8 +147,6 @@ func (u *DocumentFile) authorize(ctx context.Context, req FileRequest) (domain.D
 	switch req.Actor {
 	case FileActorBuyer:
 		if req.BuyerID == 0 {
-			// fail-closed：gateway 的 InjectBuyerIDHeader 失敗時 header 是空的。
-			// 「沒有述詞就不篩」在這裡等於把每一張發票的 PDF 開放給任何登入者。
 			return domain.Document{}, errDocumentNotFound()
 		}
 		doc, err := u.documents.GetForBuyerByID(ctx, req.DocumentID, req.BuyerID)
@@ -200,21 +170,14 @@ func (u *DocumentFile) authorize(ctx context.Context, req FileRequest) (domain.D
 		}
 		return doc, nil
 	default:
-		// 值域長胖時 fail-closed。放行的後果是新讀者面預設無述詞。
 		return domain.Document{}, errDocumentNotFound()
 	}
 }
 
-// reasonFor 與 Query.FileAvailability 的判準保持一致（載具未中獎／逾查詢期限／其餘）。
-//
-// ⚠️ 這裡**不能**直接呼叫 Query.FileAvailability：Query 的建構子有 15 個依賴，
-// 為了一個純函式把它整包拉進來，會讓下載路徑跟著 ADM 稽核、商業日鏡像一起起停。
-// 兩份判準要一致靠的是 documentFileUnavailableReason 這支共用純函式。
 func (u *DocumentFile) reasonFor(doc domain.Document) string {
 	return documentFileUnavailableReason(doc, u.now())
 }
 
-// fileNameFor 是下載時的檔名：以發票號為主，退回 document id。
 func fileNameFor(doc domain.Document) string {
 	if doc.ProviderInvoiceNo != nil && *doc.ProviderInvoiceNo != "" {
 		return "invoice-" + *doc.ProviderInvoiceNo + ".pdf"
@@ -225,10 +188,6 @@ func fileNameFor(doc domain.Document) string {
 	return "invoice-" + strconv.FormatInt(doc.ID, 10) + ".pdf"
 }
 
-// fileUnavailableError 把三個不可用理由折成對應的業務碼。
-//
-// 9312／9313 是**正常業務分支**（§6.1.4 鐵則 4），不是系統錯誤；
-// 其餘（尚未抓檔、不適用）走 9301 —— 對使用者的意思同樣是「現在沒有這份檔案」。
 func fileUnavailableError(doc domain.Document, reason string) error {
 	switch reason {
 	case FileUnavailableCarrierNotWon:
@@ -253,15 +212,6 @@ func errDocumentNotFound() error {
 // 200 ＋ envelope。兩個邊界（gRPC 與 /file/content）各自把它折成自己的 400。
 var ErrInvalidFileStyle = errors.New("invoice: download style is outside the whitelist {0,1,2,3,5}")
 
-// mapToNotFound 保證「查無列」與「述詞不符」走同一個出口。
-//
-// repository 的三支授權讀取（GetForBuyerByID／GetForSeller／GetByID）已經把述詞寫在
-// SQL 裡，兩種情況本來就同樣回 9301 ⇒ 這裡多數時候是直通。留著它是為了讓
-// 「不可分辨」這件事在**本層**也看得見：日後有人換成先查再比對，這一行會提醒他
-// 兩條路徑必須匯流。
-//
-// 非 9301 的錯誤（連線失敗等）原樣往上拋：把它們也折成 404 會讓一次 DB 斷線被
-// 講成「你的發票不見了」，而那兩者的下一步完全不同。
 func mapToNotFound(err error) error {
 	if isBizCode(err, bizcode.InvoiceDocumentNotFound) {
 		return errDocumentNotFound()

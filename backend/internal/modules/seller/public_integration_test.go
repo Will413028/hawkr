@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// reconcile 跑一次可曝光的對帳，回傳掃描的店家數。
 func (f *fixture) reconcile(t *testing.T) int {
 	t.Helper()
 	n, err := f.module.ReconcileExposure(context.Background())
@@ -253,7 +252,6 @@ func TestStoreCardsCoverTheStampLag(t *testing.T) {
 	if got := f.card(t, stamped.StoreID); got.Status != CardPaused {
 		t.Fatalf("已記下時間的店被停權 card=%+v, want PAUSED", got)
 	}
-	// 時間欄位是唯一的依據：直接寫入也一樣（不經過 job）。
 	_, direct := f.open(t)
 	_, err = f.db.Conn(context.Background()).Exec(context.Background(), "UPDATE seller.stores SET first_exposed_at = $2 WHERE store_id = $1", direct.StoreID, f.now)
 	must(t, err)
@@ -426,7 +424,6 @@ func (f *fixture) listAllPublic(t *testing.T, size int32) []int64 {
 	return nil
 }
 
-// hiddenWorld 建立三家可曝光的店，夾著每一種不可曝光的店（id 交錯），回傳可曝光的與不可曝光的 store_id。
 func (f *fixture) hiddenWorld(t *testing.T) (visible, hidden []int64) {
 	t.Helper()
 	ctx := context.Background()

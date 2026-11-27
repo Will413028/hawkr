@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// anIssue 是測試用的一個有效問題（個人與企業的申請都有 product_type）。
 func anIssue() []KYCIssue {
 	return []KYCIssue{{Field: "product_type", Code: IssueOther, Message: "請確認商品類型"}}
 }
@@ -86,7 +85,6 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 		"asset not on the application": {true, []KYCIssue{documentIssue(docs, uuid.NewV7().String(), IssueUnreadable)}, "Issues[0].DocumentAssetID"},
 		"business field on individual": {false, []KYCIssue{issueOn("business.tax_id", IssueMismatch)}, "Issues[0].Field"},
 		"document field on individual": {false, []KYCIssue{issueOn(docs, IssueMissing)}, "Issues[0].Field"},
-		// 文件類欄位依原因碼：看不清楚、過期、不一致、格式不符必須指定是哪一張；缺少不可以指定。
 		"unreadable without an asset": {true, []KYCIssue{issueOn(docs, IssueUnreadable)}, "Issues[0].DocumentAssetID"},
 		"expired without an asset":    {true, []KYCIssue{issueOn(docs, IssueExpired)}, "Issues[0].DocumentAssetID"},
 		"mismatch without an asset":   {true, []KYCIssue{issueOn(docs, IssueMismatch)}, "Issues[0].DocumentAssetID"},
@@ -103,7 +101,6 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 			t.Errorf("%s：err=%v violations=%+v，預期指到 %s", name, err, ae.FieldViolations(), c.field)
 		}
 	}
-	// 內部備註的上限同理由（1000 字）。
 	_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: individualSub.ID, ExpectedVersion: individualSub.Version, AdminID: 9, Reason: "x", Issues: anIssue(), InternalNote: strings.Repeat("註", 1001)})
 	if ae := apperrOf(t, err); ae.Kind() != apperr.KindInvalidInput || ae.FieldViolations()[0].Field != "InternalNote" {
 		t.Errorf("overlong internal note: %v", err)
@@ -114,7 +111,6 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE action = 'REJECT'"); n != 0 {
 		t.Fatalf("被拒絕的退回寫入了審核紀錄：%d", n)
 	}
-	// 合法的問題：說明去掉前後空白；文件類的欄位可以不指定特定一張。
 	rej := f.reject(t, companySub,
 		documentIssue(docs, co1, IssueUnreadable),
 		KYCIssue{Field: docs, Code: IssueMissing, Message: "  請重新上傳公司文件  "},
@@ -154,7 +150,6 @@ func TestInternalNoteIsOnlyOnTheAdminReviewRecord(t *testing.T) {
 	}
 	mine, err := f.module.MyKYC(ctx, accountID)
 	must(t, err)
-	// 序列化整份賣家的檢視（含巢狀的指標）：%+v 印不出指標指到的內容，會漏掉。
 	raw, err := json.Marshal(mine)
 	must(t, err)
 	if strings.Contains(string(raw), note) || strings.Contains(strings.ToLower(string(raw)), "internalnote") {
@@ -165,7 +160,6 @@ func TestInternalNoteIsOnlyOnTheAdminReviewRecord(t *testing.T) {
 			t.Fatalf("申請本體含內部備註（備註只在審核紀錄）：%s err=%v", raw, err)
 		}
 	}
-	// 沒寫備註時不存。
 	_, _, other := f.submitted(t)
 	again := f.reject(t, other, anIssue()...)
 	if got := again.Reviews[len(again.Reviews)-1].InternalNote; got != nil {
@@ -205,18 +199,15 @@ func TestOutstandingIssuesAreResolvedByTheSellersEdits(t *testing.T) {
 			t.Fatalf("%s：MyKYC 的 outstanding=%v，預期 %v", step, got, remaining)
 		}
 	}
-	// 沒改任何東西、重填同樣的值：都不算處理。
 	save(KYCDraftInput{})
 	want("empty save", all...)
 	save(KYCDraftInput{ProductType: ptr("蔬果")})
 	want("same value", all...)
-	// 改了值才算。
 	save(KYCDraftInput{ProductType: ptr("水果")})
 	want("product type", "website_url")
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_review_issues WHERE resolved_at IS NOT NULL"); n != 1 {
 		t.Fatalf("已處理的問題=%d", n)
 	}
-	// 重新送出：outstanding 與 last_rejection 都清空；沒處理的問題不被標記（已處理與否只由寫入申請判定）。
 	again, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: mine.Version})
 	must(t, err)
 	if len(again.OutstandingIssues) != 0 || again.LastRejection != nil {
@@ -228,12 +219,10 @@ func TestOutstandingIssuesAreResolvedByTheSellersEdits(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_review_issues WHERE resolved_at IS NULL"); n != 1 {
 		t.Fatalf("重送不該標記問題：未處理=%d", n)
 	}
-	// 再次退回：只算新的一批，上一批沒處理的不會回來。
 	second := f.reject(t, again, issueOn("product_type", IssueInvalid))
 	if got := fields(second.OutstandingIssues); !slices.Equal(got, []string{"product_type"}) {
 		t.Fatalf("second outstanding=%v", got)
 	}
-	// 重新送出後取消：沒有待處理的問題。
 	resubmitted, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: second.Version})
 	must(t, err)
 	cancelled, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: accountID, ExpectedVersion: resubmitted.Version})
@@ -294,7 +283,6 @@ func TestLastRejectionStaysUntilResubmit(t *testing.T) {
 	if again.LastRejection != nil || len(again.OutstandingIssues) != 0 {
 		t.Fatalf("重送之後：%+v", again.LastRejection)
 	}
-	// 再次退回：新的一次才是要處理的。
 	second := f.reject(t, again, issueOn("website_url", IssueInvalid))
 	if second.LastRejection == nil || len(second.LastRejection.Issues) != 1 || second.LastRejection.Issues[0].Field != "website_url" {
 		t.Fatalf("second=%+v", second.LastRejection)
@@ -327,17 +315,14 @@ func TestOutstandingCompanyDocumentIssuesFollowTheAssetNotThePosition(t *testing
 		must(t, err)
 		mine = out
 	}
-	// 順序反過來：兩張都還在。
 	save(KYCDraftInput{CompanyDocuments: &[]KYCDocumentRef{{AssetID: co2}, {AssetID: co1}}})
 	if got := f.outstanding(t, accountID); !slices.Equal(got, []string{"business.company_documents@" + co1, "business.company_documents@" + co2, "business.tax_id"}) {
 		t.Fatalf("reordered outstanding=%v", got)
 	}
-	// 換掉 co2：只有 co2 的問題算處理。
 	save(KYCDraftInput{CompanyDocuments: &[]KYCDocumentRef{{AssetID: co1}, {StagedToken: tokens[2]}}})
 	if got := f.outstanding(t, accountID); !slices.Equal(got, []string{"business.company_documents@" + co1, "business.tax_id"}) {
 		t.Fatalf("replaced outstanding=%v", got)
 	}
-	// 統編改掉才算；整份公司文件清空時 co1 也算處理。
 	save(KYCDraftInput{TaxID: ptr("71777777"), CompanyDocuments: &[]KYCDocumentRef{}})
 	if got := f.outstanding(t, accountID); len(got) != 0 {
 		t.Fatalf("cleared outstanding=%v", got)
@@ -364,7 +349,6 @@ func TestKYCReviewIssueChecksMatchGoAndRejectBadRows(t *testing.T) {
 			t.Errorf("%s 的值數 %d 與 Go 的 %d 不同：%s", constraint, got, len(want), def)
 		}
 	}
-	// 文件類欄位的清單綁同一份 Go 的來源：只有文件類的欄位能帶 asset ID。
 	var assetDef string
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='kyc_review_issues_asset_check'").Scan(&assetDef))
 	documentFields := KYCDocumentFieldNames()
@@ -397,7 +381,6 @@ func TestKYCReviewIssueChecksMatchGoAndRejectBadRows(t *testing.T) {
 			t.Errorf("%s 應該被 CHECK 擋下", name)
 		}
 	}
-	// 內部備註只有退回有，1 到 1000 字。
 	for name, query := range map[string]string{
 		"note on a submit": "UPDATE seller.kyc_reviews SET internal_note = 'x' WHERE action = 'SUBMIT'",
 		"empty note":       "UPDATE seller.kyc_reviews SET internal_note = '' WHERE action = 'REJECT'",

@@ -65,8 +65,8 @@ type Report struct {
 }
 
 const (
-	pageSize        = 200 // 重新求值（reevaluate_*）與買家內容的分頁
-	batchSize       = 500 // 全量重算的一批：鎖住的 stats 列數（寫入者最多等一批的時間）
+	pageSize        = 200
+	batchSize       = 500
 	maxDriftDetails = 100
 )
 
@@ -174,7 +174,6 @@ func (s *Service) MarkAuthorInactive(ctx context.Context, buyerID int64, since t
 	return inserted, err
 }
 
-// syncInactiveAuthors 是對帳的第一步：buyer.pub_inactive_buyers 裡複本還沒有的買家補進來（訂閱者漏了的漂移，正常是 0）。
 func (s *Service) syncInactiveAuthors(ctx context.Context, rep *Report) error {
 	missing, err := store.New(s.d.DB.Conn(ctx)).MissingInactiveAuthors(ctx)
 	if err != nil {
@@ -200,8 +199,6 @@ func (r *Report) add(d Drift) {
 	}
 }
 
-// reevaluateAll 讓全部留言與討論區留言重新求值，修旗標（每批一個 transaction，依 ID 的 keyset 分頁）。旗標先於計數修：reevaluate 依旗標的
-// 差額加減計數，之後的覆寫才以同一個述詞的結果為準。
 func (s *Service) reevaluateAll(ctx context.Context, rep *Report) error {
 	q := store.New(s.d.DB.Conn(ctx))
 	var after uuid.UUID

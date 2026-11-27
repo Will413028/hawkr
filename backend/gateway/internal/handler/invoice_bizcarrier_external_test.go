@@ -20,19 +20,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// 繞道 ⑨ 的第二種形態：**把 handler 搬到別的 package**。
-//
-// 舊 AST gate 的判定材料是 `internal/handler/*.go` 的 AST —— 它只掃自己那一個目錄。
-// 把 handler 搬到任何其他 package（新的 internal/xxxhandler、既有的 proxy、甚至只是
-// 換成 external test package）之後，gate 連檔案都看不到，報零 finding。
-//
-// 本檔刻意宣告成 `package handler_test`：它是一個**與 handler 不同的 package**，
-// 只能碰得到匯出 API，也因此完全複製了「handler 住在別處」的條件。而斷言仍然成立，
-// 因為判定發生在 internal/response —— 誰呼叫它、從哪個 package 呼叫它，都不影響。
-//
-// 一併證明的第二件事：這條路徑上沒有任何 handler package 的內部知識參與，所以
-// 「gate 依賴 Holder.Invoice 這個欄位名／依賴 <recv>.Invoice.<M> 這個呼叫語法」
-// （舊 gate 的 invoiceRPCName 在原始碼註解裡自己承認的失明點）也一併失效。
 
 type externalProbeServer struct {
 	pb.UnimplementedInvoiceServiceServer
@@ -70,7 +57,6 @@ func TestBypass10_HandlerInAnotherPackage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(bizcarrier.Middleware())
-	// 完全沒有守門的 handler，住在 handler package 之外。
 	r.GET("/probe", func(c *gin.Context) {
 		resp, rpcErr := h.Invoice.HealthCheckProviderAccountForAdmin(c.Request.Context(),
 			&pb.HealthCheckProviderAccountForAdminRequest{ActorAccountId: 1, StoreId: "2685914682"})

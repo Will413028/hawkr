@@ -10,7 +10,7 @@ class AnalyticsService {
   final FirebaseAnalytics? _fa;
   final bool enabled;
 
-  FirebaseAnalytics? get instance => _fa; // for the navigator observer
+  FirebaseAnalytics? get instance => _fa;
 
   Future<void> logEvent(String name, Map<String, Object?> params) async {
     final fa = _fa;

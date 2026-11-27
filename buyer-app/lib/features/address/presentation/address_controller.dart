@@ -10,8 +10,6 @@ class AddressController extends _$AddressController {
   @override
   Future<List<Address>> build() async {
     ref.keepAlive();
-    // Apple App Review 合規：訪客（無 token）打 address API 必 401，
-    // 直接回空清單不打 API。登入後 session 變動會自動 rebuild 重新拉取。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return const [];

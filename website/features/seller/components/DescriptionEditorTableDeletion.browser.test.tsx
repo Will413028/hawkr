@@ -164,8 +164,6 @@ function assertTableState(
 	try {
 		expect(actual).toEqual(expected);
 	} catch {
-		// Keep the failing assertion strict, but report only changed cells: MCP's
-		// error excerpt otherwise truncates Vitest's full 3×3 object diff.
 		const differences: Record<string, unknown>[] = [];
 		if (actual.withHeadings !== expected.withHeadings) {
 			differences.push({

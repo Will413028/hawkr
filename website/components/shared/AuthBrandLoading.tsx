@@ -4,9 +4,6 @@ import BrandWordmark from "@/components/shared/BrandWordmark";
 
 export default function AuthBrandLoading() {
 	return (
-		// One accessible name for the whole surface. The wordmark below and the
-		// clover mark are both `aria-hidden`, so「Hawkr 載入中」is announced once
-		// instead of three times (label + wordmark alt + a duplicate sr-only line).
 		<div
 			className="auth-brand-loading"
 			role="status"

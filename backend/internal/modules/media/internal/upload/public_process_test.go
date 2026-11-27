@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/upload"
 )
 
-// tinyGIF 是 1x1、不透明的單格 GIF。
 var tinyGIF = func() []byte {
 	var b bytes.Buffer
 	img := stdimage.NewPaletted(stdimage.Rect(0, 0, 1, 1), color.Palette{color.Black, color.White})

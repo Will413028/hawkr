@@ -17,7 +17,6 @@ export const dom = new JSDOM("<!doctype html><body></body>", {
 });
 const g = globalThis as Record<string, unknown>;
 g.window = dom.window;
-// next/link 載入時讀 `self`。
 g.self = dom.window;
 g.document = dom.window.document;
 g.HTMLElement = dom.window.HTMLElement;

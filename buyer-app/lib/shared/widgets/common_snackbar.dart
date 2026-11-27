@@ -64,7 +64,6 @@ void showFloatingToast(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Icon 在上方 (24x24)
                   Icon(
                     icon ??
                         (isSuccess ? AppIcons.check : AppIcons.errorOutline),
@@ -74,7 +73,6 @@ void showFloatingToast(
                         : AppIconColors.danger,
                   ),
                   SizedBox(height: 12.h),
-                  // 文字在下方
                   Text(
                     message,
                     textAlign: TextAlign.center,
@@ -119,16 +117,6 @@ void showCommonSnackBar(
   Duration duration = const Duration(seconds: 2),
   SnackBarAction? action,
 }) {
-  // [舊版 SnackBar - 已棄用，改用 showFloatingToast]
-  // ScaffoldMessenger.of(context).showSnackBar(
-  //   SnackBar(
-  //     content: Text(message),
-  //     backgroundColor: kSnackBarBackground,
-  //     duration: duration,
-  //     action: action,
-  //   ),
-  // );
 
-  // 新版：直接呼叫浮動 Toast
   showFloatingToast(context, message, duration: duration);
 }

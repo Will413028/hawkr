@@ -78,7 +78,6 @@ class AppCachedImage extends StatelessWidget {
 
     if (isInlineImageData(url)) return _buildInline(url);
 
-    // 當有 scene 時，URL 走 ImageConfig 處理管線
     if (scene != null && !_fromApi) {
       url = ImageConfig.urlFor(url, scene!);
     }
@@ -103,8 +102,6 @@ class AppCachedImage extends StatelessWidget {
       placeholder: (context, url) => _buildPlaceholder(),
       errorWidget: (context, url, error) => _buildError(),
       placeholderFadeInDuration: Duration.zero,
-      // quiet 不淡出佔位塊：1 秒的淡出在捲動列表裡會拖出殘影，圖片換到下一張
-      // 時尤其明顯。淡入取 180ms，與網頁圖片到位的節奏相同。
       fadeOutDuration: loadingStyle == AppImageLoadingStyle.quiet
           ? Duration.zero
           : const Duration(milliseconds: 1000),

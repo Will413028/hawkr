@@ -141,7 +141,6 @@ async function installInteractionFixtures(
 			records: [{ hashtag: "當季", count: "3" }],
 		});
 	});
-	// social 走 Connect（GET，請求在 `message` query；回應是訊息本身的 protobuf JSON）。
 	await page.route(
 		socialMethod("SocialPublicService", "SuggestTrendingPosts"),
 		(route) => {
@@ -160,7 +159,6 @@ async function installInteractionFixtures(
 			return rawData(route, { tags: [{ name: "產地", postCount: "4" }] });
 		},
 	);
-	// content 走 Connect（gateway 根目錄的 /{service}/{method}，回應是訊息本身的 JSON）。
 	await page.route(
 		/\/ContentPublicService\/ListLiveBanners(?:\?|$)/,
 		(route) => {
@@ -239,7 +237,6 @@ test.describe("interaction-only navbar resources", { tag: ["@ui"] }, () => {
 		const fixtureRequests = await installInteractionFixtures(page);
 
 		await openHome(page);
-		// Include the full idle W30, so a delayed timer cannot hide startup work.
 		await page.waitForTimeout(30_000);
 
 		expect(allInteractionRequests(fixtureRequests)).toEqual([]);
@@ -258,8 +255,6 @@ test.describe("interaction-only navbar resources", { tag: ["@ui"] }, () => {
 		await openHome(page);
 		expect(requestedAny(requestedJs, menuChunks)).toBe(false);
 
-		// 2026-09-10：觸發鈕不再宣告 aria-haspopup（面板不是 menu），改以
-		// aria-expanded + aria-controls 表達關係。
 		const firstTrigger = navbar(page).locator("a[aria-expanded]").first();
 		await navbar(page).getByRole("link", { name: "回到 Hawkr 首頁" }).focus();
 		await page.keyboard.press("Tab");
@@ -331,8 +326,6 @@ test.describe("interaction-only navbar resources", { tag: ["@ui"] }, () => {
 		for (const width of [841, 1024, 1440]) {
 			await page.setViewportSize({ width, height: 900 });
 			await openHome(page);
-			// A full navigation retains the mouse position. Start outside the nav
-			// so every viewport exercises an actual pointer entry after hydration.
 			await page.mouse.move(0, 899);
 			await menuTrigger(page).hover();
 			const surface = page.locator(
@@ -474,8 +467,6 @@ test.describe("interaction-only navbar resources", { tag: ["@ui"] }, () => {
 			await installInteractionFixtures(page);
 			const chunks = deferredChunkPaths(INTERACTION_MARKERS[kind]);
 			await openHome(page);
-			// Exercise the local fallback after the existing one-shot recovery has
-			// already been used. Production listeners stay installed and unchanged.
 			await page.evaluate(() =>
 				sessionStorage.setItem("__chunk_reload_at", String(Date.now())),
 			);

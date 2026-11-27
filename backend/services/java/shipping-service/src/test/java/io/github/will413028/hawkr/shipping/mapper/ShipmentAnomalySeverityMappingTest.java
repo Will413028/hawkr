@@ -44,8 +44,6 @@ class ShipmentAnomalySeverityMappingTest {
             if (v.startsWith("'") && v.endsWith("'") && v.length() >= 2) {
                 out.add(v.substring(1, v.length() - 1));
             } else if (!v.isEmpty()) {
-                // 🔴 解析不出來就讓它爆，不要靜默跳過——
-                //    靜默跳過會讓「常數格式被改壞」變成這支測試看不見的事。
                 throw new IllegalStateException("無法解析 severity in-list 的項目：" + v);
             }
         }
@@ -116,10 +114,6 @@ class ShipmentAnomalySeverityMappingTest {
     @Test
     @DisplayName("🔴 ELSE 分支必須是 HIGH 不是 LOW（fail-loud 而不是 fail-silent）")
     void elseBranchFailsLoud() {
-        // 值域理論上已窮舉，所以 ELSE 走不到。但「走不到」是這支測試保證的，
-        // 而保證會被繞過（有人加了值卻沒跑測試就 merge）。
-        // ⇒ ELSE 的值決定了那個情況下的後果：LOW 讓賣家收不到推播（靜默），
-        //    HIGH 讓它吵（可見）。在分不出來的時候，吵比靜默安全。
         assertThat(ShipmentAnomalyQueryMapper.CASE_SEVERITY)
                 .as("ELSE 用 LOW 收尾 ＝ 未知值靜默降級，正是本波要修掉的形狀")
                 .contains("ELSE 'HIGH'")
@@ -131,8 +125,6 @@ class ShipmentAnomalySeverityMappingTest {
     void uberValuesFollowTheDecision() {
         List<String> h = high();
         List<String> l = low();
-        // 裁決第 17 條：需要營運／Seller 立即介入、等到摘要才處理就失去處理價值的 ⇒ HIGH；
-        // 純資訊型、不需人立即介入 ⇒ LOW。
         assertThat(h).contains("UBER_COURIER_UNASSIGNED", "UBER_PICKUP_STUCK", "UBER_CREATE_UNKNOWN_UNRESOLVED");
         assertThat(l).contains("UBER_POD_MISSING");
     }

@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 )
 
-// writeDevKey 在 t 的暫存目錄寫一把 PKCS#8 的 RSA 私鑰，回傳路徑。
 func writeDevKey(t *testing.T) string {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)

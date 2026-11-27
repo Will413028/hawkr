@@ -23,9 +23,6 @@ import { formatDateTime as formatTaipeiDateTimeShared } from "@/lib/format";
 import { api } from "@/services/api";
 import { buildImageUrl } from "@/utils/media";
 
-// Evidence URLs come from buyer/seller uploads. Only treat http(s) as a
-// clickable link — a javascript:/data: URL in href would be DOM XSS when an
-// admin clicks the thumbnail.
 function isSafeHttpUrl(u: string): boolean {
 	try {
 		const p = new URL(u);
@@ -62,15 +59,8 @@ interface DecideResponse {
 	data: { caseNo: string; outcome: string; refundAmount: string };
 }
 
-// AfterSaleAppealState value：已裁決的案件不再開放裁決操作。
 const APPEAL_STATE_RESOLVED = "30";
 
-// 裁決結果的**名稱**走生成的 AFTER_SALE_PLATFORM_DECISION_OUTCOME_LABEL（SSOT 是
-// backend 的 業務類型碼.md）。這裡只留「這個裁決對誰有利」的補充說明——那是本頁的
-// 呈現決定，後端不下發，也不屬於碼表。
-//
-// 以前這裡是 `REJECT_APPEAL: "駁回申訴（支持賣家）"` 這種把兩者黏在一起的手寫表，
-// 結果名稱那一半就跟著漂了（SSOT 是「駁回申訴」，這裡自己長出括號後綴）。
 const OUTCOME_HINT: Record<string, string> = {
 	REJECT_APPEAL: "支持賣家",
 	FULL_REFUND: "支持買家",
@@ -83,21 +73,14 @@ const outcomeLabel = (outcome: string): string => {
 	return hint ? `${label}（${hint}）` : label;
 };
 
-// 時間一律走 lib/format 的台北釘死版（backend#3053 的稽查）：本地這份用
-// toLocaleString 會跟著看的人的瀏覽器時區跑，而管理員不一定在台灣。
 const formatDateTime = formatTaipeiDateTimeShared;
 
-// 讀不到金額時回 "-"。舊版回 `String(raw)`，欄位名一錯就把字串 "undefined" 印在畫面上
-// （售後商品區塊的實際症狀）——寧可顯示缺值也不要把 JS 型別漏到管理員眼前。
-// 幣別前綴是 `NT$ ` 不是裸 `$`：這一頁在裁決要退多少錢，`$225` 讀不出是台幣還是美元。
-// 與同 feature 的列表頁（`disputes/page.tsx`）及 `anomalies` 的同名函式一致。
 function formatAmount(raw: string | number | undefined): string {
 	const n = Number(raw);
 	if (!Number.isFinite(n)) return "-";
 	return `NT$ ${n.toLocaleString()}`;
 }
 
-// imageKey ＝ 頭像/商家 logo 的 objectKey（SSOT）；顯示 URL 由 buildImageUrl 依 preset 組。
 function Avatar({
 	imageKey,
 	name,
@@ -165,7 +148,6 @@ function PhotoGrid({
 	return (
 		<div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
 			{photoKeys.map((key, i) => {
-				// 傳進來的是 objectKey（SSOT）；縮圖走 thumb preset，開新分頁看原圖。
 				const full = buildImageUrl(key, "original");
 				return (
 					<a
@@ -228,8 +210,6 @@ export default function DisputeDetail() {
 			: "載入失敗"
 		: "";
 
-	// 一次性 seed：partialRefundAmount 預設為可退金額的一半。用 ref 確保只在
-	// detail 首次到達時 seed，背景 refetch 不會覆蓋管理員已輸入的金額。
 	const seededRef = useRef(false);
 	useEffect(() => {
 		if (detail && !seededRef.current) {
@@ -239,7 +219,6 @@ export default function DisputeDetail() {
 		}
 	}, [detail]);
 
-	// 裁決送出 → 成功後導回列表（不 invalidate：離開本頁，無 re-seed 風險）
 	const decideMutation = useMutation({
 		mutationFn: (body: Record<string, string>) =>
 			api.post<DecideResponse>(
@@ -352,7 +331,7 @@ export default function DisputeDetail() {
 
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-			{/* Header */}
+
 			<div style={headerCardStyle}>
 				<div style={{ display: "flex", alignItems: "center", gap: 24 }}>
 					<button
@@ -426,9 +405,9 @@ export default function DisputeDetail() {
 					alignItems: "start",
 				}}
 			>
-				{/* Left: case details */}
+
 				<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-					{/* Buyer / Seller */}
+
 					<div style={cardStyle}>
 						<div style={cardHeaderStyle}>
 							<MaterialSymbol name="person" style={{ fontSize: 22 }} />
@@ -453,7 +432,7 @@ export default function DisputeDetail() {
 						</div>
 					</div>
 
-					{/* Items */}
+
 					{(caseDetail?.items?.length ?? 0) > 0 && (
 						<div style={cardStyle}>
 							<div style={cardHeaderStyle}>
@@ -476,8 +455,7 @@ export default function DisputeDetail() {
 										}}
 									>
 										<div>
-											{/* 售後明細沒有商品名，規格名就是這一列的標題（proto
-											    AfterSaleCaseItemView 只有 sku_name）。 */}
+
 											<div style={{ fontWeight: 600, color: "#101828" }}>
 												{item.skuName || "（未命名規格）"}
 											</div>
@@ -503,7 +481,7 @@ export default function DisputeDetail() {
 						</div>
 					)}
 
-					{/* Buyer original complaint */}
+
 					<div style={cardStyle}>
 						<div style={cardHeaderStyle}>
 							<MaterialSymbol
@@ -568,7 +546,7 @@ export default function DisputeDetail() {
 						</div>
 					</div>
 
-					{/* Seller rejection */}
+
 					<div style={cardStyle}>
 						<div style={cardHeaderStyle}>
 							<MaterialSymbol name="storefront" style={{ fontSize: 22 }} />
@@ -646,7 +624,7 @@ export default function DisputeDetail() {
 						</div>
 					</div>
 
-					{/* Buyer appeal (additional evidence) */}
+
 					{photoKeys.buyerAppeal.length > 0 && (
 						<div style={cardStyle}>
 							<div style={cardHeaderStyle}>
@@ -659,7 +637,7 @@ export default function DisputeDetail() {
 						</div>
 					)}
 
-					{/* Arbitration timeline */}
+
 					{(arbitration?.timeline?.length ?? 0) > 0 && (
 						<div style={cardStyle}>
 							<div style={cardHeaderStyle}>
@@ -743,7 +721,7 @@ export default function DisputeDetail() {
 						</div>
 					)}
 
-					{/* Decision result */}
+
 					{arbitration?.decision && (
 						<div style={{ ...cardStyle, border: "2px solid #9ca3af" }}>
 							<div style={{ ...cardHeaderStyle, background: "#f3f4f6" }}>
@@ -805,7 +783,7 @@ export default function DisputeDetail() {
 					)}
 				</div>
 
-				{/* Right: ruling panel */}
+
 				<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 					<div style={cardStyle}>
 						<div style={cardHeaderStyle}>
@@ -886,7 +864,7 @@ export default function DisputeDetail() {
 				</div>
 			</div>
 
-			{/* Ruling Modals */}
+
 			{modalType === "support_seller" && (
 				<RulingModal
 					title="確認駁回申訴？"
@@ -952,8 +930,7 @@ export default function DisputeDetail() {
 								gap: 4,
 							}}
 						>
-							{/* 與同頁 formatAmount 同一個幣別前綴：管理員在這一格輸入退款金額，
-							    顯示處寫 NT$ 而輸入處寫 $ 等於在同一個畫面上問「這是哪一國的錢」。 */}
+
 							<span style={{ color: "#6a7282", fontSize: 16 }}>NT$</span>
 							<input
 								type="number"

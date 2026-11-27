@@ -53,7 +53,6 @@ public class ReturnTimeoutWorker {
     public void checkReturnTimeout() {
         LocalDateTime now = DateTimeUtils.nowUtc();
 
-        // §5.3.8 掃描：status='20' AND ship_back_deadline_at <= NOW（partial index idx_aftersale_cases_return_timeout 覆蓋）
         List<AfterSaleCaseEntity> expired = caseMapper.selectList(
                 new LambdaQueryWrapper<AfterSaleCaseEntity>()
                         .eq(AfterSaleCaseEntity::getStatus, AfterSaleCaseStatus.RETURN_PENDING.value())
@@ -69,9 +68,6 @@ public class ReturnTimeoutWorker {
 
         for (AfterSaleCaseEntity entity : expired) {
             try {
-                // issue #2294 P1-2：身分反解（兩次無 deadline 的 gRPC）必須在**進 tx 之前**做完。
-                // 失敗即跳過本筆——此時尚未 CAS，status 仍是 '20'、ship_back_deadline_at 仍到期，
-                // 下一 tick（cron 10 分鐘）必然重撈。
                 EventPrincipals principals =
                         eventPublisher.resolveEventPrincipals(entity.getStoreId(), entity.getBuyerId());
                 closeService.closeExpiredCase(entity, now, principals);
@@ -80,7 +76,6 @@ public class ReturnTimeoutWorker {
                         "身分反解失敗，本輪跳過（未進 tx、未 CAS），下一 tick 重試, caseNo="
                                 + entity.getCaseNo(), e);
             } catch (Exception e) {
-                // 含 EventPublishFailedException：短 tx 已 rollback，下一 tick 重撈重發
                 log.error("ReturnTimeoutWorker.error",
                         "處理待寄回逾時案件異常, caseNo=" + entity.getCaseNo(), e);
             }

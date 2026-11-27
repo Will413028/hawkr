@@ -26,7 +26,6 @@ import {
 	requiredFixture,
 } from "@/lib/seller/onboarding-fixtures";
 
-// 真的 store 以 localStorage 持久化；這裡只要它的狀態與動作，用不持久化的同形 store 取代。
 vi.mock("./dashboardUiStore", async () => {
 	const { create } = await import("zustand");
 	return {
@@ -171,7 +170,6 @@ describe("OnboardingProgressCard", () => {
 	});
 
 	it("follows the summary, not the store's capabilities", () => {
-		// 能力說沒有缺任何條件，摘要說三項都沒完成：不顯示「任務完成」。
 		renderCard({
 			onboarding: requiredFixture(PENDING, PENDING, PENDING),
 			missing: [],
@@ -254,7 +252,6 @@ describe("OnboardingProgressCard", () => {
 		const alert = screen.getByRole("alert");
 		expect(alert.textContent).toBe("系統錯誤");
 		expect(screen.getByText("公開前必須")).toBeTruthy();
-		// 沒有必要任務可數：不顯示進度，也不是「任務完成」。
 		expect(screen.queryByText(/\/\d/)).toBeNull();
 		expect(screen.queryByText("任務完成")).toBeNull();
 		const lists = screen.getAllByRole("list");

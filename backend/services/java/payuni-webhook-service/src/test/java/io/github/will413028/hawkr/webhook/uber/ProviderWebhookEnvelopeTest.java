@@ -65,8 +65,6 @@ class ProviderWebhookEnvelopeTest {
                 "8242", "event.delivery_status", "evt_1", awkward(), Map.of(), "2026-09-12T01:02:03Z");
         JsonNode root = MAPPER.readTree(MAPPER.writeValueAsString(out.toWireMap()));
 
-        // 🔴 期望值硬寫字面值，不引用 ProviderWebhookEnvelope.KEY_*：
-        //    引用常數的話，改名時測試會跟著改名而不會轉紅 —— 那就驗不到任何東西。
         assertTrue(root.has("provider"));
         assertTrue(root.has("webhook_type"));
         assertTrue(root.has("event_key"));

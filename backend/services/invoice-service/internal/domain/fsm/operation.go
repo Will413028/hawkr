@@ -44,26 +44,16 @@ var OperationTransitions = []OperationTransition{
 	{Code: "J03", From: []string{opCreated}, To: opAwaitingTrigger, Trigger: "同上，issue_not_before > now"},
 	{Code: "J04", From: []string{opCreated}, To: opNotApplicable, Trigger: "決策樹落在四個 reason 之一"},
 	{Code: "J05", From: []string{opAwaitingTrigger}, To: opReady, Trigger: "issue_not_before 到期（INV.op RunOnce 前置 promote）"},
-	// ⚠️ CREATED 是「作廢重開全鏈路」那次（6219d7a50）刻意加進 SQL 的：重開票的
-	// REISSUE operation 會停在 CREATED，那時全額退款一樣要取消得掉。
-	// 本表與該支 SQL 的註解**當時都沒跟上** —— 這是 2026-09-04 由
-	// TestOperationFSMMatchesSQL 對帳出來的（#3089 §1.5 T3：一個沒有人讀的 SSOT
-	// 必然漂移，而漂移了也不會有任何東西轉紅）。
 	{Code: "J06", From: []string{opCreated, opAwaitingTrigger, opReady, opRetryScheduled, opHeld}, To: opCancelledBeforeIssue, Trigger: "累計退款 = 實付總額"},
-	// J07 的候選述詞必須含 SENDING，否則崩潰的租約永遠回不來。
 	{Code: "J07", From: []string{opReady, opRetryScheduled, opSending}, To: opSending, Trigger: "Claim CAS rows=1（next_attempt_at <= tickNow）"},
 	{Code: "J08", From: []string{opReady, opRetryScheduled}, To: opHeld, Trigger: "買家送出付款後修改（held_until = now + 60s）"},
 	{Code: "J09", From: []string{opHeld}, To: opReady, Trigger: "快照更新完成 或 held_until <= now"},
 	{Code: "J10", From: []string{opSending}, To: opSucceeded, Trigger: "code = 0（或 3050122／4050132 視同成功）"},
-	// ⚠️ RETRY_SCHEDULED 同上是對帳補回來的：MarkInvoiceOperationFailed 的
-	// allowed-from 是 IN ('SENDING','RETRY_SCHEDULED')，因為 pkg/outbox 在
-	// 重試預算用完時呼叫它，而那個時點的 status 正是 RETRY_SCHEDULED。
 	{Code: "J11", From: []string{opSending, opRetryScheduled}, To: opFailedPermanent, Trigger: "錯誤碼分類 = PERMANENT，或重試預算用完（pkg/outbox）"},
 	{Code: "J12", From: []string{opSending}, To: opRetryScheduled, Trigger: "錯誤碼分類 = RETRYABLE 且 attempt_count < MaxAttempts"},
 	{Code: "J13", From: []string{opSending}, To: opWaitingConfirmation, Trigger: "逾時／連線中斷／JSON 解析失敗／分類 = UNKNOWN"},
 	{Code: "J14", From: []string{opRetryScheduled}, To: opFailedRetryExhausted, Trigger: "attempt_count 達 MaxAttempts"},
 	{Code: "J15", From: []string{opWaitingConfirmation}, To: opProviderStatusRecheck, Trigger: "INV.rc Claim CAS rows=1"},
-	// J16 的候選述詞必須含 PROVIDER_STATUS_RECHECK，理由同 J07。
 	{Code: "J16", From: []string{opProviderStatusRecheck}, To: opProviderStatusRecheck, Trigger: "租約到期後被重新 Claim（持有者崩潰）"},
 	{Code: "J17", From: []string{opProviderStatusRecheck}, To: opFailedUnknown, Trigger: "重查仍不確定，now − unknown_since > 24h，且無 ADM 取消在途"},
 	{Code: "J18", From: []string{opFailedPermanent}, To: opReady, Trigger: "ADM 修正資料後重試（必須帶新的 snapshot_version）"},
@@ -80,11 +70,7 @@ var OperationTransitions = []OperationTransition{
 	{Code: "J29", From: []string{opCancelledByAdmin}, To: opManualProcessAllowed, Trigger: "第二人覆核解鎖（actor != 取消者）"},
 	{Code: "J30", From: []string{opManualProcessAllowed}, To: opResolvedExternally, Trigger: "賣家回報號碼（provider_invoice_no 必須留空）"},
 	{Code: "J31", From: []string{opProviderStatusRecheck}, To: opWaitingConfirmation, Trigger: "重查仍不確定，now − unknown_since <= 24h，且無 ADM 取消在途"},
-	// J32 與 J11 分開列是刻意的：兩者分類同為 PERMANENT，但一個要通知賣家去財政部、
-	// 一個要通知 ADM 改資料。
 	{Code: "J32", From: []string{opSending}, To: opSellerActionRequired, Trigger: "PERMANENT 且屬「賣家法定前置未完成」子類（3040111 字軌不足）"},
-	// J33 是 SELLER_ACTION_REQUIRED 不是永久旗標的唯一理由——刪掉它，卡住的票就再也回不來，
-	// 而且無告警。集合式 UPDATE、無外部副作用、不需 claim。
 	{Code: "J33", From: []string{opSellerActionRequired}, To: opReady, Trigger: "INV.trk 查到該 issuer_id 字軌餘量恢復"},
 	{Code: "J34", From: []string{opSellerActionRequired}, To: opReady, Trigger: "ADM 手動重試（不要求新的 snapshot_version）"},
 }

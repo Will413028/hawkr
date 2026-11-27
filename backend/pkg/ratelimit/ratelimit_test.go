@@ -25,11 +25,9 @@ func TestLimiter_FallbackEnforcesAndDegradesOpen(t *testing.T) {
 	if l.Allow(ctx, "k", 3, time.Minute) {
 		t.Fatal("request #4 allowed, want denied (over quota)")
 	}
-	// Different key has an independent counter.
 	if !l.Allow(ctx, "other", 3, time.Minute) {
 		t.Fatal("distinct key denied, want independent counter")
 	}
-	// Non-positive limit / window means unlimited.
 	if !l.Allow(ctx, "k", 0, time.Minute) {
 		t.Fatal("limit 0 should be treated as unlimited")
 	}
@@ -39,10 +37,10 @@ func TestLimiter_FallbackEnforcesAndDegradesOpen(t *testing.T) {
 // inserting a new key evicts the least-recently-used one.
 func TestBoundedWindows_EvictsLRU(t *testing.T) {
 	b := newBoundedWindows(2)
-	b.allow("a", 5, time.Minute) // a
-	b.allow("b", 5, time.Minute) // a, b
-	b.allow("a", 5, time.Minute) // touch a → LRU is now b
-	b.allow("c", 5, time.Minute) // insert c → evict b
+	b.allow("a", 5, time.Minute)
+	b.allow("b", 5, time.Minute)
+	b.allow("a", 5, time.Minute)
+	b.allow("c", 5, time.Minute)
 
 	if _, ok := b.m["b"]; ok {
 		t.Fatal("b should have been evicted as least-recently-used")
@@ -84,7 +82,6 @@ func TestLimiter_CountDoesNotIncrement(t *testing.T) {
 	if n := l.Count(ctx, "absent", time.Minute); n != 0 {
 		t.Fatalf("absent key: got %d, want 0", n)
 	}
-	// Reading repeatedly must not create or advance a counter.
 	for i := 0; i < 5; i++ {
 		if n := l.Count(ctx, "absent", time.Minute); n != 0 {
 			t.Fatalf("read #%d of absent key: got %d, want 0 (Count must not increment)", i+1, n)
@@ -124,7 +121,6 @@ func TestBoundedWindows_CountDoesNotRefreshLRU(t *testing.T) {
 	b.allow("a", 100, time.Minute)
 	b.allow("b", 100, time.Minute)
 
-	// Reading "a" must not promote it; inserting "c" should still evict "a".
 	b.count("a", time.Minute)
 	b.allow("c", 100, time.Minute)
 
@@ -136,14 +132,6 @@ func TestBoundedWindows_CountDoesNotRefreshLRU(t *testing.T) {
 	}
 }
 
-// blockScripting installs a pre-hook on mr that fails EVAL/EVALSHA with a
-// generic (non-NOSCRIPT) error while leaving every other Redis command —
-// INCR, GET, PEXPIRE, ... — working normally. This simulates a narrower
-// failure than a full Redis outage: e.g. a proxy layer in front of Redis that
-// disables scripting, or an EVAL call that times out while the connection
-// itself is healthy. redis.Script.Run's EVALSHA-then-EVAL-on-NOSCRIPT retry
-// never gets a NOSCRIPT reply here, so it returns the injected error directly
-// instead of falling through to a successful EVAL.
 func blockScripting(mr *miniredis.Miniredis) {
 	mr.Server().SetPreHook(func(c *miniredisServer.Peer, cmd string, args ...string) bool {
 		if cmd == "EVAL" || cmd == "EVALSHA" {
@@ -181,7 +169,6 @@ func TestLimiter_AllowStrict_MatchesAllowWhenRedisHealthy(t *testing.T) {
 	if ok {
 		t.Fatal("request #4 allowed, want denied (over quota)")
 	}
-	// Non-positive limit / window means unlimited, matching Allow.
 	if ok, err := l.AllowStrict(ctx, "k", 0, time.Minute); err != nil || !ok {
 		t.Fatalf("limit 0: got (%v, %v), want (true, nil) — should be treated as unlimited", ok, err)
 	}
@@ -203,9 +190,6 @@ func TestLimiter_AllowStrict_NilRedis_ReturnsErrNoRedis(t *testing.T) {
 	if ok {
 		t.Fatal("got allowed=true on nil-Redis AllowStrict, want false (fail closed)")
 	}
-	// Confirm this is genuinely not touching the fallback: Allow on the same
-	// Limiter and key must still work via the fallback, proving AllowStrict's
-	// error isn't a side effect of a broken fallback.
 	if !l.Allow(ctx, "k", 3, time.Minute) {
 		t.Fatal("sanity check failed: Allow should still admit via fallback on this Limiter")
 	}
@@ -226,7 +210,6 @@ func TestLimiter_AllowStrict_ScriptFailure_ReturnsErrorNotFallback(t *testing.T)
 	l := New(rdb, 100, nil)
 	ctx := context.Background()
 
-	// Sanity: plain Redis commands still work — this is not a full outage.
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		t.Fatalf("sanity check failed: PING should succeed with scripting alone blocked: %v", err)
 	}
@@ -239,10 +222,6 @@ func TestLimiter_AllowStrict_ScriptFailure_ReturnsErrorNotFallback(t *testing.T)
 		t.Fatal("AllowStrict returned allowed=true on script failure, want false (fail closed)")
 	}
 
-	// Contrast: Allow on an identical Limiter+key silently degrades to the
-	// fallback and admits the request — proving the two methods really do
-	// differ only in this failure path, and that a silent bypass is exactly
-	// what AllowStrict is preventing here.
 	l2 := New(rdb, 100, nil)
 	if allowed := l2.Allow(ctx, "k", 3, time.Minute); !allowed {
 		t.Fatal("sanity check failed: Allow should degrade-open (admit) on the same script failure")

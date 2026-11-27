@@ -36,11 +36,6 @@ import (
 // offer at all, so it fails closed immediately.
 var ErrNoRedis = errors.New("ratelimit: no redis client configured")
 
-// fixedWindowScript atomically increments a per-key counter and, on the first
-// hit of a new window, sets its expiry. It returns the post-increment count so
-// the caller can compare against the limit. Fixed-window (INCR+PEXPIRE) is
-// chosen over a token bucket for its single-round-trip atomicity; abuse
-// throttling does not need sub-window smoothing.
 const fixedWindowScript = `
 local c = redis.call("INCR", KEYS[1])
 if c == 1 then
@@ -51,7 +46,7 @@ return c
 
 // Limiter is a distributed fixed-window rate limiter.
 type Limiter struct {
-	rdb      *redis.Client // may be nil → always use fallback
+	rdb      *redis.Client
 	fallback *boundedWindows
 	script   *redis.Script
 	logger   *zap.Logger

@@ -100,23 +100,17 @@ test("src/ 沒有任何手寫的「數字碼 → 中文標籤」對照表", () =
 });
 
 test("偵測式本身有鑑別力（能抓到一個刻意造出來的第二份碼表）", () => {
-	// 沒有這一條，SECOND_COPY 正則哪天被改壞成永不命中，上面那支會靜默恆綠。
 	const planted = 'const X = {\n\t"0": "待付款",\n\t"10": "已付款",\n};';
 	const hits = [...planted.matchAll(SECOND_COPY)];
 	assert.equal(hits.length, 2, "偵測式抓不到已知的違規樣本");
 	assert.equal(hits[0][2], "待付款");
 
-	// 反向：顏色 / icon 表不該被誤判。
 	const legit =
 		'const S = {\n\t"0": { variant: "pending" },\n\t"10": "approved",\n};';
 	assert.deepEqual([...legit.matchAll(SECOND_COPY)], [], "誤報了呈現層對照表");
 });
 
 test("toOptions 的顯示順序保證成立（嚴重度下拉是「高／中／低」）", () => {
-	// `toOptions(map, order)` 對 order 內找不到的 key 是**靜默忽略**。若哪天 SSOT 把
-	// ShipmentAnomalySeverity 的 Value 換成別的形式，SHIPMENT_ANOMALY_SEVERITY_ORDER
-	// 會整組落空、下拉靜默翻轉成 SSOT 列序（低／中／高），而且沒有任何東西會報錯。
-	// digest 測試只會告訴你「值變了」，不會告訴你「下拉順序反了」。
 	assert.deepEqual(
 		toOptions(
 			SHIPMENT_ANOMALY_SEVERITY_LABEL,
@@ -124,7 +118,6 @@ test("toOptions 的顯示順序保證成立（嚴重度下拉是「高／中／�
 		).map(([, label]) => label),
 		["高", "中", "低"],
 	);
-	// order 必須真的全部命中 map，沒有一個落到 rest（落空是上面那個靜默失效的前兆）。
 	const missing = SHIPMENT_ANOMALY_SEVERITY_ORDER.filter(
 		(k) => !(k in SHIPMENT_ANOMALY_SEVERITY_LABEL),
 	);
@@ -140,7 +133,6 @@ test("toOptions 不會漏掉 order 沒列到的值域（新增碼值不會從下
 	]);
 });
 
-// ── 第二份碼表的另一種形態：值不是中文，所以上面那條看不到它 ─────────────────────
 
 /**
  * 「殘缺的碼表」偵測器。
@@ -214,7 +206,6 @@ function findPartialTables(source: string): PartialTable[] {
 		present: [...e.values].filter((v) => keys.has(v)),
 		missing: [...e.values].filter((v) => !keys.has(v)),
 	}));
-	// 有 enum 被完整覆蓋 ⇒ 這些鍵已經有主人，其他 enum 的部分命中是值域重疊造成的。
 	if (scored.some((s) => s.present.length > 0 && s.missing.length === 0)) {
 		return [];
 	}
@@ -247,7 +238,6 @@ test("src/ 沒有任何「以碼值為鍵但漏掉值域成員」的對照表", 
 });
 
 test("殘缺碼表偵測式本身有鑑別力", () => {
-	// 沒有這一條，findPartialTables 哪天被改壞成永不命中，上面那支會靜默恆綠。
 	const planted = [
 		"const M = {",
 		'\t"4001": { className: "pending" },',
@@ -263,7 +253,6 @@ test("殘缺碼表偵測式本身有鑑別力", () => {
 		`抓不到已知的殘缺樣本，實際命中：${JSON.stringify(hits)}`,
 	);
 
-	// 正例一：收齊了就不該被判違規。
 	assert.deepEqual(
 		findPartialTables(
 			planted.replace('\t"4003"', '\t"4002": { className: "info" },\n\t"4003"'),
@@ -271,7 +260,6 @@ test("殘缺碼表偵測式本身有鑑別力", () => {
 		[],
 		"完整的呈現層對照被誤判成違規",
 	);
-	// 正例二：不足 3 個命中的子集（刻意只列兩種狀態的 tab）不該被判違規。
 	assert.deepEqual(
 		findPartialTables('const T = {\n\t"4001": "a",\n\t"4004": "b",\n};'),
 		[],
@@ -279,13 +267,10 @@ test("殘缺碼表偵測式本身有鑑別力", () => {
 	);
 });
 
-// ── 商品狀態的呈現 token：值域要收齊，而且彼此要看得出差別 ──────────────────────
 
 test("每個 ProductStatus 值都有自己的呈現 token，且四種狀態彼此可分辨", () => {
 	const codes = Object.values(ProductStatus);
 
-	// ① 收齊：沒有任何一個值落進 fallback。漏一個的後果不是「少了顏色」，是畫面上
-	//    出現一個看起來像「被退回」的紅色徽章 —— 那正是 4002 出過的事。
 	const fellBack = codes.filter(
 		(code) => getStatusMeta(code) === UNKNOWN_STATUS_META,
 	);
@@ -295,8 +280,6 @@ test("每個 ProductStatus 值都有自己的呈現 token，且四種狀態彼�
 		`這些 ProductStatus 值沒有呈現 token，會用未知碼的紅底問號渲染：${fellBack.join(", ")}`,
 	);
 
-	// ② 可分辨：className / badgeVariant 兩兩相異。光是「有補」不夠 —— 把 4002 也給
-	//    `pending`，草稿與審核中在同一張表裡就是同一顆徽章，等於沒補。
 	for (const field of ["className", "badgeVariant"] as const) {
 		const used = codes.map((code) => getStatusMeta(code)[field]);
 		assert.equal(
@@ -308,8 +291,6 @@ test("每個 ProductStatus 值都有自己的呈現 token，且四種狀態彼�
 });
 
 test("每個狀態的呈現 token 都對得到真的樣式（不是一個對不到 CSS 的字串）", () => {
-	// className / badgeVariant 都是字串，打錯字不會編譯錯：`.status-badge` 只剩形狀沒有
-	// 顏色、`<StatusBadge>` 靜靜退回預設 variant。兩者都不會有任何錯誤訊息。
 	const globals = readFileSync(join(SRC, "app", "globals.css"), "utf8");
 	const badgeCss = readFileSync(
 		join(SRC, "components", "UI", "StatusBadge.css"),
@@ -340,18 +321,8 @@ test("每個狀態的呈現 token 都對得到真的樣式（不是一個對不�
 	assert.deepEqual(missing, [], missing.join("\n"));
 });
 
-// ── 以下與 CodeMeta 無關，是同一類「機械保證」：守住 modal 必須 portal ──────────
 
 test("對話框一律 portal 到 body：共用 Dialog 沒有 portal 開關，也沒有人傳", async () => {
-	// 2026-08-20：/admin/merchants 列表最後一欄是 `position: sticky; z-index: 1`
-	// （`7d2a6e5` 為修 1440px 下按鈕被裁掉而加），而 MerchantOperationEntry 就掛在那格裡。
-	// sticky + z-index 會建立 stacking context ⇒ 對話框的 `position: fixed; z-index: 1000`
-	// 被壓到那一層 ⇒ 其他列的 sticky 儲存格蓋在遮罩上、對話框被表格的 overflow 裁掉，
-	// 底部「建立工作階段」按鈕捲不到，整條代行流程無法完成。
-	//
-	// 調高 z-index 治不了（問題是被困在錯的 stacking context），唯一治本是 portal 出去。
-	// 原本靠「每個代行對話框都要記得傳 portal」守，那是容易漏的約定；現在 portal 是 Dialog 唯一的行為，
-	// 這支測試守兩件事：Dialog 真的 createPortal 到 body，而且沒有人再傳 `portal`（那個 prop 已不存在）。
 	const dialog = readFileSync(
 		join(SRC, "components", "UI", "Dialog.tsx"),
 		"utf8",
@@ -375,7 +346,6 @@ test("對話框一律 portal 到 body：共用 Dialog 沒有 portal 開關，也
 });
 
 test("偵測式本身抓得到「還在傳 portal」", () => {
-	// 同上，防止判定條件哪天被改壞成永不命中。
 	const detect = (source: string) => /<Dialog\b[^>]*\bportal\b/u.test(source);
 	assert.ok(
 		detect('<Dialog variant="operation" portal title="x">'),
@@ -461,9 +431,6 @@ const renderAuditDialog = (patch: Record<string, unknown> = {}): string =>
 	);
 
 test("稽核內容是 modal，不是會被視窗寬度推到畫面外的側欄", () => {
-	// 側欄版在 `.adm-audit-layout`（flex-wrap）裡是固定 340px 的一欄，視窗不夠寬就
-	// 換行到表格下方 ⇒ 按「查看前後差異」的人看到的是「按了沒反應」（2026-08-21 回報）。
-	// modal 在任何寬度都在畫面正中，不存在「打開在畫面外」這個狀態。
 	const markup = renderAuditDialog();
 	assert.match(markup, /role="dialog"/u, "稽核內容沒有 dialog 語意");
 	assert.match(
@@ -479,8 +446,6 @@ test("稽核內容是 modal，不是會被視窗寬度推到畫面外的側欄",
 });
 
 test("「變更內容（系統紀錄）」是稽核內容的第一個區塊", () => {
-	// 按下那顆鈕的人要看的就是它。它原本排在 15 個區塊的第 12 個，開啟後還要捲過
-	// 整頁定義列表；那正是「查看前後差異」這個承諾沒有兌現的地方。
 	const markup = renderAuditDialog();
 	const body = '<div class="adm-operation-dialog-body">';
 	const bodyAt = markup.indexOf(body);
@@ -490,14 +455,12 @@ test("「變更內容（系統紀錄）」是稽核內容的第一個區塊", ()
 		"找不到對話框 body —— 版面已改，這支要跟著改不是刪掉",
 	);
 
-	// 第一個子元素就是變更內容區塊（相鄰，中間不得插入任何東西）。
 	assert.ok(
 		markup
 			.slice(bodyAt + body.length)
 			.startsWith('<div class="adm-audit-changed">'),
 		`body 的第一個子區塊不是「變更內容」，而是 ${markup.slice(bodyAt + body.length, bodyAt + body.length + 60)}`,
 	);
-	// 再從另一個方向釘一次：它必須早於所有定義列（`DetailRow`）。
 	const changedAt = markup.indexOf("變更內容（系統紀錄）");
 	const firstRowAt = markup.indexOf('class="adm-audit-detail-row"');
 	assert.notEqual(changedAt, -1);
@@ -506,14 +469,10 @@ test("「變更內容（系統紀錄）」是稽核內容的第一個區塊", ()
 		changedAt < firstRowAt,
 		`「變更內容」出現在第一個定義列之後（${changedAt} > ${firstRowAt}）—— 它被推回欄位堆裡了`,
 	);
-	// 內容真的渲染出來了，不是驗到一個空殼。
 	assert.match(markup, /認證標章/u, "三欄變更表沒有渲染出後端下發的 label");
 });
 
 test("失敗列印出後端下發的業務碼說明；拿不到說明才退回只顯示原碼", () => {
-	// 「業務碼 9266」對操作者與客服等於沒有資訊，而說明只有後端查得到（稽核列存的是
-	// 碼，不是當時的訊息）。前端補一張自己的對照表就是第二份 CodeMeta 鏡像 —— 這正是
-	// 本檔整支測試在防的東西。
 	const withLabel = renderAuditDialog({
 		result: "FAILED",
 		bizCode: 9266,
@@ -525,11 +484,8 @@ test("失敗列印出後端下發的業務碼說明；拿不到說明才退回�
 		/資料已被更新，請重新載入後再試/u,
 		"失敗列沒有印出 bizCodeLabel —— 面板又退回只有裸業務碼",
 	);
-	// 原碼仍要留著：說明給人看，碼給客服／工單追。
 	assert.match(withLabel, /業務碼 9266/u, "說明蓋掉了原碼");
 
-	// 反向：後端拿不出說明（未登錄的碼、或 gateway 尚未 promote）時只顯示原碼。
-	// 少了這一筆，「前端自己補一句『操作失敗』」也會讓上面那段綠。
 	const withoutLabel = renderAuditDialog({
 		result: "FAILED",
 		bizCode: 9266,
@@ -552,9 +508,6 @@ test("稽核內容對話框走共用 Dialog（a11y 三件套在 Dialog 內），
 	assert.match(dialog, /import \{ Dialog \} from "@\/components\/UI"/u);
 	assert.match(dialog, /<Dialog\b/u);
 
-	// `Dialog` 的 portal 在無 `document` 時就地渲染，前提是「對話框都是互動後才掛載」
-	// （見 Dialog.tsx）。首屏就渲染它＝server 就地、client portal ⇒
-	// hydration mismatch，而 production build 下那個警告是靜默的。
 	const console_ = readFileSync(
 		join(
 			SRC,
@@ -569,7 +522,6 @@ test("稽核內容對話框走共用 Dialog（a11y 三件套在 Dialog 內），
 	);
 });
 
-// ── 第三種形態：碼值是字串，所以上面兩條都看不到它 ────────────────────────────────
 
 /**
  * 「字串碼值的殘缺對照表」偵測器。
@@ -670,11 +622,9 @@ function findPartialStringTables(source: string): PartialTable[] {
 	const out: PartialTable[] = [];
 	const seen = new Set<string>();
 	for (const block of braceBlocks(source)) {
-		// 型別已保證窮盡的表不可能真的漏成員，見 isExhaustivelyTypedRecord。
 		if (isExhaustivelyTypedRecord(source, block.open)) continue;
 		const keys = new Set([...block.body.matchAll(IDENT_KEY)].map((m) => m[1]));
 		for (const hit of incompleteDomains(keys)) {
-			// 巢狀區塊會讓同一張表被算到很多次，同 enum 只報一次。
 			if (seen.has(hit.enumName)) continue;
 			seen.add(hit.enumName);
 			out.push(hit);
@@ -706,10 +656,6 @@ test("src/ 沒有任何「以字串碼值為鍵但漏掉值域成員」的對照
 });
 
 test("型別已保證窮盡的表不報，但 Record<string, …> 不是後門", () => {
-	// 沒有這一條，isExhaustivelyTypedRecord 哪天被改寬成「看到 Record< 就跳過」，
-	// 上面那支會靜默恆綠——那正是 2026-09-13 這個誤報最容易被修壞的方向。
-	// 必須挑「值本身是 UPPER_SNAKE 識別字」的值域：IDENT_KEY 只認那種形狀，
-	// 挑到數字碼值域（"0"／"4001"）的話兩條斷言都會失去鑑別力而假性通過。
 	const domain = GENERATED_ENUMS.find(
 		(e) =>
 			[...e.values].length >= 5 &&
@@ -741,7 +687,6 @@ test("型別已保證窮盡的表不報，但 Record<string, …> 不是後門",
 });
 
 test("字串碼表偵測式本身有鑑別力", () => {
-	// 沒有這一條，findPartialStringTables 哪天被改壞成永不命中，上面那支會靜默恆綠。
 	const planted = [
 		"const STATUS_LABELS = {",
 		'\tPENDING: "待處理",',
@@ -758,7 +703,6 @@ test("字串碼表偵測式本身有鑑別力", () => {
 		`抓不到檢舉頁真正出過的那張殘缺表，實際命中：${JSON.stringify(findPartialStringTables(planted))}`,
 	);
 
-	// 正例一：收齊了就不該被判違規（`ACTION_DESCRIPTIONS` 的形狀）。
 	assert.deepEqual(
 		findPartialStringTables(
 			[
@@ -773,8 +717,6 @@ test("字串碼表偵測式本身有鑑別力", () => {
 		[],
 		"收齊的操作說明表被誤判成違規",
 	);
-	// 正例二：同一個檔案裡有一張收齊的表，不該替另一張殘缺的表擋掉告警
-	//（這正是「逐區塊而不是逐檔案」存在的理由）。
 	assert.ok(
 		findPartialStringTables(
 			[
@@ -789,7 +731,6 @@ test("字串碼表偵測式本身有鑑別力", () => {
 		).some((h) => h.enumName === "ReportStatus"),
 		"收齊的表把同檔另一張殘缺表的告警吃掉了",
 	);
-	// 正例三：帶引號的 `case "PENDING":` 不是物件鍵，不該被當成對照表。
 	assert.deepEqual(
 		findPartialStringTables(
 			'switch (s) {\ncase "PENDING":\ncase "DISMISSED":\ncase "RESOLVED_HIDDEN":\nbreak;\n}',
@@ -799,7 +740,6 @@ test("字串碼表偵測式本身有鑑別力", () => {
 	);
 });
 
-// ── 手寫的 <option>：碼值當選項時，值域一樣要收齊 ─────────────────────────────────
 
 /**
  * 篩選下拉裡手寫的 `<option value="PENDING">` 是碼表的另一種寄生形態 —— 它連物件字面值
@@ -840,7 +780,6 @@ test("src/ 沒有任何「手寫 <option> 卻漏掉值域成員」的下拉", ()
 });
 
 test("下拉偵測式本身有鑑別力", () => {
-	// 沒有這一條，OPTION_VALUE 哪天被改壞成永不命中，上面那支會靜默恆綠。
 	const planted = [
 		'<option value="">全部狀態</option>',
 		'<option value="PENDING">待處理</option>',
@@ -856,7 +795,6 @@ test("下拉偵測式本身有鑑別力", () => {
 		),
 		"抓不到檢舉頁真正出過的那組殘缺下拉",
 	);
-	// 正例：值域外的自訂選項（violations 那幾頁的小寫代碼）不該被誤判。
 	assert.deepEqual(
 		incompleteDomains(
 			new Set(

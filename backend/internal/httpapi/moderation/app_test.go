@@ -53,7 +53,6 @@ func (f *fakeReports) MyReports(_ context.Context, b int64, after *moderation.Re
 	return f.page, f.err
 }
 
-// fakeBuyers 把帳號對到買家 7；missing 為真時帳號沒有買家身分（NotFound）。
 type fakeBuyers struct{ missing bool }
 
 func (f fakeBuyers) CurrentBuyerID(context.Context, int64) (int64, error) {
@@ -63,7 +62,6 @@ func (f fakeBuyers) CurrentBuyerID(context.Context, int64) (int64, error) {
 	return 7, nil
 }
 
-// fakeMessages 以固定的歸屬回答 MessageParties；沒有登記的訊息是 NotFound。
 type fakeMessages struct {
 	parties map[uuid.UUID]im.ConversationParties
 	err     error
@@ -87,19 +85,16 @@ type env struct {
 	logs   *bytes.Buffer
 }
 
-// newEnv 掛上真的 Connect handler 與 rpc 的 interceptor；header X-Test-Account 非空時以買家帳號登入，X-Test-Admin 非空時以管理員登入。
 func newEnv(t *testing.T, r *fakeReports) *env {
 	t.Helper()
 	return newEnvWith(t, r, &fakeStores{})
 }
 
-// identities 是測試的呼叫者身分與訊息歸屬：buyers 決定帳號的買家身分，messages 是訊息的歸屬。
 type identities struct {
 	buyers   fakeBuyers
 	messages fakeMessages
 }
 
-// newEnvWith 以指定的社群與店家來源掛上 handler；env.r 只在來源是 *fakeReports 時有值。
 func newEnvWith(t *testing.T, reports Reports, stores StoreReports) *env {
 	t.Helper()
 	return newEnvIdentities(t, reports, stores, identities{})

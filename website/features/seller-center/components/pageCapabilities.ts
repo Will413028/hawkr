@@ -37,14 +37,12 @@ const PAGES: readonly PageRule[] = [
 	{ prefix: "/seller-center/shipments", capability: C.ORDER_FULFILL },
 	{ prefix: "/seller-center/products", capability: C.PRODUCT_MANAGE },
 	{ prefix: "/seller-center/inventory", capability: C.PRODUCT_MANAGE },
-	// 列表頁是下架與刪除的入口（伺服器端掛 CONTENT_CONTRACT，停權時仍開放）；新增與編輯是經營動作，仍要 MARKETING。
 	{
 		prefix: "/seller-center/posts",
 		exact: true,
 		capability: C.CONTENT_CONTRACT,
 	},
 	{ prefix: "/seller-center/posts", capability: C.MARKETING },
-	// 封鎖是保護動作，停權時仍可管理（`ListBlockedBuyers`、`UnblockBuyer` 掛 CONTENT_CONTRACT）。
 	{ prefix: "/seller-center/blocked-buyers", capability: C.CONTENT_CONTRACT },
 	{ prefix: "/seller-center/coupons", capability: C.MARKETING },
 	{ prefix: "/seller-center/customers", capability: C.MARKETING },
@@ -63,13 +61,11 @@ const PAGES: readonly PageRule[] = [
 		prefix: "/seller-center/invoices/appeals",
 		capability: C.ORDER_FULFILL,
 	},
-	// 商店設定頁本身：停權時仍可以關店（ACCOUNT_CLOSE），頁面在沒有 STOREFRONT_WRITE 時只能檢視。
 	{ prefix: "/seller-center/me", exact: true, capability: C.ACCOUNT_CLOSE },
 	{
 		prefix: "/seller-center/me/certifications",
 		capability: C.STOREFRONT_WRITE,
 	},
-	// 主要讀取是 PRODUCT_MANAGE；開通、啟用與關閉配送方式要 SHIPPING_SETUP，由頁內依它的缺項顯示閘門。
 	{ prefix: "/seller-center/me/shipping", capability: C.PRODUCT_MANAGE },
 ];
 
@@ -80,7 +76,6 @@ function matchPage(pathname: string): PageRule | undefined {
 			pathname === page.prefix ||
 			(!page.exact && pathname.startsWith(`${page.prefix}/`));
 		if (!matches) continue;
-		// 前綴相同時，只比對本頁的規則優先於含子路徑的規則。
 		if (
 			!best ||
 			page.prefix.length > best.prefix.length ||

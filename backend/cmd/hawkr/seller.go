@@ -19,9 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
-// readKYCHashKeys 讀統編比對（blind index）的 HMAC 金鑰 KYC_HASH_KEYS：逗號分隔的 id:base64，每把至少 32 bytes，第一把計算、全部可以查詢；
-// 處分的身分快照沒有明文可以重算，所以舊的金鑰要留到用它算的快照所屬的處分都結束，也要留到防詐保存的 hash 過期被刪。
-// 必填（沒設定、空的或太短都會讓啟動失敗）。平台不再加密保存個資（收款開通 ADR D22），沒有加密金鑰。
 func readKYCHashKeys(e *config.Env) *seal.MAC {
 	mac, err := parseKYCHashKeys(e.String("KYC_HASH_KEYS"))
 	if err != nil {
@@ -41,10 +38,6 @@ func parseKYCHashKeys(mac string) (*seal.MAC, error) {
 	return macs, nil
 }
 
-// readGCIS 讀統一編號查詢（經濟部商業司的公開資料，不是舊公司的服務）的設定：GCIS_BASE_URL（預設是公開資料平台
-// https://data.gcis.nat.gov.tw）、GCIS_TIMEOUT（一次查詢的總上限，預設 5 秒；公司與商業登記兩個資料集的請求共用）。
-// serve（統編查詢的 Connect 方法、送件時排入登記資料的查詢）、worker（執行查詢的 job）與建構 seller 模組的子命令都需要它。
-// 網址格式不合會讓啟動失敗。
 func readGCIS(e *config.Env) *gcis.Client {
 	client, err := gcis.New(gcis.Config{BaseURL: e.StringOr("GCIS_BASE_URL", ""), Timeout: e.Duration("GCIS_TIMEOUT", gcis.DefaultTimeout)})
 	if err != nil {
@@ -53,11 +46,6 @@ func readGCIS(e *config.Env) *gcis.Client {
 	return client
 }
 
-// newSeller 組裝 seller 模組。serve 與 worker 都需要它：serve 給 accountdeletion 當參與者，worker 另外執行它的
-// job（圖片、治理佐證與 KYC 補充文件的引用收斂、處分的到期與對帳、匿名通報人聯絡欄位的清理、關店滿保留期的個資清理、
-// 商家名單圖片的引用收斂、商品瀏覽事件的彙總與清理；排程的是 PeriodicJobs）。orders 是店家未結訂單的 port（自己關店用；刪帳號的
-// accountdeletion 用同一個實作），products 是商品所屬店家的 port（彙總瀏覽事件用，見 sellerProducts）。
-// 它的事件由 subscribeSellerRelay 轉成給舊服務的 RabbitMQ 訊息（sellerrelay），治理事件的通知由 notification 模組訂閱。
 func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med mediaPort, orders seller.Orders, products seller.ProductStores, kycMAC *seal.MAC, payments *payment.Module, registry *gcis.Client, log *slog.Logger) *seller.Module {
 	return seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: jc, Identity: id, Media: med, Orders: orders, KYCMAC: kycMAC,
@@ -65,7 +53,6 @@ func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identit
 	})
 }
 
-// legacySellerRatings 以 review 模組實作 legacy SellerService 的評價統計 port（sellerserver.Ratings）。
 type legacySellerRatings struct{ client storeRatings }
 
 func (r legacySellerRatings) StoreRatingStats(ctx context.Context, storeIDs []int64) (map[int64]sellerserver.RatingStats, error) {

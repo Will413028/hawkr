@@ -9,7 +9,6 @@ func TestBuildURL(t *testing.T) {
 		objectKey string
 		want      string
 	}{
-		// Image Gateway 契約：base + "/i/original/" + objectKey（49 §6.1/§6.5）
 		{"Image Gateway 原圖路徑", "https://media.example.com", "public/product/20260304/x.jpg", "https://media.example.com/i/original/public/product/20260304/x.jpg"},
 		{"空 objectKey", "https://cdn.example.com", "", ""},
 		{"http 前綴直接回傳", "https://cdn.example.com", "https://lh3.google.com/avatar.jpg", "https://lh3.google.com/avatar.jpg"},

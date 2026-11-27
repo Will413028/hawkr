@@ -73,8 +73,6 @@ async function publicGet<T>(
 	},
 ): Promise<T | null> {
 	try {
-		// The transport applies the default fetch timeout (8s) on both server and
-		// client, so a server fetch can no longer hang the SSR stream (React #419).
 		const { data } = await apiClient.public.get<T>(path, {
 			next: init?.next,
 			signal: init?.signal,
@@ -129,8 +127,6 @@ export async function searchProducts({
 	if (priceMax != null) qs.set("price_max", String(priceMax));
 	if (sortBy) qs.set("sort_by", sortBy);
 	if (sortOrder) qs.set("sort_order", sortOrder);
-	// 分頁 key 是 records（§16），四個計數以 string 過線（§4）——Number() 是
-	// 型別轉換，不是相容分支。
 	const data = await publicGet<{
 		records?: SearchProductHit[];
 		total?: string;
@@ -153,10 +149,6 @@ export async function fetchSuggestions(
 		`/public/search/suggest?q=${encodeURIComponent(q)}`,
 		{ visitorIp, ...options },
 	);
-	// Backend returns a plain string[] (e.g. ["123","番茄"]); also tolerate a
-	// { suggestions: [...] } wrapper and richer {keyword,category} objects in
-	// case the endpoint grows. Normalise to SearchSuggestion and drop blanks /
-	// dupes so the popover's `key={s.keyword}` stays defined and unique.
 	const raw: unknown[] = Array.isArray(data)
 		? data
 		: ((data as { suggestions?: unknown[] })?.suggestions ?? []);
@@ -181,13 +173,6 @@ export async function fetchSuggestions(
 	return out;
 }
 
-/* ============================================================
- *           Search hashtags
- *
- * Backend exposes post hashtags through `/public/tags/*`.
- * Product hashtags are a separate namespace (`/public/hashtags/*`) and
- * should not drive feed filtering.
- * ============================================================ */
 
 export interface SearchHashtagHit {
 	name: string;
@@ -196,15 +181,6 @@ export interface SearchHashtagHit {
 	latestPostAt?: number;
 }
 
-/* ============================================================
- *           Popular product hashtags
- *
- * `/public/hashtags/popular?startFrom=&endTo=&limit=` ranks hashtags
- * by distinct listed-product count over an inclusive date range. Used
- * by the Hawkr 市集 megamenu column and the /market/products sidebar —
- * semantics are "most-tagged products", not "most-active posts" (the
- * server's SuggestTrendingTags covers that case for the post-side columns).
- * ============================================================ */
 
 export interface PopularHashtagHit {
 	name: string;
@@ -233,10 +209,6 @@ export async function fetchPopularHashtags(options?: {
 	const path = qs.toString()
 		? `/public/hashtags/popular?${qs}`
 		: "/public/hashtags/popular";
-	// Popular tags shift slowly. This fetcher is uncached itself; the fixed-limit
-	// server callers (navbar / market sidebar) read it via
-	// `getCachedPopularHashtags` (lib/api/cached) so the search header doesn't
-	// pay a backend round-trip per render.
 	const data = await publicGet<{ records?: PopularHashtagRecord[] }>(path, {
 		strict: options?.strict,
 	});

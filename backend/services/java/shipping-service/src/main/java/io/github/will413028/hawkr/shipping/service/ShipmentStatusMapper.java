@@ -150,70 +150,38 @@ public class ShipmentStatusMapper {
         if (from == to) {
             return false;
         }
-        // 終態不可再轉移
         if (TERMINAL.contains(from)) {
             return false;
         }
 
-        // ── 🔴 取消申請的專屬入邊（S0：不加這一段，配送中申請取消恆被拒） ──────────────
-        //
-        // 992 不屬於 TERMINAL／IN_DELIVERY／abnormal 任一集合，而下面三個分支的 to 判定
-        // 一律是「TERMINAL || abnormal || IN_DELIVERY」⇒ isValidTransition(31, 992) 恆 false。
-        //
-        // 失敗症狀是完全靜默的：買家在配送中按取消 → 寫入被擋 → webhook 處理只留一行
-        // invalidTransition warn 就 return ⇒ 單子停在原狀、前端顯示「取消已受理」、零告警。
-        // ⚠️ 對照：990 沒有這個問題，因為它由建單失敗殼「直接 insert」不走本方法；992 沒有等價路徑。
         if (to == ShippingStatus.CANCEL_PENDING) {
-            // ⚠️ 建單失敗（990）除外：它的出邊只有 {91 重建, 41 取消}（見下方分支）。
-            //    990 根本沒有 provider 側的單子可取消，走 992「取消處理中」會卡在一個
-            //    永遠等不到 provider 回覆的狀態。QA 的 L2 lane 實測到這條邊被允許，
-            //    而同一支方法的 javadoc 說它不存在——先前是**順序**造成的：
-            //    這個 blanket allow 排在 CREATE_FAILED 分支之前。
             return from != ShippingStatus.CREATE_FAILED;
         }
 
-        // ── 🔴 取消申請的出邊：全值域唯一允許回退的狀態 ────────────────────────────
-        //
-        // provider 拒絕取消時貨照送，下一個實際貨態必須進得來；否則該筆會停在
-        // 「取消處理中」直到人工介入。
-        // ⚠️ 刻意**不做**「回到取消前的狀態」——那需要一個 cancel_from_status 快照欄，
-        //    而 allowed-from 對不上就是 rows=0 靜默卡死。
         if (from == ShippingStatus.CANCEL_PENDING) {
             return true;
         }
 
-        // ── 🔴 建單失敗的出邊（本波補上；在此之前 990 恆為非法轉移、只能人工改 DB） ────
         if (from == ShippingStatus.CREATE_FAILED) {
-            return to == ShippingStatus.UNPROCESSED   // Admin 重建
-                    || to == ShippingStatus.CANCELLED; // Admin 取消（＋觸發退款鏈）
+            return to == ShippingStatus.UNPROCESSED
+                    || to == ShippingStatus.CANCELLED;
         }
 
-        // 出貨前 → 任何狀態合法（可能跳號推進）
         if (PRE_SHIPMENT.contains(from)) {
             return true;
         }
 
-        // 平台本地處理完成 → 只能接收實際物流進展，禁止被出貨前狀態倒退覆蓋
         if (LOCAL_PROCESSING_DONE.contains(from)) {
-            // 🔴 920 → 921「超商賣家確認出貨」（BLOCKER 3，2026-09-10 補）。
-            //    這條邊 production **一直在走**（ShippingService.confirmCvsShipment 的 CAS 接受它），
-            //    而本方法拒絕它。在只有 provider 回報路徑呼叫本方法時，那個不一致沒有症狀；
-            //    Shared Foundation 讓 allowedActions 也開始問本方法之後，它變成
-            //    「契約說 handover 不可用（9527）、端點照做並成功」——
-            //    前端一旦依 改由 allowedActions 驅動，超商賣家將永遠無法確認出貨。
-            //    ⚠️ 修的是**本表**不是端點：端點的行為是對的，錯的是這份判定漏了一條合法邊。
             if (from == ShippingStatus.CVS_CODE_RECEIVED && to == ShippingStatus.SELLER_CONFIRMED) {
                 return true;
             }
             return TERMINAL.contains(to) || ShippingStatusRules.isAbnormal(to) || IN_DELIVERY.contains(to);
         }
 
-        // 配送中 → 只能前進：終態、異常、其他配送中；禁止倒退到出貨前
         if (IN_DELIVERY.contains(from)) {
             return TERMINAL.contains(to) || ShippingStatusRules.isAbnormal(to) || IN_DELIVERY.contains(to);
         }
 
-        // 異常 → 可互相轉移、可到終態、可重回配送中（門市關轉後重回配送）；禁止倒退到出貨前
         if (ShippingStatusRules.isAbnormal(from)) {
             return ShippingStatusRules.isAbnormal(to) || TERMINAL.contains(to) || IN_DELIVERY.contains(to);
         }

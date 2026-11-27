@@ -39,8 +39,6 @@ func mqTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// countInboxByType 回 (總列數, 非終態列數)。非終態述詞逐字取自 M30 的 sql_exporter
-// 查詢與 idx_invinbox_due：RECEIVED / DEFERRED / FAILED。
 func countInboxByType(ctx context.Context, t *testing.T, pool *pgxpool.Pool, eventType string) (total, nonTerminal int) {
 	t.Helper()
 	if err := pool.QueryRow(ctx,
@@ -52,8 +50,6 @@ func countInboxByType(ctx context.Context, t *testing.T, pool *pgxpool.Pool, eve
 	return total, nonTerminal
 }
 
-// explodingCancelled 讓業務寫入失敗，用來觸發 rollback。它包住真的 repository，
-// 所以除了 Insert 之外的一切行為都是真的。
 type explodingCancelled struct {
 	domain.CancelledOrderRepository
 	boom bool
@@ -80,7 +76,6 @@ func TestIntegration_OrderCancelledLeavesNoNonTerminalInboxRow(t *testing.T) {
 	body := producerShapedCancelledBody(t, map[string]any{"order_no": orderNo})
 	evType := string(pkgmq.EventTypeOrderCancelled)
 
-	// ① 下游失敗 ⇒ handler 回 error，而且**什麼都沒留下**。
 	cancelled.boom = true
 	if err := c.Handle(ctx, pkgmq.RoutingKeyOrderCancelled, body); err == nil {
 		t.Fatal("下游失敗時 handler 必須回 error（→ retry → DLQ）")
@@ -95,12 +90,10 @@ func TestIntegration_OrderCancelledLeavesNoNonTerminalInboxRow(t *testing.T) {
 			"（INV.dl 只掃 ORDER_PAID），它會在 7 天後才觸發 InvoiceInboxStranded", nonTerminal)
 	}
 
-	// ② 重投（pkg/mq 的 retry）必須真的重跑，而不是被去重擋掉之後假裝成功。
 	if err := c.Handle(ctx, pkgmq.RoutingKeyOrderCancelled, body); err == nil {
 		t.Fatal("重投時下游仍然失敗，handler 卻回 nil —— 它被自己上一次留下的去重鍵擋掉了")
 	}
 
-	// ③ 下游恢復 ⇒ 同一則訊息成功，且 inbox 那一列直接是終態。
 	cancelled.boom = false
 	if err := c.Handle(ctx, pkgmq.RoutingKeyOrderCancelled, body); err != nil {
 		t.Fatalf("下游恢復後重投應該成功：%v", err)
@@ -113,7 +106,6 @@ func TestIntegration_OrderCancelledLeavesNoNonTerminalInboxRow(t *testing.T) {
 		t.Fatalf("成功之後仍有 %d 列非終態 —— MarkProcessed 沒有在同一個交易內生效", nonTerminal)
 	}
 
-	// ④ 業務事實真的落庫，而且讀路徑查得到（含 Tier A 的 buyer 綁定）。
 	got, err := real.IsCancelledForBuyer(ctx, orderNo, 2623900520)
 	if err != nil {
 		t.Fatalf("IsCancelledForBuyer: %v", err)
@@ -122,7 +114,6 @@ func TestIntegration_OrderCancelledLeavesNoNonTerminalInboxRow(t *testing.T) {
 		t.Fatal("業務列沒有落庫 —— 買家仍會看到「付款完成後會立即開立發票」")
 	}
 
-	// ⑤ 再投一次（at-least-once）：不新增列、不報錯。
 	if err := c.Handle(ctx, pkgmq.RoutingKeyOrderCancelled, body); err != nil {
 		t.Fatalf("重複投遞應該被去重並 ACK：%v", err)
 	}

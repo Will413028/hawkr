@@ -182,7 +182,6 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
               ),
             ),
             const Divider(height: 0, thickness: 1, color: AppColors.gray300),
-            // ── 按鈕列 ───────────────────────────────
             Row(
               children: [
                 Expanded(

@@ -54,8 +54,6 @@ const PERIOD_OPTIONS = [
 
 type PeriodKey = (typeof PERIOD_OPTIONS)[number]["key"];
 
-// Status buckets surfaced as 訂單待辦. Each entry maps to one fetchOrders
-// call via useOrderStatusCounts (CSV string with comma-separated statuses).
 const TODO_BUCKETS = [
 	{
 		key: "pending_payment",
@@ -81,9 +79,6 @@ const TODO_BUCKETS = [
 	{
 		key: "review",
 		label: "待評價",
-		// `delivered` = arrived but not yet confirmed; treated as
-		// review-eligible alongside `completed` because Hawkr's
-		// auto-confirm window still lets the buyer review.
 		statusCsv: "delivered,completed",
 		href: "/account/orders?status=completed",
 		icon: "chat",
@@ -97,14 +92,8 @@ const TODO_BUCKETS = [
 	},
 ] as const;
 
-// Pre-computed at module scope so `useOrderStatusCounts` array identity
-// stays stable across renders (the hook keys its effect on identity).
 const TODO_STATUS_CSVS = TODO_BUCKETS.map((b) => b.statusCsv);
 
-// Inline Tailwind class sets reused by the overview's repeated rows. Migrated
-// from .account-stats__card / .account-todos__all / .account-insights__empty
-// in styles/features/account.css. Dark mode on the stat cards mirrors the
-// .account-shell .seller-card frosted-glass group (white/4 + backdrop blur).
 const STAT_CARD =
 	"flex flex-col gap-1 py-[18px] px-5 rounded-[18px] bg-content1 border border-divider text-inherit no-underline shadow-[0_4px_16px_rgb(var(--color-ink-950-rgb)/0.04)] transition-[transform,box-shadow,border-color] duration-[160ms] hover:-translate-y-0.5 hover:border-[rgb(var(--color-ink-400-rgb)/0.4)] hover:shadow-[0_10px_28px_rgb(var(--color-ink-950-rgb)/0.08)] dark:bg-white/4 dark:backdrop-blur-[12px] dark:backdrop-saturate-[1.2] dark:border-[rgba(245,222,165,0.12)] dark:shadow-[inset_0_1px_0_rgba(245,222,165,0.1),0_12px_28px_rgba(0,0,0,0.32)] dark:text-foreground dark:hover:border-[rgba(241,205,112,0.4)]";
 const STAT_CARD_LABEL =
@@ -124,8 +113,6 @@ function formatTwd(amount: number): string {
 	})}`;
 }
 
-// Order.createdAt ships as a unix timestamp in seconds OR milliseconds depending
-// on the legacy row. Normalise to ms for consistent date math.
 function toMs(ts: number | null | undefined): number {
 	if (!ts) return 0;
 	return ts > 1e12 ? ts : ts * 1000;
@@ -265,9 +252,6 @@ export default function AccountOverviewClient() {
 	const following = useFollowing();
 	const todoCounts = useOrderStatusCounts(TODO_STATUS_CSVS);
 
-	// Read by BOTH the 收藏商品 stat card and the 收藏與回購 rail. They used to
-	// filter differently, which is the whole of #377's fourth item — see
-	// lib/favorites/visible.ts.
 	const visibleFavorites = React.useMemo(
 		() => displayableFavorites(favorites.items),
 		[favorites.items],
@@ -284,9 +268,6 @@ export default function AccountOverviewClient() {
 		const usable = orders.orders.filter(isUsableOrder);
 		const sum = usable.reduce((acc, o) => acc + orderAmount(o), 0);
 		const count = orders.total || usable.length;
-		// AOV uses the loaded-page sum / loaded-page count rather than the
-		// backend `total` — mixing the two would understate AOV when the
-		// list is paginated and we only know per-page spend.
 		const aov = usable.length > 0 ? Math.round(sum / usable.length) : 0;
 		return { totalSpent: sum, totalOrders: count, aov };
 	}, [orders.orders, orders.total]);
@@ -299,9 +280,6 @@ export default function AccountOverviewClient() {
 		[periodOrders],
 	);
 
-	// Sum of `order.discount` across usable orders in the period. Backend
-	// returns this as a string (NT$ amount, often "0" or "0.00" when no
-	// coupon/promo applied); ignore missing or non-finite values silently.
 	const periodSaved = React.useMemo(
 		() =>
 			periodOrders.filter(isUsableOrder).reduce((acc, o) => {
@@ -501,10 +479,7 @@ export default function AccountOverviewClient() {
 						</div>
 					</div>
 
-					{/* Honest disclosure: the period stats are computed off the
-					    loaded order page (default 20). When the buyer has more
-					    historical orders, "今年" / "全部" tabs would otherwise
-					    appear truncated without explanation. */}
+
 					{orders.total > orders.orders.length ? (
 						<p className="mt-2 mx-1 mb-0 text-xs text-foreground-soft">
 							分析最近 {orders.orders.length.toLocaleString()} 筆訂單（共{" "}
@@ -522,8 +497,6 @@ export default function AccountOverviewClient() {
 							) : (
 								<ol className="list-none m-0 p-0 flex flex-col gap-1.5">
 									{topSellers.map((s, idx) => {
-										// 連結與暫停營業、已關閉的標籤依 B11 由店家卡片決定；
-										// 卡片還沒回來或沒有卡片就不連結。
 										const view = topSellerViews.get(s.id);
 										const href = view?.href ?? "";
 										const body = (
@@ -618,8 +591,6 @@ export default function AccountOverviewClient() {
 					</Link>
 				</header>
 				{(() => {
-					// visibleFavorites is hoisted so the stat card above counts exactly
-					// what this rail renders — see its definition for why.
 					return visibleFavorites.length === 0 ? (
 						favorites.items.length === 0 ? (
 							<p className={INSIGHTS_EMPTY}>

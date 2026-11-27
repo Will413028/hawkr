@@ -11,9 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// fakes
-// ---------------------------------------------------------------------------
 
 type fakeOutboxRepo struct {
 	domain.OutboxRepository
@@ -26,7 +23,6 @@ type fakeOutboxRepo struct {
 	attempts  map[int64]int32
 	claimLog  []time.Time
 
-	// parkNotPending 模擬「那一列已被維運 SQL 隔離成 'failed'」⇒ Park 打在空集合上。
 	parkNotPending bool
 }
 
@@ -39,8 +35,6 @@ func newFakeOutboxRepo(evs ...domain.OutboxEvent) *fakeOutboxRepo {
 }
 
 func (f *fakeOutboxRepo) FetchPending(context.Context, time.Time, int32) ([]domain.OutboxEvent, error) {
-	// 🔴 只排除 done：**停泊過的列仍然是候選**。這正是 Park 與舊 MarkFailed 的差別，
-	// 而舊 fake 把 failed 排除掉，等於在測試裡複製了那個永久旗標的行為。
 	out := make([]domain.OutboxEvent, 0, len(f.pending))
 	for _, e := range f.pending {
 		if !f.done[e.ID] {
@@ -122,9 +116,6 @@ func testOutboxCfg() outbox.Config {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 順序不變式：publish 成功之前不得標記完成
-// ---------------------------------------------------------------------------
 
 // TestOutboxWorker_PublishFailureLeavesRowPending 是**變異④的靶心**。
 //
@@ -177,9 +168,6 @@ func TestOutboxWorker_PublishSuccessMarksDone(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 派送時解析 notify_seller_account_id（§6.3.3.2）
-// ---------------------------------------------------------------------------
 
 func TestOutboxWorker_ResolvesSellerAccountAtDispatch(t *testing.T) {
 	repo := newFakeOutboxRepo(testOutboxEvent(1, map[string]any{
@@ -192,7 +180,6 @@ func TestOutboxWorker_ResolvesSellerAccountAtDispatch(t *testing.T) {
 		t.Fatalf("RunOnce: %v", err)
 	}
 	got := decodePublished(t, pub)
-	// 🔴 字串不是數字：int64 進 generic-map consumer 會被解成 float64 而截斷。
 	if got["notify_seller_account_id"] != "777" {
 		t.Fatalf("notify_seller_account_id = %#v，want 字串 \"777\"", got["notify_seller_account_id"])
 	}
@@ -244,8 +231,6 @@ func TestOutboxWorker_DoesNotOverwriteExistingNotifyField(t *testing.T) {
 	}
 }
 
-// 規則本體已搬到 internal/notifyrouting（葉 package，讓 usecase 側的契約測試打得到
-// 同一份）。ParseStringID 的行為測試隨之搬到 internal/notifyrouting/notifyrouting_test.go。
 
 func decodePublished(t *testing.T, pub *fakePublisher) map[string]any {
 	t.Helper()
@@ -259,9 +244,6 @@ func decodePublished(t *testing.T, pub *fakePublisher) map[string]any {
 	return out
 }
 
-// ---------------------------------------------------------------------------
-// 停泊而非終結（甲）
-// ---------------------------------------------------------------------------
 
 // TestOutboxWorker_RetryExhaustionParksInsteadOfFlaggingTerminal 是「永久旗標 ＋
 // 告警方向相反」那個缺陷的行為層證據。
@@ -281,7 +263,7 @@ func decodePublished(t *testing.T, pub *fakePublisher) map[string]any {
 func TestOutboxWorker_RetryExhaustionParksInsteadOfFlaggingTerminal(t *testing.T) {
 	ev := testOutboxEvent(1, map[string]any{"store_id": "2685914682"})
 	cfg := testOutboxCfg()
-	ev.AttemptCount = int32(cfg.MaxAttempts - 1) // 下一次失敗就是「耗盡」
+	ev.AttemptCount = int32(cfg.MaxAttempts - 1)
 	repo := newFakeOutboxRepo(ev)
 	pub := &fakePublisher{err: errors.New("broker unreachable")}
 	w := NewOutboxWorker(repo, pub, fakeSellerResolver{accountID: 99}, cfg, obParkInterval, testObsB, nil)
@@ -291,12 +273,10 @@ func TestOutboxWorker_RetryExhaustionParksInsteadOfFlaggingTerminal(t *testing.T
 		t.Fatalf("RunOnce: %v", err)
 	}
 
-	// ① 停泊發生了，而且帶著那句錯誤（維運唯一需要的線索）。
 	if repo.parked[1] == "" {
 		t.Fatal("耗盡重試沒有走 Park —— 若改回 status='failed'，那一列會永久退出候選集合，" +
 			"而 InvoiceOutboxLag 會在它卡死那一刻熄滅")
 	}
-	// ② 仍在候選集合：這是「告警持續亮著」與「修好之後自己排空」共同的前提。
 	rows, err := repo.FetchPending(context.Background(), before, 100)
 	if err != nil {
 		t.Fatalf("FetchPending: %v", err)
@@ -307,7 +287,6 @@ func TestOutboxWorker_RetryExhaustionParksInsteadOfFlaggingTerminal(t *testing.T
 	if repo.done[1] {
 		t.Fatal("停泊不是完成")
 	}
-	// ③ 停泊間隔要大於整條退避梯子，否則只是把梯子接長。
 	ladder := time.Duration(0)
 	d := cfg.BaseBackoff
 	for i := 1; i < cfg.MaxAttempts; i++ {

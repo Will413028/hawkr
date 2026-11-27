@@ -99,7 +99,6 @@ function stripCommentsAndStringBodies(src: string): string {
 		const c = src[i];
 		const next = src[i + 1];
 
-		// --- 樣板字面值的「文字」部分：抹掉，但要認得 `${` 與結尾的反引號 ---
 		if (top?.kind === "template") {
 			if (c === "\\") {
 				i += 2;
@@ -122,9 +121,7 @@ function stripCommentsAndStringBodies(src: string): string {
 			continue;
 		}
 
-		// --- 以下是「程式碼」上下文（頂層，或 `${}` 內的運算式）---
 
-		// 行註解
 		if (c === "/" && next === "/") {
 			while (i < n && src[i] !== "\n") {
 				out += " ";
@@ -133,7 +130,6 @@ function stripCommentsAndStringBodies(src: string): string {
 			continue;
 		}
 
-		// 區塊註解（換行保留，其餘換空白）
 		if (c === "/" && next === "*") {
 			out += "  ";
 			i += 2;
@@ -146,7 +142,6 @@ function stripCommentsAndStringBodies(src: string): string {
 			continue;
 		}
 
-		// 一般字串：保留引號，內容清空
 		if (c === '"' || c === "'") {
 			out += c;
 			i += 1;
@@ -163,7 +158,6 @@ function stripCommentsAndStringBodies(src: string): string {
 			continue;
 		}
 
-		// 樣板字面值開頭
 		if (c === "`") {
 			stack.push({ kind: "template" });
 			out += "`";
@@ -171,7 +165,6 @@ function stripCommentsAndStringBodies(src: string): string {
 			continue;
 		}
 
-		// `${}` 內：追蹤大括號深度，深度回到 0 的 `}` 表示運算式結束
 		if (top?.kind === "expr") {
 			if (c === "{") {
 				top.depth += 1;
@@ -247,7 +240,6 @@ function looksLikeDateReceiver(token: string): boolean {
 	) {
 		return true;
 	}
-	// camelCase 後綴：createdAt / decidedAt / detectedAt / shipDeadlineAt / lastMessageTime
 	return /(At|Date|Time|Deadline)$/.test(token);
 }
 
@@ -348,7 +340,6 @@ function listSourceFiles(dir: string, acc: string[]): string[] {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) {
-			// 測試自己要能示範舊寫法（反向驗證），不納入掃描。
 			if (entry.name === "__tests__" || entry.name === "node_modules") continue;
 			listSourceFiles(full, acc);
 			continue;
@@ -384,7 +375,6 @@ function countLocalTimeUsages(code: string): number {
 		}
 	}
 
-	// `new Date(...)` 帶頂層逗號 = 逐欄位建構 = 本地時區。
 	let from = 0;
 	for (;;) {
 		const hit = code.indexOf("new Date(", from);
@@ -398,7 +388,6 @@ function countLocalTimeUsages(code: string): number {
 			const ch = args[k];
 			if (ch === "(" || ch === "[" || ch === "{") depth += 1;
 			else if (ch === ")" || ch === "]" || ch === "}") depth -= 1;
-			// formatter 會在多行呼叫的最後一個引數後面加逗號；那不是「多引數」。
 			else if (ch === "," && depth === 0 && args.slice(k + 1).trim() !== "") {
 				topLevelComma = true;
 			}
@@ -478,7 +467,6 @@ test("local-time getter 只准出現在帳本登記的位置，數量必須完�
 	for (const root of SCAN_ROOTS) {
 		for (const file of listSourceFiles(path.join(repoRoot, root), [])) {
 			const rel = path.relative(repoRoot, file);
-			// helper 自己由下一支測試單獨把關（它只准用 getUTC*）。
 			if (rel === "lib/date/taipei.ts") continue;
 			const code = stripCommentsAndStringBodies(readFileSync(file, "utf8"));
 			const count = countLocalTimeUsages(code);
@@ -509,8 +497,6 @@ test("共用 helper 自己不得依賴 runtime 時區（只准用 getUTC*）", (
 	const src = readFileSync(path.join(repoRoot, "lib/date/taipei.ts"), "utf8");
 	const code = stripCommentsAndStringBodies(src);
 
-	// helper 是全站唯一讀時間欄位的地方，一旦它自己用了 local-time getter，
-	// 上面那條閘門再綠也沒有意義（全站都會跟著 runtime 時區飄）。
 	for (const getter of [
 		"getFullYear",
 		"getMonth",
@@ -548,41 +534,29 @@ test("helper 提供的具名輸出涵蓋全站四種日期呈現", () => {
 	}
 });
 
-// ---------------------------------------------------------------------------
-// (c) 無時區標記的牆上時間字串不得被當成 instant 解析
-//
-// 前兩條閘門守的是**輸出端**（不准用 toLocale* / local-time getter 讀時間），
-// 這條守的是**輸入端**：`Date.parse("2026/07/19")` 依規格以 runtime 本地時區
-// 解讀，所以瀏覽器時區在進到 partsFromMs 之前就已經污染了 instant。
-//
-// 實測（修復前，同一頁只換瀏覽器時區）：消費明細的 `orderDate="2026/07/19"`
-// 在 Asia/Taipei 顯示 2026/07/19、在 Asia/Tokyo 顯示 2026/07/18。
-// 這裡用 process.env.TZ 逐一切換 runtime 時區跑同一份輸入，任何一種輸入只要
-// 在兩個時區之間輸出不同就是回歸。
-// ---------------------------------------------------------------------------
 
 /** 橫跨 UTC+8 兩側的代表性時區（含最東的 +14 與美西 -7）。 */
 const TZ_MATRIX = [
 	"Asia/Taipei",
-	"Asia/Tokyo", // +09 — 使用者常駐地，修復前就是這裡少一天
-	"Pacific/Kiritimati", // +14 — 最極端的東移
+	"Asia/Tokyo",
+	"Pacific/Kiritimati",
 	"UTC",
-	"America/Los_Angeles", // -07 — 反向偏移
-	"Pacific/Niue", // -11 — 最極端的西移
+	"America/Los_Angeles",
+	"Pacific/Niue",
 ];
 
 /** 每一種 wire 上會出現的時間表示法，都必須是時區不變量。 */
 const TZ_INVARIANT_INPUTS: readonly DateLike[] = [
-	"2026/07/19", // buyer 模組消費明細 orderDate（台北牆上時間）
-	"2026/01/01", // 年界：東移時區在修復前會退回前一年
-	"2026-07-19", // 純日期（生日 / 交易日）
-	"2026-07-19 08:30", // 空白分隔的牆上時間
-	"2026-07-19T08:30:00", // 無位移的 ISO 牆上時間
-	"2026-07-19T08:30:00Z", // 真正的 instant（帶 Z）
-	"2026-07-19T08:30:00+08:00", // 真正的 instant（帶位移）
-	1785000000000, // epoch 毫秒
-	1785000000, // epoch 秒
-	"1785000000000", // 數字字串
+	"2026/07/19",
+	"2026/01/01",
+	"2026-07-19",
+	"2026-07-19 08:30",
+	"2026-07-19T08:30:00",
+	"2026-07-19T08:30:00Z",
+	"2026-07-19T08:30:00+08:00",
+	1785000000000,
+	1785000000,
+	"1785000000000",
 ];
 
 test("所有 formatter 的輸出與 runtime 時區脫鉤（含無時區標記的牆上時間字串）", async () => {
@@ -627,19 +601,15 @@ test("牆上時間字串以台北時區還原，且不存在的日期不會靜�
 		"../lib/date/taipei"
 	);
 	try {
-		// 在最會出事的時區跑，確保斷言驗的是解析行為而不是恰好同時區。
 		process.env.TZ = "Asia/Tokyo";
 
-		// 台北 2026/07/19 00:00 = 2026-07-18T16:00:00Z。
 		assert.equal(toEpochMs("2026/07/19"), Date.UTC(2026, 6, 18, 16, 0, 0));
-		// 純日期同樣是台北當日 00:00（不是 UTC 00:00）。
 		assert.equal(toEpochMs("2026-07-19"), Date.UTC(2026, 6, 18, 16, 0, 0));
 		assert.equal(
 			formatTaipeiDateTime("2026-07-19T08:30:00"),
 			"2026/07/19 08:30",
 		);
 
-		// 語法對但不存在的日期回 null（不得進位成 2026/03/02 之類）。
 		for (const bogus of [
 			"2026-02-30",
 			"2026-13-01",

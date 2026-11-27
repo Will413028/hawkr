@@ -21,7 +21,6 @@ class UberWebhookProviderCodeTest {
     void codeMetaHasUber() {
         assertTrue(UberWebhookProviderCode.isAvailable(),
                 "WebhookProvider CodeMeta 少了 UBER ⇒ Uber webhook 全部寫不進 webhook_inbox");
-        // 🔴 期望值硬寫字面值：引用 WebhookProvider.UBER.value() 會讓改號時測試跟著改，等於沒驗
         assertEquals("8242", new UberWebhookProviderCode().value());
         assertEquals("UBER", UberWebhookProviderCode.CODE);
     }

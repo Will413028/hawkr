@@ -18,19 +18,13 @@ import (
 // AppName 是 ADK 的 app 名稱，session 以 (AppName, 買家 ID, session ID) 為鍵。
 const AppName = "hawkr_ai"
 
-// temperature 是所有買家 agent 的取樣溫度。
 const temperature = float32(0.3)
 
-// 系統提示的共用段落。提示本身是給模型的指令（繁體中文），買家看到的語言由 replyRule 決定。
 
-// statusGuide 是訂單狀態碼表，來源是 CodeMeta〈業務狀態碼〉的 OrderStatus（擁有者是 ordering）；
-// tool 回給模型的 status 是這些代碼，不是任何語言的標籤。
 const statusGuide = `訂單狀態碼（tool 回傳的 status 是代碼）：0=待付款, 10=已付款, 20=待出貨, 30=配送中, 32=待取貨, 35=物流異常, 40=已送達（待買家確認收貨）, 50=已完成, 54=配送失敗未退款, 60=部分退款, 70=全額退款, 80=已取消。回覆時把代碼說成買家語言的狀態名稱，不要直接顯示代碼。`
 
-// toolErrorGuide 說明 tool 失敗時回的代碼；下游的錯誤文字不會給模型。
 const toolErrorGuide = `tool 失敗時回傳 {"error": 代碼}：upstream_unavailable=訂單服務暫時不可用、order_not_found=查無這筆訂單、forbidden=無權查詢、tool_failed 與 delegate_failed=查詢失敗、unknown_tool=呼叫了不存在的工具。遇到錯誤時用買家的語言簡短說明查不到或請稍後再試，不要顯示代碼。`
 
-// replyRule 是回覆語言規則（A9-D15）：以買家這則訊息使用的語言回覆，判斷不了才用請求的語系。
 func replyRule(loc uitext.Locale) string {
 	fallback := "繁體中文"
 	if loc == uitext.EN {
@@ -53,7 +47,6 @@ func trackingSpecialistInstruction(loc uitext.Locale) string {
 ` + replyRule(loc)
 }
 
-// coordinatorInstruction 是買家 coordinator 的系統提示。退貨流程取請求語系的共用文案，與固定回覆同一份來源。
 func coordinatorInstruction(loc uitext.Locale) string {
 	return `你是「Hawkr 購物小幫手」，服務對象是 Hawkr 平台上的買家。
 你的職責：理解買家意圖，委派給對的專職助手取得真實資料，最後彙整成友善回覆。
@@ -92,7 +85,6 @@ type Deps struct {
 	OnTool func(ToolCall)
 }
 
-// toolNames 是這個 agent 掛的 tool 名稱（agenttool 的名稱是被包的 agent 名稱）；已知名單與解碼端限制都由它導出，只有這一份。
 func toolNames(tools []adktool.Tool) map[string]bool {
 	names := make(map[string]bool, len(tools))
 	for _, t := range tools {
@@ -101,8 +93,6 @@ func toolNames(tools []adktool.Tool) map[string]bool {
 	return names
 }
 
-// generateConfig 是每個 agent 的生成設定（A9-D15 第 3 點修訂）：有 tool 的 agent 以 Gemini 的 VALIDATED 模式
-// 把可呼叫的函式限制在自己的 tool 名稱，解碼端就不會產生未知的 tool 名稱；事後防線仍在 onToolError。
 func generateConfig(tools []adktool.Tool) *genai.GenerateContentConfig {
 	cfg := &genai.GenerateContentConfig{Temperature: genai.Ptr(temperature)}
 	if len(tools) == 0 {
@@ -119,7 +109,6 @@ func generateConfig(tools []adktool.Tool) *genai.GenerateContentConfig {
 	return cfg
 }
 
-// specialist 只接受 *guardedTool：沒有包過的 tool 掛不上 agent。
 func (d Deps) specialist(name, description, instruction string, tools ...*guardedTool) (agent.Agent, error) {
 	list := make([]adktool.Tool, 0, len(tools))
 	for _, t := range tools {

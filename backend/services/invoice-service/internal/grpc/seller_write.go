@@ -10,16 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔是兩支賣家寫入端點的 Layer 5：
-//
-//	端點 36 POST /app/seller/invoices/complaints/{id}/responses   （S10 回覆申訴，K02／K03）
-//	端點 62 POST /app/seller/invoices/jobs/{id}/external_issuances（S07 回報自行開立，J30）
-//
-// 🔴 兩支都是**停權賣家的放行路徑**（§3 D16 ＋ §6.1.11）。放行由 Gateway 的能力層決定，
-// 本層不重複判斷——但也不得自行加嚴。加嚴的後果分別是：
-//   - 端點 36：因為停權所以無法回覆，因為無法回覆所以繼續累積違規（死結）
-//   - 端點 62：ADM 雙人解鎖完成、賣家自行開了票，然後沒有地方回報 ⇒ operation 永遠停在
-//     非終態，買家端永遠顯示「處理中」，法定期限照樣倒數
 
 // RespondSellerInvoiceComplaint 是賣家回覆申訴（端點 36）。
 //
@@ -62,8 +52,6 @@ func (s *InvoiceServer) RespondSellerInvoiceComplaint(
 		}
 		return nil, s.internal(ctx, "invoice.complaint.seller_respond.failed", err)
 	}
-	// 一律回**轉移後**的完整單筆（§6.1.6 共通形狀）：前端據此直接覆蓋 query cache，
-	// 不必再打一次端點 35；少了它，兩次請求之間的窗口會讓畫面顯示轉移前的狀態。
 	info := toComplaintInfo(view)
 	s.fillOneBuyerName(ctx, info, view)
 	return &pb.InvoiceComplaintResponse{Code: 0, Message: msgSuccess, Data: info}, nil
@@ -112,10 +100,6 @@ func (s *InvoiceServer) ReportExternalIssuance(
 	return &pb.GetSellerInvoiceJobResponse{Code: 0, Message: msgSuccess, Data: s.toJobInfoView(view)}, nil
 }
 
-// externalIssuanceInvalidArgument 把端點 62 的型別邊界錯誤映成 400。
-//
-// 四個號碼／日期／金額類錯誤與端點 56 共用（同一組 usecase 變數）：兩支端點對同一種
-// 輸入錯誤必須回同一件事，否則賣家與 ADM 會看到互相矛盾的說法。
 func externalIssuanceInvalidArgument(err error) (error, bool) {
 	switch {
 	case errors.Is(err, usecase.ErrExternalInvoiceNoInvalid),

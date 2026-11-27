@@ -52,7 +52,6 @@ export function useChatUnreadStream({
 		} catch (err) {
 			if (ConnectError.from(err).code === Code.Unauthenticated)
 				setCountState(0);
-			// 其他錯誤：保留最後已知的數字，不閃動。
 		} finally {
 			if (!cancelledRef.current) setLoading(false);
 		}

@@ -26,9 +26,6 @@ type PublicPutResult struct {
 	ExpiresAt   time.Time
 }
 
-// preparePublic 是 PutPublic 的驗證與重新編碼：讀 body（上限以實際讀到的位元組套用）、辨認並重新編碼，與處理 job 用同一組規則。
-// 解碼前先取 publicSlots 的名額，等待受 ctx 約束。辨認不出、無法解碼、超過像素或邊長上限、空內容與超過大小上限都是 InvalidInput；
-// 管線自己的永久失敗（image.ErrProcessing）與其餘錯誤都不是 InvalidInput。
 func (s *Service) preparePublic(ctx context.Context, body io.Reader) (image.Result, error) {
 	data, err := io.ReadAll(&capReader{r: body, max: model.MaxPublicUploadSize})
 	if errors.Is(err, errTooLarge) {
@@ -49,7 +46,6 @@ func (s *Service) preparePublic(ctx context.Context, body io.Reader) (image.Resu
 	return res, publicErr(ctx, err)
 }
 
-// publicErr 把 Sanitize 的錯誤分類給 PutPublic 的呼叫方：輸入的問題是 InvalidInput，管線自己的失敗是內部錯誤（不說成輸入的格式不對）。
 func publicErr(ctx context.Context, err error) error {
 	switch {
 	case err == nil:
@@ -79,7 +75,6 @@ func (s *Service) PutPublic(ctx context.Context, uploader model.Uploader, body i
 	return s.stagePublic(ctx, uploader, res.Data, res.Format.ContentType())
 }
 
-// stagePublic 把已驗證的公開圖片位元組寫到新的 public/ key，成功後建資產列（STAGED）與 READY 的暫存列並回 token；PutPublic 與 CopyPublic 共用。
 func (s *Service) stagePublic(ctx context.Context, uploader model.Uploader, data []byte, contentType string) (PublicPutResult, error) {
 	sum := md5.Sum(data) //nolint:gosec // 暫存列的 declared_md5 欄位要求內容 MD5，不是安全用途
 	declaredMD5 := base64.StdEncoding.EncodeToString(sum[:])

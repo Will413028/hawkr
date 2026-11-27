@@ -15,7 +15,6 @@ export function testMediaHostname(
 		try {
 			return new URL(base).hostname.toLowerCase().replace(/\.+$/, "");
 		} catch {
-			// fall through to the reserved name
 		}
 	}
 	return DEFAULT_TEST_MEDIA_HOSTNAME;

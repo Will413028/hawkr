@@ -8,9 +8,6 @@ import type { CartItem } from "@/lib/cart";
 import { formatUnitLabel } from "@/lib/codemeta/enums";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 
-// 後端 issue #1127：cart 透過 purchasable + unavailableReason 表達 row 級可購買性，
-// reason ∈ {DELISTED, OUT_OF_STOCK, INSUFFICIENT_STOCK, LOOKUP_FAILED}（CartItemUnavailableReason）。
-// 前端只看 purchasable 決定反灰；reason 用於 badge 文案與 dialog 提示。
 const UNAVAILABLE_REASON_LABEL: Record<string, string> = {
 	DELISTED: "已下架",
 	OUT_OF_STOCK: "已售完",
@@ -18,8 +15,6 @@ const UNAVAILABLE_REASON_LABEL: Record<string, string> = {
 	LOOKUP_FAILED: "暫時無法確認",
 };
 
-// Legacy 路徑（舊版 backend / 訪客本地快取無 purchasable 欄位時的 fallback）。
-// purchasable 欄位優先；item.status 與 stockQty 是 fallback。
 const UNAVAILABLE_CART_STATUSES = new Set<string>([
 	"SOLD_OUT",
 	"OFF_SHELF",
@@ -113,8 +108,6 @@ export function CartProductTile({
 		},
 		[item.id, operationCoordinator],
 	);
-	// 後端 issue #1127：purchasable 為 source of truth。reason 用於 badge 文案。
-	// 舊欄位（status / stockQty）保留作 fallback，避免後端未升級或本地舊快取造成全綠誤導。
 	const purchasable = item.purchasable !== false;
 	const reason = item.unavailableReason ?? "";
 	const stock = item.stockQty;
@@ -141,11 +134,8 @@ export function CartProductTile({
 	const qtyDraft = editingValue ?? String(item.quantity);
 	const max = typeof stock === "number" ? stock : 999;
 	const atMax = typeof stock === "number" && item.quantity >= stock;
-	// 數量加減 / 數量輸入框 unavailable 時 disabled（沒理由改數量）
 	const inputDisabled =
 		isUnavailable || operationBlocked || pendingAction != null;
-	// 保留既有 unavailable 勾選相容行為；不可購買 row 不計入結帳，仍能逐項移除。
-	// 選取另一家店前，先用店頭「改選本店商品」切換。issue #1127 user feedback.
 	const checkboxDisabled =
 		isLocked ||
 		operationBlocked ||
@@ -170,7 +160,7 @@ export function CartProductTile({
 			</label>
 
 			<div className="cart-tile__thumb">
-				{/* 傳入縮圖尺寸，讓缺圖佔位使用小圖示，避免在手機框內裁切。 */}
+
 				<AppImage
 					src={imageSrc}
 					alt={item.name}
@@ -221,7 +211,7 @@ export function CartProductTile({
 											: "cart-tile__stock"
 								}
 							>
-								{/* 不可購買時庫存欄顯示對應 reason 文字（與 badge 對齊），其餘正常顯示庫存數字 */}
+
 								{reason === "DELISTED"
 									? "已下架"
 									: reason === "OUT_OF_STOCK" || stockOut
@@ -300,7 +290,7 @@ export function CartProductTile({
 			</div>
 
 			<div className="cart-tile__actions">
-				{/* 不可購買 row 隱藏「稍後買」（語意不通：下架商品不會再上架；缺貨另議）— issue #1127 */}
+
 				{isUnavailable ? null : (
 					<Button
 						type="button"

@@ -11,8 +11,6 @@ afterEach(cleanup);
 function renderRow(
 	props: Partial<React.ComponentProps<typeof HawkrAgentTypingRow>> = {},
 ) {
-	// 包一層 <ul>：這一列是 transcript 清單的項目，直接掛在容器 div 底下會是
-	// 不合法的 DOM 巢狀，測出來的結構就不是實際渲染的那個。
 	return render(
 		React.createElement(
 			"ul",
@@ -37,7 +35,6 @@ describe("HawkrAgentTypingRow", () => {
 		renderRow();
 		const dots = document.querySelector(".thread-page__typing");
 		expect(dots).toBeTruthy();
-		// 三點是裝飾，語意由整列的 aria-label 承擔。
 		expect(dots?.getAttribute("aria-hidden")).toBe("true");
 		expect(document.querySelector(".hawkr-agent-typing-row__label")).toBeNull();
 	});
@@ -58,8 +55,6 @@ describe("HawkrAgentTypingRow", () => {
 	});
 
 	it("不是 live region——朗讀由 workspace 那顆常駐 sr-only status 統一負責", () => {
-		// 這一列若自己帶 role=status，同一句話會被播兩次（軌本身 aria-hidden 的
-		// 前提就是播報只有一個來源）。
 		renderRow({ label: "正在查詢公開商務名單" });
 		const row = document.querySelector("li.hawkr-agent-typing-row");
 		expect(row?.getAttribute("role")).toBeNull();
@@ -69,12 +64,9 @@ describe("HawkrAgentTypingRow", () => {
 	it("標誌掛在列上，且旁邊已有等值文字時整顆視為裝飾", () => {
 		renderRow({ label: "正在查詢公開商務名單", motion: "SEARCHING" });
 		const sprite = document.querySelector(".hawkr-agent-sprite");
-		// 先確認真的畫出來了，否則下面那條 aria 斷言會空過。
 		expect(sprite).toBeTruthy();
 		expect(sprite?.getAttribute("data-motion")).toBe("SEARCHING");
-		// 處理中的狀態用標誌的載入動態。
 		expect(sprite?.querySelector(".il-logo")).toBeTruthy();
-		// 傳 label="" ＝ 整顆 aria-hidden，不跟旁邊那行字重複朗讀。
 		expect(sprite?.getAttribute("aria-hidden")).toBe("true");
 		expect(sprite?.getAttribute("role")).toBeNull();
 	});

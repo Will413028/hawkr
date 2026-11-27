@@ -16,12 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ---------------------------------------------------------------------------
-// fakes
-//
-// 嵌入介面而不是逐方法實作空殼：沒被覆寫的方法是 nil，被呼叫時 panic 並指名方法。
-// 空殼會回零值，而「回零值」與「這條路徑本來就不該被走到」在測試裡長得一模一樣。
-// ---------------------------------------------------------------------------
 
 type stubIssuers struct{ domain.IssuerRepository }
 
@@ -57,7 +51,6 @@ func (stubPrefs) GetDefault(context.Context, int64) (domain.BuyerPreference, boo
 
 var testCutover = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-// approvedSeller 是已核定、AMEGO 可用、切點已過的賣家。
 func approvedSeller() (domain.SellerTaxProfile, domain.ProviderAccount) {
 	return domain.SellerTaxProfile{
 		ReviewStatus:       codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value,
@@ -69,7 +62,6 @@ func approvedSeller() (domain.SellerTaxProfile, domain.ProviderAccount) {
 	}
 }
 
-// blockedPendingSeller 是待審中且接單上限已滿的賣家。
 func blockedPendingSeller() (domain.SellerTaxProfile, domain.ProviderAccount) {
 	_, account := approvedSeller()
 	return domain.SellerTaxProfile{
@@ -92,10 +84,6 @@ func newServer(profile domain.SellerTaxProfile, account domain.ProviderAccount) 
 	), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
-// internalCtx 造一個「來自內部服務」的 context。
-//
-// ⚠️ 只帶 x-internal-service 不帶簽章 —— 那是刻意的：驗簽是 interceptor 的職責
-// （InternalAuthServerInterceptor），本檔驗的是 handler 這一層的授權閘門。
 func internalCtx() context.Context {
 	return metadata.NewIncomingContext(context.Background(),
 		metadata.Pairs(interceptor.HeaderInternalService, "order-service"))
@@ -121,9 +109,6 @@ func validateReq() *pb.ValidateOrderInvoiceInputInternalRequest {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// internal-only 閘門
-// ---------------------------------------------------------------------------
 
 // TestResolveOrderInvoiceModeInternal_RejectsNonInternalCall 守 §5.2：
 // 這兩支只給服務間呼叫，使用者面（gateway 代理過來、不帶 x-internal-service）一律拒絕。
@@ -136,7 +121,6 @@ func TestResolveOrderInvoiceModeInternal_RejectsNonInternalCall(t *testing.T) {
 	resp, err := s.ResolveOrderInvoiceModeInternal(context.Background(), resolveReq())
 	assertDeniedWithNoData(t, resp == nil, err)
 
-	// 帶了 header 但值是空字串 ⇒ 一樣不算內部呼叫（interceptor 對空值也視為非內部）。
 	empty := metadata.NewIncomingContext(context.Background(),
 		metadata.Pairs(interceptor.HeaderInternalService, ""))
 	resp, err = s.ResolveOrderInvoiceModeInternal(empty, resolveReq())
@@ -171,9 +155,6 @@ func TestRequireInternalCall_AcceptsInternalCall(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// envelope 形狀
-// ---------------------------------------------------------------------------
 
 func TestResolveOrderInvoiceModeInternal_Success(t *testing.T) {
 	s := newServer(approvedSeller())
@@ -200,7 +181,6 @@ func TestResolveOrderInvoiceModeInternal_Success(t *testing.T) {
 	if got := d.GetAmount().GetTaxCategory(); got != "1" {
 		t.Errorf("tax_category = %q, want \"1\"（CodeMeta 的 Value 不是 Code）", got)
 	}
-	// 沒有預設常用發票資料、也不在待審期間 ⇒ 兩者都是 null 而不是空 message。
 	if d.GetDefaultProfile() != nil {
 		t.Error("沒有預設常用發票資料時必須回 null，不得合成一列（§6.1.1 定版）")
 	}

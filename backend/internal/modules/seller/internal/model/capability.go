@@ -58,13 +58,6 @@ func Capabilities() []Capability {
 // SellerCapability 數字一致。
 func AllCapabilities() []Capability { return append(Capabilities(), CapPublicListing) }
 
-// needs 是每個能力需要的條件，能力的狀態、缺項、停權白名單與是否取決於 KYC 都由這一張表推導（Stripe Connect 的做法：
-// 每個 capability 對應自己的 requirements，狀態是結果）：
-//   - STORE_ACTIVE：每個能力都需要，關閉的店家沒有任何能力；
-//   - NOT_SUSPENDED：經營類能力需要。停權時仍授予的能力（能力檢查 ADR 的白名單）就是表裡沒有它的那些；
-//   - NOT_PENDING_DELETION：經營類能力與關店需要，等待刪除時只剩履約類；
-//   - ONBOARDING_COMPLETE：物流建店需要（平台審核核准且收款帳戶的轉帳能力啟用）；
-//   - 店家狀態 CapPublicListing 需要全部條件，缺的就是 MissingExposure。
 var needs = map[Capability][]Requirement{
 	CapAccountSelfRead:  {RequirementActive},
 	CapOrderFulfill:     {RequirementActive},
@@ -115,8 +108,6 @@ type CapabilityStatus struct {
 	Missing    []Requirement
 }
 
-// missingFor 是一個能力缺的條件，依 Requirements() 的順序：表（needs）裡該能力需要、而店家此刻沒有滿足的條件（met：讀店家時由 SQL 讀出的
-// Conditions 與 Sanctions）。
 func missingFor(c Capability, s Store) []Requirement {
 	var missing []Requirement
 	for _, r := range Needs(c) {

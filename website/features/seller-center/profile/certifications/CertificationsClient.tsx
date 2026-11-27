@@ -143,9 +143,6 @@ import { storeAddressInputError } from "@/lib/seller/store-form";
 import { PaymentAccountSection } from "./PaymentAccountSection";
 import { PlatformReviewSection } from "./PlatformReviewSection";
 
-/* ============================================================
- *               Client-held, non-data wizard state
- * ============================================================ */
 
 /** 店家地址（寫到店家，不是 KYC 申請的欄位）。 */
 interface StoreAddressState {
@@ -219,9 +216,6 @@ const KYC_AGREEMENT_KINDS = [AgreementKind.KYC_PRIVACY_NOTICE] as const;
 const VERSION_CONFLICT_NOTICE = versionConflictNotice("申請資料");
 const STORE_VERSION_CONFLICT_NOTICE = versionConflictNotice("店家資料");
 
-/* ============================================================
- *                    Page entry
- * ============================================================ */
 
 export default function CertificationsClient() {
 	const defaults = useDefaultErrorText();
@@ -326,7 +320,6 @@ export default function CertificationsClient() {
 		[],
 	);
 
-	// Initial load — hydrate the form once from the application (resume) and the store
 	React.useEffect(() => {
 		if (authStatus === "unknown") return;
 		if (sellerLoading || kycLoading) return;
@@ -364,15 +357,11 @@ export default function CertificationsClient() {
 	]);
 
 	const certified = isStoreCertified(seller);
-	// 店家已認證（平台審核核准且收款帳戶啟用）時一律是已通過。
 	const shownStatus = certified
 		? KYCStatus.KYC_STATUS_APPROVED
 		: application?.status;
 	const editable = kycEditable(application);
 
-	// 已通過認證的賣家不需要這頁 — 認證狀態已移到「錢包與認證」頁的
-	// 展開式 row。任何已通過的賣家（剛通過或事後造訪）
-	// 一律導回錢包頁。此頁僅保留給尚未通過的賣家填 KYC 表單。
 	const router = useObservedRouter("seller_certifications");
 	React.useEffect(() => {
 		if (!hydrated) return;
@@ -381,7 +370,6 @@ export default function CertificationsClient() {
 		}
 	}, [certified, hydrated, router]);
 
-	/* ===== Autosave ===== */
 
 	const draftRequest = React.useCallback(
 		(nextForm: KycForm, nextDocs: KycDocs) =>
@@ -443,7 +431,6 @@ export default function CertificationsClient() {
 					for (const [path, message] of Object.entries(failure.fields)) {
 						const applicationPath = path.replace(/^application\./, "");
 						const field = kycFieldOfPath(applicationPath);
-						// 證件沒有行內的提示位置：把伺服器對那一張的訊息放進提示，賣家刪掉那一張重新上傳。
 						const notice =
 							field === undefined
 								? undefined
@@ -572,7 +559,6 @@ export default function CertificationsClient() {
 					latestAppRef.current = fresh;
 					setMyKyc(fresh);
 				} catch {
-					// 缺項清單稍後的重讀或送出時會更新。
 				}
 				return true;
 			}
@@ -633,7 +619,6 @@ export default function CertificationsClient() {
 		return () => window.clearTimeout(t);
 	}, [hydrated, application, editable, form, docs, draftRequest, persist]);
 
-	// 續填：載入後捲到第一個還有缺項的區塊。
 	React.useEffect(() => {
 		if (!hydrated || !resumeRef.current) return;
 		const target = document.getElementById(`cert-${resumeRef.current}`);
@@ -663,7 +648,6 @@ export default function CertificationsClient() {
 		}
 	}, [setMyKyc]);
 
-	/* ===== Actions ===== */
 
 	const startDraft = React.useCallback(
 		async (sellerType: SellerType) => {
@@ -717,9 +701,6 @@ export default function CertificationsClient() {
 		],
 	);
 
-	// Auto-start the draft when arriving with `?type=individual|business`
-	// from the wallet page's seller-type picker. Skips if an application already
-	// exists (so we don't trample an in-progress application).
 	React.useEffect(() => {
 		if (!hydrated || application) return;
 		const requested = searchParams?.get("type");
@@ -817,7 +798,6 @@ export default function CertificationsClient() {
 		}));
 	};
 
-	/* ===== Submit gate — the server decides what is still missing ===== */
 
 	const localContactErrors = storeContactErrors(storeContact);
 	const contactErrors: StoreContactErrors =
@@ -968,7 +948,6 @@ export default function CertificationsClient() {
 				);
 				setMyKyc(await fetchMyKyc());
 			} else if (ConnectError.from(e).code === Code.FailedPrecondition) {
-				// 店家資料還缺（店家的狀態不在請求裡）：重讀申請，缺哪些由伺服器的清單決定；否則是身分比對等固定訊息。
 				let missing: readonly StoreField[] = [];
 				try {
 					const fresh = await fetchMyKyc();
@@ -1048,9 +1027,6 @@ export default function CertificationsClient() {
 		[],
 	);
 
-	/* ============================================================
-	 *                       Render branches
-	 * ============================================================ */
 
 	if (!hydrated) {
 		return (
@@ -1060,7 +1036,6 @@ export default function CertificationsClient() {
 		);
 	}
 
-	// 平台審核是否完成是開通摘要（伺服器）的答案；`shownStatus` 只用來顯示申請本身。
 	const platformApproved = platformReviewCompleted(onboarding);
 
 	if (certified || (application !== null && !editable) || submitOk) {
@@ -1114,8 +1089,6 @@ export default function CertificationsClient() {
 		);
 	}
 
-	// Type picker — shown once before any application exists. Source of truth
-	// for the seller-type choice; the wallet page links here directly.
 	if (!application) {
 		return (
 			<div className="seller-cert seller-cert--shell">
@@ -1196,8 +1169,7 @@ export default function CertificationsClient() {
 									<span className="seller-cert__panel-anchors-num">
 										{idx + 1}
 									</span>
-									{/* `visibleSections` pre-prefixes label with "N. " —
-									 * strip it so the num pill is the only numbering. */}
+
 									{s.label.replace(/^\d+\.\s*/, "")}
 								</a>
 							</li>
@@ -1421,9 +1393,6 @@ export default function CertificationsClient() {
 	);
 }
 
-/* ============================================================
- *                    Section components
- * ============================================================ */
 
 function TypePicker({
 	value,
@@ -1772,9 +1741,6 @@ function SectionDocuments({
 	);
 }
 
-/* ============================================================
- *                       Atoms
- * ============================================================ */
 
 function ContactEmailField({
 	contact,

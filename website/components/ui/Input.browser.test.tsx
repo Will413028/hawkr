@@ -84,7 +84,6 @@ describe("Input", () => {
 			.getByText("收件人姓名", { exact: true })
 			.element();
 
-		// These are the visible App field metrics, independent of utility classes.
 		await vi.waitFor(() => {
 			expect(normalWrapper.getBoundingClientRect().height).toBe(48);
 			expect(renderedStyle(normal).fontSize).toBe("16px");

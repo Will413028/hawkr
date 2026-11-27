@@ -12,9 +12,6 @@ import {
 	navigateDocument,
 } from "../lib/navigation/observability";
 
-// F2: a hung soft-nav (RSC fetch that never rejects) leaves the user on the
-// route skeleton forever. The watchdog arms on transition start and, if the URL
-// still hasn't committed when the timer fires, forces a hard navigation.
 
 const realSetTimeout = globalThis.setTimeout;
 const realClearTimeout = globalThis.clearTimeout;
@@ -104,7 +101,6 @@ afterEach(() => {
 test("forces a hard navigation when the target never commits", () => {
 	armNavigationWatchdog("/b");
 	assert.ok(scheduled, "should have armed a timer");
-	// Timer fires while the address bar is still stuck on /a → hung soft-nav.
 	scheduled?.();
 	assert.equal(assigned, "https://shop.test/b");
 	assert.equal(replaced, null);
@@ -128,7 +124,6 @@ test("keeps ordinary routes on the default watchdog budget", () => {
 
 test("does nothing once the route has committed", () => {
 	armNavigationWatchdog("/b");
-	// Soft-nav succeeded: the URL is now /b before the timer fires.
 	location.pathname = "/b";
 	location.href = "https://shop.test/b";
 	scheduled?.();
@@ -137,9 +132,6 @@ test("does nothing once the route has committed", () => {
 });
 
 test("does not hard-navigate when a redirect lands on a different URL", () => {
-	// User clicks /explore but the server redirect()s to /feed. The address
-	// bar leaves the start URL (/a) and settles on /feed — committed, not hung.
-	// A target-equality check would misread this and reload /explore mid-read.
 	armNavigationWatchdog("/explore");
 	location.pathname = "/feed";
 	location.href = "https://shop.test/feed";

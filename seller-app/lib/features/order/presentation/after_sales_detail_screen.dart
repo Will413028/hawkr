@@ -76,7 +76,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
       return null;
     }, [caseNo]);
 
-    // 本案件狀態變更時自動刷新
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((event) {
         if (event.refreshesAll || event.caseNo == caseNo) load();
@@ -137,7 +136,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status header
           _SectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +173,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
           if (c.autoEscalated || c.processDeadline.isNotEmpty)
             SizedBox(height: 12.h),
 
-          // Reason & description
           _SectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,7 +194,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
           ),
           SizedBox(height: 12.h),
 
-          // Items
           if (c.items.isNotEmpty) ...[
             _SectionCard(
               child: Column(
@@ -241,7 +237,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                // PayUni #758: 顯示 effectiveUnitPrice，有 sale 時旁邊加 listPrice 刪除線
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
@@ -282,7 +277,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
             SizedBox(height: 12.h),
           ],
 
-          // Resolutions history
           if (c.resolutions.isNotEmpty) ...[
             _SectionCard(
               child: Column(
@@ -303,7 +297,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
             SizedBox(height: 12.h),
           ],
 
-          // Return shipment info
           if (c.returnShipmentNo.isNotEmpty) ...[
             _SectionCard(
               child: Column(
@@ -323,7 +316,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
             SizedBox(height: 12.h),
           ],
 
-          // Action buttons based on status
           if (c.status == AfterSaleStatus.pending) ...[
             _buildPendingActions(
               context,
@@ -336,7 +328,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
               orderReceiptPhotoUrls,
             ),
           ],
-          // 唯一允許按「確認收貨」的狀態 = 27 RETURN_DELIVERED（與 backend mapper SQL 對齊）
           if (c.status == AfterSaleStatus.returnDelivered) ...[
             _buildConfirmReceiptAction(context, ref, c, actionLoading, reload),
           ],
@@ -544,7 +535,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
   }
 }
 
-// ── Shared widgets ──────────────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.child});
@@ -732,5 +722,3 @@ class _ResolutionTile extends StatelessWidget {
     );
   }
 }
-
-// Old _ResolveSheet removed — replaced by after_sales_resolve_sheet.dart

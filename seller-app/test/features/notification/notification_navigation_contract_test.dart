@@ -24,8 +24,6 @@ void main() {
   final guarded = _guardedRoutes(appRouter, routeConstants);
 
   test('抽得出必填 extra 的路由清單（清單為空＝掃描器壞了，不是沒有問題）', () {
-    // 這一條是掃描器自己的鑑別力：guarded 若因為 app_router 改寫而抽成空集合，
-    // 下面那條主契約會變成恆真，靜默失去保護。
     expect(guarded, isNotEmpty);
     expect(guarded.keys, contains('/orders/matched/detail'));
     expect(guarded.keys, contains('/product/preview'));
@@ -52,14 +50,11 @@ void main() {
       }
     }
 
-    // 掃到零個命中＝掃描器失效（例如呼叫寫法改了正規表示式對不上），
-    // 而不是「全部合規」。
     expect(scanned, isNotEmpty, reason: '一個受保護路由的呼叫都沒掃到，掃描器可能失效');
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 }
 
-// ── 以下是原始碼掃描工具 ─────────────────────────────────────────────
 
 class _NavCall {
   const _NavCall({
@@ -148,7 +143,6 @@ Map<String, String> _guardedRoutes(
 ) {
   final result = <String, String>{};
   final blocks = appRouter.split('GoRoute(');
-  // 第 0 塊是 routes list 之前的東西（含 _CustomerDetailRoute 等 helper），略過。
   for (final block in blocks.skip(1)) {
     final pathMatch = RegExp(r'path: ([\w.]+),').firstMatch(block);
     if (pathMatch == null) continue;

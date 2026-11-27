@@ -83,7 +83,6 @@ interface Props {
 export function SellerOrderInvoiceCard({ orderNo }: Props) {
 	const { isSuspended } = useSellerIdentity();
 
-	// 段 1。`page_size: 10` —— 一張訂單的發票文件數量遠小於此（作廢重開會有兩筆）。
 	const listParams = React.useMemo(
 		() => ({ orderNo, page: 1, pageSize: 10 }),
 		[orderNo],
@@ -91,23 +90,16 @@ export function SellerOrderInvoiceCard({ orderNo }: Props) {
 	const { page: list, loading: listLoading } =
 		useSellerInvoiceDocuments(listParams);
 
-	// 挑主卡的規則抽成純函式（含跨 repo 排序契約的說明與 dev 實測證據），
-	// 這樣它才測得到——原本的 inline 取值沒有任何測試守著，於是
-	// 「後端依 issuedAt 遞增」這個錯的假前提一路活到 dev。
 	const items = list?.records ?? [];
 	const primary: SellerInvoiceDocumentItem | null =
 		pickPrimaryInvoiceDocument(items);
 
-	// 段 2。
 	const { detail, loading: detailLoading } = useSellerInvoiceDocument(
 		primary?.summary.documentId ?? "",
 	);
 
-	// 獨立第三支——見檔頭。
 	const { records: issuances } = useOrderExternalIssuances(orderNo);
 	const reported = issuances.find((job) => job.reportedAt !== "");
-	// 🔴 閘門是後端的 `canReportExternal`，不是 `reportedAt === ""`——後者對「還沒
-	// 解鎖人工處理」的作業也成立，會渲染一顆必回 9349 的鍵（§B-2.0 T23）。
 	const reportable = issuances.find((job) => job.canReportExternal);
 
 	const mode = primary?.invoiceMode ?? "";
@@ -156,12 +148,7 @@ export function SellerOrderInvoiceCard({ orderNo }: Props) {
 							<p className="m-0 text-[0.8125rem]">
 								平台會繼續處理這筆發票，你不需要重新開立。
 							</p>
-							{/*
-							 * 🔴 `latestJobId` 為空字串時**整顆不渲染**，不要渲染 disabled 鍵，
-							 * 也不得拿 `documentId` 去組 `/jobs/{jobId}`——打進去會 404＋9340，
-							 * 而那個 404 與「不是你的」長得完全一樣（Tier A，§B-2.0 T06）。
-							 * 這裡優先取端點 31 的 `latestJobId`（明細比列表新），列表那份當備援。
-							 */}
+
 							{jobId ? (
 								<Link
 									href={`/seller-center/invoices/jobs/${encodeURIComponent(jobId)}`}
@@ -191,7 +178,7 @@ export function SellerOrderInvoiceCard({ orderNo }: Props) {
 						</p>
 					) : null}
 
-					{/* 恆在的那一行——出貨與發票是兩條獨立的線。 */}
+
 					<p
 						role="status"
 						className="m-0 text-[0.8125rem] text-[var(--hkui-foreground-soft)]"
@@ -204,12 +191,7 @@ export function SellerOrderInvoiceCard({ orderNo }: Props) {
 							label="開票方式"
 							value={INVOICE_FULFILLMENT_MODE_LABEL[mode] ?? mode}
 						/>
-						{/*
-						 * 遮罩值用 <span> 而非 <code>，避免螢幕閱讀器逐字讀 `*`。
-						 * 端點 31 **沒有 `notifiedEmailMasked`**（那一欄在買家端點 8）⇒
-						 * 「通知寄送對象」那一列整列不渲染，不得用賣家自己的 email 頂替
-						 * （§B-2.0 T21）。
-						 */}
+
 						<Row label="發票號碼" value={primary.summary.invoiceNumber} />
 						<Row
 							label="開立時間"
@@ -310,7 +292,6 @@ function ReportExternalIssuance({
 			expectedVersion: job.version,
 		});
 
-	// 成功即關閉；62R 重讀後 `canReportExternal` 變 false，整段自然換成 ⑦a。
 	React.useEffect(() => {
 		if (succeeded) setOpen(false);
 	}, [succeeded]);

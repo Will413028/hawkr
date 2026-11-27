@@ -6,9 +6,7 @@ import { allRoutableLocales, defaultLocale } from "../lib/intl/locales";
 import { PRIVATE_PREFIXES } from "../lib/seo/indexability";
 import nextConfig from "../next.config.ts";
 
-// 公開頁：禁止未驗證重用（擋部署 skew），但允許 bfcache。
 const NO_CACHE = "private, no-cache, max-age=0, must-revalidate";
-// 私有路由：連瀏覽器磁碟與 bfcache 都不留。
 const NO_STORE = "private, no-cache, no-store, max-age=0, must-revalidate";
 
 type HeaderEntry = { key: string; value: string };
@@ -39,8 +37,6 @@ const matchHas =
 		has?: HeaderMatcher[],
 		missing?: HeaderMatcher[],
 	) => false | Record<string, string>;
-// Next 自己的 source 比對器：規則的 `source` 走 path-to-regexp，不能用字串相等
-// 去猜。用它，測試量到的才是 runtime 真正的匹配結果。
 const getPathMatch = require("next/dist/shared/lib/router/utils/path-match.js")
 	.getPathMatch as (
 	path: string,
@@ -87,18 +83,13 @@ const PUBLIC_PATHS = [
 	"/feed",
 	"/faq",
 	"/seller-guide",
-	// 公開行銷頁：與 /seller/onboarding 同前綴，但必須留在 no-cache 這邊。
 	"/seller",
 	"/seller/pricing",
-	// 前綴只在完整路徑段才算：`/accounting` 不是 `/account`、`/apis` 不是 `/api`。
 	"/accounting",
 	"/cartridge",
 	"/apis",
 ];
 
-// 手寫、不從 next.config 或 PRIVATE_PREFIXES 反推的敏感面清單。這份清單的
-// 存在理由就是「設定漏了 app/ 裡的某個敏感頁時要紅」——如果從設定生成期望值，
-// 測試只能證明設定跟自己一致。新增敏感路由時要同時補這裡。
 const PRIVATE_PATHS = [
 	"/account",
 	"/account/orders",
@@ -123,16 +114,12 @@ const PRIVATE_PATHS = [
 	"/adm",
 	"/adm/123/dashboard",
 	"/adm/enter",
-	// 一次性 token 驅動的報價確認頁。
 	"/quote-confirm",
-	// 開店流程：承接已驗證手機與表單狀態。
 	"/seller/onboarding",
-	// route handler 自己宣告 no-store 是契約，全域規則不得把它降級。
 	"/api/health",
 	"/api/public/tab-bootstrap/v1/home",
 	"/api/v1/app/orders",
 	"/api/revalidate",
-	// 快取金絲雀探針。
 	"/sentinel",
 ];
 
@@ -226,8 +213,6 @@ test("no page header rule opts out of the two cache policies", async () => {
 			!rule.source.startsWith("/_next/static"),
 	);
 
-	// The three public rules, the no-store rule, and one more no-store rule per
-	// routed non-default locale (prod routes none, so there it is exactly four).
 	assert.equal(cacheRules.length, 4 + NON_DEFAULT_LOCALES.length);
 	for (const rule of cacheRules.slice(0, 3)) {
 		assert.equal(cacheControlOf(rule), NO_CACHE);
@@ -237,8 +222,6 @@ test("no page header rule opts out of the two cache policies", async () => {
 	}
 });
 
-// 語系前綴不能讓一個頁面脫離它的快取政策：只認無前綴路徑的 source 在 `/en/…` 底下不會命中，
-// no-store 會悄悄失效。手寫的清單，同上面的理由。
 const NON_DEFAULT_LOCALES = allRoutableLocales().filter(
 	(locale) => locale !== defaultLocale,
 );
@@ -295,7 +278,6 @@ test("the localized no-store rules are not applied to the staff and infrastructu
 	const rules = await loadRules();
 	for (const locale of NON_DEFAULT_LOCALES) {
 		for (const path of ["/adm", "/api/health", "/sentinel"]) {
-			// `/en/adm` is not a route: it gets the ordinary page policy, not a private one.
 			assert.equal(
 				effectiveCacheControl(rules, `/${locale}${path}`, {
 					accept: "text/html",

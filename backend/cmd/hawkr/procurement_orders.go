@@ -7,10 +7,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 )
 
-// rfqOrderLane 是 CreateRfqOrder 的 lane：WISH_POOL 刪除後只剩平台的店（A9-D44），賣方就是被接受的店。
 const rfqOrderLane = "PLATFORM"
 
-// procurementOrders 把舊 order-service 的 CreateRfqOrder 轉成建單的 port；ordering 搬進單體時整段刪除。
 type procurementOrders struct{ client rfqOrderCreator }
 
 type rfqOrderCreator interface {

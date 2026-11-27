@@ -495,20 +495,6 @@ export async function previewCheckout(
 export async function confirmCheckout(
 	body: CheckoutConfirmRequest,
 ): Promise<CheckoutConfirmResult> {
-	// Payload schema mirrors the buyer APP's confirm body exactly
-	// (lib/features/cart/presentation/widgets/checkout_payment_sheet.dart:282).
-	// Notable parity points:
-	//   - shippingNote and orderRemark are ALWAYS sent (even as empty
-	//     strings) — APP omits the `if` guard for them. The web's
-	//     conditional spread was hypothesised as one of the variables
-	//     that could trip backend dedupe (resource conflict / 409),
-	//     so we now match APP's "always present, possibly empty"
-	//     contract verbatim.
-	//   - recipientName / recipientPhone are required by the OpenAPI confirm
-	//     schema, so they are always sent. The checkout UI supplies them for
-	//     both home delivery and store pickup.
-	//   - shippingAddress remains conditional because it is not required for
-	//     store pickup.
 	const wirePayload = {
 		...checkoutPayload(body),
 		checkoutId: body.checkoutId,
@@ -517,15 +503,6 @@ export async function confirmCheckout(
 		recipientName: body.recipientName ?? "",
 		recipientPhone: body.recipientPhone ?? "",
 		...(body.shippingAddress ? { shippingAddress: body.shippingAddress } : {}),
-		// 🔴 買家的發票選擇（58 §7.1.2 步驟 1）。**這一行曾經漏掉**：
-		// 上面那段「mirrors the buyer APP's confirm body exactly」是照當時的 App body 抄的，
-		// 而 `invoice` 是之後才加進 CheckoutConfirmRequest 的欄位 ⇒ 逐欄重組時被丟掉。
-		// 症狀非常隱蔽：畫面顯示已套用、buildConfirmPayload 也確實組進了 body，
-		// 但送出的 wire payload 沒有它 ⇒ 後端一律走 USE_BUYER_DEFAULT。
-		// TS 不會叫（wirePayload 是無型別標註的新物件，少一欄不算錯），
-		// 而 USE_BUYER_DEFAULT 是合法值 ⇒ DB CHECK 與後端驗證也都不會有意見。
-		// 2026-09-01 dev 實測：web 選統編／捐贈碼／常用資料三種全部沒帶到，
-		// 而同日 App 送的同樣選擇都正確落庫。
 		...(body.invoice ? { invoice: body.invoice } : {}),
 	};
 	if (process.env.NODE_ENV !== "production") {

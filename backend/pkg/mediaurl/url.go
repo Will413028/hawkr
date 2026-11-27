@@ -83,7 +83,6 @@ func NormalizeToObjectKey(value string, knownBases []string, allowedPrefixes []s
 			}
 			prefix := strings.TrimRight(base, "/") + "/"
 			if strings.HasPrefix(value, prefix) {
-				// 剝除域名前綴後，還原可能含 Image Gateway 路徑段（/i/{preset}/），一併剝掉還原裸 key
 				key := stripImageGatewayPath(strings.TrimPrefix(value, prefix))
 				if err := ValidateObjectKey(key, allowedPrefixes...); err != nil {
 					return "", err
@@ -113,16 +112,12 @@ func StripPrefix(baseURL, value string) string {
 	return stripImageGatewayPath(strings.TrimPrefix(value, prefix))
 }
 
-// stripImageGatewayPath 把「剝除域名後」的殘值還原成裸 objectKey：
-// 若殘值是 Image Gateway 路徑（i/{preset}/{objectKey}），剝掉前兩段（i 與 preset）回傳 objectKey；
-// 否則（已是裸 key，如舊 CDN 直拼格式）原樣回傳。
-// objectKey 前綴恆為 public/、secure/、tmp/、defaults/ 等，絕不以 "i/" 開頭，故判斷無歧義。
 func stripImageGatewayPath(rest string) string {
 	const gwPrefix = "i/"
 	if !strings.HasPrefix(rest, gwPrefix) {
 		return rest
 	}
-	afterI := rest[len(gwPrefix):] // {preset}/{objectKey}
+	afterI := rest[len(gwPrefix):]
 	if idx := strings.IndexByte(afterI, '/'); idx >= 0 {
 		return afterI[idx+1:]
 	}

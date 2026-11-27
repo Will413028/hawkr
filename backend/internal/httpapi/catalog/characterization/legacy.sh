@@ -1,27 +1,4 @@
 # shellcheck shell=bash
-# maven-pl: product-service
-#
-# scripts/characterize.sh catalog 會 source 這個檔，在起 gateway 之前呼叫 legacy_start 起舊的 Java product-service。
-# 可以用的函式與變數見 scripts/characterize.sh 的說明。product-service 刪除時連同這個檔一起刪除。
-# 上面的 maven-pl 行是 CI（backend-characterization.yml）建 jar 用的 Maven 模組名。
-#
-# 先建好 jar（CI 與本機都一樣）：
-#   (cd services/java && ./mvnw package -B -q -pl :product-service -am -DskipTests)
-#
-# product-service 呼叫 seller、buyer 的 gRPC 時連單體的 legacy listener（127.0.0.1:${LEGACY_PORT}）；shipping 與 media 不起
-# （情境不送配送方式與圖片，兩條呼叫都不會發生；公開商品頁取 shipping 設定失敗時降級，ProductService.java:1016）。
-# Flyway 在啟動時套用 migration；V1 的 trigram 索引要 pg_trgm，建 database 後先建 extension。RabbitMQ 與 Redis 用 infra
-# 的那一組（docker-compose-infra.yml）。兩個清理排程關掉。
-#
-# 店家可曝光：公開讀取以 store_exposure 判斷（沒有列＝不可曝光），平常由單體 sellerrelay 經 RabbitMQ 送
-# seller.exposure.changed 餵入，但這支腳本不起 River worker。所以 product-service 起來後直接寫入兩家種子店可曝光的列，
-# 情境不驗停權與不可曝光（B4-3 integration 覆蓋）。
-#
-# 分類：V1 的種子只有第一層，Java 的商品要掛第三層（ProductService.java:304-314 由它推第二、第一層），所以同一步寫入
-# 第二、第三層分類。新的分類是兩層（D8），情境只要求商品掛在最深的葉節點。
-#
-# 身分：CHARACTERIZE_SELLER_TOKEN、CHARACTERIZE_SELLER2_TOKEN 是種子帳號 9、4（店家 1009、1004）的 token；買家用腳本
-# 新建的帳號（沒有賣家角色），管理員是腳本簽的。套用 infra/seed-data/01-account.sql 再跑 hawkr dev-seed 建店家。
 
 JAVA_HTTP_PORT=19961
 JAVA_GRPC_PORT=19962
@@ -105,7 +82,6 @@ JOIN (VALUES ('菠菜', '葉菜'), ('高麗菜', '葉菜'), ('橘子', '柑橘')
 ON CONFLICT DO NOTHING;
 SELECT 1 / count(*) FROM category c JOIN category p ON p.id = c.parent_id WHERE COALESCE(p.parent_id, 0) <> 0;
 SQL
-  # 分類樹整表快取在 Redis 的 cat:all（CategoryCacheService）；寫入後清掉，第一次讀才看得到第二層。
   docker exec hawkr-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DEL cat:all >/dev/null
   gateway_env+=(
     PRODUCT_SERVICE_HOST=127.0.0.1 PRODUCT_SERVICE_GRPC_PORT="$JAVA_GRPC_PORT" PRODUCT_SERVICE_PORT="$JAVA_HTTP_PORT"

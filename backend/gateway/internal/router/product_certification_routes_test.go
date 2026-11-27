@@ -9,18 +9,6 @@ import (
 	"github.com/Will413028/hawkr/gateway/internal/handler"
 )
 
-// 商品認證審核的七支 ADM 端點（19 號設計書 §9.2 / §9.3）。
-//
-// 這支測試守兩件事，兩件都不會有其他訊號：
-//
-//	① 七支都真的掛上去了。路徑常數打錯或某一支在重構時被刪掉，編譯照樣過、
-//	   所有既有測試照樣綠，症狀是 ADM 上某一顆按鈕回 404。
-//	② 七支都在 requireAdmin 那一組，不在 credential-only 的 sibling group。
-//	   掛錯那一組＝任何持有代行 operation credential 的人都能核准／撤銷全平台的
-//	   農業認證標章——那是對買家展示的法規標章，不是店內設定。
-//
-// ⚠️ 賣家那三支不在這裡：seller_capability_test.go 的 expectedSellerRoutes 與 live
-// registry 是**精確集合相等**，已經涵蓋，再抄一份只會多出一份會腐化的清單。
 func adminProductCertificationRoutes() []string {
 	return []string{
 		"GET " + adminPrefix + "/product_certification_applications",

@@ -52,7 +52,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
     });
 
     try {
-      // 使用和訂單頁相同的 API 撈取訂單列表
       HKLog.logD('=== _loadSpendingHistory called ===');
       HKLog.logD(
         'Calling API orderListWithItem, then filter by merchantId: ${widget.merchantId}',
@@ -62,7 +61,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
           .getOrdersRaw(page: 1);
       HKLog.logD('API returned ${allOrders.length} total orders');
 
-      // 篩選當前商家的訂單
       final merchantOrders = allOrders.where((order) {
         final m = Map<String, dynamic>.from(order);
         final ordMerchantId = _getStr(m, [
@@ -84,7 +82,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
         'Filtered ${merchantOrders.length} orders for merchant ${widget.merchantId}',
       );
 
-      // 計算累積消費總額和退回總額
       double totalSpent = 0;
       double totalRefund = 0;
       final List<Map<String, dynamic>> records = [];
@@ -92,7 +89,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
       for (final order in merchantOrders) {
         final m = Map<String, dynamic>.from(order);
 
-        // 使用和訂單頁相同的欄位名稱
         final amount = _parseDouble(
           _getNum(m, [
             'totalAmount',
@@ -134,7 +130,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
         });
       }
 
-      // 按日期排序（最新的在前）
       records.sort((a, b) => b['date'].compareTo(a['date']));
 
       if (!mounted) return;
@@ -159,7 +154,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
     return double.tryParse(value.toString()) ?? 0;
   }
 
-  // 從 Map 中取得字串值（支援多個 key）
   String _getStr(Map<String, dynamic>? m, List<String> keys) {
     if (m == null) return '';
     for (final k in keys) {
@@ -171,7 +165,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
     return '';
   }
 
-  // 從 Map 中取得數值（支援多個 key）
   num _getNum(Map<String, dynamic>? m, List<String> keys) {
     if (m == null) return 0;
     for (final k in keys) {
@@ -185,7 +178,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
     return 0;
   }
 
-  // 判斷訂單是否為「完成訂單」狀態
   bool _isCompletedStatus(String statusText) {
     final s = statusText.trim();
     if (s.isEmpty) return false;
@@ -237,10 +229,8 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
               padding: EdgeInsets.all(16.w),
               child: Column(
                 children: [
-                  // 頂部統計卡片
                   _buildSummaryCard(),
                   SizedBox(height: 12.h),
-                  // 提示文字
                   Text(
                     '• 退回總額可以當成下次購物扣款使用',
                     style: TextStyle(
@@ -249,7 +239,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
                     ),
                   ),
                   SizedBox(height: 16.h),
-                  // 表格標題
                   SpendingHistoryTable(records: _records),
                 ],
               ),
@@ -274,7 +263,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
       ),
       child: Row(
         children: [
-          // 累積消費總額
           Expanded(
             child: Column(
               children: [
@@ -298,9 +286,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
               ],
             ),
           ),
-          // 分隔線
           Container(width: 1, height: 50.h, color: AppColors.gray300),
-          // 退回總額
           Expanded(
             child: Column(
               children: [
@@ -446,7 +432,6 @@ class SpendingHistoryTable extends StatelessWidget {
             Expanded(
               flex: 1,
               child: Text(
-                // B-109：後端 amount 一律字串，使用 AmountUtils 做容錯解析
                 formatMoney(AmountUtils.parseToInt(record['amount'])),
                 textAlign: TextAlign.center,
                 style: textStyle,

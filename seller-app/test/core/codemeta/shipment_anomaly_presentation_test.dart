@@ -50,7 +50,6 @@ void main() {
         anomalyTypeLabelOf('WHATEVER_NEW_CODE', backendLabel: '某個新的異常'),
         '某個新的異常',
       );
-      // 空白的 backendLabel 不算數——否則畫面會顯示一片空白。
       expect(
         anomalyTypeLabelOf('PACKAGE_LOST', backendLabel: '   '),
         isNot('   '),

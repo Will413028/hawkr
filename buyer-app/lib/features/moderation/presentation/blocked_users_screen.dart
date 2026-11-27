@@ -72,7 +72,6 @@ class BlockedUsersScreen extends ConsumerWidget {
       case WriteStatus.applied:
         showFloatingToast(context, '已解除封鎖', isSuccess: true);
       case WriteStatus.failed:
-        // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
         final error = result.error;
         if (error == null || isAccountSuspendedError(error)) return;
         showFloatingToast(context, _errorMessage(ref, error), isSuccess: false);
@@ -91,7 +90,6 @@ class BlockedUsersScreen extends ConsumerWidget {
     final failed =
         stores.phase == SectionPhase.failed &&
         buyers.phase == SectionPhase.failed;
-    // 整頁 loader 只在兩段都還沒有任何結果時；之後一段的讀取或重試都在該段就地顯示 loader。
     final loading = _isPending(stores) && _isPending(buyers);
     final empty = !_hasContent(stores) && !_hasContent(buyers);
     return Scaffold(

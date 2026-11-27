@@ -35,8 +35,6 @@ export default function CustomerDetailDrawer({
 			onMutated={onMutated}
 			side="right"
 			title="客戶詳情"
-			// Wider than the default sheet (max-w-md) so the purchase-history
-			// table breathes; still full-width on phones via the base w-full.
 			className="max-w-2xl"
 		>
 			{customer ? (

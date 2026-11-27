@@ -49,42 +49,10 @@ import {
 import { formatAmount, formatDateTime } from "@/lib/format";
 import { request } from "@/services/api";
 import { ApiClientError } from "@/services/api-error";
-// 對話框骨架（overlay、面板、標題列）在共用 Dialog 自己的 Dialog.css；這裡的 DelegatedOperations.css 只放
-// `.adm-operation-field*` 等欄位與版面 class（58A 陷阱 C07：少 import 不會報錯也不會轉紅）。
 import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A03｜稅務身分審核詳情（58A §A03，端點 39 `GET /api/v1/admin/invoices/tax_reviews/{store_id}`）。
-//
-// ## 審核決策已接上（2026-09-02）
-//
-// 這一頁原本掛著「這一頁目前只能檢視」的告示，理由寫「invoice-service 沒有實作
-// 端點 40／41」。**那是錯的。** 兩支 RPC 在
-// `services/invoice-service/internal/grpc/tax_profile.go` 的 receiver 清單裡
-// （`DecideTaxReviewForAdmin`／`DecideTaxExtensionForAdmin`），dev 實測
-// `POST /admin/invoices/tax_reviews/{id}/decisions` 回的是業務層驗證訊息
-// （`decision is outside the defined value set`）而不是 5xx。
-//
-// 沒有這兩顆鍵的代價：賣家送得出 `SUBMITTED`，ADM 看得到佇列卻既不能核准也不能駁回
-// ⇒ 整條稅籍生命週期在 ADM 側斷掉。
-//
-// ## 七個決策：條件不成立時**不渲染**（不是 disabled）
-//
-// 「決策 × 允許的來源狀態」逐列住在 `features/invoices/admin-actions.ts` 的
-// `TAX_DECISION_ALLOWED_FROM`（＝ `tax_profile.go` 的 `taxDecisionAllowedFrom`），
-// 有 gate 逐列比對。放寬它等於造一顆按下去必回 9348 的鍵，而 ADM 不會知道為什麼。
-//
-// ## `expectedVersion` 取自**這一次載入讀到的那筆**
-//
-// `profile.version`，不是寫死、不是 0。它是樂觀鎖：兩位管理員同時開著這一頁時，
-// 後送出的那一位必須拿到 9322 而不是覆蓋掉前一位的決策。
-//
-// ## 與 58A 的欄位落差（四處，全部是「規格有、DTO 沒有」）
-//
-// `storeName` / `kycTaxId` / `riskFlags[]` / `decisionHistory[]` 都不在端點 39 的回應
-// 上（詳見 `features/invoices/types.ts` 的 `SellerTaxProfileData`）。憑語意造欄名的
-// 症狀是渲染 `undefined`，TS 不擋、runtime 不擋（陷阱 T15）⇒ 一律照 DTO 有什麼畫什麼。
 
 function Section({
 	title,
@@ -127,7 +95,6 @@ function Field({
 export default function TaxReviewDetailPage() {
 	const router = useRouter();
 	const params = useParams<{ storeId: string }>();
-	// storeId 是 TSID，全程字串——轉 number 會截斷精度（merchants/page.tsx 已記過）。
 	const storeId = String(params?.storeId ?? "");
 
 	/** 開著的對話框：`null` ＝ 沒開；決策走碼值、延長走兩個字面值。 */
@@ -164,8 +131,6 @@ export default function TaxReviewDetailPage() {
 		},
 	});
 
-	// 404 + 9320 ＝ 查無此申請。這一類不顯示技術訊息，只給一句話與返回鍵——
-	// 詳情頁的 404 對操作者而言就是「這筆不存在」，貼業務碼沒有幫助。
 	const notFound =
 		isError &&
 		error instanceof ApiClientError &&
@@ -174,12 +139,8 @@ export default function TaxReviewDetailPage() {
 	const profile = data ?? null;
 	const identity = profile?.taxIdentity;
 	const attestation = profile?.selfIssueAttestation;
-	// intakeLimit 在 proto 上是 message 不是 optional ⇒ JSON 永遠是物件。
-	// 「非待審期間」的判準是上限為空字串，不是 `=== null`（那永遠不成立）。
-	// 判錯的症狀是每一頁都顯示「0 / 0 筆」，而 0 與「沒有限制」是兩件事。
 	const intakeLimit = profile?.intakeLimit;
 	const hasIntakeLimit = (intakeLimit?.orderCountLimit ?? "") !== "";
-	// 同理：條款未接受時整個物件是空字串，不是 null。
 	const attestationAccepted = (attestation?.termsVersion ?? "") !== "";
 
 	const address = [
@@ -228,8 +189,6 @@ export default function TaxReviewDetailPage() {
 	 */
 	const routeBusinessError = (caught: unknown): boolean => {
 		if (!(caught instanceof ApiClientError)) return false;
-		// 收到回應 ⇒ 下一次按鍵是新的操作，換一把新的冪等鍵。
-		// （逾時／斷線走上面那個 return，鍵保持不變。）
 		setIdempotencyKey(createInvoiceAdminIdempotencyKey());
 
 		const code = caught.code ?? 0;
@@ -244,8 +203,6 @@ export default function TaxReviewDetailPage() {
 			return true;
 		}
 		if (code === TAX_APPROVAL_IDENTITY_INCOMPLETE_CODE) {
-			// 🔴 不 refetch：資料沒有變舊，是本來就缺 ⇒ 重整幾次都一樣。
-			// 下一步是「要求補件」，所以文案要指到那顆鍵而不是叫人重新整理。
 			setOpenDecision(null);
 			setBanner({
 				tone: "danger",
@@ -254,9 +211,6 @@ export default function TaxReviewDetailPage() {
 			return true;
 		}
 		if (code === TAX_APPROVAL_RECEIPT_AUTH_MISSING_CODE) {
-			// 🔴 **要 refetch**（與 9353 相反）：畫面上那顆按鈕已經照
-			// `receiptAuthorized` 擋過一次，還能走到這裡代表讀到的那一筆是舊的
-			// ——賣家在載入之後取消了授權。重新載入才會讓按鈕跟著變成不可按。
 			setOpenDecision(null);
 			setBanner({
 				tone: "danger",
@@ -268,9 +222,6 @@ export default function TaxReviewDetailPage() {
 		if (ACTION_CONFLICT_CODES.has(code)) {
 			setOpenDecision(null);
 			setOpenExtension(null);
-			// 🔴 不透傳後端 message：9322 的定版文案是「稅務資格資料已被更新」，
-			// 而 9348 是「決策與狀態不相容」——兩者對操作者的下一步相同（重新整理再看），
-			// 但後端那兩句混在一起讀不出來。
 			setBanner({ tone: "warning", text: actionConflictText(code) });
 			void refetch();
 			return true;
@@ -289,10 +240,7 @@ export default function TaxReviewDetailPage() {
 		try {
 			await run();
 		} catch (caught) {
-			// 頁面層接住了（dialog 已關、畫面已更新）⇒ 不要再往上丟。
 			if (routeBusinessError(caught)) return;
-			// 其餘（網路、格式、5xx）交給 dialog 就地顯示：使用者改完可以直接再送一次，
-			// 而冪等鍵沒換 ⇒ 重送不會被當成第二次操作。
 			throw caught;
 		}
 	};
@@ -330,7 +278,6 @@ export default function TaxReviewDetailPage() {
 					body: JSON.stringify({
 						decision,
 						reason,
-						// 空字串 ＝ 不指定 ⇒ 後端用 approved_at + 365 天。
 						approvalValidUntil:
 							TAX_DECISION_APPROVALS.has(decision) && validUntil
 								? `${validUntil}T00:00:00Z`
@@ -405,8 +352,6 @@ export default function TaxReviewDetailPage() {
 		},
 	});
 
-	// 🔴 **所有 hook 都在這一行之上**：`useMutation` 不能排在下面這個提早 return
-	//    之後（`lint/correctness/useHookAtTopLevel`）。查無的分支要放在最後。
 	if (isError && notFound) {
 		return (
 			<div>
@@ -510,18 +455,7 @@ export default function TaxReviewDetailPage() {
 			) : (
 				<div className="invoice-detail-grid">
 					<div>
-						{/*
-						 * 已核定免用統一發票、但賣家還沒簽收據代製授權。
-						 *
-						 * 🔴 這不是「資料還沒載完」，是一個**正在扣住收據**的狀態：
-						 * 決策樹（58 §7.1.3 的 RA 節點）對 `receipt_authorized_at IS NULL`
-						 * 一律落 `AWAITING_MANUAL` / `RECEIPT_AUTH_MISSING`，而那些文件
-						 * 不會出現在「發票工作」頁面（工作台是 job-first，那條路徑不建
-						 * operation）⇒ 沒有人會發現它們卡住。買家端一直顯示「處理中」。
-						 *
-						 * 出口有兩條，都寫出來：請賣家補簽（根治），或到 A13 逐筆
-						 * 「送回自動線」（補救既有的那些）。
-						 */}
+
 						{reviewStatus === "APPROVED_INVOICE_EXEMPT" &&
 						!profile.receiptAuthorized ? (
 							<section className="invoice-section">
@@ -548,25 +482,12 @@ export default function TaxReviewDetailPage() {
 										identity?.claimedStatus,
 									)}
 								</Field>
-								{/* 統編屬 O 類公開登記資訊，完整 8 碼不遮。KYC 統編不在這支端點的
-								    回應上，所以「兩個統編分兩欄」只畫得出申請統編這一欄。 */}
+
 								<Field label="申請統編">{identity?.taxId || "—"}</Field>
 								<Field label="審核期限">
 									{formatDateTime(profile.deadlineAt)}
 								</Field>
-								{/*
-								 * 收據代製授權（S05）。畫在「賣家簽得了的每一個狀態」下
-								 * （`RECEIPT_AUTH_SIGNABLE_STATUSES` ＝ 端點 29 的 allowed-from）。
-								 *
-								 * 🔴 **不能只在 `APPROVED_INVOICE_EXEMPT` 畫**：決策按鈕只在
-								 * `UNDER_REVIEW`／`SELF_ISSUE_PENDING` 按得到，兩個條件互斥
-								 * ⇒ ADM 在按下核准之前永遠看不到這一欄，而它現在正是
-								 * 「核定免用統一發票」的前置條件（T08／9354）。
-								 *
-								 * 反過來，不在那張表裡的狀態（草稿／已駁回／已撤銷／逾期／
-								 * 核定應開統一發票）下賣家簽不了，畫出「尚未授權」會被讀成
-								 * 缺件而其實不是。
-								 */}
+
 								{receiptAuthRelevant(reviewStatus) ? (
 									<Field
 										label="收據代製授權"
@@ -617,16 +538,12 @@ export default function TaxReviewDetailPage() {
 										<tbody>
 											{profile.documents.map((doc) => (
 												<tr key={doc.documentId}>
-													{/* kind 的值域（TAX_REGISTRATION / EXEMPTION_CERT /
-													    ID_DOCUMENT / OTHER）不是 CodeMeta enum ⇒ 查不到中文。
-													    這裡原樣顯示碼值，不自己寫一張四筆的對照表——那會是
-													    一份沒有 SSOT 的第二碼表。 */}
+
 													<td className="invoice-code">{doc.kind || "—"}</td>
 													<td>{doc.fileName || "—"}</td>
 													<td>{formatDateTime(doc.uploadedAt)}</td>
 													<td>
-														{/* 路徑由 invoice 經 gateway 回傳（fileDownloadPath），不自己組；
-														    走同源 BFF（/api/bff 前綴）：Authorization 由 BFF route 在 server 端注入。 */}
+
 														{doc.fileDownloadPath ? (
 															<a
 																className="invoice-doc-link"
@@ -665,25 +582,12 @@ export default function TaxReviewDetailPage() {
 										<Field label="接受時間">
 											{formatDateTime(attestation?.acceptedAt)}
 										</Field>
-										{/*
-										 * ⚠️ `acceptedByAccountId` 目前恆為空字串：seller_tax_profiles
-										 * 只有 attestation_version ＋ attested_at 兩欄，沒有存簽署人。
-										 * 簽署人**有**落庫，在 invoice_status_history 的
-										 * actor_account_id（端點 19 與 22 都會寫）⇒ 要查是誰簽的
-										 * 走稽核主控台，不是這一格。這裡明說出處，不留一個看起來
-										 * 像「沒有人簽」的破折號。
-										 */}
+
 										<Field label="接受人 account_id">
 											{attestation?.acceptedByAccountId ||
 												"見稽核主控台的狀態歷程"}
 										</Field>
-										{/*
-										 * 🔴 與上面的「已接受／未接受」是**兩個不同的問題**，不可合併：
-										 * 上面問「條款簽過沒」（termsVersion 非空），這裡問「自行開票
-										 * 責任現在生效中沒」（後端＝ review_status === SELF_ISSUE_PENDING）。
-										 * 裁決 C 之後 SUBMITTED 的賣家已簽但責任未生效，兩列會不同——
-										 * 若這兩列永遠一致，就是後端的 effective 又退回讀 attested_at 了。
-										 */}
+
 										<Field label="自行開票責任">
 											{attestation?.effective ? "生效中" : "尚未生效"}
 										</Field>
@@ -692,20 +596,7 @@ export default function TaxReviewDetailPage() {
 							</div>
 						</Section>
 
-						{/*
-						 * 🔴 這裡**不是**決策歷程（backend#3053 那一輪的稽查）。
-						 *
-						 * 後端的 `review_note` 是 seller_tax_profiles 上的**單一 text 欄位**，
-						 * 只有補件／駁回／延長／撤銷／維持審核中這五種決策會寫它，而且是
-						 * **覆蓋**不是追加；核准與重開根本不寫。58A 給 `admNotes[]` 的定位
-						 * 也是「補件時的說明清單」（賣家端 S02 讀它），不是審核歷程。
-						 *
-						 * 舊 hint 寫「追加不覆蓋：每一筆備註都保留」—— 那描述的是一個
-						 * 不存在的機制。dev 實測：同一個賣家做過 7 次帶理由的決策，
-						 * 這一區顯示 0 筆，而理由全在 invoice_admin_audit_logs 裡。
-						 * 完整歷程要等後端把稽核紀錄下發（DTO 目前沒有 decisionHistory[]，
-						 * 見 features/invoices/types.ts 的落差清單）。
-						 */}
+
 						<Section
 							title="審核備註"
 							hint="只顯示最近一次的備註，而且只有「要求補件／駁回／延長／撤銷／維持審核中」會寫入——核准與重開不寫。完整的決策理由在稽核紀錄。"
@@ -760,21 +651,7 @@ export default function TaxReviewDetailPage() {
 										每一個決策都要填理由，理由會寫入保存 5
 										年的發票稽核紀錄。這裡只列出目前狀態下真的做得到的動作。
 									</p>
-									{/*
-									 * 核定免用統一發票之前還有一步，而那一步不在 ADM 手上。
-									 *
-									 * 🔴 這一段 2026-09-05 反過來了（`DEC-20260905-015836`）：
-									 * 端點 29 的 allowed-from 放寬到審核期間 ⇒ 賣家在核定之前
-									 * 就簽得了 ⇒ 端點 40 新增 T08 守衛，未授權時核定回 9354。
-									 * 舊註解寫的「刻意不 disable，否則會死結」已經不成立。
-									 *
-									 * 用 disabled 而不是不渲染（同 `identityIncomplete` 的慣例）：
-									 * 狀態機層不成立的決策**不存在**，而這一顆存在、只是現在按
-									 * 不得——藏起來會讓 ADM 找不到自己要的那顆鍵，也看不到原因。
-									 *
-									 * ⚠️ ADM 的下一步是**通知賣家**，不是補件——這一格 ADM 自己
-									 * 解決不了，文案要指到賣家那一步，不能只說「不能按」。
-									 */}
+
 									{availableDecisions.includes(
 										SellerTaxReviewDecision.APPROVE_INVOICE_EXEMPT,
 									) ? (
@@ -854,30 +731,14 @@ export default function TaxReviewDetailPage() {
 							)}
 						</section>
 
-						{/*
-						 * 延長裁決（端點 41）。
-						 *
-						 * 核准只在「已具結待審 ＋ 還沒延長過」時成立（後端 DecideExtension 的
-						 * 兩道守衛，否則 9321／9323）；駁回沒有狀態守衛——「駁回了一個延長申請」
-						 * 本身就是一次需要留痕的 ADM 行為，所以它常駐。
-						 */}
+
 						<section className="invoice-section">
 							<h2 className="invoice-section__title">延長申請</h2>
 							<p className="invoice-section__hint">
 								一筆申請只能延長一次。核准之後新的期限從「原到期日」起算，不是從今天起算——
 								所以一個快到期的案子不會因為延長而變成完整的 30 天。
 							</p>
-							{/*
-							 * 🔴 待裁決的申請。**這一塊是「現在該不該按核准」的唯一線索**：
-							 * 端點 20 只寫一列 invoice_status_history、不碰 seller_tax_profiles
-							 * 的任何一欄 ⇒ 在 pendingExtensionRequest 出現之前（2026-09-05），
-							 * 申請過與沒申請過的賣家在這一頁完全長得一樣，A02 也分不出來
-							 * （filter=UNDER_REVIEW 把兩者混在同一頁）。dev 實測有一筆掛兩天沒人看見。
-							 *
-							 * ⚠️ 它為 null 時**不隱藏下面的按鈕**：核准的判準是
-							 * taxExtensionApprovable（狀態 ＋ 次數），與「有沒有人在等」是兩件事。
-							 * ADM 主動延長一個沒開口的賣家仍然合法。
-							 */}
+
 							{profile.pendingExtensionRequest ? (
 								<div className="invoice-extension-request">
 									<strong>
@@ -1013,14 +874,9 @@ export default function TaxReviewDetailPage() {
 											<option value="">不指定</option>
 											{(profile?.documents ?? []).map((doc) => (
 												<option key={doc.documentId} value={doc.documentId}>
-													{/* kind 設計上恆為空（平台從未收集過文件分類，見 backend
-													    proto_field_producer_test.go 的白名單）⇒ 直接串接會渲染成
-													    前導的「｜檔名」。有值才補分隔線。 */}
+
 													{doc.kind ? `${doc.kind}｜` : ""}
-													{/* fileName 可能為空（該 asset 沒有 asset_reference ⇒ media 的
-													    BatchGetAssetMetadata 查不到它，見 backend #3149）。同頁表格
-													    對空值有 `|| "—"`，這裡沒有的話會渲染出「完全空白但選得下去」
-													    的選項——審核員無從分辨，選了之後畫面看起來仍像「不指定」。 */}
+
 													{doc.fileName || `文件 #${doc.documentId}`}
 												</option>
 											))}

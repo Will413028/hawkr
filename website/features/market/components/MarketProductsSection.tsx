@@ -46,11 +46,6 @@ export async function loadMarketProductsSection({
 			fetchParams.priceMin == null &&
 			fetchParams.priceMax == null;
 
-		// Cache only the canonical anonymous first page. Filter values come from
-		// the URL and are intentionally fetched directly so arbitrary queries do
-		// not create an unbounded cache key space. Use the shared 100-item
-		// pool already consumed by Home, then slice the
-		// visible grid; this keeps all three surfaces on one cache key.
 		const productJson = await (isCanonicalNavbarLanding
 			? getCachedProductsFirstPage(100)
 			: fetchProducts(
@@ -72,8 +67,6 @@ export async function loadMarketProductsSection({
 			? fetchedRecords.slice(0, pageSize)
 			: fetchedRecords;
 		products = rawRecords.map(mapProduct);
-		// `done` when backend returned fewer than the requested page size —
-		// the client uses this to disable the explicit load-more action.
 		initialDone = fetchedRecords.length < pageSize;
 	}
 	return { products, initialDone };

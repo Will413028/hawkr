@@ -47,7 +47,6 @@ func (f fakeFollowers) SubscriberCounts(context.Context, []int64) (map[int64]int
 	return f.counts, f.err
 }
 
-// fakeRatings 是評價來源的替身：記錄每次呼叫收到的店家，只回 stats 裡有的店（沒有評價的店不在回傳裡）。
 type fakeRatings struct {
 	stats map[int64]httpseller.RatingStats
 	err   error

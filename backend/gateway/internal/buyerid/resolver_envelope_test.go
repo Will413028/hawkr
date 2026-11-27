@@ -15,14 +15,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// 真正過 EnvelopeGuardInterceptor 的 regression（複製 storeid 的
-// resolver_envelope_test.go 套路：resolver_test.go 用 GetterFunc 直接 mock
-// BuyerGetter 回傳 err=nil+resp=nil，這個組合在正式環境不會發生——真實鏈路
-// GetBuyerProfile 對「無現任 buyer stint」一律回 envelope code 404，先被
-// EnvelopeGuardInterceptor 轉成 err!=nil + status.Code()==NotFound，繞過
-// interceptor 的 mock 給了假信心。本檔起 bufconn fake buyer server，接上
-// production 同款的 EnvelopeGuardInterceptor + *grpcclient.BuyerClient，驗證
-// resolver 在真實鏈路下仍正確判斷 ErrNoCurrentBuyer）。
 type fakeBuyerServer struct {
 	buyerpb.UnimplementedBuyerServiceServer
 	code    int32

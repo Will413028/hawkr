@@ -133,8 +133,6 @@ test("the eager drawer boundary mirrors final thread geometry and room paint", (
 		assertSameRule(drawerShellCss, messagesCss, selector);
 	}
 
-	// Keep the bounded conversation texture, but no second ambient loop
-	// competing with the site's persistent, user-pausable background.
 	assert.doesNotMatch(messagesCss, /chat-wallpaper-drift/);
 	assert.doesNotMatch(drawerShellCss, /chat-wallpaper-drift/);
 

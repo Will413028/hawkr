@@ -126,7 +126,6 @@ type Options struct {
 	Breaker      BreakerSettings
 	Deadlines    Deadlines
 
-	// now 供測試注入；nil 時用 time.Now。
 	now func() time.Time
 }
 
@@ -139,14 +138,8 @@ type HTTPClient struct {
 	http    *http.Client
 	clock   *Clock
 	limiter *rateLimiter
-	breaker *gobreaker.CircuitBreaker[[]byte] // 全域（§7.3.4「全域斷路器另計」）
+	breaker *gobreaker.CircuitBreaker[[]byte]
 
-	// perIssuer 是**每個 store 一顆**斷路器（§7.3.4「per-store 斷路器」）。
-	//
-	// 🔴 先前只有一顆全域的、而且用的是 per-store 的跳脫條件（連 5 敗）⇒
-	// **一家賣家的憑證壞掉會把全服務推向 open**，其餘賣家的開票一起停在
-	// RETRY_SCHEDULED。而 invoice_provider_accounts.status='DEGRADED' 的語意是
-	// 「per-store 斷路器的持久化投影」，投影的來源卻不是 per-store 的。
 	perIssuerMu sync.Mutex
 	perIssuer   map[int64]*gobreaker.CircuitBreaker[[]byte]
 	breakerSet  BreakerSettings
@@ -191,9 +184,6 @@ func New(opts Options) (*HTTPClient, error) {
 		return nil, errors.New("amego: BaseURL is required")
 	}
 	if opts.TestInvoice == "" {
-		// 沒有測試統編 ⇒ guardEnvironment 的第二個放行條件永遠不成立。
-		// 這在 ALLOW_REAL=false 的環境等於全部外呼被擋，而那是靜默的
-		// ⇒ 寧可在建構時就硬錯。Config.Validate 也擋同一件事（§4.5.8 第一層）。
 		return nil, errors.New("amego: TestInvoice is required (AMEGO_TEST_INVOICE)")
 	}
 	nowFn := opts.now
@@ -220,11 +210,6 @@ func New(opts Options) (*HTTPClient, error) {
 	if hc == nil {
 		hc = &http.Client{Timeout: dl.Issue + 5*time.Second}
 	}
-	// 全域斷路器（§7.3.4「全域斷路器另計」）：**60 秒滾動窗口內失敗率 ≥ 50% 且
-	// 樣本 ≥ 20** ⇒ 全域 open。對應「code 10 停機維護」這種所有賣家一起壞的情況。
-	//
-	// 🔴 跳脫條件與 per-store 那顆**不同**，這是刻意的：先前全域那顆用的是
-	// per-store 的「連 5 敗」，於是一家賣家壞掉就拖垮全部。
 	cb := gobreaker.NewCircuitBreaker[[]byte](gobreaker.Settings{
 		Name:        "amego-global",
 		MaxRequests: bs.MaxRequests,
@@ -236,8 +221,6 @@ func New(opts Options) (*HTTPClient, error) {
 			}
 			return float64(counts.TotalFailures)/float64(counts.Requests) >= globalBreakerFailureRatio
 		},
-		// 🔴 per-store 開路**不計入全域**：那是「這一家壞了」不是「AMEGO 壞了」。
-		// 少了這一句，一家賣家持續開路會把全域的失敗率一路推上去 ⇒ 回到修正前的行為。
 		IsExcluded: func(err error) bool {
 			if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
 				return true
@@ -285,14 +268,6 @@ func (c *HTTPClient) BreakerOpenFor(issuerID int64) bool {
 	return c.breakerFor(issuerID).State() == gobreaker.StateOpen
 }
 
-// guardEnvironment 是環境 fail-closed 的**第二層**（§4.5.8）。
-//
-// 啟動時的 Config.Validate 只涵蓋平台自身那一組憑證；per-seller 憑證是 runtime
-// 從 DB 讀出來的，那時 Validate 早已跑完。測試與正式共用同一網域、回應無環境標記
-// ⇒ 設定填錯會對真實公司開出無法回收的真發票，而且無法從回應辨識。
-//
-// 放行條件：AllowRealInvoice == true **或** cred.Invoice == TestInvoice。
-// 否則回 ENV_GUARD 並且**不打出去**。
 func (c *HTTPClient) guardEnvironment(cred Credential) *APIError {
 	if c.allowRealInvoice {
 		return nil
@@ -311,21 +286,12 @@ func (c *HTTPClient) guardEnvironment(cred Credential) *APIError {
 	}
 }
 
-// do 執行一次帶簽章的 POST，回原始回應 body。
-//
-// 稽核用 defer 包住整個流程 ⇒ 無論從哪一條 return 出去都恰好寫一次
-// （PayUniHttpClient 用 finally 達成的同一件事）。
 func (c *HTTPClient) do(ctx context.Context, cred Credential, endpoint string, payload any, deadline time.Duration) (raw []byte, retErr error) {
 	if gerr := c.guardEnvironment(cred); gerr != nil {
 		gerr.Endpoint = endpoint
-		// 沒有任何交互發生 ⇒ 不寫 provider audit（那張表的 error_kind 只有
-		// TIMEOUT／CONNECTION／PROVIDER_ERROR／DECODE 四值，記錄一次不存在的往返
-		// 只會污染「這筆送了幾遍」的對帳）。
 		return nil, gerr
 	}
 
-	// 🔴 序列化一次。dataJSON 之後同時餵給 signature 與 buildForm，
-	// 中間絕對不可再 marshal 一次 payload。
 	dataJSON, err := encodeOnce(payload)
 	if err != nil {
 		return nil, &APIError{Endpoint: endpoint, Code: "ENCODE", Class: ClassPermanent, Kind: ErrorKindDecode, Msg: err.Error(), KnownCode: true, wrapped: err}
@@ -335,19 +301,6 @@ func (c *HTTPClient) do(ctx context.Context, cred Credential, endpoint string, p
 	form := buildForm(cred.Invoice, dataJSON, unixSec, sign)
 
 	opID, attempt := auditFromContext(ctx)
-	// #3031：保證這一次往返有 correlation_id。
-	//
-	// 🔴 為什麼補在這裡而不是「有就用、沒有就算了」：`invoice_provider_audit_logs`
-	// 的**絕大多數列是排程 worker 寫的**（INV.op／recheck／pdf），而 worker 沒有
-	// 請求可種、本服務也沒有任何地方起 OTel span（`InitTracer` 只裝了 provider，
-	// 全 repo 零 `tracer.Start`）⇒ 只讀不補的話那一欄恆為 NULL。
-	// 2026-09-02 實測即如此：修復部署之後新寫的 6 列 correlation_id 仍全空，
-	// 因為它們全都來自 `/json/invoice_query` 的排程路徑。
-	//
-	// ⚠️ **誠實標明它是什麼**：有請求脈絡時它就是那條請求的 correlation id
-	// （可跨服務追）；排程路徑上它是**這一次往返自己的識別碼**——足以讓 ADM 的
-	// 服務商往來列表指名某一列、讓客服對話有東西可引用，但**不是**跨系統 trace key。
-	// 要讓後者成立，得先讓 worker 起 span，那是 observability 的工程不是查詢層補得出來的。
 	ctx = ensureCorrelationID(ctx)
 	started := c.now()
 	ex := Exchange{
@@ -374,9 +327,6 @@ func (c *HTTPClient) do(ctx context.Context, cred Credential, endpoint string, p
 				ex.HTTPStatus = apiErr.HTTPStatus
 			}
 		}
-		// M2／M3／M4 掛在**同一個 defer** 上，與 provider audit 落庫同一個理由：
-		// 無論從哪一條 return 出去都恰好觀測一次。掛在各 return 前面的話，
-		// 新增一條 return 就會少一次觀測，而少的那次沒有任何東西看得出來。
 		observeCall(endpoint, apiErr, elapsed.Seconds())
 		safeRecord(ctx, c.audit, ex)
 	}()
@@ -384,18 +334,11 @@ func (c *HTTPClient) do(ctx context.Context, cred Credential, endpoint string, p
 	callCtx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 
-	// limiter 吃**這次呼叫自己的 ctx**：排隊時間因此被該支 API 的 deadline 涵蓋，
-	// 租約下界才不必為它另計一項。
 	if werr := c.limiter.Wait(callCtx); werr != nil {
-		// 排隊排到超過 deadline ⇒ 一個字都沒送出去 ⇒ 開票延後，不遺失。
-		// M4 source=local：這是設計中的正常行為（與 source=amego 的「限速沒守住」
-		// 分開記，混在一起會讓告警 ① 在尖峰長期紅著而被忽略）。
 		observeLocalRateLimited()
 		return nil, &APIError{Endpoint: endpoint, Code: "RATE_LIMIT_LOCAL", Class: ClassRetryable, Kind: ErrorKindConn, Msg: werr.Error(), KnownCode: true, wrapped: werr}
 	}
 
-	// 雙層：全域先擋（AMEGO 整體壞掉時所有人一起停），再走該賣家自己那顆。
-	// 順序不可對調——顛倒的話全域 open 期間仍會為每個賣家各建一顆並各打一次。
 	perStore := c.breakerFor(cred.IssuerID)
 	body, berr := c.breaker.Execute(func() ([]byte, error) {
 		return perStore.Execute(func() ([]byte, error) {
@@ -411,14 +354,11 @@ func (c *HTTPClient) do(ctx context.Context, cred Credential, endpoint string, p
 	return body, nil
 }
 
-// roundTrip 送出一次請求並把回應翻成 (raw, *APIError)。它不重試。
 func (c *HTTPClient) roundTrip(ctx context.Context, endpoint string, form url.Values, ex *Exchange) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, &APIError{Endpoint: endpoint, Code: "REQUEST", Class: ClassReconcile, Kind: ErrorKindConn, Msg: err.Error(), KnownCode: true, wrapped: err}
 	}
-	// 官方明令「請勿使用 Content-Type: application/json」——用錯會回 code 11
-	// 「invoice 不可為空」，訊息完全誤導。
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := c.http.Do(req)
@@ -427,8 +367,6 @@ func (c *HTTPClient) roundTrip(ctx context.Context, endpoint string, form url.Va
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			kind = ErrorKindTimeout
 		}
-		// 傳輸層失敗／ctx deadline ⇒ **結果未知**，走 §4.5.7 對帳決策樹。
-		// 絕不可直接當成失敗：「沒有回應」與「沒有開票」是兩件事，中間差一張真發票。
 		return nil, &APIError{Endpoint: endpoint, Code: "TRANSPORT", Class: ClassReconcile, Kind: kind, Msg: err.Error(), KnownCode: true, wrapped: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -440,7 +378,6 @@ func (c *HTTPClient) roundTrip(ctx context.Context, endpoint string, form url.Va
 	ex.HTTPStatus = resp.StatusCode
 	ex.ResponseMasked = string(raw)
 
-	// HTTP status 恆為 200，但仍要記：哪天不是 200 就是重要訊號（例如上游換了反代）。
 	if resp.StatusCode != http.StatusOK {
 		return nil, &APIError{Endpoint: endpoint, Code: "HTTP_" + strconv.Itoa(resp.StatusCode), Class: ClassReconcile, Kind: ErrorKindConn, HTTPStatus: resp.StatusCode, Msg: string(raw), KnownCode: false}
 	}
@@ -450,17 +387,12 @@ func (c *HTTPClient) roundTrip(ctx context.Context, endpoint string, form url.Va
 		Msg  string       `json:"msg"`
 	}
 	if uerr := json.Unmarshal(raw, &head); uerr != nil {
-		// 🔴 HTTP 200 但 body 非 JSON ⇒ **PERMANENT 不是 UNKNOWN**（§7.5.1）。
-		// 打錯路徑時 AMEGO 回 200 ＋ text/html ＋ body 是字串 `error`，不是 404。
-		// 那是開機就全錯的我方 bug，要的是立刻告警，不是每一筆都 fail-closed
-		// 停在 WAITING_CONFIRMATION 等一個永遠不會有結論的重查。
 		return nil, &APIError{Endpoint: endpoint, Code: ErrorKindDecode, Class: ClassPermanent, Kind: ErrorKindDecode, HTTPStatus: resp.StatusCode, Msg: truncateForLog(string(raw)), KnownCode: true, wrapped: uerr}
 	}
 	code := string(head.Code)
 	if code != "0" {
 		apiErr := newProviderError(endpoint, code, head.Msg, resp.StatusCode)
 		if code == "21" {
-			// 我方限速自動降檔。AMEGO 沒有 Retry-After／X-RateLimit-*。
 			c.limiter.Degrade()
 		}
 		return nil, apiErr
@@ -476,7 +408,6 @@ func truncateForLog(s string) string {
 	return s[:max] + "…(truncated)"
 }
 
-// ── 寫入類 ────────────────────────────────────────────────────────────────
 
 // IssueInvoice 開立發票。data 是**單一物件**（送陣列回 3040112）。
 func (c *HTTPClient) IssueInvoice(ctx context.Context, cred Credential, req IssueRequest) (*IssueResult, error) {
@@ -527,7 +458,6 @@ func (c *HTTPClient) VoidAllowance(ctx context.Context, cred Credential, req Voi
 	return &VoidAccepted{Accepted: true}, nil
 }
 
-// ── 查詢類 ────────────────────────────────────────────────────────────────
 
 type invoiceQueryRequest struct {
 	Type          string `json:"type"`
@@ -608,10 +538,6 @@ func (c *HTTPClient) QueryAllowance(ctx context.Context, cred Credential, allowa
 	return &detail, nil
 }
 
-// validDownloadStyles 是我方自訂的白名單。
-//
-// AMEGO 對 download_style **不做值域驗證**（對照：allowance_file 有錯誤碼 34，
-// invoice_file 沒有）⇒ 錯誤值會靜默產生非預期版面的 PDF。
 var validDownloadStyles = map[int]bool{0: true, 1: true, 2: true, 3: true, 5: true}
 
 // FetchInvoiceFileURL 取 PDF 連結。**URL 僅 10 分鐘有效**，取得後必須立即下載。
@@ -641,7 +567,6 @@ func (c *HTTPClient) FetchInvoiceFileURL(ctx context.Context, cred Credential, r
 	return data.FileURL, nil
 }
 
-// ── 驗證類 ────────────────────────────────────────────────────────────────
 
 // VerifyMobileBarcode 驗手機條碼。它是唯一的載具驗證端點，且只驗手機條碼。
 // 成功時回應沒有任何載具資訊 ⇒ 回傳值只有 error。
@@ -694,7 +619,6 @@ func (c *HTTPClient) QueryCompanyNames(ctx context.Context, cred Credential, ban
 	return out, nil
 }
 
-// ── 資源與健康 ────────────────────────────────────────────────────────────
 
 type trackRequest struct {
 	Year         int    `json:"Year"`
@@ -777,11 +701,9 @@ func (c *HTTPClient) ServerTime(ctx context.Context) (time.Time, error) {
 	if env.Timestamp == 0 {
 		return time.Time{}, &APIError{Endpoint: EndpointServerTime, Code: ErrorKindDecode, Class: ClassPermanent, Kind: ErrorKindDecode, Msg: "timestamp 缺席", KnownCode: true}
 	}
-	// 只用 timestamp，不解析 text：text 是台北時間、文件未載明時區。
 	return time.Unix(env.Timestamp, 0).UTC(), nil
 }
 
-// ── 上傳狀態 ──────────────────────────────────────────────────────────────
 
 // InvoiceUploadStatus 回填 provider_upload_status（status=99 才是「上傳完成」）。
 func (c *HTTPClient) InvoiceUploadStatus(ctx context.Context, cred Credential, number string) (*UploadStatus, error) {
@@ -807,9 +729,6 @@ func (c *HTTPClient) AllowanceUploadStatus(ctx context.Context, cred Credential,
 	return decodeUploadStatus(EndpointAllowanceStatus, raw, "allowance_number", allowanceNumber)
 }
 
-// decodeUploadStatus 容忍新版（data 為陣列）與舊版（data 為以單號為 key 的物件）
-// 兩種形狀：文件同時列出兩者卻沒說怎麼切換，只認一種的話 AMEGO 任何時候切回舊版
-// 就 parse 失敗。
 func decodeUploadStatus(endpoint string, raw []byte, numberField, want string) (*UploadStatus, error) {
 	var env stdEnvelope
 	if uerr := json.Unmarshal(raw, &env); uerr != nil {
@@ -863,27 +782,16 @@ func decodeUploadStatus(endpoint string, raw []byte, numberField, want string) (
 	return pick(r, want), nil
 }
 
-// decodeErr 把「回應是合法 JSON、但形狀不是我方預期」歸成 DECODE + PERMANENT，
-// 與 HTTP 200 非 JSON 同一分支：兩者都是我方 bug，要的是立刻告警。
 func decodeErr(endpoint string, err error) *APIError {
 	return &APIError{Endpoint: endpoint, Code: ErrorKindDecode, Class: ClassPermanent, Kind: ErrorKindDecode, Msg: err.Error(), KnownCode: true, wrapped: err}
 }
 
-// 全域斷路器的跳脫參數（§7.3.4「全域斷路器另計」逐字）。
 const (
 	globalBreakerWindow       = 60 * time.Second
 	globalBreakerMinSamples   = 20
 	globalBreakerFailureRatio = 0.5
 )
 
-// breakerFor 回該 issuer 的斷路器，沒有就建一顆。
-//
-// 🔴 用 IssuerID 當 key 而不是 store_id：本層拿得到的是 Credential.IssuerID，
-// 而 invoice_issuers 與 store 是一對一（issuer_type='SELLER' 時 issuer_ref_id
-// 就是 store_id）⇒ 兩者等價。用 IssuerID 可以少一次查詢。
-//
-// map 會隨賣家數線性成長而不回收：那是刻意的。一顆 gobreaker 只有幾個計數器，
-// 而「回收之後那家的連敗計數歸零」會讓斷路器在賣家間歇性呼叫時永遠跳不起來。
 func (c *HTTPClient) breakerFor(issuerID int64) *gobreaker.CircuitBreaker[[]byte] {
 	c.perIssuerMu.Lock()
 	defer c.perIssuerMu.Unlock()

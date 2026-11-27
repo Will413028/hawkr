@@ -30,8 +30,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 測試用的身分證號（格式與檢查碼都正確，不是真實的人）。
-// testTaxID 是測試用的統編（檢查碼正確，不是真實的公司）。
 const testTaxID = "33330333"
 
 type fakeRegistry struct {
@@ -48,7 +46,6 @@ func (r *fakeRegistry) Lookup(context.Context, string) (gcis.Registration, bool,
 
 var draftPaths = []string{"individual", "product_type", "website_url"}
 
-// completeDraft 是一份完整、合法的個人賣家草稿請求（個人賣家沒有身分欄位，只有商品類型與網站）。
 func completeDraft() *pb.SaveKYCDraftRequest {
 	return &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{
@@ -59,7 +56,6 @@ func completeDraft() *pb.SaveKYCDraftRequest {
 	}
 }
 
-// companyDraftRequest 是一份完整、合法的企業賣家草稿請求（公司名稱與統編）。
 func companyDraftRequest(taxID string) *pb.SaveKYCDraftRequest {
 	return &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{
@@ -79,7 +75,6 @@ func saveDraft(t *testing.T, c sellerconnect.SellerAppServiceClient, req *pb.Sav
 	return resp.Msg.GetApplication()
 }
 
-// detailTypes 回傳錯誤帶的 details 型別名稱。
 func detailTypes(t *testing.T, err error) []string {
 	t.Helper()
 	var ce *connect.Error
@@ -131,11 +126,9 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 		t.Fatalf("got=%v err=%v", got, err)
 	}
 
-	// 沒有帶 etag 又已經有申請：already_exists（VERSION_CONFLICT），不是再建一份；帶過期的 etag 才是 aborted。
 	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(completeDraft()))
 	wantCode(t, err, connect.CodeAlreadyExists, "VERSION_CONFLICT")
 
-	// 只改 mask 選到的欄位；沒選到的（網站）不動，mask 選到又沒帶值的欄位（website_url）回到空。
 	updated := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{Etag: created.GetEtag(), ProductType: "水果", WebsiteUrl: "https://不在-mask.example.com"},
 		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"product_type"}},
@@ -154,7 +147,6 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 	}))
 	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
 
-	// 網址不合法：整筆不寫入，錯誤指向請求的欄位。
 	_, err = f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{Etag: cleared.GetEtag(), WebsiteUrl: "ftp://x", ProductType: "不該寫入"},
 		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"website_url", "product_type"}},
@@ -180,7 +172,6 @@ func TestKYCDraftSubmitAndCancel(t *testing.T) {
 	if err != nil || cancelled.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_CANCELLED {
 		t.Fatalf("cancelled=%v err=%v", cancelled, err)
 	}
-	// 取消之後重讀是「沒有申請」（not_found）。
 	_, err = f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{}))
 	wantCode(t, err, connect.CodeNotFound, "")
 }
@@ -200,7 +191,6 @@ func TestKYCFollowsTheDeclaredCapabilities(t *testing.T) {
 	f.applyComplete(t, f.app)
 	draft := saveDraft(t, f.app, completeDraft())
 	f.suspendStore(t, f.storeID(t))
-	// 停權：讀自己的申請仍可以，寫入與統編查詢不行。
 	if _, err := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +276,6 @@ func TestSubmitKYCIsRateLimitedPerAccount(t *testing.T) {
 	ctx := context.Background()
 	f.applyComplete(t, f.app)
 	draft := saveDraft(t, f.app, completeDraft())
-	// 過期的 etag：每次都是版本衝突，仍然計一次。
 	stale := &pb.SubmitKYCRequest{Etag: "99", AcceptedAgreements: kycAgreementsPB()}
 	for i := range 5 {
 		_, err := f.app.SubmitKYC(ctx, connect.NewRequest(stale))
@@ -303,7 +292,6 @@ func TestSubmitKYCIsRateLimitedPerAccount(t *testing.T) {
 	if got, _ := f.app.GetMyKYC(ctx, connect.NewRequest(&pb.GetMyKYCRequest{})); got.Msg.GetApplication().GetStatus() != pb.KYCStatus_KYC_STATUS_DRAFT {
 		t.Fatalf("超過額度的請求不該到達模組：%v", got)
 	}
-	// 別的帳號不受影響。
 	f.applyComplete(t, f.other)
 	theirs := saveDraft(t, f.other, completeDraft())
 	if _, err := f.other.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: theirs.GetEtag(), AcceptedAgreements: kycAgreementsPB()})); err != nil {
@@ -341,7 +329,6 @@ func TestLookupBusinessRegistration(t *testing.T) {
 	wantCode(t, err, connect.CodeUnavailable, "")
 	f.registry.err = nil
 	callsBefore := f.registry.calls
-	// 格式錯與檢查碼錯都不打外部（但在入口計了額度）。
 	for _, bad := range []string{"abc", "12345678"} {
 		_, err = f.app.LookupBusinessRegistration(ctx, connect.NewRequest(&pb.LookupBusinessRegistrationRequest{TaxId: bad}))
 		if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "tax_id" {
@@ -351,7 +338,6 @@ func TestLookupBusinessRegistration(t *testing.T) {
 	if f.registry.calls != callsBefore {
 		t.Fatalf("格式或檢查碼不合的統編查了資料來源：%d 次", f.registry.calls-callsBefore)
 	}
-	// 到目前為止 5 次（含兩次格式與檢查碼錯誤，它們在入口就計了）；再 5 次用完 10 次的額度。
 	for range 5 {
 		if _, err := lookup(); err != nil {
 			t.Fatal(err)
@@ -434,7 +420,6 @@ func TestApprovedKYCCannotBeResubmittedAndStoreContactUpdate(t *testing.T) {
 		}
 	}
 
-	// 已核准時客服信箱不能清掉；聯絡人姓名與手機是選填，可以清。
 	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
 		Store: &pb.Store{Etag: after.GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"support_email"}},
 	}))
@@ -461,7 +446,6 @@ func TestApprovedKYCCannotBeResubmittedAndStoreContactUpdate(t *testing.T) {
 	wantCode(t, err, connect.CodePermissionDenied, "SELLER_SUSPENDED")
 }
 
-// suspendStore 以管理員的身分對店家建立沒有固定期間的 RISK 停權（模組的操作，Connect 的後台方法另有測試）。
 func (f *fixture) suspendStore(t *testing.T, storeID int64) seller.Measure {
 	t.Helper()
 	review := time.Now().Add(7 * 24 * time.Hour)
@@ -475,7 +459,6 @@ func (f *fixture) suspendStore(t *testing.T, storeID int64) seller.Measure {
 	return res.Measure
 }
 
-// createMeasure 以管理員的身分在呼叫者的店家上建立一個依據認定的措施：警告，或七天的停權（模組的操作）。
 func (f *fixture) createMeasure(t *testing.T, kind seller.MeasureKind) string {
 	t.Helper()
 	in := seller.CreateMeasureInput{
@@ -520,7 +503,6 @@ func TestAnAccountWithNoOpenStoreCanListGetAndAppealItsOwnMeasures(t *testing.T)
 		t.Fatalf("got=%v err=%v", got, err)
 	}
 
-	// 別的帳號（沒有店家、不是賣家）：列表是空的，讀與申覆都與不存在的措施相同。
 	otherList, err := f.other.ListMyMeasures(ctx, connect.NewRequest(&pb.ListMyMeasuresRequest{}))
 	if err != nil || len(otherList.Msg.GetMeasures()) != 0 {
 		t.Fatalf("別的帳號看到了措施：%v err=%v", otherList, err)
@@ -536,7 +518,6 @@ func TestAnAccountWithNoOpenStoreCanListGetAndAppealItsOwnMeasures(t *testing.T)
 		t.Fatalf("別人的措施與不存在的措施回應不同：%v / %v", theirRead, missing)
 	}
 
-	// 單張佐證被 media 拒絕：BadRequest 的欄位帶那一張的索引（AIP-193），張數上限則指整個欄位。
 	_, err = f.app.SubmitAppeal(ctx, connect.NewRequest(&pb.SubmitAppealRequest{MeasureId: id, Etag: got.Msg.GetMeasure().GetEtag(), Reason: "x", EvidenceStagedTokens: []string{"evidence", "expired-1"}}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
 	if fields := badRequestFields(t, err); !slices.Equal(fields, []string{"evidence_staged_tokens[1]"}) {
@@ -662,7 +643,6 @@ func TestAppealAndGovernanceCommandsCarryTheMeasureEtag(t *testing.T) {
 	}
 	_, err = decide("")
 	wantKind(t, err, apperr.KindInvalidInput)
-	// 提出申覆起措施凍結，申覆之後唯一還能讓 etag 前進的修改是縮短結束時間（停權七天，縮成一天）。
 	stored, err := f.module.Measure(ctx, measureID)
 	if err != nil {
 		t.Fatal(err)
@@ -706,7 +686,6 @@ func TestAppealAndGovernanceCommandsCarryTheMeasureEtag(t *testing.T) {
 	}
 }
 
-// badRequestFields 回傳錯誤的 BadRequest 違規的欄位路徑。
 func badRequestFields(t *testing.T, err error) []string {
 	t.Helper()
 	var ce *connect.Error
@@ -741,7 +720,6 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 	})
 	_, err := f.app.SubmitKYC(ctx, connect.NewRequest(&pb.SubmitKYCRequest{Etag: individual.GetEtag(), AcceptedAgreements: kycAgreementsPB()}))
 	wantStore := []string{"store.support_email"}
-	// 個人賣家的申請沒有必填欄位；店家資料還缺：failed_precondition（不是欄位違規），缺哪些看 missing_store_fields；補齊之後才能送出。
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 	if got := badRequestFields(t, err); len(got) != 0 {
 		t.Fatalf("店家資料缺項不該帶欄位違規：%v", got)
@@ -756,7 +734,6 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 		!slices.Equal(missingStorePaths(mine.Msg.GetApplication()), wantStore) {
 		t.Fatalf("GetMyKYC：err=%v mine=%v", err, mine)
 	}
-	// 店家資料補齊之後，缺項只剩申請自己的欄位。
 	filled := f.fillContact(t, f.app)
 	if got := missingStorePaths(saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{Etag: individual.GetEtag()}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"product_type"}},
@@ -787,7 +764,6 @@ func TestSubmitKYCReportsEveryMissingItemAsAFieldViolation(t *testing.T) {
 	}
 }
 
-// missingPaths 是申請的 missing_fields 對應的欄位路徑（排序）。
 func missingStorePaths(a *pb.KYCApplication) []string {
 	var out []string
 	for _, f := range a.GetMissingStoreFields() {
@@ -842,7 +818,6 @@ func TestKYCDocumentsAreStateOverConnect(t *testing.T) {
 	if got[0].GetDownloadUri() != "/api/files/seller/kyc/0" {
 		t.Fatalf("download uri=%q", got[0].GetDownloadUri())
 	}
-	// 指定的現有圖片不是這份申請目前的文件。
 	_, err := f.app.SaveKYCDraft(ctx, connect.NewRequest(&pb.SaveKYCDraftRequest{
 		Application: &pb.KYCApplication{Etag: next.GetEtag(), Subject: &pb.KYCApplication_Business{Business: &pb.BusinessKYC{CompanyDocuments: []*pb.KYCDocument{{AssetId: "asset-of-someone-else"}}}}},
 		UpdateMask:  &fieldmaskpb.FieldMask{Paths: []string{"business.company_documents"}},
@@ -962,13 +937,11 @@ func TestSaveKYCDraftSwitchesTheSellerTypeAndValidatesTheTaxID(t *testing.T) {
 	if switched.GetIndividual() != nil || switched.GetBusiness().GetTaxId() != "33330333" || switched.GetBusiness().GetCompanyName() != "某某有限公司" {
 		t.Fatalf("switched=%v", switched)
 	}
-	// 共用的欄位保留。
 	if switched.GetProductType() != "蔬果" || len(missingPaths(switched)) != 0 {
 		t.Fatalf("switched=%v missing=%v", switched, missingPaths(switched))
 	}
 }
 
-// wantKind 確認錯誤是模組的指定種類（直接呼叫 handler 時還沒經過 interceptor 轉成 Connect 的錯誤）。
 func wantKind(t *testing.T, err error, kind apperr.Kind) {
 	t.Helper()
 	if apperr.KindOf(err) != kind {
@@ -976,7 +949,6 @@ func wantKind(t *testing.T, err error, kind apperr.Kind) {
 	}
 }
 
-// kycAgreementsPB 是 SubmitKYC 要求的同意（現行版本）。
 func kycAgreementsPB() []*pb.AgreementAcceptance {
 	return pbAcceptances(seller.CurrentKYCAcceptances())
 }

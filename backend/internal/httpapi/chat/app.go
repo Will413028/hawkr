@@ -23,14 +23,11 @@ type App struct {
 	stores Stores
 	images rpc.Images
 	log    *slog.Logger
-	// streams 與 auth 給串流用：訂閱即時事件，與每 RecheckEvery 重新驗證 session。
 	streams Streams
 	auth    Reauthenticator
-	// stream 是串流傳輸的常數、時鐘與抖動來源；正式組裝用預設值，測試注入假的。
 	stream streamConfig
 	clock  streamClock
 	jitter func() float64
-	// reasonOf 取出模組錯誤帶的業務原因；正式組裝是 im.ReasonOf，測試換成固定的原因（模組的原因型別不能在模組外建構）。
 	reasonOf func(error) im.Reason
 }
 
@@ -41,7 +38,6 @@ func NewApp(reads Reads, writes Writes, streams Streams, auth Reauthenticator, b
 	return newApp(declarations, reads, writes, streams, auth, buyers, stores, images, log)
 }
 
-// newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
 func newApp(table map[string]declaration, reads Reads, writes Writes, streams Streams, auth Reauthenticator, buyers Buyers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
 	switch {
 	case log == nil:
@@ -123,7 +119,6 @@ func (h *App) GetStoreConversationByBuyer(ctx context.Context, req *connect.Requ
 	if err != nil {
 		return nil, err
 	}
-	// 契約承諾不區分原因：沒有店、店家關閉、買家不存在、沒有對話都是同一個 not_found（同 code、訊息與 details）。
 	p, err := h.storeParty(ctx)
 	if err != nil {
 		if apperr.KindOf(err) == apperr.KindNotFound {
@@ -184,8 +179,6 @@ func (h *App) ListMessages(ctx context.Context, req *connect.Request[pb.ListMess
 	return connect.NewResponse(&pb.ListMessagesResponse{Messages: items, HasMore: page.HasMore, PeerReadSeq: page.PeerReadSeq}), nil
 }
 
-// beforeSeq 是交給模組的 before_seq（模組以 0 表示從最新開始）：沒設是 0；明確給 0 是「seq 小於 0」，序號從 1 起所以沒有訊息，
-// 以 1 表示（同樣沒有 seq 小於 1 的訊息），仍回真正的 peer_read_seq。
 func beforeSeq(msg *pb.ListMessagesRequest) int64 {
 	if msg.BeforeSeq == nil {
 		return 0
@@ -193,7 +186,6 @@ func beforeSeq(msg *pb.ListMessagesRequest) int64 {
 	return max(*msg.BeforeSeq, 1)
 }
 
-// sendInput 解析送出的共同欄位：request_id 必填 UUIDv4（模組另驗），內容恰好是文字或圖片其中一個。
 func sendInput(requestID string, content *pb.MessageContent) (im.SendInput, error) {
 	rid, err := rpc.ParseRequestID(requestID)
 	if err != nil {
@@ -350,7 +342,6 @@ func (h *App) GetStoreUnreadCount(ctx context.Context, _ *connect.Request[pb.Get
 	return connect.NewResponse(&pb.GetStoreUnreadCountResponse{UnreadCount: n}), nil
 }
 
-// presence 查呼叫者這一方的對話的對方是否在線：ID 先檢查數量與格式，不是自己的對話由模組回 not_found（整個請求失敗）。
 func (h *App) presence(ctx context.Context, rawIDs []string, party func(context.Context) (im.Party, error)) ([]*pb.ConversationPresence, error) {
 	if len(rawIDs) == 0 {
 		return nil, rpc.RequiredField("conversation_ids", "conversation_ids 至少要有一個")

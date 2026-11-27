@@ -39,14 +39,12 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// queue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type queue struct {
 	mu    sync.Mutex
 	args  []river.JobArgs
 	trace *trace
 }
 
-// trace 依序記錄 catalog 替身與 job 佇列的呼叫，讓測試斷言先後。
 type trace struct {
 	mu     sync.Mutex
 	events []string
@@ -110,7 +108,6 @@ func (q *queue) reset() {
 	q.args = nil
 }
 
-// orders 是 review 的訂單 port 的替身：以訂單號查，錯誤由測試設定（ErrOrderNotFound 或暫時性故障）。
 type orders struct {
 	mu    sync.Mutex
 	byNo  map[string]review.OrderForReview
@@ -138,7 +135,6 @@ type ratingCall struct {
 	count     int32
 }
 
-// ratingSink 是 catalog 的替身：記住每個商品目前的評分（LockProduct 回它、SetRating 改它），可設定商品不存在、錯誤與 SetRating 的 hook。
 type ratingSink struct {
 	mu      sync.Mutex
 	calls   []ratingCall
@@ -300,7 +296,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// stage 以 b 的帳號為上傳者放 n 張公開 PNG，回傳可 Confirm 的 token 與資產 ID（同順序）。
 func (f *fixture) stage(t *testing.T, b buyer.Profile, n int) ([]string, []uuid.UUID) {
 	t.Helper()
 	var body bytes.Buffer
@@ -349,7 +344,6 @@ func (f *fixture) scalar(t *testing.T, sql string, args ...any) int64 {
 
 func (f *fixture) next() int64 { return f.ids.Add(1) + 100 }
 
-// exposableStore 建一家店（直接寫 seller 的表，最小的列），回傳 store_id。
 func (f *fixture) exposableStore(t *testing.T) int64 {
 	t.Helper()
 	accountID := f.next()
@@ -384,7 +378,6 @@ func (f *fixture) newBuyer(t *testing.T) buyer.Profile {
 	return p
 }
 
-// item 是登記進訂單替身的一個項目；訂單已完成一天。
 type item struct {
 	orderNo string
 	itemID  int64
@@ -448,5 +441,4 @@ func revalidations(q *queue) [][]string {
 	return out
 }
 
-// pid 把小整數編號轉成固定的商品 UUID（後 16 位元組為編號的大端表示），與 SQL 的 lpad(to_hex(n), 32, '0')::uuid 同值。
 func pid(n int) uuid.UUID { return uuid.UUID{14: byte(n >> 8), 15: byte(n)} }

@@ -10,8 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 )
 
-// CodeMeta〈錯誤碼〉的代行段是這裡業務碼的投影（擁有者是 delegation，ADR 2026-09-25-codemeta-retirement 過渡第 1 步）：
-// gateway 與後台以 CodeMeta 的名稱解讀這些碼，兩邊的數字不一致時，gateway 會把拒絕對到錯的 HTTP status。
 var codemetaNames = map[delegation.DelegationDenial]string{
 	delegation.DenialInvalidCommand:             "DELEGATION_INVALID_COMMAND",
 	delegation.DenialAdminRequired:              "DELEGATION_ADMIN_SESSION_REQUIRED",

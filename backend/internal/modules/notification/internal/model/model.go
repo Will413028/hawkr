@@ -70,22 +70,15 @@ const (
 type categoryDef struct {
 	category PrefCategory
 	class    CategoryClass
-	// audiences 是這個分類存在的受眾：偏好 API 只列出受眾自己的分類，沒有對應型別的分類不給設定（避免按了沒效果的開關）。
 	audiences []Audience
-	// locked 是這個分類不可關的渠道。
 	locked []Channel
-	// undelivered 是這個分類不會送達的渠道：偏好 API 不列這些組合，也不接受設定。
 	undelivered []Channel
 }
 
-// D4：交易必要的收件匣與 email 不可關（推播可關，賣家 SHIPMENT_ANOMALY 的推播也不可關）；互動與行銷全部可關、預設開。
 var transactionalLocked = []Channel{ChannelInbox, ChannelEmail}
 
-// D18：公告只有收件匣與推播，收件匣不可關。
 var announcementLocked = []Channel{ChannelInbox}
 
-// 受眾的分類集合：SHIPMENT_ANOMALY 與 PAYOUT、REVIEW、FOLLOW、PROCUREMENT（D29）只有店家會收到；FOLLOWED_STORE_POST、COUPON、RESTOCK 只有買家會收到
-// （舊服務 notification_preference.go 的 SellerCategories／BuyerCategories 同樣如此，後者的註解說明配送異常不對買家開放）。
 var (
 	bothAudiences = []Audience{AudienceBuyer, AudienceStore}
 	buyerOnly     = []Audience{AudienceBuyer}

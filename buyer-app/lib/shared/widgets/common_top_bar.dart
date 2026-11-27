@@ -7,8 +7,6 @@ import '../../core/theme/hk_tokens.dart';
 import 'hk_icon.dart';
 import 'hk_liquid_glass.dart';
 
-// Shared top bar height (EXCLUDES status bar)
-// 對齊網頁 mobile header，固定 logical px，避免不同螢幕高度切換時跳動。
 const double kTopBarHeight = HkControl.topBarHeight;
 
 EdgeInsetsGeometry _defaultHorizontalPadding() =>

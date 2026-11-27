@@ -114,10 +114,6 @@ export function useFocusTrap<T extends HTMLElement>(
 		container.addEventListener("keydown", handleKeyDown);
 		return () => {
 			container.removeEventListener("keydown", handleKeyDown);
-			// Modal isolation may still have the trigger inside an inert subtree while
-			// sibling effects are cleaning up. Restore focus after those synchronous
-			// cleanups complete so browsers do not discard the focus request. The
-			// generation guard also ignores React Strict Mode's setup/cleanup replay.
 			queueMicrotask(() => {
 				if (effectGenerationRef.current !== effectGeneration) return;
 				const returnFocus = returnFocusRef.current;

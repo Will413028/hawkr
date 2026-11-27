@@ -44,7 +44,6 @@ class _Server {
       overrides: [
         sellerStoreIdProvider.overrideWith((ref) => ref.watch(_storeProvider)),
         refreshClockProvider.overrideWithValue(() => now),
-        // 每次依賴重建都是一個新的 client（和換掉 client 的情況一樣）。
         sellerClientProvider.overrideWith(
           (ref) => SellerAppServiceClient(
             FakeTransportBuilder().unary(SellerAppService.getMyDashboard, (
@@ -307,12 +306,10 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(server.calls, 1);
 
-      // 第 1 次讀取還卡著時依賴改變：重建出第 2 次讀取（沒有 gate，立刻完成）。
       container.invalidate(sellerClientProvider);
       await container.read(storeDashboardProvider('store-1').future);
       expect(server.calls, 2);
       expect(_pending(container), 2);
-      // 第 2 次讀取剛完成：保鮮期內，可見重讀不讀。
       expect(
         await notifier.refresh(maxAge: const Duration(seconds: 1)),
         isTrue,
@@ -320,12 +317,10 @@ void main() {
       expect(server.calls, 2);
       server.advance(const Duration(minutes: 5));
 
-      // 被取代的第 1 次讀取現在才回來：狀態不動、不算成功（保鮮期不重設）。
       server.gates.first.complete();
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(_pending(container), 2);
       expect(server.calls, 2);
-      // 保鮮期沒被重設，所以可見重讀照讀。
       expect(await notifier.refresh(maxAge: statusStaleTime), isTrue);
       expect(server.calls, 3);
     });
@@ -343,7 +338,6 @@ void main() {
       expect(server.calls, 2);
 
       final joined = notifier.refresh();
-      // 舊的先回來也不會讓「進行中」結束。
       server.gates[0].complete();
       await Future<void>.delayed(const Duration(milliseconds: 20));
       final again = notifier.refresh();
@@ -391,13 +385,13 @@ void main() {
       expect(_pending(container), 1);
 
       final notifier = container.read(_storeProvider.notifier);
-      notifier.switchTo(null); // 關店
+      notifier.switchTo(null);
       await Future<void>.delayed(Duration.zero);
       expect(container.read(currentDashboardProvider), isNull);
 
       final gate = Completer<void>();
       server.gates.add(gate);
-      notifier.switchTo('store-9'); // 開新店
+      notifier.switchTo('store-9');
       final fresh = container.read(currentDashboardProvider)!;
       expect(fresh.isLoading, isTrue);
       expect(fresh.value, isNull);

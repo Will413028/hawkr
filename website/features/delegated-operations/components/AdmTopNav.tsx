@@ -71,12 +71,6 @@ export default function AdmTopNav({ storeId }: { storeId: string }) {
 				{hasCapability("products.write") ? (
 					<Link
 						href={`${base}/products/new`}
-						// ⚠️ `.adm-topnav__cta` 自帶實心森林綠底＋白字（0-1-0），但
-						// `[data-theme="dark"] body a:not([data-hkui-button])`（0-2-2）會壓過它，
-						// 把白字換成 `--color-ink-200`。`data-hkui-button` 是「這是按鈕、前景色由自己的
-						// 表面決定」的既有宣告（`01-tokens-theme.css:761`）。
-						// 少了它，這顆與 `ProductsPage` 那顆同名同義的「＋ 上架新商品」會在
-						// **同一個畫面上**呈現兩種字色（那一顆已帶標記）。
 						data-hkui-button=""
 						className="adm-topnav__cta"
 					>

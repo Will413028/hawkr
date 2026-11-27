@@ -154,7 +154,6 @@ func (s *Service) runRestock(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// notify 重新確認可買、讀最新的名稱與主圖，可買才呼叫通知 port；不可買（庫存又歸零、商品下架或刪除、店家不可曝光）不通知，視為處理完。
 func (s *Service) notify(ctx context.Context, skuID uuid.UUID) error {
 	now := s.d.Now()
 	st, err := s.q(ctx).GetSkuRestockState(ctx, store.GetSkuRestockStateParams{ID: skuID, At: now})
@@ -196,7 +195,6 @@ func (s *Service) runPurge(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// settle 收尾一個認領的列：成功就刪（requested_at 沒變）；處理中有新請求（刪不到）就重新排；失敗就同列退避或停手。
 func (s *Service) settle(ctx context.Context, c claimed, procErr error,
 	finish func(context.Context, claimed) (int64, error),
 	fail func(context.Context, claimed, time.Time, string, *time.Time) (int64, error),

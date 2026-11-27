@@ -21,7 +21,6 @@ func isDeadlock(err error) bool {
 	return err != nil && (strings.Contains(err.Error(), "40P01") || strings.Contains(err.Error(), "deadlock"))
 }
 
-// race 同時執行兩個函式並回傳各自的錯誤。
 func race(a, b func() error) (error, error) {
 	var ea, eb error
 	var wg sync.WaitGroup
@@ -100,7 +99,6 @@ func TestDecideAndAConcurrentTriageNeverLeaveAnUnresolvedMemberInAClosedCase(t *
 		if isDeadlock(a) || isDeadlock(b) {
 			t.Fatalf("round %d: deadlock %v / %v", i, a, b)
 		}
-		// 結案可能因為 triage 先加入而版本衝突（案件的版本前進）；重讀再結一次也行。要緊的是不變量。
 		if a != nil && apperr.KindOf(a) != apperr.KindVersionConflict {
 			t.Fatalf("round %d: decide %v", i, a)
 		}
@@ -140,12 +138,10 @@ func TestDecideAndMoveNeverDeadlockWithASupplementToTheSameReport(t *testing.T) 
 		if a != nil || b != nil {
 			t.Fatalf("round %d: 結案與補充都要成功（補充不改案件的版本）：decide=%v supplement=%v", i, a, b)
 		}
-		// 補充要嘛併進原通報（結案帶入的結果之前），要嘛因為原通報已有結果而成為新的檢舉：不能不見。
 		if n := f.count(t, "SELECT count(*) FROM seller.report_supplements WHERE report_id = $1", members[0].ID) + f.count(t, "SELECT count(*) FROM seller.reports WHERE reporter_buyer_id = $1 AND id <> $2", buyer, members[0].ID); n != 1 {
 			t.Fatalf("round %d: 補充不見了或重複了：%d", i, n)
 		}
 
-		// 移動對補充。
 		_, s2 := f.open(t)
 		_, m2 := f.newCase(t, s2.StoreID, policy.Counterfeit, SeverityLow, 2)
 		buyer2 := f.reportOf(t, m2[0].ID).ReporterBuyerID
@@ -161,7 +157,6 @@ func TestDecideAndMoveNeverDeadlockWithASupplementToTheSameReport(t *testing.T) 
 		if isDeadlock(a) || isDeadlock(b) {
 			t.Fatalf("round %d: deadlock %v / %v", i, a, b)
 		}
-		// 補充先 commit 時通報的版本前進，移動撞版本；移動先時兩個都成功。
 		if a != nil && apperr.KindOf(a) != apperr.KindVersionConflict || b != nil {
 			t.Fatalf("round %d: move=%v supplement=%v", i, a, b)
 		}

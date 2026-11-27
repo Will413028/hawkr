@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ProtoConversionUtilsTest {
 
-    // ==================== parseUuid ====================
 
     @Test
     void parseUuidRequired_canonicalFormRoundTrips() {
@@ -31,7 +30,6 @@ class ProtoConversionUtilsTest {
         assertNotNull(ProtoConversionUtils.parseUuidOrNull("0192f3a4-7b1c-7d2e-8f3a-123456789abc"));
     }
 
-    // ==================== parseDecimalToInt ====================
 
     @Test
     void parseDecimalToInt_integerString() {
@@ -55,7 +53,6 @@ class ProtoConversionUtilsTest {
 
     @Test
     void parseDecimalToInt_negativeTruncatesTowardsZero() {
-        // BigInteger.toBigInteger() 向 0 truncate：-18.9 → -18
         assertEquals(-18, ProtoConversionUtils.parseDecimalToInt("-18.9", "v"));
         assertEquals(-18, ProtoConversionUtils.parseDecimalToInt("-18.00", "v"));
     }
@@ -94,7 +91,6 @@ class ProtoConversionUtilsTest {
                 ProtoConversionUtils.parseDecimalToInt(String.valueOf(Integer.MIN_VALUE), "v"));
     }
 
-    // ==================== parseDecimalToLong ====================
 
     @Test
     void parseDecimalToLong_integerString() {

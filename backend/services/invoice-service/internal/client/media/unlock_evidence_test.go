@@ -22,7 +22,7 @@ func TestUnlockEvidenceUsesInvoiceDocumentRefType(t *testing.T) {
 // 空 token ⇒ 回空字串且不打 media：證據檔是選填的（kind ＋ 查證說明已構成 §6.4 的證據）。
 // 這一格若改成回錯誤，端點 54 的「不附檔」路徑會整條壞掉。
 func TestFinalizeUnlockEvidenceEmptyTokenIsNoop(t *testing.T) {
-	c := &Client{} // 刻意不給 stub：真的打出去就會 nil panic，那正是本測試要抓的
+	c := &Client{}
 	key, err := c.FinalizeUnlockEvidence(t.Context(), "", 7001)
 	if err != nil {
 		t.Fatalf("空 token 不是錯誤：%v", err)

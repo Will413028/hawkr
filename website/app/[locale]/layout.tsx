@@ -24,8 +24,6 @@ export function generateStaticParams() {
 export async function generateMetadata({
 	params,
 }: LocaleParams): Promise<Metadata> {
-	// An unroutable locale 404s in the layout below; its metadata still needs `metadataBase`
-	// (Next resolves the root `opengraph-image` against it even for the 404), so it gets the default's.
 	const locale = resolveRoutableLocale((await params).locale) ?? defaultLocale;
 	return buildRootMetadata(locale);
 }

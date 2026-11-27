@@ -138,7 +138,6 @@ export async function fetchSellerForum(
 		{ storeId, pageToken, pageSize },
 		{ signal },
 	);
-	// 佔位項目（刪除、隱藏而底下有回覆）沒有內文與作者：沒有回覆要掛的直接略過。
 	const records = res.entries
 		.filter((e) => e.state === CommentState.VISIBLE || Number(e.replyCount) > 0)
 		.map(forumEntryFromWire);

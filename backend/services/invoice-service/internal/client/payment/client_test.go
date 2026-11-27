@@ -15,9 +15,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// fakePayment 是一個真的 gRPC server（跑在 bufconn 上），不是 stub interface 的假物件：
-// 只有真的過一趟 gRPC，「deadline 有沒有被設上」才驗得到——那個值是用 wire 上的
-// grpc-timeout header 傳的，換成 interface 假物件就完全測不到。
 type fakePayment struct {
 	pb.UnimplementedPaymentServiceServer
 
@@ -104,7 +101,6 @@ func TestGetPaymentFacts_FieldMapping(t *testing.T) {
 	if got.IsDuplicate {
 		t.Fatalf("is_duplicate 應為 false")
 	}
-	// PaidAt() 的 COALESCE：provider_paid_at 非 nil 時取它，不是 pay_time。
 	if !got.PaidAt().Equal(time.Date(2026, 8, 30, 1, 2, 3, 0, time.UTC)) {
 		t.Fatalf("PaidAt() = %v，want provider_paid_at", got.PaidAt())
 	}
@@ -188,20 +184,12 @@ func TestGetPaymentFacts_DownstreamErrorsNeverReturnZeroValue(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			// 🔴 payment 端**實際**回的形狀：gRPC status = OK，錯誤在 envelope 的 code。
-			// 8015 = TRANSACTION_NOT_FOUND_FOR_ORDER（GrpcResponseCode.java）。
-			// 只看 gRPC error 的 client 會拿到一個全零的 PaymentFactsData，
-			// PaidAt() 靜默退回本地時鐘——那正是這支 RPC 存在的理由要防的事。
 			name:    "envelope code=8015 ＋ 無 data（gRPC status 是 OK）",
 			srv:     &fakePayment{resp: &pb.GetPaymentFactsInternalResponse{Code: 8015, Message: "查無該訂單的交易"}},
 			wantIs:  ErrPaymentFactsNotFound,
 			wantErr: true,
 		},
 		{
-			// 🔴 code != 0 **且** data 非空：這一格才驗得到「client 真的讀了 code」。
-			// 只給「code != 0 ＋ 無 data」的話，拿掉 code 檢查之後 data==nil 那一條
-			// 仍會回同一個 ErrPaymentFactsNotFound ⇒ 測試照樣綠，鑑別力是假的
-			// （2026-08-30 實測過這個假綠）。
 			name: "envelope code=8015 ＋ data 非空（唯一驗得到 code 檢查的一格）",
 			srv: &fakePayment{resp: &pb.GetPaymentFactsInternalResponse{
 				Code: 8015, Message: "查無該訂單的交易",
@@ -251,7 +239,6 @@ func TestGetPaymentFacts_DownstreamErrorsNeverReturnZeroValue(t *testing.T) {
 			if tc.wantIs != nil && !errors.Is(err, tc.wantIs) {
 				t.Fatalf("errors.Is(err, %v) = false；err = %v", tc.wantIs, err)
 			}
-			// 陰性斷言：回 error 時不得同時交出一個看起來可用的值。
 			if err != nil && (got.TradeNo != "" || !got.PayTime.IsZero()) {
 				t.Fatalf("回 error 時仍交出了部分值：%+v", got)
 			}

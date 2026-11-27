@@ -90,7 +90,6 @@ public class SellerGrpcClient {
                     .batchGetSellerMeta(request);
             return response.getSellersMap();
         } catch (Exception e) {
-            // 降級：Seller Service 失敗不影響優惠券查詢
             log.error("SellerGrpcClient.batchGetSellerMeta.fail", "Seller Service 呼叫失敗，降級為空", e);
             return Collections.emptyMap();
         }
@@ -116,8 +115,6 @@ public class SellerGrpcClient {
                 .withDeadlineAfter(PRINCIPAL_RESOLVE_DEADLINE_SEC, TimeUnit.SECONDS)
                 .resolvePrincipals(request);
         if (response.getCode() != 0) {
-            // 非 0 code（業務碼錯誤，非 transport 失敗）同樣視為失敗、fail-closed，
-            // 避免呼叫端拿到空 map 後 getOrDefault 悄悄退化成錯誤比對（final review follow-up）
             throw Status.INTERNAL.withDescription(response.getMessage()).asRuntimeException();
         }
         return PrincipalResolution.of(response.getPrincipalsMap(), response.getUnresolvedIdsList());

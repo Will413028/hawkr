@@ -903,7 +903,6 @@ func (m Measure) RejectionCooldown() time.Duration {
 	return CooldownAfterRejections(n + 1)
 }
 
-// 以下是每個動作的前置條件，方法的檢查與 API 的 can_* 共用這一份。
 
 // MeasureActionUnavailableReason 是 admin 此刻不能修改措施（改理由、延長、縮短）或撤銷的原因。
 type MeasureActionUnavailableReason string
@@ -1009,7 +1008,6 @@ func ActionUnavailableText(reason MeasureActionUnavailableReason, action Measure
 	return uitext.Message{}
 }
 
-// frozenByRequest 是賣家已提出申覆（含已裁定）或有待處理的解除請求：提出申覆起凍結理由與延長，解除請求待處理期間凍結加重，縮短與解除不受限。
 func (m Measure) frozenByRequest() bool { return m.Appeal() != nil || m.PendingRemediation() != nil }
 
 // UpdateStatementUnavailableReasons 是 admin 此刻不能改給賣家的理由的原因，全部列出並依優先序：結構性的在前（已撤銷、已結束），最後是賣家的請求造成的
@@ -1031,8 +1029,6 @@ func (m Measure) UpdateStatementUnavailableReasons() []MeasureActionUnavailableR
 // CanUpdateStatement 判斷 admin 此刻能不能改給賣家的理由：沒有任何不能改的原因（UpdateStatementUnavailableReasons）。
 func (m Measure) CanUpdateStatement() bool { return len(m.UpdateStatementUnavailableReasons()) == 0 }
 
-// takedownRevokeOnly 補上內容下架在延長、縮短與結束的唯一結構性原因：未撤銷時是 CONTENT_TAKEDOWN_REVOKE_ONLY；已撤銷的只有 REVOKED（out 已帶），
-// 同終止合作，已經不能再撤銷，不再多說「只能撤銷」。
 func (m Measure) takedownRevokeOnly(out []MeasureActionUnavailableReason) []MeasureActionUnavailableReason {
 	if m.Status == MeasureStatusEnforced {
 		out = append(out, ActionReasonContentTakedownRevokeOnly)
@@ -1040,8 +1036,6 @@ func (m Measure) takedownRevokeOnly(out []MeasureActionUnavailableReason) []Meas
 	return out
 }
 
-// endTimeUnavailableReasons 是結束時間可調的結構性前置，全部列出並依優先序：已撤銷、內容下架（未撤銷時只能撤銷，其餘原因都不列）、警告（沒有結束時間）、終止合作（未撤銷時，要撤銷後重建）、停權不在生效中；
-// 空表示結構上可以調整。
 func (m Measure) endTimeUnavailableReasons() []MeasureActionUnavailableReason {
 	var out []MeasureActionUnavailableReason
 	if m.Status != MeasureStatusEnforced {
@@ -1066,7 +1060,7 @@ func (m Measure) endTimeUnavailableReasons() []MeasureActionUnavailableReason {
 // 造成的凍結；空表示可以延長。已結束的措施不能延長，再限制要另立措施。CanExtend 與 UpdateMeasure 的前置檢查、API 的 can_extend 都只看這一份。
 func (m Measure) ExtendUnavailableReasons() []MeasureActionUnavailableReason {
 	out := m.endTimeUnavailableReasons()
-	if m.frozenByRequest() && m.Kind != MeasureContentTakedown { // 內容下架沒有結束時間可延長，凍結不是它的原因
+	if m.frozenByRequest() && m.Kind != MeasureContentTakedown {
 		out = append(out, ActionReasonRequestPendingFrozen)
 	}
 	return out

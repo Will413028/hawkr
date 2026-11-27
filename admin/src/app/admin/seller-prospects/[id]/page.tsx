@@ -38,7 +38,7 @@ function statusBadgeVariant(status: ProspectStatus): BadgeVariant {
 		case ProspectStatus.CONVERTED:
 			return "info";
 		default:
-			return "gray"; // ARCHIVED 與未知值都算「不是進行中」，同列表頁的判斷
+			return "gray";
 	}
 }
 
@@ -152,7 +152,6 @@ export default function SellerProspectDetailPage() {
 	}
 
 	const lockNotice = buildLockNotice(prospect);
-	// 只有進行中的業者可以編輯、換圖與轉成店家；封存的可以還原，被合併的不能。
 	const canEdit = prospect.status === ProspectStatus.ACTIVE;
 	const canArchive = canEdit;
 	const canRestore =
@@ -181,7 +180,6 @@ export default function SellerProspectDetailPage() {
 					</div>
 				</div>
 				{(canArchive || canRestore) && (
-					// 兩者互斥，同一顆按鈕依當下狀態切換文案／icon，不必疊兩顆各自判斷。
 					<div className="detail-header-actions">
 						<Button
 							variant="outline"
@@ -205,9 +203,6 @@ export default function SellerProspectDetailPage() {
 			)}
 
 			{lockNotice?.tone === "success" ? (
-				// `.adm-authorization-notice`（DelegatedOperations.css）：icon 必須是
-				// 直接子層的圖示 svg，同 GovernanceNoticeBanner 自己 success 分支的形狀。
-				// 這個 class 沒有另外的 title／text 二段式樣式，所以標題用 <strong> 內嵌。
 				<div className="adm-authorization-notice" role="status">
 					<MaterialSymbol name={lockNotice.icon} />
 					<div>
@@ -252,8 +247,6 @@ export default function SellerProspectDetailPage() {
 			</div>
 
 			{canEdit && (
-				// `key={prospect.id}`：同一個 route 換到另一筆（例如從列表頁點另一列）不會整頁重新 mount，
-				// 沒有這個 key 的話上一筆的搜尋輸入與已選定的店家會帶到這一筆，讓人對著錯的業者按下確認。
 				<ConvertPanel
 					key={prospect.id}
 					prospect={prospect}

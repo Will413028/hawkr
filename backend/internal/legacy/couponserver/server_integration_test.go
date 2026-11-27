@@ -22,7 +22,6 @@ import (
 
 var pg *testdb.Server
 
-// 買家看得到的原因不可以帶分類前綴（"failed_precondition: …"）。
 func requireNoKindPrefix(t *testing.T, msg string) {
 	t.Helper()
 	for _, k := range []string{"failed_precondition", "not_found", "invalid_input", "already_exists", "internal"} {
@@ -71,7 +70,6 @@ func setup(t *testing.T) *fixture {
 	return &fixture{t: t, db: d, m: m, srv: New(m, slog.New(slog.NewTextHandler(io.Discard, nil)))}
 }
 
-// campaign 建立並發布 admin 的全平台現金折抵 100 的活動；threshold 是門檻。
 func (f *fixture) campaign(threshold int64) coupon.Campaign {
 	f.t.Helper()
 	c, err := f.m.CreateCampaign(context.Background(), coupon.CreateCampaignInput{
@@ -195,7 +193,6 @@ func TestValidateMapsTemplateToTheBuyersVoucher(t *testing.T) {
 			t.Fatalf("%s：code = %d，要 400", name, r.GetCode())
 		}
 	}
-	// 不存在的活動：買家在該活動沒有券，同樣是未領取，不是通過。
 	if r := f.validate(uuid.New().String(), buyer1, "501", "1000"); r.GetCode() != 7011 {
 		t.Fatalf("不存在的活動 code = %d，要 7011", r.GetCode())
 	}
@@ -361,18 +358,16 @@ func TestReleaseByOrderNoIsIdempotentWithoutInstanceID(t *testing.T) {
 	if got := f.status(v.ID); got != "AVAILABLE" {
 		t.Fatalf("釋放後狀態 = %s，要 AVAILABLE", got)
 	}
-	// 回應遺失後的重送：沒有 instance_id。
 	if r := f.release("ORDER-R", ""); !r.GetSuccess() {
 		t.Fatalf("重送要成功：%+v", r)
 	}
-	f.lock(v, "ORDER-R2") // 釋放後別的訂單鎖得住
+	f.lock(v, "ORDER-R2")
 	if r := f.release("ORDER-R", ""); !r.GetSuccess() {
 		t.Fatalf("舊訂單的第三次重送要成功：%+v", r)
 	}
 	if got := f.status(v.ID); got != "LOCKED" {
 		t.Fatalf("舊訂單的重送不可以解開新訂單的鎖：%s", got)
 	}
-	// 回應遺失、訂單沒有 instance id 的情形：只有 order_no 也要釋得掉。
 	v2 := f.claim(c, buyer2)
 	f.lock(v2, "ORDER-R4")
 	if r := f.release("ORDER-R4", ""); !r.GetSuccess() {

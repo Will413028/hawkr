@@ -61,8 +61,6 @@ export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
 		queryFn: accountQueryFn(status, () => fetchOrderInvoice(orderNo)),
 		enabled: orderNo.length > 0,
 		refetchOnWindowFocus: true,
-		// 9301 是「這筆訂單沒有發票」——零元訂單天天都有，上報它等於把正常狀態
-		// 灌進 Sentry。
 		meta: { isExpectedError: isNotApplicable },
 	});
 

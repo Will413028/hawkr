@@ -99,7 +99,6 @@ public class SellerGrpcClient {
             GetSellerBatchRequest request = GetSellerBatchRequest.newBuilder()
                     .addAllStoreIds(storeIds)
                     .build();
-            // 不能挪到建構子——理由見 PRINCIPAL_RESOLVE_DEADLINE_SEC 的最後一段。
             SellerBatchResponse response = sellerStub
                     .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                     .getSellerBatch(request);
@@ -145,8 +144,6 @@ public class SellerGrpcClient {
             ResolvePrincipalsRequest request = ResolvePrincipalsRequest.newBuilder()
                     .addAllIds(List.of(storeId))
                     .build();
-            // issue #2294 P1-C：deadline 必須在**每次呼叫時**套用（絕對時間以此刻起算），
-            // 不能挪到建構子——理由見 PRINCIPAL_RESOLVE_DEADLINE_SEC 的最後一段。
             ResolvePrincipalsResponse response = sellerStub
                     .withDeadlineAfter(PRINCIPAL_RESOLVE_DEADLINE_SEC, TimeUnit.SECONDS)
                     .resolvePrincipals(request);
@@ -156,7 +153,6 @@ public class SellerGrpcClient {
             PrincipalResolution resolution =
                     PrincipalResolution.of(response.getPrincipalsMap(), response.getUnresolvedIdsList());
             if (resolution.isUnresolved(storeId)) {
-                // 單體的 store_id 與 account_id 是兩個序列：沒有解析到就沒有收件人，不能拿 store_id 冒充 account_id。
                 log.warn("SellerGrpcClient.resolveAccountIdForStore.unresolved",
                         "store_id 查無存活店家（已關閉或不存在），該筆通知的 seller_account_id 帶 0",
                         "storeId", String.valueOf(storeId));

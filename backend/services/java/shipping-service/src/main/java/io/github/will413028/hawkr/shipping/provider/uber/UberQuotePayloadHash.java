@@ -101,7 +101,6 @@ public final class UberQuotePayloadHash {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(md.digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
-            // SHA-256 是 JDK 必備演算法；走到這裡代表 runtime 被改過。
             throw new IllegalStateException("SHA-256 不可用", e);
         }
     }

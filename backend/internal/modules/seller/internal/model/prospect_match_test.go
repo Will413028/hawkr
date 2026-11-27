@@ -12,7 +12,6 @@ func TestContactMatchKey(t *testing.T) {
 		want     []string
 	}{
 		{
-			// 匯入來源實測：email 有 541 筆、電話有 48 筆是「待確認」。不排除會讓這幾百筆共用同一個鍵，被比對成同一家業者。
 			name:     "佔位值一律視為沒有這個鍵",
 			contacts: []ContactPoint{{Kind: ContactEmail, Value: "待確認"}, {Kind: ContactPhone, Value: "待確認"}, {Kind: ContactWebsite, Value: "N/A"}},
 			want:     []string{},
@@ -43,7 +42,6 @@ func TestContactMatchKey(t *testing.T) {
 			want:     []string{"DOMAIN:taiwan9.com.tw"},
 		},
 		{
-			// 匯入來源 CRM1 的 454 筆連結全落在社群網域（threads.com 347、facebook.com 107）。用網域當鍵會把 347 家併成一家。
 			name:     "社群網域絕不可成為 match_domain，改抽 handle",
 			contacts: []ContactPoint{{Kind: ContactWebsite, Value: "https://www.threads.com/@tree_egg_"}},
 			want:     []string{"SOCIAL:threads:tree_egg_"},

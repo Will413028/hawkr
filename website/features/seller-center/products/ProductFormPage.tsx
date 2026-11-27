@@ -49,17 +49,12 @@ export default function ProductFormPage({ mode, productId }: Props) {
 		Parameters<typeof form.submit>[0] | null
 	>(null);
 
-	// Jump to a step and reset scroll so the new step starts at the top
-	// (mobile only — desktop never changes `step`).
 	const goToStep = (next: number) => {
 		setStep(Math.min(LAST_STEP, Math.max(1, next)));
 		if (typeof window !== "undefined") window.scrollTo({ top: 0 });
 	};
 
 	if (form.loading) {
-		// Skeleton silhouette mirroring the real form (header + stacked section
-		// cards) so the loading state fills the column instead of collapsing
-		// into a single line. Matches the coupon form's loading rhythm.
 		return (
 			<div
 				className="mx-auto w-full max-w-[1200px] px-5 pt-6 pb-[calc(120px+var(--hkui-space-6))]"
@@ -107,11 +102,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 		mode,
 		Number(form.draft.status ?? 0),
 	);
-	// 上架中(=1)：內容不可改，但不再擋整頁；改以頂部可切換狀態 + 表單毛玻璃鎖住呈現。
 	const locked = mode === "edit" && Number(form.draft.status ?? 0) === 1;
-	// 編輯草稿／下架商品時，桌機可並排顯示「只儲存」與「儲存並上架」；手機底列
-	// 空間不足，因此延續桌機的視覺優先順序：實心的上架操作直接顯示，另一個動作
-	// 收入「其他儲存方式」。兩個 action 仍沿用 adapter 回傳值，不在 UI 猜狀態。
 	const mobileProminentAction = secondary ?? primary;
 	const mobileAlternateAction = secondary ? primary : null;
 	const submitFromButton = async (
@@ -121,7 +112,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 		setPendingSubmitAction(action);
 		try {
 			const succeeded = await form.submit(action);
-			// 成功後保留 loading，直到導頁卸載；驗證未過或失敗才恢復操作。
 			if (!succeeded) setPendingSubmitAction(null);
 		} catch (error) {
 			setPendingSubmitAction(null);
@@ -129,7 +119,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 		}
 	};
 
-	// 頂部狀態切換：下架就地重整轉可編輯；上架等同「儲存並上架」（存目前欄位後上架）。
 	const handleShelfToggle = (target: "4003" | "4004") => {
 		if (target === "4003") {
 			void form.unshelf();
@@ -154,7 +143,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 						{mode === "edit" ? "編輯商品" : "新增商品"}
 					</h1>
 					{mode === "edit" ? (
-						// 一律可點：上架中按一下即下架（解鎖表單），下架/草稿按一下即上架。
 						<ShelfStatusControl
 							status={form.draft.status}
 							className="product-form__status-control"
@@ -176,7 +164,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 				</p>
 			</header>
 
-			{/* Mobile-only step indicator. Hidden ≥961px where the full form shows. */}
+
 			<ol className="min-[961px]:hidden flex items-center gap-1.5 mb-4 list-none p-0">
 				{WIZARD_STEPS.map((s) => {
 					const active = s.step === step;
@@ -219,7 +207,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 				{locked && <LockedOverlay />}
 			</div>
 
-			{/* Desktop toolbar — full action set, hidden on the mobile wizard. */}
+
 			<div
 				className="max-[960px]:hidden fixed left-0 right-0 bottom-0 bg-hk-surface-card border-t border-hk-border-soft shadow-hk-lift px-5 py-3 flex gap-4 justify-between items-center z-[var(--z-sticky)] dark:bg-white/4 dark:border-[#f5dea5]/14"
 				role="toolbar"
@@ -241,7 +229,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 					>
 						{locked ? "返回" : "取消"}
 					</Button>
-					{/* 上架中內容鎖住，儲存鈕無意義 — 隱藏，改由頂部狀態切換下架解鎖。 */}
+
 					{!locked && (
 						<>
 							<Button
@@ -272,7 +260,7 @@ export default function ProductFormPage({ mode, productId }: Props) {
 				</div>
 			</div>
 
-			{/* Mobile wizard step nav — prev/next, final step exposes submit. */}
+
 			<div
 				className="product-form__mobile-toolbar min-[961px]:hidden fixed left-0 right-0 bottom-0 z-[var(--z-sticky)] bg-hk-surface-card border-t border-hk-border-soft shadow-hk-lift px-4 py-3 flex items-center gap-3 dark:bg-white/4 dark:border-[#f5dea5]/14"
 				role="toolbar"

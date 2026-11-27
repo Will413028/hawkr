@@ -214,7 +214,6 @@ func TestAnotherBuyersSessionIsNotFound(t *testing.T) {
 	}
 }
 
-// flakySessions 的 Create 失敗一次。
 type flakySessions struct {
 	session.Service
 	mu   sync.Mutex
@@ -244,7 +243,6 @@ func TestFailedSessionWriteReleasesTheGuardAndTheWaitGroup(t *testing.T) {
 	if n != 0 {
 		t.Fatalf("失敗後還有 %d 個佔用", n)
 	}
-	// wg 也要放掉：否則 Shutdown 會卡到逾時。
 	ctx, cancel := context.WithTimeout(context.Background(), 5_000_000_000)
 	defer cancel()
 	if err := e.Shutdown(ctx); err != nil {

@@ -9,24 +9,11 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔守一件在 2026-09-05 之前**沒有任何東西看得見**的事：
-// 賣家按下「申請延長期限」之後，那筆申請只存在於 invoice_status_history，
-// 而 A03 的 DTO 沒有任何一欄承載它 ⇒ ADM 不知道該按「核准展延」，
-// 賣家也看不出送出去了沒（dev 實測一筆掛了兩天）。
-//
-// 三個斷言方向缺一不可：
-//   ① 有待裁決的申請 ⇒ 回得出來（含理由，那是 ADM 唯一的判斷依據）
-//   ② **已核准過（extension_count=1）⇒ 不得回**——只驗 ① 的測試對
-//      「無條件回最新那列」這個實作完全無感，而那個實作會讓已經准過的申請
-//      永遠掛在 A03 上，ADM 每次都以為還有人在等
-//   ③ 稽核表讀失敗 ⇒ 降級成 nil 而不是把整頁打爆
 
-// fakeHistoryAudit 只實作 ListStatusHistory；鑑別力來自它**拒絕**錯的 subject。
 type fakeHistoryAudit struct {
 	domain.AuditRepository
 	rows []domain.StatusHistoryEntry
 	err  error
-	// gotSubject 記下被查的 (type,id)，用來證明呼叫端沒有拿別人的歷程當答案。
 	gotSubjectType string
 	gotSubjectID   int64
 }
@@ -55,8 +42,6 @@ func TestPendingTaxExtensionRequest(t *testing.T) {
 	rows := []domain.StatusHistoryEntry{
 		historyRow(taxReasonExtensionRequested, "會計師還在準備文件", base),
 		historyRow(other, "", base.Add(time.Hour)),
-		// 最新的那一筆才是待裁決的那筆：ListStatusHistory 是 occurred_at ASC，
-		// 由前往後找會取到已經被別筆取代的舊理由。
 		historyRow(taxReasonExtensionRequested, "字軌配號作業中", base.Add(2*time.Hour)),
 	}
 
@@ -79,8 +64,6 @@ func TestPendingTaxExtensionRequest(t *testing.T) {
 		}
 	})
 
-	// 🔴 陰性斷言：這一格是「只有待裁決才顯示」這個保證的本體。
-	// 拿掉 ExtensionCount 那道守衛時，只有本子測會轉紅。
 	t.Run("已核准過（extension_count=1）：不得回", func(t *testing.T) {
 		q := &Query{audit: &fakeHistoryAudit{rows: rows}}
 		if got := q.PendingTaxExtensionRequest(context.Background(),

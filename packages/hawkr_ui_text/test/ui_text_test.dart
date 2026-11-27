@@ -76,7 +76,6 @@ void main() {
       ),
       '生效中',
     );
-    // 「停權中」只由 SUSPENSION 選出；內容下架的狀態是 ISSUED，萬一是 ACTIVE 也不能顯示成停權中。
     expect(
       MeasureState.MEASURE_STATE_ACTIVE.uiText(
         UiLocale.zhTW,
@@ -129,8 +128,6 @@ void main() {
     }
   });
 
-  // golden 沒有 en 的 plural 分支（en 目錄是空的）；這裡確認生成碼依賴的 Intl.pluralLogic 行為。
-  // zh 的 plural 只有 other（生成器擋下其他分支），所以生成碼對 zh 不呼叫 pluralLogic（intl 對 zh 仍會回 one，不能依賴它）。
   test('Intl.pluralLogic：en 的 1 是 one', () {
     String en(int n) =>
         Intl.pluralLogic(n, one: 'one', other: 'other', locale: 'en');

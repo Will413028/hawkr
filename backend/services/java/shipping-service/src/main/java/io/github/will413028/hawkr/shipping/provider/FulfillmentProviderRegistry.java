@@ -42,24 +42,12 @@ public class FulfillmentProviderRegistry {
             }
             FulfillmentProviderAdapter previous = map.put(method.value(), adapter);
             if (previous != null) {
-                // 🔴 撞號必須立刻爆開機，不能靜默取其中一個：
-                // 兩個 adapter 宣告同一個配送方式時，「哪一個生效」取決於 bean 掃描順序，
-                // 那是一個不可預測、且在測試環境與 prod 可能不同的行為。
                 throw new IllegalStateException("配送方式 " + method.value() + " 有兩個 adapter 宣告支援："
                         + previous.getClass().getName() + " 與 " + adapter.getClass().getName());
             }
         }
         this.byMethodValue = Map.copyOf(map);
 
-        // 🔴 開機列出實際註冊了哪些 provider。
-        //
-        // 為什麼需要這一行：本 registry 的兩道 fail-fast（supportedMethod() 回 null、撞號）
-        // 都只在「有東西不對」時出聲，**沒有註冊到任何 adapter 一樣會安靜地開機成功**——
-        // 症狀要等到某個賣家按下叫件、拿到 FULFILLMENT_PROVIDER_NOT_ENABLED 才浮現。
-        // 「開機成功」證明的是沒有撞號，不是有註冊；這一行才讓後者可查證。
-        //
-        // ⚠️ 印的是 adapter 的 simple name 不只是配送方式碼：接新 provider 時真正要確認的是
-        // 「3001 現在由誰承接」，只印碼值看不出換人了沒。
         StringBuilder wired = new StringBuilder();
         byMethodValue.forEach((methodValue, adapter) -> {
             if (wired.length() > 0) {
@@ -67,9 +55,6 @@ public class FulfillmentProviderRegistry {
             }
             wired.append(methodValue).append("=").append(adapter.getClass().getSimpleName());
         });
-        // ⚠️ ObsLogger 只收單一 bzCol/bzValue 對，所以數量併進訊息本體。
-        // ⚠️ 第一個參數是 ObsLogger 的 result 段，不是完整 event 名——它自己會補
-        //    ClassName.method 前綴。傳完整名會得到 "X.<init>.X.init.ok" 這種重複。
         log.info("init.ok",
                 "履約 provider adapter 註冊完成，共 " + byMethodValue.size() + " 個",
                 "wired", wired.toString());

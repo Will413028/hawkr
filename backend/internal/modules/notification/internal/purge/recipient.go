@@ -37,7 +37,6 @@ func (a RecipientArgs) validate() error {
 	return nil
 }
 
-// scope 把 job 參數轉成查詢的收件人範圍：NULL 表示不限。
 func (a RecipientArgs) scope() (audience *string, storeID *int64) {
 	if a.Audience != "" {
 		audience = &a.Audience
@@ -75,7 +74,6 @@ func (s *Service) Recipient(ctx context.Context, a RecipientArgs) error {
 		}
 	}
 	if a.StoreID > 0 {
-		// 偏好是 (帳號, 受眾) 的、沒有店別；一間店退場時，同帳號可能已重開另一間店，整組 STORE 偏好不能刪。
 		return nil
 	}
 	err := store.New(s.d.DB.Conn(ctx)).DeleteAccountPreferenceOverrides(ctx, store.DeleteAccountPreferenceOverridesParams{AccountID: a.AccountID, Audience: audience})

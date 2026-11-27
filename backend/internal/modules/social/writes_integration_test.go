@@ -33,19 +33,16 @@ func TestSD4ReplyTargetMustBeReadableAndOnTheSamePost(t *testing.T) {
 	if r1.ParentID == nil || *r1.ParentID != top.ID || r1.ReplyToID == nil || *r1.ReplyToID != top.ID {
 		t.Fatalf("沒給 reply_to 時是父留言：%+v", r1)
 	}
-	// 回覆的父是回覆：壓成頂層。
 	r2 := mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p1.ID, Body: "回回覆", ParentID: &r1.ID, ReplyToID: &r1.ID}))
 	if *r2.ParentID != top.ID || *r2.ReplyToID != r1.ID {
 		t.Fatalf("父壓成頂層、reply_to 保留：%+v", r2)
 	}
-	// 別篇的留言。
 	if _, err := f.module.CreateComment(ctx, store, social.CommentInput{PostID: p1.ID, Body: "x", ParentID: &top.ID, ReplyToID: &other.ID}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("reply_to 指向別篇：%v", err)
 	}
 	if _, err := f.module.CreateComment(ctx, store, social.CommentInput{PostID: p1.ID, Body: "x", ParentID: &other.ID}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("父是別篇的留言：%v", err)
 	}
-	// 已刪除與被隱藏的目標。
 	must(t, f.module.DeleteComment(ctx, store, r2.ID, 0))
 	if _, err := f.module.CreateComment(ctx, store, social.CommentInput{PostID: p1.ID, Body: "x", ParentID: &top.ID, ReplyToID: &r2.ID}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("reply_to 已刪除：%v", err)
@@ -55,7 +52,6 @@ func TestSD4ReplyTargetMustBeReadableAndOnTheSamePost(t *testing.T) {
 	if _, err := f.module.CreateComment(ctx, store, social.CommentInput{PostID: p1.ID, Body: "x", ParentID: &top.ID}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("父留言被隱藏（reply_to 預設是父）：%v", err)
 	}
-	// 回覆只限貼文所屬的店；reply_to 沒有父。
 	other2, _ := f.exposableStore(t)
 	if _, err := f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p1.ID, Body: "x", ParentID: &r1.ID}); kindOf(err) != apperr.KindPermissionDenied {
 		t.Fatalf("買家不能回覆：%v", err)
@@ -86,7 +82,6 @@ func TestSD5DeleteIsIdempotent(t *testing.T) {
 	if got := mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID)); got.Stats.Comments != 0 {
 		t.Fatalf("連刪兩次只扣一次，不會變負數：%d", got.Stats.Comments)
 	}
-	// 貼文重複刪除。
 	must(t, f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0))
 	f.jobs.reset()
 	if err := f.module.DeleteOwnPost(ctx, f.store(t, storeID), p.ID, 0); kindOf(err) != apperr.KindNotFound {
@@ -95,7 +90,6 @@ func TestSD5DeleteIsIdempotent(t *testing.T) {
 	if len(f.jobs.revalidations()) != 0 {
 		t.Fatal("重複刪除貼文不做副作用")
 	}
-	// 別人的留言不能刪；店家只能刪自己貼文底下的。
 	p2 := f.publishedPost(t, storeID, "二")
 	c2 := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p2.ID, Body: "x"}))
 	if err := f.module.DeleteComment(ctx, f.asBuyer(f.newBuyer(t)), c2.ID, 0); kindOf(err) != apperr.KindPermissionDenied {
@@ -134,7 +128,6 @@ func TestSD6ProfanityFilterCoversEveryWritePath(t *testing.T) {
 	if _, err := f.module.UpdateForumEntry(ctx, f.asBuyer(b), e.ID, 1, bad); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("編輯討論區留言：%v", err)
 	}
-	// 空白與長度。
 	for _, body := range []string{"", "  \t　 ", strings.Repeat("字", 2201)} {
 		if _, err := f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: body}); kindOf(err) != apperr.KindInvalidInput {
 			t.Fatalf("留言 %q：%v", body, err)
@@ -143,7 +136,6 @@ func TestSD6ProfanityFilterCoversEveryWritePath(t *testing.T) {
 	if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: strings.Repeat("字", 2201)}, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("貼文太長：%v", err)
 	}
-	// 上限（Will 2026-10-23）：貼文、留言、討論區留言各 2200 個字元，剛好 2200 通過。
 	full := strings.Repeat("字", 2200)
 	mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: full}))
 	mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: full}))
@@ -176,13 +168,11 @@ func TestSD8PostPublishedFiresOnPublishNotOnDraft(t *testing.T) {
 	if len(published) != 1 || published[0].PostID != draft.ID || published[0].StoreID != storeID || published[0].Preview != "草稿" {
 		t.Fatalf("發布才發：%+v", published)
 	}
-	// DR-A2：已經公開時再發布是 no-op：不寫入（version、updated_at 不變）、不發事件、published_at 不變。
 	f.advance(3600e9)
 	again := mustV[social.Post](t)(f.module.PublishPost(ctx, st, pub.ID, pub.Version, nil))
 	if len(published) != 1 || again.Version != pub.Version || !again.PublishedAt.Equal(*pub.PublishedAt) || !again.UpdatedAt.Equal(pub.UpdatedAt) {
 		t.Fatalf("已經公開再發布是 no-op：%d %+v %+v", len(published), pub, again)
 	}
-	// 下架不清 published_at；下架後再發布是新的公開（再發事件），但 published_at 沿用第一次（動態牆不能靠下架再發布來洗）。
 	f.advance(3600e9)
 	down := mustV[social.Post](t)(f.module.UnpublishPost(ctx, st, again.ID, again.Version, nil))
 	if down.Status != social.StatusUnpublished || down.PublishedAt == nil || !down.PublishedAt.Equal(*pub.PublishedAt) {
@@ -196,12 +186,10 @@ func TestSD8PostPublishedFiresOnPublishNotOnDraft(t *testing.T) {
 	if re.Status != social.StatusPublished || re.PublishedAt == nil || !re.PublishedAt.Equal(*pub.PublishedAt) || re.Version != down.Version+1 {
 		t.Fatalf("再發布沿用第一次的 published_at：first %v, now %+v", pub.PublishedAt, re)
 	}
-	// 直接以發布建立也發。
 	f.publishedPost(t, storeID, "直接發布")
 	if len(published) != 3 {
 		t.Fatalf("直接發布建立：%d", len(published))
 	}
-	// 草稿不能下架；公開要件。
 	d2 := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "草稿二"}, nil))
 	if _, err := f.module.UnpublishPost(ctx, st, d2.ID, d2.Version, nil); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("草稿不能下架：%v", err)
@@ -257,7 +245,6 @@ func TestSD24ProductIsVerifiedOnWrite(t *testing.T) {
 			t.Fatalf("更新商品 %s：%v", bad, err)
 		}
 	}
-	// 之後商品下架：讀取不重驗。
 	delete(f.products.owner, p7)
 	if got := mustV[social.Post](t)(f.module.OwnPost(ctx, storeID, p.ID)); got.ProductID == nil {
 		t.Fatal("讀取時不重驗商品")
@@ -308,7 +295,6 @@ func TestHashtagsAreAReplaceableValueSet(t *testing.T) {
 	if len(p.Hashtags) != 2 || p.Hashtags[0].Name != "fruit" || p.Hashtags[0].Display != "Fruit" || p.Hashtags[1].Name != "水果" {
 		t.Fatalf("正規化與去重（保留第一次出現的樣子與順序）：%+v", p.Hashtags)
 	}
-	// 不帶 Hashtags 保留；帶空集合清空；帶新集合取代。
 	p = mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("改")}, nil))
 	if len(p.Hashtags) != 2 {
 		t.Fatalf("nil 保留：%+v", p.Hashtags)
@@ -359,13 +345,12 @@ func TestPostWritesUseVersionCAS(t *testing.T) {
 	if got := mustV[social.Post](t)(f.module.OwnPost(ctx, storeID, p.ID)); got.Body != "新文" {
 		t.Fatalf("衝突不寫入：%q", got.Body)
 	}
-	if _, err := f.module.UpdatePost(ctx, f.store(t, otherID), social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("偷改")}, nil); kindOf(err) != apperr.KindPermissionDenied { // SD26：別家已發布的貼文回 PermissionDenied
+	if _, err := f.module.UpdatePost(ctx, f.store(t, otherID), social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("偷改")}, nil); kindOf(err) != apperr.KindPermissionDenied {
 		t.Fatalf("別家店：%v", err)
 	}
 	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Body: ptr("沒帶版本")}, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("沒帶版本：%v", err)
 	}
-	// 已發布的貼文被編輯後仍要滿足公開要件。
 	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: up.Version, Body: ptr("")}, nil); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("已發布的貼文內文不能清空：%v", err)
 	}
@@ -406,17 +391,14 @@ func TestStoreWritesAreGatedByCapabilities(t *testing.T) {
 	if _, err := f.module.LikeComment(ctx, sc, c.ID); kindOf(err) != apperr.KindPermissionDenied {
 		t.Fatalf("停權的店對留言按讚：%v", err)
 	}
-	// 收縮型的動作停權時仍可：刪除別人的留言（貼文所屬的店）與下架自己的貼文。
 	must(t, f.module.DeleteComment(ctx, sc, c.ID, 0))
 	if _, err := f.module.UnpublishPost(ctx, suspended, p.ID, p.Version, nil); err != nil {
 		t.Fatalf("停權時仍可下架自己的貼文：%v", err)
 	}
-	// 隨帳號刪除中的店不能做經營類的事（前置條件沒有滿足）。
 	f.exec(t, "UPDATE seller.stores SET status = 'PENDING_DELETION' WHERE store_id = $1", storeID)
 	if _, err := f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "x"}, nil); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("等待刪除的店不能建立貼文：%v", err)
 	}
-	// 沒有推導過條件的店一律拒絕（fail-closed）。
 	if _, err := f.module.CreatePost(ctx, seller.Store{Profile: live.Profile, StoreID: live.StoreID, AccountID: live.AccountID}, social.CreatePostInput{Body: "x"}, nil); err == nil {
 		t.Fatal("沒有推導過條件的店要拒絕")
 	}
@@ -455,7 +437,6 @@ func TestPostImageReplacementConfirmsTheNewAssetAndMarksTheOldDeleted(t *testing
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
 	st := f.store(t, storeID)
-	// 草稿：已發布的貼文必須有 1 張照片，不能清掉圖。
 	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ImageToken: "first"}, nil))
 	first := f.postAsset(t, p.ID)
 	if got := f.assetState(t, first); got != "ACTIVE" {
@@ -472,7 +453,6 @@ func TestPostImageReplacementConfirmsTheNewAssetAndMarksTheOldDeleted(t *testing
 	if got := f.assetState(t, first); got != "DELETING" {
 		t.Fatalf("舊資產 state=%s，預期 DELETING", got)
 	}
-	// 清掉圖：目前的資產標為刪除。
 	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: up.Version, ClearImage: true}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -558,14 +538,12 @@ func TestHashtagPublishedAtIsACopyOfThePost(t *testing.T) {
 	if n := f.scalar(t, `SELECT count(*) FROM social.post_hashtags WHERE post_id = $1 AND published_at = $2`, pub.ID, *pub.PublishedAt); n != 2 || mismatch() != 0 {
 		t.Fatalf("第一次發布寫進所有標籤列：%d，不一致 %d", n, mismatch())
 	}
-	// 已發布的貼文換一組標籤：新列帶入貼文的值。
 	tags := []string{"蔬菜", "fruit", "organic"}
 	f.advance(3600e9)
 	upd := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: pub.ID, Version: pub.Version, Body: ptr("改"), Hashtags: &tags}, nil))
 	if n := f.scalar(t, `SELECT count(*) FROM social.post_hashtags WHERE post_id = $1`, pub.ID); n != 3 || mismatch() != 0 {
 		t.Fatalf("已發布貼文的新標籤列帶入貼文的 published_at：%d，不一致 %d", n, mismatch())
 	}
-	// 下架再發布：貼文與標籤列都沿用第一次。
 	f.advance(3600e9)
 	down := mustV[social.Post](t)(f.module.UnpublishPost(ctx, st, upd.ID, upd.Version, nil))
 	f.advance(3600e9)
@@ -573,13 +551,11 @@ func TestHashtagPublishedAtIsACopyOfThePost(t *testing.T) {
 	if !re.PublishedAt.Equal(*pub.PublishedAt) || mismatch() != 0 {
 		t.Fatalf("再發布沿用第一次：%v／%v，不一致 %d", re.PublishedAt, pub.PublishedAt, mismatch())
 	}
-	// 標籤列表的順序與貼文的 published_at 一致（先發布的在後）。
 	later := f.publishedPost(t, storeID, "較晚", "organic")
 	page := mustV[social.PostPage](t)(f.module.ListHashtagPosts(ctx, social.Caller{}, "organic", nil, 10))
 	if len(page.Posts) != 2 || page.Posts[0].ID != later.ID || page.Posts[1].ID != pub.ID {
 		t.Fatalf("標籤的貼文依發布時間由新到舊：%+v", page.Posts)
 	}
-	// 貼文的 published_at 發布後不能改（複本才不需要同步）。
 	if _, err := f.db.Conn(ctx).Exec(ctx, `UPDATE social.posts SET published_at = published_at + interval '1 hour' WHERE id = $1`, pub.ID); err == nil {
 		t.Fatal("published_at 發布後改動要被擋下")
 	}

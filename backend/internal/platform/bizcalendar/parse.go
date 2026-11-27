@@ -95,7 +95,6 @@ func ParseOfficeCalendar(year int, content string) ([]Day, error) {
 	return out, nil
 }
 
-// readError 把 csv.Reader 的錯誤換成繁體中文的訊息；表頭列（isHeader）欄數不對視為表頭不合。
 func readError(err error, record []string, bad func(int, string, ...any) error, isHeader bool) error {
 	var pe *csv.ParseError
 	if !errors.As(err, &pe) {
@@ -112,7 +111,6 @@ func readError(err error, record []string, bad func(int, string, ...any) error, 
 	}
 }
 
-// parseCompactDate 解析恰好 8 位數字的 YYYYMMDD；time.Parse 會拒絕不存在的日期（2 月 30 日）。
 func parseCompactDate(s string) (time.Time, error) {
 	if len(s) != 8 {
 		return time.Time{}, fmt.Errorf("length")

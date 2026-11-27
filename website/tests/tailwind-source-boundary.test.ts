@@ -10,8 +10,6 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const GLOBALS = join(ROOT, "styles/globals.css");
 const RUNTIME_ROOTS = ["app", "components", "features", "lib"] as const;
 
-// If automatic repository scanning is accidentally restored, this test file is
-// itself a source candidate and this otherwise-unused color will enter the CSS.
 const TEST_ONLY_SENTINEL = "bg-[#010203]";
 
 let compiledGlobals: Promise<Result> | undefined;

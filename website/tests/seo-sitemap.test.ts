@@ -7,10 +7,8 @@ import { __setPublishedLocalesForTest } from "../lib/intl/locales";
 import { INDEXABLE_STATIC_ROUTES, isIndexable } from "../lib/seo/indexability";
 import { siteUrl } from "../lib/seo/urls";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-// The prod flavor requires its own web origin (NEXT_PUBLIC_WEB_ORIGIN); these cases describe a deployment at this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://example.com";
 
 function reset() {
@@ -29,8 +27,6 @@ test("static sitemap covers exactly the indexable static routes", () => {
 test("home entry is absolute and top priority", () => {
 	__setEnvForTest(null);
 	__setFlavorForTest("prod");
-	// absoluteUrl("/") is the bare origin (no trailing slash) so the home entry
-	// matches the root canonical Next.js renders — keeps sitemap/canonical aligned.
 	const home = staticSitemapEntries().find(
 		(e) => e.url === "https://example.com",
 	);
@@ -40,8 +36,6 @@ test("home entry is absolute and top priority", () => {
 });
 
 test("static entries carry no lastModified the content does not own", () => {
-	// Prod served 13 identical build-time stamps; a date that is not the page's
-	// own is noise, so the static entries omit the field altogether.
 	__setEnvForTest(null);
 	__setFlavorForTest("prod");
 	for (const e of staticSitemapEntries()) {
@@ -122,10 +116,8 @@ test("once en is published for the buyer surface, its platform pages enter the s
 		const urls = entries.map((e) => e.url);
 		assert.ok(urls.includes(`${origin()}/en`), "en home");
 		assert.ok(urls.includes(`${origin()}/en/faq`), "en faq");
-		// UGC: the zh-TW entry stays, the en entry is left out (noindex there)
 		assert.ok(urls.includes(`${origin()}/feed`));
 		assert.equal(urls.includes(`${origin()}/en/feed`), false);
-		// the seller surface has not published en
 		assert.equal(urls.includes(`${origin()}/en/seller`), false);
 		assert.equal(urls.includes(`${origin()}/en/seller/pricing`), false);
 		const faq = entries.find((e) => e.url === `${origin()}/en/faq`);
@@ -134,7 +126,6 @@ test("once en is published for the buyer surface, its platform pages enter the s
 			en: `${origin()}/en/faq`,
 			"x-default": `${origin()}/faq`,
 		});
-		// every listed URL is itself indexable in its own locale (purity)
 		for (const e of entries) {
 			const { pathname } = new URL(e.url);
 			const isEn = pathname === "/en" || pathname.startsWith("/en/");

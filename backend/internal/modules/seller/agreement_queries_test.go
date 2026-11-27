@@ -29,7 +29,6 @@ func TestAgreementAcceptancesAreAppendOnly(t *testing.T) {
 		}
 		for _, loc := range update.FindAllIndex(body, -1) {
 			stmt := string(body[loc[0]:loc[1]])
-			// 往前找這條語句所屬的 query 名稱。
 			names := regexp.MustCompile(`(?m)^-- name: (\w+)`).FindAllStringSubmatch(string(body[:loc[0]]), -1)
 			if len(names) == 0 || names[len(names)-1][1] != "PurgeAgreementSources" {
 				t.Errorf("%s 有不在允許清單的 UPDATE：%q", f, stmt)

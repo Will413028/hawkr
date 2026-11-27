@@ -1,8 +1,5 @@
 //go:build !integration
 
-// statementOf 住在 fail_reason_visibility_test.go，那一檔是 `!integration` ⇒
-// 本檔必須掛同一個 tag，否則 `go vet -tags integration` 會找不到它而編譯不過
-// （§17.4.1 的第四道 gate；本檔第一次提交時就是這樣被 lefthook 擋下來的）。
 
 package usecase
 
@@ -40,7 +37,6 @@ func TestAbortRotationNeverTouchesLiveCredential(t *testing.T) {
 
 	abort := statementOf(t, body, "AbortProviderCredentialRotation")
 
-	// 現役憑證四欄一個都不准出現在 SET 子句裡。
 	for _, col := range []string{
 		"credential_ciphertext",
 		"credential_key_version",
@@ -53,8 +49,6 @@ func TestAbortRotationNeverTouchesLiveCredential(t *testing.T) {
 		}
 	}
 
-	// 陽性：它必須真的清掉 pending 三欄並把 status 移回 ACTIVE，
-	// 否則 chk_ipa_rotation（雙向等式）當場 23514、帳號永遠卡在 ROTATION_PENDING。
 	for _, want := range []string{
 		"pending_ciphertext = NULL",
 		"pending_fingerprint = NULL",
@@ -67,14 +61,11 @@ func TestAbortRotationNeverTouchesLiveCredential(t *testing.T) {
 		}
 	}
 
-	// 陰性對照：**扶正**那一句必須真的覆蓋憑證，否則上面那組斷言等於在守一個
-	// 「兩句都不換 key」的世界，而那時輪替功能整個是假的。
 	promote := statementOf(t, body, "UpdateProviderAccountCredential")
 	if !strings.Contains(promote, "credential_ciphertext = sqlc.arg(credential_ciphertext)") {
 		t.Error("UpdateProviderAccountCredential 沒有覆蓋 credential_ciphertext —— " +
 			"輪替成功卻沒換 key，賣家以為換過了而外洩的那一把還在用")
 	}
-	// 兩句都必須夾住 allowed-from，否則一把還沒被收下的 key 可以直接覆蓋現役憑證。
 	for name, stmt := range map[string]string{
 		"AbortProviderCredentialRotation": abort,
 		"UpdateProviderAccountCredential": promote,

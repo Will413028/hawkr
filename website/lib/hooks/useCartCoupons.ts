@@ -75,9 +75,6 @@ export function useCartCoupons({
 			},
 		),
 		enabled,
-		// keepPreviousData: orderAmount/seller change (debounced) as the buyer
-		// edits quantities — keep the prior coupon list visible instead of
-		// flashing empty. First-load fallback handled by the empty fallback below.
 		placeholderData: keepPreviousData,
 	});
 

@@ -14,7 +14,7 @@ import (
 // 多算一個 ⇒ 同一筆出現在兩頁、ADM 處理兩次。
 // **兩種失敗都不會有任何其他測試轉紅。**
 func TestAdminJobTabs_PartitionsAllOperationStatuses(t *testing.T) {
-	seen := map[string]string{} // status -> 第一個宣告它的 tab
+	seen := map[string]string{}
 	for tab, statuses := range adminJobTabs {
 		for _, st := range statuses {
 			if prev, dup := seen[st]; dup {
@@ -34,8 +34,6 @@ func TestAdminJobTabs_PartitionsAllOperationStatuses(t *testing.T) {
 		}
 	}
 
-	// 分割計數 4＋2＋3＋7＋2＋2＝20（§6.1.14 逐字）。逐 tab 釘住筆數，
-	// 讓「兩個 tab 各搬走一個值」這種聯集仍成立的變異也轉紅。
 	want := map[string]int{
 		"PENDING": 4, "RETRYING": 2, "NEEDS_ATTENTION": 3,
 		"NEEDS_MANUAL": 7, "COMPLETED": 2, "CANCELLED": 2,
@@ -96,7 +94,6 @@ func TestAdminComplaintTabs_OverdueIsACrossCuttingView(t *testing.T) {
 			t.Fatalf("OVERDUE 的橫切集合缺 %q（§6.1.16 三類之一）", want)
 		}
 	}
-	// 與 AWAITING_SELLER 交集非空 —— 這正是「加總 ≠ 總筆數」的來源。
 	if !containsString(adminComplaintTabs["AWAITING_SELLER"].Statuses, codemeta.InvoiceComplaintStatusOverdue.Value) {
 		t.Fatal("AWAITING_SELLER 必須含 OVERDUE：兩者對賣家的手勢相同（該你回了）")
 	}
@@ -118,7 +115,6 @@ func TestUploadStatusProjections_PendingCoversNullAndInFlight(t *testing.T) {
 			t.Fatalf("PENDING 缺在途碼 %d（chk_invdoc_upload_recheck 的正面枚舉）", code)
 		}
 	}
-	// 三個終態各自獨立，且都**不得**含 NULL：含了就會把「還沒查過」誤報成結論。
 	for name, want := range map[string]int16{"UPLOADED": 99, "FAILED": 91, "NOT_FOUND": -1} {
 		p := uploadStatusProjections[name]
 		if len(p.Codes) != 1 || p.Codes[0] != want {
@@ -141,7 +137,6 @@ func TestOpenJobStatuses_DerivesFromTabsNotASecondList(t *testing.T) {
 			}
 		}
 	}
-	// 已了結的兩個分頁不得混進來：混進來 A01 的 priorityJobs 會被已完成的工作淹沒。
 	for _, tab := range []string{"COMPLETED", "CANCELLED"} {
 		for _, st := range adminJobTabs[tab] {
 			if containsString(open, st) {
@@ -182,13 +177,10 @@ func TestTimelineEventOf_ProjectsFiveValuesOnly(t *testing.T) {
 	}{
 		{subjectDocument, codemeta.InvoiceDocumentStatusIssued.Value, codemeta.InvoiceDocumentTimelineEventIssued.Value, true},
 		{subjectDocument, codemeta.InvoiceDocumentStatusVoided.Value, codemeta.InvoiceDocumentTimelineEventVoided.Value, true},
-		// REISSUED 落在**舊**文件的時間軸上（to_status=SUPERSEDED）。
 		{subjectDocument, codemeta.InvoiceDocumentStatusSuperseded.Value, codemeta.InvoiceDocumentTimelineEventReissued.Value, true},
 		{subjectCorrectionRequest, codemeta.InvoiceCorrectionStatusUpdatedBeforeIssue.Value, codemeta.InvoiceDocumentTimelineEventUpdated.Value, true},
-		// 時間軸沒有「處理中」與「失敗」的值 —— 那些由 state ＋ stateNotice 承擔。
 		{subjectDocument, codemeta.InvoiceDocumentStatusPending.Value, "", false},
 		{subjectDocument, codemeta.InvoiceDocumentStatusIssueFailed.Value, "", false},
-		// 主體型別必須參與判定：CORRECTION_REQUEST 的 COMPLETED 不是文件的 ISSUED。
 		{subjectCorrectionRequest, codemeta.InvoiceDocumentStatusIssued.Value, "", false},
 	}
 	for _, c := range cases {
@@ -214,18 +206,15 @@ func TestParseInvoiceDateRange_RejectsLooseFormatsAndUsesTaipeiDayBoundary(t *te
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// 台北 2026-08-01 00:00 ＝ UTC 2026-07-31 16:00。取 UTC 00:00 的實作在這裡當場紅。
 	wantFrom := time.Date(2026, 7, 31, 16, 0, 0, 0, time.UTC)
 	if !got.From.Equal(wantFrom) {
 		t.Fatalf("下界應為台北日界換算的 %v，實得 %v", wantFrom, got.From.UTC())
 	}
-	// 上界是當日 23:59:59（台北）＝ UTC 2026-08-31 15:59:59。
 	wantTo := time.Date(2026, 8, 31, 15, 59, 59, 0, time.UTC)
 	if !got.To.Equal(wantTo) {
 		t.Fatalf("上界應為當日台北 23:59:59，實得 %v", got.To.UTC())
 	}
 
-	// 兩側皆可缺席（＝該側不篩）。
 	empty, err := ParseInvoiceDateRange("", "")
 	if err != nil || empty.From != nil || empty.To != nil {
 		t.Fatalf("空字串應是「不篩」，實得 %+v err=%v", empty, err)

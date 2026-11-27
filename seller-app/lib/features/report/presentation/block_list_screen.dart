@@ -93,7 +93,6 @@ class BlockListScreen extends HookConsumerWidget {
         loading: () => const TruckLoadingOverlay(),
         error: (error, _) => _buildErrorState(context, ref, error),
         data: (state) => FruitRefreshIndicator(
-          // silentRefresh 失敗只跳 toast、保留既有清單（不整頁切成 error 狀態）
           onRefresh: () => ref
               .read(blockListControllerProvider.notifier)
               .silentRefresh()

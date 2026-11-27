@@ -11,8 +11,6 @@ import {
 	onboardingTaskPresentation,
 } from "./onboarding-summary";
 
-// 商家詳情的開通摘要卡（SellerAdminService.GetStoreOnboarding）：與賣家看到的同一份任務，標題與狀態句由伺服器產生、逐字顯示。
-// 狀態只決定圖示與色調，client 不依 id、state、action 造文字；action 是賣家的下一步，後台不代辦所以不顯示。
 
 const SHELL = {
 	titleId: "onboarding-summary-title",

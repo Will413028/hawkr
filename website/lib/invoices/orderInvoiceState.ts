@@ -82,12 +82,9 @@ export function foldOrderInvoiceState(
 			};
 		case ORDER_INVOICE_STATE.ORDER_CANCELLED:
 			return {
-				// tone 是 `info` 不是 `danger`：訂單取消對發票模組不是異常，是一個
-				// 確定的終局。紅色會讓買家以為發票出了問題而跑去申訴。
 				title: "訂單已取消",
 				tone: "info",
 				role: "status",
-				// 不給「重新整理」：這個狀態不會再變，按了也一樣。
 				showRefresh: false,
 				unknown: false,
 			};
@@ -137,8 +134,6 @@ export function orderInvoiceEmptyHint(state: string): string {
 		case ORDER_INVOICE_STATE.AWAITING_PAYMENT:
 			return "付款完成後開始處理。";
 		case ORDER_INVOICE_STATE.ORDER_CANCELLED:
-			// 🔴 這一句是 #2904 的另一半。少了它會落到 default 的「系統正在處理，
-			// 完成後會寄送 Email」——對已取消的訂單那是一封永遠不會寄出的信。
 			return "這筆訂單已取消，不會開立發票。";
 		case ORDER_INVOICE_STATE.SELLER_WILL_ISSUE:
 		case ORDER_INVOICE_STATE.SELLER_SELF_ISSUED:

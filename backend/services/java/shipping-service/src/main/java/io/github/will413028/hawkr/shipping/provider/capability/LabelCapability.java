@@ -113,7 +113,6 @@ public interface LabelCapability {
         public LabelIdentifierLookup {
             segmentCodes = segmentCodes == null ? Map.of() : Map.copyOf(segmentCodes);
             if (identifiersReady && segmentCodes.isEmpty()) {
-                // 🔴 契約：宣告「識別已就緒」卻交不出任何識別，會讓呼叫端把空值往下寫。
                 throw new IllegalArgumentException(
                         "identifiersReady=true 但 segmentCodes 為空——呼叫端會把空的三段碼寫進 shipments");
             }

@@ -14,7 +14,6 @@ import {
 } from "./observability";
 import { navigationRecoveryTimeout } from "./recovery-state";
 
-// 保留真實的狀態機，只攔截整頁 location I/O、縮短等待預算、關掉分析送出。
 vi.mock("./document-location", { spy: true });
 vi.mock("./recovery-state", { spy: true });
 vi.mock("@/lib/analytics/gtag", { spy: true });
@@ -22,7 +21,6 @@ vi.mock("@/lib/analytics/gtag", { spy: true });
 const DESTINATION = "/account/orders?status=paid#latest";
 const LOGIN_DESTINATION = "/account?from=login#profile";
 
-// 預覽元件掛上時才有監聽者；commitDocumentNavigation 的 spy 在 beforeEach 安裝、afterEach 還原。
 let documentNavigationListener:
 	| ((target: string, replace?: boolean) => void)
 	| undefined;

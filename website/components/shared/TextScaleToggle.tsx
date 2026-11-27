@@ -27,13 +27,9 @@ export default function TextScaleToggle({
 	variant = "default",
 }: TextScaleToggleProps) {
 	const { scale, cycle } = useTextScale();
-	// Announce only AFTER a change. Seeding the live region with the current
-	// value would make every page load speak 「字級：中」.
 	const [announcement, setAnnouncement] = React.useState("");
 	const label = TEXT_SCALE_LABELS[scale];
 
-	// Driven off the store value, not the click, so a change made from the 設定
-	// control or from another tab is announced here too.
 	const previousScale = React.useRef(scale);
 	React.useEffect(() => {
 		if (previousScale.current === scale) return;
@@ -42,10 +38,6 @@ export default function TextScaleToggle({
 	}, [scale]);
 
 	return (
-		// `display: contents` — the wrapper exists only to keep the live region
-		// OUT of the button. `button` has presentational children, so a status
-		// region nested inside it is never exposed, and it generates no box, so
-		// the navbar / footer flex rails lay out exactly as before.
 		<span className="contents">
 			<button
 				type="button"
@@ -54,10 +46,6 @@ export default function TextScaleToggle({
 					variant === "footer" ? FOOTER_ICON_LINK : THEME_TOGGLE_CHROME_CLASS,
 					className,
 				)}
-				// NOT the APG toggle-button pattern: `aria-pressed` is binary and
-				// this control has three states, so a pressed/unpressed
-				// announcement would be a lie. The name carries the current value
-				// plus the affordance; the status region reports each result.
 				aria-label={`字級：${label}，點擊切換`}
 				title={`字級：${label}，點擊切換`}
 				onClick={cycle}
@@ -65,8 +53,6 @@ export default function TextScaleToggle({
 				<LazyAppIcon
 					name="document"
 					size={18}
-					// The icon colour follows the control's surface explicitly; the
-					// footer stays dark in both page themes.
 					style={{
 						color:
 							variant === "footer"

@@ -74,7 +74,6 @@ func GetEnvAsBoolOrDefault(key string, defaultVal bool) bool {
 	return b
 }
 
-// envCollector collects missing required environment variables for batch validation.
 type envCollector struct {
 	missing []string
 }

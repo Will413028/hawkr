@@ -395,7 +395,6 @@ func TestUnreadEvents(t *testing.T) {
 		}
 	}
 
-	// MarkAllRead 只發一個 u。
 	raw := f.listenRaw(t)
 	f.say(t, f.buyerParty(b1), s1, "again")
 	f.say(t, f.buyerParty(b2), s1, "other conversation")
@@ -442,7 +441,6 @@ func TestPeerReadOnlyWhenTheCursorAdvances(t *testing.T) {
 	if len(got) != 2 || got[0].Kind != live.KindRead || got[0].Seq != 1 || got[0].Side != live.SideStore || got[1].Kind != live.KindMessage {
 		t.Fatalf("游標沒前進不發通知：%+v", got)
 	}
-	// 同一輪裡訊息排在對方已讀之前，所以要等兩者都到才算收完。
 	var sawMessage, sawPeer bool
 	evs := collectUntil(t, buyerSub, func(e im.Event) bool {
 		sawMessage = sawMessage || messageSeq(conv, 2)(e)
@@ -501,13 +499,11 @@ func TestPresence(t *testing.T) {
 	if !online() {
 		t.Fatal("對方開了串流要在線")
 	}
-	// 心跳延長。
 	f.exec(t, "UPDATE im.presence_streams SET expires_at = now() + interval '1 second'")
 	beat <- time.Time{}
 	f.eventually(t, "延長批次", func() bool {
 		return f.scalar(t, "SELECT count(*) FROM im.presence_streams WHERE expires_at > now() + interval '30 seconds'") == 1
 	})
-	// 崩潰：沒有 Close，列過期後離線。
 	f.exec(t, "UPDATE im.presence_streams SET expires_at = now() - interval '1 second'")
 	if online() {
 		t.Fatal("過期的列不算在線")
@@ -516,7 +512,6 @@ func TestPresence(t *testing.T) {
 	if !online() {
 		t.Fatal("未過期要在線")
 	}
-	// 封鎖（任一方向）與封鎖查詢失敗。
 	if _, err := f.buyers.owner.BlockStore(ctx, b1, s1); err != nil {
 		t.Fatal(err)
 	}
@@ -539,11 +534,9 @@ func TestPresence(t *testing.T) {
 		t.Fatal("封鎖查詢失敗要回錯誤，不放行")
 	}
 	f.stores.blockErr = nil
-	// 非共有對話。
 	if _, err := f.m.Presence(ctx, f.buyerParty(b2), []uuid.UUID{conv}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("非共有對話要 NotFound：%v", err)
 	}
-	// 對方已退場。
 	if err := f.db.InTx(ctx, func(ctx context.Context) error { return closeStoreRows(ctx, f.db, s1) }); err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +546,6 @@ func TestPresence(t *testing.T) {
 	if err := f.db.InTx(ctx, func(ctx context.Context) error { return reopenStoreRows(ctx, f.db, s1) }); err != nil {
 		t.Fatal(err)
 	}
-	// Close 之後離線。
 	sub.Close()
 	if online() {
 		t.Fatal("Close 之後要離線")
@@ -668,7 +660,6 @@ func TestSubscribeLimitsAndAuthorization(t *testing.T) {
 		s.Close()
 	}
 
-	// 並行：12 個同時 Subscribe 同一個 Party，恰好 10 個成功。
 	other := f.buyerParty(b2)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -700,7 +691,6 @@ func TestSubscribeLimitsAndAuthorization(t *testing.T) {
 		t.Fatalf("並行 Subscribe：成功 %d、被拒 %d，預期 10 與 2", ok, exhausted)
 	}
 
-	// 存活標記寫不進去：Subscribe 失敗（fail-closed）。
 	seedParties(t, f.db, []int64{99}, nil)
 	f.exec(t, "ALTER TABLE im.presence_streams RENAME TO presence_streams_gone")
 	_, err = m1.Subscribe(ctx, f.buyerParty(99), nil)

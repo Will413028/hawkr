@@ -121,7 +121,6 @@ const (
 	SupportEmailMaxRunes = emailaddr.MaxLen
 )
 
-// normalizeContact 驗證並正規化店家的聯絡資料：聯絡人姓名至多 50 字、聯絡人手機是 09 開頭的 10 碼、客服信箱格式正確（長度由 emailaddr 檢查）。
 func normalizeContact(p *Profile) error {
 	if p.ContactName != nil {
 		name := trimtext.Trim(*p.ContactName)
@@ -147,7 +146,6 @@ func normalizeContact(p *Profile) error {
 	return nil
 }
 
-// normalizeAddress 驗證鄉鎮市區代碼與地址：代碼必須是現行的 8 碼鄉鎮市區代碼，地址要有鄉鎮市區。
 func normalizeAddress(p *Profile) error {
 	if p.TownCode != nil {
 		if _, ok := twaddr.TownByCode(*p.TownCode); !ok {
@@ -165,7 +163,6 @@ func normalizeAddress(p *Profile) error {
 	return nil
 }
 
-// websiteURL 只接受有主機的 http、https 網址，scheme 與主機轉成小寫（DB 的 stores_website_url_check 區分大小寫）。
 func websiteURL(raw string) (string, bool) {
 	u, err := url.Parse(raw)
 	if err != nil {

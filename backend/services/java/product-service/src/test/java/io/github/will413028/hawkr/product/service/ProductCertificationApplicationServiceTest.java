@@ -95,11 +95,9 @@ class ProductCertificationApplicationServiceTest {
 
     @BeforeAll
     static void initTsid() {
-        // product-service 的 node-id-base（§7.2）；重複初始化會拋，已初始化就沿用
         try {
             TsidUtil.init(200, 0);
         } catch (IllegalStateException ignored) {
-            // 同一個 JVM 內的其他測試已初始化
         }
     }
 
@@ -109,13 +107,10 @@ class ProductCertificationApplicationServiceTest {
                 applicationRepository, reviewEventRepository, productRepository,
                 govCertificationService, cacheService, revalidationService, idempotencyService,
                 new ObjectMapper(), eventPublisher, sellerGrpcClient, redisTemplate);
-        // 重新查驗租約：預設「拿得到」，個別測試再覆寫成 false 模擬併發
         when(redisTemplate.opsForValue()).thenReturn(redisValueOps);
         when(redisValueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
         stubEmptyRepository();
-        // 同步階段一律只讀快取；預設 miss
         when(govCertificationService.readCachedResult(anyString(), any())).thenReturn(null);
-        // 決定事件的收件人解析（fail-closed）；預設解析得到，個別測試再覆寫成拋錯
         when(sellerGrpcClient.getSellerMetaOrThrow(anyLong()))
                 .thenReturn(io.github.will413028.hawkr.seller.grpc.SellerMeta.newBuilder()
                         .setAccountId(SELLER_ACCOUNT_ID)
@@ -138,10 +133,8 @@ class ProductCertificationApplicationServiceTest {
         when(productRepository.findByIdIncludingDeleted(anyLong()))
                 .thenReturn(Optional.of(productWithProjection()));
         when(productRepository.updateCertificationProjection(anyLong(), any())).thenReturn(1);
-        // 冪等：預設不是重放
         when(idempotencyService.acquireLock(anyString(), any(), anyString(), any(), any()))
                 .thenReturn(Optional.empty());
-        // 收斂點插完會把該列讀回來寫 SUBMIT 事件；預設回一筆 PENDING（不符自動核准資格）
         when(applicationRepository.findById(anyLong())).thenAnswer(inv ->
                 Optional.of(application(inv.getArgument(0), ORGANIC, CERT_A,
                         ProductCertificationStatus.SUBMITTED.value(), 0L)));
@@ -151,7 +144,6 @@ class ProductCertificationApplicationServiceTest {
         return org.mockito.ArgumentMatchers.anyBoolean();
     }
 
-    // ==================== ① Step 0 前置閘門（§6.3.0） ====================
 
     @Nested
     @DisplayName("§6.3 Step 0：effectiveUpdate 閘門")
@@ -170,7 +162,6 @@ class ProductCertificationApplicationServiceTest {
                     syncCommand(false, null));
 
             assertTrue(warnings.isEmpty());
-            // 連「有哪些 type 沒送」都不准去查——查了就代表閘門在它後面
             verify(applicationRepository, never()).lockApprovedByProductExcludingTypes(anyLong(), any());
             verify(applicationRepository, never()).transitionToTerminalStatus(any(), anyString(), anyString(), any());
             verify(applicationRepository, never()).insertSubmittedIfAbsent(any(), any(), any(), any(), any(),
@@ -227,7 +218,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== ② 換號情境（§6.4 粒度 ＋ §3.5） ====================
 
     @Nested
     @DisplayName("§6.4 換號：舊號碼保持公開到新號碼核准為止")
@@ -242,9 +232,7 @@ class ProductCertificationApplicationServiceTest {
         void submittingNewNumberKeepsOldApprovedPublic() {
             service.syncFromProductWrite(syncCommand(true, List.of(input(ORGANIC, CERT_B))));
 
-            // 該 type 有送任一號碼 ⇒ 不在「沒送」集合內
             verify(applicationRepository).lockApprovedByProductExcludingTypes(PRODUCT_ID, List.of(ORGANIC));
-            // 沒有任何 APPROVED 被轉成 WITHDRAWN，投影也不該被改寫
             verify(applicationRepository, never()).transitionToTerminalStatus(any(),
                     eq(ProductCertificationStatus.APPROVED.value()), anyString(), any());
             verify(productRepository, never()).updateCertificationProjection(anyLong(), any());
@@ -265,7 +253,6 @@ class ProductCertificationApplicationServiceTest {
                     .thenReturn(1);
             when(applicationRepository.casTransitionStatus(eq(22L), eq(0L), anyString(), anyString(),
                     any(), any(), any(), any(), any())).thenReturn(1);
-            // 核准後 approved 集合只剩 B
             when(applicationRepository.findApprovedByProductId(PRODUCT_ID)).thenReturn(List.of(
                     application(22L, ORGANIC, CERT_B, ProductCertificationStatus.APPROVED.value(), 1L)));
             when(applicationRepository.findById(22L)).thenReturn(Optional.of(
@@ -288,7 +275,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== ③ 核准順序（§6.6 ①→②） ====================
 
     @Nested
     @DisplayName("§6.6 核准交易：① SUPERSEDE 必須在 ② APPROVE 之前")
@@ -342,7 +328,6 @@ class ProductCertificationApplicationServiceTest {
             ProductBusinessException e = assertThrows(ProductBusinessException.class,
                     () -> service.approveForAdmin(22L, 2L, 999L, null, null, "idem-approve"));
             assertEquals(GrpcResponseCode.CERT_APPLICATION_VERSION_CONFLICT.code(), e.code());
-            // 版本不符時，① 都不該發生 —— 否則賣家原本的待審申請被吞掉而沒有新申請
             verify(applicationRepository, never()).transitionToTerminalStatus(any(), anyString(), anyString(), any());
         }
 
@@ -358,7 +343,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== ④ rebuildProjection 的四個觸發點（§7.2） ====================
 
     @Nested
     @DisplayName("§7.2 投影重建的四個觸發點")
@@ -391,13 +375,9 @@ class ProductCertificationApplicationServiceTest {
         void systemAutoApproveRebuildsProjection() {
             when(govCertificationService.readCachedResult(eq(CERT_A), eq(CertificationType.ORGANIC)))
                     .thenReturn(validResult(CERT_A));
-            // 剛插入的列：VERIFIED、非人工複審、version = 0
             ProductCertificationApplicationEntity inserted = application(33L, ORGANIC, CERT_A,
                     ProductCertificationStatus.SUBMITTED.value(), 0L);
             inserted.setGovVerifyState(ProductCertificationGovVerifyState.VERIFIED.value());
-            // §8.5.1 第五個條件：payload 的業者名稱必須屬於這個賣家。真實路徑的 payload 由
-            // toSnapshot(validResult) 產生，holderName 就是 HOLDER_NAME；mock 走 findById 繞過了
-            // 那段轉換，所以在這裡補上，否則本案例會停在 NO_HOLDER_NAME 而非驗到投影重建。
             ProductCertificationApplicationEntity.GovVerifyPayload payload =
                     new ProductCertificationApplicationEntity.GovVerifyPayload();
             payload.setCertNo(CERT_A);
@@ -414,7 +394,6 @@ class ProductCertificationApplicationServiceTest {
 
             service.syncFromProductWrite(syncCommand(true, List.of(input(ORGANIC, CERT_A))));
 
-            // 一律以 SUBMITTED 插入（insertSubmittedIfAbsent 的 SQL 寫死 'SUBMITTED'）
             verify(applicationRepository).insertSubmittedIfAbsent(any(), eq(PRODUCT_ID), any(), any(),
                     eq(ORGANIC), eq(CERT_A), any(), eq(false),
                     eq(ProductCertificationGovVerifyState.VERIFIED.value()), any(), any(), any());
@@ -449,8 +428,6 @@ class ProductCertificationApplicationServiceTest {
         void withdrawRebuildsProjectionOnlyFromApproved() {
             ProductCertificationApplicationEntity approved = application(55L, ORGANIC, CERT_A,
                     ProductCertificationStatus.APPROVED.value(), 2L);
-            // 起始投影必須含 A：起始就是空的話「撤回後也是空」⇒ rebuildProjection 判定沒變、
-            // 本測試會在實作正確時照樣紅，等於量到的是 fixture 不是行為
             when(productRepository.findByIdIncludingDeleted(PRODUCT_ID))
                     .thenReturn(Optional.of(productWithProjection(ORGANIC, CERT_A)));
             when(applicationRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(approved));
@@ -523,7 +500,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== ⑤ 非法輸入剔除（§6.2） ====================
 
     @Nested
     @DisplayName("§6.2 非法輸入：剔除該筆，不拋例外、不回 4xx")
@@ -537,9 +513,9 @@ class ProductCertificationApplicationServiceTest {
         @DisplayName("非法 type 與非法 certNo 各自被剔除，其他合法筆數照常進申請表")
         void illegalEntriesAreDroppedWithoutThrowing() {
             List<CertificationWarningDTO> warnings = service.syncFromProductWrite(syncCommand(true, List.of(
-                    input("產銷履歷", CERT_A),        // 中文標籤，不是 CodeMeta value
-                    input(ORGANIC, "abc def"),        // 空白不在白名單字元集內
-                    input(ORGANIC, CERT_B))));        // 合法
+                    input("產銷履歷", CERT_A),
+                    input(ORGANIC, "abc def"),
+                    input(ORGANIC, CERT_B))));
 
             assertEquals(2, warnings.size());
             assertEquals(CertificationWarningDTO.REASON_INVALID_TYPE, warnings.get(0).reason());
@@ -583,7 +559,6 @@ class ProductCertificationApplicationServiceTest {
     }
 
 
-    // ==================== §6.2.9 certNo 依類型分流 ====================
 
     @Nested
     @DisplayName("§6.2.9：certNo 的合法性依類型而異")
@@ -733,7 +708,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== §6.3 Step 1/2/3 ====================
 
     @Nested
     @DisplayName("§6.3 Step 1–3：冪等與裁決不可被重送繞過")
@@ -768,7 +742,6 @@ class ProductCertificationApplicationServiceTest {
                             ProductCertificationStatus.REVOKED.value())))
                     .thenReturn(List.of(application(11L, ORGANIC, CERT_A,
                             ProductCertificationStatus.REJECTED.value(), 2L)));
-            // 政府查驗剛好通過也不得放行
             when(govCertificationService.readCachedResult(eq(CERT_A), any())).thenReturn(validResult(CERT_A));
             ProductCertificationApplicationEntity inserted = application(33L, ORGANIC, CERT_A,
                     ProductCertificationStatus.SUBMITTED.value(), 0L);
@@ -838,7 +811,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== §8.5.1 持有人歸屬（自動核准的第五個條件） ====================
 
     /**
      * §8.5.1：政府 API 只回答「這個編號存在且有效」，<b>不回答「這張證書屬於誰」</b>。
@@ -1024,7 +996,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== 賣家專用端點（§9.1） ====================
 
     @Nested
     @DisplayName("§9.1 賣家專用端點")
@@ -1067,7 +1038,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== §9.3 重新查驗 ====================
 
     @Nested
     @DisplayName("§9.3 ADM 重新查驗：只查驗、不改 status")
@@ -1183,7 +1153,6 @@ class ProductCertificationApplicationServiceTest {
             verify(govCertificationService, never()).verifyDetailedForceRefresh(anyString(), any());
         }
 
-        // ---------- 冷卻護欄（配額保護） ----------
 
         /**
          * 🔴 繞過結果快取之後，每按一次「重新查驗」都真的打農業部並消耗每日配額，
@@ -1304,7 +1273,6 @@ class ProductCertificationApplicationServiceTest {
         void leaseHeldByConcurrentAdminBlocks() {
             ProductCertificationApplicationEntity app = application(99L, ORGANIC, CERT_A,
                     ProductCertificationStatus.SUBMITTED.value(), 1L);
-            // 上一次查驗是很久以前 ⇒ 時間差那一關會放行，只剩租約擋得住
             app.setGovVerifiedAt(DateTimeUtils.nowUtc().minusDays(3));
             when(applicationRepository.findById(99L)).thenReturn(Optional.of(app));
             when(redisValueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(false);
@@ -1336,9 +1304,6 @@ class ProductCertificationApplicationServiceTest {
             service.reverifyForAdmin(99L, 999L, "idem-reverify");
             verify(redisTemplate).delete("cert:reverify:lease:99");
 
-            // 例外路徑。⚠️ 不能讓 verifyDetailedForceRefresh 拋——runGovVerify 會把
-            // RuntimeException 收斂成 UNAVAILABLE（§8.4 防線 1 要求的行為），根本傳不出來。
-            // 改讓回寫那一句炸，它在 runVerify 裡沒有 catch，才真的會穿出 try 區塊。
             org.mockito.Mockito.clearInvocations(redisTemplate);
             when(applicationRepository.casUpdateGovVerifyResult(anyLong(), anyLong(), anyString(), any(), any()))
                     .thenThrow(new IllegalStateException("boom"));
@@ -1421,7 +1386,6 @@ class ProductCertificationApplicationServiceTest {
     }
 
 
-    // ==================== §4.1 來源與送出者 ====================
 
     @Nested
     @DisplayName("§4.1 source 與 submitted_by_account_id")
@@ -1466,7 +1430,6 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== §16.3 冪等 ====================
 
     @Nested
     @DisplayName("§16.3 冪等：idempotencyKey 必須真的被消費")
@@ -1501,7 +1464,6 @@ class ProductCertificationApplicationServiceTest {
         void approveReplayRereadsCurrentStateAndDoesNotRerun() {
             when(idempotencyService.acquireLock(eq("idem-approve"), any(), anyString(), any(), any()))
                     .thenReturn(Optional.of(new CertificationApplicationRefDTO("22")));
-            // 第一次核准之後，這筆已經被同 type 的更新號碼 SUPERSEDE 掉了
             when(applicationRepository.findById(22L)).thenReturn(Optional.of(
                     application(22L, ORGANIC, CERT_B, ProductCertificationStatus.SUPERSEDED.value(), 4L)));
 
@@ -1544,13 +1506,10 @@ class ProductCertificationApplicationServiceTest {
         }
     }
 
-    // ==================== fixtures ====================
 
     private ProductCertificationApplicationService.CertificationSyncCommand syncCommand(
             boolean updateCertifications,
             List<ProductCertificationApplicationService.CertificationInput> certs) {
-        // 🔴 submittedByAccountId 傳 null：商品寫入路徑沒有 account_id 可用，而 storeId 是營運鍵
-        //    ——ProductService 也是這樣傳的，fixture 若傳 ACCOUNT_ID 會讓測試對頂替行為失明
         return new ProductCertificationApplicationService.CertificationSyncCommand(
                 PRODUCT_ID, STORE_ID, null,
                 ProductCertificationSource.SELLER.value(), updateCertifications, certs);

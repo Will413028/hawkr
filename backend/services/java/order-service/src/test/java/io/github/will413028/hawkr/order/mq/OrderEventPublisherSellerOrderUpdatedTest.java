@@ -33,17 +33,12 @@ class OrderEventPublisherSellerOrderUpdatedTest {
     void emitSellerOrderUpdated_publishesStoreIdVerbatim() throws Exception {
         ObsRabbitPublisher rabbitPublisher = mock(ObsRabbitPublisher.class);
         OrderRepository orderRepository = mock(OrderRepository.class);
-        // 分岔賣家：store_id 與 login account_id 不相等（2026-09-02 身分分離後的常態）。
-        // 兩者若相等，這支測試對「有沒有反解析」零鑑別力 —— 那正是本 bug 活到部署的原因。
         long storeId = 2685914682L;
         long loginAccountId = 2600000012L;
         assertNotEquals(storeId, loginAccountId, "fixture 必須用分岔身分，否則本測試無鑑別力");
 
         OrderEventPublisher publisher = new OrderEventPublisher(rabbitPublisher, orderRepository);
 
-        // ObsRabbitPublisher.publish is overloaded (byte[] vs Message); an ArgumentCaptor<byte[]>.capture()
-        // inline in the verify() call is ambiguous to javac between the two overloads (same issue already
-        // worked around in ShipmentAnomalyEventPublisherTest via any(byte[].class)). Capture via doAnswer instead.
         byte[][] capturedBody = new byte[1][];
         doAnswer(invocation -> {
             capturedBody[0] = invocation.getArgument(2, byte[].class);

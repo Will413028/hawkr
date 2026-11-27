@@ -25,10 +25,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// supplementNotice 是模組給登入檢舉人的「補充到原本檢舉」那一句（模組的 default 句子 report.duplicate_supplemented；這裡只看 handler 原樣轉出）。
 const supplementNotice = "你今天已經檢舉過這家店的這個類別，這次的內容已經補充到原本的檢舉。"
 
-// reportModule 是檢舉入口的模組替身：supplement 決定 SubmitReport 是新增還是補充到原本那一筆（匿名的補充不帶 Report）。
 type reportModule struct {
 	supplement   bool
 	err          error
@@ -259,7 +257,6 @@ func TestCreateReportPointsAtTheRejectedEvidenceToken(t *testing.T) {
 	m := &reportModule{err: apperr.InvalidInputOn([]string{"EvidenceTokens[1]"}, "圖片無法使用，請重新上傳")}
 	h := newTestReports(t, m, buyersOf{5: 50})
 	req := &pb.CreateReportRequest{StoreId: "12", Category: commonpb.PolicyCategory_POLICY_CATEGORY_FRAUD, Description: "x", EvidenceStagedTokens: []string{"ok", "expired"}}
-	// 錯誤經過和線上相同的攔截器才轉成 connect 錯誤（欄位路徑在那裡對應）。
 	call := rpc.NewInterceptor(slog.New(slog.DiscardHandler)).WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 		return h.CreateReport(ctx, connect.NewRequest(req))
 	})

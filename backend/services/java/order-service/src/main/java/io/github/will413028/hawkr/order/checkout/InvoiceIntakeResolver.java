@@ -98,8 +98,6 @@ public final class InvoiceIntakeResolver {
         String donationCode = trimToNull(request.getDonationCode());
         String notifyEmail = trimToNull(request.getNotifyEmail());
 
-        // "0" 是前端「已清除預設」的哨兵（§6.1.2 端點 2 註）：pkg/tsid 的 time-based 高位恆非零，
-        // 不會產生 id = 0 ⇒ 拿它當「未指定」不會與任何真實 profile 撞號。
         if ("0".equals(profileId)) {
             profileId = null;
         }
@@ -108,7 +106,6 @@ public final class InvoiceIntakeResolver {
                 + (buyerTaxId != null ? 1 : 0)
                 + (donationCode != null ? 1 : 0);
         if (targets > 1) {
-            // 我方強制；AMEGO 不擋（58 號 I-04、§6.1.2 confirm 失敗分支表）
             throw new OrderBusinessException(GrpcResponseCode.INVOICE_TARGET_CONFLICT);
         }
 
@@ -123,19 +120,13 @@ public final class InvoiceIntakeResolver {
             throw new OrderBusinessException(GrpcResponseCode.INVOICE_CARRIER_INVALID);
         }
         if (buyerTaxId != null) {
-            // chk_ois_b2b 要求 B2B 必有抬頭；讓它在這裡以 9305 失敗，而不是在建單交易內炸 23514
             if (buyerTitle == null) {
                 throw new OrderBusinessException(GrpcResponseCode.INVOICE_CARRIER_INVALID);
             }
-            // 用**字元數**而非 displayLength：DB 是 VARCHAR(60)（PostgreSQL 以字元計），
-            // 而 displayLength 把全形算 2 ⇒ 會把「30 個中文字的合法公司名」擋掉，
-            // 那是採集端多擋、使用者看得到的失敗。
             if (buyerTitle.codePointCount(0, buyerTitle.length()) > BUYER_TITLE_MAX) {
                 throw new OrderBusinessException(GrpcResponseCode.INVOICE_CARRIER_INVALID);
             }
         } else if (buyerTitle != null) {
-            // 沒有統編的抬頭在 AMEGO 無處可放（B2C 的 BuyerName 恆為預設值）⇒ 不靜默丟棄，
-            // 靜默丟棄會讓買家以為自己填的抬頭會出現在發票上。
             throw new OrderBusinessException(GrpcResponseCode.INVOICE_CARRIER_INVALID);
         }
         if (notifyEmail != null
@@ -149,7 +140,6 @@ public final class InvoiceIntakeResolver {
 
         String mode;
         if (buyerTaxId != null) {
-            // B2B 一律 NONE（chk_ois_b2b 逐字要求）
             mode = InvoiceCarrierSelectionMode.NONE.value();
         } else if (donationCode != null) {
             mode = InvoiceCarrierSelectionMode.DONATION.value();

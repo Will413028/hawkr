@@ -1,10 +1,8 @@
-/* ========== 會員管理頁面樣式 ========== */
 
 .member-list-page {
 	font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
 
-/* Header */
 .member-list-page .page-header {
 	display: flex;
 	justify-content: space-between;
@@ -51,7 +49,6 @@
 	background: var(--color-ink-600);
 }
 
-/* Stats Row */
 .member-list-page .stats-row {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(200px, 280px));
@@ -113,7 +110,6 @@
 	color: #111827;
 }
 
-/* Toolbar */
 .member-list-page .toolbar {
 	display: flex;
 	align-items: center;
@@ -197,7 +193,6 @@
 	padding: 10px 12px;
 }
 
-/* Table */
 .member-list-page .table-container {
 	background: white;
 	border-radius: 16px;
@@ -236,7 +231,6 @@
 	border-bottom: none;
 }
 
-/* Member Info Cell */
 .member-list-page .member-info {
 	display: flex;
 	align-items: center;
@@ -295,7 +289,6 @@
 	color: #9ca3af;
 }
 
-/* Contact Info */
 .member-list-page .contact-info {
 	display: flex;
 	flex-direction: column;
@@ -312,7 +305,6 @@
 	color: #6b7280;
 }
 
-/* Points Info */
 .member-list-page .points-info {
 	display: flex;
 	flex-direction: column;
@@ -330,7 +322,6 @@
 	color: #6b7280;
 }
 
-/* Status Badges */
 .member-list-page .status-badge {
 	display: inline-flex;
 	align-items: center;
@@ -355,7 +346,6 @@
 	color: #6b7280;
 }
 
-/* Level Badges */
 .member-list-page .level-badge {
 	display: inline-flex;
 	align-items: center;
@@ -385,7 +375,6 @@
 	color: #d97706;
 }
 
-/* Type Badges */
 .member-list-page .type-badge {
 	display: inline-flex;
 	align-items: center;
@@ -410,7 +399,6 @@
 	color: #2563eb;
 }
 
-/* Action Buttons */
 .member-list-page .action-buttons {
 	display: flex;
 	gap: 8px;
@@ -463,7 +451,6 @@
 	cursor: not-allowed;
 }
 
-/* Loading & Empty States */
 .member-list-page .loading-cell,
 .member-list-page .empty-cell {
 	text-align: center;
@@ -493,7 +480,6 @@
 	font-size: 15px;
 }
 
-/* Pagination */
 .member-list-page .pagination {
 	display: flex;
 	justify-content: center;
@@ -535,7 +521,6 @@
 	border-radius: 8px;
 }
 
-/* Loading State in Modal */
 .member-list-page .loading-state {
 	text-align: center;
 	padding: 40px;
@@ -548,7 +533,6 @@
 	display: block;
 }
 
-/* Detail Content */
 .member-list-page .detail-header {
 	display: flex;
 	gap: 20px;
@@ -645,7 +629,6 @@
 	color: #111827;
 }
 
-/* Modal Footer Buttons */
 .member-list-page .btn-status {
 	display: flex;
 	align-items: center;
@@ -693,7 +676,6 @@
 	background: #f9fafb;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
 	.member-list-page .page-header {
 		flex-direction: column;
@@ -723,7 +705,6 @@
 	}
 }
 
-/* ========== Header Buttons ========== */
 .member-list-page .header-buttons {
 	display: flex;
 	gap: 12px;
@@ -749,7 +730,6 @@
 	background: #1d4ed8;
 }
 
-/* ========== Action Buttons - Edit & Delete ========== */
 .member-list-page .btn-edit {
 	width: 32px;
 	height: 32px;
@@ -788,7 +768,6 @@
 	color: #b91c1c;
 }
 
-/* ========== Delete Modal ========== */
 .member-list-page .delete-modal {
 	max-width: 420px;
 }
@@ -815,7 +794,6 @@
 	color: #6b7280;
 }
 
-/* ========== Edit & Add Modal ========== */
 .member-list-page .edit-modal,
 .member-list-page .add-modal {
 	max-width: 480px;
@@ -866,7 +844,6 @@
 	color: #9ca3af;
 }
 
-/* ========== Modal Footer Buttons ========== */
 .member-list-page .btn-cancel {
 	padding: 10px 20px;
 	background: #f3f4f6;

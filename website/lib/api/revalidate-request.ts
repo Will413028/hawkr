@@ -60,16 +60,10 @@ const ENTITY_TAG =
 	/^(?:product|seller|post|category|hashtag):[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const EVENT_ID = /^[\x21-\x7E]{1,128}$/;
 
-// A product's mutable card fields (name/price/image/stock/rating) are embedded
-// by the product lists and by the posts feed's linked-product block — nowhere
-// else, so nothing else is expanded.
 const PRODUCT_AGGREGATE_TAGS = [
 	PUBLIC_CACHE_TAGS.products,
 	PUBLIC_CACHE_TAGS.posts,
 ] as const;
-// Seller name + logo ride along on every product card (lib/market/listFilters
-// mapProduct) and post card, so a seller edit has to reach the product and post
-// lists as well as the recommended-seller rail.
 const SELLER_AGGREGATE_TAGS = [
 	PUBLIC_CACHE_TAGS.sellers,
 	PUBLIC_CACHE_TAGS.products,
@@ -150,10 +144,6 @@ export function parseRevalidateRequest(
 	if (!isRevalidationSecretAuthorized(secretHeader, expectedSecret)) {
 		return { ok: false, status: 401, error: "unauthorized" };
 	}
-	// A payload may still carry the retired `mode` field; it is read by nobody
-	// and must stay a tolerated unknown, because rejecting it would 400 the whole
-	// request and drop the valid tags travelling with it — the invalidation would
-	// simply vanish.
 	const payload = body as {
 		tags?: unknown;
 		eventId?: unknown;

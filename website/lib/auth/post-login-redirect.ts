@@ -68,9 +68,6 @@ export function sellerPostLoginRedirect(
 		workspaceRedirect.startsWith(`${SELLER_ONBOARDING_PATH}?`);
 	if (alreadyTargetsOnboarding) return workspaceRedirect;
 
-	// Only preserve an explicitly requested seller-workspace deep link. Empty,
-	// public, buyer, and unsafe targets all converge on the onboarding page; its
-	// own default completion target is the seller dashboard.
 	return requestedWorkspaceRedirect
 		? `${SELLER_ONBOARDING_PATH}?redirect=${encodeURIComponent(requestedWorkspaceRedirect)}`
 		: SELLER_ONBOARDING_PATH;
@@ -128,8 +125,6 @@ export function resolvePostLoginTarget({
 		: effectiveActiveRole(account, storedRole);
 	const hasSellerRole = account.isSeller;
 
-	// A signed-in-only page needs no workspace, shop or onboarding: the target
-	// is the page itself whatever the seller state.
 	if (isAccountPath(redirectAfter)) {
 		return { activeRole, destination: safeRedirectPath(redirectAfter) };
 	}

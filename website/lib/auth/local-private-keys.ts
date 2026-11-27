@@ -50,15 +50,10 @@ export const LOCAL_PRIVATE_KEYS = {
 	sellerInventoryUi: { key: "hawkr:seller-inventory:ui", in: ["local"] },
 	marketListSnapshot: { key: "hk-market-list-snapshot", in: ["session"] },
 	feedListSnapshot: { key: "hk-feed-list-snapshot", in: ["session"] },
-	// 這兩把是補掃時才發現的帳號私有 key，正是
-	// tests/local-private-registry.test.ts 要防的那種「清單看起來完整」的漏。
 	sellerShipmentOperations: {
 		key: "hawkr:seller-shipment-operations",
 		in: ["session"],
 	},
-	// 搜尋 handoff：訪客在首頁打的字要能帶進登入後的 Agent 工作區，所以「訪客 →
-	// 登入」不能清；但登出或換帳號時必須清，否則同裝置的下一個人會拿到上一位的
-	// 搜尋字串。
 	hawkrAgentHandoff: {
 		key: "hawkr:hawkr-agent:search-handoff:v1",
 		in: ["session"],

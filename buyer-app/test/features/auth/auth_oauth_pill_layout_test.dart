@@ -455,8 +455,6 @@ void main() {
     );
     loading.value = true;
     await tester.pump();
-    // 減少動態時 HkBrandLoader 自己停在完成態，不再靠呼叫端傳 value；
-    // 「確實停住」由本測試最後的 hasScheduledFrame 斷言把關。
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('auth-oauth-loading-indicator')),

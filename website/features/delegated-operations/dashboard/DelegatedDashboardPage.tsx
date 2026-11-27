@@ -84,19 +84,10 @@ export default function DelegatedDashboardPage() {
 	const canReadPosts = ready && hasCapability("posts.read");
 	const base = `/adm/${encodeURIComponent(storeId)}`;
 
-	// 這支 hook 自己就判 `orders.read`（缺 capability 時一個請求都不發），所以
-	// 這裡不再包一層條件 —— 包了反而換成另一把鍵，與訂單頁的槽位就分開了。
-	// ⚠️ 這一頁沒有篩選列，數字恆為**未篩選**的總數，所以傳空條件（也因此與訂單頁
-	// 尚未篩選時共用同一個快取槽）。訂單頁的卡片會跟著它的搜尋與日期範圍走，兩邊在
-	// 那個當下不相等是對的 —— 下面那句「與清單頁逐格相同」講的是未篩選時。
 	const { totals: orderTotals } = useDelegatedOrderStatusTotals(
 		ORDER_STAT_STATUSES,
 		EMPTY_DELEGATED_ORDER_FILTERS,
 	);
-	// 四張卡與商品頁的 KPI 取自同一組參數（總數／4004／4003／4001），數字因此逐格
-	// 相等。⚠️ 4003 那一張不可省：省掉之後這一區會畫成「總數 9、已上架 1、草稿 1」，
-	// 剩下的 7 件在畫面上無從解釋，而使用者的下一步正是點「前往商品管理」——那一頁
-	// 有四張卡，於是同一批商品在兩個畫面上算出不同的帳。
 	const productsAll = useSellerProducts(TOTAL_PROBE, {
 		enabled: canReadProducts,
 	});
@@ -113,8 +104,6 @@ export default function DelegatedDashboardPage() {
 		{ enabled: canReadProducts },
 	);
 	const postTotal = useDelegatedPostTotal(canReadPosts);
-	// 說明列講的區塊數與下面 `canRead*` 三個條件渲染的區塊數是同一件事，所以由同一
-	// 組布林推導出來，不另寫一個會漂移的字面值。
 	const grantedSections = [
 		canReadOrders ? "訂單" : "",
 		canReadProducts ? "商品" : "",
@@ -143,9 +132,7 @@ export default function DelegatedDashboardPage() {
 			<div className="adm-dashboard__note" role="note">
 				<AppIcon name="info" size={20} />
 				<span>
-					{/* `{" "}` 不可省：JSX 會把「運算式 → 換行 → 文字」之間的空白整段吃掉，
-					    少了它兩句話會黏成「…逐格相同。營收、瀏覽數…」。原本兩句都是文字節點，
-					    換行本身就會被折成一個空格。 */}
+
 					{sectionsSentence(grantedSections)}{" "}
 					營收、瀏覽數與追蹤者屬於統計端點，不在代行授權範圍，因此不呈現。
 				</span>
@@ -194,14 +181,7 @@ export default function DelegatedDashboardPage() {
 							tint="primary"
 							icon={<AppIcon name="category" size={20} />}
 						/>
-						{/* 走 CodeMeta Label 而不是「上架中」：商品列表那一列的 pill 直接顯示
-						    後端下發的 `statusLabel`，而這張卡與那顆 pill 只隔一次點擊（右上角
-						    「前往商品管理」），同一個狀態出現兩種說法會讓人以為是兩種狀態。
-						    賣家中心那一側維持自己的操作語（`上架中`／`下架中`）—— 那是既有
-						    契約，而且那邊的卡與 pill 本來就彼此一致。
 
-						    ⚠️ **讀 `PRODUCT_STATUS_LABEL`，不抄字面值**：抄過來的字在 CodeMeta
-						    改 Label 時不會轉紅，於是卡片與它一步之遙的 pill 各說各話。 */}
 						<SummaryStatCard
 							label={PRODUCT_STATUS_LABEL[ProductStatus.ACTIVE]}
 							value={statValue(productsActive.data?.total)}
@@ -220,9 +200,7 @@ export default function DelegatedDashboardPage() {
 							tint="secondary"
 							icon={<AppIcon name="document" size={20} />}
 						/>
-						{/* 「庫存預警」不渲染：它要一個安全庫存門檻，而代行的列表 DTO 沒有
-						    這個來源（賣家路徑用的 ≤5 是賣家自己的視角，不該替另一家店代為
-						    定義）。與商品頁同一條裁決。 */}
+
 					</div>
 				</section>
 			) : null}
@@ -243,10 +221,7 @@ export default function DelegatedDashboardPage() {
 							tint="accent"
 							icon={<AppIcon name="edit" size={20} />}
 						/>
-						{/* 只有一張卡是刻意的：貼文列表的 `status` 值域是 `published`／
-						    `hidden`，而 `published` 在 social-service 的實際述詞是
-						    `hidden_at IS NULL`（`posts.sql` 的 `ListMyPosts`）—— 草稿也
-						    算在內。拿它當「已發布」會是一個看起來很具體的假數字。 */}
+
 					</div>
 				</section>
 			) : null}

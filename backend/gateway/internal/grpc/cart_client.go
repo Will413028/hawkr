@@ -50,12 +50,10 @@ func ctxWithAccount(ctx context.Context, timeout time.Duration, userID int64) (c
 	return ctx, cancel
 }
 
-// ctxWithoutAccount 建立不含身分 metadata 的 context（訪客流程）
 func ctxWithoutAccount(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, timeout)
 }
 
-// ==================== 對外 API ====================
 
 // AddItem 加入購物車
 func (c *CartClient) AddItem(ctx context.Context, userID int64, req *pb.AddItemRequest) (*pb.AddItemResponse, error) {

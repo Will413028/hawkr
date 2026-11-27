@@ -77,8 +77,6 @@ describe("isShippingDestinationReady", () => {
 			expect(isShippingDestinationReady(method, bothPicked)).toBe(false);
 			expect(isShippingDestinationReady(method, nothingPicked)).toBe(false);
 		}
-		// 對照：已知 provider 在同一組輸入下是放行的，證明上面的 false 不是
-		// 「這個函式對什麼都回 false」。
 		expect(isShippingDestinationReady(ShippingMethod.TAQBIN, bothPicked)).toBe(
 			true,
 		);

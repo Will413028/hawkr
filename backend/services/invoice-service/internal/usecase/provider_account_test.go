@@ -14,19 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// 本檔的每一支陰性測試都在驗同一件事：**守衛不成立時什麼都不能發生**。
-// 只斷言「回了哪個碼」不夠——rows=0 的危險形狀是「回了錯誤，但前面已經寫了一半」。
-// 所以每一支陰性都額外數 repo 的呼叫次數。
-//
-// 🔴 另有一組**明文旁路**斷言（TestProviderAccount_AppKeyNeverLeaves…）：AppKey 是
-// write-only 的憑證，它只能出現在 repository 的寫入參數裡。回應、狀態歷程、ADM 稽核
-// 任何一處出現它都是外洩，而那三處都是持久化且保存期以年計。
 
 var providerNow = time.Date(2026, 8, 30, 6, 0, 0, 0, time.UTC)
 
 const testAppKey = "amego-app-key-SECRET-9f2c"
 
-// providerAdjs 記下 P14／P16 有沒有把該 issuer 的未送出調整一起收掉（#3073）。
 type providerAdjs struct {
 	domain.AdjustmentRepository
 	calls   int
@@ -87,9 +79,6 @@ func accountAt(status string, version int64) domain.ProviderAccount {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 24 憑證寫入
-// ---------------------------------------------------------------------------
 
 func TestProviderAccount_PutCredentials_FirstBind(t *testing.T) {
 	fx := newProviderFixture(domain.ProviderAccount{})
@@ -105,8 +94,6 @@ func TestProviderAccount_PutCredentials_FirstBind(t *testing.T) {
 	if len(fx.accounts.created) != 1 {
 		t.Fatalf("應建列一次，實得 %d", len(fx.accounts.created))
 	}
-	// 落地即 CREDENTIAL_VERIFYING（§6.1.8 端點 24）：CREDENTIAL_SUBMITTED 是不對外呈現
-	// 的中間態，賣家按下儲存後看到的下一格必須是「驗證中」。
 	if fx.accounts.created[0].Status != codemeta.InvoiceProviderAccountStatusCredentialVerifying.Value {
 		t.Fatalf("建列狀態應為 CREDENTIAL_VERIFYING，實得 %q", fx.accounts.created[0].Status)
 	}
@@ -179,7 +166,6 @@ func TestProviderAccount_PutCredentials_FingerprintTaken(t *testing.T) {
 		ConsentVersion: "v1", ExpectedVersion: 5,
 	})
 	assertBiz(t, err, bizcode.InvoiceProviderCredentialTaken)
-	// 交易在 PostgreSQL 端已 aborted ⇒ 之後不得再下任何一句 SQL。
 	if len(fx.audit.entries) != 0 {
 		t.Fatalf("撞唯一鍵之後不得再寫任何一列，實得 %d", len(fx.audit.entries))
 	}
@@ -214,11 +200,9 @@ func TestProviderAccount_AppKeyNeverLeavesRepository(t *testing.T) {
 		t.Fatalf("PutCredentials 失敗：%v", err)
 	}
 
-	// ① 明文確實有到 repository（否則本測試會因為「根本沒寫」而假綠）。
 	if len(fx.accounts.seenAppKeys) != 1 || fx.accounts.seenAppKeys[0] != testAppKey {
 		t.Fatalf("repository 應收到一次明文 AppKey，實得 %v", fx.accounts.seenAppKeys)
 	}
-	// ② 回應的每一個字串欄位都不得包含它。
 	for name, v := range map[string]string{
 		"Provider": view.Account.Provider, "ProviderTaxID": view.Account.ProviderTaxID,
 		"Status": view.Account.Status, "CredentialLast4": view.Account.CredentialLast4,
@@ -230,13 +214,11 @@ func TestProviderAccount_AppKeyNeverLeavesRepository(t *testing.T) {
 	if view.Account.StatusReason != nil && strings.Contains(*view.Account.StatusReason, testAppKey) {
 		t.Fatalf("StatusReason 洩漏 AppKey")
 	}
-	// ③ 狀態歷程不得包含它。
 	for _, e := range fx.audit.entries {
 		if e.ReasonDetail != nil && strings.Contains(*e.ReasonDetail, testAppKey) {
 			t.Fatalf("狀態歷程 reason_detail 洩漏 AppKey：%q", *e.ReasonDetail)
 		}
 	}
-	// ④ ADM 稽核不得包含它（本路徑本來就不寫，但值域一旦擴大就會有人加上去）。
 	for _, e := range fx.audit.admin {
 		if strings.Contains(string(e.AfterState), testAppKey) || strings.Contains(e.ReasonDetail, testAppKey) {
 			t.Fatalf("ADM 稽核洩漏 AppKey")
@@ -244,9 +226,6 @@ func TestProviderAccount_AppKeyNeverLeavesRepository(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 25 測試連線
-// ---------------------------------------------------------------------------
 
 func TestProviderAccount_Verify_Success(t *testing.T) {
 	fx := newProviderFixture(accountAt("CREDENTIAL_SUBMITTED", 2))
@@ -267,19 +246,15 @@ func TestProviderAccount_Verify_Success(t *testing.T) {
 	if landed.NextStatus != codemeta.InvoiceProviderAccountStatusActive.Value {
 		t.Fatalf("三項全過應落 ACTIVE，實得 %q", landed.NextStatus)
 	}
-	// 🔴 落 ACTIVE 必須同時寫 verified_at：chk_ipa_active_verified 是 DB 端的等式，
-	// 少寫它整句 UPDATE 會 23514。
 	if landed.VerifiedAt == nil || !landed.VerifiedAt.Equal(providerNow) {
 		t.Fatalf("落 ACTIVE 應寫 verified_at=now，實得 %v", landed.VerifiedAt)
 	}
-	// CAS 帶的是**推進之後**的版本（2 → 3）。拿舊版本去落地會 rows=0。
 	if landed.ExpectedVersion != 3 {
 		t.Fatalf("落地 CAS 應帶 version=3，實得 %d", landed.ExpectedVersion)
 	}
 	if view.Account.Status != "ACTIVE" {
 		t.Fatalf("回應狀態應為 ACTIVE，實得 %q", view.Account.Status)
 	}
-	// 三項的第一項與第三項各打一次唯讀端點；**沒有任何寫入類外呼**。
 	if len(fx.provider.verify.banCalls) != 1 || len(fx.provider.verify.trackArgs) != 1 {
 		t.Fatalf("應各打一次 ban_query／track_all，實得 %d／%d",
 			len(fx.provider.verify.banCalls), len(fx.provider.verify.trackArgs))
@@ -298,16 +273,12 @@ func TestProviderAccount_Verify_InvalidCredential(t *testing.T) {
 		StoreID: 2685914682, ExpectedVersion: 2,
 	})
 	assertBiz(t, err, bizcode.InvoiceProviderCredentialInvalid)
-	// 🔴 狀態必須**先落地**才回碼：少了它 S03 顯示「驗證失敗」而狀態還停在驗證中，
-	// 賣家看不出下一步是重打 AppKey 還是等一下再試。
 	if view.Account.Status != codemeta.InvoiceProviderAccountStatusInvalidCredential.Value {
 		t.Fatalf("code 16 應落 INVALID_CREDENTIAL，實得 %q", view.Account.Status)
 	}
-	// 失敗時 verified_at 必須沿用原值：清成 NULL 會讓已設切點的列 23514。
 	if fx.accounts.landed[0].VerifiedAt == nil {
 		t.Fatalf("落失敗狀態時 verified_at 不得被清空")
 	}
-	// track_all 不該被打（第一項就掛了）。
 	if len(fx.provider.verify.trackArgs) != 0 {
 		t.Fatalf("簽章檢查失敗後不得續打 track_all")
 	}
@@ -348,7 +319,6 @@ func TestProviderAccount_Verify_Unavailable(t *testing.T) {
 // ——那是重試多久都不會好的錯誤，而失敗高峰正好落在期初。
 func TestProviderAccount_Verify_NoUsableTrack(t *testing.T) {
 	fx := newProviderFixture(accountAt("CREDENTIAL_SUBMITTED", 2))
-	// 有字軌列，但沒有任何一組是「API 配號」（TrackApiCode 空）。
 	fx.provider.verify.tracks = []amego.Track{{Code: "AB", TrackAPICode: ""}}
 
 	view, err := fx.uc.Verify(context.Background(), VerifyProviderAccountInput{
@@ -400,9 +370,6 @@ func TestProviderAccount_Verify_StateNotAllowed(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 26 確認啟用切點
-// ---------------------------------------------------------------------------
 
 func TestProviderAccount_Activate(t *testing.T) {
 	fx := newProviderFixture(accountAt("ACTIVE", 6))
@@ -454,9 +421,6 @@ func TestProviderAccount_Activate_NotVerified(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 27 憑證輪替
-// ---------------------------------------------------------------------------
 
 func TestProviderAccount_Rotate_Success(t *testing.T) {
 	fx := newProviderFixture(accountAt("ACTIVE", 8))
@@ -473,7 +437,6 @@ func TestProviderAccount_Rotate_Success(t *testing.T) {
 	if len(fx.accounts.promoted) != 1 {
 		t.Fatalf("驗證通過應扶正一次，實得 %d", len(fx.accounts.promoted))
 	}
-	// 扶正 CAS 帶的是 ROTATION_PENDING 之後的版本（8 → 9）。
 	if fx.accounts.promoted[0].ExpectedVersion != 9 {
 		t.Fatalf("扶正應帶 version=9，實得 %d", fx.accounts.promoted[0].ExpectedVersion)
 	}
@@ -520,9 +483,6 @@ func TestProviderAccount_Rotate_SameKey(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 44 ADM 主動連線檢查
-// ---------------------------------------------------------------------------
 
 // TestProviderAccount_HealthCheck_ActiveStaysActive 驗定版③：ACTIVE 通過 ⇒ status 完全不動。
 func TestProviderAccount_HealthCheck_ActiveStaysActive(t *testing.T) {
@@ -582,9 +542,6 @@ func TestProviderAccount_HealthCheck_CredentialFaultLandsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 45 停用／端點 66 恢復／端點 67 撤銷
-// ---------------------------------------------------------------------------
 
 func TestProviderAccount_Deactivate(t *testing.T) {
 	fx := newProviderFixture(accountAt("ACTIVE", 4))
@@ -596,7 +553,6 @@ func TestProviderAccount_Deactivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeactivateForAdmin 失敗：%v", err)
 	}
-	// 🔴 同一交易內把該 issuer 全部未終態 operation 轉終態（§7.4 C-8）。
 	if len(fx.ops.failOpen) != 1 {
 		t.Fatalf("應集合式轉終態一次，實得 %d", len(fx.ops.failOpen))
 	}
@@ -604,11 +560,6 @@ func TestProviderAccount_Deactivate(t *testing.T) {
 		t.Fatalf("cancel_reason_code 應為 PROVIDER_SUSPENDED_BY_ADMIN，實得 %q",
 			fx.ops.failOpen[0].CancelReasonCode)
 	}
-	// 🔴 同一交易內也要收掉該 issuer 還沒送出去的 adjustment（#3073）。
-	//
-	// 少了這一句，operation 被打成 FAILED_PERMANENT 而 adjustment 留在 PENDING／SENDING
-	// ——沒有執行者、沒有告警（在 invoice_adjustment_stuck_rows 出現之前），
-	// dev 上實測 8 筆卡了三天，last_error 全是這條路徑寫的。
 	if fx.adjs.calls != 1 {
 		t.Fatalf("應收掉未送出的 adjustment 一次，實得 %d —— 它們會停在 PENDING／SENDING 而沒有執行者",
 			fx.adjs.calls)
@@ -628,7 +579,6 @@ func TestProviderAccount_Deactivate(t *testing.T) {
 	if len(fx.audit.admin) != 1 || fx.audit.admin[0].Action != providerAuditActionDeactivate {
 		t.Fatalf("應寫一列 ADM 稽核")
 	}
-	// 稽核 before/after 只放狀態欄：那張表保存 5 年。
 	if strings.Contains(string(fx.audit.admin[0].AfterState), "9f2c") {
 		t.Fatalf("ADM 稽核不得含 credential_last4")
 	}
@@ -678,7 +628,6 @@ func TestProviderAccount_Reactivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReactivateForAdmin 失敗：%v", err)
 	}
-	// 🔴 恢復前強制重驗：必須先推進 CREDENTIAL_VERIFYING，不得直接回 ACTIVE。
 	if len(fx.accounts.startVerify) != 1 {
 		t.Fatalf("恢復前應強制重驗，實得 %d 次推進", len(fx.accounts.startVerify))
 	}
@@ -688,7 +637,6 @@ func TestProviderAccount_Reactivate(t *testing.T) {
 	if view.Account.Status != "ACTIVE" {
 		t.Fatalf("重驗通過後應為 ACTIVE，實得 %q", view.Account.Status)
 	}
-	// 被端點 45 打成 FAILED_PERMANENT 的那批**不自動復活**。
 	if len(fx.ops.failOpen) != 0 {
 		t.Fatalf("恢復不得碰 operation")
 	}
@@ -720,7 +668,6 @@ func TestProviderAccount_Revoke_FromActive(t *testing.T) {
 	if got.Status != codemeta.InvoiceProviderAccountStatusRevoked.Value {
 		t.Fatalf("狀態應為 REVOKED，實得 %q", got.Status)
 	}
-	// 來源非 SUSPENDED ⇒ 比照 P14 打掉在途 job。
 	if len(fx.ops.failOpen) != 1 {
 		t.Fatalf("來源為 ACTIVE 時應集合式轉終態一次，實得 %d", len(fx.ops.failOpen))
 	}
@@ -748,7 +695,7 @@ func TestProviderAccount_Revoke_FromSuspendedSkipsFailOpen(t *testing.T) {
 // 已 REVOKED 的列撤不了第二次，而且**不會靜默成功**。
 func TestProviderAccount_Revoke_AlreadyRevoked(t *testing.T) {
 	fx := newProviderFixture(accountAt("REVOKED", 9))
-	fx.accounts.revokeOK = false // SQL 的 allowed-from 不含 REVOKED ⇒ rows=0
+	fx.accounts.revokeOK = false
 
 	_, err := fx.uc.RevokeForAdmin(context.Background(), AdminProviderActionInput{
 		ActorAccountID: 42, StoreID: 2685914682, Reason: "再撤一次",
@@ -791,9 +738,6 @@ func TestProviderAccount_Revoke_VersionConflict(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tier A
-// ---------------------------------------------------------------------------
 
 // TestProviderAccount_TierA_UnknownStoreIsIndistinguishable 驗越權與查無共用 9330。
 //
@@ -837,9 +781,6 @@ func assertBiz(t *testing.T, err error, code int32) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 切點歷史（§5.1.15，端點 46 的唯一資料來源）
-// ---------------------------------------------------------------------------
 
 // 端點 26 必須在**同一交易**內留下一列切點歷史，否則端點 46 永遠是空清單，
 // 而空清單看起來就像「這個賣家還沒設過切點」。
@@ -859,11 +800,9 @@ func TestProviderAccount_Activate_RecordsCutoverHistory(t *testing.T) {
 	if !row.CutoverAt.Equal(cutover) {
 		t.Fatalf("切點時間不符：want %v got %v", cutover, row.CutoverAt)
 	}
-	// 記的是**設定之後**的版本：ADM 拿 ProviderCutoverItem.version 要對得回帳戶當時那一版。
 	if row.AccountVersion != 7 {
 		t.Fatalf("account_version 應為設定後的 7，實得 %d", row.AccountVersion)
 	}
-	// 賣家路徑的 actor 是 store surrogate（§6 身分分離的既有慣例）。
 	if row.CreatedByAccountID != 2685914682 {
 		t.Fatalf("created_by 應為 store surrogate，實得 %d", row.CreatedByAccountID)
 	}
@@ -965,7 +904,7 @@ func TestProviderOutcomeFromError_ManualCodesAreNotReportedAsTransient(t *testin
 		name          string
 		err           error
 		wantStatus    string
-		wantTransient bool // Reason 是否該說「請稍後再試」
+		wantTransient bool
 	}{
 		{
 			name: "code 99（ClassManual，一碼多義）不得說成暫時性",
@@ -1013,8 +952,6 @@ func TestProviderOutcomeFromError_ManualCodesAreNotReportedAsTransient(t *testin
 			if isTransient != tc.wantTransient {
 				t.Fatalf("Reason=%q 的暫時性語氣 = %v，期望 %v", got.Reason, isTransient, tc.wantTransient)
 			}
-			// 非暫時性的那幾條必須把 AMEGO 的原文帶出來 —— 我方無法把「一碼多義」的 99
-			// 翻成固定文案，猜一句就是把賣家推向錯的下一步。
 			if !tc.wantTransient {
 				var apiErr *amego.APIError
 				if errors.As(tc.err, &apiErr) && apiErr.Msg != "" &&
@@ -1022,7 +959,6 @@ func TestProviderOutcomeFromError_ManualCodesAreNotReportedAsTransient(t *testin
 					t.Fatalf("Reason=%q 應含服務商原文 %q", got.Reason, apiErr.Msg)
 				}
 			}
-			// ACTIVE 帳號不得因為一個分不出歸屬的碼被降級。
 			if got.CredentialFault {
 				t.Fatalf("CredentialFault 應為 false（分不出是賣家憑證還是我方參數），實得 true")
 			}

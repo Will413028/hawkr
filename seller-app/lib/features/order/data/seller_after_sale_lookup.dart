@@ -25,14 +25,11 @@ class SellerAfterSaleLookup extends _$SellerAfterSaleLookup {
           .getAfterSaleList(pageSize: 100);
       final map = <String, AfterSaleCase>{};
       for (final c in result.records) {
-        // 仲裁中的案件即使 raw status 為 60 已拒絕，也已重新進入平台審理，
-        // 必須保留讓賣家在訂單卡看到「申訴仲裁中」，不可當已拒絕排除。
         if (_excludedStatuses.contains(c.status) &&
             !AfterSaleStatus.isUnderAppeal(c.appealState)) {
           continue;
         }
         if (c.orderNo.isEmpty) continue;
-        // 同一訂單可能有多筆 case，保留 createdAt 最新的那筆
         final existing = map[c.orderNo];
         if (existing == null || c.createdAt.compareTo(existing.createdAt) > 0) {
           map[c.orderNo] = c;

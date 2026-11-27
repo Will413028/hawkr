@@ -25,17 +25,6 @@ interface Props {
 	className?: string;
 }
 
-// tone → 完整的 class 字串。兩件事都是刻意的：
-//   1. 不用樣板拼 `border-` ＋ tone ＋ `-200`——Tailwind 掃的是字面值，拼出來的
-//      類別不會被生成，畫面會變成沒有邊框的白卡。
-//   2. 邊框色走 var() 形式而不是語意色 utility：`styles/globals.css` 的 @theme
-//      只把每個語意色的 50 / 600 / 700 階對應成 --color-*，**200 那一階從未登記**
-//      ⇒ 直接寫語意色的 200 階 utility 在 Tailwind v4 下不產生任何 CSS（既有的
-//      `AfterSaleRefundBanner.tsx` 就有幾個這樣的死類別，`check-theme-tokens`
-//      只掃 hk-/hkui- 前綴所以抓不到）。
-//   ⚠️ 這段註解刻意不寫出完整的類別字面值：Tailwind v4 連註解都掃，寫成
-//      class 形狀（尤其帶萬用字元）會真的產出一條 CSS 規則，帶 `*` 的那一條
-//      還會讓整份 globals.css 解析失敗、開發伺服器起不來。
 const TONE_CLASS: Record<InvoiceTaxStatusBanner["tone"], string> = {
 	neutral: "border-divider bg-content2 text-[var(--hkui-foreground)]",
 	info: "border-[var(--hkui-info-200)] bg-info-50 text-info-700",

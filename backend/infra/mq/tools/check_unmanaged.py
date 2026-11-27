@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# infra/mq/tools/check_unmanaged.py
 """terraform plan 看不到 unmanaged 資源（手動 SSH 建的實體是盲區），nightly 用此補上。
 已知盲區：只查 queue/exchange，不查 unmanaged binding（tf plan 只看 managed、本腳本不看
 binding——手動加的野 binding 兩邊都抓不到；Phase 1 接受，Phase 2 可補 /api/bindings 比對）。"""

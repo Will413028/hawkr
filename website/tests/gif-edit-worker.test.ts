@@ -142,9 +142,9 @@ function patchAnimation(disposal: number): ArrayBuffer {
 		if (index === 0) header = bytes.slice(0, 13 + tableBytes);
 		const palette = bytes.slice(13, 13 + tableBytes);
 		const body = bytes.slice(13 + tableBytes, -1);
-		assert.equal(body[8], 0x2c); // GCE followed by image descriptor
+		assert.equal(body[8], 0x2c);
 		body[9] = frame.left;
-		body[17] = 0x80 | (bytes[10] & 7); // give each patch its own palette
+		body[17] = 0x80 | (bytes[10] & 7);
 		return [...body.slice(0, 18), ...palette, ...body.slice(18)];
 	});
 	const loop = [
@@ -256,7 +256,6 @@ test("worker composites edits and budgets selected work before decoding", async 
 		await t.test(
 			"high-colour canvas readback uses bounded bins and retains valid colour and transparent padding",
 			() => {
-				// Represents the high-colour RGBA produced by smooth browser downscaling.
 				const width = 128;
 				const height = 96;
 				const rgba = new Uint8ClampedArray(width * height * 4);
@@ -417,7 +416,7 @@ test("worker composites edits and budgets selected work before decoding", async 
 					const output = preflightAnimatedGif(result.buffer);
 					assert.equal(output.durationMs, "maxFps" in settings ? 7240 : 200);
 					assert.equal(output.frameCount, "maxFps" in settings ? 87 : 5);
-					assert.equal(decodeCalls, 180); // includes the trimmed/sampled leading patches
+					assert.equal(decodeCalls, 180);
 				}
 				responses.length = 0;
 				decodeCalls = 0;
@@ -491,7 +490,6 @@ test("worker composites edits and budgets selected work before decoding", async 
 				);
 				assert.equal(parseCalls, 0);
 				assert.equal(decodeCalls, 0);
-				// The same source is editable when the chosen early prefix is small.
 				responses.length = 0;
 				scope.onmessage?.({
 					data: {

@@ -15,24 +15,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// 本檔涵蓋兩支賣家寫入端點：
-//
-//	端點 36（S10 回覆申訴，K02／K03）
-//	端點 62（S07 回報自行開立，J30）
-//
-// 兩支都是**停權賣家的放行路徑**，所以每一支的陰性測試都特別要求「守衛不成立時
-// 什麼都不能發生」——在這兩條路徑上靜默失敗的後果分別是「賣家回不了申訴而繼續累積
-// 違規」與「賣家開了票卻無處回報、法定期限照樣倒數」。
 
 var sellerNow = time.Date(2026, 8, 30, 7, 0, 0, 0, time.UTC)
 
-// sellerStoreID 是 invoice_issuers.issuer_ref_id（＝ sellers.store_id）；
-// 對照的 PK 是 900，兩者不同才驗得出出向事件填了哪一個。
 const sellerStoreID int64 = 2685914682
 
-// ---------------------------------------------------------------------------
-// 端點 36
-// ---------------------------------------------------------------------------
 
 type sellerComplaintFixture struct {
 	uc         *SellerComplaint
@@ -49,8 +36,6 @@ func newSellerComplaintFixture(status string, version int64) *sellerComplaintFix
 		SlaDueAt: sellerNow.Add(48 * time.Hour), CreatedAt: sellerNow.Add(-24 * time.Hour),
 	}}
 	outbox := &fakeOutbox{}
-	// issuer.ID = 900（PK，與 complaint.IssuerID 相同）、issuer_ref_id = 2685914682
-	// （store_id）。兩者不同才驗得出 payload 填的是哪一個。
 	issuers := &fakeIssuerRepo{issuer: domain.Issuer{
 		ID: 900, IssuerType: "SELLER", IssuerRefID: sellerStoreID,
 	}}
@@ -74,8 +59,6 @@ func TestSellerComplaint_Respond_Resent(t *testing.T) {
 	if view.Complaint.Status != "SELLER_RESPONDED" {
 		t.Fatalf("狀態應為 SELLER_RESPONDED，實得 %q", view.Complaint.Status)
 	}
-	// 🔴 buyer_review_due_at 必須寫 now+72h：它是 K06「逾期視為接受」唯一的觸發依據，
-	// 少寫**不會報錯**，那一列只是從自動結案的候選集合裡消失。
 	if len(fx.complaints.responded) != 1 {
 		t.Fatalf("應走 K02 一次，實得 %d", len(fx.complaints.responded))
 	}
@@ -83,11 +66,9 @@ func TestSellerComplaint_Respond_Resent(t *testing.T) {
 	if !fx.complaints.responded[0].DueAt.Equal(want) {
 		t.Fatalf("buyer_review_due_at 應為 %v，實得 %v", want, fx.complaints.responded[0].DueAt)
 	}
-	// 擁有者述詞必須進 SQL（fake 記下它收到的 store_id）。
 	if fx.complaints.responded[0].StoreID != 2685914682 {
 		t.Fatalf("CAS 必須帶 store_id，實得 %d", fx.complaints.responded[0].StoreID)
 	}
-	// 回覆採**追加事件**、不覆蓋前次。
 	if len(fx.complaints.events) != 1 {
 		t.Fatalf("應追加一列時間軸，實得 %d", len(fx.complaints.events))
 	}
@@ -120,7 +101,6 @@ func TestSellerComplaint_Respond_NeedPlatformHelp(t *testing.T) {
 		t.Fatalf("NEED_PLATFORM_HELP 必須走 K03 而不是 K02：escalated=%d responded=%d",
 			len(fx.complaints.escalated), len(fx.complaints.responded))
 	}
-	// event_type 取 ESCALATED（CodeMeta 對它的描述逐字寫「actor_type = SELLER，請求協助，K03」）。
 	if fx.complaints.events[0].EventType != codemeta.InvoiceComplaintEventTypeEscalated.Value {
 		t.Fatalf("event_type 應為 ESCALATED，實得 %q", fx.complaints.events[0].EventType)
 	}
@@ -166,7 +146,6 @@ func TestSellerComplaint_Respond_UnknownAction(t *testing.T) {
 
 	for _, action := range []string{
 		"", "SELLER_REPLY",
-		// 兩個 ADM 專屬動作：正面列舉三值的用意就是擋住它們。
 		codemeta.InvoiceComplaintActionDecidedResolved.Value,
 		codemeta.InvoiceComplaintActionReminded.Value,
 	} {
@@ -230,7 +209,6 @@ func TestSellerComplaint_Respond_EventPayloadHasNoFreeText(t *testing.T) {
 	if strings.Contains(string(ev.Payload), secret) {
 		t.Fatalf("payload 不得含賣家填寫的自由文字：%s", ev.Payload)
 	}
-	// 冪等鍵必須帶 phase：少了它，created 與 responded 兩則通知會被下游去重掉一則。
 	var decoded struct {
 		NotificationRefID string `json:"notification_ref_id"`
 	}
@@ -242,9 +220,6 @@ func TestSellerComplaint_Respond_EventPayloadHasNoFreeText(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 62
-// ---------------------------------------------------------------------------
 
 type sellerJobFixture struct {
 	uc     *SellerJob
@@ -283,7 +258,7 @@ func TestSellerJob_ReportExternalIssuance_ActorIsSellerOnBothAxes(t *testing.T) 
 
 	if _, err := fx.uc.ReportExternalIssuance(context.Background(), ReportExternalIssuanceInput{
 		StoreID: 2685914682, JobID: 7001, InvoiceNo: "AB12345678", InvoiceDate: "2026-08-25",
-		ExpectedVersion: 4, IdempotencyKey: "idem-62-actor", // gitleaks:allow（測試值）
+		ExpectedVersion: 4, IdempotencyKey: "idem-62-actor",
 	}); err != nil {
 		t.Fatalf("ReportExternalIssuance 失敗：%v", err)
 	}
@@ -322,28 +297,22 @@ func TestSellerJob_ReportExternalIssuance(t *testing.T) {
 	if view.Operation.Status != "RESOLVED_EXTERNALLY" {
 		t.Fatalf("狀態應為 RESOLVED_EXTERNALLY，實得 %q", view.Operation.Status)
 	}
-	// 🔴 operation 與 document 必須同一交易一起轉：只轉 operation 的話賣家 S08 會
-	// 同時看到「已由賣家開立」與「處理中」。
 	if len(fx.ops.resolvedExternally) != 1 || len(fx.docs.resolvedExternally) != 1 {
 		t.Fatalf("operation／document 應各轉一次，實得 %d／%d",
 			len(fx.ops.resolvedExternally), len(fx.docs.resolvedExternally))
 	}
-	// 🔴 provider_invoice_no 必須留空——平台不冒充開立人。號碼只能寫進 external_invoice_no。
 	if fx.docs.resolvedExternally[0].ExternalInvoiceNo != "AB12345678" {
 		t.Fatalf("號碼應寫進 external_invoice_no")
 	}
-	// P12 只發一則、且 wire 欄名是 external_invoice_no（不是 invoice_no）。
 	if len(fx.outbox.inserted) != 1 {
 		t.Fatalf("應發一則 P12，實得 %d", len(fx.outbox.inserted))
 	}
 	if !strings.Contains(string(fx.outbox.inserted[0].Payload), `"external_invoice_no"`) {
 		t.Fatalf("P12 的 wire 欄名必須是 external_invoice_no：%s", fx.outbox.inserted[0].Payload)
 	}
-	// 賣家的動作不寫 ADM 稽核（那張表的 actor 恆為管理員）。
 	if len(fx.audit.admin) != 0 {
 		t.Fatalf("賣家路徑不得寫 invoice_admin_audit_logs，實得 %d 列", len(fx.audit.admin))
 	}
-	// actor 必須是 SELLER：同一件事由 ADM 代錄時是 ADMIN，兩者只有歷程分得出來。
 	var sawSeller bool
 	for _, e := range fx.audit.entries {
 		if e.ActorType == "SELLER" {
@@ -353,7 +322,6 @@ func TestSellerJob_ReportExternalIssuance(t *testing.T) {
 	if !sawSeller {
 		t.Fatalf("狀態歷程的 actor_type 應含 SELLER，實得 %+v", fx.audit.entries)
 	}
-	// 佐證 key 必須落在某處（本波唯一的落點是歷程 reason_detail）。
 	var sawEvidence bool
 	for _, e := range fx.audit.entries {
 		if e.ReasonDetail != nil && strings.Contains(*e.ReasonDetail, "invoice/2026/08/abc.png") {
@@ -445,7 +413,6 @@ func TestSellerJob_ReportExternalIssuance_BadInput(t *testing.T) {
 func TestSellerJob_ReportExternalIssuance_DateBeforePayment(t *testing.T) {
 	fx := newSellerJobFixture("MANUAL_PROCESS_ALLOWED", 4)
 
-	// docAt 的 issue_not_before 是 2026-08-20T01:00Z ⇒ 台北曆日 2026-08-20。
 	_, err := fx.uc.ReportExternalIssuance(context.Background(), ReportExternalIssuanceInput{
 		StoreID: 2685914682, JobID: 7001, InvoiceNo: "AB12345678", InvoiceDate: "2026-08-19",
 		ExpectedVersion: 4,

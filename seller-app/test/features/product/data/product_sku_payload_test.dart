@@ -61,8 +61,6 @@ void main() {
     test('新增規格（無 id）：兩個欄位都不送，維持 INSERT 語意', () {
       final json = spec().toSkuJson();
 
-      // 送空字串 id 會讓後端的「帶 id 必須屬於本商品」檢查與 INSERT 分支語意都變糊，
-      // 所以是「不送」而不是「送空字串」。
       expect(json.containsKey('id'), isFalse);
       expect(json.containsKey('expectedVersion'), isFalse);
     });
@@ -126,7 +124,6 @@ void main() {
 
   group('版本衝突業務碼', () {
     test('與後端 CodeMeta 的 DELEGATION_RESOURCE_VERSION_CONFLICT 一致', () {
-      // 值改了就代表後端 SSOT 改了，這支測試是提醒去對照 錯誤碼.md 的錨。
       expect(kVersionConflictBizCode, 9266);
     });
   });

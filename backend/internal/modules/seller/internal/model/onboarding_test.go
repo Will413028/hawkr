@@ -11,7 +11,6 @@ import (
 
 var errRead = errors.New("來源讀取失敗")
 
-// conds 是店家讀出的條件：kyc 與 transfers 是閘門的兩個來源欄，profile 決定店名、logo 與鄉鎮市區代碼是否都有。
 func conds(kyc, transfers, profile bool) Conditions {
 	return Conditions{Derived: true, Active: true, NotPendingDeletion: true, KYCApproved: kyc, TransfersActive: transfers, StoreName: profile, Logo: profile, TownCode: profile}
 }
@@ -158,7 +157,6 @@ func TestOnboardingActionsAreNoneWhenTheStoreCannotWrite(t *testing.T) {
 				t.Errorf("%s：%s 的狀態或句子被清掉：%+v", tc.name, task.ID, task)
 			}
 		}
-		// 狀態與句子與「能寫」的同一份輸入相同。
 		writable := tc.store
 		writable.Sanctions, writable.Status = NoSanctions(), Active
 		writable.Conditions.Active, writable.Conditions.NotPendingDeletion = true, true
@@ -172,7 +170,6 @@ func TestOnboardingActionsAreNoneWhenTheStoreCannotWrite(t *testing.T) {
 			}
 		}
 	}
-	// 聯絡客服不需要賣家能力：停權的店家照舊拿得到。
 	dis := OnboardingTasksOf(uitext.ZhTW, OnboardingInput{Store: withKYC(suspended), KYC: OnboardingKYCRead{Found: true, Status: KYCStatusApproved},
 		Payment: OnboardingPaymentRead{Found: true, Status: "DISABLED", Configured: true}})
 	if got := taskOf(t, dis, OnboardingPaymentAccount).Action; got != OnboardingActionContactSupport {
@@ -240,7 +237,6 @@ func TestEveryPublicListingRequirementIsCoveredByATaskOrTheNoticePage(t *testing
 			t.Errorf("對照表有不是公開條件的 %s", r)
 		}
 	}
-	// 商店資料任務缺哪些條件就是表裡歸它的條件：缺任何一項都不能是 COMPLETED。
 	for _, r := range requirementsOf(OnboardingProfile) {
 		c := conds(true, true, true)
 		clear, ok := map[Requirement]func(*Conditions){

@@ -1,15 +1,3 @@
-/*
- * 買家端「詢價已發布」的三區版面（稿 R-02，issue #2538 A8 後半）。
- *
- * 用 CSS module 而不是往 styles/features/procurement-assistant.css 疊，理由與
- * buyer-quote-compare.module.css 同一條：那支是 assistant layout 的全域樣式表，
- * 這個版面的 class 沒有理由進入全域命名空間。仍在用的全域 class 只剩
- * `assistant-quote-summary__delivery`（揭露行）；`__footer` 隨舊 footer、
- * `__invites` 隨 legacy 邀請清單一起移除。本檔只加三個區塊自己的樣式。
- *
- * 兩欄是「事實」與「還沒成立的事實」的分界：左欄放已經固定下來的快照與進度，
- * 右欄整欄都是「目前交易真相」。窄螢幕堆疊時右欄排在最後，因為它是結論。
- */
 
 .panel {
 	display: grid;
@@ -61,8 +49,6 @@
 	font-weight: 600;
 }
 
-/* 快照卡：dl/dt/dd（V.11.4 Accessibility 要求 artifact 用 section＋heading 與
- * dl 結構），欄寬自動塞滿，窄螢幕自然掉成一欄。 */
 .facts {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -114,8 +100,6 @@
 	color: var(--hkui-primary);
 }
 
-/* 進度：ol，每一步一列。狀態不只靠顏色——序號圈的形狀、右側的狀態字與
- * aria-current 三者一起表達（V.11.4 Accessibility：warning 不只靠顏色）。 */
 .steps {
 	display: grid;
 	gap: 2px;
@@ -203,7 +187,6 @@
 	color: var(--hkui-danger-text);
 }
 
-/* 目前交易真相：右欄整欄。 */
 .truth {
 	display: grid;
 	gap: 14px;
@@ -244,8 +227,6 @@
 	overflow-wrap: anywhere;
 }
 
-/* 「尚未成立」「尚未建立」「尚未取得」不是壞消息也不是好消息，所以刻意不上
- * 語意色——把空狀態染紅會讓買家以為出了問題，染綠則是樂觀文案。 */
 .truthRow dd[data-empty] {
 	color: var(--hkui-foreground-muted);
 	font-weight: 400;

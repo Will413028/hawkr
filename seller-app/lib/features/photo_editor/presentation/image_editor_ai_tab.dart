@@ -42,18 +42,15 @@ class ImageEditorAiTab extends StatefulWidget {
 
 class ImageEditorAiTabState extends State<ImageEditorAiTab> {
   final TextEditingController _promptController = TextEditingController();
-  String _selectedTab = 'preset'; // preset, custom, history
+  String _selectedTab = 'preset';
   String? _selectedStyle;
   bool _hasPromptText = false;
 
-  // 使用外部傳入的歷史紀錄
   List<Map<String, dynamic>> get _aiHistory => widget.aiHistory ?? [];
   int get _aiUsageCount => widget.aiUsageCount ?? 0;
   int get _maxAiUsage => widget.aiMaxUsage ?? 10;
-  // 額度用盡：停用預設風格 / 自訂套用；後端仍是最終把關者，這只是前端閘門。
   bool get _quotaReached => _aiUsageCount >= _maxAiUsage;
 
-  // 靜態 fallback（API 失敗時使用），依分類拆兩組
   static final _fallbackStylesProduct = [
     const AiStyle(id: '1', name: 'natural', label: '新鮮自然', prompt: ''),
     const AiStyle(id: '2', name: 'warm', label: '陽光暖色', prompt: ''),
@@ -125,7 +122,6 @@ class ImageEditorAiTabState extends State<ImageEditorAiTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // AI 優化標題列
             Padding(
               padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 12.h),
               child: Row(
@@ -156,7 +152,6 @@ class ImageEditorAiTabState extends State<ImageEditorAiTab> {
                 ],
               ),
             ),
-            // Tab 選擇（預設風格、自訂提示詞、更改紀錄）
             Container(
               decoration: const BoxDecoration(
                 border: Border(
@@ -172,7 +167,6 @@ class ImageEditorAiTabState extends State<ImageEditorAiTab> {
               ),
             ),
             SizedBox(height: 16.h),
-            // 內容區
             _selectedTab == 'custom'
                 ? _buildCustomPromptContent()
                 : _selectedTab == 'history'

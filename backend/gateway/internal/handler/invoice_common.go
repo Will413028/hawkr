@@ -7,9 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// invoiceAdminPageSizeStr 是 ADM 佇列類端點（tax_reviews／jobs／complaints／
-// audit_logs／documents）的預設 page_size，買賣家面沿用 defaultPageSizeStr（10）。
-// §6.1.0(9)。
 const invoiceAdminPageSizeStr = "20"
 
 // DeleteBuyerInvoiceProfileData 是端點 4 的 data。
@@ -20,10 +17,6 @@ type DeleteBuyerInvoiceProfileData struct {
 	Deleted bool `json:"deleted"`
 }
 
-// invoicePaging 解析並驗證分頁 query（§6.1.0(9)）。
-//
-// ⚠️ 逾越上限一律 400，**不夾住**：夾住之後回應的 pageSize 與請求不符，前端據此算
-// 總頁數會算錯，而且沒有任何訊號。
 func invoicePaging(c *gin.Context, defaultSize string) (string, string, bool) {
 	page := c.DefaultQuery("page", defaultPageStr)
 	size := c.DefaultQuery("page_size", defaultSize)
@@ -38,7 +31,6 @@ func invoicePaging(c *gin.Context, defaultSize string) (string, string, bool) {
 	return page, size, true
 }
 
-// invoiceBoolQuery 讀 "true"/"false" 的布林 query；未帶視為 false，其餘值 400。
 func invoiceBoolQuery(c *gin.Context, key string) (bool, bool) {
 	raw := c.Query(key)
 	switch raw {

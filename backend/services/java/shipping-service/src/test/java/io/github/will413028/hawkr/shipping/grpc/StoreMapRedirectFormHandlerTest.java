@@ -24,9 +24,6 @@ import static org.mockito.Mockito.when;
 class StoreMapRedirectFormHandlerTest {
 
     private ShippingGrpcServiceImpl newService(StoreMapService storeMapService) {
-        // 建構子僅賦值不呼叫；只需要 storeMapService，其餘依賴傳 null
-        // ⚠️ 位置參數 ⇒ 建構子多一個參數這裡就編譯失敗。那是**好事**：
-        //    它強迫加參數的人看一眼這支測試，而不是讓它靜默地傳錯位置。
         return new ShippingGrpcServiceImpl(
                 null, null, null, storeMapService, null, null, null, null, null, null, null, null, null,
                 null, null);

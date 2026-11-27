@@ -19,8 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// 代行 Connect 的共用元件（DelegatedWrite、DelegatedRead）：不開 transaction：呼叫資源模組（這裡是 social），social 在自己的 transaction 內發帶代行者的一般貼文事件（代行者是方法的明確參數，A7-D27），訂閱者同 transaction 檢查 session 與能力、寫單段 SUCCEEDED 稽核（A7-D26）；
-// 被拒絕與寫入失敗另開 transaction 寫 FAILED。handler 的角色由下面的 writePost 等輔助函式扮演（資源模組的 handler 在 httpapi/social）。
 
 var (
 	methodRead      = DelegatedMethod{Capability: CapabilityPostsRead, Action: AuditPostRead, Resource: ResourcePost}
@@ -37,7 +35,6 @@ type operator struct {
 	session issuedSession
 }
 
-// newOperator 建一位開通的管理員、含三個貼文能力的店家授權與進行中的 session；seller 用真的讀取（貼文要經 social 的店家能力檢查）。
 func (f *fixture) newOperator(t *testing.T, tag string, caps ...Capability) operator {
 	t.Helper()
 	f.storeFn = func(id int64) (seller.Store, error) { return f.sellers.Store(context.Background(), id) }
@@ -50,7 +47,6 @@ func (f *fixture) newOperator(t *testing.T, tag string, caps ...Capability) oper
 	return operator{storeID: storeID, admin: admin, session: f.start(t, startInput(admin, storeID, "ik-"+tag, caps...))}
 }
 
-// caller 是 interceptor 解出的代行：以憑證重新解析（與傳輸層相同），帶著被呼叫的方法宣告。
 func (f *fixture) caller(t *testing.T, o operator, m DelegatedMethod) DelegatedCaller {
 	t.Helper()
 	s, err := f.m.ResolveDelegation(context.Background(), o.session.Credential, true)
@@ -84,7 +80,6 @@ func (f *fixture) postCount(t *testing.T, storeID int64) int {
 	return f.count(t, `SELECT count(*) FROM social.posts WHERE store_id = $1`, storeID)
 }
 
-// failedRow 是 session 的 FAILED 稽核列中指定動作的那一列：failure_reason、操作原因、冪等鍵、request_id、能力與 notify_seller。
 type failedRow struct {
 	failureReason              *string
 	reason, key                *string
@@ -115,14 +110,12 @@ func wantFailureReason(t *testing.T, what string, got *string, want string) {
 	}
 }
 
-// written 是 handler 扮演者的結果：貼文、元件的結果與排程時間。
 type written struct {
 	Post      social.Post
 	Res       DelegatedWriteResult
 	PublishAt *time.Time
 }
 
-// writePost 扮演資源模組的 handler：交給元件執行 do；重送時讀回第一次寫入的貼文。
 func (f *fixture) writePost(c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error)) (written, error) {
 	ctx := context.Background()
 	var out written
@@ -288,11 +281,9 @@ func TestEveryDelegatedPostWriteLeavesOneSucceededAuditRow(t *testing.T) {
 	if n := f.resultRows(t, sid, "FAILED"); n != 0 {
 		t.Fatalf("成功的寫入留下 %d 列 FAILED", n)
 	}
-	// 通知賣家的完成事件：五個寫入各一則。
 	if len(f.completed) != 5 {
 		t.Fatalf("完成通知 %d 則，預期 5", len(f.completed))
 	}
-	// 排程是店家的、發起者是這個 session。
 	var kind, ref string
 	if err := f.db.Pool().QueryRow(ctx, `SELECT scheduled_by_kind, scheduled_by_ref FROM social.post_schedules WHERE post_id = $1 AND state = 'PENDING'`, scheduled.Post.ID).Scan(&kind, &ref); err != nil {
 		t.Fatal(err)
@@ -334,7 +325,6 @@ func TestReplayWithTheSamePayloadDoesNotCallSocialAgain(t *testing.T) {
 	if n := f.resultRows(t, sid, "FAILED"); n != 0 {
 		t.Fatalf("重送留下 %d 列 FAILED", n)
 	}
-	// 重送回的是貼文此刻的樣子：第一次之後貼文被改過，重送看到新的版本。
 	if _, err := f.updatePost(f.caller(t, o, methodUpdate), f.op("改"), first.Post.ID, first.Post.Version, "後來改的"); err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +332,6 @@ func TestReplayWithTheSamePayloadDoesNotCallSocialAgain(t *testing.T) {
 	if err != nil || !later.Res.Replayed || later.Post.Body != "後來改的" {
 		t.Fatalf("重送要回目前的樣子：%+v %v", later.Post.Body, err)
 	}
-	// 同一把 request_id、不同內容不是重送：拒絕，且另寫一列 FAILED（9267）。
 	_, err = f.createPost(c, op, "別的內容", "tok-fixed")
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("同一個 request_id、不同內容：%v，預期 failed_precondition", err)
@@ -420,7 +409,6 @@ func TestSocialFailureLeavesNoSucceededRowButAFailedRow(t *testing.T) {
 	if got := f.postStatus(t, p.ID); got != "DRAFT" {
 		t.Fatalf("貼文 = %s", got)
 	}
-	// 同一個 request_id 以正確的版本重試成功，SUCCEEDED 只有一列，FAILED 那一列仍在。
 	if _, err := f.transition(c, op, p.ID, p.Version); err != nil {
 		t.Fatal(err)
 	}
@@ -443,12 +431,10 @@ func TestEndedOrRevokedSessionCannotWriteAndLeavesFailedRows(t *testing.T) {
 	if _, err := f.m.RevokeDelegation(ctx, RevokeDelegationInput{SessionID: sid, AdminID: o.admin, Reason: "測試撤銷"}); err != nil {
 		t.Fatal(err)
 	}
-	// 傳輸層解析之後才被撤銷：用過期的快照（ACTIVE）呼叫，transaction 內的 session 檢查擋下。
 	_, err := f.createPost(live, f.op("撤銷之後"), "x", "tok-x")
 	if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialSessionRevoked {
 		t.Fatalf("撤銷後（舊快照）：%v，預期 DenialSessionRevoked", err)
 	}
-	// 重新解析得到的快照是 REVOKED：進交易之前就擋下。
 	fresh := f.caller(t, o, methodCreate)
 	if fresh.Session.Status != DelegationRevoked {
 		t.Fatalf("status = %s", fresh.Session.Status)
@@ -468,7 +454,6 @@ func TestEndedOrRevokedSessionCannotWriteAndLeavesFailedRows(t *testing.T) {
 	}
 	wantFailureReason(t, "撤銷的 session", row.failureReason, "SESSION_REVOKED")
 
-	// 結束的 session（到期）：以到期的快照呼叫。
 	o2 := f.newOperator(t, "ended2")
 	if err := f.m.EndDelegation(ctx, o2.session.Credential); err != nil {
 		t.Fatal(err)
@@ -526,14 +511,12 @@ func TestMissingCapabilityIsRejectedAndLeavesFailedRows(t *testing.T) {
 	if n := f.postCount(t, o.storeID); n != 1 {
 		t.Fatalf("貼文 %d 篇，預期只有一開始的草稿", n)
 	}
-	// 讀取有 posts.read：能讀，而且成功的讀取不稽核。
 	if _, err := f.readPost(f.caller(t, o, methodRead), p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if n := f.auditRows(t, sid, "POST_READ"); n != 0 {
 		t.Fatalf("成功的讀取留下 %d 列稽核", n)
 	}
-	// 沒有 posts.read 的 session 讀不了，被拒絕的讀取寫 FAILED（POST_READ，9262）。
 	w := f.newOperator(t, "writeonly", CapabilityPostsWrite)
 	_, err = f.readPost(f.caller(t, w, methodRead), p.ID)
 	deny("讀取", err)
@@ -685,7 +668,6 @@ func TestStoreSuspendedAndClosedEndThatStoresSessions(t *testing.T) {
 			if o, _ := f.m.ResolveDelegation(ctx, theirs.Credential, false); o.Status != DelegationActive {
 				t.Fatalf("別家店的 session 不受影響：%+v", o)
 			}
-			// 事件的 transaction 失敗時結束一起 rollback（同一個 transaction）。
 			again := f.start(t, startInput(admin, testStore, "ik-3"))
 			boom := fmt.Errorf("boom")
 			if err := f.db.InTx(ctx, func(ctx context.Context) error {

@@ -31,8 +31,6 @@ const avatarSource = () =>
 	readFile(new URL("../components/shared/Avatar.tsx", import.meta.url), "utf8");
 
 test("a pending avatar renders the image, not the fallback element", () => {
-	// Buyer with a name: the fallback strategy is `initial`, i.e. the case where
-	// the old code had the most to swap in. Nothing may pre-empt the image.
 	const markup = renderToStaticMarkup(
 		createElement(Avatar, {
 			src: "public/avatar/buyer-1.png",
@@ -49,9 +47,6 @@ test("a pending avatar renders the image, not the fallback element", () => {
 		/<span/,
 		"the fallback element must not stand in for a src that is merely loading",
 	);
-	// The initial is the fallback element's text content, and that element
-	// carries `role="img"`. Neither may be on screen while a real avatar is on
-	// its way. (`陳` on its own would match the alt attribute, which is correct.)
 	assert.doesNotMatch(markup, /role="img"/);
 	assert.doesNotMatch(markup, />陳</);
 });
@@ -60,7 +55,6 @@ test("the placeholder fallback is painted under the image, not in its place", ()
 	const markup = renderToStaticMarkup(
 		createElement(Avatar, {
 			src: "public/avatar/buyer-2.png",
-			// No name → the buyer strategy resolves to `placeholder`.
 			entity: "buyer",
 			className: "size-10 rounded-full object-cover",
 		}),
@@ -73,8 +67,6 @@ test("the placeholder fallback is painted under the image, not in its place", ()
 		`placeholder layer missing from: ${markup}`,
 	);
 	assert.match(markup, /background-size:cover/);
-	// The layer must ride on the image element itself. A second element would
-	// take `className` away from the node every caller's CSS sizes and targets.
 	assert.doesNotMatch(markup, /<span|<div/);
 });
 
@@ -90,10 +82,6 @@ test("a seller avatar keeps its className on the image element", () => {
 	);
 
 	assert.match(markup, /class="seller-hero__avatar-img"/);
-	// `fallbackClassName` belongs to the fallback ELEMENT only. Merging it onto
-	// the image would hand callers' sizing to whichever rule the stylesheet
-	// happens to declare later: `.seller-customers__avatar-fallback` hard-codes
-	// 40px while its caller's `.seller-customer-detail__avatar` is 64px.
 	assert.doesNotMatch(markup, /seller-hero__avatar--fallback/);
 });
 
@@ -111,10 +99,6 @@ test("no timer may treat a slow avatar as a broken one", async () => {
 test("the hydration-race guard survives", async () => {
 	const source = await avatarSource();
 
-	// A server-rendered <img> can finish or fail before hydration attaches the
-	// handlers, and React never replays the event it missed. Without this read
-	// of the element's own state, an avatar that already failed sits blank
-	// forever (#427, commit 40f63e9c).
 	assert.match(source, /\.complete/);
 	assert.match(source, /naturalWidth === 0/);
 	assert.match(source, /onError/);

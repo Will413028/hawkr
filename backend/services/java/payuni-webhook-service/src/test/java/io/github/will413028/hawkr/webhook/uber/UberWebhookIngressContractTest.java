@@ -74,7 +74,6 @@ class UberWebhookIngressContractTest {
         outboxTxOps = mock(WebhookOutboxTxOps.class);
         providerCode = mock(UberWebhookProviderCode.class);
         when(providerCode.value()).thenReturn(PROVIDER_VALUE);
-        // 模擬 MyBatis 回填自增主鍵
         doAnswer(inv -> {
             inv.getArgument(0, WebhookInbox.class).setId(4242L);
             return null;
@@ -136,7 +135,6 @@ class UberWebhookIngressContractTest {
             assertTrue(s.contains("\\u5b85"), "fixture 必須含 JSON unicode 逸出");
             assertTrue(s.contains("\"kind\"  :"), "fixture 必須含非標準空白");
             assertTrue(s.endsWith("\n"), "fixture 必須以換行結尾");
-            // 反證：Jackson 重新序列化後這三個特徵全部消失
             String reserialized;
             try {
                 reserialized = new ObjectMapper().readTree(s).toString();
@@ -260,7 +258,6 @@ class UberWebhookIngressContractTest {
             ArgumentCaptor<WebhookInbox> inboxCaptor = ArgumentCaptor.forClass(WebhookInbox.class);
             verify(inboxTxOps).insertInbox(inboxCaptor.capture());
             assertEquals("unparseable", inboxCaptor.getValue().getWebhookType());
-            // JSONB 塞不進非 JSON ⇒ 可讀欄位留 null，證據在 raw_envelope
             assertEquals(null, inboxCaptor.getValue().getDecryptedPayload());
             assertTrue(inboxCaptor.getValue().getRawEnvelope().contains("raw_body_base64"));
             verify(outboxTxOps, never()).enqueueAndMark(anyLong(), anyString(), any());
@@ -346,7 +343,6 @@ class UberWebhookIngressContractTest {
             } catch (Exception e) {
                 throw new AssertionError(e);
             }
-            // 前提：兩者確實不同，否則本條沒有鑑別力。
             assertTrue(raw.length != reserialized.length,
                     "fixture 的 raw 與 re-serialize 後相同 ⇒ 本條驗不到東西");
 

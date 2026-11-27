@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== DTO ====================
 
 // AddToCartRequest 加入購物車請求
 type AddToCartRequest struct {
@@ -79,10 +78,7 @@ type CartItemResponse struct {
 	UnavailableReason string   `json:"unavailableReason,omitempty"` // 不可購買原因（CartItemUnavailableReason value：DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）
 }
 
-// ==================== 共用工具 ====================
 
-// getOptionalAccountID 取得可選的 accountId（OptionalJWTAuth 場景）
-// 回傳 0 表示訪客
 func getOptionalAccountID(c *gin.Context) int64 {
 	accountIDRaw, exists := c.Get("accountId")
 	if !exists {
@@ -95,10 +91,6 @@ func getOptionalAccountID(c *gin.Context) int64 {
 	return accountID
 }
 
-// resolveCartBuyerID 回傳購物車擁有者的現任 buyer_id。兩個非 buyer_id 的分支：
-//   - accountID == 0（訪客，OptionalJWTAuth 未帶身份）→ 回 0，由呼叫端配 guestID 判斷
-//   - ErrNoCurrentBuyer（帳號沒有現任買家 stint）→ grandfather 回原 accountID，
-//     不 403（購物車是登入前就能用的功能，不該因為身份解析失敗整條斷掉）
 func (h *Holder) resolveCartBuyerID(c *gin.Context, accountID int64) (int64, bool) {
 	if accountID == 0 {
 		return 0, true
@@ -114,7 +106,6 @@ func (h *Holder) resolveCartBuyerID(c *gin.Context, accountID int64) (int64, boo
 	return int64(resolved), true
 }
 
-// ==================== 對外 API ====================
 
 // AddToCart 加入購物車
 // @Summary      加入購物車
@@ -144,7 +135,6 @@ func (h *Holder) AddToCart(c *gin.Context) {
 		return
 	}
 
-	// 訪客必須提供 guest_id
 	if buyerID == 0 && req.GuestID == "" {
 		response.BadRequest(c, "guest_id is required for guest user")
 		return
@@ -185,7 +175,6 @@ func (h *Holder) GetCartList(c *gin.Context) {
 	}
 	guestID := c.Query("guest_id")
 
-	// 訪客必須提供 guest_id
 	if buyerID == 0 && guestID == "" {
 		response.BadRequest(c, "guest_id is required for guest user")
 		return
@@ -201,7 +190,6 @@ func (h *Holder) GetCartList(c *gin.Context) {
 		return
 	}
 
-	// 轉換 gRPC 回應為前端友善格式（49 §6.6：Gateway 由 objectKey 組顯示 URL）
 	base := h.MediaBaseURL
 	groups := make([]CartGroupResponse, 0, len(resp.Groups))
 	for _, g := range resp.Groups {
@@ -272,7 +260,6 @@ func (h *Holder) SetItemQuantity(c *gin.Context) {
 		return
 	}
 
-	// 訪客必須提供 guest_id
 	if buyerID == 0 && req.GuestID == "" {
 		response.BadRequest(c, "guest_id is required for guest user")
 		return
@@ -367,7 +354,6 @@ func (h *Holder) DeleteCartItem(c *gin.Context) {
 
 	guestID := c.Query("guest_id")
 
-	// 訪客必須提供 guest_id
 	if buyerID == 0 && guestID == "" {
 		response.BadRequest(c, "guest_id is required for guest user")
 		return

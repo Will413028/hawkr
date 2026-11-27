@@ -24,10 +24,10 @@ public class ChatMessageSentEvent extends BaseEvent {
     private Long senderId;
     private String senderName;
     private Long receiverId;
-    private String messageType;  // TEXT, IMAGE, ORDER_CARD, PRODUCT_CARD
+    private String messageType;
     private String content;
-    private Long orderId;  // For order-related chats
-    private Long productId;  // For product inquiry chats
+    private Long orderId;
+    private Long productId;
 
     public static ChatMessageSentEvent create(Long messageId, Long conversationId, Long senderId,
                                                String senderName, Long receiverId, String messageType,

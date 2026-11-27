@@ -64,7 +64,6 @@ class PaymentEventHandlerSalesOutboxTest {
         try {
             TsidUtil.init(300, 0);
         } catch (IllegalStateException ignored) {
-            // 已初始化
         }
     }
 
@@ -165,7 +164,6 @@ class PaymentEventHandlerSalesOutboxTest {
         assertThat(sales.getStatus()).isEqualTo(OutboxEventStatus.PENDING.value());
         assertThat(sales.getAggregateId()).isEqualTo("O1");
 
-        // payload 形狀不變：publisher 端已 group by productId
         OrderSalesAccumulatedPayload parsed =
                 MAPPER.readValue(sales.getPayload(), OrderSalesAccumulatedPayload.class);
         assertThat(parsed.orderNo()).isEqualTo("O1");

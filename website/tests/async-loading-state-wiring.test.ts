@@ -22,8 +22,6 @@ test("cart background refresh and clear use real request state without a logisti
 		/if \(clearPendingRef\.current\) return clearPendingRef\.current;/,
 	);
 	assert.match(client, /if \(\s*clearCartPendingRef\.current \|\|/);
-	// Refresh is automatic now; its real request state blocks selection and
-	// checkout rather than presenting a separate refresh action.
 	assert.match(
 		client,
 		/const selectionBusy = clearing \|\| hasRowPending \|\| cart\.refreshing;/,
@@ -49,8 +47,6 @@ test("cart row mutations keep per-SKU initiating identity until every request se
 
 	assert.match(client, /rowPendingRef\.current\.has\(skuId\)/);
 	assert.match(client, /rowPendingRef\.current\.set\(skuId, action\)/);
-	// Each retained row action owns its pending state until its request settles;
-	// the redundant bulk-remove action no longer exists.
 	assert.match(
 		client,
 		/setRowPendingBySku\([\s\S]*?\[skuId\]: action[\s\S]*?try \{\s*await operation\(\);\s*\} finally \{\s*rowPendingRef\.current\.delete\(skuId\);[\s\S]*?delete next\[skuId\];/,
@@ -75,8 +71,6 @@ test("cart row mutations keep per-SKU initiating identity until every request se
 		/isLoading=\{pendingAction === "remove"\}\s*loadingLabel="移除中…"/,
 	);
 
-	// Destructive row mutations settle before the query cache drops the row,
-	// otherwise React unmounts the exact button that should report progress.
 	assert.match(
 		hook,
 		/const remove = React\.useCallback\([\s\S]*?\(prev\) => prev,[\s\S]*?removeFromCart\(skuId\)/,
@@ -123,8 +117,6 @@ test("manual seller refreshes remain locked until their aggregate work settles",
 	assert.match(forumTab, /isLoading=\{forum\.refreshing\}/);
 	assert.match(forumTab, /loadingLabel="重新載入留言中…"/);
 
-	// SellerOrdersPage eagerly owns the complete queue; its button only widens
-	// an in-memory slice and therefore must not reuse initial-query loading.
 	const ordersTabBody = ordersPage.slice(
 		ordersPage.indexOf("function OrdersTabBody"),
 		ordersPage.indexOf("function BulkActionBar"),

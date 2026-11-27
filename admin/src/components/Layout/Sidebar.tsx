@@ -88,9 +88,6 @@ const navGroups: Array<{ section: string; items: NavItem[] }> = [
 				icon: "policy",
 			},
 			{
-				// 站外業者主檔（尚未加入平台的目標賣家名單，供業務團隊追蹤入駐進度）。
-				// 圖示與同組的「賣家管理／審核」（storefront）刻意錯開，避免兩個
-				// 入口在側欄一眼看起來像同一個功能。
 				href: "/admin/seller-prospects",
 				label: "站外業者",
 				icon: "store",
@@ -120,17 +117,9 @@ const navGroups: Array<{ section: string; items: NavItem[] }> = [
 		],
 	},
 	{
-		// 發票 / 稅務（58A §B-3.1.1）。這是**唯一**必須手動登記的地方：ADM 沒有
-		// 路由清冊 gate，`src/app/admin/<path>/page.tsx` 存在即成路由 ⇒ 漏了這一段，
-		// 頁面存在、路由通、但沒有任何入口找得到它。
-		//
-		// A03／A06／A08／A09／A11／A13 刻意不進來：詳情頁與表單頁的入口在各自的
-		// 佇列頁（同 merchants/[id]、disputes/[id] 的慣例）。
 		section: "發票 / 稅務",
 		items: [
 			{
-				// exact 是必要的：選中判定是 prefix 比對（Sidebar 下方 isActive），
-				// 少了它，進 /admin/invoices/jobs 時「發票營運總覽」會跟著一起亮。
 				href: "/admin/invoices",
 				label: "發票營運總覽",
 				icon: "receipt_long",
@@ -207,7 +196,6 @@ const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
 	ref,
 ) {
 	const pathname = usePathname();
-	// 登入的管理員，只供顯示；載入中與讀取失敗時顯示預設值。
 	const { data: session } = useQuery(
 		IdentityAdminService.method.getSession,
 		{},
@@ -299,7 +287,7 @@ const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
 				tabIndex={-1}
 			>
 				{sidebarContent}
-				{/* 抽屜是最上層的 modal 時，toast 寫進這裡（aria-modal 面板之外的內容可能不進無障礙樹）。 */}
+
 				{open && <ToastRegions />}
 			</aside>
 		);

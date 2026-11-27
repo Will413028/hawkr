@@ -92,8 +92,6 @@ export default function StoryRail({
 	hideTabsOnMobile = false,
 	reserveRegion = false,
 }: StoryRailProps) {
-	// Collapse is a compact-screen affordance. If a mobile collapse state is
-	// restored on desktop, the rail becomes hidden while the toggle is hidden too.
 	const [collapsed, setCollapsed] = React.useState(false);
 	const [canCollapse, setCanCollapse] = React.useState(false);
 	const listId = React.useId();
@@ -135,10 +133,6 @@ export default function StoryRail({
 
 	const isCollapsed = canCollapse && collapsed;
 
-	// 只要有任何一家帶得出地區，整排都保留第二行的高度，否則同一排會出現
-	// 兩行 / 一行混排、名稱基線參差。`reserveRegion` 讓會被 client 補上地區的
-	// rail（feed 推薦商家）從 server 首屏就先保留這行高度，避免資料換手時整排
-	// 長高 16px 把下方貼文網格往下推（見 reserveRegion prop 註解）。
 	const showRegion = React.useMemo(
 		() => reserveRegion || items.some((item) => regionLabel(item).length > 0),
 		[items, reserveRegion],
@@ -225,11 +219,6 @@ export default function StoryRail({
 				)}
 			</header>
 			{items.length > 0 ? (
-				/* Instagram-style horizontal scroller — single row, swipe sideways
-				 * through merchants. The list breaks out of the page's 24px
-				 * (desktop) / 14px (mobile) gutter via negative side margins so
-				 * cards scroll edge-to-edge; the matching padding keeps the first
-				 * card visually flush with the content column. */
 				<ul
 					id={listId}
 					ref={listRef}

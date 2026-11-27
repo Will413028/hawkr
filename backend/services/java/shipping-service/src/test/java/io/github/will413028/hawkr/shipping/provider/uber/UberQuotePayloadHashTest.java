@@ -47,7 +47,6 @@ class UberQuotePayloadHashTest {
         assertThat(base()).isEqualTo(base());
     }
 
-    // ==================== 該變 ====================
 
     @Test
     @DisplayName("🔴 換取件門市 ⇒ hash 必須變（66 A9：否則用舊報價建新門市的單）")
@@ -96,7 +95,6 @@ class UberQuotePayloadHashTest {
         assertThat(UberQuotePayloadHash.of("store-1", DROPOFF, ITEMS, 2)).isNotEqualTo(base());
     }
 
-    // ==================== 不該變 ====================
 
     @Test
     @DisplayName("🔴 品項順序不影響（購物車重排不是換了一車）")

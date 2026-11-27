@@ -10,8 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// earningsStatus 把來源紀錄的狀態收斂成賣家看到的三種（不洩漏 provider 與內部狀態機）：進行中與待人工處理都是處理中。
-// 來源 CHECK 沒有的狀態（schema 與這裡對不上）是錯誤，不猜。
 func earningsStatus(kind model.EarningsType, raw string) (model.EarningsStatus, error) {
 	switch kind {
 	case model.EarningsTransfer:
@@ -30,7 +28,6 @@ func earningsStatus(kind model.EarningsType, raw string) (model.EarningsStatus, 
 		case model.ReversalReversing, model.ReversalAnomaly:
 			return model.EarningsPending, nil
 		case model.ReversalNone, model.ReversalWaiting, model.ReversalReleased:
-			// 撤回列沒有 NONE 與 WAITING（只是退款列上的彙總值），RELEASED 沒有收回、查詢不列：出現就是 schema 與查詢對不上。
 		}
 	case model.EarningsTopUp:
 		switch model.TopupStatus(raw) {
@@ -39,7 +36,6 @@ func earningsStatus(kind model.EarningsType, raw string) (model.EarningsStatus, 
 		case model.TopupWaiting, model.TopupSending, model.TopupAnomaly:
 			return model.EarningsPending, nil
 		case model.TopupNone, model.TopupReleased:
-			// 沒有補差額，查詢不列：出現就是 schema 與查詢對不上。
 		}
 	}
 	return "", fmt.Errorf("charge：入帳帳本不認得的來源狀態 %s/%s", kind, raw)
@@ -83,7 +79,6 @@ func (s *Service) ListEarnings(ctx context.Context, storeID int64, f model.Earni
 	return out, nil
 }
 
-// orderEarningsPage 是 OrderEarnings 逐頁讀取的每頁筆數。
 const orderEarningsPage = model.MaxRecordPageSize
 
 // OrderEarnings 回傳 storeID 這家店一張訂單的全部入帳列（新的在前）與已完成列的淨額。訂單不是這家店的、或沒有訂單應收（沒有付款）回 NotFound，

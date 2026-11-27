@@ -108,7 +108,6 @@ type Service struct{ d Deps }
 // New 建立 Service。
 func New(d Deps) *Service { return &Service{d: d} }
 
-// plan 是準備階段的結果：送出需要的一切，加上寫回結果時要重新比對的收件人。
 type plan struct {
 	delivery store.DeliveryForUpdateRow
 	typeName string
@@ -116,7 +115,6 @@ type plan struct {
 	params   json.RawMessage
 	rendered registry.Rendered
 	tokens   []string
-	// inboxItemID 是這筆投遞對應的收件匣列（只推播的型別沒有）；imageURL 是推播圖片（型別沒有圖或沒有設定圖片網域時為空）。
 	inboxItemID *uuid.UUID
 	imageURL    string
 	address     string
@@ -173,8 +171,6 @@ func (s *Service) Deliver(ctx context.Context, id uuid.UUID, final bool) error {
 	return s.sendEmail(ctx, p, final)
 }
 
-// quietWait 回傳行銷類推播要再等多久才能送（D26）：不在台北 22:00–09:00 的靜音時段、不是行銷類，或內容（型別宣告的 NotAfter）在靜音結束前就失效時回 0。
-// 在每次執行時以注入的時鐘判斷，所以重試落在靜音時段的 job 也會被延後；River 的 snooze 不佔重試次數。
 func (s *Service) quietWait(p plan) (time.Duration, error) {
 	if class, _ := model.ClassOf(p.entry.Spec().Category); class != model.ClassMarketing {
 		return 0, nil
@@ -201,7 +197,6 @@ func recipientStoreID(d store.DeliveryByIDRow) int64 {
 	return *d.StoreID
 }
 
-// prepare 在 transaction 內鎖收件人、重讀並鎖投遞紀錄、組字、取目標。done 為 true 表示這筆已在這個 transaction 內定案（標成永久失敗或本來就不需要送）。
 func (s *Service) prepare(ctx context.Context, head store.DeliveryByIDRow) (plan, bool, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	aud := model.Audience(head.Audience)
@@ -290,7 +285,6 @@ func (s *Service) prepare(ctx context.Context, head store.DeliveryByIDRow) (plan
 	return p, false, nil
 }
 
-// appFor 是受眾對應的 App：BUYER 受眾只推 BUYER App、STORE 受眾只推 SELLER App，不跨 App。
 func appFor(a model.Audience) string {
 	if a == model.AudienceStore {
 		return appSeller
@@ -298,7 +292,6 @@ func appFor(a model.Audience) string {
 	return appBuyer
 }
 
-// emailTarget 回傳寄件位址；沒有可寄的位址（沒有已驗證信箱、在 suppression 名單內）時回失敗原因。
 func (s *Service) emailTarget(ctx context.Context, q *store.Queries, accountID int64) (address, reason string, err error) {
 	c, ok, err := s.d.Contacts.ContactEmail(ctx, accountID)
 	switch {
@@ -344,7 +337,6 @@ func (s *Service) log() *slog.Logger {
 	return slog.Default()
 }
 
-// settle 在 transaction 內再鎖一次收件人並記下結果：sent 為 true 記已送出（收件人此時已不在則不留文字），否則標永久失敗（收件人已不在時原因是 recipient_gone）。
 func (s *Service) settle(ctx context.Context, p plan, sent bool, failReason string) error {
 	d := p.delivery
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -382,7 +374,6 @@ func (s *Service) settle(ctx context.Context, p plan, sent bool, failReason stri
 	})
 }
 
-// retryOrFail 處理暫時性失敗：還有嘗試次數就回錯誤讓 River 重試，最後一次嘗試改記永久失敗（紀錄不會永遠停在 PENDING）。
 func (s *Service) retryOrFail(ctx context.Context, p plan, final bool, cause error) error {
 	if final {
 		s.log().ErrorContext(ctx, "渠道暫時性失敗用完重試，投遞標為永久失敗", "delivery_id", p.delivery.ID, "channel", p.delivery.Channel, "error", cause)

@@ -20,7 +20,7 @@ func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		edit  func(*PreviewPublicationInput)
-		field string // 空字串表示合法
+		field string
 	}{
 		{"valid", func(*PreviewPublicationInput) {}, ""},
 		{"zero lower", func(i *PreviewPublicationInput) { i.LowerBoundAmount = 0 }, "LowerBoundAmount"},

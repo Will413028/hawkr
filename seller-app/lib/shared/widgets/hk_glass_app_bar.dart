@@ -31,8 +31,6 @@ class HkGlassAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool centerTitle;
   final Color backgroundColor;
 
-  // Two lines need their own space at the supported 1.4x text scale. Reserving
-  // it in preferredSize as well keeps Scaffold's body below the actual bar.
   double get _toolbarHeight =>
       HkControl.topBarHeight + (subtitle == null ? 0 : HkSpace.lg);
 

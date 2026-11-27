@@ -30,12 +30,10 @@ func (q *recordingJobs) Enqueue(_ context.Context, args river.JobArgs, opts *riv
 
 var (
 	occurred = time.Date(2026, 11, 24, 17, 30, 15, 123456000, time.FixedZone("TST", 8*3600))
-	// wire 上的時間是 Java LocalDateTime.toString()：UTC、沒有時區後綴。
 	wireTime = "2026-11-24T09:30:15.123456"
 	paidAt   = time.Date(2026, 11, 24, 17, 29, 0, 0, time.FixedZone("TST", 8*3600))
 )
 
-// run 把模組事件交給 OnX，取出排入的唯一一個 PublishArgs，回傳它與解成 map 的 body（解成 map[string]any，所以 string 與 number 分得清楚）。
 func run[E any](t *testing.T, on func(*recordingJobs) func(context.Context, E) error, event E) (rabbitmq.PublishArgs, map[string]any) {
 	t.Helper()
 	q := &recordingJobs{}

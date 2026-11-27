@@ -1,19 +1,3 @@
-// CodeMeta 的穩定公開入口。既有 import 路徑 `@/lib/codemeta` 不變。
-//
-// 碼值本身**不在本檔維護**——它們在 ./generated.ts，由
-// `backend/docs/代碼管理（CodeMeta）/scripts/generate.sh --admin` 從 CodeMeta Markdown 直接生成
-// （CI 檢查 drift）。要改代碼值或中文標籤，改 backend 的 `.md` 再重新生成，
-// 不要改 ./generated.ts（會被下次生成覆蓋，且與 SSOT 分歧）。
-//
-// 本檔只放**不是碼值**的東西：查表 helper 與顯示順序。這條界線是 CodeMeta 規範
-// 明訂的（生成 enum 只承載代碼資料，業務 helper 另放），也是讓 ./generated.ts
-// 可以被整檔重新生成而不損失任何手寫邏輯的前提。
-//
-// 歷史：本檔前身是 208 行手抄的 backend 鏡像。集中到單一檔案解決了「各頁自定義
-// enum」那次漂移（transactions 頁 status 假想 0-6 / payType 假想 1-4 全數錯位），
-// 但集中之後它仍然是手抄的，所以又漂了 5 處——包括把 CodeMeta 的 Description 欄
-// 當成 Label 欄抄（AppType 抄成「買家版／賣家版」，正確是「買家／賣家」）。
-// 那種錯誤任何「統一措辭」都治不了，只有吃生成物才治得到（backend #2536）。
 export * from "./generated";
 
 export type CodeLabelMap = Record<string, string>;

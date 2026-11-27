@@ -26,9 +26,6 @@ test("mobile navbar uses a plain beige shell and white glass lens", async () => 
 	assert.doesNotMatch(source, /Curved caustic|chromatic split/);
 	assert.match(source, /data-mobile-nav-active-indicator="true"/);
 	assert.match(source, /setPointerCapture\?\.\(event\.pointerId\)/);
-	// The indicator is a CSS transform transition now — framer-motion is no
-	// longer imported into this globally mounted component just to run one
-	// spring, and the pill no longer mixes two animation systems on one node.
 	assert.doesNotMatch(source, /from "framer-motion"/);
 	assert.match(source, /transition-\[transform,box-shadow\]/);
 	assert.match(source, /translate3d\(\$\{target\.left\}px/);

@@ -181,9 +181,6 @@ export default function ProductSellerIntro({
 		.filter(Boolean)
 		.join(" ");
 
-	// The storefront link is built from the seller's storeCode alone (`sellerId`
-	// is the store_id, which is not a storefront URL segment); without a code the
-	// identity renders as plain content.
 	const storefrontHref = sellerPath(
 		firstText(
 			sellerRecord.storeCode,
@@ -192,8 +189,6 @@ export default function ProductSellerIntro({
 		),
 	);
 
-	// Seller identity uses the canonical display URL: `logoUrl`, on both the store
-	// view and the product wire's embedded seller block.
 	const avatarSrc = firstText(
 		sellerRecord.logoUrl,
 		productSellerRecord.logoUrl,
@@ -230,9 +225,7 @@ export default function ProductSellerIntro({
 			className="flex flex-col items-end gap-3 justify-self-end w-full max-w-[230px] text-right max-md:max-w-none max-md:pt-3.5 max-md:border-t max-md:border-hk-brand-secondary/30"
 			aria-label="商家資訊"
 		>
-			{/* The buyer PDP links identity to the storefront and keeps Chat
-			 * separate. Seller preview renders the same identity as plain content
-			 * and omits Chat so this public-data view cannot initiate a write flow. */}
+
 			{previewMode || !storefrontHref ? (
 				<div className="flex w-full items-center justify-end gap-3 rounded-[14px] text-inherit">
 					<SellerIdentity

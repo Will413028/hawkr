@@ -15,16 +15,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// enrichContext injects a logger with trace_id, span_id, correlation_id into the context.
 func enrichContext(ctx context.Context, logger *zap.Logger) (context.Context, *zap.Logger) {
 	var fields []zap.Field
 
-	// Add correlation_id from correlation interceptor
 	if corrID := CorrelationIDFromContext(ctx); corrID != "" {
 		fields = append(fields, zap.String("correlation_id", corrID))
 	}
 
-	// Add OTel trace/span IDs
 	spanCtx := trace.SpanContextFromContext(ctx)
 	if spanCtx.HasTraceID() {
 		fields = append(fields, zap.String("trace_id", spanCtx.TraceID().String()))
@@ -46,9 +43,6 @@ func enrichContext(ctx context.Context, logger *zap.Logger) (context.Context, *z
 type LoggingOption func(*loggingConfig)
 
 type loggingConfig struct {
-	// expectedCodes maps a gRPC FULL method name (e.g.
-	// "/hawkr.account.AccountService/GetWebSession") to the status codes
-	// that are routine business outcomes *of that one method*.
 	expectedCodes map[string]map[codes.Code]struct{}
 }
 
@@ -85,7 +79,6 @@ func WithExpectedCodes(m map[string][]codes.Code) LoggingOption {
 	}
 }
 
-// isExpected reports whether code is a registered routine outcome of fullMethod.
 func (c *loggingConfig) isExpected(fullMethod string, code codes.Code) bool {
 	set, ok := c.expectedCodes[fullMethod]
 	if !ok {
@@ -108,14 +101,10 @@ func LoggingInterceptor(logger *zap.Logger, opts ...LoggingOption) grpc.UnarySer
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (interface{}, error) {
-		// Enrich context with logger + trace_id
 		ctx, enriched := enrichContext(ctx, logger)
 
-		// Build service/method names for event
-		// FullMethod format: /package.ServiceName/Method → extract ServiceName only
-		fullService := path.Dir(info.FullMethod)[1:] // e.g. "hawkr.social.SocialService"
-		method := path.Base(info.FullMethod)         // e.g. "GetPostDetail"
-		// Extract short service name (last segment after last dot)
+		fullService := path.Dir(info.FullMethod)[1:]
+		method := path.Base(info.FullMethod)
 		service := fullService
 		if idx := len(fullService) - 1; idx >= 0 {
 			for i := idx; i >= 0; i-- {
@@ -126,7 +115,6 @@ func LoggingInterceptor(logger *zap.Logger, opts ...LoggingOption) grpc.UnarySer
 			}
 		}
 
-		// Log start event
 		enriched.Info("gRPC request started",
 			zap.String("event", service+"."+method+".start"),
 			zap.String("method", info.FullMethod),
@@ -134,13 +122,10 @@ func LoggingInterceptor(logger *zap.Logger, opts ...LoggingOption) grpc.UnarySer
 
 		start := time.Now()
 
-		// Call the handler with enriched context
 		resp, err := handler(ctx, req)
 
-		// Calculate duration
 		duration := time.Since(start)
 
-		// Extract gRPC status code
 		code := codes.OK
 		if err != nil {
 			if st, ok := status.FromError(err); ok {
@@ -150,13 +135,8 @@ func LoggingInterceptor(logger *zap.Logger, opts ...LoggingOption) grpc.UnarySer
 			}
 		}
 
-		// An error whose code this method declared routine (WithExpectedCodes) is
-		// a business answer, not a failure: it gets its own event name and info
-		// level so it neither inflates the ".error" event count nor dilutes
-		// error-level alerting. The error itself is still returned to the caller.
 		expected := err != nil && cfg.isExpected(info.FullMethod, code)
 
-		// Build end/expected/error event name
 		var event string
 		switch {
 		case err == nil:
@@ -167,7 +147,6 @@ func LoggingInterceptor(logger *zap.Logger, opts ...LoggingOption) grpc.UnarySer
 			event = service + "." + method + ".error"
 		}
 
-		// Log the request
 		fields := []zap.Field{
 			zap.String("event", event),
 			zap.String("method", info.FullMethod),
@@ -200,13 +179,10 @@ func StreamLoggingInterceptor(logger *zap.Logger) grpc.StreamServerInterceptor {
 	) error {
 		start := time.Now()
 
-		// Call the handler
 		err := handler(srv, ss)
 
-		// Calculate duration
 		duration := time.Since(start)
 
-		// Extract gRPC status code
 		code := codes.OK
 		if err != nil {
 			if st, ok := status.FromError(err); ok {
@@ -216,7 +192,6 @@ func StreamLoggingInterceptor(logger *zap.Logger) grpc.StreamServerInterceptor {
 			}
 		}
 
-		// Log the stream
 		fields := []zap.Field{
 			zap.String("method", info.FullMethod),
 			zap.Duration("duration", duration),

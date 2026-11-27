@@ -96,7 +96,6 @@ class _ShareSheetState extends State<_ShareSheet>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── 拖曳指示條 ──────────────────────────────────
           Center(
             child: Container(
               margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
@@ -109,7 +108,6 @@ class _ShareSheetState extends State<_ShareSheet>
             ),
           ),
 
-          // ── 標題列 ─────────────────────────────────────
           Padding(
             padding: EdgeInsets.fromLTRB(20.w, 4.h, 8.w, 8.h),
             child: Row(
@@ -135,13 +133,11 @@ class _ShareSheetState extends State<_ShareSheet>
             ),
           ),
 
-          // ── 圖片 + 文字 ────────────────────────────────
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.w),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 左側縮圖
                 if (hasImage)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12.r),
@@ -166,7 +162,6 @@ class _ShareSheetState extends State<_ShareSheet>
                     ),
                   ),
                 if (hasImage) SizedBox(width: 14.w),
-                // 右側文字
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,7 +199,6 @@ class _ShareSheetState extends State<_ShareSheet>
 
           SizedBox(height: 16.h),
 
-          // ── URL 複製列 ─────────────────────────────────
           Padding(
             padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 16.h),
             child: GestureDetector(

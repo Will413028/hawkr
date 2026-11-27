@@ -116,7 +116,6 @@ class AddressRepository {
     final fields = <String>[];
     if (receiverName != null) fields.add('receiver_name');
     if (receiverPhone != null) fields.add('receiver_phone');
-    // 鄉鎮市區代碼與明細一起修改：整個 postal_address 換掉，兩者都要有值。
     if ((townCode == null) != (addressDetail == null)) {
       throw const ServerException('地址的鄉鎮市區與明細必須一起修改');
     }

@@ -54,36 +54,6 @@ function isActive(pathname: string, href: string) {
 	return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/*
- * Buyer-navbar chrome — Tailwind migration (子刀 4, PR-B).
- *
- * PR-A consolidated the buyer navbar into a single CSS source spread across
- * navigation-shell/final/floating (all `body .site-nav*` at 0,1,1). PR-B moves
- * the HOST element styles here as inline utilities and deletes the matching CSS
- * declarations so the unlayered rules no longer shadow these utilities.
- *
- * The original BEM class on each element is KEPT as a hook — the computed-style
- * gate (tests/visual/buyer-navbar.spec.ts) selects on `.site-nav*`/`.nav-item`,
- * the nav-overlap regression test reads `.site-nav__inner`, and a few retained
- * rules still key off them: `.auto-nav .site-nav{position}` (子刀 1 wrapper),
- * the `.site-nav-action .notif-bell__*` descendant overrides (子刀 5),
- * `.site-nav .brand-logo` lockup sizing, and the icon/label descendant + sr-only
- * machinery. Descendant rules are intentionally NOT migrated in PR-B.
- *
- * Dark text uses `text-[var(--ink-body)]!`: --ink-body resolves to the body
- * text token (rgb(66,73,63) light / --color-ink-100 dark), and the `!`
- * is required to beat the unlayered dark-link exception
- * (`[data-theme=dark] body a.nav-item{color:inherit}` at 0,2,2) — see
- * styles/foundation/01-tokens-theme.css. Light needs no `!` (utilities beat the
- * `@layer base a` default) but `!` is harmless there. Surface/accent colours use
- * theme-aware vars so they flip with [data-theme=dark].
- *
- * Breakpoints mirror the source CSS exactly (so the gate stays byte-identical):
- * the icon-collapse is `@media (max-width:1280px)` → `[@media(max-width:1280px)]:`, the
- * center/login hide + right rail shift is `@media (max-width:840px)` →
- * `[@media(max-width:840px)]:`, and the floating-pill→flat-bar swap is
- * `@media (max-width:768px)` → `[@media(max-width:768px)]:`.
- */
 const SITE_NAV =
 	"site-nav relative flex items-center justify-center h-[84px] px-6 [@media(max-width:768px)]:h-[56px] [@media(max-width:768px)]:px-0";
 
@@ -91,24 +61,9 @@ const SITE_NAV_INNER = cn(
 	"site-nav__inner flex w-full items-center justify-between max-w-[1440px]",
 	"h-[84px] min-h-[84px] p-[8px_36px_8px_24px] rounded-[9999px]",
 	"bg-[var(--page-nav-pill-bg)]",
-	// box-shadow via an arbitrary *property* (not the shadow-* utility): Tailwind's
-	// shadow utility prepends 4 transparent ring placeholder layers, changing the
-	// computed string the gate diffs byte-for-byte.
 	"[box-shadow:var(--page-nav-pill-shadow)]",
-	// No backdrop-filter: the pill's computed backdrop-filter has always been
-	// `none`. floating-navigation.css declared blur(20px) saturate(140%) on
-	// .site-nav__inner, but navigation-final.css's now-removed inner rule set
-	// `backdrop-filter: none` and won the cascade, so the blur never took effect.
-	// PR-B preserves that observed value (re-adding blur would be a behaviour
-	// change, not a faithful migration).
 	"transition-[box-shadow,transform]",
-	// Dark floating pill: ink-tinted gradient over a near-black base. The gate
-	// reads background-color (the solid layer); the gradient is background-image.
-	// Light/dark now live on the tokens (00-color-config.css), so the pill has
-	// ONE box-shadow declaration per breakpoint instead of four competing ones.
 	"dark:[background-image:var(--page-nav-pill-gradient-dark)]",
-	// Mobile: flat top bar, square corners, single hairline shadow (dark keeps the
-	// 2-layer gold ring — its non-media dark rule must still win at this width).
 	"[@media(max-width:768px)]:h-[56px] [@media(max-width:768px)]:min-h-[56px] [@media(max-width:768px)]:p-[8px_10px] [@media(max-width:768px)]:rounded-none",
 	"[@media(max-width:768px)]:[box-shadow:var(--page-nav-pill-shadow-mobile)]",
 );
@@ -128,21 +83,12 @@ const NAV_ITEM = cn(
 	"transition-colors hover:bg-[var(--page-nav-item-hover-bg)] hover:text-[var(--page-nav-item-hover-fg)]!",
 );
 const NAV_ITEM_DEFAULT = "text-[var(--ink-body)]!";
-// `--theme-text-accent` + `--theme-primary-subtle` are the theme-aware
-// "selected label" tokens (light = primary on ink-tint, dark = gold-cream
-// on gold-tint). The old `--color-brand-primary-strong` never flipped, so the active
-// tab rendered --color-brand-primary-strong primary text on the --color-ink-950 dark page — near-invisible.
 const NAV_ITEM_ACTIVE = "text-[var(--theme-text-accent)]!";
 
 const SITE_NAV_ACTION = cn(
 	"site-nav-action static inline-flex items-center justify-center gap-x-2 min-h-11 px-[13px] rounded-[999px]",
 	"text-[0.9375rem] font-bold leading-none no-underline whitespace-nowrap transition-[background-color,color,transform]",
-	// ≤1280: collapse to a 44px icon-only pill (the label spans are sr-only'd by
-	// the retained descendant rules at the same breakpoint).
 	"[@media(max-width:1280px)]:w-11 [@media(max-width:1280px)]:min-w-11 [@media(max-width:1280px)]:gap-x-0 [@media(max-width:1280px)]:p-0",
-	// `[ transform:… ]`, not `-translate-y-px`: Tailwind v4's translate utilities
-	// drive the standalone `translate` property, but the gate (and the old CSS)
-	// read the `transform` matrix.
 	"hover:bg-[var(--page-nav-action-hover-bg)] hover:text-[var(--page-nav-item-hover-fg)]! hover:[transform:translateY(-1px)]",
 	"motion-reduce:hover:[transform:none]",
 );
@@ -157,8 +103,6 @@ const SITE_NAV_LOGIN = cn(
 	"dark:border-[var(--page-nav-login-border-dark)]",
 	"[@media(max-width:1280px)]:w-11 [@media(max-width:1280px)]:min-w-11 [@media(max-width:1280px)]:gap-x-0 [@media(max-width:1280px)]:p-0 [@media(max-width:840px)]:hidden",
 	"hover:bg-[var(--surface-card)] hover:text-[var(--color-brand-primary-strong)]! hover:[transform:translateY(-1px)]",
-	// Dark login hover keeps body text (the floating dark-login colour rule at
-	// 0,2,2 beat the shared hover green), only the surface lifts.
 	"dark:hover:text-[var(--page-nav-login-hover-fg-dark)]!",
 	"motion-reduce:hover:[transform:none]",
 );
@@ -182,15 +126,11 @@ const SITE_NAV_USER_TRIGGER = cn(
 	"hover:bg-[var(--page-nav-user-trigger-hover-bg)] hover:text-[var(--color-brand-primary-strong)]",
 	"aria-expanded:bg-[var(--page-nav-user-trigger-hover-bg)] aria-expanded:text-[var(--color-brand-primary-strong)]",
 );
-// rounded-[50%], not rounded-full: v4's rounded-full computes to a giant px
-// value (calc(infinity*1px)); the gate pins the literal "50%" the old CSS used.
 const SITE_NAV_USER_AVATAR =
 	"site-nav-user__avatar w-8 h-8 rounded-[50%] object-cover bg-[var(--page-nav-user-avatar-bg)]";
 const SITE_NAV_USER_NAME = cn(
 	"site-nav-user__name block max-w-[96px] overflow-hidden text-ellipsis whitespace-nowrap",
 	"text-[0.875rem] font-medium text-[var(--page-nav-user-name-fg)]!",
-	// ≤1440：登入後的 rail（主題・字級・App・購物車・訊息・通知・頭像）在 1281–1440
-	// 之間剛好塞不下，先收起名字只留頭像；≤1280 整條 rail 都進 icon mode。
 	"[@media(max-width:1440px)]:hidden",
 );
 const SITE_NAV_USER_CHEV =
@@ -222,13 +162,7 @@ function BuyerMenu({ onSignOut }: { onSignOut: SignOutAction }) {
 
 	const close = React.useCallback(() => setOpen(false), []);
 	const openMenu = React.useCallback(() => setOpen(true), []);
-	// A sign-out in flight owns the panel: it is showing the pending state, so
-	// neither Escape nor a stray outside click may tear it down.
 	const isLocked = React.useCallback(() => signOutPendingRef.current, []);
-	// Outside-click, Escape + focus return, roving Arrow/Home/End and the
-	// aria-controls wiring all live in the shared hook — this dropdown, the
-	// seller account menu and the seller rail menu used to carry three copies
-	// of the effect and none of the keyboard behaviour.
 	const menu = useDisclosureMenu({
 		open,
 		onClose: close,
@@ -290,7 +224,7 @@ function BuyerMenu({ onSignOut }: { onSignOut: SignOutAction }) {
 				<div ref={panelRef} className={SITE_NAV_USER_MENU} {...menu.panelProps}>
 					<div className={SITE_NAV_USER_MENU_HEADER}>
 						<strong>{displayName}</strong>
-						{/* TODO(B-189): profile endpoint — phone not on Identity */}
+
 					</div>
 					<ul className={SITE_NAV_USER_MENU_LIST}>
 						{buyerMenuItems.map((item) => (
@@ -350,22 +284,12 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 	const pathname = usePathname() ?? "";
 	const router = useObservedRouter("navbar");
 	const { activeRole, status, signOut } = useAuth();
-	// Single decision point for the right-rail auth affordance. `unknown` (the
-	// server's answer has not arrived) and `unavailable` hold the neutral skeleton;
-	// the client-only `bootRole` below only shapes it and never gates the rail.
 	const railMode = resolveAuthRailMode({ status, activeRole });
-	// Pre-hydration role HINT from localStorage (set on login/role switch), used
-	// ONLY to shape the skeleton (buyer shows 訊息+通知 placeholders, others just
-	// the avatar). Read in an effect so SSR + first client render agree (both
-	// null → neutral avatar-only skeleton), then refined within a frame.
 	const [bootRole, setBootRole] = React.useState<RoleSlot | null>(null);
 	React.useEffect(() => {
 		setBootRole(getActiveRole());
 	}, []);
 	const isHome = pathname === "/";
-	// Guests keep the homepage shortcut in the navbar at every viewport. Signed-in
-	// buyers keep it here on desktop, while mobile hides this copy and uses the
-	// full-width row between the navbar and the home category bar instead.
 	const showHomeSearch =
 		isHome && (railMode === "guest" || railMode === "buyer");
 	const moveHomeSearchBelowNavbar = isHome && railMode === "buyer";
@@ -393,8 +317,6 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 		try {
 			await signOut();
 		} catch {
-			// 撤銷失敗＝session 仍有效（signOut 已跳 toast）。不能導航離開：導走會
-			// 讓畫面看起來像登出了，實際上 cookie 還在，下次冷載入又是登入狀態。
 			return false;
 		}
 		return true;
@@ -454,26 +376,11 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 				) : null}
 
 				<div className={SITE_NAV_RIGHT}>
-					{/*
-					 * Header rail per the 2026-05 buyer-spec rewrite (revised
-					 * 2026-05 three-page split PR2):
-					 *   center nav — Hawkr 動態 · Hawkr 市集 · 搜尋
-					 *     (關於我們 / 招商合作 moved to footer only, 2026-06)
-					 *   right rail — 主題切換 · App 下載 · 購物車 · 登入
-					 *   logged-in buyers also see 訊息 + 通知
-					 *   removed — 收藏 (still reachable via user menu)
-					 */}
-					<ThemeToggle className="size-11" />
-					{/* 字體大小 sits beside 主題切換, but only once we know who is
-					    looking: the guest rail is already the widest thing on a
-					    small laptop, and the setting is a returning reader's
-					    preference. Signed-out visitors reach it from the footer. */}
 
-					{/* Hidden on phones: six 44px actions plus the brand do not fit a
-					    393px viewport, and the nav clips its own overflow, so the
-					    rightmost control (the account menu) becomes unreachable with no
-					    scroll to recover it. Text scale stays one tap away in the footer
-					    and in the settings page 顯示 section. */}
+					<ThemeToggle className="size-11" />
+
+
+
 					{status === "signedIn" && (
 						<TextScaleToggle className="size-11 [@media(max-width:840px)]:hidden" />
 					)}
@@ -500,12 +407,7 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 						<span aria-hidden="true">購物車</span>
 					</CartBubble>
 
-					{/* Auth-dependent rail. Only a request that carried a session
-					    cookie (railMode "skeleton") holds these layout-stable
-					    placeholders while GetSession resolves — a returner used
-					    to see the guest rail paint first and then shift the whole
-					    row when 訊息/通知/頭像 popped in. A no-session visitor skips
-					    this entirely and gets the clickable 登入 link below. */}
+
 					{railMode === "skeleton" ? (
 						<>
 							{bootRole === "buyer" && (
@@ -586,9 +488,6 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 							<span>登入</span>
 						</Link>
 					) : (
-						// Logged in as seller. Show a primary "賣家中心" CTA
-						// (sellers' main reason to be in the navbar) plus the
-						// SellerMenu dropdown for everything else.
 						<>
 							<Link
 								href="/seller-center/dashboard"

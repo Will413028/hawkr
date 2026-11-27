@@ -68,7 +68,6 @@ class ProductCertificationWithdrawOnDeleteTest {
         try {
             TsidUtil.init(200, 0);
         } catch (IllegalStateException ignored) {
-            // 同一個 JVM 內的其他測試已初始化
         }
     }
 
@@ -118,8 +117,6 @@ class ProductCertificationWithdrawOnDeleteTest {
         service.withdrawSubmittedOnProductDeleted(PRODUCT_ID);
 
         verify(applicationRepository).lockSubmittedByProductId(PRODUCT_ID);
-        // 這兩支會撈到 APPROVED —— 用它們就會把已核准的標章一起撤掉，
-        // 等於讓賣家用「刪商品」抹除盜用證號的治理紀錄。
         verify(applicationRepository, never()).lockApprovedByProductExcludingTypes(anyLong(), any());
         verify(applicationRepository, never()).findApprovedByProductId(anyLong());
     }

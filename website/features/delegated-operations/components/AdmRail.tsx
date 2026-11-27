@@ -49,9 +49,7 @@ export default function AdmRail() {
 				<span className="adm-rail__actor-avatar" aria-hidden="true">
 					{actorName.slice(0, 1)}
 				</span>
-				{/* displayName 常常是一組 email，而窄欄的內容寬度只有 72px。不截斷就
-				    直接溢出被切掉，看起來像渲染壞了；截斷後把完整值放進 title，游標
-				    停住仍看得到自己是誰。 */}
+
 				<span className="adm-rail__actor-name" title={actorName}>
 					{actorName}
 				</span>

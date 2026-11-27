@@ -54,7 +54,7 @@ class OrderExpiryCancellationServiceTest {
                 .setAmount("1000")
                 .setPayTime("")
                 .setPaymentType("CREDIT_CARD")
-                .setStatus("1") // PaymentTransactionStatus.PAID
+                .setStatus("1")
                 .build();
         GetActivePaymentStatusByOrderNoResponse response = GetActivePaymentStatusByOrderNoResponse.newBuilder()
                 .setCode(GrpcResponseCode.SUCCESS.code())
@@ -89,7 +89,6 @@ class OrderExpiryCancellationServiceTest {
 
         assertTrue(cancelled);
         verify(paymentEventHandler).cancelExpiredOrderInTx(ORDER_NO, OrderCancelReason.SELLER_SUSPENDED.value());
-        // 庫存歸還在 cancelExpiredOrderInTx 事務內落 order.cancelled outbox，此處只驗釋券
         verify(couponReleaseService).release(ORDER_NO, "coupon-1");
     }
 
@@ -102,7 +101,6 @@ class OrderExpiryCancellationServiceTest {
         boolean cancelled = newService().cancelPendingOrder(ORDER_NO, OrderCancelReason.PAYMENT_TIMEOUT.value());
 
         assertFalse(cancelled);
-        // fail-safe：gate 無法判定付款真相 → 不進 CAS 取消，交由下輪 PaymentDeadlineScheduler 重掃自癒
         verify(paymentEventHandler, never()).cancelExpiredOrderInTx(anyString(), anyString());
         verify(couponReleaseService, never()).release(anyString(), any());
     }
@@ -135,7 +133,6 @@ class OrderExpiryCancellationServiceTest {
         boolean cancelled = newService().cancelPendingOrder(ORDER_NO, OrderCancelReason.SELLER_SUSPENDED.value());
 
         assertFalse(cancelled);
-        // CAS 0 rows → cancelExpiredOrderInTx 內既不改狀態也不落 outbox，且不做 TX 外釋券補償
         verify(couponReleaseService, never()).release(anyString(), any());
     }
 }

@@ -130,13 +130,10 @@ type Resolver struct {
 	tree     *index
 	loading  *treeLoad
 	loadedAt time.Time
-	// readStart 是目前快取樹開始讀取的時間；樹的內容不會比它更舊。
 	readStart time.Time
-	// retryAfter 之前不發起新的讀取；lastErr 是造成它的錯誤。
 	retryAfter time.Time
 	lastErr    error
 
-	// beforeWait 只給測試：在呼叫者開始等待共用讀取之前呼叫。
 	beforeWait func()
 }
 
@@ -215,8 +212,6 @@ func leafIn(idx *index, categoryID uuid.UUID) (Match, bool, error) {
 	return idx.match(n, ViaExact), true, nil
 }
 
-// indexAsOf 回傳開始讀取的時間不早於 notBefore、且在 TTL 之內的分類樹；否則等一次讀取（與其他呼叫共用進行中的讀取，但共用的讀取若早於 notBefore 開始就再等下一次），
-// 讀取失敗或在退避期間回錯誤。
 func (r *Resolver) indexAsOf(ctx context.Context, notBefore time.Time) (*index, error) {
 	for {
 		r.mu.Lock()
@@ -253,18 +248,12 @@ func (r *Resolver) indexAsOf(ctx context.Context, notBefore time.Time) (*index, 
 	}
 }
 
-// treeLoad 是一次進行中的分類樹讀取；所有等待者共用它的結果。
 type treeLoad struct {
 	done    chan struct{}
 	err     error
 	started time.Time
 }
 
-// index 回傳可用的分類樹（stale-while-revalidate）：
-//
-//   - 有快取樹：立即回它，不等讀取；過期時在背景更新（同時只有一次讀取），失敗後 RetryBackoff 內不再發起讀取，期間繼續用舊樹。
-//   - 沒有快取樹：所有呼叫共用同一次讀取，等待者可因 ctx 結束而離開（讀取本身不隨呼叫者取消）；
-//     失敗後 RetryBackoff 內直接回上一次的錯誤，不再發起讀取。
 func (r *Resolver) index(ctx context.Context) (*index, error) {
 	r.mu.Lock()
 	now := r.now()
@@ -311,7 +300,6 @@ func (r *Resolver) startLoadLocked(ctx context.Context) *treeLoad {
 	return l
 }
 
-// load 讀一次分類樹。reader 的 panic 轉成錯誤：這是背景 goroutine，沒人接就會讓整個進程結束。
 func (r *Resolver) load(ctx context.Context, l *treeLoad) {
 	var idx *index
 	err := func() (err error) {
@@ -350,7 +338,6 @@ func (r *Resolver) load(ctx context.Context, l *treeLoad) {
 type index struct {
 	nodes  map[uuid.UUID]Node
 	byNorm map[string][]uuid.UUID
-	// order 是節點在分類樹讀取結果中的順序；hasChild 記錄有子節點的節點。
 	order    []uuid.UUID
 	hasChild map[uuid.UUID]bool
 }
@@ -412,7 +399,6 @@ func (x *index) path(n Node) string {
 	return strings.Join(parts, " > ")
 }
 
-// normalize 是比對用的形式：NFKC、小寫、去掉所有空白。
 func normalize(s string) string {
 	s = norm.NFKC.String(s)
 	return strings.Map(func(r rune) rune {

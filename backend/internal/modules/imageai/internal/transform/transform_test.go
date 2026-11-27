@@ -23,7 +23,6 @@ var (
 	resultPN = []byte("result")
 )
 
-// slots 是容量固定的名額，與模組的 limit 套件同一個語意（transform 不依賴它）。
 type slots chan struct{}
 
 func (s slots) TryAcquire() (func(), bool) {

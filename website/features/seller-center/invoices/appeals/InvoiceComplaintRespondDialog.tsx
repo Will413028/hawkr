@@ -59,7 +59,6 @@ export function InvoiceComplaintRespondDialog({
 	const [action, setAction] = React.useState<SellerComplaintAction | "">("");
 	const [note, setNote] = React.useState("");
 
-	// 每次開啟都回到空白：上一次放棄的輸入不該在下一次冒出來。
 	React.useEffect(() => {
 		if (open) {
 			setAction("");

@@ -48,7 +48,6 @@ export default function SlaCountdown({
 
 	const remaining = Number(remainingBusinessDays);
 	if (!Number.isFinite(remaining)) {
-		// 後端給了一個看不懂的值：原樣顯示。吞掉它的話沒有人會發現契約壞了。
 		return (
 			<span className="adm-sla" aria-live="polite">
 				{remainingBusinessDays}

@@ -62,8 +62,6 @@ class SellerOrderFilterIT {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // application.yml 的 spring.flyway.* 指向本機真實 hawkr_order；不覆寫會讓 migration
-        // 跑到那裡去，而 testcontainers 裡的測試 DB 是空的。
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
@@ -80,7 +78,7 @@ class SellerOrderFilterIT {
             SqlInitializationAutoConfiguration.class,
             FlywayAutoConfiguration.class,
             MybatisPlusAutoConfiguration.class,
-            MyBatisPlusAutoConfiguration.class  // common-core：TimestampTz TypeHandler + MetaObjectHandler
+            MyBatisPlusAutoConfiguration.class
     })
     @MapperScan("io.github.will413028.hawkr.order.repository")
     static class MinimalConfig {
@@ -107,11 +105,9 @@ class SellerOrderFilterIT {
         order(2L, "O200000002", STORE_ID, 502L, "陳大文", "2026-08-10 02:00:00+00");
         item(21L, "O200000002", "溫室番茄", "500g 盒裝");
 
-        // recipient_name 刻意含字面 % ：用來分辨「LIKE 萬用字元有沒有被跳脫」
         order(3L, "O300000003", STORE_ID, 503L, "100% 王", "2026-08-13 23:59:59+00");
         item(31L, "O300000003", "蜜蘋果禮盒", "大");
 
-        // 一單兩品且兩品都會命中 "蘋果"：半連接寫成 JOIN 的話這筆會重複出現
         order(4L, "O400000004", STORE_ID, 504L, "李四", "2026-08-20 02:00:00+00");
         item(41L, "O400000004", "有機蘋果", "散裝 1kg");
         item(42L, "O400000004", "蘋果醋", "隨手瓶");
@@ -133,7 +129,6 @@ class SellerOrderFilterIT {
     @DisplayName("keyword 命中 order_no")
     void keywordMatchesOrderNo() {
         assertMatches(query("%O200000002%", null, null), "O200000002");
-        // 訂單編號不含日期也不遞增，只能子字串匹配；取中段仍要命中
         assertMatches(query("%0000000%", null, null),
                 "O400000004", "O300000003", "O200000002", "O100000001");
     }
@@ -148,9 +143,7 @@ class SellerOrderFilterIT {
     @Test
     @DisplayName("keyword 命中商品名／規格名，且一單多品不重複出現")
     void keywordMatchesItemNames() {
-        // product_name：O100000001「有機蘋果」、O300000003「蜜蘋果禮盒」、O400000004 兩品皆含「蘋果」
         assertMatches(query("%蘋果%", null, null), "O400000004", "O300000003", "O100000001");
-        // sku_name
         assertMatches(query("%5kg%", null, null), "O100000001");
         assertMatches(query("%隨手瓶%", null, null), "O400000004");
     }
@@ -165,25 +158,19 @@ class SellerOrderFilterIT {
     @Test
     @DisplayName("使用者輸入的 % 被當字面字元：只命中名字裡真的有 % 的那筆")
     void wildcardInUserInputIsEscaped() {
-        // OrderService.toKeywordPattern("%") 的結果；未跳脫的話 pattern 會是 "%%%"＝全部命中
         assertMatches(query("%\\%%", null, null), "O300000003");
     }
 
     @Test
     @DisplayName("日期範圍以 created_at 篩選，上界含當日最後一刻")
     void dateRangeFiltersOnCreatedAt() {
-        // OrderService 對純日期 date_to 的補值：2026-08-13 → 當日最後一微秒。
-        // 若上界誤補成 00:00:00，23:59:59 那筆會掉出去。
         assertMatches(query(null, LocalDateTime.of(2026, 8, 10, 0, 0),
                         LocalDateTime.of(2026, 8, 13, 23, 59, 59, 999_999_000)),
                 "O300000003", "O200000002");
 
-        // 只給下界
         assertMatches(query(null, LocalDateTime.of(2026, 8, 13, 0, 0), null),
                 "O400000004", "O300000003");
 
-        // 只給上界，且邊界值恰為某筆的 created_at ⇒ 閉區間必須含它（也順帶證明測試 JVM 跑在 UTC，
-        // 否則這個時刻會位移，見 pom surefire 的 -Duser.timezone=UTC）
         assertMatches(query(null, null, LocalDateTime.of(2026, 8, 1, 2, 0)), "O100000001");
     }
 
@@ -200,7 +187,6 @@ class SellerOrderFilterIT {
         assertMatches(query("%不存在的商品%", null, null));
     }
 
-    // ==================== helpers ====================
 
     private SellerOrderQuery query(String keywordPattern, LocalDateTime dateFrom, LocalDateTime dateTo) {
         return new SellerOrderQuery(STORE_ID, 0L, List.of(), keywordPattern, dateFrom, dateTo);

@@ -25,12 +25,8 @@ public class CouponEventPublisher {
 
     public void publishCouponIssued(long buyerId, long couponId, String couponName,
                                     String couponImageUrl, String expireAt) {
-        // buyer_id -> 登入 account_id 解析（notification routing 用，鏡像
-        // OrderOutboxPublisher.enrich 對 notifyBuyerAccountId 的解析模式）。
-        // 失敗時帶 0（notification-service 端 skip），不阻斷本次 coupon.issued 派送主流程。
         long notifyBuyerAccountId;
         try {
-            // 通知類：未解析帶 0（略過收件人），不回吐 buyer_id 冒充 account_id。
             notifyBuyerAccountId = buyerGrpcClient.resolvePrincipals(List.of(buyerId))
                     .principalOrZero(buyerId, "buyer_id");
         } catch (Exception e) {

@@ -201,7 +201,7 @@ Finder get _remediationButton =>
 
 void main() {
   group('已改善，請求解除（按鈕）', () {
-    final cooldownEnd = DateTime.utc(2026, 11, 1, 6, 5); // 臺北 2026/11/01 14:05
+    final cooldownEnd = DateTime.utc(2026, 11, 1, 6, 5);
     final pending = MeasureRequestState.MEASURE_REQUEST_STATE_PENDING;
 
     Future<void> pumpOne(WidgetTester tester, Measure measure) =>
@@ -399,7 +399,6 @@ void main() {
 
       expect(find.text('需要處理'), findsOneWidget);
       expect(find.text('歷史'), findsOneWidget);
-      // 需要處理在歷史之前。
       expect(
         tester.getTopLeft(find.text('需要處理')).dy,
         lessThan(tester.getTopLeft(find.text('歷史')).dy),
@@ -407,12 +406,10 @@ void main() {
       expect(find.text('食品安全'), findsOneWidget);
       expect(find.text('商品標示與實品不符'), findsOneWidget);
       expect(find.text('嚴重程度：高 · 措施：停權'), findsNWidgets(2));
-      // create_time 2026-10-05 01:30 UTC ＝ 臺北 09:30。
       expect(find.text('措施時間：2026/10/05 09:30'), findsNWidgets(3));
       expect(find.text('停權中（至 2026/10/19 16:30）'), findsOneWidget);
       expect(find.text('已撤銷'), findsOneWidget);
       expect(find.text('已發出'), findsNWidgets(1));
-      // 申覆狀態用 chip；沒有申覆的兩列沒有 chip。
       expect(find.text('申覆已通過'), findsOneWidget);
       expect(find.textContaining('申覆審核中'), findsNothing);
       expect(find.text('平台回覆：申覆成立'), findsOneWidget);
@@ -546,11 +543,9 @@ void main() {
       await tester.tap(find.text('送出申覆'));
       await tester.pumpAndSettle();
       expect(server.submits.single.measureId, 'm9');
-      // 沒有上一頁（網址直接開啟）：送出後改去措施與申覆列表，不是丟「nothing to pop」。
       expect(find.text('措施與申覆'), findsOneWidget);
       await _drainToast(tester);
 
-      // 列表是唯一一頁：返回不能丟「nothing to pop」，改去設定分頁（常駐入口所在）。
       await tester.tap(find.byTooltip('返回'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -754,7 +749,6 @@ void main() {
       expect(request.measureId, 'm1');
       expect(request.reason, '判定有誤');
       expect(request.etag, 'etag-1');
-      // 回應的那一筆（can_appeal 為假）取代原列：離開「需要處理」、沒有申覆按鈕，列表沒有再讀。
       expect(find.text('需要處理'), findsNothing);
       expect(find.text('歷史'), findsOneWidget);
       expect(_enabledAppealButton, findsNothing);
@@ -881,12 +875,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      // 提示與卡片按鈕旁的說明是同一句伺服器的句子。
       expect(find.text(appealAlreadyAppealedSentence), findsNWidgets(2));
       await tester.pump(const Duration(seconds: 3));
       await tester.pumpAndSettle();
       expect(find.text('送出申覆'), findsNothing);
-      // 伺服器的最新一筆（已申覆）直接寫進列表。
       expect(find.text('申覆審核中'), findsOneWidget);
       expect(_enabledAppealButton, findsNothing);
     });
@@ -995,7 +987,7 @@ void main() {
       expect(find.text('佐證最多 5 張'), findsOneWidget);
       expect(find.byKey(const ValueKey('request-notice')), findsNothing);
       expect(find.byType(Image), findsOneWidget);
-      expect(_submitButton(tester).onPressed, isNotNull); // 沒有任何一張被標成失敗
+      expect(_submitButton(tester).onPressed, isNotNull);
       expect(tester.widget<TextField>(_reasonField).controller?.text, '判定有誤');
     });
 
@@ -1051,18 +1043,17 @@ void main() {
         'token-1',
         'token-2',
       ]);
-      expect(find.text('佐證圖片已過期'), findsOneWidget); // 表單提示
-      expect(find.bySemanticsLabel('佐證圖片已過期'), findsWidgets); // 失敗的縮圖
+      expect(find.text('佐證圖片已過期'), findsOneWidget);
+      expect(find.bySemanticsLabel('佐證圖片已過期'), findsWidgets);
       expect(find.byType(Image), findsNWidgets(2));
-      expect(_submitButton(tester).onPressed, isNull); // 壞圖還在，重送只會再失敗
+      expect(_submitButton(tester).onPressed, isNull);
       expect(tester.widget<TextField>(_reasonField).controller?.text, '判定有誤');
 
-      // 移除第二張（失敗的那張）。
       await tester.tap(find.bySemanticsLabel('移除照片').last);
       await tester.pump();
       expect(find.byType(Image), findsOneWidget);
       expect(_submitButton(tester).onPressed, isNotNull);
-      expect(find.text('佐證圖片已過期'), findsNothing); // 該張的提示跟著照片移除
+      expect(find.text('佐證圖片已過期'), findsNothing);
 
       server.submitFailure = null;
       await tester.tap(find.text('送出申覆'));
@@ -1087,7 +1078,6 @@ void main() {
         await tester.pump();
 
         expect(uploads.uploaded, ['appeal_evidence:a.jpg']);
-        // 上傳中不能送出。
         expect(_submitButton(tester).onPressed, isNull);
 
         uploads.gates.first.complete();
@@ -1165,7 +1155,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('新增照片'));
       await tester.pump();
       expect(find.byType(Image), findsOneWidget);
-      expect(_submitButton(tester).onPressed, isNull); // 上傳中不能送出
+      expect(_submitButton(tester).onPressed, isNull);
 
       await tester.tap(find.bySemanticsLabel('移除照片'));
       await tester.pump();
@@ -1248,7 +1238,6 @@ void main() {
       Measure? measure,
     }) async {
       final shown = measure ?? riskSuspension(canRequestRemediation: true);
-      // 直接開網址：列表沒讀過，用 GetMyMeasure 讀這一筆。
       final server = _Server()..getAnswer = shown;
       await _pump(
         tester,
@@ -1396,7 +1385,7 @@ void main() {
 
 /// 1x1 的透明 PNG，給 `Image.memory`。
 final _png = Uint8List.fromList(const [
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, //
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
   0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
   0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
   0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xFF, 0xFF, 0x3F,

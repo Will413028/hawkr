@@ -93,7 +93,6 @@ export async function fetchSession(
 			{ contextValues: suppressAuthExpired(), signal },
 		);
 	} catch (e) {
-		// 代行工作區的護欄拋的不是 ConnectError：同樣是「答不出來」。
 		const err = ConnectError.from(e);
 		if (err.code === Code.Unauthenticated) return null;
 		return SESSION_UNAVAILABLE;
@@ -144,12 +143,6 @@ export async function logout(): Promise<void> {
 		if (!NO_RESPONSE_CODES.has(err.code)) {
 			throw new LogoutRevokeFailedError("server");
 		}
-		// Network-layer failure (offline / flaky mobile). Reported as a warning
-		// rather than an error because it is a connectivity fact, not a defect —
-		// it is the one signal for how often people try to sign out with no line.
-		// Lazy import（比照 lib/api/client.ts reportApiFailure）：build/test 情境
-		// Sentry 可能缺席或只部分 mock；.catch 吞掉 import 失敗，觀測絕不能反過
-		// 來讓登出中斷。訊息只取網路層錯誤字串（"Load failed" 類）並截斷。
 		const message = err.rawMessage;
 		void import("@sentry/nextjs")
 			.then((Sentry) => {

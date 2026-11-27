@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// prospectModule 記下每個指令收到的輸入，回傳設定好的業者；err 非 nil 時指令回這個錯誤。
 type prospectModule struct {
 	ProspectModule
 	prospect model.Prospect
@@ -103,7 +102,6 @@ var prospectNow = time.Date(2026, 10, 4, 2, 0, 0, 0, time.UTC)
 
 func str(s string) *string { return &s }
 
-// fullProspect 是每個欄位都有值的業者（含單筆讀取才有的聯絡方式與分類）。
 func fullProspect() model.Prospect {
 	store, merged, creator, updater := int64(77), int64(5), int64(11), int64(12)
 	converted := prospectNow.Add(time.Hour)
@@ -161,7 +159,6 @@ func TestProspectMapperFillsEveryResponseField(t *testing.T) {
 		!slices.Equal(got.GetCategoryIds(), []string{"c1", "c2"}) {
 		t.Fatalf("got=%v", got)
 	}
-	// 沒有值的欄位：空字串、不設，不是零值冒充有值。
 	empty, err := h.toProspect(model.Prospect{ID: 1, Version: 1, DisplayName: "x", VendorType: model.VendorIndividual, Status: model.ProspectStatusActive, OutreachStatus: model.OutreachNotContacted})
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +167,6 @@ func TestProspectMapperFillsEveryResponseField(t *testing.T) {
 		empty.GetMergedIntoId() != "" || empty.GetTaxId() != "" || empty.GetCreatedByAdminId() != "" || len(empty.GetContacts()) != 0 {
 		t.Fatalf("empty=%v", empty)
 	}
-	// 舊資料可能存完整網址：不能組進 URI template。
 	if _, err := h.toProspect(model.Prospect{LogoKey: str("https://x.example/a.jpg")}); apperr.KindOf(err) != apperr.KindUnavailable {
 		t.Fatalf("err=%v", err)
 	}
@@ -312,7 +308,6 @@ func TestProspectStateCommandsRequireAnEtagExceptRestore(t *testing.T) {
 	if m.calls != 0 {
 		t.Fatalf("沒有 etag 的指令不能呼叫模組：%d", m.calls)
 	}
-	// 沒帶 etag 的錯誤指到 etag 欄位。
 	_, err = h.ArchiveProspect(ctx, connect.NewRequest(&adminpb.ArchiveProspectRequest{Id: "9"}))
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "etag" {
@@ -366,7 +361,6 @@ func TestUpdateProspectSendsOnlyTheMaskedWritableFields(t *testing.T) {
 		_, err := h.UpdateProspect(adminCtx(9), connect.NewRequest(&adminpb.UpdateProspectRequest{Prospect: p, UpdateMask: mask(paths...)}))
 		return err
 	}
-	// 只選 display_name 與 region：其他欄位即使請求裡有值也不送。
 	if err := update(&adminpb.Prospect{Id: "9", Etag: "4", DisplayName: "新名", Region: "花蓮", Category: "不採用", PriorityStars: 5}, "display_name", "region"); err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +370,6 @@ func TestUpdateProspectSendsOnlyTheMaskedWritableFields(t *testing.T) {
 		u.VendorType != nil || u.OutreachStatus != nil || u.ProductSummary != nil || u.Positioning != nil || u.ResearchSummary != nil || u.PriorityLetter != nil {
 		t.Fatalf("update=%+v", u)
 	}
-	// 選到卻沒有值：文字是空字串（清掉），聯絡方式與分類是空清單、星數是 0。
 	if err := update(&adminpb.Prospect{Id: "9", Etag: "4"}, "tax_id", "category", "contacts", "category_ids", "priority_stars"); err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +378,6 @@ func TestUpdateProspectSendsOnlyTheMaskedWritableFields(t *testing.T) {
 		u.CategoryIDs == nil || len(*u.CategoryIDs) != 0 || u.PriorityStars == nil || *u.PriorityStars != 0 || u.DisplayName != nil {
 		t.Fatalf("clear=%+v", u)
 	}
-	// 聯絡方式整批替換。
 	if err := update(&adminpb.Prospect{Id: "9", Etag: "4", Contacts: []*adminpb.ProspectContact{
 		{Kind: adminpb.ContactKind_CONTACT_KIND_EMAIL, Value: "a@example.com", Primary: true}, {Kind: adminpb.ContactKind_CONTACT_KIND_SOCIAL, Value: "@wang"},
 	}}, "contacts"); err != nil {
@@ -394,7 +386,6 @@ func TestUpdateProspectSendsOnlyTheMaskedWritableFields(t *testing.T) {
 	if c := *m.update.Contacts; len(c) != 2 || c[0] != (model.ContactPoint{Kind: model.ContactEmail, Value: "a@example.com", Primary: true}) || c[1].Kind != model.ContactSocial {
 		t.Fatalf("contacts=%+v", c)
 	}
-	// 沒帶 mask：只有有值的欄位。
 	_, err := h.UpdateProspect(adminCtx(9), connect.NewRequest(&adminpb.UpdateProspectRequest{Prospect: &adminpb.Prospect{Id: "9", Etag: "4", Positioning: "高價"}}))
 	if err != nil {
 		t.Fatal(err)
@@ -402,7 +393,6 @@ func TestUpdateProspectSendsOnlyTheMaskedWritableFields(t *testing.T) {
 	if u = m.update; *u.Positioning != "高價" || u.DisplayName != nil || u.Contacts != nil || u.PriorityStars != nil {
 		t.Fatalf("implicit=%+v", u)
 	}
-	// OUTPUT_ONLY、IDENTIFIER、etag 列在 mask 裡也不回錯、不送。
 	if err := update(&adminpb.Prospect{Id: "9", Etag: "4", Status: adminpb.ProspectStatus_PROSPECT_STATUS_ARCHIVED, MergedIntoId: "3"}, "status", "merged_into_id", "id", "etag", "logo_image", "convert_time"); err != nil {
 		t.Fatal(err)
 	}
@@ -410,7 +400,6 @@ func TestUpdateProspectSendsOnlyTheMaskedWritableFields(t *testing.T) {
 	if u.ExpectedVersion != 4 || u.DisplayName != nil || u.VendorType != nil || u.OutreachStatus != nil || u.Logo != nil {
 		t.Fatalf("outputonly=%+v", u)
 	}
-	// 沒有任何可寫的欄位被選到也照送給模組（模組沒有改變時不寫入）。
 	calls := m.calls
 	wantInvalidArgument(t, update(&adminpb.Prospect{Id: "9", Etag: "4"}, "no_such_field"))
 	wantInvalidArgument(t, update(&adminpb.Prospect{Id: "9", Etag: "4"}, "contacts.value"))
@@ -438,7 +427,6 @@ func TestUpdateProspectNeverTreatsAnUnsetOutreachStatusAsAValue(t *testing.T) {
 	if got := m.update.OutreachStatus; got == nil || *got != model.OutreachInvited {
 		t.Fatalf("outreach=%v", got)
 	}
-	// 沒有值的 vendor_type 交給模組回報不合法，不當成有效值。
 	if err := send(&adminpb.Prospect{Id: "9", Etag: "4"}, "vendor_type"); err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +456,6 @@ func TestUpdateProspectImageUploadsAreInputOnlyAndNeedTheMask(t *testing.T) {
 	if got := m.update; got.Logo == nil || got.Cover == nil || got.Cover.StagedToken != "tok-cover" || got.Cover.SourceURL != "" {
 		t.Fatalf("both=%+v %+v", got.Logo, got.Cover)
 	}
-	// 沒帶 mask：有上傳就換。
 	if _, err := h.UpdateProspect(adminCtx(9), connect.NewRequest(&adminpb.UpdateProspectRequest{Prospect: &adminpb.Prospect{Id: "9", Etag: "4", CoverUpload: up}})); err != nil {
 		t.Fatal(err)
 	}

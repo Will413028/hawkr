@@ -1,8 +1,6 @@
 import { stripLocale } from "@/lib/intl/paths";
 import { isStandaloneFlowTransition } from "@/lib/navigation/standalone-flow";
 
-// Every classifier below takes the path the browser shows (`/en/feed` as well as `/feed`) and judges it
-// on the locale-free route, so the rules are written once for every language.
 export function tabKeyFor(rawPath: string | null | undefined): string | null {
 	if (!rawPath) return null;
 	const path = stripLocale(rawPath);
@@ -20,8 +18,6 @@ export function isTabToTabNav(
 	return Boolean(sourceTab && targetTab && sourceTab !== targetTab);
 }
 
-// Same-tab legacy hops such as /market -> /market/products must remain an
-// instant continuation of the tab switch that started them.
 export function isSameTabHop(
 	sourcePath: string | null | undefined,
 	targetPath: string | null | undefined,
@@ -48,8 +44,6 @@ export function getPersistentShell(
 	const pathname = rawPathname ? stripLocale(rawPathname) : rawPathname;
 	if (pathname?.startsWith("/seller-center")) return "seller-center";
 	if (pathname?.startsWith("/account")) return "account";
-	// Storefront tabs share the seller profile chrome. Key by seller id so a
-	// cross-seller navigation is still treated as a new page.
 	const storefrontTab = pathname?.match(
 		/^\/sellers\/([^/]+)(?:\/(?:posts|reviews|messages))?\/?$/,
 	);
@@ -81,8 +75,6 @@ export function shouldAnimateProgrammaticRoute(
 	if (isSameTabHop(sourcePath, targetPath)) return false;
 	if (hasSamePersistentShell(sourcePath, targetPath)) return false;
 	if (isProductDetailPath(targetPath)) return false;
-	// Storefront data can be cold. Keep the source interactive until commit and
-	// land immediately; its progress rail already owns the wait feedback.
 	if (/^\/sellers\/[^/]+/.test(stripLocale(targetPath))) return false;
 	return true;
 }

@@ -34,7 +34,6 @@ func CacheControlFor(key string) string {
 // NewKey 回傳 `<prefix>/<uuid v4>`。key 由伺服器隨機產生，不含呼叫端檔名，也不含任何可猜的部分。
 func NewKey(p Prefix) string {
 	var b [16]byte
-	// crypto/rand.Read 不會回傳錯誤（失敗時直接終止程式）。
 	_, _ = rand.Read(b[:])
 	b[6] = b[6]&0x0f | 0x40
 	b[8] = b[8]&0x3f | 0x80

@@ -95,7 +95,6 @@ func TestCaseCarriesTheModulesAvailabilityAndDecisionOptions(t *testing.T) {
 			t.Errorf("%s：進行中的案件 %v", name, got)
 		}
 	}
-	// 已結案：什麼決定都不能做、不能改嚴重度與連結措施。
 	closedAt, reason, decision := governanceNow, model.CaseClosedDecided, model.DecisionNoAction
 	closed := caseFixture(model.CaseFacts{Case: model.Case{ClosedAt: &closedAt, CloseReason: &reason, Decision: &decision}, StoreClosed: true})
 	got := toCase(closed)
@@ -104,7 +103,6 @@ func TestCaseCarriesTheModulesAvailabilityAndDecisionOptions(t *testing.T) {
 		got.GetCloseReason() != adminpb.CaseCloseReason_CASE_CLOSE_REASON_DECIDED || got.GetDecision() != adminpb.CaseDecision_CASE_DECISION_NO_ACTION {
 		t.Fatalf("已結案：%v", got)
 	}
-	// 以沒有通報關閉的案件沒有決定；店家已關閉時進行中的案件不能建立警告、停權與風險措施，仍可連結終止合作。
 	noReports := model.CaseClosedNoReports
 	got = toCase(caseFixture(model.CaseFacts{Case: model.Case{ClosedAt: &closedAt, CloseReason: &noReports}}))
 	if got.GetDecision() != adminpb.CaseDecision_CASE_DECISION_UNSPECIFIED {
@@ -127,7 +125,6 @@ func TestAvailabilityIsNeverSerializedAsReasons(t *testing.T) {
 		reasons = append(reasons, string(b))
 	}
 	for _, reason := range reasons {
-		// 原因的代碼（NO_ACTION_BASIS、NEEDS_CASE…）與句子都不在回應裡；ACTION_TAKEN 是結果與決定的值，不是原因。
 		if reason != "ACTION_TAKEN" && strings.Contains(raw, reason) {
 			t.Errorf("回應不得帶原因 %s：%s", reason, raw)
 		}
@@ -166,7 +163,6 @@ func TestStateChangingReportAndCaseCommandsRequireAnEtag(t *testing.T) {
 			t.Fatalf("%s：沒有 etag 的指令不能呼叫模組", name)
 		}
 	}
-	// 不帶 etag 的是寫註記（只新增）。
 	if _, err := h.CreateCaseNote(ctx, connect.NewRequest(&adminpb.CreateCaseNoteRequest{CaseId: caseID, Note: &adminpb.GovernanceNote{Body: "x"}})); err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +386,6 @@ func TestReportCarriesTheDerivedFactsTheClientUsedToCompute(t *testing.T) {
 		targets[1].GetSeverity() != pb.ViolationSeverity_VIOLATION_SEVERITY_UNSPECIFIED {
 		t.Fatalf("targets=%v", targets)
 	}
-	// 在案件裡：生效的類別是平台判定類別（不是檢舉人選的）；補充看過之後沒有提醒。
 	assessed := policy.Fraud
 	inCase := awaiting.Report
 	inCase.AssessedCategory, inCase.SupplementsSeenSeq = &assessed, 3

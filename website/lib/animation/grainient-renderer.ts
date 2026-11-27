@@ -122,8 +122,6 @@ void main(){
 type Rgb = readonly [number, number, number];
 
 function parseHexColor(value: string): Rgb | null {
-	// CSS optimizers legitimately shorten #ffffff to #fff, including tokens
-	// read via getComputedStyle. Accept both forms rather than dropping to CSS.
 	const expanded = value.replace(
 		/^#?([\da-f])([\da-f])([\da-f])$/i,
 		"#$1$1$2$2$3$3",
@@ -223,7 +221,6 @@ export function createGrainientRenderer(
 		try {
 			operation();
 		} catch {
-			// Cleanup remains best-effort if the WebGL context is already lost.
 		}
 	};
 
@@ -238,8 +235,6 @@ export function createGrainientRenderer(
 			safely(() => observerToDisconnect.disconnect());
 		}
 		resizeObserver = null;
-		// Deleting a current program defers its release. Unbind first, including
-		// a VAO left current by a failed draw, before deleting GPU handles.
 		safely(() => gl.bindVertexArray(null));
 		safely(() => gl.bindBuffer(gl.ARRAY_BUFFER, null));
 		safely(() => gl.useProgram(null));
@@ -292,7 +287,6 @@ export function createGrainientRenderer(
 		try {
 			options.onError();
 		} catch {
-			// The renderer must not leak an exception from an asynchronous failure.
 		}
 	};
 

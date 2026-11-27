@@ -1,13 +1,8 @@
-// Pure Tailwind class strings for the home page's shared chrome primitives.
-// No React imports — unit-tested directly. Consumers fold in caller `className`
-// via cn() at the component layer.
 
 export function eyebrowClasses(onDark = false): string {
 	return [
 		"inline-flex items-center gap-2.5 rounded-full px-4 py-2",
 		"text-xs font-bold uppercase tracking-[0.26em] whitespace-nowrap",
-		// Dark mode: the light `bg-white/70` pill glared on the night canvas, so
-		// match the subtle dark `.eyebrow` (glass fill, gold hairline, cream text).
 		onDark
 			? "bg-white/12 text-hk-home-paper"
 			: "bg-white/70 text-hk-home-accent-700 dark:bg-white/[0.06] dark:border dark:border-[rgba(245,222,165,0.14)] dark:text-[rgba(255,253,247,0.78)]",
@@ -67,8 +62,6 @@ export const sectionDescriptionClasses =
 export const sectionMoreClasses =
 	"shrink-0 pb-2 border-b-[1.5px] border-current text-sm font-bold tracking-[0.06em] text-hk-home-accent-700 no-underline hover:text-[color:var(--color-brand-primary-deep)]";
 
-// Roboto fallback has no Tailwind token — kept as inline style, matching the
-// existing pattern in HomePage.tsx (the category-card meta label).
 export const sectionMoreFontStyle = {
 	fontFamily: '"Roboto", var(--font-body)',
 } as const;

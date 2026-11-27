@@ -11,12 +11,8 @@ import (
 )
 
 const (
-	// drainTimeout 是關機後處理中的訊息還能跑的時間：handler 的 context 不隨關機取消，關機滿 drainTimeout 才取消。
-	// 平常運作不設上限，handler 的逾時由它自己的呼叫負責。
 	drainTimeout = 5 * time.Second
-	// ackMargin 是 handler 被取消後留給 ack 或 nack 的時間。
 	ackMargin = time.Second
-	// closeTimeout 是關閉連線時等 broker 回應的上限；關連線會取消其上的消費者，未 ack 的預取訊息由 broker 放回 queue。
 	closeTimeout = 5 * time.Second
 )
 
@@ -39,9 +35,6 @@ func Run(ctx context.Context, url string, bindings []Binding, isPermanent func(e
 	}
 }
 
-// runOnce 消費到 ctx 取消（關機）或連線、channel 出錯為止。不論哪一種，都先讓每個消費者停止取新訊息、等處理中的跑完，
-// 才關連線。handler 的 context 平常不取消，在關機或出錯後滿 drain 才取消，再多等 ackMargin 讓它 ack 或 nack；handler
-// 不理會 context 時照樣關連線，未 ack 的訊息由 broker 重送。
 func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent func(error) bool, log *slog.Logger, drain time.Duration) error {
 	conn, err := amqp.DialConfig(url, amqp.Config{Dial: amqp.DefaultDial(5 * time.Second)})
 	if err != nil {
@@ -52,7 +45,6 @@ func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent fu
 	var consumers sync.WaitGroup
 	defer func() {
 		cancel()
-		// 關機或出錯都在這裡起算 drain：關機時 runOnce 立刻走到這裡。
 		drainTimer := time.AfterFunc(drain, cancelHandlers)
 		waitTimeout(&consumers, drain+ackMargin)
 		drainTimer.Stop()
@@ -125,7 +117,6 @@ func runOnce(ctx context.Context, url string, bindings []Binding, isPermanent fu
 	}
 }
 
-// waitTimeout 等 wg 歸零，最多等 d；handler 不理會自己的逾時時，連線照樣關閉，未 ack 的訊息由 broker 重送。
 func waitTimeout(wg *sync.WaitGroup, d time.Duration) {
 	done := make(chan struct{})
 	go func() { wg.Wait(); close(done) }()

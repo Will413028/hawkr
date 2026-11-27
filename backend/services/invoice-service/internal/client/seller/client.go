@@ -105,8 +105,6 @@ func (c *Client) ResolveSellerAccountID(ctx context.Context, storeID int64) (int
 	ctx, cancel := context.WithTimeout(ctx, c.deadline)
 	defer cancel()
 
-	// StoreId 是 int64 而非 string：§4.1 例外① —— 它是服務內部注入的身分欄位、
-	// 前端不可控（Request 端；Response 同語意欄位仍必須是 string）。
 	resp, err := c.stub.ResolveSellerAccountID(ctx, &pb.ResolveSellerAccountIDRequest{StoreId: storeID})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -115,8 +113,6 @@ func (c *Client) ResolveSellerAccountID(ctx context.Context, storeID int64) (int
 		return 0, fmt.Errorf("invoice: resolve seller account (store_id=%d): %w", storeID, err)
 	}
 
-	// 本 RPC 的 Response 沒有 code/message envelope（錯誤走真實 gRPC status，
-	// seller.proto 的註解逐字寫明）⇒ 這裡不得去讀 GetCode()。
 	accountID := resp.GetAccountId()
 	if accountID <= 0 {
 		return 0, fmt.Errorf("invoice: legacy seller listener returned non-positive account_id %d for store_id %d",
@@ -149,9 +145,6 @@ func (c *Client) BatchGetSellerMeta(ctx context.Context, storeIDs []int64) (map[
 	}
 	out := make(map[int64]string, len(resp.GetSellers()))
 	for storeID, meta := range resp.GetSellers() {
-		// 空店名照樣放進 map：那是 seller 對端的事實，不是「查不到」。
-		// 兩者對呼叫端的處置相同（顯示 store_id），但混在一起會讓下次查不到時
-		// 以為是店名真的沒設。
 		out[storeID] = meta.GetSellerName()
 	}
 	return out, nil

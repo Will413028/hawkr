@@ -54,8 +54,6 @@ export default function RoleSwitcher() {
 			<button
 				ref={fabRef}
 				type="button"
-				// The CSS box is 52px; the floor is declared here too so the
-				// component guarantees its own target size.
 				className="role-switcher__fab min-h-11 min-w-11"
 				onClick={() => setOpen((v) => !v)}
 				aria-label="切換登入角色"
@@ -74,9 +72,6 @@ export default function RoleSwitcher() {
 				</span>
 			</button>
 			{open && (
-				// `role="dialog"`, not `menu`: the panel is mostly read-only status
-				// text with at most one action, and a menu whose children are not
-				// menuitems is announced wrongly.
 				<div
 					id={panelId}
 					className="role-switcher__panel"
@@ -93,16 +88,12 @@ export default function RoleSwitcher() {
 								? "未登入 (訪客)"
 								: "登入狀態確認中"}
 					</div>
-					{/* Role is driven by the signed-in account + the stored
-					    workspace. Use switchRole() from the navbar role switcher UI
-					    instead of a dev override. */}
+
 					{status === "signedIn" && (
 						<button
 							type="button"
 							className="role-switcher__option mt-1 border-t border-[var(--hkui-divider)] text-[var(--hkui-danger)]"
 							onClick={() => {
-								// 撤銷失敗時 signOut 會 reject（session 仍有效，畫面維持
-								// 登入）；它已跳 toast，這裡只吸收 rejection。
 								void signOut().catch(() => {});
 								close(true);
 							}}

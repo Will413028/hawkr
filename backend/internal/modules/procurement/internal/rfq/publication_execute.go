@@ -54,7 +54,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		}
 		now := s.Now()
 		claimed, err := q.ClaimApprovalForExecute(ctx, store.ClaimApprovalForExecuteParams{ID: in.ApprovalID, Version: in.ApprovalVersion, BuyerID: &in.BuyerID, Now: now})
-		if errors.Is(err, pgx.ErrNoRows) { // 同一個鍵的另一個請求剛執行完時，這裡才讀得到它的發布
+		if errors.Is(err, pgx.ErrNoRows) {
 			if out, err = replayPublication(ctx, q, in); err != nil || out.ID != (uuid.UUID{}) {
 				return err
 			}
@@ -91,7 +91,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		if err != nil {
 			return fmt.Errorf("rfq：寫入發布：%w", err)
 		}
-		if n == 0 { // 核准已領走，所以只可能是這個冪等鍵已用在別的發布：整筆還原
+		if n == 0 {
 			return idempotencyMismatch()
 		}
 		invites := make([]model.RfqInvite, 0, len(c.storeIDs))
@@ -120,7 +120,6 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 	return out, err
 }
 
-// replayPublication 以冪等鍵找第一次的發布：沒有回零值；有但內容（需求、核准、核准版本、讀到的版本、PayloadHash）不同回 INVALID_ARGUMENT。
 func replayPublication(ctx context.Context, q *store.Queries, in ExecuteInput) (model.Publication, error) {
 	pub, err := q.GetPublicationByClientRequest(ctx, store.GetPublicationByClientRequestParams{BuyerID: &in.BuyerID, ClientRequestID: in.ClientRequestID})
 	if errors.Is(err, pgx.ErrNoRows) {

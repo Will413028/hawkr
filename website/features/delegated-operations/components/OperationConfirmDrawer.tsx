@@ -51,13 +51,6 @@ export default function OperationConfirmDrawer({
 	const [notifySeller, setNotifySeller] = React.useState(true);
 	const [touched, setTouched] = React.useState(false);
 
-	// 每次開新的一筆寫入都從乾淨的表單開始：沿用上一次的理由會讓「複製貼上同一句」
-	// 變成預設行為，而稽核列的價值正來自它逐筆不同。呼叫端把表單上已填的理由當
-	// `initialReason` 帶進來時才是例外——那是同一次寫入的接續，不是沿用上一次。
-	//
-	// ⚠️ 相依只能是 `request` 物件本身，不能是它的欄位摘要：關掉抽屜、改掉底部條的
-	// 理由、再開同一種寫入時，標題與版本都沒變，摘要當鍵會讓 effect 不重跑而沿用
-	// 上一次的值。
 	React.useEffect(() => {
 		if (!request) return;
 		setReason(request.initialReason ?? "");
@@ -176,8 +169,6 @@ export default function OperationConfirmDrawer({
 							<strong>{request.expectedVersion}</strong>
 						</p>
 					) : request.versionNote ? (
-						// 建立類寫入沒有版本可覆蓋。空著與「漏畫」在畫面上分不出來，而這一
-						// 格正是操作者判斷「我會不會覆蓋別人」的地方。
 						<p className="adm-confirm__version">
 							<span>目前版本</span>
 							<strong>{request.versionNote}</strong>

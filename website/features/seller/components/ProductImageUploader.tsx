@@ -16,8 +16,8 @@ import type {
 interface PendingUpload {
 	id: string;
 	name: string;
-	previewBlob: string; // local objectURL for instant preview
-	progress: number; // 0..1
+	previewBlob: string;
+	progress: number;
 	error?: string;
 }
 
@@ -88,10 +88,6 @@ export default function ProductImageUploader({
 					.then((asset) => {
 						URL.revokeObjectURL(previewBlob);
 						setPending((prev) => prev.filter((p) => p.id !== id));
-						// Functional updater: append onto the latest gallery, not the
-						// stale `images` captured when this upload started. Multiple
-						// uploads from one multi-select resolve against a shared closure
-						// base otherwise and overwrite each other down to one image.
 						onChange((prev) =>
 							[
 								...prev,
@@ -137,7 +133,7 @@ export default function ProductImageUploader({
 
 	const handleAiPick = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
-		e.target.value = ""; // allow re-picking the same file
+		e.target.value = "";
 		if (!file) return;
 		setAiSource(file);
 		setAiOpen(true);
@@ -147,8 +143,6 @@ export default function ProductImageUploader({
 		const file = new File([enhanced], `ai-${Date.now()}.jpg`, {
 			type: enhanced.type || "image/jpeg",
 		});
-		// AI output is not guaranteed to be 4:3. Route it through the exact same
-		// full-image-first framing step as a normal pick before staging bytes.
 		setAiCropQueue([file]);
 	};
 

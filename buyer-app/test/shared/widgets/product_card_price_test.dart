@@ -33,7 +33,6 @@ void main() {
     expect(find.byKey(const ValueKey('product-card-price-row')), findsNothing);
     expect(_visibleText(tester), isNot(contains('NT\$')));
     expect(_visibleText(tester), isNot(contains('0')));
-    // 商品名稱仍在 —— 隱藏的只有價格，不是整張卡。
     expect(find.text('無價格商品'), findsOneWidget);
   });
 
@@ -67,7 +66,6 @@ void main() {
   });
 
   testWidgets('售價為 "0" 時不單獨掛一條被劃掉的原價', (tester) async {
-    // 價格列整條不畫，所以刪除線原價也不該有機會出現。
     await tester.pumpWidget(
       _host(
         const ProductCard(
@@ -102,7 +100,6 @@ void main() {
     );
 
     expect(_visibleText(tester), contains('NT\$ 120'));
-    // 刪除線那格若把 "0" 印出來，這裡會抓到一個獨立的 "0"。
     expect(_visibleText(tester).split('\n'), isNot(contains('0')));
   });
 }

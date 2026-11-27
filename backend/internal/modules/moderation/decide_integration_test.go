@@ -27,7 +27,6 @@ func (f *fixture) openCase(t *testing.T, target Target) Case {
 	return f.submit(t, reporter, target, policy.Spam).Case
 }
 
-// bumpVersion 模擬案件在管理員讀取之後被別人動過：版本過期，之後的結案 UPDATE 會是 0 列。
 func (f *fixture) bumpVersion(t *testing.T, id uuid.UUID) {
 	t.Helper()
 	f.exec(t, "UPDATE moderation.cases SET version = version + 1 WHERE id = $1", id)

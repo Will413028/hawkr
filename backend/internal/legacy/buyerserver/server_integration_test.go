@@ -94,7 +94,6 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 		if e != nil || r.Msg.GetPrincipals()[p.BuyerID] != accountID {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 不存在的 ID 只在 unresolved_ids，不在 principals 裡（不回吐 buyer_id 冒充 account_id）。
 		r, e = s.ResolvePrincipals(ctx, connect.NewRequest(&pb.ResolvePrincipalsRequest{Ids: []int64{p.BuyerID, 999999}}))
 		if _, ok := r.Msg.GetPrincipals()[999999]; e != nil || ok || len(r.Msg.GetUnresolvedIds()) != 1 || r.Msg.GetUnresolvedIds()[0] != 999999 || len(r.Msg.GetPrincipals()) != 1 {
 			t.Fatalf("%v %v", r, e)

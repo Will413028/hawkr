@@ -91,7 +91,6 @@ export default function InvoiceProfilesClient() {
 		keysRef.current.delete(intent);
 	};
 
-	// 成功 banner 8 秒後自動收掉；失敗 banner 留著，並把焦點移過去（§B08 A11y）。
 	React.useEffect(() => {
 		if (!banner) return;
 		if (banner.tone === "alert") {
@@ -232,7 +231,6 @@ export default function InvoiceProfilesClient() {
 	const otherProfiles = deleteTarget
 		? profiles.filter((profile) => profile.profileId !== deleteTarget.profileId)
 		: [];
-	// 「預設且還有別筆」才必須先指定接手的那一筆；最後一筆預設直接刪，不強迫指定。
 	const needsNewDefault =
 		Boolean(deleteTarget?.isDefault) && otherProfiles.length > 0;
 
@@ -260,7 +258,6 @@ export default function InvoiceProfilesClient() {
 		setDeleteBusy(true);
 		setDeleteError(null);
 		try {
-			// 順序是硬性的：先設新預設，成功才刪。第一步失敗就不執行刪除。
 			if (needsNewDefault) {
 				const promoteIntent = `default:${newDefaultId}`;
 				await setDefault(newDefaultId, keyFor(promoteIntent));
@@ -472,8 +469,6 @@ export default function InvoiceProfilesClient() {
 									size="lg"
 									label={T.deleteNewDefaultLabel}
 									isRequired
-									// Select 的 description／error 沒有 id、也沒接 aria-describedby
-									// （components/ui/Input.tsx 的既有 divergence）⇒ 說明自己渲染並手動接上。
 									aria-describedby="invoice-delete-new-default-hint"
 									value={newDefaultId}
 									disabled={deleteBusy}

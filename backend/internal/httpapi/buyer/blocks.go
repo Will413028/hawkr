@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// blockModule 是個人封鎖的模組 API（*buyer.Module，A7-1b）加上名單的買家顯示資料。
 type blockModule interface {
 	BlockBuyer(ctx context.Context, buyerID, targetBuyerID int64) (bool, error)
 	UnblockBuyer(ctx context.Context, buyerID, targetBuyerID int64) (bool, error)
@@ -44,7 +43,6 @@ func (h *App) BlockAuthor(ctx context.Context, req *connect.Request[pb.BlockAuth
 		changed, err = h.m.BlockBuyer(ctx, buyerID, author.Author.ID)
 	case social.ActorStore:
 		if req.Msg.GetMessageId() != "" {
-			// 對話的店已由對話歸屬證明存在；店家卡片不設的對話（從未公開的店也能傳訊給買家）照樣可以封鎖。
 			changed, err = h.blockKnownStore(ctx, buyerID, author.Author.ID)
 		} else {
 			changed, err = h.blockStore(ctx, buyerID, author.Author.ID)
@@ -74,8 +72,6 @@ func (h *App) BlockStore(ctx context.Context, req *connect.Request[pb.BlockStore
 	return connect.NewResponse(&pb.BlockStoreResponse{Changed: changed}), nil
 }
 
-// blockStore 是買家封鎖店的唯一入口：店家要存在而且曾經公開過（buyer 不檢查店是否存在；沒有卡片的店不洩漏存在與否，一律 not_found），
-// 再經跨身分規則擋下封鎖自己的店。
 func (h *App) blockStore(ctx context.Context, buyerID, storeID int64) (bool, error) {
 	cards, err := h.storeCards(ctx, []int64{storeID})
 	if err != nil {
@@ -87,7 +83,6 @@ func (h *App) blockStore(ctx context.Context, buyerID, storeID int64) (bool, err
 	return h.blockKnownStore(ctx, buyerID, storeID)
 }
 
-// blockKnownStore 是已確認店存在之後的封鎖：經跨身分規則擋下封鎖自己的店，再交給 buyer 模組。
 func (h *App) blockKnownStore(ctx context.Context, buyerID, storeID int64) (bool, error) {
 	if err := h.blocking.Identities.RejectSamePerson(ctx, buyerID, storeID); err != nil {
 		return false, err

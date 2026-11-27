@@ -110,7 +110,7 @@ export default function MegaMenu({
 	const panelRef = React.useRef<HTMLElement | null>(null);
 	const panelId = `${React.useId()}-mega-panel`;
 	React.useEffect(() => {
-		void retry; // An explicit retry starts a new request after a failed import.
+		void retry;
 		if (!openId || Panel) return;
 		let active = true;
 		setLoadError(false);
@@ -197,13 +197,11 @@ export default function MegaMenu({
 		};
 	}, [cancelClose, cancelOpen]);
 
-	// Route changes must not leave an old overlay or delayed hover open.
 	React.useEffect(() => {
 		void pathname;
 		close();
 	}, [pathname, close]);
 
-	// Esc to close
 	React.useEffect(() => {
 		if (!openId) return;
 		const onKey = (e: KeyboardEvent) => {
@@ -221,9 +219,6 @@ export default function MegaMenu({
 		return () => window.removeEventListener("keydown", onKey);
 	}, [openId, close]);
 
-	// Keep the auto-hide navbar pinned visible while the panel is open —
-	// otherwise scrolling the page would slide the bar (and our anchor
-	// for the panel) off-screen mid-interaction.
 	const pinNav = useNavPin();
 	React.useEffect(() => {
 		if (!openId || !pinNav) return;
@@ -231,11 +226,6 @@ export default function MegaMenu({
 		return release;
 	}, [openId, pinNav]);
 
-	// Outside-click close. This used to be a full-viewport `pointer-events-auto`
-	// backdrop div, which swallowed the first click on any page content while a
-	// panel was open (dismissing the menu cost the user a click). A capture-phase
-	// document listener does the same job without preventing the click from
-	// reaching what the user actually aimed at.
 	React.useEffect(() => {
 		if (!openId) return;
 		const onDocumentPointerDown = (event: PointerEvent) => {
@@ -250,9 +240,6 @@ export default function MegaMenu({
 			document.removeEventListener("pointerdown", onDocumentPointerDown, true);
 	}, [openId, close]);
 
-	// Roving arrow-key movement across the top-level triggers. The panel keeps
-	// following focus, so arrowing along the bar previews each section the same
-	// way tabbing already did.
 	const onNavKeyDown = React.useCallback((event: React.KeyboardEvent) => {
 		const { key } = event;
 		if (
@@ -282,8 +269,6 @@ export default function MegaMenu({
 		triggers[next]?.focus();
 	}, []);
 
-	// Tab from an open trigger enters its panel instead of walking the remaining
-	// triggers first; Shift+Tab off the panel's first control returns to it.
 	const onTriggerKeyDown = React.useCallback(
 		(event: React.KeyboardEvent, isOpen: boolean) => {
 			if (event.key !== "Tab" || event.shiftKey || !isOpen) return;
@@ -307,12 +292,6 @@ export default function MegaMenu({
 		trigger.focus({ preventScroll: true });
 	}, []);
 
-	// Body scroll-lock removed: when the page has a vertical scrollbar,
-	// switching `overflow: hidden` removes ~15px of width and the entire
-	// content (incl. the navbar) jumps right by that amount on every
-	// open/close. The mega menu is a hover affordance, not a modal, so
-	// just letting the page scroll behind the backdrop is fine. The
-	// backdrop + visible panel still keeps focus on the menu.
 
 	const activeItem = openId
 		? items.find((it) => it.label === openId && it.panel)
@@ -323,9 +302,6 @@ export default function MegaMenu({
 			<nav
 				ref={navRef}
 				className="relative z-[42] inline-flex items-center gap-[var(--space-2)]"
-				// Distinct from the host navbar's own 「主要導覽」 landmark: two
-				// nested nav elements with the same name read as one duplicated
-				// entry in a screen reader's landmark list.
 				aria-label="商品分類"
 				onMouseLeave={scheduleClose}
 				onMouseEnter={cancelClose}
@@ -352,10 +328,6 @@ export default function MegaMenu({
 						/>
 					) : null;
 					if (!hasPanel) {
-						// Hovering / focusing a panel-less item (關於我們, 招商合作, 搜尋)
-						// must dismiss any open panel — otherwise sweeping the cursor
-						// off 市集 onto a neighbour leaves its panel stuck open (you
-						// never leave <nav>, so the nav-level onMouseLeave never fires).
 						return (
 							<Link
 								key={item.label}
@@ -395,9 +367,6 @@ export default function MegaMenu({
 								prefetch={false}
 								className={`${className} inline-flex items-center gap-1`}
 								aria-current={isCurrent ? "page" : undefined}
-								// Not aria-haspopup="menu": the panel is a content
-								// section, not a menu. expanded + controls is the
-								// disclosure pattern that actually describes it.
 								aria-expanded={isOpen}
 								aria-controls={panelId}
 								onKeyDown={(event) => onTriggerKeyDown(event, isOpen)}
@@ -425,13 +394,6 @@ export default function MegaMenu({
 								}}
 								onClick={(e) => {
 									cancelMainNavPointerIntent(item.href);
-									// Tap the trigger on touch toggles the panel instead of
-									// navigating away. Holding link semantics for keyboard
-									// users (Tab → Enter still navigates).
-									// `pointer: coarse` is included on purpose: a hybrid
-									// laptop/tablet reports `hover: hover` yet is driven by a
-									// finger, so the hover-open path never fires there and
-									// the panel was unreachable.
 									if (
 										typeof window !== "undefined" &&
 										window.matchMedia("(hover: none), (pointer: coarse)")
@@ -458,18 +420,9 @@ export default function MegaMenu({
 				})}
 			</nav>
 
-			{/* No backdrop element: it was a transparent full-viewport layer whose
-			 *  only job was the click-outside close, and `pointer-events-auto`
-			 *  made it eat the first click on the page underneath. The
-			 *  capture-phase document listener above closes on the same gesture
-			 *  and lets the click through. */}
 
-			{/* Single shared panel — content swaps based on activeItem.
-			 *  Anchored to the navbar bottom via CSS (top: var(--nav-height)).
-			 *  Outer <section> is a transparent positioning shell so the white
-			 *  card chrome (bg/border/radius/shadow) lives on the inner div —
-			 *  that's what makes the panel read as a centered popup instead of
-			 *  a full-bleed slab across the viewport. */}
+
+
 			<section
 				ref={panelRef}
 				id={panelId}

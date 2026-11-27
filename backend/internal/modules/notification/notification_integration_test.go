@@ -20,8 +20,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// setup 給這支測試一個只套用了本模組 migration 的 database：integration 測試只跑在自己的 schema 上。排入 River
-// job 的模組在前面加 testdb.Jobs()（見 content 模組）。獨立的測試開頭呼叫 t.Parallel()。
 func setup(t *testing.T) *db.DB {
 	t.Helper()
 	return pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "notification", Dir: Migrations()}))
@@ -42,7 +40,6 @@ func mustExec(t *testing.T, d *db.DB, sql string, args ...any) {
 	}
 }
 
-// wantConstraint 要求 err 是違反名為 name 的約束（唯一鍵 23505、CHECK 23514）。
 func wantConstraint(t *testing.T, err error, code, name string) {
 	t.Helper()
 	var pgErr *pgconn.PgError

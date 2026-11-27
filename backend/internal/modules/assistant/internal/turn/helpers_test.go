@@ -18,14 +18,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant/internal/model"
 )
 
-// chunk 是替身 LLM 的一個回應片段（fixture 的 scripted_llm.chunks 同形）。
 type chunk struct {
 	Partial      bool       `json:"partial"`
 	Text         string     `json:"text"`
 	Thought      bool       `json:"thought"`
 	FunctionCall *chunkCall `json:"function_call"`
 	Error        string     `json:"error"`
-	// ErrorCode 非空時送出沒有內容的最終回應，形狀同 Gemini 擋下的回應（ErrorCode 與 FinishReason 都帶安全原因）。
 	ErrorCode string `json:"error_code"`
 }
 
@@ -34,28 +32,23 @@ type chunkCall struct {
 	Args map[string]any `json:"args"`
 }
 
-// scriptedCall 是替身 LLM 的一次呼叫要回的內容。
 type scriptedCall struct {
 	Agent  string  `json:"agent"`
 	Chunks []chunk `json:"chunks"`
-	// FinishReason 是非 Partial 回應的結束原因；nil 表示 STOP，指向空字串表示串流被提早關閉。
 	FinishReason *genai.FinishReason `json:"finish_reason"`
 }
 
-// llmRequest 是替身 LLM 收到的一次請求的摘要。
 type llmRequest struct {
 	Agent                 string
 	LastUserTexts         []string
 	FileURIs              []string
 	FunctionResponsesBack []map[string]any
 	HistoryContents       int
-	// CallingMode 與 AllowedNames 是請求的 ToolConfig.FunctionCallingConfig；DeclaredNames 是同一個請求宣告的函式名稱。
 	CallingMode   string
 	AllowedNames  []string
 	DeclaredNames []string
 }
 
-// agentOf 由系統提示判斷這次呼叫是哪個 agent（路由是否正確）。
 func agentOf(req *adkmodel.LLMRequest) string {
 	si := ""
 	if req.Config != nil && req.Config.SystemInstruction != nil {
@@ -104,7 +97,6 @@ func summarize(req *adkmodel.LLMRequest) llmRequest {
 	return s
 }
 
-// scriptedLLM 依序重播 script，每次 GenerateContent 取下一筆；不依賴 goroutine 的排程順序。
 type scriptedLLM struct {
 	mu       sync.Mutex
 	script   []scriptedCall
@@ -158,7 +150,6 @@ func (l *scriptedLLM) seen() []llmRequest {
 	return append([]llmRequest(nil), l.requests...)
 }
 
-// textLLM 每次呼叫回一段固定文字。
 func textLLM(text string) *scriptedLLM {
 	calls := make([]scriptedCall, 8)
 	for i := range calls {
@@ -167,7 +158,6 @@ func textLLM(text string) *scriptedLLM {
 	return &scriptedLLM{script: calls}
 }
 
-// fakeOrders 是 buyeragent.Orders 的替身。
 type fakeOrders struct {
 	orders      []buyeragent.Order
 	ordersErr   error
@@ -209,7 +199,6 @@ func (f *fakeOrders) OrderDetail(_ context.Context, _ int64, orderNo string) (bu
 	return d, nil
 }
 
-// failingSessions 讓 Create 失敗。
 type failingSessions struct{ session.Service }
 
 func (failingSessions) Create(context.Context, *session.CreateRequest) (*session.CreateResponse, error) {
@@ -233,7 +222,6 @@ func newExecutor(t *testing.T, llm adkmodel.LLM, orders buyeragent.Orders, mutat
 	return e
 }
 
-// collect 訂閱一輪直到它結束，回全部事件；30 秒只是防止測試卡死的保險，不是被測的行為。
 func collect(t *testing.T, e *Executor, buyerID int64, turnID, cursor string) []model.Event {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

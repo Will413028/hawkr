@@ -41,14 +41,12 @@ var DelegatedDeclaration = httpdelegation.Declaration{
 	},
 }
 
-// delegatedCreatePostPaths 由店主建立的欄位對照表衍生：委派建立的 request_id 在 operation 之內。
 var delegatedCreatePostPaths = func() rpc.FieldPaths {
 	p := maps.Clone(createPostPaths)
 	p["RequestID"] = "operation.request_id"
 	return p
 }()
 
-// writeMethod 由這個寫入方法發的 social 事件種類衍生能力與動作（delegation.PostWriteFor，與稽核訂閱者共用，不在這裡再寫一份）。
 func writeMethod(e any) moddelegation.DelegatedMethod {
 	w, ok := moddelegation.PostWriteFor(e)
 	if !ok {
@@ -90,7 +88,6 @@ func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, 
 	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log}, runner: runner, posts: posts}, nil
 }
 
-// postPreview 是稽核列的資源名稱：內文去除首尾空白後的前 60 個字元。
 func postPreview(body string) string {
 	b := strings.TrimSpace(body)
 	if r := []rune(b); len(r) > 60 {
@@ -99,8 +96,6 @@ func postPreview(body string) string {
 	return b
 }
 
-// delegatedWrite 是每個代行寫入共同的流程：交給 delegation 檢查重送與店家、帶著代行者（明確的參數，A7-D27）執行 do（social 在自己的 transaction 內發帶代行者的事件，稽核同 transaction 寫入）；重送（do 沒被呼叫）時讀回第一次寫入的貼文目前的樣子。
-// 回傳貼文、店家、稽核列 ID，與排程的發布時間（只有排程）。
 func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.DelegatedWrite,
 	do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (social.Post, *time.Time, error)) (post social.Post, st seller.Store, auditID string, publishAt *time.Time, err error) {
 	c, err := httpdelegation.CallerFrom(ctx)
@@ -290,7 +285,6 @@ func (h *Delegated) UpdateStorePost(ctx context.Context, req *connect.Request[pb
 	return connect.NewResponse(&pb.UpdateStorePostResponse{Post: out, AuditLogId: auditID}), nil
 }
 
-// transition 是發布與下架共同的流程：operation、貼文 ID 與必填的 etag，再由 do 呼叫模組。
 func (h *Delegated) transition(ctx context.Context, op *commonpb.DelegatedOperation, postID, etag string, action moddelegation.AuditAction,
 	do func(context.Context, seller.Store, uuid.UUID, int64, *delegatedactor.Actor) (social.Post, error)) (*pb.Post, string, error) {
 	o, err := httpdelegation.ParseOperation(op)

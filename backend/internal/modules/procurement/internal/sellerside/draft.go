@@ -31,7 +31,6 @@ func ParseVersion(field, raw string) (int32, error) {
 	return int32(v), nil
 }
 
-// draftSizeConstraint 是草稿大小上限的 CHECK（jsonb 轉文字的位元組數 <= 16384）；大小只由它量，Go 端不重算（序列化格式不同，邊界會對不上）。
 const draftSizeConstraint = "seller_response_drafts_payload_size_check"
 
 func isDraftTooLarge(err error) bool {

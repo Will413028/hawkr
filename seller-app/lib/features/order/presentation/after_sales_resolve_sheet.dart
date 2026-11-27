@@ -20,9 +20,6 @@ import '../data/after_sale_evidence.dart';
 import '../data/after_sale_model.dart';
 import 'widgets/appeal_deadline_card.dart';
 
-// ══════════════════════════════════════════════════════════════
-// 售後處理 Entry Sheet (Figma 4820:44588)
-// ══════════════════════════════════════════════════════════════
 
 /// 從售後卡片的「售後申請」按鈕呼叫。
 /// [afterSaleCase] 帶入退貨原因 / 詳細說明 / 照片。
@@ -41,9 +38,6 @@ void showAfterSalesResolveSheet({
 }) {
   showModalBottomSheet<void>(
     context: context,
-    // 這個 sheet 有兩個開啟點：售後詳情頁（根路由，本來就正常）與訂單列表卡片的
-    // `OrderBottomRow`（訂單 tab，位於 `StatefulShellRoute` 分支底下）。後者的分支
-    // Navigator 在浮動導覽列之下，不掛根 Navigator 底部決策鈕會被蓋住（#132 同型）。
     useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: AppColors.bgCard,
@@ -65,7 +59,6 @@ void showAfterSalesResolveSheet({
   );
 }
 
-// ── Entry Sheet ───────────────────────────────────────────────
 
 class _ResolveEntrySheet extends StatelessWidget {
   const _ResolveEntrySheet({
@@ -116,7 +109,6 @@ class _ResolveEntrySheet extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Title
             Text(
               '選擇處理方式',
               style: TextStyle(
@@ -166,7 +158,6 @@ class _ResolveEntrySheet extends StatelessWidget {
               SizedBox(height: 8.h),
             ],
 
-            // 5 option buttons (2x2 grid + 1)
             Row(
               children: [
                 Expanded(
@@ -229,7 +220,6 @@ class _ResolveEntrySheet extends StatelessWidget {
     );
   }
 
-  // ── Sub-dialogs ──
 
   void _showReturnRefundDialog(BuildContext context) {
     showDialog(
@@ -275,7 +265,6 @@ class _ResolveEntrySheet extends StatelessWidget {
   }
 }
 
-// ── Shared Widgets ────────────────────────────────────────────
 
 /// 買家舉證照片 + 出貨照片。前者是 objectKey、後者是 Gateway 組好的顯示 URL，
 /// 兩者都直接餵給 `OptimizedNetworkImage`（內部走 buildImageUrl 唯一入口）。
@@ -497,8 +486,6 @@ class _PhotoThumb extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           OptimizedNetworkImage(
-            // objectKey 或後端顯示 URL 皆直接交給 OptimizedNetworkImage，內部走
-            // buildImageUrl（唯一組裝入口）依 reviewPhoto 場景組 URL。
             imageUrl: url,
             scene: ImageScene.reviewPhoto,
             fit: BoxFit.cover,
@@ -619,7 +606,6 @@ class _OptionCard extends StatelessWidget {
   }
 }
 
-// ── Dialog shell ──────────────────────────────────────────────
 
 class _ResolveDialog extends StatelessWidget {
   const _ResolveDialog({
@@ -641,10 +627,6 @@ class _ResolveDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 視覺對齊「同意退貨退款」彈窗（_ReturnRefundDialog）：細灰邊 + 15r 卡片，
-    // 標題 18sp、副標 14sp，按鈕 40h / 8r 圓角 + 微陰影。
-    // 依 confirmColor 亮度挑前景色：淺色（如金 #E0C44C）用深墨字，深色用白字，
-    // 確保按鈕文字/載入圈與底色對比足夠。
     final fg = confirmColor.computeLuminance() > 0.45
         ? AppColors.textEmphasis
         : AppColors.bgCard;
@@ -661,7 +643,6 @@ class _ResolveDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Title
             Text(
               title,
               textAlign: TextAlign.center,
@@ -688,7 +669,6 @@ class _ResolveDialog extends StatelessWidget {
             SizedBox(height: 16.h),
             body,
             SizedBox(height: 16.h),
-            // Bottom buttons: 取消 + confirm
             Row(
               children: [
                 Expanded(
@@ -774,7 +754,6 @@ class _ResolveDialog extends StatelessWidget {
   }
 }
 
-// ── 1. 同意退貨退款 Dialog (Figma 6260:116436) ─────────────────
 
 class _ReturnRefundDialog extends StatefulWidget {
   const _ReturnRefundDialog({
@@ -800,16 +779,11 @@ class _ReturnRefundDialogState extends State<_ReturnRefundDialog> {
   void initState() {
     super.initState();
     final allowed = widget.allowedReturnShippingMethod;
-    // 🔴 原本是 `allowed == 3002 ? 3002 : 3001` —— 後端指定了一個本 App 不支援的
-    // 退貨方式（3003/3005 或任何新碼值）時會**預設選取黑貓並一鍵建出黑貓
-    // 逆物流單**。改為：只有兩個支援值才預選，其餘留空並由 build 擋住送出。
     final allowedPresentation = shippingPresentationOf(allowed);
     _shippingMethod = switch (allowedPresentation) {
       ShippingPresentation.cvsStorePickup =>
         ShippingMethod.sevenElevenStorePickup.value,
       ShippingPresentation.homeDelivery => ShippingMethod.taqbin.value,
-      // allowed 為空 = 後端未限定 → 沿用既有預設（黑貓，兩張卡都給選）；
-      // allowed 非空但不支援 → 留空，_availableMethods() 會回空清單。
       ShippingPresentation.unsupported =>
         (allowed == null || allowed.trim().isEmpty)
             ? ShippingMethod.taqbin.value
@@ -823,7 +797,6 @@ class _ReturnRefundDialogState extends State<_ReturnRefundDialog> {
     final selected = shippingPresentationOf(_shippingMethod);
     final unsupportedAllowed = availableMethods.isEmpty;
     final methodLabel = _methodTitle(_shippingMethod);
-    // 🔴 CTA 文案依所選退貨方式**明確分派**；未支援時不得顯示「預約黑貓派車」。
     final confirmLabel = switch (selected) {
       ShippingPresentation.cvsStorePickup => '產生7-11退貨代碼',
       ShippingPresentation.homeDelivery => '預約黑貓派車',
@@ -1087,8 +1060,6 @@ class _ReturnRefundDialogState extends State<_ReturnRefundDialog> {
       switch (shippingPresentationOf(method)) {
         ShippingPresentation.cvsStorePickup => '7-11 退貨便',
         ShippingPresentation.homeDelivery => '黑貓宅急便',
-        // 未知 / 本版未支援：顯示 CodeMeta label（查不到就顯示原碼），
-        // 不得冒名成「黑貓宅急便」。
         ShippingPresentation.unsupported => CodeMetaDisplay.shippingMethod(
           method,
           fallback: '未指定',
@@ -1235,7 +1206,6 @@ class _LogisticsCard extends StatelessWidget {
   }
 }
 
-// ── 2. 部分退款 Dialog (Figma 5050:45736) ──────────────────────
 
 class _PartialRefundDialog extends StatefulWidget {
   const _PartialRefundDialog({required this.maxAmount, required this.onSubmit});
@@ -1325,7 +1295,6 @@ class _PartialRefundDialogState extends State<_PartialRefundDialog> {
   }
 }
 
-// ── 3. 全額退款(免退貨) Dialog (Figma 5050:46375) ──────────────
 
 class _FullRefundDialog extends StatefulWidget {
   const _FullRefundDialog({required this.refundAmount, required this.onSubmit});
@@ -1358,7 +1327,6 @@ class _FullRefundDialogState extends State<_FullRefundDialog> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 退款金額 (readonly)
           Container(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
             decoration: BoxDecoration(
@@ -1416,7 +1384,6 @@ class _FullRefundDialogState extends State<_FullRefundDialog> {
   }
 }
 
-// ── 4. 發放優惠券 Dialog (Figma 5050:47403) ────────────────────
 
 class _CouponDialog extends StatefulWidget {
   const _CouponDialog({required this.onSubmit});
@@ -1502,7 +1469,6 @@ class _CouponDialogState extends State<_CouponDialog> {
   }
 }
 
-// ── 5. 婉拒售後申請 Dialog (Figma 5053:24762) ──────────────────
 
 class _RejectDialog extends StatefulWidget {
   const _RejectDialog({required this.afterSaleCase, required this.onSubmit});
@@ -1540,7 +1506,6 @@ class _RejectDialogState extends State<_RejectDialog> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 時效與爭議比對（生鮮 60h 申訴期；deliveredAt 將於 [B-95] 後補上）
           if (createdAt != null) AppealDeadlineCard(createdAt: createdAt),
           SizedBox(height: 16.h),
           Text(
@@ -1593,7 +1558,6 @@ class _RejectDialogState extends State<_RejectDialog> {
   }
 }
 
-// ── Form helpers ──────────────────────────────────────────────
 
 class _InputField extends StatelessWidget {
   const _InputField({

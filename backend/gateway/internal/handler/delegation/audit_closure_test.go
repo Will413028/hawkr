@@ -9,26 +9,13 @@ import (
 	commonpb "github.com/Will413028/hawkr/go-pkg/proto/common"
 )
 
-// 每一列稽核 intent 都必須抵達終態。留在 PENDING 的列不是「還沒好」——三步序跑完之後
-// 沒有人會再回來看它，而 delegation_audit_pending_total 的告警窗口是 24 小時，一列卡住
-// 就響滿一天再自行 resolve，於是「真的需要人看的 PENDING」（domain write 成立但 confirm
-// 沒回來）與「永遠不會關的 PENDING」在告警上長得一模一樣，鑑別力歸零。
-//
-// 本檔守三條離開路徑，它們的共同點是**寫入已經成立、只有稽核沒關**，所以全部無聲：
-// 回應是成功的、log 只有一行 Warn、指標照常。
-//
-// ⚠️ 這裡刻意直接驅動 Orchestrator 而不是打 HTTP：要斷言的是「Gateway 送了什麼給
-// delegation 模組」，而三條路徑在 HTTP 層的回應全部正常，從外面看不出差別。
 
-// closureAuditStub 記下送出的 intent／confirm，並可指定 intent 回 replayed 與既有 result。
 type closureAuditStub struct {
 	replayed      bool
 	existingState string
 
 	intents  []*accountpb.RecordAuditIntentRequest
 	confirms []*accountpb.ConfirmAuditResultRequest
-	// confirmCtxErr 記錄 confirm 當下 ctx 的狀態。detached 之後它必須是 nil，即使
-	// 呼叫端的 ctx 早就被取消。
 	confirmCtxErr error
 
 	batchIntentResults []*accountpb.RecordAuditIntentItemResult
@@ -187,7 +174,6 @@ func TestOrchestrate_ConfirmSurvivesCallerCancellation(t *testing.T) {
 			return &Resource{ID: "7001", Version: "3", Fields: map[string]any{"name": "before"}}, nil
 		},
 		Write: func(context.Context, *commonpb.DelegationContext) (*Resource, *Denial) {
-			// 寫入已經成立，之後呼叫端才斷線 —— 這是真實時序，不是人造的邊角。
 			cancel()
 			return &Resource{ID: "7001", Version: "4", Fields: map[string]any{"name": "after"}}, nil
 		},
@@ -231,7 +217,6 @@ func TestOrchestrateBatch_MissingWriteResultStillCloses(t *testing.T) {
 			}, nil
 		},
 		WriteBatch: func(_ context.Context, _ *commonpb.DelegationContext, items []BatchWriteItem) ([]BatchWriteResult, *Denial) {
-			// 上游只回報了第一與第三個元素。7002 憑空消失。
 			out := make([]BatchWriteResult, 0, 2)
 			for _, it := range items {
 				if it.ResourceID == "7002" {
@@ -269,7 +254,6 @@ func TestOrchestrateBatch_MissingWriteResultStillCloses(t *testing.T) {
 			t.Fatalf("%s 有回報且成功，必須是 SUCCEEDED；實際 %q", id, byID[id].GetResult())
 		}
 	}
-	// 回應那一側也不能說謊：那個元素不是「成功」。
 	for _, r := range results {
 		if r.ResourceID == "7002" && r.OK {
 			t.Fatal("上游沒回報的元素不得回報成 OK")

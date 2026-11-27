@@ -192,7 +192,6 @@ class ChatThread extends _$ChatThread {
       }
       if (found == null) {
         if (arg.conversationId != null && state.conversationId != null) {
-          // 指定了對話 ID 卻不在列表裡：讓 ListMessages 回覆（不存在或不是自己的是 not_found）。
           await _loadLatest(arg.conversationId!, null);
           return;
         }
@@ -270,7 +269,6 @@ class ChatThread extends _$ChatThread {
     );
   }
 
-  // ── 即時事件 ────────────────────────────────────────────────────────────
 
   void _onEvent(pb.ChatEvent event) {
     switch (event.whichEvent()) {
@@ -318,10 +316,8 @@ class ChatThread extends _$ChatThread {
       _update((s) => s.copyWith(messages: mergeMessages(s.messages, [m])));
       return;
     }
-    // 比已載入的視窗更舊：不放進來（會變成第一則而讓載入更舊跳過中間），往上捲時由分頁讀到。
     if (state.messages.isNotEmpty && m.seq < state.messages.first.seq) return;
     if (state.messages.isNotEmpty && m.seq > state.maxSeq + 1) {
-      // 序號有缺口：先補洞（補回來的頁含這則訊息）。
       unawaited(_catchUp());
       return;
     }
@@ -396,7 +392,6 @@ class ChatThread extends _$ChatThread {
     _markReadIfNeeded();
   }
 
-  // ── 使用者操作 ──────────────────────────────────────────────────────────
 
   /// 下拉重新整理：補到最新，不丟掉已載入的舊訊息；失敗丟出。
   Future<void> refresh() async {
@@ -405,7 +400,6 @@ class ChatThread extends _$ChatThread {
 
   /// 載入更舊的一頁；回傳是否還有更舊的。失敗丟出（不改狀態）。
   Future<bool> loadOlder() {
-    // 已經有一頁在讀就不再排隊：往上捲時捲動事件很密。
     if (_loadingOlder) return Future.value(state.hasMoreOlder);
     _loadingOlder = true;
     return _serial(() async {
@@ -478,7 +472,6 @@ class ChatThread extends _$ChatThread {
           sent.conversationId == state.conversationId &&
           sent.seq > state.maxSeq + 1;
       if (hole) {
-        // 自己的訊息跳過了別人的訊息：先從原本的最後一個 seq 補到最新，不把游標推過空洞。
         await _serial(_fillGap);
       }
       _update(

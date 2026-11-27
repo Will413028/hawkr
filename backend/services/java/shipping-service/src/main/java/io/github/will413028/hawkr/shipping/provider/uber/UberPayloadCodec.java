@@ -38,8 +38,6 @@ public final class UberPayloadCodec {
 
     public String waypointToJson(UberWaypoint wp) {
         ObjectNode n = objectMapper.createObjectNode();
-        // structuredAddress 本身是物件，不是字串——存成字串會變成 JSON-in-JSON，
-        // 而那種資料一旦落庫就只能靠 unescape 讀，任何 SQL 查詢都對它無能為力。
         n.set("structuredAddress", parseOrNull(wp.structuredAddressJson()));
         n.put("name", wp.name());
         n.put("phone", wp.phone());

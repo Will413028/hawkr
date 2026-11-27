@@ -21,10 +21,6 @@ void main() {
     );
 
     test('keeps cancellation and 7-11 label fields from backend response', () {
-      // Gateway 的 json tag 一律 camelCase（`handler/order.go`）。
-      // 這個 fixture 原本用 snake_case（validation_no / cancel_reason / …），
-      // 驗到的是 App 自己那層 snake fallback 而不是後端契約——後端從來
-      // 沒有回過那些鍵。改成契約實際形狀後，這條才真的在守契約。
       final order = OrderSummary.fromJson({
         'orderNo': 'HK202605070002',
         'status': '80',

@@ -65,19 +65,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         child: ListView(
           padding: const EdgeInsets.only(top: 16, bottom: 16),
           children: [
-            // 用戶頭像和名稱區塊
             _buildUserSection(session),
             SizedBox(height: 16.h),
-            // 三個標籤頁 (追蹤中、收藏、瀏覽過)
             _buildTabsSection(),
             SizedBox(height: 16.h),
-            // 選單項目列表
             _buildMenuList(textSize),
             SizedBox(height: 24.h),
-            // 登出 / 登入按鈕（依登入狀態切換）
             _buildLogoutButton(session),
             SizedBox(height: 10.h),
-            // 版本號
             _buildVersionNumber(),
           ],
         ),
@@ -92,7 +87,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          // 用戶頭像 + 編輯按鈕
           SizedBox(
             key: const ValueKey('settings-avatar-stage'),
             width: 100 + HkSpace.sm,
@@ -106,7 +100,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     child: _buildAvatarWidget(session),
                   ),
                 ),
-                // 編輯按鈕（筆圖標）
                 Positioned(
                   right: 0,
                   bottom: 0,
@@ -135,7 +128,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             ),
           ),
           SizedBox(height: 8.h),
-          // 用戶名稱
           Text(
             userName,
             style: TextStyle(
@@ -166,7 +158,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final sessionModel = session is SessionModel ? session : null;
     if (!hasUsableSession(sessionModel)) return _buildDefaultAvatar();
     final userId = sessionModel!.userId;
-    // 同一使用者只取一次；切帳號後重取
     if (_avatarFuture == null || _avatarFutureUserId != userId) {
       _avatarFutureUserId = userId;
       _avatarFuture = _loadAvatarUrl(userId);
@@ -175,15 +166,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       future: _avatarFuture,
       builder: (ctx, snap) {
         final s = (snap.data ?? '').trim();
-        // [_loadAvatarUrl] 只會回 `GET /app/buyers/me` 的 `avatarUrl`，那是
-        // Gateway 用 MEDIA_BASE_URL 組好的顯示 URL（外部 Google 頭像
-        // passthrough，本身也是 http），沒有 key 時整個欄位是空字串而不是裸
-        // objectKey。所以這裡只需要處理 http(s) 一種形態。
-        //
-        // 原本還有兩條分支：前綴白名單（`/` `member` `avatars/` `public/`）
-        // 走 normalizeAvatarUrl，以及 else 把字串當 base64 解。兩條都不可達
-        // ——而 base64 那條特別危險，它是「什麼都不是就當圖片資料解」，
-        // 任何非預期字串都會走進去然後被 catch 吞掉，變成靜默的預設頭像。
         if (!s.startsWith('http://') && !s.startsWith('https://')) {
           return _buildDefaultAvatar();
         }
@@ -551,7 +533,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     );
   }
 
-  // 選單點擊事件
   void _onProfileTap() => context.push('/settings/profile');
 
   void _onAddressTap() => context.push('/settings/address');
@@ -605,7 +586,6 @@ const helpCenterLineId = String.fromEnvironment('HELP_CENTER_LINE_ID');
 const helpCenterLineUrl = String.fromEnvironment('HELP_CENTER_LINE_URL');
 const helpCenterEmail = 'support@example.com';
 
-// 幫助中心獨立頁面
 class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({
     super.key,

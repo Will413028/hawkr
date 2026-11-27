@@ -59,7 +59,6 @@ func TestCheckAgreementsReportsAnOutdatedVersionAsFailedPrecondition(t *testing.
 			t.Errorf("%s：err=%v", name, err)
 		}
 	}
-	// 種類錯誤先於版本：版本也過時的壞請求仍是 invalid_argument。
 	err := CheckAgreements(ApplyAgreements, []AgreementAcceptance{{Kind: AgreementKYCPrivacyNotice, Version: "2026-01-01"}})
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("err=%v", err)

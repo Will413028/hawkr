@@ -15,9 +15,6 @@ import { parseDate } from "@hawkr/api/proto/date";
 import { trimGoSpace } from "@hawkr/api/text/server-text";
 import { fromLocalInput } from "@/app/admin/merchants/[id]/measure";
 
-// 主管機關來函的對話框與登記頁：輸入的驗證、請求組裝、失敗句（3c-b 設計書 §5.3、§5.4 (d)(g)）。能不能做來自伺服器
-// （AuthorityOrder.can_complete、can_extend_hold）；欄位的長度、範圍與組合由伺服器判斷並回已核准的句子，這裡不重做，
-// 只擋有核准文案的「每個對象都要選告知方式」。
 
 /** 來函的版本衝突（L21）。 */
 export const AUTHORITY_CONFLICT_TEXT =
@@ -32,8 +29,6 @@ export const TARGET_NOTICE_REQUIRED_TEXT = "請為每個指名的對象選擇告
 export const ADD_TARGET_TEXT = "新增對象";
 export const REMOVE_TARGET_TEXT = "移除";
 
-// ---------------------------------------------------------------------------
-// 登記來函
 
 export interface TargetRowForm {
 	/** 列的穩定鍵（只給畫面用，不送出）。 */
@@ -108,8 +103,6 @@ export function buildCreateAuthorityOrder(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 告知（完成來函、記下告知）
 
 export interface NoticeForm {
 	/** UNSPECIFIED＝還沒選。 */
@@ -155,8 +148,6 @@ export function buildNotice(
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 完成
 
 export interface CompleteForm {
 	resolutionSummary: string;
@@ -204,8 +195,6 @@ export function buildComplete(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 延長保存、記下告知
 
 export interface ExtendForm {
 	/** 新的保存期限，`datetime-local`（台北）。 */
@@ -241,8 +230,6 @@ export function buildRecordNotice(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 撤銷登記
 
 /** 撤銷登記的請求：原因去掉前後空白（長度由伺服器判斷並回已核准的句子 authority_order.revoke_reason_length）。 */
 export function buildRevoke(

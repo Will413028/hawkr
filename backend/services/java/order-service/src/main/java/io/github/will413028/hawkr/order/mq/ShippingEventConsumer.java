@@ -91,7 +91,6 @@ public class ShippingEventConsumer {
                 return;
             }
 
-            // §5.9 解析賣家處理期限（ISO 8601 UTC，Uber 為空字串時寫 NULL）
             LocalDateTime processingDeadline = processingDeadlineStr.isBlank()
                     ? null
                     : DateTimeUtils.parseIso8601(processingDeadlineStr);
@@ -175,7 +174,6 @@ public class ShippingEventConsumer {
                 return;
             }
 
-            // 退貨事件由 AfterSales Service 消費快照至 aftersale_cases，Order Service 跳過避免覆寫 orders（§5.3.6）
             if (isReturn) {
                 log.info("ShippingEventConsumer.labelUpdated.skipReturn",
                         "退貨事件交由 AfterSales 處理，Order Service 跳過", "orderNo", orderNo);
@@ -284,10 +282,8 @@ public class ShippingEventConsumer {
             String statusDesc = payload.path("status_desc").asText("");
             String labelUrl = payload.path("label_key").asText("");
             String labelExpireAt = payload.path("label_expire_at").asText("");
-            // [B-207] #1181：記錄訂單狀態是否真的推進（僅變更時才發 seller.order.updated）
             String newOrderStatus = null;
 
-            // 更新物流狀態 + statusDesc + labelUrl + labelExpireAt
             int rows;
             if (!labelUrl.isEmpty()) {
                 LocalDateTime expireAt = null;
@@ -299,9 +295,7 @@ public class ShippingEventConsumer {
                 rows = orderRepository.updateShippingStatus(orderNo, toStatus, statusDesc);
             }
 
-            // 依物流狀態碼推進訂單狀態
             if (ShippingStatusRules.isPendingShipment(shippingStatus)) {
-                // 91/92/21/920 → 訂單 PAID(10) → PENDING_SHIPMENT(20)（合法前置由 OrderShippingProgress 統一）
                 int statusRows = orderRepository.updateStatusIfMatchAny(
                         orderNo, OrderStatus.PENDING_SHIPMENT.value(),
                         OrderShippingProgress.allowedFromFor(OrderStatus.PENDING_SHIPMENT.value()));
@@ -311,8 +305,6 @@ public class ShippingEventConsumer {
                             "訂單狀態推進為待出貨", "orderNo", orderNo);
                 }
             } else if (ShippingStatusRules.isConfirmedShipment(shippingStatus)) {
-                // 210(宅配叫件) / 921(超商確認出貨) → 訂單 IN_TRANSIT(30)
-                // 合法前置由 OrderShippingProgress 統一（與 PayUni 31 分支一致，含自 35 恢復）
                 int statusRows = orderRepository.updateStatusIfMatchAny(
                         orderNo, OrderStatus.IN_TRANSIT.value(),
                         OrderShippingProgress.allowedFromFor(OrderStatus.IN_TRANSIT.value()));
@@ -322,8 +314,6 @@ public class ShippingEventConsumer {
                             "訂單狀態推進為配送中（" + shippingStatus.value() + "）", "orderNo", orderNo);
                 }
             } else if (shippingStatus == ShippingStatus.IN_TRANSIT) {
-                // PayUni 31 → 訂單 IN_TRANSIT(30)
-                // 含自 35 恢復：物流商回報恢復正常配送，合法前置由 OrderShippingProgress 統一（03 設計書「35 恢復轉移」）
                 int statusRows = orderRepository.updateStatusIfMatchAny(
                         orderNo, OrderStatus.IN_TRANSIT.value(),
                         OrderShippingProgress.allowedFromFor(OrderStatus.IN_TRANSIT.value()));
@@ -333,8 +323,6 @@ public class ShippingEventConsumer {
                             "訂單狀態推進為配送中", "orderNo", orderNo);
                 }
             } else if (shippingStatus == ShippingStatus.WAITING_PICKUP) {
-                // PayUni 32 → 訂單 WAITING_PICKUP(32)
-                // 含自 35 恢復：合法前置由 OrderShippingProgress 統一（03 設計書「35 恢復轉移」）
                 int statusRows = orderRepository.updateStatusIfMatchAny(
                         orderNo, OrderStatus.WAITING_PICKUP.value(),
                         OrderShippingProgress.allowedFromFor(OrderStatus.WAITING_PICKUP.value()));
@@ -344,8 +332,6 @@ public class ShippingEventConsumer {
                             "訂單狀態推進為待取貨", "orderNo", orderNo);
                 }
             } else if (ShippingStatusRules.isAbnormal(shippingStatus)) {
-                // PayUni 33/43/44/46/51~56/81/82 → 訂單 → SHIPPING_ABNORMAL(35)
-                // 合法前置由 OrderShippingProgress 統一（在途主線態，不含已送達 40）
                 int statusRows = orderRepository.updateStatusIfMatchAny(
                         orderNo, OrderStatus.SHIPPING_ABNORMAL.value(),
                         OrderShippingProgress.allowedFromForAbnormal());
@@ -355,7 +341,6 @@ public class ShippingEventConsumer {
                             "訂單狀態推進為物流異常，PayUni=" + statusValue, "orderNo", orderNo);
                 }
             }
-            // PayUni 98/22/41 → 不推進訂單狀態
 
             if (rows == 0) {
                 log.info("ShippingEventConsumer.statusChanged.idempotent",
@@ -365,7 +350,6 @@ public class ShippingEventConsumer {
                         "物流狀態更新完成，toStatus=" + statusValue, "orderNo", orderNo);
             }
 
-            // [B-207] #1181：僅當訂單狀態真的推進時發 seller.order.updated（eager，consumer 非 @Transactional）
             if (newOrderStatus != null) {
                 Long storeId = orderRepository.findStoreIdByOrderNo(orderNo);
                 eventPublisher.emitSellerOrderUpdated(
@@ -405,11 +389,6 @@ public class ShippingEventConsumer {
             String deliveredValue = ShippingStatus.PICKED_UP.value();
             LocalDateTime autoCompleteAt = DateTimeUtils.nowUtc().plusHours(orderConfig.getAutoCompleteHours());
 
-            // 狀態 CAS 與 order.delivered 的 outbox 落地必須同生共死（**例外 A**，
-            // 《多副本排程搶佔規範》§四）。原本兩者各自 auto-commit、publish 又走
-            // OrderEventPublisher.publish（吞掉所有例外）⇒ MQ 短暫不可用時「訂單已 DELIVERED、
-            // 事件沒送出」，而重投時這句 CAS 的 allowed-from 已不含 DELIVERED ⇒ rows=0 冪等 skip
-            // ⇒ 送達通知與 order.delivered 的其他消費者**永久收不到**。
             int rows = deliveredInTx(orderNo, deliveredValue, autoCompleteAt);
 
             if (rows == 0) {
@@ -419,12 +398,6 @@ public class ShippingEventConsumer {
                 log.info("ShippingEventConsumer.delivered.success",
                         "物流送達事件處理完成，autoCompleteAt=" + autoCompleteAt, "orderNo", orderNo);
 
-                // [B-207] #1181：賣家工作區 realtime — 已送達（eager）
-                // 刻意留在 tx **之外**：它是 best-effort（漏推有前端 REST 全刷兜底），
-                // 不該讓已落地的送達狀態因為 realtime 推播失敗而 rollback。
-                // （原本還有第二個理由「emit 自己會打一次 seller gRPC」——那次身分反解已於
-                //  2026-09-03 移除，payload 現在直接帶 store_id，見 OrderEventPublisher 的 javadoc。
-                //  第一個理由仍然成立，位置不動。）
                 Long storeId = orderRepository.findStoreIdByOrderNo(orderNo);
                 eventPublisher.emitSellerOrderUpdated(
                         storeId, orderNo, OrderEventPublisher.SRC_SHIPPING_WEBHOOK,
@@ -459,11 +432,7 @@ public class ShippingEventConsumer {
             if (affected == 0) {
                 return 0;
             }
-            // buyer_id 一律查自己 order 記錄取得，不採信上游 shipping-service payload 同名欄位
-            // （跨服務身份欄位不可信；鏡像 OrderService.completeOrder / OrderOutboxPublisher.enrich）
             Long buyerId = orderRepository.findBuyerIdByOrderNo(orderNo);
-            // notifyBuyerAccountId 帶 null 佔位，由 OrderOutboxPublisher.enrichDelivered 於派送前反解
-            // （鏡像 order.paid / order.completed 的 core payload 寫法）
             OrderDeliveredPayload core = new OrderDeliveredPayload(
                     orderNo,
                     buyerId != null ? String.valueOf(buyerId) : null,
@@ -479,7 +448,6 @@ public class ShippingEventConsumer {
             try {
                 outbox.setPayload(MAPPER.writeValueAsString(core));
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                // 固定結構序列化理論上不會失敗；拋出讓事務 rollback，避免狀態已轉但事件遺失
                 throw new IllegalStateException("order.delivered payload 序列化失敗 orderNo=" + orderNo, e);
             }
             orderOutboxMapper.insert(outbox);

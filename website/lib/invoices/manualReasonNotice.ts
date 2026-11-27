@@ -17,8 +17,6 @@ import { INVOICE_MANUAL_REASON_LABEL } from "@/lib/codemeta/generated";
  * 手寫的 switch 不會。這裡只負責「哪幾個碼要另外給一句行動指引」。
  */
 const ACTION_HINT: Record<string, string> = {
-	// 唯一一個「平台做不了、只有賣家自己能解」的碼。行動指引寫在這裡而不是後端，
-	// 是因為它是純文案；判定（哪個碼）仍然只由後端決定。
 	SELLER_TRACK_INSUFFICIENT:
 		"請至財政部電子發票整合服務平台申請新的字軌號碼；配號完成後系統會自動繼續開立，不需要你按重試。",
 };
@@ -33,9 +31,6 @@ export type ManualReasonNotice = {
 export function manualReasonNotice(code: string): ManualReasonNotice {
 	if (!code) return { label: "", hint: "" };
 	const label = INVOICE_MANUAL_REASON_LABEL[code];
-	// 🔴 未知碼**不落回代碼本身**：那等於把 SELLER_TRACK_INSUFFICIENT 這種字丟到
-	// 賣家面前。認不得就不顯示，寧可少說也不要說一句他看不懂的
-	// （與 correctionRejectNotice 同一條原則）。
 	if (!label) return { label: "", hint: "" };
 	return { label, hint: ACTION_HINT[code] ?? "" };
 }

@@ -8,11 +8,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-    // ==================== 消費端（來自 Webhook Service）====================
 
     @Bean
     public TopicExchange payuniWebhookExchange() {
-        // payuni.events 由 webhook-service 宣告，此處 declare=false 避免覆蓋
         TopicExchange exchange = new TopicExchange(MqConstants.EXCHANGE_PAYUNI_WEBHOOK, true, false);
         exchange.setShouldDeclare(false);
         return exchange;
@@ -50,7 +48,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_SHIPPING_PAYUNI_WEBHOOK_DLQ);
     }
 
-    // ==================== 發布端（通知 Order Service）====================
 
     @Bean
     public TopicExchange shippingEventsExchange() {
@@ -62,11 +59,9 @@ public class RabbitMqConfig {
         return new TopicExchange(MqConstants.EXCHANGE_SHIPPING_DLX, true, false);
     }
 
-    // ==================== 消費端（來自 Order Service）====================
 
     @Bean
     public TopicExchange orderExchange() {
-        // hawkr.order 由 order-service 宣告，此處 declare=false 避免覆蓋
         TopicExchange exchange = new TopicExchange(MqConstants.EXCHANGE_ORDER, true, false);
         exchange.setShouldDeclare(false);
         return exchange;
@@ -99,7 +94,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_SHIPPING_ORDER_RECEIPT_CONFIRMED_DLQ);
     }
 
-    // ==================== 消費端（來自 Order Service — 付款成功自動建單）====================
 
     @Bean
     public Queue shippingOrderPaidQueue() {
@@ -128,7 +122,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_SHIPPING_ORDER_PAID_DLQ);
     }
 
-    // ==================== 消費端（來自 Order Service — Backstop 重試建單，03 §8.11）====================
 
     @Bean
     public Queue shippingShipmentCreateRequestedQueue() {

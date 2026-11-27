@@ -94,10 +94,6 @@ public class TcatCallStuckAlertScheduler {
 
         int alerted = 0;
         for (ShipmentEntity entity : candidates) {
-            // issue #2294 L4：冷卻租約 claim —— 搶到才告警（0 = 另一個 pod 已搶走或仍在冷卻中）。
-            // ⚠️ 租約基準取 **claim 當下** 而非 tick 起點的 now：取 tick 起點 ⇒ 全批共用同一個
-            // 到期時間 ⇒ 不變式退化成「批次總耗時 < 租約」。改在這裡取之後，不變式降為
-            // 「**單筆**最壞耗時 < 租約」，與 batch-size（預設 30）無關。
             LocalDateTime leaseUntil = DateTimeUtils.nowUtc().plusMinutes(ALERT_COOLDOWN_MINUTES);
             int claimed = shipmentMapper.claimTcatStuckAlert(
                     entity.getId(), TcatCallStatus.REQUESTED.value(), now, leaseUntil);
@@ -114,7 +110,6 @@ public class TcatCallStuckAlertScheduler {
                             entity.getShipTradeNo(), entity.getTcatCallRequestedAt()),
                     "shipmentNo", entity.getShipmentNo());
 
-            // §5.21 配送異常賣家通知：發 TCAT_CALL_FAILED event（fire-and-forget）
             anomalyEventPublisher.publishAnomalyDetected(
                     ShipmentAnomalyType.TCAT_CALL_FAILED,
                     entity.getOrderNo(),

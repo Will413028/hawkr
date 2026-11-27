@@ -36,7 +36,6 @@ class _PostHashtagTextFormFieldState
   final OverlayPortalController _overlayController = OverlayPortalController();
   final LayerLink _layerLink = LayerLink();
   PostHashtagTaggingMode? _taggingMode;
-  // Mirrors the TextField's measured width so the floating popover matches it.
   double _fieldWidth = 0;
 
   @override
@@ -175,7 +174,6 @@ class _PostHashtagTextFormFieldState
         },
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // 在下一個 frame 更新 _fieldWidth，避免在 layout 階段 setState。
             if (_fieldWidth != constraints.maxWidth &&
                 constraints.maxWidth.isFinite) {
               final next = constraints.maxWidth;

@@ -97,7 +97,6 @@ export default function ReviewList({
 					>
 						{review.skuName || review.productImageUrl
 							? (() => {
-									// #1155：有 productId（非 "0"）時整個商品列連到商品頁；legacy 無 productId 維持純顯示
 									const linkableProductId =
 										review.productId && review.productId !== "0"
 											? review.productId

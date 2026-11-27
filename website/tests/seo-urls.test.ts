@@ -14,10 +14,8 @@ import {
 	siteUrl,
 } from "../lib/seo/urls";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-// The prod flavor requires its own web origin (NEXT_PUBLIC_WEB_ORIGIN); these cases describe a deployment at this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://example.com";
 
 function reset() {
@@ -79,8 +77,6 @@ const origin = () => siteUrl();
 test("every URL builder takes the locale of the page it describes", () => {
 	__setEnvForTest(null);
 	__setFlavorForTest("prod");
-	// zh-TW is the unprefixed URL; en is under /en. The locale is required: leaving it out would
-	// silently describe the zh-TW page.
 	assert.equal(absoluteUrl("/faq", "zh-TW"), `${origin()}/faq`);
 	assert.equal(absoluteUrl("/faq", "en"), `${origin()}/en/faq`);
 	assert.equal(absoluteUrl("/", "zh-TW"), origin());
@@ -100,7 +96,6 @@ test("every URL builder takes the locale of the page it describes", () => {
 		),
 		`${origin()}/en/sellers/2600123456/reviews`,
 	);
-	// root-relative internal links are locale-free: the navigation layer adds the prefix, once
 	assert.equal(sellerPath("9"), "/sellers/9");
 	assert.equal(sellerPath("9", "/posts"), "/sellers/9/posts");
 	assert.equal(sellerCardPath("9"), "/sellers/9/card");
@@ -127,11 +122,9 @@ test("hreflang lists the published locales of the page's surface, with x-default
 test("hreflang: nothing while one locale is published, nothing for private or UGC pages", () => {
 	__setEnvForTest(null);
 	__setFlavorForTest("prod");
-	// the shipped state: zh-TW only, on both surfaces
 	assert.equal(languageAlternates("/faq"), undefined);
 	assert.equal(languageAlternates("/seller/pricing"), undefined);
 	const both = ["zh-TW", "en"] as const;
-	// an hreflang cluster may only list indexable pages
 	assert.equal(languageAlternates("/account/orders", both), undefined);
 	assert.equal(languageAlternates("/products/1", both), undefined);
 	assert.equal(languageAlternates("/sellers/9/posts", both), undefined);

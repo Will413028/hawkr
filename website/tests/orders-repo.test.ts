@@ -89,10 +89,6 @@ test("fetchOrders normalizes seller shipment and buyer receipt photos", async ()
 							status: "50",
 							createdAt: "2026-06-25T12:00:00Z",
 							totalActualAmount: "999",
-							// §231 (#430 D3-S3): the wire sends BOTH — the bare-objectKey
-							// SSOT and the Gateway-composed display URL. Keeping both here
-							// is what makes this test discriminating: it fails if the
-							// normalizer ever goes back to reading the `*Urls` twin.
 							shipmentPhotoKeys: ["public/shipment/seller.jpg", ""],
 							shipmentPhotoUrls: [
 								"https://test-media.example.com/i/original/public/shipment/seller.jpg",
@@ -199,9 +195,6 @@ test("fetchOrders reads the buyer avatar from the objectKey SSOT, not the URL tw
 							orderNo: "O-buyer-profile",
 							status: "10",
 							nickname: "Hawkr 買家",
-							// §231 (#430 D3-S2, renamed backend#2216): seller-view orders
-							// send the flat pair `avatarKey` + `avatarUrl`
-							// (order.go:47-48). Both present → the key must win.
 							avatarKey: "public/buyer_avatar/2623900520/a.png",
 							avatarUrl:
 								"https://test-media.example.com/i/original/public/buyer_avatar/2623900520/a.png",
@@ -249,8 +242,6 @@ test("fetchOrderStatusCounts hits the rollup endpoint and folds counts by raw st
 	const url = new URL(fetchCalls[0].url);
 
 	assert.ok(url.pathname.endsWith("/app/orders/status_counts"));
-	// No args at all — the handler reads only `view` (to reject the seller
-	// view) and derives the buyer from the JWT, so nothing is sent.
 	assert.equal(url.searchParams.get("status"), null);
 	assert.equal(url.searchParams.get("page"), null);
 	assert.equal(url.searchParams.get("view"), null);
@@ -259,6 +250,5 @@ test("fetchOrderStatusCounts hits the rollup endpoint and folds counts by raw st
 	assert.equal(result.countsByStatus["10"], 3);
 	assert.equal(result.countsByStatus["20"], 2);
 	assert.equal(result.countsByStatus["50"], 5);
-	// Absent buckets fold to 0 at the call site (no key present here).
 	assert.equal(result.countsByStatus["80"], undefined);
 });

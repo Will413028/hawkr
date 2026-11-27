@@ -48,19 +48,12 @@ func (r *Resolver) CurrentBuyerID(ctx context.Context, accountID identity.Accoun
 
 	resp, err := r.buyer.GetProfile(ctx, rawAccountID)
 	if err != nil {
-		// EnvelopeGuardInterceptor 已把「gRPC OK + resp.Code!=0」轉成真正的 gRPC
-		// error，resp 在這裡永遠拿不到帶 code!=0 的值——判斷一律走 status.Code(err)
-		// （storeid resolver 曾因誤判 resp.Code 犯過同款死碼 bug，PR #1560 merge
-		// 後 E2E 才挖到）。
 		if status.Code(err) == codes.NotFound {
 			return 0, ErrNoCurrentBuyer
 		}
 		return 0, err
 	}
 
-	// err == nil 保證 resp.GetCode() == 0（成功）；resp 為 nil/empty 是防禦性
-	// 分支（buyer 模組的 handler 現行邏輯不會走到，但保留給未來 nil-Data 成功
-	// response 的可能）。
 	if resp == nil || resp.GetId() == "" {
 		return 0, ErrNoCurrentBuyer
 	}

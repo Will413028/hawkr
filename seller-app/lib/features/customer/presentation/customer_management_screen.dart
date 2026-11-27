@@ -298,7 +298,6 @@ class _CustomerCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                // Avatar with VIP badge
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -393,7 +392,6 @@ class _CustomerCard extends StatelessWidget {
 
                 SizedBox(width: 8.w),
 
-                // Amount + visit count (right-aligned)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -419,12 +417,11 @@ class _CustomerCard extends StatelessWidget {
                 ),
               ],
             ),
-            // Tags row — show first 3 tags from API
             if (customer.tags.isNotEmpty) ...[
               SizedBox(height: 8.h),
               Row(
                 children: [
-                  SizedBox(width: 72.w), // align with text after avatar
+                  SizedBox(width: 72.w),
                   Expanded(
                     child: Wrap(
                       spacing: 6.w,

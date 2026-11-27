@@ -55,8 +55,6 @@ export default function SellerChatButton({
 		sellerSelf,
 		sellerSelfLoading,
 	});
-	// `useAuthGate` may replay a pre-hydration click later. Keep ownership data
-	// fresh so that replay cannot close over the initial guest/null snapshot.
 	sellerIdentityRef.current = {
 		hasSellerRole: hasSeller,
 		sellerProfileMissing,
@@ -115,8 +113,6 @@ export default function SellerChatButton({
 
 	const handleClick = () => {
 		if (previewMode) return;
-		// Role comes from the gate's post-hydration snapshot — the render-time
-		// value is stale when the click happened before the session resolved.
 		authGate(({ activeRole }) => {
 			const decision = decideSellerChatAction({
 				activeRole,
@@ -144,8 +140,6 @@ export default function SellerChatButton({
 		});
 	};
 
-	// Once `GetMyStore` proves this is the viewer's own store, remove the
-	// impossible CTA instead of leaving a control that can only return an error.
 	if (!previewMode && hasSeller && isOwnSellerTarget(sellerId, sellerSelf)) {
 		return null;
 	}

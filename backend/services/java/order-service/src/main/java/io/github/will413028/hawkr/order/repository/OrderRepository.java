@@ -669,8 +669,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
         if (OrderConstants.CONFIRM_TYPE_AUTO.equals(confirmType)) {
             return ReceiptStatus.AUTO_CONFIRMED.value();
         }
-        // fail-closed：未知的確認方式不猜。丟例外而不是落一個「像的」值——
-        // E 軸的值直接影響撥款資格，猜錯的後果是錢的方向錯。
         throw new IllegalArgumentException(
                 "未知的 confirmType=" + confirmType + "，無法決定收貨確認軸的狀態。"
                         + "新增確認方式時必須同批決定它對應哪一個 ReceiptStatus，"

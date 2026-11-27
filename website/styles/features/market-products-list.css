@@ -1,77 +1,19 @@
-/* Extracted from styles/globals.css.
- * Market products list sidebar, filters, sort, and dark mode.
- * Keep import order in styles/globals.css unless intentionally changing cascade.
- */
 
-/* ============================================================
- * Market — products list page (/market/products)
- *
- * Standard e-commerce browse layout: persistent left sidebar
- * (search / categories / temp / price / hashtags) + main column
- * (breadcrumb / sort / product grid). Replaces the old hero +
- * tab strip + horizontal chip row layout — the old chrome is
- * gone and the sidebar is the single source of filter affordance.
- *
- * Below 960px the sidebar collapses above the grid so phones
- * keep a single column. Server-rendered; no client JS required.
- * ============================================================ */
 
-/* Public lists and seller previews share the application canvas.
- * Sidebar and product-card surfaces remain independently painted. */
 body .page-content:has(.market-page) {
 	background: transparent;
 }
-/* The legacy prd-v2-commerce.css paints a 180deg cream→white→cream gradient
- * on `.market-page` itself. With the shell already flattened above, that
- * gradient re-introduces a faint vertical band that shows through any gap —
- * e.g. the empty column below the (shorter) sidebar card. Clear it so the
- * whole content area is the one flat surface. `body` prefix outranks the
- * legacy single-class rule regardless of import order. */
 body .market-page {
 	background: transparent;
 }
 
-/* === Sidebar ==============================================
- * Structure:
- *   <aside.market-list-sidebar>           ← card chrome (bg/border/radius)
- *     <input.market-list-sidebar__check>  ← visually-hidden checkbox
- *     <label.market-list-sidebar__toggle> ← mobile-only toggle bar
- *     <div.market-list-sidebar__body>     ← stacked filter sections
- *
- * CSS-only collapse via the classic "checkbox hack": a hidden
- * `<input type=checkbox>` toggles its sibling body via
- * `:checked ~ .market-list-sidebar__body`. The pattern was chosen
- * over `<details>` because modern browsers hide details content
- * inside a shadow-DOM slot with `content-visibility: hidden`,
- * which a plain `display: flex` override couldn't break through —
- * the body would stay invisible on desktop. With the checkbox the
- * body is always in the regular DOM and we control its display
- * fully via author CSS.
- *
- * Default state is unchecked → mobile lands on the product grid
- * immediately. Desktop CSS hides the toggle and forces the body
- * open so the legacy desktop layout is preserved.
- * ========================================================== */
 .market-list-sidebar {
 	padding: 18px;
-	/* Floating OPAQUE card. Opaque (not glass) is the point: a translucent
-	 * fill tints the page surface behind it so the *background* looks
-	 * segmented; a solid fill keeps the page background uniform and lets the
-	 * card sit on top as one distinct floating object. The soft shadow lifts
-	 * it off the surface (floats), the border + radius give the frame. */
 	background: var(--surface-card, #fffefa);
 	border: 1px solid var(--surface-border, rgb(var(--color-ink-800-rgb) / 0.08));
 	border-radius: var(--radius-lg);
-	/* Tight, low-spread shadow that hugs the card. The earlier wide
-	 * `0 10px 30px` cast a card-shaped penumbra onto the empty background
-	 * below the card (the sidebar is shorter than the product grid), which
-	 * read as a faint "block with a gradient" beneath the filters. A small
-	 * blur + tiny offset keeps the float without the downward tail. */
 	box-shadow: 0 2px 8px rgb(var(--color-ink-800-rgb) / 0.07);
 }
-/* Visually hide the checkbox but keep it focusable for keyboard
- * users (Space toggles open/closed; focus ring is forwarded to the
- * label via `:focus-visible ~ .toggle`). */
 .market-list-sidebar__check {
 	position: absolute;
 	width: 1px;
@@ -96,24 +38,12 @@ body .market-page {
 	.market-list-sidebar {
 		position: sticky;
 		top: 96px;
-		/* Intentionally no max-height / overflow-y — let the sidebar
-		 * hug its natural content height so users don't get an inner
-		 * scrollbar. When the content is taller than the viewport the
-		 * sidebar still sticks at top; the bottom just falls below the
-		 * fold and the main page scroll picks it up. */
 	}
-	/* On desktop the collapse pattern is meaningless — the sidebar
-	 * always occupies its own column. Hide the toggle; the body is
-	 * already `display: flex` so no override needed regardless of
-	 * the checkbox state (a stale "closed" state from mobile won't
-	 * leave the filter panel empty). */
 	.market-list-sidebar__toggle {
 		display: none;
 	}
 }
 
-/* Mobile collapse — the aside shrinks to a single tappable header.
- * Body hidden by default; user taps the toggle to expand. */
 @media (max-width: 768px) {
 	.market-list-sidebar__mobile-controls {
 		display: flex;
@@ -199,7 +129,6 @@ body .market-page {
 		color: #fff;
 		font-weight: 700;
 	}
-	/* Checked → expand body, rotate chevron, divider under the toggle. */
 	.market-list-sidebar__check:checked ~ .market-list-sidebar__body {
 		display: flex;
 	}
@@ -211,8 +140,6 @@ body .market-page {
 		border-bottom: 1px solid
 			var(--surface-border, rgb(var(--color-ink-800-rgb) / 0.08));
 	}
-	/* Keyboard focus ring lands on the label since the checkbox is
-	 * clipped. `:focus-visible` keeps mouse clicks clean. */
 	.market-list-sidebar__check:focus-visible ~ .market-list-sidebar__toggle {
 		outline: 2px solid var(--action-primary, var(--color-ink-800));
 		outline-offset: -2px;
@@ -228,16 +155,6 @@ body .market-page {
 	letter-spacing: 0.5px;
 }
 
-/* Collapsible section — the `<section>` was replaced with a
- * `<details open>` element so each filter group can be toggled
- * independently on every viewport. The summary acts as the
- * section header (same look as the old `<h2>`) plus a chevron
- * that rotates when expanded. Tap target is the full header
- * width so phone users don't have to aim at a 12px caret.
- *
- * `<details>` content stays in the DOM when collapsed (just
- * hidden via the spec-defined `content-visibility` swap), so
- * SSR-rendered filter links and forms remain crawlable. */
 details.market-list-sidebar__section {
 	padding-bottom: 4px;
 	border-bottom: 1px solid
@@ -288,9 +205,6 @@ details.market-list-sidebar__section[open] > summary::after {
 details.market-list-sidebar__section[open] > summary {
 	margin-bottom: 12px;
 }
-/* Collapsed sections still occupy the gap slot of the flex container;
- * shrink the margin between adjacent closed sections so they don't
- * leave a tall stack of empty headers. */
 details.market-list-sidebar__section:not([open]) > summary {
 	margin-bottom: 0;
 }
@@ -324,11 +238,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	font-weight: 700;
 }
 
-/* ===========================================================================
- * Category multi-select popover.
- * Master-detail pattern (left = L1, right = L2 + inline L3) inspired by the
- * usebutter.com filters panel — adapted to Hawkr primary tokens.
- * =========================================================================== */
 .market-category-popover {
 	position: relative;
 	display: block;
@@ -336,9 +245,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	border-bottom: 1px solid
 		var(--surface-border, rgb(var(--color-ink-800-rgb) / 0.08));
 }
-/* The trigger is styled to mirror `.market-list-sidebar__section > summary`
- * so the 分類 row reads as a regular sidebar section header — but clicking
- * it opens the popover panel instead of collapsing inline content. */
 .market-list-sidebar .market-category-popover
 	.market-category-popover__trigger {
 	appearance: none;
@@ -388,12 +294,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	line-height: 1;
 	letter-spacing: 0;
 }
-/* Caret matches the section-header summary chevron exactly so the
- * category row sits flush with the price rows
- * below it in the rhythm. Same rotation contract as
- * `.market-list-sidebar__section > summary::after`:
- *   default → -135deg (up, "click to open")
- *   open    →   45deg (down, "click to close") */
 .market-category-popover__trigger-caret {
 	display: inline-block;
 	width: 10px;
@@ -410,8 +310,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	transform: rotate(45deg);
 	margin-top: -4px;
 }
-/* Hide the chevron-down SVG that the JSX still emits; the CSS pseudo
- * border above does the visual work instead. */
 .market-category-popover__trigger-caret > svg {
 	display: none;
 }
@@ -421,10 +319,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 }
 
 .market-category-popover__panel {
-	/* Position normally comes from CSS variables set by
-	 * CategoryFilterPopover.tsx updateCoords(). The fallback values below
-	 * keep the portalled panel usable during transient coords=null renders,
-	 * where React may emit an empty style attribute. */
 	position: fixed;
 	z-index: 1300;
 	top: var(
@@ -497,20 +391,11 @@ details.market-list-sidebar__section:not([open]) > summary {
 .market-category-popover__body {
 	display: grid;
 	grid-template-columns: 140px 1fr;
-	/* Pin the single grid row to the body's height. Without an explicit
-	 * row sizing, the row goes `auto` and grows to the L1 / L2 cells'
-	 * intrinsic content size — when L3 expands inline, the L2 fieldset
-	 * pushes the row taller than the body, the body overflows into the
-	 * footer, and the visible area below the L1/L2 viewport ends up
-	 * blank (panel background showing). `minmax(0, 1fr)` keeps the row
-	 * pinned to the body's flex-allocated height and lets the cells'
-	 * own `overflow-y: auto` handle the scroll inside their cell. */
 	grid-template-rows: minmax(0, 1fr);
 	flex: 1;
 	min-height: 0;
 }
 
-/* ── Left column: L1 master nav ───────────────────────────────────────── */
 .market-category-popover__l1 {
 	display: flex;
 	flex-direction: column;
@@ -571,14 +456,7 @@ details.market-list-sidebar__section:not([open]) > summary {
 	color: var(--hkui-primary-foreground, #fff);
 }
 
-/* ── Right column: L2 checkboxes (+ inline L3) ────────────────────────── */
 .market-category-popover__l2 {
-	/* `<fieldset>` is intentionally a flow root here so `overflow-y: auto`
-	 * actually clips to the grid cell. Without `min-block-size: 0` +
-	 * `display: block`, browsers treat fieldset with its legacy intrinsic
-	 * sizing — overflow doesn't clamp to the grid track and the cell can
-	 * blow past the body height, leaving the rest of the panel showing
-	 * the cream background ("blank" area). */
 	display: block;
 	min-width: 0;
 	min-height: 0;
@@ -660,7 +538,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	font-size: var(--text-sm, 0.875rem);
 }
 
-/* ── Custom checkbox ──────────────────────────────────────────────────── */
 .market-category-popover__checkbox {
 	position: relative;
 	display: inline-flex;
@@ -677,12 +554,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	background: rgb(var(--color-ink-800-rgb) / 0.05);
 }
 .market-category-popover__checkbox input[type="checkbox"] {
-	/* Fill the label with an invisible native checkbox. The old
-	 * 1px/clip hiding pattern left the focused input at its static
-	 * scroll-content position; clicking deep L3 labels made the browser
-	 * scroll the outer panel itself, pushing the body out of view and
-	 * leaving a blank cream rectangle. Keeping the input inside its label
-	 * preserves accessibility without triggering that scroll jump. */
 	position: absolute;
 	inset: 0;
 	z-index: 1;
@@ -750,7 +621,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	color: var(--action-primary, var(--color-ink-800));
 }
 
-/* ── Footer ───────────────────────────────────────────────────────────── */
 .market-category-popover__foot {
 	display: flex;
 	align-items: center;
@@ -787,8 +657,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	font-weight: 600;
 	font-variant-numeric: tabular-nums;
 }
-/* Horizontally-scrolling strip of selected-category chips. Takes the
- * leftover footer space; the apply button stays pinned right. */
 .market-category-popover__chips {
 	flex: 1 1 0;
 	min-width: 0;
@@ -882,8 +750,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	background: var(--hkui-primary-600, var(--color-ink-900));
 }
 
-/* Mobile collapse — make the panel a bottom sheet. JS clears trigger
- * coordinates at this viewport so the sheet can be positioned by CSS. */
 @media (max-width: 767px) {
 	.market-category-popover__scrim {
 		position: fixed;
@@ -1025,8 +891,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	}
 }
 
-/* Applied-filters summary — sits between the search bar and the first
- * filter section. Each chip is a Link that removes its own filter. */
 .market-list-sidebar__applied {
 	display: flex;
 	flex-direction: column;
@@ -1286,7 +1150,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	color: var(--color-neutral-cream);
 }
 
-/* === Main column ========================================== */
 .market-list-main__sort {
 	display: flex;
 	flex-wrap: wrap;
@@ -1314,8 +1177,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	font-weight: 700;
 }
 
-/* Keep mobile controls single-owned by the filter drawer. This rule must sit
- * after the base sort display rule above or the cascade exposes both copies. */
 @media (max-width: 768px) {
 	.market-story-tabs,
 	.market-list-main__sort {
@@ -1323,7 +1184,6 @@ details.market-list-sidebar__section:not([open]) > summary {
 	}
 }
 
-/* === Dark mode ============================================ */
 [data-theme="dark"] .market-list-sidebar {
 	background: rgb(var(--color-ink-950-rgb) / 0.68);
 	border-color: rgba(245, 222, 165, 0.1);

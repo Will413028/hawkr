@@ -61,7 +61,7 @@ func BuildHeader(lines []Line, buyerIdentifier string) Header {
 		seen[l.TaxCategory] = struct{}{}
 		switch l.TaxCategory {
 		case TaxCategoryTaxable:
-			g += l.NetAmount // 含稅、恆 >= 0（DISCOUNT 行為負，已相抵）
+			g += l.NetAmount
 		case TaxCategoryZeroRate:
 			z += l.NetAmount
 		case TaxCategoryExempt:
@@ -81,8 +81,6 @@ func BuildHeader(lines []Line, buyerIdentifier string) Header {
 		h.TaxAmount = TaxOf(g)
 		h.SalesAmount = g - h.TaxAmount
 	} else {
-		// 沒打統編的發票 TaxAmount 一律帶 0（[AMEGO]:464 逐字）。誤帶 5 會回 3040174
-		// 「SalesAmount 計算錯誤」——訊息指向錯誤的欄位，所以一定要在我方擋（A7）。
 		h.TaxAmount = 0
 		h.SalesAmount = g
 	}

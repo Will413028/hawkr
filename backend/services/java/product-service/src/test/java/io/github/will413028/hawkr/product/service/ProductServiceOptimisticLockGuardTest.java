@@ -80,7 +80,6 @@ class ProductServiceOptimisticLockGuardTest {
         return e;
     }
 
-    // ==================== 攔截器開關 ====================
 
     @Test
     @DisplayName("ProductEntity.version 必須帶 @Version —— 少了它，本檔每一測都只是在驗 mock 自己的回傳值")
@@ -95,13 +94,10 @@ class ProductServiceOptimisticLockGuardTest {
                         + "分辨不出真實述詞在不在 ⇒ 拿掉註解後那些測試照樣全綠。");
     }
 
-    // ==================== admin：UpdateProductStatusForAdmin ====================
 
     @Test
     @DisplayName("admin 改狀態：CAS 回 0 列 ⇒ 拋 9266，不回成功")
     void updateProductStatus_casMiss_throwsVersionConflict() {
-        // fixture 刻意補滿到「成功回應」所需的每一個相依：拿掉守衛時這條路徑要一路走到回傳 DTO
-        // （那正是漏洞的形狀），而不是半途撞上未 stub 的相依拋 NPE——後者會讓「轉紅」變成假訊號
         ProductEntity e = persisted(ProductStatus.ACTIVE.value(), 7L);
         when(productRepository.findById(PID)).thenReturn(Optional.of(e));
         when(productRepository.updateById(any())).thenReturn(0);
@@ -114,7 +110,6 @@ class ProductServiceOptimisticLockGuardTest {
                 () -> productService.updateProductStatus(String.valueOf(PID), ProductStatus.INACTIVE.value()));
 
         assertEquals(GrpcResponseCode.DELEGATION_RESOURCE_VERSION_CONFLICT.code(), ex.code());
-        // CAS 未命中即中止：快取失效不得發生
         verify(cacheService, never()).evictProductDetail(anyString());
     }
 
@@ -138,7 +133,6 @@ class ProductServiceOptimisticLockGuardTest {
         assertEquals(8L, result.getVersion());
     }
 
-    // ==================== cascade reflow（分類改名 / 批次換分類） ====================
 
     @Test
     @DisplayName("reflow：第一次 CAS 未命中 ⇒ 重讀重算後再寫一次，成功即計入")
@@ -153,7 +147,6 @@ class ProductServiceOptimisticLockGuardTest {
 
         assertEquals(1, productService.reflowSearchableForProductIds(List.of(PID)));
 
-        // 重讀是重點：拿的是併發寫入者留下的當前列，不是第一次讀到的舊快照
         verify(productRepository, times(2)).findById(PID);
         verify(productRepository, times(2)).updateById(any());
     }
@@ -184,7 +177,6 @@ class ProductServiceOptimisticLockGuardTest {
         verify(productRepository, never()).updateById(any());
     }
 
-    // ==================== 建立路徑：INSERT 後的補寫 ====================
 
     @Test
     @DisplayName("建立商品：補寫影響 0 列 ⇒ 拋 IllegalStateException 並標冪等 FAILED，不回 CREATED")
@@ -197,7 +189,7 @@ class ProductServiceOptimisticLockGuardTest {
         dto.setStatus(ProductStatus.DRAFT.value());
 
         ProductEntity entity = persisted(ProductStatus.DRAFT.value(), 0L);
-        entity.setVersion(null);   // INSERT 前後記憶體中都是 null，樂觀鎖攔截器因此整段略過
+        entity.setVersion(null);
         when(idempotencyService.calculateHash(dto)).thenReturn("hash");
         when(idempotencyService.acquireLock(anyString(), eq(STORE), anyString(), anyString(), any()))
                 .thenReturn(Optional.empty());
@@ -207,14 +199,12 @@ class ProductServiceOptimisticLockGuardTest {
         when(categoryService.getCategoryNames(any())).thenReturn(Map.of(LV1, "蔬菜", LV2, "葉菜", LV3, "小松菜"));
         when(hashtagService.upsertHashtags(any())).thenReturn(List.of());
         when(productRepository.updateById(any())).thenReturn(0);
-        // 補滿到「成功回應」為止：拿掉守衛時必須是回傳 DTO（漏洞形狀），不是半途 NPE（假訊號）
         when(hashtagService.findHashtagsByProductId(any())).thenReturn(List.of());
         when(productEntityConverter.toDetailDTO(any(), any(), anyBoolean()))
                 .thenReturn(ProductDetailDTO.builder().id(String.valueOf(PID)).build());
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> productService.createProduct(dto));
-        // 只判型別會拿到假綠（這條路徑上還有別的 IllegalStateException 來源）
         org.junit.jupiter.api.Assertions.assertTrue(
                 ex.getMessage().contains("商品建立後補寫影響 0 列"), ex.getMessage());
 

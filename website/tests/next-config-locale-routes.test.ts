@@ -3,7 +3,6 @@ import test from "node:test";
 import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
 /**
@@ -60,7 +59,6 @@ test("dev routes /en, so every page redirect exists under /en too, with the pref
 	});
 	assert.equal(find("/en/explore")?.destination, "/en/feed");
 
-	// every unprefixed page rule has its /en twin (the 307 Agent-legacy rules included)
 	const unprefixed = redirects.filter(
 		(r) => !r.source.startsWith("/en/") && !r.source.startsWith("/adm/"),
 	);
@@ -108,9 +106,8 @@ test("prod routes no /en: its redirect and header rules are exactly the unprefix
 		prod.headers.some((rule) => rule.source.startsWith("/en")),
 		false,
 	);
-	// same rule list as dev minus the /en twins
 	const dev = await loadConfig("dev", "dev-for-prod-compare", {
-		hawkrAgentEnabled: false, // prod's default: the Agent gate rules exist there
+		hawkrAgentEnabled: false,
 	});
 	assert.deepEqual(
 		dev.redirects.filter((r) => !r.source.startsWith("/en/")),
@@ -126,7 +123,6 @@ test("dev adds exactly one private-route header rule per routed non-default loca
 		localized[0].headers.map((h) => h.key),
 		["Cache-Control"],
 	);
-	// the staff and infrastructure prefixes have no locale, so they are not in the /en rule
 	for (const prefix of ["adm", "api", "sentinel"]) {
 		assert.equal(
 			localized[0].source.includes(`|${prefix}|`) ||

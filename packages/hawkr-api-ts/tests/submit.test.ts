@@ -9,7 +9,6 @@ import {
 } from "../src/gen/google/rpc/error_details_pb";
 import { ContentAdminService } from "../src/gen/hawkr/admin/content/v1alpha1/content_pb";
 
-// 預設文字由呼叫端從目錄注入；替身讓「用了預設文字」可以和任何伺服器文字區分。
 const defaults: DefaultErrorText = (code) => `預設:${Code[code]}`;
 
 const update = ContentAdminService.method.updateBanner;

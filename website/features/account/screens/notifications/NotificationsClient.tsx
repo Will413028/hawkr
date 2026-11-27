@@ -133,8 +133,6 @@ function NotificationsContent({
 		useNotificationUnread();
 	const streamStatus = useNotificationStreamStatus();
 
-	// 篩選 chips 與通知偏好同源（後端 category metadata），與偏好頁共用同一條 query。
-	// 失敗時 prefs 為 null → 只有「全部」chip，不擋通知列表。
 	const ut = useUiText();
 	const { entries } = useNotificationPreferences(role);
 	const filterOptions = React.useMemo(
@@ -142,8 +140,6 @@ function NotificationsContent({
 		[ut, entries],
 	);
 
-	// 切換 workspace（買家/賣家）時重置篩選。role 是觸發依賴（值改變即重置），
-	// effect 內未讀取它，故停用 exhaustive-deps 的移除建議。
 	// biome-ignore lint/correctness/useExhaustiveDependencies: role 為觸發依賴
 	React.useEffect(() => {
 		setFilter(0);
@@ -163,7 +159,6 @@ function NotificationsContent({
 		try {
 			await request();
 		} catch {
-			// The list hook keeps the row and exposes mutation errors inline.
 		} finally {
 			pendingActionRef.current = null;
 			setPendingAction(null);
@@ -176,8 +171,6 @@ function NotificationsContent({
 		? pendingAction.slice("delete:".length)
 		: null;
 
-	// Collapse consecutive same-source rows (same title — chat sender or
-	// notification kind) into one expandable stack, matching the in-app toast.
 	const groups = React.useMemo(
 		() => groupNotifications(list.items),
 		[list.items],
@@ -273,7 +266,6 @@ function NotificationsContent({
 					<>
 						<ul className="seller-mobile-disclosure-desktop list-none m-0 p-0 flex flex-col gap-3">
 							{groups.map((group, gi) => {
-								// Running index across groups drives the staggered pop-in.
 								const baseIndex = groups
 									.slice(0, gi)
 									.reduce((n, g) => n + g.length, 0);
@@ -503,9 +495,6 @@ function NotificationGroup({
 	const unreadInRest = rest.filter((n) => !n.read).length;
 	const peekLayers = Math.min(rest.length, 2);
 
-	// Fan the revealed cards out when the pile opens — they drop in from behind
-	// the top card, staggered. The top card was already on screen, so skip it.
-	// The collapse button then eases in on the right, once the cards have landed.
 	React.useLayoutEffect(() => {
 		if (!open) return;
 		const list = expandedRef.current;
@@ -546,7 +535,7 @@ function NotificationGroup({
 					aria-label={`展開 ${items.length} 則同類通知`}
 					className="relative block w-full cursor-pointer appearance-none border-0 bg-transparent p-0 text-left"
 				>
-					{/* Cards peeking out behind the top one — the「堆疊」look. */}
+
 					{Array.from({ length: peekLayers }).map((_, i) => (
 						<span
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed 0–1 decorative layers

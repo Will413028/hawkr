@@ -33,10 +33,8 @@ class HelpCenterScreen extends StatefulWidget {
 }
 
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
-  // FAQ 展開狀態
   final Map<int, bool> _expandedItems = {};
 
-  // FAQ 資料
   final List<Map<String, String>> _faqList = [
     {
       'question': '如何上架商品？',
@@ -64,7 +62,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 常見問題標題
             Text(
               '常見問題',
               style: TextStyle(
@@ -74,10 +71,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
               ),
             ),
             SizedBox(height: 12.h),
-            // FAQ 卡片
             _buildFaqCard(),
             SizedBox(height: 24.h),
-            // 聯絡我們標題
             Text(
               '聯絡我們',
               style: TextStyle(
@@ -87,7 +82,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
               ),
             ),
             SizedBox(height: 12.h),
-            // 聯絡資訊卡片
             _buildContactCard(),
           ],
         ),
@@ -143,7 +137,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
 
     return Column(
       children: [
-        // 問題列（可點擊展開）
         InkWell(
           onTap: () {
             setState(() {
@@ -186,7 +179,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             ),
           ),
         ),
-        // 答案區（展開時顯示）
         if (isExpanded)
           Container(
             width: double.infinity,
@@ -228,7 +220,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary),
           ),
           SizedBox(height: 16.h),
-          // LINE
           if (widget.lineId.isNotEmpty && widget.lineUrl.isNotEmpty) ...[
             KeyedSubtree(
               key: const ValueKey('help-line-contact'),
@@ -241,7 +232,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             ),
             SizedBox(height: 12.h),
           ],
-          // Email
           _buildCopyableRow(
             icon: AppIcons.emailOutlined,
             label: '',
@@ -250,7 +240,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           ),
           if (widget.lineUrl.isNotEmpty) ...[
             SizedBox(height: 16.h),
-            // 線上客服按鈕
             SizedBox(
               key: const ValueKey('help-line-cta'),
               width: double.infinity,

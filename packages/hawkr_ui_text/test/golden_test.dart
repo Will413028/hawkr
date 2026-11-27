@@ -6,8 +6,6 @@ import 'package:test/test.dart';
 
 import 'golden_calls.g.dart';
 
-// 共用 golden（backend/internal/platform/uitext/testdata/golden.gen.json 的複本，期望值由 icu 參考格式器算出）：
-// Dart 生成碼要全部相符。Dart 只有預設受眾（staff 是後台，admin 不用 Dart）。
 void main() {
   final cases = [
     for (final c

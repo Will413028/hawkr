@@ -11,8 +11,6 @@ import {
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
 
-// 伺服器對「不能做」給的句子（LocalizedMessage）：client 原樣顯示，不依 reason 自己組字。
-// 句子取自設計 step10e-Lprime-design.md §7(a)；mock 的形狀是 proto3 JSON 的 `*Unavailability { reason, message }`。
 const SELLER_ID = "90010003";
 const LOADER_KEY = "hawkr:initial-loader-seen";
 
@@ -85,7 +83,6 @@ async function prepareSeller(page: Page, baseURL: string | undefined) {
  * 桌面寬度沒有展開鈕，什麼都不做；回傳只找看得到的那份。
  */
 async function serverSentence(page: Page, sentence: string) {
-	// 與 styles/components/seller-mobile-disclosure.css 的斷點（max-width: 767px）相同。
 	if ((page.viewportSize()?.width ?? 1280) <= 767) {
 		const toggle = page
 			.locator(".seller-mobile-disclosure-list button[aria-expanded]")
@@ -111,8 +108,6 @@ test.describe("伺服器給的不能做的原因句", { tag: ["@ui"] }, () => {
 		await expect(
 			await serverSentence(page, APPEAL_PENDING_SENTENCE),
 		).toBeVisible();
-		// 句子裡的時間（10:06）與 nextRemediationTime（10:05:01）進位後相同只是巧合；
-		// 換掉句子就換掉畫面，證明畫面讀的是句子而不是欄位。
 		await expect(await serverSentence(page, COOLDOWN_SENTENCE)).toBeVisible();
 		await expect(
 			page.getByRole("button", { name: "提出申覆" }).first(),

@@ -28,14 +28,12 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// setup 給這支測試一個套用了 seller、payment 與 moderation migration 的 database（本模組沒有自己的 schema，讀三者發布的 pub_review_items，函式建在它們的表上）。
 func setup(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: seller.Migrations()}, migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "moderation", Dir: moderation.Migrations()}))
 	return d, reviewqueue.New(reviewqueue.Deps{DB: d})
 }
 
-// base 是測試固定的時間起點；測試不讀時鐘（now 一律是注入的值）。
 var reporterSeq atomic.Int64
 
 var base = time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
@@ -47,7 +45,6 @@ func must(t *testing.T, err error) {
 	}
 }
 
-// seedStore 建一個店家（直接寫 seller 的表：本模組的測試只需要 pub_review_items 讀得到的事實，不經 seller 的指令）。
 func seedStore(t *testing.T, d *db.DB, n int, name string) int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -57,12 +54,10 @@ func seedStore(t *testing.T, d *db.DB, n int, name string) int64 {
 	return id
 }
 
-// seedReport 建一份待分案的通報（REPORT_TRIAGE：開始是 created_at，期限是 +72 小時，食安 +4 小時）。
 func seedReport(t *testing.T, d *db.DB, storeID int64, category string, created time.Time) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
 	id := uuid.NewV7()
-	// 每份通報一個檢舉人：同一個買家對同一家店同一天只能有一份（reports_buyer_daily）。
 	buyer := reporterSeq.Add(1)
 	_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at)
 		VALUES ($1, $2, $3, '測試', $4, $5, $5)`, id, storeID, category, buyer, created)
@@ -70,7 +65,6 @@ func seedReport(t *testing.T, d *db.DB, storeID int64, category string, created 
 	return id
 }
 
-// seedOrder 建一件處理中的主管機關來函（AUTHORITY_ORDER：開始是 received_at，期限是 due_at；沒有單一店家）。
 func seedOrder(t *testing.T, d *db.DB, no int, received, due time.Time) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
@@ -81,10 +75,6 @@ func seedOrder(t *testing.T, d *db.DB, no int, received, due time.Time) uuid.UUI
 	return id
 }
 
-// world 建一份含期限相同、開始時間也相同、跨種類的待辦：
-//   - 通報（一般 72 小時）created 在 T，與來函 received T、due T+72h：兩個種類的期限與開始時間都相同，只靠種類分先後；
-//   - 同一個 (期限, 開始) 的多件同種類：靠 item_id 分先後；
-//   - 期限相同、開始時間不同；期限不同；食安通報（4 小時）的期限落在別件的期限之間。
 func world(t *testing.T, d *db.DB) {
 	t.Helper()
 	store := seedStore(t, d, 1, "範例小農")
@@ -97,18 +87,17 @@ func world(t *testing.T, d *db.DB) {
 	for range 3 {
 		seedReport(t, d, other, "OTHER", T)
 	}
-	seedReport(t, d, store, "OTHER", T.Add(time.Hour))             // 期限 T+73h
-	seedReport(t, d, other, "FOOD_SAFETY", T.Add(68*time.Hour))    // 期限 T+72h，開始 T+68h：期限相同、開始時間不同
-	seedReport(t, d, other, "FOOD_SAFETY", T.Add(68*time.Hour))    // 同上，與上一件完全相同
-	seedReport(t, d, store, "FOOD_SAFETY", T.Add(2*time.Hour))     // 期限 T+6h
-	seedOrder(t, d, 100, T.Add(-24*time.Hour), T.Add(6*time.Hour)) // 期限 T+6h，開始 T-24h：與上一件期限相同，開始較早
-	seedOrder(t, d, 101, T.Add(2*time.Hour), T.Add(6*time.Hour))   // 期限 T+6h，開始 T+2h：與食安通報 (T+6h, T+2h) 完全相同、種類不同
-	seedOrder(t, d, 102, T.Add(2*time.Hour), T.Add(6*time.Hour))   // 同上，同種類的第二件
+	seedReport(t, d, store, "OTHER", T.Add(time.Hour))
+	seedReport(t, d, other, "FOOD_SAFETY", T.Add(68*time.Hour))
+	seedReport(t, d, other, "FOOD_SAFETY", T.Add(68*time.Hour))
+	seedReport(t, d, store, "FOOD_SAFETY", T.Add(2*time.Hour))
+	seedOrder(t, d, 100, T.Add(-24*time.Hour), T.Add(6*time.Hour))
+	seedOrder(t, d, 101, T.Add(2*time.Hour), T.Add(6*time.Hour))
+	seedOrder(t, d, 102, T.Add(2*time.Hour), T.Add(6*time.Hour))
 	seedOrder(t, d, 103, T.Add(100*time.Hour), T.Add(240*time.Hour))
 	seedReport(t, d, store, "OTHER", T.Add(500*time.Hour))
 }
 
-// reference 是 pub_review_items 在 now 的全部列，由 Go 以位元組順序排成全序（不經過本模組的 SQL）。
 func reference(t *testing.T, d *db.DB, now time.Time) []reviewqueue.Item {
 	t.Helper()
 	ctx := context.Background()
@@ -154,7 +143,6 @@ func ident(items []reviewqueue.Item) []string {
 	return out
 }
 
-// pageAll 以 size 逐頁讀完（游標取自上一頁最後一列），回傳依序拼起來的列與頁數。
 func pageAll(t *testing.T, m *reviewqueue.Module, now time.Time, kinds []reviewqueue.Kind, size int32) ([]reviewqueue.Item, int) {
 	t.Helper()
 	var (
@@ -210,7 +198,6 @@ func TestListPagesWithoutGapsOrDuplicates(t *testing.T) {
 			t.Errorf("每頁 %d：%d 頁，預期 %d 頁", size, pages, wantPages)
 		}
 	}
-	// 一次讀完與逐頁一致，列的內容（店家與店名）也與來源相同。
 	all, err := m.List(context.Background(), now, reviewqueue.Kinds(), nil, int32(len(want)))
 	must(t, err)
 	if !slices.Equal(ident(all), ident(want)) {
@@ -313,11 +300,9 @@ func TestKindsMatchTheSource(t *testing.T) {
 		"seller.review_kyc_application", "seller.review_shared_bank_account", "payment.pub_review_items", "moderation.review_moderation_case",
 	}
 	var sourceKinds []string
-	// 每支函式的 kind 字面值：從函式定義裡讀（pg_get_functiondef 的第一個 SELECT 字面值）。
 	for _, fn := range fns {
 		var def string
 		must(t, d.Conn(ctx).QueryRow(ctx, `SELECT pg_get_functiondef(($1||'(timestamptz)')::regprocedure)`, fn).Scan(&def))
-		// seller 的函式各發布一種；payment.pub_review_items 以 UNION ALL 發布兩種（PAYMENT_ACCOUNT_CREATE_FAILED、PAYMENT_ACCOUNT_PURGE_STUCK），每個 SELECT 一個字面值。
 		rest, found := def, 0
 		for {
 			i := strings.Index(rest, "SELECT '")
@@ -350,12 +335,10 @@ func TestKindsMatchTheSource(t *testing.T) {
 	}
 }
 
-// setupICU 給這支測試一個預設 collation 是 ICU 語言排序（en-US）的 database，套用了與 setup 相同的 migration（seller、payment、moderation）。
-// 測試用的 Postgres 預設是 C 系的 collation，位元組順序與資料庫的預設順序相同，COLLATE "C" 有沒有寫都看不出來。
 func setupICU(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	t.Helper()
 	ctx := context.Background()
-	adminURL := pg.NewURL(t) // 一個空的 database，只借它的連線建立另一個 database
+	adminURL := pg.NewURL(t)
 	admin, err := pgx.Connect(ctx, adminURL)
 	must(t, err)
 	t.Cleanup(func() { _ = admin.Close(context.WithoutCancel(ctx)) })
@@ -394,7 +377,6 @@ func TestOrderingIsBytewiseNotLocale(t *testing.T) {
 		    FROM (VALUES ('B'), ('a'), ('A'), ('b'), ('a-1'), ('a/1'), ('ab'), ('Ab'), ('_x'), ('1')) AS v(id);
 		END`)
 	must(t, err)
-	// 前提：這個 database 的語言排序真的與位元組順序不同（否則測試是空轉）。
 	var locale, bytewise []string
 	for _, q := range []struct {
 		dst   *[]string
@@ -413,7 +395,7 @@ func TestOrderingIsBytewiseNotLocale(t *testing.T) {
 		t.Fatalf("語言排序與位元組順序相同（%v），測試沒有鑑別力", locale)
 	}
 	want := slices.Clone(bytewise)
-	slices.Sort(want) // Go 的字串比較就是位元組順序
+	slices.Sort(want)
 	if !slices.Equal(bytewise, want) {
 		t.Fatalf("COLLATE \"C\" 的順序 %v 不是位元組順序 %v", bytewise, want)
 	}
@@ -468,11 +450,9 @@ type modCase struct {
 	opened   time.Time
 	reports  int
 	target   string
-	decision string // 空字串是進行中
+	decision string
 }
 
-// seedCase 直接寫 moderation 的表：一個案件與它的檢舉（decision 空字串是進行中；NO_VIOLATION 與 VIOLATION 帶合法的結案欄位）。
-// contentID 為 nil 時是買家對象。
 func seedCase(t *testing.T, d *db.DB, c modCase, contentID *uuid.UUID, buyerID *int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -499,7 +479,6 @@ func seedCase(t *testing.T, d *db.DB, c modCase, contentID *uuid.UUID, buyerID *
 	}
 }
 
-// moderationWorld 建每一種案件的領域狀態；回傳進行中的案件（應該在待辦裡的）與其他的。
 func moderationWorld(t *testing.T, d *db.DB) (open, other []modCase) {
 	t.Helper()
 	post, comment, entry, reused := uuid.NewV7(), uuid.NewV7(), uuid.NewV7(), uuid.NewV7()
@@ -592,8 +571,6 @@ func TestCrossSourceKeysetPagingWithModeration(t *testing.T) {
 	ctx := context.Background()
 	store := seedStore(t, d, 1, "範例小農")
 	open, _ := moderationWorld(t, d)
-	// 案件 openOne 的期限是 base+73h、開始是 base+49h：食安通報（base+69h 建立，4 小時）與 payment 帳戶（base+49h 失敗）各自與它同期限，
-	// 其中帳戶連開始時間都相同，只剩種類與 ID 分序。
 	seedReport(t, d, store, "OTHER", base.Add(1*time.Hour))
 	seedReport(t, d, store, "OTHER", base.Add(2*time.Hour))
 	seedReport(t, d, store, "FOOD_SAFETY", base.Add(69*time.Hour))

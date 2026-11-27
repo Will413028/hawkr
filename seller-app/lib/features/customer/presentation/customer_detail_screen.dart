@@ -45,7 +45,6 @@ class CustomerDetailScreen extends HookConsumerWidget {
     final currentTags = useState<List<CustomerTag>>(List.from(customer.tags));
     final defaults = ref.read(defaultErrorTextProvider);
 
-    // 進頁時重讀客戶（GetCustomer 帶標籤）；失敗顯示伺服器的錯誤文字，保留列表帶進來的資料。
     Future<void> loadDetail() async {
       loadError.value = null;
       try {
@@ -70,7 +69,6 @@ class CustomerDetailScreen extends HookConsumerWidget {
     final c = currentCustomer.value;
     final isVip = c.isVip;
 
-    // 標籤寫入失敗時顯示伺服器的錯誤文字並回 null；成功回貼完（移除完）之後客戶身上的標籤。
     Future<List<CustomerTag>?> addTag(String name) async {
       try {
         final updated = await ref
@@ -583,7 +581,6 @@ class CustomerDetailScreen extends HookConsumerWidget {
   }
 }
 
-// ─── 管理客戶標籤 底部彈出頁 ─────────────────────────────────────────────────
 
 /// 標籤管理底部彈窗的標題列。
 ///
@@ -680,7 +677,6 @@ class _TagManagementSheet extends HookWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
           Container(
             margin: EdgeInsets.only(top: 12.h),
             width: 40.w,
@@ -696,13 +692,11 @@ class _TagManagementSheet extends HookWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Title + close button
                 CustomerTagManagementHeader(
                   onClose: () => Navigator.pop(context),
                 ),
                 SizedBox(height: 20.h),
 
-                // 目前標籤
                 Text(
                   '目前標籤',
                   style: TextStyle(
@@ -768,7 +762,6 @@ class _TagManagementSheet extends HookWidget {
                   ),
                 SizedBox(height: 16.h),
 
-                // 新增標籤
                 Text(
                   '新增標籤',
                   style: TextStyle(
@@ -845,7 +838,6 @@ class _TagManagementSheet extends HookWidget {
                 ),
                 SizedBox(height: 16.h),
 
-                // 快速標籤
                 Text(
                   '快速標籤',
                   style: TextStyle(
@@ -910,7 +902,6 @@ class _TagManagementSheet extends HookWidget {
                 ),
                 SizedBox(height: 24.h),
 
-                // 完成 button
                 Opacity(
                   opacity: hasChanges.value ? 1.0 : 0.5,
                   child: HkTapTarget(

@@ -123,7 +123,6 @@ func (f *fakeBuyers) BatchDisplay(context.Context, []int64) ([]buyer.Display, er
 	return f.displays, f.err
 }
 
-// fakeCustomers 是店家的客戶：customers 之外的買家回 NotFound；err 非空時讀取失敗。
 type fakeCustomers struct {
 	customers map[int64]bool
 	err       error
@@ -146,7 +145,6 @@ func (f *fakeCustomers) CustomersAmong(_ context.Context, storeID int64, ids []i
 	return out, nil
 }
 
-// fakeStores 記下 ActingStore 被要求的能力；suspended 時回停權的拒絕。
 type fakeStores struct {
 	suspended bool
 	asked     []seller.Capability
@@ -595,7 +593,6 @@ func TestErrorLocaleFollowsTheRequestLocale(t *testing.T) {
 	}
 }
 
-// localizedModule 的 Claim 依 ctx 的語系產生句子，語系是實際使用的語系（同模組的 model.Precondition）。
 type localizedModule struct{ *fakeModule }
 
 func (m *localizedModule) Claim(ctx context.Context, _ uuid.UUID, _ int64) (coupon.ClaimResult, error) {
@@ -607,7 +604,6 @@ func (m *localizedModule) Claim(ctx context.Context, _ uuid.UUID, _ int64) (coup
 	return coupon.ClaimResult{}, apperr.FailedPrecondition("%s", uitext.Message{Text: text, Locale: loc})
 }
 
-// withAccount 把測試帳號放進請求（模擬入口的 session 中介層）。
 func withAccount(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: callerAccount})))

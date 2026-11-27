@@ -71,7 +71,6 @@ func (h *Holder) CalculateShippingOptions(c *gin.Context) {
 		return
 	}
 
-	// 區域預設值由 Product Service 決定，Gateway 僅透傳
 	grpcReq := &pb.CalculateShippingOptionsRequest{
 		StoreId:      int64(storeID),
 		Length:       req.Length,

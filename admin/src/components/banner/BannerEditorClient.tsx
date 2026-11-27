@@ -197,7 +197,6 @@ const BannerEditorClient: React.FC<BannerEditorClientProps> = ({ id }) => {
 			alert("請上傳 Banner 預覽圖與彈窗大圖");
 			return;
 		}
-		// 日期區間與點擊行為的值由伺服器檢查，錯誤標在對應的欄位上（規則只在伺服器一處）。
 
 		setSaving(true);
 		setFieldErrors({});
@@ -220,7 +219,6 @@ const BannerEditorClient: React.FC<BannerEditorClientProps> = ({ id }) => {
 				popupImageStagedToken: popupToken,
 			};
 			if (isEdit && id) {
-				// 只換有新圖的那一張：沿用的圖不列進 update_mask（ADR 2026-09-25-api-image-uri-template D5）。
 				const paths = [...FORM_FIELDS];
 				if (previewToken) paths.push("preview_image_staged_token");
 				if (popupToken) paths.push("popup_image_staged_token");
@@ -231,7 +229,6 @@ const BannerEditorClient: React.FC<BannerEditorClientProps> = ({ id }) => {
 			} else {
 				await client.createBanner({ banner: { ...banner, active: true } });
 			}
-			// 清單的 staleTime 是 30s，不失效就會在存檔後退回清單時繼續顯示改動前的資料。
 			queryClient.invalidateQueries({
 				queryKey: createConnectQueryKey({
 					schema: ContentAdminService.method.listBanners,
@@ -248,7 +245,6 @@ const BannerEditorClient: React.FC<BannerEditorClientProps> = ({ id }) => {
 			}
 			const failure = submitError(e, defaultErrorTextZhTW, method);
 			if (failure.kind === "conflict" && id) {
-				// 別人先改過：保留輸入，讀最新版本給使用者對照。
 				try {
 					const { banner } = await client.getBanner({ id });
 					setLatest(banner ?? null);
@@ -258,7 +254,6 @@ const BannerEditorClient: React.FC<BannerEditorClientProps> = ({ id }) => {
 			} else if (failure.kind === "fields") {
 				setFieldErrors(failure.fields);
 				setFormError(failure.message ?? "");
-				// 被拒的 staged token 不能再用，要重新上傳。
 				if (fieldMessage(failure.fields, "banner.preview_image_staged_token")) {
 					setPreview((prev) => ({ ...prev, stagedToken: "" }));
 				}
@@ -273,7 +268,6 @@ const BannerEditorClient: React.FC<BannerEditorClientProps> = ({ id }) => {
 		}
 	};
 
-	// 必填（標題、兩張圖）沒填就不讓按；值的格式與完整性交給伺服器。
 	const canSubmit = title.trim() && preview.previewUrl && popup.previewUrl;
 
 	if (loading) {

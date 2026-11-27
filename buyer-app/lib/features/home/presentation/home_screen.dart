@@ -47,12 +47,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with TopBarProvider {
-  // 優惠券與會員卡計數
   int _couponCount = 0;
   int _memberCardCount = 0;
   List<String> _merchantAvatars = [];
 
-  // Banner 資料
   List<api.Banner> _banners = const [];
 
   @override
@@ -60,9 +58,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TopBarProvider {
     super.initState();
     _loadCouponCount();
     _loadBanners();
-    // Riverpod rejects provider mutations while the first widget tree is
-    // mounting. Starting immediately can leave the controller in loading
-    // before the request is sent, which turns the product skeleton permanent.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(ref.read(homeProductControllerProvider.notifier).loadInitial());
@@ -85,7 +80,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TopBarProvider {
 
   /// 載入優惠券數量 — GET /app/coupons
   Future<void> _loadCouponCount() async {
-    // Apple App Review 合規：訪客（無 token）打 /app/coupons 必 401，直接略過。
     final session = ref.read(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return;
@@ -223,7 +217,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TopBarProvider {
     _syncMemberCards();
 
     final session = ref.watch(sessionProvider).value;
-    // Apple App Review 合規：未登入顯示「訪客」；已登入用 nickname，空字串再退回「會員」。
     final bool isGuest = !hasUsableSession(session);
     final activeSession = isGuest ? null : session!;
     final String userName = isGuest ? '訪客' : (activeSession!.nickname ?? '會員');

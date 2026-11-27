@@ -28,7 +28,6 @@ public class GrpcAuthAutoConfiguration {
     @Value("${hawkr.auth.skip-account-type-check:${SKIP_ACCOUNT_TYPE_CHECK:false}}")
     private boolean skipAccountTypeCheck;
 
-    // 內部身分 HMAC 簽章設定（#1366）。預設 permissive；enforcing 由 PR-C 純環境變數切換。
     @Value("${hawkr.auth.internal.mode:${INTERNAL_AUTH_MODE:permissive}}")
     private String internalAuthMode;
 
@@ -56,7 +55,6 @@ public class GrpcAuthAutoConfiguration {
         InternalAuthConfig.configure(
                 internalAuthMode, internalAuthSecret, internalAuthSecretPrev, internalAuthTsWindowSeconds);
 
-        // enforcing 缺 secret → fail-closed（沿用 #1396 StagedTokenService 模式，不明文 fallback）。
         if (InternalAuthConfig.isEnforcing() && !InternalAuthConfig.hasSecret()) {
             throw new IllegalStateException(
                     "internal-auth mode=enforcing 但缺 INTERNAL_SERVICE_HMAC_SECRET，拒絕啟動（fail-closed）");

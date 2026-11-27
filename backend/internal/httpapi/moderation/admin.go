@@ -182,7 +182,6 @@ func reportsPB(reports []moderation.Report) []*adminpb.CaseReport {
 	return out
 }
 
-// snapshotPB 把案件的內容快照轉成 oneof；沒有快照回 nil。
 func snapshotPB(c *moderation.Snapshot) *adminpb.CaseSnapshot {
 	switch {
 	case c == nil:

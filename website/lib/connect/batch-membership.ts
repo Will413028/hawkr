@@ -10,7 +10,6 @@ interface Batch {
 	>;
 }
 
-// Queries mounted in the same render are sent together, up to the API's 100-ID cap.
 export function createMembershipBatcher(check: Check) {
 	const pending = new Map<string, Batch>();
 

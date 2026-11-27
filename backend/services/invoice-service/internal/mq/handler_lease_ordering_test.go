@@ -77,7 +77,6 @@ func TestHandlerLeaseOnlyHasToCoverWorkBeforeMarkProcessed(t *testing.T) {
 	}
 }
 
-// methodBody 找 (recv).name 的函式本體。
 func methodBody(f *ast.File, recv, name string) *ast.BlockStmt {
 	for _, d := range f.Decls {
 		fn, ok := d.(*ast.FuncDecl)

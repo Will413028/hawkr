@@ -74,7 +74,6 @@ func (in Input) Validate() error {
 	case in.DistinctBuyers < 0 || in.QualifyingOrders < 0 || in.SellerCancelledOrders < 0 || in.RatingCount < 0:
 		return fmt.Errorf("店家 %d 的統計不可為負數", in.StoreID)
 	case in.DistinctBuyers > in.QualifyingOrders:
-		// 每個不重複買家至少有一筆成立訂單；違反代表上游的口徑或彙總有誤。
 		return fmt.Errorf("店家 %d 的買家數 %d 大於成立訂單數 %d", in.StoreID, in.DistinctBuyers, in.QualifyingOrders)
 	case math.IsNaN(in.RatingAverage) || in.RatingAverage < 0 || in.RatingAverage > RatingMax:
 		return fmt.Errorf("店家 %d 的平均評分不合法：%v", in.StoreID, in.RatingAverage)
@@ -118,7 +117,6 @@ func Compute(inputs []Input, now time.Time) ([]Score, error) {
 	return out, nil
 }
 
-// demand 是 log1p(買家數) 除以全體的最大值：取 log 讓頭部不會壓過其餘，max 為 0（沒有人有成交）時是 0。
 func demand(buyers int64, maxLog float64) float64 {
 	if maxLog == 0 {
 		return 0
@@ -126,18 +124,15 @@ func demand(buyers int64, maxLog float64) float64 {
 	return clamp(math.Log1p(float64(buyers))/maxLog, 0, 1)
 }
 
-// quality 是評分的貝氏平均 (C·m + n·avg)/(C + n)，再從 [RatingMin, RatingMax] 正規化到 0..1。沒有評價時等於全站平均 m。
 func quality(n int64, avg, mean float64) float64 {
 	bayes := (RatingPriorWeight*mean + float64(n)*avg) / (RatingPriorWeight + float64(n))
 	return clamp((bayes-RatingMin)/(RatingMax-RatingMin), 0, 1)
 }
 
-// penalty 是賣家取消的平滑占比：取消 /（成立 + 取消 + PenaltyPrior）。
 func penalty(qualifying, cancelled int64) float64 {
 	return float64(cancelled) / (float64(qualifying) + float64(cancelled) + PenaltyPrior)
 }
 
-// newness 是第一次可曝光起 NewnessDays 天內線性遞減的加分；時間在未來（時鐘偏差）時當作剛開始曝光。
 func newness(publishedAt, now time.Time) float64 {
 	age := now.Sub(publishedAt)
 	return clamp(1-float64(age)/float64(NewnessDays*24*time.Hour), 0, 1)

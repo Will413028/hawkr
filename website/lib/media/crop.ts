@@ -85,8 +85,6 @@ export function calculateContainedOutputSize(
 	const scaledWidth = idealWidth * scale;
 	const scaledHeight = idealHeight * scale;
 
-	// Posts currently use the canonical 4:3 feed surface. Snap to whole 4x3
-	// pixel units so the downstream card preset has no fractional strip to crop.
 	if (Math.abs(targetAspect - 4 / 3) < 0.000001) {
 		const units = Math.max(
 			1,
@@ -182,8 +180,6 @@ export async function cropImageFile(
 			);
 		}
 
-		// Transparent padding must never be flattened by JPEG encoding. An exact
-		// target-ratio crop has no padding, so a JPEG source can remain compact.
 		const hasTransparentPadding = Boolean(
 			destination && (destination.x > 0.01 || destination.y > 0.01),
 		);

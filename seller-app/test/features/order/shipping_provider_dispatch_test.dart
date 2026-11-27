@@ -22,7 +22,6 @@ OrderSummary _order(String shippingMethod) => OrderSummary(
   productName: '測試商品',
   price: '100',
   shippingMethod: shippingMethod,
-  // 超商段的判定依據：odno 有值就會秀「出貨便代碼」。
   odno: 'ODNO1234',
   validationNo: '5678',
   shipmentStatus: '91',
@@ -67,9 +66,7 @@ void main() {
         'shippingMethod=${unknown.isEmpty ? "(空)" : unknown} → 不得走超商段',
         (tester) async {
           await _pump(tester, _order(unknown));
-          // ① 不得顯示超商專屬欄位
           expect(find.textContaining('出貨便代碼'), findsNothing);
-          // ② 不得憑空消失：仍要有 provider-neutral 的狀態文案
           expect(find.text('訂單處理中'), findsOneWidget);
         },
       );
@@ -100,8 +97,6 @@ void main() {
     });
 
     test('B2C / C2B / 空字串 / 未知 → null（不得回 C2C 的百分比）', () {
-      // C2C 對 code=11 回 80；若哪天又退回「不是 HOME 就當超商」，
-      // 下面四條會全部拿到 80 而轉紅。
       for (final lgsType in const [
         PayuniLogisticsService.lgsTypeB2C,
         PayuniLogisticsService.lgsTypeC2B,

@@ -99,11 +99,8 @@ void main() {
   group('金額：wire 值 → 顯示值', () {
     test('詳情端點三個訂單層金額原樣帶入，不重算', () {
       final order = OrderSummary.fromJson(_liveDetailOrder());
-      // shippingFee   wire '125' → 125
       expect(order.shippingFee, 125);
-      // discountAmount wire '0'  → 0
       expect(order.discountAmount, 0);
-      // totalActualAmount wire '445' → totalAmount 445
       expect(order.totalAmount, 445);
     });
 
@@ -111,11 +108,10 @@ void main() {
       final order = OrderSummary.fromJson(_liveListOrder());
       expect(order.shippingFee, 0);
       expect(order.discountAmount, 0);
-      expect(order.totalAmount, 445); // totalActualAmount 兩支都有
+      expect(order.totalAmount, 445);
     });
 
     test('item 金額：詳情取實付、列表退回成交單價', () {
-      // 詳情 item：actualPayAmount '320' → price '320'
       final detail = OrderSummary.fromJson(_liveDetailOrder()).items.single;
       expect(detail.unitPrice, '320');
       expect(detail.listPrice, '320');
@@ -124,7 +120,6 @@ void main() {
       expect(detail.price, '320');
       expect(detail.quantity, 1);
 
-      // 列表 item：沒有 actualPayAmount → price 退回 unitPrice '320'
       final list = OrderSummary.fromJson(_liveListOrder()).items.single;
       expect(list.actualPayAmount, isEmpty);
       expect(list.shareDiscount, isEmpty);
@@ -145,9 +140,6 @@ void main() {
     });
 
     test('缺 totalActualAmount 時顯示 0，不用 items 自行推算', () {
-      // 舊行為會算 320*1 + 125 - 0 = 445 頂上去。那個數字沒有把分攤折扣與
-      // 部分退款算進去，跟實際請款金額對不起來——顯示一個看似合理但錯的
-      // 總額，比顯示 0 更難發現。
       final payload = _liveDetailOrder()..remove('totalActualAmount');
       expect(OrderSummary.fromJson(payload).totalAmount, 0);
     });
@@ -298,8 +290,6 @@ void main() {
     });
 
     test('啟發式嗅探已移除：其他帶 name 的清單不會被當成商品明細', () {
-      // 舊的 looksLikeItemMap 只要鍵名含 name/title 就算命中。
-      // 只要 items 因 omitempty 消失，這類清單就會變成商品被算進金額。
       final payload = _liveDetailOrder()..remove('items');
       payload['paymentOptions'] = [
         {'method': '2001', 'name': '信用卡', 'enabled': true},
@@ -426,7 +416,6 @@ void main() {
       final payload = _liveDetailOrder()..remove('orderNo');
       for (final k in const ['orderSn', 'order_id', 'number', 'sn', 'code']) {
         final p = Map<String, dynamic>.from(payload)..[k] = 'FAKE123';
-        // id 缺 orderNo 時退回 title（首件商品名），不會採用這些別名
         expect(OrderSummary.fromJson(p).id, isNot('FAKE123'), reason: k);
       }
     });
@@ -468,7 +457,6 @@ void main() {
       expect(order.shippingStatus, 'SHIPPED');
       expect(order.shipmentStatus, 'SHIPPED');
 
-      // `shipmentStatus` 這個鍵後端沒有，不該被讀
       final fake = _liveDetailOrder()..['shipmentStatus'] = 'FAKE';
       expect(OrderSummary.fromJson(fake).shipmentStatus, isEmpty);
     });

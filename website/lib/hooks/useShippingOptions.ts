@@ -92,26 +92,13 @@ export function useShippingOptions(
 			};
 		},
 		enabled: ready,
-		// keepPreviousData (not initialData / a static placeholder): every qty
-		// edit changes `itemSignature` → a new query key. With a static
-		// placeholder the data snapped back to EMPTY for the debounce + fetch
-		// window, so the per-seller free-shipping meter and the summary's
-		// shipping list collapsed and re-expanded on every +/- tap — visible
-		// flicker + layout bounce on mobile. keepPreviousData holds the prior
-		// options on screen while the new key revalidates (the consumers only
-		// show their loading state when `options` is empty, so the previous
-		// list stays put). It still triggers the fetch — unlike initialData,
-		// which the 30s staleTime would treat as fresh and suppress entirely.
 		placeholderData: keepPreviousData,
 	});
 
 	if (!ready) return EMPTY_STATE;
-	// On error, placeholderData no longer applies and query.data is undefined.
 	const data = query.data ?? EMPTY_STATE;
 	return {
 		...data,
-		// Retain the list visually, but never treat a previous store/quantity
-		// snapshot as ready for checkout during the debounce or revalidation.
 		loading: query.isFetching || query.isPlaceholderData,
 		error: query.error instanceof Error ? query.error.message : data.error,
 		errorCode:

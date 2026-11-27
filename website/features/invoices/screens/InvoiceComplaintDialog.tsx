@@ -82,8 +82,6 @@ export function InvoiceComplaintDialog({
 			title={T.createTitle}
 			description={T.createDescription}
 			size="md"
-			// 送出中不讓背景點擊與關閉鍵把 Dialog 關掉——請求已經在路上，關掉只會
-			// 讓使用者以為沒送出而再按一次。
 			isDismissable={!submitting}
 			showCloseButton={!submitting}
 			footer={
@@ -102,7 +100,6 @@ export function InvoiceComplaintDialog({
 						size="lg"
 						isLoading={submitting}
 						loadingLabel={T.submitting}
-						// 說明是選填 ⇒ 只在超過上限時 disable。
 						disabled={text.length > DESCRIPTION_MAX}
 						onClick={() => onSubmit(reasonCode, text.trim())}
 					>

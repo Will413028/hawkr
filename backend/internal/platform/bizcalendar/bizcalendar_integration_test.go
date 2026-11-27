@@ -105,7 +105,6 @@ func TestReimportReplacesTheYear(t *testing.T) {
 	if _, err := f.store.Import(ctx, admin, 2026, fixtureCSV(t, "115.csv")); err != nil {
 		t.Fatal(err)
 	}
-	// 2026-01-02（週五）改成放假、備註改成「更正」。
 	edited := strings.Replace(fixtureCSV(t, "115.csv"), "20260102,五,0,", "20260102,五,2,更正", 1)
 	res, err := f.store.Import(ctx, admin, 2026, edited)
 	if err != nil {

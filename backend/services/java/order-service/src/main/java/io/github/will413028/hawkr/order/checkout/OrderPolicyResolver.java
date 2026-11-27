@@ -82,8 +82,6 @@ public class OrderPolicyResolver {
      * ⚠️ 2026-09-12 架構合併：該判準原本在獨立的 settlement 服務，現落 payment-service。
      */
     private static String fulfillmentModeFor(String shippingMethodValue) {
-        // null 要自己擋：Set.of(...).contains(null) 在 Java 上是 NPE 不是 false，
-        // 而 NPE 會被上層翻成 500，維運看到的碼指不到真正的原因。
         if (shippingMethodValue == null) {
             throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
         }

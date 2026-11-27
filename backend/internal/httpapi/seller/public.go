@@ -41,7 +41,6 @@ type Ratings interface {
 	StoreRatingStats(ctx context.Context, storeIDs []int64) (map[int64]RatingStats, error)
 }
 
-// maxBatchStores 是 BatchGetStores 一次最多接受的 id 數量。
 const maxBatchStores = model.MaxBatchSize
 
 // Public 是 SellerPublicService 的 handler。

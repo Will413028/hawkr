@@ -158,8 +158,6 @@ func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &typedWorker[StoreExposureChangedArgs]{work: w.storeExposureChanged})
 }
 
-// baseEvent 是舊 pkg/mq 的 BaseEvent：timestamp 是 time.Time 的 JSON（RFC3339Nano、UTC），version 固定 "1.0"；
-// correlation_id 與 metadata 在舊 publisher 是空值，omitempty 之下不出現，這裡不帶。
 type baseEvent struct {
 	EventID   string    `json:"event_id"`
 	EventType string    `json:"event_type"`
@@ -172,14 +170,12 @@ func base(f eventFields, eventType string) baseEvent {
 	return baseEvent{EventID: f.EventID, EventType: eventType, Version: "1.0", Timestamp: f.Occurred.UTC(), Source: source}
 }
 
-// sellerDeleted 是舊 SellerDeletedEvent：id 是 JSON 數字。
 type sellerDeleted struct {
 	baseEvent
 	AccountID int64 `json:"accountId"`
 	StoreID   int64 `json:"store_id"`
 }
 
-// sellerSuspended 是舊 SellerSuspendedEvent：id 是 JSON 字串（,string），reasonCode 不省略。
 type sellerSuspended struct {
 	baseEvent
 	SuspensionID int64  `json:"suspensionId,string"`
@@ -189,7 +185,6 @@ type sellerSuspended struct {
 	StoreID      int64  `json:"store_id,string"`
 }
 
-// sellerUnsuspended 是舊 SellerUnsuspendedEvent。
 type sellerUnsuspended struct {
 	baseEvent
 	SuspensionID int64 `json:"suspensionId,string"`
@@ -197,8 +192,6 @@ type sellerUnsuspended struct {
 	StoreID      int64 `json:"store_id,string"`
 }
 
-// sellerProfileChanged 是舊 SellerProfileChangedEvent：沒有 BaseEvent，occurred_at 是秒精度的 UTC（pkg/timeutil 的
-// FormatISO8601，單體 import 不到 pkg，格式相同）。
 type sellerProfileChanged struct {
 	EventID    string `json:"event_id"`
 	EventType  string `json:"event_type"`
@@ -206,7 +199,6 @@ type sellerProfileChanged struct {
 	OccurredAt string `json:"occurred_at"`
 }
 
-// sellerExposureChanged 是新的事件（沒有舊 publisher），形狀由 Java 派工依這裡實作。
 type sellerExposureChanged struct {
 	baseEvent
 	StoreID         int64 `json:"store_id"`
@@ -214,8 +206,6 @@ type sellerExposureChanged struct {
 	ExposureVersion int64 `json:"exposure_version"`
 }
 
-// enqueuePublish 不在 transaction 內排入（relay 要讀 seller）；relay job 在排入後失敗而重試時，PublishArgs 以 event_id 做的
-// unique 讓同一則事件只有一個送出的 job。
 func (w *Worker) enqueuePublish(ctx context.Context, eventID, exchange, key string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -230,10 +220,6 @@ func (w *Worker) storeRetired(ctx context.Context, a StoreRetiredArgs) error {
 	})
 }
 
-// storeSuspended 在 relay 這一刻讀店家目前生效中的措施（事件不帶原因：持續停權中措施的新增或結束是同一段期間）：有依據風險類型的
-// 停權措施時，用舊契約管理員停權的碼 9603 與風險類型的名稱；只有依據認定的停權，或 relay 時已沒有生效中的措施，reasonCode 是空字串、
-// 不帶 reasonLabel（舊系統的 seller.suspended 只有管理員停權才發，違規停權在 sellerserver 的 suspended_governance 也沒有原因碼），
-// 事件照樣送出。
 func (w *Worker) storeSuspended(ctx context.Context, a StoreSuspendedArgs) error {
 	st, err := w.Stores.Store(ctx, a.StoreID)
 	if err != nil {

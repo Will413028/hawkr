@@ -80,20 +80,8 @@ function withCurrentOption(
 }
 
 export default function ShippingClient() {
-	// Cert status comes from the shared store and KYC-flow queries (deduped with the
-	// navbar / shell); this page only owns its shipping-onboarding rows.
 	const certGate = useCertGate();
-	// Shared with DashboardPage / SkuShippingEditor — `refresh` (passed to the
-	// sections as `onChange`) refetches the one query, so a method opened here
-	// updates the dashboard badge and the product 可配送方案 picker too.
-	// `loaded` (first success), not `loading` (= isLoading||isFetching): the
-	// shared query refetches on every `onChange`/mutation, and gating the
-	// full-page skeleton on isFetching would blank the page — discarding the
-	// section forms' in-progress input — on each toggle. Skeleton only until the
-	// first load resolves; later refetches update rows in place.
 	const { rows, loaded, loading, error, refresh } = useShippingOnboardings();
-	// 表單初值只算一次，所以要等「本次掛載後的資料」：快取命中時 loaded 先成立、
-	// 背景重新讀取還在跑，這時算初值會拿到舊的 rows。第一次讀取結束（成功或失敗）後才放行，之後不再收回。
 	const [settled, setSettled] = React.useState(false);
 	if (!settled && (loaded || error) && !loading) setSettled(true);
 
@@ -180,9 +168,6 @@ function UnsupportedOnboardingNotice({ rows }: { rows: ShippingOnboarding[] }) {
 	);
 }
 
-/* ============================================================
-   黑貓宅配
-   ============================================================ */
 
 function HomeDeliverySection({
 	rows,
@@ -193,14 +178,12 @@ function HomeDeliverySection({
 	store: MyStore | null;
 	onChange: () => void | Promise<void>;
 }) {
-	// 以單一 home_delivery row 為主，顯示「目前已開通 / 處理中 / 失敗」三態之一。
 	const row = findOnboarding(rows, SHIPPING_TYPE.HOME_DELIVERY);
 	const locked = isLocked(row);
 	const processing = isProcessing(row);
 	const failed = isFailed(row);
 	const approved = isApproved(row);
 
-	// 初值只算一次（父層等到 rows 與店家都讀完才渲染本區塊）；之後重新讀取不覆蓋使用者尚未送出的輸入。
 	const [form, setForm] = React.useState<HomeForm>(() =>
 		homeFormInitial(row, store),
 	);
@@ -210,9 +193,6 @@ function HomeDeliverySection({
 	const update = (patch: Partial<HomeForm>) =>
 		setForm((prev) => ({ ...prev, ...patch }));
 
-	// 黑貓寄件人姓名：顯示長度 [1, 30]（中文 1 字算 2、英文 1 字算 1），
-	// 對齊後端 PayUni 物流欄位約束。只有使用者已輸入時才即時提示，避免
-	// 空欄一進頁面就亮紅。
 	const senderNameError =
 		form.senderName.trim().length > 0
 			? checkDisplayLength(form.senderName, {
@@ -246,7 +226,6 @@ function HomeDeliverySection({
 			return;
 		}
 
-		// 郵遞區號由表單選的縣市與區推導；對不到代碼就不能送出。
 		const postalCode = senderPostalCodeOf(form.senderCity, form.senderDistrict);
 		if (!postalCode) {
 			setSubmitError("請重新選擇行政區");
@@ -408,9 +387,6 @@ function HomeDeliverySection({
 	);
 }
 
-/* ============================================================
-   7-11 店到店
-   ============================================================ */
 
 interface CvsForm {
 	senderName: string;
@@ -433,7 +409,6 @@ function CvsSection({
 	const approved = isApproved(reference);
 	const processing = isProcessing(reference);
 
-	// 初值只算一次；之後重新讀取不覆蓋使用者尚未送出的輸入。
 	const [form, setForm] = React.useState<CvsForm>(() => ({
 		...cvsSenderInitial(reference, store),
 		returnStoreCode: reference?.returnStoreCode ?? "",
@@ -451,9 +426,6 @@ function CvsSection({
 		setOpeningMap(true);
 		setSubmitError(null);
 		try {
-			// appType 必須是 "web"：桌面瀏覽器要走 /store-map/return 的
-			// postMessage 回傳；"seller" 會 302 到 hawkrseller:// deep
-			// link，瀏覽器接不住、popup 停在 PayUni 空白頁。
 			const session = await createStoreMapSession("web");
 			if (!session.redirectUrl) {
 				setSubmitError("無法開啟 7-11 電子地圖");
@@ -473,8 +445,6 @@ function CvsSection({
 		}
 	};
 
-	// 超商寄件人姓名：顯示長度 [1, 10]（中文 1 字算 2、英文 1 字算 1），
-	// 對齊後端 PayUni 物流欄位約束。只有使用者已輸入時才即時提示。
 	const senderNameError =
 		form.senderName.trim().length > 0
 			? checkDisplayLength(form.senderName, {
@@ -668,9 +638,6 @@ function CvsSection({
 	);
 }
 
-/* ============================================================
-   shared bits
-   ============================================================ */
 
 function StatusPill({ row }: { row: ShippingOnboarding | undefined }) {
 	if (!row?.payuniSubmitStatus) {

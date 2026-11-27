@@ -330,7 +330,6 @@ describe("ProductGallery measured media", () => {
 			expect(thumb.src).toContain(images[index]);
 		}
 		expect(thumbs[1].src).toBe(`${MEDIA_BASE}/i/motion/${images[1]}`);
-		// The square thumb derivative would crop the uploaded 4:3 image again.
 		expect(thumbs[0].src).toBe(`${MEDIA_BASE}/i/card/${images[0]}`);
 	});
 

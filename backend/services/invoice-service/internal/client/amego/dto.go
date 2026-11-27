@@ -36,14 +36,6 @@ func Endpoints() []string {
 	}
 }
 
-// scalarString 讀一個「有時是 JSON 字串、有時是 JSON 數字」的欄位，並保留**字面值**。
-//
-// AMEGO 的 `code` 在查詢類回 Number、在 g0401／g0501／f0701 回 String（§4.5.1 事實 3）；
-// `invoice_date` 文件標 String 而實際回 Number。以 int 綁 code 會在折讓的錯誤路徑上
-// unmarshal 失敗 —— 而那正是最需要讀到錯誤碼的路徑。
-//
-// 保留字面值（而非轉成 int 再格式化）是刻意的：7 位數的碼經過 float64 會失真，
-// 而分類完全靠這個字串做精確比對。
 func unmarshalScalar(b []byte) (string, error) {
 	b = bytes.TrimSpace(b)
 	if len(b) == 0 || string(b) == "null" {
@@ -59,7 +51,6 @@ func unmarshalScalar(b []byte) (string, error) {
 	return string(b), nil
 }
 
-// providerCode 是 AMEGO 的回應碼，一律以字串承載（落庫也是字串，§4.5.12）。
 type providerCode string
 
 // UnmarshalJSON 吃 number 與 string 兩種型別。
@@ -72,7 +63,6 @@ func (p *providerCode) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// flexString 同 providerCode 的寬容解析，用在 invoice_date 這種型別漂移的欄位。
 type flexString string
 
 // UnmarshalJSON 吃 number 與 string 兩種型別。
@@ -85,16 +75,13 @@ func (f *flexString) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// ── 四種 envelope（§4.5.1 事實 2：不可用單一泛型 envelope）────────────────────
 
-// stdEnvelope 是絕大多數 API 的形狀。
 type stdEnvelope struct {
 	Code providerCode    `json:"code"`
 	Msg  string          `json:"msg"`
 	Data json.RawMessage `json:"data"`
 }
 
-// pageEnvelope 是 invoice_list／allowance_list 的形狀：三個分頁欄與 data 平級。
 type pageEnvelope struct {
 	Code      providerCode    `json:"code"`
 	Msg       string          `json:"msg"`
@@ -104,8 +91,6 @@ type pageEnvelope struct {
 	Data      json.RawMessage `json:"data"`
 }
 
-// issueEnvelope 是 f0401 的形狀：業務結果攤在頂層、不放 data。
-// 套泛型 envelope 會拿不到發票號碼。
 type issueEnvelope struct {
 	Code          providerCode `json:"code"`
 	Msg           string       `json:"msg"`
@@ -118,14 +103,11 @@ type issueEnvelope struct {
 	Base64Data    string       `json:"base64_data"`
 }
 
-// timeEnvelope 是 GET /json/time 的形狀：沒有 code／msg，Content-Type 是 text/plain。
-// 程式一律只用 timestamp，不解析 text（text 是台北時間、文件未載明時區）。
 type timeEnvelope struct {
 	Timestamp int64  `json:"timestamp"`
 	Text      string `json:"text"`
 }
 
-// ── Request DTO（欄名逐字照 AMEGO；不是我方命名慣例）──────────────────────────
 
 // IssueProductItem 是 f0401 的明細行。UnitPrice／Amount 預設含稅（DetailVat=1）。
 type IssueProductItem struct {
@@ -229,7 +211,6 @@ type FileRequest struct {
 	DownloadStyle int    `json:"download_style"`
 }
 
-// ── Result DTO ──────────────────────────────────────────────────────────────
 
 // IssueResult 是 f0401 成功後的業務結果。
 type IssueResult struct {

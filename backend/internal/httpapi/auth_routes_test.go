@@ -19,8 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// authModule 與 authProvider 是 web 登入路由的最小替身：這裡驗的是入口中介層對 /api/auth/* 的處理，不是登入流程本身
-// （後者在 httpapi/identity 的測試與 integration 測試）。
 type authModule struct{}
 
 func (authModule) BeginLoginFlow(context.Context, identity.LoginFlowInput) (identity.LoginFlowStart, error) {

@@ -74,7 +74,6 @@ void main() {
     expect(logs, hasLength(1));
   });
 
-  // `docs/spec.md`：任何失敗都放行。後端故障時若判成「需要更新」，所有使用者會被鎖在沒辦法自救的畫面。
   for (final (name, error) in <(String, Object)>[
     ('伺服器錯誤', ConnectException(Code.internal, 'boom')),
     ('參數錯誤', ConnectException(Code.invalidArgument, 'bad version')),
@@ -88,7 +87,6 @@ void main() {
   }
 
   test('逾時 → 約 3 秒放行，不卡住啟動', () async {
-    // fake transport 不會因為 signal 中止；handler 自己等 signal，模擬真的 transport。
     backend.respond = (ctx) async => throw await ctx.signal.future;
     final stopwatch = Stopwatch()..start();
     expect((await gate().checkOnStartup()).updateRequired, isFalse);

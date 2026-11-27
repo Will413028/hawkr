@@ -22,17 +22,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// 本服務內部使用、值域由 DB CHECK 正面列舉而非 CodeMeta 管理的字面值（附錄 C.4）。
-// 集中在此處而不是散落在呼叫點：值域的 SSOT 是 §5 的 DDL，改 DDL 時 grep 得到全部用點。
 const (
-	sourceTypeOrder   = "ORDER"  // chk_invdoc_source
-	triggerTypeAuto   = "AUTO"   // chk_invdoc_trigger
-	providerAmego     = "AMEGO"  // invoice_documents.provider
-	actorTypeSystem   = "SYSTEM" // invoice_status_history.actor_type（C.4 判定不納管）
+	sourceTypeOrder   = "ORDER"
+	triggerTypeAuto   = "AUTO"
+	providerAmego     = "AMEGO"
+	actorTypeSystem   = "SYSTEM"
 	subjectDocument   = "DOCUMENT"
 	subjectOperation  = "OPERATION"
-	outboxAggregateD  = "DOCUMENT" // invoice_outbox_events.aggregate_type（C.4 不納管）
-	receiptAuthNoneV1 = ""         // 收據授權條款版本；本波不採集
+	outboxAggregateD  = "DOCUMENT"
+	receiptAuthNoneV1 = ""
 )
 
 // ErrUnexpectedIssueOperation ＝ 一筆 ISSUE operation 的 document 不是 AMEGO_AUTO。
@@ -76,9 +74,6 @@ type Issuance struct {
 	audit       domain.AuditRepository
 	provider    ProviderClient
 
-	// receipts／receiptStore 只有 PLATFORM_RECEIPT 那條線會用到（#3026）。
-	// 兩者都是**必填**：DI 那一層在字型讀不起來時就 fail-closed（pod 起不來），
-	// 所以取到 nil 只可能發生在測試裡忘了給 —— settleReceipt 會就地報錯而不是靜默跳過。
 	receipts     ReceiptRenderer
 	receiptStore ReceiptUploader
 
@@ -111,8 +106,6 @@ func NewIssuance(
 		docs: docs, ops: ops, corrections: corrections, outbox: outbox, audit: audit, provider: provider,
 		receipts: receipts, receiptStore: receiptStore,
 		newID: newID, now: func() time.Time { return time.Now().UTC() }, cfg: cfg,
-		// nil 守衛放在建構子而不是每個呼叫點：少一處就是一個 nil deref，
-		// 而那類 panic 只在「剛好走到那條分支」時才炸（2026-09-01 R08 實例）。
 		log: orNop(log),
 	}
 }
@@ -125,9 +118,6 @@ func (u *Issuance) WithClock(now func() time.Time) *Issuance {
 	return u
 }
 
-// ---------------------------------------------------------------------------
-// Prepare：order.paid 消費之後的建立階段（§7.1.2 步驟 5–9）
-// ---------------------------------------------------------------------------
 
 // OrderPaidInput 是 Prepare 的全部輸入。
 //
@@ -170,12 +160,6 @@ type OrderPaidInput struct {
 
 	CorrelationID string
 
-	// ── 作廢重開（R04→R10）才會設的兩欄；一般開票留零值 ──────────────────
-	//
-	// 為什麼是**參數化既有的 buildPlan** 而不是另寫一套 document builder：
-	// 建票要決定的東西（issuer 解析、稅務檔、fulfillment 判定、AWAITING_MANUAL、
-	// 字軌預檢）在重開時**一項都沒有變**，複製一份出來就是兩份會各自漂移的實作。
-	// 這裡只有兩件事真的不同：這是第幾張實體發票，以及它是誰的替代品。
 
 	// IssueAttemptSeq 是實體軸（§5：同一 snapshot_version 下第幾張實體發票，
 	// 作廢重開 +1）。**零值視為 1**，讓一般開票路徑不必知道這一欄存在。
@@ -219,10 +203,6 @@ func (u *Issuance) Prepare(ctx context.Context, in OrderPaidInput) (PrepareResul
 		return PrepareResult{}, err
 	}
 
-	// 稅務資格與 provider 帳戶「查不到」不是錯誤，是決策樹的一個輸入值。
-	// 🔴 deny-by-default：查不到 ⇒ 空字串 ⇒ ResolveFulfillmentMode 的 default 分支
-	// ⇒ LEGACY_MANUAL + TAX_PROFILE_NOT_APPROVED。把它當錯誤往上拋會讓 consumer 重試三次
-	// 後進 DLQ，而真相是「這位賣家還沒送審」——那不需要重試。
 	profile, err := u.profiles.GetByIssuer(ctx, issuer.ID)
 	if err != nil && !isBizCode(err, bizcode.SellerTaxProfileNotFound) {
 		return PrepareResult{}, err
@@ -245,8 +225,6 @@ func (u *Issuance) Prepare(ctx context.Context, in OrderPaidInput) (PrepareResul
 		buyerIdentifier = in.BuyerTaxID
 	}
 
-	// 明細行先組出來：混合稅別這一格要靠它判定，而它同時是後面落庫的內容。
-	// ErrZeroAmount 是正常分支（§5A.10 第 1 列）不是失敗 —— 決策樹的 Z 節點承接它。
 	draft, buildErr := domain.NewIssueDraft(in.Snapshot, resolver, buyerIdentifier)
 	if buildErr != nil && !errors.Is(buildErr, domain.ErrZeroAmount) {
 		return PrepareResult{}, fmt.Errorf("invoice: build issue draft (order_no=%s): %w", in.OrderNo, buildErr)
@@ -279,11 +257,6 @@ func (u *Issuance) Prepare(ctx context.Context, in OrderPaidInput) (PrepareResul
 		SellerReceiptAuthorized:   profile.ReceiptAuthorizedAt != nil,
 	})
 
-	// I-47：載具歸屬驗證失敗是 fail-closed 的第四格。它放在 §5A.11 斷言**之前**，
-	// 理由是它與金額／稅額無關——用 A15 的 BUYER_INFO_CONFLICT 去蓋它，ADM 工作台上
-	// 會看到一個指向錯方向的理由碼，而真相是「有人拿別人的常用發票資料對這張訂單試」。
-	//
-	// 與其餘 fail-closed 一樣只作用在真的會送出去的那條路徑：其餘葉節點本來就不開票。
 	if in.PreferenceOwnershipMismatch &&
 		decision.FulfillmentMode == codemeta.InvoiceFulfillmentModeAmegoAuto.Value &&
 		decision.DocumentStatus == codemeta.InvoiceDocumentStatusPending.Value {
@@ -295,9 +268,6 @@ func (u *Issuance) Prepare(ctx context.Context, in OrderPaidInput) (PrepareResul
 			zap.String("manual_reason_code", decision.ManualReasonCode))
 	}
 
-	// §5A.11 送出前不變式斷言（fail-closed）。只對真的會送出去的那條路徑跑：
-	// 其餘葉節點不會產生 AMEGO request，拿 AMEGO 專屬的斷言（A7 B2C 稅額、A14 DetailVat…）
-	// 去擋它們只會把「賣家還沒串接」誤報成「金額算錯」。
 	if decision.FulfillmentMode == codemeta.InvoiceFulfillmentModeAmegoAuto.Value &&
 		decision.DocumentStatus == codemeta.InvoiceDocumentStatusPending.Value {
 		if verr := draft.Validate(); verr != nil {
@@ -328,8 +298,6 @@ func (u *Issuance) Prepare(ctx context.Context, in OrderPaidInput) (PrepareResul
 	return out, err
 }
 
-// issuancePlan 是「決策已定、還沒落庫」的中間值。分出來的理由是 Prepare 的交易區塊必須
-// 只剩寫入：任何一次 gRPC／解密／算式留在交易裡，都會把交易持有時間綁在外部依賴上。
 type issuancePlan struct {
 	doc         domain.NewDocument
 	lines       []domain.NewDocumentLine
@@ -337,22 +305,13 @@ type issuancePlan struct {
 	op          domain.NewOperation
 	opNextState string
 	opNextAt    time.Time
-	// manualReason 非空 ⇒ 建成 PENDING 之後在**同一交易內**接 MarkAwaitingManual。
-	// M1 只有兩條建立邊（→PENDING／→NOT_APPLICABLE），`[*]` → AWAITING_MANUAL 不存在。
 	manualReason  string
 	correlationID string
 	now           time.Time
 
-	// bumpIntakeProfileID 非 0 ⇒ 這位賣家在待審窗口內，persist 要在**同一交易內**
-	// 累加接單額度（§5.1.2 口徑：已付款訂單，只在建立 invoice_documents 的同交易內累加）。
-	// 零值代表不累加——把判斷留在 buildPlan 而不是 persist，是因為 persist 是純寫入區塊，
-	// 讓它去查賣家狀態會在交易內多一次讀，而那個值 buildPlan 手上就有。
 	bumpIntakeProfileID int64
 	bumpIntakeAmount    int64
 
-	// issuer 只給 P7（invoice.operation.review_required）用（#3055 的橫向稽查）：
-	// 事件 payload 的 store_id 一律走 eventwire.StoreIDOf(issuer)，而 persist 是交易內的
-	// 純寫入區塊，不該為了取它多一次讀 —— buildPlan 手上本來就有。
 	issuer domain.Issuer
 }
 
@@ -368,8 +327,6 @@ func (u *Issuance) buildPlan(
 ) (issuancePlan, error) {
 	documentID := u.newID()
 
-	// statutory_deadline_at 由 chk_invdoc_deadline_presence 綁 document_kind 而**與 status 無關**：
-	// 連 NOT_APPLICABLE 的 B2C 文件都必須有期限，RECEIPT 則必須沒有。
 	var deadline *time.Time
 	if d, ok := domain.StatutoryDeadline(invoiceDate, decision.DocumentKind); ok {
 		deadline = &d
@@ -380,18 +337,12 @@ func (u *Issuance) buildPlan(
 		header = draft.Header
 	}
 
-	// chk_invdoc_exclusive：統編／載具／捐贈碼三選一，AMEGO 不擋、只能我方擋。
-	// 這裡做的是**落庫正規化**（統編優先、其次載具），不是判斷：判斷已經由 A15 在
-	// Validate 內做完並落成 BUYER_INFO_CONFLICT。兩者分開，才不會把「輸入互斥」
-	// 悄悄變成「我幫你挑一個」。
 	carrierType, carrierID1, carrierID2, donation := normalizeBuyerIdentity(
 		decision.DocumentKind, draft, in.DonationCode)
 
 	receiptNo := ""
 	if decision.DocumentKind == codemeta.InvoiceDocumentKindReceipt.Value {
-		// chk_invdoc_receipt 是雙向等式 ⇒ 號碼必須與 document_kind 同一句寫。
-		// 取號在交易外：SEQUENCE 的 nextval 不受交易回滾影響，跳號本來就可接受。
-		receiptNo = "" // 由 persist 在交易內取號（見該處註解）
+		receiptNo = ""
 	}
 
 	provider := ""
@@ -428,7 +379,6 @@ func (u *Issuance) buildPlan(
 			DonationCode:        donation,
 			DocumentKind:        decision.DocumentKind,
 			FulfillmentMode:     decision.FulfillmentMode,
-			// 建立邊只有 PENDING 與 NOT_APPLICABLE 兩條；AWAITING_MANUAL 走 manualReason。
 			Status:                      creationStatus(decision),
 			NotApplicableReason:         decision.NotApplicableReason,
 			SnapshotVersion:             in.SnapshotVersion,
@@ -447,20 +397,8 @@ func (u *Issuance) buildPlan(
 			ReceiptNo:                   receiptNo,
 			ReceiptAuthorizationVersion: receiptAuthNoneV1,
 			InvoiceDateTaipei:           &invoiceDate,
-			// 🔴 **收據沒有稅期別**（#3026 收尾，2026-09-03）。期別碼是「這張發票落在
-			// 哪一個財政部申報期」，而收據不申報、不上傳、沒有作廢期限（設計書 §7.2）。
-			//
-			// 這不是潔癖：它唯一一次被讀到就產生了錯答案 —— `canRequestCorrection` 拿
-			// `WithinVoidWindow(tax_period_code)` 判定，收據帶著 11505 ⇒ 判定成立 ⇒
-			// 買家看到一顆「申請更正」按鈕，而那條路整條是發票語意、按下去會在 AMEGO
-			// 那一段失敗。守衛已補（兩道），但那是擋 instance；**這一行才是拿掉 class**。
-			//
-			// 空字串經 `snp` 落 NULL；`chk_invdoc_period` 允許 NULL。
 			TaxPeriodCode: taxPeriodFor(decision.DocumentKind, invoiceDate),
-			// Phase 1 的 issue_not_before ＝ 收款時點（即刻可開），不是未來時點。
 			IssueNotBefore: in.PaidAt,
-			// paid_at 與 issue_not_before 在這條路徑上同值，但語意不同（見
-			// domain.Document.PaidAt 的紅線）⇒ 分兩欄寫，不共用一欄。
 			PaidAt:              &in.PaidAt,
 			StatutoryDeadlineAt: deadline,
 			SourceSnapshot:      snapshotJSON,
@@ -473,13 +411,6 @@ func (u *Issuance) buildPlan(
 		plan.lines = toNewLines(draft.Lines)
 	}
 
-	// operation 的建立與否，逐葉節點：
-	//   NOT_APPLICABLE  → 建，並在同一交易內推進 J04（讓「這一單為什麼沒開」在 M2 上也留痕）
-	//   AWAITING_MANUAL → **不建**（§7.1.3 的 AM 節點明文「operation 不建」）。ADM 給出判定後
-	//                     document 回 PENDING，那時才建 —— 建了再靠 HELD 壓住需要一條
-	//                     `CREATED → HELD` 的邊，而 M2 上沒有那條邊（J08 的起點是 READY／
-	//                     RETRY_SCHEDULED），硬寫會 rows=0 靜默失敗。
-	//   PENDING         → 建 ＋ J02（issue_not_before <= now，Phase 1 恆成立）
 	switch plan.doc.Status {
 	case codemeta.InvoiceDocumentStatusNotApplicable.Value:
 		plan.makeOp = true
@@ -495,24 +426,12 @@ func (u *Issuance) buildPlan(
 		plan.opNextAt = now
 	}
 
-	// 待審接單額度：只有在窗口內才累加。
-	//
-	// 🔴 **不得無條件累加**：這兩個計數器沒有任何遞減或重置路徑（遞減需要有人在窗口
-	// 滑出時掃描，那是《後端服務責任邊界規範》禁止的 reconciliation job）⇒ 無條件累加
-	// 會讓一個歷史悠久的賣家哪天進入待審時被累積總數瞬間擋死，症狀是結帳回 9326。
-	//
-	// 值域逐字對齊 intakeLimitOf（讀那兩個欄位的唯一地方）：兩處認的是同一組狀態，
-	// 不一致的話會出現「累加了但永遠不檢查」或「檢查了但從不累加」——後者正是
-	// 2026-09-01 發現的實況（BumpSellerTaxProfilePendingOrderCounters 零呼叫端）。
 	if intakeLimitOf(profile).Applicable {
 		plan.bumpIntakeProfileID = profile.ID
 		plan.bumpIntakeAmount = plan.doc.TotalAmount
 	}
 
 	if plan.makeOp {
-		// operation_type 的推導（REISSUE vs ISSUE）、operation_key 的參數順序與
-		// issue_attempt_seq 的下界都在 newIssueOperation 一處，三個呼叫端共用
-		// （見 issue_operation.go 的檔頭：那三件事錯了都不會編譯錯）。
 		op, err := newIssueOperation(issueOperationSpec{
 			OperationID:         u.newID(),
 			DocumentID:          documentID,
@@ -533,40 +452,11 @@ func (u *Issuance) buildPlan(
 	return plan, nil
 }
 
-// ensureIssuer 取得（必要時建立）這位賣家的 invoice_issuers 列。
-//
-// 🔴 **這是 dev 上 4 筆 ORDER_PAID 永遠卡在 RECEIVED 的根因。** 原本這裡是裸的 GetByRef，
-// 查不到就把錯誤往上拋 ⇒ Prepare 失敗 ⇒ consumer 回 error ⇒ pkg/mq 重投 ⇒ 被 inbox 去重
-// 擋掉 return nil ⇒ 該列永遠停在 RECEIVED、發票與留檔文件都不存在、沒有任何告警。
-//
-// 前提為什麼是假的：checkout.go 的同一格 guard 註解寫著「Prepare 那裡 issuer 是必然存在的，
-// 因為 order.paid 之前賣家已經開過店」——但 invoice_issuers 的**唯一**建列點是
-// TaxProfile.ensureProfile（賣家第一次存稅務資格草稿，§6.1.7），不是開店。從未進過發票
-// 設定流程的賣家照樣可以有已付款訂單。dev 實測：卡住的 3 個 store_id 都是真實賣家。
-//
-// ⚠️ 不能只把 checkout.go 的 guard 抄過來（那裡查不到就回零值 domain.Issuer{}）：
-// buildPlan 直接用 `IssuerID: issuer.ID`，零值 ID=0 會撞 fk_invdoc_issuer ⇒ 把「靜默卡住」
-// 換成 FK violation，一樣開不出留檔。這裡必須真的建列。
-//
-// 建出來的 issuer 沒有稅務資格 ⇒ profile 查無 ⇒ SellerReviewStatus 為空 ⇒
-// ResolveFulfillmentMode 走 default 分支 ⇒ LEGACY_MANUAL ＋ TAX_PROFILE_NOT_APPROVED
-// ＋ document NOT_APPLICABLE ＋ operation NOT_APPLICABLE。**那才是這些訂單的正確處置**：
-// 賣家沒送審本來就不該開票，但「不開票」也要有留檔、有法定期限欄、說得出理由。
-//
-// 🔴 呼叫點在 u.tx.WithTx **之外**（persist 的交易區塊刻意只剩寫入）。persist 之後失敗會
-// 留下一列孤兒 issuer —— 無害且刻意接受：它是身分列、冪等、之後 ensureProfile 會重用同一列，
-// display_name 由 UpdateDisplayName 在法定名稱出現時覆蓋。
-//
-// 建列邏輯逐字沿用 TaxProfile.ensureProfile（同樣的佔位 display_name、同樣的
-// inserted=false 就回查）：兩處若分歧，同一個 store_id 會在兩條路徑下拿到不同的顯示名稱。
 func (u *Issuance) ensureIssuer(ctx context.Context, storeID int64, now time.Time) (domain.Issuer, error) {
 	issuer, err := u.issuers.GetByRef(ctx, codemeta.InvoiceIssuerTypeSeller.Value, storeID)
 	switch {
 	case err == nil:
 		return issuer, nil
-	// ⚠️ 「查無此列」回的是 InvoiceProviderAccountNotFound（9330）而不是 issuer 專屬碼
-	// ——那是 seller_repo.go 的既有實作（notFound(err, bizcode.InvoiceProviderAccountNotFound)），
-	// 不是這裡挑的。碼名沒有 issuer 語意，所以只能靠它，不能靠「碼名看起來對不對」。
 	case !isBizCode(err, bizcode.InvoiceProviderAccountNotFound):
 		return domain.Issuer{}, err
 	}
@@ -582,8 +472,6 @@ func (u *Issuance) ensureIssuer(ctx context.Context, storeID int64, now time.Tim
 		return domain.Issuer{}, cerr
 	}
 	if !inserted {
-		// 併發的另一個請求（或 TaxProfile.ensureProfile）搶先建了 ⇒ 讀它建的那一列。
-		// ON CONFLICT DO NOTHING 的 rows=0 是正常結果不是錯誤。
 		return u.issuers.GetByRef(ctx, codemeta.InvoiceIssuerTypeSeller.Value, storeID)
 	}
 	u.log.Info("invoice.issuance.issuer_created_on_demand",
@@ -592,11 +480,8 @@ func (u *Issuance) ensureIssuer(ctx context.Context, storeID int64, now time.Tim
 	return created, nil
 }
 
-// persist 是 Prepare 的交易區塊：**只有寫入**，沒有任何外部呼叫。
 func (u *Issuance) persist(ctx context.Context, plan issuancePlan) (PrepareResult, error) {
 	if plan.doc.DocumentKind == codemeta.InvoiceDocumentKindReceipt.Value {
-		// SEQUENCE 的 nextval 不受交易回滾影響（跳號可接受、不可重複，§5.3.3），
-		// 放在交易內只是為了少一次往返。
 		no, err := u.docs.NextReceiptNo(ctx)
 		if err != nil {
 			return PrepareResult{}, err
@@ -609,16 +494,9 @@ func (u *Issuance) persist(ctx context.Context, plan issuancePlan) (PrepareResul
 		return PrepareResult{}, err
 	}
 	if !inserted {
-		// 冪等命中：uq_invdoc_order_identity 已有這一列。呼叫端直接 ACK。
-		// 這裡不補 SELECT —— 呼叫端手上有冪等鍵，要既有列自己去讀（GetBySourceRef）。
 		return PrepareResult{AlreadyExisted: true}, nil
 	}
 
-	// 🔴 累加待審接單額度的位置就在這裡，不在下面任何一個 return 之前。
-	//
-	// persist 有**三個**成功出口（!makeOp／!opInserted／正常路徑），接在其中任何一個
-	// 都會漏掉另外兩個或重複計數。這一行的位置保證「每張**新建**的 document 恰好一次」：
-	// 上面那個 AlreadyExisted 早退已經把冪等重入濾掉了。
 	if err := u.bumpIntakeIfPending(ctx, plan); err != nil {
 		return PrepareResult{}, err
 	}
@@ -640,7 +518,6 @@ func (u *Issuance) persist(ctx context.Context, plan issuancePlan) (PrepareResul
 		NotApplicableReason: derefString(doc.NotApplicableReason),
 	}
 
-	// fail-closed：PENDING → AWAITING_MANUAL，**同一交易內**。
 	if plan.manualReason != "" {
 		ok, err := u.docs.MarkAwaitingManual(ctx, doc.ID, plan.manualReason, plan.now)
 		if err != nil {
@@ -657,8 +534,6 @@ func (u *Issuance) persist(ctx context.Context, plan issuancePlan) (PrepareResul
 		}
 		out.DocumentStatus = codemeta.InvoiceDocumentStatusAwaitingManual.Value
 		out.ManualReasonCode = plan.manualReason
-		// P7：賣家要知道有一筆開票作業卡在人工出口（#3055 的橫向稽查）。
-		// 沒有這一則，fail-closed 的落點對賣家是完全無聲的 —— 他只會發現發票一直沒開。
 		if err := u.emitReviewRequired(ctx, plan.issuer, doc, plan.manualReason, plan.now); err != nil {
 			return PrepareResult{}, err
 		}
@@ -673,9 +548,6 @@ func (u *Issuance) persist(ctx context.Context, plan issuancePlan) (PrepareResul
 		return PrepareResult{}, err
 	}
 	if !opInserted {
-		// 同一把 operation_key 已存在 ⇒ 冪等命中，讀既有列。
-		// （另一種 rows=0 的意義「序列閘門被佔用」只發生在調整類 operation，ISSUE 不進那個
-		//   partial unique 的述詞 ⇒ 這裡只可能是前者。分辨方式仍是讀 key 而不是猜。）
 		op, err = u.ops.GetByKey(ctx, plan.op.OperationKey)
 		if err != nil {
 			return PrepareResult{}, err
@@ -703,18 +575,6 @@ func (u *Issuance) persist(ctx context.Context, plan issuancePlan) (PrepareResul
 	return out, nil
 }
 
-// bumpIntakeIfPending 累加待審接單額度（§5.1.2：**只在建立 invoice_documents 的
-// 同交易內累加**，所以它在 persist 裡，不在 Prepare 的外層）。
-//
-// 🔴 在此之前 BumpSellerTaxProfilePendingOrderCounters 的非生成呼叫端是 **0**
-// （2026-09-01 實查）——SQL、repo 方法與欄位註解都在，而沒有任何執行者。
-// 後果是待審接單雙上限（§6.1.2 C5、業務碼 9326）**結構上永遠不會觸發**：
-// 兩個計數器恆為 0，intakeLimitOf 的 Blocked 恆 false。
-// 那是「機制存在於 SQL 與註解裡但沒有執行者」的同一個 class。
-//
-// ⚠️ 這一格只讓計數**動起來**。它讓 9326 變成可觸發的，但**結帳前置驗證仍未接線**
-// （§6.2.4 order ③，見 #2900）——沒有接線就沒有人讀那個判定。兩件事都要做完，
-// 這裡只完成前一半，不要因為計數會動了就以為額度已經在守。
 func (u *Issuance) bumpIntakeIfPending(ctx context.Context, plan issuancePlan) error {
 	if plan.bumpIntakeProfileID == 0 {
 		return nil
@@ -723,11 +583,6 @@ func (u *Issuance) bumpIntakeIfPending(ctx context.Context, plan issuancePlan) e
 		plan.bumpIntakeProfileID, plan.bumpIntakeAmount, plan.now)
 }
 
-// issueAttemptSeqOf 把零值折成 1。
-//
-// 🔴 折在**一個地方**而不是讓每個呼叫端自己填 1：chk_invdoc_versions 要求
-// issue_attempt_seq >= 1，漏填的症狀是建列當下 23514，而那個錯誤訊息不會告訴你
-// 是哪一欄。同源教訓見 2026-08-31 的 MaxAttempts（同一個 CHECK 家族）。
 func issueAttemptSeqOf(in OrderPaidInput) int32 {
 	if in.IssueAttemptSeq < 1 {
 		return 1
@@ -735,14 +590,6 @@ func issueAttemptSeqOf(in OrderPaidInput) int32 {
 	return in.IssueAttemptSeq
 }
 
-// reviewRequiredEvent 是 P7（`invoice.operation.review_required`，58 §6.3.9 定版 13 列第 8 列）。
-//
-// 收件人是**賣家**（模板的 target_user_field 是 notify_seller_account_id），而那個欄位由
-// outbox dispatcher 在派送時用 payload 的 store_id 解析 ⇒ store_id 填錯的症狀是通知靜默
-// 不送（notify_seller_account_id 恆為 "0"，下游 skip），全程零錯誤零 DLQ。
-//
-// review_reason_code 是 CodeMeta InvoiceManualReason 的**碼**不是人話：模板刻意不把它放進
-// 文案，只放進 data 讓前端用 codeLabel 查表（migration 檔頭逐字寫了這個理由）。
 type reviewRequiredEvent struct {
 	NotificationRefID string            `json:"notification_ref_id"`
 	InvoiceDocumentID string            `json:"invoice_document_id"`
@@ -753,10 +600,6 @@ type reviewRequiredEvent struct {
 	OccurredAt        string            `json:"occurred_at"`
 }
 
-// emitReviewRequired 在 document 落 AWAITING_MANUAL 的**同一個交易內**寫 P7。
-//
-// 冪等鍵用 `INV:{invoice_document_id}`：M1 上以 AWAITING_MANUAL 為終點的邊全部來自
-// PENDING／ISSUING／ISSUE_FAILED，而一份文件走完就停在那裡等人 ⇒ 同一份不會發第二則。
 func (u *Issuance) emitReviewRequired(
 	ctx context.Context, issuer domain.Issuer, doc domain.Document, reasonCode string, now time.Time,
 ) error {

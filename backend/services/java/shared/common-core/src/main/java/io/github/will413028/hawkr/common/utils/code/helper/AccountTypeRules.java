@@ -46,15 +46,12 @@ public final class AccountTypeRules {
         }
         String trimmed = raw.trim();
 
-        // 優先 value 查找（"1","2","3","4"）
         if (AccountType.isValidValue(trimmed)) {
             return AccountType.fromValue(trimmed);
         }
-        // code 查找（"BUYER","SELLER"）
         if (AccountType.isValidCode(trimmed)) {
             return AccountType.fromCode(trimmed);
         }
-        // 小寫名稱查找
         String lower = trimmed.toLowerCase();
         for (AccountType type : AccountType.values()) {
             if (type.code().toLowerCase().equals(lower)) {

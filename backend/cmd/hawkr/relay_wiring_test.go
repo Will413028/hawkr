@@ -8,13 +8,11 @@ import (
 	"testing"
 )
 
-// callsIn 回傳 file 裡函式 fn 本體內實際呼叫的名稱（`Name(...)` 與 `x.Name(...)`），已排序去重；只被參照而沒呼叫的不算。
 func callsIn(t *testing.T, file, fn string) []string {
 	t.Helper()
 	return namesIn(t, file, fn, true)
 }
 
-// refsIn 另外包含 `x.Name` 形式的參照（當成值傳出的方法，例如 `events.Subscribe(bus, m.OnX)`）。
 func refsIn(t *testing.T, file, fn string) []string {
 	t.Helper()
 	return namesIn(t, file, fn, false)

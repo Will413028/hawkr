@@ -84,14 +84,12 @@ func requireIdempotencyKey(store *IdempotencyStore) gin.HandlerFunc {
 
 		accountID, ok := accountIDFromContext(c)
 		if !ok {
-			// 見上方「擋不住什麼」①。
 			c.Next()
 			return
 		}
 
 		body, ok := readAndRestoreBody(c)
 		if !ok {
-			// body 讀不完整就沒有可信的指紋 ⇒ 不冒充做過冪等，交給 handler 自己失敗。
 			c.Next()
 			return
 		}
@@ -115,12 +113,8 @@ func requireIdempotencyKey(store *IdempotencyStore) gin.HandlerFunc {
 
 		capture := &idempotencyCapture{ResponseWriter: c.Writer}
 		c.Writer = capture
-		// defer 而不是 c.Next() 之後直接寫：panic 會被更外層的 Recovery 接住，
-		// 而執行權必須在那條路徑上一樣被歸還，否則那把鍵在 TTL 內永遠回 9351。
 		defer func() {
 			status := capture.Status()
-			// Written() 一起看：gin 的 Status() 在什麼都沒寫時預設回 200，只看它會把
-			// 「handler 什麼都沒做」存成一則可回放的空 200。
 			if capture.Written() && status >= http.StatusOK &&
 				status < http.StatusMultipleChoices && !capture.truncated {
 				store.Commit(scope, status, capture.Header().Get("Content-Type"), capture.body.Bytes())
@@ -132,9 +126,6 @@ func requireIdempotencyKey(store *IdempotencyStore) gin.HandlerFunc {
 	}
 }
 
-// readAndRestoreBody 讀完 request body 並塞回去讓 handler 還讀得到。
-// 大小由 BodyGuard 先封頂（一般路由 2 MiB），這裡不再自訂上限——自訂第二個上限
-// 只會產生兩個會漂移的數字。
 func readAndRestoreBody(c *gin.Context) ([]byte, bool) {
 	if c.Request.Body == nil {
 		return nil, true
@@ -171,9 +162,6 @@ func replayIdempotentResponse(c *gin.Context, rec *idempotencyRecord) {
 	_, _ = c.Writer.Write(rec.body)
 }
 
-// idempotencyCapture 抄下回應以便日後回放。
-// 超過 idempotencyMaxBodyBytes 就標記 truncated 而**不**留紀錄——回放半截 JSON
-// 比不回放危險得多。
 type idempotencyCapture struct {
 	gin.ResponseWriter
 	body      bytes.Buffer

@@ -20,16 +20,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// 本檔驗 M4 寫入面的**型別邊界、Tier A 出口形狀與明文外洩**；業務規則本身在
-// internal/usecase/provider_account_test.go。
-//
-// 🔴 兩支核心斷言：
-//
-//	① 越權與查無的回應**逐位元相同**（proto.Marshal，不是比 code）。比 code 只證明兩者
-//	   同碼，證明不了 message、data 或任何未來新增的欄位沒有洩漏「這家店存在，只是不是你的」。
-//	② **AppKey 不出現在序列化後的 wire bytes 裡**。proto 的 reserved 90 讓「加回欄位」
-//	   變成 buf build 失敗，但它擋不住有人把明文塞進 status_notice 這種既有的字串欄
-//	   ——只有掃 wire bytes 才抓得到那個形狀。
 
 const (
 	pxStoreA    int64 = 2685914682
@@ -41,7 +31,6 @@ const (
 
 var pxNow = time.Date(2026, 8, 30, 8, 0, 0, 0, time.UTC)
 
-// pxIssuers 照 SQL 述詞回應：只有 pxStoreA 有 issuer 列。
 type pxIssuers struct{ domain.IssuerRepository }
 
 func (pxIssuers) GetByRef(_ context.Context, issuerType string, ref int64) (domain.Issuer, error) {
@@ -64,8 +53,6 @@ func (pxProfiles) GetByIssuer(context.Context, int64) (domain.SellerTaxProfile, 
 	}, nil
 }
 
-// pxAccounts 是一份最小的 provider 帳號 repo：它記下每一次收到的明文 AppKey，
-// 讓「明文有到 repository」與「明文沒有到回應」兩件事都能被斷言。
 type pxAccounts struct {
 	domain.ProviderAccountRepository
 	row      domain.ProviderAccount
@@ -125,8 +112,6 @@ type pxOps struct{ domain.OperationRepository }
 
 func (pxOps) CountOpenForIssuer(context.Context, int64) (int64, error) { return 0, nil }
 
-// pxCutovers 是切點歷史的替身。它只需要回無誤：端點 26 的回應不含歷史，
-// 歷史的內容由 usecase 層與 integration 測試驗。
 type pxCutovers struct {
 	domain.ProviderCutoverRepository
 }
@@ -143,7 +128,6 @@ func (pxAudit) AppendAdminAuditLog(context.Context, domain.NewAdminAuditLogEntry
 	return 55, nil
 }
 
-// pxProvider 是一份會通過三項檢查的 AMEGO 替身。
 type pxProvider struct{}
 
 func (pxProvider) IssueInvoice(context.Context, amego.Credential, amego.IssueRequest) (*amego.IssueResult, error) {
@@ -167,17 +151,11 @@ func newProviderServer(exists bool, status string) (*InvoiceServer, *pxAccounts)
 		}
 	}
 	uc := usecase.NewProviderAccount(xTx{}, pxIssuers{}, pxProfiles{}, accounts,
-		// adjustments：本檔驗的是 gRPC 邊界（授權、參數、回應形狀），不走 failOpen
-		// 那一段 ⇒ nil 就是誠實的替身。傳一個「什麼都回得出來」的 fake 反而會讓
-		// 「有沒有真的呼叫它」變得看不出來。
 		pxOps{}, nil, pxAudit{}, pxCutovers{}, pxProvider{}, func() int64 { return 4242 }, zap.NewNop()).
 		WithClock(func() time.Time { return pxNow })
 	return NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil), accounts
 }
 
-// ---------------------------------------------------------------------------
-// Tier A：越權與查無逐位元相同
-// ---------------------------------------------------------------------------
 
 // TestProviderWritesForeignAndMissingAreByteIdentical 是本檔最重要的一支。
 //
@@ -208,13 +186,11 @@ func TestProviderWritesForeignAndMissingAreByteIdentical(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// 越權：pxStoreB 有店但沒有 issuer 列。
 			foreignSrv, _ := newProviderServer(false, "")
 			foreign, err := tc.call(foreignSrv, pxStoreB)
 			if err != nil {
 				t.Fatalf("越權應回 envelope 不是 gRPC error：%v", err)
 			}
-			// 查無：pxStoreA 有 issuer 但沒有 provider 帳號列。
 			missingSrv, _ := newProviderServer(false, "")
 			missing, err := tc.call(missingSrv, pxStoreA)
 			if err != nil {
@@ -260,9 +236,6 @@ func TestAdminProviderWritesForeignAndMissingAreByteIdentical(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 明文外洩
-// ---------------------------------------------------------------------------
 
 // TestPutCredentialsResponseNeverCarriesAppKey 掃**序列化後的 wire bytes**。
 //
@@ -282,11 +255,9 @@ func TestPutCredentialsResponseNeverCarriesAppKey(t *testing.T) {
 	if resp.GetCode() != 0 {
 		t.Fatalf("應成功，實得 code=%d message=%q", resp.GetCode(), resp.GetMessage())
 	}
-	// ① 明文確實有到 repository —— 少了這一句，本測試會在「根本沒寫」時假綠。
 	if len(accounts.seenKeys) != 1 || accounts.seenKeys[0] != pxAppKey {
 		t.Fatalf("repository 應收到一次明文 AppKey，實得 %v", accounts.seenKeys)
 	}
-	// ② 序列化後的每一個 byte 都不得含它。
 	raw, err := proto.Marshal(resp)
 	if err != nil {
 		t.Fatal(err)
@@ -294,7 +265,6 @@ func TestPutCredentialsResponseNeverCarriesAppKey(t *testing.T) {
 	if strings.Contains(string(raw), pxAppKey) {
 		t.Fatalf("回應的 wire bytes 洩漏 AppKey：%q", raw)
 	}
-	// ③ last4 是刻意保留的自我確認欄位（§8.1.1(f) U2），它不是明文的一部分。
 	if resp.GetData().GetCredentialLast4() == "" {
 		t.Fatalf("credential_last4 應回傳，供賣家自我確認")
 	}
@@ -322,9 +292,6 @@ func TestVerifyResponseNeverCarriesAppKey(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 型別邊界
-// ---------------------------------------------------------------------------
 
 func TestProviderWritesRejectMalformedInput(t *testing.T) {
 	s, _ := newProviderServer(true, codemeta.InvoiceProviderAccountStatusActive.Value)

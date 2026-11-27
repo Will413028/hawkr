@@ -16,22 +16,16 @@ void main() {
     });
 
     test('連續 ##', () {
-      // 第一個 # 後面是另一個 # 不是合法 hashtag char → 不抽出空 tag；
-      // 第二個 # 後面接合法 chars → 抽出 hashtag
       expect(HashtagExtractor.extractFromText('##紐西蘭'), ['紐西蘭']);
     });
 
     test('黏在字元前不抽（必須 word boundary）', () {
-      // 「abc#xx」這種沒有空白分隔的不算 hashtag
-      // 注意：regex 不在意前面是什麼字元，所以這個 case 其實會抽出。
-      // 我們的設計選擇：簡化規則，只要 # 後面有合法 chars 就抽（跟 Twitter 行為一致）。
       expect(HashtagExtractor.extractFromText('abc#xx'), ['xx']);
     });
 
     test('排除標點 / 空白 / emoji', () {
       expect(
         HashtagExtractor.extractFromText('#fo!odie #good 🎉 #台灣🇹🇼'),
-        // ! 中斷 → 抽出 'fo'；'good' 完整；emoji 中斷 → 抽出 '台灣'
         ['fo', 'good', '台灣'],
       );
     });
@@ -88,7 +82,7 @@ void main() {
       final mode = HashtagExtractor.detectTaggingMode('我去了 #紐');
       expect(mode, isNotNull);
       expect(mode!.prefix, '紐');
-      expect(mode.hashAt, 4); // '我去了 ' 4 chars, 然後 #
+      expect(mode.hashAt, 4);
     });
 
     test('只打 # 但設定為要 1 個字才觸發 → 不觸發', () {
@@ -110,7 +104,6 @@ void main() {
     });
 
     test('# 前面接著合法 chars → 不在 tagging mode（避免 abc#xx 觸發 popover）', () {
-      // 規則：tagging mode 只在 # 是 word boundary 開頭時觸發
       expect(HashtagExtractor.detectTaggingMode('abc#xx'), isNull);
     });
 

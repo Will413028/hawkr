@@ -34,16 +34,12 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// errRace 表示同一個 (provider, subject) 的另一個登入先一步寫入了身分：放棄這個 transaction（帳號與事件一起 rollback），重做時會讀到它。
 var errRace = errors.New("identity：並發的首次登入")
 
-// maxAttempts 是並發首次登入的重試上限：第二次一定讀得到對方 commit 的身分。
 const maxAttempts = 2
 
-// gmailDomain 是 Google 保證 email 屬於該 Google 帳號本人的網域；其他網域要有 hd（Workspace 網域）才算。
 const gmailDomain = "gmail.com"
 
-// normalize 驗證並整理 provider 身分：provider 是已知的值、subject 非空；email 去前後空白，沒有 email 時 EmailVerified 一律是假。
 func normalize(id model.ProviderIdentity) (model.ProviderIdentity, error) {
 	if !id.Provider.Valid() {
 		return id, apperr.InvalidInputOn([]string{"Provider"}, "不支援的登入方式 %q", id.Provider)
@@ -60,7 +56,6 @@ func normalize(id model.ProviderIdentity) (model.ProviderIdentity, error) {
 	return id, nil
 }
 
-// verifiedEmail 回傳可以寫進帳號寄件地址的 email：只有 provider 保證已驗證的。
 func verifiedEmail(id model.ProviderIdentity) *string {
 	if id.EmailVerified && id.Email != "" {
 		return &id.Email
@@ -193,7 +188,6 @@ func (s *Service) login(ctx context.Context, in model.LoginInput) (model.LoginRe
 	return res, nil
 }
 
-// linkTarget 回傳可自動連結的既有帳號（已鎖定）；沒有、不唯一或不符合資格時 linked 是假。
 func (s *Service) linkTarget(ctx context.Context, q *store.Queries, id model.ProviderIdentity) (accountID int64, linked bool, err error) {
 	if !AutoLinkEligible(id) {
 		return 0, false, nil
@@ -213,7 +207,6 @@ func (s *Service) linkTarget(ctx context.Context, q *store.Queries, id model.Pro
 	return ids[0], true, nil
 }
 
-// insertIdentity 寫入身分；已被並發的登入先寫入時回 errRace。
 func (s *Service) insertIdentity(ctx context.Context, q *store.Queries, accountID int64, id model.ProviderIdentity) error {
 	_, err := q.InsertIdentity(ctx, store.InsertIdentityParams{
 		Provider: string(id.Provider), Subject: id.Subject, AccountID: accountID, Email: nonEmpty(id.Email),

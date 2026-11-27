@@ -68,7 +68,6 @@ type env struct {
 	url    string
 }
 
-// newEnv 掛上真的 Connect handler 與 rpc 的 interceptor；header X-Test-Account 非空時以帳號 7 登入，X-Test-Admin 非空時以管理員登入。
 func newEnv(t *testing.T, app *App) *env {
 	t.Helper()
 	path, handler := mediav1alpha1connect.NewMediaAppServiceHandler(app, connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.NewTextHandler(io.Discard, nil)))))

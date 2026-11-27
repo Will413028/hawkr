@@ -77,7 +77,7 @@ const SellerBusinessCard = React.forwardRef<
 					</div>
 					<div className="seller-business-card__identity">
 						<strong>{data.name}</strong>
-						{/* 沒有地點就不畫這一行：補一個佔位字串會被讀成「這家店在那裡」。 */}
+
 						{data.location ? <span>{data.location}</span> : null}
 					</div>
 				</div>

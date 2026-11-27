@@ -106,14 +106,12 @@ func OutsideRange(lower, upper int64, basisQuantity int32, basisUnit string, v s
 	return goods.Cmp(scaleBound(lower, offered, basis)) < 0 || goods.Cmp(scaleBound(upper, offered, basis)) > 0
 }
 
-// scaleBound 回傳 bound × offered ÷ basis 四捨五入到整數（offered 與 basis 同為千分位整數）。
 func scaleBound(bound, offered int64, basis *big.Int) *big.Int {
 	product := new(big.Int).Mul(big.NewInt(bound), big.NewInt(offered))
 	product.Add(product, new(big.Int).Div(basis, big.NewInt(2)))
 	return product.Quo(product, basis)
 }
 
-// milli 把 NUMERIC(14, 3) 讀回的值換成千分位整數（3 -> 3000）；不是有限的數或不是整千分位時 ok 為 false。
 func milli(n pgtype.Numeric) (int64, bool) {
 	if !n.Valid || n.NaN || n.InfinityModifier != pgtype.Finite || n.Int == nil {
 		return 0, false
@@ -172,7 +170,6 @@ func PayloadHash(q model.SellerQuote) (string, error) {
 	})
 }
 
-// owned 把「沒有列」換成 NOT_FOUND（不屬於這位買家與不存在不分）。
 func owned(err error, what string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperr.NotFound("找不到這%s", what)

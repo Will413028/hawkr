@@ -18,11 +18,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// batchMax 是批次讀取一次最多的鍵數，超過回 InvalidInput（呼叫方分批）。
 const batchMax = 500
 
-// errStillCreating 是關閉付款時付款的建立還沒收斂：PaymentIntent 還沒確認，等建立收斂才有東西可取消。關閉 job 以 snooze 等它（不計嘗試、不放棄），
-// 建立一定會收斂（同鍵重送到 ResendWindow、之後查回，進入已建立、CREATE_FAILED 或 ANOMALY），收斂之後關閉才不會留下沒人取消的孤兒 PaymentIntent（D-G）。
 var errStillCreating = errors.New("charge: 付款的建立還沒收斂，稍後再關閉")
 
 // PaymentByOrderNo 以訂單編號讀付款（不驗呼叫者，給訂單、發票與售後一方的服務間讀取）：回付款群組與被問到的那張訂單應收；不回 client_secret。沒有回 NotFound。
@@ -131,7 +128,6 @@ func (s *Service) LatestRefundsByOrderNos(ctx context.Context, orderNos []string
 	return out, nil
 }
 
-// batchKeys 去掉頭尾空白與重複、拒絕空白鍵與過大的批次。
 func batchKeys(in []string, what string) ([]string, error) {
 	if len(in) > batchMax {
 		return nil, apperr.InvalidInput(what + "一次最多 500 筆")

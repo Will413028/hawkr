@@ -34,13 +34,11 @@ import java.nio.charset.StandardCharsets;
  */
 final class UberWebhookCorrelation {
 
-    // §7.2 DaaS：delivery 物件與其中的我方識別碼
     static final String F_DATA = "data";
     static final String F_EXTERNAL_ID = "external_id";
     static final String F_MANIFEST = "manifest";
     static final String F_REFERENCE = "reference";
 
-    // §6.2 Eats：meta.external_order_id
     static final String F_META = "meta";
     static final String F_EXTERNAL_ORDER_ID = "external_order_id";
 

@@ -122,7 +122,7 @@ public class PayUniHttpClient {
             ctx.setErrorCode("IO_EXCEPTION");
             ctx.setErrorMessage(e.getMessage());
             if (ctx.getHttpStatus() == null) {
-                ctx.setHttpStatus(0); // 連線層失敗（未取得 HTTP 狀態）；200 後讀 body 失敗保留原狀態碼
+                ctx.setHttpStatus(0);
             }
             throw new PayUniApiException("PayUni API 呼叫失敗: " + path, e);
         } finally {
@@ -189,7 +189,7 @@ public class PayUniHttpClient {
             ctx.setErrorCode("IO_EXCEPTION");
             ctx.setErrorMessage(e.getMessage());
             if (ctx.getHttpStatus() == null) {
-                ctx.setHttpStatus(0); // 連線層失敗（未取得 HTTP 狀態）；200 後讀 body 失敗保留原狀態碼
+                ctx.setHttpStatus(0);
             }
             throw new PayUniApiException("PayUni Agent API 呼叫失敗: " + path, e);
         } finally {
@@ -247,7 +247,6 @@ public class PayUniHttpClient {
 
                 String html = body.string();
                 log.info("PayUni API 回應 (HTML): path={}, length={}", path, html.length());
-                // HTML 回應無 parseResponse（無解密內層）；response_raw 記 HTML 全文（不截斷）。
                 ctx.setRawResponseBody(html);
                 return html;
             }
@@ -257,7 +256,7 @@ public class PayUniHttpClient {
             ctx.setErrorCode("IO_EXCEPTION");
             ctx.setErrorMessage(e.getMessage());
             if (ctx.getHttpStatus() == null) {
-                ctx.setHttpStatus(0); // 連線層失敗（未取得 HTTP 狀態）；200 後讀 body 失敗保留原狀態碼
+                ctx.setHttpStatus(0);
             }
             throw new PayUniApiException("PayUni API 呼叫失敗: " + path, e);
         } finally {
@@ -315,7 +314,6 @@ public class PayUniHttpClient {
                 }
             }
 
-            // 物流 API 外層無 Message，從解密資料補充
             if (message == null && decryptedData != null && decryptedData.containsKey("Message")) {
                 message = decryptedData.get("Message");
             }

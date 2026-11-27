@@ -143,14 +143,6 @@ interface OrderItem {
 	statusSummary: string;
 }
 
-// Order status -> display label + badge variant + description
-// `GET /api/v1/admin/orders` 的 `status` 是 **OrderStatus 的數字 Value**（"0" / "10" /
-// … / "80"），見 backend `gateway/internal/handler/admin_order.go` 的 AdminOrder.Status
-// 註解——gateway 直接透傳後端碼值，不做任何翻譯。
-//
-// 這裡以前 switch 的是 "pending" / "processing" / "shipping" 這類英文字面值，那組值域
-// **全鏈路從未存在過**，所以每一筆都落進 default、把碼值原樣印在畫面上（管理員看到的是
-// 「35」而不是「物流異常」）。標籤一律走生成的 ORDER_STATUS_LABEL，不再自建對照表。
 const getOrderStatusDisplay = (
 	status: string,
 	statusSummary: string,
@@ -164,8 +156,6 @@ const getOrderStatusDisplay = (
 	desc: statusSummary || "",
 });
 
-// Badge 配色是純呈現層判斷，不屬於 CodeMeta（後端不下發顏色），所以留在本檔手寫。
-// 但它 switch 的是**生成物裡的值物件**而非字面值——值域改動會在型別層現形。
 const orderStatusVariant = (
 	status: string,
 ): "success" | "gray" | "warning" | "danger" => {
@@ -194,68 +184,45 @@ export default function MerchantCertificationDetail() {
 }
 
 function MerchantDetail({ storeId }: { storeId: string }) {
-	// sellers.store_id surrogate（自 merchants 列表頁導覽帶入，見 merchants/page.tsx
-	// 的 router.push(`/admin/merchants/${m.storeId}`)）——不是登入用的 accountId，
-	// 兩者在賣家重開店後會分岔。店家資料、停權與 KYC 用這個值（SellerAdminService 的 store_id）；
-	// 需要 account_id 的（商品與訂單的 owner_id 篩選、刪除帳號）一律吃 store.accountId。
 	const storeIdStr = storeId;
 	const router = useRouter();
 
 	const queryClient = useQueryClient();
 	const transport = useTransport();
-	// 審核員正在填的內容（退回的逐項問題、總理由與內部備註）。送出失敗（含版本衝突）時整份保留，成功才清空（draftAfter）。
 	const [draft, setDraft] = useState<ReviewDraft>(EMPTY_REVIEW_DRAFT);
 	const [showRejectModal, setShowRejectModal] = useState(false);
-	// 放大中的補充文件影像只在這裡（瀏覽器記憶體），不寫進任何儲存。
 	const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
-	// 建立風險措施、建立終止合作、措施詳情、結束措施、刪除帳號、退回的對話框各自在獨立元件（它們的 a11y 三件套與輸入狀態在那裡）。
-	// 結束措施記要結束的措施 id，不記整個措施：對話框每次都顯示最新讀到的那一筆（etag 也是），重讀之後不會拿舊的 etag 送出。
 	const [showCreateMeasureModal, setShowCreateMeasureModal] = useState(false);
 	const [showCreateViolationMeasure, setShowCreateViolationMeasure] =
 		useState(false);
 	const [endTargetId, setEndTargetId] = useState<string | null>(null);
 	const [showTerminationDialog, setShowTerminationDialog] = useState(false);
-	// 刪除賣家帳號 / 強制下架商品：兩個治理對話框，各自的目標即開關
 	const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
 	const [unpublishTarget, setUnpublishTarget] = useState<ProductItem | null>(
 		null,
 	);
-	// 本頁唯一的操作結果承載處。開啟任何確認框時清空，所以確認框開著時它只可能是
-	// 那一個確認框自己的錯誤——不會有上一個動作的殘留訊息跟著被朗讀第二次。
 	const [notice, setNotice] = useState<GovernanceNotice | null>(null);
 	const noticeRef = useRef<HTMLDivElement>(null);
 	const [activeTab, setActiveTab] = useState<
 		"basic" | "products" | "orders" | "finance" | "delegation"
 	>("basic");
 
-	// 店家（SellerAdminService.GetStore）。頁面的 loading／error／找不到以它為準；已關閉的店照樣回傳。
 	const storeQuery = useStoreDetail(storeIdStr);
 	const detail = storeQuery.data;
 	const store = detail?.store;
 	useScrollToHash(!storeQuery.isLoading && !!store);
-	// 登入信箱（K6）：頁首與刪帳號確認框共用。
 	const accountEmail = useAccountEmail(store?.accountId);
 
-	// 商家認證的申請內容（GetKYCApplication；申請 ID 來自 GetStore.kyc）。它失敗不擋整頁：KYC 區塊各自顯示錯誤與重試。
-	// 沒有送出過的申請（GetStore 沒有 kyc 摘要）時不發請求，也不顯示 KYC 區塊。
 	const kycSummary = detail?.kyc;
-	// 「已通過」看 KYC 的人工決定（KYCStatus.APPROVED，與清單的「已核准」同義）。
 	const isApproved = isKycApproved(kycSummary?.status);
-	// 評分統計卡：與買家看到的店面同一個來源（公開 GetStore 的 StoreStats）；讀不到（含已關閉、未公開）就沒有值，那張卡不渲染。
 	const rating = useStoreRating(store?.storeCode, isApproved);
 	const kycQuery = useKycApplication(kycSummary?.applicationId);
 	const application =
 		kycQuery.value.state === "ready" ? kycQuery.value.application : undefined;
-	// 收款帳戶（GetPaymentAccount）：核准前是 not_found（尚未建立）；核准、退回後與待辦一起重讀。
 	const paymentAccount = usePaymentAccount(store?.id);
-	// 開通任務（GetStoreOnboarding）：平台審核與收款帳戶都會改變它，核准、退回與收款帳戶的動作後重讀。
 	const onboarding = useStoreOnboarding(store?.id);
-	// 核准、退回與重新查詢的可用性只讀伺服器（申請的 can_approve、can_reject、can_requery_registration；前提 2026-10-15）。
-	// 核准不能做而且第一個原因不是結構性的（店家已關閉、等待刪除、帳號停權）時，不顯示按鈕，改顯示伺服器的第一個原因（blockedLabel）；
-	// 伺服器列出全部原因，畫面只顯示第一個。
 	const reviewable = reviewActions(application);
 	const blockedLabel = reviewBlockedLabel(application);
-	// 進行中的登記資料查詢超過伺服器保證的期限時要重新判斷（計時器在期限那一刻觸發一次渲染）。
 	const pendingCheck = application?.pendingRegistrationCheck;
 	const deadlineNow = useNow(LIST_REFRESH_MS);
 	const now = useNowUntil(
@@ -263,13 +230,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			? timestampDate(pendingCheck.deadlineTime)
 			: undefined,
 	);
-	// 商品 / 訂單分頁懶載：用 enabled 取代「切到該 tab 才 fetch」的手刻 effect。
-	// owner_id 是 admin_product.go SearchAdminProducts 自己解析的 filter：後端拿到
-	// 這個值後呼叫 CurrentSellerAccountID(ownerID) 把「帳號」解析成現任 store
-	// surrogate 再過濾——換句話說它要吃真實 account_id，不是 store_id，餵
-	// storeIdStr 進去會被誤判成別的帳號 ID 或直接 ErrNoCurrentSeller（見
-	// admin_product.go:29-56 的 @Param 說明與 h.SellerID.CurrentSellerAccountID
-	// 呼叫）。用店家的 store.accountId，不是 URL 上的 storeIdStr。
 	const { data: products = [], isLoading: productsLoading } = useQuery({
 		queryKey: ["merchants", "detail", storeIdStr, "products"],
 		queryFn: async () => {
@@ -284,12 +244,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		enabled: !!store?.accountId && activeTab === "products",
 	});
 
-	// /admin/orders 的實際 query 鍵是 store_id（order.go SearchOrders /
-	// resolveOptionalSellerFilterQuery），且同 owner_id 一樣把值當 account_id
-	// 解析成現任 store_id 再過濾——鍵名雖叫 store_id，值本身仍是原始
-	// account_id，gateway 負責解析。2026-08 硬切自舊的 seller_account_id，
-	// 後端已移除舊鍵 fallback：鍵名打 seller_account_id 會被後端 DefaultQuery
-	// 忽略，filter 靜默失效變成回傳全平台訂單，而不是 404 或報錯。
 	const { data: orders = [], isLoading: ordersLoading } = useQuery({
 		queryKey: ["merchants", "detail", storeIdStr, "orders"],
 		queryFn: async () => {
@@ -304,11 +258,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		enabled: !!store?.accountId && activeTab === "orders",
 	});
 
-	// KPI 卡的數字取列表端點的 total，不是上面兩支懶載清單的 records 長度：
-	// 那兩支只在對應 tab 開啟時才 fetch（進頁預設 basic tab ⇒ 恆為 0），
-	// 且被 page_size=50 夾住（106 筆會顯示成 50）。page_size=1 只為了取 total。
-	// 取不到（請求失敗／非 0 code）一律回 null，對應的卡片不渲染——寧可少一張卡，
-	// 不可渲染一個編出來的 0。
 	const totalFromPage = (
 		res: { code: number; data?: { total?: string } } | null,
 	) => {
@@ -320,7 +269,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	const { data: activeProductTotal = null } = useQuery({
 		queryKey: ["merchants", "detail", storeIdStr, "activeProductTotal"],
 		queryFn: async () => {
-			// status=4004（啟用）＝卡片標籤「上架商品」的語意；不加 filter 會把草稿一起算進去。
 			const res = await api.get<{
 				code: number;
 				data: { total: string };
@@ -351,10 +299,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			queryKey: ["merchants", "detail", storeIdStr],
 		});
 
-	// 平台端能對單一商品做的治理動作只有「切狀態」：gateway 沒有任何 admin 刪除商品的
-	// 路由——`DeleteProduct` 是賣家 scope 的 RPC。目標狀態 4003＝`ProductStatus.INACTIVE`
-	// （CodeMeta Label「未上架」）。值域本身以 `@/lib/codemeta` 的 `ProductStatus` 為準，
-	// 不在註解裡複述一份（複述過的那一版漏了 4002）。
 	const forceUnpublishMutation = useMutation({
 		mutationFn: (productId: string) =>
 			api.put(`/api/v1/admin/products/${productId}/status`, {
@@ -363,7 +307,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		onSuccess: invalidateDetail,
 	});
 
-	// 店家的操作走 SellerAdminService（K10、K6）。成功後 SellerAdminService 的查詢整組失效：店家、停權紀錄、列表都會重讀。
 	const invalidateStore = () => {
 		queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
@@ -406,7 +349,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		{ onSuccess: invalidateStore },
 	);
 
-	// 商家認證（K1、K3、K7）：核准與退回帶讀到的 etag；成功後店家（KYC 摘要）、申請與列表一起重讀。
 	const invalidateKyc = () => {
 		invalidateStore();
 		queryClient.invalidateQueries({
@@ -436,14 +378,11 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		SellerAdminService.method.rejectKYC,
 		{ onSuccess: invalidateKyc },
 	);
-	// 重新查詢成功不整筆重讀申請：回應就是那筆進行中的查詢（帶期限），直接寫進申請的快取（handleRequery），輪詢隨後接手。
 	const requeryMutation = useConnectMutation(
 		SellerAdminService.method.requeryKYCRegistration,
 	);
 	const submitting = approveMutation.isPending || rejectMutation.isPending;
 
-	// 刪除整個帳號（IdentityAdminService.DeleteAccount）。帳號 ID 一律是店家的 account_id，絕不能是 URL 上的 store_id。
-	// 成功後不 invalidate 店家查詢：DELETED 時店家已不存在，重讀會把結果對話框底下的頁面換成錯誤畫面。
 	const deleteAccountMutation = useConnectMutation(
 		IdentityAdminService.method.deleteAccount,
 	);
@@ -452,21 +391,15 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		setPreviewImage({ src, alt });
 	const closePreview = () => setPreviewImage(null);
 
-	// 強制下架的按鈕在商品分頁的表格裡，而結果提示掛在頁首下方——不捲進來的話,
-	// 使用者會在一個看不到任何回饋的位置以為操作沒有發生。`block: "nearest"` 讓
-	// 已經在畫面上的提示不動。
 	useEffect(() => {
 		if (notice) noticeRef.current?.scrollIntoView({ block: "nearest" });
 	}, [notice]);
 
-	// 確認框開啟前一律清掉上一次的結果，見 notice state 的說明
 	const openDialog = (open: () => void) => {
 		setNotice(null);
 		open();
 	};
 
-	// 兩個治理對話框把例外交還給呼叫端顯示（它們就地渲染在確認框內，不會被遮罩蓋住），
-	// 所以這兩支 handler 不 catch。
 	const handleForceUnpublish = async () => {
 		if (!unpublishTarget) return;
 		const target = unpublishTarget;
@@ -478,7 +411,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		});
 	};
 
-	// 刪除帳號的結果（DELETED 或 PENDING_ORDERS）由對話框顯示；這裡只送出，回傳契約的狀態。
 	const handleDeleteAccount = async (reason: string) => {
 		if (!store?.accountId) {
 			throw new Error("帳號 ID 還沒載入，請重新整理頁面後再試。");
@@ -493,7 +425,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	const handleDeleteDone = (state: DeleteAccountResponse_DeletionState) => {
 		setShowDeleteAccountDialog(false);
 		if (state === DeleteAccountResponse_DeletionState.DELETED) {
-			// 店家已經不存在：列表與統計重讀，然後回到列表。
 			queryClient.invalidateQueries({
 				queryKey: createConnectQueryKey({
 					schema: SellerAdminService.method.listStores,
@@ -509,7 +440,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			router.push("/admin/merchants");
 			return;
 		}
-		// 帳號還有未完成的訂單：店家進入等待刪除，重讀顯示目前的狀態，留在本頁。
 		invalidateStore();
 	};
 
@@ -529,7 +459,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		setNotice({ tone: "success", text: VIOLATION_MEASURE_CREATED_TEXT });
 	};
 
-	// 建立終止合作（關聯帳號的終止在措施詳情頁建立）：成功提示用伺服器回的生效時間。
 	const handleCreateTermination = async (
 		request: MessageInitShape<typeof CreateMeasureRequestSchema>,
 	) => {
@@ -538,7 +467,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		setNotice({ tone: "success", text: terminationCreatedText(res.measure) });
 	};
 
-	// 結束措施：帶讀到的 etag。版本衝突（別人先改過這個措施）時重讀店家，關掉對話框並在頁首說明；其他失敗丟回對話框就地顯示。
 	const handleEndMeasure = async (measure: Measure) => {
 		const result = await runAction(
 			() =>
@@ -558,8 +486,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 			throw new Error(result.text);
 		}
 		setEndTargetId(null);
-		// 結束一個措施不會結束帳號的其他措施：重讀後的成功訊息照實說（仍有其他措施時不能說「會恢復公開」）。
-		// 重讀失敗時兩種說法都不能斷言，只說結束成功。
 		const after = await storeQuery.refetch();
 		setNotice({
 			tone: "success",
@@ -570,7 +496,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		});
 	};
 
-	// 核准：帶讀到的 etag（K3）。版本衝突（別人先處理、或登記資料有新的查詢結果）時重讀申請，頁面上的勾選與理由照舊。
 	const handleApprove = async () => {
 		if (!application || !reviewable.canApprove) return;
 		setNotice(null);
@@ -594,7 +519,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		);
 	};
 
-	// 退回：失敗時回傳給對話框就地顯示，問題、理由與備註整份保留（draftAfter）。
 	const handleReject = async (): Promise<ActionResult> => {
 		if (!application || !reviewable.canReject) {
 			return {
@@ -656,8 +580,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 	}
 
 	if (storeQuery.isError || !detail || !store) {
-		// 404（查無此商家）語意上是 empty，不是 error：店家查詢回 NotFound（connect code 5）。
-		// 其他錯誤是讀取失敗，給重試；沒有 store 也沒有錯誤時照找不到處理。
 		const error = storeQuery.error;
 		const notFound =
 			!storeQuery.isError ||
@@ -687,19 +609,14 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 		);
 	}
 
-	// 店家的操作可用性（D4 第 13 點：已關閉時停權、解除、關店、刪帳號、核准與退回全部隱藏）。
-	// 生效中的措施（GetStore.active_measures，與店家同一次讀取，帳號範圍）：每個措施一張卡；結束對話框對應的措施取最新讀到的那一筆，
-	// 而且仍然 can_end 才開。
 	const activeMeasures = detail.activeMeasures;
 	const endTarget = activeMeasures.find(
 		(m) => m.id === endTargetId && m.canEnd,
 	);
-	// 狀態的顯示（徽章與關店資訊），不是動作的可用性：動作能不能做都讀伺服器的旗標。
 	const closed = store.status === StoreStatus.CLOSED;
 	const termination = terminationAvailability(detail);
 	const lifecycle = lifecycleBadge(store.status);
 	const logo = imageUri(store.logo, "avatar");
-	// 商家認證：沒有送出過的申請（GetStore 沒有 kyc 摘要）時徽章是「尚未申請」，沒有 KYC 區塊。
 	const statusBadge = kycBadge(kycSummary?.status);
 	const isRejected = application?.status === KYCStatus.KYC_STATUS_REJECTED;
 	const anyDialogOpen =
@@ -713,7 +630,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 
 	return (
 		<div className="certification-detail-page">
-			{/* Header Card */}
+
 			<div className="detail-header">
 				<div className="header-left">
 					<button
@@ -856,12 +773,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					</div>
 				</div>
 				<div className="header-actions">
-					{/* 資格整個交給伺服器的 preflight（設計書 6.1 S-1：preflight 就是「入口
-					    按鈕的可用性」，觸發點含詳情頁）。這一頁的 profile 沒有 `lifecycleStatus`，
-					    而治理停權只寫 `sellers.status`、不寫 `seller_suspensions` 列 —— 修前
-					    那組 `isApproved && suspensionConfirmed && !activeSuspension` 因此對治理
-					    停權與關店完全失明，按鈕照樣可按、點下去才被 9272 擋；未開通治理權限的
-					    管理員同理（9265）。在這裡補一份本地判準就是造第二份判準，而權威只有一份。 */}
+
 					<MerchantOperationEntry
 						storeId={store.id}
 						enabled
@@ -904,7 +816,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 							</button>
 						</div>
 					)}
-					{/* 建立措施（違規依據的警告與停權）：入口條件同建立風險措施，都是伺服器的 can_create_measure */}
+
 					{detail.canCreateMeasure && (
 						<button
 							type="button"
@@ -917,7 +829,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 							<MaterialSymbol name="crisis_alert" /> 建立措施
 						</button>
 					)}
-					{/* 建立風險措施：伺服器說能建立時顯示（帳號已有生效中的措施也可以再建立）；結束入口在下方紅色狀態卡 */}
+
 					{detail.canCreateMeasure && (
 						<button
 							type="button"
@@ -928,7 +840,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 							<MaterialSymbol name="block" /> 建立風險措施
 						</button>
 					)}
-					{/* 終止合作（條款第 21 條）：沒有直接關店的入口，平台關店一律經終止合作的措施；入口與事由由伺服器給（GetStore.can_create_termination），已關閉的店也可能有（第 21.3 條事由） */}
+
 					{termination.canCreate && (
 						<button
 							type="button"
@@ -939,7 +851,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 							<MaterialSymbol name="storefront" /> 終止合作
 						</button>
 					)}
-					{/* 刪除帳號：帳號層級的動作，不看店家是否關閉（從零：刪除請求權不看商店狀態）；帳號讀得到才顯示。無商家認證 gating；等待刪除的店仍可呼叫，契約回目前的狀態 */}
+
 					{accountEmail.value.state === "ready" && (
 						<button
 							type="button"
@@ -953,13 +865,12 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			</div>
 
-			{/* 操作結果：確認框開著時不在這裡渲染（會被遮罩蓋住，且同一段文字會被
-			    輔助科技朗讀兩次），改由確認框自己就地承載。 */}
+
 			{!anyDialogOpen && (
 				<GovernanceNoticeBanner notice={notice} ref={noticeRef} />
 			)}
 
-			{/* 停權中 — 紅色狀態卡，一個生效中的措施一張（風險依據：類型/理由/時間/操作者 + 結束入口；違規依據：說明與連結，沒有結束） */}
+
 			<ScheduledTerminationNotice accountId={store.accountId} />
 			<ActiveMeasureCards
 				active={activeMeasures}
@@ -967,12 +878,10 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				onEnd={(measure) => openDialog(() => setEndTargetId(measure.id))}
 			/>
 
-			{/* 已通過 — 統計卡片 + Tab 列 */}
+
 			{isApproved && (
 				<>
-					{/* 統計卡：每一張都必須有權威來源，算不出來的那張不渲染。
-					    「總營收」曾是寫死的 NT$ 0——admin 面沒有任何營收聚合端點，
-					    留著等於對管理員宣稱這家店零營收，故整張移除。 */}
+
 					{(orderTotal !== null ||
 						activeProductTotal !== null ||
 						rating !== undefined) && (
@@ -1054,7 +963,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</>
 			)}
 
-			{/* Audit Notice Banner — 待審核 or 已退回 */}
+
 			{(!isApproved || activeTab === "basic") && reviewable.canReject && (
 				<div className="audit-notice">
 					<div className="audit-notice-icon">
@@ -1073,7 +982,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				<KycRejectionNotice application={application} />
 			)}
 
-			{/* 開通摘要卡（GetStoreOnboarding）— 只讀，與賣家看到的同一份任務；在收款帳戶卡之上。 */}
+
 			{(!isApproved || activeTab === "basic") && (
 				<OnboardingSummaryCard
 					state={onboarding.value}
@@ -1081,7 +990,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 收款帳戶卡（GetPaymentAccount）— 獨立於平台審核狀態，核准後仍顯示；錨點 #payment-account。 */}
+
 			{(!isApproved || activeTab === "basic") && (
 				<PaymentAccountSection
 					storeId={store.id}
@@ -1090,10 +999,10 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* Main Content: 2-column grid — basic info tab or non-approved view */}
+
 			{(!isApproved || activeTab === "basic") && (
 				<div id="kyc" className="detail-content-grid">
-					{/* Left Column */}
+
 					<div className="detail-left-column">
 						{application ? (
 							<KycBasicInfoCard
@@ -1142,7 +1051,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 						)}
 					</div>
 
-					{/* Right Column */}
+
 					{application && (
 						<div className="detail-right-column">
 							<KycDocumentsCard
@@ -1156,12 +1065,12 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-			{/* 措施歷史：帳號的警告與停權措施（新到舊，上一頁／下一頁，不顯示總數）。 */}
+
 			{(!isApproved || activeTab === "basic") && (
 				<MeasureHistoryCard accountId={store.accountId} />
 			)}
 
-			{/* 商品管理 Tab */}
+
 			{isApproved && activeTab === "products" && (
 				<div className="tab-content-card">
 					{productsLoading ? (
@@ -1215,8 +1124,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 											</td>
 											<td>
 												<div className="tab-table-actions">
-													{/* 已下架的商品沒有可下架的狀態可切，按了也只會送出一次無變化的
-													    請求——維持可按等於留一顆什麼都不做的按鈕。 */}
+
 													<button
 														type="button"
 														className="btn-force-unpublish"
@@ -1252,7 +1160,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-			{/* 歷史訂單 Tab */}
+
 			{isApproved && activeTab === "orders" && (
 				<div className="tab-content-card">
 					{ordersLoading ? (
@@ -1348,10 +1256,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-			{/* 代行授權 Tab（backend#2444）。條件渲染即懶載：面板內的三支查詢隨掛載才發，
-			    與 products / orders 用 `enabled` 達成的效果相同。
-			    ⚠️ 傳 `store.id`（與 URL 上的 sellers.store_id 相同），不是 account_id：
-			    授權列以 store_id 為鍵，兩者在賣家重開店後會分岔。 */}
+
 			{isApproved && activeTab === "delegation" && (
 				<div className="tab-content-card">
 					<MerchantDelegationAuthorizationPanel
@@ -1361,7 +1266,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-			{/* 財務設定 Tab - placeholder */}
+
 			{isApproved && activeTab === "finance" && (
 				<div className="tab-content-card">
 					<div className="tab-empty-state">
@@ -1371,7 +1276,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-			{/* 退回申請（RejectKYC）。草稿（逐項問題、總理由、內部備註）由頁面持有，送出失敗時整份保留。 */}
+
 			{showRejectModal && application && (
 				<RejectKycDialog
 					draft={draft}
@@ -1388,7 +1293,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 建立風險措施確認（D4 第 2 點）。確認框自己的 a11y 三件套在 CreateRiskMeasureDialog。 */}
+
 			{showCreateMeasureModal && (
 				<CreateRiskMeasureDialog
 					storeId={store.id}
@@ -1397,7 +1302,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 建立措施（違規依據的警告與停權，CreateMeasure 的 warning／suspension.violation） */}
+
 			{showCreateViolationMeasure && (
 				<CreateMeasureDialog
 					storeId={store.id}
@@ -1406,7 +1311,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 結束措施確認：只有 can_end 的措施（風險依據）能在這裡結束；違規依據的措施要到違規紀錄撤銷 */}
+
 			{endTarget && (
 				<EndMeasureDialog
 					measure={endTarget}
@@ -1415,7 +1320,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 強制下架確認 —— 目標卡片 + 後果說明，失敗就地顯示 */}
+
 			{unpublishTarget && (
 				<ProductForceUnpublishDialog
 					productName={unpublishTarget.name}
@@ -1426,7 +1331,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 刪除整個帳號（IdentityAdminService.DeleteAccount）。帳號 ID 是店家的 account_id。 */}
+
 			{showDeleteAccountDialog && (
 				<SellerAccountDeleteDialog
 					storeName={store.storeName}
@@ -1438,7 +1343,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 終止合作（SellerGovernanceAdminService.CreateMeasure，kind=TERMINATION） */}
+
 			{showTerminationDialog && (
 				<CreateTerminationDialog
 					storeId={store.id}
@@ -1449,7 +1354,7 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-			{/* 圖片放大預覽 Lightbox — 整片點擊關閉是預期 UX,整個遮罩即關閉 button */}
+
 			{previewImage && (
 				<button
 					type="button"

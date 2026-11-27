@@ -56,8 +56,7 @@ class PlatformDecisionRefundIdempotencyTest {
 
     @BeforeEach
     void setUp() {
-        // refund_task 的 id 走 TSID（node-id-base 700 = aftersales，§7.2）
-        try { io.github.will413028.hawkr.common.utils.TsidUtil.init(700, 0); } catch (IllegalStateException ignored) { /* 已初始化 */ }
+        try { io.github.will413028.hawkr.common.utils.TsidUtil.init(700, 0); } catch (IllegalStateException ignored) {  }
         service = new PlatformDecisionService(caseMapper, platformDecisionMapper, resolutionMapper,
                 appealEventMapper, refundTaskMapper, new AfterSalesProperties(), eventPublisher);
     }
@@ -79,7 +78,6 @@ class PlatformDecisionRefundIdempotencyTest {
     @DisplayName("第二次裁決（CAS affected=0）⇒ 拋例外且一張退款單都不建（併發 / 重送皆同）")
     void secondDecisionCreatesNoRefundTask() {
         when(caseMapper.selectOne(any())).thenReturn(appealedCase());
-        // 併發的第一筆已把 appeal_state 推進 RESOLVED ⇒ 本次 CAS 命中 0 列
         when(caseMapper.markAppealResolved(eq(CASE_NO), anyString(), any())).thenReturn(0);
 
         assertThrows(AfterSalesBusinessException.class, () -> service.decide(

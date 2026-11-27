@@ -59,7 +59,6 @@ class UberInboundWireContractTest {
     /** 66 §7.3.1：Pick &amp; Pack 專屬，我方非代購情境不訂閱 ⇒ 容忍值，不是我們要映射的狀態。 */
     private static final String TOLERATED = "shopping_completed";
 
-    // ==================== ① 值域 ====================
 
     @Test
     @DisplayName("① DaaS 狀態值域（官方 8 值 − 容忍值 1）＝ 映射表的 7 個 key")
@@ -92,7 +91,6 @@ class UberInboundWireContractTest {
                 .isFalse();
     }
 
-    // ==================== ② 未知值 fail-closed ====================
 
     @Test
     @DisplayName("② 未知 raw status ⇒ normalized empty ＋ raw 照存（fail-closed，不得靜默忽略）")
@@ -116,7 +114,6 @@ class UberInboundWireContractTest {
                         + "\"delivery_id\":\"del_1\",\"status\":\"delivered\"}");
 
         assertThat(event.isKnown()).isTrue();
-        // 🔴 硬寫 "11"：期望值跟著 ShippingStatus 一起變的話，這條就什麼都驗不到
         assertThat(event.normalizedStatus()).contains("11");
         assertThat(event.providerRawStatus()).isEqualTo("delivered");
     }
@@ -133,16 +130,10 @@ class UberInboundWireContractTest {
                 .isInstanceOf(UberWebhookSignatureException.class);
     }
 
-    // ==================== ③ courier_imminent 是欄位不是狀態 ====================
 
     @Test
     @DisplayName("③ courier_imminent 是 boolean 欄位，不是第 8 個狀態")
     void courierImminentIsAFieldNotAStatus() throws IOException {
-        // 🔴 語意斷言，不釘完整句子（BL1）：文件原本把「不是狀態」與「是 boolean 欄位」寫在
-        // 同一句，Stage 8B Step 5P-0 的文件重寫把它拆成相鄰兩行 ＋ 粗體強調——語意一字未改，
-        // 而釘連續字串的斷言當場假紅。改成分別驗兩個語意，並要求兩者相鄰：
-        // 🔴 相鄰是鑑別力的來源。只驗「全文某處有 boolean」會被文件裡任何一個 boolean 欄位滿足，
-        // 只驗「全文某處有『不是狀態』」同理 —— 那樣的斷言看起來還在守，實際上已經空了。
         List<String> docLines = Files.readAllLines(API_DOC, StandardCharsets.UTF_8);
         int declLine = -1;
         for (int i = 0; i < docLines.size(); i++) {
@@ -172,7 +163,6 @@ class UberInboundWireContractTest {
                 .as("🔴 當成狀態會多出一條永不出現的邊")
                 .isEmpty();
 
-        // 帶著 courier_imminent=true 的事件，狀態仍由 status 欄決定（不被旗標帶偏）。
         InboundCapability.InboundStatusEvent event = parse(
                 "{\"kind\":\"event.courier_update\",\"created\":1789000003,\"delivery_id\":\"del_4\","
                         + "\"courier_imminent\":true,\"status\":\"dropoff\"}");
@@ -183,18 +173,14 @@ class UberInboundWireContractTest {
                 .isFalse();
     }
 
-    // ==================== ④ 正向 vs 逆向的 returned ====================
 
     @Test
     @DisplayName("④ 🔴 正向 returned 與逆向 returned 的下游語意不同（錢往相反方向走）")
     void returnedMeansOppositeThingsOnEachLeg() {
-        // 兩條 leg 的 normalized 值相同（leg 是維度不是狀態，66 §7.3.2）……
         assertThat(UberStatusMapper.normalize("returned")).contains(ShippingStatus.ABNORMAL);
 
-        // ……分歧在售後案件軸：逆向 returned ＝ 退貨包裹送不回賣家 ⇒ RETURN_FAILED(28)
         assertThat(UberStatusMapper.returnLegCaseStatus("returned"))
                 .contains(AfterSaleCaseStatus.RETURN_FAILED);
-        // 而逆向 delivered ＝ 退貨已送達賣家 ⇒ RETURN_DELIVERED(27)：兩者不可互換
         assertThat(UberStatusMapper.returnLegCaseStatus("delivered"))
                 .contains(AfterSaleCaseStatus.RETURN_DELIVERED);
         assertThat(UberStatusMapper.returnLegCaseStatus("returned"))
@@ -206,24 +192,19 @@ class UberInboundWireContractTest {
     @Test
     @DisplayName("④ 逆向 leg 的 U5／U6：pickup_complete 進退貨運送中；pending／pickup 是「明確不處理」")
     void returnLegExplicitNoOpIsNotTheSameAsNoMapping() {
-        // U5：不決定的代價是案件永遠停在 RETURN_PENDING(20)，出口是 7 天逾期的「不退款」終態
-        // ⇒ 買家明明已交件卻拿不到退款（66 §7.3.2 的四問推導）。
         assertThat(UberStatusMapper.returnLegCaseStatus("pickup_complete"))
                 .contains(AfterSaleCaseStatus.RETURN_SHIPPING);
 
-        // U6：「明確不處理」要與「未識別」分得開，否則兩者混在一起沒有人分得出漏了什麼。
         assertThat(UberStatusMapper.isReturnLegExplicitNoOp("pending")).isTrue();
         assertThat(UberStatusMapper.isReturnLegExplicitNoOp("pickup")).isTrue();
         assertThat(UberStatusMapper.returnLegCaseStatus("pending")).isEmpty();
 
-        // UP-8：逆向的 canceled **無對應** AfterSaleCaseStatus ⇒ 建 case，不猜。
         assertThat(UberStatusMapper.isReturnLegExplicitNoOp("canceled"))
                 .as("🔴 它不是「明確不處理」，是 open item UP-8——兩者的處置完全不同")
                 .isFalse();
         assertThat(UberStatusMapper.returnLegCaseStatus("canceled")).isEmpty();
     }
 
-    // ==================== 去重鍵（66 §6.3.3） ====================
 
     @Test
     @DisplayName("去重鍵：級 1 用 provider event id；沒有時退級 2 且同內容 → 同鍵、不同內容 → 不同鍵")
@@ -254,7 +235,6 @@ class UberInboundWireContractTest {
         assertThat(inbound.parseLabelEvent(p)).isEmpty();
     }
 
-    // ==================== helpers ====================
 
     private static InboundCapability.InboundStatusEvent parse(String body) {
         return TestUberAdapters.mockedAdapter().inbound(ctx()).orElseThrow()
@@ -332,7 +312,6 @@ class UberInboundWireContractTest {
      */
     private static Path repoRoot() {
         Path p = Path.of("").toAbsolutePath();
-        // backend 根目錄以 go.work 為錨：monorepo 裡 .git 在上一層，不是 backend/。
         while (p != null && !Files.exists(p.resolve("go.work"))) {
             p = p.getParent();
         }

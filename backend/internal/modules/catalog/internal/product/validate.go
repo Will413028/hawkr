@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// prepared 是通過驗證並整理過（文字去頭尾空白、hashtag 正規化）的輸入。
 type prepared struct {
 	title      string
 	categoryID uuid.UUID
@@ -23,11 +22,9 @@ type prepared struct {
 	skus       []model.SkuInput
 	tags       []hashtag.Tag
 	lowStock   *int32
-	// confirmed 是 confirmImages 這一次確認的新資產（writeImages 不必在商品現有的圖裡找到它們）。
 	confirmed map[uuid.UUID]bool
 }
 
-// prepare 驗證商品輸入的所有純規則（不碰資料庫與 media）。
 func prepare(in model.ProductInput) (prepared, error) {
 	var p prepared
 	p.title = trimtext.Trim(in.Title)
@@ -97,7 +94,6 @@ func normalizeGallery(in []model.Image) ([]model.Image, error) {
 	return out, nil
 }
 
-// checkImageRefsUnique 擋同一個 token 或同一個資產在圖庫與描述裡出現兩次（product_images 的 (product_id, asset_id) 唯一）。
 func checkImageRefsUnique(gallery []model.Image, desc []model.Block) error {
 	tokens, assets := map[string]bool{}, map[uuid.UUID]bool{}
 	check := func(field string, img model.Image) error {
@@ -172,8 +168,6 @@ func normalizeAxes(in []model.Axis) ([]model.Axis, error) {
 	return out, nil
 }
 
-// normalizeSkus 驗證 SKU 是選項值的組合：沒有軸的商品剛好一個預設 SKU；有軸時每個 SKU 的每個軸都落在該軸的值內、
-// 沒有軸的位置是空的、組合不重複；價格與原價。
 func normalizeSkus(axes []model.Axis, in []model.SkuInput) ([]model.SkuInput, error) {
 	if len(in) == 0 {
 		return nil, model.Invalid("Skus", model.ReasonRequired)

@@ -48,7 +48,6 @@ public class CategoryService {
         this.productRevalidationService = productRevalidationService;
     }
 
-    // ==================== 讀取 ====================
 
     /**
      * 取得分類樹（三層結構）
@@ -121,7 +120,6 @@ public class CategoryService {
         return children;
     }
 
-    // ==================== 寫入：新增（含自動套用） ====================
 
     /**
      * 新增分類，遵守自動套用規則：
@@ -180,8 +178,6 @@ public class CategoryService {
         cacheService.evict();
         fillParentName(newCat);
 
-        // frontend cache bust（§9.3）：新分類進入分類樹。自動套用既有 ACTIVE 分類的分支
-        // 上面已 return，不會走到這裡——那條路徑什麼都沒改，不該失效任何快取。
         productRevalidationService.revalidateCategory(newCat.getId());
 
         log.info("createCategory.success",
@@ -189,7 +185,6 @@ public class CategoryService {
         return newCat;
     }
 
-    // ==================== 寫入：改名 ====================
 
     /**
      * 修改分類名稱（admin 專屬，僅可改 name，不可改 parent_id）
@@ -230,13 +225,8 @@ public class CategoryService {
         categoryRepository.updateById(entity);
         cacheService.evict();
 
-        // Cascade reflow（02 §5.11.5）：依層級判斷影響範圍，重算受影響 product 的 cat_*_name + searchable_text
         List<Long> affectedProductIds = cascadeReflowAfterCategoryRename(categoryId);
 
-        // frontend cache bust（§9.3）：改名同時動到兩個 surface——分類樹顯示新名稱
-        // （category:<id> → categories 展開），cascade 又改了這些商品的 cat_*_name /
-        // searchable_text（product:<id> → products:list 展開）。同一 mutation 合成單次 POST。
-        // 不共發 seller:<id>：改名不改變任何賣家的公開商品集合（§9.3 ★ 判定原則）。
         productRevalidationService.revalidateCategoryWithProducts(categoryId, affectedProductIds);
 
         fillParentName(entity);
@@ -257,7 +247,6 @@ public class CategoryService {
         return affectedIds;
     }
 
-    // ==================== 寫入：軟刪除 ====================
 
     /**
      * 批次軟刪除（按拓樸排序執行：L3 → L2 → L1）。
@@ -324,8 +313,6 @@ public class CategoryService {
 
         cacheService.evict();
 
-        // frontend cache bust（§9.3）：這些分類離開分類樹。前置驗證保證底下無商品，
-        // 故不發 product:<id>——沒有任何商品的顯示欄位被改到。
         productRevalidationService.revalidateCategories(deletedIds);
 
         log.info("softDelete.success", "批次軟刪除成功，count=" + deletedIds.size());
@@ -342,7 +329,6 @@ public class CategoryService {
         boolean hasProducts(Long categoryId, int level);
     }
 
-    // ==================== 寫入：還原 ====================
 
     /**
      * 還原已軟刪除分類。
@@ -389,7 +375,6 @@ public class CategoryService {
         }
         cacheService.evict();
 
-        // frontend cache bust（§9.3）：分類回到分類樹。
         productRevalidationService.revalidateCategory(entity.getId());
 
         CategoryEntity refreshed = categoryRepository.findById(entity.getId()).orElse(entity);
@@ -398,7 +383,6 @@ public class CategoryService {
         return refreshed;
     }
 
-    // ==================== 名稱查詢（提供給 ProductService） ====================
 
     /** 不限狀態取分類名稱（用於商品列表/詳情顯示，含軟刪除分類，修破口）。 */
     public String getCategoryName(Long categoryId) {
@@ -462,7 +446,6 @@ public class CategoryService {
         return dto;
     }
 
-    // ==================== ProductService 依賴的工具方法 ====================
 
     /** 檢查分類是否存在且為 ACTIVE 狀態（軟刪除回 false）。 */
     public boolean isActive(Long categoryId) {
@@ -516,7 +499,6 @@ public class CategoryService {
         return 3;
     }
 
-    // ==================== Internal helpers ====================
 
     private void fillParentName(CategoryEntity entity) {
         if (entity.getParentId() != null) {

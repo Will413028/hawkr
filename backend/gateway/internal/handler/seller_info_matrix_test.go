@@ -15,42 +15,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ============================================================================
-// SellerInfoItem 覆蓋矩陣
-//
-// 每個吐 `seller` 物件的端點都必須把 pb.SellerInfo 映射成**同一組**欄位。這在
-// 過去是靠人手抄五份達成的，於是長期不一致：賣家店內列表與市集漏了
-// city/district/address，store_code 則是分三次逐處補釘（commit a2419f271 的
-// 說明就叫「2 missed SellerInfoItem sites」）。前端商品卡的產地是
-// `origin || seller.city`，所以漏 city 不是美觀問題，是店內商品卡產地直接空白。
-//
-// 現在五處統一走 buildSellerInfoItem。本測試餵**同一份**上游 SellerInfo 給全部
-// 端點，斷言每一端吐出的 seller 物件「鍵集合與值」完全相同——用 DeepEqual 比對
-// 完整 map，所以少映一欄會紅，某一端偷偷多吐一欄也會紅。
-//
-// 這支測試是防「第六份手抄副本」的柵欄：日後 SellerInfoItem 新增欄位，只要有
-// 任何一個端點沒跟上，這裡就會失敗。
-//
-// ---- 矩陣範圍：為什麼是 5 個端點而不是 7 個 ----
-//
-// 另有兩個端點回 ProductItem 但**整個 Seller 物件都不組**，且**刻意不納入**本矩陣：
-//
-//	GET /public/products/{id}/brief    （GetProductInfoByID）
-//	GET /public/products/{id}/related  （GetRelatedProducts）
-//
-// 判準是「今天有沒有使用者看得見的缺陷」，不是「一致比較整齊」。2026-07-31 實測
-// 四個前端 repo（website / admin / buyer app / seller app）：
-//   - /related 零客戶端呼叫（網頁的「相關商品」是自己用 /public/search/products
-//     併同分類補齊做的，不走這支）
-//   - /brief 唯一呼叫者是 buyer app product_repository.dart:206 getSkuImageUrl()，
-//     只讀 url / imageUrl / data，不讀任何 seller 欄位，且該方法無人呼叫（dead code）
-//
-// 兩者上游都帶得出 seller（product-service 公開分支已 batch 填 seller meta），
-// 所以要補都只是兩行——但沒有消費者的情況下補，只是為零讀者放大回應體。
-// 詳細理由與**重新評估的觸發條件**寫在兩支 handler 的呼叫點註解上（product.go）。
-// 觸發條件成立時：補 buildSellerInfoItem + flatSellerFields，並把該端點加進
-// matrixAssemblies()，即自動受本矩陣保護。
-// ============================================================================
 
 const matrixMediaBase = "https://media.example.test"
 
@@ -60,13 +24,11 @@ const (
 	matrixStoreName = "老王鮮魚"
 )
 
-// matrixSellerInfo 是餵給所有端點的唯一上游 fixture：pb.SellerInfo 的每個欄位
-// 都填了值，好讓「某端漏映射」表現為缺鍵而不是剛好同為空值。
 func matrixSellerInfo() *productpb.SellerInfo {
 	return &productpb.SellerInfo{
 		StoreId:   matrixStoreID,
 		Name:      matrixStoreName,
-		Rate:      "4.8", // 見下方 wantSeller 註解：全端一致不映射
+		Rate:      "4.8",
 		LogoKey:   matrixLogoKey,
 		Address:   "台北市大安區",
 		City:      "台北市",
@@ -75,11 +37,6 @@ func matrixSellerInfo() *productpb.SellerInfo {
 	}
 }
 
-// matrixWantSeller 是 seller 物件的期望**完整**樣貌（鍵集合 + 值）。
-//
-// 刻意不含 `rate`：pb.SellerInfo.rate 存在，但 SellerInfoItem 沒有對應欄位，
-// 五個端點一致不映射。這是全端一致的省略（不是分歧），故列為期望的一部分——
-// 哪天有人只在單一端點把 rate 加上去，這裡會紅，逼他五處一起走 builder。
 func matrixWantSeller() map[string]interface{} {
 	return map[string]interface{}{
 		"storeId":   matrixStoreID,
@@ -93,8 +50,6 @@ func matrixWantSeller() map[string]interface{} {
 	}
 }
 
-// matrixWantFlat 是商品卡容器（ProductItem / ProductHitData）在 nested seller
-// 之外另外攤平的三欄期望值。攤平值必須恆等於 nested 值。
 func matrixWantFlat() map[string]interface{} {
 	return map[string]interface{}{
 		"sellerName":    matrixStoreName,
@@ -103,7 +58,6 @@ func matrixWantFlat() map[string]interface{} {
 	}
 }
 
-// ==================== 共用小工具 ====================
 
 func matrixListResponse() *productpb.GetProductListResponse {
 	return &productpb.GetProductListResponse{
@@ -153,7 +107,6 @@ func matrixDoGET(t *testing.T, r *gin.Engine, path string) map[string]interface{
 	return data
 }
 
-// matrixFirstOf 取出清單型回應的第一筆記錄。
 func matrixFirstOf(t *testing.T, data map[string]interface{}, key string) map[string]interface{} {
 	t.Helper()
 	arr, ok := data[key].([]interface{})
@@ -179,8 +132,6 @@ func matrixSellerOf(t *testing.T, rec map[string]interface{}) map[string]interfa
 	return si
 }
 
-// matrixFlatOf 只取三個攤平欄，缺席時留空字串（omitempty 會讓漏映射的欄位消失，
-// 正好讓比對顯示為空字串 vs 期望值）。
 func matrixFlatOf(rec map[string]interface{}) map[string]interface{} {
 	out := map[string]interface{}{}
 	for _, k := range []string{"sellerName", "sellerLogoKey", "sellerLogoUrl"} {
@@ -193,19 +144,11 @@ func matrixFlatOf(rec map[string]interface{}) map[string]interface{} {
 	return out
 }
 
-// ==================== 各端點 driver ====================
 
-// assembly 描述一個 SellerInfoItem 組裝點的實測產出。
 type assembly struct {
-	// endpoint 是人看的名字，失敗訊息會指名道姓。
 	endpoint string
-	// seller 是該端點吐出的 nested seller 物件。
 	seller map[string]interface{}
-	// flat 是攤平便利欄；容器型別沒有這三欄時為 nil（見 hasFlat 說明）。
 	flat map[string]interface{}
-	// hasFlat 標記「這個端點的容器型別**應該**帶攤平欄」。
-	// 唯一 false 的是商品詳情：PublicProductDetailItem 根本沒宣告這三個欄位，
-	// 是容器型別的差異，不是漏抄——故列為預期例外而非失敗。
 	hasFlat bool
 }
 
@@ -219,7 +162,6 @@ func matrixAssemblies(t *testing.T) []assembly {
 	}
 }
 
-// ① /public/products —— product.go GetProductList
 func driveProductList(t *testing.T) assembly {
 	t.Helper()
 	h := &Holder{Product: grpcclient.NewProductClientForTest(matrixProductMock()), MediaBaseURL: matrixMediaBase}
@@ -228,7 +170,6 @@ func driveProductList(t *testing.T) assembly {
 	return assembly{endpoint: "GET /public/products", seller: matrixSellerOf(t, rec), flat: matrixFlatOf(rec), hasFlat: true}
 }
 
-// ② /public/products/:id —— product.go convertToPublicProductDetail
 func driveProductDetail(t *testing.T) assembly {
 	t.Helper()
 	h := &Holder{Product: grpcclient.NewProductClientForTest(matrixProductMock()), MediaBaseURL: matrixMediaBase}
@@ -240,7 +181,6 @@ func driveProductDetail(t *testing.T) assembly {
 	return assembly{endpoint: "GET /public/products/:id", seller: si, hasFlat: false}
 }
 
-// ④ /public/search/products —— search.go buildSearchResult
 func driveSearch(t *testing.T) assembly {
 	t.Helper()
 	h := &Holder{Product: grpcclient.NewProductClientForTest(matrixProductMock()), MediaBaseURL: matrixMediaBase}
@@ -249,7 +189,6 @@ func driveSearch(t *testing.T) assembly {
 	return assembly{endpoint: "GET /public/search/products", seller: matrixSellerOf(t, rec), flat: matrixFlatOf(rec), hasFlat: true}
 }
 
-// ⑤ /public/sellers/:id/products —— seller.go GetSellerProducts
 func driveSellerProducts(t *testing.T) assembly {
 	t.Helper()
 	sellerMock := &mockSellerServiceClient{
@@ -271,7 +210,6 @@ func driveSellerProducts(t *testing.T) assembly {
 	return assembly{endpoint: "GET /public/sellers/:id/products", seller: matrixSellerOf(t, rec), flat: matrixFlatOf(rec), hasFlat: true}
 }
 
-// ==================== 矩陣斷言 ====================
 
 // TestSellerInfoMatrix_NestedSellerIdenticalAcrossEndpoints 是本組的主斷言：
 // 同一份上游 SellerInfo 餵進五個端點，吐出的 seller 物件必須逐鍵逐值相同。
@@ -292,7 +230,6 @@ func TestSellerInfoMatrix_FlatColumnsMirrorNested(t *testing.T) {
 	wantFlat := matrixWantFlat()
 	for _, a := range matrixAssemblies(t) {
 		if !a.hasFlat {
-			// 預期例外：PublicProductDetailItem 沒宣告攤平欄（見 flatSellerFields 註解）。
 			continue
 		}
 		if !reflect.DeepEqual(a.flat, wantFlat) {

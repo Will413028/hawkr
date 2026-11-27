@@ -120,7 +120,6 @@ describe("row actions follow the server's viewer_can_* flags", () => {
 			comment("2", { viewerCanEdit: true }),
 			comment("3", { viewerCanReply: true }),
 			comment("4"),
-			// 自己寫的留言，伺服器卻沒給任何權限：畫面不自己補（不能因為 isMine 就顯示）。
 			comment("5", { isMine: true }),
 		];
 		mount({ viewer: BUYER });

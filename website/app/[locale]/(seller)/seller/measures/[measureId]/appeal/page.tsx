@@ -7,8 +7,6 @@ interface PageProps {
 }
 
 export function generateStaticParams() {
-	// A sentinel PPR shell keeps the dynamic param from turning the whole route
-	// into a blocking render. No real measure id is ever prerendered.
 	return [{ measureId: "0" }];
 }
 

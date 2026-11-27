@@ -41,8 +41,6 @@ export default function SearchFreshnessBridge({
 	const router = useObservedRouter("search_freshness");
 	const [isPending, startTransition] = React.useTransition();
 	const scopeRef = React.useRef(scope);
-	// The landing tree arrived with the route even if a keyword initially hides
-	// it. Starting its age here also covers a first visit to `/search?q=...`.
 	const lastActivatedAtRef = React.useRef(Date.now());
 	const lastAttemptAtRef = React.useRef(0);
 

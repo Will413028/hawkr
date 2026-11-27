@@ -17,9 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// 終止合作生效之後的關店（賣家合作條款第 21.4 條：終止後店家暫停營業，未結訂單完成後關閉）。「待關閉」不存：它就是生效中的終止合作加 stint 還沒關閉。
-// 這個 job 只在生效時（starts_at）把停權的效果對齊（第一次發 StoreSuspended）並嘗試關店；有未結訂單就結束這一次，order.completed 的事件加速一次
-// （AdvanceStore）、每小時的掃描（ReconcileTerminations）保底，所以 job 遺失或被去重掉都只是晚關，方向安全。
 
 // TerminationEffectArgs 是終止合作生效的 job，以 measure_id 為唯一鍵（重跑沒有副作用：每一步都重讀並重新判斷）。
 type TerminationEffectArgs struct {
@@ -59,7 +56,6 @@ func (s *Service) EffectTermination(ctx context.Context, measureID uuid.UUID) er
 	return s.closeTerminated(ctx, measureID, storeID)
 }
 
-// effect 是第 1 步；回傳要接著查訂單的 stint（沒有事要做時是 0）。
 func (s *Service) effect(ctx context.Context, measureID uuid.UUID) (int64, error) {
 	var storeID int64
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -103,7 +99,6 @@ func (s *Service) effect(ctx context.Context, measureID uuid.UUID) (int64, error
 	return storeID, err
 }
 
-// closeTerminated 是第 3 步。
 func (s *Service) closeTerminated(ctx context.Context, measureID uuid.UUID, checked int64) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))

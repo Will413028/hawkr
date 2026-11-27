@@ -132,8 +132,6 @@ export default function ContactPage() {
 	const handleSubmit = useCallback(
 		async (e: React.FormEvent<HTMLFormElement>) => {
 			e.preventDefault();
-			// submitting guard: the Google Form roundtrip can take seconds on a
-			// slow network — without it repeat clicks POST duplicate entries.
 			if (!canSubmit || submitting) return;
 			setSubmitting(true);
 
@@ -153,7 +151,6 @@ export default function ContactPage() {
 					mode: "no-cors",
 				});
 			} catch {
-				// Google Forms CORS will cause an error but the submission still goes through
 			}
 
 			setSubmitted(true);
@@ -174,7 +171,7 @@ export default function ContactPage() {
 					<h1 className="sr-only">聯絡我們</h1>
 
 					<div className="mx-auto grid w-full max-w-[1040px] grid-cols-1 items-start gap-[var(--hkui-space-10)] px-[var(--hkui-space-5)] py-[var(--hkui-space-4)] sm:px-[var(--hkui-space-6)] sm:py-[var(--hkui-space-6)] lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-[var(--hkui-space-8)] lg:px-[var(--hkui-space-8)] lg:py-0">
-						{/* Intro / contact details */}
+
 						<div className="flex flex-col gap-[var(--hkui-space-6)] lg:pt-[var(--hkui-space-4)]">
 							<div className="flex flex-col gap-[var(--hkui-space-3)]">
 								<span className="text-[length:var(--text-sm)] font-bold uppercase tracking-[4px] text-[var(--color-primary)]">
@@ -227,7 +224,7 @@ export default function ContactPage() {
 							</ul>
 						</div>
 
-						{/* Form */}
+
 						<form
 							id="contact-form"
 							className="flex w-full flex-col gap-[var(--hkui-space-5)] rounded-[var(--hkui-radius-2xl)] border border-[var(--hkui-divider)] bg-[var(--hkui-content1)] px-[var(--hkui-space-6)] py-[var(--hkui-space-8)] shadow-[var(--hkui-shadow-md)]"
@@ -310,7 +307,7 @@ export default function ContactPage() {
 				</div>
 			</section>
 
-			{/* Success Dialog */}
+
 			{submitted && (
 				<div
 					className="fixed inset-0 z-[var(--z-tooltip)] flex items-center justify-center p-6"

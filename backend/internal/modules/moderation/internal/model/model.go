@@ -259,7 +259,6 @@ type ReportItem struct {
 	ClosedAt *time.Time
 }
 
-// cursorTimeMax 與 cursorIDMax 是 keyset 第一頁的游標參數：由大到小排序的極值，讓每一頁走同一個 query（同 social 的 keyset 慣例）。
 var (
 	cursorTimeMax = time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC)
 	cursorIDMax   = uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}

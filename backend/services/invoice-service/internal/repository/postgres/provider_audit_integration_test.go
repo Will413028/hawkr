@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// newProviderAuditEntry 組一筆「除了 attempt_seq 以外都合法」的稽核列。
 func newProviderAuditEntry(issuerID int64, attemptSeq int32) domain.NewProviderAuditLogEntry {
 	return domain.NewProviderAuditLogEntry{
 		IssuerID:      issuerID,

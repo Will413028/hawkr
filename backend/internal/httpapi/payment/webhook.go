@@ -19,10 +19,7 @@ const WebhookRoute = "POST /webhooks/stripe"
 const ChargeWebhookRoute = "POST /webhooks/stripe-payments"
 
 const (
-	// maxAccountWebhookBytes 是收款帳戶 webhook 本文的上限：thin event 只有事件資訊（幾百 bytes）。
 	maxAccountWebhookBytes = 64 << 10
-	// maxChargeWebhookBytes 是付款 webhook 本文的上限：snapshot event 內含完整物件（testdata 的 PaymentIntent 約 2 KB），物件最大的變數是 metadata
-	// （Stripe 上限 50 個 key、每個 value 500 字元，約 25 KB）與帳單資訊，所以取 256 KiB：約是已知最大內容的 5 倍以上，仍擋得住灌爆記憶體的本文。
 	maxChargeWebhookBytes = 256 << 10
 )
 

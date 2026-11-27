@@ -112,7 +112,6 @@ export default function OnboardingProgressCard({
 	const toggleCollapsed = useSellerDashboardUiStore(
 		(state) => state.toggleOnboardingCollapsed,
 	);
-	// 「公開前必須」全部滿足就預設收合；「建議完成」不影響進度。
 	const defaultCollapsed = allRequiredComplete;
 	const collapsed = collapsedOverride ?? defaultCollapsed;
 

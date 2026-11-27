@@ -32,12 +32,10 @@ class AfterSaleCaseSnapshot {
 /// keepAlive 避免每次 rebuild 都重撈。
 @Riverpod(keepAlive: true)
 class AfterSaleOrderLookup extends _$AfterSaleOrderLookup {
-  // 已取消/已結案的 status 不算「有售後案件」（71=確認收貨取消，#1225）
   static const _inactiveStatuses = {'50', '70', '71'};
 
   @override
   Future<Map<String, AfterSaleCaseSnapshot>> build() async {
-    // Apple App Review 合規：訪客（無 token）打 /app/after_sales 必 401，回空不打。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return {};

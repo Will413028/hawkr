@@ -29,7 +29,6 @@ void main() {
     });
 
     test('3003 / 3005 → unsupported（不得落到黑貓或 7-11）', () {
-      // 3003 是已刪除的 Uber 即時配送（值域仍在 CodeMeta）。
       for (final value in const ['3003', 'UBER_INSTANT', '3005']) {
         expect(
           shippingPresentationOf(value),
@@ -51,8 +50,6 @@ void main() {
 
     test('CodeMeta 每個 ShippingMethod 成員都有明確歸屬（無漏網）', () {
       for (final method in ShippingMethod.values) {
-        // 不做「等於某個特定值」的斷言 —— 這裡要證明的是「查得到、不會拋例外」，
-        // 各成員該落到哪一格由上面三支測試逐一釘住。
         expect(
           ShippingPresentation.values,
           contains(shippingPresentationOf(method.value)),
@@ -60,8 +57,6 @@ void main() {
               '${method.value} (${method.code}) 沒有被 shippingPresentationOf 覆蓋',
         );
       }
-      // 目前 3001 / 3002 有專屬 UI；新增支援時本斷言要一起改，
-      // 它的作用是讓「悄悄多支援一個 provider」不會無聲通過。
       final supported = ShippingMethod.values
           .where((m) => shippingPresentationOf(m.value).isSupported)
           .map((m) => m.value)

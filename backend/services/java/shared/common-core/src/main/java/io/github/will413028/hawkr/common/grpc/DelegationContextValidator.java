@@ -35,37 +35,30 @@ public final class DelegationContextValidator {
      */
     public static void validate(DelegationContext d, long storeId, String capability,
                                 String requestIdempotencyKey) {
-        // S0：不存在 ⇒ 賣家本人路徑
         if (d == null) {
             return;
         }
 
-        // S1a：三個必填欄位恆驗
         if (isBlank(d.getSessionId()) || isBlank(d.getOperatorAdminId()) || isBlank(d.getCapability())) {
             throw contractMismatch("代行語境缺少必要欄位");
         }
 
-        // S1b：只在必落稽核的操作上驗（.write / .publish），判定輸入是「本 RPC 宣告的 cap」
         if (DelegationCapability.requiresAuditLog(capability) && isBlank(d.getAuditLogId())) {
             throw contractMismatch("代行寫入必須帶稽核列 ID");
         }
 
-        // S2：落在封閉列舉（大小寫敏感）
         if (!DelegationCapability.ALL.contains(d.getCapability())) {
             throw contractMismatch("代行能力宣告與本 RPC 的契約不符");
         }
 
-        // S3：與本 RPC 宣告相符
         if (!d.getCapability().equals(capability)) {
             throw contractMismatch("代行能力宣告與本 RPC 的契約不符");
         }
 
-        // S4：歸屬鍵存在
         if (storeId <= 0) {
             throw contractMismatch("代行請求缺少店家歸屬鍵");
         }
 
-        // S5：request 自身有帶 idempotency_key 時必須與代行語境逐字元相同
         if (!isBlank(requestIdempotencyKey) && !isBlank(d.getIdempotencyKey())
                 && !requestIdempotencyKey.equals(d.getIdempotencyKey())) {
             throw contractMismatch("冪等鍵與代行語境不一致");
@@ -93,7 +86,6 @@ public final class DelegationContextValidator {
                 throw contractMismatch("代行批次每一項都必須帶稽核列 ID");
             }
         }
-        // S1b 已由上方逐項完成，故以 .read 語意跑其餘步驟；S3 仍以真正宣告的 capability 比對
         validateWithoutAuditLog(d, storeId, capability, requestIdempotencyKey);
     }
 

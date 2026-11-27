@@ -69,7 +69,6 @@ class _HkSkeletonShimmerState extends State<HkSkeletonShimmer>
 
   @override
   Widget build(BuildContext context) {
-    // 網頁的 prefers-reduced-motion 直接拿掉掃光，只留靜態色塊。
     if (_reduceMotion ?? false) return widget.child;
 
     return Stack(
@@ -92,7 +91,6 @@ class _HkSkeletonShimmerState extends State<HkSkeletonShimmer>
                     child: const DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          // CSS 的 100deg：水平再往下傾 10 度。
                           begin: Alignment(-1, -0.18),
                           end: Alignment(1, 0.18),
                           stops: [0.3, 0.5, 0.7],

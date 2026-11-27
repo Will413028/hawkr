@@ -74,10 +74,6 @@ export default function MarketClientShell({
 }: MarketClientShellProps) {
 	const queryClient = useQueryClient();
 	const { accountId, activeRole } = useQueryIdentity();
-	// The route is ISR: writing `?tab` via history.pushState re-reads the URL on
-	// the client (useUrlSearchParams) and re-scopes the grid in place (the follow
-	// tab still fetches the buyer-scoped products client-side), with no server
-	// round trip / no useSearchParams bailout. `null` clears the tab (推薦).
 	const setTab = React.useCallback((value: string | null) => {
 		updateUrlParams({ tab: value });
 	}, []);
@@ -123,10 +119,6 @@ export default function MarketClientShell({
 		queryClient,
 	]);
 
-	// Warm the only viewer-aware market tab in the background. If the buyer
-	// taps immediately, handleTabChange awaits this same query and leaves the
-	// fully rendered recommendation grid in place until the follow result is
-	// ready — no empty-state or skeleton flash.
 	React.useEffect(() => {
 		if (currentTab === "follow") return;
 		void prefetchFollowProducts().catch(() => undefined);
@@ -177,14 +169,7 @@ export default function MarketClientShell({
 							: undefined
 					}
 				>
-					{/* CSS-only collapse: a visually-hidden checkbox toggles a
-					 * sibling `~ .market-list-sidebar__body` via the
-					 * `:checked` selector. Default state is unchecked so
-					 * mobile lands on the product grid immediately. Desktop
-					 * CSS hides the toggle and forces the body open. This
-					 * avoids the modern <details> shadow-DOM
-					 * `content-visibility: hidden` behavior which a plain
-					 * `display: flex` override couldn't break through. */}
+
 					<input
 						type="checkbox"
 						id="market-filter-toggle"

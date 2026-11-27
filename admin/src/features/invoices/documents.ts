@@ -72,6 +72,5 @@ export function shipmentStatusDisplay(
 	if (code === "") {
 		return { kind: "none" };
 	}
-	// 值域是 ShippingStatus 的 value（數字字串）⇒ 走 CodeMeta 查表，不手寫中文。
 	return { kind: "status", label: codeLabel(SHIPPING_STATUS_LABEL, code) };
 }

@@ -57,8 +57,6 @@ export function useMyAfterSaleDetail(
 		staleTime: 30_000,
 	});
 	return {
-		// `data` (not `error || !data`): a failed background refetch keeps the
-		// last-good detail rather than blanking the page.
 		data: query.data ?? null,
 		loading: accountQueryPending(status, query.isLoading),
 		error: query.error instanceof Error ? query.error.message : null,

@@ -22,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-// imTestBuyers 是 im 的 Buyers port：守門 LockNotClosed 走真正的 buyer 模組（買家的關閉事實只在 buyer），其餘是固定的替身。
 type imTestBuyers struct{ owner *buyer.Module }
 
 func (imTestBuyers) AccountIDByBuyerID(_ context.Context, id int64) (int64, error) {

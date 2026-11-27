@@ -71,10 +71,6 @@ export default function ProductReviewsSection({
 									typeof photo === "string" && photo.trim().length > 0,
 							)
 						: [];
-					// The public reviews endpoint omits a per-review id (it normalizes
-					// to 0), so id/content alone collide ("pdrev-0" for every card).
-					// Prefix the list index to guarantee sibling-unique keys; the list
-					// is fetched once and never reordered client-side.
 					const reviewKey = `${index}-${
 						textOrNumber(review.id ?? review.reviewId) ||
 						textOrEmpty(review.text ?? review.content).slice(0, 32) ||

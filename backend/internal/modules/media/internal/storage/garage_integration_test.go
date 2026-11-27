@@ -48,7 +48,6 @@ var (
 	garageNodeRe   = regexp.MustCompile(`[0-9a-f]{64}`)
 )
 
-// garageExec 在容器內執行 garage CLI 並回傳合併輸出；結束碼非 0 視為錯誤。
 func garageExec(ctx context.Context, c testcontainers.Container, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -66,7 +65,6 @@ func garageExec(ctx context.Context, c testcontainers.Container, args ...string)
 	return string(out), nil
 }
 
-// waitGarageReady 只重試唯讀的就緒探測：節點剛啟動時 RPC 還沒就緒；之後的每個變更指令只執行一次。
 func waitGarageReady(ctx context.Context, t *testing.T, c testcontainers.Container) string {
 	t.Helper()
 	deadline := time.Now().Add(60 * time.Second)
@@ -82,7 +80,6 @@ func waitGarageReady(ctx context.Context, t *testing.T, c testcontainers.Contain
 	}
 }
 
-// mustGarage 執行一次 garage 指令，失敗即中止。
 func mustGarage(ctx context.Context, t *testing.T, c testcontainers.Container, args ...string) string {
 	t.Helper()
 	out, err := garageExec(ctx, c, args...)
@@ -92,7 +89,6 @@ func mustGarage(ctx context.Context, t *testing.T, c testcontainers.Container, a
 	return out
 }
 
-// startGarage 起單節點 Garage、初始化 layout、key 與 bucket，回傳經 s3compat 設定建構的 adapter 與 endpoint。
 func startGarage(t *testing.T) (*S3, string) {
 	t.Helper()
 	ctx := context.Background()
@@ -165,9 +161,6 @@ func md5B64(b []byte) string {
 	return base64.StdEncoding.EncodeToString(sum[:])
 }
 
-// sendPresigned 以純 net/http 送出預簽 PUT：header 取自簽發結果，可用 override 覆蓋個別 header；
-// 簽發結果不含 Content-Length，它由 body 長度決定。回傳 HTTP 狀態碼。
-// override 的值為空字串時刪除該 header。
 func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[string]string) presignedResp {
 	t.Helper()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPut, p.URL, bytes.NewReader(body))
@@ -265,7 +258,6 @@ func TestGarageStore(t *testing.T) {
 		key := NewKey(PrefixTmp)
 		signed := []byte("signed-size")
 		actual := []byte("a body that is longer than the signed size")
-		// Content-MD5 對應實際送出的內容，只有長度與簽章不符。
 		p := presign(t, s, key, signed, "text/plain", md5B64(actual))
 		requireStatus(t, sendPresigned(t, p, actual, nil), http.StatusForbidden)
 		requireAbsent(t, s, key)
@@ -343,7 +335,6 @@ func TestGarageStore(t *testing.T) {
 		}
 	})
 
-	// Garage 支援依前綴列出：機敏資產的 GC 靠它找出沒推進成功的孤兒嘗試（B1-3c1 的停止條件）。
 	t.Run("list_by_prefix", func(t *testing.T) {
 		asset := uuid.New()
 		other := uuid.New()

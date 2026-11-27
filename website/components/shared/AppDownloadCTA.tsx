@@ -5,10 +5,6 @@ import * as React from "react";
 import { FOOTER_ICON_LINK } from "@/components/shared/footerChrome";
 import { cn } from "@/lib/utils/cn";
 
-// The modal (QR renderer) only exists after a click, but a
-// static import put it in the navbar's AND the footer's module graph, i.e.
-// every page's first load. `ssr: false` is correct here: the modal is a
-// portal that renders nothing until `open`.
 const AppDownloadModal = dynamic(
 	() => import("@/components/shared/AppDownloadModal"),
 	{ ssr: false },
@@ -49,8 +45,6 @@ export default function AppDownloadCTA({
 	children = "下載 App",
 }: AppDownloadCTAProps) {
 	const [open, setOpen] = React.useState(false);
-	// The modal is only mounted once it has been asked for: an unopened CTA
-	// should not pull the chunk down at all.
 	const [everOpened, setEverOpened] = React.useState(false);
 
 	const classes =
@@ -64,9 +58,6 @@ export default function AppDownloadCTA({
 		<>
 			<button
 				type="button"
-				// `min-h-11` is the touch floor. The compact variant's CSS height is
-				// 36px and the navbar additionally forced it to 40px; with the floor
-				// declared here that override is no longer doing anything useful.
 				className={cn(classes, "min-h-11", className)}
 				onClick={() => {
 					setEverOpened(true);

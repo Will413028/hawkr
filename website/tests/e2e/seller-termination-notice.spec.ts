@@ -23,8 +23,6 @@ const STORE: MockStore = {
 	logoUriTemplate: "https://example.com/{preset}/logo.png",
 };
 
-// 預告終止的生效時間（伺服器給的 period.startTime）刻意不是 createTime + 30 天：
-// createTime 2026-10-05，+30 天是 2026-11-04；生效時間是 2026-11-20 11:30（台北）。
 const SCHEDULED_TERMINATION: MockMeasure = {
 	id: "t-scheduled",
 	kind: "TERMINATION",
@@ -38,7 +36,6 @@ const SCHEDULED_TERMINATION: MockMeasure = {
 	appealDeadlineTime: "2027-05-20T03:30:00Z",
 };
 
-// 狀態不是 SCHEDULED 的措施：ListMyMeasures(state=SCHEDULED) 不會回它，橫幅不能出現它的日期。
 const ACTIVE_DECOY: MockMeasure = {
 	...SCHEDULED_TERMINATION,
 	id: "t-active",
@@ -90,7 +87,6 @@ test.describe("預告終止橫幅", { tag: ["@ui"] }, () => {
 		const banner = page.getByRole("status").filter({ hasText: "終止合作" });
 		await expect(banner).toBeVisible();
 		await expect(banner).toContainText("2026/11/20 11:30");
-		// createTime + 30 天（2026/11/04）與其他狀態的措施日期都不能出現。
 		await expect(banner).not.toContainText("2026/11/04");
 		await expect(banner).not.toContainText("2026/09/01");
 		await expect(

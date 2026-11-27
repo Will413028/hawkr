@@ -34,17 +34,12 @@ export default function SiteBackgroundToggle({
 		>
 			<button
 				type="button"
-				// Geometry is also declared in site-grainient.css, but a component
-				// must be able to guarantee its own 44px target without depending on
-				// a stylesheet it does not own.
 				className={
 					variant === "icon"
 						? FOOTER_ICON_LINK
 						: "site-background-control__button min-h-11 px-3"
 				}
 				disabled={!available}
-				// A permanently disabled control needs a reason. Without one the
-				// footer just carries a dead 「靜態背景」 button.
 				aria-describedby={available ? undefined : hintId}
 				title={
 					available
@@ -53,8 +48,6 @@ export default function SiteBackgroundToggle({
 							: undefined
 						: UNAVAILABLE_HINT
 				}
-				// Toggle semantics: the visible label changes with state, but the
-				// control's nature (a two-state switch) was never exposed to AT.
 				aria-pressed={available ? paused : undefined}
 				onClick={toggleSiteBackgroundPaused}
 			>

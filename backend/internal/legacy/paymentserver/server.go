@@ -21,13 +21,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 舊契約的業務碼（GrpcResponseCode）。
 const (
 	codeSuccess            = 0
 	codeInvalidInput       = 400
 	codeNotFound           = 404
 	codeFailedPrecondition = 428
-	// codeTransactionNotFound 是 TRANSACTION_NOT_FOUND_FOR_ORDER：發票側要求查無一律回非 0。
 	codeTransactionNotFound = 8015
 )
 
@@ -41,7 +39,6 @@ const (
 	maxAmountDigits       = 18
 )
 
-// 舊的 PaymentTransactionStatus 與退款狀態的值。
 const (
 	paymentStatusInit      = "0"
 	paymentStatusPaid      = "1"
@@ -83,7 +80,6 @@ func New(payments Payments) *Server {
 	return &Server{payments: payments}
 }
 
-// businessCode 把模組的分類錯誤轉成舊契約的業務碼（NotFound 404、InvalidInput 400、FailedPrecondition 428）；其他錯誤 ok 為 false，由呼叫方回 gRPC 錯誤。
 func businessCode(err error) (code int32, ok bool) {
 	switch apperr.KindOf(err) {
 	case apperr.KindNotFound:
@@ -102,8 +98,6 @@ func businessCode(err error) (code int32, ok bool) {
 
 func millis(t time.Time) string { return strconv.FormatInt(t.UnixMilli(), 10) }
 
-// paymentStatus 把付款狀態對到舊的 PaymentTransactionStatus 值：建立中、等待付款、處理中是 0（INIT），入帳 1（PAID），建立失敗 2（FAILED），取消 5（CLOSED）。
-// ANOMALY 與不認得的值回錯誤，不推定成任何狀態：呼叫端（逾期取消前的守門）要 fail-safe，不能把「付款真相未知」當成未付。
 func paymentStatus(s payment.PaymentStatus) (string, error) {
 	switch s {
 	case payment.PaymentCreating, payment.PaymentAwaitingPayment, payment.PaymentProcessing:
@@ -120,8 +114,6 @@ func paymentStatus(s payment.PaymentStatus) (string, error) {
 	return "", fmt.Errorf("paymentserver：不認得的付款狀態 %q", s)
 }
 
-// refundStatus 把退款狀態對到舊的退款狀態值：PENDING 0（REQUESTED），REFUNDING 1（PROCESSING），SUCCEEDED 2，FAILED 3。
-// ANOMALY（結果與 provider 對不起來、仍佔額度）對成 1（PROCESSING）：它沒有終局，呼叫端不能把它當成功或失敗。
 func refundStatus(s payment.PaymentRefundStatus) (string, error) {
 	switch s {
 	case payment.RefundPending:
@@ -136,7 +128,6 @@ func refundStatus(s payment.PaymentRefundStatus) (string, error) {
 	return "", fmt.Errorf("paymentserver：不認得的退款狀態 %q", s)
 }
 
-// parseAmount 解析請求的金額字串；不合法時回 problem（給呼叫端的說明，空字串表示合法）。
 func parseAmount(raw string) (amount int64, problem string) {
 	if len(raw) == 0 || len(raw) > maxAmountDigits {
 		return 0, "金額不合法"
@@ -199,9 +190,6 @@ func (s *Server) CreateRefund(ctx context.Context, req *connect.Request[pb.Creat
 	return connect.NewResponse(&pb.CreateRefundResponse{Code: codeSuccess, Message: successMessage, Data: detail}), nil
 }
 
-// refundDetail 逐欄位建立 RefundDetail。填的欄位：refund_no（冪等鍵）、trade_no 與 order_id（訂單編號）、amount、status、provider_status（退款狀態名）、
-// provider_message（失敗原因）、created_at。不填的欄位：reason（只在建立的回應回填呼叫端給的原文，不存）、provider_refund_no（port 不外露 provider 的退款 ID）、
-// completed_at（退款列沒有完成時間）、estimated_refund_date 與 bank_date（ATM 專屬，已隨舊金流商刪除）。
 func refundDetail(r payment.PaymentRefund) (*pb.RefundDetail, error) {
 	status, err := refundStatus(r.Status)
 	if err != nil {
@@ -306,10 +294,6 @@ func (s *Server) GetActivePaymentStatusByOrderNo(ctx context.Context, req *conne
 	return connect.NewResponse(&pb.GetActivePaymentStatusByOrderNoResponse{Code: codeSuccess, Message: successMessage, Data: paymentDetail(p, status)}), nil
 }
 
-// paymentDetail 逐欄位建立 PaymentDetail。填的欄位：trade_no 與 order_id（訂單編號）、buyer_id、amount、status、provider_status（付款狀態名）、
-// provider_message（最近一次嘗試的失敗原因碼）、pay_time（入帳時間）、created_at。不填的欄位：payment_type（付款沒有付款方式欄位，order 端沿用訂單上的）、
-// mer_id（SCT 不需要商店代號）、product_name、provider_trade_no、atm_*（ATM 已刪）、closed_at、expire_at、updated_at（付款列沒有對外的這些時間）、
-// is_duplicate 與 duplicate_sequence（一張訂單一個 PaymentIntent，沒有重複付款列）、granted_at、grant_status、grant_message（轉帳在 admin 的轉帳列表）。
 func paymentDetail(p payment.OrderPayment, status string) *pb.PaymentDetail {
 	d := &pb.PaymentDetail{
 		TradeNo: p.Order.OrderNo, OrderId: p.Order.OrderNo, BuyerId: strconv.FormatInt(p.BuyerID, 10), Amount: strconv.FormatInt(p.Order.Amount, 10),

@@ -129,20 +129,10 @@ export default function ThreadClient({
 	const router = useObservedRouter("message_thread");
 	const searchParams = useSearchParams();
 	const pathname = usePathname() || "";
-	// Pin the compose bar above the soft keyboard on mobile (iOS Safari in
-	// particular ignores `interactive-widget`, so `dvh` never shrinks on its
-	// own). Publishes `--keyboard-inset` for the chat shell to subtract.
 	useKeyboardInset();
-	// Seller → buyer first contact carries the customer's name/avatar — as
-	// props when opened from the chat drawer, or as query hints on the
-	// full-page route — since no `activeConversation` exists until a message
-	// is exchanged.
 	const hintedName = peerNameHint ?? searchParams?.get("name") ?? "";
 	const hintedAvatar = peerAvatarHint ?? searchParams?.get("avatar") ?? "";
-	// The persistent messages layout owns the conversation-list socket
-	// subscription. This read shares its React Query cache without registering a
 	// second invalidation listener; the global drawer explicitly refreshes the
-	// list when it closes.
 	const conversations = useConversations({ subscribeToSocket: false });
 	const {
 		messages,
@@ -158,10 +148,6 @@ export default function ThreadClient({
 	const ut = useUiText();
 	const tMessages = useTranslations("account.messages");
 	const headStatus = resolveHeadStatus(connectionState, peerOnline);
-	// Expectation-management line above the composer (the Airbnb
-	// "typical response time" slot). Sending goes over HTTP POST, so a
-	// dropped WebSocket only pauses live updates — say exactly that
-	// instead of leaving "未連線" in the header to read as "broken".
 	const composeNotice =
 		connectionState === "reconnecting"
 			? "即時更新暫停中，傳送的訊息仍會送達。"
@@ -222,10 +208,6 @@ export default function ThreadClient({
 			await send(draft.trim());
 			setDraft("");
 		} catch {
-			// useChatThread already rolls back the optimistic row and exposes the
-			// friendly error. Consume the rejection at the event boundary so an
-			// expected business 4xx (including self-message rejection) is not an
-			// unhandled promise reported to Sentry; keep the draft for retry.
 		} finally {
 			setSending(false);
 		}
@@ -241,20 +223,16 @@ export default function ThreadClient({
 
 	const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
-		// Reset value so picking the same file twice still fires `change`.
 		event.target.value = "";
 		if (!file || sendingImage || sending) return;
-		// Crop (or 使用原圖) first; the confirmed file sends below.
 		setPendingImage(file);
 	};
 
 	const sendPickedImage = async (file: File) => {
 		setSendingImage(true);
 		try {
-			// uploadImageFile + the hook own all validation/error surfacing.
 			await sendImage(file);
 		} catch {
-			/* error is surfaced via the thread's `error` state */
 		} finally {
 			setSendingImage(false);
 		}
@@ -262,8 +240,6 @@ export default function ThreadClient({
 
 	const handleQuickReply = (text: string) => {
 		setDraft(text);
-		// Focus + caret-to-end so the user can hit Enter or keep typing.
-		// rAF lets the textarea's value commit before we move the caret.
 		requestAnimationFrame(() => {
 			const ta = composerRef.current;
 			if (!ta) return;
@@ -323,11 +299,6 @@ export default function ThreadClient({
 							載入中…
 						</p>
 					) : messages.length === 0 ? (
-						/* Conversation start — an inline peer-profile block (the
-						 * Instagram DM pattern) instead of a floating card. It reads
-						 * as "the beginning of this thread": future messages grow
-						 * from beneath it, and the quick-reply chips sit where they
-						 * act (above the composer), not in the middle of the room. */
 						<div className="thread-intro">
 							<ChatPeerAvatar
 								src={peerAvatar}
@@ -433,9 +404,7 @@ export default function ThreadClient({
 				) : null}
 
 				<form className="thread-page__compose" onSubmit={handleSend}>
-					{/* Single pill: attach / image / textarea / send live inside one
-					 * bordered container (instead of four scattered circles), so the
-					 * composer reads as one control — the Airbnb/Nextdoor pattern. */}
+
 					<div className="thread-page__field">
 						<Button
 							type="button"
@@ -490,9 +459,7 @@ export default function ThreadClient({
 					</div>
 				</form>
 			</section>
-			{/* Buyer-side only: the peer is a seller with a public profile, so
-			 * the grid can grow a commerce-context rail at >=1440px. Rendered
-			 * as a `.chat-shell` grid sibling, not inside `.thread-page`. */}
+
 			{!isSeller ? <ChatContextPanel sellerId={targetId} /> : null}
 		</>
 	);
@@ -521,9 +488,7 @@ function ChatImage({ url }: { url: string }) {
 				role="img"
 				aria-label="圖片無法載入"
 			>
-				{/* Landscape glyph. It uses currentColor so the placeholder adapts to the
-				 * bubble's foreground (primary on peer, white on mine, gold-ish
-				 * on dark mode). */}
+
 				<AppIcon
 					name="image"
 					className="thread-page__bubble-attachment__icon"

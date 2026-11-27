@@ -54,14 +54,12 @@ export default function CommentsBottomSheet({ postId, open, onClose }: Props) {
 		try {
 			e.currentTarget.setPointerCapture(e.pointerId);
 		} catch {
-			// older WebKit: ignore
 		}
 	};
 
 	const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
 		const g = gestureRef.current;
 		if (!g || e.pointerId !== g.pointerId) return;
-		// Only allow drag DOWN; ignore drag-up (no expand-beyond-sheet).
 		setDragY(Math.max(0, e.clientY - g.startY));
 	};
 
@@ -75,7 +73,6 @@ export default function CommentsBottomSheet({ postId, open, onClose }: Props) {
 				e.currentTarget.releasePointerCapture(e.pointerId);
 			}
 		} catch {
-			// noop
 		}
 		const dy = Math.max(0, e.clientY - g.startY);
 		const dt = Math.max(performance.now() - g.startTime, 1);

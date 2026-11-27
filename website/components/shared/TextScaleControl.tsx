@@ -31,8 +31,6 @@ export default function TextScaleControl({
 	className?: string;
 }) {
 	const { scale, setScale } = useTextScale();
-	// Two of these can be on one page (設定 plus anything embedding it); a
-	// shared `name` would merge them into a single radio group.
 	const groupName = `${React.useId()}-text-scale`;
 
 	return (
@@ -53,11 +51,8 @@ export default function TextScaleControl({
 						data-selected={selected}
 						className={cn(
 							"relative inline-flex items-center justify-center gap-2 cursor-pointer font-medium text-hk-muted transition-colors duration-200 motion-reduce:transition-none",
-							// 44px touch target, matching Tabs' md size.
 							"h-11 min-w-11 px-4 text-sm rounded-hk-md",
-							// The ring follows the visually-hidden input's focus, and is
 							// inset: the global 2px outline sits OUTSIDE the pill and
-							// would be clipped by the `p-1` container.
 							"has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-[-2px] has-[:focus-visible]:outline-[var(--hkui-focus)]",
 							"data-[selected=true]:bg-hk-surface-elevated data-[selected=true]:text-hk-heading data-[selected=true]:shadow-hk-sm",
 						)}

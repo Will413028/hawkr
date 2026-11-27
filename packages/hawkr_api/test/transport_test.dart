@@ -142,7 +142,6 @@ void main() {
   });
 
   group('timeoutInterceptor', () {
-    // fake transport 不會因為 signal 中止，handler 自己等 signal，模擬真的 transport。
     Future<CheckAppVersionResponse> hang(
       CheckAppVersionRequest _,
       FakeHandlerContext ctx,
@@ -170,7 +169,6 @@ void main() {
       expect(seen!['connect-timeout-ms'], '50');
     });
 
-    // connect-timeout-ms 由真的 protocol 依 signal 的 deadline 產生，fake transport 不產生，這裡只驗中止。
     test('withTimeout 的上限優先於預設的上限', () async {
       final client = _client(hang, [
         timeoutInterceptor(const Duration(seconds: 30)),
@@ -289,7 +287,6 @@ void main() {
   }
 
   group('authInterceptor', () {
-    // 模擬單體：只接受 [valid] 這個 token。
     ({List<String?> seen, ContentPublicServiceClient client}) harness({
       required Future<String?> Function() token,
       required void Function() onInvalid,

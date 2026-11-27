@@ -73,10 +73,8 @@ public class AfterSaleResolutionService {
                         Long refundAmount, String returnShippingMethod,
                         String rejectReason, String rejectMessage,
                         Long couponAmount, Long couponMinSpend, String couponMessage) {
-        // 1. 驗證決議類型
         CodeMetaValidator.requireValidValue(AfterSaleResolutionType.class, resolutionType, "resolutionType");
 
-        // 2. 查詢並鎖定案件
         AfterSaleCaseEntity caseEntity = caseMapper.selectOne(
                 new LambdaQueryWrapper<AfterSaleCaseEntity>()
                         .eq(AfterSaleCaseEntity::getCaseNo, caseNo)
@@ -85,27 +83,18 @@ public class AfterSaleResolutionService {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_NOT_FOUND);
         }
 
-        // 3. 驗證賣家身分
         if (!caseEntity.getStoreId().equals(storeId)) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_NOT_OWNER);
         }
 
-        // §10 凍結檢查：申訴中禁止賣家處置
         caseService.assertNotUnderAppeal(caseEntity);
 
-        // 4. 驗證案件狀態
         if (!RESOLVABLE_STATUSES.contains(caseEntity.getStatus())) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
         }
 
-        // 5. 依決議類型分流處理
         AfterSaleResolutionType type = AfterSaleResolutionType.fromValue(resolutionType);
 
-        // §2A.1.4：零元訂單沒有金流退款概念，禁止所有「退款型」決議（含 RETURN_REFUND）。
-        // 禁止 RETURN_REFUND 的理由：售後鏈路 refund.completed 在 order-service 端會把訂單標
-        // PARTIALLY_REFUNDED / FULLY_REFUNDED 並寫 refund financial_log，但不歸還優惠券；
-        // 對沒收錢的零元訂單，「退貨退款」會讓買家退商品卻沒拿回券，業務上不公平。
-        // 僅允許 COUPON_COMPENSATION（補一張新券）、REJECT（拒絕）。
         if (PaymentMethod.ZERO_AMOUNT.value().equals(caseEntity.getPaymentMethod())
                 && (type == AfterSaleResolutionType.RETURN_REFUND
                         || type == AfterSaleResolutionType.PARTIAL_REFUND
@@ -120,23 +109,18 @@ public class AfterSaleResolutionService {
             case FULL_REFUND_NO_RETURN -> handleFullRefundNoReturn(caseEntity, storeId);
             case COUPON_COMPENSATION -> handleCouponCompensation(caseEntity, storeId, couponAmount, couponMinSpend, couponMessage);
             case REJECT -> handleReject(caseEntity, storeId, rejectReason, rejectMessage);
-            // INSPECTION_DEDUCTION 僅限 confirmReceipt 路徑插入（§2.5.2 / §5.3.3）
             case INSPECTION_DEDUCTION -> throw new AfterSalesBusinessException(GrpcResponseCode.INVALID_PARAM);
         }
     }
 
-    // ==================== 各類型處理 ====================
 
     /**
      * 退貨退款：建立退貨物流 → 更新狀態為待退貨。
      */
     private void handleReturnRefund(AfterSaleCaseEntity caseEntity, Long storeId,
                                      String returnShippingMethod) {
-        // §5.2.1.1 必須是合法 ShippingMethod value，禁止字面 code（如 "SEVEN_ELEVEN_STORE_PICKUP"）
-        // null / blank 由 CodeMetaValidator 統一拋 INVALID_PARAM
         CodeMetaValidator.requireValidValue(ShippingMethod.class, returnShippingMethod, "return_shipping_method");
 
-        // §5.2.1.2 enforcement：return 必須 = forward；Uber 暫不支援
         String forwardMethod = caseEntity.getShippingMethod();
         if (ShippingMethod.UBER_INSTANT.value().equals(forwardMethod)) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER);
@@ -147,7 +131,6 @@ public class AfterSaleResolutionService {
 
         String caseNo = caseEntity.getCaseNo();
 
-        // 呼叫 Shipping 建立退貨物流
         CreateReturnShipmentResponse shipResp;
         if (ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value().equals(returnShippingMethod)) {
             shipResp = shippingGrpcClient.createReturnCvsShipment(
@@ -174,16 +157,11 @@ public class AfterSaleResolutionService {
             );
         }
 
-        // envelope-code 檢查（依《Java gRPC 錯誤處理規範》§7.0 現行約定）：
-        // shipping-service 建單失敗以 envelope code≠0 回傳（onNext，非 StatusRuntimeException），必須檢查。
-        // 屬「無不可逆前置」情境 → throw 透傳下游訊息，@Transactional rollback，case 維持 PENDING
-        // 不推進 RETURN_PENDING（#1150 同類：原本不檢查 code 直接取 getData() 推進，物流單實際未建成）。
         if (shipResp.getCode() != GrpcResponseCode.SUCCESS.code()) {
             throw new AfterSalesBusinessException(
                     GrpcResponseCode.RETURN_SHIPMENT_FAILED, shipResp.getMessage());
         }
 
-        // 插入決議記錄
         AfterSaleResolutionEntity resolution = new AfterSaleResolutionEntity();
         resolution.setId(TsidUtil.generate());
         resolution.setCaseNo(caseNo);
@@ -193,8 +171,6 @@ public class AfterSaleResolutionService {
         resolution.setResolvedBy(storeId);
         resolutionMapper.insert(resolution);
 
-        // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → RETURN_PENDING）
-        // §5.3.8 2026-06-15 新增：同 SQL stamp ship_back_deadline_at = NOW + return.timeout-days（預設 7 天）
         String shipTradeNo = shipResp.getData().getShipTradeNo();
         java.time.LocalDateTime shipBackDeadlineAt = DateTimeUtils.nowUtc()
                 .plusDays(properties.getReturnConfig().getTimeoutDays());
@@ -236,7 +212,6 @@ public class AfterSaleResolutionService {
             throw new AfterSalesBusinessException(GrpcResponseCode.REFUND_AMOUNT_EXCEEDED);
         }
 
-        // 插入決議記錄
         AfterSaleResolutionEntity resolution = new AfterSaleResolutionEntity();
         resolution.setId(TsidUtil.generate());
         resolution.setCaseNo(caseNo);
@@ -245,11 +220,9 @@ public class AfterSaleResolutionService {
         resolution.setResolvedBy(storeId);
         resolutionMapper.insert(resolution);
 
-        // 建立退款任務（部分退款 outcome）
         createRefundTask(caseEntity, refundAmount,
                 AfterSalePlatformDecisionOutcome.PARTIAL_REFUND);
 
-        // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → REFUND_PROCESSING）
         int updated = caseMapper.markRefundProcessingFromResolution(caseNo);
         if (updated == 0) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
@@ -276,7 +249,6 @@ public class AfterSaleResolutionService {
         String caseNo = caseEntity.getCaseNo();
         Long refundAmount = caseEntity.getRefundableAmount();
 
-        // 插入決議記錄
         AfterSaleResolutionEntity resolution = new AfterSaleResolutionEntity();
         resolution.setId(TsidUtil.generate());
         resolution.setCaseNo(caseNo);
@@ -285,11 +257,9 @@ public class AfterSaleResolutionService {
         resolution.setResolvedBy(storeId);
         resolutionMapper.insert(resolution);
 
-        // 建立退款任務（全額退款 outcome）
         createRefundTask(caseEntity, refundAmount,
                 AfterSalePlatformDecisionOutcome.FULL_REFUND);
 
-        // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → REFUND_PROCESSING）
         int updated = caseMapper.markRefundProcessingFromResolution(caseNo);
         if (updated == 0) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
@@ -316,15 +286,10 @@ public class AfterSaleResolutionService {
                                            Long couponAmount, Long couponMinSpend, String couponMessage) {
         String caseNo = caseEntity.getCaseNo();
 
-        // 驗證集中化（依 coupon 設計書 §5.12）：
-        // - 金額 > 0、業務規則（minSpend >= amount*5、minSpend - amount >= 100）由 coupon-service 統一驗
-        // - 失敗時 coupon-service 回傳 INVALID_PARAM / COUPON_RULE_VIOLATED，會被下方 catch 透傳
-        // - 此處只做 null 防禦避免 NPE 透傳到 RPC 層
         if (couponAmount == null || couponMinSpend == null) {
             throw new AfterSalesBusinessException(GrpcResponseCode.INVALID_PARAM);
         }
 
-        // 呼叫 Coupon Service 發放補償優惠券
         GrantSellerCompensationCouponResponse couponResp = couponGrpcClient.grantSellerCompensationCoupon(
                 ProtoConversionUtils.formatLong(caseEntity.getStoreId()),
                 ProtoConversionUtils.formatLong(caseEntity.getBuyerId()),
@@ -332,15 +297,9 @@ public class AfterSaleResolutionService {
                 ProtoConversionUtils.formatLong(couponMinSpend),
                 couponMessage != null ? couponMessage : "",
                 caseNo,
-                // D4：售後單 id 是 coupon 端補償券的冪等鍵，重送同一張售後單只發一張
                 ProtoConversionUtils.formatLong(caseEntity.getId())
         );
 
-        // envelope-code 檢查（依《Java gRPC 錯誤處理規範》§7.0 現行約定）：
-        // coupon-service 業務失敗（amount<=0 / minSpend 規則違反等）以 envelope code≠0 回傳（onNext，非
-        // StatusRuntimeException），caller 必須檢查。屬「無不可逆前置」情境 → throw 透傳下游訊息，
-        // @Transactional rollback，case 維持 PENDING 不關案（#1150：原本不檢查 code 直接取
-        // getData().getTemplateId()（失敗時為空字串）insert + 關案，導致案件 CLOSED 但買家無券）。
         if (couponResp.getCode() != GrpcResponseCode.SUCCESS.code()) {
             throw new AfterSalesBusinessException(
                     GrpcResponseCode.AFTERSALE_COUPON_COMPENSATION_FAILED, couponResp.getMessage());
@@ -348,7 +307,6 @@ public class AfterSaleResolutionService {
 
         String couponTemplateId = couponResp.getData().getTemplateId();
 
-        // 插入決議記錄
         AfterSaleResolutionEntity resolution = new AfterSaleResolutionEntity();
         resolution.setId(TsidUtil.generate());
         resolution.setCaseNo(caseNo);
@@ -360,7 +318,6 @@ public class AfterSaleResolutionService {
         resolution.setResolvedBy(storeId);
         resolutionMapper.insert(resolution);
 
-        // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → CLOSED；coupon 路徑專用）
         int updated = caseMapper.closeByCouponCompensation(caseNo, DateTimeUtils.nowUtc());
         if (updated == 0) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
@@ -390,7 +347,6 @@ public class AfterSaleResolutionService {
 
         CodeMetaValidator.requireValidValue(AfterSaleRejectReason.class, rejectReason, "rejectReason");
 
-        // 插入決議記錄
         AfterSaleResolutionEntity resolution = new AfterSaleResolutionEntity();
         resolution.setId(TsidUtil.generate());
         resolution.setCaseNo(caseNo);
@@ -400,7 +356,6 @@ public class AfterSaleResolutionService {
         resolution.setResolvedBy(storeId);
         resolutionMapper.insert(resolution);
 
-        // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → REJECTED + stamp last_rejected_at）
         int updated = caseMapper.markRejectedByResolution(caseNo, DateTimeUtils.nowUtc());
         if (updated == 0) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
@@ -420,7 +375,6 @@ public class AfterSaleResolutionService {
                 "seller");
     }
 
-    // ==================== 共用方法 ====================
 
     /** 建立退款任務（PENDING，由 {@code RefundTaskWorker} 呼叫 payment 的 CreateRefund）。 */
     private void createRefundTask(AfterSaleCaseEntity caseEntity, Long refundAmount,

@@ -55,19 +55,15 @@ public class OrderExpiryCancellationService {
      * @return true 表示本次呼叫實際取消了訂單；false 表示已被其他流程處理，或付款已成功並收斂為 PAID
      */
     public boolean cancelPendingOrder(String orderNo, String cancelReason) {
-        // 階段 0（TX 外，#1349 L3 縱深防護，03 §8.5）：取消前反查 payment SoT，已付款收斂為 PAID、
-        // 付款真相未知（RPC 失敗/非成功碼）則保守跳過，皆不取消（fail-safe，MQ-01 窄窗修復）。
         if (convergeIfAlreadyPaid(orderNo)) {
             return false;
         }
 
-        // 階段 1：TX 內悲觀鎖 + CAS 狀態變更
         PaymentEventHandler.CancelInfo info = paymentEventHandler.cancelExpiredOrderInTx(orderNo, cancelReason);
         if (info == null) {
-            return false; // 已被其他流程處理（狀態已變更）
+            return false;
         }
 
-        // 階段 2：TX 外 best-effort 補償
         compensateAfterCancel(info);
         return true;
     }
@@ -94,14 +90,12 @@ public class OrderExpiryCancellationService {
         try {
             response = paymentGrpcClient.getActivePaymentStatusByOrderNo(orderNo);
         } catch (Exception e) {
-            // fail-safe（MQ-01）：gate 無法判定付款真相，保守跳過取消，待下輪排程 gate 成功再判
             log.warn("OrderExpiryCancellationService.gate.rpcFailed",
                     "取消前反查付款狀態失敗，保守跳過取消待下輪重試: orderNo=" + orderNo + ", err=" + e.getMessage());
             return true;
         }
 
         if (response.getCode() != GrpcResponseCode.SUCCESS.code()) {
-            // fail-safe（MQ-01）：payment 側查詢自身失敗，付款真相未知，同 RPC 失敗保守跳過
             log.warn("OrderExpiryCancellationService.gate.nonSuccess",
                     "取消前反查回非成功碼，保守跳過取消待下輪重試: orderNo=" + orderNo + ", code=" + response.getCode());
             return true;
@@ -109,7 +103,7 @@ public class OrderExpiryCancellationService {
 
         PaymentDetail detail = response.getData();
         if (!PaymentTransactionStatus.PAID.value().equals(detail.getStatus())) {
-            return false; // 非 PAID / 查無交易 → 照舊取消
+            return false;
         }
 
         JsonNode payload = buildPaymentSuccessPayload(orderNo, detail);
@@ -147,7 +141,7 @@ public class OrderExpiryCancellationService {
     private static String toIsoPayTime(String epochMillisStr) {
         try {
             if (epochMillisStr == null || epochMillisStr.isEmpty()) {
-                return ""; // handlePaymentSuccess.parsePayTime 會 fallback 為 nowUtc()
+                return "";
             }
             return DateTimeUtils.fromEpochMillis(Long.parseLong(epochMillisStr.trim())).toString();
         } catch (NumberFormatException e) {
@@ -159,12 +153,8 @@ public class OrderExpiryCancellationService {
      * TX 外 best-effort 補償：優惠券走 gRPC（庫存歸還已於 cancelExpiredOrderInTx 同事務落 order.cancelled outbox，#1368）
      */
     private void compensateAfterCancel(PaymentEventHandler.CancelInfo info) {
-        // 庫存歸還已改為取消事務內落 order.cancelled outbox（#1368），由 outbox scheduler 保證投遞，此處不再直發
 
-        // 禁止呼叫 ClosePaymentByOrderNo：讓交易由 Payment Service ExpiredTransactionScheduler 自然過期，
-        // 確保遲到的 PayUni Webhook 能正常觸發退款補償流程（見設計書 §8.5）
 
-        // 釋放優惠券：釋券任務已在取消事務內寫入，這裡當場嘗試加速，失敗由 CouponConsumptionWorker 重試
         String couponInstanceId = info.couponInstanceId();
         if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
             couponReleaseService.release(info.orderNo(), couponInstanceId);

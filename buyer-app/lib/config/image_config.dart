@@ -2,50 +2,39 @@ import 'media_image.dart';
 
 /// 圖片使用場景
 enum ImageScene {
-  // ── 首頁 ──
   homeBanner,
   homeBannerPopup,
   homeProductCard,
   homeAvatar,
 
-  // ── 商品 ──
   productDetail,
   productLandscapeCard,
   productThumbnail,
   productSearch,
 
-  // ── 購物車 / 訂單 ──
   cartItem,
   orderItem,
 
-  // ── 商家 ──
   merchantBanner,
   merchantAvatar,
 
-  // ── 評論 / 社群 ──
   reviewPhoto,
   socialPost,
   postImage,
 
-  // ── 分類 ──
   categoryBanner,
 
-  // ── 搜尋 ──
   searchResult,
 
-  // ── 分享 ──
   shareThumbnail,
 
-  // ── 聊天 ──
   chatImage,
   chatAvatar,
 
-  // ── 通用頭像 ──
   avatarSmall,
   avatarMedium,
   avatarLarge,
 
-  // ── 全屏查看 ──
   fullscreen,
 }
 
@@ -75,52 +64,39 @@ class ImageConfig {
 
   /// 場景 → Worker 顯示 preset（49 §4.4 白名單）。
   static const Map<ImageScene, ImagePreset> _presets = {
-    // ── 首頁 ──
     ImageScene.homeBanner: ImagePreset.banner,
     ImageScene.homeBannerPopup: ImagePreset.banner,
     ImageScene.homeProductCard: ImagePreset.card,
     ImageScene.homeAvatar: ImagePreset.avatar,
 
-    // ── 商品 ──
     ImageScene.productDetail: ImagePreset.detail,
-    // 收藏／瀏覽 4:3 橫卡：card preset（720×540 cover）與畫面同比例，
-    // 避免直圖被橫向卡片二次裁切放大。
     ImageScene.productLandscapeCard: ImagePreset.card,
     ImageScene.productThumbnail: ImagePreset.thumb,
     ImageScene.productSearch: ImagePreset.thumb,
 
-    // ── 購物車 / 訂單 ──
     ImageScene.cartItem: ImagePreset.thumb,
     ImageScene.orderItem: ImagePreset.thumb,
 
-    // ── 商家 ──
     ImageScene.merchantBanner: ImagePreset.banner,
     ImageScene.merchantAvatar: ImagePreset.avatar,
 
-    // ── 評論 / 社群 ──
     ImageScene.reviewPhoto: ImagePreset.card,
     ImageScene.socialPost: ImagePreset.card,
     ImageScene.postImage: ImagePreset.card,
 
-    // ── 分類 ──
     ImageScene.categoryBanner: ImagePreset.banner,
 
-    // ── 搜尋 ──
     ImageScene.searchResult: ImagePreset.thumb,
 
-    // ── 分享 ──
     ImageScene.shareThumbnail: ImagePreset.thumb,
 
-    // ── 聊天 ──
     ImageScene.chatImage: ImagePreset.chat,
     ImageScene.chatAvatar: ImagePreset.avatar,
 
-    // ── 通用頭像 ──
     ImageScene.avatarSmall: ImagePreset.avatar,
     ImageScene.avatarMedium: ImagePreset.avatar,
     ImageScene.avatarLarge: ImagePreset.avatar,
 
-    // ── 全屏查看 ──
     ImageScene.fullscreen: ImagePreset.original,
   };
 

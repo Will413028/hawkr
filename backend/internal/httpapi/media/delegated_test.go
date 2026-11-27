@@ -27,16 +27,12 @@ const (
 	delegatedStoreID = int64(5)
 )
 
-// fakeSessions 以憑證回 session；AuthorizeDelegated 以與模組相同的規則（非 ACTIVE 或缺方法宣告的能力）拒絕並記下動作與資源
-// （模組為這些寫 FAILED 稽核；稽核本身由模組的測試守）。
 type fakeSessions struct {
 	sessions map[string]moddelegation.DelegationSession
 	denied   []moddelegation.DelegatedMethod
 	touched  []int64
-	// storeErr 是 DelegatedRead 的店家檢查結果（nil 是可代行）；reads 是通過檢查、實際執行 read 的次數。
 	storeErr error
 	reads    int
-	// readStore 非 0 時是 DelegatedRead 交回的店家，與 session 綁定的店家不同，用來證明店家取自它的回傳。
 	readStore int64
 }
 
@@ -79,7 +75,6 @@ func (f *fakeSessions) AuthorizeDelegated(_ context.Context, c moddelegation.Del
 	return nil
 }
 
-// fakeRunner 像 delegation 的 DelegatedRead 那樣先授權再執行 read；它不寫稽核（成功的讀取不稽核，見模組的測試）。
 type fakeRunner struct {
 	reads int
 	err   error

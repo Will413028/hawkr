@@ -88,12 +88,12 @@ function restoreMediaObjectKey(value: string): string | null {
 		host = u.host;
 		pathname = u.pathname;
 	} catch {
-		return null; // not an absolute URL
+		return null;
 	}
-	if (host !== configuredMediaHost()) return null; // foreign host — leave to caller
-	let rest = pathname.replace(/^\/+/, ""); // drop leading slash(es)
+	if (host !== configuredMediaHost()) return null;
+	let rest = pathname.replace(/^\/+/, "");
 	if (rest.startsWith("i/")) {
-		const afterI = rest.slice(2); // "{preset}/{objectKey}"
+		const afterI = rest.slice(2);
 		const idx = afterI.indexOf("/");
 		if (idx >= 0) rest = afterI.slice(idx + 1);
 	}
@@ -114,13 +114,9 @@ export function buildImageUrl(
 
 	const base = mediaBaseUrl();
 
-	// Peel our own media-host display URLs back to the objectKey so they
-	// re-render under the requested preset.
 	const restored = restoreMediaObjectKey(trimmed);
 	if (restored !== null) return `${base}/i/${preset}/${restored}`;
-	// Foreign URLs / data / blob are not objectKeys → passthrough.
 	if (isPassthrough(trimmed)) return trimmed;
-	// No media origin configured: there is no host to build an object URL on.
 	if (!base) return "";
 	const key = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed;
 	return `${base}/i/${preset}/${key}`;

@@ -10,9 +10,6 @@ export type MainTabPendingSnapshot = Readonly<{
 	variant: MainTabPendingVariant;
 }> | null;
 
-// This is cleanup after the existing 20s main-tab navigation watchdog, not a
-// completion signal. A slow request must not reveal the source at the progress
-// rail's unrelated 4s abort deadline.
 const PENDING_CLEANUP_MS = 22_000;
 const variants = new Map<string, MainTabPendingVariant>([
 	["/", "home"],
@@ -88,7 +85,6 @@ export function beginMainTabPending(
 		clearPending();
 		return;
 	}
-	// locale-free, like the `usePathname()` the pending surface compares them with
 	const sourcePathname = stripLocale(window.location.pathname);
 	const targetPathname = stripLocale(target.pathname);
 	const variant = variants.get(targetPathname);
@@ -97,8 +93,6 @@ export function beginMainTabPending(
 		!variant ||
 		!isTabToTabNav(sourcePathname, targetPathname)
 	) {
-		// A source-tab re-tap or a newer non-tab destination supersedes the
-		// pending shell just as it supersedes the router's earlier navigation.
 		clearPending();
 		return;
 	}
@@ -115,7 +109,5 @@ export function beginMainTabPending(
 /** Called from the content owner's layout effect, never a history insertion effect. */
 export function completeMainTabPending(committedPathname: string): void {
 	if (!snapshot || committedPathname === snapshot.sourcePathname) return;
-	// Reaching the requested tab or any redirected destination ends this
-	// surface. The initial effect for the still-current source cannot clear it.
 	clearPending();
 }

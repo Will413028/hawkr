@@ -139,8 +139,6 @@ class _SellerFloatingNavigationLayoutState
     if (notification is ScrollStartNotification) {
       _userScrollActive = notification.dragDetails != null;
     } else if (notification is ScrollUpdateNotification) {
-      // 程式性 jumpTo／animateTo 沒有 dragDetails；忽略它們。手指放開後的
-      // 慣性捲動仍屬於同一個使用者手勢，持續追蹤到 ScrollEnd。
       if (notification.dragDetails != null) _userScrollActive = true;
       if (!_userScrollActive) return false;
       _consumeUserScrollDelta(notification.scrollDelta ?? 0);

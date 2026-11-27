@@ -16,9 +16,6 @@ function recordToHit(p: ProductRecord): SearchProductHit {
 		...(p as unknown as SearchProductHit),
 		id: p.id ?? "",
 		name: p.name ?? "",
-		// §231: the popover renders through resolveCdnUrl, so hand it the bare
-		// objectKey. `/public/products` sends `imageKey` + `imageKeys` (SSOT) with
-		// the Gateway-composed `imageUrl`/`imageUrls` twins.
 		imageKey: p.imageKey || p.imageKeys?.[0] || undefined,
 		sellerName,
 		seller: p.seller
@@ -56,8 +53,6 @@ export async function GET(request: Request) {
 	const priceMax = params.get("price_max");
 	const sortBy = params.get("sort_by") || undefined;
 	const sortOrder = params.get("sort_order") || undefined;
-	// Both upstream reads below are made on one visitor's behalf, so they are
-	// charged to that visitor rather than to the shared SSR subject (backend#2264).
 	const visitorIp = getVisitorIp(request);
 
 	let result: Awaited<ReturnType<typeof searchProducts>>;
@@ -80,9 +75,6 @@ export async function GET(request: Request) {
 			signal: request.signal,
 		});
 	} catch {
-		// An unavailable keyword source must not overwrite the buyer's cached
-		// cards with a successful-looking empty result. Category fills below are
-		// optional and may still fail without discarding real keyword matches.
 		return Response.json(
 			{ error: "商品搜尋暫時無法載入" },
 			{ status: 502, headers: { "cache-control": "no-store" } },
@@ -92,8 +84,6 @@ export async function GET(request: Request) {
 	const merged: SearchProductHit[] = [...result.records];
 	const seen = new Set(merged.map((r) => String(r.id)));
 
-	// Top up with same-category products (keyword hits stay first). Honour an
-	// explicit category filter if given, else take the top hit's category.
 	const topCategoryId =
 		categoryId || result.records.find((r) => r.categoryId)?.categoryId;
 	if (topCategoryId && merged.length < RELATED_CAP && !request.signal.aborted) {
@@ -115,12 +105,9 @@ export async function GET(request: Request) {
 				if (merged.length >= RELATED_CAP) break;
 			}
 		} catch {
-			// Same-category top-up is best-effort; keyword hits already returned.
 		}
 	}
 
-	// 只吐 records（§16）。過去同時吐 products + records 兩份同樣的陣列，讓上游
-	// 換 key 時沒有任何一端會壞——也就沒有任何一端會發現。
 	return Response.json(
 		{ records: merged, total: result.total },
 		{ headers: { "cache-control": "public, max-age=20" } },

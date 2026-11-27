@@ -41,8 +41,6 @@ export default function DelegatedAreaUnauthorized({
 			{backHref ? (
 				<Link
 					href={backHref}
-					// 理由同 `OperationBlockedState`：`.adm-blocked__link` 的實心底白字
-					// 會被 dark 的 `body a:not([data-hkui-button])` 換成 `--color-ink-200`。
 					data-hkui-button=""
 					className="adm-blocked__link"
 				>

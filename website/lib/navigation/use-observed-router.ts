@@ -71,9 +71,6 @@ export function useObservedRouter(componentId: string) {
 				);
 				return router.forward();
 			},
-			// Refresh keeps the same route and is not a navigation intent. In
-			// particular, a refresh immediately following push/replace must not
-			// supersede the still-pending destination transaction.
 			refresh: () => {
 				return router.refresh();
 			},

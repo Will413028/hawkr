@@ -50,10 +50,8 @@ export default function Page() {
 
 test("會渲染的頁面不算 redirect-only", () => {
 	const routes = discoverRedirectOnlyPages();
-	// /about 是普通的 RSC 頁；它若被誤認，site-links 會期待它 307 而它回 200。
 	assert.ok(!routes.includes("/about"));
 	assert.ok(!routes.includes("/"));
-	// 放寬只該多認「守衛 + redirect」這一種形狀，不該把清單放大到失控。
 	assert.ok(
 		routes.length <= 5,
 		`redirect-only 頁暴增到 ${routes.length} 條，偵測器多半放太寬：${JSON.stringify(routes)}`,

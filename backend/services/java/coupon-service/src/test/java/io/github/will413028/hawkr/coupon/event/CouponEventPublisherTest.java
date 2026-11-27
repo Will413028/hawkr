@@ -36,7 +36,6 @@ class CouponEventPublisherTest {
     void publishCouponIssued_unresolvedBuyerIsNotEchoedAsAnAccount() {
         RabbitTemplate rabbit = mock(RabbitTemplate.class);
         BuyerGrpcClient buyers = mock(BuyerGrpcClient.class);
-        // 舊 buyer-service 會回填 principals；unresolved_ids 才是真相。
         when(buyers.resolvePrincipals(List.of(3001L))).thenReturn(PrincipalResolution.of(Map.of(3001L, 3001L), List.of(3001L)));
 
         new CouponEventPublisher(rabbit, buyers).publishCouponIssued(3001L, 1L, "券", null, "2026-12-31");

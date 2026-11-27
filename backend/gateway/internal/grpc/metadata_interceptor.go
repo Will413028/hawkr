@@ -9,8 +9,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// ==================== Context Keys ====================
-// 用於在 Go context 中傳遞身分與追蹤資訊（由 auth/tracing middleware 設定）
 
 type contextKey string
 
@@ -25,7 +23,6 @@ const (
 	CtxKeyRequestID contextKey = "auth-request-id"
 )
 
-// ==================== Context 存取工具 ====================
 
 // WithAuthContext 將身分資訊存入 Go context
 // 由 auth.go middleware 呼叫
@@ -57,7 +54,6 @@ func GenerateRequestID() string {
 	return uuid.New().String()
 }
 
-// ==================== gRPC Client Interceptor ====================
 
 // AuthMetadataInterceptor 建立 gRPC Client UnaryInterceptor，
 // 自動從 Go context 提取身分與追蹤資訊，注入 gRPC outgoing metadata。
@@ -73,7 +69,6 @@ func AuthMetadataInterceptor() grpc.UnaryClientInterceptor {
 
 		pairs := make([]string, 0, 8)
 
-		// 身分資訊
 		if accountID, ok := ctx.Value(CtxKeyAccountID).(int64); ok && accountID > 0 {
 			pairs = append(pairs, "x-account-id", fmt.Sprintf("%d", accountID))
 		}
@@ -81,7 +76,6 @@ func AuthMetadataInterceptor() grpc.UnaryClientInterceptor {
 			pairs = append(pairs, "x-account-type", accountType)
 		}
 
-		// 追蹤資訊
 		if traceID, ok := ctx.Value(CtxKeyTraceID).(string); ok && traceID != "" {
 			pairs = append(pairs, "x-trace-id", traceID)
 		}
@@ -89,7 +83,6 @@ func AuthMetadataInterceptor() grpc.UnaryClientInterceptor {
 			pairs = append(pairs, "x-request-id", requestID)
 		}
 
-		// 合併既有 metadata（保留 OTel 等已設定的 metadata）
 		if len(pairs) > 0 {
 			md := metadata.Pairs(pairs...)
 			if existingMD, ok := metadata.FromOutgoingContext(ctx); ok {

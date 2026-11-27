@@ -65,8 +65,6 @@ const NotificationUnreadContext = React.createContext<UnreadCountState | null>(
 	null,
 );
 
-// Separate from the unread context so a status change does not re-render the
-// count's consumers and a count change does not re-render the status's.
 const NotificationStreamStatusContext =
 	React.createContext<SseConnectionStatus>("idle");
 
@@ -93,9 +91,6 @@ export function NotificationUnreadProvider({
 
 	const activeListInvalidationPendingRef = React.useRef(false);
 	const invalidateActiveLists = React.useCallback(() => {
-		// The first frame after a reconnect arrives as a reconnect signal and an
-		// inbox signal in the same task; collapse them into one active-list refetch
-		// instead of repeatedly cancelling and restarting the same infinite query.
 		if (activeListInvalidationPendingRef.current) return;
 		activeListInvalidationPendingRef.current = true;
 		queueMicrotask(() => {
@@ -104,7 +99,6 @@ export function NotificationUnreadProvider({
 		});
 	}, [identity, queryClient]);
 
-	// 串流 effect 不依賴它：身分物件換了參照不該重連。
 	const invalidateRef = React.useRef(invalidateActiveLists);
 	invalidateRef.current = invalidateActiveLists;
 
@@ -137,8 +131,6 @@ export function NotificationUnreadProvider({
 				} else if (signal.type === "reconnected" && signal.afterAbnormalEnd) {
 					void unreadRef.current.refresh();
 					invalidateRef.current();
-					// Signals during the gap may be lost: tell every state-refresh
-					// subscriber to re-read, as the backend does on reconnect.
 					const detail: NotificationSignalEventDetail = {
 						hints: ALL_STATE_REFRESH_HINTS,
 					};
@@ -173,7 +165,6 @@ export function NotificationUnreadProvider({
 		}
 		if (unavailableRecoveryRef.current === resetSignal) return;
 		unavailableRecoveryRef.current = resetSignal;
-		// One recovery per terminal stream failure; this is not polling.
 		void unreadRef.current.refresh();
 		invalidateActiveLists();
 	}, [invalidateActiveLists, resetSignal, streamStatus]);

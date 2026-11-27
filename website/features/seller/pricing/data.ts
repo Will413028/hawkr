@@ -115,7 +115,6 @@ export const SELLER_PLANS: SellerPlan[] = [
 	},
 ];
 
-// 公開頁一律使用「成交服務費」；契約正文使用「平台交易服務費，以下簡稱成交服務費」。
 export const TAX_NOTE =
 	"上列方案月費與百分比均為含 5% 營業稅的價格，結帳後不再另加。";
 

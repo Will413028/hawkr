@@ -1,8 +1,5 @@
 import "@/styles/features/market.css";
 import "@/styles/features/market-products-list.css";
-/* RecommendedPostRail renders <PostCardV2>, which relies on
- * feed-components.css for badge / like / author absolute positioning.
- * Without this import the card chrome collapses to a plain block stack. */
 import "@/styles/features/feed-components.css";
 import "@/styles/features/search-agent-entry.css";
 import { getCachedHotProducts, getCachedPublicPosts } from "@/lib/api/cached";
@@ -20,8 +17,6 @@ import SearchClient from "./SearchClient";
  * without a per-request dynamic server render.
  */
 export default async function SearchPage() {
-	// The two landing rails fetch concurrently but commit as one server tree,
-	// then ship inside the static HTML.
 	const [hotProducts, landingPosts] = await Promise.all([
 		getCachedHotProducts(8).catch(() => []),
 		getCachedPublicPosts(8).catch(() => ({

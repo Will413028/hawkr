@@ -111,7 +111,6 @@ public class AfterSalePayoutHoldService {
         List<AfterSaleCaseEntity> cases = caseMapper.selectList(
                 new LambdaQueryWrapper<AfterSaleCaseEntity>().eq(AfterSaleCaseEntity::getOrderNo, orderNo));
         if (cases == null || cases.isEmpty()) {
-            // 絕大多數訂單走這條：沒有售後 case ⇒ 完全不受本閘門影響，撥款 cadence 不變
             return PayoutHold.released();
         }
 
@@ -125,14 +124,12 @@ public class AfterSalePayoutHoldService {
         for (AfterSaleCaseEntity c : cases) {
             AfterSaleCaseStatus status = AfterSaleCaseStatus.isValidValue(c.getStatus())
                     ? AfterSaleCaseStatus.fromValue(c.getStatus())
-                    : null;   // 讀不出來 ⇒ payoutBlock 回 INDEFINITE（deny-by-default）
+                    : null;
 
             switch (AfterSaleCaseStatusRules.payoutBlock(status, c.getAppealState())) {
                 case NONE -> {
-                    // 這張 case 確定不會再生出退款
                 }
                 case INDEFINITE -> {
-                    // 無時間界者支配一切，可直接短路
                     log.info("AfterSalePayoutHoldService.hold.indefinite",
                             "撥款 hold（無時間界）status=" + c.getStatus()
                                     + ", appealState=" + c.getAppealState()
@@ -143,20 +140,14 @@ public class AfterSalePayoutHoldService {
                 case UNTIL_APPEAL_DEADLINE -> {
                     LocalDateTime deadline = AppealDeadlineRules.computeDeadline(c, deadlineHours);
                     if (deadline == null) {
-                        // 起算時間戳缺漏 ⇒ submitAppeal 的 A3 也會拒絕 ⇒ 申訴不可能成立 ⇒ 不需 hold
                         continue;
                     }
                     LocalDateTime until = deadline.plusMinutes(graceMinutes);
                     if (!now.isBefore(until)) {
-                        // 窗（含 grace）已過——但這是本 service 唯一會「放行」的出口，
-                        // 放行前必須通過 backend#3262 P0 的兩道確認（修復本體）：
-                        //   (a) 沒有一筆已通過 A3、尚未 commit 的申訴正壓在這一列上
-                        //   (b) 上面那個 selectList 快照不是舊的（申訴可能在快照之後才 commit）
-                        // 正確性來自 submitAppeal 的持鎖順序，不是來自 grace 的長度。
                         if (!confirmStillReleasableUnderLock(c, orderNo, deadlineHours, graceMinutes)) {
                             return new PayoutHold(true, null, HoldReason.APPEAL_IN_FLIGHT, c.getCaseNo());
                         }
-                        continue;   // 窗已過、無人持鎖、且新鮮那一列仍可放行 ⇒ 買家再也不能申訴 ⇒ 放行
+                        continue;
                     }
                     if (latestBoundedUntil == null || until.isAfter(latestBoundedUntil)) {
                         latestBoundedUntil = until;
@@ -212,14 +203,13 @@ public class AfterSalePayoutHoldService {
 
         AfterSaleCaseStatus freshStatus = AfterSaleCaseStatus.isValidValue(fresh.getStatus())
                 ? AfterSaleCaseStatus.fromValue(fresh.getStatus())
-                : null;   // 讀不出來 ⇒ payoutBlock 回 INDEFINITE（deny-by-default）
+                : null;
         boolean releasable = switch (AfterSaleCaseStatusRules.payoutBlock(
                 freshStatus, fresh.getAppealState())) {
             case NONE -> true;
             case INDEFINITE -> false;
             case UNTIL_APPEAL_DEADLINE -> {
                 LocalDateTime freshDeadline = AppealDeadlineRules.computeDeadline(fresh, deadlineHours);
-                // 起算時間戳缺漏 ⇒ A3 也會拒絕 ⇒ 申訴不可能成立 ⇒ 可放行（與主迴圈同語意）
                 yield freshDeadline == null
                         || !DateTimeUtils.nowUtc().isBefore(freshDeadline.plusMinutes(graceMinutes));
             }

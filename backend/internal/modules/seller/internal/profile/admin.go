@@ -38,7 +38,6 @@ func (s *Service) AdminList(ctx context.Context, in model.StoreListInput) (model
 		params.StoreCode = &code
 	}
 	if in.KYCStatus != nil {
-		// 篩選的是目前那一筆還沒取消的申請：草稿是賣家自己的，已取消的不是目前的申請。
 		if !slices.Contains(filterableKYCStatuses, *in.KYCStatus) {
 			return model.StorePage{}, apperr.InvalidInputOn([]string{"KYCStatus"}, "申請狀態不合法")
 		}
@@ -120,10 +119,8 @@ func (s *Service) AdminList(ctx context.Context, in model.StoreListInput) (model
 	return page, nil
 }
 
-// filterableKYCStatuses 是清單可以篩選的申請狀態：核准與退回（儲存的事實）；審核中不在這裡：「待審核」是待辦的成員（KYCAwaitingReview），草稿與已取消不是「目前送出的申請」。
 var filterableKYCStatuses = []model.KYCStatus{model.KYCStatusApproved, model.KYCStatusRejected}
 
-// storeCode 回報關鍵字是不是 store_code（只有數字、1 到 10 位、不以 0 開頭：電話號碼不會被當成店號）。
 func storeCode(keyword string) (int64, bool) {
 	keyword = strings.TrimSpace(keyword)
 	if keyword == "" || len(keyword) > 10 || keyword[0] == '0' {

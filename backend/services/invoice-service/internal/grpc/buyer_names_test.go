@@ -51,7 +51,6 @@ func TestResolveBuyerNames_MasksBeforeReturning(t *testing.T) {
 	if got[11] != "陳•••" {
 		t.Fatalf("🔴 明碼外洩：got %q，應為遮罩後的值", got[11])
 	}
-	// 墓碑不是個資，遮了會變成讀不懂的字串，而它存在的唯一理由就是要讓人讀懂。
 	if got[12] != "已註銷的買家" {
 		t.Fatalf("墓碑被遮罩了：%q", got[12])
 	}
@@ -85,8 +84,6 @@ func TestResolveBuyerNames_DedupesAndDropsZero(t *testing.T) {
 // records 與 views 同序，錯位的症狀不是報錯，是甲買家的名字出現在乙買家的申訴卡上
 // ——那是一次跨使用者的資料外洩，而畫面完全正常。
 func TestFillBuyerNames_AttachesToTheRightRow(t *testing.T) {
-	// 🔴 兩個名字的**第一個字必須不同**：遮罩只保留第一個字，
-	// 用「阿明／阿華」會雙雙遮成「阿•••」⇒ 錯位了測試照樣綠，等於沒驗到排序。
 	r := &fakeBuyerNames{byID: map[int64]buyer.Display{
 		11: {DisplayName: "陳小明"},
 		22: {DisplayName: "林大華"},
@@ -97,7 +94,7 @@ func TestFillBuyerNames_AttachesToTheRightRow(t *testing.T) {
 		{ComplaintId: "A"}, {ComplaintId: "B"}, {ComplaintId: "C"},
 	}
 	views := []usecase.ComplaintView{
-		complaintView(22), complaintView(11), complaintView(99), // 99 查無
+		complaintView(22), complaintView(11), complaintView(99),
 	}
 	s.fillBuyerNames(context.Background(), records, views)
 

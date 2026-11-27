@@ -47,8 +47,6 @@ func (o *fakeReviewOrders) OrderForReview(_ context.Context, orderNo string) (re
 	return v, nil
 }
 
-// gatedCatalog 包住真的 catalog，在 arm 之後讓第一次 SetRating 停在寫入之前（直到 releaseFirstSet 關閉），
-// 並在第二次 LockProduct 被呼叫時通知；沒有 arm 就是直通。
 type gatedCatalog struct {
 	review.Catalog
 	mu              sync.Mutex
@@ -109,7 +107,6 @@ type catalogSocialReviewFixture struct {
 	seq     int
 }
 
-// runRatings 跑一輪評分投影；清到沒有待重算列為止（最多數輪，處理中到的請求會重排）。
 func (f *catalogSocialReviewFixture) runRatings(ctx context.Context) {
 	f.t.Helper()
 	for range 5 {
@@ -383,7 +380,6 @@ func TestReviewProjectsRatingToCatalogAsynchronouslyAndToleratesMissingProduct(t
 		t.Fatalf("Restore 後評分應為 (4.5, 2)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
 	}
 
-	// 不存在的商品：評價照常成功；worker 記錄後刪掉待重算列，不重試。
 	if _, err := f.review.Submit(ctx, review.SubmitInput{BuyerID: b2, OrderNo: "ORD-MISSING", OrderItemID: 3, Rating: 5, Content: "不存在商品"}); err != nil {
 		t.Fatalf("商品不存在不影響評價：%v", err)
 	}
@@ -399,7 +395,6 @@ func TestReviewProjectsRatingToCatalogAsynchronouslyAndToleratesMissingProduct(t
 		t.Fatalf("商品不存在：待重算列要被刪掉而不是留著重試：%d", n)
 	}
 
-	// 買家停用並 PurgeAuthor 後，catalog 評分同步為剩餘公開評價 (4.0, 1)。
 	if err := f.buyers.BeginDeletion(ctx, b1); err != nil {
 		t.Fatal(err)
 	}

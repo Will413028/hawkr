@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/lockorder"
 )
 
-// queryText 取出 sqlc 檔裡 `-- name: <name>` 開頭到下一個 `-- name:`（或檔尾）的原文。
 func queryText(t *testing.T, path, name string) string {
 	t.Helper()
 	raw, err := os.ReadFile(path)

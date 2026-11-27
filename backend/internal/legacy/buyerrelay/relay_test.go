@@ -92,7 +92,6 @@ func TestBuyerDeletedExchangeIsDeclaredInTopology(t *testing.T) {
 	}
 }
 
-// topologyDeclaresExchange 讀 topology.yaml（exchange 的唯一登記處），回答 exchange 有沒有宣告。
 func topologyDeclaresExchange(t *testing.T, exchange string) bool {
 	t.Helper()
 	body, err := os.ReadFile(filepath.Join("..", "..", "..", "infra", "mq", "topology", "topology.yaml"))

@@ -15,8 +15,6 @@ func TestDecideCorrectionRoute(t *testing.T) {
 	issued := codemeta.InvoiceDocumentStatusIssued.Value
 	pending := codemeta.InvoiceDocumentStatusPending.Value
 
-	// allPass 是「已開立且六項檢查全過」——R04 的基準線。
-	// 每個 case 只翻動它的一項，這樣失敗訊息指得出是哪一項。
 	allPass := CorrectionFacts{
 		DocumentStatus:      issued,
 		OperationOpen:       false,
@@ -45,9 +43,6 @@ func TestDecideCorrectionRoute(t *testing.T) {
 			wantRoute: RouteUpdateBeforeIssue,
 		},
 		{
-			// 🔴 這一格是本表最重要的：R04 的四項預檢問的是「作廢重開會不會失敗」，
-			// 而 R03 根本不作廢。拿它們擋 R03 會讓「字軌暫時不足」這種與本案無關的
-			// 狀況擋掉一個只是改快照的請求 —— 而買家會收到一句他看不懂的理由。
 			name: "尚未開立 ＋ 字軌不足／載具無效／已過期限／有折讓 → 仍走 R03",
 			facts: with(func(f *CorrectionFacts) {
 				f.DocumentStatus = pending
@@ -71,7 +66,6 @@ func TestDecideCorrectionRoute(t *testing.T) {
 			wantRoute: RouteVoidAndReissue,
 		},
 		{
-			// 已申報排最前面：它是唯一不會回頭的（其餘都可能隨時間或補配號改變）。
 			name: "已申報優先於其他理由（同時有多項不過時，回最終局的那一個）",
 			facts: with(func(f *CorrectionFacts) {
 				f.AlreadyReported = true
@@ -151,13 +145,10 @@ func TestDecideCorrectionRoute_NonRejectCarriesNoReason(t *testing.T) {
 // 這些真終態的憑證變成「請稍後再試」，買家永遠等一個不會來的結果。
 // 所以下表把真終態也一併列進來，它們必須仍然是婉拒。
 func TestDecideCorrectionRoute_InProgressIsNotReject(t *testing.T) {
-	// 進行中：operation 已離開 READY／RETRY_SCHEDULED（所以 OperationOpen=false），
-	// 但憑證的實體流程還沒結束。
 	inProgress := []string{
 		codemeta.InvoiceDocumentStatusVoiding.Value,
 		codemeta.InvoiceDocumentStatusIssuing.Value,
 	}
-	// 真終態：沒有東西會再動它 ⇒ 仍是婉拒。
 	terminal := []string{
 		codemeta.InvoiceDocumentStatusVoided.Value,
 		codemeta.InvoiceDocumentStatusSuperseded.Value,

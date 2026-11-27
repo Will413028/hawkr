@@ -68,7 +68,6 @@ class ChatThreadScreen extends HookConsumerWidget {
     final data = thread.value;
     final convId = data?.conversationId;
 
-    // 標記使用者正在這個聊天室裡，讓前景通知跳過同一個對話。
     useEffect(() {
       final peerVal = (participantId ?? '').isNotEmpty ? participantId : null;
       final convVal = (conversationId ?? '').isNotEmpty ? conversationId : null;
@@ -91,7 +90,6 @@ class ChatThreadScreen extends HookConsumerWidget {
       return null;
     }, [convId]);
 
-    // 對方是否在線：進頁後與每 30 秒讀一次。
     useEffect(() {
       if (convId == null) return null;
       var disposed = false;
@@ -112,7 +110,6 @@ class ChatThreadScreen extends HookConsumerWidget {
       };
     }, [convId]);
 
-    // 捲到最舊端時載入更早的訊息（列表是反向的，最舊的在 maxScrollExtent）。
     useEffect(() {
       void onScroll() {
         if (!scrollCtrl.hasClients) return;
@@ -126,7 +123,6 @@ class ChatThreadScreen extends HookConsumerWidget {
       return () => scrollCtrl.removeListener(onScroll);
     }, const []);
 
-    // 新訊息到尾端時，使用者在底部附近就跟著捲下去。
     final lastCount = data?.messages.length ?? 0;
     useEffect(() {
       if (scrollCtrl.hasClients && scrollCtrl.position.pixels < 120) {
@@ -343,7 +339,6 @@ class ChatThreadScreen extends HookConsumerWidget {
                 itemCount: list.length,
                 itemBuilder: (context, i) {
                   final m = list[i];
-                  // reverse：i+1 是時間上更早的一則。
                   final older = i + 1 < list.length ? list[i + 1] : null;
                   final newer = i > 0 ? list[i - 1] : null;
                   final first = older == null || older.fromStore != m.fromStore;

@@ -174,8 +174,6 @@ function RenameField({
 
 	const trimmed = value.replaceAll(/[\n\r]/g, " ").trim();
 	const runes = Array.from(trimmed).length;
-	// 超長以前是靜默還原——使用者打了 60 個字、按 Enter、標題變回原樣，
-	// 而且沒有任何地方說過有 40 字上限。現在即時說出來。
 	const tooLong = runes > MAX_TITLE_RUNES;
 
 	const commit = () => {
@@ -278,9 +276,6 @@ export default function ConversationSidebar({
 		null,
 	);
 
-	// 沒有標題也沒有任何訊息的對話＝點了「＋」卻沒輸入就離開的殘骸。一整排
-	// 「未命名對話」既無法分辨也點不出東西，所以不進列表。正在看的那一個
-	// 例外——把使用者當下所在的列從側欄抽走會讓人以為對話被刪了。
 	const agentRows = React.useMemo(
 		() =>
 			agentConversations.filter(
@@ -288,10 +283,6 @@ export default function ConversationSidebar({
 			),
 		[agentConversations],
 	);
-	// 分頁的有無跟著「這個收件匣本身有沒有 Agent」，不是「現在剛好有幾個
-	// agent 對話」——後者會讓同一頁在新帳號、清空對話後、或列表端點暫時
-	// 降級時各長成不一樣的樣子。買家收件匣一定有 assistantEntry，賣家中心
-	// 沒有，剛好就是這條界線。
 	const hasAgentSection = Boolean(assistantEntry);
 	const compactSectionTabs = hasAgentSection && collapsed && iconRailViewport;
 
@@ -299,7 +290,6 @@ export default function ConversationSidebar({
 	const visibleItems = React.useMemo(() => {
 		const q = query.trim().toLowerCase();
 		return items.filter((item) => {
-			// 「未讀」只在沒有 agent 分頁時存在（見 FilterKey 的說明）。
 			if (!hasAgentSection && filter === "unread" && item.unreadCount <= 0)
 				return false;
 			if (!q) return true;
@@ -311,7 +301,6 @@ export default function ConversationSidebar({
 		});
 	}, [items, query, filter, hasAgentSection, ut]);
 
-	// Agent 列吃搜尋、但沒有未讀語意，所以不套未讀篩選。
 	const visibleAgentRows = React.useMemo(() => {
 		const q = query.trim().toLowerCase();
 		if (!q) return agentRows;
@@ -322,23 +311,12 @@ export default function ConversationSidebar({
 		);
 	}, [agentRows, query]);
 
-	// 分頁旁的數字在所有訊息產品都代表「未讀」，所以這裡就給未讀數，不給總數。
-	// agent 對話沒有未讀語意，那顆分頁因此不帶數字（WhatsApp 的 chip rail 同理：
-	// 只有 Unread 有數字）。
 	const unreadCount = React.useMemo(
 		() =>
 			items.reduce((total, item) => total + Math.max(0, item.unreadCount), 0),
 		[items],
 	);
 
-	// 分頁預設跟著「你現在在讀哪一則」，不是寫死「賣家」。寫死的後果是：點進
-	// 一則 Agent 對話後，側欄停在賣家分頁——你正在讀的那則不在看得到的清單裡，
-	// 而且「開新對話」也在另一個分頁後面（部署被擋下來時就是卡在這）。
-	// 手動切過之後以使用者的選擇為準，不再被路由拉回去。
-	// 用路由本身，不用資料反推。`assistantEntry.active` 只在停在
-	// /assistant/procurement 時為真，而第一輪之後 URL 已被 replaceState 改成
-	// 對話 id；`row.active` 則要等列表載回來、且那則真的在列表裡。兩個訊號都
-	// 會在「剛開始的新對話」這個最常見的情況下同時是 false。
 	const routeSection: SectionKey =
 		onAssistantRoute ||
 		assistantEntry?.active ||
@@ -350,8 +328,6 @@ export default function ConversationSidebar({
 
 	const showAgentList = hasAgentSection && section === "agent";
 
-	// 分頁數字改成未讀之後，「搜到的東西在另一個分頁」就不能再靠數字表達，
-	// 改成在空狀態裡直接講出來並給一個可點的切換。
 	const query_ = query.trim();
 	const otherTabMatches = showAgentList
 		? visibleItems.length
@@ -369,17 +345,11 @@ export default function ConversationSidebar({
 				}
 			: null;
 
-	// 兩份清單都以 pageSize 50 抓取。剛好拿滿就有可能被截斷——這種時候
-	// 不可以斬釘截鐵說「找不到對話」，那會對一個真的存在的對話說謊。
 	const humanMaybeTruncated = items.length >= 50;
 	const activeListMaybeTruncated = showAgentList
 		? agentHasMore
 		: humanMaybeTruncated;
 
-	// 清單底部的「顯示 1 - 6 / 6」。兩個數字都取**當前分頁**的，不把兩份清單
-	// 加總——使用者看得到的就是其中一份，加總會給出一個畫面上數不出來的數字。
-	// 載入中與空清單都會落到 `visible === 0`，由 helper 自己回 null，所以這裡
-	// 不需要再判一次載入旗標。
 	const rangeLabel = conversationRangeLabel({
 		visible: showAgentList ? visibleAgentRows.length : visibleItems.length,
 		loaded: showAgentList ? agentRows.length : items.length,
@@ -445,9 +415,6 @@ export default function ConversationSidebar({
 				aria-label={hasAgentSection ? "訊息分類" : "訊息篩選"}
 				aria-orientation={compactSectionTabs ? "vertical" : "horizontal"}
 				onKeyDown={(event) => {
-					// Expanded tabs are horizontal; the compact icon rail is vertical.
-					// Only consume the arrows promised by the current ARIA orientation,
-					// otherwise ArrowUp/Down would unexpectedly block page scrolling.
 					const orientationKeys = compactSectionTabs
 						? ["ArrowUp", "ArrowDown"]
 						: ["ArrowLeft", "ArrowRight"];
@@ -509,7 +476,7 @@ export default function ConversationSidebar({
 									aria-hidden="true"
 								/>
 							</span>
-							{/* 數字＝未讀，跟所有訊息產品一致；0 不印。 */}
+
 							{unreadCount > 0 ? (
 								<span className="chat-sidebar__filter-count">
 									{unreadCount > 99 ? "99+" : unreadCount}
@@ -609,15 +576,7 @@ export default function ConversationSidebar({
 				}
 				aria-busy={showAgentList ? agentLoading : loading}
 			>
-				{/* 開新對話是常駐的：它以前掛在 header 的方框 ＋ 上，那顆拿掉之後
-				 * 入口只剩空狀態那一顆——買家一旦有了任何一則對話，側欄裡就再也開
-				 * 不了新的（`onNewAgentChat` 還在傳，只是沒有地方渲染）。
-				 *
-				 * 放在列表頂端而不是 header：它是「這份清單的第一個項目」，跟著清
-				 * 單捲動的層級關係比浮在標題列上更直接。
-				 *
-				 * 使用 Edit 圖示，而不是曾被移除的方框 Plus：它表達「開始撰寫」且不會
-				 * 把這列誤讀成清單裡的新增資料方框。 */}
+
 				{showAgentList && onNewAgentChat ? (
 					<button
 						type="button"
@@ -633,9 +592,7 @@ export default function ConversationSidebar({
 					</button>
 				) : null}
 
-				{/* 載入中／端點降級／真的沒有／搜不到，是四種不同狀態，不可以共用
-				 * 同一句 placeholder（DESIGN.md：空表、載入、錯誤、無搜尋結果與無
-				 * 權限是不同狀態）。 */}
+
 				{showAgentList && visibleAgentRows.length === 0 ? (
 					agentLoading ? (
 						<ConversationListLoading />
@@ -687,10 +644,6 @@ export default function ConversationSidebar({
 					<nav className="chat-sidebar__agent" aria-label="Hawkr Agent 對話">
 						<ul className="chat-sidebar__list chat-sidebar__list--agent">
 							{visibleAgentRows.map((row) => {
-								// 後端的自動標題要「品項＋配送城市」都齊了才產生，而且
-								// backfill 出來的舊對話 title 是空字串——只退回「未命名對話」
-								// 的話，一整排列會長得一模一樣、無法分辨。沒有標題就用最後
-								// 一則訊息當列標（那是真實內容），並且不再重複印一次預覽。
 								const label = row.title || row.preview || "未命名對話";
 								const showPreview = Boolean(row.title) && Boolean(row.preview);
 								const body = (
@@ -711,8 +664,6 @@ export default function ConversationSidebar({
 								return (
 									<li key={row.id} className="chat-sidebar__agent-row">
 										{renamingId === row.id && onAgentRowRename ? (
-											// 就地改名時整列不是連結——輸入框巢在 <a> 裡會被
-											// 導航吃掉點擊，而且巢狀互動元素是 a11y 硬傷。
 											<div className="chat-sidebar__item" data-kind="agent">
 												<RenameField
 													initial={row.title || ""}
@@ -730,7 +681,6 @@ export default function ConversationSidebar({
 												data-kind="agent"
 												aria-current={row.active ? "page" : undefined}
 												title={collapsed ? label : undefined}
-												// 滑過就先把該對話抓進快取，點下去才不用等。
 												onMouseEnter={() => onAgentRowPrefetch?.(row)}
 												onFocus={() => onAgentRowPrefetch?.(row)}
 											>
@@ -739,8 +689,6 @@ export default function ConversationSidebar({
 										)}
 										{renamingId !== row.id &&
 										(onAgentRowRename || onAgentRowDelete) ? (
-											// Link 的兄弟節點（絕對定位），不巢狀在 Link 內——
-											// 巢狀互動元素是 a11y 硬傷。
 											<span className="chat-sidebar__agent-actions">
 												{onAgentRowDelete ? (
 													<button
@@ -785,8 +733,6 @@ export default function ConversationSidebar({
 							copy = "所有訊息都已讀完，先去逛逛新商品吧。";
 						} else if (isSearch) {
 							title = "找不到對話";
-							// 清單一次只抓 50 筆。剛好拿滿代表可能還有沒載入的對話，
-							// 這時候說「找不到」會對一個真的存在的對話說謊。
 							copy = activeListMaybeTruncated
 								? "目前只載入最近的對話，更早的還沒抓下來。"
 								: "換個關鍵字再試一次。";
@@ -866,14 +812,7 @@ export default function ConversationSidebar({
 				)}
 			</div>
 
-			{/* 清單底部的計數（設計稿 01／03／04 都有這一列）。
-			 *
-			 * 住在 `.chat-sidebar__panel` **外面**：面板是 `flex: 1 1 0` 且自己
-			 * 捲動，放進去會跟著列一起捲走，而這一列要講的正是「捲到底之前共有
-			 * 幾筆」。
-			 *
-			 * 收合成 icon rail 時整列隱藏（CSS）而不是這裡回 null：rail 只有
-			 * 44px 寬，一段中文計數在那個寬度只會擠成兩三行。 */}
+
 			{rangeLabel ? <p className="chat-sidebar__range">{rangeLabel}</p> : null}
 		</aside>
 	);

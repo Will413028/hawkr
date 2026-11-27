@@ -211,7 +211,6 @@ func TestAbortEndsTheTurnAsFailedAndReleasesTheSession(t *testing.T) {
 	collect(t, e, buyer, again.TurnID, "")
 }
 
-// failOnceCreate 的第一次 Create 等到 release 才失敗，之後交給底層。
 type failOnceCreate struct {
 	session.Service
 	entered chan struct{}

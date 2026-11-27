@@ -76,8 +76,6 @@ export default function InvoiceAuditConsole({
 	initialJobId?: string;
 }) {
 	const seeded: FilterDraft = { ...EMPTY_FILTERS, jobId: initialJobId };
-	// draft / applied 兩層：按「套用篩選」才生效。少了這一層，每打一個字就是一次
-	// 查詢，而這些端點共用一個限流桶。
 	const [draft, setDraft] = useState<FilterDraft>(seeded);
 	const [applied, setApplied] = useState<FilterDraft>(seeded);
 	const [filterError, setFilterError] = useState("");
@@ -118,8 +116,6 @@ export default function InvoiceAuditConsole({
 	const total = data?.total ?? 0;
 	const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 	const hasFilters = !isBlank(applied);
-	// 「重設」要連**還沒套用的草稿**一起清掉：否則按完之後篩選框還留著字而列表已是全集，
-	// 兩者互相矛盾。
 	const canReset = hasFilters || !isBlank(draft);
 	const selected = records.find((row) => row.auditLogId === selectedId) ?? null;
 
@@ -246,11 +242,7 @@ export default function InvoiceAuditConsole({
 							}
 						/>
 					</div>
-					{/*
-					 * 這兩個是 `type="date"` 不是 `datetime-local`：端點 61 的 date_from／date_to
-					 * 契約就是 `YYYY-MM-DD`。給時間選擇器卻把時間那半丟掉，是一個不會發出
-					 * 任何訊號的靜默失效（理由全文見 features/invoices/date-range.ts）。
-					 */}
+
 					<div className="adm-operation-field">
 						<label htmlFor="invoice-audit-from">起始日期</label>
 						<input
@@ -311,10 +303,7 @@ export default function InvoiceAuditConsole({
 				) : (
 					<div className="adm-audit-table-wrap">
 						<table className="adm-audit-table">
-							{/*
-							 * ADM 既有表格沒有 caption，這是刻意補強（58A §A10 要求，並寫進 PR body
-							 * 免得被當成不一致）：螢幕閱讀器在進入表格時需要一句「這是什麼表、多少筆」。
-							 */}
+
 							<caption className="sr-only">
 								發票操作稽核紀錄，共 {total} 筆，依操作發生時間由新到舊排列
 							</caption>
@@ -336,11 +325,7 @@ export default function InvoiceAuditConsole({
 								{records.length === 0 ? (
 									<tr>
 										<td colSpan={6} className="adm-audit-empty">
-											{/*
-											 * 三句話刻意不同：載入中／有篩選但無結果／完全沒有紀錄。
-											 * 共用一句會讓管理員以為今天沒有任何操作，而實際上是他把
-											 * 條件設窄了。
-											 */}
+
 											{isLoading
 												? "正在載入發票稽核紀錄…"
 												: hasFilters
@@ -358,12 +343,7 @@ export default function InvoiceAuditConsole({
 										>
 											<td>{formatDateTime(entry.occurredAt)}</td>
 											<td>
-												{/*
-												 * 中文來源優先序：**已載入資料的欄位優先**，只有「本期間沒
-												 * 發生過的動作」才退回 CodeMeta 鏡像。Phase 1 的 DTO 還沒有
-												 * `operationTypeLabel` ⇒ 兩處都走 CodeMeta，但結構留成這個
-												 * 形狀，日後後端補欄位不用重寫。
-												 */}
+
 												<strong>
 													{codeLabel(
 														INVOICE_OPERATION_TYPE_LABEL,

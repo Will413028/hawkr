@@ -267,7 +267,6 @@ func TestEveryOpenCaseHasADecisionOptionForAllConsistentFacts(t *testing.T) {
 			}
 		}
 	}
-	// 已結案的案件沒有任何可以選的決定。
 	if got := (CaseFacts{Case: closedCase(policy.Fraud, CaseClosedDecided), ActionTakenReports: 1, ResultingMeasures: 1}).Availability().DecisionOptions(); len(got) != 0 {
 		t.Errorf("已結案：%v", got)
 	}
@@ -279,8 +278,8 @@ func reportBlocksOf(bs ...ReportBlock) []ReportBlock { return bs }
 func TestReportAvailabilityListsEveryReasonInOrder(t *testing.T) {
 	type want struct {
 		triage, move, cite []ReportBlock
-		takeAction         []ReportBlock // 結果「已採取措施」不能設的原因
-		otherOutcomes      []ReportBlock // 其餘結果不能設的原因（都相同）
+		takeAction         []ReportBlock
+		otherOutcomes      []ReportBlock
 		outcomes           []Outcome
 	}
 	noActionBasis := &CaseFacts{Case: openCase(policy.Fraud), StoreClosed: false}
@@ -409,7 +408,6 @@ func TestEveryBlockHasADistinctSentence(t *testing.T) {
 		if msg == "" {
 			t.Errorf("ReportBlock %s 沒有句子", b)
 		}
-		// 店家已關閉：通報、案件與 CreateMeasure 是同一句（StoreActionUnavailableText），這是設計（建立措施被擋下時錯誤就是 CreateMeasure 的那一句）。
 		if b == ReportBlockStoreClosed {
 			if want := StoreActionUnavailableText(StoreReasonStoreClosed, StoreActionCreateMeasure).Text; msg != want {
 				t.Errorf("ReportBlock STORE_CLOSED 是 %q，要與 CreateMeasure 的 STORE_CLOSED 同一句 %q", msg, want)
@@ -441,7 +439,6 @@ func TestEveryBlockHasADistinctSentence(t *testing.T) {
 		}
 		seen[msg] = "CaseBlock " + string(b)
 	}
-	// 已結案：連結措施（從案件建立措施）的句子說明不能再從案件建立措施（#S31），與其他動作的「案件已結案。」不同。
 	if link, other := CaseBlockClosed.Text(CaseActionLinkMeasure).Text, CaseBlockClosed.Text(CaseActionDecide).Text; link != "案件已結案，不能再從它建立措施。" || link == other {
 		t.Errorf("CaseBlock CLOSED：連結措施 %q，其他動作 %q", link, other)
 	}

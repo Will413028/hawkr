@@ -52,14 +52,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     if (!widget.runtimeSideEffectsEnabled) return;
-    // App 回前景時節流重新註冊 device token（讓後端 updated_at 反映活躍度，供 staleness reaper）。
     WidgetsBinding.instance.addObserver(this);
-    // GA4: 綁定 session → 身分（user_id/seller_id/role），fireImmediately 套用當前登入狀態
     registerAnalyticsIdentity(ref);
     HKLog.logD(
       '[MyApp] ====== initState: Setting up new message listener ======',
     );
-    // 監聯新訊息事件；eager read → creates the keepAlive provider
     _newMessageSub = ref
         .read(chatSessionProvider)
         .onNewMessage
@@ -95,8 +92,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (!widget.runtimeSideEffectsEnabled) return;
     if (state == AppLifecycleState.resumed) {
       PushNotificationManager.instance.onAppResumed();
-      // App 版本 gate 前景重檢（`packages/hawkr_app_update/docs/spec.md`）：節流 10 分鐘、以上次
-      // 成功檢查為錨；結果變動經 SessionChangeNotifier 觸發 redirect 重判。
       unawaited(ref.read(forceUpdateGateProvider.notifier).checkOnResume());
     }
   }
@@ -106,10 +101,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       '[MyApp] _showNewMessageToast called from conversation=${event.conversationId}',
     );
 
-    // 使用者正在跟這個人聊天 → 不彈 toast，跟 FCM 前景 banner 同邏輯
-    // (manager.dart 已有同樣 gate)。
-    // senderId / conversationId 任一比對到就跳過：participantId 與 senderId
-    // 可能 namespace 不同對不上，conversationId 是 server 端唯一 ID 比對最穩。
     final gate = ref.read(activeChatGateProvider);
     final activePeer = gate.peerId;
     final activeConv = gate.conversationId;
@@ -144,7 +135,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
     HKLog.logD('[MyApp] Showing toast overlay...');
 
-    // 建立 OverlayEntry 顯示浮動 Toast
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -227,7 +217,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
     overlay.insert(overlayEntry);
 
-    // 3 秒後自動移除
     Future.delayed(const Duration(seconds: 3), () {
       if (overlayEntry.mounted) {
         overlayEntry.remove();
@@ -282,9 +271,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final appTextSize = ref.watch(appTextSizeProvider);
     return ScreenUtilInit(
       designSize: const Size(414, 896),
-      // Keep logical dimensions and typography stable across physical phones.
-      // Responsive screens must adapt from constraints instead of scaling the
-      // entire simulator canvas to the device width.
       enableScaleWH: () => false,
       enableScaleText: () => false,
       minTextAdapt: false,
@@ -325,14 +311,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           final appSurface =
               F.appFlavor == Flavor.prod || !AppConstants.showFcmDebugOverlay
               ? environmentFramed
-              // fit: StackFit.expand 讓內容填滿全螢幕，否則會靠左貼齊。
               : Stack(
                   fit: StackFit.expand,
                   children: [environmentFramed, const FcmDebugOverlay()],
                 );
 
-          // Keep routes, the environment banner, and debug controls under
-          // the same user-selected typography policy.
           return MediaQuery(data: mediaQuery, child: appSurface);
         },
       ),

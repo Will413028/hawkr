@@ -57,26 +57,20 @@ public class SellerCancelService {
      */
     @Transactional
     public void cancelShipment(Long storeId, String orderNo, String reason, String remark) {
-        // 1. 驗證取消原因
         CodeMetaValidator.requireValidValue(OrderCancelReason.class, reason, "reason");
 
-        // 2. 查詢訂單資訊
         GetOrderForAfterSalesResponse orderResp = orderGrpcClient.getOrderForAfterSales(orderNo);
-        // order-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         OrderAfterSalesView order = orderResp.getData();
 
-        // 3. 驗證賣家身分
         Long orderStoreId = ProtoConversionUtils.parseLongRequired(order.getStoreId(), "storeId");
         if (!orderStoreId.equals(storeId)) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_NOT_OWNER);
         }
 
-        // 4. 驗證訂單狀態
         if (!CANCEL_ALLOWED_ORDER_STATUSES.contains(order.getStatus())) {
             throw new AfterSalesBusinessException(GrpcResponseCode.CANCEL_NOT_ALLOWED);
         }
 
-        // 5. 檢查是否已有取消請求（UNIQUE constraint 保護）
         Long existingCount = cancelMapper.selectCount(
                 new LambdaQueryWrapper<SellerCancelRequestEntity>()
                         .eq(SellerCancelRequestEntity::getOrderNo, orderNo)
@@ -85,7 +79,6 @@ public class SellerCancelService {
             throw new AfterSalesBusinessException(GrpcResponseCode.CANCEL_DUPLICATE);
         }
 
-        // 6. 計算退款金額 = orders.total_actual_amount（已含運費與折扣，= PayUni 實收，見 §2.5）
         Long buyerId = ProtoConversionUtils.parseLongRequired(order.getBuyerId(), "buyerId");
         boolean isUnpaid = ORDER_STATUS_PENDING_PAYMENT.equals(order.getStatus());
         Long refundAmount;
@@ -95,7 +88,6 @@ public class SellerCancelService {
             refundAmount = ProtoConversionUtils.parseLongRequired(order.getTotalActualAmount(), "totalActualAmount");
         }
 
-        // 7. 建立取消請求
         SellerCancelRequestEntity cancelEntity = new SellerCancelRequestEntity();
         cancelEntity.setId(TsidUtil.generate());
         cancelEntity.setOrderNo(orderNo);
@@ -112,27 +104,22 @@ public class SellerCancelService {
 
         Long cancelId = cancelEntity.getId();
 
-        // 8. 呼叫 Order Service 取消訂單
         try {
             orderGrpcClient.cancelOrderInternal(orderNo, reason, remark != null ? remark : "",
                     OrderCancelByRole.SELLER.value());
         } catch (io.grpc.StatusRuntimeException e) {
             log.error("SellerCancelService.cancelShipment.cancelOrderFailed",
                     "取消訂單失敗, orderNo=" + orderNo + ", " + e.getMessage());
-            // §2.3 INV-3：PENDING → FAILED
             cancelMapper.markFailedFromPending(cancelId);
             throw io.github.will413028.hawkr.common.utils.grpc.GrpcClientErrorTranslator.translate(
                     e, AfterSalesBusinessException::new);
         }
 
-        // 9. 依訂單狀態決定後續流程
         if (isUnpaid) {
-            // 未付款：直接完成（§2.3 INV-3：PENDING → COMPLETED）
             cancelMapper.markCompletedFromPending(cancelId);
 
             afterSalesEventPublisher.publishCancelCompleted(orderNo, cancelId);
         } else {
-            // 已付款：建立退款任務
             RefundTaskEntity refundTask = new RefundTaskEntity();
             refundTask.setId(TsidUtil.generate());
             refundTask.setCancelId(cancelId);
@@ -145,11 +132,9 @@ public class SellerCancelService {
             refundTask.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
             refundTaskMapper.insert(refundTask);
 
-            // §2.3 INV-3：PENDING → REFUND_PROCESSING
             cancelMapper.markRefundProcessing(cancelId);
         }
 
-        // 10. 稽核日誌
         auditService.log(null, cancelId, storeId, AfterSaleAuditActor.SELLER.value(), AfterSaleAuditAction.CANCEL_SHIPMENT.value(),
                 Map.of("orderNo", orderNo, "reason", reason, "refundAmount", refundAmount, "isUnpaid", isUnpaid));
 
@@ -168,7 +153,6 @@ public class SellerCancelService {
         String reason = cancelReason.value();
         String remark = "系統自動取消：" + cancelReason.label();
 
-        // 1. 冪等：檢查是否已有取消請求
         Long existingCount = cancelMapper.selectCount(
                 new LambdaQueryWrapper<SellerCancelRequestEntity>()
                         .eq(SellerCancelRequestEntity::getOrderNo, orderNo)
@@ -179,18 +163,15 @@ public class SellerCancelService {
             return;
         }
 
-        // 2. 查詢訂單資訊
         GetOrderForAfterSalesResponse orderResp = orderGrpcClient.getOrderForAfterSales(orderNo);
         OrderAfterSalesView order = orderResp.getData();
 
-        // 3. 驗證訂單狀態（不驗賣家身分）
         if (!CANCEL_ALLOWED_ORDER_STATUSES.contains(order.getStatus())) {
             log.info("SellerCancelService.cancelShipmentBySystem.skip",
                     "訂單狀態不允許取消, status=" + order.getStatus(), "orderNo", orderNo);
             return;
         }
 
-        // 4. 計算退款金額 = orders.total_actual_amount（已含運費與折扣，= PayUni 實收，見 §2.5）
         Long storeId = ProtoConversionUtils.parseLongRequired(order.getStoreId(), "storeId");
         Long buyerId = ProtoConversionUtils.parseLongRequired(order.getBuyerId(), "buyerId");
         boolean isUnpaid = ORDER_STATUS_PENDING_PAYMENT.equals(order.getStatus());
@@ -201,7 +182,6 @@ public class SellerCancelService {
             refundAmount = ProtoConversionUtils.parseLongRequired(order.getTotalActualAmount(), "totalActualAmount");
         }
 
-        // 5. 建立取消請求
         SellerCancelRequestEntity cancelEntity = new SellerCancelRequestEntity();
         cancelEntity.setId(TsidUtil.generate());
         cancelEntity.setOrderNo(orderNo);
@@ -218,20 +198,16 @@ public class SellerCancelService {
 
         Long cancelId = cancelEntity.getId();
 
-        // 6. 通知 Order Service 取消訂單（系統觸發 → cancel_by_role='SYSTEM'）
         try {
             orderGrpcClient.cancelOrderInternal(orderNo, reason, remark, OrderCancelByRole.SYSTEM.value());
         } catch (io.grpc.StatusRuntimeException e) {
             log.error("SellerCancelService.cancelShipmentBySystem.cancelOrderFailed",
                     "取消訂單失敗, orderNo=" + orderNo + ", " + e.getMessage());
-            // §2.3 INV-3：PENDING → FAILED
             cancelMapper.markFailedFromPending(cancelId);
-            return; // 系統取消不重新拋出，靜默失敗
+            return;
         }
 
-        // 7. 依訂單狀態決定後續流程
         if (isUnpaid) {
-            // §2.3 INV-3：PENDING → COMPLETED（未付款 0 元直接完成）
             cancelMapper.markCompletedFromPending(cancelId);
             afterSalesEventPublisher.publishCancelCompleted(orderNo, cancelId);
         } else {
@@ -247,11 +223,9 @@ public class SellerCancelService {
             refundTask.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
             refundTaskMapper.insert(refundTask);
 
-            // §2.3 INV-3：PENDING → REFUND_PROCESSING
             cancelMapper.markRefundProcessing(cancelId);
         }
 
-        // 8. 稽核日誌（actor = SYSTEM）
         auditService.log(null, cancelId, null, AfterSaleAuditActor.SYSTEM.value(),
                 AfterSaleAuditAction.AUTO_CANCEL_PROCESSING_TIMEOUT.value(),
                 Map.of("orderNo", orderNo, "reason", reason, "refundAmount", refundAmount, "isUnpaid", isUnpaid));

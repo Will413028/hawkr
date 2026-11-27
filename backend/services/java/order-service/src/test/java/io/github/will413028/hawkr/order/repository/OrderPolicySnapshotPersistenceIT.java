@@ -104,7 +104,6 @@ class OrderPolicySnapshotPersistenceIT {
         jdbc.update("DELETE FROM orders WHERE order_no LIKE 'ITPOL%'");
     }
 
-    // ==================== 契約 ====================
 
     @Test
     @DisplayName("3001 黑貓：五欄逐欄等於 resolver 的輸出，且 fulfillment_mode 不是 DB DEFAULT")
@@ -121,17 +120,12 @@ class OrderPolicySnapshotPersistenceIT {
     @Test
     @DisplayName("3005 商家自送：fulfillment_mode = SELLER_MANAGED（與 DB DEFAULT 同值，但來源是 resolver 不是 DEFAULT）")
     void merchantDeliveryPersistsSellerManaged() {
-        // ⚠️ 這一格的值恰好等於 DB DEFAULT ⇒ 它單獨無鑑別力，
-        //    真正的鑑別力來自上面兩支（值與 DEFAULT 不同）。列在這裡是為了覆蓋
-        //    chk_orders_fulfillment_mode_consistent：3005 若被寫成 PLATFORM_LOGISTICS，DB 會擋。
         assertPersisted(ShippingMethod.MERCHANT_DELIVERY.value(), "ITPOL0005", "SELLER_MANAGED");
     }
 
     @Test
     @DisplayName("沒有人寫政策欄時 DB 會落 DEFAULT——這是本測試要防的失效本身，先證明它真的會發生")
     void withoutExplicitWriteTheRowFallsBackToDbDefault() {
-        // 🔴 這支是「量測有鑑別力」的對照組：它刻意重現修復前的行為。
-        //    若哪天 DB DEFAULT 被移除或改掉，這支會先紅，提醒上面三支的前提變了。
         OrderEntity order = baseOrder("ITPOL9999", ShippingMethod.TAQBIN.value());
         orderRepository.insert(order);
 
@@ -140,13 +134,11 @@ class OrderPolicySnapshotPersistenceIT {
         assertThat(row.get("policy_version")).isEqualTo("v0-legacy");
     }
 
-    // ==================== helpers ====================
 
     private void assertPersisted(String shippingMethod, String orderNo, String expectedFulfillmentMode) {
         OrderPolicySnapshot policy = resolver.resolve(shippingMethod);
 
         OrderEntity order = baseOrder(orderNo, shippingMethod);
-        // 與 OrderCreationTxHandler.applyPolicySnapshot 同一組 setter。
         order.setCommerceModel(policy.commerceModel());
         order.setCollectionModel(policy.collectionModel());
         order.setFulfillmentMode(policy.fulfillmentMode());
@@ -156,14 +148,12 @@ class OrderPolicySnapshotPersistenceIT {
 
         Map<String, Object> row = readPolicy(orderNo);
 
-        // 期望值一律硬寫字面值，不從 resolver 取——否則 resolver 改壞了測試也不會紅。
         assertThat(row.get("commerce_model")).isEqualTo("SELLER_DIRECT");
         assertThat(row.get("collection_model")).isEqualTo("SELLER_MERCHANT");
         assertThat(row.get("fulfillment_mode")).isEqualTo(expectedFulfillmentMode);
         assertThat(row.get("invoice_model")).isEqualTo("SELLER_TO_BUYER");
         assertThat(row.get("policy_version")).isEqualTo("v1-foundation");
 
-        // 第二層：DB row 與 resolver 的輸出**逐欄相同**（BLOCKER 1 的驗收條件原話）。
         assertThat(row.get("commerce_model")).isEqualTo(policy.commerceModel());
         assertThat(row.get("collection_model")).isEqualTo(policy.collectionModel());
         assertThat(row.get("fulfillment_mode")).isEqualTo(policy.fulfillmentMode());

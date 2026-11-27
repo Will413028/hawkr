@@ -335,7 +335,6 @@ func TestStoreRetirementClearsStoreReporterDataButKeepsTheReports(t *testing.T) 
 	_, ids := f.seedChat(t, b, storeID, 4, 0)
 	_, otherIDs := f.seedChat(t, b, otherStore, 4, 0)
 	mineRID, otherRID, buyerRID := uuid.New(), uuid.New(), uuid.New()
-	// 店家檢舉買家寄的單數訊息；買家只能檢舉店家寄的雙數訊息（檢舉自己的內容回 InvalidInput）。
 	target, otherTarget := Target{Kind: TargetChatMessage, ContentID: ids[1]}, Target{Kind: TargetChatMessage, ContentID: otherIDs[1]}
 	buyerTarget := Target{Kind: TargetChatMessage, ContentID: ids[2]}
 	mine := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterStoreID: storeID, Target: target, Category: policy.Harassment, Description: "店家的說明", RequestID: &mineRID}))

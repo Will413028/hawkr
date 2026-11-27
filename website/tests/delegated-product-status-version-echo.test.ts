@@ -48,9 +48,6 @@ function scriptedFetcher(responses: unknown[]) {
 	return { sent, fetcher };
 }
 
-/* ============================================================
-   一、資料層：上下架要把新版本交還給呼叫端
-   ============================================================ */
 
 test("商品：連續兩次上下架時，第二次可以帶著第一次回應的版本送出", async () => {
 	const { sent, fetcher } = scriptedFetcher([
@@ -59,12 +56,10 @@ test("商品：連續兩次上下架時，第二次可以帶著第一次回應�
 	]);
 	const repo = createDelegatedProductRepo(fetcher, STORE_ID);
 
-	// 上架 → 立刻改變主意下架，中間沒有重新載入列表（這正是真實動線）。
 	const published = await repo.updateProductStatus("905", "4004", {
 		...META,
 		expectedVersion: "12",
 	});
-	// 呼叫端手上唯一的新版本來源就是上一行的回應 —— 這正是原本被丟掉的東西。
 	assert.equal(published.version, "13");
 
 	await repo.updateProductStatus("905", "4003", {
@@ -80,7 +75,6 @@ test("商品：連續兩次上下架時，第二次可以帶著第一次回應�
 		],
 	);
 	assert.equal(sent[0]?.json?.expectedVersion, "12");
-	// 送 12 的話後端一定回 9266：上架那一次已經把它推進到 13 了。
 	assert.equal(sent[1]?.json?.expectedVersion, "13");
 });
 
@@ -89,8 +83,6 @@ test("商品：回應沒有 version 時不憑空生一個出來", async () => {
 	const repo = createDelegatedProductRepo(fetcher, STORE_ID);
 
 	const written = await repo.updateProductStatus("905", "4004", META);
-	// `undefined` 會讓 `mutationBody` 整個欄位不送；退成 `""` 反而會送出一個後端必拒
-	// 的空版本。
 	assert.equal(written.version, undefined);
 });
 
@@ -100,18 +92,12 @@ test("賣家自助路徑：請求形狀與回傳語意都不因為新簽章而�
 
 	const written = await repo.updateProductStatus("2698", "4004");
 
-	// 仍然是「傳 status 值」的單一端點，body 一格未動。
 	assert.deepEqual(sent, [
 		{ path: "/app/products/2698/status", json: { status: "4004" } },
 	]);
-	// 賣家端沒有樂觀鎖，`version` 必須留空 —— 生一個出來會讓呼叫端把它寫進清單，
-	// 而那個值對 `/app/products` 沒有任何意義。
 	assert.equal(written.version, undefined);
 });
 
-/* ============================================================
-   二、呼叫端接線：版本只准從「自己這一次寫入的回應」更新
-   ============================================================ */
 
 /**
  * 這個 repo 沒有 DOM 測試環境（`vitest.config.ts` 是 `environment: "node"`，也沒有
@@ -139,7 +125,6 @@ function patchStatusLocalCode(source: string): string {
 test("商品列表：patchStatusLocal 必須連 version 一起 patch", () => {
 	const code = patchStatusLocalCode(read(PRODUCTS_PAGE));
 
-	// 反向自檢：確認擷取到的真的是那一段（沒抓到東西時 match 會直接失敗）。
 	assert.match(code, /setItems\(/);
 	assert.match(code, /setSummaryItems\(/);
 
@@ -158,27 +143,19 @@ test("商品列表：patchStatusLocal 必須連 version 一起 patch", () => {
 test("商品列表：版本取自本次寫入的回應，不是背景 refetch", () => {
 	const source = read(PRODUCTS_PAGE);
 
-	// ① 回傳值要接住，不能只 await。
 	assert.match(
 		source,
 		/const written = await productRepo\.updateProductStatus\(/,
 		"updateProductStatus 的回傳值被丟掉 ⇒ 第二次上下架必 9266",
 	);
-	// ② 接住之後要真的交給清單。
 	assert.match(source, /patchStatusLocal\(id, target, written\.version\)/);
 
-	// ③ 反向：帶版本的 patch 呼叫點只有這一處，而且來源是 `written`。
-	//    多出任何一處，就要回頭確認那一處的版本是不是從 refetch／query cache 抄來的。
 	const versioned =
 		source.match(/patchStatusLocal\([^)]*,[^)]*,[^)]*\)/g) ?? [];
 	assert.deepEqual(versioned, [
 		"patchStatusLocal(id, target, written.version)",
 	]);
 
-	// ④ 這一頁的清單是自持狀態（`items`），不訂閱 seller-products query —— 只用它的
-	//    invalidate。訂閱進來就等於開了「背景 refetch 回填版本」那條路。
-	//    用 assert.ok 而不是 doesNotMatch：後者失敗時會把整份原始碼（近 40KB）印進
-	//    測試輸出，真正的訊息反而被埋掉。
 	assert.ok(
 		!/\buseSellerProducts\s*\(/.test(source),
 		"訂閱 seller-products query ⇒ 背景 refetch 會把賣家這段期間的修改靜默納為己方版本，樂觀鎖從此不會擋",

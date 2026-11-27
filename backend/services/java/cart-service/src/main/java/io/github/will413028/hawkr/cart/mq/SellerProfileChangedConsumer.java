@@ -84,7 +84,7 @@ public class SellerProfileChangedConsumer {
         } catch (IllegalArgumentException e) {
             log.warn("SellerProfileChangedConsumer.parse.fail",
                     "payload 格式錯誤 body=" + body + " error=" + e.getMessage());
-            channel.basicAck(deliveryTag, false);   // 不重試
+            channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             log.error("SellerProfileChangedConsumer.handle.fail",
                     "處理失敗，進 DLQ body=" + body, e);

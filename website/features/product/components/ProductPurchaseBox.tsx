@@ -118,8 +118,6 @@ export default function ProductPurchaseBox({
 	const openLoginRequired = useLoginRequiredOverlay(loginPayload);
 	const { authGate, authWaiting } = useAuthGate(openLoginRequired);
 
-	// Re-sync selection if the parent swaps the SKU list (e.g. variant
-	// switch on the same PDP). Keeps the controlled selection valid.
 	React.useEffect(() => {
 		if (!skus.length) return;
 		if (!skus.some((s) => s.id === selectedSkuId)) {
@@ -130,23 +128,12 @@ export default function ProductPurchaseBox({
 	const selected = skus.find((s) => s.id === selectedSkuId) ?? skus[0];
 
 	const [buyingNow, setBuyingNow] = React.useState(false);
-	// 成功路徑刻意不立即重置 buyingNow：router.push("/cart") 到 commit 之間
-	// 本頁仍可互動，立刻重置會開出慢網路下重複加購（數量翻倍）的窗口。改在
-	// 路由變化時復位——cacheComponents 保留實例不 remount（PR#221），返回本頁
-	// 靠這裡解除 disabled+spinner，兩種卡死/重複情境都關掉。
 	const pathname = usePathname() ?? "";
 	React.useEffect(() => {
-		// 值本身不用，「變化」即復位訊號。
 		void pathname;
 		setBuyingNow(false);
 	}, [pathname]);
 
-	// Out-of-stock SKUs swap the buy buttons for a "已售完" notice + a
-	// "補貨通知" subscribe action. Subscription is independent of favouriting:
-	// the PDP detail endpoint returns `isRestockSubscribed` separately from
-	// `isFavorited`, and the dedicated endpoints
-	// `POST/DELETE /app/products/{id}/restock_subscriptions` toggle it.
-	// (Previously this re-used the favourites context — that was a UX bug.)
 	const productId = item.id;
 	const [restockOn, setRestockOn] = React.useState(initialRestockSubscribed);
 	const [restockPending, setRestockPending] = React.useState(false);
@@ -159,25 +146,10 @@ export default function ProductPurchaseBox({
 	});
 	const outOfStock = purchaseAvailability.unavailable;
 
-	// Resync if PDP swaps the product underneath us (e.g. variant route change).
-	// Depending only on initialRestockSubscribed is enough: the parent passes a
-	// fresh value with the new productId, so it always changes together.
 	React.useEffect(() => {
 		setRestockOn(initialRestockSubscribed);
 	}, [initialRestockSubscribed]);
 
-	// PDP is fetched via the public (anonymous) cached endpoint so the SSR
-	// `isRestockSubscribed` flag is always false for logged-in buyers. Mirror
-	// the favourites context pattern: client-side reconcile against the buyer's
-	// own subscription list on mount. Page size 50 is enough for typical buyers;
-	// if larger lists are ever common the gateway should add a per-product check
-	// (`GET /app/products/{id}/restock_subscriptions`) — for now keep it simple.
-	// ⚠️ `previewMode` 在這裡是**必要**條件，不是保險。預覽路徑（代行工作區）
-	// 傳進來的 `productId` 不是買家端認得的商品，而這一發是 `/app/*` 的買家端請求。
-	// 今天它不會送出，只是因為預覽面恰好沒有 www 登入態（`status` 不是
-	// `signedIn`）—— 那是巧合不是保證：管理員本人若剛好也在同一個瀏覽器登入過 www，這一發
-	// 就會用他自己的買家身分打出去。按鈕全部 disabled 卻仍發請求，正是 previewMode
-	// 要防的形狀。
 	React.useEffect(() => {
 		if (
 			previewMode ||
@@ -195,7 +167,6 @@ export default function ProductPurchaseBox({
 					setRestockOn(true);
 				}
 			} catch {
-				/* keep current state — initial server value is the fallback */
 			}
 		})();
 		return () => {
@@ -246,8 +217,6 @@ export default function ProductPurchaseBox({
 		}
 	};
 
-	// Defensive guard: products with no SKUs can't be purchased. The page
-	// is responsible for hiding / messaging this case; we just no-op.
 	if (!selected) return null;
 
 	const unitPrice = selected.price;
@@ -259,8 +228,6 @@ export default function ProductPurchaseBox({
 
 	const cartItem: CartInput = {
 		...item,
-		// Cart mutations are keyed by SKU id; productId stays on the record for
-		// checkout validation, coupon scope, and analytics.
 		id: selected.id,
 		productId: item.id,
 		skuId: selected.id,
@@ -271,22 +238,13 @@ export default function ProductPurchaseBox({
 
 	const handleBuyNow = () => {
 		if (buyingNow) return;
-		// Guests can't check out — `authGate` prompts login up front instead of
-		// letting the cart API fail with the raw backend "guest_id is required"
-		// error, and parks the click until the server's answer arrives. The 401
-		// catch below stays as a fallback for stale/expired sessions.
 		authGate(() => void runBuyNow());
 	};
 
 	const runBuyNow = async () => {
 		setBuyingNow(true);
 		try {
-			// Await backend so the cart page sees the new SKU on mount.
-			// Previously this was fire-and-forget which could race the cart
-			// page's loadCart and leave it showing stale (or empty) state.
 			await addToCart(cartItem);
-			// Route to /cart, NOT /checkout. Checkout requires the draft
-			// written from the cart page (shipping/address/coupon).
 			router.push("/cart");
 		} catch (err) {
 			if (err instanceof CartError && err.status === 401) {
@@ -294,8 +252,6 @@ export default function ProductPurchaseBox({
 			} else {
 				emitCartToast({ message: buyNowErrorMessage(err), tone: "error" });
 			}
-			// 失敗留在本頁，pathname 不變 → 這裡明確重置；成功路徑由上方的
-			// pathname effect 在路由變化時復位。
 			setBuyingNow(false);
 		}
 	};
@@ -374,7 +330,6 @@ export default function ProductPurchaseBox({
 							}
 							onClick={() => {
 								setSelectedSkuId(sku.id);
-								// Reset qty if the new SKU's stock is below current qty.
 								if (typeof sku.stock === "number" && quantity > sku.stock) {
 									setQuantity(Math.max(1, sku.stock));
 								}
@@ -450,11 +405,7 @@ export default function ProductPurchaseBox({
 			</section>
 
 			<div className="grid grid-cols-2 gap-3.5 mt-1 max-sm:grid-cols-1">
-				{/* ⚠️ 這裡的條件**不能**是 `outOfStock && !previewMode`。預覽存在的理由就是
-				    「買家會看到什麼」，把不可購買的商品畫成可購買，等於預覽說了一句買家頁
-				    不會說的話——而那正是代行者上架前唯一能拿來判斷的東西（#2479）。
-				    `previewMode` 真正要擋的是**會發請求的那一顆**（補貨通知打 `/app/*`，
-				    見上方 effect 的註解），不是整個不可購買狀態。 */}
+
 				{outOfStock ? (
 					<>
 						{purchaseAvailability.canSubscribeRestock && !previewMode ? (
@@ -499,9 +450,6 @@ export default function ProductPurchaseBox({
 							item={cartItem}
 							disabled={previewMode}
 							className="inline-flex items-center justify-center gap-2.5 min-h-[64px] px-7 rounded-full border-0 text-[1.0625rem] font-bold tracking-[0.5px] cursor-pointer transition-[filter,transform,background-color] duration-[160ms] ease-in-out hover:brightness-105 active:translate-y-0.5 dark:hover:brightness-110 max-sm:min-h-[56px] bg-hk-ink-800 text-hk-cream dark:bg-hk-ink-800/92 dark:text-hk-cream dark:shadow-[inset_0_0_0_1px_rgba(245,222,165,0.18)] disabled:cursor-not-allowed disabled:opacity-50"
-							// The icon stays through the added state. Swapping to a
-							// text-only label pulled the glyph out and let the row
-							// re-centre, so a confirmation read as a jolt.
 							addedLabel={
 								<>
 									<AppIcon name="cart" size={22} />

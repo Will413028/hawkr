@@ -271,9 +271,6 @@ export function DatePicker({
 		top: number;
 	} | null>(null);
 
-	// Track mobile vs desktop so the popover can be rendered as a centered
-	// modal on mobile and an anchored popover on desktop. Both go through a
-	// portal (see desktopPos).
 	const [isMobile, setIsMobile] = React.useState(false);
 	React.useEffect(() => {
 		const mql = window.matchMedia("(max-width: 768px)");
@@ -296,9 +293,6 @@ export function DatePicker({
 			: datePlaceholder);
 
 	React.useEffect(() => {
-		// While a manual-entry error is showing, the user's own text stays in
-		// the field — reverting it here is the silent data-loss bug this
-		// component used to have.
 		if (!editing && manualError === null) setDraftValue(displayValue);
 	}, [displayValue, editing, manualError]);
 
@@ -314,17 +308,12 @@ export function DatePicker({
 		setOpen(false);
 	}, []);
 
-	// Close on outside click + ESC. On desktop the popover is inside the
-	// root wrapper, so a rootRef contains-check is sufficient. On mobile
-	// the popover is portaled to document.body — outside the rootRef tree
-	// — so we also exempt clicks inside the popover node itself.
 	React.useEffect(() => {
 		if (!open) return;
 		const onClick = (e: MouseEvent) => {
 			const target = e.target as Node;
 			if (rootRef.current?.contains(target)) return;
 			if (popoverRef.current?.contains(target)) return;
-			// 焦點還在面板裡才收回來：點在別的欄位上時搶焦點反而更糟。
 			const focusWasInside = popoverRef.current?.contains(
 				document.activeElement,
 			);
@@ -341,8 +330,6 @@ export function DatePicker({
 		};
 	}, [open, closeCalendar]);
 
-	// 手機全螢幕 modal：鎖捲動＋把背後的 `.page-wrapper` 設 inert。少了 inert，
-	// Tab 與讀屏都會漏到 scrim 後面的頁面（Dialog.tsx 的同一套隔離）。
 	React.useEffect(() => {
 		if (!open || !isMobile) return;
 		const releaseScroll = acquireBodyScrollLock();
@@ -353,8 +340,6 @@ export function DatePicker({
 		};
 	}, [open, isMobile]);
 
-	// 必須排在 inert effect 之後：同一次 commit 裡 React 先跑完所有 cleanup
-	// （解除 inert）再跑 effect body，順序反了焦點會落在 inert 元素上而失效。
 	React.useEffect(() => {
 		if (open) return;
 		if (!returnFocusRef.current) return;
@@ -406,9 +391,6 @@ export function DatePicker({
 		setDesktopPos({ left: desktopPos.left, top: flipped });
 	}, [open, isMobile, desktopPos]);
 
-	// 開啟後跟著觸發器走：fixed 座標與捲動脫鉤，不重算的話捲一下日曆就留在
-	// 原地。捲出視窗才關閉，不是「一捲就關」——把焦點送進日曆本身就可能讓
-	// 瀏覽器捲動祖先，那種寫法會讓它開了瞬間自己關掉。
 	React.useLayoutEffect(() => {
 		if (!open || isMobile) return;
 		repositionDesktop();
@@ -454,8 +436,6 @@ export function DatePicker({
 				if (closePopover) closeCalendar(false);
 				return;
 			}
-			// 解析不出來就**留著使用者打的字**並報錯，不要靜默還原成上一個值：
-			// 舊行為讓輸入憑空消失，使用者連自己打錯在哪都看不到。
 			if (!iso) {
 				setManualError(MANUAL_FORMAT_ERROR);
 				setDraftValue(raw);
@@ -491,7 +471,6 @@ export function DatePicker({
 			const time = timePart || "00:00";
 			onChange?.(`${iso}T${time}`);
 			setDraftValue(formatDisplay(`${iso}T${time}`, granularity, yearMode));
-			// keep popover open so user can also set time
 		} else {
 			onChange?.(iso);
 			setDraftValue(formatDisplay(iso, granularity, yearMode));
@@ -516,18 +495,14 @@ export function DatePicker({
 
 	const popoverNode = open ? (
 		<>
-			{/* Mobile-only scrim — hidden via CSS on desktop. Tapping the
-			 * scrim closes the modal (matches the standard dialog pattern
-			 * and gives users an obvious way out on touch devices). */}
+
 			<button
 				type="button"
 				className="hkui-datepicker__scrim"
 				aria-label="關閉日期選擇"
 				onClick={() => closeCalendar(true)}
 			/>
-			{/* aria-modal 只在手機全螢幕 modal 那條分支成立（背後 `.page-wrapper`
-			 * 真的被 inert 掉了）。桌機是非 modal 的錨定 popover，宣告 aria-modal
-			 * 會讓讀屏誤以為頁面其他內容不存在，所以只留 role="dialog"。 */}
+
 			<div
 				ref={popoverRef}
 				id={popoverId}
@@ -562,8 +537,7 @@ export function DatePicker({
 				{granularity === "date-time" && (
 					<div className="hkui-datepicker__time">
 						<label htmlFor={`${id ?? "hkui-dp"}-time`}>時間</label>
-						{/* 時間欄改用與日期欄同一套 input-wrapper 樣式，尺寸／焦點環
-						 * ／無效態都跟著 Input 家族走，不再是自己一份手寫規則。 */}
+
 						<div
 							className={inputWrapperClasses({
 								variant,
@@ -658,8 +632,6 @@ export function DatePicker({
 				aria-haspopup="dialog"
 				aria-controls={open ? popoverId : undefined}
 				endContent={
-					// 鍵盤可達（舊版 tabIndex=-1，只有未文件化的 ArrowDown 能開）。
-					// 44×44 點擊區靠負 margin 撐出來，28px 的圖示視覺不變。
 					<button
 						type="button"
 						className="hkui-datepicker__trigger"
@@ -679,13 +651,7 @@ export function DatePicker({
 			/>
 			{name && <input type="hidden" name={name} value={value} />}
 
-			{/* Mobile: portal the modal+scrim out to document.body so it
-			 * escapes any ancestor with `transform` / `backdrop-filter` /
-			 * `filter` / `contain` — those properties create a new
-			 * containing block for `position: fixed`, which makes the
-			 * modal stick to the input region instead of the viewport.
-			 * Desktop: render inline so the popover anchors to the
-			 * trigger position via the wrapper. */}
+
 			{popoverNode && typeof document !== "undefined"
 				? createPortal(popoverNode, document.body)
 				: popoverNode}

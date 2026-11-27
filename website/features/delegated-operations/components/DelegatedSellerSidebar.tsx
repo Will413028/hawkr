@@ -87,8 +87,7 @@ export default function DelegatedSellerSidebar({
 						allItems={allItems}
 					/>
 				))}
-				{/* 「登出」＝結束本次代行（B16）。⚠️ 不得接任何 ADM 登出端點：那會污染
-				    稽核的 revoke_reason 判讀，也會把操作者踢回登入頁。 */}
+
 				<Button
 					type="button"
 					variant="light"

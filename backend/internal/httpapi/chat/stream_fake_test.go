@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// fakeTimer 是測試用的計時器：只有測試呼叫 fire 才會到期，Reset 的次數（arms）讓測試等到 loop 已重新武裝它。
 type fakeTimer struct {
 	clk   *fakeClock
 	c     chan time.Time
@@ -39,8 +38,6 @@ func (t *fakeTimer) Stop() {
 	t.clk.cond.Broadcast()
 }
 
-// fakeClock 以建立時的時長辨識計時器（測試把三個時長設成互不相同）。runStream 只在返回時 Stop 計時器，所以 stopped 為真表示它已返回，
-// 這時還在等計時器被武裝的 fire、await 立刻讓測試失敗，而不是永遠等下去。
 type fakeClock struct {
 	t       testing.TB
 	stopped bool
@@ -73,7 +70,6 @@ func (c *fakeClock) NewTimer(d time.Duration) streamTimer {
 
 func (c *fakeClock) clock() streamClock { return streamClock{Now: c.Now, NewTimer: c.NewTimer} }
 
-// waitFor 在持有 c.mu 時等到 ready 為真。runStream 已返回（stopped）或超過安全上限都讓測試失敗，不讓任何 mutant 造成永遠等待。
 func (c *fakeClock) waitFor(ready func() bool, what string) {
 	timedOut := false
 	guard := time.AfterFunc(5*time.Second, func() {
@@ -94,7 +90,6 @@ func (c *fakeClock) waitFor(ready func() bool, what string) {
 	}
 }
 
-// fire 等到名為 name 的計時器（以最初的時長辨識）至少被武裝過 arms 次，再讓它到期。
 func (c *fakeClock) fire(name time.Duration, arms int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -107,7 +102,6 @@ func (c *fakeClock) fire(name time.Duration, arms int) {
 	t.c <- c.now
 }
 
-// await 等到計時器至少被武裝過 arms 次（不讓它到期）。
 func (c *fakeClock) await(name time.Duration, arms int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -116,7 +110,6 @@ func (c *fakeClock) await(name time.Duration, arms int) {
 	}, fmt.Sprintf("計時器 %v 不會再被武裝（第 %d 次）", name, arms))
 }
 
-// fakeSource 是測試的拉取來源：Next 阻塞到測試推進一個結果，ctx 取消時返回並記下自己已退出。
 type fakeSource struct {
 	results chan fakeResult
 	exited  chan struct{}

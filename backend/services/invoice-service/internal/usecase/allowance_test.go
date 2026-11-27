@@ -15,15 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// 折讓執行軸（G08–G12）
-//
-// 🔴 這個檔案在 #3073 的第一版**不存在**，而後果具體且必然：`ClaimForAllowanceAt`
-// 漏了 `MarkSending`，於是 adjustment 停在 PENDING，而 MarkCompleted 的 allowed-from
-// 是 (SENDING, WAITING_CONFIRMATION, FAILED_UNKNOWN) ⇒ **每一筆折讓都會在
-// settleAllowanceCompleted 撞上 rows=0**——而那時 AMEGO 已經開好折讓單了。
-// 沒有一支測試從 claim 走到 completed，所以那個洞從頭到尾沒有訊號。
-// ---------------------------------------------------------------------------
 
 const (
 	alwOpID  = int64(6101)
@@ -31,10 +22,6 @@ const (
 	alwDocID = int64(5101)
 )
 
-// alwAdjs 是折讓軸的 adjustment 替身：**真的維護狀態**。
-//
-// 只記 calls 的替身在這裡沒有鑑別力——本檔要驗的正是「狀態機的 allowed-from 對不對」，
-// 而那需要替身真的拒絕非法轉換（同 §0.3：fake 的鑑別力來自它拒絕什麼）。
 type alwAdjs struct {
 	domain.AdjustmentRepository
 	adj       domain.Adjustment
@@ -57,7 +44,6 @@ func (f *alwAdjs) ListLines(context.Context, int64) ([]domain.AdjustmentLine, er
 }
 func (f *alwAdjs) NextAllowanceNumber(context.Context) (string, error) { return f.nextNo, nil }
 
-// transition 逐字鏡射 SQL 的 allowed-from。對不上就回 rows=0。
 func (f *alwAdjs) transition(to string, from ...string) bool {
 	for _, s := range from {
 		if f.adj.Status == s {
@@ -107,13 +93,6 @@ func (f *alwAdjs) MarkFailedUnknown(context.Context, int64, time.Time) (bool, er
 		codemeta.InvoiceAdjustmentStatusWaitingConfirmation.Value), nil
 }
 
-// alwDocs 記下反正規化落帳。
-//
-// 🔴 **它必須鏡射 SQL 的述詞，不能什麼都接受。** AddAllowanceTotal 是單句 CAS，
-// 述詞 `allowance_total_amount + delta <= total_amount` 不成立時回 rows=0
-// （不是 error）。恆回 true 的替身零鑑別力：呼叫端把那個 bool 丟掉時，**沒有任何
-// 測試走得到那條路**——那正是它被丟掉五輪都沒有人發現的原因（2026-09-05 第 6 輪稽核）。
-// fake 的鑑別力來自它**拒絕什麼**。
 type alwDocs struct {
 	domain.DocumentRepository
 	doc          domain.Document
@@ -127,7 +106,6 @@ func (f *alwDocs) AddAllowanceTotal(_ context.Context, _ int64, amount int64, _ 
 	for _, a := range f.allowanceAdd {
 		sum += a
 	}
-	// 鏡射 chk_invdoc_allowance_cap ＋ CAS 述詞（0 ≤ 累計 ≤ total_amount）。
 	if next := f.doc.AllowanceTotalAmount + sum + amount; next > f.doc.TotalAmount || next < 0 {
 		return false, nil
 	}
@@ -148,25 +126,16 @@ type alwOps struct {
 	claimOK bool
 	claimed int
 	doneCnt int
-	// recheckDoneCnt 是「經 INV.rc lane 收尾」的次數，與 doneCnt 分開計：
-	// 兩者合併就分不出「走對 lane」與「走錯 lane 但 fake 放行」。
 	recheckDoneCnt int
 	waitNextAt     time.Time
-	// gotProvider* 是 #3082 的斷言材料：provider_code／provider_message
-	// 在此之前從未被任何路徑寫入。
 	gotProviderCode    string
 	gotProviderMessage string
 
-	// claim 的兩個時間參數（見 alwOps.Claim 的說明）。
 	claimNow        time.Time
 	claimLeaseUntil time.Time
 
-	// recheckUnresolvedCnt／gotUnresolvedNextAt 是 J26／J17 落點的斷言材料。
 	recheckUnresolvedCnt int
 	gotUnresolvedNextAt  time.Time
-	// gotResolved 留下 MarkRecheckResolved 的完整輸入：J24 的兩個專屬欄位
-	// （cancel_evidence_kind／cancel_confirmed_at）只有在這裡看得到，
-	// 而少了 evidence_kind 在真實 DB 上是 23514（chk_invop_admin_cancel_needs_confirm）。
 	gotResolved *domain.MarkRecheckResult
 }
 
@@ -284,8 +253,6 @@ type alwHarness struct {
 	ops  *alwOps
 	prov *fakeProvider
 	out  *fakeOutbox
-	// audit 讓測試看得到「訊息到底寫進了哪一欄」——correlation_id 只有 varchar(64)，
-	// 而 reason_detail 是 text，兩者混用就是 SQLSTATE 22001 的成因。
 	audit *fakeAudit
 }
 
@@ -369,16 +336,13 @@ func TestAllowance_ClaimThenSubmitReachesCompleted(t *testing.T) {
 			"我方的帳卻是失敗的", h.adjs.steps)
 	}
 
-	// I4：累計與逐行落帳必須在同一交易內。
 	if len(h.docs.allowanceAdd) != 1 || h.docs.allowanceAdd[0] != 300 {
 		t.Errorf("allowance_total_amount 累加 = %v，want [300]", h.docs.allowanceAdd)
 	}
-	// 逐行加的是**含稅**額（明細存未稅）：少加稅額會讓下一次折讓的剩餘基數被高估。
 	if got := h.docs.lineAdd[8001]; got != 300 {
 		t.Errorf("line 8001 的 allowanced_amount 加了 %d，want 300（286 未稅 ＋ 14 稅）", got)
 	}
 
-	// P4 事件必須在同一交易內寫 outbox。
 	if len(h.out.inserted) != 1 {
 		t.Fatalf("outbox 有 %d 筆事件，want 1（invoice.allowance.issued）", len(h.out.inserted))
 	}
@@ -401,7 +365,6 @@ func TestAllowance_ClaimThenSubmitReachesCompleted(t *testing.T) {
 // 兩個副本同時打 AMEGO ⇒ 重複折讓，而折讓單是法定憑證、開錯不可逆。
 func TestAllowance_SubmitWithoutClaimIsRejected(t *testing.T) {
 	h := newAllowanceHarness(t)
-	// operation 停在 READY（沒 claim 過）。
 	if err := h.uc.SubmitAllowance(context.Background(), alwOpID); err == nil {
 		t.Fatal("沒有租約也送出去了 —— 兩個副本會同時打 AMEGO g0401")
 	}
@@ -448,9 +411,6 @@ func TestAllowance_FailureLandingsMatchTheStateMachine(t *testing.T) {
 			&amego.APIError{Code: "3050121", Class: amego.ClassRetryable, KnownCode: true},
 			codemeta.InvoiceAdjustmentStatusPending.Value},
 
-		// 🔴 結果不明**不得重送**：我方自產的折讓單號已經送出去了，重送會讓 AMEGO 端
-		// 出現第二張同號憑證。唯一安全的下一步是查詢（G13／G14 由 recheck 軸收斂）。
-		// 非 APIError（ctx 取消、transport 尚未分類）走同一個落點：折讓可能已經送達。
 		{"結果不明 ⇒ WAITING_CONFIRMATION（不重送）",
 			errors.New("context deadline exceeded"),
 			codemeta.InvoiceAdjustmentStatusWaitingConfirmation.Value},
@@ -466,7 +426,6 @@ func TestAllowance_FailureLandingsMatchTheStateMachine(t *testing.T) {
 			if _, err := h.uc.ClaimForAllowanceAt(ctx, alwOpID, testNow, testNow.Add(2*time.Minute)); err != nil {
 				t.Fatalf("claim: %v", err)
 			}
-			// SubmitAllowance 的契約：所有業務落點都回 nil（狀態已經寫定）。
 			if err := h.uc.SubmitAllowance(ctx, alwOpID); err != nil {
 				t.Fatalf("SubmitAllowance 回了 error：%v —— 業務落點必須回 nil，"+
 					"否則 worker 的 attempt 簿記會打在錯的前提上", err)
@@ -474,7 +433,6 @@ func TestAllowance_FailureLandingsMatchTheStateMachine(t *testing.T) {
 			if got := h.adjs.adj.Status; got != c.want {
 				t.Errorf("adjustment = %q，want %q（走過 %v）", got, c.want, h.adjs.steps)
 			}
-			// 失敗路徑一律不得寫 P4：買家會收到一張根本沒開成的折讓單通知。
 			if len(h.out.inserted) != 0 {
 				t.Errorf("失敗卻寫了 %d 筆 outbox 事件", len(h.out.inserted))
 			}
@@ -498,7 +456,6 @@ func TestAllowance_FailureLandingsMatchTheStateMachine(t *testing.T) {
 func TestAllowance_ClaimReclaimsAdjustmentStuckInSending(t *testing.T) {
 	h := newAllowanceHarness(t)
 	ctx := context.Background()
-	// 前一個持有者留下的殘局：adjustment 已 SENDING，operation 已被退回可搶佔。
 	h.adjs.adj.Status = codemeta.InvoiceAdjustmentStatusSending.Value
 	h.ops.op.Status = codemeta.InvoiceOperationStatusRetryScheduled.Value
 
@@ -552,7 +509,6 @@ func TestAllowance_ClaimRefusesAdjustmentInTerminalState(t *testing.T) {
 //
 // 這支測試的鑑別力來自 fakeAudit 鏡射了那三個長度約束（見 fake_test.go）。
 func TestAllowance_LongProviderMessageDoesNotBreakFailureHandling(t *testing.T) {
-	// 逐字仿 AMEGO 實際回應的形狀：endpoint ＋ 碼 ＋ 中文原文。
 	longMsg := "查無此發票號碼，請確認發票號碼與開立日期是否正確，" +
 		"或該發票已被作廢／已逾可折讓期間，詳見折讓作業說明第三節"
 	for _, c := range []struct {
@@ -590,7 +546,6 @@ func TestAllowance_LongProviderMessageDoesNotBreakFailureHandling(t *testing.T) 
 			if got := h.adjs.adj.Status; got != c.want {
 				t.Errorf("adjustment = %q，want %q（走過 %v）", got, c.want, h.adjs.steps)
 			}
-			// 訊息必須真的被保存下來，而且是在 reason_detail 不是 correlation_id。
 			var found bool
 			for _, e := range h.audit.entries {
 				if e.ReasonDetail != nil && strings.Contains(*e.ReasonDetail, "查無此發票號碼") {
@@ -619,12 +574,6 @@ func TestAllowance_ConfirmReachesCompleted(t *testing.T) {
 	ctx := context.Background()
 	h.adjs.adj.Status = codemeta.InvoiceAdjustmentStatusWaitingConfirmation.Value
 
-	// 🔴 真實時序（internal/usecase/recheck.go 的 reconcileOperations）：
-	// INV.rc **先** ClaimInvoiceRecheck —— 那一句把 DB 上的 status 蓋成
-	// PROVIDER_STATUS_RECHECK —— **再**把 claim 之前讀到的快照傳進 ConfirmAllowance。
-	// 所以「參數裡的 op.Status」與「DB 上的 status」不同是常態，不是 fixture 寫錯。
-	// 收尾守衛必須對得上 **DB 上的那一個**；原本這裡兩者都設成 WAITING_CONFIRMATION，
-	// 於是測不出「MarkDone 守 SENDING ⇒ 這條 lane 必然 rows=0」。
 	snapshot := h.ops.op
 	snapshot.Status = codemeta.InvoiceOperationStatusWaitingConfirmation.Value
 	h.ops.op.Status = codemeta.InvoiceOperationStatusProviderStatusRecheck.Value
@@ -638,8 +587,6 @@ func TestAllowance_ConfirmReachesCompleted(t *testing.T) {
 	if err := h.uc.ConfirmAllowance(ctx, snapshot); err != nil {
 		t.Fatalf("ConfirmAllowance: %v", err)
 	}
-	// operation 必須**真的**收尾，而且是經 INV.rc lane 收的。
-	// 這兩句是本支的核心：少了它們，「軌跡寫了 SUCCEEDED 但 status 沒動」照樣全綠。
 	if h.ops.recheckDoneCnt != 1 {
 		t.Errorf("operation 應經 INV.rc lane（MarkRecheckResolved）收尾 1 次，實際 %d 次；"+
 			"doneCnt=%d —— 走 MarkDone 的話 DB 上會 rows=0 而完全無聲",
@@ -650,7 +597,6 @@ func TestAllowance_ConfirmReachesCompleted(t *testing.T) {
 			"它會每 60 秒被 INV.rc 重新 claim 一次，且 unknown_since 從不推進 ⇒ 24h 放棄門檻永遠到不了",
 			h.ops.op.Status)
 	}
-	// 拿的必須是**我方自產的折讓單號**，不是發票號碼。
 	if queried != "A000000000001" {
 		t.Errorf("查了 %q，want 折讓單號 A000000000001 —— 拿發票號碼去查會查到原發票", queried)
 	}
@@ -670,26 +616,17 @@ func TestAllowance_ConfirmKeepsWaitingWhenNotFound(t *testing.T) {
 	ctx := context.Background()
 	h.adjs.adj.Status = codemeta.InvoiceAdjustmentStatusWaitingConfirmation.Value
 
-	// 真實時序：INV.rc 先 ClaimInvoiceRecheck（DB status → PROVIDER_STATUS_RECHECK），
-	// 再把 claim 之前的快照傳進來（同 TestAllowance_ConfirmReachesCompleted）。
 	snapshot := h.ops.op
 	snapshot.Status = codemeta.InvoiceOperationStatusWaitingConfirmation.Value
 	h.ops.op.Status = codemeta.InvoiceOperationStatusProviderStatusRecheck.Value
 
 	h.prov.allowanceQueryFn = func(string) (*amego.AllowanceDetail, error) {
-		return &amego.AllowanceDetail{}, nil // 查無
+		return &amego.AllowanceDetail{}, nil
 	}
 
 	if err := h.uc.ConfirmAllowance(ctx, snapshot); err != nil {
 		t.Fatalf("ConfirmAllowance: %v", err)
 	}
-	// 🔴 G14 的核心：這一列必須**真的回到** WAITING_CONFIRMATION，而且
-	// unknown_since 要起算。留在 PROVIDER_STATUS_RECHECK 的話：
-	//   ① 退避階梯整條失效，只被 60s 租約推著走 ⇒ 每分鐘打一次 AMEGO
-	//   ② unknown_since 從不寫入 ⇒ `now − unknown_since` 恆為 0
-	//      ⇒ 24h give-up 永遠到不了
-	// dev 第 3 輪實測到的正是這個形狀（三次取樣：updated_at 每分鐘前進、
-	// unknown_since 永遠 NULL、狀態永遠不變）。
 	if got := h.ops.op.Status; got != codemeta.InvoiceOperationStatusWaitingConfirmation.Value {
 		t.Fatalf("operation = %q，want 回到 WAITING_CONFIRMATION —— "+
 			"留在重查中就是無限迴圈且 24h 門檻到不了", got)
@@ -738,7 +675,6 @@ func TestAllowance_PermanentFailureRecordsNeutralReasonAndProviderResult(t *test
 		t.Fatalf("SubmitAllowance: %v", err)
 	}
 
-	// ① provider 的原話落在 provider 專用欄，不是只有 last_error。
 	if h.ops.gotProviderCode != "4040156" {
 		t.Errorf("provider_code = %q，want \"4040156\" —— 這兩欄在修復前從未被寫入",
 			h.ops.gotProviderCode)
@@ -748,7 +684,6 @@ func TestAllowance_PermanentFailureRecordsNeutralReasonAndProviderResult(t *test
 			h.ops.gotProviderMessage)
 	}
 
-	// ② reason_code 是中性的 CodeMeta 值，**不是**猜出來的「超額」。
 	var sawNeutral, sawExceeds bool
 	for _, e := range h.audit.entries {
 		if e.ReasonCode == nil {
@@ -800,7 +735,6 @@ func TestAllowance_ClaimPassesNowAndLeaseInSqlOrder(t *testing.T) {
 	h := newAllowanceHarness(t)
 	ctx := context.Background()
 
-	// 兩個值刻意取得可分辨：對調的話 claimNow 會變成 lease 那一個。
 	lease := testNow.Add(2 * time.Minute)
 	if _, err := h.uc.ClaimForAllowanceAt(ctx, alwOpID, testNow, lease); err != nil {
 		t.Fatalf("ClaimForAllowanceAt: %v", err)
@@ -816,7 +750,6 @@ func TestAllowance_ClaimPassesNowAndLeaseInSqlOrder(t *testing.T) {
 		t.Errorf("Claim 收到的 leaseUntil = %v，want %v —— 參數對調會讓 started_at／updated_at 寫成未來",
 			h.ops.claimLeaseUntil, lease)
 	}
-	// 租約必須嚴格落在 now 之後；相等或更早都代表沒有租約。
 	if !h.ops.claimLeaseUntil.After(h.ops.claimNow) {
 		t.Errorf("leaseUntil(%v) 沒有晚於 now(%v) —— 等於沒有租約",
 			h.ops.claimLeaseUntil, h.ops.claimNow)

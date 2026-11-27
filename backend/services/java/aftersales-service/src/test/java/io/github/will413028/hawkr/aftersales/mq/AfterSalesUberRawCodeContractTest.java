@@ -64,8 +64,6 @@ class AfterSalesUberRawCodeContractTest {
                             + "ADR-013 的前提被打破了");
         }
 
-        // 對照組：同一支方法對一個**確知存在**的值必須回得來。
-        // 少了它，上面那圈「全部都拋例外」也可能只是因為 fromValue 壞了。
         assertThat(ShippingStatus.fromValue(ShippingStatus.HANDED_OVER.value()))
                 .as("對照組：fromValue 對合法值必須回得來，否則上面的否定結論沒有意義")
                 .isEqualTo(ShippingStatus.HANDED_OVER);
@@ -102,7 +100,6 @@ class AfterSalesUberRawCodeContractTest {
             List<String> literals = stringLiterals(Files.readString(f));
             totalLiterals += literals.size();
             if (literals.contains("is_return")) {
-                // ReturnShipmentStatusConsumer 解析 payload 用的 key，確知存在。
                 sawKnownLiteral = true;
             }
             for (String lit : literals) {
@@ -112,7 +109,6 @@ class AfterSalesUberRawCodeContractTest {
             }
         }
 
-        // 🔴 對照組三連：掃描範圍是空的時候，上面的「零命中」毫無意義。
         assertThat(scannedFiles).as("掃到的 .java 檔數").isGreaterThan(50);
         assertThat(totalLiterals).as("抽到的字串字面值總數").isGreaterThan(100);
         assertThat(sawKnownLiteral)
@@ -144,7 +140,6 @@ class AfterSalesUberRawCodeContractTest {
         }
     }
 
-    // ==================== 字串字面值抽取（狀態機，不用正則） ====================
 
     /**
      * 抽出一份 Java 原始碼裡的所有字串字面值。
@@ -159,7 +154,6 @@ class AfterSalesUberRawCodeContractTest {
         StringBuilder cur = new StringBuilder();
         int i = 0;
         int n = src.length();
-        // 0=code 1=line comment 2=block comment 3=string 4=char 5=text block
         int state = 0;
         while (i < n) {
             char c = src.charAt(i);
@@ -228,8 +222,6 @@ class AfterSalesUberRawCodeContractTest {
                     }
                 }
                 case 5 -> {
-                    // text block 整段當一個字面值捨棄：它裝的是多行文字（SQL／JSON），
-                    // 不會是「一個 Uber 原生狀態碼」那種單值比對。
                     if (c == '"' && next == '"' && i + 2 < n && src.charAt(i + 2) == '"') {
                         state = 0;
                         i += 3;

@@ -121,15 +121,12 @@ public class ReturnStuckAlertScheduler {
      */
     @Scheduled(cron = "${hawkr.aftersales.return-stuck-alert.cron:0 0 3 * * ?}")
     public void run() {
-        // ⚠️ R4-P1-2（2026-08-08）：這個 now 只用於「候選述詞」與「租約未到期判定」。
-        // 租約的**基準**不在這裡取（見下方迴圈內），否則整批共用同一個到期時間。
         LocalDateTime now = DateTimeUtils.nowUtc();
         LocalDateTime cutoff = now.minusDays(returnStuckDays);
         List<AfterSaleCaseEntity> candidates = caseMapper.selectList(
                 new LambdaQueryWrapper<AfterSaleCaseEntity>()
                         .eq(AfterSaleCaseEntity::getStatus, AfterSaleCaseStatus.RETURN_SHIPPING.value())
                         .lt(AfterSaleCaseEntity::getUpdatedAt, cutoff)
-                        // 租約未到期的列由別的 pod 持有（或仍在冷卻中），本輪不撈
                         .and(lease -> lease
                                 .isNull(AfterSaleCaseEntity::getReturnStuckAlertedAt)
                                 .or()
@@ -145,18 +142,9 @@ public class ReturnStuckAlertScheduler {
 
         int published = 0;
         for (AfterSaleCaseEntity acase : candidates) {
-            // 宣告在 try 之外：catch 分支要用它做租約釋放的 CAS 條件（見 releaseLease）。
             LocalDateTime leaseUntil = null;
             try {
-                // ⚠️ R4-P1-2（2026-08-08）：租約基準取 **claim 當下**而非 tick 起點的 now。
-                // 取 tick 起點 ⇒ 全批共用同一個到期時間 ⇒ 第 k 筆的**有效**租約
-                // = returnStuckDays − (前 k−1 筆的耗時)，不變式退化成「批次總耗時 < 租約」，
-                // 會隨 batchSize（預設 200，可由設定調大）一起破。改在這裡取之後，
-                // 不變式降為「**單筆**最壞耗時 < 租約」——與 batchSize 無關，是結構保證而非參數巧合。
-                // 述詞用的 now/cutoff 維持 tick 起點：那個方向讓候選集合與可搶佔集合更小，是保守的。
-                // issue #2294 L6：租約長度 = returnStuckDays（與告警冷卻同值）
                 leaseUntil = DateTimeUtils.nowUtc().plusDays(returnStuckDays);
-                // issue #2294 L6：lease claim —— 搶到才 publish（0 = 另一個 pod 已搶走）
                 int claimed = caseMapper.claimReturnStuckAlert(
                         acase.getCaseNo(), AfterSaleCaseStatus.RETURN_SHIPPING.value(), now, leaseUntil);
                 if (claimed == 0) {
@@ -202,7 +190,6 @@ public class ReturnStuckAlertScheduler {
      */
     private void releaseLease(AfterSaleCaseEntity acase, LocalDateTime leaseUntil, String reason) {
         if (leaseUntil == null) {
-            // claim 之前就失敗（例如租約基準都還沒取到）⇒ 沒有租約要還。
             return;
         }
         try {
@@ -212,8 +199,6 @@ public class ReturnStuckAlertScheduler {
                     "publish 未成功，租約已還原（released=" + released + "，0 = 期間已被他人重新 claim）"
                             + " caseNo=" + acase.getCaseNo() + " reason=" + reason);
         } catch (Exception e) {
-            // 還原失敗不是新的破口：不還原就等於維持修復前的行為（等滿一個冷卻週期），
-            // 正確性仍由租約本身保證。
             log.error("ReturnStuckAlertScheduler.lease_release_failed",
                     "租約還原失敗，本案件要等滿 " + returnStuckDays + " 天冷卻才會重試 caseNo="
                             + acase.getCaseNo() + " err=" + e.getMessage());
@@ -237,20 +222,12 @@ public class ReturnStuckAlertScheduler {
     private boolean publishReturnStuck(AfterSaleCaseEntity acase) throws Exception {
         ShipmentAnomalyType type = ShipmentAnomalyType.RETURN_STUCK;
         ShipmentAnomalySeverity severity = ShipmentAnomalyRules.severityOf(type);
-        // Plan C Phase 3 追加：sellerAccountId 對外是已反解的登入 account_id，非 store_id
-        // 代理鍵，見 ShipmentLabelConsumer 同款註解。
         Long resolvedSellerAccountId = sellerGrpcClient.resolveAccountIdForStore(acase.getStoreId());
-        // 2026-08-05 identity-naming triage：對稱處理買家側——buyerAccountId 契約上同樣是
-        // 「已反解的登入 account_id」（見 ShipmentAnomalyDetectedPayload javadoc「買家 accountId」），
-        // 不是 aftersale_cases 的 buyer_id 代理鍵。本呼叫點是同一批 remediation（Plan C Phase 3
-        // Task 9b）唯一漏掉的一處：ShipmentLabelConsumer.publishPayUniLgsNoCodeAnomaly 與
-        // shipping-service 的 ShipmentAnomalyEventPublisher（同一 payload 的另一 producer）
-        // 早就都有這一步。
         Long buyerAccountId = resolveNotifyBuyerAccountId(acase.getBuyerId());
         ShipmentAnomalyDetectedPayload payload = new ShipmentAnomalyDetectedPayload(
                 UUID.randomUUID().toString(),
                 acase.getOrderNo(),
-                "",                                       // 退貨流程無對應 shipments.id（退貨運單在 aftersale_case 上）
+                "",
                 resolvedSellerAccountId,
                 buyerAccountId,
                 type.value(),

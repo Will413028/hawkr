@@ -62,7 +62,6 @@ afterEach(() => {
 	delete (globalThis as Record<string, unknown>).localStorage;
 });
 
-/* ===== fetchCart ===== */
 
 test("fetchCart GETs /public/carts and returns the normalized summary", async () => {
 	const { fetchCart } = await import("../lib/cart/repo");
@@ -120,7 +119,6 @@ test("fetchCart surfaces 401 as UnauthorizedError", async () => {
 	});
 });
 
-/* ===== addCartItem ===== */
 
 test("addCartItem POSTs OpenAPI string quantity and coerces totalItems to number", async () => {
 	const { addCartItem } = await import("../lib/cart/repo");
@@ -160,7 +158,6 @@ test("addCartItem defaults totalItems to 0 when the envelope has no data", async
 test("addCartItem throws ApiClientError carrying the backend envelope code", async () => {
 	const { addCartItem } = await import("../lib/cart/repo");
 	const { ApiClientError } = await import("../lib/api/client");
-	// 6005 CHECKOUT_LOCK_FAILED — the guest/member cart mixup guard.
 	respond = () =>
 		jsonResponse({ code: 6005, msg: "CHECKOUT_LOCK_FAILED", data: null });
 
@@ -175,7 +172,6 @@ test("addCartItem throws ApiClientError carrying the backend envelope code", asy
 	);
 });
 
-/* ===== setCartItemQuantity ===== */
 
 test("setCartItemQuantity PUTs string quantity to the encoded sku path", async () => {
 	const { setCartItemQuantity } = await import("../lib/cart/repo");
@@ -204,7 +200,6 @@ test("setCartItemQuantity coerces a string totalItems from the wire", async () =
 	assert.deepEqual(result, { totalItems: 12 });
 });
 
-/* ===== removeCartItem ===== */
 
 test("removeCartItem DELETEs the encoded sku path and returns totalItems", async () => {
 	const { removeCartItem } = await import("../lib/cart/repo");

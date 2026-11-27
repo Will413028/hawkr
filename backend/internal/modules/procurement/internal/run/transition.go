@@ -18,7 +18,6 @@ const (
 	StatusCancelled       = "CANCELLED"
 )
 
-// edges 是 run 狀態機允許的邊（from → 可到的 to），也是唯一的來源：沒有出邊的狀態是終態，終態吸收。
 var edges = map[string][]string{
 	StatusQueued:          {StatusRunning, StatusCancelRequested, StatusFailed},
 	StatusRunning:         {StatusWaitingForInput, StatusSucceeded, StatusFailed, StatusCancelRequested},
@@ -40,7 +39,6 @@ func CanTransition(from, to string) bool {
 	return slices.Contains(edges[from], to)
 }
 
-// allowedFrom 回傳可以轉到 to 的所有來源狀態（排序後，輸出穩定）。
 func allowedFrom(to string) []string {
 	var out []string
 	for from, tos := range edges {
@@ -52,7 +50,6 @@ func allowedFrom(to string) []string {
 	return out
 }
 
-// publicFrom 是公開的 Transition 允許的來源：WAITING_FOR_INPUT 轉 SUCCEEDED 只在回答的提交點（同時解決中斷），公開入口不含這條邊。
 func publicFrom(to string) []string {
 	from := allowedFrom(to)
 	if to == StatusSucceeded {
@@ -61,7 +58,6 @@ func publicFrom(to string) []string {
 	return from
 }
 
-// activeStatuses 回傳還沒到終態的狀態：事件只能在這些狀態下寫入。
 func activeStatuses() []string {
 	var out []string
 	for status, tos := range edges {

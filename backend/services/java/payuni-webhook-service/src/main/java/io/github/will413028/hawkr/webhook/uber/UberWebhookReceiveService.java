@@ -94,32 +94,17 @@ public class UberWebhookReceiveService {
     public void receive(byte[] rawBody, Map<String, String> headers) {
         Map<String, String> signatureHeaders = filterSignatureHeaders(headers);
 
-        // 🔴 **驗簽必須在 INSERT inbox 之前**（66 §6.3.1／§6.3.4）。
-        //
-        //    inbox 有 uq_inbox_event UNIQUE (provider, webhook_type, event_key)，
-        //    而未驗簽就落地 ⇒ 任何能打到本端點的人，搶先送一個**同 event_id 的偽造事件**，
-        //    真正的 Uber 事件到達時就會被判為重複而丟棄。
-        //    🔴 那是一個**未認證的事件壓制攻擊面**：攻擊者不需要偽造得出合法簽章，
-        //    只需要搶先佔住那個鍵。
-        //
-        //    ⚠️ 驗的是 rawBody 這一份位元組，不是 parse 後再 serialize 的版本
-        //    ——後者會因欄位順序不同而**偶發**失敗、測不出來、上線才炸（陷阱 A2）。
-        //    所以本段在 UberWebhookParser.parse() **之前**：解析不得先於驗簽。
         if (!verifier.verify(rawBody, signatureHeaders)) {
-            // 拋而不是靜默丟：401 是 ingress 唯一允許的 4xx（66 §0.3），
-            // 而「不落 inbox」正是這條修復的重點——偽造事件不得佔用去重鍵位。
             throw new UberWebhookSignatureException("Uber webhook 驗簽失敗");
         }
 
         UberWebhookEvent event = UberWebhookParser.parse(rawBody);
         String provider = providerCode.value();
 
-        // T1：INSERT inbox（REQUIRES_NEW，與 PayUni 路徑同一個 dedup commitment 邊界）
         WebhookInbox inbox = buildInbox(provider, event, rawBody, signatureHeaders);
         try {
             inboxTxOps.insertInbox(inbox);
         } catch (DuplicateKeyException dup) {
-            // T1 已 rollback 釋放 connection，後續 SELECT 在新交易中執行（§2.5.1 aborted state）
             WebhookInbox existing = inboxMapper.findByEventKey(provider, event.kind(), event.eventKey());
             if (existing == null) {
                 log.error("UberWebhookReceiveService.dedup.lookupMissing",
@@ -134,7 +119,6 @@ public class UberWebhookReceiveService {
                         "eventKey", event.eventKey());
                 return;
             }
-            // RECEIVED／FAILED：上次 T2 失敗或中途卡住，本次重送觸發 replay
             log.warn("UberWebhookReceiveService.replay",
                     "進入 replay 路徑，補建 outbox eventKey=" + event.eventKey()
                             + " prevStatus=" + existing.getStatus(),
@@ -143,13 +127,11 @@ public class UberWebhookReceiveService {
         }
 
         if (event.route() != UberWebhookEvent.Route.PUBLISH) {
-            // INBOX_ONLY／IGNORE 都是 terminal：已稽核、故意不投遞 MQ、不參與 replay。
             inboxTxOps.markIgnored(inbox.getId());
             logNonPublished(event);
             return;
         }
 
-        // T2：outbox INSERT + inbox status=ENQUEUED（REQUIRES_NEW，單一事務）
         try {
             ProviderWebhookEnvelope envelope = ProviderWebhookEnvelope.ofJson(
                     provider, event.kind(), event.eventKey(), rawBody, signatureHeaders,
@@ -176,14 +158,11 @@ public class UberWebhookReceiveService {
 
     private void logNonPublished(UberWebhookEvent event) {
         if (UberWebhookParser.routeOf(event.kind()) == UberWebhookEvent.Route.INBOX_ONLY) {
-            // courier_update：每 20 秒一發，正常流量，不該吵
             log.info("UberWebhookReceiveService.inboxOnly",
                     "事件已落地，依 66 §6.3.2 不投遞 MQ kind=" + event.kind(),
                     "eventKey", event.eventKey());
             return;
         }
-        // 🔴 告警級：我方未訂閱、或本波尚無落點（refund_request）。
-        //    錢的事不自動化 ⇒ 要有人看到，而不是安靜地留在 inbox 裡。
         log.error("UberWebhookReceiveService.unhandledKind",
                 "收到未處理的 Uber webhook 事件，已落 inbox 並標 IGNORED kind=" + event.kind()
                         + " eventKey=" + event.eventKey(),
@@ -217,19 +196,10 @@ public class UberWebhookReceiveService {
                                      byte[] rawBody, Map<String, String> signatureHeaders) {
         WebhookInbox inbox = new WebhookInbox();
         inbox.setProvider(provider);
-        // 🔴 Uber 沒有 MerID。V2 已把該欄放寬成 nullable；不得塞 sentinel（66 §5.1.6）。
         inbox.setMerId(null);
         inbox.setWebhookType(event.kind());
         inbox.setEventKey(event.eventKey());
         inbox.setStatus(WebhookInboxStatus.RECEIVED.value());
-        // ⚠️ 🔴 本 ingress **不驗簽**（驗簽在 shipping-service 側的 UberDirectAdapter.inbound()，
-        //    它才拿得到 per-webhook signing key）。而 WebhookVerifyStatus 只有 PASSED／FAILED
-        //    兩個值，沒有一個能誠實表達「尚未驗」：
-        //      - FAILED 會讓每一筆合法的 Uber 事件看起來像攻擊 ⇒ 告警疲勞
-        //      - PASSED 是過度樂觀
-        //    兩者都不真。此處取 PASSED（DB 預設值亦同），並把缺口列為待處理：
-        //    要嘛 WebhookVerifyStatus 新增第三個值（CodeMeta 變更），要嘛驗簽移回 ingress
-        //    （66 §6.3.1／§6.3.4 原本就是這樣寫的）。**在那之前不要把本欄當證據。**
         inbox.setVerifyStatus(WebhookVerifyStatus.PASSED.value());
         inbox.setRawEnvelope(toJson(Map.of(
                 ProviderWebhookEnvelope.KEY_RAW_BODY_BASE64,
@@ -263,7 +233,6 @@ public class UberWebhookReceiveService {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
-            // raw_envelope 是稽核欄位，序列化失敗不得讓整條 ingress 失敗
             log.error("UberWebhookReceiveService.toJson.failed", "JSON 序列化失敗", e);
             return "{}";
         }

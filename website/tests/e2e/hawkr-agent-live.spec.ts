@@ -68,15 +68,12 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 
 		const response = await gotoStreamed(page, LEGACY_LIVE_PATH);
 		expect(response?.status()).toBeLessThan(400);
-		// §V.10.12-4：不得再掛 legacy workspace，必須落在 procurement。
 		expect(new URL(page.url()).pathname).toBe(PROCUREMENT_PATH);
-		// 搜尋內容永遠不進 URL（redirect 也不得把它帶成 query）。
 		expect(new URL(page.url()).search).toBe("");
 		expect(page.url()).not.toContain(encodeURIComponent(SEARCH_DRAFT));
 
 		const workspace = page.locator('[data-assistant-mode="live"]');
 		await expect(workspace).toBeVisible();
-		// 無既有 conversation → entry state（§V.11.0 Screen Contract 00）。
 		await expect(workspace).toHaveAttribute("data-assistant-view", "entry");
 		await expect(
 			page.getByRole("heading", { name: "今天想請 Hawkr 幫你完成什麼？" }),
@@ -103,7 +100,6 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 			expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
 			expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
 		}
-		// 草稿帶進唯一那個 composer，且沒有被自動送出。
 		const composer = page.locator("#procurement-clarify-input");
 		await expect(composer).toHaveValue(SEARCH_DRAFT);
 		await expect(page.locator("#procurement-clarify-input")).toHaveCount(1);
@@ -114,7 +110,6 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 			),
 		).toBeNull();
 
-		// 送出鍵的觸控目標維持 44×44（§V.11.0 Composer）。
 		const sendButton = page.getByRole("button", { name: "送出" });
 		const sendBox = await sendButton.boundingBox();
 		expect(sendBox?.width ?? 0).toBeGreaterThanOrEqual(44);
@@ -127,7 +122,6 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 		await expect(composer).toHaveAttribute("wrap", "soft");
 		await expect(composer).toHaveCSS("white-space", "pre-wrap");
 		if (!isMobile) {
-			// 中央 composer 仍吃滿內容欄，可借 12px × 2 gutter，並由 960px 封頂。
 			const desktopLayout = await composer.evaluate((element) => {
 				const shell = element.closest<HTMLElement>(
 					".hawkr-agent-entry__composer",
@@ -154,8 +148,6 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 			);
 		}
 
-		// 現行 composer 支援多行：依內容由 44px 增高至 120px，超過後在欄內
-		// 垂直捲動。驗版面邊界與可捲動性，不依賴 macOS/Linux 的字體折行數。
 		const longDraft = ["採購需求".repeat(60), "配送與品項".repeat(60)].join(
 			"\n",
 		);
@@ -186,7 +178,6 @@ test.describe("Hawkr Agent legacy 入口退場", { tag: ["@ui"] }, () => {
 					const inputRect = input.getBoundingClientRect();
 					const sendRect = send?.getBoundingClientRect();
 					const style = getComputedStyle(input);
-					// 主動捲到底，證明長文能讀到尾端，不只把超出高度的內容裁掉。
 					input.scrollTop = input.scrollHeight;
 					return {
 						whiteSpace: style.whiteSpace,

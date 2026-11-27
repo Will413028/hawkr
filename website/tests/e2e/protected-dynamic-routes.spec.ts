@@ -35,9 +35,6 @@ const PRODUCT_ID = "500";
 const ORDER_NO = "HK-ROUTE-SMOKE";
 const CASE_NO = "AS-ROUTE-SMOKE";
 const COUPON_ID = "900";
-// 58 號電子發票的四條動態路由（買家 B05 ＋ 賣家 S08／S10／S11）。
-// `/seller-center/invoices/[documentId]` 與同層的 `documents`／`tax-status`／
-// `appeals`／`jobs` 四個靜態段並存 ⇒ 這個 id 刻意不長得像那四個字串。
 const INVOICE_DOCUMENT_ID = "INVDOC-ROUTE-SMOKE";
 const SELLER_INVOICE_DOCUMENT_ID = "SELLERINVDOC-ROUTE-SMOKE";
 const INVOICE_COMPLAINT_ID = "INVCMP-ROUTE-SMOKE";
@@ -90,8 +87,6 @@ function crmMethod(method: string): RegExp {
 	);
 }
 
-// GetMyStore 的店家：沒有完成新手引導的店家會被當成半註冊帳號導去 onboarding，
-// 這些路由守衛的斷言就整批測不到真正想測的東西。
 const SELLER_STORE: MockStore = {
 	id: SELLER_ID,
 	storeName: "路由測試商店",
@@ -190,8 +185,6 @@ const INVOICE_DOCUMENT_FIXTURE = {
 			taxCategory: "1",
 		},
 	],
-	// `event` 的值域是 `InvoiceDocumentTimelineEvent`（5 值），不是 `InvoiceEventType`
-	// ——查錯表只會整欄空白而不報錯，所以這裡刻意用會查到 label 的 `ISSUED`。
 	timeline: [{ occurredAt: "2026-01-02T03:04:05Z", event: "ISSUED", note: "" }],
 };
 
@@ -259,7 +252,6 @@ const SELLER_INVOICE_DOCUMENT_FIXTURE = {
  */
 const SELLER_INVOICE_COMPLAINT_FIXTURE = {
 	complaintId: INVOICE_COMPLAINT_ID,
-	// 後端恆為空字串 ⇒ 頁面退回顯示 complaintId，這裡照現況給空的。
 	caseNo: "",
 	orderNo: ORDER_NO,
 	storeId: SELLER_ID,
@@ -413,8 +405,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		],
 		async assertVisible(page) {
 			await assertHeading(page, "發票與收據");
-			// 發票號碼是這一頁的識別欄，也是買家對獎／報帳的唯一憑據：斷言它才分得出
-			// 「渲染了正確那份文件」與「渲染了殼」。
 			await assertText(page, "AB-87654321");
 			await assertHeading(page, "文件資訊");
 			await assertText(page, "二聯式（買受人為個人）");
@@ -454,10 +444,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		mocks: [],
 		requiredRequests: [],
 		async assertVisible(page) {
-			// initialRequestId is null for this route (page.tsx doesn't pass one
-			// for conversationId="demo"), so session.restoring starts false and
-			// the workspace renders straight into the "clarifying" stage — no
-			// procurement backend mocks needed for this smoke check.
 			const workspace = page.locator('[data-assistant-mode="live"]');
 			await expect(workspace).toBeVisible();
 			await expect(
@@ -668,7 +654,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 			},
 		],
 		async setup(page) {
-			// 客戶讀取走 CrmAppService（Connect），訂單仍是店家訂單列表加買家篩選。
 			await page.route(crmMethod("GetCustomer"), (route) =>
 				fulfillConnect(route, {
 					customer: {
@@ -721,8 +706,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 			await assertHeading(page, "發票詳情");
 			await assertHeading(page, "文件資訊");
 			await assertText(page, "CD-13572468");
-			// 沒有 `?kind=received` ⇒ 這一頁必須標成「銷項」。標錯方向會讓賣家以為
-			// 自己可以作廢平台開給他的發票，所以這一格是有鑑別力的斷言而非裝飾。
 			await assertText(page, "銷項");
 			await assertHeading(page, "金額與稅額明細");
 			await assertText(page, "87654321");
@@ -749,8 +732,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		],
 		async assertVisible(page) {
 			await assertHeading(page, "申訴詳情");
-			// 案件狀態（CodeMeta 的 7 個原值之一）＋ 工作天倒數：這兩格是賣家判斷
-			// 「該不該現在處理」的依據，也是這一頁唯一會逾期計入違規的資訊。
 			await assertText(page, "待賣家處理");
 			await assertText(page, "剩餘 3 個工作天");
 			await assertHeading(page, "申訴內容");
@@ -779,12 +760,9 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		],
 		async assertVisible(page) {
 			await assertHeading(page, "發票異常詳情");
-			// 摘要句由後端保證「可理解、不含 provider code」⇒ 它就是這一頁的標題行。
 			await assertHeading(page, "發票開立失敗：買受人統編格式不正確。");
 			await assertText(page, "待賣家處理");
 			await assertHeading(page, "系統重試進度");
-			// 「已嘗試 N／M 次」的 M 取那一列建立當下的 `maxAttempts`，不是政策現值；
-			// 混用會讓「還剩幾次」算錯，所以連字串一起釘死。
 			await assertText(page, "3 / 5 次");
 			await assertText(page, "開立");
 		},
@@ -857,7 +835,6 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 			},
 		],
 		async setup(page) {
-			// 編輯頁讀賣家自己的單篇（任何發布狀態）：SocialAppService.GetMyPost，不是公開的 GetPost。
 			await page.route(socialMethod("SocialAppService", "GetMyPost"), (route) =>
 				fulfillConnect(route, {
 					post: {
@@ -1007,7 +984,6 @@ async function prepareAuthenticatedPage(
 	role: UserRole,
 	mocks: readonly ApiMock[],
 ) {
-	// Lowest-priority safety net for unrelated chrome/background queries.
 	await page.route("**/api/v1/**", (route) =>
 		route.fulfill({
 			status: 200,
@@ -1024,8 +1000,6 @@ async function prepareAuthenticatedPage(
 	});
 	await mockMyStore(page, SELLER_STORE);
 	await mockMyKyc(page, { status: "APPROVED" });
-	// Route-specific dispatcher is installed last, so it wins over the generic
-	// /app/** gateway handler while still falling through for unmatched paths.
 	await installApiMocks(page, mocks);
 
 	await page
@@ -1057,8 +1031,6 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 		issues.push(`pageerror: ${error.message}`);
 	});
 	page.on("console", (message) => {
-		// Google Pay reports this browser diagnostic without enforcing it; keep
-		// every other console error visible to the smoke test.
 		if (
 			message.type() === "error" &&
 			!isKnownNonEnforcingConsoleError(message.text())
@@ -1095,8 +1067,6 @@ async function assertNoInvalidInternalLinks(page: Page, route: string) {
 				failures.push(href);
 				continue;
 			}
-			// External, hash-only, mail and phone links are outside this route
-			// contract. Internal links must be concrete, safe app paths.
 			if (!href.startsWith("/") || href.startsWith("//")) continue;
 			if (
 				/\[[^\]]+\]/.test(href) ||
@@ -1168,15 +1138,9 @@ async function runDynamicRouteSmoke(
 
 	await routeCase.assertVisible(page);
 	await assertRequiredRequests(seen, routeCase);
-	// CategorySelector replaces its initial aria-busy tree in the same React
-	// commit that reveals the populated form. Observe the settled state through
-	// the shared polling gate instead of taking a one-frame DOM snapshot that can
-	// catch React between those mutations and report a false flaky failure.
 	await assertNoResidualLoading(page, routeCase.url);
 	await assertNoInvalidInternalLinks(page, routeCase.url);
 
-	// Let lazy chunks and background client queries surface post-hydration
-	// failures before the runtime ledger is evaluated.
 	await page.waitForTimeout(350);
 	const mainText = await page.locator("main").allInnerTexts();
 	expect(
@@ -1203,9 +1167,6 @@ test.describe("authenticated protected dynamic route smoke", {
 			(entry) =>
 				entry.access !== "public" &&
 				entry.access !== "delegated" &&
-				// 帳號層級的頁面（`account`）不在這份清單：e2e 的 mock 沒有建立這類帳號的工作階段
-				// （見 helpers/mock-gateway.ts），登入後的畫面由 SellerMeasureRequestPage 的元件測試承接，
-				// 訪客導頁由 site-links 斷言。
 				entry.access !== "account",
 		).map(({ access, pattern }) => ({ role: access, pattern }));
 		const covered = ROUTE_CASES.map(({ role, pattern }) => ({ role, pattern }));
@@ -1320,9 +1281,6 @@ test.describe("protected dynamic mobile canaries", { tag: ["@ui"] }, () => {
 			textGeometry.viewportWidth,
 		);
 
-		// Reproduce the old touch bug without letting the browser synthesize a
-		// pointerover: mouseover used to overwrite the insertion target even though
-		// the second block remained the current mobile block.
 		await blocks.nth(2).dispatchEvent("mouseover", { bubbles: false });
 		await actions.locator(".ce-toolbar__plus").dispatchEvent("click");
 		await expect(blocks).toHaveCount(4);

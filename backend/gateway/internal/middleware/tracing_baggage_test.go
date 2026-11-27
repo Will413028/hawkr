@@ -24,9 +24,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// setupTracingTest 用 in-memory exporter 接管 package-level tracer 與 global
-// propagator（InitTracer 在測試中不跑），t.Cleanup 還原——這兩個都是 process
-// 全域，本檔測試不可 t.Parallel。
 func setupTracingTest(t *testing.T) *tracetest.InMemoryExporter {
 	t.Helper()
 	exporter := tracetest.NewInMemoryExporter()

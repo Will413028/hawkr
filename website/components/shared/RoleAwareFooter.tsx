@@ -44,14 +44,7 @@ export default function RoleAwareFooter({
 	const pathname = usePathname() ?? "";
 	const { activeRole, status } = useAuth();
 	const [mounted, setMounted] = React.useState(false);
-	// Pathname and active role are both browser state. Wait for both so a seller
-	// opening a public/legal page never flashes the buyer footer first.
 	React.useEffect(() => setMounted(true), []);
-	// No role-specific links on focused/delegated flows, but the shared
-	// background pause action remains reachable without covering page actions.
-	// Decided before the auth gate below: it depends on the pathname alone
-	// (both predicates return false for the empty prerender pathname), so
-	// reserving a full-height footer here would only be undone a frame later.
 	if (isStandaloneFlowPath(pathname) || isDelegatedWorkspacePath(pathname)) {
 		return (
 			<footer className="site-background-footer">

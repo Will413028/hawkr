@@ -12,11 +12,10 @@ import { formatDateTime, formatTaipeiDateTime } from "../src/lib/format";
  * 03:56:50 ⇒ 兩個畫面對不起來。使用者人在日本（UTC+9），這是預設情境不是假想。
  */
 
-// 票裡逐欄實測的三個值，直接當 fixture（不是我自己編的例子）。
 const CASES: Array<[string, string]> = [
-	["2026-08-29T19:56:50Z", "2026/08/30 03:56:50"], // 自動開票啟用切點
-	["2026-08-29T20:56:50Z", "2026/08/30 04:56:50"], // 最近驗證時間
-	["2026-09-02T16:37:21Z", "2026/09/03 00:37:21"], // 憑證更新時間
+	["2026-08-29T19:56:50Z", "2026/08/30 03:56:50"],
+	["2026-08-29T20:56:50Z", "2026/08/30 04:56:50"],
+	["2026-09-02T16:37:21Z", "2026/09/03 00:37:21"],
 ];
 
 test("台北換算逐值正確（三個值取自 #3053 的實測表）", () => {
@@ -42,7 +41,6 @@ test("輸出與 runtime 時區脫鉤：改 process.env.TZ 不影響結果", () =
 });
 
 test("跨日邊界：UTC 當天 16:00 之後在台北已是隔天", () => {
-	// 這一格是「本機時區」與「台北」最容易分岔的地方，也是 #3053 症狀的來源。
 	assert.equal(formatDateTime("2026-08-29T15:59:59Z"), "2026/08/29 23:59:59");
 	assert.equal(formatDateTime("2026-08-29T16:00:00Z"), "2026/08/30 00:00:00");
 });
@@ -98,13 +96,11 @@ test("ADM 不得自己組時間字串（一律走 lib/format 的台北釘死版�
 			}
 			if (!/\.tsx?$/.test(entry.name)) continue;
 			if (TZ_RATCHET_EXEMPT.has(full)) continue;
-			// lib/format.ts 自己就是那個釘死的實作，它必須用 getUTC*。
 			if (full === "src/lib/format.ts") continue;
 			const src = await readFile(full, "utf8");
 			for (const [i, line] of src.split("\n").entries()) {
-				// 金額千分位（`n.toLocaleString()` 無參數）不在此列：它與時區無關。
 				if (/toLocaleString\(\s*\)/.test(line)) continue;
-				if (line.trimStart().startsWith("*")) continue; // 註解
+				if (line.trimStart().startsWith("*")) continue;
 				if (banned.test(line))
 					offenders.push(`${full}:${i + 1} ${line.trim()}`);
 			}

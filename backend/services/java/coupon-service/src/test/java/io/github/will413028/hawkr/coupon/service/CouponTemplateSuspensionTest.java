@@ -22,9 +22,9 @@ class CouponTemplateSuspensionTest {
     @Mock CouponTemplateMapper templateMapper;
 
     private static final long ACCOUNT_ID = 2619961976L;
-    private static final String ACTIVE = CouponTemplateStatus.ACTIVE.value();     // 1
-    private static final String INACTIVE = CouponTemplateStatus.INACTIVE.value(); // 2
-    private static final String SELLER = IssuerType.SELLER.value();               // 2
+    private static final String ACTIVE = CouponTemplateStatus.ACTIVE.value();
+    private static final String INACTIVE = CouponTemplateStatus.INACTIVE.value();
+    private static final String SELLER = IssuerType.SELLER.value();
 
     @Test
     @DisplayName("停權：有 ACTIVE 賣家自建模板 → 停用為 INACTIVE 並標記 disabled_by_suspension")
@@ -67,8 +67,6 @@ class CouponTemplateSuspensionTest {
     @Test
     @DisplayName("解除停權：模板停權期間被 admin 另行停用（disabled_by_suspension 仍 FALSE）→ WHERE 排除，不誤還原")
     void restoreTemplatesFromSuspensionSkipsAdminDisabledTemplates() {
-        // admin 手動停用的模板 disabled_by_suspension 從未被設為 TRUE，
-        // SQL WHERE disabled_by_suspension=TRUE 天然排除，mapper 回 0
         when(templateMapper.restoreTemplatesFromSuspension(ACCOUNT_ID, SELLER, ACTIVE, INACTIVE))
                 .thenReturn(0);
 

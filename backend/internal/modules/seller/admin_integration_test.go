@@ -145,7 +145,6 @@ func TestClosureMigrationBackfillsStoresClosedBeforeTheRecordExisted(t *testing.
 	}
 }
 
-// openAt 在 at 這個時間開一家名為 name 的店。
 func (f *fixture) openAt(t *testing.T, at time.Time, name string) Store {
 	t.Helper()
 	f.now = at
@@ -174,7 +173,6 @@ func TestAdminStoresKeysetPagesHaveNoGapsOrDuplicates(t *testing.T) {
 	for i, offset := range []int{0, 0, 1, 2, 2, 2, 3} {
 		created = append(created, f.openAt(t, base.Add(time.Duration(offset)*time.Hour), "店"+string(rune('甲'+i))))
 	}
-	// 期望的順序：建立時間新到舊，同時間的 store_id 大到小。
 	want := slices.Clone(created)
 	slices.SortStableFunc(want, func(a, b Store) int {
 		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
@@ -212,7 +210,6 @@ func TestAdminStoresKeysetPagesHaveNoGapsOrDuplicates(t *testing.T) {
 		}
 	}
 
-	// 翻頁途中有新店：它比游標新，不在後面的頁；其餘的店一個不漏、一個不重。
 	first, err := f.module.AdminStores(ctx, StoreListInput{PageSize: 3})
 	must(t, err)
 	late := f.openAt(t, base.Add(10*time.Hour), "店晚")
@@ -255,7 +252,6 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 	}
 	idsOf := func(in StoreListInput) []int64 { return storeIDs(list(in)) }
 
-	// 預設只列目前的店家，已關閉的要明列。
 	if got := idsOf(StoreListInput{}); slices.Contains(got, closing.StoreID) || len(got) != 3 {
 		t.Fatalf("default=%v", got)
 	}
@@ -268,7 +264,6 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 	if got := idsOf(StoreListInput{Statuses: []Status{PendingDeletion}}); len(got) != 0 {
 		t.Fatalf("pending=%v", got)
 	}
-	// 店名、電話、store_code；% 與 _ 不是萬用字元；電話號碼不會被當成 store_code。
 	if got := idsOf(StoreListInput{Query: "小農"}); !slices.Equal(got, []int64{farm.StoreID}) {
 		t.Fatalf("name=%v", got)
 	}
@@ -283,7 +278,6 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 			t.Fatalf("query %q matched %v", q, got)
 		}
 	}
-	// 停權是推導出來的，不是儲存的篩選。
 	byID := map[int64]StoreListItem{}
 	for _, item := range list(StoreListInput{}) {
 		byID[item.Store.StoreID] = item
@@ -296,11 +290,9 @@ func TestAdminStoresFiltersAndDerivedFields(t *testing.T) {
 			t.Fatalf("store %d 沒有申請，卻有申請狀態 %s", id, *item.KYCStatus)
 		}
 	}
-	// 不合法的篩選值被拒絕，不被忽略。
 	if _, err := f.module.AdminStores(ctx, StoreListInput{Statuses: []Status{"WEIRD"}}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("status: %v", err)
 	}
-	// 「待審核」不是儲存的事實，是待辦的成員（KYCAwaitingReview）：SUBMITTED 與草稿、不認得的值一樣被拒絕。
 	for _, bad := range []KYCStatus{KYCStatusDraft, KYCStatusSubmitted, "WEIRD"} {
 		if _, err := f.module.AdminStores(ctx, StoreListInput{KYCStatus: &bad}); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Fatalf("kyc %s: %v", bad, err)
@@ -343,7 +335,6 @@ func TestAdminStoresFilterByKYCStatusAndShowTheFlow(t *testing.T) {
 	if got := list(KYCStatusRejected); len(got) != 0 {
 		t.Fatalf("rejected=%v", got)
 	}
-	// 沒有篩選時，草稿的店家顯示草稿，沒有申請的店家沒有申請狀態。
 	page, err := f.module.AdminStores(ctx, StoreListInput{})
 	must(t, err)
 	statuses := map[int64]*KYCStatus{}
@@ -361,8 +352,8 @@ func TestAdminStoreStats(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	taipeiSep30 := time.Date(2026, 9, 30, 15, 59, 59, 0, time.UTC) // 台北 9/30 23:59:59
-	taipeiOct1 := time.Date(2026, 9, 30, 16, 0, 0, 0, time.UTC)    // 台北 10/1 00:00:00
+	taipeiSep30 := time.Date(2026, 9, 30, 15, 59, 59, 0, time.UTC)
+	taipeiOct1 := time.Date(2026, 9, 30, 16, 0, 0, 0, time.UTC)
 	f.openAt(t, taipeiSep30, "九月的店")
 	f.openAt(t, taipeiOct1, "十月的店一")
 	f.openAt(t, taipeiOct1.Add(10*24*time.Hour), "十月的店二")
@@ -379,14 +370,12 @@ func TestAdminStoreStats(t *testing.T) {
 	accountDraft, _ := f.open(t)
 	f.savedDraft(t, kycDraft(accountDraft))
 
-	// 目前的店家：測月界的三家、三家有申請的、一家草稿，共 7 家（已關閉的不算）；其中九月那家以外的 6 家是十月開的。
 	f.now = time.Date(2026, 10, 20, 4, 0, 0, 0, time.UTC)
 	stats, err := f.module.AdminStoreStats(ctx)
 	must(t, err)
 	if want := (StoreStats{Total: 7, KYCAwaitingReview: 1, KYCApproved: 1, KYCRejected: 1, NewThisMonth: 6}); stats != want {
 		t.Fatalf("stats=%+v want=%+v", stats, want)
 	}
-	// 月界是台北的：時鐘退回 9/30 台北晚上，十月的店不算本月，九月的店算。
 	f.now = taipeiSep30
 	stats, err = f.module.AdminStoreStats(ctx)
 	must(t, err)
@@ -407,7 +396,6 @@ func TestStoreKYC(t *testing.T) {
 	if _, ok, err := f.module.StoreKYC(ctx, none.StoreID); err != nil || ok {
 		t.Fatalf("no application: ok=%v err=%v", ok, err)
 	}
-	// 草稿是賣家自己的，後台讀不到。
 	if _, ok, err := f.module.StoreKYC(ctx, draft.StoreID); err != nil || ok {
 		t.Fatalf("draft: ok=%v err=%v", ok, err)
 	}
@@ -416,7 +404,6 @@ func TestStoreKYC(t *testing.T) {
 	if !ok || got.ID != submitted.ID || got.Status != KYCStatusSubmitted || got.SubmittedAt == nil || got.StoreID != submittedStore.StoreID || got.AccountID != submittedAccount {
 		t.Fatalf("got=%+v ok=%v", got, ok)
 	}
-	// 取消之後也讀不到。
 	if _, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: submittedAccount, ExpectedVersion: submitted.Version}); err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +418,6 @@ func TestStoreKYC(t *testing.T) {
 	}
 }
 
-// approvedWith 開店、送出並核准一份申請。
 func (f *fixture) approvedWith(t *testing.T) (int64, Store) {
 	t.Helper()
 	accountID, s, submitted := f.submitted(t)
@@ -478,7 +464,6 @@ func TestAdminStoresKYCFilterOnlyMatchesTheCurrentApplication(t *testing.T) {
 			t.Fatalf("filter %s: %v", status, err)
 		}
 	}
-	// 「待審核」是待辦的成員（KYCAwaitingReview），不是儲存的狀態：只有重送的那家（營運中、審核中）。
 	if got := listIDs(t, f, StoreListInput{KYCAwaitingReview: true}); !slices.Equal(got, []int64{resubmitted.StoreID}) {
 		t.Fatalf("submitted=%v want=%v", got, resubmitted.StoreID)
 	}
@@ -507,7 +492,6 @@ func TestAdminStoresFilterByAccountAndSuspension(t *testing.T) {
 	_, third := f.approvedWith(t)
 	_, none := f.open(t)
 
-	// 帳號：完全相符，換過店的帳號有兩個 stint。
 	if got := listIDs(t, f, StoreListInput{AccountID: &boundAccount}); !slices.Equal(got, []int64{bound.StoreID}) {
 		t.Fatalf("account=%v", got)
 	}
@@ -531,7 +515,6 @@ func TestAdminStoresFilterByAccountAndSuspension(t *testing.T) {
 		t.Fatalf("other account=%v", got)
 	}
 
-	// 停權：風險停權、結束；認定的停權到期。篩選與停權狀態（stint.Derive，能力檢查的來源）永遠一致。
 	yes, no := true, false
 	check := func(label string, want []int64) {
 		t.Helper()

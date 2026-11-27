@@ -22,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// readability 是測試用的可讀性：模組隨資料回傳的旗標由它蓋上，預設全部可讀；unreadable 列出不可讀的貼文，forumClosed 讓討論區不可讀。
 type readability struct {
 	unreadable  map[uuid.UUID]bool
 	forumClosed bool
@@ -187,9 +186,7 @@ func (f *fakeReads) TopPosts(_ context.Context, _ social.Caller, n int32) ([]soc
 
 type fakeBuyers struct {
 	id int64
-	// displayCalls 非 nil 時記錄 BatchDisplay 被呼叫的次數。
 	displayCalls *int
-	// displayIDs 非 nil 時記錄每次 BatchDisplay 收到的 id。
 	displayIDs *[][]int64
 }
 
@@ -241,7 +238,6 @@ func (f *fakeStores) StoresBlockingBuyer(_ context.Context, _ int64, ids []int64
 	return f.blocking, nil
 }
 
-// fakeProducts 回 cards 裡有的商品（沒有的就是缺少），記錄每次批次查詢的 ID 與 includeInactive。
 type fakeProducts struct {
 	cards map[uuid.UUID]ProductInfo
 	asked [][]uuid.UUID
@@ -819,7 +815,6 @@ func TestListForumEntriesFlagsAndScoping(t *testing.T) {
 	})
 }
 
-// codeOf 是 interceptor 轉出的 Connect code（handler 回的是 apperr 或 rpc.Error，轉換在傳輸層）。
 func codeOf(t *testing.T, err error) connect.Code {
 	t.Helper()
 	if err == nil {
@@ -1003,7 +998,6 @@ func TestForumListingViewerActorFollowsViewerIdentity(t *testing.T) {
 			if !c.guest {
 				ctx = asBuyer(ctx)
 			}
-			// 空的一頁也要帶觀看者身分。
 			reads := &fakeReads{forum: social.ForumPage{}}
 			reads.forumClosed = c.block[c.forumShop]
 			h := newPublic(t, reads, fakeBuyers{id: 7}, &fakeStores{own: c.store, blocking: c.block})
@@ -1065,7 +1059,6 @@ func TestGetForumThreadMapsTopRepliesAndScopesTheNextToken(t *testing.T) {
 	if r := resp.Msg.GetReplies(); len(r) != 1 || !r[0].GetIsMine() || !r[0].GetViewerCanReply() || !resp.Msg.GetViewerCanComment() {
 		t.Errorf("回覆 = %v", r)
 	}
-	// 下一頁的 token 要能交給 ListForumEntries（同一組 store_id、parent_id）。
 	reads.forumParents = map[uuid.UUID]int64{top.ID: 5}
 	reads.forumReply = social.ForumPage{Entries: []social.ForumEntry{reply}}
 	if _, err := h.ListForumEntries(asBuyer(t.Context()), connect.NewRequest(&pb.ListForumEntriesRequest{StoreId: "5", ParentId: &tid, PageToken: resp.Msg.GetNextPageToken()})); err != nil {

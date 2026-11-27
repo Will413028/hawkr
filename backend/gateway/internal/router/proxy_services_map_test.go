@@ -51,9 +51,6 @@ func TestProxiedServiceNamesExistInServicesMap(t *testing.T) {
 	}
 }
 
-// scanProxiedServiceNames 掃 router 的非測試檔，取 CreateProxy／
-// CreateProxyWithPathRewrite／proxyToPath 第一個參數的**值**。
-// 參數是 Service* 常數時解析成它在 constants.go 的字面值；是字串字面值時直接取。
 func scanProxiedServiceNames(t *testing.T) []string {
 	t.Helper()
 	constByName := parseServiceConstants(t)
@@ -85,8 +82,6 @@ func scanProxiedServiceNames(t *testing.T) []string {
 			}
 			switch arg := call.Args[0].(type) {
 			case *ast.Ident:
-				// proxyToPath 的包裝函式自己也符合形狀，但它的第一個參數是參數名
-				// serviceName（不是常數）⇒ 查不到就跳過，不誤報。
 				if v, found := constByName[arg.Name]; found {
 					seen[v] = true
 				}
@@ -108,7 +103,6 @@ func scanProxiedServiceNames(t *testing.T) []string {
 	return out
 }
 
-// parseServiceConstants 回傳 constants.go 內 ServiceXxx = "..." 的 名稱→值。
 func parseServiceConstants(t *testing.T) map[string]string {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -138,7 +132,6 @@ func parseServiceConstants(t *testing.T) map[string]string {
 	return out
 }
 
-// parseProxyServicesMapKeys 取 `var services = map[string]ServiceConfig{...}` 的 key。
 func parseProxyServicesMapKeys(t *testing.T) []string {
 	t.Helper()
 	fset := token.NewFileSet()

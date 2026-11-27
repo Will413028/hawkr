@@ -61,7 +61,6 @@ export function useCertGate(): CertGate {
 	const { data: seller, loading, error, refresh } = useSellerSelf();
 	const { application, loading: kycLoading } = useMyKyc();
 	const { onboarding, loading: onboardingLoading } = useMyOnboarding();
-	// 收款帳戶在平台審核完成之後才讀；「完成」是開通摘要（伺服器）的答案，不從申請狀態推導。
 	const { account: paymentAccount, loading: paymentLoading } =
 		useMyPaymentAccount({ enabled: platformReviewCompleted(onboarding) });
 	const reload = () => {
@@ -84,12 +83,6 @@ export function useCertGate(): CertGate {
 		};
 	}
 
-	// No usable data — first-load failure / not found / no store — reads as
-	// "not started". NOTE: we branch on `!seller`, not `error`, on purpose: the
-	// query is SHARED across the navbar / dashboard / gates, and TanStack keeps the
-	// last-good `data` while setting `error` on a *background* refetch failure.
-	// Preferring last-good data means a transient blip can't re-lock an already
-	// certified seller everywhere at once.
 	if (!seller) {
 		return {
 			loading: false,

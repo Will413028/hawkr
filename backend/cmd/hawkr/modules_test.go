@@ -108,11 +108,8 @@ func TestCarryOverAuditCheckRejectsIncompleteTables(t *testing.T) {
 	}
 }
 
-// carryOverColumns 是「沿用盤點」表的欄位。
 var carryOverColumns = []string{"沿用的機制", "必要條件", "今天是否成立", "業界在同樣條件下的做法", "決定"}
 
-// checkCarryOverAudit 確認 md 有「## 沿用盤點」一節，其中的表欄位是 carryOverColumns，
-// 至少有一列，而且每一格都有填。
 func checkCarryOverAudit(md string) error {
 	lines := strings.Split(md, "\n")
 	start := slices.IndexFunc(lines, func(l string) bool { return strings.TrimSpace(l) == "## 沿用盤點" })
@@ -149,7 +146,6 @@ func checkCarryOverAudit(md string) error {
 	return nil
 }
 
-// tableCells 切出 Markdown 表格一列的儲存格；儲存格裡的直線要寫成 \|。
 func tableCells(line string) []string {
 	line = strings.ReplaceAll(strings.TrimSpace(line), `\|`, "\x00")
 	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(line, "|"), "|"), "|")

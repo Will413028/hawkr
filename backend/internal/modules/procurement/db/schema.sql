@@ -1,22 +1,8 @@
--- procurement 模組的 desired state（Atlas 與 sqlc 共用）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（procurement.<表>），不建跨 schema 的 FK。buyer_id、store_id 是外部鍵（BIGINT，不建 FK）；
--- 自己的實體用 UUIDv7（應用層產生、不設 DEFAULT，ADR 2026-09-25-row-identity-by-data-kind）。
---
--- 31 張舊表依 A9-D19（table-audit.md 的 S1–S11）收斂：沒有 candidate_leads（AD4）、controller_kind（AD12）、external lane 與 prospect（A9-D1）、
--- 預約表（A9-D9）、outbox 與 *_commands（M11、S4）。頭尾不得有空白的文字欄用 `trimtext.Check` 展開（單體規則 9），登記在 cmd/hawkr 的 trimmedColumns。
---
--- 買家刪除（S10）：requests、candidate_sets（被核准引用的）、approvals、publications、acceptances 的 buyer_id 可為 NULL：已發布的詢價與賣家
--- 看得到的紀錄保留（匿名，保留期跟詢價的生命週期），其餘買家資料（對話、輪次、沒被核准引用的候選集、run、額度）刪除。
--- approvals.candidate_set_id 是 RESTRICT：核准連到發布與賣家紀錄，候選集被誤刪時要明確失敗，不得連帶刪掉賣家看得到的資料。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA procurement;
 
--- 一張採購需求。「現行 revision」只有一種表示法：request_revisions 的 partial unique（S2）。
 CREATE TABLE procurement.requests (
     id UUID PRIMARY KEY,
     buyer_id BIGINT,
@@ -28,8 +14,6 @@ CREATE TABLE procurement.requests (
 );
 CREATE INDEX requests_buyer ON procurement.requests (buyer_id, created_at DESC) WHERE buyer_id IS NOT NULL;
 
--- 需求的一個版本，append-only。slots 是具名欄位（S3）；欄位 NULL 表示買家還沒填。
--- parent_revision_id 是內容祖先（這一版從哪一版的內容長出來；Rewind 的新版指向倒回的目標版），不是被取代者；取代順序是 revision_no 與現行（status）。
 CREATE TABLE procurement.request_revisions (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
@@ -67,10 +51,8 @@ CREATE TABLE procurement.request_revisions (
     CONSTRAINT request_revisions_budget_check CHECK (budget_per_unit >= 0)
 );
 CREATE UNIQUE INDEX request_revisions_no ON procurement.request_revisions (request_id, revision_no);
--- 一張需求同時只有一個現行版本，由資料庫擋雙頭。
 CREATE UNIQUE INDEX request_revisions_active ON procurement.request_revisions (request_id) WHERE status = 'ACTIVE';
 
--- 一個買家的對話，與 requests 1:1。軟刪除只在這裡：買家刪對話後需求與已發布的詢價保留。
 CREATE TABLE procurement.conversations (
     id UUID PRIMARY KEY,
     buyer_id BIGINT NOT NULL,
@@ -89,7 +71,6 @@ CREATE TABLE procurement.conversations (
 CREATE UNIQUE INDEX conversations_request ON procurement.conversations (request_id);
 CREATE INDEX conversations_buyer_active ON procurement.conversations (buyer_id, updated_at DESC, id DESC) WHERE deleted_at IS NULL;
 
--- 一輪釐清（舊 answer_patches，S2）：冪等鍵、稽核紀錄與對話訊息的唯一來源。
 CREATE TABLE procurement.turns (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
@@ -103,12 +84,7 @@ CREATE TABLE procurement.turns (
     recorded_this_turn JSONB NOT NULL DEFAULT '[]',
     optional_streak INTEGER NOT NULL DEFAULT 0,
     skipped_slots TEXT[] NOT NULL DEFAULT '{}',
-    -- TurnResult 的 wire JSON（第一次提交時的完整回應）。存在的必要條件：SubmitAnswer 與 Rewind 不經 run，重送沒有 run 事件可回放，
-    -- 重算會因 planner 或文案改動而與第一次不同；任何來源的 turn 一律寫它（A9-D33(2)）。
     turn_result JSONB NOT NULL,
-    -- SubmitAnswer 回答的欄位或 Rewind 倒回的欄位（SlotKey 字串）；其他來源的輪次為 NULL。存在的必要條件（A9-D34）：不經 run 的指令重送要比對「同一個欄位」，
-    -- 略過的回答沒有 buyer_message、turn_result 的 question 是下一題而不是這一題，兩者都帶不住欄位。source = 'ANSWER' 也含 ResumeRun 的回答（欄位在中斷上，此欄 NULL），
-    -- 所以 CHECK 只能要求 REWIND 必填、LLM_EXTRACT 必空。SubmitAnswer 的輪次必帶此欄的不變量由程式保證（Direct 寫入、`TestCommandSlotIsSetOnlyForSubmitAnswerAndRewindTurns`），DB 無法強制。
     command_slot TEXT,
     client_request_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
@@ -130,7 +106,6 @@ CREATE TABLE procurement.turns (
 CREATE UNIQUE INDEX turns_idempotency ON procurement.turns (buyer_id, client_request_id);
 CREATE INDEX turns_request ON procurement.turns (request_id, created_at DESC);
 
--- 一次候選搜尋的結果（S1）：不承載 run 的生命週期（在 runs），沒有 lease、fencing_token、policy_version。冪等鍵在 run（A9-D29）；失敗後買家重送就是新的一列。
 CREATE TABLE procurement.candidate_sets (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
@@ -141,7 +116,6 @@ CREATE TABLE procurement.candidate_sets (
 );
 CREATE INDEX candidate_sets_request ON procurement.candidate_sets (request_id, created_at DESC);
 
--- 候選賣家：沒有店名快照（S9，名稱讀取時由 StoreCard 組裝），只收 OPEN 的店；selected 併入（S11）。自由文字（研究摘要等）與事實不入庫，事實讀取時由需求現行版本組出（A9-D8、A9-D29(3)）。
 CREATE TABLE procurement.candidates (
     id UUID PRIMARY KEY,
     candidate_set_id UUID NOT NULL REFERENCES procurement.candidate_sets (id) ON DELETE CASCADE,
@@ -158,9 +132,6 @@ CREATE TABLE procurement.candidates (
 CREATE UNIQUE INDEX candidates_set_store ON procurement.candidates (candidate_set_id, store_id);
 CREATE INDEX candidates_set_rank ON procurement.candidates (candidate_set_id, rank);
 
--- 發布核准（PreviewRfqPublication 建立）：買家對「發給誰、發什麼」的唯一一個同意，不可變、會到期、只能執行一次（A9-D35）。
--- 賣家看得到的內容由需求版本（不可變）加上這裡凍結的單價範圍、補充說明與回價期限組出；hash 由 Go 重算（S5），表裡沒有 hash 欄。
--- schema_version 保留：hash 要知道 preimage 的版本才能重算（S3）。candidate_set_id 是預覽當下的候選集，Execute 重驗它仍有效（search.IsEffective）。
 CREATE TABLE procurement.rfq_publication_approvals (
     id UUID PRIMARY KEY,
     version INT NOT NULL DEFAULT 1,
@@ -189,7 +160,6 @@ CREATE TABLE procurement.rfq_publication_approvals (
 CREATE UNIQUE INDEX rfq_publication_approvals_idempotency ON procurement.rfq_publication_approvals (buyer_id, client_request_id);
 CREATE INDEX rfq_publication_approvals_request ON procurement.rfq_publication_approvals (request_id, created_at DESC);
 
--- 核准當下凍結的受眾（店家，順序有意義）。值的集合，主鍵 (approval_id, position)。
 CREATE TABLE procurement.rfq_publication_approval_recipients (
     approval_id UUID NOT NULL REFERENCES procurement.rfq_publication_approvals (id) ON DELETE CASCADE,
     position INT NOT NULL,
@@ -200,7 +170,6 @@ CREATE TABLE procurement.rfq_publication_approval_recipients (
 );
 CREATE UNIQUE INDEX rfq_publication_approval_recipients_store ON procurement.rfq_publication_approval_recipients (approval_id, store_id);
 
--- 一次發布。state 只收有寫入者的值 PUBLISHED（S6）；一個核准最多一次發布；冪等鍵放在這裡（S4，舊 rfq_publication_commands 刪除）。
 CREATE TABLE procurement.rfq_publications (
     id UUID PRIMARY KEY,
     version INT NOT NULL DEFAULT 1,
@@ -225,7 +194,6 @@ CREATE UNIQUE INDEX rfq_publications_approval ON procurement.rfq_publications (a
 CREATE UNIQUE INDEX rfq_publications_idempotency ON procurement.rfq_publications (buyer_id, client_request_id);
 CREATE INDEX rfq_publications_request ON procurement.rfq_publications (request_id, created_at DESC);
 
--- 發給一家店的邀請，是賣家可見性的唯一依據。通知有沒有送到只記在 notification 的投遞紀錄（A8 D30），這裡不複製。
 CREATE TABLE procurement.rfq_publication_invites (
     id UUID PRIMARY KEY,
     publication_id UUID NOT NULL REFERENCES procurement.rfq_publications (id) ON DELETE CASCADE,
@@ -239,8 +207,6 @@ CREATE TABLE procurement.rfq_publication_invites (
 CREATE UNIQUE INDEX rfq_publication_invites_store ON procurement.rfq_publication_invites (publication_id, store_id);
 CREATE UNIQUE INDEX rfq_publication_invites_position ON procurement.rfq_publication_invites (publication_id, position);
 
--- 一家店對一次發布的回價（身分列）。只有被邀請的店能有回價列：(publication_id, store_id) 參照邀請列，邀請列是賣家可見性的唯一依據（A9-D44）。沒有 buyer_id（由 request 推出）、沒有列版本（回價版次是 latest_version）。
--- write_closed_reason 只收有寫入者的 DECLINED（S6）。withdrawn_reason_code、write_closed_reason_code 是賣家填的原因代碼，伺服器記錄、不解析（A9-D45(2)；撤回與婉拒是目標狀態的方法，不建收據）。
 CREATE TABLE procurement.seller_responses (
     id UUID PRIMARY KEY,
     publication_id UUID NOT NULL REFERENCES procurement.rfq_publications (id) ON DELETE CASCADE,
@@ -269,8 +235,6 @@ CREATE TABLE procurement.seller_responses (
 CREATE UNIQUE INDEX seller_responses_publication_store ON procurement.seller_responses (publication_id, store_id);
 CREATE INDEX seller_responses_request_submitted ON procurement.seller_responses (request_id, created_at DESC) WHERE latest_version > 0;
 
--- 賣家回價的一個版本，不可變。沒有驗證欄位（A9-D1）、沒有 hash 複本（S5，由 Go 重算）。
--- conversion_basis 的去留是 A9-3c 開工要交 Will 的題目（計畫 A9-3 停止條件），這裡只保留契約必填的形狀；spec_note 是選填的規格說明（A9-D44）。
 CREATE TABLE procurement.seller_response_versions (
     id UUID PRIMARY KEY,
     seller_response_id UUID NOT NULL REFERENCES procurement.seller_responses (id) ON DELETE CASCADE,
@@ -314,7 +278,6 @@ CREATE TABLE procurement.seller_response_versions (
 CREATE UNIQUE INDEX seller_response_versions_version ON procurement.seller_response_versions (seller_response_id, version);
 CREATE UNIQUE INDEX seller_response_versions_idempotency ON procurement.seller_response_versions (seller_response_id, client_request_id);
 
--- 賣家的回價草稿：一家店一份、整份覆寫；payload 是部分填寫的 SellerQuote（JSONB 合理：形狀不固定）。
 CREATE TABLE procurement.seller_response_drafts (
     seller_response_id UUID PRIMARY KEY REFERENCES procurement.seller_responses (id) ON DELETE CASCADE,
     payload JSONB NOT NULL,
@@ -326,7 +289,6 @@ CREATE TABLE procurement.seller_response_drafts (
     CONSTRAINT seller_response_drafts_version_check CHECK (version >= 1)
 );
 
--- 買家的候選報價清單（買家資料，買家刪除時清掉）。
 CREATE TABLE procurement.buyer_shortlist_entries (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
@@ -338,10 +300,6 @@ CREATE TABLE procurement.buyer_shortlist_entries (
 );
 CREATE UNIQUE INDEX buyer_shortlist_entries_response ON procurement.buyer_shortlist_entries (request_id, seller_response_id);
 
--- order_ref 只當呼叫舊 ordering 的 CreateRfqOrder 的冪等鍵（Java orders.acceptance_id 是 BIGINT，A9-D45(1)），ordering 搬進單體時刪；
--- order_job_id 是建單的 River job，對帳（reconciler）用它判斷 job 是否已死。
--- 買家接受一份報價。state 只收有寫入者的值（S6，A9-D19 修訂）：ACTIVE，與建單重試用盡後的 ORDER_FAILED；live 鎖只擋 ACTIVE，
--- 所以建單失敗後買家可以再接受（同家或別家）。成交價（三金額）凍結在這裡；接受當下賣家可見內容的 hash 與回價 hash 是買家 CAS 的對象，留作稽核（S5 的 (c)）。
 CREATE TABLE procurement.buyer_quote_acceptances (
     id UUID PRIMARY KEY,
     buyer_id BIGINT,
@@ -384,8 +342,6 @@ CREATE UNIQUE INDEX buyer_quote_acceptances_order_no ON procurement.buyer_quote_
 CREATE INDEX buyer_quote_acceptances_response ON procurement.buyer_quote_acceptances (seller_response_id, seller_response_version);
 CREATE INDEX buyer_quote_acceptances_creating ON procurement.buyer_quote_acceptances (id) WHERE order_provisioning_state = 'CREATING_ORDER';
 
--- run 帳本：job_id 是執行它的 River job（WAITING_FOR_INPUT 的 run 沒有進行中的 job），quota_period_start 是扣額度的期間（失敗退款用；只有 TURN 扣額度，其餘 run 類型為 NULL，退款只在非 NULL 時做）；沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
--- 建 run 的方法（SubmitTurn、StartCandidateSearch、ResumeRun）的冪等鍵放在這裡（S4，舊 agent_run_commands 刪除）。
 CREATE TABLE procurement.agent_runs (
     id UUID PRIMARY KEY,
     buyer_id BIGINT NOT NULL,
@@ -422,7 +378,6 @@ CREATE INDEX agent_runs_buyer_created ON procurement.agent_runs (buyer_id, creat
 CREATE INDEX agent_runs_buyer_active ON procurement.agent_runs (buyer_id) WHERE status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED');
 CREATE INDEX agent_runs_event_expiry ON procurement.agent_runs (completed_at) WHERE completed_at IS NOT NULL AND min_available_seq <= last_event_seq;
 
--- run 的輸入（買家原文，具名文字欄）。回答中斷的 run 要嘛帶選項（option_id，buyer_message 為空字串）要嘛帶文字（option_id 為 NULL），恰一個（A9-D30）。沒有 retention_class（只有一個字面值、沒有讀取者）。
 CREATE TABLE procurement.agent_run_inputs (
     run_id UUID PRIMARY KEY REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     buyer_message TEXT NOT NULL,
@@ -435,7 +390,6 @@ CREATE TABLE procurement.agent_run_inputs (
     CONSTRAINT agent_run_inputs_answer_check CHECK ((option_id IS NULL) = (char_length(buyer_message) >= 1))
 );
 
--- run 事件：(run_id, seq) 識別；payload 是 proto JSON（WatchRunResponse 的 oneof），形狀靠 proto 規則演進（S3），沒有 schema_version。run 結束 7 天後由週期 job 清除並把 min_available_seq 推到 last_event_seq + 1（A9-D20 R1）。
 CREATE TABLE procurement.agent_run_events (
     run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
     seq BIGINT NOT NULL,
@@ -449,8 +403,6 @@ CREATE TABLE procurement.agent_run_events (
     CONSTRAINT agent_run_events_payload_check CHECK (jsonb_typeof(payload) = 'object')
 );
 
--- run 停下來等買家回答的中斷，只在回答成功時解決（A9-D26）：回答的 run（agent_runs.interrupt_id 指向它）轉 SUCCEEDED 或寫入自己的新中斷的同一個 transaction 內，這筆轉 RESOLVED、提問的 run 轉 SUCCEEDED；回答失敗或被取消不動它。
--- request_id 與 run 的 request_id 相同，放在這裡讓「每個需求最多一筆 PENDING」能用部分唯一索引表達。提問的 run 被取消或被新一輪取代時，這筆轉 CANCELLED（closed_at 是離開 PENDING 的時間），不再佔用索引。不設到期（A9-D20 R2）。
 CREATE TABLE procurement.agent_run_interrupts (
     id UUID PRIMARY KEY,
     run_id UUID NOT NULL REFERENCES procurement.agent_runs (id) ON DELETE CASCADE,
@@ -470,7 +422,6 @@ CREATE INDEX agent_run_interrupts_run ON procurement.agent_run_interrupts (run_i
 CREATE UNIQUE INDEX agent_run_interrupts_pending ON procurement.agent_run_interrupts (request_id) WHERE status = 'PENDING';
 ALTER TABLE procurement.agent_runs ADD CONSTRAINT agent_runs_interrupt_fkey FOREIGN KEY (interrupt_id) REFERENCES procurement.agent_run_interrupts (id) ON DELETE CASCADE;
 
--- 買家每期的送出次數：一列計數器加條件 UPDATE（A9-D9），沒有預約表。
 CREATE TABLE procurement.usage (
     buyer_id BIGINT NOT NULL,
     period_start TIMESTAMPTZ NOT NULL,

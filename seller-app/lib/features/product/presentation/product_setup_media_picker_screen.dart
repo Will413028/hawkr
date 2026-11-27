@@ -31,15 +31,13 @@ class _ProductSetupMediaPickerScreenState
     extends State<ProductSetupMediaPickerScreen> {
   final ImagePicker _picker = ImagePicker();
 
-  // Album and assets
   List<AssetEntity> _assets = [];
   bool _loading = true;
   String? _error;
 
-  // Multi-select state
-  final Set<int> _selectedIndices = {}; // indices into _assets
-  AssetEntity? _previewAsset; // currently previewed asset
-  File? _capturedFile; // if taken from camera
+  final Set<int> _selectedIndices = {};
+  AssetEntity? _previewAsset;
+  File? _capturedFile;
   Color _dominantColor = AppColors.textEmphasis;
 
   Future<void> _updateDominantColor() async {
@@ -84,7 +82,6 @@ class _ProductSetupMediaPickerScreenState
       _error = null;
     });
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    // 處理 iOS 14+ 限制存取權限：hasAccess 表示至少有部分存取權限
     if (!ps.hasAccess) {
       setState(() {
         _error = '需要相簿權限才能選取媒體';
@@ -93,7 +90,6 @@ class _ProductSetupMediaPickerScreenState
       return;
     }
 
-    // 如果是限制存取，顯示提示但繼續載入可用的照片
     if (ps == PermissionState.limited) {
       debugPrint(
         '[PhotoPicker] Limited access - only selected photos are available',
@@ -103,7 +99,7 @@ class _ProductSetupMediaPickerScreenState
     try {
       final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
         onlyAll: true,
-        type: RequestType.image, // images only
+        type: RequestType.image,
       );
       if (paths.isEmpty) {
         setState(() {
@@ -113,7 +109,6 @@ class _ProductSetupMediaPickerScreenState
         });
         return;
       }
-      // Load more photos - increased from 60 to 500
       final recent = paths.first;
       final List<AssetEntity> assets = await recent.getAssetListPaged(
         page: 0,
@@ -199,7 +194,6 @@ class _ProductSetupMediaPickerScreenState
   }
 
   Future<void> _next() async {
-    // 多選模式：收集所有選中的圖片，直接回傳（不進編輯器）
     if (_selectedIndices.isEmpty && _capturedFile == null) {
       FloatingToast.error(context, '請至少選擇一張照片');
       return;
@@ -210,13 +204,11 @@ class _ProductSetupMediaPickerScreenState
     try {
       final List<Uint8List> imageBytesList = [];
 
-      // 相機拍攝的照片
       if (_capturedFile != null) {
         final bytes = await _capturedFile!.readAsBytes();
         imageBytesList.add(bytes);
       }
 
-      // 相簿多選的照片
       for (final idx in _selectedIndices.toList()..sort()) {
         if (idx < 0 || idx >= _assets.length) continue;
         final file = await _assets[idx].file;
@@ -299,13 +291,11 @@ class _ProductSetupMediaPickerScreenState
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        // 切換多選
                         if (isChecked) {
                           _selectedIndices.remove(assetIdx);
                         } else {
                           _selectedIndices.add(assetIdx);
                         }
-                        // 更新預覽
                         _capturedFile = null;
                         _previewAsset = asset;
                       });
@@ -323,14 +313,12 @@ class _ProductSetupMediaPickerScreenState
                           errorBuilder: (context, error, stackTrace) =>
                               Container(color: AppColors.borderSubtle),
                         ),
-                        // 選中遮罩
                         if (isChecked)
                           Container(
                             color: AppColors.textEmphasis.withValues(
                               alpha: 0.3,
                             ),
                           ),
-                        // 勾選圈圈
                         Positioned(
                           right: 6,
                           top: 6,

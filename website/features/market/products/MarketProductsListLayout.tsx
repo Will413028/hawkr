@@ -41,7 +41,6 @@ export interface MarketProductsListLayoutProps {
 	categories: CategoryNode[];
 	sellerStories: StoryItem[];
 
-	// 當前篩選狀態（hidden field 與 active 標記用）
 	currentCategories: string[];
 	currentPriceMin: string;
 	currentPriceMax: string;
@@ -52,7 +51,6 @@ export interface MarketProductsListLayoutProps {
 	fetchParams?: MarketFetchParams;
 	pageSize?: number;
 
-	// SSR 已展開的 chips / link maps
 	appliedChips: AppliedChip[];
 	clearAllHref: string;
 	sortLinks: Array<{ value: string; label: string; href: string }>;

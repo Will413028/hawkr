@@ -175,7 +175,6 @@ public class ProductDetailDTO implements Serializable {
      */
     private Long version;
 
-    // ==================== 三層分類 ====================
 
     /** 第三層分類 ID（product.category 指向的分類） */
     private Long categoryLv3Id;
@@ -195,17 +194,14 @@ public class ProductDetailDTO implements Serializable {
     /** 第一層分類名稱 */
     private String categoryLv1Name;
 
-    // ==================== 商家資訊（僅公開 API 填充） ====================
 
     /** 商家資訊 */
     private SellerInfoDTO seller;
 
-    // ==================== 評論預覽（僅公開 API 填充） ====================
 
     /** 評論預覽（最多 2 筆） */
     private List<ReviewPreviewDTO> reviews;
 
-    // ==================== Hashtag（02 設計書 §3.7-§3.9） ====================
 
     /** Hashtag 列表（依 product_hashtag.position 升序，含讀取時計算的公開商品數）。 */
     private List<HashtagItemDTO> hashtags;

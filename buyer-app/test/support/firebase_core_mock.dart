@@ -16,9 +16,6 @@ import 'package:flutter_test/flutter_test.dart';
 /// 再碰任何真的 FirebaseMessaging 方法，不需要 mock 訊息通道。
 void mockFirebaseCore() {
   Firebase.delegatePackingProperty = _FakeFirebasePlatform();
-  // Firebase.delegatePackingProperty 是全域靜態欄位，跨測試檔存活（同一
-  // isolate）。今天這個檔案只有一個測試用到它，但往後同檔若加測試、且刻意
-  // 不需要 Firebase 的案例，沒有這行會悄悄繼承前一個測試設下的假物件。
   addTearDown(() => Firebase.delegatePackingProperty = null);
 }
 

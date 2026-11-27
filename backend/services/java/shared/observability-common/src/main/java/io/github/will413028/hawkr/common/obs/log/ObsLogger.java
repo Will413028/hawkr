@@ -76,14 +76,8 @@ public final class ObsLogger {
      */
     private String getCallerMethodName() {
         StackTraceElement[] stack = Thread.currentThread().getStackTrace();
-        // stack[0] = getStackTrace
-        // stack[1] = getCallerMethodName
-        // stack[2] = buildEvent
-        // stack[3] = info/warn/error
-        // stack[4] = actual caller
         if (stack.length > 4) {
             String methodName = stack[4].getMethodName();
-            // Filter out lambda and synthetic methods
             if (methodName != null && !methodName.startsWith("lambda$") && !methodName.contains("$")) {
                 return methodName;
             }
@@ -102,18 +96,15 @@ public final class ObsLogger {
 
         StringBuilder sb = new StringBuilder();
 
-        // Add className
         if (className != null && !className.isEmpty()) {
             sb.append(className);
         }
 
-        // Add methodName
         if (!methodName.isEmpty()) {
             if (sb.length() > 0) sb.append(".");
             sb.append(methodName);
         }
 
-        // Add result
         if (result != null && !result.isEmpty()) {
             if (sb.length() > 0) sb.append(".");
             sb.append(result);
@@ -122,7 +113,6 @@ public final class ObsLogger {
         return sb.length() > 0 ? sb.toString() : "unknown";
     }
 
-    // ==================== INFO ====================
 
     /**
      * Logs at INFO level.
@@ -167,7 +157,6 @@ public final class ObsLogger {
         }
     }
 
-    // ==================== WARN ====================
 
     /**
      * Logs at WARN level.
@@ -212,7 +201,6 @@ public final class ObsLogger {
         }
     }
 
-    // ==================== ERROR ====================
 
     /**
      * Logs at ERROR level.

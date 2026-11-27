@@ -114,8 +114,6 @@ TextStyle(
     final nonCanonicalWeight = RegExp(r'FontWeight\.w(?:[12368]00)\b');
     for (final file in _dartFiles()) {
       var source = file.readAsStringSync();
-      // CartTypography's scoped 600 emphasis is documented in component-library.md.
-      // Only these cart consumers use it; other non-canonical weights still fail.
       const cartEmphasisPaths = {
         'lib/features/cart/presentation/cart_typography.dart',
         'lib/features/cart/presentation/widgets/coupon_selection_sheet.dart',

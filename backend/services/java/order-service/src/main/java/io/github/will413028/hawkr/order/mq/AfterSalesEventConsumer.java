@@ -81,7 +81,6 @@ public class AfterSalesEventConsumer {
                 return;
             }
 
-            // fail-loud：金額非數字 → DLQ（退款記帳不容許靜默當 0）
             long refundAmount;
             try {
                 refundAmount = Long.parseLong(refundAmountStr);
@@ -91,7 +90,6 @@ public class AfterSalesEventConsumer {
                                 + "'，orderNo=" + orderNo + "; caseNo=" + caseNo, e);
             }
 
-            // fail-loud：null / 未知值 / REJECT_APPEAL 進 DLQ
             if (refundOutcome.isEmpty() || !AfterSalePlatformDecisionOutcome.isValidValue(refundOutcome)) {
                 throw new IllegalStateException(
                         "refund.completed payload 缺少或不合法的 refund_outcome: '" + refundOutcome
@@ -103,17 +101,14 @@ public class AfterSalesEventConsumer {
                         "refund.completed payload 不應帶 REJECT_APPEAL outcome, orderNo=" + orderNo
                                 + "; caseNo=" + caseNo);
             }
-            // fail-loud：PARTIAL 沒有正金額 = 事件本身矛盾（部分退款必有退款額）
             if (outcome == AfterSalePlatformDecisionOutcome.PARTIAL_REFUND && refundAmount <= 0) {
                 throw new IllegalStateException(
                         "refund.completed PARTIAL_REFUND 但 refund_amount<=0: " + refundAmount
                                 + "，orderNo=" + orderNo + "; caseNo=" + caseNo);
             }
 
-            // 交易段（返回即 commit）
             refundEventHandler.handleRefundCompleted(orderNo, outcome, refundAmount, externalRefId, caseNo);
 
-            // 倒數恢復段（post-commit；語意與兜底見方法 javadoc 第 2 點）
             countdownService.tryResume(orderNo, AfterSalesEventType.REFUND_COMPLETED.value());
 
             log.info("AfterSalesEventConsumer.refundCompleted.done",
@@ -152,7 +147,6 @@ public class AfterSalesEventConsumer {
                 return;
             }
 
-            // 交易段（返回即 commit）：financial_log + order.refund.finalized outbox
             sellerCancelRefundTxHandler.handleCancelCompleted(orderNo, cancelId);
 
             log.info("AfterSalesEventConsumer.cancelCompleted.done",

@@ -7,8 +7,6 @@ import (
 	"unicode/utf8"
 )
 
-// pascal 把點與底線分隔的 key 路徑接成 PascalCase：每段只把第一個字母大寫，其餘不動。
-// seller.OnboardingTaskId.description → SellerOnboardingTaskIdDescription。
 func pascal(path string) string {
 	var b strings.Builder
 	for _, seg := range strings.FieldsFunc(path, func(r rune) bool { return r == '.' || r == '_' }) {
@@ -27,12 +25,10 @@ func lowerFirst(s string) string {
 	return string(unicode.ToLower(r)) + s[n:]
 }
 
-// lowerCamel 把 lower_snake 轉成 lowerCamel：gate_message → gateMessage。
 func lowerCamel(snake string) string {
 	return lowerFirst(pascal(snake))
 }
 
-// connectCodeName 把 Connect code 的 proto 名轉成 PascalCase：INVALID_ARGUMENT → InvalidArgument。
 func connectCodeName(code string) string {
 	var b strings.Builder
 	for _, p := range strings.Split(code, "_") {
@@ -41,7 +37,6 @@ func connectCodeName(code string) string {
 	return b.String()
 }
 
-// checkNames 擋下三端的 API 名稱撞名。
 func (m *Model) checkNames() error {
 	var errs errList
 	seen := map[string]string{}

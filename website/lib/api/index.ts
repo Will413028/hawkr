@@ -171,10 +171,6 @@ export async function fetchProducts(
 	if (options?.followedSellerOnly) {
 		params.set("followed_seller_only", "true");
 	}
-	// Viewer-aware filters require the buyer's session cookie on the public route.
-	// Non-viewer branches also go through apiClient for consistency (same
-	// credentials policy; server-side calls use env.serverApiBase automatically).
-	// apiClient re-serialises a plain object back to URLSearchParams.
 	const query = Object.fromEntries(params);
 	const needsAuth = options?.followedProductOnly || options?.followedSellerOnly;
 	if (needsAuth) {
@@ -231,15 +227,6 @@ export async function fetchSellerProducts(
 	strict = false,
 ) {
 	if (!isSellerAccountId(id)) return emptyRecords();
-	// strict (via getCachedSellerProducts): a 5xx / network error throws so the
-	// cache keeps stale; a 404 stays a cacheable empty list. Client callers keep
-	// the soften-all default (empty list on any failure).
-	// getCachedSellerProducts is the sole server caller and owns the window
-	// (seller:<id> + products:list tags + COMMERCE_LIVE TTL), so there is no inner
-	// next:{revalidate} here — it would hold a storefront's price/stock past a tag
-	// bust it cannot see. The remaining callers are all 'use client' (chat context
-	// panel, attachment picker, post composer, storefront pagination), where Next
-	// never patches fetch and the option was inert anyway (#339 M4).
 	const { data: d } = await apiClient.public.get<LooseJson>(
 		`/sellers/${id}/products`,
 		{
@@ -262,18 +249,6 @@ export async function fetchProduct(sellerId: string, productId: string) {
 }
 
 export async function fetchPublicProduct(id: string) {
-	// softFailNotFound: a real 404 → null, so a genuinely absent product (or the
-	// app/[locale]/(public)/products/[id]/page.tsx id="0" sentinel) renders a cacheable
-	// "找不到商品" shell. A 5xx / network error THROWS instead of softening — the
-	// sole caller getCachedProduct then keeps its prior stale entry (runtime) and
-	// getCachedProduct's .catch(prerenderSafe(null)) still absorbs it at build, so
-	// a deploy-window outage never crashes the SSG export nor caches empty as fresh.
-	// Product entity still untyped (Phase c openapi codegen will type it); `any`
-	// preserves the previous loose contract for PDP / metadata consumers.
-	// getCachedProduct is the only caller and owns the window (product:<id> tag +
-	// COMMERCE_LIVE TTL), so there is no inner next:{revalidate} here — a second,
-	// untagged fetch window is exactly what used to keep a just-changed price on
-	// the PDP after its tag had already been busted (#339 M4).
 	const { data } = await apiClient.public.get<LooseJson>(`/products/${id}`, {
 		credentials: "omit",
 		softFailNotFound: true,
@@ -291,9 +266,6 @@ export interface SellerStats {
 	totalSales?: number;
 }
 
-// strict (via getCachedCategoryTree): any transport failure throws so the cache
-// keeps its prior tree rather than caching an empty taxonomy for the long 6h
-// window. Client callers (Navbar / useCategoryTree) keep soften-all (empty tree).
 export async function fetchCategoryTree(strict = false) {
 	const { data } = await apiClient.public.get<unknown>("/categories/tree", {
 		credentials: "omit",

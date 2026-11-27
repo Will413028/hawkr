@@ -126,8 +126,6 @@ class UberCheckoutProbeWiringTest {
                                 .setSenderCity("臺北市")
                                 .setSenderDistrict("大安區")
                                 .build())
-                        // 賣家同時開通 3001：陰性案例（preview(3001) 不得組 probe）才走得到閘門那一行，
-                        // 否則會在更前面的 requireSellerOnboarded 就被擋掉 ⇒ 那條測試對本案零鑑別力。
                         .addConfigs(SellerShippingConfigItem.newBuilder()
                                 .setShippingMethod("3001")
                                 .setGoodsType(TEMP)
@@ -141,8 +139,6 @@ class UberCheckoutProbeWiringTest {
                 .setSellerName("測試賣家")
                 .setCanAcceptOrders(true)
                 .build());
-        // 🔴 買家地址簿是 dropoff 三欄的唯一來源。值刻意與「一整串 shipping_address」不同，
-        //    這樣「有沒有真的走 buyer-service」驗得出來（若改成反解那串字串，縣市會是別的值）。
         when(buyerGrpcClient.getAddress(anyLong(), anyLong())).thenReturn(AddressInfo.newBuilder()
                 .setId(ADDRESS_ID)
                 .setReceiverName("王小明")
@@ -218,7 +214,6 @@ class UberCheckoutProbeWiringTest {
                 .setUberQuoteId(QUOTE_ID);
     }
 
-    // ===== preview =====
 
     @Test
     @DisplayName("🔴 preview(3003) 帶 address_id：閘門收到的是完整 probe，不是 methodOnly")
@@ -230,7 +225,6 @@ class UberCheckoutProbeWiringTest {
         assertThat(context.probe())
                 .as("probe 為 null ⇒ 閘門 deny-by-default ⇒ 買家選得到卻一律 9503")
                 .isNotNull();
-        // dropoff 三欄逐欄比對：值來自 buyer-service，不是從 shipping_address 反解。
         assertThat(context.probe().county()).isEqualTo("臺北市");
         assertThat(context.probe().district()).isEqualTo("信義區");
         assertThat(context.probe().detailAddress()).isEqualTo("市府路1號5樓");
@@ -272,7 +266,6 @@ class UberCheckoutProbeWiringTest {
         verify(buyerGrpcClient, never()).getAddress(anyLong(), anyLong());
     }
 
-    // ===== shippingFee =====
 
     @Test
     @DisplayName("🔴 shippingFee(3003) 恆為 methodOnly：級距費率表不承載會過期的即時報價")
@@ -282,7 +275,6 @@ class UberCheckoutProbeWiringTest {
         assertThat(capturedContext().probe()).isNull();
     }
 
-    // ===== confirm =====
 
     @Test
     @DisplayName("🔴 confirm(3003)：建單成功後把報價 CAS 成 CHECKOUT_ACCEPTED（accept=true ＋ order_no）")
@@ -296,11 +288,9 @@ class UberCheckoutProbeWiringTest {
 
         assertThat(accepted.accept()).isTrue();
         assertThat(accepted.orderNo()).isEqualTo(ORDER_NO);
-        // 🔴 鎖的是**重驗回來的**那一筆，不是買家送上來的那一筆（重驗允許重報，66 §7）。
         assertThat(accepted.quoteId())
                 .isEqualTo("dqt_revalidated")
                 .isNotEqualTo(QUOTE_ID);
-        // 沿用同一份 dropoff：地址在這兩步之間被重組，鎖到的會是另一個 payload 的報價。
         assertThat(accepted.county()).isEqualTo("臺北市");
         assertThat(accepted.district()).isEqualTo("信義區");
     }

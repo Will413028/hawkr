@@ -62,7 +62,6 @@ func (s *Service) record(ctx context.Context, actor adminaudit.Actor, targetType
 	return s.d.Audit.Record(ctx, adminaudit.Entry{Actor: actor, TargetType: targetType, TargetID: targetID, Detail: detail})
 }
 
-// uniqueBuyers 去重（保留第一次出現的順序），index[i] 是 out[i] 在 raw 的位置；raw 超過 limit 個回人數錯誤，不做任何事。
 func uniqueBuyers(ctx context.Context, field string, raw []int64, limit int) (out []int64, index []int, err error) {
 	if len(raw) > limit {
 		return nil, nil, model.Invalid(ctx, field, model.InvalidBuyerCountInvalid)
@@ -81,7 +80,6 @@ func uniqueBuyers(ctx context.Context, field string, raw []int64, limit int) (ou
 	return out, index, nil
 }
 
-// requireBuyers 檢查每個買家都存在；不存在的回 InvalidInput 並指出第一個（index[i] 是 ids[i] 在請求陣列的位置）。
 func (s *Service) requireBuyers(ctx context.Context, field string, ids []int64, index []int) error {
 	if len(ids) == 0 {
 		return nil
@@ -102,7 +100,6 @@ func (s *Service) requireBuyers(ctx context.Context, field string, ids []int64, 
 	return nil
 }
 
-// requireOpenStore 檢查店家存在且沒有關閉（停權不擋）。
 func (s *Service) requireOpenStore(ctx context.Context, storeID int64) error {
 	st, err := s.d.Directory.StoreState(ctx, storeID)
 	if err != nil {

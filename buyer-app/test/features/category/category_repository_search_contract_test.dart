@@ -68,9 +68,6 @@ void main() {
     test('分頁計數以 string 過線時要 parse 出真正的數字，不是退回預設值', () async {
       final result = await _repo(_wire).searchProducts(keyword: '菜', page: 1);
 
-      // 這三條是本測試的重點：後端送 string，若讀取端用 `as int?` 直接接會拿到
-      // null → 靜默退回預設值（total=0、page=送出去的那頁），畫面看起來正常但
-      // 分頁永遠壞掉。斷言真值才擋得住。
       expect(result.total, 48);
       expect(result.page, 2);
       expect(result.pageSize, 20);
@@ -90,8 +87,6 @@ void main() {
     });
 
     test('舊形狀（products key + snake_case + 數字型計數）不再被接受', () async {
-      // 反向斷言：餵舊 wire 進去必須 parse 不出東西。若這裡仍拿得到資料，代表
-      // 讀取端還留著雙讀相容層——本專案禁止相容層。
       final stale = await _repo({
         'code': 0,
         'data': {

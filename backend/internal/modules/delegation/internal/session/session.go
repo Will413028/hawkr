@@ -17,13 +17,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// idleExpired 回傳閒置逾時是否已到（backend/docs/modules/delegation.md §3：閒置逾時）。與 SQL 的 last_active_at > idle_since 互補。
 func idleExpired(s store.DelegationDelegatedOperationSession, now time.Time) bool {
 	return model.IdleExpired(s.LastActiveAt, now)
 }
 
-// delegationStatus 依 backend/docs/modules/delegation.md §3 的順位推導：撤銷、hard 到期、閒置逾時，否則進行中。兩種到期共用 expired：
-// 前端的狀態是三個值的封閉列舉，區分成因是稽核的事。
 func delegationStatus(s store.DelegationDelegatedOperationSession, now time.Time) model.DelegationStatus {
 	return model.SessionStatus(s.Status, s.ExpiresAt, s.LastActiveAt, now)
 }
@@ -89,7 +86,6 @@ func (m *Module) preflight(ctx context.Context, q *store.Queries, in model.Deleg
 		res.Denial, res.DeniedLabel = d, model.DeniedLabel(d)
 		return res, nil
 	}
-	// 管理員與店家分兩句問（OR 會讓兩個 partial unique index 都用不上）；已經到期的列不算衝突。
 	if _, err := q.GetActiveDelegationSessionOfActor(ctx, store.GetActiveDelegationSessionOfActorParams{
 		ActorAdminID: in.AdminID, Now: now, IdleSince: model.IdleSince(now),
 	}); err == nil {
@@ -108,7 +104,6 @@ func (m *Module) preflight(ctx context.Context, q *store.Queries, in model.Deleg
 	return res, nil
 }
 
-// displayCodeAttempts 是 display_code 撞號時重試的次數上限（67 bit 的亂數，撞一次都可以忽略）。
 const displayCodeAttempts = 3
 
 // StartDelegation 建立代行的 session，或重放同一把冪等鍵的 session（backend/docs/modules/delegation.md §3）：
@@ -138,8 +133,6 @@ func (m *Module) StartDelegation(ctx context.Context, in model.StartDelegationIn
 		return model.StartedDelegation{}, err
 	}
 	if !pre.Allowed {
-		// 同一把 key 的另一個請求可能剛好在上面的查詢之後 commit：它的 session 讓管理員或店家變成「已在代行」（兩個衝突
-		// 探測之間 commit 時是後者），答案卻是重放。重放一律優先於目前的判定，與上面的順序一致。
 		existing, err := q.GetDelegationSessionByIdempotencyKey(ctx, store.GetDelegationSessionByIdempotencyKeyParams{
 			ActorAdminID: in.AdminID, IdempotencyKey: in.IdempotencyKey,
 		})
@@ -149,7 +142,6 @@ func (m *Module) StartDelegation(ctx context.Context, in model.StartDelegationIn
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return model.StartedDelegation{}, fmt.Errorf("delegation：讀取代行的冪等鍵：%w", err)
 		}
-		// 拒絕原樣轉出（碼與那一句）：9286 帶著「這家店從來沒有開通」，換成模糊的碼只會讓操作者失去它。
 		return model.StartedDelegation{}, model.Deny(pre.Denial, "%s", pre.DeniedLabel)
 	}
 	for _, c := range in.Capabilities {
@@ -187,8 +179,6 @@ func (m *Module) StartDelegation(ctx context.Context, in model.StartDelegationIn
 	var out model.StartedDelegation
 	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
-		// 權限在這個 transaction 內讀並鎖住角色列（identity 的 FOR SHARE）：只在入口檢查一次的話，入口通過之後、寫入之前
-		// 撤掉角色，會留下沒有角色的管理員的代行；撤銷的 DELETE 與這次讀取互相等待。
 		allowed, err := m.d.Identity.AdminAllows(ctx, in.AdminID, adminperm.DelegationSessionsCreate)
 		if err != nil {
 			return fmt.Errorf("delegation：檢查管理員的權限：%w", err)
@@ -201,7 +191,6 @@ func (m *Module) StartDelegation(ctx context.Context, in model.StartDelegationIn
 		} else if err != nil {
 			return fmt.Errorf("delegation：鎖定管理員代行資格：%w", err)
 		}
-		// 先結束這位管理員與這家店已經到期、卻還佔著 partial unique index 的列（hard 與閒置兩種都要）。
 		if _, err := q.EndStaleDelegationSessions(ctx, store.EndStaleDelegationSessionsParams{
 			Now: now, IdleSince: model.IdleSince(now), ActorAdminID: in.AdminID, TargetStoreID: in.StoreID,
 		}); err != nil {
@@ -217,7 +206,6 @@ func (m *Module) StartDelegation(ctx context.Context, in model.StartDelegationIn
 			if !errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("delegation：建立代行：%w", err)
 			}
-			// 沒有寫入：判斷撞到哪一個 unique index。同一把 key 的另一個請求先寫入了，它的列就是兩者的答案。
 			existing, err := q.GetDelegationSessionByIdempotencyKey(ctx, store.GetDelegationSessionByIdempotencyKeyParams{
 				ActorAdminID: in.AdminID, IdempotencyKey: in.IdempotencyKey,
 			})
@@ -258,21 +246,18 @@ func validateStart(in model.StartDelegationInput) error {
 	if err := model.ValidateCaseReference(in.CaseReference); err != nil {
 		return err
 	}
-	// 前端也會擋，但藏起來的按鈕不是授權：伺服端再驗一次。
 	if in.Reason.CaseReferenceRequired() && in.CaseReference == nil {
 		return model.Deny(model.DenialInvalidCommand, "此理由必須填寫案件編號")
 	}
 	if err := model.ValidateCapabilities("capabilities", in.Capabilities); err != nil {
 		return err
 	}
-	// 超出範圍是錯誤的請求，不悄悄夾住：回應會與要求的不同，下游沒有人會發現。
 	if in.TTLSeconds < 1 || time.Duration(in.TTLSeconds)*time.Second > model.DelegationTTL {
 		return model.Deny(model.DenialInvalidCommand, "ttlSeconds 必須介於 1 與 %d 之間", int(model.DelegationTTL.Seconds()))
 	}
 	return nil
 }
 
-// replayDelegation 回傳既有的 session；credential 已核發時不再簽發 handoff code。
 func (m *Module) replayDelegation(ctx context.Context, q *store.Queries, s store.DelegationDelegatedOperationSession, in model.StartDelegationInput, now time.Time) (model.StartedDelegation, error) {
 	if !sameStartPayload(s, in) {
 		return model.StartedDelegation{}, model.Deny(model.DenialIdempotencyKeyReused, "冪等鍵已用於不同的請求內容")
@@ -297,7 +282,6 @@ func (m *Module) replayDelegation(ctx context.Context, q *store.Queries, s store
 	return model.StartedDelegation{HandoffCode: handoff, Session: toDelegationSession(row, now)}, nil
 }
 
-// sameStartPayload 比對請求與既有的 session。TTL 以 expires_at − issued_at 比對（它變成的值）。
 func sameStartPayload(s store.DelegationDelegatedOperationSession, in model.StartDelegationInput) bool {
 	if s.TargetStoreID != in.StoreID || s.ReasonCode != string(in.Reason) {
 		return false
@@ -402,7 +386,6 @@ func (m *Module) RevokeDelegation(ctx context.Context, in model.RevokeDelegation
 	}
 	var out model.DelegationSession
 	err := m.d.DB.InTx(ctx, func(ctx context.Context) error {
-		// 先取消這個 session 的排程，再改 session 的列：social 的貼文列在 delegation 之前鎖（單體規則 4）。
 		if err := m.d.CancelSchedules(ctx, []int64{in.SessionID}); err != nil {
 			return err
 		}
@@ -412,7 +395,6 @@ func (m *Module) RevokeDelegation(ctx context.Context, in model.RevokeDelegation
 			Now: now, RevokeReason: in.Reason, RevokedByAdminID: in.AdminID, ID: in.SessionID,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 已經撤銷過，或不存在。
 			row, err = q.GetDelegationSession(ctx, in.SessionID)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return model.Deny(model.DenialSessionNotFound, "找不到指定的代行工作階段")
@@ -472,7 +454,6 @@ func (m *Module) OnAdminRoleRevoked(ctx context.Context, e identity.AdminRoleRev
 	return m.revokeDelegationsOfAdmin(ctx, e.AdminID, nil, model.RevokeReasonAdminRoleRevoked)
 }
 
-// revokeDelegationsOfAdmin 的 operatorAdminID 為 nil 表示沒有操作者（系統因角色變動撤銷），revoked_by_admin_id 寫 NULL。
 func (m *Module) revokeDelegationsOfAdmin(ctx context.Context, adminID int64, operatorAdminID *int64, reason string) error {
 	if err := m.cancelSchedulesOfAdmin(ctx, adminID); err != nil {
 		return err
@@ -480,9 +461,6 @@ func (m *Module) revokeDelegationsOfAdmin(ctx context.Context, adminID int64, op
 	return m.revokeActiveDelegationsOfAdmin(ctx, adminID, operatorAdminID, reason)
 }
 
-// cancelSchedulesOfAdmin 取消這位管理員所有沒被撤銷的 session（含已結束、已到期的）發起的待發布排程：先問 social 目前有待發布排程的代行 session ID
-// （筆數以待發布的排程為界），再與這位管理員沒被撤銷的 session 求交集，不依 session 的年齡截斷。兩個讀取都不鎖；讀取之後才新開的 session 與漏接取消的路徑，
-// 由到點的重驗擋下。必須在鎖或改 delegation 的任何列之前呼叫（social 的貼文列在 delegation 之前鎖）。
 func (m *Module) cancelSchedulesOfAdmin(ctx context.Context, adminID int64) error {
 	pending, err := m.d.PendingScheduleSessionIDs(ctx)
 	if err != nil {
@@ -528,7 +506,6 @@ func (m *Module) SetAdminEligibility(ctx context.Context, in model.AdminEligibil
 		return nil
 	}
 	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
-		// 順序：取消排程 → 改資格列 → 撤銷進行中的 session。social 的列在 delegation 之前鎖。
 		if err := m.cancelSchedulesOfAdmin(ctx, in.AdminID); err != nil {
 			return err
 		}

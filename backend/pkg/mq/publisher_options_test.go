@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// applyOptions mirrors what NewPublisher does before dialling AMQP, so we
-// can test Option composition without needing a live broker.
 func applyOptions(opts ...Option) publisherOpts {
 	cfg := publisherOpts{confirmTimeout: defaultConfirmTimeout}
 	for _, opt := range opts {

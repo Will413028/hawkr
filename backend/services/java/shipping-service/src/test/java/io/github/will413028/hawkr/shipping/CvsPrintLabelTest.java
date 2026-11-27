@@ -15,12 +15,9 @@ import java.util.Map;
  */
 public class CvsPrintLabelTest {
 
-    // ===== 可替換變數 =====
     private static final String MER_ID = "HAWK9";
-    // 替換為實際的超商物流序號
     private static final String SHIP_TRADE_NO = "S0011772023712347560";
 
-    // ===== PayUni 代理商金鑰（sandbox） =====
     private static final String HASH_KEY = "TestOnlyFakeHashKey0123456789AB1";
     private static final String HASH_IV = "TestOnlyFakeIV00";
     private static final String BASE_URL = "https://sandbox-api.payuni.com.tw";

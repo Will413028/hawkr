@@ -1,11 +1,5 @@
 import 'dart:math' as math;
 
-// ---------------------------------------------------------------------------
-// 優惠券工具函數 — 純 Dart，無 Flutter 依賴。
-//
-// 從購物車 API 回傳的 coupon Map 中提取顯示資訊、
-// 計算折扣金額，供 UI 層使用。
-// ---------------------------------------------------------------------------
 
 /// 取得優惠券的唯一識別 ID（嘗試多個欄位名）。
 String couponIdentifier(Map<String, dynamic> coupon) {
@@ -46,7 +40,6 @@ String couponDisplayTitle(Map<String, dynamic> coupon) {
 
 /// 取得優惠券折扣描述文字（折扣金額 / 折數 / 免運 等）。
 String couponDiscountText(Map<String, dynamic> coupon) {
-  // 固定金額折抵
   final amountCandidate = coupon['discount_amount'] ?? coupon['discountAmount'];
   if (amountCandidate != null) {
     final num? amount = num.tryParse(amountCandidate.toString());
@@ -54,7 +47,6 @@ String couponDiscountText(Map<String, dynamic> coupon) {
       return '折抵 NT\$${amount.toStringAsFixed(0)}';
     }
   }
-  // 最高折抵上限
   final capCandidate = coupon['discount_cap'] ?? coupon['discountCap'];
   if (capCandidate != null) {
     final num? cap = num.tryParse(capCandidate.toString());
@@ -62,7 +54,6 @@ String couponDiscountText(Map<String, dynamic> coupon) {
       return '最高折抵 NT\$${cap.toStringAsFixed(0)}';
     }
   }
-  // 折扣比例
   final rateCandidate = coupon['discount_rate'] ?? coupon['discountRate'];
   if (rateCandidate != null) {
     final num? rate = num.tryParse(rateCandidate.toString());
@@ -82,7 +73,6 @@ String couponDiscountText(Map<String, dynamic> coupon) {
       return '$display折';
     }
   }
-  // 規則類型 fallback
   final rule = coupon['rule_type'] ?? coupon['ruleType'];
   if (rule is String && rule.trim().isNotEmpty) {
     return localizeRuleType(rule);
@@ -165,7 +155,6 @@ CouponEffect? resolveCouponEffect(
   double deduction = 0;
   String display = '';
 
-  // 折扣上限
   double? cap;
   final capCandidate =
       coupon['discount_cap'] ??
@@ -182,7 +171,6 @@ CouponEffect? resolveCouponEffect(
     return math.max(0, result);
   }
 
-  // 固定金額折抵
   final amountCandidate =
       coupon['discount_amount'] ?? coupon['discountAmount'] ?? coupon['amount'];
   if (amountCandidate != null) {
@@ -195,7 +183,6 @@ CouponEffect? resolveCouponEffect(
     }
   }
 
-  // 比例折扣 fallback
   if (deduction <= 0) {
     final rateCandidate =
         coupon['discount_rate'] ??

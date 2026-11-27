@@ -125,8 +125,6 @@ export function startDraftL2(
 	return {
 		...draft,
 		l2: { kind: "new", name },
-		// A not-yet-created L2 cannot have existing children. Starting a new L2
-		// therefore makes L3 a required new value in the same flow.
 		l3: { kind: "new", name: "" },
 	};
 }
@@ -138,8 +136,6 @@ export function markDraftL2Created(
 	return {
 		...draft,
 		l2: existingCategoryChoice(node),
-		// Preserve the typed L3 name. This is the recovery state when creating L2
-		// succeeded but the subsequent L3 request failed.
 		l3: draft.l3,
 	};
 }

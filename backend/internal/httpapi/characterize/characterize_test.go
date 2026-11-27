@@ -48,7 +48,6 @@ func TestErrorsMapToTheSameKinds(t *testing.T) {
 			t.Errorf("HTTP %d → %v，預期 %v", c.status, err, c.kind)
 		}
 	}
-	// envelope 的 code 優先於 HTTP status（gateway 的業務錯誤常回 200 帶非 0 的 code）。
 	if err := RESTKind(http.StatusOK, http.StatusNotFound); !errors.Is(err, ErrNotFound) {
 		t.Errorf("code 404 → %v", err)
 	}

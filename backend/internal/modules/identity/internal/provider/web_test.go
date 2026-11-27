@@ -22,7 +22,6 @@ import (
 
 var webNow = time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
 
-// fakeProvider 是假的 Google／LINE：token 端點檢查 authorization code 與 PKCE verifier 後回一個 ID token，JWKS 端點給 Google 的公鑰。
 type fakeProvider struct {
 	t        *testing.T
 	srv      *httptest.Server
@@ -30,7 +29,6 @@ type fakeProvider struct {
 	secret   string
 	code     string
 	verifier string
-	// idToken 組出要回的 ID token；tokenStatus 不是 0 時 token 端點直接回這個狀態。
 	idToken     func() string
 	tokenStatus int
 	form        url.Values

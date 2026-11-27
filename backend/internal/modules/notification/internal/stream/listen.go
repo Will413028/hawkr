@@ -51,8 +51,6 @@ func (p *pgConn) Wait(ctx context.Context) (string, error) {
 
 func (p *pgConn) Close(ctx context.Context) { _ = p.c.Close(ctx) }
 
-// stableAfter 是連線要維持多久才算穩定（估計值，不是量測值）：連上就斷的連線不重設退避，否則壞掉的連線每次重連都從頭等，
-// 每次重連的完整重讀訊號（resync）會讓所有訂閱者各讀一次資料庫，約每秒數次。
 const stableAfter = 10 * time.Second
 
 // Run 持有這個行程唯一的 LISTEN 連線，把通知扇出給本行程的訂閱者，直到 ctx 結束（回 nil 或 ctx 的錯誤）。
@@ -151,7 +149,6 @@ func (h *Hub) logger() *slog.Logger {
 	return slog.Default()
 }
 
-// dispatch 把一則通知交給本地訂閱者；不合法的通知記錄後丟棄。
 func (h *Hub) dispatch(raw string) {
 	p, err := decode(raw)
 	if err != nil {
@@ -162,7 +159,7 @@ func (h *Hub) dispatch(raw string) {
 	case kindInbox:
 		var item uuid.UUID
 		if p.Item != "" {
-			item = uuid.MustParse(p.Item) // decode 已驗證
+			item = uuid.MustParse(p.Item)
 		}
 		h.InboxChanged(Key{AccountID: p.Account, Audience: model.Audience(p.Audience)}, p.Store, model.StateHint(p.Hint), item)
 	case kindWorkspace:
@@ -170,7 +167,6 @@ func (h *Hub) dispatch(raw string) {
 	}
 }
 
-// resync 對本行程所有訂閱者發完整重讀訊號：收件匣，以及店家訂閱者的各類賣家工作區變更。
 func (h *Hub) resync() {
 	h.mu.Lock()
 	subs := make([]*Subscription, 0, len(h.byAccount))
@@ -203,7 +199,6 @@ func containsChange(cs []SellerChange, c SellerChange) bool {
 	return false
 }
 
-// shutdown 在 Run 結束時關閉全部訂閱（開著的串流以 ErrClosed 結束，server 的 Shutdown 才不會被它們卡住），之後的 Subscribe 回 ErrClosed。
 func (h *Hub) shutdown() {
 	h.mu.Lock()
 	h.down = true

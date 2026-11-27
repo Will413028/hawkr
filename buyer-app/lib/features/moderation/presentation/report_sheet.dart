@@ -129,7 +129,6 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
       if (isAccountSuspendedError(e)) return;
       showFloatingToast(
         context,
@@ -323,7 +322,6 @@ class _ReasonTile extends StatelessWidget {
             SizedBox(width: 10.w),
             Expanded(
               child: Text(
-                // 「其他」要補說明，選項後面加提示（送出鈕在說明填好前鎖住）。
                 reason.requiresDescription
                     ? '${reason.label}（請說明）'
                     : reason.label,

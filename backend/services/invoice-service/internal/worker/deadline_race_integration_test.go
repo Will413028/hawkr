@@ -24,20 +24,12 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres"
 )
 
-// raceCfg 是把 deadlineCfg() 的租約換成 lease、其餘照抄生產值。
-//
-// 只有 ClaimLease 可調：其餘（MaxAttempts／backoff／FetchBatch）都是被攻擊的對象，
-// 在測試裡另給一組會讓這裡驗到的是一個不存在的設定。
 func raceCfg(lease time.Duration) outbox.Config {
 	c := deadlineCfg()
 	c.ClaimLease = lease
 	return c
 }
 
-// countingReprocessor 記錄「副作用真的跑了幾次、對哪幾列」，並可在中途卡住。
-//
-// gate 是 nil 時不阻塞；非 nil 時每一次呼叫都等它被關閉——用來把一個持有者釘在
-// 「已 claim、副作用進行中」的狀態，這正是租約要保護的窗口。
 type countingReprocessor struct {
 	mu      sync.Mutex
 	calls   []int64
@@ -66,15 +58,6 @@ func (r *countingReprocessor) count() int {
 	return len(r.calls)
 }
 
-// barrierInboxRepo 把「兩個 pod 都撈完了、都還沒 claim」這個狀態變成**確定的**。
-//
-// 🔴 沒有它的話，兩個 goroutine 各跑一次 RunOnce 幾乎測不到東西：先起跑的那個通常在
-// 另一個發出 FetchDueByType 之前就已經 claim ＋ 副作用 ＋ MarkDone 跑完，於是第二個
-// 撈到空集合，測試綠燈但**搶佔一行都沒被執行到**。實測（2026-08-31）把 ClaimInboxEvent
-// 的租約述詞整個拿掉之後，沒有 barrier 的版本照樣全綠——那正是「綠燈是假的」。
-//
-// 生產上這個狀態是常態而非巧合：兩個 pod 的 ticker 相位獨立，5 分鐘一次的掃描很容易
-// 在同一秒內各撈一次同一批候選。
 type barrierInboxRepo struct {
 	domain.InboxRepository
 	wg *sync.WaitGroup
@@ -82,22 +65,16 @@ type barrierInboxRepo struct {
 
 func (r barrierInboxRepo) FetchDueByType(ctx context.Context, eventType string, now time.Time, limit int32) ([]domain.InboxEvent, error) {
 	rows, err := r.InboxRepository.FetchDueByType(ctx, eventType, now, limit)
-	// 先撈完再對齊：對齊點必須在 claim **之前**、fetch **之後**。
 	r.wg.Done()
 	r.wg.Wait()
 	return rows, err
 }
 
-// seedDueInbox 造一列「已到期、等著被兜底掃描撿走」的 ORDER_PAID 事件，payload 就是
-// consumer 真的會落庫的那一份，好讓 ReprocessFromInbox 走得完整條路。
 func seedDueInbox(t *testing.T, env *e2eEnv, eventID string, nextAttemptAt time.Time) int64 {
 	t.Helper()
 	inbox := postgres.NewInboxRepository(env.pool)
 	id, inserted, err := inbox.Insert(context.Background(), domain.NewInboxEvent{
 		EventID: eventID,
-		// 🔴 event_type 的值必須來自 pkgmq 常數，不是 routing key 的字面值：
-		// 兩者長得像但不相等（"ORDER_PAID" vs "order.paid"），寫錯的話
-		// FetchDueByType 永遠撈不到，於是每一支攻擊都會「通過」而什麼都沒測到。
 		EventType:        string(pkgmq.EventTypeOrderPaid),
 		RoutingKey:       "order.paid",
 		Exchange:         "hawkr.order",
@@ -134,9 +111,6 @@ func inboxRowState(t *testing.T, env *e2eEnv, id int64) (status string, attempt 
 	return
 }
 
-// ---------------------------------------------------------------------------
-// 攻擊 1：CAS 到底原不原子
-// ---------------------------------------------------------------------------
 
 // TestIntegration_DLRace_ClaimIsAtomicUnderRealConcurrency 攻擊「兩個 pod 同時掃到同一列」。
 //
@@ -180,9 +154,6 @@ func TestIntegration_DLRace_ClaimIsAtomicUnderRealConcurrency(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 攻擊 2：兩個 pod 各跑一次 RunOnce，副作用是真的 Prepare
-// ---------------------------------------------------------------------------
 
 // TestIntegration_DLRace_TwoPodsProduceOneInvoice 攻擊整支 DeadlineWorker，不只 SQL。
 //
@@ -199,14 +170,10 @@ func TestIntegration_DLRace_TwoPodsProduceOneInvoice(t *testing.T) {
 
 	id := seedDueInbox(t, env, "evt-twopods", time.Now().UTC().Add(-time.Minute))
 
-	// 兩個 pod 共用同一個 reprocessor 才數得出「總共跑了幾次」；業務面它們是同一支
-	// OrderPaidConsumer.ReprocessFromInbox 的兩個副本，行為相同。
 	rp := &countingReprocessor{}
 	var barrier sync.WaitGroup
 	barrier.Add(2)
 	braked := barrierInboxRepo{InboxRepository: repo, wg: &barrier}
-	// K05 的 sweeper 傳 nil：本檔驗的是兩個 pod 搶同一列 inbox 的租約行為，
-	// 與申訴逾期無關（RunOnce 對未 wire 的 sweeper 安靜跳過）。
 	podA := NewDeadlineWorker(braked, rp, strictRefundReprocessor{}, deadlineCfg(), dlParkInterval, nil, testObsC, nil)
 	podB := NewDeadlineWorker(braked, rp, strictRefundReprocessor{}, deadlineCfg(), dlParkInterval, nil, testObsC, nil)
 
@@ -276,9 +243,6 @@ func TestIntegration_DLRace_TwoPodsRealIssuanceOneDocument(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 攻擊 3：租約到期，但前一個持有者還在跑
-// ---------------------------------------------------------------------------
 
 // TestIntegration_DLRace_ExpiredLeaseLetsASecondPodInWhileTheFirstStillRuns 是本檔最重要的一支。
 //
@@ -315,10 +279,8 @@ func TestIntegration_DLRace_ExpiredLeaseLetsASecondPodInWhileTheFirstStillRuns(t
 	}()
 
 	select {
-	case <-rpA.entered: // A 已 claim 且正在副作用中
+	case <-rpA.entered:
 	case <-time.After(30 * time.Second):
-		// 沒有這個 case 的話，種子沒被撈到就會靜靜地卡到 go test 的 10 分鐘 panic，
-		// 而 panic 的訊息完全不會指向真正的原因（event_type 寫錯）。
 		t.Fatal("pod A 從未進入副作用 —— 種子沒有進入 INV.dl 的候選集合，本支的前提不成立")
 	}
 	time.Sleep(lease + 40*time.Millisecond)
@@ -336,8 +298,6 @@ func TestIntegration_DLRace_ExpiredLeaseLetsASecondPodInWhileTheFirstStillRuns(t
 			"本支的前提沒有成立，後面的斷言沒有意義", lease, gotB)
 	}
 
-	// 這才是本支要留下的證據：租約到期後，同一列被跑了兩次副作用，
-	// 而 A 直到最後都不知道自己已經不是持有者。
 	total := rpA.count() + gotB
 	if total != 2 {
 		t.Fatalf("副作用總次數 = %d，want 2（A 一次、B 一次）", total)
@@ -363,11 +323,9 @@ func TestIntegration_DLRace_ZombieHolderCanResetALiveHoldersLease(t *testing.T) 
 	now := time.Now().UTC()
 	id := seedDueInbox(t, env, "evt-zombie", now.Add(-time.Minute))
 
-	// A 取得一個「即將到期」的租約（模擬 A 很慢、租約已經走完）。
 	if ok, err := repo.Claim(ctx, id, now.Add(-time.Second), now); err != nil || !ok {
 		t.Fatalf("A claim: ok=%v err=%v", ok, err)
 	}
-	// B 合法搶走（A 的租約已過期）。
 	if ok, err := repo.Claim(ctx, id, now.Add(dlClaimLease), now); err != nil || !ok {
 		t.Fatalf("B claim 應成功（A 租約已到期）：ok=%v err=%v", ok, err)
 	}
@@ -375,7 +333,6 @@ func TestIntegration_DLRace_ZombieHolderCanResetALiveHoldersLease(t *testing.T) 
 		t.Fatalf("B 的租約沒有寫進去（next_attempt_at=%v）", nextAt)
 	}
 
-	// 殭屍 A 這時才失敗返回，寫它自己的重試簿記。它的租約早就沒了。
 	ok, err := repo.UpdateAttempt(ctx, id, 1, now.Add(2*time.Second), nil)
 	if err != nil {
 		t.Fatalf("zombie UpdateAttempt: %v", err)
@@ -384,7 +341,6 @@ func TestIntegration_DLRace_ZombieHolderCanResetALiveHoldersLease(t *testing.T) 
 		t.Skip("UpdateAttempt 已帶租約 fence（rows=0）—— 本攻擊不成立，這是好事")
 	}
 
-	// 後果：B 仍在工作，但那一列已經因為 A 的寫入回到候選集合。
 	due, err := repo.FetchDueByType(ctx, string(pkgmq.EventTypeOrderPaid), now.Add(3*time.Second), 10)
 	if err != nil {
 		t.Fatalf("FetchDueByType: %v", err)
@@ -421,7 +377,6 @@ func TestIntegration_DLRace_ZombieCannotResurrectACompletedRow(t *testing.T) {
 	if ok, err := repo.Claim(ctx, id, now.Add(-time.Second), now); err != nil || !ok {
 		t.Fatalf("A claim: ok=%v err=%v", ok, err)
 	}
-	// B 搶走並成功完成。
 	if ok, err := repo.Claim(ctx, id, now.Add(dlClaimLease), now); err != nil || !ok {
 		t.Fatalf("B claim: ok=%v err=%v", ok, err)
 	}
@@ -429,7 +384,6 @@ func TestIntegration_DLRace_ZombieCannotResurrectACompletedRow(t *testing.T) {
 		t.Fatalf("B MarkProcessed: ok=%v err=%v", ok, err)
 	}
 
-	// 殭屍 A 現在做它會做的三件事，全部必須是 no-op。
 	for _, tc := range []struct {
 		name string
 		run  func() (bool, error)
@@ -452,9 +406,6 @@ func TestIntegration_DLRace_ZombieCannotResurrectACompletedRow(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 攻擊 4：崩潰在副作用中途
-// ---------------------------------------------------------------------------
 
 // TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent 攻擊「持有者在
 // 副作用做到一半就消失」。
@@ -479,8 +430,6 @@ func TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent(t *testin
 	now := time.Now().UTC()
 	id := seedDueInbox(t, env, "evt-crash", now.Add(-time.Minute))
 
-	// pod A：claim（短租約，好讓它在測試時間內真的到期）→ 副作用成功 → 崩潰
-	// （MarkDone 從未執行——進程沒了，不會有任何 defer 跑）。
 	const crashLease = 150 * time.Millisecond
 	if ok, err := repo.Claim(ctx, id, now.Add(crashLease), now); err != nil || !ok {
 		t.Fatalf("A claim: ok=%v err=%v", ok, err)
@@ -493,7 +442,6 @@ func TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent(t *testin
 		t.Fatal("claim 之後該列仍在候選集合裡 —— 這不是搶佔")
 	}
 
-	// A 的副作用跑完了（document 已落庫），然後進程消失。
 	if err := env.paid.ReprocessFromInbox(ctx, domain.InboxEvent{
 		ID: id, EventType: string(pkgmq.EventTypeOrderPaid),
 		AggregateRef: &env.orderNo, Payload: e2ePaidBody(t, "evt-crash", env),
@@ -508,7 +456,6 @@ func TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent(t *testin
 		t.Fatalf("模擬崩潰後狀態 = %s，want RECEIVED（沒有人標記過它）", status)
 	}
 
-	// ① 租約真的到期之後，那一列自己回到候選集合。
 	time.Sleep(crashLease + 100*time.Millisecond)
 	back, err := repo.FetchDueByType(ctx, string(pkgmq.EventTypeOrderPaid), time.Now().UTC(), 10)
 	if err != nil {
@@ -519,7 +466,6 @@ func TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent(t *testin
 			"持有者崩潰即該訂單永遠開不出發票")
 	}
 
-	// ② pod B 接手，跑完整條 RunOnce（真時間、生產參數）。
 	podB := NewDeadlineWorker(repo, env.paid, strictRefundReprocessor{}, deadlineCfg(), dlParkInterval, nil, testObsC, nil)
 	if err := podB.RunOnce(ctx); err != nil {
 		t.Fatalf("pod B RunOnce: %v", err)
@@ -537,9 +483,6 @@ func TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent(t *testin
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 攻擊 5：consumer 的 handlerLease vs worker 的 ClaimLease
-// ---------------------------------------------------------------------------
 
 // TestIntegration_DLRace_RunningHandlerIsNotPreemptedByARealScan 用**真的**
 // DeadlineWorker 打真的 DB，驗 handlerLease 擋得住兜底掃描。
@@ -552,8 +495,6 @@ func TestIntegration_DLRace_RunningHandlerIsNotPreemptedByARealScan(t *testing.T
 	env := setupE2E(t)
 	repo := postgres.NewInboxRepository(env.pool)
 
-	// consumer 的 peer client 不可用 ⇒ handler 在步驟 5 失敗、那一列留在 RECEIVED，
-	// 正是「兜底掃描要接手、但現在還不可以」的形狀。
 	failing := invoicemq.NewOrderPaidConsumer(repo, env.uc,
 		invoicemq.UnavailableOrderFactsClient{}, invoicemq.UnavailablePaymentFactsClient{},
 		invoicemq.UnimplementedAdjustmentApplier{}, nil, nil)
@@ -569,7 +510,6 @@ func TestIntegration_DLRace_RunningHandlerIsNotPreemptedByARealScan(t *testing.T
 		t.Fatalf("read inbox row: %v", err)
 	}
 
-	// 立刻跑一輪兜底掃描：它必須撈不到這一列。
 	rp := &countingReprocessor{}
 	dl := NewDeadlineWorker(repo, rp, strictRefundReprocessor{}, deadlineCfg(), dlParkInterval, nil, testObsC, nil)
 	if err := dl.RunOnce(ctx); err != nil {
@@ -583,7 +523,6 @@ func TestIntegration_DLRace_RunningHandlerIsNotPreemptedByARealScan(t *testing.T
 		t.Fatalf("落庫時預留的租約已經是過去（next_attempt_at=%v）", nextAt)
 	}
 
-	// 租約到期之後，同一支掃描必須撈得到——否則就變成永遠沒人接手。
 	due, err := repo.FetchDueByType(ctx, string(pkgmq.EventTypeOrderPaid), nextAt.Add(time.Second), 10)
 	if err != nil {
 		t.Fatalf("FetchDueByType: %v", err)
@@ -616,12 +555,10 @@ func TestIntegration_DLRace_ConsumerCanStealTheRowFromAClaimedWorker(t *testing.
 	now := time.Now().UTC()
 	id := seedDueInbox(t, env, "evt-steal", now.Add(-time.Minute))
 
-	// worker 合法 claim（租約 5 分鐘，還沒到期）。
 	if ok, err := repo.Claim(ctx, id, now.Add(dlClaimLease), now); err != nil || !ok {
 		t.Fatalf("worker claim: ok=%v err=%v", ok, err)
 	}
 
-	// 慢 handler 這時才跑完，標記自己那一列。租約在它眼裡不存在。
 	ok, err := repo.MarkProcessed(ctx, id, now)
 	if err != nil {
 		t.Fatalf("consumer MarkProcessed: %v", err)

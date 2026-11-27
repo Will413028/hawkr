@@ -16,7 +16,6 @@ void main() {
         systemTextScale: 2,
         viewPadding: const EdgeInsets.only(top: 24, bottom: 16),
         viewInsets: const EdgeInsets.only(bottom: 260),
-        // 面板讀 provider（語系），底部面板掛在 Navigator 下，所以 ProviderScope 要在 Navigator 之上。
         home: ProviderScope(
           child: Navigator(
             onGenerateRoute: (_) => MaterialPageRoute<void>(

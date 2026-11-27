@@ -260,7 +260,6 @@ export async function revokeDelegatedSession(input: {
 	return parsed;
 }
 
-// ==================== 授權列七支（backend#2444） ====================
 
 /**
  * 授權面錯誤 → 給人看的一句話。
@@ -314,7 +313,6 @@ export async function getDelegationCapabilityCatalog(): Promise<DelegationCapabi
 	);
 	const parsed = parseDelegationCapabilityCatalog(envelope.data);
 	if (!parsed) {
-		// fail-closed：拿不到目錄就不開對話框，不得退回本地依賴表。
 		throw new DelegatedOperationClientError(
 			"代行能力目錄格式不完整，已停止開啟授權設定。",
 			502,

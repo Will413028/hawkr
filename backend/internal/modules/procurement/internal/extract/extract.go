@@ -73,7 +73,6 @@ type Extractor struct {
 	shape     Shape
 
 	attemptTimeout, totalBudget, backoff time.Duration
-	// sleep 與 jitter 讓測試不必真的等；jitter 回 [0,1)。
 	sleep  func(ctx context.Context, d time.Duration) error
 	jitter func() float64
 }
@@ -137,15 +136,12 @@ func (e *Extractor) Extract(ctx context.Context, message string, known slots.Set
 	return slots.Patch{}, &Error{Unavailable: ae.unavailable, Err: ae.err}
 }
 
-// nonRetryableCodes 是重試只會得到同樣結果的模型 ErrorCode 與結束原因（安全過濾、禁止內容、引用、黑名單、敏感個資、截斷、不支援的語言、圖片安全、工具呼叫異常）；
-// 不在清單內的值（OTHER、MALFORMED_FUNCTION_CALL、UNSPECIFIED 等）視為輸出不明或壞掉，可重試一次。
 var nonRetryableCodes = map[string]bool{
 	"SAFETY": true, "PROHIBITED_CONTENT": true, "RECITATION": true, "BLOCKLIST": true, "SPII": true,
 	"MAX_TOKENS": true, "content_filter": true,
 	"LANGUAGE": true, "IMAGE_SAFETY": true, "UNEXPECTED_TOOL_CALL": true, "TOO_MANY_TOOL_CALLS": true,
 }
 
-// attemptErr 是一次嘗試的失敗分類。
 type attemptErr struct {
 	err                    error
 	retryable, unavailable bool
@@ -185,7 +181,6 @@ func (e *Extractor) attempt(parent, budget context.Context, req *adkmodel.LLMReq
 	return patch, nil
 }
 
-// classify 把呼叫錯誤分類：逾時、429、5xx、連線層錯誤可重試且屬於「服務不可用」；其餘 4xx 與停用不重試。
 func classify(parent, attempt context.Context, err error) *attemptErr {
 	if errors.Is(err, llm.ErrDisabled) {
 		return &attemptErr{err: err}
@@ -206,7 +201,6 @@ func classify(parent, attempt context.Context, err error) *attemptErr {
 	return &attemptErr{err: err}
 }
 
-// instruction 把單位允許清單注入，prompt 與 slots 的規則同步。品項解析（分類）不是模型能填的：抽取結果沒有這個欄位。
 var instruction = fmt.Sprintf(`你是採購需求解析器。從買家的訊息中抽出明確提到的採購條件。
 
 規則：
@@ -234,7 +228,6 @@ func schema() *genai.Schema {
 	}
 }
 
-// known 是 prompt 裡「目前已知的需求」，只含買家能改的欄位。
 type known struct {
 	Item               *string `json:"item,omitempty"`
 	Quantity           *int32  `json:"quantity,omitempty"`
@@ -267,7 +260,6 @@ func (e *Extractor) request(message string, s slots.Set) (*adkmodel.LLMRequest, 
 			Description: "把買家訊息中明確提到的採購條件寫入這個 tool 的參數。",
 			Parameters:  schema(),
 		}}}}
-		// 只設 Mode 不設 AllowedFunctionNames：只宣告一個 tool，allow-list 買不到任何東西，卻會讓請求變成相容性最差的 allowed_tools 形狀。
 		cfg.ToolConfig = &genai.ToolConfig{FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeAny}}
 	case ShapeSchema:
 		cfg.ResponseMIMEType = "application/json"
@@ -281,7 +273,6 @@ func (e *Extractor) request(message string, s slots.Set) (*adkmodel.LLMRequest, 
 	}, nil
 }
 
-// wire 是模型輸出的形狀；沒有品項解析欄位，模型多吐的 key 一律被忽略，「模型不得決定品項分類」是結構事實。
 type wire struct {
 	Item               *string `json:"item"`
 	Packaging          *string `json:"packaging"`

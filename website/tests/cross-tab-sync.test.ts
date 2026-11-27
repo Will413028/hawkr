@@ -37,7 +37,6 @@ test("F1: another tab switched to a role the account holds → sync that role", 
 });
 
 test("F1: a switch to a role the account does NOT hold is ignored (never widens authority)", () => {
-	// buyer-only account can't be pushed into the seller workspace.
 	assert.equal(
 		reduceStorageEvent({ key: KEY, newValue: "seller" }, { isSeller: false }),
 		null,

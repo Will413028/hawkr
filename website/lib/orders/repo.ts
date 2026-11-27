@@ -99,11 +99,6 @@ const STATUS_VALUE_BY_NAME: Record<string, string> = Object.fromEntries(
 );
 
 export function denormalizeStatus(name: string): string {
-	// CSV-safe: each comma-separated token is mapped independently.
-	// `OrdersClient` passes codemeta-numeric CSVs (e.g. "10,20") that
-	// fall through unchanged; single semantic names (e.g.
-	// "pending_payment") get mapped to a single code. Mixed input
-	// (e.g. "preparing,paid") also works.
 	if (!name.includes(",")) return STATUS_VALUE_BY_NAME[name] ?? name;
 	return name
 		.split(",")
@@ -114,11 +109,6 @@ export function denormalizeStatus(name: string): string {
 		.join(",");
 }
 
-// Backend ships order items under wildly inconsistent keys depending on
-// service (orderItems / orderItemEntityList / itemList / products / …)
-// and per-item fields (image vs skuImage vs spuPic vs pic vs goodsImg).
-// Mirrors `OrderSummary.fromMap` + `OrderItem.fromMap` in the Flutter
-// seller app so the same payload renders identically on both clients.
 const ITEMS_KEY_ALIASES = [
 	"items",
 	"orderItemEntityList",
@@ -231,10 +221,6 @@ function extractItemsList(raw: Record<string, unknown>): unknown[] {
 function normalizeOrderItem(
 	it: Record<string, unknown>,
 ): Order["items"][number] {
-	// §231: the order item carries a flat `imageKey` (objectKey SSOT) + `imageUrl`
-	// (Gateway-composed) pair — `OrderItemDetailResponse` / `OrderItemViewResponse`
-	// (order.go:101-102, 204-205). The key is the only thing read; every consumer
-	// feeds it through buildImageUrl/resolveCdnUrl, which accept either form.
 	const image = pickFirst<string>(it, ["imageKey"]);
 
 	const name = String(
@@ -248,11 +234,6 @@ function normalizeOrderItem(
 		]) ?? "",
 	);
 
-	// 成交「單價」快照。訂單明細/列表回 `unitPrice`、結帳預覽回 `price`，
-	// 兩者都是單價。嚴禁退回 `actualPayAmount` / `realAmount` / `payAmount` /
-	// `totalPrice` 這類「整列已付金額（單價 × 數量）」欄位 — UI 會再乘一次數量
-	// 算小計，用整列金額當單價會重複相乘（例：1,000 的單價被當成整列 10,000，
-	// 顯示成 10,000 × 10 = 100,000）。
 	const price = String(
 		pickFirst(it, ["unitPrice", "price", "salePrice", "originalPrice"]) ?? "0",
 	);
@@ -294,9 +275,6 @@ function normalizeOrderItem(
 export function normalizeOrder(raw: Record<string, unknown>): Order {
 	const itemsRaw = extractItemsList(raw) as Record<string, unknown>[];
 	const items = itemsRaw.map(normalizeOrderItem);
-	// Backend sometimes flattens receiver/shipping fields onto the order
-	// root instead of nesting under `shipping`. Treat both shapes the
-	// same so we always run the receiver-field fallback chain.
 	const shipping =
 		pickFirstRecord(raw, [
 			"shipping",
@@ -444,9 +422,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 			paymentPaidAt !== undefined ||
 			paymentAmount,
 	);
-	// Buyer-side identity — mirrors OrderSummary.fromMap (lines 552-607) in
-	// the seller App. Names come from a long alias chain (商城後端蓋過幾次
-	// schema 了).
 	const buyerName = (pickFirst<string>(raw, [
 		"buyerNickname",
 		"buyer_nickname",
@@ -462,12 +437,7 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 		"realName",
 		"real_name",
 	]) ?? "") as string;
-	// §231: seller-view order list/detail carry the flat pair `avatarKey`
-	// (objectKey SSOT) + `avatarUrl` (order.go:47-48, 162-163). Consumers pass
-	// this through buildImageUrl, so only the key is read.
 	const buyerAvatar = (pickFirst<string>(raw, ["avatarKey"]) ?? "") as string;
-	// 買家營運鍵。`/app/orders` 與 `/app/orders/{order_no}` 都只發 `buyerId`
-	// （OrderSummaryResponse.BuyerID / OrderDetailResponse.BuyerID），單一來源。
 	const buyerId = String(pickFirst(raw, ["buyerId"]) ?? "");
 	const sellerObj =
 		asRecord(raw.seller) ??
@@ -476,11 +446,7 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 		asRecord(raw.merchant) ??
 		asRecord(raw.sellerInfo) ??
 		asRecord(raw.seller_info);
-	// 賣家營運鍵（store surrogate）。同上，兩支端點都只發 `storeId`。
 	const storeId = String(pickFirst(raw, ["storeId"]) ?? "");
-	// 賣家店面 canonical 短碼。與 sellerName/logo 同源自 order-service 的
-	// batchGetSellerMeta；後端聚合失敗時不送，此處保持 undefined，由呼叫端決定
-	// 不渲染連結（不回退 storeId — storeId 路徑會多吃一次 308）。
 	const storeCode =
 		typeof raw.storeCode === "string"
 			? raw.storeCode.trim() || undefined
@@ -505,8 +471,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 			"shopName",
 			"shop_name",
 		]);
-	// B-238: order list/detail expose one canonical seller-logo URL. Do not
-	// recover deprecated sellerAvatarUrl/seller_logo aliases or nested fields.
 	const sellerLogo =
 		typeof raw.logoUrl === "string"
 			? raw.logoUrl.trim() || undefined
@@ -634,9 +598,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 					"expire_at",
 				]),
 		),
-		// 出貨/取消期限 — App OrderSummary 用 `autoCancelAt`，後端實際送
-		// `processingDeadline`（OrderSummaryResponse / OrderDetailResponse 皆有）。
-		// 同一條 fallback 鏈對齊 App order_model.dart。
 		autoCancelAt: normalizeTimestamp(
 			pickFirst(raw, [
 				"autoCancelAt",
@@ -872,9 +833,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 					labelExpireAt:
 						pickFirst<string>(shipping, ["labelExpireAt", "label_expire_at"]) ??
 						pickFirst<string>(raw, ["labelExpireAt", "label_expire_at"]),
-					// §231: `shipmentPhotoKeys` / `receiptPhotoKeys` are the objectKey
-					// SSOT; the `*Urls` twins are the Gateway-composed display URLs
-					// (order.go:75-78). Consumers run these through buildImageUrl.
 					shipmentPhotoUrls: normalizeStringArray(
 						pickFirst(shipping, ["shipmentPhotoKeys"]) ??
 							pickFirst(raw, ["shipmentPhotoKeys"]),
@@ -894,8 +852,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 					amount: paymentAmount,
 				}
 			: undefined,
-		// `canCancel` **不 normalize**：後端根本不送這一欄（見 types.ts 的說明）。
-		// 讀一個永遠不存在的欄位並不會報錯，只會讓每一顆掛在它身上的按鈕靜默消失。
 		canConfirm: raw.canConfirm === true,
 		canReview: raw.canReview === true,
 		canRefund: raw.canRefund === true,
@@ -989,10 +945,6 @@ async function fetchOrdersWith(
 	});
 	if (status) qs.set("status", denormalizeStatus(status));
 	if (view) qs.set("view", view);
-	// query key 用 buyer_id、參數名用 buyerId（44 號身分分離：買家業務鍵是
-	// buyers.buyer_id，不是登入 principal 的 account_id；命名統一來自 dev 的 aa83fb4e）。
-	// fetcher/root 是代行資料層的注入點：代行下要走 /adm/api 的 BFF，不能寫死
-	// authedFetch 與 /app/orders。兩者正交，都要保留。
 	if (buyerId) qs.set("buyer_id", buyerId);
 	const env = await fetcher<ServerListShape | unknown[]>(`${root}?${qs}`, {
 		signal,

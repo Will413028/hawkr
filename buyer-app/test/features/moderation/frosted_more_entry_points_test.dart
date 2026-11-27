@@ -185,7 +185,6 @@ void main() {
             );
             final reportTarget = report.target;
             if (surface == '商品評價') {
-              // 評價的檢舉只送參照：種類與評價 ID。
               expect(reportTarget.id, 'review-12');
               expect(
                 reportTarget.kind,
@@ -203,7 +202,6 @@ void main() {
             await tester.tap(more);
             await tester.pumpAndSettle();
             if (surface == '商品評價') {
-              // 契約只能封鎖評價的回覆店家，不能封鎖寫評價的買家，所以評價入口沒有封鎖選項。
               expect(find.text('封鎖此使用者'), findsNothing);
               await tester.tapAt(const Offset(10, 10));
               await tester.pumpAndSettle();

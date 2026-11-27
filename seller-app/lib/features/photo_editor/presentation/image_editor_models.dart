@@ -14,9 +14,9 @@ class EditHistory {
   final double blur;
   final List<TextLayer> textLayers;
   final List<StickerLayer> stickerLayers;
-  final Uint8List? imageBytes; // 圖片緩存（用於 AI 編輯後的 undo）
-  final int imageVersion; // 圖片版本號
-  final Matrix4? transformMatrix; // 整張圖片的縮放/平移變換矩陣
+  final Uint8List? imageBytes;
+  final int imageVersion;
+  final Matrix4? transformMatrix;
 
   EditHistory({
     required this.action,
@@ -45,8 +45,8 @@ class TextLayer {
   final bool isVisible;
   final TextAlign textAlign;
   final String fontFamily;
-  final double rotation; // 旋轉角度（弧度）
-  final double scale; // 縮放比例
+  final double rotation;
+  final double scale;
 
   TextLayer({
     required this.text,
@@ -102,7 +102,7 @@ class StickerLayer {
   final double y;
   final double size;
   final double rotation;
-  final double scale; // 縮放比例
+  final double scale;
   final bool isVisible;
 
   StickerLayer({

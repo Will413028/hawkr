@@ -73,10 +73,6 @@ export function delegatedPreviewProduct(
 			unit: sku.unit,
 		})),
 		shippingMethods: methods,
-		// 這兩欄是預覽存在的理由本身：「買家看不看得到、買不買得到」。
-		// ⚠️ 不映射的後果是靜默且方向最壞的——deriveDetailLayoutProps 的判定是
-		// `product.purchasable !== false`，欄位缺席就恆為 true ⇒ 未上架商品的預覽
-		// 顯示成「可以購買」，而那正是這個畫面要回答的那個問題。
 		purchasable: detail.purchasable,
 		publicationState: detail.publicationState,
 		storeId,

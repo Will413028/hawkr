@@ -105,7 +105,6 @@ func (f *fakeStreams) Delete(_ context.Context, ids []uuid.UUID) error {
 	return nil
 }
 
-// fakeDatabaseStart 是 fakeStreams 預設的資料庫時間：晚於各測試自己用的存活確認時間。
 var fakeDatabaseStart = time.Unix(5000, 0)
 
 func newTestHub(t *testing.T, r Reader, cfg Config) *Hub {
@@ -131,7 +130,6 @@ func storeParty(id int64) model.Party {
 	return model.Party{Kind: model.PartyStore, Store: &st}
 }
 
-// drain 取走目前所有能立刻取得的事件：用 poll，沒有事件時不阻塞，所以不靠時間判斷「沒有更多了」。
 func drain(t *testing.T, s *Subscription) []Event {
 	t.Helper()
 	var out []Event

@@ -17,7 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== DTO ====================
 
 // DelegatedProductListItem is one row of GET .../products.
 //
@@ -243,7 +242,6 @@ type DelegatedBatchUnpublishData struct {
 	Results   []DelegatedBatchResultItem `json:"results"`
 }
 
-// ==================== handlers ====================
 
 // ListDelegatedProducts handles GET .../products.
 func (h *Holder) ListDelegatedProducts(c *gin.Context) {
@@ -266,8 +264,6 @@ func (h *Holder) ListDelegatedProducts(c *gin.Context) {
 
 	orch := h.orchestrator()
 	resp, err := h.Product.GetProductListForDelegation(c.Request.Context(), &productpb.GetProductListRequest{
-		// owner_store_id 是「呼叫者自己的 store」語意；store_id（field 9）是公開頁
-		// 「指定任意賣家」語意，兩者不可混用。
 		OwnerStoreId: req.StoreID,
 		Keyword:      keyword,
 		Status:       c.Query("status"),
@@ -345,12 +341,8 @@ func (h *Holder) CreateDelegatedProduct(c *gin.Context) {
 		!validateProductArrays(c, body.Origin, body.Certifications, body.Hashtags) {
 		return
 	}
-	// 值域非法的認證在這裡剔除（19 §6.2.1 第 ① 層）。建立時還沒有 productId。
 	filteredCerts, localCertWarnings := filterDelegatedCertifications(c, body.Certifications, "", req.StoreID)
 	body.Certifications = filteredCerts
-	// 收斂點判定出來的 CONCURRENT_CONFLICT 只出現在 gRPC 回應裡，用一個宣告在
-	// closure 外的變數接住。用賦值不用 append：Write 有可能被重跑，append 會讓
-	// 同一批 warning 出現兩次。
 	var upstreamCertWarnings []*productpb.CertificationWarning
 
 	description, err := convertDescriptionInputToProto(h.MediaBaseURL, body.Description)
@@ -366,13 +358,7 @@ func (h *Holder) CreateDelegatedProduct(c *gin.Context) {
 		ResourceType: "product",
 		ReadCap:      authz.AdminCapProductsRead,
 		WriteCap:     authz.AdminCapProductsWrite,
-		// 全表比較。建立類沒有 before，每一欄都是「— → 值」，收窄反而會漏記剛建出來
-		// 的內容。
 		SnapshotFields: nil,
-		// 建立類沒有 pre-image，名稱只能從請求本身取。不填的話這一列的
-		// resource_name 是空的，而 resource_id 要等 confirm 才補上 —— 稽核主控台的
-		// 「目標資源」欄因此指不回任何一件商品，正是建立這個動作最需要交代的東西。
-		// 取請求值也比取寫入後的名稱誠實：寫入失敗的那一列同樣記得下「當時要建的是誰」。
 		ResourceName:    body.Name,
 		OperationReason: reason,
 		NotifySeller:    notifySellerOrDefault(body.NotifySeller),
@@ -381,7 +367,6 @@ func (h *Holder) CreateDelegatedProduct(c *gin.Context) {
 		RequestID:       req.RequestID,
 		CorrelationID:   req.CorrelationID,
 		UserAgent:       req.UserAgent,
-		// ReadBefore 為 nil：建立類沒有 before 狀態，不是「有一個空的」。
 		Write: func(ctx context.Context, dctx *commonpb.DelegationContext) (*delegation.Resource, *delegation.Denial) {
 			images := make([]*productpb.ProductImage, 0, len(body.Images))
 			for _, img := range body.Images {
@@ -401,22 +386,6 @@ func (h *Holder) CreateDelegatedProduct(c *gin.Context) {
 				StoreId:        req.StoreID,
 				Origin:         body.Origin,
 				Certifications: toCertificationProtos(body.Certifications),
-				// status 明確填 4003 未上架。
-				//
-				// 不是 4001：DRAFT 的語意是「僅建立者可查看」，而代行建立的商品從第一刻
-				// 起就該歸賣家看見與接手 —— 一個賣家看不到的「草稿」正是代行不該製造的
-				// 隱藏狀態。4003 的語意涵蓋「從未上架」，且 INACTIVE→ACTIVE 是賣家自己
-				// 就走得通的既有轉換（ProductService.validateSellerStatusTransition），
-				// 賣家不必等代行者回來才能把它上架。
-				//
-				// ⚠️ 這一行不能省。product-service 的 ProductEntityConverter.toEntity 在
-				// **未指定 status 時預設落地 ACTIVE(4004)**（ProductService.createProduct:222
-				// 的註解明載），所以「不填 = 不上架」是錯的：本機實打坐實，代行建立出來的
-				// 商品直接是 4004、買家立刻看得到。
-				//
-				// 那是一個**繞過 capability** 的洞：建立只要 products.write，而讓商品對買家
-				// 可見本來只有 products.publish 做得到。少了這一行，一個沒有上架權的工作
-				// 階段可以用「建立商品」把商品直接上架，稽核列上留下的卻是 PRODUCT_CREATE。
 				Status:     strconv.Itoa(codemeta.ProductStatusInactive),
 				Hashtags:   body.Hashtags,
 				Delegation: dctx,
@@ -472,11 +441,8 @@ func (h *Holder) UpdateDelegatedProduct(c *gin.Context) {
 	if !validateProductArrays(c, origin, body.Certifications, body.Hashtags) {
 		return
 	}
-	// 只過濾「這一次送進來的」認證，不碰 before 快照的回填值：既有列可能是本期之前
-	// 落庫的舊值，把它們剔掉等於用一次無關的更新順手清掉賣家的標章。
 	filteredCerts, localCertWarnings := filterDelegatedCertifications(c, body.Certifications, productID, req.StoreID)
 	body.Certifications = filteredCerts
-	// 理由同 CreateDelegatedProduct：收斂點的 CONCURRENT_CONFLICT 只在 gRPC 回應裡。
 	var upstreamCertWarnings []*productpb.CertificationWarning
 
 	description, err := convertDescriptionInputToProto(h.MediaBaseURL, body.Description)
@@ -493,8 +459,6 @@ func (h *Holder) UpdateDelegatedProduct(c *gin.Context) {
 		ResourceType: "product",
 		ReadCap:      authz.AdminCapProductsRead,
 		WriteCap:     authz.AdminCapProductsWrite,
-		// 全表比較：PATCH 可以動到規則表裡幾乎每一個可編輯欄，而 UpdateProduct 回的是
-		// 完整 ProductDetail，兩側鍵集合對稱。
 		SnapshotFields:  nil,
 		OperationReason: reason,
 		NotifySeller:    notifySellerOrDefault(body.NotifySeller),
@@ -514,23 +478,12 @@ func (h *Holder) UpdateDelegatedProduct(c *gin.Context) {
 			return res, nil
 		},
 		Write: func(ctx context.Context, dctx *commonpb.DelegationContext) (*delegation.Resource, *delegation.Denial) {
-			// assetId 的越權比對對象是 orchestrator 於 intent 之前讀到的**原始資源
-			// 物件**，不是持久化的 before_snapshot：images 進快照時被投影成數量而非
-			// assetId 陣列，拿快照比對會永遠不命中，這條防線會靜默失效。
 			if denial := verifyImageAssetIDs(body.Images, before); denial != nil {
 				return nil, denial
 			}
 			if denial := verifySkuOwnership(body.Skus, body.RemovedSkuIDs, before); denial != nil {
 				return nil, denial
 			}
-			// 未送的欄位一律以 before 快照回填後整份送下游。UpdateProductRequest 的
-			// 純量欄位是值型別，空字串在 product-service 是「覆寫成空」而不是「保留」
-			// ⇒ 只改一個名稱會把產地一起清掉，而 expectedVersion 相符、回 code: 0，
-			// 破壞完全靜默（本機實打坐實：origin 從「台南善化」被清成空字串）。
-			//
-			// 陣列同理但語意不同：images／certifications 是整份替換，未送就必須把
-			// 原內容回送；skus 未送＝不動（product-service 對空清單直接略過）；
-			// hashtags 靠 update_hashtags 旗標表達「這次不動」。
 			images := make([]*productpb.ProductImage, 0, len(body.Images))
 			if body.Images != nil {
 				for _, img := range body.Images {
@@ -546,10 +499,6 @@ func (h *Holder) UpdateDelegatedProduct(c *gin.Context) {
 				skus = append(skus, newProductSkuProto(s, findBeforeSku(before, s.SkuID)))
 			}
 			certifications := body.Certifications
-			// body 有給（含明確給空陣列）＝這次要以它全量取代；沒給才回填 before 保持原狀。
-			// 少了這個旗標，「移除唯一一張認證」會送出空陣列而 product-service 分不出
-			// 「空」與「未提供」⇒ 靜默不動、稽核卻記 SUCCEEDED（見 product.proto
-			// update_certifications 的註解）。
 			updateCertifications := body.Certifications != nil
 			if certifications == nil && before != nil {
 				certifications = before.Certifications
@@ -563,7 +512,6 @@ func (h *Holder) UpdateDelegatedProduct(c *gin.Context) {
 				Skus:                 skus,
 				Certifications:       toCertificationProtos(certifications),
 				UpdateCertifications: updateCertifications,
-				// status 不填：發布狀態只能經 /publish、/unpublish 改。
 				ExpectedVersion: body.ExpectedVersion,
 				Delegation:      dctx,
 			}
@@ -639,14 +587,6 @@ func (h *Holder) changeDelegatedProductStatus(c *gin.Context, action, targetStat
 		ResourceType: "product",
 		ReadCap:      authz.AdminCapProductsRead,
 		WriteCap:     authz.AdminCapProductsPublish,
-		// 只比 status。/publish 與 /unpublish 的 body 只有 expectedVersion／
-		// operationReason／notifySeller，內容欄一律動不到（§6.1.8），所以這一列的
-		// changedFields 依契約只會有 status（§6.1.11）。
-		//
-		// 不收窄的後果不是理論值：UpdateSellerProductStatus 回的 ProductDetail 曾經
-		// 不帶 hashtags，於是每一次上下架都虛報一列「主題標籤被清空」，而 DB 裡的
-		// product_hashtag 一列未動。上游那個缺口已補（ProductService.java），但這裡
-		// 不靠它——領域服務回什麼形狀，不該決定稽核記什麼。
 		SnapshotFields:  delegation.ScopeProductStatus(),
 		OperationReason: reason,
 		NotifySeller:    notifySellerOrDefault(body.NotifySeller),
@@ -699,7 +639,6 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// items 上限與分頁的 page_size 上限必須由同一個常數提供，不得各寫各的字面值。
 	if len(body.Items) < 1 || len(body.Items) > maxPageSize {
 		response.BizStatus(c, bizcode.DelegationInvalidCommand, "items 需為 1–50 筆")
 		return
@@ -727,9 +666,6 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 		ReadCap:      authz.AdminCapProductsRead,
 		WriteCap:     authz.AdminCapProductsPublish,
 
-		// 只比 status，理由同單筆下架。批次這一側更需要它：AfterFields 是手寫的衍生
-		// 投影（批次回應只有新版本、沒有資源），一旦 ReadBatch 哪天改成回完整資源，
-		// 兩側就會不對稱。
 		SnapshotFields: delegation.ScopeProductStatus(),
 
 		OperationReason: reason,
@@ -771,8 +707,6 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 				protoItems = append(protoItems, &productpb.BatchProductStatusItem{
 					ProductId:       wi.ResourceID,
 					ExpectedVersion: wi.ExpectedVersion,
-					// audit_log_id 由 Gateway 填、領域服務原樣回音：稽核列在
-					// delegation 模組，領域服務拿不到這個值。
 					AuditLogId: wi.AuditLogID,
 				})
 			}
@@ -805,8 +739,6 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 		},
 	})
 	if denial != nil {
-		// 整批在逐項執行**之前**就被拒（沒有 results 可回）。9276 是這個位置的兜底
-		// 碼，不是部分失敗的表達。
 		response.BizStatusData(c, denial.Code, denial.Message, nil)
 		return
 	}
@@ -835,7 +767,6 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 	response.OK(c, data)
 }
 
-// ==================== 讀取與轉換 ====================
 
 func (h *Holder) readProduct(ctx context.Context, storeID int64, productID string, dctx *commonpb.DelegationContext) (*delegation.Resource, *delegation.Denial) {
 	if h.Product == nil {
@@ -862,18 +793,6 @@ func (h *Holder) recordProductReadDenial(c *gin.Context, orch *delegation.Orches
 	orch.RecordReadDenial(c.Request.Context(), req.readDenial("product", productID, code))
 }
 
-// batchProductResource 把批次 before 快照的一項轉成 orchestrator 要的 Resource。
-//
-// 走的是**與單筆路徑同一支** productResource()，這是刻意的：before_snapshot 的欄位集合
-// 與格式化語意只准存在一處。批次曾經在這裡自己組 `{"status": …}`，於是
-// PRODUCT_BATCH_UNPUBLISH 的 before_snapshot 只有一個鍵，而同一個操作的單筆版本
-// （PRODUCT_UNPUBLISH）存的是完整 12 欄——批次正是「一次動很多件」的高風險操作，舉證素材
-// 反而最少。⚠️ changed_fields 不受影響：批次的比較範圍仍是 ScopeProductStatus()，收窄的是
-// Diff 不是 Project（見 delegation/diff.go 的 SnapshotFields 註解）。
-//
-// detail 缺席時退回舊形狀而不是照樣投影：productResource(nil) 會產出一整組空字串，稽核列
-// 會記下「名稱是空的、產地是空的」這種從未成立的事實，比只記 status 更糟。這條路徑只在滾動
-// 部署的窗口內走得到（Gateway 已更新、product-service 還沒）。
 func batchProductResource(h *Holder, snap *productpb.BatchProductSnapshot) *delegation.Resource {
 	if snap.GetDetail() != nil {
 		return h.productResource(snap.GetDetail())
@@ -924,8 +843,6 @@ func (h *Holder) productResource(detail *productpb.ProductDetail) *delegation.Re
 		Name:        detail.GetName(),
 		Status:      detail.GetStatus(),
 		StatusLabel: codemeta.ProductStatusLabel(detail.GetStatus()),
-		// 上游一律填這兩欄（ProductEntityConverter.toDetailDTO 由 ProductPublicationPolicy
-		// 推導，非可選欄位），投影原樣帶出來即可——它們是預覽自繪的判定依據，不是可省的裝飾。
 		PublicationState: detail.GetPublicationState(),
 		Purchasable:      detail.GetPurchasable(),
 		CategoryID:       detail.GetCategoryLv3Id(),
@@ -962,8 +879,6 @@ func (h *Holder) productResource(detail *productpb.ProductDetail) *delegation.Re
 			"priceMin":     dto.PriceMin,
 			"priceMax":     dto.PriceMax,
 			"stockQty":     dto.StockQty,
-			// skus／images 投影成數量而非內容：內容差異會讓單列輕易破 KB 級，而
-			// UI 三欄表要的是「規格從 2 項變 3 項」這種可讀事實。
 			"skus":           strconv.Itoa(len(skus)),
 			"images":         strconv.Itoa(len(images)),
 			"hashtags":       joinForDisplay(hashtags),
@@ -973,9 +888,6 @@ func (h *Holder) productResource(detail *productpb.ProductDetail) *delegation.Re
 	}
 }
 
-// descriptionPlainText flattens the block document into one scalar for the
-// projection: the formatter layer only handles scalars, which is why seven of them
-// are enough.
 func descriptionPlainText(desc *DelegatedProductDescription) string {
 	if desc == nil {
 		return ""
@@ -992,19 +904,12 @@ func descriptionPlainText(desc *DelegatedProductDescription) string {
 	return b.String()
 }
 
-// filterDelegatedCertifications 是代行路徑（W3／W4）的認證輸入 filter（19 §6.2 的表）。
-//
-// 代行走的是另一個 DTO，但判定規則與賣家路徑共用 certificationInputDecision——
-// 值域規則只有一份，這裡只負責把遮罩套回代行自己的 slice。
-// 剔除仍然不回 4xx：validateProductArrays 只擋筆數，值域一律剔除該筆＋warn log。
 func filterDelegatedCertifications(c *gin.Context, certs []DelegatedProductCertification, productID string, storeID int64) ([]DelegatedProductCertification, []CertificationWarningOutput) {
 	refs := make([]certificationInputRef, 0, len(certs))
 	for _, cert := range certs {
 		refs = append(refs, certificationInputRef{Type: cert.Name, No: cert.CertNo})
 	}
 	keep, warnings := certificationInputDecision(c, refs, productID, storeID)
-	// nil 進 nil 出：代行更新用 `body.Certifications != nil` 區分「未提供」與「清空」，
-	// 把 nil 換成空 slice 會讓「這次不動認證」變成「清空全部認證」。
 	if certs == nil {
 		return nil, warnings
 	}
@@ -1013,7 +918,6 @@ func filterDelegatedCertifications(c *gin.Context, certs []DelegatedProductCerti
 		if !keep[i] {
 			continue
 		}
-		// 理由同賣家路徑：驗過的值與送出的值必須是同一個（normalizedCertNo）。
 		cert.CertNo = normalizedCertNo(cert.Name, cert.CertNo)
 		kept = append(kept, cert)
 	}
@@ -1028,9 +932,6 @@ func toCertificationProtos(certs []DelegatedProductCertification) []*productpb.C
 	return out
 }
 
-// newProductSkuProto merges one request element over its pre-image. Fields absent
-// from the element keep the existing value — the same partial-update rule the scalar
-// fields follow.
 func newProductSkuProto(in DelegatedProductSkuInput, before *DelegatedProductSku) *productpb.ProductSku {
 	sku := &productpb.ProductSku{Id: in.SkuID}
 	if before != nil {
@@ -1115,8 +1016,6 @@ func findBeforeSku(before *DelegatedProductDetail, skuID string) *DelegatedProdu
 	return nil
 }
 
-// verifyImageAssetIDs rejects an assetId that was not in the product's own gallery.
-// 9275 / 403, and the whole request is refused rather than partially applied.
 func verifyImageAssetIDs(images []DelegatedProductImageInput, before *DelegatedProductDetail) *delegation.Denial {
 	if len(images) == 0 {
 		return nil
@@ -1138,8 +1037,6 @@ func verifyImageAssetIDs(images []DelegatedProductImageInput, before *DelegatedP
 	return nil
 }
 
-// verifySkuOwnership rejects a skuId that belongs to another product (or another
-// store). Cross-product SKU edits refuse the entire request.
 func verifySkuOwnership(skus []DelegatedProductSkuInput, removed []string, before *DelegatedProductDetail) *delegation.Denial {
 	owned := map[string]struct{}{}
 	if before != nil {
@@ -1160,7 +1057,6 @@ func verifySkuOwnership(skus []DelegatedProductSkuInput, removed []string, befor
 			return delegation.Deny(bizcode.DelegationResourceNotOwned, "規格不屬於本商品")
 		}
 	}
-	// 刪到零個 SKU：商品至少保留一個規格。
 	if before != nil && len(removed) > 0 {
 		remaining := len(before.Skus) - len(removed)
 		for _, s := range skus {
@@ -1175,15 +1071,12 @@ func verifySkuOwnership(skus []DelegatedProductSkuInput, removed []string, befor
 	return nil
 }
 
-// ==================== 值域 ====================
 
 func validateProductName(c *gin.Context, name *string) bool {
 	if name == nil {
 		return true
 	}
 	trimmed := strings.TrimSpace(*name)
-	// 上限 255（DB 欄位定義）。產品需求畫的 60 字計數器不是任何一層的實際上限，
-	// 照稿設限會讓合法商品名在前端就被擋下。
 	if trimmed == "" || len([]rune(trimmed)) > 255 {
 		response.BizStatus(c, bizcode.DelegationInvalidCommand, "商品名稱需為 1–255 字")
 		return false
@@ -1283,9 +1176,6 @@ func validateProductSkus(c *gin.Context, skus []DelegatedProductSkuInput, requir
 			return false
 		}
 		if s.Unit != nil && !gwcodemeta.IsValidWeightUnit(*s.Unit) {
-			// unit 存的是 WeightUnit 的 Value（3301／3302／3303），不是 Code、不是
-			// 中文。髒值落庫會讓商品上架成功，到結帳鏈才由 WeightUnit.fromValue()
-			// 拋例外。
 			response.BizStatus(c, bizcode.DelegationInvalidCommand, "規格單位不在合法值域內")
 			return false
 		}
@@ -1319,9 +1209,6 @@ func validateRemovedSkuIDs(c *gin.Context, removed []string, skus []DelegatedPro
 			return false
 		}
 	}
-	// 下游 UpdateProductRequest 目前沒有承載刪除的欄位（product-service 全平台都還
-	// 沒有刪除 SKU 的路徑）。接受這個欄位卻送不下去就是靜默失效——請求合法、
-	// 回 code: 0、規格一個也沒被刪掉，而操作者以為刪掉了。明確拒絕，直到下游補上。
 	response.BizStatus(c, bizcode.DelegationInvalidCommand, "刪除商品規格尚未開放")
 	return false
 }
@@ -1335,7 +1222,6 @@ func validateProductArrays(c *gin.Context, origin string, certs []DelegatedProdu
 		response.BizStatus(c, bizcode.DelegationInvalidCommand, "產品驗證最多 10 個")
 		return false
 	}
-	// Gateway 只擋筆數；正規化與重複判定由 product-service 權威。
 	if len(hashtags) > 10 {
 		response.BizStatus(c, bizcode.DelegationInvalidCommand, "主題標籤最多 10 個")
 		return false
@@ -1359,7 +1245,6 @@ func nonNegativeInteger(s string) bool {
 	return err == nil && n >= 0
 }
 
-// delegatedDescriptionDTO projects the block document without the imageUrl twin.
 func delegatedDescriptionDTO(desc *productpb.ProductDescription) *DelegatedProductDescription {
 	if desc == nil {
 		return nil

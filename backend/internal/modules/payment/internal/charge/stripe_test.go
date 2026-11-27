@@ -31,7 +31,6 @@ const (
 	stripeTestAttemptID = "0192f0a0-0000-7000-8000-000000000001"
 )
 
-// stripeTestCreatedAfter 是查回的 created 下限（固定值，不取目前時間）。
 var stripeTestCreatedAfter = time.Date(2026, 11, 23, 4, 0, 0, 0, time.UTC)
 
 type fixture struct {
@@ -39,7 +38,6 @@ type fixture struct {
 	Body   json.RawMessage `json:"body"`
 }
 
-// loadFixture 讀 platform/stripe/testdata 的樣本（{status, body}，遮罩過）。
 func loadFixture(t *testing.T, name string) fixture {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "platform", "stripe", "testdata", name+".json"))
@@ -68,7 +66,6 @@ func (f fixture) respond(w http.ResponseWriter) {
 	_, _ = w.Write(f.Body)
 }
 
-// recordedRequest 是 adapter 送出的一個請求（伺服器端看到的）。
 type recordedRequest struct {
 	Method string
 	Path   string
@@ -77,7 +74,6 @@ type recordedRequest struct {
 	Header http.Header
 }
 
-// deadlineTransport 記下每個出站請求的 ctx 是否帶 deadline（伺服器端看不到 client 的 ctx，要在 transport 看）。
 type deadlineTransport struct {
 	next http.RoundTripper
 	mu   sync.Mutex
@@ -183,7 +179,6 @@ func withID(obj map[string]any, id string) map[string]any {
 	return cp
 }
 
-// stripeCalls 是四個搬錢的建立呼叫，各自對同一個回應執行一次。
 func stripeCalls(a *Stripe) map[string]func(context.Context) error {
 	return map[string]func(context.Context) error{
 		"CreatePayment": func(ctx context.Context) error {
@@ -521,7 +516,6 @@ func TestStripePaymentIntentWithoutExpandedChargeHasNoPaidAt(t *testing.T) {
 	}
 }
 
-// expandValues 取出查詢字串裡所有 expand 參數的值（SDK 編成 expand[0]=…）。
 func expandValues(q url.Values) []string {
 	var out []string
 	for k, v := range q {

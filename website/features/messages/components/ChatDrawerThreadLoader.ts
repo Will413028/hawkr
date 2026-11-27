@@ -66,7 +66,6 @@ export function createChatDrawerThreadResource(
 		load,
 		prewarm: () => {
 			void load().catch(() => {
-				// Intent prewarming is speculative. A later open retries visibly.
 			});
 		},
 	};

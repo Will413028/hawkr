@@ -1,36 +1,7 @@
 #!/bin/bash
-# =====================================================================
-# 代碼管理（CodeMeta）Code Generate 腳本
-#
-# 解析 Markdown 檔案中的 Enum 定義，生成 Java / Go / Flutter / Web 程式碼。
-# 僅依賴 macOS 內建工具（bash, awk, sed, diff）。
-#
-# 使用方式：
-#   ./generate.sh --all            # 生成全部（等同 --java --go --go-errors
-#                                  #   --go-media --go-labels --go-registry --flutter
-#                                  #   --web --admin；不含 --diff）
-#   ./generate.sh --java           # 僅 Java（直接覆蓋 common-core）
-#   ./generate.sh --go             # 僅 Go（輸出到 internal/platform/codemeta/：代碼表與單體的錯誤原因）
-#   ./generate.sh --go-errors      # 僅 Go 業務碼常數（直寫 pkg/errors/bizcode/bizcode.go）
-#   ./generate.sh --go-media       # 僅 Go media 引用類型常數（直寫 pkg/media/ref_type.go）
-#   ./generate.sh --go-labels      # 僅 Go Value→Label 對照（直寫 pkg/codemeta/labels.go）
-#   ./generate.sh --go-registry    # 僅 Go registry：typed 常數 + AllXxx + FromCode/FromValue
-#                                  #   （直寫 pkg/codemeta/registry.go；清單見 GO_REGISTRY_ENUMS）
-#   ./generate.sh --flutter        # 僅 Flutter（直寫 buyer-app 與 seller-app 的 lib/core/codemeta/code_meta.dart）
-#   ./generate.sh --web            # 僅 Web/TypeScript（直寫 website/lib/codemeta/generated.ts）
-#   ./generate.sh --admin          # 僅 ADM/TypeScript（直寫 admin/src/lib/codemeta/generated.ts；清單見 ADMIN_ENUMS）
-#   ./generate.sh --diff           # 比較生成結果與現行檔案差異（唯讀）
-#   ./generate.sh --help           # 列出可用旗標（亦可用 -h）
-#
-# 以上即全部可接受的參數，傳入其他參數會報錯退出。
-# =====================================================================
 
 set -euo pipefail
 
-# 強制 byte-consistent locale：macOS 內建 awk(BWK 20200816) 在 UTF-8 locale 下
-# index()/substr() 對多位元組 key（如 `說明`）的 offset 會錯位，導致屬性值（class
-# javadoc 的描述）被解析成空字串、進而讓所有 enum 檔產生假性 churn。LC_ALL=C 讓
-# awk 以純 byte 處理，多位元組內容原樣穿透，跨環境結果一致。
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -44,24 +15,17 @@ GO_ERRORS_OUTPUT_FILE="$PROJECT_ROOT/pkg/errors/bizcode/bizcode.go"
 GO_MEDIA_OUTPUT_FILE="$PROJECT_ROOT/pkg/media/ref_type.go"
 GO_LABELS_OUTPUT_FILE="$PROJECT_ROOT/pkg/codemeta/labels.go"
 GO_REGISTRY_OUTPUT_FILE="$PROJECT_ROOT/pkg/codemeta/registry.go"
-# client 的生成物直接寫進 monorepo，CI（backend-monolith.yml）重新生成並檢查 drift。
 MONOREPO_ROOT="$(cd "$PROJECT_ROOT/.." && pwd)"
 FLUTTER_OUTPUT_FILES=("$MONOREPO_ROOT/buyer-app/lib/core/codemeta/code_meta.dart" "$MONOREPO_ROOT/seller-app/lib/core/codemeta/code_meta.dart")
 WEB_OUTPUT_FILE="$MONOREPO_ROOT/website/lib/codemeta/generated.ts"
 ADMIN_OUTPUT_FILE="$MONOREPO_ROOT/admin/src/lib/codemeta/generated.ts"
 TMP_DIR="$(mktemp -d)"
 
-# Markdown 來源
 MD_FILES=("$MD_DIR/業務狀態碼.md" "$MD_DIR/業務類型碼.md" "$MD_DIR/內部技術碼.md")
 ERROR_MD_FILE="$MD_DIR/錯誤碼.md"
 
-# --go-labels 的涵蓋清單（見 generate_go_labels 的說明）。日後 Go 側再需要別的
-# enum 的中文 Label，一律加進這個陣列，不得另開手寫表。
 GO_LABEL_ENUMS=(ProductStatus PostPublishStatus OrderStatus DelegationReasonCode DelegationAuditAction DelegationAuthorizationAction CertificationType)
 
-# --go-registry 的涵蓋清單：需要在 Go 端有 typed 常數 + AllXxx + FromCode/FromValue
-# 的 enum。與 GO_LABEL_ENUMS 必須互斥——兩者同寫 package codemeta，對同一個 enum
-# 會產生同名符號（例如 OrderStatusPaid）而編譯失敗。
 GO_REGISTRY_ENUMS=(
     CommonStatus
     ProcurementRunStatus ProcurementStepStatus ProcurementLaneStatus ProcurementArtifactStatus
@@ -80,30 +44,13 @@ GO_REGISTRY_ENUMS=(
     InvoiceManualReason InvoiceNotApplicableReason InvoiceCancelReason InvoiceCancelEvidenceKind InvoiceComplaintEventType
     InvoiceComplaintAction InvoiceDocumentTimelineEvent InvoiceCorrectionRejectReason
     InvoiceInboxDisposition
-    # 65 物流履約平台 Foundation。
-    # ⚠️ 2026-09-12：原本的消費者是獨立的 Go settlement-service，該服務已隨架構裁決
-    #    DEC-20260912-184025 併進 payment-service（Java）⇒ 這批 Go 常數目前零消費者。
-    #    **刻意保留**：碼表屬於物流財務結算 domain，domain 還在、只是換了 runtime owner；
-    #    刪掉會讓 ADMIN_ENUMS 那半也要重判，而 ADM 的帳本畫面確實會用到值域。
     CommerceModel CollectionModel FulfillmentMode InvoiceModel
     LedgerOwnerType LedgerAccountCode LedgerTxnType
     FulfillmentAction UberDeliveryOutcome
-    # 70 物流財務結算（線 B）：應收狀態機與責任成因判定（runtime owner 已改為 payment-service）
-    # 都在 Go 側，需要 typed 常數與 FromValue（狀態值用字串比對會讓 typo 在 runtime 才現形）。
     LogisticsReceivableStatus ResponsibilityCause
 )
 
-# --admin 的涵蓋清單。ADM 後台只顯示這些值域，不像 website 需要全量前端可見碼表，
-# 所以走 allowlist 而非「前端可見: Yes」全掃——否則 admin 會帶進 50+ 個它永遠用不到
-# 的 enum（例如 Procurement 那一組），review 時「這張表誰在用」就答不出來了。
-#
-# ⚠️ 這份清單**不受「前端可見」過濾**（機制見 generate_ts_file 的註解）：
-# DelegationAuditAction 標 `前端可見: No`（不外洩給買賣家前端），但 ADM 的稽核動作
-# 篩選下拉需要它。清單裡少掉任何一個 enum 會直接中止生成，不會靜默產出空表。
 ADMIN_ENUMS=(
-    # Hawkr Agent 採購線（#2538）：ADM 是內部後台，營運要看得懂一張採購單卡在哪一步、
-    # 為什麼被擋。這些值域全部標「前端可見: Yes」但買賣家端各自只消費其中一部分，
-    # **ADM 要拿到完整值域只能靠本 allowlist**——少了就只能在後台硬編字串。
     ProcurementRunStatus ProcurementStepStatus ProcurementLaneStatus
     ProcurementArtifactStatus ProcurementConfirmationStatus
     ProcurementRfqPublicationApprovalState
@@ -116,18 +63,11 @@ ADMIN_ENUMS=(
     ProcurementWishPoolPolicy
     OrderStatus AfterSaleAppealState PaymentMethod PaymentTransactionStatus RefundStatus
     ShippingMethod ShippingTemperature ShippingFeePayer WeightUnit ShippingStatus
-    # 65 物流履約平台 Foundation：商流／履約維度 ＋ 動作值域 ＋ 帳本科目。
-    # 帳本四個 enum 標「前端可見: No」（買賣家端不消費），**只能靠本 allowlist 進 ADM**——
-    # 少任何一個，ADM 的帳本／撥款畫面就會拿不到值域而只能硬編碼字串。
     CommerceModel CollectionModel FulfillmentMode InvoiceModel
     FulfillmentAction UberDeliveryOutcome ShippingType ReceiptStatus
     LedgerOwnerType LedgerAccountCode LedgerTxnType
-    # 70 物流財務結算：ADM 的收款異常佇列依 LogisticsReceivableStatus 篩 UNCONFIRMED／FAILED，
-    # 對帳與爭議畫面依 ResponsibilityCause 分流歸屬。
     LogisticsReceivableStatus ResponsibilityCause
     ShipmentAnomalyType ShipmentAnomalySeverity ShipmentAnomalyAckAction
-    # AppType 不在這裡：版本門檻頁改用 ContentAdminService 的 proto enum，顯示文字在頁面裡
-    # （ADR 2026-09-25-codemeta-retirement D5）。
     ProviderSource DelegationAuditAction
     SellerSuspensionReason AfterSalePlatformDecisionOutcome
     ProductStatus ProductPublicationState
@@ -148,17 +88,7 @@ ADMIN_ENUMS=(
 
 trap "rm -rf $TMP_DIR" EXIT
 
-# docs/開發規範/Java 微服務開發規範.md §6（另見 docs/代碼管理（CodeMeta）/README.md）：
-# CodeMeta enum 禁止包含業務輔助邏輯（自定義方法區塊）。
-# 業務 helper 必須建立在使用該 enum 的服務或模組內（cross-service 共用時可
-# 放 common-core/utils/code/helper/）。本 generator 不再支援自定義方法區塊。
 
-# =====================================================================
-# Markdown 解析器（awk）
-# 輸出格式：每個 Enum 一段，用 === 分隔
-# ENUM:name|category|interface|visible|services|dbField|desc|specialMethods
-# ROW:name|code|value|label|description
-# =====================================================================
 parse_markdown() {
     local md_file="$1"
     awk '
@@ -391,14 +321,11 @@ generate_java_error_code() {
     } > "$output_file"
 }
 
-# =====================================================================
-# Java CodeMeta Enum 生成
-# =====================================================================
 generate_java_enum() {
     local enum_name="$1"
     local desc="$2"
-    local special_methods="$3"  # 已廢棄（Java 微服務開發規範 §6），保留參數以維持呼叫端簽名
-    local constants_file="$4"  # 暫存的常數列表
+    local special_methods="$3"
+    local constants_file="$4"
     local output_file="$5"
 
     {
@@ -417,7 +344,6 @@ generate_java_enum() {
         echo "public enum ${enum_name} implements CodeMeta {"
         echo ""
 
-        # 常數
         local total_lines
         total_lines=$(wc -l < "$constants_file" | tr -d ' ')
         local line_num=0
@@ -425,24 +351,17 @@ generate_java_enum() {
             line_num=$((line_num + 1))
             local suffix=","
             if [[ $line_num -eq $total_lines ]]; then suffix=";"; fi
-            # 🔴 四個欄位都要過 java_escape：Description 是自由書寫的中文散文，
-            # 出現 `"` 或 `\` 是完全合法的 Markdown，但直接吐進 Java 字串字面值會
-            # 讓整個 enum 檔語法錯誤（首例：SellerTaxReviewDecision.EXTEND 的說明
-            # 裡有 `decision = "EXTEND"`，common-core 整個模組編不過）。
-            # ⚠️ 錯誤碼那一支（Message 欄）本來就有過 java_escape，只有本函式漏了。
             echo "    ${name}(\"$(java_escape "${code}")\", \"$(java_escape "${value}")\", \"$(java_escape "${display}")\", \"$(java_escape "${description}")\")${suffix}"
         done < "$constants_file"
 
         echo ""
 
-        # 欄位
         echo "    private final String code;"
         echo "    private final String value;"
         echo "    private final String label;"
         echo "    private final String description;"
         echo ""
 
-        # 建構子
         echo "    ${enum_name}(String code, String value, String label, String description) {"
         echo "        this.code = code;"
         echo "        this.value = value;"
@@ -451,7 +370,6 @@ generate_java_enum() {
         echo "    }"
         echo ""
 
-        # CodeMeta 介面方法
         echo "    @Override"
         echo "    public String code() { return code; }"
         echo ""
@@ -465,7 +383,6 @@ generate_java_enum() {
         echo "    public String description() { return description; }"
         echo ""
 
-        # 靜態 Map
         echo "    private static final Map<String, ${enum_name}> BY_CODE ="
         echo "        Arrays.stream(values()).collect(Collectors.toUnmodifiableMap(${enum_name}::code, e -> e));"
         echo ""
@@ -473,7 +390,6 @@ generate_java_enum() {
         echo "        Arrays.stream(values()).collect(Collectors.toUnmodifiableMap(${enum_name}::value, e -> e));"
         echo ""
 
-        # 標準靜態 helper（4 個固定不可變）
         echo "    public static boolean isValidCode(String code) {"
         echo "        return code != null && BY_CODE.containsKey(code);"
         echo "    }"
@@ -502,9 +418,6 @@ generate_java_enum() {
     } > "$output_file"
 }
 
-# =====================================================================
-# Go 生成（單一檔案）
-# =====================================================================
 to_pascal() {
     echo "$1" | awk '{
         n=split(tolower($0), parts, "_")
@@ -519,8 +432,6 @@ to_pascal() {
 generate_go_file() {
     local parsed_file="$1"
     local output_file="$2"
-    # 第 3 參數：以空白分隔的 enum 白名單。留空 = 全部（原行為）。
-    # 第 4 參數：header 要提示的重生成指令，預設 --go。
     local allowlist="${3:-}"
     local regen_flag="${4:---go}"
 
@@ -537,12 +448,6 @@ generate_go_file() {
         echo ""
     } > "$output_file"
 
-    # 空 allowlist ⇒ 看可見性；非空 allowlist ⇒ 只看名字在不在清單裡。
-    # 與 _ts_should_emit 同一條規則，理由也相同：allowlist 是「這個 target 明確
-    # 要哪幾個」的宣告，把它與「前端可見」AND 起來，等於讓一個標 No 的 enum 就算
-    # 被逐字列進清單也永遠生不出來 —— 而且是靜默的。GO_REGISTRY_ENUMS 服務的是
-    # Go 服務端的值域檢查（例如 ReportStatus 只寫進 DB、從不外送前端），標 No 才
-    # 是誠實的旗標，不該因此被排除。
     _go_should_emit() {
         if [[ -z "$allowlist" ]]; then
             [[ "$visible" =~ ^[Yy] ]]
@@ -552,13 +457,11 @@ generate_go_file() {
     }
 
     local enum_name="" desc="" visible=""
-    # 已產出的 enum 名，供下方的缺項檢查用（格式 |A|B|）。
     local emitted="|"
     local constants_file="$TMP_DIR/go_constants"
 
     while IFS= read -r line; do
         if [[ "$line" == "===" ]]; then
-            # 結束上一個 Enum，生成 Go 代碼
             if [[ -n "$enum_name" ]] && _go_should_emit "$enum_name"; then
                 _append_go_enum "$enum_name" "$desc" "$constants_file" "$output_file"
                 emitted="${emitted}${enum_name}|"
@@ -580,22 +483,14 @@ generate_go_file() {
         fi
     done < "$parsed_file"
 
-    # 最後一個
     if [[ -n "$enum_name" ]] && _go_should_emit "$enum_name"; then
         _append_go_enum "$enum_name" "$desc" "$constants_file" "$output_file"
         emitted="${emitted}${enum_name}|"
     fi
 
-    # 每個 enum 區塊尾端都有一個 echo "" 當分隔，最後一個因此在檔尾留下空行，
-    # 而 gofmt 只允許檔尾恰好一個換行。生成物依 CodeMeta 規範不能手改，所以在這裡收掉。
     printf '%s\n' "$(cat "$output_file")" > "${output_file}.tmp" \
         && mv "${output_file}.tmp" "$output_file"
 
-    # 清單裡有、但解析結果沒有 ⇒ 中止，不要產出一個少了東西的檔。
-    # 與 generate_ts_file 尾端同一道檢查：少掉的那個 enum 在 Go 側是「呼叫端拿到
-    # 一個不存在的識別字」，編譯期會炸但錯誤訊息已離現場很遠；更壞的情況是
-    # 呼叫端還沒寫，於是清單說覆蓋了五個、實際只有兩個，而**沒有任何東西轉紅**
-    # （registry_test.go 的檔頭早就記著這個坑，這是它的第二種形態）。
     if [[ -n "$allowlist" ]]; then
         local e
         for e in $allowlist; do
@@ -622,10 +517,6 @@ _append_go_enum() {
         echo "}"
         echo ""
 
-        # 變數
-        # gofmt 會把同一個 var 區塊的 `=` 對齊到最長的變數名。先量寬度再補空白，
-        # 產出才是 gofmt-clean —— 否則 gofmt gate 會紅，而生成檔依 CodeMeta 規範不能手改，
-        # 唯一的修法就是改這裡（同 generate_go_media 的做法）。
         local max_var_len=0
         while IFS='|' read -r name _ _ _ _; do
             local pascal
@@ -638,10 +529,6 @@ _append_go_enum() {
             local pascal
             pascal=$(to_pascal "$name")
             local var_name="${enum_name}${pascal}"
-            # 四個欄位都要跳脫（Go 與 Java 的雙引號字串跳脫規則相同，共用 java_escape）：
-            # Description / Label 是自由書寫的中文散文，出現 `"` 或 `\` 是完全合法的
-            # Markdown，但直接吐進 Go 字串字面值會讓整個生成檔語法錯誤（gofmt gate 會紅，
-            # 而生成檔依 CodeMeta 規範不能手改，唯一的修法就是改這裡）。
             printf '\t%-*s = %s{Code: "%s", Value: "%s", Label: "%s", Description: "%s"}\n' \
                 "$max_var_len" "$var_name" "$enum_name" \
                 "$(java_escape "$code")" "$(java_escape "$value")" \
@@ -650,7 +537,6 @@ _append_go_enum() {
         echo ")"
         echo ""
 
-        # All slice
         echo "var All${enum_name}s = []${enum_name}{"
         while IFS='|' read -r name _ _ _ _; do
             local pascal
@@ -660,7 +546,6 @@ _append_go_enum() {
         echo "}"
         echo ""
 
-        # FromCode
         echo "func ${enum_name}FromCode(code string) (${enum_name}, bool) {"
         echo "	for _, v := range All${enum_name}s {"
         echo "		if v.Code == code {"
@@ -671,7 +556,6 @@ _append_go_enum() {
         echo "}"
         echo ""
 
-        # FromValue
         echo "func ${enum_name}FromValue(value string) (${enum_name}, bool) {"
         echo "	for _, v := range All${enum_name}s {"
         echo "		if v.Value == value {"
@@ -684,9 +568,6 @@ _append_go_enum() {
     } >> "$ofile"
 }
 
-# =====================================================================
-# Flutter (Dart) 生成
-# =====================================================================
 to_camel() {
     echo "$1" | awk '{
         n=split(tolower($0), parts, "_")
@@ -698,20 +579,6 @@ to_camel() {
     }'
 }
 
-# Dart 保留字（reserved words）不能當識別字，撞到就加尾底線。
-#
-# 為什麼需要這一層：Dart 的 enum 成員名是識別字，而 CodeMeta 的 Name 欄是
-# UPPER_SNAKE 的碼值，`to_camel` 之後有機會正好等於保留字。首例是
-# `InvoiceOperationType.VOID` -> `void`，`dart format` 直接以
-# 「Expected an identifier」解析失敗 ⇒ **整支 code_meta.dart 不可用**，
-# 而 backend 這邊完全無感（Java／TS／Go 都合法，只有 Dart 炸）。
-#
-# 🔴 修法只能在生成器這一層。碼值本身不可改名——它與 DB CHECK 約束、
-# provider 線上值逐字綁定（改 Name 就是改契約）。
-#
-# 下表是 Dart 的 reserved words 全集（built-in identifiers 如 `dynamic`／
-# `abstract` 可以當一般識別字，不列入）。加尾底線而不是改字首，是為了讓
-# 「原本是哪個碼」一眼可讀；Dart 對尾底線沒有任何 lint 限制。
 DART_RESERVED="assert break case catch class const continue default do else enum extends false final finally for if in is new null rethrow return super switch this throw true try var void while with"
 
 to_dart_ident() {
@@ -779,7 +646,6 @@ _append_dart_enum() {
         echo "/// ${desc}"
         echo "enum ${enum_name} {"
 
-        # 列舉值
         local total
         total=$(wc -l < "$cfile" | tr -d ' ')
         local idx=0
@@ -824,15 +690,7 @@ _append_dart_enum() {
     } >> "$ofile"
 }
 
-# =====================================================================
-# Web (TypeScript) 生成
-#
-# 直接從已解析的 Markdown（$parsed_file）生成，不透過 Dart 中介檔案。
-# 直寫 website/lib/codemeta/generated.ts，enums.ts 只 re-export ＋ 保留手寫 helper
-# （不在 CodeMeta 生成範圍內）。
-# =====================================================================
 to_snake_upper() {
-    # OrderCancelReason -> ORDER_CANCEL_REASON
     echo "$1" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g; s/([A-Z]+)([A-Z][a-z])/\1_\2/g' | tr '[:lower:]' '[:upper:]'
 }
 
@@ -843,28 +701,10 @@ ts_escape() {
     printf '%s' "$value"
 }
 
-# Dart 生成器用單引號字串，跳脫的是反斜線與**單**引號（不是雙引號）。
-# 與 java_escape / ts_escape 是同一個病的第三份解法：Label / Code / Value 都是
-# 自由書寫的欄位，出現引號是合法 Markdown，但直接吐進字面值會讓整個生成檔語法錯誤。
 dart_escape() {
-    # ⚠️ 不能寫成 `${value//\'/\\\'}`（java_escape / ts_escape 的形式）：**bash 3.2 與
-    # bash 5 對替換字串裡的反斜線處理不同**，而本檔 shebang 是 `#!/bin/bash`＝macOS 的
-    # bash 3.2。實測同一段程式碼 bash 5 產出 `\'`（正確）、bash 3.2 產出 `\\'`（兩個反斜線，
-    # Dart 字串就地截斷 ⇒ 整個生成檔語法錯誤）。用 `bash` 手測會過、跑 generate.sh 會壞。
-    # `\"` 那個形式兩版一致，所以只有本函式需要繞開；改用 sed 與 shell 版本無關。
     printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e "s/'/\\\\'/g"
 }
 
-# TypeScript 生成器。`--web` 與 `--admin` 共用同一份實作，差別只在兩個參數：
-#
-#   flag       ── 重新生成的旗標名（寫進檔頭）
-#   allowlist  ── 空字串＝沿用「前端可見: Yes」全量過濾（--web 的原行為）；
-#                 非空＝只產清單內的 enum，且**不受前端可見過濾**
-#
-# allowlist 不受可見性過濾是刻意的，理由與 GO_LABEL_ENUMS 相同（見該陣列註解）：
-# 有些值域標「前端可見: No」是為了不外洩給買賣家前端，但 ADM 這種內部後台確實
-# 要顯示它們（例如 DelegationAuditAction）。把 .md 改成 Yes 會讓那些值同時灌進
-# website 與兩支 App 的生成物，是更糟的解法。
 generate_ts_file() {
     local parsed_file="$1"
     local output_file="$2"
@@ -881,10 +721,8 @@ generate_ts_file() {
 
     local enum_name="" desc="" visible=""
     local constants_file="$TMP_DIR/ts_constants"
-    # 已產出的 enum，供 allowlist 模式做「清單有但 .md 沒有」的缺項檢查。
     local emitted="|"
 
-    # 空 allowlist ⇒ 看可見性；非空 allowlist ⇒ 只看名字在不在清單裡。
     _ts_should_emit() {
         local name="$1"
         if [[ -z "$allowlist" ]]; then
@@ -922,9 +760,6 @@ generate_ts_file() {
         emitted="${emitted}${enum_name}|"
     fi
 
-    # 清單裡少掉任何一個就中止（同 GO_LABEL_ENUMS 的理由）：靜默略過會讓消費端
-    # 拿到一個不存在的識別字。TS 側是編譯期就炸，但那時錯誤訊息已離現場很遠，
-    # 而且 CI 上先炸的會是前端 repo 而不是改 .md 的這個 PR。
     if [[ -n "$allowlist" ]]; then
         local e
         for e in $allowlist; do
@@ -954,11 +789,6 @@ _append_ts_enum() {
         echo "export type ${enum_name}Value = (typeof ${enum_name})[${enum_name}Code];"
         echo ""
 
-        # Record<string, string>（非 Record<${enum_name}Value, string>）：既有
-        # web 慣例對部分 label map（如 ORDER_CANCEL_REASON_LABEL、
-        # PAYMENT_METHOD_INELIGIBLE_REASON_LABEL）以未收斂型別的原始字串（後端
-        # 傳來、未先轉型）直接查表，嚴格型別會在這類呼叫點產生 TS7053。統一放寬
-        # 避免每個 caller 各自 cast。
         echo "export const ${snake}_LABEL: Record<string, string> = {"
         local seen_values="|"
         while IFS='|' read -r name code value display description; do
@@ -966,7 +796,6 @@ _append_ts_enum() {
                 continue
             fi
             seen_values="${seen_values}${value}|"
-            # 去除 Label 尾綴「（終態）」標記（web 顯示不需要）
             local clean_display="${display%（終態）}"
             echo "	\"$(ts_escape "$value")\": \"$(ts_escape "$clean_display")\","
         done < "$cfile"
@@ -975,24 +804,12 @@ _append_ts_enum() {
     } >> "$ofile"
 }
 
-# =====================================================================
-# Go 業務碼常數生成（bizcode package）
-# 從錯誤碼.md 中過濾 code >= 1000 的業務碼，輸出為 Go const 定義。
-# 通用碼（400~503）已在 pkg/errors/domain_error.go 具名定義，不重複生成。
-#
-# 同時輸出 code → Message 對照（Message()）。Go 側原本只有碼值沒有訊息，於是拿到
-# 一個碼的地方（代行稽核面板、客服工單）只能印裸數字；前端自建對照表就是第二份
-# CodeMeta 鏡像，它的失敗形狀是 drift 而非錯誤 —— Markdown 改了文案，副本不編譯
-# 失敗、不轉紅，只是從那天起顯示舊字串。同 generate_go_labels／generate_go_media
-# 的動機。
-# =====================================================================
 generate_go_bizcode() {
     local parsed_error_file="$1"
     local output_file="$2"
 
     mkdir -p "$(dirname "$output_file")"
 
-    # 收集業務碼（code >= 1000），保留 section 資訊
     local biz_rows_file="$TMP_DIR/biz_rows.txt"
     > "$biz_rows_file"
 
@@ -1005,8 +822,6 @@ generate_go_bizcode() {
         if [[ "$line" == ROW:* ]]; then
             local data="${line#ROW:}"
             local name code msg
-            # 第三個變數吃剩下的全部：訊息本身若含 `|` 會在 parse_error_markdown
-            # 就先被切碎，這裡再切一次只會把它悄悄截短。
             IFS='|' read -r name code msg <<< "$data"
             if [[ "$code" =~ ^[0-9]+$ ]] && [[ "$code" -ge 1000 ]]; then
                 printf '%s|%s|%s|%s\n' "$current_section" "$name" "$code" "$msg" >> "$biz_rows_file"
@@ -1014,10 +829,6 @@ generate_go_bizcode() {
         fi
     done < "$parsed_error_file"
 
-    # 訊息欄空掉就中止，不產出半張表。空訊息在下游是靜默的：Message() 回空字串，
-    # 呼叫端 fallback 顯示原碼 —— 畫面看起來與「這個碼沒登記」一模一樣，不會有任何
-    # 東西轉紅。抓錯欄位（少抓一欄／欄序改了）正是會全表空掉的那種失誤。
-    # 檢查放在開檔重導向之前：先寫檔再中止會留下一個被截斷的生成物。
     local _s _n _c _m
     while IFS='|' read -r _s _n _c _m; do
         if [[ -z "$_m" ]]; then
@@ -1040,11 +851,6 @@ generate_go_bizcode() {
         echo ""
         echo "const ("
 
-        # gofmt 對 const 區塊的對齊規則是「以空行分隔的每一組各自對齊到組內最長的名字」，
-        # 而這裡每個 section 之間正好會 echo 一個空行 —— 所以要逐 section 量寬度。
-        # 不對齊的話產出就不是 gofmt-clean，而 pkg/errors/bizcode/bizcode.go 是
-        # DO NOT EDIT 的生成物、依 CodeMeta 規範不能手改，gofmt gate 與 CodeMeta drift gate
-        # 會互相打架（一個要求對齊、一個要求跟生成結果一致）。
         local pascal_file="$TMP_DIR/biz_pascal.txt"
         : > "$pascal_file"
         while IFS='|' read -r section name code msg; do
@@ -1072,17 +878,12 @@ generate_go_bizcode() {
 
         echo ")"
 
-        # code → Message。key 一律是碼值不是常數名：常數名長度差距大，gofmt 會把
-        # map literal 切成好幾個對齊區段，而本腳本的對齊是自算的（不依賴 gofmt
-        # binary），區段一切開自算結果就對不上，CodeMeta drift gate 與 gofmt gate
-        # 會互相打架。碼值全為等寬數字則只有一個區段。
         local msg_file="$TMP_DIR/biz_messages.txt"
         : > "$msg_file"
         local max_key=0
         while IFS='|' read -r section name code msg; do
             local key="${code}:"
             (( ${#key} > max_key )) && max_key=${#key}
-            # Go 與 Java 的雙引號字串跳脫規則相同（反斜線與雙引號），共用同一支。
             printf '%s|%s\n' "$key" "$(java_escape "$msg")" >> "$msg_file"
         done < "$biz_rows_file"
 
@@ -1105,23 +906,12 @@ generate_go_bizcode() {
     } > "$output_file"
 }
 
-# =====================================================================
-# Go media 引用類型常數生成（media package，直寫 pkg/media/ref_type.go）
-#
-# AssetReferenceType 前端可見=No，不會被 --go（無 allowlist ⇒ 只輸出 Yes）納入，
-# 但 Go media package 需要這組常數（各服務 FinalizeImages/LinkImages 帶 ref_type）。
-# 故獨立 target 直寫，杜絕手維護副本 drift（issue #1530）。
-# 命名前綴固定 RefType（既有 caller 慣例，如 RefTypeProduct），值取 Markdown Value。
-# 對齊自算（純 bash，不依賴 gofmt binary），輸出即 gofmt-clean，供 light runner 的
-# CodeMeta drift gate 純文字重跑後 diff 穩定。
-# =====================================================================
 generate_go_media() {
     local parsed_file="$1"
     local output_file="$2"
 
     mkdir -p "$(dirname "$output_file")"
 
-    # 從已解析的 Markdown 抽出 AssetReferenceType 的資料列（無視「前端可見」過濾）。
     local rows_file="$TMP_DIR/media_rows.txt"
     > "$rows_file"
     local enum_desc="" in_target=0 cur_enum="" cur_desc=""
@@ -1152,7 +942,6 @@ generate_go_media() {
         return 1
     fi
 
-    # 對齊寬度：模擬 gofmt const 區塊，name 欄與 value 欄各自補到最長者。
     local max_name=0 max_val=0
     while IFS='|' read -r name code value display description; do
         local var_name="RefType$(to_pascal "$name")"
@@ -1184,24 +973,6 @@ generate_go_media() {
     } > "$output_file"
 }
 
-# =====================================================================
-# Go CodeMeta Label 生成（codemeta package，直寫 pkg/codemeta/labels.go）
-#
-# Go 側中文 Label 的唯一來源。走不了 --go：該 target 不帶 allowlist ⇒ 只輸出「前端可見=Yes」
-# 的 enum，而 DelegationAuditAction / DelegationReasonCode 都是 No；而且 --go 的輸出在
-# 單體的 internal/platform/codemeta，舊的各服務 module import 不到。手寫第二份中文對照表的失敗形狀是 drift
-# 不是錯誤 —— CodeMeta 改了 Label，副本不編譯失敗、不轉紅，只是從那天起稽核與
-# 通知顯示舊字串（56 號設計書 §6.1.12）。同 generate_go_media 的動機（issue #1530）。
-#
-# 涵蓋清單見 GO_LABEL_ENUMS。
-#
-# 值常數只對「Value 全為數字」的 enum 生成：4402 這種數字在 Go 端無法自我說明，
-# 正是禁硬編碼要消滅的字面值來源；UPPER_SNAKE / snake_case 的 Value 本身就是
-# 識別字，各服務已有自己的常數，再生成一份只是多一個同義名字。
-#
-# 對齊自算（純 bash，不依賴 gofmt binary），輸出即 gofmt-clean，供 CodeMeta drift
-# gate 純文字重跑後 diff 穩定。
-# =====================================================================
 generate_go_labels() {
     local parsed_file="$1"
     local output_file="$2"
@@ -1236,8 +1007,6 @@ generate_go_labels() {
         fi
     done < "$parsed_file"
 
-    # 清單裡少掉任何一個就中止：靜默略過會讓消費端拿到一個不存在的識別字（編譯
-    # 失敗，還算好）或一張空表（Label 顯示成原始碼值，沒有任何東西會報錯）。
     local e
     for e in "${GO_LABEL_ENUMS[@]}"; do
         if [[ ! -s "$work/$e.rows" ]]; then
@@ -1267,7 +1036,6 @@ _append_go_labels_enum() {
     desc="$(cat "$work/$enum_name.desc")"
     local lower="$(echo "${enum_name:0:1}" | tr '[:upper:]' '[:lower:]')${enum_name:1}"
 
-    # 註解只取說明的第一句：完整敘述在 Markdown SSOT，生成檔只需要指認這是什麼。
     if [[ "$desc" == *"。"* ]]; then
         desc="${desc%%。*}。"
     fi
@@ -1299,7 +1067,6 @@ _append_go_labels_enum() {
             echo ""
         fi
 
-        # 寬度要量**跳脫後**的長度，否則含引號的 value 會讓對齊算錯而 gofmt gate 轉紅。
         local max_key=0
         while IFS='|' read -r name code value label description; do
             local key="\"$(java_escape "$value")\":"
@@ -1324,9 +1091,6 @@ _append_go_labels_enum() {
     } >> "$ofile"
 }
 
-# =====================================================================
-# Diff 模式 — 比較生成結果與現行檔案
-# =====================================================================
 run_diff() {
     echo "📊 比較生成結果與現行 Java 檔案..."
     echo ""
@@ -1346,7 +1110,6 @@ run_diff() {
             continue
         fi
 
-        # 比較時忽略自定義方法區塊（只比常數和標準方法）
         if diff -q "$gen_file" "$existing" > /dev/null 2>&1; then
             same_count=$((same_count + 1))
         else
@@ -1362,9 +1125,6 @@ run_diff() {
     echo "結果：✅ 相同 $same_count | ⚠ 差異 $diff_count | 🆕 新增 $new_count"
 }
 
-# =====================================================================
-# 主流程
-# =====================================================================
 main() {
     local do_java=0 do_go=0 do_go_errors=0 do_go_media=0 do_go_labels=0 do_go_registry=0 do_flutter=0 do_web=0 do_admin=0 do_diff=0
 
@@ -1402,7 +1162,6 @@ main() {
         exit 1
     fi
 
-    # 解析所有 Markdown
     echo "📖 解析 Markdown 檔案..."
     local parsed_file="$TMP_DIR/parsed.txt"
     > "$parsed_file"
@@ -1428,7 +1187,6 @@ main() {
     fi
     echo ""
 
-    # Java 生成
     if [[ $do_java -eq 1 || $do_diff -eq 1 ]]; then
         local java_target_dir="$JAVA_OUTPUT_DIR"
         if [[ $do_diff -eq 1 ]]; then
@@ -1472,7 +1230,6 @@ main() {
             fi
         done < "$parsed_file"
 
-        # 最後一個
         if [[ -n "$current_enum" && "$current_iface" != "Legacy" ]]; then
             generate_java_enum "$current_enum" "$current_desc" "$current_special" \
                 "$constants_tmp" "$java_target_dir/${current_enum}.java"
@@ -1494,13 +1251,11 @@ main() {
         echo ""
     fi
 
-    # Diff 模式
     if [[ $do_diff -eq 1 ]]; then
         run_diff
         return
     fi
 
-    # Go 生成
     if [[ $do_go -eq 1 ]]; then
         mkdir -p "$GO_OUTPUT_DIR"
         echo "🔵 生成 Go 常數定義..."
@@ -1509,7 +1264,6 @@ main() {
         echo ""
     fi
 
-    # Go 業務碼生成
     if [[ $do_go_errors -eq 1 ]]; then
         echo "🔵 生成 Go 業務碼常數..."
         local parsed_error_file="$TMP_DIR/errors_parsed.txt"
@@ -1523,7 +1277,6 @@ main() {
         echo ""
     fi
 
-    # Go media 引用類型生成（AssetReferenceType 前端可見=No，不走 --go，獨立直寫）
     if [[ $do_go_media -eq 1 ]]; then
         echo "🔵 生成 Go media 引用類型常數..."
         generate_go_media "$parsed_file" "$GO_MEDIA_OUTPUT_FILE"
@@ -1531,7 +1284,6 @@ main() {
         echo ""
     fi
 
-    # Go Value→Label 對照生成（含前端可見=No 的 enum，不走 --go，獨立直寫）
     if [[ $do_go_labels -eq 1 ]]; then
         echo "🔵 生成 Go CodeMeta Label 對照..."
         generate_go_labels "$parsed_file" "$GO_LABELS_OUTPUT_FILE"
@@ -1539,7 +1291,6 @@ main() {
         echo ""
     fi
 
-    # Go registry 生成（typed 常數 + AllXxx + FromCode/FromValue，直寫 Go module）
     if [[ $do_go_registry -eq 1 ]]; then
         echo "🔵 生成 Go CodeMeta registry..."
         generate_go_file "$parsed_file" "$GO_REGISTRY_OUTPUT_FILE" "${GO_REGISTRY_ENUMS[*]}" "--go-registry"
@@ -1547,7 +1298,6 @@ main() {
         echo ""
     fi
 
-    # Flutter 生成
     if [[ $do_flutter -eq 1 ]]; then
         echo "💙 生成 Flutter Dart Enum..."
         generate_flutter_file "$parsed_file" "${FLUTTER_OUTPUT_FILES[0]}"
@@ -1557,7 +1307,6 @@ main() {
         echo ""
     fi
 
-    # Web 生成
     if [[ $do_web -eq 1 ]]; then
         echo "🌐 生成 Web TypeScript Enum..."
         generate_ts_file "$parsed_file" "$WEB_OUTPUT_FILE" "--web" ""
@@ -1565,7 +1314,6 @@ main() {
         echo ""
     fi
 
-    # ADM 生成
     if [[ $do_admin -eq 1 ]]; then
         echo "🛠  生成 ADM TypeScript Enum..."
         generate_ts_file "$parsed_file" "$ADMIN_OUTPUT_FILE" "--admin" "${ADMIN_ENUMS[*]}"

@@ -65,8 +65,6 @@ func New(d Deps) *Service {
 	return &Service{d: d}
 }
 
-// normalize 驗證輸入並回傳正規化後的輸入：管理員的理由與關店的理由同一條規則（platform/auditreason：去掉前後空白，1 到 1000
-// 字）；帳號本人的理由選填，只限長度。錯誤帶欄位（AccountID、OperatorAdminID、Reason），傳輸層對應到請求的路徑。
 func normalize(in model.RequestInput) (model.RequestInput, error) {
 	if in.AccountID <= 0 {
 		return in, apperr.InvalidInputOn([]string{"AccountID"}, "帳號 ID 必須為正數")
@@ -94,7 +92,6 @@ func normalize(in model.RequestInput) (model.RequestInput, error) {
 	return in, nil
 }
 
-// lockAccount 以 identity 的帳號列鎖序列化同一帳號的申請，以及與授予 SELLER、刪帳號之間的交錯。
 func (s *Service) lockAccount(ctx context.Context, accountID int64) error {
 	return s.d.Identity.LockAccount(ctx, accountID)
 }
@@ -102,12 +99,9 @@ func (s *Service) lockAccount(ctx context.Context, accountID int64) error {
 type snapshot struct {
 	deleted, seller bool
 	buyerID         int64
-	// store 是帳號目前的店家，由 withStore 讀取（申請與完成等待中的申請都一樣）。
 	store *seller.Store
 }
 
-// snapshot 讀取帳號與現任 buyer_id。帳號活著 ⇔ 買家活著（ADR 2026-09-30-account-created-provisions-buyer）：
-// 未刪除的帳號沒有現任買家是不變量被破壞，回 internal 並記 error log，不當成「沒有買家」刪帳。
 func (s *Service) snapshot(ctx context.Context, accountID int64) (snapshot, error) {
 	a, err := s.d.Identity.Account(ctx, accountID)
 	if err != nil {
@@ -119,8 +113,6 @@ func (s *Service) snapshot(ctx context.Context, accountID int64) (snapshot, erro
 	}
 	buyerID, err := s.d.Buyer.CurrentBuyerID(ctx, accountID)
 	if apperr.KindOf(err) == apperr.KindNotFound {
-		// 交易外的讀取不是同一個 snapshot：讀帳號之後、讀買家之前，另一個申請可能剛好完成刪帳（同交易關閉買家）。
-		// 重讀帳號，已刪除就照已刪除處理；仍存活才是不變量被破壞。
 		again, aerr := s.d.Identity.Account(ctx, accountID)
 		if aerr == nil && again.Deleted {
 			return snapshot{deleted: true}, nil
@@ -134,9 +126,6 @@ func (s *Service) snapshot(ctx context.Context, accountID int64) (snapshot, erro
 	return snap, nil
 }
 
-// withStore 讀取存活帳號目前的店家（不論有沒有 SELLER）。SELLER 與現任店家成對（開店與授予 SELLER、關店與移除 SELLER
-// 各在同一個 transaction）：有店家卻沒有 SELLER、有 SELLER 卻沒有店家都是本模組以外的程式破壞了不變量，回 internal 並記
-// error log。
 func (s *Service) withStore(ctx context.Context, accountID int64, snap *snapshot) error {
 	if snap.deleted {
 		return nil
@@ -157,8 +146,6 @@ func (s *Service) withStore(ctx context.Context, accountID int64, snap *snapshot
 	return nil
 }
 
-// openOrders 在 transaction 外查帳號有沒有未結訂單：買家的訂單，以及帳號目前店家（snap.store，呼叫方已讀）的訂單。買家先查，
-// 已經有未結訂單就不必再問店家。任何一個查詢失敗都回 unavailable（fail-closed）：不確定就不刪、不進入等待。
 func (s *Service) openOrders(ctx context.Context, snap snapshot) (bool, error) {
 	open, err := s.d.HasOpenOrders(ctx, snap.buyerID)
 	if err == nil && !open && snap.store != nil {
@@ -170,8 +157,6 @@ func (s *Service) openOrders(ctx context.Context, snap snapshot) (bool, error) {
 	return open, nil
 }
 
-// sameStore 回報交易外查訂單的店家與交易內讀到的是不是同一個 stint：不是的話（店家在查詢之後關閉又重新入駐）查到的
-// 訂單不屬於現在的店家，要重來。
 func sameStore(before, current *seller.Store) bool {
 	if before == nil || current == nil {
 		return before == current
@@ -181,7 +166,6 @@ func sameStore(before, current *seller.Store) bool {
 
 func errStoreChanged() error { return apperr.Unavailable("店家剛剛有變動，請重試") }
 
-// pendingStore 回報店家是不是已隨這個帳號的刪除申請進入等待（完成等待中的申請時一起關閉）。
 func pendingStore(snap snapshot) bool {
 	return snap.store != nil && snap.store.Status == seller.PendingDeletion
 }
@@ -204,7 +188,6 @@ func (s *Service) Request(ctx context.Context, in model.RequestInput) (model.Sta
 	}
 	open := false
 	if !before.deleted {
-		// 不論申請者，店家都是參與者：店家的訂單也要查。
 		if err := s.withStore(ctx, in.AccountID, &before); err != nil {
 			return "", err
 		}
@@ -295,7 +278,6 @@ func (s *Service) CompletePending(ctx context.Context, accountID int64) (model.S
 	}
 	open := false
 	if !before.deleted {
-		// 先確認有待辦（便宜的 DB 讀取），沒有待辦的帳號不必對訂單與店家發 RPC；交易內鎖住帳號之後會再確認一次。
 		if _, err := store.New(s.d.DB.Conn(ctx)).PendingRequest(ctx, accountID); errors.Is(err, pgx.ErrNoRows) {
 			return "", apperr.FailedPrecondition("帳號沒有待完成的刪除")
 		} else if err != nil {
@@ -361,9 +343,6 @@ func (s *Service) CompletePending(ctx context.Context, accountID int64) (model.S
 	return state, err
 }
 
-// lockParticipants 依單體規則 4 的順序（帳號列已鎖，然後買家列、店家列）先鎖完買家與店家，之後才派發買家的刪除事件：事件的同 transaction
-// 訂閱者（social）會鎖上層模組的列，必須排在店家列之後。重複鎖同一列是 no-op，所以 BeginDeletion 與 CloseForDeletion 各自再鎖不會反序。
-// TestDeletionLocksBuyerAndSellerBeforeSocialRows 量這個順序。
 func (s *Service) lockParticipants(ctx context.Context, snap snapshot) error {
 	if err := s.d.Buyer.LockForDeletion(ctx, snap.buyerID); err != nil {
 		return err
@@ -374,8 +353,6 @@ func (s *Service) lockParticipants(ctx context.Context, snap snapshot) error {
 	return s.d.Seller.LockForDeletion(ctx, snap.store.StoreID)
 }
 
-// closeParticipants 在已鎖住帳號列的 transaction 內刪掉各店對這買家的封鎖（seller 擁有那張表）、關閉買家與（有的話）店家，之後由呼叫方刪除帳號。
-// 店家封鎖在買家的刪除事件派發之前刪：事件的訂閱者鎖 social 的列，必須排在店家之後（規則 4）。
 func (s *Service) closeParticipants(ctx context.Context, snap snapshot) error {
 	if err := s.lockParticipants(ctx, snap); err != nil {
 		return err
@@ -410,8 +387,6 @@ func (s *Service) recordCompleted(ctx context.Context, q *store.Queries, account
 	return q.InsertCompletedRequest(ctx, store.InsertCompletedRequestParams{ID: s.d.NewID(), AccountID: accountID, RequestedAt: now})
 }
 
-// completeRequest 把待辦申請標成完成，且冪等：0 列（申請已不是 PENDING_ORDERS）代表並行的另一個 transaction 已完成它，回傳那一筆申請（以 pending.ID 重讀，不是帳號的最新一筆）。
-// 活帳號的路徑被帳號列鎖序列化，不會走到 0 列；已刪除的帳號沒有列可鎖（LockLiveAccount 對已刪除帳號不鎖），並行完成才會。
 func (s *Service) completeRequest(ctx context.Context, q *store.Queries, pending store.AccountdeletionDeletionRequest, now time.Time) (store.AccountdeletionDeletionRequest, error) {
 	row, err := q.CompleteRequest(ctx, store.CompleteRequestParams{ID: pending.ID, CompletedAt: &now})
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -26,17 +26,14 @@ export function calculateCenterCrop(
 		};
 	}
 	const currentAspect = srcWidth / srcHeight;
-	// 容許千分之一的浮點數誤差
 	if (Math.abs(currentAspect - targetAspect) < 0.001) {
 		return { sx: 0, sy: 0, sWidth: srcWidth, sHeight: srcHeight };
 	}
 	if (currentAspect > targetAspect) {
-		// 原始圖片比 16:9 寬：裁切左右兩側
 		const sWidth = srcHeight * targetAspect;
 		const sx = (srcWidth - sWidth) / 2;
 		return { sx, sy: 0, sWidth, sHeight: srcHeight };
 	}
-	// 原始圖片比 16:9 高：裁切上下兩側
 	const sHeight = srcWidth / targetAspect;
 	const sy = (srcHeight - sHeight) / 2;
 	return { sx: 0, sy, sWidth: srcWidth, sHeight };
@@ -60,7 +57,6 @@ export async function cropImageFileTo16x9(file: File): Promise<File> {
 				BANNER_ASPECT_RATIO,
 			);
 			const canvas = document.createElement("canvas");
-			// 輸出尺寸上限為 1600x900，若原圖裁切範圍較小則等比縮放為 16:9
 			const outWidth = Math.min(Math.round(crop.sWidth), BANNER_CANVAS_WIDTH);
 			const outHeight = Math.round(outWidth / BANNER_ASPECT_RATIO);
 			canvas.width = outWidth;

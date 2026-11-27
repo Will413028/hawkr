@@ -22,7 +22,6 @@ const (
 
 var errInsufficientFunds = fmt.Errorf("%w：stripe insufficient available funds（HTTP 400）", ErrChargeRetryableRefusal)
 
-// paidPayment 建立並讓一筆付款入帳（store 7、金額 amount），回傳付款。
 func (f *chargeFixture) paidPayment(t *testing.T, orderNo string, amount int64) Payment {
 	t.Helper()
 	f.order(orderNo, 11, 7, amount)
@@ -35,7 +34,6 @@ func (f *chargeFixture) paidPayment(t *testing.T, orderNo string, amount int64) 
 	return p
 }
 
-// enableAccount 寫入賣家的收款帳戶列（外部帳戶 ID 是 external，active 決定能否轉帳）；同一個測試多次呼叫時更新同一列。
 func (f *chargeFixture) enableAccount(t *testing.T, storeID int64, external string, active bool) {
 	t.Helper()
 	ctx := context.Background()
@@ -60,10 +58,6 @@ VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), $3, $
 	return id
 }
 
-// insertReversal 寫一筆退款列並指定向賣家收回的彙總狀態：refundStatus 是 REFUNDING、SUCCEEDED 或 FAILED 時 provider 已接受（寫 external_refund_id 與呼叫時刻），
-// reversalAmount 大於 0 才是有預留的列；彙總狀態是 REVERSING、REVERSED、RELEASED 或 ANOMALY 時再寫一列對原轉帳的撤回列（狀態同彙總，REVERSED 補撤回 ID 與呼叫時刻，
-// RELEASED 與 ANOMALY 補原因），REVERSED 的退款 reversal_recovered 等於預留額。
-// callDeadline 給測試直接呼叫 provider 用：provider 的呼叫規則要求帶 deadline。
 func callDeadline(t *testing.T, ctx context.Context) context.Context {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
@@ -92,13 +86,11 @@ VALUES ($1, $2, (SELECT id FROM payment.payment_orders WHERE payment_id = $3), 0
 	return id
 }
 
-// segText 讀退款第一列（seq 最小）撤回列的欄位：一次收回只有一個目標的測試用它看這一次 provider 撤回呼叫的鍵、時刻與撤回 ID。
 func (f *chargeFixture) segText(t *testing.T, col string, refundID uuid.UUID) string {
 	t.Helper()
 	return f.text(t, "SELECT "+col+"::text FROM payment.refund_reversals WHERE refund_id = $1 ORDER BY seq LIMIT 1", refundID)
 }
 
-// reversalID 是退款第一列撤回列的 ID（AnomalyReversal 的物件 ID）。
 func (f *chargeFixture) reversalID(t *testing.T, refundID uuid.UUID) uuid.UUID {
 	t.Helper()
 	return uuid.MustParse(f.segText(t, "id", refundID))
@@ -197,7 +189,6 @@ func TestADuplicateTransferRequestReturnsTheExistingActiveTransfer(t *testing.T)
 	if third.ID != first.ID || third.Status != TransferSucceeded || f.count(t, "SELECT count(*) FROM payment.transfers") != 1 {
 		t.Fatalf("成功之後的請求：%+v", third)
 	}
-	// 帳戶之後被停用：已有有效轉帳時仍回傳它，不是拒絕。
 	ctx := context.Background()
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET status = 'DISABLED', transfers_active = false WHERE store_id = 7")
 	must(t, err)
@@ -212,19 +203,15 @@ func TestRequestTransferRefusesWhatCannotBeTransferred(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	ctx := context.Background()
-	// T-3a：付款還沒入帳，賣家帳戶（store 6）是開通的，只剩「未入帳」能擋它。
 	f.order("T-3a", 11, 6, 100)
 	f.create(t, 11, "T-3a")
 	f.enableAccount(t, 6, "acct_6", true)
-	// T-3b：已入帳，store 7 沒有收款帳戶。
 	f.paidPayment(t, "T-3b", 100)
-	// T-3c：已入帳，store 8 的帳戶沒有開通轉帳。
 	f.order("T-3c", 11, 8, 100)
 	f.create(t, 11, "T-3c")
 	must(t, f.fake.Settle(f.externalOf(t, "T-3c"), PaymentStateSucceeded, f.now))
 	f.sync(t, f.idOf(t, "T-3c"))
 	f.enableAccount(t, 8, "acct_8", false)
-	// T-3d：已入帳、帳戶開通，但已全額退款（退款全部成功；還有進行中的退款時不拒絕，見 TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail）。
 	f.order("T-3d", 11, 9, 100)
 	f.create(t, 11, "T-3d")
 	must(t, f.fake.Settle(f.externalOf(t, "T-3d"), PaymentStateSucceeded, f.now))
@@ -403,7 +390,6 @@ func TestTheSweepRequeuesIdlePendingTransfersAndReversingRefunds(t *testing.T) {
 	}
 }
 
-// reversalFixture 是一筆已入帳 100、轉帳已成功的付款。
 func (f *chargeFixture) transferred(t *testing.T, orderNo string) (Payment, PaymentTransfer) {
 	t.Helper()
 	p := f.paidPayment(t, orderNo, 100)

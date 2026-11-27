@@ -46,10 +46,6 @@ export const Tabs: React.FC<TabsProps> = ({
 	const [internal, setInternal] = React.useState<string>(
 		defaultSelectedKey ?? items[0]?.key ?? "",
 	);
-	// `items` often arrives asynchronously (fetched tabs). The initial state was
-	// computed once, so an empty first render left `internal` as "" forever —
-	// activeIndex -1, and a `…-panel--1` id wired to nothing. Re-seed the moment
-	// a matching key becomes available. Controlled usage is untouched.
 	const hasMatch = items.some((item) => item.key === internal);
 	React.useEffect(() => {
 		if (isControlled || hasMatch) return;
@@ -94,9 +90,6 @@ export const Tabs: React.FC<TabsProps> = ({
 			}
 		}
 		const target = items[next];
-		// Every candidate can be disabled (a fully-locked tab set). The loops
-		// above then land back on a disabled item; selecting it would move the
-		// panel to a tab the user cannot activate with the mouse.
 		if (target?.isDisabled) return;
 		if (target) {
 			select(target.key);
@@ -138,8 +131,6 @@ export const Tabs: React.FC<TabsProps> = ({
 							className={cn(
 								"relative inline-flex items-center gap-2 bg-transparent border-none cursor-pointer font-medium text-hk-body transition-colors duration-200 motion-reduce:transition-none",
 								// Inset the ring: the global 2px outline sits
-								// OUTSIDE the tab and was clipped by the `p-1`
-								// list container (and overlapped its neighbour).
 								"focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--hkui-focus)]",
 								"disabled:opacity-50 disabled:cursor-not-allowed",
 								tabsSizeClass[size],
@@ -183,16 +174,12 @@ export const Tabs: React.FC<TabsProps> = ({
 	);
 };
 
-// md is the default and clears 44px outright; sm stays dense on a mouse and
-// only grows on coarse pointers.
 const tabsSizeClass: Record<TabsSize, string> = {
 	sm: "h-8 px-3 text-xs rounded-hk-sm pointer-coarse:min-h-11",
 	md: "h-11 px-4 text-sm rounded-hk-md",
 	lg: "h-12 px-5 text-base rounded-hk-md",
 };
 
-// Adjacent tabs used to butt up against each other (gap-0), so a mistap on the
-// seam always hit *a* tab — just not the intended one.
 const tabsListVariantClass: Record<TabsVariant, string> = {
 	solid: "bg-hk-surface-muted p-1 rounded-hk-md gap-1.5",
 	bordered: "border border-hk-border-soft p-1 rounded-hk-md gap-1.5",

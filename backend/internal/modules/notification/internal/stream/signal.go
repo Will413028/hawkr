@@ -17,22 +17,18 @@ const Channel = "notification_signals"
 
 const payloadVersion = 1
 
-// 通知的種類。
 const (
-	kindInbox     = "i" // 某 (帳號, 受眾) 的收件匣有變化
-	kindWorkspace = "w" // 某家店的賣家工作區有變化
+	kindInbox     = "i"
+	kindWorkspace = "w"
 )
 
-// payload 是 NOTIFY 的內容：只有業務鍵與提示，沒有未讀數、通知文字或個資；內容由 serve 端對每個訂閱者讀取（授權在讀取）。
 type payload struct {
 	V    int    `json:"v"`
 	Kind string `json:"k"`
-	// Account、Audience、Store、Hint 屬於 kindInbox（BUYER 沒有 Store）；kindWorkspace 只有 Store 與 Change。
 	Account  int64  `json:"a,omitempty"`
 	Audience string `json:"u,omitempty"`
 	Store    int64  `json:"s,omitempty"`
 	Hint     string `json:"h,omitempty"`
-	// Item 是這則通知新建或聚合更新的收件匣列 ID（kindInbox 可選；一則 NOTIFY 至多一個）。
 	Item   string `json:"i,omitempty"`
 	Change int    `json:"c,omitempty"`
 }
@@ -42,7 +38,7 @@ var errPayload = errors.New("notification/stream：不合法的通知")
 func (p payload) encode() string {
 	b, err := json.Marshal(p)
 	if err != nil {
-		panic(fmt.Sprintf("notification/stream：編碼通知：%v", err)) // 欄位全是字串與整數，不會失敗
+		panic(fmt.Sprintf("notification/stream：編碼通知：%v", err))
 	}
 	return string(b)
 }

@@ -33,7 +33,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// steppingClock 是注入的時鐘：從固定時刻起，每讀一次前進一毫秒，讓先建立的公告的建立時間一定早於後建立的，排序不靠真實時間或 sleep。
 type steppingClock struct {
 	mu  sync.Mutex
 	now time.Time
@@ -50,11 +49,9 @@ func (c *steppingClock) Now() time.Time {
 	return c.now
 }
 
-// jobQueue 依排入順序記下公告派送排的 job；測試以 drain 等同 River 取件。
 type jobQueue struct {
 	mu      sync.Mutex
 	pending []river.JobArgs
-	// enqueued 是曾經排入過的 job 種類計數（含已展開的）。
 	enqueued map[string]int
 }
 
@@ -86,11 +83,9 @@ func (q *jobQueue) count(kind string) int {
 	return q.enqueued[kind]
 }
 
-// testDirectory 以真的 buyer 模組列買家、以固定名單列店家（seller 的表不在這支測試的 schema 裡）。
 type testDirectory struct {
 	buyers *buyer.Module
 	stores []announce.Recipient
-	// poison 非空時排在買家名單第一頁的最前面：一個永遠寫不進去的收件人（帶不合法的 store_id）。
 	poison *announce.Recipient
 }
 
@@ -186,7 +181,6 @@ func (f *announceFixture) create(t *testing.T, in announce.CreateInput) announce
 	return a
 }
 
-// drain 展開排著的 job 直到沒有，回傳展開的派送 job 數與排出的渠道 job 數。
 func (f *announceFixture) drain(t *testing.T) (pages, deliveries int) {
 	t.Helper()
 	ctx := context.Background()
@@ -398,7 +392,6 @@ func TestCreateWithTheSameRequestIDMakesOneAnnouncement(t *testing.T) {
 	if third := f.create(t, in); third.ID == first.ID {
 		t.Error("不同的 request_id 是另一則公告")
 	}
-	// 沒有 request_id 不做冪等；另一個管理員用同一個 request_id 也是另一則。
 	in.RequestID = nil
 	f.create(t, in)
 	in.RequestID = &rid

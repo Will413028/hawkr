@@ -33,7 +33,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// batchSize 是一個 transaction 清理的店家數上限（批次大小，不是總量上限）。
 const batchSize int32 = 100
 
 // Deps 外部依賴；clock 由組裝點注入。
@@ -56,7 +55,6 @@ type Payment interface {
 // Service 執行個資清理。
 type Service struct {
 	d Deps
-	// hooks 是測試用的同步點（hooks_integration.go，只在 integration build tag 下有內容，正式程式是空的）。
 	hooks hooks
 }
 
@@ -86,7 +84,6 @@ func (s *Service) Run(ctx context.Context) (int, error) {
 	return purged, nil
 }
 
-// holds 回傳候選之中被保存擋下的（StoreHolds 是保存條件的唯一定義）：申覆的 legal hold 或主管機關來函的保存。
 func holds(ctx context.Context, q *store.Queries, ids []int64, now time.Time) (map[int64]bool, error) {
 	rows, err := q.StoreHolds(ctx, store.StoreHoldsParams{StoreIds: ids, Now: now})
 	if err != nil {
@@ -99,11 +96,6 @@ func holds(ctx context.Context, q *store.Queries, ids []int64, now time.Time) (m
 	return held, nil
 }
 
-// retireBatch 在一個 transaction 內讓一批店家退場（第一段）；回傳這批實際退場的店家數、第一次選到的候選數（滿批次大小才需要再跑一批）與最後一個候選的
-// store_id（下一批的 keyset）。
-//
-// 候選用 RetireDueStores（第一段）選並鎖住，然後以同一支查詢、新的語句限定在候選上再判斷一次時間條件，再以 StoreHolds 判斷保存：第一個語句開始之後、掃到那一列
-// 之前才 commit 的寫入（READ COMMITTED 下第一個語句的快照看不到它，那一列也沒有被它鎖）在之後的語句看得到。
 func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int64, error) {
 	retiredCount, candidateCount := 0, 0
 	var last *int64
@@ -153,8 +145,6 @@ func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int
 			return err
 		}
 		retiredCount = len(retired)
-		// 說明與圖片清掉之後店家頁（與卡片）要失效：同一個 transaction 內排入快取失效；logo 與封面在這時才釋放（同一個 transaction 內 MarkDeleted）。
-		// 退場之後恢復營業不可能，下游的資料可以刪除：發出 StoreRetired。
 		for _, id := range retired {
 			row := byID[id]
 			if err := s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: revalidate.StoreTags(row.StoreID, row.StoreCode)}, nil); err != nil {
@@ -182,7 +172,6 @@ func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int
 	return retiredCount, candidateCount, last, err
 }
 
-// purgeBatch 在一個 transaction 內清理一批已退場店家的註冊、身分與連線資料（第二段）；回傳值與鎖住之後再判斷的做法同 retireBatch。
 func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int64, error) {
 	purgedCount, candidateCount := 0, 0
 	var last *int64
@@ -236,7 +225,6 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		}
 		purgedCount = len(cleared)
 		purged := make([]int64, len(cleared))
-		// 店名清掉之後卡片沒有店名：同一個 transaction 內排入店家頁（與卡片）的快取失效。
 		for i, r := range cleared {
 			purged[i] = r.StoreID
 			if err := s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: revalidate.StoreTags(r.StoreID, r.StoreCode)}, nil); err != nil {
@@ -247,7 +235,6 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		if err != nil {
 			return err
 		}
-		// 登記資料的查詢快照含公司名稱與地址，與申請的個資同時清除；審核紀錄的引用由外鍵（ON DELETE SET NULL）置 NULL。
 		if _, err := q.PurgeKYCRegistrationChecks(ctx, applications); err != nil {
 			return err
 		}
@@ -264,24 +251,17 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 				return err
 			}
 		}
-		// 內容下架措施留著的內容快照（本文與連結，A7-D29）跟著店家退場清空，不論措施是否撤銷、是否滿 184 天。
 		if _, err := q.ClearContentSnapshotsOfStores(ctx, purged); err != nil {
 			return err
 		}
-		// 入駐同意紀錄的來源 IP 與 User-Agent 是連線紀錄，清掉；種類、版本、時間、帳號與送出保留（審核的事實）。
 		if _, err := q.PurgeAgreementSources(ctx, store.PurgeAgreementSourcesParams{StoreIds: purged, Now: &now}); err != nil {
 			return err
 		}
-		// 收款帳戶（聯絡信箱、外部帳戶 ID、requirements）由 payment 擁有：同一個 transaction 只排入它的刪除 job，不在鎖住店家列之後等下層的列
-		// （platform/lockorder）。收款事件的 inbox 列由 platform 依保存期清理。
 		return s.d.Payment.ForgetOwners(ctx, purged)
 	})
 	return purgedCount, candidateCount, last, err
 }
 
-// expireIdentityHashBatch 刪掉一批來源 stint 已關店滿 model.IdentityHashRetention 的防詐保存 hash（account_identity_hashes）：先選候選 stint，再問 StoreHolds
-// （被保存擋下的略過，不刪），刪除的語句自己再判斷一次時間（stint 在候選之後恢復營業的不會被刪）。回傳這批刪了 hash 的 stint 數、候選數與最後一個候選的 store_id
-// （keyset；與兩段清理同一個形狀）。
 func (s *Service) expireIdentityHashBatch(ctx context.Context, after *int64) (int, int, *int64, error) {
 	var deleted, candidates int
 	var last *int64

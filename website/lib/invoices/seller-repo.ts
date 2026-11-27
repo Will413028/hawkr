@@ -101,7 +101,6 @@ import type {
 
 const BASE = "/app/seller/invoices";
 
-/* ===== 業務碼 ===== */
 
 /**
  * 58 §6.1.0 (13) 的碼表中，本波四個畫面會遇到的那些。文案在 `./errorCopy.ts`。
@@ -175,7 +174,6 @@ export const SELLER_INVOICE_BIZ_CODE = {
 	COMPLAINT_NOT_FOUND: 9309,
 } as const;
 
-/* ===== normalize ===== */
 
 function str(value: unknown): string {
 	return value == null ? "" : String(value);
@@ -250,7 +248,6 @@ function normalizeIntakeLimit(raw: unknown): SellerIntakeLimit {
 	};
 }
 
-/* ===== 端點 16 ===== */
 
 /** 端點 16。唯讀聚合，`recentDocuments` 固定 5 筆、不接受 query 調整。 */
 export async function fetchSellerInvoiceOverview(): Promise<SellerInvoiceOverview> {
@@ -274,7 +271,6 @@ export async function fetchSellerInvoiceOverview(): Promise<SellerInvoiceOvervie
 	};
 }
 
-/* ===== 端點 17 ===== */
 
 function normalizeTaxIdentity(raw: unknown): SellerTaxIdentity {
 	const it = obj(raw);
@@ -418,12 +414,10 @@ function normalizeExtensionRequest(
 	if (!data || typeof data !== "object") return null;
 	const raw = obj(data);
 	const requestedAt = str(raw.requestedAt);
-	// 時間是「這筆申請存在」的證據；沒有它就當作沒有申請，不要畫一塊沒有時間的提示。
 	if (!requestedAt) return null;
 	return { requestedAt, reason: str(raw.reason) };
 }
 
-/* ===== 端點 30 ===== */
 
 /** 端點 30 的 query。全部走 URL query，值域見 §S06 的表。 */
 export interface SellerInvoiceDocumentsQuery {
@@ -478,13 +472,10 @@ export async function listSellerInvoiceDocuments(
 		total: num(data.total),
 		page: num(data.page),
 		pageSize: num(data.pageSize),
-		// 🔴 `=== true` 而不是 `Boolean(...)`：舊版後端不回這個 key ⇒ undefined ⇒ false，
-		// 也就是這一波之前的行為（空字串就是沒出貨）。若預設成 true，每一頁都會掛降級提示。
 		shipmentStatusDegraded: data.shipmentStatusDegraded === true,
 	};
 }
 
-/* ===== 端點 31 ===== */
 
 /**
  * 端點 31。回應把明細包在 `detail` 之下、賣家專屬欄位平放在外層，這裡攤平成一層
@@ -520,7 +511,6 @@ export async function fetchSellerInvoiceDocument(
 	};
 }
 
-/* ===== 端點 62R ===== */
 
 function normalizeRetryPolicy(raw: unknown): InvoiceJobInfo["retryPolicy"] {
 	const it = obj(raw);
@@ -635,7 +625,6 @@ export const EXTERNAL_INVOICE_NO_PATTERN = /^[A-Z]{2}[0-9]{8}$/;
 /** 端點 62 的 `note` 長度上限（後端 `adminNoteMaxRunes`）。 */
 export const EXTERNAL_ISSUANCE_NOTE_MAX = 500;
 
-/* ===== 端點 33 ===== */
 
 /**
  * 端點 33（S08 唯一資料源）。
@@ -652,7 +641,6 @@ export async function fetchSellerInvoiceJob(
 	return normalizeJobInfo(obj(env.data));
 }
 
-/* ===== 端點 34／35 ===== */
 
 /**
  * 端點 34 的 query。
@@ -752,7 +740,6 @@ export async function fetchSellerInvoiceComplaint(
 	return normalizeComplaint(obj(env.data));
 }
 
-/* ===== 端點 72 ===== */
 
 /** 端點 72 的 query。與端點 30 不同：**沒有** `mode`／`abnormal_only`／`order_no`。 */
 export interface SellerReceivedInvoicesQuery {
@@ -800,7 +787,6 @@ export async function listSellerReceivedInvoiceDocuments(
 	};
 }
 
-/* ===== PDF 子路由 ===== */
 
 /**
  * 賣家面 PDF 的絕對網址（`GET /documents/{document_id}/file/content`，
@@ -818,7 +804,6 @@ export function sellerInvoiceFileUrl(documentId: string): string {
 	);
 }
 
-/* ===== AMEGO 憑證帳號（端點 23–27，S03）===== */
 
 /**
  * `PUT /credentials` 的 `consentVersion`（後端 `requireConsentVersion` 只驗非空 ＋ 長度）。
@@ -965,7 +950,6 @@ function normalizeProviderAccount(data: unknown): SellerProviderAccount {
 	};
 }
 
-/* ===== 自行開票責任條款（端點 21／22，S04）===== */
 
 /**
  * 端點 21。**恆有回應**（未簽過的賣家拿到 `termsVersion: ""` ＋ 非空的
@@ -1004,7 +988,6 @@ export async function acceptSelfIssueAttestation(args: {
 	return normalizeAttestation(env.data);
 }
 
-/* ===== 收據代製授權（端點 28／29，S05）===== */
 
 /**
  * 端點 29 的 `consentVersion`。與 S03 的 `AMEGO_CONSENT_VERSION` 同理：後端只驗
@@ -1058,7 +1041,6 @@ function normalizeReceiptAuthorization(
 	};
 }
 
-/* ===== 賣家回覆申訴（端點 36，S10 ⑥）===== */
 
 /**
  * 賣家可選的三個 action。
@@ -1103,7 +1085,6 @@ export async function respondSellerInvoiceComplaint(args: {
 	return normalizeComplaint(obj(env.data));
 }
 
-/* ===== 稅務身分草稿（端點 18，S02 表單）===== */
 
 /**
  * 端點 18。存草稿。**這是整條發票鏈的第一步**：只有這支會寫
@@ -1124,9 +1105,6 @@ export async function saveSellerTaxProfileDraft(args: {
 	evidenceStagedTokens: string[];
 	expectedVersion: string;
 }): Promise<SellerTaxProfile> {
-	// 端點 18 是 PUT 不是 POST（58 號設計書 :4780 與 :8737 兩處一致，gateway 也註冊 PUT）。
-	// 這裡曾經是 post，實測回 404 page not found ⇒「儲存草稿」按鈕 100% 失敗、
-	// 稅籍生命週期第一步就斷，連帶讓已上傳的稅籍證明停在 upload_session 成為孤兒檔案。
 	const env = await apiClient.authed.put<Record<string, unknown>>(
 		`${BASE}/tax_profile/draft`,
 		{
@@ -1162,7 +1140,6 @@ export async function requestSellerTaxExtension(args: {
 	return normalizeTaxProfile(env.data);
 }
 
-/* ===== 重寄發票通知（端點 32，S06／S11）===== */
 
 /**
  * 端點 32。重寄發票通知信給買家。

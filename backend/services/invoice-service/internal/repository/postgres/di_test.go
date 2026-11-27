@@ -32,7 +32,6 @@ func TestModule_GraphResolves(t *testing.T) {
 		fx.NopLogger,
 		fx.Supply(cfg, cipher, (*pgxpool.Pool)(nil)),
 		Module,
-		// 把每個介面都要一次，否則 fx 只驗「有沒有人要」而不會實際解析它們。
 		fx.Invoke(func(RepositorySet) {}),
 	); err != nil {
 		t.Fatalf("fx graph 解不開：%v", err)

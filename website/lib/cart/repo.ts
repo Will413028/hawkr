@@ -17,7 +17,6 @@
 import { authedFetch } from "../api/client";
 import type { CartSummary } from "./types";
 
-/* ===== Reads ===== */
 
 export async function fetchCart(): Promise<CartSummary> {
 	const env = await authedFetch<CartSummary | { groups?: never }>(
@@ -32,7 +31,6 @@ export async function fetchCart(): Promise<CartSummary> {
 	};
 }
 
-/* ===== Writes ===== */
 
 export interface AddCartItemBody {
 	skuId: string;
@@ -47,7 +45,6 @@ export async function addCartItem({
 		"/public/carts/items",
 		{
 			method: "POST",
-			// OpenAPI: handler.AddToCartRequest quantity is a string.
 			json: { skuId, quantity: String(quantity) },
 		},
 	);
@@ -62,7 +59,6 @@ export async function setCartItemQuantity(
 		`/public/carts/items/${encodeURIComponent(skuId)}/quantity`,
 		{
 			method: "PUT",
-			// OpenAPI: handler.SetItemQuantityRequest quantity is a string.
 			json: { quantity: String(quantity) },
 		},
 	);

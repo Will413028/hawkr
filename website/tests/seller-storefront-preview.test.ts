@@ -96,8 +96,6 @@ test("seller preview never reads through the shared public caches or the removed
 test("seller sidebar and buyer surfaces both draw the preview icon through the shared registry", () => {
 	const icons = source("../components/shared/AppIcon.tsx");
 	const sidebarIcons = source("../components/shared/SellerSidebarIcon.tsx");
-	// 「商店預覽」這一項的定義住在選單資料模組（ADM 代行工作區沿用同一份，
-	// 56 號 §6.1.14）；shell 仍是它唯一的賣家側渲染者。
 	const shell = [
 		source("../features/seller-center/components/SellerCenterShell.tsx"),
 		source("../features/seller-center/components/sellerNav.tsx"),
@@ -227,8 +225,6 @@ test("seller back matches product detail while mobile CTAs keep fixed geometry",
 	);
 	assert.match(
 		compactBack,
-		// 44px (was h-9/36px) — the shared compact back pill is a primary touch
-		// target on both detail pages.
 		/h-11 min-w-11 justify-center pl-2\.5 pr-3\.5 rounded-hk-pill border border-hk-border-soft bg-hk-surface-glass text-hk-body text-sm font-semibold/,
 	);
 	assert.match(

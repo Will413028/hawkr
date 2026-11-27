@@ -4,17 +4,10 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { withApiBase, withoutApiBasePins } from "./helpers/default-api-base";
 
-// The prod flavor requires the browser API base on the web origin; the prod API base below is this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://api.example.com";
 
-// dev/prod connection parity: both env hit the gateway directly (no dev-only
-// same-origin proxy). The browser path is apiBaseUrl in every flavor; if anyone
-// reintroduces a dev proxy divergence, this fails.
 for (const flavor of ["dev", "prod"] as const) {
 	test(`${flavor} resolves the gateway directly`, () => {
-		// dev's default gateway is under test, so build its env without the loopback pins that
-		// tests/setup/hermetic.mjs puts in the API base variables (nothing here makes a request).
-		// prod has no default: its gateway is the origin of the configured API base.
 		const restore =
 			flavor === "dev"
 				? withoutApiBasePins()

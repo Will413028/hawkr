@@ -245,7 +245,6 @@ export async function recordPostView(postId: string): Promise<void> {
 	try {
 		await socialViewerClient().recordPostView({ postId });
 	} catch {
-		// 瀏覽計數是 best-effort。
 	}
 }
 

@@ -19,18 +19,12 @@ import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { queryKeys } from "@/lib/query/keys";
 import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
-// Note: 「全站可領」 tab is intentionally hidden — the backend's
-// `/app/coupons/available` endpoint requires both `store_id`
-// and `order_amount` (cart context) at runtime, despite OpenAPI marking
-// them optional. There is no "list all platform coupons" endpoint
-// today. Re-add the tab when backend ships one.
 const TABS: Array<{ value: string; label: string }> = [
 	{ value: "unused", label: "可使用" },
 	{ value: "used", label: "已使用" },
 	{ value: "expired", label: "已過期" },
 ];
 
-// 秒／毫秒判別與台北時區位移都在 `toEpochMs` / `formatTaipeiDate` 裡。
 const formatExpire = formatTaipeiDate;
 
 type CouponKindVisual = {
@@ -67,9 +61,6 @@ export default function CouponsClient() {
 	const identity = useQueryIdentity();
 	const [tab, setTab] = React.useState("unused");
 
-	// Each tab is a different status filter → its own cache entry. Switching tabs
-	// keeps the previous tab's rows on screen (keepPreviousData) until the new
-	// page lands, instead of flashing the loading text.
 	const query = useQuery({
 		queryKey: queryKeys.buyer.coupons(identity, { status: tab, pageSize: 50 }),
 		queryFn: accountQueryFn(status, () =>
@@ -136,20 +127,12 @@ export default function CouponsClient() {
 								? `滿 NT$${Number(c.min_spend).toLocaleString()} 可用`
 								: "";
 
-							// Backend uses `applicableStoreId` (camelCase) for the
-							// normalized record; `seller_name` (snake) for the
-							// pre-normalization legacy alias. Prefer the camelCase one
-							// since `normalizeCoupon` writes it explicitly.
 							const sellerName = c.sellerName ?? c.seller_name;
 							const storeView = c.applicableStoreId
 								? storeViews.get(c.applicableStoreId)
 								: undefined;
 							const sellerHref = storeView?.href || null;
 
-							// Per-kind badge tint (was the CSS `data-kind` attribute); a
-							// used/expired coupon overrides every kind to the muted chip.
-							// Per-kind badge tint (was the CSS `data-kind` attribute); a
-							// used/expired coupon overrides every kind to the muted chip.
 							const badgeColor = isUsed
 								? "bg-default-100 text-default-600 dark:bg-hk-ink-100/8 dark:text-hk-ink-100/60"
 								: visual.kind === "cash"
@@ -263,9 +246,6 @@ export default function CouponsClient() {
 												查看詳情
 											</span>
 										) : (
-											// "unused" + transient states like "locked" all route to
-											// the market — buyer can spend the coupon as long as it's
-											// not in a terminal used/expired state.
 											<Link
 												href="/market/products"
 												className="text-sm font-semibold text-hkui-primary dark:text-hk-ink-200 no-underline hover:text-hkui-primary-700 dark:hover:text-hk-ink-100 hover:underline"

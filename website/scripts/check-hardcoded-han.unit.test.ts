@@ -385,7 +385,6 @@ describe("features/delegated-operations 的 en 掃描範圍", () => {
 	const isTest = (f: string): boolean =>
 		/\.(test|spec|unit\.test)\.[cm]?[jt]sx?$/.test(f) ||
 		f.split("/").includes("__tests__");
-	// 從代行工作區以外、非測試的檔出發，沿 import 可達的檔。
 	const reachable = new Set<string>();
 	const stack = files.filter((f) => !inDelegatedScope(f) && !isTest(f));
 	for (const f of stack) reachable.add(f);

@@ -13,7 +13,6 @@ func TestTaipeiIsUTCPlus8AndIsTheIANAZone(t *testing.T) {
 	if y, m, d := at.Date(); y != 2026 || m != 10 || d != 4 || at.Hour() != 0 {
 		t.Fatalf("at=%s", at)
 	}
-	// 歷史上台灣實施過日光節約時間（1979 年夏季），固定偏移做不到。
 	summer := time.Date(1979, 7, 1, 12, 0, 0, 0, Taipei)
 	if _, off := summer.Zone(); off != 9*3600 {
 		t.Fatalf("1979-07-01 offset=%d", off)
@@ -45,7 +44,6 @@ func TestMinuteCeilRoundsUpAnyRemainder(t *testing.T) {
 }
 
 func TestDayAndMidnightCutAtTaipeiMidnight(t *testing.T) {
-	// UTC 15:59:59 仍是台北的前一天 23:59:59；UTC 16:00 是台北的隔天 00:00。
 	before := time.Date(2026, 10, 19, 15, 59, 59, 0, time.UTC)
 	after := before.Add(time.Second)
 	if got, want := Day(before), time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC); !got.Equal(want) || got.Location() != time.UTC {

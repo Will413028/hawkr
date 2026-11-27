@@ -28,7 +28,7 @@ class BuyerStorePickupServiceTest {
 
         BuyerStorePickupEntity existing = new BuyerStorePickupEntity();
         existing.setId(1L);
-        existing.setBuyerId(999L); // 屬於另一個買家（分岔後的舊 buyer_id 或他人）
+        existing.setBuyerId(999L);
         when(mapper.selectById(1L)).thenReturn(existing);
 
         ShippingBusinessException ex = assertThrows(ShippingBusinessException.class, () ->

@@ -109,7 +109,6 @@ void main() {
         ),
         'NT \$150',
       );
-      // salePrice "0" ＝ 無特價，退回原價而不是印 0
       expect(
         PriceDisplay.productCardPrice(
           priceMin: null,
@@ -138,8 +137,6 @@ void main() {
 
   group('parseMoney 的語意不受影響', () {
     test('SKU 比價路徑仍然分得出 0 與缺席', () {
-      // effectiveSkuPrice / hasSkuSale / discountPercent 靠 0 與 null 的區別
-      // 做判斷，區間顯示的修正不得外溢到它們身上。
       expect(PriceDisplay.parseMoney('0'), 0);
       expect(PriceDisplay.parseMoney(null), isNull);
       expect(PriceDisplay.hasSkuSale(price: '200', salePrice: '0'), isFalse);

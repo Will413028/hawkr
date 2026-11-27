@@ -13,9 +13,7 @@ test.describe("sitemap purity", () => {
 
 		for (const loc of locs) {
 			const path = new URL(loc).pathname;
-			// Registry purity: the sitemap must never list a noindex path.
 			expect(isIndexable(path), `${path} must be indexable`).toBeTruthy();
-			// Live purity: every listed URL must really resolve 200 (no 404/3xx).
 			const page = await request.get(path, { maxRedirects: 0 });
 			expect(page.status(), `${path} should be 200`).toBe(200);
 		}
@@ -40,7 +38,6 @@ test.describe("robots policy (gate open)", () => {
 		request,
 	}) => {
 		const body = await (await request.get("/robots.txt")).text();
-		// Gate OPEN → must NOT contain the closed-gate full-site block.
 		expect(body).not.toMatch(/^Disallow:\s*\/\s*$/m);
 		expect(body).toMatch(/^Allow:\s*\//m);
 		expect(body).toMatch(/^Disallow:\s*\/api\//m);

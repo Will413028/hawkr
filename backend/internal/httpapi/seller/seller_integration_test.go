@@ -64,7 +64,6 @@ type orders struct{ open bool }
 
 func (o *orders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return o.open, nil }
 
-// noDashboardOrders 是這個測試不讀儀表板的訂單時的替身：NewHandler 要求提供儀表板訂單的來源。
 type noDashboardOrders struct{}
 
 func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWindow) ([]httpseller.SalesStats, error) {
@@ -192,7 +191,6 @@ func setup(t *testing.T) *fixture {
 	}
 }
 
-// wantCode 確認錯誤的 code 與 ErrorInfo.reason，回傳第一個 BadRequest 違規的欄位路徑。
 func wantCode(t *testing.T, err error, code connect.Code, reason string) string {
 	t.Helper()
 	var ce *connect.Error
@@ -220,7 +218,6 @@ func wantCode(t *testing.T, err error, code connect.Code, reason string) string 
 	return field
 }
 
-// errorReason 回傳 ErrorInfo.reason，沒有時是空字串。
 func errorReason(err error) string {
 	var ce *connect.Error
 	if !errors.As(err, &ce) {
@@ -236,7 +233,6 @@ func errorReason(err error) string {
 	return ""
 }
 
-// errorMetadata 回傳 ErrorInfo.metadata 的一個值。
 func errorMetadata(t *testing.T, err error, key string) string {
 	t.Helper()
 	var ce *connect.Error
@@ -255,7 +251,6 @@ func errorMetadata(t *testing.T, err error, key string) string {
 	return ""
 }
 
-// capabilityStatus 取出 GetMyStore 回報的一個能力的狀態。
 func capabilityStatus(t *testing.T, resp *pb.GetMyStoreResponse, c pb.SellerCapability) *pb.CapabilityStatus {
 	t.Helper()
 	return httpseller.CapabilityStatusOf(t, resp.GetCapabilities(), c)
@@ -274,7 +269,6 @@ func (f *fixture) apply(t *testing.T) *pb.Store {
 	return resp.Msg.GetStore()
 }
 
-// fillContact 補上送出 KYC 需要的店家聯絡資料（開店不帶這三欄，用 UpdateMyStore 寫）。
 func (f *fixture) fillContact(t *testing.T, c sellerconnect.SellerAppServiceClient) *pb.Store {
 	t.Helper()
 	got, err := c.GetMyStore(context.Background(), connect.NewRequest(&pb.GetMyStoreRequest{}))
@@ -291,7 +285,6 @@ func (f *fixture) fillContact(t *testing.T, c sellerconnect.SellerAppServiceClie
 	return resp.Msg.GetStore()
 }
 
-// applyComplete 開店並補齊店家的聯絡資料。
 func (f *fixture) applyComplete(t *testing.T, c sellerconnect.SellerAppServiceClient) *pb.Store {
 	t.Helper()
 	if _, err := c.ApplyStore(context.Background(), connect.NewRequest(validApply())); err != nil {
@@ -460,18 +453,15 @@ func TestUpdateMyStoreAppliesTheMaskAndOnboarding(t *testing.T) {
 	if s.GetContactPhone() != "0912345678" || s.GetAddress().GetTownCode() != "63000050" {
 		t.Fatalf("欄位不在 mask 內卻被改掉：%v", s)
 	}
-	// 食品業者登錄不再是店家的欄位：food_business 是未知的路徑，不寫入。
 	_, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
 		Store:      &pb.Store{Etag: s.GetEtag()},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"food_business"}},
 	}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
-	// onboarding_completed 是 OUTPUT_ONLY：UpdateMyStore 不會改它。
 	if s.GetOnboardingCompleted() {
 		t.Fatalf("UpdateMyStore completed the onboarding: %v", s)
 	}
 
-	// 地址只有鄉鎮、沒有明細：可以成功寫入，明細為空字串。
 	resp, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
 		Store: &pb.Store{
 			Address: &commonpb.PostalAddress{TownCode: "63000050"},
@@ -487,7 +477,6 @@ func TestUpdateMyStoreAppliesTheMaskAndOnboarding(t *testing.T) {
 		t.Fatalf("update address town only failed: %v", s)
 	}
 
-	// 清除地址：update_mask 有 address 但沒有帶值。
 	resp, err = f.app.UpdateMyStore(ctx, connect.NewRequest(&pb.UpdateMyStoreRequest{
 		Store:      &pb.Store{Etag: s.GetEtag()},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"address"}},
@@ -667,7 +656,6 @@ func TestStoreWaitingForDeletionRejectsWritesButCanBeRead(t *testing.T) {
 	ctx := context.Background()
 	created := f.apply(t)
 	storeID := f.storeID(t)
-	// 與刪帳號流程相同：進入等待要在 transaction 內呼叫。
 	if err := f.inTx(ctx, func(ctx context.Context) error { return f.module.BeginDeletion(ctx, storeID) }); err != nil {
 		t.Fatal(err)
 	}
@@ -723,7 +711,6 @@ func TestGetMyStoreShowsASuspensionRecordedOnAnEarlierStint(t *testing.T) {
 	if _, err := f.module.CloseCurrent(ctx, f.accountID); err != nil {
 		t.Fatal(err)
 	}
-	// Apply 在停權中會拒絕，所以直接寫一個新的 stint 重現「新 stint 繼承停權」。
 	if err := f.inTx(ctx, func(ctx context.Context) error {
 		tx, _ := db.TxFrom(ctx)
 		_, err := tx.Exec(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES ($1, $2, '新店', now(), now())`, old.StoreCode+1, f.accountID)

@@ -23,7 +23,6 @@ var Module = fx.Module("repository.postgres",
 	fx.Provide(fx.Annotate(NewIssuerRepository, fx.As(new(domain.IssuerRepository)))),
 	fx.Provide(fx.Annotate(NewSellerTaxProfileRepository, fx.As(new(domain.SellerTaxProfileRepository)))),
 	fx.Provide(fx.Annotate(NewBuyerPreferenceRepository, fx.As(new(domain.BuyerPreferenceRepository)))),
-	// 冪等鍵（#3015 裁決 A）。與業務寫入共用 ctx 裡的交易，見 IdempotencyRepository 的檔頭。
 	fx.Provide(fx.Annotate(NewIdempotencyRepository, fx.As(new(domain.IdempotencyRepository)))),
 	fx.Provide(fx.Annotate(NewDocumentRepository, fx.As(new(domain.DocumentRepository)))),
 	fx.Provide(fx.Annotate(NewOperationRepository, fx.As(new(domain.OperationRepository)))),
@@ -71,18 +70,11 @@ func NewKeyRing(cfg *config.Config, current *crypto.Cipher) (*KeyRing, error) {
 		ring.PrevVersion = prevVer
 	}
 	if ring.LookupHMACKey == "" {
-		// Config.Validate ⑤ 已擋掉，這裡是第二道：fingerprint 用空 key 算得出來，
-		// 而算出來的值會被寫進 uq_ipa_fingerprint ⇒ 全站賣家共用同一組可離線重算的指紋。
 		return nil, fmt.Errorf("invoice: INVOICE_LOOKUP_HMAC_KEY is empty (fail-closed)")
 	}
 	return ring, nil
 }
 
-// toKeyVersion 把 config 的 int 收斂成 credential_key_version 的 smallint 值域。
-//
-// ⚠️ Config.Validate 目前允許 1~99999，而 smallint 上限是 32767 —— 落在 (32767, 99999]
-// 的值在寫入時會撞 22003 而不是在 boot 期被擋下。這裡先擋一次；根治要收窄 Validate
-// 的上界（見交付回報的「設計書／實作矛盾」段）。
 func toKeyVersion(v int, envName string) (int16, error) {
 	if v < 1 || v > math.MaxInt16 {
 		return 0, fmt.Errorf("invoice: %s must be within 1..%d (credential_key_version is smallint), got %d", envName, math.MaxInt16, v)

@@ -178,7 +178,6 @@ func (r Reader) Cases(ctx context.Context, f model.CaseFilter, after *model.Case
 	return out, nil
 }
 
-// annotate 用兩個查詢補上一頁案件的檢舉數與快照店家（不逐案件查）。
 func (r Reader) annotate(ctx context.Context, q *store.Queries, rows []store.ModerationCase, cases []model.Case) error {
 	if len(rows) == 0 {
 		return nil

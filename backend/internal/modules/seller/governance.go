@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-// 治理（ADR 2026-10-18-seller-governance-consolidated）的公開型別與方法。
 
 // Severity 是嚴重度。
 type Severity = model.Severity

@@ -160,7 +160,6 @@ var (
 	ErrIgnoredEvent = errors.New("payment: ignored event")
 )
 
-// maxReasonLen 是 status_reason 的字數上限（accounts_status_reason_check）。
 const maxReasonLen = 200
 
 // StatusNote 標示 StatusOf 遇到不認得或不完整的快照：狀態仍會推導（視為審核中），呼叫方要記警示（帶店家與外部帳戶 ID）。
@@ -221,7 +220,6 @@ func StatusOf(s Snapshot) (model.PaymentAccountStatus, string, StatusNote) {
 	return model.PaymentUnderReview, clipReason(firstReason(s.Details)), note
 }
 
-// firstDetail 回傳第一筆行動方在 want 之內的細節。
 func firstDetail(details []StatusDetail, want ...Resolution) (StatusDetail, bool) {
 	for _, d := range details {
 		if slices.Contains(want, d.Resolution) {
@@ -231,7 +229,6 @@ func firstDetail(details []StatusDetail, want ...Resolution) (StatusDetail, bool
 	return StatusDetail{}, false
 }
 
-// firstReason 回傳第一筆有原因碼的細節的原因碼，沒有時是空字串。
 func firstReason(details []StatusDetail) string {
 	for _, d := range details {
 		if d.Reason != "" {

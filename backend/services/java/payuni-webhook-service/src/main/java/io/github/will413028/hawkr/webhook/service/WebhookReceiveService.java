@@ -67,7 +67,6 @@ public class WebhookReceiveService {
      * 接收並處理 PayUni Webhook 統一入口。
      */
     public void receive(String encryptInfo, String hashInfo) {
-        // Step 1: 驗簽 + 解密 + 解析（無事務）
         WebhookParseResult parseResult;
         try {
             parseResult = webhookParser.parse(encryptInfo, hashInfo);
@@ -86,31 +85,25 @@ public class WebhookReceiveService {
         PayUniEventType actualType = resolveType(parseResult);
         String eventKey = EventKeyBuilder.build(actualType, payload);
 
-        // Step 2: T1 — INSERT inbox（REQUIRES_NEW）
         WebhookInbox inbox = buildInbox(merId, actualType, eventKey, encryptInfo, hashInfo, payload);
 
         try {
             inboxTxOps.insertInbox(inbox);
             log.info("WebhookReceiveService.inbox.saved", "Webhook 已入庫", "eventKey", eventKey);
         } catch (DuplicateKeyException dup) {
-            // T1 已 rollback 釋放 connection，後續 SELECT 在新交易中執行
             WebhookInbox existing = inboxMapper.findByEventKey(
                     WebhookProvider.PAYUNI.value(), actualType.value(), eventKey);
             if (existing == null) {
-                // 理論不會走到（UNIQUE 撞了卻找不到 row）
                 log.error("WebhookReceiveService.dedup.lookupMissing",
                         "DupKey 後找不到 existing row eventKey=" + eventKey, dup);
                 return;
             }
             inbox = handleDedupHit(existing, payload, eventKey);
             if (inbox == null) {
-                return; // dedup hit / lookup 異常：silent return
+                return;
             }
-            // 否則進入 replay 路徑：inbox 是 existing，繼續往下走
         }
-        // 注意：T1 其他例外（非 DupKey）不被 catch，向上拋 → controller 回 500 → PayUni 重送
 
-        // Step 3: UNKNOWN（含已不經 PayUni 的金流通知）→ 寫入 inbox 稽核並標 IGNORED，不投遞 MQ
         if (actualType == PayUniEventType.UNKNOWN) {
             inboxTxOps.markIgnored(inbox.getId());
             log.warn("WebhookReceiveService.unknown.markedIgnored",
@@ -119,7 +112,6 @@ public class WebhookReceiveService {
             return;
         }
 
-        // Step 4: T2 — outbox INSERT(s) + inbox status=ENQUEUED（REQUIRES_NEW）
         try {
             String envelopeJson = toJson(buildEventEnvelope(actualType, merId, eventKey, payload));
             List<OutboxRoute> routes = buildRoutes(actualType, eventKey, envelopeJson, payload);
@@ -127,7 +119,6 @@ public class WebhookReceiveService {
             log.info("WebhookReceiveService.receive.success",
                     "Webhook 處理完成", "eventKey", eventKey);
         } catch (Exception e) {
-            // T2 失敗：標 inbox FAILED（REQUIRES_NEW，不被 T2 rollback 牽連）→ rethrow → 5xx → PayUni 重送 → REPLAY
             try {
                 inboxTxOps.markFailed(inbox.getId(), e.getMessage());
             } catch (Exception markErr) {
@@ -149,7 +140,6 @@ public class WebhookReceiveService {
         if (WebhookInboxStatus.ENQUEUED.value().equals(status)
                 || WebhookInboxStatus.IGNORED.value().equals(status)
                 || WebhookInboxStatus.DEDUPED.value().equals(status)) {
-            // §2.5.1：dedup hit 必須 log.warn + 含 eventKey + 完整 payload
             log.warn("WebhookReceiveService.dedup.hit",
                     "重複 Webhook 已忽略 eventKey=" + eventKey + " status=" + status
                             + " payload=" + toJson(payload),
@@ -158,13 +148,11 @@ public class WebhookReceiveService {
         }
         if (WebhookInboxStatus.RECEIVED.value().equals(status)
                 || WebhookInboxStatus.FAILED.value().equals(status)) {
-            // Orphan：上次 T2 失敗或卡住，本次 PayUni 重送觸發 replay
             log.warn("WebhookReceiveService.receive.replay",
                     "進入 replay 路徑，補建 outbox eventKey=" + eventKey + " prevStatus=" + status,
                     "eventKey", eventKey);
             return existing;
         }
-        // 未知狀態（防呆）
         log.error("WebhookReceiveService.dedup.unexpectedStatus",
                 "DupKey 後 existing 狀態異常 eventKey=" + eventKey + " status=" + status,
                 "eventKey", eventKey);
@@ -188,10 +176,6 @@ public class WebhookReceiveService {
 
     private List<OutboxRoute> buildRoutes(PayUniEventType type, String eventKey,
                                            String envelopeJson, Map<String, String> payload) {
-        // AGENT_NOTIFY 已收斂為單通道（#1757）：原 payuni.events/payuni.agent.notify primary route
-        // 無任何 consumer（過渡期雙通道殘留），已物理移除；僅在含 MerStatus 時發 seller.review.result，
-        // 由 seller-service agent_notify_consumer 推進審核狀態。無 MerStatus → 零 route，
-        // 行為等價現況（原 primary route 本就被丟棄，webhook 不因 route 減少而 500）。
         if (type == PayUniEventType.AGENT_NOTIFY) {
             List<OutboxRoute> agentRoutes = new ArrayList<>(1);
             if (payload.containsKey("MerStatus")) {
@@ -221,11 +205,6 @@ public class WebhookReceiveService {
 
     private Map<String, Object> buildEventEnvelope(PayUniEventType type, String merId,
                                                      String eventKey, Map<String, String> payload) {
-        // 36 §7.4 Conformance Contract：envelope 鍵採 snake_case。
-        // PayUniWebhookEnvelope.parse() 只認 snake_case（判定鍵為 event_id）——過渡期的 camelCase
-        // 雙鍵 fallback 已於 PR #1004 移除，沒有任何自動適配。parse() 僅剩的另一分支是「裸 payload」
-        // （根層無 event_id → 整個 JSON 當 payload，metadata 全空字串），那不是 camelCase 相容路徑。
-        // ⇒ 本方法的鍵名若與 parse() 不一致，consumer 讀到的 metadata 會全空且不報錯。
         return Map.of(
                 "event_id", UUID.randomUUID().toString(),
                 "provider", WebhookProvider.PAYUNI.value(),

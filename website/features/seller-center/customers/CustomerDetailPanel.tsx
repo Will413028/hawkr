@@ -52,8 +52,6 @@ function CustomerClassControl({
 	);
 	const [error, setError] = React.useState<string | null>(null);
 
-	// Keep in sync when the detail load resolves a different class than the
-	// optimistic summary the drawer opened with.
 	React.useEffect(() => {
 		setValue(initial);
 	}, [initial]);
@@ -129,22 +127,16 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 	const { data, loading, error } = useCustomerDetail(buyerId);
 	const invalidateDetail = useInvalidateCustomerDetail();
 	const openChat = useChatDrawerStore((state) => state.openChat);
-	// 抽屜模式：即時通知父頁清單同步（分類 / 標籤變更）；全頁模式為 no-op。
 	const { notify } = useDrawerMutated();
 	const detail = data?.detail ?? null;
 	const orders = data?.orders ?? [];
 	const orderTotal = data?.orderTotal ?? 0;
 
-	// After a classification / tag mutation, refetch this customer's detail so a
-	// reopen shows the new state, then notify the host list behind the drawer to
-	// re-sync its rows immediately (#1247: no longer deferred to drawer close).
 	const handleMutate = React.useCallback(() => {
 		void invalidateDetail(buyerId);
 		notify();
 	}, [buyerId, invalidateDetail, notify]);
 
-	// Prefer freshly-loaded detail; fall back to the summary so the drawer header
-	// is populated immediately on open.
 	const name = detail?.name || summary?.name || "客戶";
 	const avatar = detail?.avatar ?? summary?.avatar;
 	const totalSpent = Number(detail?.totalSpent ?? summary?.totalSpent ?? 0);
@@ -157,11 +149,6 @@ export default function CustomerDetailPanel({ buyerId, summary }: Props) {
 			<div className="seller-customer-detail__panel-actions">
 				<Link
 					href={`/seller-center/coupons/new?buyerId=${buyerId}&buyerName=${encodeURIComponent(name)}`}
-					// `.seller-orders__action` 自帶 `--hkui-primary` 實心底＋
-					// `--hkui-primary-foreground` 白字（0-1-0）；dark 的
-					// `body a:not([data-hkui-button])`（0-2-2）會把白字換成 `--color-ink-200`。
-					// 旁邊那顆同款的「傳訊息」是 `<button>`，不受影響 ⇒ 少了這個標記
-					// 就會變成同一排兩顆鈕字色不同。
 					data-hkui-button=""
 					className="seller-orders__action seller-customer-detail__action-primary"
 				>

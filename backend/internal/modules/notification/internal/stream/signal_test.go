@@ -149,7 +149,6 @@ func TestRunDeliversNotificationsAndResyncsOnReconnect(t *testing.T) {
 	}
 }
 
-// runFlapping 讓每條連線連上後經過 uptime（假時鐘）就斷線，dials 次後取消 ctx，回傳每次重連前的等待。
 func runFlapping(t *testing.T, uptime time.Duration, dials int) []time.Duration {
 	t.Helper()
 	h := newHub(fakeRead, 8)

@@ -69,10 +69,6 @@ export function isExternalWebsiteUrl(raw: string): boolean {
 		const u = new URL(normalized);
 		if (u.protocol !== "http:" && u.protocol !== "https:") return false;
 		const host = u.hostname.toLowerCase();
-		// Same engine split as isValidHostname guards against, with a worse
-		// symptom: in the browser a stored `https://not a url` parses to the host
-		// `not%20a%20url`, which is neither empty nor ours, so the storefront
-		// would render 「訪問官網」 pointing at a link that cannot resolve.
 		if (!isValidHostname(host) || host === "localhost") return false;
 		const own = new URL(getEnv().webOrigin).hostname
 			.toLowerCase()

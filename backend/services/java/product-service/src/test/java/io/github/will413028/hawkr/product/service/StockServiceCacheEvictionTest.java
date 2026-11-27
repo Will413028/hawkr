@@ -63,7 +63,6 @@ class StockServiceCacheEvictionTest {
         stockService = new StockService(skuRepository, stockTxRepository, productRepository,
                 cacheService, productEventPublisher, productRevalidationService, storeExposureRepository);
 
-        // cascadeProductStock 依賴：SKU → product 反查、product → owner 反查
         when(skuRepository.findSkuProductRefs(List.of(SKU_ID)))
                 .thenReturn(List.of(new SkuProductRef(SKU_ID, PRODUCT_ID, 3)));
         when(productRepository.findProductSellerRefs(List.of(PRODUCT_ID)))
@@ -91,17 +90,14 @@ class StockServiceCacheEvictionTest {
                 .thenReturn(false);
         when(skuRepository.deductStock(eq(SKU_ID), eq(QTY))).thenReturn(1);
 
-        // 模擬 Spring 交易的 synchronization 上下文
         TransactionSynchronizationManager.initSynchronization();
 
         StockService.StockResult result = stockService.deductStock(
                 "TX-D1", List.of(new StockService.StockItemParam(SKU_ID, QTY)));
 
-        // 交易「尚未 commit」→ 絕不可 evict（消除 evict-inside-txn race）
         verify(cacheService, never()).evictProductDetail(anyString());
         verify(cacheService, never()).evictProductListForWriteBatch(org.mockito.ArgumentMatchers.any());
 
-        // commit 後才一次性 evict detail + list
         fireAfterCommit();
         verify(cacheService).evictProductDetail(String.valueOf(PRODUCT_ID));
         verify(cacheService).evictProductListForWriteBatch(List.of(OWNER_ID));
@@ -114,11 +110,9 @@ class StockServiceCacheEvictionTest {
     void restoreEvictsOnlyAfterCommit() {
         when(stockTxRepository.existsByStockTxIdAndOperation("TX-R1", StockTxPhase.RESTORE.value()))
                 .thenReturn(false);
-        // over-restore 因果閘門：需存在同 txId 已 commit 的 DEDUCT
         when(stockTxRepository.existsByStockTxIdAndOperation("TX-R1", StockTxPhase.DEDUCT.value()))
                 .thenReturn(true);
         when(skuRepository.restoreStock(eq(SKU_ID), eq(QTY))).thenReturn(1);
-        // restore（sign>0）會查 restock transition，回空即不觸發 restock event
         when(productRepository.findRestockTransitionFields(List.of(PRODUCT_ID)))
                 .thenReturn(List.of());
 
@@ -140,10 +134,8 @@ class StockServiceCacheEvictionTest {
                 .thenReturn(false);
         when(skuRepository.deductStock(eq(SKU_ID), eq(QTY))).thenReturn(1);
 
-        // 不 initSynchronization → isSynchronizationActive() == false
         stockService.deductStock("TX-D2", List.of(new StockService.StockItemParam(SKU_ID, QTY)));
 
-        // 無交易上下文 → 立即 evict（不等 afterCommit）
         verify(cacheService).evictProductDetail(String.valueOf(PRODUCT_ID));
         verify(cacheService).evictProductListForWriteBatch(List.of(OWNER_ID));
     }

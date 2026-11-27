@@ -10,7 +10,6 @@ abstract class CartItem with _$CartItem {
     @JsonKey(name: 'skuId') required int skuId,
     required int count,
     required int price,
-    // PayUni #758: 加入購物車當下的原價快照（刪除線用），缺欄位時為 null。
     @JsonKey(name: 'listPrice') int? listPrice,
     String? title,
     String? image,
@@ -20,7 +19,6 @@ abstract class CartItem with _$CartItem {
     bool? check,
     @JsonKey(name: 'userId') String? userId,
     @JsonKey(name: 'userKey') String? userKey,
-    // issue #1127 後端 row 級可購買性
     @JsonKey(name: 'stockQty') String? stockQty,
     @JsonKey(name: 'purchasable') @Default(true) bool purchasable,
     @JsonKey(name: 'unavailableReason') String? unavailableReason,

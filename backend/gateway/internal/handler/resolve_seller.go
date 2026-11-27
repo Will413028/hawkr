@@ -20,9 +20,6 @@ func (h *Holder) resolveStoreID(c *gin.Context) (identity.StoreID, bool) {
 	return h.resolveStoreIDFor(c, accountID)
 }
 
-// resolveStoreIDFor 是 2-arg 變體：call site 已有自己的 identity guard
-// （要保留原錯誤碼）、手上已有驗過的 accountID 時用（section X 的 sweep 站點）。
-// 錯誤對映與 resolveStoreID 相同，只少 401 分支。
 func (h *Holder) resolveStoreIDFor(c *gin.Context, accountID int64) (identity.StoreID, bool) {
 	storeID, err := h.Store.CurrentStoreID(c.Request.Context(), identity.AccountID(accountID))
 	if err != nil {
@@ -50,7 +47,7 @@ func (h *Holder) resolveOptionalSellerFilterQuery(c *gin.Context, rawIDStr strin
 	storeID, err := h.Store.CurrentStoreID(c.Request.Context(), identity.AccountID(rawID))
 	if err != nil {
 		if errors.Is(err, storeid.ErrNoCurrentStore) {
-			return noCurrentSellerFilterSentinel, true // 哨兵值：保證查無結果，而非略過篩選（"0" 會被 Java 端當成未篩選，見上方註解）
+			return noCurrentSellerFilterSentinel, true
 		}
 		response.GrpcErr(c, "seller", err)
 		return "", false
@@ -58,7 +55,6 @@ func (h *Holder) resolveOptionalSellerFilterQuery(c *gin.Context, rawIDStr strin
 	return strconv.FormatInt(int64(storeID), 10), true
 }
 
-// isSellerRole 回報呼叫者是否具賣家權限（accountType code 2 或 3）。
 func isSellerRole(c *gin.Context) bool {
 	accountType, _ := c.Get("accountType")
 	code, _ := accountType.(int)

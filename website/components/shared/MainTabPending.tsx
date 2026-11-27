@@ -51,10 +51,6 @@ export default function MainTabPending() {
 			setRevealed(false);
 			return;
 		}
-		// The navigation selection/progress still responds synchronously via the
-		// pending store. Only delay the skeleton: cached content can commit before
-		// another surface paints, without guessing that a visited tab is ready.
-		// Once visible, a newer destination updates the same surface immediately.
 		if (revealed) return;
 		const timer = setTimeout(
 			() => setRevealed(true),
@@ -79,7 +75,6 @@ export default function MainTabPending() {
 		content.inert = true;
 		content.setAttribute("aria-hidden", "true");
 		root.setAttribute("data-main-tab-pending", visible.variant);
-		// A wheel over the placeholder must not move the hidden source page.
 		const surface = surfaceRef.current;
 		const preventScroll = (event: WheelEvent) => event.preventDefault();
 		const preventKeyboardScroll = (event: KeyboardEvent) => {

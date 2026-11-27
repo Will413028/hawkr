@@ -7,8 +7,6 @@ const STALE_MS = 30_000;
 const GC_MS = 5 * 60_000;
 
 export const homeSearchQueryKeys = {
-	// This BFF adds related category products; it is not the full keyword-only
-	// search transport, even when both surfaces happen to use the same text.
 	products: (query: string) =>
 		[
 			"search",
@@ -39,9 +37,6 @@ function debounceRequest(ms: number, signal: AbortSignal): Promise<void> {
  * typing to settle. Fresh cached results can therefore paint on the same render
  * as reopening, without showing another keyword during the debounce window. */
 export function useHomeSearchQueries(open: boolean, requestQuery: string) {
-	// A disabled observer alone does not cancel an in-flight request. Detaching
-	// from the active key on close lets Query abort it when no other popover is
-	// observing it, while retaining the successful result for the next opening.
 	const query = open ? requestQuery.trim() : "";
 	const enabled = open && Boolean(query);
 	const suggestions = useQuery({

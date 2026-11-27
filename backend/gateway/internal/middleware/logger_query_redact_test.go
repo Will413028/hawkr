@@ -18,34 +18,14 @@ func TestRedactQuery(t *testing.T) {
 		{"guest-id dash", "guest-id=abc-123", "guest-id=" + R},
 		{"GUEST_ID upper", "GUEST_ID=abc-123", "GUEST_ID=" + R},
 		{"existing sensitive key also covered", "token=eyJhbG", "token=" + R},
-		// 後綴規則（staged token 家族）也必須兩條路都套到，否則今天沒有 query 路徑的
-		// 端點，明天多一支就靜默漏遮。
 		{"stagedToken camel", "stagedToken=eyJhbG", "stagedToken=" + R},
 		{"staged_token snake", "staged_token=eyJhbG", "staged_token=" + R},
 		{"KYC 前綴變體", "document_staged_tokens=d1", "document_staged_tokens=" + R},
 
-		// Must not over-redact: an access log with every value masked is an
-		// access log nobody can debug with.
 		{"ordinary params untouched", "page=1&size=20", "page=1&size=20"},
 		{"only the sensitive one is masked", "page=1&guest_id=x&size=20", "page=1&guest_id=" + R + "&size=20"},
-		// #2506 (Task 2): redactQuery now calls shouldRedact, the same
-		// default-deny decision point as redactBody. "guest_identity" is
-		// redacted here because it's unclassified and not on allowedKeys —
-		// NOT because isSensitiveKey substring/prefix-matched it against
-		// "guestid". This case alone can no longer tell "correct
-		// default-deny" apart from "isSensitiveKey regressed to substring
-		// matching", since both produce the same [REDACTED] output now; see
-		// TestIsSensitiveKey_LookalikeNotSubstringMatched below for the
-		// direct exact-match proof this case used to provide on its own,
-		// and TestRedactBody_UnknownKeyDefaultsRedacted for the body-side
-		// equivalent of the default-deny behavior itself.
 		{"substring is not a match", "guest_identity=keep", "guest_identity=" + R},
 
-		// Shape preservation: order, separators and empty values survive so the
-		// log line still reads as the request that was actually made.
-		// Uses "page" (an allowlisted key) rather than an arbitrary "a" so
-		// this stays a genuine allowlisted-survives / sensitive-masked pair
-		// post-#2506 instead of both sides defaulting to redacted.
 		{"semicolon separator", "page=1;guest_id=x", "page=1;guest_id=" + R},
 		{"bare flag has no value to hide", "debug&guest_id=x", "debug&guest_id=" + R},
 		{"empty value", "guest_id=", "guest_id=" + R},

@@ -13,9 +13,6 @@ const ALL = Object.values(InvoiceDocumentStatus);
 
 describe("invoiceDocumentDisplay", () => {
 	it("covers every InvoiceDocumentStatus value without falling to default", () => {
-		// 11 值全部有歸屬。這一條是 default 分支的**鑑別力**測試：如果 default 被寫成
-		// 萬用分支（例如 `return {label: status, color: "default", unknown: false}`），
-		// 拿掉任一個已知值都不會有人發現——`unknown` 旗標讓它會。
 		expect(ALL).toHaveLength(11);
 		for (const status of ALL) {
 			const display = invoiceDocumentDisplay(status);
@@ -27,17 +24,13 @@ describe("invoiceDocumentDisplay", () => {
 	});
 
 	it("falls to the default branch for a value the backend has not shipped to us yet", () => {
-		// §0.6 C11：後端先上線一個前端還不知道的值時，落 default 而不是白畫面。
 		const display = invoiceDocumentDisplay("SOME_FUTURE_STATUS");
 		expect(display.unknown).toBe(true);
 		expect(display.color).toBe("default");
-		// label 印原始碼而不是「未知狀態」——賣家截圖給客服時那串碼是唯一線索。
 		expect(display.label).toBe("SOME_FUTURE_STATUS");
 	});
 
 	it("keeps the seller projection distinct from the buyer's folded one", () => {
-		// 買家面把 ISSUE_FAILED 折進「處理中」；賣家面**必須**看得到失敗，否則
-		// 永遠不知道該去處理。
 		const failed = invoiceDocumentDisplay(InvoiceDocumentStatus.ISSUE_FAILED);
 		expect(failed.color).toBe("danger");
 		expect(failed.label).not.toBe("處理中");

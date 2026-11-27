@@ -101,7 +101,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
       FloatingToast.error(context, '無法取得託運單 PDF');
       return;
     }
-    // 開啟內嵌 PDF 預覽頁（iOS 的 WKWebView 直接渲染）。
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PdfPreviewScreen(pdfUrl: labelUrl),
@@ -115,14 +114,11 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // ── margin-top 8h 为 Flag banner 留空间 ────────────────────────────
         Container(
           margin: EdgeInsets.only(top: 8.h),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // ── 拖拉欄位：高 25h, bottom:0 對齊內層 Stack 底
-              // 上 13h 被主卡片覆蓋（z-order 靠前），僅下 12h 露出呈現「抽屜把手」
               Positioned(
                 left: 0,
                 right: 0,
@@ -130,10 +126,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                 height: 25.h,
                 child: _buildDragHandle(),
               ),
-              // ── 主卡片：padding-bottom 12h 撐出空間讓拖拉欄位露出 ─────────
-              // 外層 GestureDetector：點擊卡片空白區也能展開／收起。
-              // 內部具名按鈕（細節 / 售後處理 / 單號複製 / info_outline 等）
-              // 本身是 GestureDetector，依 Flutter 手勢競爭機制自動贏得各自區域。
               Padding(
                 padding: EdgeInsets.only(bottom: 12.h),
                 child: Semantics(
@@ -152,8 +144,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                       decoration: ShapeDecoration(
                         color: AppColors.bgCard,
                         shape: RoundedRectangleBorder(
-                          // 對齊 buyer：用預設 strokeAlignInside，避免圓角邊框
-                          // 在 Clip.antiAlias 下被裁切不連續。
                           side: BorderSide(
                             width: 1,
                             color: AppColors.cardBorder,
@@ -175,7 +165,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                         children: [
                           _buildStatusHeader(),
 
-                          // ── 買家與收件摘要 ──
                           Padding(
                             padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
                             child: Row(
@@ -206,7 +195,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                             ),
                           ),
 
-                          // ── 下區：單號（靠左）+ 按鈕群（靠右） ──
                           Padding(
                             padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 8.h),
                             child: OrderBottomRow(
@@ -218,7 +206,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                             ),
                           ),
 
-                          // ── 展開區：有售後 case 時優先顯示售後進度 ──
                           ClipRect(
                             child: AnimatedAlign(
                               duration: const Duration(milliseconds: 250),
@@ -237,14 +224,11 @@ class _OrderCardState extends ConsumerState<OrderCard> {
             ],
           ),
         ),
-        // ── 配送異常紅角徽章（top-left） ─────────────────────────────────
-        // 該訂單對應 shipment 有未 ack 的 anomaly 時顯示。
         Positioned(
           top: 0,
           left: 16.w,
           child: _ShipmentAnomalyBadge(orderNo: _orderId),
         ),
-        // ── Per-card loading overlay ─────────────────────────────────────
         if (widget.isLoading)
           Positioned.fill(
             top: 8.h,
@@ -336,8 +320,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
         )..layout();
-        // Reserve a useful product-name column; a large amount gets a separate
-        // full-width line rather than shrinking or truncating financial data.
         final stackPrice =
             painter.width + 40.w + 12.w + 8.w + 112.w > constraints.maxWidth;
         painter.dispose();
@@ -451,9 +433,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
   Widget _buildDragHandle() {
     return GestureDetector(
       onTap: _toggleExpanded,
-      // The complete card already exposes the same expand/collapse action as a
-      // large semantics target. Avoid advertising this 25dp visual affordance
-      // as a second, undersized accessibility control.
       excludeFromSemantics: true,
       behavior: HitTestBehavior.opaque,
       child: Container(

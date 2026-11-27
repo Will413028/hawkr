@@ -39,7 +39,6 @@ var _ imageaiv1alpha1connect.ImageAiAdminServiceHandler = (*Admin)(nil)
 // NewAdmin 建立後台的 handler；images 組風格縮圖。
 func NewAdmin(m AdminModule, images rpc.Images) *Admin { return &Admin{m: m, images: images} }
 
-// 模組欄位違規的欄位名對到請求的 proto 路徑。
 var (
 	stylePaths = rpc.FieldPaths{
 		"Category": "ai_style.category", "Name": "ai_style.name", "Label": "ai_style.label", "Prompt": "ai_style.prompt",
@@ -264,7 +263,6 @@ func (h *Admin) toStyle(s imageai.AdminStyle) (*adminpb.AiStyle, error) {
 	}, nil
 }
 
-// toQuota 組成對外的額度；預設額度（沒有個別設定）沒有 etag 與 update_time。
 func toQuota(q imageai.AdminQuota) *adminpb.AiQuota {
 	out := &adminpb.AiQuota{
 		StoreId: rpc.FormatID(q.StoreID), WeeklyLimit: q.WeeklyLimit, WeeklyUsage: q.WeeklyUsage, Memo: q.Memo, Custom: q.Custom,

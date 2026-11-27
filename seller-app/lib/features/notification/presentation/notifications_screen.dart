@@ -36,7 +36,6 @@ class NotificationsScreen extends HookConsumerWidget {
     final scrollController = useScrollController();
     final isDeleteMode = useState(false);
     final selectedIds = useState(<String>{});
-    // 每次進入頁面時靜默刷新通知列表（不顯示 loading 遮罩）
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(notificationListControllerProvider.notifier).silentRefresh();
@@ -44,7 +43,6 @@ class NotificationsScreen extends HookConsumerWidget {
       return null;
     }, const []);
 
-    // 分頁滾動
     useEffect(() {
       void onScroll() {
         if (scrollController.position.pixels >=
@@ -65,7 +63,6 @@ class NotificationsScreen extends HookConsumerWidget {
         title: const Text('通知中心'),
         onBackPressed: () => context.pop(),
         actions: [
-          // 全部已讀
           if (unreadCount > 0 && !isDeleteMode.value)
             IconButton(
               tooltip: '全部標為已讀',
@@ -90,7 +87,6 @@ class NotificationsScreen extends HookConsumerWidget {
                     .silentRefresh();
               },
             ),
-          // 刪除模式
           IconButton(
             tooltip: isDeleteMode.value ? '結束選取' : '選取要刪除的通知',
             icon: isDeleteMode.value
@@ -162,7 +158,6 @@ class NotificationsScreen extends HookConsumerWidget {
             ),
           ),
 
-          // 刪除模式底部欄
           if (isDeleteMode.value)
             Positioned(
               left: 0,
@@ -195,7 +190,6 @@ class NotificationsScreen extends HookConsumerWidget {
           .read(notificationListControllerProvider.notifier)
           .markAsRead(notification.id);
     }
-    // 目的地由伺服器給；已經在收件匣，所以空字串與落在收件匣的連結不導航。
     final link = NotificationDeepLink.parse(notification.deepLink);
     if (!link.opensInbox) link.open();
   }
@@ -249,9 +243,6 @@ class NotificationsScreen extends HookConsumerWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 通知卡片
-// ══════════════════════════════════════════════════════════════
 
 class _NotificationCard extends ConsumerStatefulWidget {
   final InboxItem notification;
@@ -333,7 +324,6 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Checkbox（刪除模式）
                   if (widget.isDeleteMode)
                     Padding(
                       padding: EdgeInsets.only(right: 12.w, top: 4.h),
@@ -363,7 +353,6 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                       ),
                     ),
 
-                  // 圓形圖標（未讀時右上角顯示紅點）
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -398,12 +387,10 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                   ),
                   SizedBox(width: 12.w),
 
-                  // 內容
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 標題 + 時間（同行）
                         Row(
                           children: [
                             Expanded(
@@ -429,7 +416,6 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                           ],
                         ),
                         SizedBox(height: 4.h),
-                        // Body — 把通用「買家」替換成具體名字（data 有提供才會替換）
                         Text(
                           body,
                           style: TextStyle(
@@ -533,9 +519,6 @@ class _NotificationBuyerAvatar extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 全部已讀成功彈窗
-// ══════════════════════════════════════════════════════════════
 
 class _MarkAllReadDialog extends StatelessWidget {
   const _MarkAllReadDialog();
@@ -612,9 +595,6 @@ class _MarkAllReadDialog extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 刪除模式底部欄
-// ══════════════════════════════════════════════════════════════
 
 class _DeleteBottomBar extends StatelessWidget {
   final int count;

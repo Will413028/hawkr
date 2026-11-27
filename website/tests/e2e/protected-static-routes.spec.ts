@@ -72,9 +72,6 @@ async function prepareAuthenticatedPage(
 	baseURL: string,
 	role: UserRole,
 ) {
-	// Register the generic fallback first. setupGatewayMocks installs its
-	// session/app handlers afterwards, and Playwright gives the most recently
-	// registered matching route priority.
 	await page.route("**/api/v1/**", (route) => {
 		route.fulfill({
 			status: 200,
@@ -89,10 +86,6 @@ async function prepareAuthenticatedPage(
 		},
 		session: "identity",
 	});
-	// The seller shell and preview resolver both require a real store record.
-	// Register this after the generic gateway mocks so the exact GET wins.
-	// 一個完成新手引導、但還沒認證的店家：舊形狀會讓賣家看起來是半註冊帳號，路由守衛的判定
-	// 就測不到了。
 	await mockMyStore(page, {
 		id: SELLER_FIXTURE_ID,
 		storeName: "路由測試商店",
@@ -119,8 +112,6 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 		issues.push(`pageerror: ${error.stack || error.message}`);
 	});
 	page.on("console", (message) => {
-		// Google Pay reports this browser diagnostic without enforcing it; keep
-		// every other console error visible to the smoke test.
 		if (
 			message.type() === "error" &&
 			!isKnownNonEnforcingConsoleError(message.text())
@@ -131,9 +122,6 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 	page.on("requestfailed", (request) => {
 		const failure = request.failure()?.errorText ?? "unknown failure";
 		const requestUrl = new URL(request.url());
-		// Chromium aborts superseded fetches when a guard redirects or a query
-		// observer is disposed during navigation. The destination document is
-		// still verified below; only completed HTTP failures are actionable.
 		if (/net::ERR_ABORTED|cancelled/i.test(failure)) {
 			return;
 		}
@@ -277,8 +265,6 @@ async function assertProtectedRoute(
 		)
 		.toBeGreaterThan(10);
 
-	// Give client queries, lazy chunks, and redirect guards one turn to surface
-	// errors that occur after the first hydrated commit.
 	await page.waitForTimeout(500);
 	const text = await pageContent.innerText();
 	expect(
@@ -305,32 +291,7 @@ test.describe("authenticated protected static route smoke", {
 	);
 
 	test("protected static inventory stays complete", () => {
-		// `/account/find-sellers` is now a redirect into the canonical
-		// procurement assistant, not a protected page of its own.
-		// 58 號電子發票買家面：B09 買家發票中心 ＋1 —— /account/invoices。
-		// B05（/account/invoices/[documentId]）是動態路由，登記在 dynamic-route-catalog。
-		// 封鎖名單 ＋1 —— /account/blocked。
-		// 我的檢舉 ＋1 —— /account/reports；詳情 /account/reports/[id] 是動態路由，登記在 dynamic-route-catalog。
-		// PayUni 導轉的結果頁 −2 —— /checkout/fail、/checkout/submitted；付款結果改由付款頁讀 GetPayment 決定。
 		expect(ROUTES_BY_ROLE.buyer).toHaveLength(23);
-		// 58 號電子發票賣家面：
-		//   第一波（S01／S02／S06）＋3 —— /seller-center/invoices、.../tax-status、
-		//     .../documents
-		//   第二波（S08–S12）＋1 —— .../invoices/appeals（S09）
-		//   第三波（S03／S04／S05）＋3 —— .../invoices/amego、
-		//     .../invoices/self-issue-terms、.../invoices/receipt-authorization
-		// S07 掛進既有的訂單詳情頁、S12 是 .../documents 的 `?tab=received` 分頁，
-		// 兩者都不是新路由；S08／S10／S11 是動態路由，登記在 dynamic-route-catalog。
-		// ⚠️ 賣家面已無未實作的 RPC（2026-09-01 從 gateway handler 的呼叫點反推查證，
-		// 而不是憑記憶猜 RPC 名——先前用自己編的名字查，把兩個做好的端點誤判成缺）。
-		//
-		// ⚠️ 下面的數字是**手寫 pin**，而路由本身是 `discoverAppPageRoutes` 自動掃出來的
-		// ⇒ 新增一個 page.tsx 就會讓它們對不上。改的時候先對帳增減量，
-		// 不要為了讓測試變綠而直接抄失敗訊息的數字。
-		// 賣家工作區 32 條（含封鎖買家頁 /seller-center/blocked-buyers、店面預覽四個分頁），不含措施頁；措施與申覆列表 /seller/measures、平台詢問列表 /seller/inquiries 是帳號層級
-		// （登入即可、不分工作區），各單獨一條（ACCOUNT_ROUTES）。買家 23 ＋ 賣家 32 ＋ 帳號 2，
-		// 三類合計 57。單筆、申覆與解除請求頁 /seller/measures/[measureId](/appeal|/remediation)
-		// 是動態路由，登記在 dynamic-route-catalog。
 		expect(ROUTES_BY_ROLE.seller).toHaveLength(32);
 		expect(ROUTES_BY_ROLE.seller).not.toContain("/seller-center/measures");
 		expect(ACCOUNT_ROUTES).toEqual(["/seller/inquiries", "/seller/measures"]);

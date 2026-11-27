@@ -68,7 +68,6 @@ func version(goods int64, offered pgtype.Numeric, offeredUnit string) store.Proc
 }
 
 func TestOutsideRange(t *testing.T) {
-	// 區間每 1 KG 100 到 200 元；報 3 KG 時貨款 300 到 600 在區間內，報 2.5 KG 時 250 到 500。
 	for name, c := range map[string]struct {
 		v    store.ProcurementSellerResponseVersion
 		want bool
@@ -91,7 +90,6 @@ func TestOutsideRange(t *testing.T) {
 			t.Errorf("%s：%v，要 %v", name, got, c.want)
 		}
 	}
-	// 克的計價基準是每 1000 個：每 1000 G 100 到 200 元，報 1500 G 時 150 到 300，報 2500 G 時 250 到 500。
 	for name, c := range map[string]struct {
 		v    store.ProcurementSellerResponseVersion
 		want bool
@@ -109,7 +107,6 @@ func TestOutsideRange(t *testing.T) {
 			t.Errorf("%s：%v，要 %v", name, got, c.want)
 		}
 	}
-	// 乘積超過 int64 也不溢位。
 	if !OutsideRange(1<<62, 1<<62, 1, "KG", version(1, num(8, 0), "KG")) {
 		t.Error("下界乘數量超過 int64 時貨款一定低於它")
 	}
@@ -156,7 +153,6 @@ func TestPayloadHashIsTheRecomputedContentHash(t *testing.T) {
 	if err != nil || len(a) != 64 {
 		t.Fatalf("%q %v", a, err)
 	}
-	// 不在原像裡的欄位（ID、版本號、送出時間、冪等鍵）改了，hash 不變；數量換成等值的表示也不變。
 	v.ID, v.Version, v.SubmittedAt, v.ClientRequestID, v.OfferedQuantity = uuid.NewV7(), 9, now.Add(time.Hour), uuid.NewV7(), num(3000, -3)
 	q2, _ := QuoteOf(v)
 	if b, _ := PayloadHash(q2); a != b {

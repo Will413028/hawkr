@@ -92,7 +92,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
 
   void _reportFailure(Object? error, String message) {
     if (!mounted) return;
-    // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
     if (error != null && isAccountSuspendedError(error)) return;
     showCommonSnackBar(context, message);
   }
@@ -267,7 +266,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
             ),
             child: Column(
               children: [
-                // Drag handle
                 Container(
                   margin: EdgeInsets.only(top: 8.h, bottom: 8.h),
                   width: 40.w,
@@ -325,7 +323,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                   ),
                 ),
                 Divider(height: 1, color: AppColors.borderSubtle),
-                // Comment list
 
                 Expanded(
                   child: comments.phase == ThreadPhase.loading
@@ -401,7 +398,6 @@ class _CommentsBottomSheetState extends ConsumerState<CommentsBottomSheet> {
                 if (viewerCanComment || guest)
                   Divider(height: 1, color: AppColors.borderSubtle),
                 if (!viewerCanComment && guest) const LoginToCommentPrompt(),
-                // Input area
                 if (viewerCanComment)
                   Column(
                     mainAxisSize: MainAxisSize.min,

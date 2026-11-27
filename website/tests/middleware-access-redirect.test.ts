@@ -3,7 +3,6 @@ import { test } from "node:test";
 import { NextRequest } from "next/server";
 import { siteMiddleware } from "../middleware";
 
-// 登入與否只看 session cookie 在不在（middleware.ts；值不驗，權威是 GetSession）。
 const SIGNED_IN = { cookie: "__Host-hk_session=opaque" };
 
 function request(path: string, headers: Record<string, string> = {}) {
@@ -102,8 +101,6 @@ test("the session cookie is checked for presence only: the API is never called",
 	}
 });
 
-// 受保護區的 layout 讀不到 pathname 與 query：middleware 把要求的 URL 放進 request header，
-// DAL 判定「cookie 在但單體拒絕」時用它組登入頁的 `redirect`。
 function forwardedReturnPath(response: Response): string | null {
 	return response.headers.get("x-middleware-request-x-hk-return-path");
 }

@@ -24,7 +24,7 @@ public class ReviewPostedEvent extends BaseEvent {
     private Long orderId;
     private Long memberId;
     private Long sellerAccountId;
-    private Integer rating;  // 1-5 stars
+    private Integer rating;
     private String content;
     private Boolean hasImages;
 

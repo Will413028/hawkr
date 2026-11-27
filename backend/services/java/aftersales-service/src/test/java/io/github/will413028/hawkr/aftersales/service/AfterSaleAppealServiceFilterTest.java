@@ -63,8 +63,8 @@ class AfterSaleAppealServiceFilterTest {
     @ParameterizedTest(name = "appeal_state=\"{0}\" → IllegalArgumentException")
     @ValueSource(strings = {
             "APPEALED", "INVESTIGATING", "RESOLVED", "NONE",
-            "appealed", "resolved",   // 舊實作用 equalsIgnoreCase，大小寫變體同樣不得放行
-            "ALL"                     // 'all' 只收精確小寫（Gateway 的 allowlist 亦然）
+            "appealed", "resolved",
+            "ALL"
     })
     void rejectsCodeMetaName(String filter) {
         assertThrows(IllegalArgumentException.class,

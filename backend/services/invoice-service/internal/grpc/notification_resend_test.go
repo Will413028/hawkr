@@ -15,11 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔驗端點 32／49／71 的 Layer 5。**核心只有一條**：
-//
-//	🔴 9352 必須走 `codes.ResourceExhausted` 而不是 envelope 的非零碼。
-//	   Gateway 的 GrpcErr 以 gRPC status 決定 HTTP 狀態；回成 `Code: 9352` 的成功回應
-//	   會變成 HTTP 200，前端的「請稍候再試」永遠不會出現，而按鈕看起來像成功了。
 
 const (
 	nrDocID   = int64(8001)
@@ -33,7 +28,6 @@ type nrDocs struct {
 	domain.DocumentRepository
 	doc     domain.Document
 	claimed int
-	// windowOpen=false 模擬「還在 10 分鐘窗口內」（SQL 的 rows=0）。
 	windowOpen bool
 }
 
@@ -89,8 +83,6 @@ func nrServer(windowOpen bool) *InvoiceServer {
 		RecipientRefID:    &buyer,
 		RecipientTaxID:    domain.B2CBuyerIdentifier,
 		ProviderInvoiceNo: &no,
-		// 有密文才會走遮罩路徑；沒有密文（載具發票／收據）回空字串是誠實的
-		// 「沒有寄件對象」，另由 usecase 測試守。
 		RecipientEmailCiphertext: &cipher,
 		TotalAmount:              1000,
 	}}
@@ -113,7 +105,6 @@ func TestResend_SellerHandlerSuccess(t *testing.T) {
 	if resp.GetData().GetSentAt() != "2026-08-30T06:00:00Z" {
 		t.Fatalf("sentAt 不符：%q", resp.GetData().GetSentAt())
 	}
-	// 收件人一律遮罩：本欄名字（toMasked）就是它的型別契約。
 	if got := resp.GetData().GetToMasked(); got == "" || got == "buyer@example.com" {
 		t.Fatalf("toMasked 必須是遮罩後的值，實得 %q", got)
 	}

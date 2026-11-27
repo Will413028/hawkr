@@ -29,7 +29,6 @@ func (f *fixture) answerExecutor() turn.AnswerExecutor {
 	}
 }
 
-// ask 讓一個 TURN run 因為「蘋果」有兩個分類而停在等待輸入，回傳提問的 run 與它的中斷。
 func (f *fixture) ask(ctx context.Context) (uuid.UUID, uuid.UUID) {
 	f.t.Helper()
 	id := f.submit("蘋果", uitext.ZhTW)
@@ -80,7 +79,7 @@ func (f *fixture) failure(r store.ProcurementAgentRun) string {
 	return *r.FailureReason
 }
 
-func TestAnswerRunCommitsAnAnswerTurnResolvesTheInterruptAndSucceedsTheAskingRun(t *testing.T) { // A9-D26(3)
+func TestAnswerRunCommitsAnAnswerTurnResolvesTheInterruptAndSucceedsTheAskingRun(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	parent, irq := f.ask(ctx)
@@ -141,7 +140,7 @@ func TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesExactlyOnePending
 	}
 }
 
-func TestRejectedAnswerFailsWithAnswerRejectedKeepsTheInterruptPendingAndRestoresNothing(t *testing.T) { // A9-D26(4)
+func TestRejectedAnswerFailsWithAnswerRejectedKeepsTheInterruptPendingAndRestoresNothing(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	parent, irq := f.ask(ctx)
@@ -179,7 +178,6 @@ func TestRejectedAnswerFailsWithAnswerRejectedKeepsTheInterruptPendingAndRestore
 	}
 }
 
-// waitForLockWaiter 等到有一個 backend 在等鎖（不斷言時間，只輪詢到條件成立）。
 func (f *fixture) waitForLockWaiter(ctx context.Context) {
 	f.t.Helper()
 	for {

@@ -16,14 +16,11 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-// ==================== Router Setup ====================
 
 func init() {
 	gin.SetMode(gin.TestMode)
 }
 
-// fakeJWTAuth is a minimal middleware that extracts accountId and accountType from headers
-// (set by tests), like middleware.JWTAuth trusting the monolith's identity headers.
 func fakeJWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.GetHeader("X-Account-Id")
@@ -54,7 +51,6 @@ func fakeJWTAuth() gin.HandlerFunc {
 	}
 }
 
-// ==================== JSON Helpers ====================
 
 func parseJSON(t *testing.T, body io.Reader) map[string]interface{} {
 	t.Helper()
@@ -83,9 +79,6 @@ func assertHTTPStatus(t *testing.T, w *httptest.ResponseRecorder, expected int) 
 	}
 }
 
-// pageData 取分頁 envelope 的 data 物件，並斷言標準四欄（records/total/page/pageSize）
-// 全都在 data 之下、且 total/page/pageSize 為字串（10 檔 §2 統一 Envelope ＋ §4 對外數字
-// 一律 string）。頂層一旦出現任一分頁欄位即視為 Page-trap 回歸，直接 fail。
 func pageData(t *testing.T, body map[string]interface{}) map[string]interface{} {
 	t.Helper()
 	for _, k := range []string{"records", "total", "page", "pageSize", "pageSize"} {
@@ -105,7 +98,6 @@ func pageData(t *testing.T, body map[string]interface{}) map[string]interface{} 
 	return data
 }
 
-// pageRecords 取分頁 envelope 的 data.records 陣列（先過 pageData 的形狀斷言）。
 func pageRecords(t *testing.T, body map[string]interface{}) []interface{} {
 	t.Helper()
 	data := pageData(t, body)
@@ -116,11 +108,9 @@ func pageRecords(t *testing.T, body map[string]interface{}) []interface{} {
 	return rows
 }
 
-// ==================== Mock SellerServiceClient ====================
 
 type mockSellerServiceClient struct {
 	MatchCertificateHolderFn func(context.Context, *sellerpb.MatchCertificateHolderRequest, ...grpc.CallOption) (*sellerpb.MatchCertificateHolderResponse, error)
-	// SearchSellerProspects：Gateway 不呼叫，mock 只是為了滿足 SellerServiceClient 介面。
 	SearchSellerProspectsFn    func(context.Context, *sellerpb.SearchSellerProspectsRequest, ...grpc.CallOption) (*sellerpb.SearchSellerProspectsResponse, error)
 	GetSellerFn                func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error)
 	GetSellerStatsFn           func(ctx context.Context, in *sellerpb.GetSellerStatsRequest, opts ...grpc.CallOption) (*sellerpb.SellerStatsResponse, error)
@@ -183,9 +173,6 @@ func (m *mockSellerServiceClient) GetSellerShippingProfile(ctx context.Context, 
 	return nil, nil
 }
 
-// ---- B-169 governance / food-safety / appeal stubs (added with PR #727) ----
-// 這 18 個 RPC 在 gateway test 目前沒被直接呼叫；補空 stub 讓 mock 滿足 interface 即可。
-// 真實單元測試另外在 b169_test.go 用獨立 mock。
 
 func (m *mockSellerServiceClient) ResolveSellerAccountID(ctx context.Context, in *sellerpb.ResolveSellerAccountIDRequest, opts ...grpc.CallOption) (*sellerpb.ResolveSellerAccountIDResponse, error) {
 	return nil, grpcstatus.Error(grpccodes.Unimplemented, "ResolveSellerAccountID not wired in test")
@@ -214,7 +201,6 @@ func (m *mockSellerServiceClient) SearchSellerProspects(ctx context.Context, in 
 	return nil, grpcstatus.Error(grpccodes.Unimplemented, "SearchSellerProspectsFn not wired in test")
 }
 
-// ==================== Mock BuyerServiceClient ====================
 
 type mockBuyerServiceClient struct {
 	GetBuyerProfileFn                func(ctx context.Context, in *buyerpb.GetBuyerProfileRequest, opts ...grpc.CallOption) (*buyerpb.BuyerProfileResponse, error)
@@ -272,7 +258,6 @@ func (m *mockBuyerServiceClient) BatchCheckFavorites(ctx context.Context, in *bu
 	return nil, nil
 }
 
-// ==================== Restock Subscription (#942) ====================
 
 func (m *mockBuyerServiceClient) BatchCheckRestockSubscriptions(ctx context.Context, in *buyerpb.BatchCheckRestockSubscriptionsRequest, opts ...grpc.CallOption) (*buyerpb.BatchCheckRestockSubscriptionsResponse, error) {
 	if m.BatchCheckRestockSubscriptionsFn != nil {
@@ -304,7 +289,6 @@ func (m *mockBuyerServiceClient) GetBuyerEntitlement(ctx context.Context, in *bu
 	return nil, nil
 }
 
-// ==================== mock clients ====================
 
 type mockOrderServiceClient struct {
 	orderpb.OrderServiceClient

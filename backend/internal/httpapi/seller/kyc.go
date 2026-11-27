@@ -18,7 +18,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// kycFields 是模組的草稿輸入的欄位名對應到 KYCApplication 的欄位路徑（與 KYCField 一對一）。
 var kycFields = map[string]string{
 	"SellerType": "individual", "ProductType": "product_type",
 	"WebsiteURL":  "website_url",
@@ -28,7 +27,6 @@ var kycFields = map[string]string{
 	"CompanyDocuments[]": "business.company_documents[]",
 }
 
-// kycDraftPaths 是草稿的錯誤指向 SaveKYCDraftRequest.application 的欄位。
 func kycDraftPaths() rpc.FieldPaths {
 	out := rpc.FieldPaths{"ExpectedVersion": "application.etag"}
 	for field, path := range kycFields {
@@ -37,9 +35,6 @@ func kycDraftPaths() rpc.FieldPaths {
 	return out
 }
 
-// kycSubmitPaths 是送出時缺少的項目（模組以欄位路徑回報）：BadRequest 的 field 就是 KYCApplication 的欄位路徑（與 KYCField
-// 一對一），SubmitKYC 的請求沒有申請本身。店家資料的缺項不是欄位違規（店家的狀態不在請求裡）：回 failed_precondition，缺哪些看
-// 申請檢視的 missing_store_fields。同意的文件（AcceptedAgreements）是請求自己的欄位。
 func kycSubmitPaths() rpc.FieldPaths {
 	out := rpc.FieldPaths{"ExpectedVersion": "etag", "AcceptedAgreements": "accepted_agreements"}
 	for _, field := range model.KYCFieldNames() {
@@ -63,7 +58,6 @@ func (h *App) SaveKYCDraft(ctx context.Context, req *connect.Request[pb.SaveKYCD
 	if app == nil {
 		return nil, rpc.RequiredField("application", "application 必填")
 	}
-	// etag 不帶是建立（店家還沒有申請）；已經有申請時模組回 already_exists（VERSION_CONFLICT）。
 	version, err := rpc.VersionFromEtag(app.GetEtag())
 	if err != nil {
 		return nil, err
@@ -80,11 +74,6 @@ func (h *App) SaveKYCDraft(ctx context.Context, req *connect.Request[pb.SaveKYCD
 	return connect.NewResponse(&pb.SaveKYCDraftResponse{Application: toKYC(ctx, saved)}), nil
 }
 
-// kycDraftInput 把 update_mask 選到的欄位轉成模組的部分更新：沒有選到的欄位是 nil（保留原值），選到卻沒有值的是空字串
-// （清成沒有值）。所以不能先合併再整筆送（API 設計規範 §七）。
-// 可寫的欄位集合由 proto 的 descriptor 決定（rpc.WritableFields），這裡沒有「哪個型態有哪些欄位」的清單：賣家型態是 subject
-// 設定的那一支。建立時必須設定其中一支；update_mask 列到的欄位在另一支底下是請求自相矛盾；設定的那一支與目前的型態不同
-// 時，模組切換型態並清掉另一型態專屬的欄位。
 func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create bool) (model.KYCDraftInput, error) {
 	var in model.KYCDraftInput
 	paths, err := rpc.WritableFields(app, mask)
@@ -96,10 +85,8 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 		return slices.ContainsFunc(paths, func(p string) bool { return strings.HasPrefix(p, prefix) })
 	}
 	individual, business := app.GetIndividual(), app.GetBusiness()
-	// individual 沒有欄位（平台不收身分證號，D22），型態只由「設定了哪一支」表示，所以 mask 要能直接列 individual 或 business 這一支。
 	maskLists := func(path string) bool { return mask != nil && slices.Contains(mask.GetPaths(), path) }
 	touchesBranch := func(branch string) bool { return touches(branch+".") || maskLists(branch) }
-	// selected 回報設定的那一支是否被這次寫入選到：列了它的欄位、直接列了它、「*」，或沒帶 mask（視為所有有值的欄位）。
 	selected := func(branch string) bool {
 		return touchesBranch(branch) || maskLists("*") || len(mask.GetPaths()) == 0
 	}
@@ -166,7 +153,6 @@ func kycDraftInput(app *pb.KYCApplication, mask *fieldmaskpb.FieldMask, create b
 	return in, nil
 }
 
-// documentRef 是請求裡一張公司文件的指定（保留現有的 asset 或換上新上傳的）。
 func documentRef(d *pb.KYCDocument) model.KYCDocumentRef {
 	return model.KYCDocumentRef{AssetID: d.GetAssetId(), StagedToken: d.GetStagedToken()}
 }
@@ -220,7 +206,6 @@ func (h *App) CancelKYC(ctx context.Context, req *connect.Request[pb.CancelKYCRe
 	return connect.NewResponse(&pb.CancelKYCResponse{Application: toKYC(ctx, cancelled)}), nil
 }
 
-// toKYC 轉成契約的申請（模組的型別沒有身分證號、銀行帳號與個人姓名的欄位），補充文件只有 asset ID 與有授權的下載網址。
 func toKYC(ctx context.Context, a model.KYCApplication) *pb.KYCApplication {
 	out := &pb.KYCApplication{
 		Id: a.ID.String(), Status: rpc.EnumToProto[pb.KYCStatus](a.Status), Etag: rpc.Etag(a.Version),
@@ -271,7 +256,6 @@ func toKYC(ctx context.Context, a model.KYCApplication) *pb.KYCApplication {
 	return out
 }
 
-// toKYCIssues 轉成契約的問題；沒有問題時是 nil。
 func toKYCIssues(issues []model.KYCIssue) []*pb.KYCIssue {
 	var out []*pb.KYCIssue
 	for _, issue := range issues {
@@ -283,17 +267,14 @@ func toKYCIssues(issues []model.KYCIssue) []*pb.KYCIssue {
 	return out
 }
 
-// kycFieldPB 把申請的欄位路徑（model.KYCFieldNames，巢狀路徑以 . 分隔）轉成契約的列舉。
 func kycFieldPB(name string) pb.KYCField {
 	return rpc.EnumToProto[pb.KYCField](strings.ToUpper(strings.ReplaceAll(name, ".", "_")))
 }
 
-// storeFieldPB 把店家的欄位路徑（model.StoreFieldNames）轉成契約的列舉。
 func storeFieldPB(name string) pb.StoreField {
 	return rpc.EnumToProto[pb.StoreField](strings.ToUpper(name))
 }
 
-// toDate 把模組的日曆日（YYYY-MM-DD）轉成 google.type.Date；沒有值或格式不合時不設。
 func toDate(s *string) *date.Date {
 	if s == nil {
 		return nil

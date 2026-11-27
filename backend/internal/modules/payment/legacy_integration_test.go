@@ -130,7 +130,6 @@ func TestLegacyReadsByOrderNoAndRequestKey(t *testing.T) {
 	if _, err := f.module.RefundByRequestKey(ctx, "nope"); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("missing refund: %v", err)
 	}
-	// 鍵只在同一筆付款內唯一：同一把鍵對到兩筆付款的退款時不猜是哪一筆。
 	if _, err := f.module.RefundByRequestKey(ctx, "C1-0"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("ambiguous key: %v", err)
 	}

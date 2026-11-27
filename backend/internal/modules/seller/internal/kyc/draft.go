@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// setText 套用一個文字欄位：nil 保留，空白清成沒有值，超過長度拒絕。
 func setText(dst **string, v *string, limit int, field, msg string) error {
 	if v == nil {
 		return nil
@@ -28,7 +27,6 @@ func setText(dst **string, v *string, limit int, field, msg string) error {
 	return nil
 }
 
-// setNormalized 套用一個要正規化並驗證的欄位：nil 保留，空白清成沒有值，格式不合拒絕。
 func setNormalized(dst **string, v *string, field, msg string, normalize func(string) (string, bool)) error {
 	if v == nil {
 		return nil
@@ -45,8 +43,6 @@ func setNormalized(dst **string, v *string, field, msg string, normalize func(st
 	return nil
 }
 
-// setDate 套用一個日期欄位（YYYY-MM-DD）：解析不了、不存在的日期、早於 1900 年或晚於今天都拒絕，整筆不寫入，
-// 不會沿用舊值或留空（盤點 D12 的回歸）。
 func setDate(dst **time.Time, v *string, now time.Time, field, msg string) error {
 	if v == nil {
 		return nil
@@ -68,7 +64,6 @@ func clearCompany(r *store.SellerKycApplication) {
 	r.CompanyRegisterDate, r.CompanyTownCode, r.CompanyAddressDetail, r.CompanyPhone = nil, nil, nil, nil
 }
 
-// applyDraft 是寫入路徑：合併並驗證（mergeDraft），再回報這次真的改了哪些欄位（draftDiff，create 時沒有「改了什麼」，是空的）。
 func applyDraft(base store.SellerKycApplication, in model.KYCDraftInput, create bool, now time.Time) (store.SellerKycApplication, draftDiff, error) {
 	next, err := mergeDraft(base, in, create, now)
 	if err != nil || create {
@@ -77,8 +72,6 @@ func applyDraft(base store.SellerKycApplication, in model.KYCDraftInput, create 
 	return next, diffRows(base, next), nil
 }
 
-// mergeDraft 把部分更新合併到 base 並驗證每一個欄位，回傳要寫入的列；任何一欄不合法就整筆不寫入。create 為 true 時 base 是空白的新列，
-// 必須給 SellerType。
 func mergeDraft(base store.SellerKycApplication, in model.KYCDraftInput, create bool, now time.Time) (store.SellerKycApplication, error) {
 	next := base
 	if create && in.SellerType == nil {

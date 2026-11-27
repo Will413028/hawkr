@@ -19,7 +19,6 @@ type AppModule interface {
 	GetPayment(ctx context.Context, buyerID int64, orderNo string) (payment.Payment, error)
 }
 
-// 設定或資料壞掉、不是使用者的錯（沒有分類，回 internal）。
 var (
 	errNoPublishableKey = errors.New("httpapi/payment：Stripe 付款沒有設定公開金鑰")
 	errUnknownProvider  = errors.New("httpapi/payment：付款的 provider 沒有對應的 client session")
@@ -40,7 +39,6 @@ func NewApp(m AppModule, buyers rpc.BuyerLookup, publishableKey string) *App {
 	return &App{m: m, buyers: buyers, publishableKey: publishableKey}
 }
 
-// providerStripe 是 Stripe 付款 provider 的代碼（付款列的 provider 欄）。
 const providerStripe = "stripe"
 
 func (h *App) toPayment(p payment.Payment, orderNo string) (*paymentpb.Payment, error) {
@@ -52,7 +50,6 @@ func (h *App) toPayment(p payment.Payment, orderNo string) (*paymentpb.Payment, 
 	if p.PaidAt != nil {
 		out.PaidTime = timestamppb.New(*p.PaidAt)
 	}
-	// secret 只在模組判定可以付款（AWAITING_PAYMENT 且 provider 仍在等待）時才有，其餘情況不帶 session。
 	if p.ClientSecret == "" {
 		return out, nil
 	}

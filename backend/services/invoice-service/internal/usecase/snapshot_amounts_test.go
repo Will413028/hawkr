@@ -31,7 +31,6 @@ func TestParseSnapshotAmounts(t *testing.T) {
 		got.DiscountAmount != 100 || got.InvoiceAmount != 960 || got.TaxCategory != 1 {
 		t.Fatalf("欄位對應錯了：%#v", got)
 	}
-	// 恆等式：invoice = product + shipping − discount（proto 逐字）。
 	if got.ProductAmount+got.ShippingAmount-got.DiscountAmount != got.InvoiceAmount {
 		t.Fatalf("拆解對不上總額：%#v", got)
 	}

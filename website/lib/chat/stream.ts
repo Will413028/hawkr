@@ -104,7 +104,6 @@ export class ChatEventStream {
 	/** 記下一個對話手上最後的 seq（只前進）；重連時當 cursors 送。 */
 	noteSeq(conversationId: string, seq: number): void {
 		if (seq > (this.cursors.get(conversationId) ?? 0)) {
-			// 先刪再放，Map 的插入順序就是「最近有動靜」的順序。
 			this.cursors.delete(conversationId);
 			this.cursors.set(conversationId, seq);
 			while (this.cursors.size > MAX_CURSORS) {
@@ -180,7 +179,6 @@ export class ChatEventStream {
 				this.setState("disconnected");
 				return;
 			}
-			// 沒有收到 Ready 就結束不是壽命到期，當成失敗走 backoff（避免對立刻結束的伺服器熱迴圈）。
 			if (outcome.kind === "normal" && outcome.gotReady) {
 				this.lastEnd = "normal";
 				failures = 0;
@@ -269,7 +267,6 @@ export class ChatEventStream {
 						});
 						break;
 					default:
-						// heartbeat 與不認得的 frame：只重設看門狗。
 						break;
 				}
 			}

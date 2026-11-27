@@ -39,7 +39,6 @@ func TestSetRatingWritesAbsoluteValuesNotASum(t *testing.T) {
 		t.Fatalf("counters do not change the etag: %d vs %d", got.Version, p.Version)
 	}
 
-	// 評價全部移除：回到 0 / 0。
 	if err := f.m.SetRating(f.ct, p.ID, 0, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +95,6 @@ func TestRecordSalesCountsAnOrderOnce(t *testing.T) {
 	if got := f.counters(a.ID).SalesCount; got != 5 {
 		t.Fatalf("two lines of the same product are summed: %d, want 5", got)
 	}
-	// MQ 重送同一筆訂單：不再累計（連內容不同的重送也以訂單編號為準）。
 	if err := f.m.RecordSales(f.ct, "ORD-1", items); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +104,6 @@ func TestRecordSalesCountsAnOrderOnce(t *testing.T) {
 	if a2, b2 := f.counters(a.ID).SalesCount, f.counters(b.ID).SalesCount; a2 != 5 || b2 != 1 {
 		t.Fatalf("a resend of the same order_no counts once: %d / %d, want 5 / 1", a2, b2)
 	}
-	// 另一筆訂單照常累計。
 	if err := f.m.RecordSales(f.ct, "ORD-2", []SalesItem{{ProductID: a.ID, Quantity: 4}}); err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +138,6 @@ func TestRecordSalesRejectsBadInputAndRollsBackOnAMissingProduct(t *testing.T) {
 		}
 	}
 
-	// 有商品不存在：整筆回滾，包括訂單的登記，之後同一個 order_no 修正後還能累計。
 	if err := f.m.RecordSales(f.ct, "ORD-MISSING", append([]SalesItem{{ProductID: uuid.NewV7(), Quantity: 1}}, ok...)); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("missing product = %v, want ErrProductNotFound", err)
 	}

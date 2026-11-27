@@ -34,7 +34,6 @@ func (f FollowedProducts) Complete() bool {
 	return f.Follows != nil && f.Catalog != nil && f.Cards != nil && f.Now != nil
 }
 
-// errFollowedNotWired 是 ListFollowedStoreProducts 在沒有組裝來源時的錯誤：商品資料在 B4-6 切換前仍在舊服務，cmd/hawkr 不接 catalog，這支 RPC 回 unimplemented。
 var errFollowedNotWired = connect.NewError(connect.CodeUnimplemented, errors.New("buyer: ListFollowedStoreProducts is not wired yet"))
 
 // ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品，最新上架在前。沒有追蹤任何店家回空清單。

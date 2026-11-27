@@ -13,11 +13,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// couponStores 是 coupon 的 Stores port 的正式 adapter（計畫 D8 修訂）：資格判定當下問 seller 店家是不是停權，不複製狀態。
-// 讀不到店家（含店家不存在）原樣回錯誤，領券與鎖券整個失敗，不當成沒有停權。
 type couponStores struct{ sellers storeReader }
 
-// storeReader 是 couponStores 需要的 seller 讀取（*seller.Module）。
 type storeReader interface {
 	Store(ctx context.Context, storeID int64) (seller.Store, error)
 }
@@ -42,10 +39,8 @@ func (s couponStores) StoreState(ctx context.Context, storeID int64) (coupon.Sto
 	return coupon.StoreState{Exists: true, Closed: st.Status == seller.Closed}, nil
 }
 
-// couponBuyers 是 coupon 的 Buyers port 的 adapter：分批問 buyer 模組存活的 profile。
 type couponBuyers struct{ buyers buyerReader }
 
-// buyerReader 是 couponBuyers 需要的 buyer 讀取（*buyer.Module）。
 type buyerReader interface {
 	BatchMeta(ctx context.Context, ids []int64) ([]buyer.Profile, error)
 }
@@ -64,7 +59,6 @@ func (b couponBuyers) Existing(ctx context.Context, ids []int64) ([]int64, error
 	return out, nil
 }
 
-// newCoupon 組裝 coupon 模組。只組裝 Connect 需要的部分；MEMBER 投影的 consumer、買家刪帳訂閱與到期提醒尚未接上。
 func newCoupon(d *db.DB, sellers *seller.Module, buyers *buyer.Module) *coupon.Module {
 	stores := couponStores{sellers}
 	return coupon.New(coupon.Deps{DB: d, Stores: stores, Buyers: couponBuyers{buyers}, StoreDirectory: stores, NewID: uuid.NewV7, Now: time.Now})

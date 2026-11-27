@@ -63,7 +63,6 @@ test("certification discard entries share an immediate guard and retain initiato
 	const catchIndex = handler.indexOf("} catch (e) {");
 	assert.ok(guardIndex >= 0 && guardIndex < requestIndex);
 	assert.ok(requestIndex < resetIndex && resetIndex < catchIndex);
-	// 失敗時顯示伺服器或目錄的句子（L′-9：@hawkr/api 的 errorText），不再有呼叫點自寫的備用句。
 	assert.match(handler, /setError\(errorText\(e, defaults\)\)/);
 	assert.doesNotMatch(handler, /"捨棄認證草稿失敗"/);
 	assert.match(handler, /discardPendingRef\.current = false/);

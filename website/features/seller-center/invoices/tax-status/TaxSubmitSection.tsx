@@ -53,9 +53,6 @@ function blockerCopy(
 	cooldownUntilText: string,
 ): { title: string; description: string } {
 	switch (blocker) {
-		// ⚠️ 這兩句原本寫「線上填寫／上傳功能還在準備中」——**2026-09-01 端點 18 接上後
-		// 那句話就變成假的**，而表單就渲染在這一段的正上方，兩者同時出現會讓賣家
-		// 以為自己看到的表單不能用。改了前提就要回灌到引用它的每一處。
 		case "not-started":
 			return {
 				title: "還沒有稅務身分資料",
@@ -97,9 +94,6 @@ export function TaxSubmitSection({
 		? formatTaipeiDate(profile.reapplyCooldownUntil)
 		: "";
 
-	// `not-editable` 由呼叫端的 `gate.visible` 擋掉、根本不會渲染本元件；在這裡
-	// 也擋一次是為了讓型別窄化成 `blockerCopy` 的四值——那個 switch 因此可以沒有
-	// default，值域增生時 TypeScript 當場報錯而不是靜默漏一種文案。
 	if (blocker === "not-editable") return null;
 	if (blocker !== null) {
 		const copy = blockerCopy(blocker, cooldownUntilText);
@@ -113,8 +107,6 @@ export function TaxSubmitSection({
 		);
 	}
 
-	// 條款版本一律顯示**當期**版本（`currentTermsVersion`），不是 `termsVersion`
-	// ——後者是「已簽的那一版」，未簽時是空字串。
 	const termsVersion = profile?.selfIssueAttestation.currentTermsVersion ?? "";
 	const copy = invoiceErrorCopy(error);
 
@@ -128,8 +120,7 @@ export function TaxSubmitSection({
 					送出後平台會開始審核，期間資料無法修改。審核完成前，這段期間的發票由你自行開立與交付。
 				</p>
 
-				{/* 五條要點是前端靜態文案（端點 21 只給版本與檔案 key）；
-				    條款全文在 S04，這裡只放摘要與連結。 */}
+
 				<ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[0.8125rem] text-[var(--hkui-foreground-soft)]">
 					<li>
 						審核完成前，你是這些訂單的發票銷售人，發票由你自行開立並交付買家。
@@ -161,7 +152,7 @@ export function TaxSubmitSection({
 					<p role="alert" className="m-0 text-sm text-danger-700">
 						{copy.title}
 						{copy.description ? ` ${copy.description}` : ""}
-						{/* 9324 的倒數時刻只在 data 裡，文案表拿不到 ⇒ 這裡補上。 */}
+
 						{cooldownUntilText ? ` 可於 ${cooldownUntilText} 後再試。` : ""}
 					</p>
 				) : null}
@@ -169,8 +160,6 @@ export function TaxSubmitSection({
 				<div>
 					<Button
 						size="lg"
-						// 🔴 未勾選就不能送。這是 UX 不是防線——後端 accepted_terms=false
-						// 一律 9325 並且一筆都不寫。
 						disabled={!accepted || submitting}
 						isLoading={submitting}
 						loadingLabel="送出中"

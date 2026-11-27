@@ -63,12 +63,10 @@ public class CvsPrintWaitingRegistry {
         } catch (JsonProcessingException e) {
             log.error("CvsPrintWaitingRegistry.serializeError",
                     "序列化失敗: " + e.getMessage(), "shipTradeNo", shipTradeNo);
-            // 降級：直接嘗試 local complete
             completeLocal(shipTradeNo, result);
         } catch (Exception e) {
             log.error("CvsPrintWaitingRegistry.publishError",
                     "Redis publish 失敗: " + e.getMessage(), "shipTradeNo", shipTradeNo);
-            // 降級：Redis 不可用時退化為本地通知
             completeLocal(shipTradeNo, result);
         }
     }

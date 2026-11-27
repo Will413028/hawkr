@@ -25,14 +25,6 @@ import { getEnv } from "@/lib/config/env";
 import { activeLocale } from "@/lib/intl/active-locale";
 import type { AppLocale } from "@/lib/intl/locales";
 
-// 對外 API（Protobuf＋Connect）的 transport，兩種（與 lib/api/client.ts 的兩種模式相同）：
-// - publicTransport：公開讀取。不帶 cookie、server 端簽 origin-auth（backend#2264）；瀏覽器的 HTTP 快取以
-//   條件請求重新驗證（公開讀取是 `public, no-cache` 加 ETag）。
-// - authedTransport：帶同源的 session cookie（`__Host-hk_session`，HttpOnly，ADR 2026-10-30-identity-self-hosted-federated-login；不帶 Authorization）。
-//   瀏覽器不快取、不帶 X-Active-Role（Connect 不讀工作區，只有舊 REST 帶它）、*AppService 回 unauthenticated 時發 AUTH_EXPIRED_EVENT、代行工作區內直接拋錯。
-// 兩者都有逾時、5xx 上報 Sentry 與錯誤模型 D7 的重試。入口在單體：CSRF 看 Sec-Fetch-Site／Origin，不需要
-// X-Requested-With（〈API 設計規範（Connect）〉§二）。
-// 兩者也都送單一值的 `Accept-Language`（UI 語系，見 acceptLanguageInterceptor）。
 
 /**
  * 瀏覽器打 Connect 的第一方路徑，每個環境都一樣：瀏覽器只跟自己的 origin 說話（lib/config/env.ts 的
@@ -283,7 +275,6 @@ function authedFetch(isBrowser: boolean, cookie?: string): typeof fetch {
 	return async (input, init) => {
 		const headers = new Headers(init?.headers);
 		const method = init?.method ?? "GET";
-		// 伺服器端沒有瀏覽器替它送 cookie：只讀取（GET）轉送呼叫端交來的 session cookie（見 TransportOptions.cookie）。
 		if (!isBrowser && cookie && (method === "GET" || method === "HEAD")) {
 			headers.set("Cookie", cookie);
 		}
@@ -404,7 +395,6 @@ function publicFetch(isBrowser: boolean, visitorIp?: string): typeof fetch {
 	return async (input, init) => {
 		const headers = new Headers(init?.headers);
 		if (!isBrowser) {
-			// 同 lib/api/client.ts：只在 server 端簽，簽章程式碼不進瀏覽器的 bundle。
 			const { signOriginAuth, ORIGIN_AUTH_HEADER } = await import(
 				"@/lib/api/origin-auth.server"
 			);
@@ -418,10 +408,7 @@ function publicFetch(isBrowser: boolean, visitorIp?: string): typeof fetch {
 		return fetch(input, {
 			...init,
 			headers,
-			// 公開讀取不帶 cookie：共用快取不會因 cookie 分裂，也不外洩 session。
 			credentials: "omit",
-			// 不強制 no-store：伺服器回 `public, no-cache` 加弱 ETag，瀏覽器每次都帶 If-None-Match 重新驗證，
-			// 沒變時拿到 304（API 設計規範（Connect）§九）；server 端的快取由呼叫方的 use cache 負責。
 		});
 	};
 }
@@ -431,8 +418,6 @@ function requestUrl(input: RequestInfo | URL): string {
 	return input instanceof URL ? input.href : input.url;
 }
 
-// 伺服器端的失敗（REST 的 5xx）才上報；沒收到回應的網路錯誤不算。同一個方法、code、trace 在 30 秒內只報一次，
-// 一次 outage 不會淹沒 Sentry（同 lib/api/client.ts 的 reportApiFailure）。
 const REPORTED_CODES = new Set([
 	Code.Unknown,
 	Code.Internal,
@@ -506,7 +491,6 @@ function sentryCapture(
 				});
 			})
 			.catch(() => {
-				// 觀測失敗不能取代原本的結果或錯誤。
 			});
 	};
 }

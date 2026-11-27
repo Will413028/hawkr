@@ -48,7 +48,6 @@ func pageSize(size int32) int32 {
 	return size
 }
 
-// authorized 讀對話並確認呼叫者是其中一方；不存在與不屬於呼叫者同為 NotFound（不洩漏對話存在）。
 func (s *Service) authorized(ctx context.Context, id uuid.UUID, p model.Party) (store.ImConversation, error) {
 	if err := p.Authorize(); err != nil {
 		return store.ImConversation{}, err
@@ -158,7 +157,6 @@ func (s *Service) MessagesAfter(ctx context.Context, conversationID uuid.UUID, p
 	return withPeer(page(rows.After(rs), n), c, p), nil
 }
 
-// withPeer 填入對方的已讀游標。
 func withPeer(pg model.MessagePage, c store.ImConversation, p model.Party) model.MessagePage {
 	pg.PeerReadSeq = c.StoreLastReadSeq
 	if p.Kind == model.PartyStore {
@@ -267,7 +265,6 @@ func (s *Service) Presence(ctx context.Context, p model.Party, conversationIDs [
 	return out, nil
 }
 
-// distinct 取各列某個 ID 去重後的清單。
 func distinct(rs []store.PresenceForPartyRow, id func(store.PresenceForPartyRow) int64) []int64 {
 	seen := make(map[int64]bool, len(rs))
 	out := make([]int64, 0, len(rs))

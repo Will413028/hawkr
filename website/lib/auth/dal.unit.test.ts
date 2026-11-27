@@ -29,8 +29,6 @@ function withCookie(value: string | null) {
 	});
 }
 
-// `verifySession` is wrapped in React `cache()`, which outside a request scope
-// does not memoise (react.react-server), so each call below is a fresh read.
 describe("verifySession", () => {
 	beforeEach(() => {
 		rpc.getSession.mockReset();

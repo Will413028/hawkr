@@ -106,17 +106,6 @@ public class ShipmentCreationBackstopScheduler {
         int attempts = order.getShipmentCreateAttempts() == null ? 0 : order.getShipmentCreateAttempts();
 
         if (attempts < maxAttempts) {
-            // 重試建單：先以 lease CAS 搶佔（同時累加 attempts + 推進下次重試時間），搶到才 publish
-            //
-            // ⚠️ R4-P1-2（2026-08-08）：租約基準取 **claim 當下**而非 tick 起點的 now
-            //（與 OrderOutboxPublisherScheduler / StockCompensationWorker /
-            //  PendingPaymentReconcileScheduler / payuni-webhook OutboxPublisherScheduler 一致）。
-            // 取 tick 起點 ⇒ 全批共用同一個到期時間 ⇒ 第 k 筆的**有效**租約
-            // = backoffMinutes − (前 k−1 筆的耗時)，不變式退化成「批次總耗時 < 租約」而非
-            // 「**單筆**最壞耗時 < 租約」。本排程今天不會觸發（BATCH_SIZE=100、單筆只有一次
-            // 本地 MQ publish ⇒ 100 × 毫秒 ≪ 30 分），但那是**參數巧合不是結構保證**：
-            // 往這個迴圈裡加一次 gRPC（例如查快照組 payload）就會破。
-            // 述詞用的 now 維持 tick 起點：那個方向讓候選集合更小，是保守的。
             int claimed = orderRepository.bumpShipmentCreateAttempt(
                     orderNo, DateTimeUtils.nowUtc().plusMinutes(backoffMinutes), now);
             if (claimed == 0) {
@@ -126,11 +115,6 @@ public class ShipmentCreationBackstopScheduler {
             log.info("ShipmentCreationBackstopScheduler.retry",
                     "重試建單 attempts=" + (attempts + 1) + "/" + maxAttempts, "orderNo", orderNo);
         } else {
-            // 超過上限：請 AfterSales 系統取消 + 退款（冪等）。
-            // give-up 同樣先搶佔——但用的是**租約**不是永久旗標：取消一旦生效訂單就離開 PAID、
-            // 自然退出候選；租約只在「取消沒生效」或「publish 靜默失敗」時才會再響一次
-            // （可觀測 > 不可觀測）。租約長度與重試分支同值，上界推導見類 javadoc。
-            // 租約基準同樣取 claim 當下（理由見重試分支的註解）。
             int claimed = orderRepository.claimShipmentBackstopGiveUp(
                     orderNo, DateTimeUtils.nowUtc().plusMinutes(backoffMinutes), now);
             if (claimed == 0) {

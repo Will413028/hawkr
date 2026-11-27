@@ -84,8 +84,6 @@ export default function DelegatedOrderDetailPanel({
 	const maskedAddress =
 		[order.recipient.city, order.recipient.district].filter(Boolean).join("") ||
 		"—";
-	// 時間軸是「這筆訂單走到哪」的權威答案（後端保證最後一個節點恆為當下狀態），
-	// 所以付款與否直接讀它，不另立第二個來源。
 	const paid = order.timeline.some(
 		(entry) => entry.status === OrderStatus.PAID,
 	);
@@ -139,7 +137,6 @@ export default function DelegatedOrderDetailPanel({
 						<span>配送備註：{order.shippingNote}</span>
 					) : null}
 					{contact ? (
-						// 稽核列 id 是這次揭露唯一可追溯的憑據，讓操作者當場看得到。
 						<span className="adm-order-timeline__time">
 							已寫入代行紀錄（稽核編號 {contact.auditLogId}）
 						</span>
@@ -163,9 +160,6 @@ export default function DelegatedOrderDetailPanel({
 										src={src}
 										alt=""
 										loading="lazy"
-										// 取不到的圖留一個空位，不留瀏覽器的破圖圖示 —— 與
-										// `SellerAvatarImage` 同一條既有慣例：賣家面的介面永遠不替
-										// 後端選定的圖片補一張佔位圖。
 										onError={(event) => {
 											event.currentTarget.style.visibility = "hidden";
 										}}
@@ -190,8 +184,7 @@ export default function DelegatedOrderDetailPanel({
 				<h3 className="adm-order-detail__section-title">金額與付款</h3>
 				<div className="adm-order-detail__row">
 					<span>付款狀態</span>
-					{/* 由時間軸推導而非另開一個欄位：後端的時間軸已經是「這筆訂單走到哪」的
-					    權威答案，再送一個 paymentStatus 就多出一個會與它不一致的來源。 */}
+
 					<strong>{paid ? "已付款" : "未付款"}</strong>
 				</div>
 				{paymentMethodText(order.paymentMethod) ? (
@@ -225,16 +218,9 @@ export default function DelegatedOrderDetailPanel({
 				) : null}
 			</section>
 
-			{/* 這三行有機械保證撐著（層 2 路由禁字 boot 斷言 ＋ 層 3a IsSeller(ADMIN)
-			    為 false ＋ 層 3b proto 上根本沒有那些欄位），所以可以照 mockup 照抄。
 
-			    ⚠️ 但**只對還走得下去的訂單照抄**。對一筆終態訂單說「出貨、取號、叫件…
-			    僅能由賣家帳號執行」是在宣告一個這裡永遠不會有的功能——而且那句話對賣家
-			    本人也不成立（已取消的訂單沒有人出得了貨），正是 §8.1.1「不要在畫面上宣告
-			    這裡有出貨功能只是你沒權限」要防的同一件事。終態改說它自己的事實。 */}
 			<section className="adm-order-lock">
-				{/* 終態不用鎖也不用綠勾：鎖是「你沒權限」、綠勾是「成功了」，兩個都答錯了
-				    問題。已取消與已完成共用同一張卡，只有中性的說明圖示兩邊都成立。 */}
+
 				<AppIcon name={terminal ? "info" : "lock"} size={22} />
 				{terminal ? (
 					<>
@@ -258,16 +244,7 @@ export default function DelegatedOrderDetailPanel({
 				)}
 			</section>
 
-			{/* 產品需求 §6.7 的第二顆「安全動作」。三件事刻意都不是 mockup 的字面：
-			    ① **不叫「建立」** —— 目的地是 29 號的異常監控，它自陳「純查詢聚合層，
-			       不新增 DB 表、不新增業務動作」，那裡沒有任何「建立異常紀錄」的動作
-			       可按。照抄「建立」＝宣告一個不存在的功能，與同頁「查看權限說明」外連
-			       因目的地不存在而不渲染是同一條判準。
-			    ② **是 `<a href>` 不是按鈕** —— §6.7 明寫它會「離開代行工作區並重新驗
-			       治理權限」。沿用 `AdmRail` 兩個入口的既有形狀：純連結、跨 host、
-			       **不產生任何 session 狀態變更**（不 end、不 revoke、不動 revision）。
-			    ③ **拿不到 storeId 就整顆不渲染** —— 少了 store_id 的連結會把人丟到全
-			       平台的異常清單，那與沒有這顆鈕一樣，只是多騙一次點擊。 */}
+
 			{summary?.target.storeId ? (
 				<a
 					className="adm-order-handoff"

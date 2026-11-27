@@ -65,8 +65,6 @@ function startApiStub(sellerId: string): Server {
 		let data: unknown;
 		switch (url.pathname) {
 			case sellerRoot:
-				// 全 camelCase（backend#2235）。`handler.PublicSellerInfo` 沒有 accountId，
-				// 賣家的營運鍵就是 storeId（44 號設計書買賣家身分分離）。
 				data = {
 					storeId: sellerId,
 					name: "SSR Stub 商店",
@@ -178,9 +176,6 @@ async function installBrowserApiStub(
 			},
 		);
 	}
-	// ⚠️ 店家必須是完成新手引導的：否則 `useSellerIdentity` 判定 setupIncomplete →
-	// `SellerCenterShell` 把整個工作區換成開店申請表單 → 唯讀邊界從未掛載，測試只會說
-	// 「marker 沒出現」，看不出真正原因是 fixture。形狀是 proto3 JSON 的 GetMyStoreResponse。
 	await page.route(/SellerAppService\/GetMyStore(?:\?|$)/, async (route) => {
 		await route.fulfill({
 			status: 200,
@@ -332,7 +327,6 @@ async function waitForNext(
 			});
 			if (response.status < 500) return;
 		} catch {
-			// next start has not opened its listener yet.
 		}
 		await new Promise((resolve) => setTimeout(resolve, 200));
 	}
@@ -345,12 +339,6 @@ test("production Next serves all four seller preview routes and the read-only gu
 }, async (context) => {
 	await access(".next/BUILD_ID");
 
-	// A fresh numeric ID prevents Next's cross-process `use cache` entries from
-	// satisfying the request before it reaches this run's API stub. Supplying
-	// SELLER_PREVIEW_SSR_API_BASE_URL + SELLER_PREVIEW_SSR_SELLER_ID switches
-	// the same harness into an explicit, repeatable smoke against a backend you run
-	// yourself. The `next start` child carries the hermetic guard (hermeticEnv), which
-	// refuses every host that is not loopback, so that backend must be local.
 	if (
 		CONFIGURED_API_BASE &&
 		!isLoopbackHost(new URL(CONFIGURED_API_BASE).hostname)
@@ -398,12 +386,6 @@ test("production Next serves all four seller preview routes and the read-only gu
 
 	await waitForNext(origin, child, () => childOutput);
 
-	// Document-level reachability check only. `/seller-center/*` sits behind `ZoneGate` and
-	// `WorkspaceAlign` (components/shared/WorkspaceAlign.tsx): the stored workspace is browser-only
-	// state, and the preview reads its store with the signed-in session on the client, so the
-	// document the server renders is the workspace skeleton. "SSR renders the preview" is not a
-	// property this app has and not one this test asserts; the read-only guarantee is asserted
-	// against a live browser below.
 	for (const { suffix } of ROUTES) {
 		const pathname = `/seller-center/preview${suffix}`;
 		const response = await fetch(`${origin}${pathname}`, {
@@ -425,17 +407,6 @@ test("production Next serves all four seller preview routes and the read-only gu
 		assert.doesNotMatch(html, ERROR_SHELL, pathname);
 	}
 
-	// System Chrome by default (#281). This was the only launch call in the repo
-	// still on Playwright's bundled build, and that is why the test had never
-	// actually executed anywhere: it is opt-in locally and CI never set
-	// RUN_SELLER_PREVIEW_SSR_SMOKE, so the missing download surfaced as neither
-	// a failure nor a skip — just a test nobody had ever run.
-	//
-	// `PW_CHANNEL=bundled` is the explicit opt-out CI uses: the runner installs
-	// `playwright install --only-shell` and has no branded Chrome, and adding one
-	// would burden every CI run for the sake of this test. A named sentinel
-	// rather than an empty string — "" is falsy and would silently fall back to
-	// "chrome", so the env var could never express "use the bundled browser".
 	const rawChannel = process.env.PW_CHANNEL ?? "chrome";
 	const channel = rawChannel === "bundled" ? undefined : rawChannel;
 	const browser = await chromium.launch({ headless: true, channel });
@@ -492,10 +463,6 @@ test("production Next serves all four seller preview routes and the read-only gu
 		}
 		assert.doesNotMatch(pageText, ERROR_SHELL, pathname);
 
-		// The attached check above is the precondition (is the subtree mounted at
-		// all); this is the guarantee (does the guard actually cancel buyer
-		// interactions). Keeping both is what separates "never mounted" from
-		// "mounted but no longer intercepting".
 		const probe = await probeReadonlyBoundary(page);
 		assert.equal(
 			probe.insidePrevented,
@@ -524,8 +491,6 @@ test("production Next serves all four seller preview routes and the read-only gu
 		await page.close();
 	}
 
-	// The stubbed store can be public: the preview reads the owner's own sources for products and
-	// posts, and the public sources only for the reviews and forum tabs.
 	const seen = new Set(seenRequests);
 	const root = `/api/v1/public/sellers/${sellerId}`;
 	for (const expected of [

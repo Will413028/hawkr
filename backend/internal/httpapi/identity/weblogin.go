@@ -16,9 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// web 的聯合登入入口（ADR 2026-10-30-identity-self-hosted-federated-login D3）：純 HTTP 的 start 與 callback，每家 provider 各一組路徑
-// （防 mix-up），經 web 的同源反代到達單體。不走 Connect，也不經動作性質宣告：兩條路由都只收 GET。start 只寫一列暫存狀態；callback
-// 登入（新建 session 與首次登入時的帳號），或在 start 帶 link=1 時把 provider 身分連結到發起的已登入帳號，不換發 session。
 
 const (
 	// AuthPathPrefix 是所有 web 登入路由的前綴。
@@ -26,12 +23,9 @@ const (
 
 	// LoginCookie 是 start 設的短效登入前 cookie（防 login CSRF）：值是登入流程的 binding，callback 比對它與暫存列的雜湊。
 	LoginCookie = "__Host-hk_login"
-	// loginCookieMaxAge 與登入流程的暫存列同為 10 分鐘（D3）；逾時的判斷以暫存列為準，cookie 的壽命只是少留垃圾。
 	loginCookieMaxAge = 10 * time.Minute
 
-	// loginPagePath 是 website 的登入頁；失敗時帶 error 代碼回到那裡。
 	loginPagePath = "/login"
-	// providerTimeout 是一次 callback 對 provider 的外部呼叫的時間上限（換 token、抓公鑰）。
 	providerTimeout = 20 * time.Second
 )
 
@@ -53,7 +47,6 @@ const (
 	LinkErrorAlreadyLinked = "identity_already_linked"
 )
 
-// webLoginModule 是 web 登入需要的 identity 方法；*identity.Module 滿足它。
 type webLoginModule interface {
 	BeginLoginFlow(ctx context.Context, in identity.LoginFlowInput) (identity.LoginFlowStart, error)
 	ConsumeLoginFlow(ctx context.Context, state, binding string, want identity.Provider) (identity.LoginFlow, error)
@@ -130,7 +123,6 @@ func (w *WebLogin) Routes() []Route {
 	return routes
 }
 
-// guard 套上所有登入回應共通的 header，只收 GET，沒設定的 provider 回 404。
 func (w *WebLogin) guard(p identity.Provider, h func(http.ResponseWriter, *http.Request, WebProvider)) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		header := rw.Header()
@@ -157,8 +149,6 @@ func (w *WebLogin) start(rw http.ResponseWriter, r *http.Request, p WebProvider)
 	}
 	input := identity.LoginFlowInput{Provider: p.Provider(), ReturnPath: returnTo}
 	if r.URL.Query().Has("link") {
-		// 手動連結：只有已登入的帳號能發起，帳號寫進暫存列；實際連結在 callback，要通過登入前 cookie 與 state。這個 GET 只寫一列暫存狀態，
-		// 不改任何帳號資料，跨站導覽過來也無法完成連結（攻擊者拿不到暫存列的 state 與瀏覽器裡的登入前 cookie）。
 		caller, ok := rpc.PrincipalFrom(r.Context())
 		switch {
 		case r.URL.Query().Get("link") != "1":
@@ -187,7 +177,6 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 	ctx, cancel := context.WithTimeout(r.Context(), providerTimeout)
 	defer cancel()
 	log := w.d.Logger.With("provider", p.Provider())
-	// 不論結果，登入前 cookie 到此為止：暫存列已是單次使用。
 	http.SetCookie(rw, expiredCookie(LoginCookie))
 
 	q := r.URL.Query()
@@ -197,7 +186,6 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 		binding = c.Value
 	}
 	flow, err := w.d.Module.ConsumeLoginFlow(ctx, state, binding, p.Provider())
-	// fail 結束這次 callback：手動連結的流程（流程成立且帶連結帳號）回到返回網址並附 link_error，其餘回到登入頁並附 error。
 	fail := func(code string) {
 		if err == nil && flow.LinkAccountID != nil {
 			redirectLinkError(rw, r, flow.ReturnPath, code)
@@ -206,7 +194,6 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 		redirectToLogin(rw, r, code)
 	}
 	if providerError := q.Get("error"); providerError != "" {
-		// 使用者在 provider 拒絕授權或 provider 出錯：流程已作廢（上面的 consume），不看 flow 是否成立。
 		code := ErrorProvider
 		if providerError == "access_denied" {
 			code = ErrorAccessDenied
@@ -224,7 +211,6 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 		fail(ErrorUnavailable)
 		return
 	}
-	// 手動連結：發起的帳號必須還是現在登入的帳號（登出或換了帳號就不連結）。
 	if flow.LinkAccountID != nil {
 		if caller, ok := rpc.PrincipalFrom(ctx); !ok || caller.Kind != identity.PrincipalAccount || caller.ID != *flow.LinkAccountID {
 			log.WarnContext(ctx, "httpapi：連結流程的帳號不是現在登入的帳號")
@@ -232,7 +218,6 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 			return
 		}
 	}
-	// RFC 9207 §2.4：宣告帶 iss 的 provider 沒帶就拒絕；帶了必須是這家的 issuer。
 	if q.Has("iss") && !p.CheckIssuer(q.Get("iss")) || !q.Has("iss") && p.RequiresIssuer() {
 		log.WarnContext(ctx, "httpapi：授權回應的 iss 缺少或不是這家 provider")
 		fail(ErrorInvalidFlow)
@@ -259,7 +244,6 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 		w.link(ctx, rw, r, log, *flow.LinkAccountID, id, flow.ReturnPath)
 		return
 	}
-	// 請求若帶著舊的 session cookie，登入換發新 session 時一併刪除它（session fixation）。
 	previous := ""
 	if token, source := rpc.Credential(r); source == rpc.CredentialCookie {
 		previous = token
@@ -279,8 +263,6 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 	http.Redirect(rw, r, flow.ReturnPath, http.StatusFound)
 }
 
-// returnPathLocale 是 web 登入記成帳號 preferred_locale 的語系：網站的語系來自路由（多語系 ADR D1），登入時依返回網址的語系前綴決定——
-// `/en` 開頭是 en，其他有效的返回網址是 zh-TW；沒有（或不合格式的）返回網址回空字串，登入不更新語系。
 func returnPathLocale(returnPath string) uitext.Locale {
 	if !identity.ValidReturnPath(returnPath) {
 		return ""
@@ -291,7 +273,6 @@ func returnPathLocale(returnPath string) uitext.Locale {
 	return uitext.ZhTW
 }
 
-// link 把 provider 驗證過的身分連結到發起流程的帳號，不換發 session；成功回到返回網址，失敗附 link_error。
 func (w *WebLogin) link(ctx context.Context, rw http.ResponseWriter, r *http.Request, log *slog.Logger, accountID int64, id identity.ProviderIdentity, returnPath string) {
 	err := w.d.Module.LinkIdentity(ctx, accountID, id)
 	switch {
@@ -327,7 +308,6 @@ func redirectToLogin(rw http.ResponseWriter, r *http.Request, code string) {
 	http.Redirect(rw, r, loginPagePath+"?"+url.Values{"error": {code}}.Encode(), http.StatusFound)
 }
 
-// redirectLinkError 回到返回網址（站內相對路徑，建立流程時已驗證），查詢參數附上 link_error；網址原有的查詢與 fragment 保留。
 func redirectLinkError(rw http.ResponseWriter, r *http.Request, returnPath, code string) {
 	base, fragment, hasFragment := strings.Cut(returnPath, "#")
 	separator := "?"

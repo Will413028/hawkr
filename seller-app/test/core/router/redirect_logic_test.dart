@@ -142,8 +142,6 @@ void main() {
       );
     });
 
-    // 措施與申覆是帳號層級：沒有店家的賣家也要能查看（開店頁的「你有措施紀錄」入口）。
-    // 路由樣式（含路徑參數）而不是實際網址，所以表單的 location 是 `/seller/measures/:measureId`。
     for (final location in [
       SellerRoutes.measures,
       SellerRoutes.measureRequest,
@@ -166,7 +164,7 @@ void main() {
       for (final location in [
         '/seller/suspension-notice',
         '/seller/measure',
-        '/seller/measures/submit', // 不是路由樣式：實際網址不放行，只有宣告過的樣式放行
+        '/seller/measures/submit',
         '/main/dashboard',
       ]) {
         expect(

@@ -50,8 +50,6 @@ function effectiveSkuPrice(sku: ProductSkuRecord): number {
 async function fetchProductDetailForCart(
 	productId: string | number,
 ): Promise<ProductDetailRecord | null> {
-	// Anonymous read → omit. throwOn*:false mirrors the prior "any non-OK → null"
-	// (a missing/unavailable product just means "no purchasable SKU" downstream).
 	const { data } = await apiClient.public.get<ProductDetailRecord>(
 		`/products/${encodeURIComponent(String(productId))}`,
 		{

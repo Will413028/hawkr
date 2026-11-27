@@ -69,7 +69,6 @@ export default function HomeCompactSearch({
 	React.useEffect(() => {
 		aliveRef.current = true;
 		setMounted(true);
-		// The existing deploy-skew guard can refresh before an import rejects.
 		// Restore only its one-shot checkpoint, without weakening global recovery.
 		const currentPath = () => window.location.pathname + window.location.search;
 		try {
@@ -92,7 +91,6 @@ export default function HomeCompactSearch({
 				if (restored.open) inputRef.current?.focus({ preventScroll: true });
 			}
 		} catch {
-			/* Storage access itself can be blocked. */
 		}
 		const checkpoint = () => {
 			try {
@@ -104,7 +102,6 @@ export default function HomeCompactSearch({
 					recoveryScope,
 				);
 			} catch {
-				/* Do not prevent the technical reload. */
 			}
 		};
 		window.addEventListener("pagehide", checkpoint);

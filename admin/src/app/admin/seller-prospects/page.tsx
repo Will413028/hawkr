@@ -46,7 +46,7 @@ function statusBadgeVariant(status: ProspectStatus): BadgeVariant {
 		case ProspectStatus.CONVERTED:
 			return "info";
 		default:
-			return "gray"; // ARCHIVED 與未知值都算「不是進行中」，用同一顆灰色徽章
+			return "gray";
 	}
 }
 
@@ -80,7 +80,7 @@ function ProspectRow({ prospect }: { prospect: Prospect }) {
 					)}
 					{prospect.displayName}
 				</Link>
-				{/* 併入別筆的列不能只顯示原資料：沒有這個徽章與連結，管理員會誤以為這是一筆還在獨立追蹤的業者。 */}
+
 				{prospect.mergedIntoId ? (
 					<div className="cell-sub">
 						<StatusBadge variant="warning" size="sm">
@@ -117,8 +117,6 @@ export default function SellerProspectsPage() {
 	const filters = readProspectFilters(searchParams);
 	const hasFilter = hasActiveFilter(filters);
 
-	// token 綁定篩選條件，換條件時回到第一頁。用 render 期間同步調整 state 的寫法（React 官方建議的
-	// 「prop 變了就重置某個 state」），不用 useEffect。
 	const filtersKey = JSON.stringify(filters);
 	const [pageTokens, setPageTokens] = useState(firstPage);
 	const [pageResetKey, setPageResetKey] = useState(filtersKey);
@@ -138,7 +136,6 @@ export default function SellerProspectsPage() {
 	const next = list.data?.nextPageToken ?? "";
 	const page = currentPage(pageTokens);
 
-	// 兩張統計卡只顯示入口上的待處理數量：第一頁的筆數，後面還有就加「+」。
 	const duplicates = useQuery(
 		SellerProspectAdminService.method.listProspectDuplicates,
 		{ pageSize: COUNT_CARD_PAGE_SIZE },
@@ -213,8 +210,7 @@ export default function SellerProspectsPage() {
 
 			<ProspectFilters />
 
-			{/* `.table-container` 的 `overflow: hidden`（globals.css）只裁切、不提供橫向捲軸；
-			    行內覆寫 `overflow-x: auto` 才是真的讓窄螢幕能在自身容器捲動。 */}
+
 			<div className="table-container" style={{ overflowX: "auto" }}>
 				<table className="data-table">
 					<thead>

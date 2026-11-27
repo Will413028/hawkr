@@ -44,7 +44,6 @@ class Session extends _$Session {
       account = await ref.read(authRepositoryProvider).currentAccount();
     } catch (error, stack) {
       if (!ref.mounted || !_restore.isCurrent(generation)) return null;
-      // 停權的帳號 GetSession 照樣成功並帶 `suspension`（它是讀取，伺服器放行），不會丟 ACCOUNT_SUSPENDED。
       if (error is UnauthorizedException) {
         if (!e2eAuthEnabled) await _clearAuthSession();
       } else {
@@ -73,8 +72,6 @@ class Session extends _$Session {
         }
       }),
     );
-    // 每次 App 啟動都重新上報 FCM Token，確保 token refresh 後仍能收到推播。註冊請求要等 FCM
-    // token 的原生呼叫回來才送出，那時這個 session 已經是 state，中央 Dio 帶得出憑證。
     PushNotificationManager.instance.onUserLoggedIn();
     return session;
   }
@@ -207,9 +204,6 @@ class Session extends _$Session {
   /// 從 Session 自身去 invalidate 依賴 Session 的 provider 會形成循環依賴
   /// （CircularDependencyError）。
   Future<void> _invalidateUserScopedCaches() async {
-    // notification 列表/偏好、coupon 列表皆已改為 ref.watch(sessionProvider)，
-    // 會自動重建，不在此 invalidate（避免循環依賴）。
-    // 收據照片存在本機檔案，provider invalidate 救不了，必須直接清底層存儲。
     await ref.read(receiptPhotoRepositoryProvider).clearAll();
   }
 }

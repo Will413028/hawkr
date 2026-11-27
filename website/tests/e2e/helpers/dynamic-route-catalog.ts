@@ -47,16 +47,6 @@ export interface PublicDynamicFixtureIds {
  * rather than this route catalog.
  */
 export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
-	// ADM 代行工作區（56 號）。access 是 `delegated` 而非 `seller`：這個子樹不看
-	// JWT 角色，`requiredAccessForPath` 對它一律回 null，守門由工作階段本身承擔
-	// （client 端的 `GET /adm/api/session/current`，見 app/(delegated)/adm/layout.tsx）。
-	// 標成 buyer/seller 會讓 site-links 的「訪客導 /login 且帶 role 參數」斷言跑錯
-	// 路徑——它們根本不發 307。專屬斷言見 site-links.spec.ts 的 delegated 區塊。
-	//
-	// `/adm/[storeId]` 不在本清冊：它已無 page.tsx，導向由 next.config.ts 的
-	// redirects() 在 HTTP 層完成（307 → /products）。清冊與 App Router 掃描結果
-	// 是 set-equality（site-links.spec.ts「dynamic route catalog exactly matches」），
-	// 留著會直接轉紅；它的契約改由同檔的 307 斷言承接。
 	{
 		pattern: "/adm/[storeId]/[...area]",
 		access: "delegated",
@@ -187,8 +177,6 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		access: "seller",
 		fixture: "protected-placeholder",
 	},
-	// 帳號層級的頁面：登入即可、不分工作區（`requiredAccessForPath` 回 `account`）。
-	// 訪客導 /login 但不帶 role。
 	{
 		pattern: "/seller/inquiries/[inquiryId]",
 		access: "account",
@@ -209,11 +197,6 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		access: "account",
 		fixture: "protected-placeholder",
 	},
-	// 58 號電子發票賣家面的三條動態路由（58A S08／S10／S11）。
-	//
-	// ⚠️ `/seller-center/invoices/[documentId]` 與同層的四個靜態段
-	// （`documents`／`tax-status`／`appeals`／`jobs`）並存：App Router 的靜態段優先，
-	// 所以那四條仍由各自的 page.tsx 承接、只會出現在 PROTECTED_STATIC_ROUTES。
 	{
 		pattern: "/seller-center/invoices/[documentId]",
 		access: "seller",
@@ -225,8 +208,6 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		fixture: "protected-placeholder",
 	},
 	{
-		// 目錄名一律 `[jobId]`：`dynamic-route-catalog` 的斷言與 App Router 目錄名
-		// 逐字比對，改名就是 CI 紅（§B-2.0 T19 的同一條規則）。
 		pattern: "/seller-center/invoices/jobs/[jobId]",
 		access: "seller",
 		fixture: "protected-placeholder",
@@ -305,19 +286,6 @@ export function materializeDynamicRoute(
 		case "protected-placeholder":
 			route = route.replace(/\[[^\]]+\]/g, "route-contract-id");
 			break;
-		// 代行工作區的 `[storeId]` **必須是數字**，其餘 param 才用字串佔位。
-		//
-		// ⚠️ 這不是美化：`app/(delegated)/adm/[storeId]/layout.tsx` 對非數字
-		// storeId 一律 notFound()，而在它存在之前，client 的
-		// `DelegatedRuntimeBoundary`（:28 同一條 `/^\d{1,19}$/`）會走
-		// `return <>{children}</>` 不掛 Provider ⇒ 各頁的嚴格
-		// `useDelegatedSession()` throw ⇒ **SSR 500**。
-		//
-		// 用 `protected-placeholder`（把 `[storeId]` 也換成 `route-contract-id`）的
-		// 後果是：本檔案的消費者「delegated workspace routes stay guest-safe and
-		// unindexed」**每一條都在 500**，於是它另外兩條斷言（缺 noindex、骨架夾帶
-		// 賣家資料）**從來沒有機會執行過** —— 那支測試存在的理由正是那兩條。
-		// 換成數字佔位，它才第一次真的走到 DelegatedWorkspaceFrame。
 		case "delegated-workspace":
 			route = route
 				.replace("[storeId]", "9000000000000000000")
@@ -338,9 +306,6 @@ export function materializeDynamicRoute(
 				requireFixtureId(fixtures, "sellerId", entry.pattern),
 			);
 			break;
-		// 討論串沒有可從公開 feed 探索的真實 id；用全零 UUID（不存在的串）佔位，
-		// 契約是「回框架 404」，由 site-links.spec.ts 專屬斷言承接，不進
-		// 「真實訪客文件」迴圈。
 		case "seller-thread":
 			route = route
 				.replace("[id]", requireFixtureId(fixtures, "sellerId", entry.pattern))

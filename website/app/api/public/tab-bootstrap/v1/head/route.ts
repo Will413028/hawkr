@@ -15,7 +15,6 @@ function readRequest(
 	if (tab !== "feed" && tab !== "market") return null;
 	const page = Number(params.get("page") ?? "1");
 	if (!Number.isInteger(page) || page < 1 || page > 100) return null;
-	// 動態牆是 page_token 分頁：token 是伺服器簽的不透明字串，這裡只限長度，內容由伺服器驗。
 	const pageToken = params.get("pageToken") ?? "";
 	if (pageToken.length > 2048) return null;
 	return { tab, page, pageToken };
@@ -52,10 +51,6 @@ export async function GET(request: Request) {
 						signal: AbortSignal.timeout(FEED_REFRESH_DEADLINE_MS),
 						strict: true,
 						locale: defaultLocale,
-						// The feed branch reads the gateway directly for this one
-						// visitor, so it is charged to them (backend#2264). The market
-						// branch below is a shared cache entry and stays on the SSR
-						// subject — a per-visitor value must never reach a cache key.
 						visitorIp: getVisitorIp(request) ?? undefined,
 					})
 				: await getCachedStrictProductsPage(input.page, 24);

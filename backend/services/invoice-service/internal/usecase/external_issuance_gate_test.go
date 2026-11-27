@@ -1,6 +1,5 @@
 //go:build !integration
 
-// statementOf 住在 fail_reason_visibility_test.go（同樣掛 !integration）。
 
 package usecase
 
@@ -15,14 +14,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔守 #3166 / DEC-20260905-221900 選 A 的那條新邊，兩個方向各一支：
-//
-//	① 判準本身對不對（canReportExternalIssuance 的四種輸入）
-//	② **三份判準有沒有漂移**（usecase 守衛 ／ 兩句 SQL 的 allowed-from）
-//
-// ② 是重點。三份分別住在 Go 與兩個 .sql 檔，改一份不會讓另兩份轉紅：
-//   - usecase 多開一格 ⇒ 回 200 然後在 SQL 撞 rows=0（泛用漂移錯誤，看起來像併發）
-//   - usecase 少一格   ⇒ 合法回報被 9349 擋掉，而那正是 #3166 的原始症狀
 
 func TestCanReportExternalIssuance(t *testing.T) {
 	selfIssue := codemeta.InvoiceFulfillmentModeSellerSelfIssue.Value
@@ -37,19 +28,14 @@ func TestCanReportExternalIssuance(t *testing.T) {
 		mode   string
 		want   bool
 	}{
-		// ① J30：ADM 人工出口解鎖的產物，mode 不拘。
 		{"人工解鎖 ＋ AMEGO_AUTO", unlocked, auto, true},
 		{"人工解鎖 ＋ 自行開立", unlocked, selfIssue, true},
 
-		// ② 新邊：平台從一開始就不開票的兩個 mode。
 		{"NOT_APPLICABLE ＋ 賣家自行開立", na, selfIssue, true},
 		{"NOT_APPLICABLE ＋ 尚未核准（LEGACY_MANUAL）", na, legacy, true},
 
-		// 🔴 陰性：AMEGO_AUTO 的 NOT_APPLICABLE 是零元訂單／切點前訂單，
-		// 平台判定「這一單不開票」而不是「賣家自己開」⇒ 不得開放回報一個發票號碼。
 		{"NOT_APPLICABLE ＋ AMEGO_AUTO（零元／切點前）", na, auto, false},
 
-		// 其餘狀態一律不行（回報只在這兩個入口）。
 		{"SENDING", "SENDING", selfIssue, false},
 		{"SUCCEEDED", "SUCCEEDED", selfIssue, false},
 		{"FAILED_PERMANENT", "FAILED_PERMANENT", legacy, false},
@@ -83,7 +69,6 @@ func TestExternalIssuanceAllowedFromMatchesGuard(t *testing.T) {
 	docStmt := statementOf(t, read("invoice_documents.sql"), "MarkInvoiceDocumentResolvedExternally")
 	opStmt := statementOf(t, read("invoice_operations.sql"), "MarkInvoiceOperationResolvedExternally")
 
-	// 兩句都必須認 NOT_APPLICABLE，且都必須夾住那兩個 mode。
 	for name, stmt := range map[string]string{
 		"MarkInvoiceDocumentResolvedExternally":  docStmt,
 		"MarkInvoiceOperationResolvedExternally": opStmt,
@@ -98,15 +83,11 @@ func TestExternalIssuanceAllowedFromMatchesGuard(t *testing.T) {
 		}
 	}
 
-	// 🔴 document 那句必須同時清 not_applicable_reason：chk_invdoc_na_reason 是雙向等式
-	// (status='NOT_APPLICABLE') = (not_applicable_reason IS NOT NULL)
-	// ⇒ 只改 status 不清 reason，這條新邊每一次都當場 23514。
 	if !strings.Contains(docStmt, "not_applicable_reason = NULL") {
 		t.Error("🔴 MarkInvoiceDocumentResolvedExternally 沒有清 not_applicable_reason —— " +
 			"chk_invdoc_na_reason 是雙向等式，從 NOT_APPLICABLE 出發時當場 23514")
 	}
 
-	// 陰性對照：兩句都必須保留原本那條入口，否則 A4 人工解鎖流程（端點 54–56）會斷掉。
 	if !strings.Contains(opStmt, "MANUAL_PROCESS_ALLOWED") {
 		t.Error("MarkInvoiceOperationResolvedExternally 掉了 MANUAL_PROCESS_ALLOWED —— A4 流程會斷")
 	}
@@ -126,8 +107,6 @@ func TestExternalIssuanceAllowedFromMatchesGuard(t *testing.T) {
 // 判準錨在**原始碼裡有沒有裸比對**，不是「有沒有呼叫 helper」：後者對
 // 「呼叫了 helper 但又自己補一個 if」無感，而那正是漂移最常見的形狀。
 func TestExternalIssuanceGateHasSingleImplementation(t *testing.T) {
-	// 這個常數只准出現在三個地方：helper 自己、以及兩處與回報無關的用途
-	// （62R 的唯讀述詞、job 清單分組）。任何**新的** `op.Status != ...` 比對都是漂移。
 	files := []string{"admin_job.go", "seller_job.go"}
 	for _, f := range files {
 		raw, err := os.ReadFile(f)

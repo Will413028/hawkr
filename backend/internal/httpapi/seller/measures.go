@@ -16,8 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 措施與申覆的方法以帳號為範圍（宣告為豁免，不要求賣家角色或店家）：所有店家都已關閉的帳號照樣受處分，必須還能查措施與
-// 申覆。帳號是登入的呼叫者；措施是不是這個帳號的，由模組以 account ID 檢查，別人的與不存在的一律 not_found。
 
 var (
 	appealPaths  = rpc.FieldPaths{"MeasureID": "measure_id", "Reason": "reason", "EvidenceTokens[]": "evidence_staged_tokens[]", "ExpectedVersion": "etag"}
@@ -30,7 +28,6 @@ func (h *App) ListMyMeasures(ctx context.Context, req *connect.Request[pb.ListMy
 		return nil, errNoPrincipal
 	}
 	msg := req.Msg
-	// page token 只能用在同一組篩選：換了篩選就從第一頁開始。
 	scope := rpc.FilterScope(sellerv1alpha1connect.SellerAppServiceListMyMeasuresProcedure, msg.GetState().String())
 	scope = rpc.PageScope(scope, p.ID)
 	after, err := rpc.ValidCursor[model.MeasureCursor](scope, msg.GetPageToken())
@@ -128,7 +125,6 @@ func (h *App) RequestRemediation(ctx context.Context, req *connect.Request[pb.Re
 	return connect.NewResponse(&pb.RequestRemediationResponse{Measure: measure}), nil
 }
 
-// toRequest 轉成賣家看到的請求（r 是 Measure.EffectiveRequests 的結果，不是儲存值）：不輸出佐證與裁定的管理員。
 func toRequest(r model.MeasureRequest) *pb.MeasureRequest {
 	out := &pb.MeasureRequest{
 		Id: r.ID.String(), Kind: rpc.EnumToProto[pb.MeasureRequestKind](r.Kind), State: rpc.EnumToProto[pb.MeasureRequestState](r.State), Reason: r.Reason,
@@ -143,9 +139,6 @@ func toRequest(r model.MeasureRequest) *pb.MeasureRequest {
 	return out
 }
 
-// toMeasure 轉成賣家看到的措施：給賣家的理由（StatementToSeller）、依據的認定與期間，平台內部的註記、複審期限、建立與撤銷的
-// 管理員、來源通報與佐證圖片不對外。etag 由賣家看得到的版本產生。不能申覆與不能請求解除的原因帶句子（語系 l），與兩個方法被拒絕時錯誤的
-// LocalizedMessage 是同一份文字。
 func toMeasure(l uitext.Locale, m model.Measure) *pb.Measure {
 	out := &pb.Measure{
 		Id: m.ID.String(), Kind: rpc.EnumToProto[pb.MeasureKind](m.Kind), Basis: rpc.EnumToProto[pb.MeasureBasis](m.Basis),
@@ -201,8 +194,6 @@ func toMeasure(l uitext.Locale, m model.Measure) *pb.Measure {
 	return out
 }
 
-// toContentRef 把措施的一個內容對象轉成對外的 ContentRef：快照在時帶摘要（伺服器截斷）、發文時間與連結目標，否則只帶狀態。
-// 賣家與後台共用；後台另以 measure.content_bodies 取得全文。
 func toContentRef(c model.MeasureContent) *pb.ContentRef {
 	out := &pb.ContentRef{
 		Kind: rpc.EnumToProto[pb.ContentKind](c.Kind), Id: c.ID.String(), SnapshotState: rpc.EnumToProto[pb.ContentSnapshotState](c.State),

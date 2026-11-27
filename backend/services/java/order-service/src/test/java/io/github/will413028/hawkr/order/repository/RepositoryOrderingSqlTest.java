@@ -63,12 +63,7 @@ class RepositoryOrderingSqlTest {
         DETERMINISM_KEY.put(CartCleanupRetryTaskRepository.class, "task_id");
         DETERMINISM_KEY.put(CouponConsumptionTaskRepository.class, "task_id");
         DETERMINISM_KEY.put(GrantPaymentTaskRepository.class, "task_id");
-        // 複合主鍵 (stock_tx_id, phase)；兩支候選查詢都把 phase 釘成單一值，
-        // 該欄在結果集內為常數 ⇒ stock_tx_id 已足以構成全序。
         DETERMINISM_KEY.put(StockTxRecordRepository.class, "stock_tx_id");
-        // 唯一鍵 (order_no, snapshot_version)；唯一一支查詢把 order_no 釘成單一值
-        // （WHERE order_no = #{orderNo}）⇒ 該欄在結果集內為常數，snapshot_version
-        // 已足以構成全序。與 StockTxRecordRepository 同一條理由。
         DETERMINISM_KEY.put(OrderInvoiceSnapshotRepository.class, "snapshot_version");
     }
 
@@ -97,7 +92,6 @@ class RepositoryOrderingSqlTest {
             "賣家停權批次取消的候選全集，無 LIMIT；SellerSuspendedConsumer 逐筆走 CAS 取消整個集合，"
                     + "每一筆都會被處理，先後不影響結果");
 
-    // ==================== 錨 ====================
 
     @Test
     @DisplayName("錨 1：package 內每個 mapper 都登記了收尾鍵（新增 mapper 不得靜默逃過）")
@@ -181,7 +175,6 @@ class RepositoryOrderingSqlTest {
                 .isNull();
     }
 
-    // ==================== helpers ====================
 
     /**
      * 走訪 {@link OrderRepository} 所在的 code source 目錄，取出本 package 下所有 mapper 介面。

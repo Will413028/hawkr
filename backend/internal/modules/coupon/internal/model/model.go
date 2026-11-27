@@ -185,7 +185,6 @@ func ReasonOf(err error) Reason {
 	return ""
 }
 
-// reasonText 是各原因的使用者面句子（模組的 internal/text）。
 var reasonText = map[Reason]func(uitext.Locale) uitext.Message{
 	ReasonCampaignNotFound:          text.ReasonCampaignNotFound,
 	ReasonVoucherNotFound:           text.ReasonVoucherNotFound,
@@ -268,7 +267,6 @@ const (
 	InvalidStoreClosed                      InvalidKey = "invalid.store_closed"
 )
 
-// invalidText 是各欄位錯誤的使用者面句子。
 var invalidText = map[InvalidKey]func(uitext.Locale) uitext.Message{
 	InvalidTitleLength:                      text.InvalidTitleLength,
 	InvalidReasonLength:                     text.InvalidReasonLength,

@@ -35,7 +35,6 @@ type postRow struct {
 	stats store.SocialPostStat
 }
 
-// withTags 補上每篇貼文的標籤（一次批次讀取）。
 func (s *Service) withTags(ctx context.Context, rows []postRow) ([]model.Post, error) {
 	out := make([]model.Post, len(rows))
 	if len(rows) == 0 {
@@ -81,7 +80,6 @@ func (s *Service) Own(ctx context.Context, storeID int64, id uuid.UUID) (model.P
 	return posts[0], nil
 }
 
-// markReadable 填貼文的 Readable（一次批次查詢，草稿與下架的不查，一定不可讀）；公開讀取的貼文由讀取規則保證可讀，不走這裡，只有店主與後台讀取需要求值。
 func (s *Service) markReadable(ctx context.Context, posts []model.Post) error {
 	ids := make([]uuid.UUID, 0, len(posts))
 	for _, p := range posts {
@@ -99,14 +97,12 @@ func (s *Service) markReadable(ctx context.Context, posts []model.Post) error {
 	return nil
 }
 
-// markPublic 標記 posts 都是公開可讀：它們來自帶公開可讀條件的讀取。
 func markPublic(posts []model.Post) {
 	for i := range posts {
 		posts[i].Readable = true
 	}
 }
 
-// markTakedowns 填店主讀自己的貼文與後台列表的 TakedownMeasureID（一次批次查複本 content_takedowns）。
 func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
 	if len(posts) == 0 {
 		return nil
@@ -131,7 +127,6 @@ func (s *Service) markTakedowns(ctx context.Context, posts []model.Post) error {
 	return nil
 }
 
-// viewerOf 是公開讀取的觀看者：呼叫者的買家身分；零值是未登入。
 func viewerOf(c model.Caller) visibility.Viewer { return visibility.Viewer{BuyerID: c.BuyerID} }
 
 // Public 讀觀看者可讀的貼文（已發布、沒有刪除、店家可曝光、觀看者沒有封鎖這家店）；其他一律 NotFound（SD1）。讀取不計瀏覽數（RecordView 另外呼叫）。
@@ -167,7 +162,6 @@ func (s *Service) PublicIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID
 	return out, nil
 }
 
-// page 把多取一筆的結果切成一頁。
 func page[R any](rows []R, size int32) ([]R, bool) {
 	if len(rows) > int(size) {
 		return rows[:size], true
@@ -276,7 +270,6 @@ func (s *Service) ListOwn(ctx context.Context, storeID int64, status model.PostS
 	return s.createdPage(ctx, pr, more)
 }
 
-// createdPage 把（已截到一頁的）列轉成建立時間排序的一頁：補標籤與下架措施，more 為真時帶下一頁游標。店主清單與後台清單共用。
 func (s *Service) createdPage(ctx context.Context, rows []postRow, more bool) (model.CreatedPostPage, error) {
 	posts, err := s.withTags(ctx, rows)
 	if err != nil {

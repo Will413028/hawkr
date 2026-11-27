@@ -29,7 +29,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// setupResolution 組真的 buyer 與 seller 模組，Resolver 是正式的 NewResolver：店家解析、店封鎖買家與追蹤者都走真的實作。
 func setupResolution(t *testing.T) *fixture {
 	t.Helper()
 	t.Parallel()
@@ -58,7 +57,6 @@ func setupResolution(t *testing.T) *fixture {
 	return &fixture{db: d, identity: id, buyer: buyers, sellerMod: sl, bus: bus, jobs: rec, module: m, logs: logs, resolver: resolver}
 }
 
-// openStore 讓帳號開一間店並回傳 store_id。
 func (f *fixture) openStore(t *testing.T, account int64) int64 {
 	t.Helper()
 	s, err := f.sellerMod.Apply(context.Background(), seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: account, StoreName: "測試小店"})
@@ -68,8 +66,6 @@ func (f *fixture) openStore(t *testing.T, account int64) int64 {
 	return s.StoreID
 }
 
-// 測試專用型別（還沒有正式的 Expand 或 fan-out 型別）。四個型別各練一種解析：店家收件（STORE，actor 是買家）、買家收件（BUYER，actor 可以是買家或店）、
-// 母意圖（對追蹤者 fan-out）與它的子型別（Spawned，BUYER，actor 是店）。
 type storeCommentParams struct {
 	EventID      string `json:"event_id"`
 	StoreID      int64  `json:"store_id"`
@@ -87,7 +83,6 @@ type postParams struct {
 	EventID string    `json:"event_id"`
 	StoreID int64     `json:"store_id"`
 	At      time.Time `json:"at"`
-	// Skip 是測試用的過濾：Targets 濾掉這些買家（模擬型別自己的濾除，底層的分頁仍照原樣前進）。
 	Skip []int64 `json:"skip"`
 }
 
@@ -190,7 +185,6 @@ func (f *fixture) newBuyer(t *testing.T) (account, buyerID int64) {
 	return account, f.buyerID(t, account)
 }
 
-// ok 吃下一個 (bool, error) 的結果並在錯誤時中止：ok(t)(f.buyer.BlockBuyer(...))。
 func ok(t *testing.T) func(bool, error) {
 	t.Helper()
 	return func(_ bool, err error) {
@@ -201,7 +195,6 @@ func ok(t *testing.T) func(bool, error) {
 	}
 }
 
-// runAll 展開排著的 process 與 fan-out job，直到沒有為止；回傳執行的 fan-out 頁數與 process 數。
 func (f *fixture) runAll(t *testing.T, svc *intake.Service) (pages []intake.FanoutArgs, processed int) {
 	t.Helper()
 	for {
@@ -423,7 +416,6 @@ func TestProcessCancelsAnIntentWithAnInvalidBuyerID(t *testing.T) {
 	}
 }
 
-// noBuyersResolver 對任何買家號碼都回「查不到」而不報錯，讓 Expand 自己的號碼檢查成為唯一擋下不合法買家號碼的地方（正式的買家模組自己也會拒絕）。
 type noBuyersResolver struct{ registry.Resolver }
 
 func (noBuyersResolver) BuyerAccounts(context.Context, []int64) (map[int64]int64, error) {

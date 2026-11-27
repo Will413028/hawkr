@@ -1,4 +1,3 @@
-// UI Components
 
 export { default as Badge } from "./Badge";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./Button";

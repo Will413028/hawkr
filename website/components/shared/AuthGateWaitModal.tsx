@@ -27,9 +27,6 @@ export default function AuthGateWaitModal({ open }: { open: boolean }) {
 			setStalled(false);
 			return;
 		}
-		// `authWaiting` 若因為請求卡住／例外而不翻轉，這個 overlay 會永久蓋住
-		// 整個 app 且沒有任何出口。15 秒後給一條自救路徑（重新整理），而不是
-		// 讓使用者只能關掉分頁。
 		const timer = window.setTimeout(() => setStalled(true), WATCHDOG_MS);
 		return () => window.clearTimeout(timer);
 	}, [open]);
@@ -37,13 +34,9 @@ export default function AuthGateWaitModal({ open }: { open: boolean }) {
 	return (
 		<Dialog
 			open={open}
-			// Never called: dismissal is off. Kept because the prop is required.
 			onClose={() => {}}
 			isDismissable={false}
 			showCloseButton={false}
-			// 純等待型 overlay：不搶焦點，讓接手的 LoginRequiredModal 記到的
-			// 「原焦點」是使用者真正點的那顆按鈕，關閉後才回得去（否則會回到
-			// 這個即將卸載的面板，最後掉到 body）。
 			autoFocus={false}
 			size="sm"
 			aria-busy={!stalled}
@@ -53,7 +46,7 @@ export default function AuthGateWaitModal({ open }: { open: boolean }) {
 			<div className="h-16 w-full">
 				<BrandLogoLoader size="fit" />
 			</div>
-			{/* polite live region：等待訊息只宣告一次，watchdog 文案接著補上。 */}
+
 			<div
 				className="grid justify-items-center gap-1"
 				role="status"

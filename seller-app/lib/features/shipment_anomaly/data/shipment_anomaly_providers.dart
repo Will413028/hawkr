@@ -29,7 +29,6 @@ Future<Map<String, ShipmentAnomaly>> shipmentAnomalyByOrderNo(Ref ref) async {
     final map = <String, ShipmentAnomaly>{};
     for (final a in result.records) {
       if (a.orderNo.isEmpty) continue;
-      // 同 orderNo 多筆 anomaly 時保留第一筆即可（badge 不需精細）。
       map.putIfAbsent(a.orderNo, () => a);
     }
     return map;
@@ -39,9 +38,6 @@ Future<Map<String, ShipmentAnomaly>> shipmentAnomalyByOrderNo(Ref ref) async {
   }
 }
 
-// ============================================================
-// Dashboard 列表 Controller
-// ============================================================
 
 /// Dashboard 列表查詢條件。
 class ShipmentAnomalyFilter {
@@ -142,7 +138,6 @@ class ShipmentAnomalyDashboardController
   Future<bool> acknowledge(String shipmentId, String anomalyType) async {
     try {
       await _repo.acknowledge(shipmentId, anomalyType);
-      // 同步刷新 banner 統計
       ref.invalidate(shipmentAnomalyStatsProvider);
       ref.invalidate(shipmentAnomalyByOrderNoProvider);
       await refresh();

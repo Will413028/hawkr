@@ -43,8 +43,6 @@ export function useSellerProducts(
 		refetchOnWindowFocus: true,
 	});
 	return {
-		// `data` (not `error || !data`): a failed background refetch keeps the
-		// last-good list rather than dropping the badge/count to empty.
 		data: query.data ?? null,
 		loading: query.isLoading,
 		error: query.error instanceof Error ? query.error.message : null,
@@ -68,8 +66,6 @@ export function useInvalidateSellerProducts(): () => Promise<void> {
 			queryClient.invalidateQueries({
 				queryKey: scope.keys.products(),
 			}),
-			// 公開商品列表（發文頁商品選單等）同步失效，避免剛上/改的商品
-			// 在 30s staleTime 窗內看不到。
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.sellers.productsRoot(),
 			}),

@@ -37,10 +37,8 @@ func New(m *delegation.Module, log *slog.Logger) *Server {
 	return &Server{m: m, log: log}
 }
 
-// bizCodes 是模組的拒絕對應的業務碼（設計書 56 §6.5.1；表在模組，稽核列的 biz_code 用同一張）。每一種拒絕都要有（TestEveryDenialHasABusinessCode）。
 var bizCodes = delegation.DenialBizCodes()
 
-// 舊的業務碼：與拒絕共用的幾個。
 var (
 	codeInvalidCommand       = bizCodes[delegation.DenialInvalidCommand]
 	codeAdminSessionRequired = bizCodes[delegation.DenialAdminRequired]
@@ -48,7 +46,6 @@ var (
 	codeAuditIntentFailed    = bizCodes[delegation.DenialAuditIntentFailed]
 )
 
-// reject 把模組的錯誤轉成舊的回應：業務的拒絕回傳 code 與 message（rpcErr 是 nil）；其他錯誤回傳 gRPC 的 internal。
 func (s *Server) reject(ctx context.Context, rpc string, err error) (code int32, msg string, rpcErr error) {
 	if d, ok := delegation.DelegationDenialOf(err); ok {
 		if c, ok := bizCodes[d.Denial]; ok {
@@ -79,7 +76,6 @@ func (s *Server) Preflight(ctx context.Context, req *connect.Request[pb.Prefligh
 	}
 	target := toTarget(res.Target)
 	if !res.TargetKnown {
-		// 契約要求非空；還沒讀到店家的拒絕只顯示拒絕的原因，不顯示店家。
 		target.SellerAccountId, target.StoreName = "0", "（查無此店家）"
 	}
 	data := &pb.PreflightData{
@@ -118,7 +114,6 @@ func (s *Server) CreateSession(ctx context.Context, req *connect.Request[pb.Crea
 		AdminDisplayName: m.GetActorDisplayName(),
 		StoreID:          storeID,
 		Reason:           fromWire[delegation.DelegationReason](m.GetReasonCode()),
-		// proto3 optional：沒有帶是 null（合法），空字串是帶了一個不合法的值。
 		CaseReference:  m.CaseReference,
 		Capabilities:   toCapabilities(m.GetRequestedCapabilities()),
 		TTLSeconds:     m.GetRequestedTtlSeconds(),
@@ -186,9 +181,7 @@ func (s *Server) RevokeSession(ctx context.Context, req *connect.Request[pb.Revo
 	}}), nil
 }
 
-// ---- 轉換 ----
 
-// parseID 解析管理員、店家與代行 session 的 ID（正的十進位整數）。
 func parseID(s string) (int64, bool) {
 	v, err := strconv.ParseInt(s, 10, 64)
 	return v, err == nil && v > 0
@@ -199,7 +192,6 @@ func parseUUID(s string) (uuid.UUID, bool) {
 	return id, err == nil
 }
 
-// parseOptionalID 解析選填的 ID 篩選：空字串是不篩選。
 func parseOptionalID(s string) (*int64, bool) {
 	if s == "" {
 		return nil, true
@@ -208,7 +200,6 @@ func parseOptionalID(s string) (*int64, bool) {
 	return &v, ok
 }
 
-// optionalString 是沒有帶（空字串）時的 nil。
 func optionalString(s string) *string {
 	if s == "" {
 		return nil
@@ -216,7 +207,6 @@ func optionalString(s string) *string {
 	return &s
 }
 
-// parseOptionalInt64 是舊的寬鬆解析：不是數字時當作沒有帶（資源的版本）。
 func parseOptionalInt64(s string) *int64 {
 	v, err := strconv.ParseInt(s, 10, 64)
 	if s == "" || err != nil {
@@ -233,7 +223,6 @@ func parseOptionalInt32(s string) (int32, bool) {
 	return int32(v), err == nil
 }
 
-// parseTime 解析 ISO 8601（RFC 3339，可以有小數秒）；空字串是沒有帶。
 func parseTime(s string) (*time.Time, bool) {
 	if s == "" {
 		return nil, true
@@ -246,7 +235,6 @@ func parseTime(s string) (*time.Time, bool) {
 	return &t, true
 }
 
-// formatTime 是對外的時間：UTC、截到秒（前端的格式最多三位小數，TIMESTAMPTZ 是微秒）。
 func formatTime(t time.Time) string { return t.UTC().Truncate(time.Second).Format(time.RFC3339) }
 
 func formatTimePtr(t *time.Time) string {
@@ -256,7 +244,6 @@ func formatTimePtr(t *time.Time) string {
 	return formatTime(*t)
 }
 
-// optionalTime 是 proto3 optional 的時間：nil 輸出 JSON null。
 func optionalTime(t *time.Time) *string {
 	if t == nil {
 		return nil
@@ -303,8 +290,6 @@ func toReason(s delegation.DelegationSession) *pb.DelegationReason {
 	return &pb.DelegationReason{Code: toWire(s.Reason), Label: s.ReasonLabel, CaseReferenceRequired: s.Reason.CaseReferenceRequired()}
 }
 
-// toSummary 是 create、current 與兌換共用的投影。不含任何 credential 或 token；連續兩次讀取必須逐位元相同（前端以
-// 九個欄位對帳）。case_reference 沒有時是 null，不是省略。
 func toSummary(s delegation.DelegationSession) *pb.OperationSessionSummary {
 	return &pb.OperationSessionSummary{
 		SessionId:     formatID(s.ID),

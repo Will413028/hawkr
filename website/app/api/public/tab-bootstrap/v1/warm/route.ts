@@ -37,7 +37,6 @@ export async function GET(request: Request) {
 	}
 
 	if (tab === "feed") {
-		// Backward-compatible no-op for already-loaded clients.
 	} else if (tab === "market") {
 		await Promise.all([
 			getCachedProductsFirstPage(100).catch(() => null),

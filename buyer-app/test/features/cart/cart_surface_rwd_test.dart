@@ -94,8 +94,6 @@ void main() {
             await _pumpSurface(
               tester,
               width: width,
-              // Single quantities also cover the embedded catalog's extra
-              // gutter; large quantities cover the production cart container.
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: count == 1 ? 16 : 0),
                 child: MerchantGroupCard(
@@ -326,8 +324,6 @@ void main() {
       child: ShippingSection(
         shippingOptions: const [
           {
-            // 長 label 的 RWD 測試；method 用真實 CodeMeta value，
-            // 未支援的碼值不會出現在選單裡（見 ShippingSection._groupOptions）
             'shippingMethod': '3001',
             'label': '產地低溫專車配送（冷凍）',
             'deliveryTemp': '3203',

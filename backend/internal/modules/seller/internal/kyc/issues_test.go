@@ -74,7 +74,6 @@ func TestIssuableFieldsFollowTheSellerType(t *testing.T) {
 	if !contains(biz, "business.tax_id") || !contains(biz, "business.company_documents") || !contains(biz, "product_type") {
 		t.Errorf("企業：%v", biz)
 	}
-	// 驗證用同一份：個人申請指企業欄位被擋，企業欄位在企業申請可用。
 	if err := checkIssuesAgainstApplication([]model.KYCIssue{{Field: "business.tax_id"}}, model.KYCIndividual, nil); err == nil {
 		t.Error("個人申請不能指企業欄位")
 	}

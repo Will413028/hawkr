@@ -8,9 +8,6 @@ interface TopbarProps {
 }
 
 export default function Topbar({ onMenuClick }: TopbarProps) {
-	// 🔴 頁首日期也釘台北（backend#3053 的稽查）：這是**平台營運日**，不是看的人的
-	// 本機日期。管理員在日本時，23:00–24:00 (JST) 這一小時的「今天」與台北差一天
-	// —— 而底下所有資料的時間都是台北。
 	const today = new Date();
 	const dateStr = formatDateLabel(today);
 	const weekday = formatWeekday(today);

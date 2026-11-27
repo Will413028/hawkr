@@ -53,8 +53,8 @@ class ProductGrpcServiceGetProductOwnerTest {
     @Test
     @DisplayName("擁有權判斷讀 request.store_id（重開店 surrogate），忽略 GrpcAuthContext 的原始 JWT accountId")
     void getProduct_usesRequestStoreId_notGrpcAuthContext() {
-        long staleJwtAccountId = 9999L;       // 請求進入時的原始 JWT accountId（重開店前的舊值）
-        long resolvedSurrogateId = 5001L;     // gateway 已解析的現任 store surrogate id
+        long staleJwtAccountId = 9999L;
+        long resolvedSurrogateId = 5001L;
 
         Context ctxWithStaleJwtId = Context.current().withValue(GrpcAuthContext.ACCOUNT_ID, staleJwtAccountId);
         Context previous = ctxWithStaleJwtId.attach();
@@ -81,7 +81,6 @@ class ProductGrpcServiceGetProductOwnerTest {
             ctxWithStaleJwtId.detach(previous);
         }
 
-        // 若回歸讀 GrpcAuthContext（9999），這個 verify 會失敗
         verify(productService).getProduct("123", resolvedSurrogateId);
 
         ArgumentCaptor<GetProductResponse> captor = ArgumentCaptor.forClass(GetProductResponse.class);

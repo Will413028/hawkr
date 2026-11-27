@@ -1,16 +1,4 @@
-/* Hawkr Agent Phase 1 — buyer procurement assistant inside the Messages shell.
- *
- * The conversation is the narrative spine; typed artifacts hold reviewable
- * facts and actions. All colours, radii, typography and spacing stay on the
- * Hawkr semantic token layer so this surface follows light/dark themes.
- */
 
-/* ── Hawkr Agent 對話列（B-244 多對話側欄）────────────────────────────
- * 密度沿用 .chat-sidebar__item（不是 hero 卡）；「更多」鈕是 Link 的絕對
- * 定位兄弟節點，避免巢狀互動元素。Agent identity 已收斂到清單上方分頁。 */
-/* 分頁化之後 agent 區段是「被選到時佔滿剩餘高度」的主區，不再是釘在
- * 人類列表上方的 `flex-shrink: 0` 區塊——那個寫法沒有高度上限，對話一多
- * 就把人類列表壓到 0px，而且它在捲動容器外面，捲也捲不到賣家訊息。 */
 .chat-sidebar__agent {
 	display: flex;
 	flex-direction: column;
@@ -18,16 +6,12 @@
 	min-height: 0;
 }
 
-/* 常駐的「開新對話」是 Agent 分頁的 quiet primary action。Edit 圖示表達
- * 開始撰寫，不把已移除的方框 Plus 帶回來；淡綠面和歷史列的 active tint 是同一
- * 家族，但固定的圖示與動作文字讓它不會被誤認成對話。 */
 .chat-sidebar__new-chat {
 	display: flex;
 	align-items: center;
 	gap: 12px;
 	width: calc(100% - 2 * var(--hkui-space-3));
 	margin: var(--hkui-space-2) var(--hkui-space-3) 0;
-	/* 命中區 44px（DESIGN.md §觸控）：11+18+11 = 40，補 min-height。 */
 	min-height: 44px;
 	box-sizing: border-box;
 	padding: 10px 12px;
@@ -72,23 +56,13 @@
 }
 
 .chat-sidebar__agent-row .chat-sidebar__item {
-	/* 預留右側動作鈕的位置，標題不壓到它。 */
 	padding-right: 40px;
 }
 
-/* 預覽那一行也要讓開兩顆動作鈕。
- *
- * 標題那一行右側本來就有時間戳佔位（hover 時它只是淡出、不讓出空間），所以
- * 標題永遠壓不到鈕；預覽行沒有這個佔位物，`padding-right: 40px` 只擋得住 40px，
- * 而兩顆 34px 鈕加 10px 間距從 right:8 一路長到 right:86——中間 46px 就是預覽
- * 文字被蓋住的那一段。刻意常駐保留而不是 hover 才加：hover 時才改 padding 會
- * 讓整行文字跳動。 */
 .chat-sidebar__agent-row .chat-sidebar__preview {
 	padding-right: 46px;
 }
 
-/* 刪除＋更多兩顆鈕。絕對定位覆蓋在時間戳那一塊上（hover 時時間戳淡出），
- * 這樣非 hover 態的版面完全不變、也不會為了兩顆鈕永久壓縮標題寬度。 */
 .chat-sidebar__agent-actions {
 	position: absolute;
 	top: 50%;
@@ -96,9 +70,6 @@
 	transform: translateY(-50%);
 	display: flex;
 	align-items: center;
-	/* 兩顆 34px 鈕各自用 ::before inset:-5px 撐到 44px 命中區。gap 必須
-	 * ≥ 10px，否則兩個命中區會重疊（34+2 的間距下重疊 8px），重疊帶裡後面
-	 * 的兄弟贏，垃圾桶的右緣會靜默開啟 ⋯ 選單。 */
 	gap: 10px;
 }
 
@@ -121,7 +92,6 @@
 		color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
 }
 
-/* 觸控目標擴到 44px（design-system §觸控），視覺維持 34px。 */
 .chat-sidebar__agent-action::before {
 	content: "";
 	position: absolute;
@@ -133,17 +103,12 @@
 	opacity: 1;
 }
 
-/* 兩顆鈕浮出時把時間戳讓出來——不改版面，只換誰可見。 */
 .chat-sidebar__agent-row:hover .chat-sidebar__item-head small,
 .chat-sidebar__agent-row:focus-within .chat-sidebar__item-head small {
 	opacity: 0;
 	transition: opacity var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
 }
 
-/* 觸控裝置沒有 hover，動作鈕只能常駐——但「常駐一顆無確認的刪除鈕，就貼在
- * 你要點開的那一列旁邊」是這個介面最危險的一件事。⋯ 選單裡本來就有刪除，
- * 所以觸控上只留 ⋯：不少任何功能，卻拿掉了誤刪路徑。
- * （對照：ChatGPT／Meta AI／XChat／BeReal 的刪除都有確認步驟。） */
 @media (hover: none) {
 	.chat-sidebar__agent-action {
 		opacity: 1;
@@ -164,7 +129,6 @@
 	color: var(--hkui-primary);
 }
 
-/* 刪除是破壞性動作——hover 才轉成 danger 語意，靜置時不製造紅色噪音。 */
 .chat-sidebar__agent-action--delete:hover {
 	background: color-mix(in srgb, var(--hkui-danger) 10%, transparent);
 	color: var(--hkui-danger);
@@ -175,16 +139,11 @@
 	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
 }
 
-/* ⋯ 的彈出選單。就地錨在觸發鈕下方（右對齊），視覺語彙與 seller-orders
- * 的列動作選單同源——同一個互動語意不長出第二種外觀。 */
 .chat-sidebar__agent-menu {
 	position: relative;
 	display: inline-flex;
 }
 
-/* fixed 而非 absolute：側欄 overflow:hidden、列表 overflow-y:auto，
- * absolute 子層會被裁掉（實機上第二個項目被切掉）。座標由 JS 依觸發鈕
- * 的 rect 決定（right/top 或 right/bottom）。 */
 .chat-sidebar__agent-menu-list {
 	position: fixed;
 	z-index: 60;
@@ -231,7 +190,6 @@
 	color: var(--hkui-danger) !important;
 }
 
-/* 就地改名：輸入框佔住標題那一格，列高不變（避免編輯時整列跳動）。 */
 .chat-sidebar__rename-input {
 	min-width: 0;
 	width: 100%;
@@ -249,8 +207,6 @@
 	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
 }
 
-/* 收合 icon-rail（960–1199px）：區段標籤與動作鈕一併隱藏；
- * 列本身沿用 .chat-sidebar__item 的收合規則（只剩 mark）。 */
 @media (min-width: 960px) and (max-width: 1199px) {
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__section-label,
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__agent-actions {
@@ -263,7 +219,6 @@
 	}
 }
 
-/* Hawkr Agent 識別記號的外圈：尺寸由這裡決定，Hawkr 標誌填滿它。 */
 .assistant-mark {
 	position: relative;
 	display: inline-grid;
@@ -275,9 +230,6 @@
 	background: transparent;
 }
 
-/* 搜尋／首頁入口用的小尺寸（原本是 AssistantEntryLink 手抄的 size-9）。
- * 不加 box-shadow：記號是入口卡內的元素，陰影由卡片本身負責，記號再帶
- * 一層會變成「卡中卡」的層級噪音（design-system §9.2）。 */
 .assistant-mark--sm {
 	width: 36px;
 	height: 36px;
@@ -291,7 +243,6 @@
 	font-size: 0.5625rem;
 }
 
-/* AI 標一律用 <small>，不用 `.assistant-mark span`。 */
 .assistant-mark small {
 	position: absolute;
 	right: -3px;
@@ -301,8 +252,6 @@
 	min-width: 22px;
 	height: 16px;
 	padding: 0 4px;
-	/* 角標的白邊只是把它從底下的圖形切開，1px 就夠——2px 在 32px 的記號上
-	 * 會粗到跟金色本體同重量。 */
 	border: 1px solid var(--hkui-content1);
 	border-radius: var(--radius-pill);
 	background: var(--accent-gold);
@@ -329,18 +278,11 @@
 	}
 }
 
-/* 搜尋頁：0 結果時，Hawkr Agent 入口只留空態那一顆 --------------------------
- * SearchForm（搜尋框下方）與 SearchResultsClient 的空態各自渲染一顆入口，
- * 查無結果時兩顆會同屏出現——同一個 CTA 重複兩次，而且空態那顆才是使用者
- * 視線落點與語意正確的位置（「找不到合適商品時，直接問 Hawkr Agent」）。
- * 用 :has() 讓上面那顆讓位，沿用 messages.css 既有的 sibling 抑制手法，
- * 不需要把結果數往上抬成共享 state。 */
 .search-page:has([data-search-empty] [data-hawkr-agent-entry])
 .search-page__agent-entry {
 	display: none;
 }
 
-/* Workspace shell ------------------------------------------------------- */
 .assistant-route-state.thread-page {
 	display: grid;
 	place-items: center;
@@ -435,7 +377,6 @@
 	line-height: 1.55;
 }
 
-/* Typed artifacts ------------------------------------------------------ */
 .assistant-artifact {
 	border: 1px solid var(--hkui-divider);
 	border-radius: var(--radius-lg);
@@ -556,7 +497,6 @@
 	line-height: 1.5;
 }
 
-/* Candidates ----------------------------------------------------------- */
 .assistant-candidates {
 	overflow: clip;
 }
@@ -667,9 +607,6 @@
 	line-height: 1.55;
 }
 
-/* Candidate results are a comparison workspace, not a gallery. The server DTO
- * currently exposes candidate facts rather than a verified seller identity, so
- * every column stays grounded in those fields and never infers supply/fulfilment. */
 .assistant-candidate-table {
 	--candidate-table-columns: 48px minmax(0, 1.05fr) minmax(0, 1.25fr)
 		minmax(0, 1.05fr) minmax(84px, 0.68fr) 100px 112px;
@@ -785,10 +722,7 @@
 	border-color: transparent;
 }
 
-/* ---- B-246 / #2377：候選收斂成商家 ---- */
 
-/* 兩種列（單一候選／收斂後的商家）共用同一個身分區塊。原本只有商家列有頭像，
- * 沒有 logo 的候選以店面圖示代替。 */
 .assistant-candidate-identity {
 	display: flex;
 	align-items: center;
@@ -814,8 +748,6 @@
 	object-fit: cover;
 }
 
-/* 部分勾選：checkbox 的 indeterminate 只改變原生外觀，而這裡的勾選標記是自繪的，
- * 所以要自己畫出「部分」的樣子——少了這條，部分勾選在視覺上與完全未選一模一樣。 */
 .assistant-candidate-row__selection-mark[data-partial] {
 	border-color: var(--hkui-primary);
 }
@@ -841,9 +773,6 @@
 	color: var(--hkui-foreground-muted);
 }
 
-/* Public candidate facts come from the server and may contain an unbroken
- * token. Keep every data cell shrinkable so the comparison pane never grows
- * wider than its container. */
 .assistant-candidate-row__facts span,
 .assistant-candidate-row__pending span,
 .assistant-candidate-row__date time {
@@ -851,9 +780,6 @@
 	overflow-wrap: anywhere;
 }
 
-/* meta 這一層在寬版只是把原本一整串文字拆成三個具名 span，視覺必須跟拆之前
- * 逐字相同——分隔點用 ::before 生成而不是寫進 JSX，窄版才能各自重新定位而不必
- * 在標記裡留下一個只為某個寬度存在的「·」。 */
 .assistant-candidate-row__meta {
 	display: flex;
 	flex-wrap: wrap;
@@ -867,9 +793,6 @@
 	color: var(--hkui-foreground-muted);
 }
 
-/* 選取狀態的文字（已選／選取／更新中）。寬版只給螢幕閱讀器——那一欄的視覺由
- * checkbox 本身承擔；窄版把同一個 span 現形當按鈕文字，看到的字與唸出來的字
- * 因此保證同源，不會各自維護一份。 */
 .assistant-candidate-row__select-text {
 	position: absolute;
 	width: 1px;
@@ -948,8 +871,6 @@
 	font-weight: 750;
 }
 
-/* The canvas can be a narrow split pane at 1200px. Below a useful comparison
- * width the same semantic rows become compact fact cards, with no x-scroll. */
 @container (max-width: 620px) {
 	.assistant-candidate-table {
 		overflow: visible;
@@ -986,9 +907,6 @@
 		background: var(--hkui-content1);
 	}
 
-	/* 底部兩顆等寬按鈕。checkbox 本體不換成 <button>——indeterminate 表達
-	 * 部分勾選是既有的刻意設計，換掉就得自己重造那個狀態；這裡只把它的
-	 * label 撐成 pill，語意與鍵盤行為原封不動。 */
 	.assistant-candidate-row__select {
 		grid-area: select;
 		justify-items: stretch;
@@ -1037,8 +955,6 @@
 		color: var(--hkui-primary);
 	}
 
-	/* 現形成按鈕文字。寬版那份 visually-hidden 的宣告要逐條抵銷，
-	 * 少抵銷任何一條（clip／clip-path／position）文字都不會出現。 */
 	.assistant-candidate-row__select-text {
 		position: static;
 		width: auto;
@@ -1059,10 +975,6 @@
 		white-space: nowrap;
 	}
 
-	/* 卡片頭部：身分（名稱／符合筆數）。
-	 * `__meta` 設 display: contents 讓它的子元素直接成為 identity 的 grid
-	 * item。span 沒有隱含 role，contents 不會從 accessibility tree 拿掉任何語意
-	 * （同一招不可以用在 <td> 上）。 */
 	.assistant-candidate-row__identity {
 		grid-area: identity;
 		grid-template-columns: minmax(0, 1fr);
@@ -1080,7 +992,6 @@
 		display: contents;
 	}
 
-	/* 拆開之後各自定位，寬版那顆分隔點在這裡不能留。 */
 	.assistant-candidate-row__meta > * + *::before {
 		content: none;
 	}
@@ -1309,7 +1220,6 @@
 	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
 }
 
-/* Drawers -------------------------------------------------------------- */
 .assistant-candidate-sheet {
 	max-width: 460px;
 }
@@ -1382,9 +1292,6 @@
 	}
 }
 
-/* RFQ front-end draft --------------------------------------------------
- * Real workspace continuation after candidate selection. The final publish
- * action intentionally remains blocked until a backend contract exists. */
 .assistant-rfq-draft {
 	display: flex;
 	min-height: 100%;
@@ -1755,9 +1662,6 @@
 	line-height: 1.55;
 }
 
-/* V6 pricing guidance -------------------------------------------------
-	* Price preview values and confirmation evidence are server-owned. The browser
-	* renders the typed projection but never derives a price basis or publication. */
 .assistant-rfq-guidance__head,
 .assistant-rfq-snapshot > header {
 	display: flex;
@@ -1868,7 +1772,6 @@
 	gap: 4px;
 }
 
-/* 稿 03 詢價總額區間。quoteTotalRange 為 null 時整張卡不渲染（元件層早退）。 */
 .assistant-rfq-guidance__quote-total {
 	padding: 14px 16px;
 	border-bottom: 1px solid var(--hkui-divider);
@@ -1938,7 +1841,6 @@
 	gap: 14px;
 }
 
-/* 稿 P-01：希望下限、希望上限與「重新試算」同一列，按鈕靠右。 */
 .assistant-rfq-guidance__desired-fields {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -2284,8 +2186,6 @@
 	flex-wrap: wrap;
 }
 
-/* 成果側欄實測寬 430px，所以輸入列的斷點不跟下面那組共用的 640px 走。
-   這裡只在真的塞不下時才收。 */
 @container (max-width: 390px) {
 	.assistant-rfq-guidance__desired-fields {
 		grid-template-columns: minmax(0, 1fr);
@@ -2511,18 +2411,10 @@
 	}
 }
 
-/* Both Hawkr Agent modes use the exact Messages thread shell. The Phase 1
- * preview only widens typed artifacts inside the conversation; it does not
- * replace the shared header, transcript, bubbles, notice or composer. */
 .hawkr-agent-phase1-thread .thread-page__list {
 	gap: 12px;
 }
 
-/* Messenger-familiar conversation rhythm, adapted to the Hawkr shell:
- * the speaker identity sits outside the bubble so the eye can scan who said
- * what without repeating a heavy name row inside every message. Only the Agent
- * thread opts into this layout; human-to-human Messages keeps its existing
- * compact Telegram-style bubbles. */
 .hawkr-agent-message-row,
 .hawkr-agent-typing-row,
 .hawkr-agent-question-row,
@@ -2603,7 +2495,6 @@
 	padding: 6px 13px 6px 7px;
 	border: 1px solid var(--hkui-divider);
 	border-radius: var(--radius-pill);
-	/* 實色先作不支援 color-mix／backdrop-filter／高對比環境的可讀 fallback。 */
 	background: var(--hkui-content1);
 	-webkit-backdrop-filter: blur(14px) saturate(90%);
 	backdrop-filter: blur(14px) saturate(90%);
@@ -2616,7 +2507,6 @@
 	place-items: center;
 	width: 30px;
 	height: 30px;
-	/* 30px 圓底加上左側 7px inset，圓心正好對齊 46px pill 的端帽圓心。 */
 	border-radius: var(--radius-circle);
 	background: var(--hkui-content2);
 	color: var(--theme-action-primary);
@@ -2629,7 +2519,6 @@
 			var(--theme-action-primary) 18%,
 			var(--hkui-content1)
 		);
-		/* 只有支援混色的瀏覽器才讓背景透出，形成暖白霧面毛玻璃。 */
 		background: color-mix(in srgb, var(--hkui-content1) 84%, transparent);
 	}
 
@@ -2761,9 +2650,6 @@
 	pointer-events: auto;
 }
 
-/* Draft-too-long warning shares the compose-surface notice slot (the
- * disclaimer line sits directly above it, so both stack borderless via
- * the shared `notice + notice` rule) — only the colour changes. */
 .thread-page__notice.hawkr-agent-phase1__compose-alert {
 	color: var(--hkui-danger-700);
 	font-weight: 650;
@@ -2773,16 +2659,6 @@
 	color: var(--hkui-danger-200);
 }
 
-/* Live Activity Rail（設計書 v6 §V.10.6、圖 00-B）。
- *
- * 伺服器推來幾個不同的 public step 就顯示幾列，heartbeat 只更新原列；step
- * 完成只完成那一列並保留，只有 run terminal 才由父層把整軌換成正式回覆。
- * DOM 裡沒有任何模型推理內容，也沒有事後回放。
- *
- * 版面刻意是**線性垂直軌**：§V.10.6-2 禁止把 steps 畫成假的 DAG、分支或推理圖。
- * 左側細 spine 由 icon 之間的偽元素串起來，讓一列一列讀起來是同一條進度。 */
-/* 固定頭像那一欄拿掉了：進度的識別現在長在**每一列自己**的前導 icon 上，
- * 旁邊再放一顆常駐標誌會變成同一畫面裡兩顆。 */
 .hawkr-agent-rail {
 	align-self: flex-start;
 	display: block;
@@ -2790,14 +2666,11 @@
 	padding-block: 2px;
 }
 
-/* 還沒收到第一個 step 時（ProcurementClarifyChat 的等待列）仍用這顆。 */
 .hawkr-agent-rail__sprite {
 	width: 32px;
 	height: 32px;
 }
 
-/* 正在跑那一列的前導標誌。尺寸與 AppIcon glyph 的視覺重量對齊，換過去時
- * 文字不會左右跳動。 */
 .hawkr-agent-rail__row-sprite {
 	width: 24px;
 	height: 24px;
@@ -2813,9 +2686,6 @@
 	list-style: none;
 }
 
-/* 前導 icon 用固定 24px 欄而不是 flex：標誌與 AppIcon 尺寸不同，靠 flex 排會
- * 讓文字在「跑完換 icon」的那一刻左右位移。固定欄寬也讓底下的 spine 有一個
- * 穩定的中心線可以對齊。 */
 .hawkr-agent-rail__row {
 	position: relative;
 	display: grid;
@@ -2847,23 +2717,15 @@
 	white-space: normal;
 }
 
-/* T23 起一列是 <li class="group"> 包一個 .row，子列再包一層 <ol>。所以
- * 「還有下一步」問的是 group 而不是 row——掛在 row 上的 :last-child 在新結構下
- * 恆為真（row 永遠是 group 的第一個子節點），整條 spine 會消失。 */
 .hawkr-agent-rail__group {
 	position: relative;
 	min-width: 0;
 	list-style: none;
 }
 
-/* 細垂直 spine：串在 icon 中心線上，最後一組不畫（沒有下一步可接）。
- *
- * 掛在 group 而不是 row 上：group 的高度含子列，spine 才會一路串過兩條 lane。
- * 掛在 row 上只有那一列的高度，子列會看起來像脫離父列的獨立項目。 */
 .hawkr-agent-rail__group:not(:last-child)::before {
 	content: "";
 	position: absolute;
-	/* 4px padding ＋ 24px 欄的中心 = 16px。 */
 	left: 16px;
 	top: 27px;
 	bottom: -10px;
@@ -2872,13 +2734,10 @@
 	transform: translateX(-50%);
 }
 
-/* 子列自己不再往下畫 spine——巢狀層裡再畫一條會變成兩條平行線。 */
 .hawkr-agent-rail__children .hawkr-agent-rail__group::before {
 	content: none;
 }
 
-/* 兩條 lane 子列。縮排對齊父列的文字欄（24px icon 欄 ＋ 10px gap），讓子列的
- * icon 起點落在父列文字的起點——一眼看得出從屬關係，不必畫框。 */
 .hawkr-agent-rail__children {
 	display: flex;
 	flex-direction: column;
@@ -2890,7 +2749,6 @@
 	list-style: none;
 }
 
-/* 這一列找到幾家。灰階、字重比列身低一階——它是註腳不是標題。 */
 .hawkr-agent-rail__count {
 	color: var(--hkui-foreground-muted);
 	font-weight: 550;
@@ -2938,8 +2796,6 @@
 	color: var(--hkui-foreground);
 }
 
-/* 等待中的列是「還沒輪到」，比已完成更退後一階——已完成是既成事實，等待中
- * 連事實都還沒有。 */
 .hawkr-agent-rail__row[data-status="PENDING"] {
 	font-weight: 550;
 	opacity: 0.55;
@@ -2949,7 +2805,6 @@
 	color: var(--theme-action-primary);
 }
 
-/* step-level FAILED 只標這一列，不得冒充 run terminal（§V.10.6-3）。 */
 .hawkr-agent-rail__row[data-status="FAILED"] {
 	color: var(--hkui-warning);
 }
@@ -2975,9 +2830,6 @@
 	}
 }
 
-/* One question is a single typed artifact, not a second page dropped inside
- * the chat. Options are real 44px+ actions laid out as a stable grid; "other"
- * and "skip" stay visibly secondary to the canonical server choices. */
 .hawkr-agent-question-row {
 	width: min(92%, 760px);
 	max-width: min(92%, 760px);
@@ -3041,11 +2893,6 @@
 	justify-content: space-between;
 	gap: 10px;
 	padding: 6px 9px 6px 13px;
-	/* 三個幾何 token 與共用輸入框的 `bordered` 對齊（見
-	 * components/ui/inputWrapperClasses.ts）：2px 邊框、--hkui-radius-md 圓角、
-	 * --hkui-input-border 邊色。padding 少 1px 補回加粗的邊，命中區維持 46px。
-	 * 這裡仍是自有實作（Chip 沒有可點擊型態，見 issue 討論），對齊的是 token
-	 * 不是複製設計——共用元件哪天改了 token，這裡跟著動。 */
 	border: 2px solid var(--hkui-input-border);
 	border-radius: var(--hkui-radius-md, 12px);
 	background: var(--hkui-content2);
@@ -3065,8 +2912,6 @@
 }
 
 .hawkr-agent-question-card__option:hover {
-	/* hover 邊色用共用 bordered 的同一條（primary 55%），底色與字色維持這張
-	 * 卡原本的 primary wash——那是「這是可選的答案」的語意，輸入框沒有。 */
 	border-color: rgb(var(--color-brand-primary-rgb) / 0.55);
 	background: var(--theme-primary-subtle);
 	color: var(--hkui-primary);
@@ -3077,16 +2922,12 @@
 	transform: translateY(0);
 }
 
-/* focus 用輸入框那圈 halo（--hkui-input-focus-ring），不是通用的
- * --hkui-focus-ring：同一張卡裡選項與輸入框相鄰，兩種不同的 focus 圈
- * 併排看得出來。邊色一併轉 primary，與 bordered 的 focused 態一致。 */
 .hawkr-agent-question-card__option:focus-visible,
 .hawkr-agent-question-card__skip:focus-visible {
 	outline: none;
 	box-shadow: var(--hkui-input-focus-ring, var(--shadow-focus-ring));
 }
 
-/* 邊色只給 option——skip 是 `border: 0` 的文字按鈕，設了也沒有邊可染。 */
 .hawkr-agent-question-card__option:focus-visible {
 	border-color: var(--hkui-primary);
 }
@@ -3098,25 +2939,15 @@
 	transform: none;
 }
 
-/* 單位 chip：一到三個字的短標籤。沿用 __option 的邊框／圓角／focus token，
- * 只把版面換成「內容寬、置中、可換行」——132px 的等寬格子配上「盒」這種標籤，
- * 會變成標籤貼左、圈選標記貼右，中間一大片空白。
- *
- * 必須排在 __option 之後：同分特異性下後定義者勝，放前面的話 min-width 會被
- * __option 的 `min-width: 0` 蓋掉（實測 chip 只剩 40px）。 */
 .hawkr-agent-question-card__options--units {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
-	/* 與上方的數量輸入框分開。__controls 沒有 gap，而 --custom 的 margin-top
-	 * 只在「有 canonical options」時才掛得上——複合數量卡沒有 options，少了這
-	 * 一條單位 chip 會直接黏在輸入框下緣。 */
 	margin-top: 12px;
 }
 
 .hawkr-agent-question-card__option--unit {
 	min-width: 4.5rem;
-	/* 44px＝DESIGN.md 的觸控命中區下限。 */
 	min-height: 44px;
 	justify-content: center;
 	padding: 6px 16px;
@@ -3173,18 +3004,6 @@
 	color: var(--hkui-foreground-soft);
 }
 
-/* 外框、圓角、背景、focus halo 全部來自共用的 `inputWrapperClasses`
- * （bordered / lg，與同一張卡裡的 DatePicker、全站 Input 同一份），這裡
- * 只補它沒有涵蓋的：送出鈕並排、以及 textarea 的高度上下限。
- *
- * `--bare` 是日期題：外框由 DatePicker 自己畫，這個 form 只當版面容器，
- * 否則會是雙框。 */
-/* 只補共用 wrapper 沒有的東西。
- *
- * 這裡刻意不再寫 display/align-items/gap：那三個共用 wrapper（bordered/lg）
- * 已經給了（flex / items-center / gap-2.5），而 feature CSS 是無 layer 的，
- * 會蓋掉 Tailwind 的 layered utilities——先前寫死 `align-items: flex-end` 的
- * 結果就是文字貼著框底、和全站其他輸入框看起來不一樣。 */
 .hawkr-agent-question-card__free-text-form--bare {
 	display: flex;
 	align-items: center;
@@ -3194,27 +3013,10 @@
 	padding: 0;
 }
 
-/* 外框做成長圓形，讓它的弧度與內嵌那顆 44px 圓形送出鈕平行。
- *
- * 共用 wrapper（bordered/lg）給的是 12px 方角圓，圓形按鈕嵌在方角框裡兩條弧線
- * 不同心，看起來像兩個不相干的元件疊在一起。底部 composer 的 .thread-page__field
- * 使用 --hkui-radius-2xl（28px），問題卡這個欄位是唯一的例外——這裡對齊它。
- *
- * 只覆蓋 border-radius，其餘度量（高度、邊框、focus halo）仍由共用 wrapper 決定；
- * 也刻意不改 inputWrapperClasses 的 SIZE_RADIUS，那會把全站每個 Input/Select/
- * DatePicker 都變成藥丸。 */
 .hawkr-agent-question-card__free-text-form:not(
 	.hawkr-agent-question-card__free-text-form--bare
 ) {
-	/* --radius-pill (999px)，不是 --radius-circle (50%)：後者套在寬矩形上會變成
-	 * 橢圓，只有正方形（頭像、圓點）才是圓。 */
 	border-radius: var(--radius-pill);
-	/* 右內距收成 1px，讓 44px 圓形送出鈕與 48px 外框的內容區貼合，
-	 * 同時讓右端兩條弧線維持平行。
-	 *
-	 * 共用 wrapper 的 `px-4`（左右各 16px）會把按鈕往內推 16px，於是右邊留
-	 * 16px、上下只有 1px，看起來像按鈕沒對準。收成 1px 後與 44px 控制一致；
-	 * 左側維持 16px 給文字呼吸。 */
 	padding-right: 1px;
 }
 
@@ -3222,7 +3024,6 @@
 	margin-top: 12px;
 }
 
-/* 自訂品項是同一題裡的表單；單一「其他」直接填寫，複數候選保留選項。 */
 .hawkr-agent-question-card[data-crop-disambiguation="true"] {
 	container-type: inline-size;
 	background: var(--theme-surface-card);
@@ -3309,7 +3110,6 @@
 	flex: 0 0 auto;
 }
 
-/* 依卡片可用空間重排，兼顧側欄開啟與手機，而非只依整頁寬度。 */
 @container (max-width: 440px) {
 	.hawkr-agent-question-card[data-crop-disambiguation="true"]
 		.hawkr-agent-question-card__options {
@@ -3328,21 +3128,13 @@
 	}
 }
 
-/* 共用 wrapper 的 padding 是給單行控制項算的；這裡是可長高的 textarea，
- * 補上高度上下限（一行起跳、最多約四行後自己捲）。 */
 .hawkr-agent-question-card__free-text-form textarea {
-	/* 高度交給共用 wrapper 的 lg 度量（min-h-12＝48px）；這裡只把 textarea
-	 * 本身收成一行，不再自己撐高，否則整個 box 會比全站其他輸入框高一截。 */
 	height: 1lh;
 	max-height: 112px;
 	overflow-y: auto;
-	/* 共用 TEXTAREA_RESET 給的是 `resize-y`（表單裡可以拉大很合理），但這裡
-	 * 是聊天答題欄，右下角多一個拖曳把手只是視覺雜訊。 */
 	resize: none;
 }
 
-/* 問題卡與底部 composer 共用 44px 觸控尺寸。外框 48px 高扣除 2px 邊框後
- * 內容正好 44px；搭配 form 的 1px 右內距，按鈕不貼邊且維持平行弧線。 */
 .hawkr-agent-question-card__free-text-send.thread-page__send {
 	width: 44px;
 	height: 44px;
@@ -3392,9 +3184,6 @@
 	color: var(--hkui-primary);
 }
 
-/* REQUIREMENT_READY hands off one real task to the agent. It stays in the
- * message rhythm, but the explicit scope and action make it read as an
- * assignment rather than another speech bubble. */
 .hawkr-agent-task-row {
 	width: min(92%, 760px);
 	max-width: min(92%, 760px);
@@ -3594,9 +3383,6 @@
 	}
 }
 
-/* 320px 搭配 200% 文字縮放時，32px agent mark 若仍佔獨立欄，任務卡只剩
- * 約 150px；scope 的 70px 對齊縮排與 Button 的 nowrap 會再把中文壓成逐字
- * 直排、裁掉 CTA。極窄寬度改成上下排列，保留身份標記與完整動作文字。 */
 @media (max-width: 360px) {
 	.chat-page:has(.hawkr-agent-phase1-thread),
 	.hawkr-agent-phase1-thread .thread-page__head,
@@ -3654,22 +3440,11 @@
 	}
 }
 
-/* Agent avatar and live seller-candidate payloads are the only other
- * surface-specific pieces layered onto the shared Messages components. */
 
 .hawkr-agent-thread .thread-page__head-status[data-state="assistant"]::before {
 	display: none;
 }
 
-/* ── 右側畫布（B-244 最終候選）────────────────────────────────────
- * ChatGPT／lev8 式：對話留在左邊，候選資料攤在右邊固定面板，兩邊各自
- * 捲動。刻意做在 workspace 內部而不是把 .chat-shell 加成三欄——畫布只屬於
- * Hawkr Agent，人類聊天室沒有這個概念，加在 shell 上會讓每個聊天室都背著一
- * 個永遠用不到的欄位。
- *
- * 高度約束要一路傳下去：.thread-page 的內部捲動依賴祖先鏈都有確定高度，
- * 中間多一層 wrapper 若沒有 minmax(0,1fr) 就會讓 body 長過格子、內層的
- * overflow-y 永遠不觸發。 */
 .hawkr-agent-workspace {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);
@@ -3682,7 +3457,6 @@
 	min-width: 0;
 }
 
-/* 沒有成果時仍維持適合閱讀的對話行寬；成果展開後跟隨主區縮放。 */
 .hawkr-agent-workspace .thread-page__list {
 	width: 100%;
 	max-width: 760px;
@@ -3698,7 +3472,6 @@
 }
 
 @media (min-width: 1200px) {
-	/* 只有成果打開才分欄，主對話保留 55%；窄成果以容器查詢切換候選卡。 */
 	.hawkr-agent-workspace[data-panel="open"] {
 		grid-template-columns: minmax(0, 55fr) minmax(320px, 45fr);
 	}
@@ -3714,9 +3487,6 @@
 	container-type: inline-size;
 }
 
-/* 窄視窗塞不下兩欄：畫布蓋掉對話（ChatGPT 手機版的 canvas 也是這樣），
- * 由標頭的關閉鈕回到對話。不做「上下堆疊」——兩個各自捲動的區塊上下排，
- * 使用者會不知道自己在捲哪一個。 */
 @media (max-width: 1199px) {
 	.hawkr-agent-workspace[data-panel="open"] > .thread-page {
 		display: none;
@@ -3736,8 +3506,6 @@
 
 .hawkr-agent-canvas__title {
 	margin: 0;
-	/* 不換行、寧可截斷：標題折成兩行會把模式分頁擠窄（實測 420px 面板下
-	 * 「候選資料 · 3」就會折行），分頁是操作、標題只是標籤。 */
 	flex: 1 1 auto;
 	min-width: 0;
 	overflow: hidden;
@@ -3781,9 +3549,6 @@
 	color: var(--hkui-foreground-soft);
 }
 
-/* Tabs 的根帶 Tailwind 的 `w-full`（width: 100%），在 flex 容器裡 flex-basis
- * auto 就解析成 100% → 吃掉整條標頭，標題被 shrink 成 0（量出來：wrapper
- * 387px／標題 0px）。所以要覆寫寬度，不是只約束內層的 tablist。 */
 .hawkr-agent-canvas__modes {
 	width: auto;
 	flex: 0 0 auto;
@@ -3805,8 +3570,6 @@
 	display: none;
 }
 
-/* 候選檢視回到「詢價已建立」的路。中性色而不是警示色：這是一條可走的路，
- * 不是一則要人處理的警告（.assistant-invalidated 才是後者）。 */
 .hawkr-agent-canvas__resume {
 	display: flex;
 	flex-wrap: wrap;
@@ -3824,8 +3587,6 @@
 	color: var(--theme-action-primary, var(--hkui-primary));
 }
 
-/* 文字塊吃掉剩下的寬度，CTA 才會被推到最右邊；窄容器下 flex-wrap 讓它整顆換行
- * 而不是把按鈕壓成兩三個字一行。 */
 .hawkr-agent-canvas__resume > div {
 	flex: 1 1 12rem;
 	min-width: 0;
@@ -3848,15 +3609,12 @@
 	min-height: 44px;
 }
 
-/* 畫布裡的候選卡沿用 .assistant-candidates，但不要它的卡片外框——
- * 畫布本身就是那個容器，兩層框線是視覺噪音。 */
 .hawkr-agent-canvas__body .assistant-artifact {
 	border: 0;
 	background: transparent;
 	padding: 0;
 }
 
-/* 成果已由外層面板定義邊界；內容只需一層內距。 */
 .hawkr-agent-canvas__body .assistant-candidates > .assistant-artifact__head {
 	padding: 0 0 var(--hkui-space-4, 16px);
 	border-bottom: 0;
@@ -3877,14 +3635,6 @@
 	}
 }
 
-/* ══════════════════════════════════════════════════════════════════════
- * Hawkr Agent 新對話中央入口（設計書 v6 §V.11.0 Screen Contract 00，圖 00-A）
- *
- * 這一區只在「procurement route ＋ 尚無 conversation」時存在；首送後整塊
- * 收合、composer 移到 thread 底部。所以它刻意**不**沿用 .thread-page 的
- * header/body/compose 三段格線——設計書的 anti-goals 明列 ENTRY 不得出現
- * thread header、固定 transcript pane、底部小型 composer 或空白 Artifact 欄。
- * ══════════════════════════════════════════════════════════════════════ */
 
 .hawkr-agent-entry {
 	display: flex;
@@ -3893,7 +3643,6 @@
 	gap: var(--hkui-space-5, 20px);
 	width: 100%;
 	min-width: 0;
-	/* 主內容自己捲，不把整頁撐長——Messages shell 的側欄要留在原地。 */
 	height: 100%;
 	min-height: 0;
 	overflow-y: auto;
@@ -3902,8 +3651,6 @@
 	text-align: center;
 }
 
-/* 入口標誌的尺寸走 CSS 而不是 inline style——§V.11.0 要求 <768px 縮到
- * 52–56px，inline 寬高會壓過 media query。 */
 .hawkr-agent-entry__sprite {
 	width: 120px;
 	height: 120px;
@@ -3934,10 +3681,6 @@
 	color: var(--hkui-foreground-muted);
 }
 
-/* ── Capability chips ────────────────────────────────────────────────
- * §V.11.0：chip 只把 prompt starter 帶進 composer 並移動焦點，不自動送出、
- * 不建案件、不觸發任何 side effect。所以它們讀作「可以請 Hawkr 做什麼」的宣告，
- * 視覺重量必須低於 composer——composer 才是第一視覺焦點。 */
 .hawkr-agent-entry__chips {
 	display: flex;
 	flex-wrap: wrap;
@@ -3953,7 +3696,6 @@
 }
 
 .hawkr-agent-entry__chip {
-	/* 命中區 44px（DESIGN.md §觸控）。 */
 	min-height: 44px;
 	padding: 0 var(--hkui-space-4, 16px);
 	border: 1px solid var(--hkui-divider);
@@ -3970,8 +3712,6 @@
 		color var(--hkui-dur-fast, 160ms) var(--hkui-ease, ease);
 }
 
-/* 三個主要能力維持簡潔 pill：24px 動畫只在文字前提供語意提示，不把 chip
- * 放大成插畫卡；整顆仍是一個 button，圖示不是第二個互動點。 */
 .hawkr-agent-entry__chip[data-has-icon="true"] {
 	display: inline-flex;
 	align-items: center;
@@ -4024,7 +3764,6 @@
 	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
 }
 
-/* 給 24px 圖示一個快速、可逆的進場回饋。 */
 .hawkr-agent-entry__chip:focus-visible .hawkr-agent-entry__capability-icon {
 	transform: translateY(-1px) scale(1.04);
 }
@@ -4035,7 +3774,6 @@
 	}
 }
 
-/* 「再按一次取代目前輸入」的待確認態——不是錯誤，是一個等你決定的動作。 */
 .hawkr-agent-entry__chip[data-confirm="replace"] {
 	border-color: var(--hkui-warning);
 	color: var(--hkui-warning);
@@ -4047,8 +3785,6 @@
 	opacity: 0.78;
 }
 
-/* ── 中央 composer ───────────────────────────────────────────────────
- * 入口與對話沿用同一個可增高輸入框；長需求自然換行，入口仍跟隨內容定位。 */
 .hawkr-agent-entry__composer {
 	width: 100%;
 	min-width: 0;
@@ -4097,16 +3833,12 @@
 	caret-color: var(--theme-action-primary);
 }
 
-/* 中尺寸桌機的 Messages sidebar 會壓縮主 pane。輸入列可借用 entry 自己的
- * 12px × 2 安全 gutter，但仍由 960px 封頂；手機保留完整 16px gutter。 */
 @media (min-width: 768px) {
 	.hawkr-agent-entry__composer {
 		width: calc(100% + var(--hkui-space-6, 24px));
 	}
 }
 
-/* <768px：標誌 52–56px、標題約 24px、chips 可換行、composer 全寬、
- * 任務卡單欄（§V.11.0 Responsive）。 */
 @media (max-width: 767px) {
 	.hawkr-agent-entry {
 		padding: var(--hkui-space-5, 20px) var(--hkui-space-4, 16px)
@@ -4154,9 +3886,6 @@
 		line-height: 1.3;
 	}
 
-	/* Entry 不是 `.thread-page`，所以 messages.css 的 keyboard-open body/footer
-	 * guard 不會命中。以同一個 root signal 補齊，避免 iOS focus-scroll 把 footer
-	 * 拉到 composer 與鍵盤之間。 */
 	:root[data-keyboard-open] body:has(.page-content .hawkr-agent-entry) {
 		overflow: hidden;
 	}
@@ -4188,13 +3917,6 @@
 	}
 }
 
-/* ── Public Narrative（設計書 v6 §V.10.6-4、圖 00-B／00-C）──────────────
- * assistant 的完成回覆是**無泡泡正文**：沒有氣泡底色、沒有邊框，也不重複
- * Agent avatar（識別只在側欄的 Agent 分頁出現一次）。每個語意 block 左側配置一枚
- * allowlisted AppIcon，icon 只標示公開語意，不是狀態 truth。
- *
- * 買家訊息維持氣泡——已核准的 00-A/B/C 三張圖裡它就是右側綠色氣泡，一問一答
- * 的方向感靠它。 */
 .hawkr-agent-narrative {
 	align-self: flex-start;
 	display: block;
@@ -4222,7 +3944,6 @@
 }
 
 .hawkr-agent-narrative__block svg {
-	/* 對齊第一行文字的視覺中心，而不是方塊頂端。 */
 	margin-top: 4px;
 	color: var(--theme-action-primary);
 }
@@ -4234,9 +3955,6 @@
 	white-space: pre-wrap;
 }
 
-/* #2549 Phase 3：只有剛完成那一輪的 block 套用交錯淡入，animation-delay 由
- * ProcurementClarifyChat.tsx inline style 依 block index 動態帶入，這裡只定義
- * 動畫本身與時長。歷史／重播的 turn 不加這個 class，維持既有靜態顯示。 */
 @keyframes hawkr-agent-narrative-block-fade-in {
 	from {
 		opacity: 0;
@@ -4258,14 +3976,11 @@
 	}
 }
 
-/* 已記下／未採用兩塊沿用原本的樣式，只是不再坐在氣泡裡，所以自己補上內縮
- * 讓它們對齊正文而不是 icon。 */
 .hawkr-agent-narrative .hawkr-agent-message__facts,
 .hawkr-agent-narrative .hawkr-agent-message__rejected {
 	margin-left: 28px;
 }
 
-/* ── 進行中列的非色彩線索與「停止處理」（§V.11.1）───────────────────── */
 .hawkr-agent-rail__state {
 	flex: 0 0 auto;
 	font-size: var(--hkui-text-tiny, 0.75rem);
@@ -4282,8 +3997,6 @@
 }
 
 .hawkr-agent-rail__stop button {
-	/* 命中區先備好 44×44（DESIGN.md §觸控）：接上 cancel command 時只要拿掉
-	 * disabled，不必再回來調幾何。 */
 	min-height: 44px;
 	padding: 0 var(--hkui-space-3, 12px);
 	border: 1px solid var(--hkui-divider);
@@ -4305,15 +4018,12 @@
 	color: var(--hkui-foreground-muted);
 }
 
-/* §V.11.4 Delivery truth 的界線句。刻意比主標小一階但不淡到看不見——它是
- * 「已建立」與「已送達」之間唯一的分界，不是註腳。 */
 .assistant-quote-summary__delivery {
 	margin: var(--hkui-space-1, 4px) 0 0;
 	font-size: var(--hkui-text-tiny, 0.75rem);
 	color: var(--hkui-foreground-muted);
 }
 
-/* ── 主對話中的處理進度，與正式回覆分層 ───────────────────────────── */
 
 .hawkr-agent-processing {
 	align-self: flex-start;
@@ -4357,7 +4067,6 @@
 	padding: 0;
 }
 
-/* ── 右欄只呈現成果，標頭與關閉鈕跨尺寸共用 ───────────────────────── */
 
 .hawkr-agent-panel {
 	display: flex;
@@ -4387,7 +4096,6 @@
 	font-weight: 650;
 }
 
-/* 唯一捲動區留在 CandidateCanvas，避免巢狀捲動與 sticky 動作列擋住候選。 */
 .hawkr-agent-panel__content {
 	display: flex;
 	flex-direction: column;
@@ -4402,7 +4110,6 @@
 	min-height: 0;
 }
 
-/* 面板已經有左邊界，畫布不要再畫一條。 */
 .hawkr-agent-panel__content > .hawkr-agent-canvas {
 	border-left: 0;
 }
@@ -4431,8 +4138,6 @@
 	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
 }
 
-/* 設計稿 01 的「執行中」段標題。只在 run 還活著時渲染（AgentTaskPanel），
-   所以這裡不處理「已完成」的樣子。 */
 .hawkr-agent-rail__heading {
 	margin: 0 0 var(--hkui-space-2, 8px);
 	font-size: var(--hkui-text-small);
@@ -4446,7 +4151,6 @@
 	}
 }
 
-/* 成果入口跨尺寸都能重開已收起的面板。 */
 .hawkr-agent-phase1__panel-open {
 	flex: 0 0 auto;
 	min-height: 44px;
@@ -4459,7 +4163,6 @@
 	cursor: pointer;
 }
 
-/* 無進度事件時的簡短等待提示。 */
 .hawkr-agent-typing-row__label {
 	min-width: 0;
 	overflow: hidden;
@@ -4469,12 +4172,6 @@
 	white-space: nowrap;
 }
 
-/* ───────────────────────────────────────────────────────────────────────────
-   稿 R-01「重新確認 RFQ 快照」。買家在這一屏做的是**發布前的第二道確認**，不是
-   再固定一次價格——所以它跟 .assistant-rfq-snapshot（價格確認）刻意長得不一樣：
-   五個編號區塊平鋪，讓「需求／價格／溫度／受眾／可追溯性」同屏可比，而不是一條
-   由上往下的表單。稿上左上那顆「快照版本」badge 不實作（ADR 2026-09-12）。
-   ─────────────────────────────────────────────────────────────────────────── */
 .assistant-rfq-reconfirm {
 	display: grid;
 	gap: 14px;
@@ -4507,7 +4204,6 @@
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* 快照追蹤是等寬鍵值表，欄位名較長，佔滿整行比擠在三欄裡好讀。 */
 .assistant-rfq-reconfirm__block--trace {
 	grid-column: 1 / -1;
 }
@@ -4567,8 +4263,6 @@
 	line-height: 1.5;
 }
 
-/* pricingMode 是 wire 上的列舉值，原樣呈現不翻譯——它是買家回報問題時要講得出
-   口的那個字，翻成中文反而對不上後端與客服看到的東西。 */
 .assistant-rfq-reconfirm__badge {
 	padding: 2px 7px;
 	border-radius: var(--radius-sm, 6px);
@@ -4618,9 +4312,6 @@
 	cursor: pointer;
 }
 
-/* 回覆期限是 R-01 上唯一可輸入的欄位。外框沿用底下那張確認卡的規格（同一組
-   邊框／圓角／底色），讓「這兩格才是要買家動手的地方」在視覺上成為一組，與
-   上面五個唯讀事實區塊分開。 */
 .assistant-rfq-reconfirm__deadline {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
@@ -4671,10 +4362,6 @@
 	opacity: 0.55;
 }
 
-/* 錯誤訊息橫跨兩欄。⚠️ 沒有錯誤時**不能**把它 `display: none`——那會把 aria-live
-   容器從無障礙樹上拿掉，第一次出現錯誤時螢幕閱讀器就播不到（live region 必須在
-   內容變動之前就存在）。空的 <p> 本來就沒有行框、高度為零，留著不佔版面。與
-   `.assistant-rfq-guidance__range-help` 同一個處理方式。 */
 .assistant-rfq-reconfirm__deadline > p {
 	grid-column: 1 / -1;
 	margin: 0;
@@ -4732,7 +4419,6 @@
 	word-break: break-all;
 }
 
-/* docx §V 圖說要求這句固定貼在 CTA 下方，所以它跟著 footer 走而不是跟著區塊。 */
 .assistant-rfq-draft__footer-meaning {
 	margin: 8px 0 0;
 	color: var(--theme-text-body);

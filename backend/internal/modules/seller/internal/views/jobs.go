@@ -10,13 +10,9 @@ import (
 )
 
 const (
-	// rollupID 是彙總排程的識別，也是 River job 的 kind。
 	rollupID = "seller.product_views_rollup"
-	// purgeID 是原始事件清理排程的識別，也是 River job 的 kind。
 	purgeID = "seller.product_views_purge"
-	// rollupInterval 是彙總的間隔；儀表板的數字最多落後這麼久（延遲式分析）。
 	rollupInterval = 5 * time.Minute
-	// purgeInterval 是清理的間隔。
 	purgeInterval = time.Hour
 )
 

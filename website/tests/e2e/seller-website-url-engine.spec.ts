@@ -59,7 +59,6 @@ test.describe("官方網站驗證在真實瀏覽器引擎下成立", { tag: ["@u
 	test("shipped isValidWebsiteUrl agrees with Node inside the browser", async ({
 		page,
 	}) => {
-		// about:blank：這支與應用程式無關，也不該受站台 CSP 影響。
 		await page.goto("about:blank");
 		await page.addScriptTag({ content: SHIPPED_SOURCE });
 
@@ -83,8 +82,6 @@ test.describe("官方網站驗證在真實瀏覽器引擎下成立", { tag: ["@u
 			{ rejected: REJECTED, accepted: ACCEPTED },
 		);
 
-		// 引擎事實錨。這條轉紅不代表我們的實作壞了，而是瀏覽器改了行為——若哪天
-		// 它也改成拋錯，主機名那一層就可以簡化掉，這是唯一會通知我們的地方。
 		expect(result.parsedHosts).toEqual([
 			"not%20a%20url",
 			"exa%20mple.com",
@@ -93,7 +90,6 @@ test.describe("官方網站驗證在真實瀏覽器引擎下成立", { tag: ["@u
 			"a%2Ab",
 		]);
 
-		// 契約本身：瀏覽器裡的判定必須與 Node 單元測試給的答案一致。
 		expect(REJECTED.filter((_, i) => result.rejectedVerdicts[i])).toEqual([]);
 		expect(ACCEPTED.filter((_, i) => !result.acceptedVerdicts[i])).toEqual([]);
 		for (const raw of REJECTED) expect(isValidWebsiteUrl(raw)).toBe(false);

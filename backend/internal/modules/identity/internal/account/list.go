@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 )
 
-// 帳號清單每頁的筆數（Google AIP-158）。
 const (
 	defaultAccountPageSize = 10
 	maxAccountPageSize     = 100
@@ -30,7 +29,6 @@ func (m *Service) ListAccounts(ctx context.Context, in model.ListAccountsInput) 
 	pattern, accountID := "", int64(0)
 	if q := strings.TrimSpace(in.Filter.Query); q != "" {
 		pattern = "%" + escapeLike(q) + "%"
-		// 不是數字（或超出範圍）時是 0：ID 從 1 開始，不會命中。
 		accountID, _ = strconv.ParseInt(q, 10, 64)
 	}
 	email := strings.ToLower(strings.TrimSpace(in.Filter.Email))
@@ -71,7 +69,6 @@ func (m *Service) ListAccounts(ctx context.Context, in model.ListAccountsInput) 
 	return page, nil
 }
 
-// escapeLike 讓使用者輸入的 %、_ 與 \ 當成字元本身（LIKE 預設的跳脫字元是 \）。
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }

@@ -128,26 +128,18 @@ import (
 
 type ctxKey struct{}
 
-// pending 是一筆尚未消化的業務失敗。method 是掛上它的 gRPC full method，
-// 也是解除它的唯一鑰匙（見 package doc「作用域」）。
 type pending struct {
 	method string
 	code   int32
 	msg    string
 }
 
-// holder 綁定單一 HTTP 請求。gin 的 handler chain 是同一個 goroutine，但
-// c.Request.Context() 會被下游（gRPC client 的 WithTimeout）包一層再傳給
-// interceptor，而 interceptor 有可能在別的 goroutine 收尾，故仍上鎖。
-//
-// arms 保持插入序：改寫時取最舊的那一筆（第一件出錯的事才是因）。
 type holder struct {
 	mu      sync.Mutex
 	arms    []pending
 	emitted bool
 }
 
-// dropCodeLocked 移除所有 code 相符的 arm，回傳是否有命中。呼叫端須持有 mu。
 func (h *holder) dropCodeLocked(code int32) bool {
 	kept := h.arms[:0]
 	hit := false
@@ -163,9 +155,6 @@ func (h *holder) dropCodeLocked(code int32) bool {
 }
 
 var (
-	// bizcodeSwallowedTotal 數的是「被攔下來的吞碼」：某支 handler 拿著非零業務碼
-	// 走進一個 code==0 的出口，被 carrier 改寫成正確的 envelope。這個計數器
-	// **不該長期非零** —— 非零代表有一支 handler 正在依賴自動改正，應該回去把它寫對。
 	bizcodeSwallowedTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gateway_bizcode_swallowed_total",
@@ -174,8 +163,6 @@ var (
 		[]string{"code", "path"},
 	)
 
-	// bizcodeEscapedTotal 數的是「攔不到的」：carrier 還有未消化的 arm，而回應不是任何
-	// 一個 internal/response 出口寫的 ⇒ 這條路徑繞過了整個 response 層，carrier 無從改寫。
 	bizcodeEscapedTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gateway_bizcode_escaped_total",
@@ -184,8 +171,6 @@ var (
 		[]string{"code", "path"},
 	)
 
-	// bizcodeAcceptedTotal 數的是顯式豁免。它與 swallowed 分開，因為兩者的意義相反：
-	// 一個是「有人忘了」，一個是「有人想清楚了」。混在一起數就分不出來。
 	bizcodeAcceptedTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gateway_bizcode_accepted_total",
@@ -206,23 +191,12 @@ func Middleware() gin.HandlerFunc {
 		h := &holder{}
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxKey{}, h))
 
-		// 🔴 defer 而不是寫在 c.Next() 之後：panic 時 c.Next() 不會正常返回，收尾偵測
-		// 整段被跳過 ⇒ 計數器 0→0、零 log。而 panic 正是「回應不是走 response 層寫
-		// 出去」最可能發生的時刻 —— 訊號在最需要它的時候消失（06 §3.10）。
 		defer func() {
 			h.mu.Lock()
 			arms := append([]pending(nil), h.arms...)
 			emitted := h.emitted
 			h.mu.Unlock()
 
-			// 有未消化的 arm 且沒有任何 response 出口留下痕跡 ⇒ 回應是別人寫的
-			// （c.JSON、直呼 pkg/envelope、c.Data…），carrier 沒有機會改寫它。
-			//
-			// 只告警不改寫是刻意的：要「補正已經送出的 body」必須扣住 Write/WriteHeader
-			// 到 c.Next() 之後，那會破壞 Flush()、SSE 與 http.ResponseController 的
-			// deadline 設定（見 middleware/logger.go 的 responseBodyWriter，它是
-			// observe-and-pass-through，不是 buffer-and-rewrite）。在 hot path 上為了
-			// 一條 lint 只能縮小、關不掉的路徑（見檔頭失效模式 4）引入一整類新 bug，不划算。
 			if len(arms) > 0 && !emitted {
 				p := arms[0]
 				label := strconv.FormatInt(int64(p.code), 10)

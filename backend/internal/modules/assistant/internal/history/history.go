@@ -17,9 +17,6 @@ import (
 // MaxMessages 是 Latest 回傳的訊息數上限：只回最近的這麼多則，不分頁。
 const MaxMessages = 100
 
-// eventsPerMessage 是讀取時每則訊息預留的 event 數：一輪的 event 除了買家與助理的文字，還有 tool 呼叫與回應。
-// 讀取只取最近 MaxMessages*eventsPerMessage 個 event 再從中取訊息，所以讀取有上限；
-// tool 呼叫特別密集的對話，最近的 event 裡可能不足 MaxMessages 則文字訊息，這時回的比 100 則少。
 const eventsPerMessage = 4
 
 // Latest 回 buyerID 最近更新的對話與它的文字訊息；只列這個買家（user_id）的 session，

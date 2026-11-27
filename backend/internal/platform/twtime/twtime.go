@@ -6,7 +6,7 @@ package twtime
 
 import (
 	"time"
-	_ "time/tzdata" // 內嵌時區資料，容器沒有 zoneinfo 也能載入
+	_ "time/tzdata"
 )
 
 // Taipei 是 Asia/Taipei。

@@ -115,7 +115,6 @@ async function waitForEditor(canvasElement: HTMLElement) {
 }
 
 function paragraphEditor(dialog: HTMLElement) {
-	// Editor.js owns these contenteditable nodes; they have no native textbox role.
 	const editable = dialog.querySelector<HTMLElement>(
 		'.ce-paragraph[contenteditable="true"]',
 	);
@@ -143,8 +142,6 @@ function textBlocks(description: ProductDescription | undefined) {
 		.join("\n");
 }
 
-// 對應 user-event 的 paste(text)：在目前焦點元素送出帶 text/plain 的 paste 事件，
-// 沒有被 preventDefault 才插入文字（vitest/browser 的 paste 只讀系統剪貼簿，不能指定文字）。
 function pasteText(target: HTMLElement, text: string) {
 	target.focus();
 	const clipboardData = new DataTransfer();
@@ -185,7 +182,6 @@ describe("DescriptionEditor", () => {
 		const { container: canvasElement } = mount({ value: importedDescription });
 
 		const dialog = await waitForEditor(canvasElement);
-		// Readiness and painted content are separate: query the live node on retry.
 		await waitFor(() => {
 			expect(within(dialog).getByText("## 商品資訊")).toBeVisibleSync();
 			expect(
@@ -359,7 +355,6 @@ describe("DescriptionEditor", () => {
 			)
 				.map((paragraph) => paragraph.textContent?.trim())
 				.filter(Boolean);
-			// Editor.js may retain an empty insertion paragraph after the list.
 			expect(restoredParagraphs).toEqual(["商品規格", "來源資訊", "保存方式"]);
 		});
 	});

@@ -25,7 +25,6 @@ public class DistributedLockService {
     private static final Duration DEFAULT_RETRY_DELAY = Duration.ofMillis(100);
     private static final int DEFAULT_MAX_RETRIES = 10;
 
-    // Lua script for safe lock release (only release if we own the lock)
     private static final String RELEASE_LOCK_SCRIPT = """
         if redis.call("GET", KEYS[1]) == ARGV[1] then
             return redis.call("DEL", KEYS[1])
@@ -34,7 +33,6 @@ public class DistributedLockService {
         end
         """;
 
-    // Lua script for lock extension
     private static final String EXTEND_LOCK_SCRIPT = """
         if redis.call("GET", KEYS[1]) == ARGV[1] then
             return redis.call("PEXPIRE", KEYS[1], ARGV[2])

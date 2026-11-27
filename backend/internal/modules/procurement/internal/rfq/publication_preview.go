@@ -96,7 +96,7 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 		if err != nil {
 			return fmt.Errorf("rfq：寫入發布核准：%w", err)
 		}
-		if n == 0 { // 同一個鍵的另一個請求搶先寫入並已提交：以它為準
+		if n == 0 {
 			if out, err = replayApproval(ctx, q, in, note); err != nil || out.ApprovalID != (uuid.UUID{}) {
 				return err
 			}
@@ -117,7 +117,6 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 	return out, err
 }
 
-// checkInput 檢查不需要讀取的輸入，回去頭尾空白後的補充說明：單價區間、補充說明長度、候選集與候選欄位、回價期限是合法日期。
 func checkInput(in PreviewPublicationInput) (string, error) {
 	if err := checkRange(in.LowerBoundAmount, in.UpperBoundAmount); err != nil {
 		return "", err
@@ -132,7 +131,6 @@ func checkInput(in PreviewPublicationInput) (string, error) {
 // DeadlinePassed 回傳回價期限（當日）是否早於 now 在營業時區（台北）的今天；期限就是今天不算過。
 func DeadlinePassed(deadline, now time.Time) bool { return dateOnly(deadline).Before(twtime.Day(now)) }
 
-// checkAudienceShape 檢查受眾欄位，不讀資料庫：要有候選集與至少一個候選，且不重複；回價期限要是合法日期（零值不是）。
 func checkAudienceShape(in PreviewPublicationInput) error {
 	if in.ResponseDeadline != nil && in.ResponseDeadline.IsZero() {
 		return apperr.InvalidInputOn([]string{"ResponseDeadline"}, "回價期限不是合法的日期")
@@ -153,7 +151,6 @@ func checkAudienceShape(in PreviewPublicationInput) error {
 	return nil
 }
 
-// resolveStores 依 SelectedCandidateIDs 的順序（契約的一部分）把候選對到店家；候選不在候選集裡回 INVALID_ARGUMENT（指出是第幾個）。
 func resolveStores(ctx context.Context, q *store.Queries, in PreviewPublicationInput) ([]int64, error) {
 	candidates, err := q.ListCandidates(ctx, store.ListCandidatesParams{CandidateSetID: in.CandidateSetID, BuyerID: in.BuyerID})
 	if err != nil {
@@ -174,7 +171,6 @@ func resolveStores(ctx context.Context, q *store.Queries, in PreviewPublicationI
 	return out, nil
 }
 
-// replayApproval 以冪等鍵找第一次的核准：沒有回零值；有但內容（需求、讀到的版本、區間、補充說明、期限、候選集、受眾）不同回 INVALID_ARGUMENT。
 func replayApproval(ctx context.Context, q *store.Queries, in PreviewPublicationInput, note string) (model.PublicationPreview, error) {
 	a, err := q.GetApprovalByClientRequest(ctx, store.GetApprovalByClientRequestParams{BuyerID: &in.BuyerID, ClientRequestID: in.ClientRequestID})
 	if errors.Is(err, pgx.ErrNoRows) {

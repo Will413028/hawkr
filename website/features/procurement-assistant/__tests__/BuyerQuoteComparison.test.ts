@@ -34,9 +34,6 @@ function buyerQuoteFailure(
 const STALE_RESPONSE_DETAIL =
 	"這家賣家已經送出新的報價版本。系統不會自動幫你接受新版本，請重新比較之後再決定。";
 
-// `Button href` 會渲染 `@/components/shared/Link`，那支需要 App Router context。
-// 與 MobileBottomNav.unit.test 同樣把它換成一個純 <a>：這裡要驗的是「連到哪裡」，
-// 不是 Next 的導航實作。
 vi.mock("@/components/shared/Link", async () => {
 	const ReactModule = await import("react");
 	return {
@@ -224,7 +221,6 @@ describe("比較清單", () => {
 		renderPanel({ responses: [response()] });
 		const table = screen.getByRole("table");
 		expect(within(table).queryByText(/每單位價|單價/)).toBeNull();
-		// 18900 / 500 = 37.8 —— 這個數字不該在畫面上任何地方出現。
 		expect(document.body.textContent).not.toContain("37.8");
 	});
 

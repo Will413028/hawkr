@@ -167,7 +167,6 @@ func (f *Fake) StoreAccounts(storeID int64) []string {
 	return append([]string(nil), f.byStore[storeID]...)
 }
 
-// check 要持有 f.mu。
 func (f *Fake) check(ctx context.Context, op string) {
 	if _, ok := db.TxFrom(ctx); ok {
 		f.violations = append(f.violations, op+" 在 DB transaction 內被呼叫")
@@ -196,7 +195,6 @@ func (f *Fake) Capabilities() Capabilities {
 	return f.caps
 }
 
-// accountFor 要持有 f.mu：回傳冪等鍵對應的帳戶，沒有就為 storeID 建立（帳戶記著它的 store_id，列出對帳用）。
 func (f *Fake) accountFor(key string, storeID int64) string {
 	if id, ok := f.byKey[key]; ok {
 		return id

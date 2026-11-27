@@ -207,8 +207,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
   void _showHiddenReasonSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      // 貼文 tab 位於 `StatefulShellRoute` 分支底下，分支 Navigator 在浮動導覽列
-      // 之下；不掛根 Navigator 的話 sheet 底部會被導覽列蓋住（#132 同型）。
       useRootNavigator: true,
       backgroundColor: AppColors.bgCard,
       shape: RoundedRectangleBorder(
@@ -273,7 +271,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
       barrierLabel: 'PostPreview',
       barrierDismissible: true,
       barrierColor: AppColors.textEmphasis.withValues(alpha: 0.2),
-      // iOS 的預覽從按下的位置展開，像 contextual preview。
       transitionDuration: HkMotionTransitions.durationOf(context),
       pageBuilder: (ctx, anim, secAnim) {
         return Builder(
@@ -561,7 +558,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
     final img = _imageFromPost(p);
     final content = p.content;
     final postId = p.id;
-    // 店主不能按自己貼文的讚，只顯示。
     final int displayLikeCount = p.likeCount;
     final int commentCount = p.commentCount;
     final int initialCount = _postCommentCount[postId] ?? commentCount;
@@ -621,8 +617,6 @@ class _PageHomeTabState extends ConsumerState<PageHomeTab>
                 onTap: () async {
                   await showModalBottomSheet(
                     context: context,
-                    // 同上：分支 Navigator 在浮動導覽列之下，留言輸入列
-                    // 會被蓋住（#132 同型）。
                     useRootNavigator: true,
                     isScrollControlled: true,
                     backgroundColor: AppColors.bgPrimary,

@@ -114,7 +114,6 @@ func (h *Public) SuggestRecommendedSellers(ctx context.Context, req *connect.Req
 		}
 		kept, keptIDs, keptCard = append(kept, s), append(keptIDs, s.StoreID), append(keptCard, store)
 	}
-	// 評分跟著卡片一次批次讀取（評價數與平均在 store 上，排名用的評價只留在快照內）；讀不到時只有評分不設。
 	h.stats.RateCards(ctx, keptIDs, keptCard)
 	for i, s := range kept {
 		item := &pb.RecommendedSeller{Store: keptCard[i]}
@@ -126,7 +125,6 @@ func (h *Public) SuggestRecommendedSellers(ctx context.Context, req *connect.Req
 	return connect.NewResponse(out), nil
 }
 
-// count32 把計數放進契約的 int32；放不下時不設（回 nil），與店面頁的統計同一個政策：不回一個錯的數字。
 func count32(n int64) *int32 {
 	if n < 0 || n > math.MaxInt32 {
 		return nil

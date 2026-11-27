@@ -49,7 +49,6 @@ export default function ProductFormSkuEditor({
 		});
 	}, []);
 
-	// Land the seller on a freshly-added spec card.
 	React.useEffect(() => {
 		if (list.length > prevLen.current) {
 			const i = list.length - 1;
@@ -59,7 +58,6 @@ export default function ProductFormSkuEditor({
 		prevLen.current = list.length;
 	}, [list.length, scrollToCard]);
 
-	// Track which card is snapped into view (drives the pager dots).
 	const onScroll = () => {
 		const scroller = scrollerRef.current;
 		if (!scroller) return;
@@ -249,7 +247,6 @@ function SkuCard({ sku, index, canRemove, onUpdate, onRemove }: SkuCardProps) {
 	);
 }
 
-/* ===== Inline atoms (form field shells) ===== */
 
 function TextField({
 	id,
@@ -264,10 +261,6 @@ function TextField({
 	placeholder?: string;
 	onChange: (v: string) => void;
 }) {
-	// Keep IME composition local until compositionend. Updating the whole
-	// product draft on every composing keystroke can make Safari/Chromium commit
-	// the first glyph and drop focus, which made a newly-added SKU appear to
-	// accept only one character.
 	const [composingValue, setComposingValue] = React.useState<string | null>(
 		null,
 	);

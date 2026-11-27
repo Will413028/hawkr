@@ -27,7 +27,7 @@ public class ProductCreatedEvent extends BaseEvent {
     private String productName;
     private Long categoryId;
     private BigDecimal price;
-    private Integer status;  // 0=draft, 1=published
+    private Integer status;
 
     public static ProductCreatedEvent create(Long productId, Long sellerAccountId, String productName,
                                               Long categoryId, BigDecimal price, Integer status) {

@@ -41,8 +41,6 @@ export function AnimateHeight({
 		observerRef.current?.disconnect();
 		observerRef.current = null;
 		if (!el || typeof ResizeObserver === "undefined") return;
-		// Measure synchronously on attach — this runs during the commit, so the
-		// very first painted frame already carries a pixel height.
 		setHeight(el.offsetHeight);
 		const observer = new ResizeObserver(() => setHeight(el.offsetHeight));
 		observer.observe(el);

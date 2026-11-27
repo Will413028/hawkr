@@ -119,8 +119,6 @@ test("merchant logo normalizers use only each endpoint's canonical logo field", 
 		undefined,
 	);
 
-	// Posts come from the Connect `Post` message: the store's logo is an Image whose
-	// uri_template the mapper copies as-is; a store with no logo maps to "".
 	const post = postToListItem(
 		create(PostSchema, {
 			id: "post-1",

@@ -153,7 +153,6 @@ describe("公開前必須 comes from the server's GetMyOnboarding", () => {
 	});
 
 	it("state comes from the server, not from the store's capabilities or KYC", () => {
-		// 店家的能力說 ONBOARDING_COMPLETE 沒缺，摘要說兩項都還沒完成：跟摘要。
 		const stillOpen = build([], {
 			onboarding: requiredFixture(
 				{ state: S.COMPLETED, action: A.NONE },
@@ -163,7 +162,6 @@ describe("公開前必須 comes from the server's GetMyOnboarding", () => {
 		});
 		expect(task(stillOpen, "platform_review").completed).toBe(false);
 		expect(task(stillOpen, "payment_account").completed).toBe(false);
-		// 店家的能力說還缺 ONBOARDING_COMPLETE，缺店名，摘要說都完成：跟摘要。
 		const done = build([R.ONBOARDING_COMPLETE, R.STORE_NAME], {
 			onboarding: requiredFixture(
 				{ state: S.COMPLETED, action: A.NONE },
@@ -344,19 +342,16 @@ describe("建議完成", () => {
 	});
 
 	it("shipping is gated by SHIPPING_SETUP, not by the PUBLIC_LISTING list", () => {
-		// PUBLIC_LISTING 說缺 ONBOARDING_COMPLETE，但 SHIPPING_SETUP 啟用：不鎖。
 		expect(
 			task(build([R.ONBOARDING_COMPLETE], { shippingMissing: [] }), "shipping")
 				.locked,
 		).toBe(false);
-		// 認證已核准（PUBLIC_LISTING 不缺 KYC），但 SHIPPING_SETUP 缺 NOT_SUSPENDED：鎖，不說需要認證。
 		const suspended = task(
 			build([R.NOT_SUSPENDED], { shippingMissing: [R.NOT_SUSPENDED] }),
 			"shipping",
 		);
 		expect(suspended.locked).toBe(true);
 		expect(suspended.statusLabel).not.toBe("需先通過認證");
-		// 缺 ONBOARDING_COMPLETE：鎖，文案是需先通過認證。
 		const kyc = task(build([R.ONBOARDING_COMPLETE]), "shipping");
 		expect(kyc.locked).toBe(true);
 		expect(kyc.statusLabel).toBe("需先通過認證");

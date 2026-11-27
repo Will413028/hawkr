@@ -142,7 +142,6 @@ Future<_MockPostRepository> _pumpEcho(
     ),
   );
   await tester.pumpAndSettle();
-  // The production navigation has a 900 ms route-settling timer.
   await tester.pump(const Duration(seconds: 1));
   if (expectRootText) expect(find.text(root.body), findsOneWidget);
   return repository;
@@ -193,7 +192,6 @@ class _EchoPage extends StatelessWidget {
   }
 }
 
-// Optional local evidence; no golden files or machine paths enter the repo.
 Future<void> _capture(WidgetTester tester, String state) async {
   final prefix = Platform.environment['HK_ECHO_CAPTURE'];
   if (prefix == null) return;
@@ -214,7 +212,6 @@ Future<void> _capture(WidgetTester tester, String state) async {
 void main() {
   setUpAll(() async {
     if (!F.isInitialized) F.init(Flavor.dev);
-    // Opt-in local capture can load the device's CJK font instead of Ahem.
     final fontPath = Platform.environment['HK_ECHO_FONT'];
     if (fontPath != null) {
       final bytes = ByteData.sublistView(await File(fontPath).readAsBytes());
@@ -315,8 +312,6 @@ void main() {
         await tester.enterText(fieldFinder, ' 明天出貨\n謝謝您 ');
         await tester.pump();
 
-        // The send control belongs to the field's tap region, so pointer-down
-        // must not close the keyboard and move the button before pointer-up.
         final sendGesture = await tester.startGesture(
           tester.getCenter(find.byTooltip('送出留言')),
         );
@@ -326,7 +321,6 @@ void main() {
           isTrue,
         );
         await sendGesture.up();
-        // Two rapid taps and an IME action can arrive before the next frame.
         await tester.tap(find.byTooltip('送出留言'));
         await tester.testTextInput.receiveAction(TextInputAction.send);
         await tester.pump();
@@ -370,7 +364,6 @@ void main() {
         expect(sentField.readOnly, isTrue);
         expect(sentField.decoration!.hintText, '請選擇留言回覆');
         expect(find.byTooltip('取消回覆'), findsNothing);
-        // Let the failure toast's removal timer finish before unmounting.
         await tester.pump(const Duration(seconds: 3));
         expect(tester.takeException(), isNull);
       } finally {
@@ -676,8 +669,6 @@ void main() {
       ],
     );
     expect(find.text('回覆'), findsNothing);
-    // 自己的回覆沒有 viewer_can_edit／viewer_can_delete：沒有編輯與刪除入口。
-    // 買家的頂層留言沒有 viewer_can_delete，也沒有任何入口。
     expect(find.byTooltip('留言更多操作'), findsNothing);
   });
 
@@ -734,7 +725,6 @@ void main() {
       await tester.tap(find.text('刪除留言'));
       await tester.pumpAndSettle();
       expect(find.text('確定要刪除此留言嗎？'), findsOneWidget);
-      // 平台的送出事件不經過被對話框蓋住的按鈕。
       await tester.showKeyboard(find.byType(TextField));
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pump();

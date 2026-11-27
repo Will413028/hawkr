@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== Admin 異常查詢 API（§29 Admin 異常訂單管理）====================
 
 // AdminShipmentSummaryResp 物流異常列表單筆
 type AdminShipmentSummaryResp struct {

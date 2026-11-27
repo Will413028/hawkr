@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// exposable 建立一間符合全部曝光條件的店家：營運中、沒有停權、平台審核核准且收款帳戶的轉帳能力啟用、店名、logo、鄉鎮市區代碼齊全。
 func (f *fixture) exposable(t *testing.T) (int64, Store) {
 	t.Helper()
 	accountID, s := f.approvedStore(t)
@@ -41,13 +40,11 @@ func TestExposableStoresReturnsAStoreMeetingEveryCondition(t *testing.T) {
 	_, s := f.exposable(t)
 	got, err := f.module.ExposableStores(context.Background(), []int64{s.StoreID})
 	must(t, err)
-	// 公開時間是寫入路徑（公告函式）記下的第一次可曝光的時間。
 	if len(got) != 1 || got[0].StoreID != s.StoreID || !got[0].PublishedAt.Equal(f.now) {
 		t.Fatalf("got=%+v, want PublishedAt %v", got, f.now)
 	}
 }
 
-// logoed 補上 logo（曝光的最後一個條件，與核准無關）。
 func (f *fixture) logoed(t *testing.T, accountID int64, s Store) {
 	t.Helper()
 	cur, err := f.module.Store(context.Background(), s.StoreID)
@@ -164,7 +161,7 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 			return s.StoreID
 		},
 		"kyc approved but payment account not enabled": func(t *testing.T, f *fixture) int64 {
-			accountID, s := f.approvedStore(t) // 申請已核准，收款帳戶還沒有建立。
+			accountID, s := f.approvedStore(t)
 			cur, err := f.module.Store(ctx, s.StoreID)
 			must(t, err)
 			_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: f.logoToken(t, accountID), UploaderID: accountID})
@@ -177,9 +174,7 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 			return s.StoreID
 		},
 		"missing town code": func(t *testing.T, f *fixture) int64 {
-			// town_code 與 address_detail 一起清掉（address_detail 需要 town_code）。
 			_, s := f.exposable(t)
-			// 已核准的店家不能經 UpdateProfile 清掉地址：直接清，再以別的欄位的寫入重新計算公告。
 			_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET town_code = NULL, address_detail = NULL WHERE store_id = $1", s.StoreID)
 			must(t, err)
 			cur, err := f.module.Store(ctx, s.StoreID)
@@ -211,7 +206,6 @@ func TestExposableAgainAfterTheSuspensionEndsOrIsLifted(t *testing.T) {
 	if got := f.exposed(t, s.StoreID); len(got) != 0 {
 		t.Fatalf("suspended store exposed: %v", got)
 	}
-	// 到期不必等任何 job：推導以注入的 clock 為準，ends_at 當下不生效。
 	f.now = ends
 	if got := f.exposed(t, s.StoreID); !slices.Equal(got, []int64{s.StoreID}) {
 		t.Fatalf("expired suspension still hides the store: %v", got)
@@ -305,7 +299,6 @@ func TestPublicListingAgreesWithExposableStores(t *testing.T) {
 		}
 		return listing.Missing
 	}
-	// 新店：沒有 KYC 申請（NOT_STARTED）也沒有 logo，店名與鄉鎮市區代碼已經有了。
 	_, fresh := f.open(t)
 	if got := missing(fresh); !slices.Equal(got, []Requirement{RequirementOnboardingComplete, RequirementLogo}) {
 		t.Fatalf("fresh store missing=%v", got)

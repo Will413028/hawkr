@@ -25,14 +25,12 @@ import 'app_colors.dart';
 class AppTypography {
   AppTypography._();
 
-  // ── Colors ────────────────────────────────────────────────────────────────
   static const Color colorPrimary = AppColors.textPrimary;
   static const Color colorEmphasis = AppColors.textEmphasis;
   static const Color colorPrice = AppColors.primary;
   static const Color colorMuted = AppColors.textSecondary;
-  static const Color colorDisabled = AppColors.textSecondary; // 50% 主色
+  static const Color colorDisabled = AppColors.textSecondary;
 
-  // ── Font family ───────────────────────────────────────────────────────────
   static const String family = 'Roboto';
 
   /// App-wide Material roles aligned with the website mobile typography.
@@ -72,7 +70,6 @@ class AppTypography {
     height: 28 / 20,
   );
 
-  // ── L1: Section Title (16sp Bold, emphasis) ──────────────────────────────
   static TextStyle get sectionTitle => TextStyle(
     fontFamily: family,
     fontSize: 16.sp,
@@ -81,7 +78,6 @@ class AppTypography {
     height: 24 / 16,
   );
 
-  // ── L2: Product Name / Button (16sp Bold, primary) ───────────────────────
   static TextStyle get productName => TextStyle(
     fontFamily: family,
     fontSize: 16.sp,
@@ -92,7 +88,6 @@ class AppTypography {
 
   static TextStyle get bodyBold => productName;
 
-  // ── L3: Price Total Emphasis (18sp Bold, accent) ─────────────────────────
   static TextStyle get priceTotal => TextStyle(
     fontFamily: family,
     fontSize: 18.sp,
@@ -107,7 +102,6 @@ class AppTypography {
     color: colorPrice,
   );
 
-  // ── M: Body (16sp Regular, primary) ──────────────────────────────────────
   static TextStyle get body => TextStyle(
     fontFamily: family,
     fontSize: 16.sp,
@@ -116,7 +110,6 @@ class AppTypography {
     height: 24 / 16,
   );
 
-  // ── S: Meta (14sp Regular, primary) ──────────────────────────────────────
   static TextStyle get meta => TextStyle(
     fontFamily: family,
     fontSize: 14.sp,
@@ -133,7 +126,6 @@ class AppTypography {
     height: 21 / 14,
   );
 
-  // ── XS: Tag (12sp Regular) ───────────────────────────────────────────────
   static TextStyle tag(Color color) => TextStyle(
     fontFamily: family,
     fontSize: 12.sp,

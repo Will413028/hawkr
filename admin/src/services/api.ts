@@ -30,7 +30,6 @@ export async function request<T>(
 		...(options.headers || {}),
 	};
 
-	// `timeoutMs` 是本層自己的參數，不屬於 `RequestInit` ⇒ 解構掉，不要往 fetch 送。
 	const { timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options;
 	const config: RequestInit = {
 		...init,
@@ -46,8 +45,6 @@ export async function request<T>(
 		const response = await fetch(`${baseUrl}${endpoint}`, config);
 		clearTimeout(timeoutId);
 
-		// 後台呼叫的 REST（/admin）只在沒有身分時回 401（非管理員是 403）：session 已經失效，
-		// 與 Connect 的 unauthenticated 一樣登出並回到 Access。
 		if (response.status === 401) {
 			console.warn("API returned 401 for:", endpoint);
 			AuthService.sessionExpired();
@@ -56,9 +53,6 @@ export async function request<T>(
 
 		if (response.status === 404) {
 			console.warn("API returned 404 for:", endpoint);
-			// 404 可能是路由不存在，也可能是後端業務上的「資源找不到」（例如帳號
-			// 已被刪除）— 兩者都回真實 message，不要一律顯示「API 端點不存在」
-			// 蓋掉實際原因。
 			const data = await response.json().catch(() => null);
 			throw new ApiClientError(
 				data?.message || "API 端點不存在",
@@ -76,10 +70,6 @@ export async function request<T>(
 				throw new Error("需要重新登入或權限不足");
 			}
 			if (data.code !== 0) {
-				// data 一定要帶上：有一批業務碼的 HTTP status 恆為 200 而 code !== 0
-				// （58 §6.1.0 (13) 的 preserveData 家族），它們要傳給前端的東西全在
-				// envelope 的 data 裡。這裡丟掉的話，呼叫端 catch 到的例外沒有任何
-				// 可用資訊，畫面上的症狀是「按了沒反應」而不是一則錯誤訊息。
 				throw new ApiClientError(
 					data.message || `API Error Code: ${data.code}`,
 					data.code,

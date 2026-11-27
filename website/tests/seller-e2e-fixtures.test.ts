@@ -361,7 +361,6 @@ test("measureJson maps the termination fields onto the wire shape the generated 
 			basis: "CONTRACT",
 			statement: "x",
 			state: "SCHEDULED",
-			// 生效時間刻意不是 createTime + 30 天（2026-11-04）：client 不能從建立時間推算。
 			period: { startTime: "2026-11-01T02:00:00Z" },
 			createTime: "2026-10-05T02:00:00Z",
 			canAppeal: false,

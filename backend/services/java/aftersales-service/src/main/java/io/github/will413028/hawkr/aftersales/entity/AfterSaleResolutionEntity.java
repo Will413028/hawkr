@@ -16,7 +16,6 @@ public class AfterSaleResolutionEntity {
 
     private String resolutionType;
 
-    // §10 來源：SELLER（既有預設）/ PLATFORM（Admin 裁決產生）
     private String resolutionSource;
 
     private Long refundAmount;

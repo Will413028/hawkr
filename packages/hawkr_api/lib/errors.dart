@@ -287,7 +287,6 @@ Interceptor retryInterceptor({
               retry >= policy.maxRetries) {
             rethrow;
           }
-          // 傳輸層的例外可能還沒被包成 ConnectException；以 connectrpc 同樣的規則轉換後再分類。
           final decision = classifyError(
             ErrorFacts.fromException(
               ConnectException.from(raw),
@@ -298,7 +297,6 @@ Interceptor retryInterceptor({
           if (decision.action != ErrorAction.retry) {
             rethrow;
           }
-          // 等待中被取消或到了 deadline 就不再重送，以中止的原因結束。
           await Future.any<void>([
             sleep(decision.retryDelay ?? policy.backoff(retry, jitter())),
             req.signal.future.then<void>((reason) => throw reason),

@@ -1,22 +1,5 @@
 package fsm
 
-// 本檔是 §7 不變式 **I7** 宣稱的「transition helper」。
-//
-// 設計書 §7 不變式表逐字：
-//
-//	I7 | 每一次 status 轉移都有一列 invoice_status_history
-//	   | transition helper 是唯一寫入點 ＋ 契約測試斷言「七個 aggregate 的每一條
-//	     轉換表列都至少被一支測試走過」
-//
-// 🔴 **這個檔案在 2026-09-04 之前不存在**（#3109）。I7 從上線起就沒有任何東西在守：
-// `internal/usecase/recheck.go` 的 `applyDecision` 三個分支承載 J23／J24／J25／J26／
-// J17／J31 六條轉移，一列 history 都不寫。dev 實證是一條**自相矛盾**的軌跡——
-// `→ CANCEL_REQUESTED` 的下一列直接是 `CANCELLED_BY_ADMIN →`，中間兩步整段消失，
-// 照它讀這筆 job 是憑空變成已取消的。
-//
-// 本檔只做一件事：**在寫 history 之前，先問 fsm 這條邊存不存在**。
-// 它不碰 DB、不知道 repository 長什麼樣——寫入由呼叫端用既有的 append helper 做，
-// 這裡回答的是「這條邊合法嗎、該不該留痕」。
 
 import "fmt"
 

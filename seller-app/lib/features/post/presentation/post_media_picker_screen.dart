@@ -38,11 +38,9 @@ class PostMediaPickerScreen extends StatefulWidget {
 class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
   final ImagePicker _picker = ImagePicker();
 
-  // Album and assets
   List<AssetEntity> _assets = [];
   bool _loading = true;
   String? _error;
-  // Helpers: media compression
   Future<Uint8List?> _readImageBytes(File file) async {
     try {
       return await file.readAsBytes();
@@ -83,7 +81,7 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
   }
 
   AssetEntity? _selected;
-  File? _capturedFile; // if taken from camera
+  File? _capturedFile;
   Color _dominantColor = AppColors.textEmphasis;
 
   Future<void> _updateDominantColor() async {
@@ -119,7 +117,6 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
   @override
   void initState() {
     super.initState();
-    // Defer heavy PhotoManager calls to after first frame to reduce iOS crash risk
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadAssets());
   }
 
@@ -129,7 +126,6 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
       _error = null;
     });
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    // 處理 iOS 14+ 限制存取權限：hasAccess 表示至少有部分存取權限
     if (!ps.hasAccess) {
       setState(() {
         _error = '需要相簿權限才能選取媒體';
@@ -138,9 +134,7 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
       return;
     }
 
-    // 如果是限制存取，顯示提示但繼續載入可用的照片
     if (ps == PermissionState.limited) {
-      // 可選：顯示提示讓用戶知道只能看到部分照片
       debugPrint(
         '[PhotoPicker] Limited access - only selected photos are available',
       );
@@ -149,7 +143,7 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
     try {
       final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
         onlyAll: true,
-        type: RequestType.image, // images only
+        type: RequestType.image,
       );
       if (paths.isEmpty) {
         setState(() {
@@ -159,7 +153,6 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
         });
         return;
       }
-      // Load more photos - increased from 60 to 500
       final recent = paths.first;
       final List<AssetEntity> assets = await recent.getAssetListPaged(
         page: 0,
@@ -184,7 +177,7 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
     if (taken != null) {
       setState(() {
         _capturedFile = File(taken.path);
-        _selected = null; // using captured file for preview
+        _selected = null;
       });
       _updateDominantColor();
     }
@@ -233,13 +226,11 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
   }
 
   Future<void> _next() async {
-    // Prepare preview and source media bytes for upload.
     Uint8List? previewBytes;
     Uint8List? mediaBytes;
     String contentType = 'image';
 
     if (_capturedFile != null) {
-      // Camera capture (image)
       try {
         TruckLoadingOverlay.show(context);
         mediaBytes = await _readImageBytes(_capturedFile!);
@@ -261,18 +252,15 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
         FloatingToast.error(context, '無法取得相簿原始圖片，請確認 iCloud 已下載後重試');
         return;
       }
-      // 使用完整圖片作為預覽，確保進入編輯器時有完整圖片資料
       previewBytes = mediaBytes;
     }
 
     if (!mounted) return;
     if (mediaBytes == null && previewBytes == null) {
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('尚未選擇媒體')));
       FloatingToast.error(context, '尚未選擇媒體');
       return;
     }
 
-    // Open compose; if published, bubble the created result back to caller
     final created = await context.push<bool>(
       '/post/compose',
       extra: {
@@ -336,7 +324,6 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
       return;
     }
 
-    // 直接帶圖片進 photo-editor，跳過 /seller/photo-tools 中間頁
     final tempFile = File(
       '${Directory.systemTemp.path}/post_edit_${DateTime.now().millisecondsSinceEpoch}.jpg',
     );
@@ -348,7 +335,6 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
       extra: PhotoEditorArgs(file: tempFile, category: 'post'),
     );
 
-    // 編輯完成 → 用編輯結果取代當前預覽，使用者直接按「下一步」就能帶著編輯後的圖片進入 compose
     if (edited != null && mounted) {
       setState(() {
         _capturedFile = edited;
@@ -388,7 +374,7 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
                             crossAxisSpacing: 1,
                             mainAxisSpacing: 1,
                           ),
-                      itemCount: _assets.length + 1, // +1 for camera tile
+                      itemCount: _assets.length + 1,
                       itemBuilder: (context, index) {
                         if (index == 0) {
                           return InkWell(
@@ -427,7 +413,6 @@ class _PostMediaPickerScreenState extends State<PostMediaPickerScreen> {
                     ),
                   ),
           ),
-          // 浮動 AI 按鈕（參考商店頁的加號樣式）
           Positioned(
             left: 0,
             right: 0,

@@ -92,8 +92,6 @@ export function foldInvoiceDocumentStatus(
 				tone: "success",
 				unknown: false,
 			};
-		// 「已被重開取代」對買家的意思就是這張已經不算數了，與已作廢同語——
-		// 借 VOIDED 的 CodeMeta label，不手抄第二份中文。
 		case InvoiceDocumentStatus.SUPERSEDED:
 		case InvoiceDocumentStatus.VOIDED:
 			return {

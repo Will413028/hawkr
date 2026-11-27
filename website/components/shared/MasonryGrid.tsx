@@ -236,8 +236,6 @@ export default function MasonryGrid<T>({
 		} as React.CSSProperties;
 	}, [breakpoints]);
 
-	// Keep prop callbacks stable inside recompute to avoid re-running
-	// the layout loop just because the parent re-rendered.
 	const getKeyRef = React.useRef(getKey);
 	getKeyRef.current = getKey;
 
@@ -269,9 +267,6 @@ export default function MasonryGrid<T>({
 		const container = containerRef.current;
 		if (!container) return;
 		if (container.clientWidth <= 0) return;
-		// The one and only source of "how many columns": whatever the CSS
-		// grid declaration resolved to on the probe, which is the very same
-		// declaration the SSR fallback painted with.
 		const geometry = readTrackGeometry(probeRef.current);
 		if (!geometry) return;
 		const { columns, colWidth, gap } = geometry;
@@ -291,9 +286,6 @@ export default function MasonryGrid<T>({
 			columns,
 			colWidth,
 			gap,
-			// A column-count change is a genuine re-layout (breakpoint / resize),
-			// so the sticky assignment is dropped; anything short of that keeps
-			// every card in the column it was already painted in.
 			previous:
 				assignmentRef.current.columns === columns
 					? assignmentRef.current.byKey
@@ -317,10 +309,6 @@ export default function MasonryGrid<T>({
 		ro.observe(container);
 		if (probeRef.current) ro.observe(probeRef.current);
 		for (const el of itemElsRef.current.values()) ro.observe(el);
-		// A media-query change can swap the track list WITHOUT changing the
-		// container's width (e.g. three fixed columns -> auto-fill at the same
-		// width), and a ResizeObserver never fires for that. The window
-		// listener is what makes those transitions land.
 		window.addEventListener("resize", recompute);
 		return () => {
 			ro.disconnect();
@@ -328,19 +316,6 @@ export default function MasonryGrid<T>({
 		};
 	}, [recompute]);
 
-	// Until the first measure pass lands, lay the items out as a PLAIN CSS
-	// grid in normal flow. This is what the SSR HTML paints while JS is
-	// still loading — previously every card was `visibility:hidden` inside
-	// a 0-height container, so /market/products painted a blank grid and
-	// then jumped to full height after hydration (massive CLS).
-	//
-	// This fallback DOES get painted on its own whenever hydration is slower
-	// than first paint (every loaded CI runner, every slow phone) — the
-	// useLayoutEffect recompute is only pre-paint relative to the hydration
-	// commit, not to the SSR paint that preceded it. So the arrangement it
-	// paints is load-bearing, not a formality: `adoptFallbackOrder` above
-	// makes the first measured pass agree with it instead of re-dealing the
-	// cards across columns.
 	const measured = layout.positions.size > 0;
 
 	return (
@@ -352,8 +327,6 @@ export default function MasonryGrid<T>({
 				measured
 					? {
 							...fallbackVars,
-							// `relative` in BOTH modes, so the probe below always
-							// resolves against this element's padding box.
 							position: "relative",
 							height: layout.height || undefined,
 						}
@@ -367,15 +340,7 @@ export default function MasonryGrid<T>({
 						}
 			}
 		>
-			{/*
-			 * Zero-height, out-of-flow carrier of the SAME grid declaration the
-			 * fallback paints with. Once the measured pass swaps the container
-			 * to absolute positioning, the container itself stops being a grid,
-			 * so without this there would be nothing left to read the resolved
-			 * column count back from — and reading it back is precisely what
-			 * removes the need for a second, JS-side formula. Being absolutely
-			 * positioned, it occupies no grid cell in fallback mode.
-			 */}
+
 			<div
 				ref={probeRef}
 				data-masonry-probe
@@ -409,9 +374,6 @@ export default function MasonryGrid<T>({
 										left: pos ? `${pos.x}px` : 0,
 										top: pos ? `${pos.y}px` : 0,
 										width: pos ? `${pos.w}px` : `${layout.colWidth || 0}px`,
-										// Freshly appended items render hidden until the
-										// next layout pass assigns them a position, so
-										// they don't flash a stack at (0,0).
 										visibility: pos ? "visible" : "hidden",
 									}
 								: undefined

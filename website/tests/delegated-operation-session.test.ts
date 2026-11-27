@@ -38,10 +38,7 @@ test("delegated cookie is HttpOnly, Lax, /adm scoped, and capped at 30 minutes",
 			httpOnly: true,
 			secure: true,
 			sameSite: "lax",
-			// __Host- 會強制 Path=/，讓憑證跟著 www 的每一個請求送出。這一格就是
-			// 「不用 __Host- 前綴」的唯一理由，改掉它等於把暴露面放大到整個站台。
 			path: "/adm",
-			// 工作階段壽命上界 1800 ＋ grace 60（見下一條）。
 			maxAge: 1800 + DELEGATED_COOKIE_EXPIRY_GRACE_SECONDS,
 		},
 	);
@@ -64,12 +61,10 @@ test("delegated cookie is HttpOnly, Lax, /adm scoped, and capped at 30 minutes",
  */
 test("cookie expiry is never earlier than the session expiry", () => {
 	const cases = [
-		// 整秒：舊寫法剛好打平，任何一點傳輸延遲都會讓它早死。
 		{
 			expiresAt: "2026-08-14T04:02:05.000Z",
 			nowAt: "2026-08-14T04:00:00.000Z",
 		},
-		// 帶零頭：舊寫法的 Math.floor 直接把它截成早死。
 		{
 			expiresAt: "2026-08-14T04:02:05.700Z",
 			nowAt: "2026-08-14T04:00:00.000Z",
@@ -78,7 +73,6 @@ test("cookie expiry is never earlier than the session expiry", () => {
 			expiresAt: "2026-08-14T04:00:00.001Z",
 			nowAt: "2026-08-14T04:00:00.000Z",
 		},
-		// 滿額 30 分鐘：上界那一格也要成立。
 		{
 			expiresAt: "2026-08-14T04:30:00.000Z",
 			nowAt: "2026-08-14T04:00:00.000Z",
@@ -106,7 +100,6 @@ test("cookie maxAge tracks the upstream expiry plus the fixed grace", () => {
 			?.maxAge,
 		125 + DELEGATED_COOKIE_EXPIRY_GRACE_SECONDS,
 	);
-	// 呼叫端給的上界仍然約束「工作階段壽命」那一段，grace 加在它之後。
 	assert.equal(
 		createDelegatedCookieOptions(
 			"2026-08-14T04:02:00.000Z",
@@ -172,8 +165,6 @@ test("end clearing is permitted only when upstream proves the session is gone", 
 	assert.equal(isDelegatedEndProven(410, { code: 9270 }), true);
 	assert.equal(isDelegatedEndProven(410, { code: 9271 }), true);
 
-	// 狀態碼本身是模糊的：401 可能是上游拒絕，404 可能是端點沒部署。兩者都不得
-	// 清掉 credential cookie。
 	for (const status of [0, 200, 401, 404, 410, 500, 503]) {
 		assert.equal(isDelegatedEndProven(status, null), false, String(status));
 	}
@@ -186,18 +177,11 @@ test("end clearing is permitted only when upstream proves the session is gone", 
  * 名（L1009）。一份憑證有兩個寫入點，就必然有一個在結束時忘了清。
  */
 test("only the entry route and the end route may name the delegated cookie", () => {
-	// fileURLToPath 而不是 .pathname：後者會把路徑裡的空白留成 %20，
-	// 含空白的 checkout 路徑（例如「Hawkr Web」）下 readFileSync 會 ENOENT。
-	// CI 路徑沒空白所以只在本機炸。
 	const root = fileURLToPath(new URL("..", import.meta.url));
 	const allowed = new Set([
-		// 名稱與屬性的定義處
 		"features/delegated-operations/server/session.ts",
-		// 兌換成功後寫入
 		"app/(delegated)/adm/enter/route.ts",
-		// 結束後清除
 		"app/(delegated)/adm/api/session/end/route.ts",
-		// 本測試
 		"tests/delegated-operation-session.test.ts",
 	]);
 	const offenders: string[] = [];

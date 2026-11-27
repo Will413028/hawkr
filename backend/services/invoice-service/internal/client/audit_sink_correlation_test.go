@@ -43,8 +43,6 @@ func TestCorrelationIDOf(t *testing.T) {
 		}
 	})
 
-	// 🔴 優先序：有請求 id 時**不得**被 trace id 蓋掉——請求 id 才是跨服務追同一次
-	// 使用者操作的那個值，trace id 只是這一跳的。
 	t.Run("兩者都有時取請求 id", func(t *testing.T) {
 		tid, _ := trace.TraceIDFromHex("4bf92f3577b34da6a3ce929d0e0e4736")
 		ctx := trace.ContextWithSpanContext(
@@ -88,7 +86,6 @@ func TestRepoAuditSink_RecordCarriesCorrelationID(t *testing.T) {
 		t.Fatalf("🔴 entry 沒帶上 correlation_id：%v —— request_id／last_request_id 兩個對外欄位會恆為空", e.CorrelationID)
 	}
 
-	// 沒有來源時保持 NULL，不塞編出來的值。
 	repo.got = nil
 	sink.Record(context.Background(), amego.Exchange{
 		IssuerID: 1, Endpoint: "/json/f0401", AttemptSeq: 2,

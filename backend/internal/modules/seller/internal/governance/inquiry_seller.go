@@ -17,15 +17,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 賣家端的詢問以帳號為範圍：詢問屬於這個帳號任何一個 stint（含已關閉的店）才讀得到、回覆得了；關店不收回回覆的義務與機會
-// （詢問開放中就能回覆，案件結案時系統撤回），所以不要求店家營運中。別人的與不存在的詢問一律 NotFound。
 
-// ownsInquiry 是賣家端授權的唯一判斷：詢問所在的店家（storeAccountID）屬於呼叫的帳號。
 func ownsInquiry(storeAccountID, accountID int64) bool {
 	return accountID > 0 && storeAccountID == accountID
 }
 
-// ownedInquiry 讀一筆呼叫帳號擁有的詢問列；不擁有與不存在都回 NotFound。
 func ownedInquiry(ctx context.Context, q *store.Queries, accountID int64, id uuid.UUID) (store.SellerCaseInquiry, error) {
 	row, err := q.CaseInquiryByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -44,7 +40,6 @@ func ownedInquiry(ctx context.Context, q *store.Queries, accountID int64, id uui
 	return row, nil
 }
 
-// sellerInquiryBlockText 是賣家回覆被擋下的句子（語系 l）；不認得的原因回零值。
 func sellerInquiryBlockText(l uitext.Locale, b model.InquiryBlock) uitext.Message {
 	switch b {
 	case model.InquiryBlockWithdrawn:
@@ -62,7 +57,6 @@ func sellerReplyBlocked(l uitext.Locale, blocks []model.InquiryBlock) error {
 	return apperr.FailedPrecondition("%s", sellerInquiryBlockText(l, blocks[0]).Text)
 }
 
-// sellerInquiries 把一批詢問列變成賣家的檢視：附件只留數量（賣家不讀回自己上傳的附件，也不輸出物件鍵）。
 func sellerInquiries(ctx context.Context, q *store.Queries, rows []store.SellerCaseInquiry) ([]model.SellerInquiry, error) {
 	views, err := adminInquiries(ctx, q, rows)
 	if err != nil {

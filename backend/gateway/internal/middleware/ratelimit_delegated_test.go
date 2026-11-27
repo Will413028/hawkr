@@ -13,8 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 代行資源端點的真實形狀：路徑第二段 sellers/:store_id 與同段的非代行路由共用，所以「是不是代行」
-// 只有登錄制答得準。adminPlainRoute 是測試自己掛的非代行示意路由。
 const (
 	delegatedProductsRoute = "/api/v1/admin/sellers/:store_id/products"
 	delegatedProductsURL   = "/api/v1/admin/sellers/2685914682/products"
@@ -22,9 +20,6 @@ const (
 	adminPlainURL          = "/api/v1/admin/sellers/2685914682/plain"
 )
 
-// rlEngineDelegated mounts one delegated route and one plain admin route that share
-// the /sellers/:store_id/ segment, plus a status knob so the auth-failure axis can be
-// driven directly.
 func rlEngineDelegated(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy, status *int) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -132,7 +127,6 @@ func TestRateLimiter_DelegatedAuthFailureBranchAlsoReturns9273(t *testing.T) {
 	}
 	r := rlEngineDelegated(limiter, policy, &status)
 
-	// 工作區憑證失效後仍在輪詢的形狀：連續 401 把 auth-failure 計數推到門檻。
 	for i := 1; i <= 2; i++ {
 		if w := doRL(r, http.MethodGet, delegatedProductsURL); w.Code != http.StatusUnauthorized {
 			t.Fatalf("第 %d 次請求 = %d，門檻內應原樣回 401", i, w.Code)

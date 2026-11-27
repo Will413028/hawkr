@@ -17,10 +17,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// rewrapBatch 是 RewrapDEKs 每批取的資產數。
 const rewrapBatch = 100
 
-// assetFromView 取出資產列本身的欄位（推導用的兩個事實不屬於列）。
 func assetFromView(a store.GetAssetViewRow) store.MediaAsset {
 	return store.MediaAsset{
 		ID: a.ID, Visibility: a.Visibility, ObjectKey: a.ObjectKey, ContentType: a.ContentType, SizeBytes: a.SizeBytes,
@@ -28,8 +26,6 @@ func assetFromView(a store.GetAssetViewRow) store.MediaAsset {
 	}
 }
 
-// openAsset 依 secure_chunks 按 idx 排序依序開各段的物件並串流解密；一個 AEAD 段的 tag 驗過才交出那一段的明文。
-// 列數不等於資產列的段總數、或序號不連續，視為損毀（secure.ErrCorrupt）。第一段在這裡就打開，物件不存在在開啟時就回錯誤。
 func (s *Service) openAsset(ctx context.Context, a store.MediaAsset) (io.ReadCloser, error) {
 	if a.KekID == nil || len(a.WrappedDek) == 0 {
 		return nil, fmt.Errorf("media：機敏資產 %s 沒有 wrapped DEK", a.ID)
@@ -62,7 +58,6 @@ func (s *Service) openAsset(ctx context.Context, a store.MediaAsset) (io.ReadClo
 	return r, nil
 }
 
-// chunkedReader 把資產的各個上傳段依序接成一條明文串流；同一時間只開一個物件。
 type chunkedReader struct {
 	ctx   context.Context
 	store storage.Store
@@ -213,7 +208,6 @@ func (s *Service) RewrapDEKs(ctx context.Context) (int, error) {
 		return 0, model.ErrNoKeyring
 	}
 	primary := s.d.Keyring.PrimaryID()
-	// 先掃 UPLOADING 暫存列再掃資產：最後一段在兩者之間提交的會話已變成資產，會被後面的資產迴圈接到；反過來會漏掉它。
 	uploads, uploadErr := s.rewrapUploads(ctx, primary)
 	if s.afterRewrapUploads != nil {
 		s.afterRewrapUploads(ctx)
@@ -272,7 +266,6 @@ func (s *Service) rewrapAssets(ctx context.Context, primary string) (int, error)
 	return total, errors.Join(errs...)
 }
 
-// rewrapUpload 重新包裹還在 UPLOADING 的暫存列的 DEK（資產列建立前 DEK 只在暫存列）；AAD 的資產 ID 是預配的資產 ID。
 func (s *Service) rewrapUpload(ctx context.Context, r store.ListUploadsToRewrapRow, primary string) (int, error) {
 	if r.KekID == nil || r.PlannedAssetID == nil {
 		return 0, fmt.Errorf("media：機敏暫存上傳 %s 沒有 kek_id 或預配的資產 ID", r.ID)

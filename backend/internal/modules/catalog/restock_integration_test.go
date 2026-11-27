@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 )
 
-// stocked 建一個商品（一個 SKU，庫存 stock），active 為真就切成 ACTIVE，回傳商品與它的 SKU。建立與上架可能排出的佇列列都清掉，測試從乾淨的佇列開始。
 func (f *productFixture) stocked(storeID, acct int64, title string, stock int32, active bool) (Product, uuid.UUID) {
 	f.t.Helper()
 	in := f.input(title)
@@ -34,7 +33,6 @@ func (f *productFixture) clearQueues() {
 	f.exec(`DELETE FROM catalog.restock_purge_queue`)
 }
 
-// queued 回傳 SKU 在補貨佇列的列數（0 或 1）。
 func (f *productFixture) queued(sku uuid.UUID) int {
 	f.t.Helper()
 	return f.count(`SELECT count(*) FROM catalog.restock_queue WHERE sku_id = $1`, sku)
@@ -59,7 +57,6 @@ func (f *productFixture) row(table string, sku uuid.UUID) queueRow {
 	return r
 }
 
-// arm 讓 SKU 在補貨佇列有一列此刻就到期、沒被認領的請求（不經偵測，隔離 worker 的行為）。
 func (f *productFixture) arm(sku uuid.UUID) {
 	f.t.Helper()
 	f.exec(`INSERT INTO catalog.restock_queue (sku_id, due_at, requested_at) VALUES ($1, $2, $2)
@@ -89,7 +86,7 @@ func TestRestockIsEnqueuedOnEveryZeroToPurchasablePath(t *testing.T) {
 	}
 	paths := []struct {
 		name  string
-		setup func(e *env) // 讓 SKU 在 ACTIVE、可曝光的店家處於庫存 0
+		setup func(e *env)
 		act   func(e *env) error
 	}{
 		{"SetStock", func(e *env) {}, func(e *env) error {
@@ -99,7 +96,6 @@ func TestRestockIsEnqueuedOnEveryZeroToPurchasablePath(t *testing.T) {
 			return e.f.m.AdjustStock(e.f.ct, e.storeID, "k-adj", e.sku, 4)
 		}},
 		{"RestoreStock", func(e *env) {
-			// 先有一次把庫存扣到 0 的扣減，再歸還它。
 			e.f.setStock(e.storeID, e.sku, 3, 0)
 			if err := e.f.m.DeductStock(e.f.ct, "order-1", []StockItem{{SkuID: e.sku, Quantity: 3}}); err != nil {
 				e.f.t.Fatal(err)
@@ -177,7 +173,6 @@ func TestActivationEnqueuesEveryLiveSkuRegardlessOfStock(t *testing.T) {
 			t.Fatalf("SKU %v has no stock but the activation must still enqueue it, got %d rows", sk.ID, got)
 		}
 	}
-	// 沒有庫存的 SKU 在執行時不可買，不通知；這時其中一個 SKU 已經補貨（模擬與啟用並行的庫存變更）才會通知。
 	f.setStock(storeID, p.Skus[1].ID, 6, 0)
 	f.advance(restock.Delay)
 	f.run()
@@ -194,7 +189,6 @@ func TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
 	f := newProductFixture(t)
 	storeID, acct := f.store()
 
-	// 庫存 >0 到 >0：三條增加的路徑都不排。
 	_, sku := f.stocked(storeID, acct, "有貨", 5, true)
 	f.setStock(storeID, sku, 7, 5)
 	if err := f.m.AdjustStock(f.ct, storeID, "adj-up", sku, 3); err != nil {
@@ -210,13 +204,11 @@ func TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
 		t.Fatalf("stock > 0 to > 0 must not enqueue a row, got %d", got)
 	}
 
-	// 庫存減少（到 0）不排。
 	f.setStock(storeID, sku, 0, 10)
 	if got := f.queued(sku); got != 0 {
 		t.Fatalf("a decrease to 0 must not enqueue a row, got %d", got)
 	}
 
-	// 草稿與已下架的商品庫存 0 -> >0：不可買，不排。
 	for _, st := range []ProductStatus{StatusDraft, StatusArchived} {
 		p, s := f.stocked(storeID, acct, "未上架"+string(st), 0, false)
 		if st == StatusArchived {
@@ -224,7 +216,7 @@ func TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
 			if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusArchived); err != nil {
 				t.Fatal(err)
 			}
-			f.clearQueues() // 啟用會排每個沒刪除的 SKU（D26）；這裡只驗庫存寫入的路徑
+			f.clearQueues()
 		}
 		f.setStock(storeID, s, 5, 0)
 		if got := f.queued(s); got != 0 {
@@ -232,7 +224,6 @@ func TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
 		}
 	}
 
-	// 店家不可曝光：不可買，不排。
 	other, otherAcct := f.store()
 	_, s2 := f.stocked(other, otherAcct, "不曝光", 0, true)
 	f.setExposable(other, false)
@@ -241,7 +232,6 @@ func TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
 		t.Fatalf("a store that is not exposable makes the SKU not purchasable, got %d rows", got)
 	}
 
-	// 已刪除的商品：SKU 還能歸還庫存（原扣減仍可歸還），但不可買，不排。
 	p3, s3 := f.stocked(storeID, acct, "將刪除", 3, true)
 	if err := f.m.DeductStock(f.ct, "order-deleted", []StockItem{{SkuID: s3, Quantity: 3}}); err != nil {
 		t.Fatal(err)
@@ -307,7 +297,7 @@ func TestRestockTransitionsWithinTheWindowCoalesceIntoOneNotification(t *testing
 		t.Fatalf("an unclaimed row is left as it is (earliest due, original request): %+v, first %+v", r, first)
 	}
 
-	f.run() // 還沒到期
+	f.run()
 	if len(f.rn.skus()) != 0 {
 		t.Fatalf("not due yet: %v", f.rn.skus())
 	}
@@ -331,7 +321,6 @@ func TestRestockTransitionWhileTheRowIsClaimedIsNotLost(t *testing.T) {
 	f.setStock(storeID, sku, 5, 0)
 	f.advance(restock.Delay)
 	f.rn.onNotify = func() {
-		// 時鐘不動：兩次請求的時間相同，requested_at 仍要不同。
 		f.setStock(storeID, sku, 0, 5)
 		f.setStock(storeID, sku, 3, 0)
 	}
@@ -347,7 +336,7 @@ func TestRestockTransitionWhileTheRowIsClaimedIsNotLost(t *testing.T) {
 	if want := f.clock().Add(restock.Delay); r.ClaimedUntil != nil || !r.DueAt.Equal(want) || r.Attempts != 0 {
 		t.Fatalf("the row is re-armed (unclaimed, due %v): %+v", want, r)
 	}
-	f.run() // 重新排的延後還沒過
+	f.run()
 	if got := len(f.rn.skus()); got != 1 {
 		t.Fatalf("the re-armed row waits out the delay, got %d notifications", got)
 	}
@@ -412,7 +401,7 @@ func TestRestockNotifierFailureBacksOffAndStopsAtMaxAttempts(t *testing.T) {
 			t.Fatalf("attempt %d: %d calls", attempt, got)
 		}
 		if attempt < restock.MaxAttempts {
-			f.run() // 退避中不重試
+			f.run()
 			if got := len(f.rn.notified); got != int(attempt) {
 				t.Fatalf("attempt %d: retried before the backoff passed, %d calls", attempt, got)
 			}
@@ -432,7 +421,6 @@ func TestRestockNotifierFailureBacksOffAndStopsAtMaxAttempts(t *testing.T) {
 		t.Fatalf("a stopped row is not retried, %d calls", got)
 	}
 
-	// 恢復之後的新轉換重置停手的列，並且通知得出去。
 	f.rn.failNotify = nil
 	f.setStock(storeID, sku, 0, 5)
 	f.setStock(storeID, sku, 2, 0)
@@ -504,7 +492,6 @@ func TestRestockNotifiesWithTheLatestSnapshotOfTheSkuThatChanged(t *testing.T) {
 		t.Fatalf("only the restocked SKU gets a row: sibling %d, restocked %d", f.queued(sibling), f.queued(restocked))
 	}
 
-	// worker 執行前商品改名換主圖：通知帶的是執行當下的最新快照。
 	in2 := in
 	in2.Title = "新名"
 	in2.Gallery = []Image{{Token: "restock-new-cover"}}
@@ -525,7 +512,6 @@ func TestRestockNotifiesWithTheLatestSnapshotOfTheSkuThatChanged(t *testing.T) {
 		t.Fatalf("notification = %+v, want sku %v product %v store %d name 新名 image %q at %v", got, restocked, p.ID, storeID, coverKey, f.clock())
 	}
 
-	// 同商品的另一個 SKU 還是 0：它的列（就算被誤排）也不通知。
 	f.arm(sibling)
 	f.run()
 	if !slices.Equal(f.rn.skus(), []uuid.UUID{restocked}) {
@@ -543,7 +529,6 @@ func TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions(t *testing.T) {
 	p := f.create(storeID, acct, in)
 	f.clearQueues()
 
-	// purged 處理佇列並回傳這一輪 port 收到的 SKU（排序後）。
 	purged := func() []uuid.UUID {
 		f.t.Helper()
 		f.rn.purged = nil
@@ -556,7 +541,6 @@ func TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions(t *testing.T) {
 	}
 	queuedPurges := func() int { return f.count(`SELECT count(*) FROM catalog.restock_purge_queue`) }
 
-	// 修改商品拿掉一個 SKU：只清被拿掉的那個。
 	keep := in
 	keep.Axes = []Axis{{Name: "尺寸", Values: []string{"S"}}}
 	keep.Skus = []SkuInput{{Option1: "S", Price: 100}}
@@ -581,7 +565,6 @@ func TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions(t *testing.T) {
 		t.Fatalf("a purged row is deleted, got %d", got)
 	}
 
-	// 沒有拿掉 SKU 的修改不排。
 	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, keep); err != nil {
 		t.Fatal(err)
 	}
@@ -589,7 +572,6 @@ func TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions(t *testing.T) {
 		t.Fatalf("an update that keeps every SKU purges nothing, got %d", got)
 	}
 
-	// 刪除商品：清它還在的 SKU；清除失敗在同一列記錄並退避。
 	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, 0); err != nil {
 		t.Fatal(err)
 	}

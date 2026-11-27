@@ -50,7 +50,6 @@ afterEach(() => {
 describe("AccountRestrictedSection", () => {
 	it("lists the date, category, reason and the restriction sentence", () => {
 		show({
-			// 台北時間 2026-11-01 08:30
 			suspendedAt: "2026-11-01T00:30:00.000Z",
 			category: PolicyCategory.HARASSMENT,
 			reason: "repeated abuse",

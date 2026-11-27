@@ -15,11 +15,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// kycReader 讀店家的 KYC 申請：found 為 false 表示沒有（不是失敗）。賣家端讀自己的申請（含草稿），後台只讀得到送出過的（草稿是賣家自己的）。
 type kycReader func(ctx context.Context) (application model.KYCApplication, found bool, err error)
 
-// readOnboarding 組出店家 store 的開通任務清單：KYC 與收款帳戶各自讀取，任何一個讀不到只讓需要它的任務是 UNKNOWN，不讓方法失敗（D26）；
-// 讀取失敗記在 log。任務的完成由 store 帶的條件決定（讀店家時一併讀出），這裡讀到的只決定狀態句與下一步。
 func readOnboarding(ctx context.Context, log *slog.Logger, store model.Store, kyc kycReader, payments PaymentReader) model.Onboarding {
 	in := model.OnboardingInput{Store: store}
 	app, found, err := kyc(ctx)

@@ -42,7 +42,7 @@ void main() {
     await applyIdentity(
       svc,
       const SessionModel(),
-    ); // isLoggedIn defaults to false
+    );
     verify(() => fa.setUserId(id: null)).called(1);
     verifyNever(
       () => fa.setUserProperty(

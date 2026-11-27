@@ -64,7 +64,6 @@ describe("classifyShipmentError", () => {
 		expect(o.message).toBe(
 			"呼叫黑貓失敗：寄件地址不在簽約可收貨範圍，請聯繫簽約站所",
 		);
-		// 舊 bug 的籠統文案絕不能再出現
 		expect(o.message).not.toContain("可能已處理過");
 		expect(o.message).not.toContain("假日");
 	});
@@ -132,7 +131,6 @@ describe("shipmentErrorGuidance", () => {
 		);
 		const g = shipmentErrorGuidance(o);
 		expect(g).not.toBeNull();
-		// 地址於開通鎖定，修改須走 PayUni 客服（與 ShippingClient 一致）
 		expect(g?.steps.some((s) => s.includes("PayUni"))).toBe(true);
 		expect(g?.links.some((l) => l.href === TCAT_BRANCH_LOOKUP_URL)).toBe(true);
 	});

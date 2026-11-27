@@ -84,8 +84,6 @@ void main() {
     });
 
     test('⛔ 清單不得為了補狀態而逐列打詳情端點', () {
-      // 端點 limit 上限 100，逐列打詳情＝一次打開最多 100 次往返。
-      // 清單列拿不到草稿／回價狀態是後端契約的形狀，正解是後端補欄位。
       final listSource = File(
         'lib/features/procurement/presentation/'
         'seller_publication_list_screen.dart',

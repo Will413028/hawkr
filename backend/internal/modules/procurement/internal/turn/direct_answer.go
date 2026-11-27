@@ -30,30 +30,24 @@ type AnswerSlotInput struct {
 	Locale             uitext.Locale
 }
 
-// 欄位違規指出的欄位名（AnswerSlotInput 的 Go 欄位名）。
 const (
 	fieldSlotKey      = "SlotKey"
 	fieldUnitOptionID = "UnitOptionID"
 	fieldSkip         = "Skip"
 )
 
-// answerable 是 SubmitAnswer 收的欄位：UNIT 不收（單位的回答走 QUANTITY 加 unit_option_id，沿用表的決定；倒回才把 UNIT 折進 QUANTITY），品項消歧與品項解析由 run 或伺服器擁有。
 var answerable = []model.SlotKey{
 	slots.Item, slots.Quantity, slots.Packaging, slots.BudgetPerUnit, slots.DeliveryCity, slots.DeliveryDate,
 }
 
-// answerPlan 是形狀檢查過的回答：不讀資料庫。
 type answerPlan struct {
 	slot model.SlotKey
 	skip bool
-	// text 是去頭尾空白的文字；option、unit 是白名單選項的值；number 是 QUANTITY、BUDGET_PER_UNIT 的文字解成的整數。
 	text, option, unit string
 	number             *int64
-	// message 是對話裡顯示的買家回答（輪次的 buyer_message）：選項的值或文字，數量帶單位，略過是空字串。
 	message string
 }
 
-// planAnswer 檢查回答的形狀（slot 認得、option_id 在白名單上、數量與預算是整數、略過只給可略過的欄位），不合回 INVALID_ARGUMENT 並指出欄位。
 func planAnswer(in AnswerSlotInput) (answerPlan, error) {
 	if !slices.Contains(answerable, in.Slot) {
 		return answerPlan{}, apperr.InvalidInputOn([]string{fieldSlotKey}, "這個欄位不能用回答送出")
@@ -157,7 +151,6 @@ func (p answerPlan) messageText() string {
 	return p.text
 }
 
-// patch 是這個回答對現況的改動；略過不寫任何值（空的 patch，只有略過欄位的記帳）；QUANTITY 缺數量或缺單位時要現況已有，否則回 INVALID_ARGUMENT。res 只給 ITEM（唯一對到的末層分類）。
 func (p answerPlan) patch(current slots.Set, res *slots.Resolution) (slots.Patch, error) {
 	var patch slots.Patch
 	if p.skip {
@@ -195,8 +188,6 @@ func (p answerPlan) patch(current slots.Set, res *slots.Resolution) (slots.Patch
 	return patch, nil
 }
 
-// answerDecision 把回答接成這一輪的 decision：沒有 I/O。略過把欄位記進上一輪帶來的 skipped，之後挑問題不再問它；
-// 值被 slots 驗證拒絕不是錯誤，記在 rejected（TurnResult.rejected）。
 func answerDecision(l uitext.Locale, now time.Time, prior priorState, p answerPlan, res *slots.Resolution) (decision, error) {
 	patch, err := p.patch(prior.current, res)
 	if err != nil {

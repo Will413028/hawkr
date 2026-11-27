@@ -126,9 +126,6 @@ export function useProviderAccountActions(
 		onSuccess: invalidate,
 	});
 
-	// 🔴 重試沿用同一把 idempotency key（58A §S03 CTA 表）：連線測試在服務商側
-	// 是有副作用的呼叫，換 key 重試等於重打一次。key 綁在 mutation 實例上，
-	// 每次「開始一輪新的測試」才換——由呼叫端在成功／改憑證後重掛。
 	const verify = useMutation({
 		mutationFn: (idempotencyKey: string) =>
 			verifySellerProviderAccount({ expectedVersion, idempotencyKey }),

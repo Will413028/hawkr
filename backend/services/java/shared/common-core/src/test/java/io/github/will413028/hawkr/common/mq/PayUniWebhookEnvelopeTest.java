@@ -54,7 +54,6 @@ class PayUniWebhookEnvelopeTest {
 
     @Test
     void parseRawPayload() {
-        // 裸 payload：沒有 eventId，整個 JSON 視為 payload
         String json = """
                 {
                   "MerID": "HAWK9",
@@ -65,12 +64,10 @@ class PayUniWebhookEnvelopeTest {
                 """;
         PayUniWebhookEnvelope env = PayUniWebhookEnvelope.parse(json.getBytes(StandardCharsets.UTF_8));
 
-        // envelope 欄位為空
         assertEquals("", env.eventId());
         assertEquals("", env.provider());
         assertEquals("", env.webhookType());
 
-        // payload 正確取出
         assertEquals("HAWK9", env.payloadField("MerID"));
         assertEquals("S002", env.payloadField("ShipTradeNo"));
         assertEquals("Print", env.payloadField("ApiType"));
@@ -142,7 +139,6 @@ class PayUniWebhookEnvelopeTest {
 
     @Test
     void parseShippingStatusEnvelope() {
-        // 模擬實際的付款結果 envelope
         String json = """
                 {
                   "event_id": "pay-001",
@@ -168,7 +164,6 @@ class PayUniWebhookEnvelopeTest {
         assertEquals("1", env.payloadField("TradeStatus"));
         assertEquals("1000", env.payloadField("TradeAmt"));
 
-        // payload() 作為完整 Map 使用
         assertEquals(4, env.payload().size());
     }
 }

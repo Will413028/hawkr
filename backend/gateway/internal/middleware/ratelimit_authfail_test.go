@@ -11,8 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// rlEngineStatus registers one default-tier route whose response status the
-// caller controls, so the auth-failure counter can be driven directly.
 func rlEngineStatus(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy, status *int) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -31,9 +29,6 @@ func doAuthReq(r *gin.Engine) int {
 	return w.Code
 }
 
-// authPolicy keeps the per-tier quotas far above the auth-failure threshold, so
-// any 429 observed can only have come from the auth-failure axis. This mirrors
-// the real incident: the loop stayed inside its tier quota the whole time.
 func authPolicy(authFailures int) middleware.RateLimitPolicy {
 	return middleware.RateLimitPolicy{
 		ModeratePerWindow: 1000, DefaultPerWindow: 1000,
@@ -62,7 +57,6 @@ func TestRateLimiter_AuthFailureThrottleTripsAfterThreshold(t *testing.T) {
 	if code := doAuthReq(r); code != http.StatusTooManyRequests {
 		t.Fatalf("request #4: got %d, want 429 (threshold of 3 auth failures exceeded)", code)
 	}
-	// Still refused while the window holds — the point is that the loop stops.
 	if code := doAuthReq(r); code != http.StatusTooManyRequests {
 		t.Fatalf("request #5: got %d, want 429 (throttle must persist within the window)", code)
 	}
@@ -137,29 +131,16 @@ func TestRateLimiter_AuthFailureIgnoresExemptRoutes(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Scope of the auth-failure axis.
-//
-// The axis is per-IP and one IP is routinely a whole office behind NAT, a shared
-// egress or a CI runner. Applying it to routes that need no credentials turns
-// "this source cannot log in" into "this source cannot use the site", which on
-// 2026-07-29 took the website E2E suite (and with it every web deploy) down:
-// its deliberate-401 assertions exhausted the budget and the following
-// /public/marketplace, /public/products and /public/posts reads were refused.
-// ---------------------------------------------------------------------------
 
-// rlEngineMixed registers one route per tier the axis has to tell apart, each
-// returning a status the caller controls, on the SAME production FullPaths so
-// classification is exercised black-box.
 func rlEngineMixed(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy, status *int) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.TieredRateLimiter(limiter, policy))
 	echo := func(c *gin.Context) { c.String(*status, "") }
 
-	r.DELETE("/api/v1/app/notifications/device-token", echo) // default — needs auth (#106 loop)
-	r.GET("/api/v1/public/products", echo)                   // moderate — OptionalJWT, anonymous OK
-	r.GET("/api/v1/public/carts", echo)                      // moderate — OptionalJWT, anonymous OK
+	r.DELETE("/api/v1/app/notifications/device-token", echo)
+	r.GET("/api/v1/public/products", echo)
+	r.GET("/api/v1/public/carts", echo)
 	return r
 }
 
@@ -171,8 +152,6 @@ func doMixed(r *gin.Engine, method, path string) int {
 	return w.Code
 }
 
-// exhaustAuthFailures drives the IP well past the threshold using the very route
-// from the #106 incident, and asserts it ends up blocked there.
 func exhaustAuthFailures(t *testing.T, r *gin.Engine, status *int) {
 	t.Helper()
 	*status = http.StatusUnauthorized
@@ -211,8 +190,6 @@ func TestRateLimiter_AuthFailureStillBlocksAuthenticatedRoutesWhilePublicPasses(
 
 	exhaustAuthFailures(t, r, &status)
 
-	// Interleaved, because the real failure mode is a public read "unblocking"
-	// the authenticated route (or vice versa) via shared state.
 	for i := 1; i <= 5; i++ {
 		status = http.StatusOK
 		if code := doMixed(r, http.MethodGet, "/api/v1/public/products"); code != http.StatusOK {
@@ -259,9 +236,6 @@ func TestRateLimiter_AuthFailureCounterIgnoresPublicReads(t *testing.T) {
 			t.Fatalf("public 401 #%d: got %d, want 401 (public reads are out of scope in both directions)", i, code)
 		}
 	}
-	// The authenticated route must still have its full budget: 3 failures
-	// allowed, blocked on the 4th. If public 401s had counted, it would already
-	// be blocked here.
 	for i := 1; i <= 3; i++ {
 		if code := doMixed(r, http.MethodDelete, "/api/v1/app/notifications/device-token"); code != http.StatusUnauthorized {
 			t.Fatalf("authenticated request #%d: got %d, want 401 (20 public 401s must not have spent the budget)", i, code)

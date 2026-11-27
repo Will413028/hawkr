@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-// migrations 是用 jet 建 query 的模組與它的 migration；新增一個模組就加一行。
 var migrations = map[string]func() fs.FS{
 	"social": social.Migrations,
 }
@@ -76,8 +75,6 @@ func runTables(args []string) error {
 	defer func() { _ = os.RemoveAll(stage) }()
 	sqlDB := stdlib.OpenDBFromPool(d.Pool())
 	defer func() { _ = sqlDB.Close() }()
-	// 只要表型別：query 的結果用自己的 struct 以 pgx 掃描，jet 的 model 與 QRM 不用；view 不生成（公開可讀的規則在 visibility，不在 DB 的 view）；
-	// 平放在輸出目錄（table/）。
 	tpl := template.Default(postgres.Dialect).UseSchema(func(m metadata.Schema) template.Schema {
 		sb := template.DefaultSQLBuilder().UseView(func(t metadata.Table) template.ViewSQLBuilder {
 			v := template.DefaultViewSQLBuilder(t)

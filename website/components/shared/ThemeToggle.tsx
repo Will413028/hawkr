@@ -20,25 +20,16 @@ interface ThemeToggleProps {
  * the 3-state cycler).
  */
 export const THEME_TOGGLE_CHROME_CLASS = cn(
-	// size / shape / flex — 44px touch target
 	"size-11 rounded-full inline-flex items-center justify-center shrink-0 cursor-pointer",
-	// frosted-glass surface; the tokens hold the previous literals
-	// (light rgba(255,255,255,.55)/.70/.78, dark the amber glass set)
 	"bg-[var(--page-theme-toggle-bg)] border border-[var(--page-theme-toggle-border)]",
 	"text-[var(--page-theme-toggle-fg)]",
-	// multi-duration transition (transform 120ms, rest 200ms)
 	"[transition:background_200ms_ease,color_200ms_ease,transform_120ms_ease,border-color_200ms_ease]",
 	"motion-reduce:transition-none",
-	// hover
 	"hover:bg-[var(--page-theme-toggle-hover-bg)] hover:-rotate-[12deg]",
-	// active
 	"active:scale-95 motion-reduce:scale-100 motion-reduce:rotate-0",
-	// reduced motion keeps the colour feedback, drops the movement
 	"motion-reduce:hover:rotate-0 motion-reduce:active:scale-100",
-	// focus-visible ring
 	"focus-visible:outline-2 focus-visible:outline-[var(--color-brand-primary-strong)] focus-visible:outline-offset-2",
 	"dark:hover:text-[var(--theme-text-accent)]",
-	// verbose variant (data-[verbose=true]: matches data-[selected=true]: pattern in codebase)
 	"data-[verbose=true]:w-auto data-[verbose=true]:py-[6px] data-[verbose=true]:pr-[14px] data-[verbose=true]:pl-[10px] data-[verbose=true]:gap-[6px]",
 );
 
@@ -47,11 +38,6 @@ export default function ThemeToggle({
 	verbose = false,
 }: ThemeToggleProps) {
 	const { theme, toggle } = useTheme();
-	// The navbar renders inside a <Suspense> under ThemeProvider, whose effect
-	// syncs `theme` from the boot-painted `data-theme` before this (suspended)
-	// subtree hydrates. Gating on a local mounted flag keeps the first client
-	// render identical to SSR (light defaults), so hydration never mismatches;
-	// the real theme is applied on the post-mount re-render.
 	const [mounted, setMounted] = React.useState(false);
 	React.useEffect(() => setMounted(true), []);
 	const isDark = mounted && theme === "dark";
@@ -62,10 +48,6 @@ export default function ThemeToggle({
 			type="button"
 			data-verbose={verbose ? "true" : undefined}
 			className={cn(THEME_TOGGLE_CHROME_CLASS, className)}
-			// APG "toggle button": a state-neutral name plus aria-pressed, so the
-			// name does not contradict the state the same node announces. The
-			// verbose variant already renders a visible action label, which then
-			// IS the accessible name (WCAG 2.5.3 label-in-name).
 			aria-label={verbose ? undefined : "主題切換"}
 			aria-pressed={isDark}
 			onClick={toggle}

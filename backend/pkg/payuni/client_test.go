@@ -10,14 +10,10 @@ import (
 )
 
 const (
-	testHashKey = "0123456789abcdef0123456789abcdef" // gitleaks:allow（虛構值 0123…）
+	testHashKey = "0123456789abcdef0123456789abcdef"
 	testHashIV  = "0123456789abcdef"
 )
 
-// newSearchStatusTestServer spins up a fake PAYUNi search_merchant_status
-// endpoint that returns plaintext (a raw PAYUNi-style query string) encrypted
-// the same way the real gateway does, so GetSellerStatus exercises its real
-// decrypt+parse path end to end.
 func newSearchStatusTestServer(t *testing.T, plaintext string) *httptest.Server {
 	t.Helper()
 	encrypted, err := EncryptString(plaintext, testHashKey, testHashIV)
@@ -69,11 +65,6 @@ func TestUpdateMerchantRequest_URLEncoding(t *testing.T) {
 	if !strings.Contains(decrypted, "MerID=HAWK999") || !strings.Contains(decrypted, "ContactMobile=0912345678") {
 		t.Fatalf("decrypted plaintext missing expected fields: %s", decrypted)
 	}
-	// Payment/Fee/Open/Close fields (issue #2806 Phase 2 deny-by-default
-	// allowlist) must never be encodable through this type at all — this
-	// test compiles only because UpdateMerchantRequest has no such fields,
-	// so there is nothing to assert their absence against beyond "the type
-	// doesn't have them" (verified by this file compiling).
 }
 
 // TestGetSellerStatus_DecodesKnownMerchantMemberChannelCodes covers issue
@@ -86,7 +77,7 @@ func TestGetSellerStatus_DecodesKnownMerchantMemberChannelCodes(t *testing.T) {
 		"Status":       {"SUCCESS"},
 		"Message":      {"OK"},
 		"MerID":        {"HAWK123"},
-		"MerStatus":    {"1"}, // active, per PayuniMerchantVerificationStatus CodeMeta
+		"MerStatus":    {"1"},
 		"Reason":       {""},
 		"MemberStatus": {"1"},
 		"CREDIT":       {"1"},
@@ -124,7 +115,6 @@ func TestGetSellerStatus_ReasonEmptyForMemberStatusPendingInfo(t *testing.T) {
 		"MerID":        {"HAWK123"},
 		"MerStatus":    {"2"},
 		"MemberStatus": {"5"},
-		// Reason intentionally omitted — PAYUni does not always send it.
 	}).Encode()
 
 	server := newSearchStatusTestServer(t, plaintext)
@@ -151,7 +141,7 @@ func TestGetSellerStatus_UnknownMerStatusCodePassesThroughWithoutError(t *testin
 	plaintext := (url.Values{
 		"Status":       {"SUCCESS"},
 		"MerID":        {"HAWK123"},
-		"MerStatus":    {"8"}, // undocumented code PAYUni is known to send
+		"MerStatus":    {"8"},
 		"MemberStatus": {"99"},
 	}).Encode()
 
@@ -199,7 +189,6 @@ func TestGetSellerStatus_RawPreservesFieldsNotDecodedIntoStruct(t *testing.T) {
 	if raw["UnionPay"] != "1" || raw["Inst3"] != "1" {
 		t.Fatalf("Raw dropped fields not decoded into the struct: %+v", raw)
 	}
-	// And still present for struct-decoded fields, since Raw preserves everything.
 	if raw["MerStatus"] != "1" {
 		t.Fatalf("Raw dropped a struct-decoded field too: %+v", raw)
 	}

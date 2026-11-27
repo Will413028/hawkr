@@ -110,14 +110,6 @@ public class RefundTaskWorker {
     @Scheduled(fixedDelayString = "${aftersales.refund.worker-interval-ms:10000}")
     public void processRefundTasks() {
         LocalDateTime now = DateTimeUtils.nowUtc();
-        // 掃描條件（issue #2294 C1：claim 從「換狀態」改成「推時間」後的候選述詞）：
-        //   PENDING   且 租約未生效或已到期 → 撈
-        //   FAILED    且 next_retry_time 已到 → 撈（retry 中）
-        //   FAILED    且 next_retry_time=NULL → 不撈（**終態**；避免無限 loop 再處理已升級異常的 task）
-        //   PROCESSING 且 租約已到期 → 撈（pod 在 claim 與 CreateRefund 之間崩潰的救援路徑；
-        //              舊實作沒有這條，該筆退款永久卡在 PROCESSING）
-        // ⚠️ PENDING 分支原本**沒有時間條件**，光推 next_retry_time 不會讓它退出候選 ⇒ 必須補。
-        // ⚠️ FAILED 的 isNotNull 是**終態守門**，不可為了「三個分支寫成一個共同述詞」而拿掉。
         List<RefundTaskEntity> tasks = refundTaskMapper.selectList(
                 new LambdaQueryWrapper<RefundTaskEntity>()
                         .and(outer -> outer
@@ -154,12 +146,6 @@ public class RefundTaskWorker {
         Long taskId = task.getId();
         LocalDateTime now = DateTimeUtils.nowUtc();
 
-        // issue #2294 C1：claim 從「換狀態」改成「**推時間**」（lease）。
-        // 舊 claim 只 SET status=PROCESSING，而 PROCESSING 不在候選集合、沒有任何時間欄能讓它回來
-        //  ⇒ pod 在 claim 與 CreateRefund 之間崩潰（進程消失，catch 不會跑）＝該筆退款永久卡死。
-        // 新 claim 同時推 next_retry_time = now + 租約：status 保留但角色降為「可觀測資訊」，
-        // 租約到期後該列會被候選述詞重新撈回。
-        // 失敗路徑寫的 next_retry_time = now+30s 在 claim 之後執行，天然覆蓋租約值（設計如此）。
         int claimed = refundTaskMapper.update(null,
                 new LambdaUpdateWrapper<RefundTaskEntity>()
                         .eq(RefundTaskEntity::getId, taskId)
@@ -179,14 +165,11 @@ public class RefundTaskWorker {
                         .set(RefundTaskEntity::getUpdatedAt, now)
         );
         if (claimed == 0) {
-            // 已被其他 Worker 搶走（租約未到期），跳過
             return;
         }
 
-        // 重新查詢最新狀態
         task = refundTaskMapper.selectById(taskId);
 
-        // 組裝退款單號（用案件編號或取消 ID 作為退款識別）
         String refundNo;
         if (task.getCaseNo() != null) {
             refundNo = task.getCaseNo() + "-" + task.getRetryCount();
@@ -194,9 +177,6 @@ public class RefundTaskWorker {
             refundNo = "C" + task.getCancelId() + "-" + task.getRetryCount();
         }
 
-        // §2A.1.4：零元訂單沒有退款概念，跳過 payment-service createRefund 呼叫，直接走成功路徑。
-        // 對 aftersales case state machine 透明（等同「refund step 即時完成」），下游 refund.completed
-        // event 仍正常發出（券恢復、庫存恢復、訂單狀態更新一致）。
         if (PaymentMethod.ZERO_AMOUNT.value().equals(task.getPaymentMethod())) {
             log.info("RefundTaskWorker.zeroAmount.skip",
                     "零元訂單退款 step 自動完成（不呼叫 payment-service），refundTaskId=" + taskId);
@@ -204,7 +184,6 @@ public class RefundTaskWorker {
             return;
         }
 
-        // 呼叫 Payment Service 執行退款
         try {
             CreateRefundResponse resp = paymentGrpcClient.createRefund(
                     task.getTransactionId(),
@@ -214,10 +193,8 @@ public class RefundTaskWorker {
             );
 
             if (resp.getCode() == 0) {
-                // 退款成功（或已受理）
                 markTaskDoneAndAdvance(task, refundNo);
             } else {
-                // 退款失敗：持久化 provider 原始 status/message（last_error 帶 payment 回報原話，非僅 code）
                 handleRefundFailure(task, refundNo,
                         "Payment 回報錯誤: code=" + resp.getCode() + ", msg=" + resp.getMessage(),
                         resp.getData().getProviderStatus(), resp.getData().getProviderMessage());
@@ -273,7 +250,6 @@ public class RefundTaskWorker {
                             .set(RefundTaskEntity::getStatus, WorkerTaskStatus.FAILED.value())
                             .set(RefundTaskEntity::getExternalRefId, refundNo)
                             .set(RefundTaskEntity::getLastError, errorMsg)
-                            // 持久化 provider 原始狀態（payment 回非 0 時帶；例外路徑為 null 不覆蓋既有值）
                             .set(providerStatus != null, RefundTaskEntity::getProviderStatus, providerStatus)
                             .set(providerMessage != null, RefundTaskEntity::getProviderMessage, providerMessage)
                             .set(RefundTaskEntity::getRetryCount, newRetryCount)
@@ -290,14 +266,12 @@ public class RefundTaskWorker {
                     "退款失敗，排隊重試, retryCount=" + newRetryCount + ", nextRetry=" + nextRetry,
                     "refundTaskId", String.valueOf(taskId));
         } else {
-            // 終態：next_retry_time=NULL 確保 Worker 下輪不再撈此 task
             refundTaskMapper.update(null,
                     new LambdaUpdateWrapper<RefundTaskEntity>()
                             .eq(RefundTaskEntity::getId, taskId)
                             .set(RefundTaskEntity::getStatus, WorkerTaskStatus.FAILED.value())
                             .set(RefundTaskEntity::getExternalRefId, refundNo)
                             .set(RefundTaskEntity::getLastError, errorMsg)
-                            // 持久化 provider 原始狀態（payment 回非 0 時帶；例外路徑為 null 不覆蓋既有值）
                             .set(providerStatus != null, RefundTaskEntity::getProviderStatus, providerStatus)
                             .set(providerMessage != null, RefundTaskEntity::getProviderMessage, providerMessage)
                             .set(RefundTaskEntity::getNextRetryTime, null)
@@ -338,7 +312,6 @@ public class RefundTaskWorker {
         if (task.getCaseNo() != null) {
             AfterSalePlatformDecisionOutcome outcome = AfterSalePlatformDecisionOutcome.fromValue(
                     task.getRefundOutcome());
-            // #1226：補發賣家工作區 realtime 需 storeId，task 不帶，由 caseNo 反查
             Long storeId = caseMapper.findStoreIdByCaseNo(task.getCaseNo());
             Long buyerId = caseMapper.findBuyerIdByCaseNo(task.getCaseNo());
             eventPublisher.publishRefundCompleted(

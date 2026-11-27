@@ -19,7 +19,6 @@ class OrderRepository with ApiRequestHelper {
   @override
   Dio get dio => _dio;
 
-  // ── 訂單列表 ──────────────────────────────────────────
 
   Future<List<OrderSummary>> fetchMatchedOrders({
     int page = 1,
@@ -73,13 +72,12 @@ class OrderRepository with ApiRequestHelper {
         'view': 'seller',
         'page': '$page',
         'page_size': '$pageSize',
-        'status': '10,20', // PAID + PENDING_SHIPMENT (待出貨)
+        'status': '10,20',
       },
     );
     return _parseOrderList(resp);
   }
 
-  // ── 訂單詳情 ──────────────────────────────────────────
 
   Future<OrderSummary> fetchMatchedOrderDetails({
     required String orderSn,
@@ -157,7 +155,6 @@ class OrderRepository with ApiRequestHelper {
     }
   }
 
-  // ── 出貨工作日 ──────────────────────────────────────────
 
   /// 取得明日起 7 個工作天（排除週日與國定假日）
   /// GET /app/shipping_business_days
@@ -179,7 +176,6 @@ class OrderRepository with ApiRequestHelper {
     return const [];
   }
 
-  // ── 訂單操作 ──────────────────────────────────────────
 
   /// 超商確認出貨
   /// POST /app/shipments/{order_no}/confirm
@@ -360,7 +356,6 @@ class OrderRepository with ApiRequestHelper {
     throw Exception('Server code $code: ${msg ?? 'Unknown error'}');
   }
 
-  // ── 內部工具 ──────────────────────────────────────────
 
   static List<OrderSummary> _parseOrderList(Map<String, dynamic> resp) {
     final data = resp['data'];
@@ -383,7 +378,6 @@ class OrderRepository with ApiRequestHelper {
         .toList(growable: false);
   }
 
-  // 身分由 dioProvider 的 auth interceptor 帶（Authorization: Bearer）。
   static const Map<String, dynamic> _jsonHeaders = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',

@@ -69,7 +69,6 @@ export default function CreateTerminationDialog({
 	const linked = sourceMeasureId !== "";
 	const requestIdRef = useRef<RequestIdSlot | null>(null);
 	const [ground, setGround] = useState<TerminationGround>(
-		// 關聯帳號的終止只有一個選項（LinkedAccount.termination_option），事由固定、不可改。
 		linked
 			? (options[0]?.ground ?? TerminationGround.UNSPECIFIED)
 			: TerminationGround.UNSPECIFIED,
@@ -80,7 +79,6 @@ export default function CreateTerminationDialog({
 	const [error, setError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	// 選到的終止合作：來自關聯帳號的選項帶來源措施，其他帶依據的認定；請求的事由與欄位都由選項決定，這裡不比較事由。
 	const option = options.find((o) => o.ground === ground);
 	const choice: TerminationChoice | undefined = !option
 		? undefined

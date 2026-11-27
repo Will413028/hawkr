@@ -25,7 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// inquiryModule 記下詢問指令收到的輸入，回傳設定好的結果。
 type inquiryModule struct {
 	GovernanceModule
 	create    model.CreateCaseInquiryInput
@@ -111,7 +110,6 @@ func TestInquiryFieldPathsExistInTheRequests(t *testing.T) {
 func TestCaseInquiryCarriesStateDueAndAvailabilityWithoutReasons(t *testing.T) {
 	open := toCaseInquiry(inquiryFixture(model.InquiryStateOpen))
 	if open.GetState() != adminpb.CaseInquiryState_CASE_INQUIRY_STATE_OPEN ||
-		// 賣家的回覆期限：開始是建立時間，期限是存下的 due_at（不是營運的審閱政策）。
 		!open.GetReplyDeadline().GetStartTime().AsTime().Equal(governanceNow) || !open.GetReplyDeadline().GetDueTime().AsTime().Equal(governanceNow.Add(model.InquiryDefaultDue)) || !open.GetCanRecordReply() || !open.GetCanWithdraw() || open.GetReply() != nil ||
 		open.GetKind() != adminpb.CaseInquiryKind_CASE_INQUIRY_KIND_RECORDS || open.GetStoreId() != "12" || open.GetCreatedByAdminId() != "7" || open.GetMessage() != "請提供批次" {
 		t.Fatalf("open=%v", open)
@@ -136,7 +134,6 @@ func TestCaseInquiryCarriesStateDueAndAvailabilityWithoutReasons(t *testing.T) {
 		withdrawn.GetWithdrawCause() != adminpb.CaseInquiryWithdrawCause_CASE_INQUIRY_WITHDRAW_CAUSE_CASE_CLOSED || withdrawn.GetWithdrawnByAdminId() != "9" || withdrawn.GetWithdrawTime() == nil {
 		t.Fatalf("withdrawn=%v", withdrawn)
 	}
-	// 原因的句子不出現在任何回應裡：can_* 之外沒有欄位說「為什麼不能」。
 	raw := protojson.Format(withdrawn) + protojson.Format(replied)
 	for _, b := range model.InquiryBlockValues() {
 		if strings.Contains(raw, b.Text().Text) {
@@ -188,7 +185,6 @@ func TestCreateCaseInquiryUsesTheCallingAdminAndMapsTheInput(t *testing.T) {
 		got.Msg.GetInquiry().GetId() != inquiry.ID.String() || got.Msg.GetCase() == nil {
 		t.Fatalf("in=%+v", in)
 	}
-	// 選填都不給。
 	if _, err := h.CreateCaseInquiry(adminCtx(42), connect.NewRequest(&adminpb.CreateCaseInquiryRequest{CaseId: caseID.String(), Kind: adminpb.CaseInquiryKind_CASE_INQUIRY_KIND_RECORDS, Message: "x"})); err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +206,6 @@ func TestCreateCaseInquiryUsesTheCallingAdminAndMapsTheInput(t *testing.T) {
 	if _, err := h.CreateCaseInquiry(context.Background(), connect.NewRequest(&adminpb.CreateCaseInquiryRequest{CaseId: caseID.String()})); err == nil || m.calls != calls {
 		t.Fatal("不是管理員不得呼叫模組")
 	}
-	// 模組的欄位錯誤指到請求的路徑（經 interceptor 轉成 BadRequest；欄位沒有對應就是 handler 的 bug，interceptor 會記 error）。
 	for module, path := range map[string]string{"DueAt": "due_time", "Kind": "kind", "Message": "message", "RequestID": "request_id"} {
 		m.err = apperr.InvalidInputOn([]string{module}, "x")
 		var logs strings.Builder
@@ -285,7 +280,6 @@ func TestRecordAndWithdrawInquiryUseTheCallingAdmin(t *testing.T) {
 	} {
 		wantInvalidArgument(t, r())
 	}
-	// handler 不改寫模組的 NotFound（詢問不存在的預設文字在模組邊界給）：模組給的句子原樣成為 LocalizedMessage。
 	localized := func(err error) []string {
 		var ce *connect.Error
 		if !errors.As(err, &ce) {

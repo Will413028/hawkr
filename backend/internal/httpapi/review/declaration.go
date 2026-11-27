@@ -11,11 +11,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// declaration 是 ReviewAppService 一個方法的能力宣告（同 httpapi/social）：要不然是以店家身分動作時需要的賣家能力，要不然明列豁免與理由。
-// 宣告表只記錄與對照，不執行：能力的檢查在 review 模組裡（seller.Authorize），handler 不檢查。
 type declaration struct {
 	capability seller.Capability
-	// exemptReason 非空表示豁免。
 	exemptReason string
 }
 
@@ -28,10 +25,7 @@ const (
 	ownStoreReason  = "review.ListOwnStoreReviews 只以 handler 推導的店家 ID 讀這家店的公開可讀評價，模組不檢查賣家能力，停權的店家仍可讀自己店的評價"
 )
 
-// declarations 是每個 ReviewAppService 方法的宣告，key 是生成的 procedure 常數。方法與宣告必須一一對應
-// （checkDeclarations 在 NewApp 時檢查，缺了或多了都不能啟動）。
 var declarations = map[string]declaration{
-	// 店家回覆是行銷經營：店家由 seller.CurrentStore 推導，能力由 review.Reply 檢查（停權時被擋）。
 	reviewv1alpha1connect.ReviewAppServiceReplyReviewProcedure:         requires(seller.CapMarketing),
 	reviewv1alpha1connect.ReviewAppServiceListOwnStoreReviewsProcedure: exempt(ownStoreReason),
 
@@ -40,12 +34,10 @@ var declarations = map[string]declaration{
 	reviewv1alpha1connect.ReviewAppServiceListMyReviewsProcedure: exempt(buyerOnlyReason),
 }
 
-// serviceDescriptor 是 ReviewAppService 的 descriptor，宣告表以它為準。
 func serviceDescriptor() protoreflect.ServiceDescriptor {
 	return pb.File_hawkr_review_v1alpha1_review_proto.Services().ByName("ReviewAppService")
 }
 
-// checkDeclarations 雙向對照宣告表與 service 的方法（rpc.CheckDeclarations），並檢查每個宣告恰好是一個存在的能力或一個有理由的豁免。
 func checkDeclarations(table map[string]declaration, svc protoreflect.ServiceDescriptor) error {
 	return rpc.CheckDeclarations("httpapi/review", table, []protoreflect.ServiceDescriptor{svc}, func(d declaration) string {
 		switch {

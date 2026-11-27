@@ -55,11 +55,6 @@ export async function POST(req: NextRequest) {
 		);
 	}
 	try {
-		// `expire: 0` = the profile POST /api/revalidate gives an entity tag: the
-		// entry is dead immediately rather than served stale while it refreshes, so
-		// the measured lag is "purge → new content", not "purge → new content
-		// eventually". The canary must measure the floor, so it never takes the
-		// deferred profile the aggregate lists get.
 		revalidateTag(CANARY_TAG, { expire: 0 });
 	} catch {
 		return NextResponse.json(

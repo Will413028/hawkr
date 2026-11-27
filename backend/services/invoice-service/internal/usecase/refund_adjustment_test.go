@@ -12,22 +12,9 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// 決策樹（§7.2.2）——純函式，逐節點
-//
-// 🔴 這棵樹的每一個分支都是稅務後果，而 fail-closed 的方向是**折讓**：
-// 折讓在任何情況下都合法，作廢不是。所以下面的表把「往作廢走」當成需要五個條件
-// 同時成立的窄路徑，其餘一律折讓。
-// ---------------------------------------------------------------------------
 
-// refundTestNow 是台北時間 2026-08-20 12:00（期別 11504 ＝ 7–8 月，尚未終結）。
 var refundTestNow = time.Date(2026, 8, 20, 4, 0, 0, 0, time.UTC)
 
-// voidableDoc 造一張「五個條件全部成立」的發票 —— 決策樹唯一會走到 VOID 的形狀。
-//
-// 每一支測試從它出發、**只改一格**，那一格就是該支測試的變數。這樣寫的理由是：
-// 造一個「剛好符合」的 fixture 很容易在無意間同時滿足兩個條件，於是測試以為自己
-// 驗到了 A，實際上是 B 讓它通過的。
 func voidableDoc() domain.Document {
 	no := "AB12345678"
 	period := "11504"
@@ -59,8 +46,6 @@ func voidableFacts() refundFacts {
 
 func TestPlanRefundAdjustment(t *testing.T) {
 	notReported := func() {
-		// 前提自檢：測試日期必須真的落在 NOT_REPORTED，否則整張表的 VOID 期望值
-		// 全部靠一個錯的前提。這一格失敗代表要改的是 refundTestNow 不是被測程式。
 		got, err := domain.ReportedStatus("11504", refundTestNow)
 		if err != nil || got != domain.ReportedStatusNotReported {
 			t.Fatalf("前提不成立：ReportedStatus(11504, %v) = %q, %v，want NOT_REPORTED",
@@ -69,8 +54,6 @@ func TestPlanRefundAdjustment(t *testing.T) {
 	}
 	notReported()
 
-	// SKIP 的分支驗 `Disposition`（CodeMeta 值，可 GROUP BY），
-	// 其餘分支驗 `Reason`（那幾條沒有 disposition，Reason 就是它們的識別）。
 	for _, c := range []struct {
 		name        string
 		mutate      func(*refundFacts)
@@ -104,8 +87,6 @@ func TestPlanRefundAdjustment(t *testing.T) {
 			f.Doc.Status = codemeta.InvoiceDocumentStatusVoided.Value
 		}, want: refundPlanSkip, disposition: codemeta.InvoiceInboxDispositionNoAdjustableDocument.Value},
 
-		// B 節點必須在 C 之前：AMEGO 3050141「已存在折讓單則不得作廢」。
-		// 順序寫反的話「先部分退 200、再退剩下的 800」會走到 VOID 而被 AMEGO 拒絕。
 		{name: "已有折讓 ⇒ 補折讓（不得作廢）", mutate: func(f *refundFacts) {
 			f.Doc.AllowanceTotalAmount = 200
 			f.RefundAmount = 800
@@ -121,8 +102,6 @@ func TestPlanRefundAdjustment(t *testing.T) {
 			f.Doc.TaxPeriodCode = nil
 		}, want: refundPlanAllowance, reason: "NO_TAX_PERIOD_CODE"},
 
-		// 期已結、申報期限未到 ⇒ UNKNOWN ⇒ 折讓。這一格是 fail-closed 的核心：
-		// 「不確定有沒有申報」時作廢是稅務違規，折讓不是。
 		{name: "申報狀態 UNKNOWN ⇒ 折讓", mutate: func(f *refundFacts) {
 			f.Now = time.Date(2026, 9, 5, 4, 0, 0, 0, time.UTC)
 		}, want: refundPlanAllowance, reason: "REPORTED_STATUS_UNKNOWN"},
@@ -181,7 +160,6 @@ func TestPlanRefundAdjustment_VoidLockIsShadowedByReportedStatus(t *testing.T) {
 		t.Fatalf("期末 %v 不早於關帳日 %v —— 前提變了，E 節點可能已經有效，回去看 planRefundAdjustment 的 ⚠️", end, lock)
 	}
 
-	// 關帳日前一刻：D 已經是 UNKNOWN（期已結、申報期限未到）⇒ 走折讓，而**不是**因為 E。
 	f := voidableFacts()
 	f.Now = lock.Add(-time.Second)
 	got := planRefundAdjustment(f)
@@ -200,7 +178,7 @@ func TestPlanRefundAdjustment_CumulativeTakesMax(t *testing.T) {
 	f := voidableFacts()
 	f.Doc.AllowanceTotalAmount = 0
 	f.RefundAmount = 1000
-	f.CumulativeRefundAmount = 400 // 上游落後
+	f.CumulativeRefundAmount = 400
 
 	if got := planRefundAdjustment(f); got.Kind != refundPlanVoid {
 		t.Fatalf("Kind = %d（%s），want VOID —— 左手邊沒有取 max(cumulative, 已折讓+本次)",
@@ -208,9 +186,6 @@ func TestPlanRefundAdjustment_CumulativeTakesMax(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Apply —— 建列（G01／G02／G03）
-// ---------------------------------------------------------------------------
 
 type refundAdjs struct {
 	byRefund   map[string]domain.Adjustment
@@ -274,19 +249,11 @@ type refundOps struct {
 	created  []domain.NewOperation
 	promoted []promotion
 
-	// byKey 是 fake 的 uq_invop_operation_key。**必須真的維護**：
-	// createOperation 在 Create 回 inserted=false 之後靠 GetByKey 分辨兩種 rows=0，
-	// 而只記 calls 的替身對「有沒有回讀」與「回讀結果怎麼用」零鑑別力。
 	byKey map[string]domain.Operation
 
-	// gateHeld 模擬撞 uq_invop_open_adjustment_per_document（I5 序列閘門被別的調整
-	// 佔用）：Create 回 inserted=false 且 **key 不進 byKey** ⇒ GetByKey 必然查不到。
-	// 這正是真實 DB 的行為——那一列根本沒插進去，所以那把 key 不存在。
 	gateHeld bool
 }
 
-// errFakeOperationKeyNotFound 是 fake 的 pgx.ErrNoRows（真實 repo 會翻成
-// bizcode.InvoiceJobNotFound）。
 var errFakeOperationKeyNotFound = errors.New("fake: operation_key not found")
 
 func (f *refundOps) GetByKey(_ context.Context, key string) (domain.Operation, error) {
@@ -307,17 +274,11 @@ func (f *refundOps) Create(_ context.Context, in domain.NewOperation) (domain.Op
 		f.byKey = map[string]domain.Operation{}
 	}
 	if f.gateHeld {
-		// ON CONFLICT DO NOTHING 命中 partial 索引：**沒有任何列被插入**，
-		// 所以這把 key 之後也查不到。
 		return domain.Operation{}, false, nil
 	}
 	if existing, dup := f.byKey[in.OperationKey]; dup {
-		// 同一把 key 重送：也是 rows=0，但那一列**存在**。
 		return existing, false, nil
 	}
-	// 🔴 回 CREATED 而不是 READY —— 那是 SQL 的 DEFAULT。
-	// 回 READY 的 fake 會讓「有沒有 promote」這件事看不出來，而 CREATED 的 operation
-	// 不在 INV.op 的候選述詞裡（READY／RETRY_SCHEDULED／SENDING）⇒ 沒有任何執行者。
 	op := domain.Operation{ID: in.ID, Status: codemeta.InvoiceOperationStatusCreated.Value}
 	f.byKey[in.OperationKey] = op
 	return op, true, nil
@@ -328,7 +289,6 @@ func (f *refundOps) Promote(_ context.Context, id int64, nextStatus string, _, _
 	return true, nil
 }
 
-// refundHarness 把四個替身與 usecase 綁在一起。
 type refundHarness struct {
 	uc   *RefundAdjustment
 	adjs *refundAdjs
@@ -347,7 +307,6 @@ func newRefundHarness(t *testing.T) *refundHarness {
 	return &refundHarness{uc: uc, adjs: adjs, docs: docs, ops: ops}
 }
 
-// refundDocLines 造兩行商品 ＋ 一行運費，含稅基數合計 1000。
 func refundDocLines() []domain.DocumentLine {
 	return []domain.DocumentLine{
 		{ID: 8001, LineSeq: 1, LineType: "PRODUCT", Description: "有機高麗菜",
@@ -359,10 +318,8 @@ func refundDocLines() []domain.DocumentLine {
 	}
 }
 
-// issuedDoc 是一張已開立、可折讓的 B2C 發票（總額 1000）。
 func issuedDoc() domain.Document {
 	d := voidableDoc()
-	// 讓它落在「部分退款」分支：本節驗的是建列，不是決策樹。
 	return d
 }
 
@@ -398,7 +355,6 @@ func TestApply_PartialRefundCreatesAllowanceWithLinesAndOperation(t *testing.T) 
 		t.Errorf("refund_no = %v，want RF-0001 —— 它是 uq_invadj_allowance_refund 的冪等鍵",
 			got.RefundNo)
 	}
-	// chk_invadj_allowance_shape：ALLOWANCE 必須帶齊三個金額欄 ＋ 單號 ＋ 日期。
 	for name, v := range map[string]any{
 		"allowance_number": got.AllowanceNumber, "allowance_date_taipei": got.AllowanceDateTaipei,
 		"net_amount_ex_tax": got.NetAmountExTax, "tax_amount": got.TaxAmount, "gross_amount": got.GrossAmount,
@@ -446,15 +402,6 @@ func TestApply_PartialRefundCreatesAllowanceWithLinesAndOperation(t *testing.T) 
 		t.Errorf("operation.adjustment_id = %d，want %d", op.AdjustmentID, got.ID)
 	}
 
-	// 🔴 建完必須 promote 到 READY。
-	//
-	// `Create` 落在 `CREATED`（SQL 的 DEFAULT），而 INV.op 的候選述詞是
-	// `status IN ('READY','RETRY_SCHEDULED','SENDING')` ⇒ 停在 CREATED 的 operation
-	// **沒有任何執行者**，而且完全無聲：adjustment 是 PENDING、operation 是 CREATED，
-	// 兩者看起來都「剛建好、等著跑」。
-	//
-	// 這一格是 dev E2E 抓到的——第一次跑建出了正確的 adjustment ＋ 明細 ＋ operation，
-	// 然後**什麼都沒發生**。單元測試當時全綠，因為 fake 的 Create 回的是 READY。
 	if len(h.ops.promoted) != 1 {
 		t.Fatalf("沒有 promote（promoted=%v）—— operation 會停在 CREATED，"+
 			"而 INV.op 的候選述詞不含它，沒有任何執行者", h.ops.promoted)
@@ -606,7 +553,6 @@ func TestApply_EmptyRefundRefIsRejected(t *testing.T) {
 	}
 }
 
-// isNilPtr 判斷一個介面裡裝的指標是不是 nil。
 func isNilPtr(v any) bool {
 	switch p := v.(type) {
 	case *string:
@@ -631,11 +577,10 @@ func isNilPtr(v any) bool {
 // ⇒ 剩餘為 0 ⇒ 分攤到它的金額是 0 ⇒ 被跳過。這正是多次部分退款的真實形狀。
 func TestApply_SourceLineIDMapsBySeqNotByIndex(t *testing.T) {
 	h := newRefundHarness(t)
-	// 第一行（id=8001）已折讓完 ⇒ 剩餘 0 ⇒ 草稿會跳過它。
 	h.docs.lines[0].AllowancedAmount = h.docs.lines[0].AllowanceableBase
 
 	doc := issuedDoc()
-	doc.AllowanceTotalAmount = 600 // 與上面那一行的已折讓額一致
+	doc.AllowanceTotalAmount = 600
 	if _, err := h.uc.Apply(context.Background(), refundInput(200), doc); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -645,7 +590,6 @@ func TestApply_SourceLineIDMapsBySeqNotByIndex(t *testing.T) {
 	if len(lines) != 2 {
 		t.Fatalf("折讓明細 %d 行，want 2（第一行剩餘為 0 應被跳過）", len(lines))
 	}
-	// 剩下的兩行必須指向 8002 與 8003。用位置對的話會拿到 8001 與 8002。
 	want := []int64{8002, 8003}
 	for i, l := range lines {
 		if l.SourceLineID == nil {

@@ -62,8 +62,6 @@ class OrderCancelTimestampIT {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // application.yml 的 spring.flyway.* 指向本機真實 hawkr_order；不覆寫會讓 migration
-        // 跑到那裡去，而 testcontainers 裡的測試 DB 是空的。
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
@@ -80,7 +78,7 @@ class OrderCancelTimestampIT {
             SqlInitializationAutoConfiguration.class,
             FlywayAutoConfiguration.class,
             MybatisPlusAutoConfiguration.class,
-            MyBatisPlusAutoConfiguration.class  // common-core：TimestampTz TypeHandler + MetaObjectHandler
+            MyBatisPlusAutoConfiguration.class
     })
     @MapperScan("io.github.will413028.hawkr.order.repository")
     static class MinimalConfig {
@@ -153,7 +151,6 @@ class OrderCancelTimestampIT {
     void failedCasLeavesNoTimestamp() {
         order(5L, "O500000005", OrderStatus.PAID.value());
 
-        // 期望舊狀態給 PENDING_PAYMENT，實際是 PAID ⇒ CAS 不命中
         int rows = orderRepository.cancelOrderByBuyerCas(
                 "O500000005", OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value());
 
@@ -165,7 +162,6 @@ class OrderCancelTimestampIT {
                 .isNull();
     }
 
-    // ==================== helpers ====================
 
     private void assertCancelled(String orderNo) {
         OrderEntity order = orderRepository.findByOrderNo(orderNo);
@@ -174,8 +170,6 @@ class OrderCancelTimestampIT {
                 .as("取消了卻沒有結案時間 ⇒ 訂單時間軸最後一格永遠是空的（不報錯、不轉紅）")
                 .isNotNull();
 
-        // 用 DB 自己的時鐘判斷「是不是當下的時間」：epoch／1970 這種假值同樣是非 NULL，
-        // 只斷言 isNotNull 擋不住。窗口取寬，測試不因機器慢而閃爍。
         assertThat(jdbc.queryForObject("""
                 SELECT cancelled_at BETWEEN NOW() - INTERVAL '5 minutes' AND NOW() + INTERVAL '5 minutes'
                 FROM orders WHERE order_no = ?

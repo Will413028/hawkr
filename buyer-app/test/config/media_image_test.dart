@@ -34,7 +34,6 @@ void main() {
         buildImageUrl('products/x.jpg', ImagePreset.thumb),
         '$_mediaBase/i/thumb/products/x.jpg',
       );
-      // 前導斜線去除
       expect(
         buildImageUrl('/products/x.jpg', ImagePreset.thumb),
         '$_mediaBase/i/thumb/products/x.jpg',
@@ -53,8 +52,6 @@ void main() {
       expect(buildImageUrl(other, ImagePreset.card), other);
     });
 
-    // 媒體域名不做新舊相容（backend#2283）：已退役的 OSS CDN／aliyuncs 不再被當成
-    // 媒體來源，一律視為外部網址原樣 passthrough，不會被靜默還原成 key。
     test('已退役的舊儲存域名一律 passthrough，不還原 key', () {
       const retiredCdn = 'https://cdn.example.com/products/x.jpg';
       expect(buildImageUrl(retiredCdn, ImagePreset.card), retiredCdn);
@@ -95,15 +92,11 @@ void main() {
   });
 
   group('isInlineImageData：只認 data: scheme，不用長度猜（#89）', () {
-    // 實打回應裡的 objectKey（2026-08-05 GET /app/chat/conversations 逐字取出）。
     const objectKey =
         'public/user_avatar/2685914682/20260729/'
         '2c7c6d22-28b9-4ad0-b802-f5818bbb632b.png';
 
     test('裸 objectKey 不是 inline 圖片——它比所有舊門檻都長', () {
-      // 這一行就是舊寫法會炸的原因：objectKey 長度落在 60~120 之間，
-      // 門檻 60 的兩處（wallet / merchant 頭像）已經被撞穿，
-      // 門檻 120 的（category landing）只差 41 個字元。
       expect(objectKey.length, greaterThan(60));
       expect(objectKey.length, lessThan(120));
       expect(isInlineImageData(objectKey), isFalse);
@@ -125,7 +118,6 @@ void main() {
     test('完整 URL、空字串、純 base64 字串都不是 inline 圖片', () {
       expect(isInlineImageData('$_mediaBase/i/avatar/$objectKey'), isFalse);
       expect(isInlineImageData(''), isFalse);
-      // 沒有 data: 前綴的裸 base64 不再被當成圖片資料——後端不會這樣回。
       expect(
         isInlineImageData('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'),
         isFalse,

@@ -14,7 +14,6 @@ class CustomerOrderDetailScreen extends StatelessWidget {
 
   final OrderRecord order;
 
-  // Kept for route compatibility with the customer flow.
   final String customerName;
 
   @override

@@ -23,8 +23,6 @@ const HOP_BY_HOP = new Set([
 	"transfer-encoding",
 	"upgrade",
 ]);
-// fetch() auto-decompresses but leaves Content-Encoding → would tell the
-// browser to re-decompress plain bytes (ERR_CONTENT_DECODING_FAILED). Strip it.
 const STRIPPED_RESPONSE = new Set(["content-encoding"]);
 
 type Ctx = { params: Promise<{ path?: string[] }> };
@@ -87,7 +85,6 @@ async function handler(request: NextRequest, ctx: Ctx) {
 		if (STRIPPED_RESPONSE.has(lower)) continue;
 		resHeaders.set(k, v);
 	}
-	// 後端的 Set-Cookie 一律不轉。
 	return new NextResponse(upstream.body, {
 		status: upstream.status,
 		statusText: upstream.statusText,

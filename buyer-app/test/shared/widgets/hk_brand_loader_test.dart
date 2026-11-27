@@ -20,9 +20,7 @@ const _allBladesUp = Duration(milliseconds: 1800);
 
 void main() {
   test('時間軸與網頁 ilBladeAwning／ilBladeCounter keyframes 對齊', () {
-    // 網頁 .il-blade 的 `2.6s` 迴圈；改這個值等於讓 App 與網頁的載入動態分岔。
     expect(HkBrandMark.loopDuration, const Duration(milliseconds: 2600));
-    // 網頁 keyframes 在 86% 開始收回，減少動態時要停在收回之前的完成態。
     expect(HkBrandMark.staticFrame, lessThan(0.86));
   });
 
@@ -35,7 +33,6 @@ void main() {
       tester.getSize(find.byType(HkBrandLoader)),
       const Size.square(HkBrandLoader.page),
     );
-    // 起始幀只有兩條線稿；遮雨棚（底色加條紋）與檯面要等綻放序列跑完才到齊。
     expect(find.byType(SvgPicture), findsNWidgets(2));
     await tester.pump(_allBladesUp);
     expect(find.byType(SvgPicture), findsNWidgets(5));
@@ -64,7 +61,6 @@ void main() {
 
     await tester.pump(_allBladesUp);
 
-    // 實心品牌色底上，只要有一個部分仍是品牌色就會整片隱形。
     const expected = ColorFilter.mode(AppColors.bgCard, BlendMode.srcIn);
     final pictures = tester.widgetList<SvgPicture>(find.byType(SvgPicture));
     expect(pictures, hasLength(5));

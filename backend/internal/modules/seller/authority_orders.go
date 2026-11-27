@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-// 主管機關來函（step10e-reports-brief R5、設計 step10e-3cb-design）的公開型別與方法。
 
 type (
 	// AuthorityOrderKind 是來函要平台做的事（限制或移除商品、調取資料、暫停帳號、其他）。

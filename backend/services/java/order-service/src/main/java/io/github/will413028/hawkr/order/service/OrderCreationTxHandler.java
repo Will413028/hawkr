@@ -73,7 +73,6 @@ public class OrderCreationTxHandler {
     ) {
         String orderNo = orderNoGenerator.generateOrderNo();
 
-        // 插入 orders
         OrderEntity order = new OrderEntity();
         order.setId(TsidUtil.generate());
         order.setOrderNo(orderNo);
@@ -92,15 +91,10 @@ public class OrderCreationTxHandler {
         applyPolicySnapshot(order, policySnapshot);
         orderRepository.insert(order);
 
-        // 插入 order_items
         insertOrderItems(orderNo, items);
 
-        // 58 號 §7.1.2 步驟 1：本路徑（購物車外建單，gRPC CreateOrder）沒有採集入口，
-        // 一律落缺省快照。**不能不寫**：invoice-service 對「查無快照」是 fail-loud
-        // （order.paid 重試三次進 DLQ），少了這一列，經本路徑建立的訂單每一張都會誤觸發它。
         insertInvoiceSnapshot(orderNo, InvoiceIntakeResolver.defaultSnapshot());
 
-        // 更新協調紀錄
         stockTxRecordRepository.updateStatusAndOrderNo(stockTxId, OrderConstants.STOCK_TX_PHASE_DEDUCT, OrderConstants.STOCK_TX_STATUS_SUCCESS, orderNo);
 
         return orderNo;
@@ -138,7 +132,6 @@ public class OrderCreationTxHandler {
         order.setShippingMethod(shippingMethod);
         order.setShippingFee(shippingFee);
         order.setShippingFeePayer(shippingFeePayer);
-        // 結帳模組新增欄位
         order.setRecipientName(recipientName);
         order.setRecipientPhone(recipientPhone);
         order.setShippingAddress(shippingAddress);
@@ -153,7 +146,6 @@ public class OrderCreationTxHandler {
             order.setDimensionSum(dimensionSum);
         }
         order.setMerId(merId);
-        // couponInstanceId 不在建單時寫入，由 CheckoutService.reserveCoupon 成功後 updateCouponInstanceId 回寫
         order.setDiscountAmount(discountAmount);
         order.setPaymentDeadline(DateTimeUtils.nowUtc().plusSeconds(orderConfig.getPaymentDeadlineSeconds()));
         order.setPaymentAttempts(0);
@@ -162,10 +154,6 @@ public class OrderCreationTxHandler {
 
         insertOrderItems(orderNo, items);
 
-        // 58 號 §7.1.2 步驟 1：發票快照與 orders / order_items 同一交易。
-        // 🔴 這裡是「付款之前」——結帳確認建的是 PENDING_PAYMENT 訂單，付款成功要等
-        // payment.success webhook。發票資料若晚於付款才落地，invoice-service 的
-        // order.paid consumer 會讀到空快照，而發票必須在付款成功即開立（§6.2.4 ③）。
         insertInvoiceSnapshot(orderNo, invoiceSnapshot);
 
         stockTxRecordRepository.updateStatusAndOrderNo(stockTxId,
@@ -207,7 +195,6 @@ public class OrderCreationTxHandler {
         order.setBuyerId(buyerId);
         order.setStoreId(storeId);
         order.setAcceptanceId(acceptanceId);
-        // RFQ 沒有優惠券：原始金額 ＝ 實付金額，discount_amount 留 DB 預設 0。
         order.setTotalOriginalAmount(totalAmount);
         order.setTotalActualAmount(totalAmount);
         order.setStatus(OrderStatus.PENDING_PAYMENT.value());
@@ -216,7 +203,6 @@ public class OrderCreationTxHandler {
         order.setShippingFee(shippingFee);
         order.setShippingFeePayer(shippingFeePayer);
         order.setMerId(merId);
-        // 64 號 §6.4.11：RFQ 的付款期限是建單 +12h，不是結帳路徑的 24h。
         order.setPaymentDeadline(DateTimeUtils.nowUtc().plusSeconds(orderConfig.getRfqPaymentDeadlineSeconds()));
         order.setPaymentAttempts(0);
         applyPolicySnapshot(order, policySnapshot);
@@ -224,9 +210,6 @@ public class OrderCreationTxHandler {
 
         insertOrderItems(orderNo, items);
 
-        // 58 號 §7.1.2 步驟 1：**不能不寫**。invoice-service 對「查無快照」是 fail-loud
-        // （order.paid 重試三次進 DLQ），少了這一列，經本路徑建立的訂單每一張都會誤觸發它。
-        // RFQ 沒有發票採集入口（買家還沒進結帳），一律落缺省快照。
         insertInvoiceSnapshot(orderNo, InvoiceIntakeResolver.defaultSnapshot());
 
         return order;
@@ -242,9 +225,6 @@ public class OrderCreationTxHandler {
      * ——若舊 App 的訂單都沒有快照，那條 fail-loud 就會對每一張訂單誤觸發。
      */
     private void insertInvoiceSnapshot(String orderNo, InvoiceIntakeResolver.Snapshot snapshot) {
-        // §8：對應 CodeMeta Enum 的欄位寫入 DB 前必須走共用 validator。值雖然由
-        // InvoiceIntakeResolver 以 enum 產生，但這裡是 order_invoice_snapshots 的**唯一寫入點**，
-        // 驗證放在收斂點才擋得住未來新增的呼叫端。
         CodeMetaValidator.requireValidValue(InvoiceDocumentKind.class, snapshot.invoiceKind(), "invoiceKind");
         CodeMetaValidator.requireValidValue(InvoiceCarrierSelectionMode.class,
                 snapshot.carrierSelectionMode(), "carrierSelectionMode");
@@ -276,7 +256,6 @@ public class OrderCreationTxHandler {
             itemEntity.setQuantity(item.quantity());
             itemEntity.setListPrice(item.listPrice());
             itemEntity.setUnitPrice(item.unitPrice());
-            // 03 §3.2.1：actual_pay_amount = unit_price × qty − share_discount
             itemEntity.setShareDiscount(item.shareDiscount());
             itemEntity.setActualPayAmount(item.unitPrice() * item.quantity() - item.shareDiscount());
             itemEntity.setRefundStatus(OrderItemStatus.NORMAL.value());

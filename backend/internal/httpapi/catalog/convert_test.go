@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 )
 
-// fullProduct 把商品的每個欄位都設成互不相同的非零值：映射丟掉哪個欄位，下面的 unsetFields 就看得到。
 func fullProduct(status catalog.ProductStatus) catalog.Product {
 	first := time.Date(2026, 11, 1, 8, 0, 0, 0, time.UTC)
 	cmp := int64(150)
@@ -53,7 +52,6 @@ func fullSummary(status catalog.ProductStatus, stock int32) catalog.ProductSumma
 	}
 }
 
-// unsetFields 列出訊息（遞迴）沒有任何一個實例設值的欄位路徑：repeated 的元素合併計算（任何一個元素設了就算有），Timestamp 不再往內看。
 func unsetFields(m protoreflect.Message, path string) []string {
 	all, set := map[string]bool{}, map[string]bool{}
 	walk(m, path, all, set)
@@ -72,7 +70,7 @@ func walk(m protoreflect.Message, path string, all, set map[string]bool) {
 	for i := range fields.Len() {
 		f := fields.Get(i)
 		if f.ContainingOneof() != nil && !f.ContainingOneof().IsSynthetic() {
-			continue // oneof 的各成員由個別的描述區塊測試涵蓋
+			continue
 		}
 		name := path + string(f.Name())
 		all[name] = true
@@ -159,8 +157,8 @@ func TestAvailabilityFollowsStatusAndStock(t *testing.T) {
 	for _, c := range []struct {
 		status catalog.ProductStatus
 		want   pb.ProductAvailability
-		sku0   pb.ProductAvailability // 庫存 4 的 SKU
-		sku1   pb.ProductAvailability // 庫存 0 的 SKU
+		sku0   pb.ProductAvailability
+		sku1   pb.ProductAvailability
 	}{
 		{catalog.StatusActive, avail, avail, unavail},
 		{catalog.StatusArchived, unavail, unavail, unavail},
@@ -177,7 +175,6 @@ func TestAvailabilityFollowsStatusAndStock(t *testing.T) {
 			t.Errorf("%s：已下架的商品頁仍顯示庫存 %d", c.status, got.GetSkus()[0].GetStockQty())
 		}
 	}
-	// ACTIVE 但所有 SKU 都沒庫存：商品不可購買。
 	soldOut := fullProduct(catalog.StatusActive)
 	soldOut.Skus[0].StockQty = 0
 	got, err := p.Product(ctx, soldOut)

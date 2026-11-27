@@ -46,7 +46,6 @@ func runtimeModule(t *testing.T) (*Module, *db.DB) {
 const itemCard = `{"stage":"ITEM","query":"蘋果","candidates":[{"categoryId":"00000000-0000-7000-8000-000000000021","label":"蘋果","path":"水果 > 蘋果"}],` +
 	`"question":{"slotKey":"SLOT_KEY_ITEM_DISAMBIGUATION","prompt":"你說的是哪一個？","options":[{"optionId":"category-00000000-0000-7000-8000-000000000021","label":"蘋果"},{"optionId":"item-other","label":"其他"}],"allowFreeText":true}}`
 
-// ask 讓 c.run 停在等待輸入並寫一個 PENDING 的中斷，回傳中斷 ID。
 func ask(ctx context.Context, t *testing.T, d *db.DB, c chain) uuid.UUID {
 	t.Helper()
 	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET status = 'WAITING_FOR_INPUT' WHERE id = $1`, c.run); err != nil {
@@ -138,7 +137,7 @@ func TestGetRuntimeSnapshotIsNotFoundForAnotherBuyersOrDeletedConversation(t *te
 	}
 }
 
-func TestSnapshotRunsAreTheCurrentRequestsNewestFirstAtMostTwenty(t *testing.T) { // A9-D30(4)
+func TestSnapshotRunsAreTheCurrentRequestsNewestFirstAtMostTwenty(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	q := store.New(d.Conn(ctx))
@@ -170,7 +169,7 @@ func TestSnapshotRunsAreTheCurrentRequestsNewestFirstAtMostTwenty(t *testing.T) 
 	}
 }
 
-func TestSnapshotOpenConfirmationShowsProcessingWhileAnAnswerRunIsInProgress(t *testing.T) { // A9-D26(5)、A9-D30(3)
+func TestSnapshotOpenConfirmationShowsProcessingWhileAnAnswerRunIsInProgress(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	q := store.New(d.Conn(ctx))
@@ -214,7 +213,7 @@ func TestSnapshotOpenConfirmationShowsProcessingWhileAnAnswerRunIsInProgress(t *
 	}
 }
 
-func TestResumeRunRejectsABadShapeWithoutCreatingARun(t *testing.T) { // A9-D30(1)
+func TestResumeRunRejectsABadShapeWithoutCreatingARun(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
@@ -255,7 +254,7 @@ func TestResumeRunRejectsABadShapeWithoutCreatingARun(t *testing.T) { // A9-D30(
 	}
 }
 
-func TestResumeRunReportsAnAnsweredInterruptTheSameWhateverTheInput(t *testing.T) { // A9-D30(1)
+func TestResumeRunReportsAnAnsweredInterruptTheSameWhateverTheInput(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
@@ -277,7 +276,7 @@ func TestResumeRunReportsAnAnsweredInterruptTheSameWhateverTheInput(t *testing.T
 	}
 }
 
-func TestResumeRunTreatsAnOptionBesideBlankTextAsOptionOnly(t *testing.T) { // A9-D30(1)
+func TestResumeRunTreatsAnOptionBesideBlankTextAsOptionOnly(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
@@ -288,7 +287,7 @@ func TestResumeRunTreatsAnOptionBesideBlankTextAsOptionOnly(t *testing.T) { // A
 	}
 }
 
-func TestResumeRunQueuesTheAnswerRunAndReturnsItImmediately(t *testing.T) { // A9-D30(2)
+func TestResumeRunQueuesTheAnswerRunAndReturnsItImmediately(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
@@ -314,7 +313,7 @@ func TestResumeRunQueuesTheAnswerRunAndReturnsItImmediately(t *testing.T) { // A
 	}
 }
 
-func TestResumeRunResendAfterTheAnswerRunSucceededReplaysTheOriginalRun(t *testing.T) { // A9-D30(1)
+func TestResumeRunResendAfterTheAnswerRunSucceededReplaysTheOriginalRun(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)

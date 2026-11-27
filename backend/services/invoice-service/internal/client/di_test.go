@@ -21,8 +21,6 @@ func TestModule_GraphResolves(t *testing.T) {
 	if err := fx.ValidateApp(
 		fx.NopLogger,
 		fx.Supply(&config.Config{}, zap.NewNop()),
-		// AMEGO client 需要 AuditRepository 才能把每次往返落 invoice_provider_audit_logs
-		// （postgres.Module 提供；本測試只驗 Layer 3 的圖，供 nil 讓型別對得上即可）。
 		fx.Provide(func() domain.AuditRepository { return nil }),
 		Module,
 		fx.Invoke(func(amego.Client, *seller.Client) {}),

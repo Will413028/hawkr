@@ -105,7 +105,6 @@ class LogisticsEventTypeMqConstantsContractTest {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    // ==================== ① 掃描器自身的鑑別力 ====================
 
     /**
      * 🔴 <b>先證明量測有效，再談它量到什麼</b>：反射掃不到東西、或 prefix 寫錯，
@@ -127,7 +126,6 @@ class LogisticsEventTypeMqConstantsContractTest {
         assertFalse(enumValues().isEmpty(), "LogisticsEventType 值域為空 ⇒ 生成檔異常");
     }
 
-    // ==================== ② 正向：常數 → enum 值域 ====================
 
     /**
      * 失敗的修法：改 {@code docs/代碼管理（CodeMeta）/內部技術碼.md} 的 LogisticsEventType 表格，
@@ -149,7 +147,6 @@ class LogisticsEventTypeMqConstantsContractTest {
                         + "——那兩個 enum 的守門測試看不到 logistics. 前綴");
     }
 
-    // ==================== ③ 反向：enum 值域 → 常數（幽靈值） ====================
 
     /**
      * 幽靈值 ＝ 碼表裡有、卻沒有人發得出這條事件。
@@ -169,7 +166,6 @@ class LogisticsEventTypeMqConstantsContractTest {
                         + "（碼表裡有，但沒有人發得出這條事件）：" + ghosts);
     }
 
-    // ==================== ④ Code 軸：event_type header 常數 ====================
 
     @Test
     @DisplayName("每個 Code 都等於同名兄弟常數 EVENT_TYPE_* 的值")
@@ -179,7 +175,6 @@ class LogisticsEventTypeMqConstantsContractTest {
 
         logisticsRoutingKeyConstants().forEach((field, key) -> {
             if (!LogisticsEventType.isValidValue(key)) {
-                // 「常數不在 enum 值域」由 ② 負責，這裡略過免得同一個缺陷報兩次。
                 return;
             }
             String sibling = EVENT_TYPE_PREFIX + field.substring(ROUTING_KEY_PREFIX.length());
@@ -200,7 +195,6 @@ class LogisticsEventTypeMqConstantsContractTest {
                 "Code 軸（event_type header）與 MqConstants 不一致：" + problems);
     }
 
-    // ==================== ⑤ 三個 family 的值域兩兩互斥 ====================
 
     /**
      * 🔴 <b>本檔最重要的一條</b>：三個 family 同掛 {@code hawkr.shipping}、同屬履約／物流鏈，
@@ -219,7 +213,6 @@ class LogisticsEventTypeMqConstantsContractTest {
                 .map(FulfillmentEventType::value).collect(Collectors.toCollection(TreeSet::new));
         Set<String> logistics = new TreeSet<>(enumValues());
 
-        // 對照組：三邊都非空，否則「沒有交集」是空集合造成的假通過
         assertFalse(shipping.isEmpty(), "ShippingEventType 值域為空 ⇒ 本斷言零鑑別力");
         assertFalse(fulfillment.isEmpty(), "FulfillmentEventType 值域為空 ⇒ 本斷言零鑑別力");
         assertFalse(logistics.isEmpty(), "LogisticsEventType 值域為空 ⇒ 本斷言零鑑別力");
@@ -228,7 +221,6 @@ class LogisticsEventTypeMqConstantsContractTest {
         assertNoOverlap("FulfillmentEventType", fulfillment, "LogisticsEventType", logistics);
         assertNoOverlap("ShippingEventType", shipping, "FulfillmentEventType", fulfillment);
 
-        // 方向性：本家族只收 logistics.*，別的家族不得出現 logistics.*
         assertTrue(logistics.stream().allMatch(v -> v.startsWith(LOGISTICS_ROUTING_KEY_PREFIX)),
                 "LogisticsEventType 出現了非 logistics.* 的值");
         assertTrue(shipping.stream().noneMatch(v -> v.startsWith(LOGISTICS_ROUTING_KEY_PREFIX)),

@@ -101,7 +101,6 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
   );
 
   Widget _buildCaseCard(AfterSaleCase c) {
-    // 申訴 / 平台仲裁中時覆寫顯示，否則維持 raw status（與詳情頁一致）。
     final underAppeal = AfterSaleStatus.isUnderAppeal(c.appealState);
     final statusLabel = AfterSaleStatus.displayLabel(c.status, c.appealState);
     final statusColor = underAppeal
@@ -136,7 +135,6 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 案件號 + 狀態
                   Row(
                     children: [
                       Expanded(
@@ -163,10 +161,8 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
                     ],
                   ),
                   SizedBox(height: 6.h),
-                  // 訂單號
                   Text('訂單：${c.orderNo}', style: _infoStyle),
                   SizedBox(height: 6.h),
-                  // 時間
                   Row(
                     children: [
                       Icon(
@@ -182,7 +178,6 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
                     ],
                   ),
                   SizedBox(height: 6.h),
-                  // 原因
                   Row(
                     children: [
                       Icon(
@@ -206,7 +201,6 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
                       ),
                     ),
                   ],
-                  // PR #983：status=20 顯示寄回截止日（後端 ISO 8601）
                   if (c.status == AfterSaleStatus.awaitingReturn &&
                       c.shipBackDeadlineAt.isNotEmpty) ...[
                     SizedBox(height: 6.h),
@@ -221,7 +215,6 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
                     ),
                   ],
                   SizedBox(height: 8.h),
-                  // 按鈕
                   Row(
                     children: [
                       Container(
@@ -247,7 +240,6 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
                 ],
               ),
             ),
-            // Red badge
             Positioned(
               top: -1,
               right: 17.w,
@@ -284,10 +276,9 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
   }
 
   Color _statusColor(String status) => switch (status) {
-    // 後端 #1241：REOPENED(65) 已淘汰（被拒後改走平台申訴）
     '0' => AppColors.warningText,
     '20' || '25' => AppColors.info,
-    '33' => AppColors.textSecondary, // PR #983 待寄回逾時自動關案（灰）
+    '33' => AppColors.textSecondary,
     '40' => AppColors.primary,
     '50' => AppColors.textSecondary,
     '60' => AppColors.danger,

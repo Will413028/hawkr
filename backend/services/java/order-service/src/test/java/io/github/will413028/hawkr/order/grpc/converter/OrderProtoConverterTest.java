@@ -145,7 +145,6 @@ class OrderProtoConverterTest {
         item.setListPrice(30000L);
         item.setShareDiscount(0L);
         item.setActualPayAmount(30000L);
-        // DB 是 NOT NULL DEFAULT '0'；記憶體 entity 要自己補，protobuf 的 setter 不吃 null。
         item.setRefundStatus("0");
         item.setImageObjectKey("");
         return item;

@@ -25,7 +25,6 @@ type PostOwnerRow struct {
 	Readable  bool  `db:"readable"`
 }
 
-// 歸屬的讀取是治理用的（moderation 驗證內容、sanction 的隱藏與還原），以匿名建入口：不套任何觀看者的個人封鎖。
 
 // GetCommentOwner 是留言的歸屬：readable 是留言可見且所屬貼文公開可讀。
 func GetCommentOwner(id uuid.UUID, now time.Time) SelectStatement {

@@ -25,13 +25,10 @@ export interface InvoiceComplaintDisplay {
 }
 
 const COLOR_BY_STATUS: Record<string, ChipColor> = {
-	// 該你回了
 	[InvoiceComplaintStatus.OPEN]: "warning",
 	[InvoiceComplaintStatus.OVERDUE]: "danger",
-	// 你已經做完你該做的
 	[InvoiceComplaintStatus.SELLER_RESPONDED]: "primary",
 	[InvoiceComplaintStatus.ESCALATED_TO_ADM]: "primary",
-	// 已結案
 	[InvoiceComplaintStatus.RESOLVED]: "success",
 	[InvoiceComplaintStatus.VIOLATION_CONFIRMED]: "danger",
 	[InvoiceComplaintStatus.WITHDRAWN]: "default",

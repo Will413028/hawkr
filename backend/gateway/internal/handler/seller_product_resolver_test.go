@@ -35,9 +35,6 @@ func TestCreateSellerProduct_StampsResolvedSurrogate(t *testing.T) {
 	h := &Holder{Product: grpcclient.NewProductClientForTest(mock), Store: storeResolverForTest(7001)}
 	r := setupSellerProductRouter(h)
 
-	// 建立商品必填至少一個 SKU，且每個 SKU 欄位齊全（CreateProductRequest.Skus 的
-	// `required,dive` + CreateSkuInput 的 binding tag）。本測驗的是 surrogate 灌注，
-	// SKU 只是讓請求通過驗證的背景資料。
 	body := `{"idempotencyKey":"k1","name":"高麗菜","categoryId":"1","skus":[` +
 		`{"skuName":"s1","unit":"3301","price":"100","stockQty":"5",` +
 		`"weight":"1","lengthCm":"10","widthCm":"10","heightCm":"10"}]}`

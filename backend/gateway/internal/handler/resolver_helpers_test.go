@@ -8,9 +8,6 @@ import (
 	buyerpb "github.com/Will413028/hawkr/go-pkg/proto/buyer"
 )
 
-// mustNotResolveBuyer returns a resolver that fails the test if consulted —
-// proves an anonymous (accountID==0) call never attempts buyer resolution
-// (resolveOptionalBuyerID short-circuits before touching the resolver).
 func mustNotResolveBuyer(t *testing.T) *buyerid.Resolver {
 	t.Helper()
 	return buyerid.New(buyerid.GetterFunc(func(context.Context, int64) (*buyerpb.BuyerInfo, error) {

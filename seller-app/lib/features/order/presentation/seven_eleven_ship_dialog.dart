@@ -37,8 +37,6 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
   static const _gray100 = AppColors.textPrimary;
 
   Future<void> _pickPhoto() async {
-    // iOS image_picker 對某些 iCloud 還沒下載完的 PNG/HEIC 會拋
-    // PlatformException(invalid_image, ...) — 包 try-catch 給友善提示。
     try {
       final picked = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -93,7 +91,6 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
                   ),
                   SizedBox(height: 12.h),
 
-                  // 交貨便代碼
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -107,11 +104,9 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
                   ),
                   SizedBox(height: 12.h),
 
-                  // 分隔線
                   Divider(color: _gray100.withValues(alpha: 0.2), height: 1),
                   SizedBox(height: 12.h),
 
-                  // 標題
                   Text(
                     '上傳產品的照片且出貨',
                     style: TextStyle(
@@ -122,7 +117,6 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
                   ),
                   SizedBox(height: 12.h),
 
-                  // 照片上傳區
                   Semantics(
                     button: true,
                     label: '上傳產品或包裝照片',
@@ -137,8 +131,6 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
                             color: _gray100.withValues(alpha: 0.5),
                           ),
                         ),
-                        // BoxFit.contain — 高度 fit 父容器、寬度按比例縮，
-                        // 寬螢幕橫圖左右會留白、不會裁切原圖。
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16.r),
                           child: _photo != null
@@ -173,10 +165,8 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // 兩個按鈕
                   Row(
                     children: [
-                      // 送出照片 (outline green, enabled only when photo selected)
                       Expanded(
                         child: GestureDetector(
                           onTap: _photo != null
@@ -207,7 +197,6 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
                         ),
                       ),
                       SizedBox(width: 12.w),
-                      // 出貨且略過 (filled green) — 確認出貨但不上傳照片
                       Expanded(
                         child: GestureDetector(
                           onTap: () => Navigator.pop(
@@ -237,7 +226,6 @@ class _SevenElevenShipDialogState extends State<SevenElevenShipDialog> {
                 ],
               ),
             ),
-            // X close button
             Positioned(
               top: -8.h,
               right: -8.w,

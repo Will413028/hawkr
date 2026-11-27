@@ -157,7 +157,6 @@ void main() {
       expect(harness.adapter.requests, isEmpty);
       _expectNoFrameworkException(tester, 'logged-out cold start');
 
-      // login 會等 GetMyStore 回來；在 fake async 裡不直接 await，交給下面的 pump 推進。
       unawaited(
         harness.container
             .read(sessionProvider.notifier)
@@ -189,8 +188,6 @@ void main() {
     'encrypted session restore reaches dashboard using controlled GET fixtures',
     (tester) async {
       SharedPreferences.setMockInitialValues({
-        // 這些是 AuthStorage 的本地 SharedPreferences key（`auth_storage.dart`），
-        // 不是 wire 欄位——不隨 Gateway 契約 camelCase 收斂。
         'account_id': 'acc-42',
         'seller_id': 42,
         'seller_name': 'Hermetic Seller',
@@ -216,12 +213,10 @@ void main() {
         harness.router.routeInformationProvider.value.uri.path,
         MainRoutes.dashboard,
       );
-      // 冷啟動恢復：session token 登入中 → GetSession（Connect，獨立的 session client）取回帳號，再讀 GetMyStore。
       expect(harness.connectCalls, [
         IdentityAppService.getSession.procedure,
         SellerAppService.getMyStore.procedure,
       ]);
-      // 儀表板第一次開啟只讀一次（第一次讀取與「成為可見」的重讀共用一輪）。
       expect(harness.dashboardCalls, 1);
       expect(harness.adapter.requests, isNotEmpty);
       expect(
@@ -254,7 +249,6 @@ class _SellerAppHarness {
       overrides: [
         authSessionProvider.overrideWith((ref) async => auth),
         dioProvider.overrideWithValue(dio),
-        // Connect 只開放 GetSession 與 GetMyStore；其他 procedure 沒註冊就直接失敗。
         myStoreRepositoryProvider.overrideWithValue(
           MyStoreRepository(
             SellerAppServiceClient(
@@ -278,7 +272,6 @@ class _SellerAppHarness {
             }).build(),
           ),
         ),
-        // 儀表板走 Connect（GetMyDashboard）；一輪只讀一次，由 [dashboardCalls] 計次。
         sellerClientProvider.overrideWithValue(
           SellerAppServiceClient(
             FakeTransportBuilder().unary(SellerAppService.getMyDashboard, (
@@ -290,7 +283,6 @@ class _SellerAppHarness {
             }).build(),
           ),
         ),
-        // 儀表板的聊天未讀數走 Connect（GetStoreUnreadCount）。
         chatClientProvider.overrideWithValue(
           ChatAppServiceClient(
             FakeTransportBuilder().unary(ChatAppService.getStoreUnreadCount, (
@@ -301,7 +293,6 @@ class _SellerAppHarness {
             }).build(),
           ),
         ),
-        // 儀表板的通知未讀數走 Connect（GetUnreadCount）。
         notificationClientProvider.overrideWithValue(
           NotificationAppServiceClient(
             FakeTransportBuilder().unary(

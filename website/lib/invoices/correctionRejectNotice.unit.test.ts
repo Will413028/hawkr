@@ -11,8 +11,6 @@ describe("correctionResultNotice", () => {
 	const REJECT_NOTICE = "這次修改無法進行，請見下方原因";
 
 	it("被婉拒時把理由接上，且不得出現「原因原因」", () => {
-		// 期望值整句硬寫——不從 REJECT_NOTICE 拼，否則後端措辭一改斷言跟著變。
-		// dev 實拍（2026-09-05）修復前的錯誤形態是「…請見下方原因原因：已存在折讓。」
 		expect(
 			correctionResultNotice({
 				statusNotice: REJECT_NOTICE,

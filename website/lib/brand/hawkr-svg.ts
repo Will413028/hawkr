@@ -1,4 +1,3 @@
-/* 內容與 brand/hawkr 的 SVG 相同（tests/brand-assets.test.ts 比對）；next/og 的 ImageResponse 在 Workers 上讀不到檔案，所以以字串內嵌。 */
 export const HAWKR_APP_ICON_SVG =
 	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Hawkr"><rect width="1024" height="1024" rx="224" fill="#E4572E"/><g transform="translate(152 140) scale(6)"><defs><clipPath id="awning"><path d="M28 24 H92 L102 46 a10.5 10.5 0 0 1 -21 0 a10.5 10.5 0 0 1 -21 0 a10.5 10.5 0 0 1 -21 0 a10.5 10.5 0 0 1 -21 0 Z"/></clipPath></defs><g clip-path="url(#awning)"><rect width="120" height="70" fill="#FFFFFF"/><rect x="39" width="21" height="70" fill="#F2A541"/><rect x="81" width="21" height="70" fill="#F2A541"/></g><g fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"><path d="M36 67 V101"/><path d="M84 67 V101"/><path d="M36 83 H84"/></g></g></svg>\n';
 export const HAWKR_LOCKUP_DARK_SVG =

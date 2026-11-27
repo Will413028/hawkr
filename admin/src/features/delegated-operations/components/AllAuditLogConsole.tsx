@@ -93,8 +93,6 @@ export default function AllAuditLogConsole() {
 
 	function apply(event: FormEvent) {
 		event.preventDefault();
-		// 空字串＝不篩選是合法的；只有「填了但不是數字 id」才擋。靜默降級成不篩選會
-		// 把「你打錯了店家 id」變成「這是全平台的紀錄」，而畫面上只差在筆數。
 		if (draft.actorAdminId && !isDelegatedNumericId(draft.actorAdminId)) {
 			setFormError("管理員 ID 必須是數字。");
 			return;
@@ -261,9 +259,7 @@ export default function AllAuditLogConsole() {
 								{records.length === 0 ? (
 									<tr>
 										<td colSpan={7} className="adm-audit-empty">
-											{/* 三態必須分得開：載入中、篩選無結果、真的沒有任何代行
-											    動作。第三種正是治理最想確認的結論，把它跟前兩種
-											    混在一起等於讓人無法確認。 */}
+
 											{auditQuery.isLoading
 												? "正在載入代行紀錄…"
 												: hasFilters

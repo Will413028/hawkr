@@ -189,7 +189,6 @@ func TestRequestIDWithDifferentContentIsRejectedOnTheDedupPathToo(t *testing.T) 
 	rid := uuid.New()
 	f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, nil)
 	f.submitWith(t, reporter, commentTarget(w.comment), policy.Spam, &rid)
-	// 同一個對象（會走併入進行中案件的路徑），但類別不同：雜湊不同。
 	_, err := f.module.SubmitReport(context.Background(), SubmitInput{ReporterBuyerID: reporter, Target: commentTarget(w.comment), Category: policy.Fraud, RequestID: &rid})
 	if kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("內容不同要回 InvalidInput：%v", err)

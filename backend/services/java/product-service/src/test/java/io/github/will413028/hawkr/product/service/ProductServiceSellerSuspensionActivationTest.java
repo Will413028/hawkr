@@ -53,7 +53,6 @@ class ProductServiceSellerSuspensionActivationTest {
     private static final long STORE_ID = 200L;
     private static final long PRODUCT_ID = 1001L;
 
-    // ==================== 規則本身（package-visible test seam） ====================
 
     @Nested
     class RuleOnly {
@@ -115,7 +114,6 @@ class ProductServiceSellerSuspensionActivationTest {
         }
     }
 
-    // ==================== updateSellerProductStatus 接線 ====================
 
     @Nested
     class UpdateSellerProductStatusWiring {
@@ -152,22 +150,16 @@ class ProductServiceSellerSuspensionActivationTest {
             when(productRepository.findByIdAndStoreId(PRODUCT_ID, STORE_ID))
                     .thenReturn(Optional.of(entity(ProductStatus.ACTIVE.value())));
 
-            // INACTIVE 下架路徑走到 productRepository.updateById 之後還有 hashtag/cache/SKU 查詢等
-            // 未 mock 的協作者；本測試只關心「backstop 不消費 sellerGrpcClient」，
-            // 用 verifyNoInteractions 斷言，故不需要在意後續是否因未 mock 協作者拋例外 —
-            // 若真的拋了，代表已經跑過了「不呼叫 backstop」這段，斷言仍成立。
             try {
                 productService.updateSellerProductStatus(
                         String.valueOf(PRODUCT_ID), STORE_ID, ProductStatus.INACTIVE.value());
             } catch (Exception ignored) {
-                // 忽略後續未 mock 協作者導致的例外，本測試只關心 sellerGrpcClient 互動
             }
 
             verifyNoInteractions(sellerGrpcClient);
         }
     }
 
-    // ==================== createProduct 接線（缺口#3：#1226「同 helper 覆蓋」風險） ====================
 
     /**
      * {@code createProduct} 與 {@code updateSellerProductStatus} 共用同一條私有規則，但落地路徑
@@ -187,9 +179,6 @@ class ProductServiceSellerSuspensionActivationTest {
             CreateProductDTO dto = new CreateProductDTO();
             dto.setIdempotencyKey("idem-key-1");
             dto.setStoreId(STORE_ID);
-            // description/hashtags 留空以繞過與本測試無關的 fail-fast 驗證
-            // （HashtagInputValidator.requireHashtagSet(null) 直接回傳空集合、
-            // validateDescriptionDtoTextBlocks(null) 直接 return）。
             return dto;
         }
 
@@ -226,9 +215,6 @@ class ProductServiceSellerSuspensionActivationTest {
             when(sellerGrpcClient.getSellerMetaOrThrow(STORE_ID))
                     .thenReturn(SellerMeta.newBuilder().setCanManageProducts(true).build());
 
-            // categoryService 等後續協作者未 mock，會在 backstop 通過後的下一步拋例外——
-            // 這正是我們要的訊號：backstop 沒有擋下，代表接線放行成立。
-            // （若 backstop 誤判擋下，會拋 ProductBusinessException 9240 而非其他例外，斷言即失敗。）
             Exception ex = assertThrows(Exception.class, () -> productService.createProduct(dto));
             org.junit.jupiter.api.Assertions.assertFalse(
                     ex instanceof ProductBusinessException pbe && pbe.code() == 9240,

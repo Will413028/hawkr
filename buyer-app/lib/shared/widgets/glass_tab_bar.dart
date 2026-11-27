@@ -143,8 +143,6 @@ class _HkGlassTabBarState extends State<HkGlassTabBar> {
     final reduceMotion =
         (MediaQuery.maybeOf(context)?.disableAnimations ?? false) ||
         View.of(context).platformDispatcher.accessibilityFeatures.reduceMotion;
-    // Keep the inset glass artwork unchanged while the transparent interaction
-    // layer below owns the full accessible tap height.
     final effectiveHeight = widget.height < HkControl.minTap
         ? HkControl.minTap
         : widget.height;

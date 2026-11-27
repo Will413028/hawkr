@@ -27,10 +27,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 )
 
-// modules 列出單體裡有自己資料的模組與它的 migration，順序就是 migrate 套用的順序。
-//
-// 模組搬進單體時加在這裡。TestEveryModuleIsRegistered 保證 internal/modules 底下的
-// 每個模組都在清單內（或在 withoutData、apiOnly 裡）：漏登記的模組，它的 schema 在部署時不會被建立。
 func modules() []migrate.Module {
 	return []migrate.Module{
 		{Name: "content", Dir: content.Migrations()},
@@ -56,22 +52,15 @@ func modules() []migrate.Module {
 	}
 }
 
-// platformData 是 platform 擁有 schema 的套件（收款開通 ADR D29 的 webhook inbox、D62 的後台動作紀錄 adminaudit、工作日行事曆 bizcalendar）：不是模組，desired state 與 migration 在套件的 db/
-// （platformDirs），migrate 時先於模組套用。
 func platformData() []migrate.Module {
 	return []migrate.Module{{Name: inbox.Schema, Dir: inbox.Migrations()}, {Name: adminaudit.Schema, Dir: adminaudit.Migrations()}, {Name: bizcalendar.Schema, Dir: bizcalendar.Migrations()}}
 }
 
-// migrations 是 migrate 套用的全部：platform 的 schema 先，模組依 modules() 的順序。
 func migrations() []migrate.Module { return append(platformData(), modules()...) }
 
-// apiOnly 是只有公開 API、實作還在舊服務的模組：由 internal/legacy 的暫時實作在組裝點
-// 接線，沒有自己的 schema。實作搬進單體時，從這裡移到 modules()。
 var apiOnly = []string{}
 
-// withoutData 是已在單體裡、但沒有自己資料的模組：不建 schema、沒有 migration（backend/AGENTS.md 規則 6），
-// sqlc 只讀依賴表允許的 pub.sql。第一次要存自己的資料時，建 schema 與 migration，從這裡移到 modules()。
 var withoutData = []string{
-	"reviewqueue",       // 待辦由各來源模組的資料推導，讀 seller、payment 與 moderation 發布的 pub_review_items
-	"accountsuspension", // 停權紀錄在 identity，這個模組只編排：鎖帳號、確認沒有店家、呼叫 identity、發事件
+	"reviewqueue",
+	"accountsuspension",
 }

@@ -89,13 +89,6 @@ public class ShipmentStatusReconcileScheduler {
         int processed = 0;
         int failed = 0;
         for (ShipmentEntity entity : candidates) {
-            // issue #2294 L2：lease claim —— 搶到才打 PayUni 查詢（0 = 另一個 pod 已搶走）。
-            // ⚠️ 租約基準取 **claim 當下**（DateTimeUtils.nowUtc()）而非 tick 起點的 now：
-            // 取 tick 起點 ⇒ 全批共用同一個到期時間 ⇒ 第 k 筆的**有效**租約
-            // = backoffMinutes − (前 k−1 筆的耗時)，不變式退化成「批次總耗時 < 租約」，
-            // 而 batch-size 預設 100、單筆是一次 PayUni HTTP ⇒ 那條會被 batchSize 直接打破。
-            // 改在這裡取之後，不變式降為「**單筆**最壞耗時 < 租約」，與 batchSize 無關。
-            // 述詞用的 backoffCutoff 維持 tick 起點：那個方向讓可搶佔集合更小，是保守的。
             int claimed = shipmentMapper.claimForReconcile(
                     entity.getId(), DateTimeUtils.nowUtc(), backoffCutoff);
             if (claimed == 0) {
@@ -110,9 +103,7 @@ public class ShipmentStatusReconcileScheduler {
                 failed++;
                 log.error("ShipmentStatusReconcileScheduler.process.failed",
                         "reconcile 失敗 shipmentNo=" + entity.getShipmentNo(), e);
-                // 失敗時 service 層 finally 已 touch，下一輪會自然退避；此處不再額外 touch
             }
-            // §5.21 配送異常賣家通知：reload row 後依當下 status 推導異常並發 event（fire-and-forget）
             try {
                 ShipmentEntity refreshed = (entity.getId() != null) ? shipmentMapper.selectById(entity.getId()) : null;
                 if (refreshed != null) {
@@ -144,7 +135,6 @@ public class ShipmentStatusReconcileScheduler {
             return;
         }
 
-        // 終態（11=待付款返貨/41=已取消）排除 DELIVERY_OVERDUE，但允許 33/44 異常通知
         if (ShipmentAnomalyRules.abnormalShipmentStatusValues().contains(status)) {
             ShipmentAnomalyType type = ShipmentAnomalyRules.providerStatusAnomalyOf(status);
             anomalyEventPublisher.publishAnomalyDetected(
@@ -156,7 +146,6 @@ public class ShipmentStatusReconcileScheduler {
             );
         }
 
-        // WAITING_PICKUP（卡 N 天）→ PACKAGE_LOST
         if (ShippingStatus.WAITING_PICKUP.value().equals(status) && entity.getUpdatedAt() != null) {
             LocalDateTime threshold = DateTimeUtils.nowUtc().minusDays(packageLostDays);
             if (entity.getUpdatedAt().isBefore(threshold)) {
@@ -170,8 +159,6 @@ public class ShipmentStatusReconcileScheduler {
             }
         }
 
-        // DELIVERY_OVERDUE（排除已取貨 / 已取消 / 已遺失終態，
-        // 且要求物流商超過 3 天無狀態更新；對應 Mapper CASE_ANOMALY_TYPE 收緊規則）
         if (!ShippingStatus.PICKED_UP.value().equals(status)
                 && !ShippingStatus.CANCELLED.value().equals(status)
                 && !ShippingStatus.PACKAGE_LOST.value().equals(status)

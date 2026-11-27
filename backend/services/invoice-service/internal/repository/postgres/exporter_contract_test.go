@@ -16,7 +16,6 @@ import (
 	"testing"
 )
 
-// repoFile 讀 repo 內的檔案（相對本 package 目錄）。
 func repoFile(t *testing.T, rel ...string) string {
 	t.Helper()
 	path := filepath.Join(rel...)
@@ -27,10 +26,6 @@ func repoFile(t *testing.T, rel ...string) string {
 	return string(raw)
 }
 
-// exporterQuery 從 monitoring/sql-exporter/sql_exporter.yml 抽出某個 metric 的 query。
-//
-// 🔴 找不到一律 t.Fatalf 不 t.Skip：檔案被搬走或 metric 被改名時，SKIP 會讓這道檢查
-// 靜默消失，而它守的正是「那支查詢從來沒有被執行過」。
 func exporterQuery(t *testing.T, metricName string) string {
 	t.Helper()
 	path := filepath.Join("..", "..", "..", "..", "..", "monitoring", "sql-exporter", "sql_exporter.yml")
@@ -74,10 +69,6 @@ func exporterQuery(t *testing.T, metricName string) string {
 	return ""
 }
 
-// checkConstraintValues 從 db/schema/schema.sql 抽某條 CHECK ... IN ('a','b',…) 的值域。
-//
-// 🔴 值域**從 schema 推導不從這裡列舉**：手寫一份清單的話，新增狀態時沒有任何東西會提醒
-// 你回來改它 —— 而那正是本檔要防的失效形狀（丙：eventProducers 硬寫 7 項的同一個病）。
 func checkConstraintValues(t *testing.T, constraint string) []string {
 	t.Helper()
 	schema := repoFile(t, "..", "..", "..", "db", "schema", "schema.sql")
@@ -86,7 +77,6 @@ func checkConstraintValues(t *testing.T, constraint string) []string {
 		t.Fatalf("schema.sql 裡找不到 CHECK 約束 %q —— 它被改名或刪除了，"+
 			"而本檔的整個覆蓋率論證建立在它身上", constraint)
 	}
-	// 取該約束之後第一組小括號內的字面值。
 	rest := schema[idx:]
 	end := strings.Index(rest, "\n")
 	if end < 0 {
@@ -104,7 +94,6 @@ func checkConstraintValues(t *testing.T, constraint string) []string {
 	return out
 }
 
-// statusesIn 回傳 query 裡出現過的狀態字面值（用於判斷某支指標的述詞含哪些狀態）。
 func statusesIn(query string, domain []string) map[string]bool {
 	out := map[string]bool{}
 	for _, s := range domain {
@@ -142,12 +131,9 @@ func statusesIn(query string, domain []string) map[string]bool {
 func TestDocumentStatusCoverageHasNoSilentTerminal(t *testing.T) {
 	domain := checkConstraintValues(t, "chk_invdoc_status")
 
-	// ① 還在自動線上 —— 由 M7 invoice_statutory_deadline_pending 承擔（③ 兩條告警）。
 	onAutomaticLine := statusesIn(exporterQuery(t, "invoice_statutory_deadline_pending"), domain)
-	// ② 在等人 —— 由 M32 invoice_documents_awaiting_manual 承擔（㉕／㉖ 兩條告警）。
 	awaitingHuman := statusesIn(exporterQuery(t, "invoice_documents_awaiting_manual"), domain)
 
-	// ③ 已結案或由 operation 軸承擔。每一項都必須寫下「為什麼沒有人需要再看它」。
 	closedStatuses := map[string]string{
 		"ISSUED":                 "發票已開出，法定義務已履行；後續作廢／折讓各有自己的 operation 與指標",
 		"VOIDED":                 "作廢已完成並經 invoice_query 確認（C0501）",
@@ -155,14 +141,6 @@ func TestDocumentStatusCoverageHasNoSilentTerminal(t *testing.T) {
 		"CANCELLED_BEFORE_ISSUE": "ADM 雙人確認本單不需開立，invoice_admin_audit_logs 留有理由",
 		"NOT_APPLICABLE":         "合法的「不開票」路徑（零元／免用發票賣家／切點前訂單），not_applicable_reason 必填",
 		"RESOLVED_EXTERNALLY":    "賣家已自行開立並回報號碼，平台不再有開立義務",
-		// 🔴 VOIDING 是**唯一**靠 operation 軸兜底的一個：它必然有一筆非終態的 VOID
-		//    operation 驅動，而 M6 invoice_pending_operations 數得到那筆 operation。
-		//    它落在這裡的前提是「VOID operation 進終態時 document 一定同步離開 VOIDING」
-		//    （成功→VOIDED、被 provider 拒絕→RestoreInvoiceDocumentToIssued 回 ISSUED）。
-		//    ✅ **§7.2.2 落地時（#3073）已重驗，前提成立**：`Voiding.settleVoidPermanent`
-		//    在 `doc.Status == VOIDING` 時呼叫 `RestoreToIssued`，與 MarkFailed 同一交易
-		//    ⇒ 不存在「operation 進 FAILED_PERMANENT 而 document 留在 VOIDING」的路徑。
-		//    退款作廢（本波新增的 VOID adjustment）走的是同一條路徑，不變式維持。
 		"VOIDING": "由驅動它的 VOID operation 在 M6 上代表；前提已於 #3073 重驗成立（見上方註解）",
 	}
 
@@ -191,8 +169,6 @@ func TestDocumentStatusCoverageHasNoSilentTerminal(t *testing.T) {
 			uncovered)
 	}
 
-	// 反向：closedStatuses 不得列出值域裡不存在的狀態 —— 那種條目看起來像已經想過了，
-	// 實際上是一個永遠不會被檢查的字串（同 ⑤ 的 selector 值域對帳）。
 	for s := range closedStatuses {
 		found := false
 		for _, d := range domain {
@@ -207,7 +183,6 @@ func TestDocumentStatusCoverageHasNoSilentTerminal(t *testing.T) {
 		}
 	}
 
-	// ①②必須互斥：同一個狀態被兩支指標數到會重複告警，而且代表兩者的分工沒想清楚。
 	for _, s := range domain {
 		if onAutomaticLine[s] && awaitingHuman[s] {
 			t.Errorf("狀態 %q 同時落在 M7 與 M32 —— 兩者是**交棒**不是重疊", s)
@@ -230,7 +205,6 @@ func TestStatutoryDeadlineHandoverIsLossless(t *testing.T) {
 		t.Fatal("M32 的述詞不含 AWAITING_MANUAL —— 那正是它存在的唯一理由")
 	}
 
-	// 從 SQL 原文取 allowed-from，不在這裡抄一份。
 	queries := repoFile(t, "..", "..", "..", "db", "queries", "invoice_documents.sql")
 	idx := strings.Index(queries, "name: MarkInvoiceDocumentAwaitingManual")
 	if idx < 0 {
@@ -309,8 +283,6 @@ func TestComplaintStatusCoverageHasNoSilentTerminal(t *testing.T) {
 		}
 	}
 
-	// ESCALATED_TO_ADM 單獨釘一次：它是本表最容易被漏掉的一格（沒有任何到期時間欄，
-	// 所以任何「依到期欄掃描」的設計都會系統性略過它）。
 	if !unresolved["ESCALATED_TO_ADM"] {
 		t.Error("🔴 M33 的述詞不含 ESCALATED_TO_ADM —— 那是本表唯一連時間欄都沒有的等人狀態，" +
 			"少了它，一則升級到 ADM 的申訴可以無限期躺著而沒有任何訊號")
@@ -326,23 +298,15 @@ func TestComplaintStatusCoverageHasNoSilentTerminal(t *testing.T) {
 func TestAdjustmentStatusCoverageHasNoSilentTerminal(t *testing.T) {
 	domain := checkConstraintValues(t, "chk_invadj_status")
 
-	// 卡住的由 invoice_adjustment_stuck_rows 承擔（告警 InvoiceAdjustmentStuck）。
 	stuck := statusesIn(exporterQuery(t, "invoice_adjustment_stuck_rows"), domain)
 
-	// 其餘每一項都必須寫下「為什麼沒有人需要再看它」。
 	closed := map[string]string{
 		"COMPLETED": "折讓／作廢已生效，累計已落帳（I4 的單句 CAS 與逐行 allowanced_amount）",
 		"CANCELLED": "已決定不做；uq_invadj_* 的述詞都排除它 ⇒ 同一筆退款可以重新建列",
 
-		// 這兩個有自己的自動執行者，停在那裡是正常過程而不是卡住。
 		"SENDING":              "INV.op 的第三條分派軸持有租約中；租約到期會自己回到候選集合",
 		"WAITING_CONFIRMATION": "INV.rc 的 ConfirmAllowance 在查；超過 24h 會自轉 FAILED_UNKNOWN 而落進 stuck 指標",
 
-		// 🔴 這兩個今天**建不出來**：chk_invadj_allowance_shape 要求 ALLOWANCE 帶齊
-		// 六欄，而它們的觸發條件正是「那六欄還算不出來」。退款路徑改走退避重試
-		// （usecase/refund_adjustment.go 的 refundPlanRetryLater）。
-		// 它們留在值域裡是因為 schema 的 CHECK 還列著；哪天有人讓它們建得出來，
-		// 這一格的說明就變成假的 —— 那時 stuck 指標的述詞要一起加上它們。
 		"BLOCKED_UNKNOWN_DOCUMENT":   "全 repo 零寫入者（chk_invadj_allowance_shape 讓它建不出來）",
 		"BLOCKED_PENDING_CORRECTION": "同上",
 	}

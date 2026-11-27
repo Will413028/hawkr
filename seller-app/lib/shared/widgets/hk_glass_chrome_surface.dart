@@ -53,9 +53,6 @@ class HkGlassChromeSurface extends StatelessWidget {
         showBorder: showBottomBorder,
         shadows: HkShadows.xs,
         padding: padding,
-        // Full-width bars still fill a bounded parent. Compact chrome inside
-        // Positioned/Row must instead size itself to its child; forcing
-        // infinity there poisons layout and then Semantics.
         width: constraints.hasBoundedWidth ? double.infinity : null,
         height: height,
         surfaceKey: surfaceKey,

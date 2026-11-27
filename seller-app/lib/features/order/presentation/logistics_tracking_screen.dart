@@ -30,10 +30,10 @@ class LogisticsTrackingScreen extends ConsumerStatefulWidget {
   });
 
   final String? shipTradeNo;
-  final String lgsType; // B2C, C2C, HOME, C2B
-  final int? tradeType; // 1=正物流, 2=逆物流
-  final String? returnOdno; // C2B 退貨便編號
-  final String? orderSn; // 訂單編號
+  final String lgsType;
+  final int? tradeType;
+  final String? returnOdno;
+  final String? orderSn;
 
   static Route<T> route<T extends Object?>({
     RouteSettings? settings,
@@ -122,8 +122,6 @@ class _LogisticsTrackingScreenState
   }
 
   Widget _buildBody() {
-    // 僅首次載入（無資料時）顯示 TruckLoadingOverlay；
-    // 下拉刷新時已有資料，跳過遮罩，由 FruitRefreshIndicator 提供視覺回饋
     if (_isLoading && _logisticsInfo == null) {
       return TruckLoadingOverlay(message: '查詢物流狀態中...');
     }
@@ -185,16 +183,12 @@ class _LogisticsTrackingScreenState
       child: ListView(
         padding: EdgeInsets.all(16.w),
         children: [
-          // 1. 物流進度卡片
           _buildProgressCard(),
           SizedBox(height: 16.h),
-          // 2. 物流狀態卡片
           _buildStatusCard(),
           SizedBox(height: 16.h),
-          // 3. 配送資訊卡片
           _buildDeliveryInfoCard(),
           SizedBox(height: 16.h),
-          // 4. 訂單資訊卡片
           _buildOrderInfoCard(),
           SizedBox(height: 24.h),
         ],
@@ -205,15 +199,12 @@ class _LogisticsTrackingScreenState
   /// 1. 物流進度卡片 - 時間軸進度
   Widget _buildProgressCard() {
     final info = _logisticsInfo!;
-    // progress 為 null = 本 App 沒有這條流程的進度表（B2C／C2B／未知 lgsType）。
     final progress =
         info.progressPercent ??
         LogisticsStatusCode.getProgressPercent(info.shipStatus, info.lgsType);
     final isError = LogisticsStatusCode.isErrorStatus(info.shipStatus);
     final isFinal = LogisticsStatusCode.isFinalStatus(info.shipStatus);
 
-    // 🔴 步驟表依 lgsType **明確分派**；原本是 `HOME ? 宅配 : 超商`，
-    // 於是 B2C／C2B／空字串都被畫成超商 C2C 的五步。
     final steps = switch (info.lgsType) {
       PayuniLogisticsService.lgsTypeHOME => [
         _ProgressStep('已下單', HkIconName.receipt, (progress ?? -1) >= 0),
@@ -236,7 +227,6 @@ class _LogisticsTrackingScreenState
           (progress ?? -1) >= 100 && !isError,
         ),
       ],
-      // 未知 / 本版未支援的物流類型：provider-neutral 兩步，不冒充任一條流程。
       _ => [
         _ProgressStep('已建立物流單', HkIconName.receipt, true),
         _ProgressStep('進度以物流商公告為準', HkIconName.truck, isFinal),
@@ -259,7 +249,6 @@ class _LogisticsTrackingScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 標題
           Row(
             children: [
               HkIcon(
@@ -309,11 +298,9 @@ class _LogisticsTrackingScreenState
             ],
           ),
           SizedBox(height: 20.h),
-          // 進度條
           ClipRRect(
             borderRadius: BorderRadius.circular(6.r),
             child: LinearProgressIndicator(
-              // 進度未知時顯示 0（空進度條），不得借用別條流程的百分比。
               value: (progress ?? 0) / 100,
               backgroundColor: AppColors.dividerLight,
               valueColor: AlwaysStoppedAnimation<Color>(
@@ -323,7 +310,6 @@ class _LogisticsTrackingScreenState
             ),
           ),
           SizedBox(height: 20.h),
-          // 步驟指示
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: steps.map((step) => _buildStepItem(step)).toList(),
@@ -385,7 +371,6 @@ class _LogisticsTrackingScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 標題
           Row(
             children: [
               HkIcon(
@@ -407,7 +392,6 @@ class _LogisticsTrackingScreenState
           SizedBox(height: 12.h),
           const Divider(height: 1, color: AppColors.gray100),
           SizedBox(height: 12.h),
-          // 狀態時間軸
           _buildStatusTimeline(info),
         ],
       ),
@@ -415,7 +399,6 @@ class _LogisticsTrackingScreenState
   }
 
   Widget _buildStatusTimeline(LogisticsInfo info) {
-    // 建立狀態歷史（模擬，實際應從 API 取得歷史記錄）
     final currentStatus = info.shipStatusLabel;
     final statusTime = info.shipStatusTime.isNotEmpty
         ? info.shipStatusTime
@@ -424,7 +407,6 @@ class _LogisticsTrackingScreenState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 時間軸指示
         Column(
           children: [
             Container(
@@ -448,12 +430,10 @@ class _LogisticsTrackingScreenState
           ],
         ),
         SizedBox(width: 12.w),
-        // 狀態內容
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 當前狀態
               Row(
                 children: [
                   Expanded(
@@ -484,7 +464,6 @@ class _LogisticsTrackingScreenState
                 ),
               ),
               SizedBox(height: 20.h),
-              // 訂單建立
               Row(
                 children: [
                   Expanded(
@@ -513,8 +492,6 @@ class _LogisticsTrackingScreenState
   }
 
   String _getStatusDescription(LogisticsInfo info) {
-    // 🔴 PayUni 原始 shipStatus 的碼空間是 provider-specific（10–14 超商 /
-    // 30–35 黑貓），所以描述必須依 lgsType 明確分派，未知一律走中性文案。
     switch (info.lgsType) {
       case PayuniLogisticsService.lgsTypeHOME:
         return _homeStatusDescription(info.shipStatus);
@@ -595,7 +572,6 @@ class _LogisticsTrackingScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 標題
           Row(
             children: [
               HkIcon(
@@ -617,28 +593,23 @@ class _LogisticsTrackingScreenState
           SizedBox(height: 12.h),
           const Divider(height: 1, color: AppColors.gray100),
           SizedBox(height: 12.h),
-          // 物流類型
           _buildInfoRow('物流類型', info.lgsTypeText),
           SizedBox(height: 8.h),
-          // 取件方式
           _buildInfoRow('取件方式', info.serviceTypeText),
           if (info.shipAmt > 0) ...[
             SizedBox(height: 8.h),
             _buildInfoRow('代收金額', 'NT\$ ${info.shipAmt}'),
           ],
-          // 超商資訊
           if (info.storeID != null && info.storeID!.isNotEmpty) ...[
             SizedBox(height: 12.h),
             const Divider(height: 1, color: AppColors.gray100),
             SizedBox(height: 12.h),
             _buildInfoRow('取件門市', '${info.storeName ?? ''} (${info.storeID})'),
           ],
-          // 驗證碼 (C2C)
           if (info.validationNo != null && info.validationNo!.isNotEmpty) ...[
             SizedBox(height: 8.h),
             _buildInfoRowWithCopy('驗證碼', info.validationNo!),
           ],
-          // 宅配地址
           if (info.consigneeAddress != null &&
               info.consigneeAddress!.isNotEmpty) ...[
             SizedBox(height: 12.h),
@@ -646,7 +617,6 @@ class _LogisticsTrackingScreenState
             SizedBox(height: 12.h),
             _buildInfoRow('配送地址', info.consigneeAddress!),
           ],
-          // 收件人資訊
           SizedBox(height: 12.h),
           const Divider(height: 1, color: AppColors.gray100),
           SizedBox(height: 12.h),
@@ -745,7 +715,6 @@ class _LogisticsTrackingScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 標題
           Row(
             children: [
               HkIcon(
@@ -767,20 +736,16 @@ class _LogisticsTrackingScreenState
           SizedBox(height: 12.h),
           const Divider(height: 1, color: AppColors.gray100),
           SizedBox(height: 12.h),
-          // 物流編號
           _buildInfoRowWithCopyLong('物流編號', info.shipTradeNo),
           SizedBox(height: 8.h),
-          // 託運單號
           if (info.odno.isNotEmpty) ...[
             _buildInfoRowWithCopyLong('託運單號', info.odno),
             SizedBox(height: 8.h),
           ],
-          // 商家訂單編號
           if (info.merTradeNo.isNotEmpty) ...[
             _buildInfoRowWithCopyLong('商家單號', info.merTradeNo),
             SizedBox(height: 8.h),
           ],
-          // 平台訂單編號
           if (widget.orderSn != null && widget.orderSn!.isNotEmpty) ...[
             _buildInfoRowWithCopyLong('訂單編號', widget.orderSn!),
           ],

@@ -148,7 +148,6 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 	if !count(acct) || count(acct) || count(social.Viewer{AccountID: 4242, IP: "198.51.100.99"}) || views() != 4 {
 		t.Fatalf("登入者用帳號，與 IP 無關：%d", views())
 	}
-	// 換日（台北日 00:00 之後）再計。台北日以 +08:00 為界：UTC 15:59 與 16:00 是不同的台北日。
 	f.mu.Lock()
 	f.now = time.Date(2026, 10, 23, 15, 59, 0, 0, time.UTC)
 	f.mu.Unlock()
@@ -165,7 +164,6 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 	if n := f.scalar(t, "SELECT count(DISTINCT viewer_key) FROM social.post_views WHERE viewer_key IS NOT NULL"); n != 6 {
 		t.Fatalf("換日後同一個觀看者的鍵不同（salt 輪替）：%d", n)
 	}
-	// 表裡沒有 IP 與 UA 的欄位，也沒有可回推帳號的值。
 	var cols []string
 	rows, err := f.db.Conn(ctx).Query(ctx, "SELECT column_name FROM information_schema.columns WHERE table_schema = 'social' AND table_name IN ('post_views', 'view_salts')")
 	must(t, err)
@@ -182,7 +180,6 @@ func TestSD18ViewsAreDeduplicatedPerTaipeiDay(t *testing.T) {
 			t.Fatalf("瀏覽的表不該有欄位 %q", c)
 		}
 	}
-	// 不公開的貼文不計；清理 job 只刪舊的去重列與 salt，不扣瀏覽數。
 	draft := mustV[social.Post](t)(f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "草稿"}, nil))
 	if mustV[bool](t)(f.module.RecordView(ctx, social.Caller{}, draft.ID, anon)) {
 		t.Fatal("草稿不計瀏覽")

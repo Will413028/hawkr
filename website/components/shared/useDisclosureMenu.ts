@@ -92,9 +92,6 @@ export function useDisclosureMenu({
 	isLocked,
 }: UseDisclosureMenuOptions): DisclosureMenu {
 	const panelId = `${React.useId()}-menu`;
-	// Pointer activation must not steal focus from the trigger; keyboard
-	// activation must land on the first item. A pointerdown on the trigger
-	// always precedes the click that flips `open`.
 	const openedByPointer = React.useRef(false);
 
 	const onCloseRef = React.useRef(onClose);
@@ -129,8 +126,6 @@ export function useDisclosureMenu({
 		};
 	}, [open, triggerRef, panelRef]);
 
-	// Seed the roving tabindex whenever the panel mounts, and enter it when the
-	// menu was summoned from the keyboard.
 	React.useEffect(() => {
 		if (!open) {
 			openedByPointer.current = false;

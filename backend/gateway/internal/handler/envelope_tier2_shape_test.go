@@ -8,22 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Tier-2 envelope 收斂（issue #2198）：Page-trap 之外還有一批端點把業務欄位掛在
-// envelope 頂層與 code/message 並列，或用 `msg` 當欄名。收斂後一律
-// {code, message, data:{...}}，唯一登記在案的例外是 /health（10 檔 §2 例外清單）。
-//
-// 這組測試對每支端點打真實路由，斷言兩件事：
-//   - envelope 頂層只允許 code/message/data/traceId/messageZh，業務欄位不得外洩
-//   - 該業務欄位確實出現在 data 之下、值正確
-//
-// 弄壞任何一支（把欄位搬回頂層、或把 message 改回 msg）都會讓對應 case 轉紅。
 
-// envelopeTopLevelKeys 是 envelope 頂層允許出現的 key 全集。
 var envelopeTopLevelKeys = map[string]bool{
 	"code": true, "message": true, "data": true, "traceId": true, "messageZh": true,
 }
 
-// assertEnvelopeData 斷言頂層乾淨並回傳 data 物件。
 func assertEnvelopeData(t *testing.T, body map[string]interface{}) map[string]interface{} {
 	t.Helper()
 	for k := range body {

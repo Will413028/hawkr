@@ -128,16 +128,12 @@ class CheckoutConfirmCouponCompensationTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(orderService.createOrderFromCheckout(any())).thenReturn("O20260830001");
 
-        // 發票前置驗證預設放行（code=0）。要測「被擋下」的分支就在該支測試裡改 stub。
         when(invoiceGrpcClient.validateOrderInvoiceInput(any()))
                 .thenReturn(ValidateOrderInvoiceInputInternalResponse.newBuilder().setCode(0).build());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
                 shippingGrpcClient, couponGrpcClient, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, couponReleaseService, null);
 
-        // 🔴 快照用**產線那一支** buildPriceSnapshot 組，不手寫 JSON。
-        //    舊版這裡餵的是 "1"（舊格式哨兵），而 confirm 現在對「快照沒有政策五欄」一律 fail-closed
-        //    ——那正是要防的東西，所以測試必須餵一份真的快照，不是繞過檢查。
         OrderPolicySnapshot policy =
                 new OrderPolicyResolver().resolve(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
         when(valueOperations.getAndDelete(anyString())).thenReturn(

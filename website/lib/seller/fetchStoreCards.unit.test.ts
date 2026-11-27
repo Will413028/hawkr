@@ -16,7 +16,6 @@ const idsOf = (n: number) => Array.from({ length: n }, (_, i) => `s${i}`);
 
 beforeEach(() => {
 	mocks.batchGetStores.mockReset();
-	// 回傳每個請求的 id 對應的卡片，但 "missing" 沒有卡片。
 	mocks.batchGetStores.mockImplementation(
 		async ({ ids }: { ids: string[] }) => ({
 			stores: ids

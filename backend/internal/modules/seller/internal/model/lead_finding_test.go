@@ -8,7 +8,6 @@ import (
 	"uuid"
 )
 
-// finding 是測試用的認定：只有挑主要依據會看的三個欄位。
 func finding(n int, severity Severity, createdAt time.Time) Violation {
 	return Violation{
 		ID:       uuid.MustParse(fmt.Sprintf("0190a000-0000-7000-8000-%012x", n)),
@@ -30,7 +29,6 @@ func arrangements(in []Violation) [][]Violation {
 	return out
 }
 
-// leadOfEveryArrangement 在 cited 的每一種排列上挑主要依據，全部相同才回傳（不同就讓測試失敗）。
 func leadOfEveryArrangement(t *testing.T, cited []Violation) uuid.UUID {
 	t.Helper()
 	var first uuid.UUID
@@ -54,7 +52,6 @@ func TestSeverityRankOrdersFromLowToCritical(t *testing.T) {
 			t.Errorf("%s 的名次是 %d，應為 %d", s, s.Rank(), i)
 		}
 	}
-	// 與 SeverityValues 的排列無關，明寫 LOW < MEDIUM < HIGH < CRITICAL。
 	previous := -1
 	for _, s := range []Severity{SeverityLow, SeverityMedium, SeverityHigh, SeverityCritical} {
 		if s.Rank() <= previous {
@@ -97,7 +94,6 @@ func TestLeadFindingOfTakesTheNewestAmongTheSameSeverity(t *testing.T) {
 	if got := leadOfEveryArrangement(t, []Violation{oldHigh, newHigh, newestMedium}); got != newHigh.ID {
 		t.Errorf("主要依據 %v，應為最新的 HIGH %v", got, newHigh.ID)
 	}
-	// 兩筆同嚴重度的 CRITICAL，舊的 ID 較大：看建立時間，不看 ID。
 	oldCritical := finding(9, SeverityCritical, at)
 	newCritical := finding(5, SeverityCritical, at.Add(time.Minute))
 	if got := leadOfEveryArrangement(t, []Violation{oldCritical, newCritical}); got != newCritical.ID {

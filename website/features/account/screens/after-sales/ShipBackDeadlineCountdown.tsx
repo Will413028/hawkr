@@ -64,9 +64,6 @@ export default function ShipBackDeadlineCountdown({
 		setNow(Date.now());
 		const tick = () => setNow(Date.now());
 		const remainingMs = deadline - Date.now();
-		// One second cadence inside the final hour; thirty seconds otherwise.
-		// Re-evaluates inside the interval so the cadence ratchets down on its
-		// own as the deadline approaches.
 		const id = window.setInterval(
 			tick,
 			remainingMs > 3_600_000 ? 30_000 : 1_000,

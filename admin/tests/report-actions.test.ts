@@ -35,7 +35,6 @@ import { kase, outcome, report, target } from "./fixtures/report-fixtures";
 const FOOD = PolicyCategory.FOOD_SAFETY;
 const FRAUD = PolicyCategory.FRAUD;
 
-// 伺服器給的去處（triage_targets）：食安已有進行中的案件（高、3 筆通報、etag c-9），詐欺會開新案件。
 const TARGETS = [
 	target(FOOD, {
 		caseId: "c-food",
@@ -199,7 +198,6 @@ test("設定結果的請求：說明去掉前後空白，帶 etag", () => {
 });
 
 test("會讓通報不能再當新認定來源的結果：只看伺服器給的 negates_source（client 沒有自己的對照表）", () => {
-	// 刻意給一組和伺服器現行規則不同的值：client 照伺服器給的，不照自己記的。
 	const options = [
 		outcome(ReportOutcome.ACTION_TAKEN, true),
 		outcome(ReportOutcome.NO_VIOLATION, false),
@@ -338,7 +336,6 @@ test("案件的註記：去掉前後空白，掛在 case_id", () => {
 });
 
 test("預先勾選的來源通報超過一次能選的上限時的說明", () => {
-	// 哪些通報可以當來源、最早的 20 筆是哪些，都由伺服器的 ListReports(citable_as_source) 決定（use-case-reports）；這裡只剩說明文字。
 	assert.equal(
 		SOURCE_OVERFLOW_TEXT,
 		"這個案件超過 20 筆可以當來源的通報，已預先勾選最早的 20 筆。",

@@ -1,9 +1,7 @@
-// tests/seo/h1-uniqueness.seo.spec.ts
 import { expect, test } from "@playwright/test";
 
 import { SEO_API_BASE as API } from "./_helpers";
 
-// 從 marketplace 取一個真實 product id + seller(account) id，驅動 on-demand 頁。
 async function pickIds(): Promise<{
 	productId: string;
 	sellerId: string;
@@ -42,7 +40,7 @@ test.describe("h1 uniqueness (on-demand SEO entity pages)", () => {
 
 		for (const url of urls) {
 			await page.goto(url, { waitUntil: "networkidle" });
-			await page.waitForTimeout(1000); // 等 Suspense streaming swap 完成
+			await page.waitForTimeout(1000);
 			const count = await page.locator("h1").count();
 			expect(count, `${url} 最終 DOM 應只有 1 個 <h1>`).toBe(1);
 		}

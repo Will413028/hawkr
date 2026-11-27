@@ -94,7 +94,6 @@ class VersionGate {
       _lastSuccessAt = _now();
       _result = res..freeze();
     } catch (e) {
-      // 逾時、連線失敗、回應不對一律放行：網路不能用時，使用者沒辦法自救。
       _log('版本檢查失敗，放行：$e');
     }
     return _result;

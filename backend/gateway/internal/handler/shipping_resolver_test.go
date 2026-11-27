@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// mockShippingServiceClient 只覆寫測試需要的 RPC；其餘靠 interface 內嵌
-// （呼叫到未覆寫方法會 nil-panic，即測試失敗——刻意）。
 type mockShippingServiceClient struct {
 	shippingpb.ShippingServiceClient
 	PrintCvsLabelFn               func(ctx context.Context, in *shippingpb.PrintCvsLabelRequest, opts ...grpc.CallOption) (*shippingpb.PrintCvsLabelResponse, error)

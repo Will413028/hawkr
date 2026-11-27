@@ -52,7 +52,6 @@ func TestAddCustomerTagsConcurrentSameNameCreatesOneTag(t *testing.T) {
 	for i := 0; i < buyers; i++ {
 		f.mustOrder(fmt.Sprintf("evt-%d", i), fmt.Sprintf("O%d", i), storeA, buyer1+int64(i), 100)
 	}
-	// 建立標籤的 INSERT 慢 200ms（只拉寬「先查再建」的競爭窗口，不是時間斷言）：沒有序列化時，並行的呼叫都會在第一個 INSERT 完成前查到「不存在」。
 	f.exec(`CREATE FUNCTION crm.slow_tag_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.2); RETURN NEW; END $$`)
 	f.exec(`CREATE TRIGGER slow_tag_insert BEFORE INSERT ON crm.tags FOR EACH ROW EXECUTE FUNCTION crm.slow_tag_insert()`)
 	errs := parallel(buyers, func(i int) error {
@@ -114,12 +113,10 @@ func TestAddCustomerTagsInputValidation(t *testing.T) {
 			t.Errorf("%s：err=%v，預期 InvalidInput", name, err)
 		}
 	}
-	// 去重與 trim：同一個名稱的不同寫法只貼一次。
 	f.mustAddTags(storeA, buyer1, " 常客", "常客 ", "常客")
 	if got := f.tagNames(storeA); len(got) != 1 {
 		t.Fatalf("標籤 %v，預期去重成一個", got)
 	}
-	// 冪等：再貼一次不報錯、不重複。
 	f.mustAddTags(storeA, buyer1, "常客")
 	if n := f.count("crm.customer_tags"); n != 1 {
 		t.Fatalf("貼標 %d 筆，預期 1", n)
@@ -152,7 +149,6 @@ func TestCustomerTagsRejectsAnotherStoresTag(t *testing.T) {
 	if !errors.As(err, &pgErr) || pgErr.Code != "23503" {
 		t.Fatalf("err=%v，預期外鍵違反 23503", err)
 	}
-	// 只有客戶才有貼標：沒有客戶列的 (store, buyer) 也被 FK 擋下。
 	tagA, err := f.m.CreateTag(context.Background(), storeA, "本店")
 	if err != nil {
 		t.Fatal(err)
@@ -177,26 +173,21 @@ func TestCreateRenameDeleteTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 撞名：建立與改名都回 AlreadyExists。
 	_, err = f.m.CreateTag(ctx, storeA, "甲")
 	wantKind(t, err, apperr.KindAlreadyExists, crm.ReasonTagNameTaken)
 	wantKind(t, errOnly(f.m.RenameTag(ctx, storeA, b.ID, "甲")), apperr.KindAlreadyExists, crm.ReasonTagNameTaken)
-	// 不同店可以同名。
 	if _, err := f.m.CreateTag(ctx, storeB, "甲"); err != nil {
 		t.Fatalf("別家店同名被擋：%v", err)
 	}
-	// 改成自己現在的名稱不是撞名。
 	if _, err := f.m.RenameTag(ctx, storeA, b.ID, "乙"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.RenameTag(ctx, storeA, b.ID, "丙"); err != nil {
 		t.Fatal(err)
 	}
-	// 他店的標籤與不存在的標籤都是 NotFound。
 	wantKind(t, errOnly(f.m.RenameTag(ctx, storeB, b.ID, "丁")), apperr.KindNotFound, crm.ReasonTagNotFound)
 	wantKind(t, errOnly(f.m.RenameTag(ctx, storeA, uuid.UUID{}, "丁")), apperr.KindNotFound, crm.ReasonTagNotFound)
 	wantKind(t, f.m.DeleteTag(ctx, storeB, b.ID), apperr.KindNotFound, crm.ReasonTagNotFound)
-	// 刪除：關聯一起消失。
 	f.mustAddTags(storeA, buyer1, "甲", "丙")
 	if err := f.m.DeleteTag(ctx, storeA, b.ID); err != nil {
 		t.Fatal(err)
@@ -244,13 +235,11 @@ func TestTagLimits(t *testing.T) {
 	}
 	_, err := f.m.CreateTag(ctx, storeA, "多一個")
 	wantKind(t, err, apperr.KindFailedPrecondition, crm.ReasonTagLimit)
-	// AddCustomerTags 要建立的新標籤會超過每店上限：整批無寫入（已存在的標籤也不貼）。
 	_, err = f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"最後一個", "又一個新的"})
 	wantKind(t, err, apperr.KindFailedPrecondition, crm.ReasonTagLimit)
 	if n := f.count("crm.customer_tags"); n != 0 {
 		t.Fatalf("超過每店上限的整批仍貼了 %d 筆", n)
 	}
-	// 每位客戶上限：店 B，貼滿 20 個再多一個。
 	f.mustOrder("evt-2", "O2", storeB, buyer1, 100)
 	var names []string
 	for i := 0; i < crm.MaxTagsPerCustomer; i++ {
@@ -262,7 +251,6 @@ func TestTagLimits(t *testing.T) {
 	if got := f.tagNames(storeB); len(got) != crm.MaxTagsPerCustomer {
 		t.Fatalf("店 B 有 %d 個標籤，預期 %d（超過上限的整批要連新標籤一起回滾）", len(got), crm.MaxTagsPerCustomer)
 	}
-	// 已貼過的不算新增：貼滿後重貼同樣的 20 個仍成功。
 	f.mustAddTags(storeB, buyer1, names...)
 }
 
@@ -315,7 +303,7 @@ func TestAddCustomerTagsConcurrentWithRenameTag(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		_, err := f.m.RenameTag(ctx, storeA, old.ID, "新名")
 		if crm.ReasonOf(err) == crm.ReasonTagNameTaken {
-			return nil // 貼標先建立了「新名」：合法的序列化結果
+			return nil
 		}
 		return err
 	})

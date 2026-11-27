@@ -280,7 +280,6 @@ func (e *Error) Locale() uitext.Locale {
 	return e.locale
 }
 
-// newError 建立錯誤；args 裡第一個 uitext.Message 的語系成為錯誤的語系。
 func newError(kind Kind, format string, args []any) *Error {
 	e := &Error{kind: kind, Message: fmt.Sprintf(format, args...)}
 	for _, a := range args {
@@ -399,7 +398,6 @@ func WithCause(public, cause error) error {
 	return &causedError{public: public, cause: cause}
 }
 
-// 內部原因只出現在 Error() 的文字（進 log），不經 errors.Is/As 暴露；測試要驗原因就檢查錯誤的文字。
 type causedError struct{ public, cause error }
 
 func (e *causedError) Error() string { return e.public.Error() + "：" + e.cause.Error() }

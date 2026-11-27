@@ -59,7 +59,6 @@ class ShippingUberQuoteAssessorTest {
                 .setCode(0).setMessage("success").setData(data).build();
     }
 
-    // ===== quoteId 空 ⇒ GetUberQuoteForCheckout =====
 
     @Test
     @DisplayName("🔴 沒有既有 quote ⇒ 打 GetUberQuoteForCheckout，且逐欄擺對位置")
@@ -81,13 +80,11 @@ class ShippingUberQuoteAssessorTest {
         verify(shippingGrpcClient, never()).validateUberQuoteForCheckout(any());
 
         GetUberQuoteForCheckoutRequest sent = captor.getValue();
-        // 🔴 買家與賣家 id 對調在型別上完全合法（都是 int64），只有逐欄斷言抓得到
         assertThat(sent.getBuyerId()).isEqualTo(BUYER_ID);
         assertThat(sent.getSellerStoreId()).isEqualTo(STORE_ID);
         assertThat(sent.getDeliveryTemp()).isEqualTo("3202");
         assertThat(sent.getDropoff().getReceiverName()).isEqualTo("王小明");
         assertThat(sent.getDropoff().getReceiverPhone()).isEqualTo("0912345678");
-        // 🔴 三欄分開，不得攤平（shipping.proto 逐字禁止讓 shipping 反解字串）
         assertThat(sent.getDropoff().getCounty()).isEqualTo("台北市");
         assertThat(sent.getDropoff().getDistrict()).isEqualTo("中正區");
         assertThat(sent.getDropoff().getDetailAddress()).isEqualTo("測試路1號3樓");
@@ -148,7 +145,6 @@ class ShippingUberQuoteAssessorTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
-    // ===== quoteId 非空 ⇒ ValidateUberQuoteForCheckout =====
 
     @Test
     @DisplayName("🔴 有既有 quote ⇒ 打 ValidateUberQuoteForCheckout，帶 quote_id／accept／order_no")
@@ -181,7 +177,6 @@ class ShippingUberQuoteAssessorTest {
 
         assertThat(result.eligible()).isTrue();
         assertThat(result.quoteId()).isEqualTo("dqt_abc");
-        // ValidateUberQuoteData 沒有 currency 欄位 ⇒ 留空，不得編一個 "TWD"
         assertThat(result.currency()).isEmpty();
     }
 
@@ -203,7 +198,6 @@ class ShippingUberQuoteAssessorTest {
                 "dqt_old", false, ""));
 
         assertThat(result.eligible()).isFalse();
-        // 空 reason 會讓閘門落進「不認得」分支而吐不出原因——這一句就是在擋那個
         assertThat(result.unavailableReason()).isEqualTo("UBER_QUOTE_PRICE_CHANGED");
     }
 

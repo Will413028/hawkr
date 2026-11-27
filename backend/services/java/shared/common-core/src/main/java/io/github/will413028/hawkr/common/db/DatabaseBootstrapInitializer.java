@@ -94,7 +94,6 @@ public class DatabaseBootstrapInitializer implements BeanFactoryPostProcessor {
             }
 
             try (Statement st = conn.createStatement()) {
-                // DB 名稱已經過 SAFE_IDENT 驗證，可以安全拼接
                 st.executeUpdate("CREATE DATABASE " + p.getTargetDatabase());
                 log.info("DatabaseBootstrap.createDatabase.success db={}", p.getTargetDatabase());
             }
@@ -118,7 +117,6 @@ public class DatabaseBootstrapInitializer implements BeanFactoryPostProcessor {
                 if (!ext.isEnabled()) {
                     continue;
                 }
-                // Extension 名稱已通過 SAFE_IDENT 驗證
                 st.executeUpdate("CREATE EXTENSION IF NOT EXISTS " + ext.getName());
                 log.info("DatabaseBootstrap.createExtension.success db={} extension={}",
                         p.getTargetDatabase(), ext.getName());

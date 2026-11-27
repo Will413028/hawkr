@@ -82,8 +82,6 @@ test("candidate, poll, and quote async paths are scoped to session generation", 
 		/sessionGenerationGuard\.isCurrent\(sessionIdentity, s\.requestId\)/,
 	);
 	assert.match(hook, /s\.candidateSet\?\.candidateSetId === candidateSetId/);
-	// legacy quote-batch 的建立與撤回端已下架（doc 64 §7），連同它們自己的
-	// generation 守衛一起——這裡不再有第二組 quoteBatchId 判準。
 	assert.doesNotMatch(hook, /quoteBatchId/);
 });
 
@@ -123,9 +121,6 @@ test("polling stops on terminal status and switches to the candidates stage", ()
 });
 
 test("toggleSelection applies the flip optimistically before the request resolves", () => {
-	// toggleSelection 已改為三個分支（樂觀套用／成功覆寫／失敗回滾）共用同一個
-	// applySelectedValue helper，差別只在傳入的 selected 值。這裡驗證「樂觀套用」
-	// 那次呼叫（傳 nextSelected）確實發生在送出 ToggleSelection 之前。
 	const optimisticSetIndex = hook.indexOf(
 		"applySelectedValue(s.candidateSet, nextSelected)",
 	);
@@ -138,10 +133,6 @@ test("toggleSelection applies the flip optimistically before the request resolve
 });
 
 test("toggleSelection rolls back only the toggled candidate to its captured pre-toggle value on failure, using latest state (not a stale whole-snapshot capture)", () => {
-	// 失敗回滾走 applySelectedValue(s.candidateSet, previousSelected)：只復原
-	// 這一個 candidateId，且讀最新的 s.candidateSet（functional setState），不是
-	// 呼叫前就地捕捉的整份快照（previousCandidateSet 已不存在於原始碼中）——
-	// 否則使用者連續勾選兩個候選、其中一個先失敗時，會連帶蓋掉另一個已成功的選取。
 	assert.match(
 		hook,
 		/applySelectedValue\(\s*s\.candidateSet,\s*previousSelected,?\s*\)/,
@@ -252,7 +243,6 @@ test("submitTurn uses the backend-composed natural-language reply instead of bui
 });
 
 test("原始模型推理（reasoning）已依 doc 55 §8.1 下架——hook 不得再讀取或轉傳", () => {
-	// 哨兵：後端仍可能回傳 reasoning 欄位（過渡期），但前端不得消費。
 	assert.doesNotMatch(hook, /\breasoning\b(?!.*不再消費)/);
 });
 
@@ -282,7 +272,6 @@ test("submitAnswer 接受 skip:true，request body 帶上 skip 欄位（與 opti
 
 test("submitAnswer 的 skip:true 繞過『沒有文字就不送』的空字串 guard，樂觀泡泡顯示「略過」", () => {
 	assert.match(hook, /answer\.skip\s*\?\s*"略過"/);
-	// guard 仍在，只是永遠有值可判斷——不得為了 skip 另開一條不檢查 buyerText 的分支。
 	assert.match(hook, /if \(!buyerText\) return;/);
 });
 

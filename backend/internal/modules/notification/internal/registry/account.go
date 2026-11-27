@@ -25,8 +25,6 @@ type AccountUnsuspendedParams struct {
 	ReleasedAt   time.Time `json:"released_at"`
 }
 
-// 只有無店的帳號能被停權（accountsuspension 的 requireNoStore），所以受眾是 BUYER。同 transaction 會刪 token（A8-3），
-// 渠道是收件匣與 email，沒有推播。受限登入仍可讀收件匣。沒有深連結（沒有可去的畫面）。
 var (
 	exampleSuspensionID = uuid.MustParse("0190a000-0000-7000-8000-000000000001")
 	exampleAt           = time.Date(2026, 11, 23, 4, 30, 0, 0, time.UTC)

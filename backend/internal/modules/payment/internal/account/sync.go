@@ -37,7 +37,6 @@ func (s *Service) Sync(ctx context.Context, storeID int64) (again bool, err erro
 	return s.syncRow(ctx, row)
 }
 
-// syncRow 是 Sync 的本體，row 是呼叫方剛讀到的帳戶列（只用它的外部 ID 與 provider，寫入在 transaction 內重新鎖列）。
 func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again bool, err error) {
 	p := s.d.Provider
 	if row.ExternalAccountID == nil || row.CreateCompletedAt == nil || row.Provider != p.Name() || row.PurgePendingAt != nil {
@@ -85,7 +84,6 @@ func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again 
 			Requirements: raw, RequirementsDeadline: snap.RequirementsDeadline, StatusReason: reason, FetchedAt: &startedAt, Now: now,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 較晚開始的讀取已經寫入：這次的快照較舊，不寫、不發布、不標記；只唯讀地回答還有沒有未處理的事件。
 			again, err = s.d.Inbox.RoutePending(ctx, before.Provider, external)
 			return err
 		} else if err != nil {
@@ -111,12 +109,8 @@ func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again 
 // （fetched_at，讀取開始時間）距現在不到這麼久，就不向 provider 讀（回答依 busyRetryAfter）。
 const ReadDebounce = 10 * time.Second
 
-// staleBefore 是搶名額的門檻：seller_read_claimed_at 與 fetched_at 不晚於它才搶得到（剛好滿 ReadDebounce 搶得到）。
 func staleBefore(now time.Time) time.Time { return now.Add(-ReadDebounce) }
 
-// busyRetryAfter 決定搶不到名額時的回答：回 0 是成功（快取已經涵蓋這個名額：fetched_at 不早於 seller_read_claimed_at，即占名額的那次讀取已寫入，
-// 或名額是別的同步寫入的），回大於 0 是 resource_exhausted 的重試等待（占名額的讀取失敗或還在進行中，快取沒有涵蓋它）：窗的剩餘時間，至少一秒。
-// 兩個時間都是列上的值，now 是注入的時鐘。
 func busyRetryAfter(claimedAt, fetchedAt *time.Time, now time.Time) time.Duration {
 	if claimedAt == nil || (fetchedAt != nil && !fetchedAt.Before(*claimedAt)) {
 		return 0
@@ -124,7 +118,6 @@ func busyRetryAfter(claimedAt, fetchedAt *time.Time, now time.Time) time.Duratio
 	return max(claimedAt.Add(ReadDebounce).Sub(now), time.Second)
 }
 
-// busyOutcome 把 busyRetryAfter 轉成回給呼叫方的結果：成功是 nil，否則是帶重試等待（傳輸層放進 RetryInfo）的 ResourceExhausted。
 func busyOutcome(claimedAt, fetchedAt *time.Time, now time.Time) error {
 	if wait := busyRetryAfter(claimedAt, fetchedAt, now); wait > 0 {
 		return apperr.ResourceExhausted(wait, "收款帳戶正在重新整理，請稍後再試")
@@ -294,7 +287,6 @@ func (s *Service) CreateOnboardingSession(ctx context.Context, storeID int64, re
 	return s.openSession(ctx, row, returnURL, refreshURL, runtimes)
 }
 
-// openSession 檢查帳戶列的前置條件，再依 ChooseSession 的結果向 provider 要 session；與讀列分開，讓決定與 provider 呼叫可以不經資料庫測試。
 func (s *Service) openSession(ctx context.Context, row store.PaymentAccount, returnURL, refreshURL string, runtimes []model.EmbeddedRuntime) (model.OnboardingSession, error) {
 	acct, err := sessionTarget(row, s.d.Provider.Name())
 	if err != nil {
@@ -318,7 +310,6 @@ func (s *Service) openSession(ctx context.Context, row store.PaymentAccount, ret
 	return session, nil
 }
 
-// sessionMatchesKind 回報 provider 回來的 session 形狀是否與要求的 Kind 一致（port 的約定）；不一致時不能把內容交給呼叫端。
 func sessionMatchesKind(session model.OnboardingSession, kind SessionKind) bool {
 	switch session.(type) {
 	case model.HostedSession:
@@ -329,7 +320,6 @@ func sessionMatchesKind(session model.OnboardingSession, kind SessionKind) bool 
 	return false
 }
 
-// sessionTarget 檢查帳戶列可以開通 session 的前置條件（沒有在關閉、已有同 provider 的外部帳戶、沒有被停用）。
 func sessionTarget(row store.PaymentAccount, providerName string) (model.PaymentAccount, error) {
 	if row.PurgePendingAt != nil {
 		return model.PaymentAccount{}, apperr.FailedPrecondition("收款帳戶正在關閉")

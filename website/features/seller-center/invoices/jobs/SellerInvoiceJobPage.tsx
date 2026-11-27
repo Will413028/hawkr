@@ -74,9 +74,6 @@ export function SellerInvoiceJobPage({ jobId }: { jobId: string }) {
 	const { isSuspended } = useSellerIdentity();
 	const { job, loading, error, refresh } = useSellerInvoiceJob(jobId);
 
-	// backend#3066 裁決 B：收據與發票在賣家中心是兩個並列的東西，文案各自為政。
-	// 🔴 判準來自後端的 documentKind，不從 operationType 推導（那個 enum 沒有 RECEIPT）。
-	// job 尚未載入時 noun 退回「發票」——見 receiptFraming.ts 對這個預設的說明。
 	const noun = docNoun(job?.documentKind);
 
 	return (
@@ -106,9 +103,6 @@ export function SellerInvoiceJobPage({ jobId }: { jobId: string }) {
 			) : loading ? (
 				<JobSkeleton />
 			) : error || !job ? (
-				// 端點 33 對「越權」與「真的不存在」回同一個 404＋9340（Tier A）⇒
-				// 文案必須完全相同，**不得寫「你沒有權限查看」**，那會讓這一頁變成一個
-				// 可枚舉的 oracle。503 也走這一支，所以重試鍵恆在（而不是把整頁畫成停用）。
 				<section
 					role="alert"
 					className="seller-card flex flex-col items-center gap-[var(--hkui-space-3)] p-6 text-center"
@@ -155,11 +149,8 @@ function JobSkeleton() {
 }
 
 function JobBody({ job }: { job: InvoiceJobInfo }) {
-	// 這裡 job 一定已載入 ⇒ documentKind 是真值，不是 fallback（#3066 裁決 B）。
 	const noun = docNoun(job.documentKind);
 	const display = invoiceOperationDisplay(job.status);
-	// 「為什麼卡住」。後端一直有給 manualReasonCode，而畫面層在 2026-09-05 之前
-	// 零消費者 —— 而通知文案逐字叫賣家「至賣家中心查看原因」。
 	const reason = manualReasonNotice(job.manualReasonCode);
 	const done = isInvoiceOperationDone(job.status);
 	const resolvedExternally = isInvoiceOperationResolvedExternally(job.status);
@@ -169,9 +160,7 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 
 	return (
 		<div className="flex flex-col gap-[var(--hkui-space-4)]">
-			{/* ② 摘要卡。`summary` 由後端保證「使用者可理解、不含 provider code」⇒
-			    原樣印出，不重寫、不加工。異常摘要本身**不用 role="alert"**——進頁時
-			    就存在的狀態不是即時事件，alert 會打斷螢幕閱讀器。 */}
+
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<div className="flex flex-wrap items-center justify-between gap-2">
 					<h2 className="m-0 text-base font-bold">{dash(job.summary)}</h2>
@@ -189,13 +178,7 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 						這筆由你自行開立並回報完成，平台不會再次開立。
 					</p>
 				) : null}
-				{/* 原因 ＋ 行動指引。**只在後端真的給了認得的碼時渲染**，認不得就整段不出現
-				    ——把 SELLER_TRACK_INSUFFICIENT 這種字丟給賣家比不說更糟。
-				    ⚠️ `!done` 是第二道防線：後端已在 MarkInvoiceDocumentIssued 清掉舊理由，
-				    但那條路只要漏一個清除者，這裡就會在「已開立」旁邊顯示上一次的失敗原因。
-				    兩層都要——單靠後端，漏掉的那天畫面會自相矛盾而沒有人會發現。
-				    字軌不足那一格的處置與其他失敗相反（重試無效、要去財政部配號），
-				    看不到它的賣家只會反覆按重試。 */}
+
 				{reason.label && !done ? (
 					<div className="m-0 rounded-hkui-md border border-warning-200 bg-warning-50 p-3">
 						<p className="m-0 text-sm font-bold text-warning-700">
@@ -208,8 +191,7 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 						) : null}
 					</div>
 				) : null}
-				{/* 恆在的 info 行。文案優先用後端給的固定字串，前端不自寫（fallback 只在
-				    後端漏給時用）。 */}
+
 				<p
 					role="status"
 					className="m-0 text-[0.8125rem] text-[var(--hkui-foreground-soft)]"
@@ -219,7 +201,7 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 				</p>
 			</section>
 
-			{/* ③ 訂單快照 */}
+
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<h2 className="m-0 text-sm font-bold">訂單資訊</h2>
 				<dl className="seller-order-detail__info">
@@ -247,13 +229,13 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 
 			<RetryProgressCard job={job} />
 
-			{/* ⑤a 只有 RESOLVED_EXTERNALLY 才有值（三欄皆 omitempty）。 */}
+
 			{resolvedExternally ? <ReportedCard job={job} /> : null}
 
-			{/* ⑤ 回報動作。判準是 `canReportExternal`，不是 status——見檔頭。 */}
+
 			{job.canReportExternal ? <ReportExternalCard job={job} /> : null}
 
-			{/* ⑥ 技術細節：原生 <details>，預設收合（不加 `open`）。 */}
+
 			{job.providerRequestId ? (
 				<section className="seller-card p-[var(--hkui-space-4)]">
 					<details className="text-sm">
@@ -274,8 +256,7 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 				</section>
 			) : null}
 
-			{/* ⑦ footer：次要 CTA。`supportContactUrl` 不在 DTO 上（gateway 的
-			    `InvoiceJobInfo` 21 欄逐欄查過），所以恆走既有客服入口。已回報。 */}
+
 			<footer className="flex flex-wrap items-center gap-[var(--hkui-space-3)]">
 				<Link href={SUPPORT_FALLBACK_HREF} className="text-sm underline">
 					聯繫客服
@@ -329,10 +310,6 @@ function RetryProgressCard({ job }: { job: InvoiceJobInfo }) {
 	const policy = job.retryPolicy;
 	const hasPolicy =
 		policy.initialIntervalSeconds !== "" && policy.maxAttempts !== "";
-	// 🔴 這件作業還會不會被系統自己再送一次。false ⇒ **不要畫「下一次重試」
-	// 與政策說明句**：那兩個對已經停下來的作業一定是假的，而賣家會照著它等
-	// 一個永遠不會到的時間（backend #3089 第 14 項，dev 實測 NOT_APPLICABLE
-	// 的作業仍顯示「系統會自動重試…最多 13 次」＋一個「下一次重試」時間）。
 	const stillAutoRetrying = AUTO_RETRYING_STATUSES.has(job.status);
 
 	return (
@@ -340,10 +317,7 @@ function RetryProgressCard({ job }: { job: InvoiceJobInfo }) {
 			<h2 className="m-0 text-sm font-bold">系統重試進度</h2>
 			<dl className="seller-order-detail__info">
 				<div>
-					{/* 🔴 「已重試」不是「已嘗試」（backend #3089 第 12 項）：
-					    attempt_count 由 pkg/outbox 的 bumpAttempt 維護，而那支**只在
-					    失敗時**被呼叫 ⇒ 它的語意是「已失敗次數」，0 ＝ 從未失敗。
-					    寫「已嘗試 0 次」會讓一張**成功開出來**的發票看起來從沒送過。 */}
+
 					<dt>已重試</dt>
 					<dd>{`${dash(job.attemptCount)} / ${dash(job.maxAttempts)} 次`}</dd>
 				</div>
@@ -394,7 +368,6 @@ function ReportExternalCard({ job }: { job: InvoiceJobInfo }) {
 			expectedVersion: job.version,
 		});
 
-	// 成功即關閉。重讀後 `canReportExternal` 會變 false，整張卡跟著不見。
 	React.useEffect(() => {
 		if (succeeded) setOpen(false);
 	}, [succeeded]);

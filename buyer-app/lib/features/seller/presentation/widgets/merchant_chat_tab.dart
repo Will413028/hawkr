@@ -39,9 +39,6 @@ import '../../../../shared/widgets/login_to_comment_prompt.dart';
 import 'merchant_layout.dart';
 import '../../../../shared/time/taipei_display.dart';
 
-// ---------------------------------------------------------------------------
-// 資料模型
-// ---------------------------------------------------------------------------
 
 /// 討論區項目節點（支援樹狀回覆結構）。包著生成的 [pb.ForumEntry]：能不能編輯、刪除、回覆只讀它的
 /// `viewer_can_*`。[replies] 在懶加載回覆時更新。
@@ -71,9 +68,6 @@ class _CommentNode {
       entry.state != pb.CommentState.COMMENT_STATE_VISIBLE;
 }
 
-// ---------------------------------------------------------------------------
-// MerchantChatTab
-// ---------------------------------------------------------------------------
 
 /// 商家頁「留言」Tab。
 ///
@@ -123,7 +117,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     super.dispose();
   }
 
-  // ── 資料載入 ──────────────────────────────────────────────────────────────
 
   Future<void> _reload() async {
     final ok = await _notifier.reload();
@@ -132,11 +125,9 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     }
   }
 
-  // ── 互動操作 ──────────────────────────────────────────────────────────────
 
   void _reportFailure(Object? error, String message) {
     if (!mounted) return;
-    // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
     if (error != null && isAccountSuspendedError(error)) return;
     showCommonSnackBar(context, message);
   }
@@ -272,7 +263,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     }
   }
 
-  // ── 解析工具 ──────────────────────────────────────────────────────────────
 
   ThreadTree<pb.ForumEntry>? _nodesTree;
   List<_CommentNode> _nodesCache = const [];
@@ -324,7 +314,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -483,16 +472,13 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     final nonLastReplies = node.replies.sublist(0, node.replies.length - 1);
     final lastReply = node.replies.last;
 
-    // 用 Stack + Positioned 畫垂直連線，避免 IntrinsicHeight 觸發 parentDataDirty
-    // (IntrinsicHeight 在 ListView/CustomScrollView 內會與 layout/semantics 衝突)。
     const double avatarSize = 32.0;
-    final double lineX = avatarSize / 2 - 0.5; // 線位於頭像中央
+    final double lineX = avatarSize / 2 - 0.5;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Stack(
           children: [
-            // 外層垂直線（從父頭像底部延伸到 Stack 底）
             Positioned(
               left: lineX,
               top: avatarSize,
@@ -571,7 +557,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     ),
   );
 
-  // ── 輸入欄 ────────────────────────────────────────────────────────────────
 
   Widget _buildInputBar(ForumState forum) {
     final submitting = forum.submitting;
@@ -592,7 +577,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     final cancelMode = isEditing ? _cancelEdit : () => _setReplyTarget(null);
 
     final spec = MerchantLayoutSpec.of(context);
-    // 新增頂層留言看 viewer_can_comment；回覆與編輯是另一種動作，進入該模式就要有輸入欄。
     if (!forum.viewerCanComment && _replyTarget == null && !isEditing) {
       if (isGuestSession(ref.watch(sessionProvider))) {
         return const LoginToCommentPrompt();
@@ -764,9 +748,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
   }
 }
 
-// ---------------------------------------------------------------------------
-// _CommentCard — 單則留言卡片
-// ---------------------------------------------------------------------------
 
 /// 單則留言的展示卡片。
 ///
@@ -854,7 +835,6 @@ class _CommentCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 用戶名稱 + 時間 + ⋯ 按鈕
             Row(
               children: [
                 Expanded(
@@ -914,7 +894,6 @@ class _CommentCard extends ConsumerWidget {
               ],
             ),
             SizedBox(height: 4.h),
-            // 回覆對象（若有）
             if (node.replyToUserName.isNotEmpty)
               Padding(
                 padding: EdgeInsets.only(bottom: 4.h),
@@ -939,7 +918,6 @@ class _CommentCard extends ConsumerWidget {
                   ),
                 ),
               ),
-            // 留言內文
             Text(
               node.entry.state.placeholder(ref.watch(uiLocaleProvider)) ??
                   node.content,
@@ -948,7 +926,6 @@ class _CommentCard extends ConsumerWidget {
                   : AppTypography.body,
             ),
             SizedBox(height: 8.h),
-            // 操作列：回覆只看伺服器的 viewer_can_reply；討論區沒有按讚。
             if (!node.isPlaceholder && node.entry.viewerCanReply)
               Row(
                 children: [
@@ -983,9 +960,6 @@ class _CommentCard extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// _ActionMenuContent — 編輯/刪除彈出選單內容
-// ---------------------------------------------------------------------------
 
 /// 留言的編輯 / 刪除操作選單內容區域。
 ///
@@ -1073,9 +1047,6 @@ class _ActionMenuContent extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// _ReplyLinePainter — 回覆引導線繪製
-// ---------------------------------------------------------------------------
 
 /// 繪製留言回覆的弧形引導線。
 ///

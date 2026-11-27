@@ -1,19 +1,4 @@
 # shellcheck shell=bash
-# maven-pl: coupon-service
-#
-# scripts/characterize.sh coupon 會 source 這個檔，在起 gateway 之前呼叫 legacy_start 起舊的 Java coupon-service。
-# 可以用的函式與變數見 scripts/characterize.sh 的說明。coupon-service 刪除時連同這個檔一起刪除。
-# 上面的 maven-pl 行是 CI（backend-characterization.yml）建 jar 用的 Maven 模組名。
-#
-# 先建好 jar（CI 與本機都一樣）：
-#   (cd services/java && ./mvnw package -B -q -pl :coupon-service -am -DskipTests)
-#
-# coupon-service 呼叫 account、buyer、seller 的 gRPC 時連單體的 legacy listener（127.0.0.1:${LEGACY_PORT}）；order-service
-# 不起（連不上時 MEMBER 型的買家資格降級為空，BD28）。Flyway 在啟動時套用 migration。RabbitMQ 與 Redis 用 infra 的那一組
-# （docker-compose-infra.yml）。兩個排程（自動釋放、自動過期）關掉：情境不該被背景的狀態轉換影響。
-#
-# 身分：BUYER_TOKEN 與 BUYER2_TOKEN 是 characterize.sh 傳給測試的變數，這裡改簽成種子帳號 2001、2002 的 token；賣家與買家要有種子的店家與帳號，套用 infra/seed-data/01-account.sql（帳號 9、4 是賣家，店家 1009、1004；2001、2002
-# 是買家）再跑 hawkr dev-seed，token 以 hawkr dev-token -account <帳號 ID> 簽。
 
 JAVA_HTTP_PORT=19951
 JAVA_GRPC_PORT=19952

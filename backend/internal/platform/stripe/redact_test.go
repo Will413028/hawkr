@@ -36,7 +36,6 @@ func mustContain(t *testing.T, logs string, values ...string) {
 	}
 }
 
-// 經 recorder 打一次 httptest 伺服器，回傳記錄。
 func roundTrip(t *testing.T, method, path, contentType, body string, respStatus int, respBody string) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +101,6 @@ func TestPatternsRedactValuesUnderInnocuousKeys(t *testing.T) {
 	})
 }
 
-// 測試自己持有的名稱清單：不從 production 的表讀，否則拿掉表裡一個名稱時對應的子測試也跟著消失，測試不會變紅。
 var expectedDeniedNames = []string{
 	"authorization", "secret", "secret_key", "api_key", "token", "password", "url",
 	"card", "number", "cvc", "cvv", "exp_month", "exp_year", "last4", "bank_account", "iban", "account_number", "routing_number",

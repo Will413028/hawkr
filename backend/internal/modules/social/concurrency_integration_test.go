@@ -17,9 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// racer 讓測試在「一個 transaction 持有尚未提交的改動」的時候，確定地讓另一個操作撞上它：hold 在自己的 transaction 內做完第一步，
-// Start 啟動 op，Settled 等 op 完成或卡在鎖上（以 pg_stat_activity 看到有人在等 Lock），hold 再做第二步或直接結束（提交）。
-// 沒有睡眠猜時機：修正有效時 op 卡在鎖上，沒有修正時 op 不等任何東西、直接完成，兩種情形測試都確定地走到下一步。
 type racer struct {
 	t      *testing.T
 	f      *fixture
@@ -66,7 +63,6 @@ func (r *racer) Settled() {
 	r.t.Fatal("op 既沒有完成也沒有卡在鎖上")
 }
 
-// race 在一個 transaction 內執行 hold，op 由 hold 內的 Start 啟動；回傳 hold 與 op 的錯誤（hold 結束提交之後才等 op）。
 func (f *fixture) race(t *testing.T, op func() error, hold func(ctx context.Context, r *racer) error) (holdErr, opErr error) {
 	t.Helper()
 	r := &racer{t: t, f: f, op: op}
@@ -225,7 +221,6 @@ func TestBuyerWritesSerializeWithDeletionRequest(t *testing.T) {
 					r.Start()
 					r.Settled()
 					if r.Finished() {
-						// 申請已經提交，清除 job 在寫入提交之前就跑了。
 						purged = true
 						return f.module.PurgeBuyerContent(context.Background(), b.BuyerID)
 					}
@@ -416,7 +411,6 @@ func TestReplyToStaysInTheThread(t *testing.T) {
 			t.Fatalf("同一串可以：%+v %v", got, err)
 		}
 	}
-	// 回覆的 parent 傳另一則回覆時壓成頂層，reply_to 以壓平後的串為準。
 	if _, err := f.module.CreateComment(ctx, st, social.CommentInput{PostID: p.ID, Body: "x", ParentID: &a1.ID, ReplyToID: &b1.ID}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("parent 壓平之後 reply_to 仍在另一串：%v", err)
 	}
@@ -561,7 +555,6 @@ func TestEditLocksTheBuyerBeforeTheContentRow(t *testing.T) {
 					t.Error("編輯沒有被買家列的排他鎖擋住")
 					return nil
 				}
-				// 另一條連線（不在 hold 的 transaction 內）嘗試鎖內容列。
 				if err := f.db.InTx(context.Background(), func(ctx context.Context) error {
 					_, err := f.db.Conn(ctx).Exec(ctx, "SELECT 1 FROM "+contentTable+" WHERE id = $1 FOR UPDATE NOWAIT", id)
 					return err
@@ -571,7 +564,6 @@ func TestEditLocksTheBuyerBeforeTheContentRow(t *testing.T) {
 				return nil
 			})
 			must(t, holdErr)
-			// 排他鎖提交後買家仍是 ACTIVE（沒有真的申請刪除），編輯完成。
 			must(t, opErr)
 		})
 	}

@@ -42,7 +42,6 @@ type ReportingEnqueuer interface {
 // 由 reconciler 把 run 標失敗（A9-D22）。它必須不小於採購 run job 的 Timeout，否則正在跑的 run 會被丟棄（procurement/internal/run 的測試守住）。
 const RescueStuckJobsAfter = 3 * time.Minute
 
-// softStopTimeout 是停止時等進行中 job 收尾的時間；超過就取消它們，之後依重試設定再跑。
 const softStopTimeout = 30 * time.Second
 
 // Client 排入 job；由 NewWorker 建立的 Client 也負責執行 job。

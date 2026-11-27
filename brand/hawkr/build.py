@@ -20,7 +20,6 @@ from fontTools.varLib.instancer import instantiateVariableFont
 OUT = os.path.dirname(os.path.abspath(__file__))
 VER, AMB, INK, LIGHT, WHITE = "#E4572E", "#F2A541", "#1F2933", "#F5F7FA", "#FFFFFF"
 
-# 圖形：遮雨棚（四個扇形、兩色條紋）加兩根柱子與檯面組成 H。座標以 120×120 為格。
 MARK = (
     '<defs><clipPath id="awning"><path d="M28 24 H92 L102 46 a10.5 10.5 0 0 1 -21 0 a10.5 10.5 0 0 1 -21 0 '
     'a10.5 10.5 0 0 1 -21 0 a10.5 10.5 0 0 1 -21 0 Z"/></clipPath></defs>'
@@ -30,7 +29,6 @@ MARK = (
     '<path d="M36 67 V101"/><path d="M84 67 V101"/><path d="M36 83 H84"/></g>'
 )
 
-# 小尺寸（16–48px）專用：不畫條紋，遮雨棚三個扇形，柱子加粗。座標以 32×32 為格。
 FAVICON = (
     f'<rect width="32" height="32" rx="7" fill="{VER}"/>'
     f'<path fill="{WHITE}" d="M8.5 5.5 H23.5 L27 12 a3.667 3.667 0 0 1 -7.333 0 a3.667 3.667 0 0 1 -7.333 0 '
@@ -73,7 +71,6 @@ def main(font_path):
     word = lambda ink: f'<path fill="{ink}" d="{d}"/>'
     pad = 20
     word_box = f"{x0 - pad:g} {y0 - pad:g} {x1 - x0 + 2 * pad:g} {y1 - y0 + 2 * pad:g}"
-    # 橫式組合：字標的底線對齊柱子底部（y=101），大寫高約為圖形 H 的高度。
     s, tx, ty = 0.112, 140, 101
     lock = lambda ink: f'<g>{mark(ink)}</g><g transform="translate({tx} {ty}) scale({s})">{word(ink)}</g>'
     lock_w = round(tx + x1 * s + 8)

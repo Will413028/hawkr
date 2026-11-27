@@ -43,12 +43,9 @@ const DISMISS_MS: Record<CartToastTone, number> = {
 	error: 6000,
 };
 
-// 15 個原始色收斂成 --page-cart-snackbar-* 一族（明暗兩套值逐字沿用原字面值）。
 const TONE_SURFACE_CLASS: Record<CartToastTone, string> = {
 	success:
 		"bg-[var(--page-cart-snackbar-success-bg)] text-[var(--page-cart-snackbar-success-fg)] shadow-[var(--page-cart-snackbar-success-shadow)] dark:border dark:border-[var(--page-cart-snackbar-success-border)]",
-	// Same pill geometry, warm-dark surface + danger rim: reads as "stop"
-	// at a glance without inventing a second toast component.
 	error:
 		"bg-[var(--page-cart-snackbar-error-bg)] text-[var(--page-cart-snackbar-error-fg)] border border-[var(--page-cart-snackbar-error-border)] shadow-[var(--page-cart-snackbar-error-shadow)]",
 };
@@ -91,8 +88,6 @@ const SNACKBAR_POSITION_CLASS =
 export default function CartSnackbar() {
 	const [toast, setToast] = React.useState<ToastState | null>(null);
 	const timerRef = React.useRef<number | null>(null);
-	// Monotonic counter, not Date.now(): two toasts fired inside the same
-	// millisecond shared a key and the second skipped its entry animation.
 	const keySeqRef = React.useRef(0);
 
 	const dismiss = React.useCallback(() => {
@@ -114,8 +109,6 @@ export default function CartSnackbar() {
 				message: detail.message || DEFAULT_MESSAGE,
 				tone,
 				actionLabel: detail.actionLabel || DEFAULT_ACTION_LABEL,
-				// `null` → no CTA; `undefined` → the default cart link, but only on
-				// success. A refusal added nothing, so its default is no CTA.
 				actionHref:
 					detail.actionHref === null
 						? null
@@ -136,8 +129,6 @@ export default function CartSnackbar() {
 		};
 	}, []);
 
-	// Escape closes it. The only other exits were a 32px button and waiting
-	// out 3.5s / 6s.
 	React.useEffect(() => {
 		if (!toast) return;
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -152,22 +143,12 @@ export default function CartSnackbar() {
 			className={SNACKBAR_POSITION_CLASS}
 			data-state={toast ? "open" : "closed"}
 			data-tone={toast?.tone ?? "success"}
-			// A refusal must interrupt: it means the action the buyer just took did
-			// not happen. `polite` would queue it behind whatever else is speaking.
 			role={toast?.tone === "error" ? "alert" : "status"}
 			aria-live={toast?.tone === "error" ? "assertive" : "polite"}
 		>
 			{toast ? (
 				<div
 					key={toast.key}
-					// `min-w-0` is what keeps the pill inside the viewport. As a flex
-					// item it defaults to `min-width: auto`, i.e. its own min-content
-					// width — and because the message runs `whitespace-nowrap`, that
-					// min-content is the *entire* untruncated string. The pill then
-					// refuses to shrink to its `left-4 right-4` track and the CTA is
-					// pushed off-screen (mobile), or it spills symmetrically past both
-					// edges once the message outgrows `max-w-[calc(100vw-32px)]`
-					// (desktop). Same defect, both breakpoints.
 					className={`pointer-events-auto inline-flex min-w-0 items-center gap-[14px] py-3 pr-3.5 pl-[18px] min-h-[52px] rounded-full font-sans text-[0.9375rem] font-semibold tracking-[0.2px] animate-cart-snackbar-in group-data-[state=closed]:animate-cart-snackbar-out motion-reduce:animate-none group-data-[state=closed]:motion-reduce:animate-none max-[840px]:flex-1 max-[840px]:justify-between max-[840px]:text-sm ${TONE_SURFACE_CLASS[toast.tone]}`}
 				>
 					<svg
@@ -192,11 +173,7 @@ export default function CartSnackbar() {
 							<polyline points="20 6 9 17 4 12" />
 						)}
 					</svg>
-					{/* `min-w-0 truncate` is unconditional: an overlong product name
-					    overflows at *every* width, so the ellipsis is the guard, not a
-					    mobile style. `flex-1` stays mobile-only — that is the phone's
-					    full-bleed layout choice (message eats the slack, CTA pinned
-					    right), whereas the desktop pill is shrink-to-fit. */}
+
 					<span className="min-w-0 truncate max-[840px]:flex-1">
 						{toast.message}
 					</span>
@@ -211,8 +188,6 @@ export default function CartSnackbar() {
 					) : null}
 					<button
 						type="button"
-						// size-11：觸控目標下限；14px 字符與圓形視覺不變（圓形背景只
-						// 在 hover 出現，原本就是 32px 的淡色圓，改為 44px 仍在 pill 內）。
 						className="inline-flex items-center justify-center size-11 p-0 border-0 bg-transparent text-[var(--page-cart-snackbar-close-fg)] rounded-full cursor-pointer transition-[background,color] duration-150 ease-out hover:bg-white/8 hover:text-[var(--page-cart-snackbar-close-hover-fg)] motion-reduce:transition-none"
 						onClick={dismiss}
 						aria-label="關閉提示"

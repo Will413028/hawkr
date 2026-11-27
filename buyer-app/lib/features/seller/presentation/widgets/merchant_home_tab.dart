@@ -95,11 +95,9 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     try {
       await ref.read(feed.future);
     } catch (_) {
-      // 重讀失敗保留舊清單。
     }
   }
 
-  // ── 互動操作 ──────────────────────────────────────────────────────────────
 
   Future<void> _openCommentSheet(int postId) async {
     if (!mounted) return;
@@ -117,7 +115,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     await ref.read(postEntityStoreProvider.notifier).refresh(postId);
   }
 
-  // ── 圖片 / 影片 URL 萃取工具 ─────────────────────────────────────────────
 
   /// 貼文封面圖的顯示值（已過 `_toAbsolute`）。
   String _pickImageUrl(Post post) => _toAbsolute(post.imageUrl);
@@ -158,7 +155,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     return '$origin/$s';
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -365,8 +361,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
                     child: SizedBox.expand(
                       child: Hero(
                         tag: 'post-image-$postId',
-                        // 飛行中用 destination 的 widget，避免 NetworkImage→cached
-                        // 兩種底層 widget 切換導致重新解碼 jank
                         flightShuttleBuilder: _postImageHeroShuttle,
                         child: tileChild,
                       ),
@@ -397,7 +391,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     ),
   );
 
-  // ── 長壓預覽卡 ────────────────────────────────────────────────────────────
 
   void _showPostPreviewAt(Offset globalPos, int postId) {
     SystemSound.play(SystemSoundType.click);
@@ -497,9 +490,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
   }
 }
 
-// ---------------------------------------------------------------------------
-// _PostPreviewCard — 長壓預覽卡（媒體 + 互動列）
-// ---------------------------------------------------------------------------
 
 /// 貼文長壓預覽卡。
 ///
@@ -662,12 +652,6 @@ class _PostPreviewCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// _StableNetImage — 預快取後才顯示的網路圖片，避免格子切換閃爍
-// ---------------------------------------------------------------------------
-// Hero flight shuttle — 飛行中用 destination 的 widget（避免兩端不同 image
-// widget 在飛行途中切換造成重新解碼 jank）。push 時 toHero=feed 詳細頁，pop
-// 時 toHero=grid tile，雙向都用「即將到達端」的 widget，視覺較順
 Widget _postImageHeroShuttle(
   BuildContext flightContext,
   Animation<double> animation,
@@ -737,9 +721,6 @@ class _StableNetImageState extends State<_StableNetImage> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// _DoubleTapLikeMedia — 雙擊愛心動畫
-// ---------------------------------------------------------------------------
 
 /// 雙擊媒體觸發愛心噴發動畫的包裝器。
 ///

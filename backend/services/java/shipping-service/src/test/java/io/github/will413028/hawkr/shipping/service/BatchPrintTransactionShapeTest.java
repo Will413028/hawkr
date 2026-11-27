@@ -70,7 +70,6 @@ class BatchPrintTransactionShapeTest {
 
         @Override
         public void rollback(TransactionStatus status) {
-            // 本測試不涉及 rollback
         }
     }
 
@@ -103,10 +102,6 @@ class BatchPrintTransactionShapeTest {
                 mock(CvsPrintWaitingRegistry.class),
                 mock(io.github.will413028.hawkr.common.providercall.ProviderCallExecutor.class),
                 txManager,
-                // 🔴 registry 必須拿到**同一個** labelService mock：批次列印已改走
-                //    LabelCapability.requestLabelBatch，adapter 委派的就是它。
-                //    傳另一個 mock 的話，下面的 doAnswer 永遠不會觸發，而測試會以
-                //    「PayUni 從未被呼叫」的形式失敗——那看起來像交易形狀壞了，其實是接線錯了。
                 io.github.will413028.hawkr.shipping.provider.TestFulfillmentProviders.realRegistry(
                         mock(ShippingClient.class), mock(ShipmentStatusMapper.class),
                         onboardingService, labelService),
@@ -168,11 +163,7 @@ class BatchPrintTransactionShapeTest {
         e.setShipTradeNo("T" + id);
         e.setMerId("HAWK" + storeId);
         e.setLabelPrintStatus(LabelPrintStatus.NONE.value());
-        // 🔴 真實的 shipments.status 是 NOT NULL；fixture 原本沒設，
-        //    而批次列印接上 canonical rule 之後，null status 會走 fail-closed 被跳過
-        //    ——那是對的產線行為（null ＝ 髒資料），錯的是 fixture 少了一欄。
         e.setStatus(ShippingStatus.UNPROCESSED.value());
-        // 配送方式是 adapter 分派的鍵：不設等於「查無 adapter」，而那是 fail-closed 的錯誤路徑
         e.setShippingMethod(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
         e.setGoodsType("1");
         e.setLgsType("B2C");

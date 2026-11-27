@@ -83,12 +83,9 @@ class CommentsBottomSheet extends HookConsumerWidget {
 
     final repliesByParentRef = useRef(<String, List<PostComment>>{});
     final repliesLoadingRef = useRef(<String>{});
-    // 讀取成功過的串；只有讀取成功才算載入，送出回覆不算（先前讀取失敗時，既有的回覆還要讀）。
     final repliesLoadedRef = useRef(<String>{});
-    // 讀取失敗的串：不在每次重繪時重讀，等下一次送出回覆或重新載入再試。
     final repliesFailedRef = useRef(<String>{});
 
-    // Listen to text changes for send button opacity
     useEffect(() {
       void listener() {
         hasText.value = ctrl.text.trim().isNotEmpty;
@@ -99,15 +96,12 @@ class CommentsBottomSheet extends HookConsumerWidget {
     }, [ctrl]);
 
     final commentCount = useRef(initialCommentCount);
-    // 校正的流水號：只有最後發出的校正算數，亂序回來的舊結果丟掉。
     final reconcileSeq = useRef(0);
     void adjustCommentCount(int delta) {
       commentCount.value = math.max(0, commentCount.value + delta);
       onCommentCountChanged?.call(commentCount.value);
     }
 
-    // 以伺服器的 comment_count 校正本地加減的漂移（別人的留言與刪除）。不擋畫面，失敗就維持本地值。
-    // 呼叫端的 onCommentCountChanged 不依賴 provider 存活（見呼叫端），這裡只用注入的 repository。
     Future<void> reconcileCommentCount() async {
       final seq = ++reconcileSeq.value;
       try {
@@ -118,7 +112,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
       } on Exception catch (_) {}
     }
 
-    // 回覆讀取的世代：load() 重設時加一，重設之前發出的讀取回來後不寫任何狀態。
     final replyGeneration = useRef(0);
 
     void scheduleScrollToBottom({bool animated = true}) {
@@ -409,7 +402,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
           child: Column(
             children: [
-              // ── Drag handle + close ──
               SizedBox(
                 height: 56,
                 child: Stack(
@@ -446,7 +438,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
                 ),
               ),
 
-              // ── Comments list ──
               if (notice != null)
                 Padding(
                   key: const ValueKey('comments-sheet-notice'),
@@ -480,7 +471,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                 final c = comments.value[i];
                                 final id = c.id;
 
-                                // Lazy-load replies
                                 if (c.replyCount > 0 &&
                                     !repliesLoadedRef.value.contains(id) &&
                                     !repliesFailedRef.value.contains(id) &&
@@ -534,7 +524,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
 
                                 return Column(
                                   children: [
-                                    // Top-level comment
                                     if (c.placeholderTextFor(
                                           ref.watch(uiLocaleProvider),
                                         )
@@ -586,7 +575,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                           ],
                                         ),
                                       ),
-                                    // Replies (indented)
                                     ...replies.map(
                                       (r) => _ReplyTile(
                                         reply: r,
@@ -602,7 +590,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                         onLike: () => toggleLike(r),
                                       ),
                                     ),
-                                    // Divider after each comment group
                                     if (i < comments.value.length - 1)
                                       Divider(
                                         height: 1,
@@ -617,7 +604,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
                             )),
               ),
 
-              // ── Input bar ──
               if (canComment)
                 SafeArea(
                   top: false,
@@ -664,11 +650,8 @@ class CommentsBottomSheet extends HookConsumerWidget {
                           ],
                           Row(
                             children: [
-                              // Text field — pill shape
                               Expanded(
                                 child: Container(
-                                  // The decorated border consumes 1dp on each edge.
-                                  // Keep the editable semantics node itself at 48dp.
                                   height: 50,
                                   decoration: BoxDecoration(
                                     color: AppColors.bgCard,
@@ -716,7 +699,6 @@ class CommentsBottomSheet extends HookConsumerWidget {
                                 ),
                               ),
                               SizedBox(width: 12.w),
-                              // Send button
                               HkFrostedIconButton(
                                 key: const ValueKey('send-comment-action'),
                                 label: '送出留言',
@@ -832,7 +814,6 @@ class _CommentTile extends StatelessWidget {
                 ],
               ),
             ),
-            // Heart + count — outline when not liked, filled when liked
             HkTapTarget(
               key: ValueKey('comment-like-${comment.id}'),
               semanticLabel: isLiked
@@ -905,7 +886,6 @@ class _ReplyTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Left indent (42px) + avatar + content
             SizedBox(width: 42.w),
             Padding(
               padding: EdgeInsets.only(top: 4.h),
@@ -935,7 +915,6 @@ class _ReplyTile extends StatelessWidget {
                 ],
               ),
             ),
-            // Heart + count
             HkTapTarget(
               key: ValueKey('reply-like-${reply.id}'),
               semanticLabel: isLiked

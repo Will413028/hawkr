@@ -26,7 +26,6 @@ func (f *chargeFixture) auditCount(t *testing.T) int64 {
 	return f.count(t, "SELECT count(*) FROM adminaudit.records")
 }
 
-// unreachedTransfer 建立一筆轉帳並讓第一次呼叫沒有到達 provider（結果不明，provider 那邊沒有）。
 func (f *chargeFixture) unreachedTransfer(t *testing.T, orderNo string) PaymentTransfer {
 	t.Helper()
 	f.paidPayment(t, orderNo, 100)
@@ -38,7 +37,6 @@ func (f *chargeFixture) unreachedTransfer(t *testing.T, orderNo string) PaymentT
 	return tr
 }
 
-// lostTransfer 建立一筆轉帳並讓第一次呼叫「已建立、回應遺失」（結果不明，provider 那邊有一筆）。
 func (f *chargeFixture) lostTransfer(t *testing.T, orderNo string) PaymentTransfer {
 	t.Helper()
 	f.paidPayment(t, orderNo, 100)
@@ -125,7 +123,6 @@ func TestRepeatedLookupFailuresPutTheTransferInAnomalyWhichHoldsTheUniqueSlot(t 
 	if f.transferText(t, "lookup_failures", tr.ID) != "2" {
 		t.Fatalf("失敗次數=%s", f.transferText(t, "lookup_failures", tr.ID))
 	}
-	// 一次成功的查回（查無、還沒滿等待）清零。
 	if err := f.runTransfer(tr.ID, false); err == nil || f.transferText(t, "lookup_failures", tr.ID) != "0" {
 		t.Fatalf("成功查回之後：%v，失敗次數 %s", err, f.transferText(t, "lookup_failures", tr.ID))
 	}
@@ -179,7 +176,6 @@ func TestAMismatchedProviderTransferIsAnAnomalyNotASuccess(t *testing.T) {
 	if len(f.anomalies) != 1 || !strings.Contains(f.anomalies[0].Reason, f.fake.TransferIDs()[0]) || !strings.Contains(f.logs.String(), f.fake.TransferIDs()[0]) {
 		t.Fatalf("外部 ID 應只進事件與 log：%+v", f.anomalies)
 	}
-	// 建立的回應不符：provider 回的金額是錯的。
 	f2 := setupCharge(t)
 	f2.enableAccount(t, 7, "acct_seller_7", true)
 	f2.paidPayment(t, "C-4b", 100)
@@ -256,7 +252,6 @@ func TestResolvingATransferAnomalyWritesTheAuditInTheSameTransaction(t *testing.
 	if !strings.Contains(detail, ids[0]) || !strings.Contains(detail, "lookup_failed") || f.text(t, "SELECT target_type FROM adminaudit.records WHERE target_id = $1", a.ID.String()) != "payment_transfer" {
 		t.Fatalf("稽核內容=%s", detail)
 	}
-	// 證據指到別的轉帳的 provider ID：核對 b 的嘗試 ID 查不到它，結案被擋下，列與稽核都不動。
 	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, b.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ids[0]); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("證據指到別的轉帳：%v", err)
 	}
@@ -332,7 +327,6 @@ func TestAReversalConvergesByLookupAndAnAnomalousRefundStillHoldsItsQuota(t *tes
 		t.Fatalf("超過舊期限的重試：%s", f.refundText(t, "reversal_status", refusal))
 	}
 
-	// 查回連續失敗：撤回進 ANOMALY；它的 10 仍佔額度。
 	stuckPayment := f.paidPayment(t, "C-7b", 100)
 	stuckTransfer := f.requestTransfer(t, "C-7b")
 	must(t, f.runTransfer(stuckTransfer.ID, false))
@@ -483,7 +477,6 @@ func TestACreateAnomalyHoldsTheOrderAndIsResolvedByAnAdmin(t *testing.T) {
 		t.Fatalf("失敗結案：%s", f.statusOf(t, "C-12"))
 	}
 
-	// 查回找到的金額不符。
 	f.order("C-13", 11, 7, 100)
 	f.fake.FailCreateAfterCreate(errLost)
 	q := f.create(t, 11, "C-13")
@@ -493,7 +486,6 @@ func TestACreateAnomalyHoldsTheOrderAndIsResolvedByAnAdmin(t *testing.T) {
 	if f.statusOf(t, "C-13") != PaymentAnomaly || !strings.HasPrefix(f.text(t, "SELECT failure_reason FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'C-13')"), "reply_mismatch") || f.externalOf(t, "C-13") != "" {
 		t.Fatalf("金額不符：%s", f.statusOf(t, "C-13"))
 	}
-	// 結案成成功：連上證據指的 PaymentIntent（provider 那邊確實有），排同步，重讀後是真實狀態。
 	evidence := f.fake.IntentFor("C-13")[0]
 	must(t, f.fake.SetAmount(evidence, 100))
 	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, q.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", evidence))

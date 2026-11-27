@@ -89,7 +89,6 @@ public final class GrpcAuthContext {
         skipAccountTypeCheck = skip;
     }
 
-    // ==================== 內部呼叫判別 ====================
 
     /**
      * 當前請求是否為內部微服務呼叫
@@ -102,7 +101,6 @@ public final class GrpcAuthContext {
         return Boolean.TRUE.equals(INTERNAL_CALL.get());
     }
 
-    // ==================== 取值方法（nullable） ====================
 
     /**
      * 取得當前 gRPC 請求的呼叫端主體 ID（nullable）。
@@ -150,7 +148,6 @@ public final class GrpcAuthContext {
         return AccountTypeRules.covers(current, type);
     }
 
-    // ==================== 授權斷言方法 ====================
 
     /**
      * 要求已登入（account_id 不為空）
@@ -165,7 +162,6 @@ public final class GrpcAuthContext {
     public static long requireAccountId() {
         Long accountId = getAccountId();
 
-        // 內部微服務呼叫：回傳已傳播的 accountId 或 0（不拋異常）
         if (isInternalCall()) {
             return accountId != null && accountId > 0 ? accountId : 0L;
         }
@@ -193,12 +189,10 @@ public final class GrpcAuthContext {
      * @throws StatusRuntimeException PERMISSION_DENIED 若角色不符
      */
     public static void requireAccountType(AccountType... allowed) {
-        // 內部微服務呼叫：直接跳過角色檢查
         if (isInternalCall()) {
             return;
         }
 
-        // 測試環境：跳過 account-type 檢查，但仍驗證 JWT
         if (skipAccountTypeCheck) {
             requireAccountId();
             return;
@@ -210,7 +204,6 @@ public final class GrpcAuthContext {
                     .withDescription("請先登入")
                     .asRuntimeException();
         }
-        // 涵蓋判斷：帳號類型涵蓋允許列表中的任一角色即通過
         for (AccountType required : allowed) {
             if (AccountTypeRules.covers(currentType, required)) {
                 return;
@@ -257,7 +250,6 @@ public final class GrpcAuthContext {
         DelegationContextValidator.validate(delegation, storeId, capability, requestIdempotencyKey);
     }
 
-    // ==================== Ownership 檢查 ====================
 
     /**
      * 驗證資源擁有權（呼叫端主體 ID 匹配）。

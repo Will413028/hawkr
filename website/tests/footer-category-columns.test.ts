@@ -44,8 +44,6 @@ test("dynamic columns reuse the mega menu href conventions", () => {
 		src,
 		/return `\/feed\?hashtag=\$\{encodeURIComponent\(tag\)\}`;/,
 	);
-	// Read on the server through the shared use cache layer, so the browser
-	// issues no request at all (tests/e2e/footer-columns-server-rendered.spec.ts).
 	assert.match(src, /getCachedCategoryTree/);
 	assert.match(src, /getCachedTrendingPostTags/);
 	assert.doesNotMatch(src, /"use client"/);
@@ -70,8 +68,6 @@ test("an empty or failed source falls back to one always-valid link", () => {
 	assert.match(src, /const items = links\.length > 0 \? links : \[fallback\];/);
 });
 
-// The loading skeleton is gone with the client fetch: the links are rendered on
-// the server, so there is no frame in which the columns are pending.
 test("no loading state remains in the columns", () => {
 	const src = columns();
 	assert.doesNotMatch(src, /SKELETON/);
@@ -104,13 +100,11 @@ test("columns collapse into native details/summary accordions on phones", () => 
 	);
 
 	const css = chrome();
-	// Phone-only accordion; above 560px the disclosure is inert.
 	assert.match(css, /FOOTER_SUMMARY =[\s\S]*?max-\[560px\]:min-h-11/);
 	assert.match(
 		css,
 		/FOOTER_COLUMN =[\s\S]*?min-\[561px\]:\[&::details-content\]/,
 	);
-	// Chevron comes from the shared icon registry and is reduced-motion safe.
 	assert.match(
 		css,
 		/FOOTER_SUMMARY_CHEVRON =[\s\S]*?motion-reduce:transition-none/,
@@ -121,9 +115,6 @@ test("columns collapse into native details/summary accordions on phones", () => 
 test("the footer and its data columns stay Server Components", () => {
 	assert.doesNotMatch(footer(), /"use client"/);
 	assert.doesNotMatch(columns(), /"use client"/);
-	// RoleAwareFooter is the client boundary that picks a footer, so the columns
-	// are rendered above it and passed down as an element. Rendering them inside
-	// it would force the reads back into the browser.
 	const layout = source("../components/shared/RootDocument.tsx");
 	assert.match(layout, /categoryColumns=\{<FooterCategoryColumns \/>\}/);
 });

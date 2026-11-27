@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// blockModule 是店家封鎖的模組 API（*seller.Module，A7-1b）。
 type blockModule interface {
 	BlockBuyer(ctx context.Context, storeID, buyerID int64) (bool, error)
 	UnblockBuyer(ctx context.Context, storeID, buyerID int64) (bool, error)
@@ -34,7 +33,6 @@ func (h *App) BlockBuyer(ctx context.Context, req *connect.Request[pb.BlockBuyer
 	if err != nil {
 		return nil, err
 	}
-	// 深度防禦：解析器只以店主身分讀，這裡仍確認內容屬於這家店；別家店的內容與讀不到同一個答案。
 	if author.StoreID != current.StoreID {
 		return nil, apperr.NotFound("找不到這則內容")
 	}

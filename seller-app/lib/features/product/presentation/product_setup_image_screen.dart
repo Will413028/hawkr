@@ -32,7 +32,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
     required this.subCategory,
     this.catalogId,
     this.isCandidateCategory = false,
-    // 完整分類資訊
     this.l1Id,
     this.l1Name,
     this.l2Id,
@@ -50,10 +49,9 @@ class ProductSetupImageScreen extends HookConsumerWidget {
   final String productName;
   final String category;
   final String subCategory;
-  final int? catalogId; // 分類 ID（可能是正式或暫時）
+  final int? catalogId;
   final bool
-  isCandidateCategory; // true=來自 category_candidate, false=來自 category
-  // 完整分類資訊
+  isCandidateCategory;
   final int? l1Id;
   final String? l1Name;
   final int? l2Id;
@@ -64,14 +62,13 @@ class ProductSetupImageScreen extends HookConsumerWidget {
   final List<Map<String, dynamic>>? descriptionBlocks;
   final List<String> descriptionStagedTokens;
   final bool isEditMode;
-  final Map<String, dynamic>? existingProduct; // 編輯模式時的現有商品資料
+  final Map<String, dynamic>? existingProduct;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final images = useState<List<Uint8List>>([]);
     final selectedIndex = useState(0);
     final isLoading = useState(false);
-    // 每張圖片的主色（用於 4:3 背景填充）
     final dominantColors = useState<Map<int, Color>>({});
 
     Future<Color> getDominantColor(Uint8List bytes) async {
@@ -95,24 +92,20 @@ class ProductSetupImageScreen extends HookConsumerWidget {
       dominantColors.value = {...dominantColors.value, index: color};
     }
 
-    // 將原始圖片渲染為 4:3 + 主色背景的合成圖
     Future<Uint8List> renderImage43(Uint8List bytes, Color bgColor) async {
       const int outWidth = 1200;
-      const int outHeight = 900; // 4:3
+      const int outHeight = 900;
 
-      // 解碼原始圖片
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       final srcImage = frame.image;
 
-      // 建立 4:3 畫布
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(
         recorder,
         Rect.fromLTWH(0, 0, outWidth.toDouble(), outHeight.toDouble()),
       );
 
-      // 填滿主色背景（模擬 alpha 0.45 疊在 page 背景上）
       final baseBg = AppColors.bgPrimary;
       final blended = Color.lerp(baseBg, bgColor, 0.45) ?? bgColor;
       canvas.drawRect(
@@ -120,7 +113,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
         Paint()..color = blended,
       );
 
-      // 計算 BoxFit.contain 位置
       final double srcW = srcImage.width.toDouble();
       final double srcH = srcImage.height.toDouble();
       final double scale = (outWidth / srcW)
@@ -155,7 +147,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
       );
       debugPrint('[ProductSetupImage] skuId=$skuId');
 
-      // 優先用已載入的 _loadedImages（來自商品卡片）
       final preloadedUrls =
           (existingProduct?['_loadedImages'] as List?)
               ?.whereType<String>()
@@ -200,7 +191,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
           '[ProductSetupImage] downloading ${urls.length} images in parallel...',
         );
 
-        // 平行下載所有圖片（保留原始順序）— Future.wait 比 for-await 快 N 倍
         final results = await Future.wait(
           urls.map((url) async {
             try {
@@ -272,14 +262,12 @@ class ProductSetupImageScreen extends HookConsumerWidget {
 
       if (!context.mounted || result == null) return;
 
-      // 多選模式：接收 List<Uint8List>
       final pickedImages = result['images'] as List<Uint8List>?;
       if (pickedImages != null && pickedImages.isNotEmpty) {
         final remaining = 10 - images.value.length;
         final toAdd = pickedImages.take(remaining).toList();
         images.value = [...images.value, ...toAdd];
         selectedIndex.value = images.value.length - 1;
-        // 清除主色快取（新圖片需要重新取色）
         dominantColors.value = {};
         if (pickedImages.length > remaining) {
           FloatingToast.show(context, '最多只能上傳 10 張，已新增 $remaining 張');
@@ -412,7 +400,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
         return;
       }
 
-      // 渲染所有圖片為 4:3 + 主色背景的合成圖
       FloatingToast.show(context, '圖片處理中...');
       final List<Uint8List> renderedImages = [];
       for (int i = 0; i < images.value.length; i++) {
@@ -494,7 +481,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
       final bgColor = dominantColors.value[idx] ?? AppColors.bgPrimary;
       final blended = Color.lerp(AppColors.bgPrimary, bgColor, 0.45) ?? bgColor;
 
-      // 載入選中圖片的主色
       updateDominantColor(idx);
 
       return AspectRatio(
@@ -506,14 +492,12 @@ class ProductSetupImageScreen extends HookConsumerWidget {
           ),
           child: Stack(
             children: [
-              // 4:3 圖片完整顯示（同最終上傳效果）
               ClipRRect(
                 borderRadius: BorderRadius.circular(16.r),
                 child: SizedBox.expand(
                   child: Image.memory(images.value[idx], fit: BoxFit.contain),
                 ),
               ),
-              // AI 編輯按鈕（右上）
               Positioned(
                 right: 16,
                 top: 16,
@@ -523,7 +507,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
                   child: const _OverlayGlyph(AppIcons.autoAwesomeOutlined),
                 ),
               ),
-              // 刪除按鈕（右下）
               Positioned(
                 right: 16,
                 bottom: 16,
@@ -746,7 +729,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
                             buildThumbnailWrap(),
                             SizedBox(height: 16.h),
                           ],
-                          // 小技巧提示
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

@@ -63,7 +63,6 @@ export default function SellerVantaAtmosphere() {
 						}) as VantaEffect;
 					})
 					.catch(() => {
-						// The original CSS gradient remains the complete fallback.
 					});
 			},
 			{ rootMargin: "240px 0px" },

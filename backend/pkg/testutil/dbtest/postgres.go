@@ -47,12 +47,8 @@ import (
 )
 
 const (
-	// 🔴 image 必須是 postgres:16-alpine：.github/workflows/mirror-testcontainers-images.yml:26
-	// 只把這一個 image 鏡像到 GHCR，self-hosted runner 連不到 Docker Hub，其他 tag 在 CI 會失敗。
 	image = "postgres:16-alpine"
 
-	// adminDB is the maintenance database used to issue CREATE/DROP DATABASE,
-	// which cannot be run from inside the database being created or dropped.
 	adminDB = "postgres"
 
 	pgUser     = "test"
@@ -86,17 +82,11 @@ type Postgres struct {
 	seq atomic.Int64
 }
 
-// instance is one container carrying one migrated template database. There is
-// one per distinct excludeMigrations set rather than one per Postgres, because
-// the excluded migrations are baked into the template by the init-script
-// replay: a transitional schema and the final schema cannot both live in the
-// same template. Tests that exclude nothing — the overwhelming majority — all
-// share the same instance.
 type instance struct {
 	container *tcpostgres.PostgresContainer
 	host      string
 	port      string
-	err       error // set once startup has been tried and lost
+	err       error
 }
 
 // New returns a Postgres that hands out copies of cfg.TemplateDB. Nothing is
@@ -135,8 +125,6 @@ type DB struct {
 func (p *Postgres) Clone(ctx context.Context, t *testing.T, excludeMigrations ...string) (DB, func()) {
 	t.Helper()
 
-	// Sorted so that two call sites naming the same migrations in a different
-	// order share one instance instead of booting two identical containers.
 	exclude := append([]string(nil), excludeMigrations...)
 	sort.Strings(exclude)
 
@@ -167,10 +155,6 @@ func (p *Postgres) Clone(ctx context.Context, t *testing.T, excludeMigrations ..
 	}
 
 	drop := func() {
-		// Dropped rather than left behind so a long run does not accumulate one
-		// copy of the schema per test. FORCE covers connections opened outside
-		// whatever pool the caller built; a failure here is not the test's
-		// verdict, so it is logged rather than fatal.
 		dropCtx := context.Background()
 		admin, err := pgx.Connect(dropCtx, p.dsn(inst, adminDB))
 		if err != nil {
@@ -213,10 +197,6 @@ func RunTests(m *testing.M, p *Postgres) {
 	os.Exit(code)
 }
 
-// start boots the container for this migration set on first use. Lazy rather
-// than eager in TestMain so that a run filtered with -run, or one that touches
-// only the package's DB-free tests, pays only for the instances its tests
-// actually ask for.
 func (p *Postgres) start(ctx context.Context, t *testing.T, exclude []string) *instance {
 	t.Helper()
 
@@ -225,9 +205,6 @@ func (p *Postgres) start(ctx context.Context, t *testing.T, exclude []string) *i
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if inst, ok := p.instances[key]; ok {
-		// A startup that already failed is not retried per test: the run is red
-		// either way, and the point of this package is to stop hammering a
-		// Docker daemon that is having a bad day.
 		if inst.err != nil {
 			t.Fatalf("shared postgres container is unavailable: %v", inst.err)
 		}
@@ -236,12 +213,6 @@ func (p *Postgres) start(ctx context.Context, t *testing.T, exclude []string) *i
 
 	scripts := p.scripts(t, exclude)
 
-	// One container now carries many tests, so a startup that lost the #2070
-	// coin toss takes down all of them rather than one. Retry once: the failure
-	// being covered is the daemon's, and a second attempt is cheaper than a
-	// rerun of the job. Any startup error is retried, not just the RWLayer one —
-	// matching a daemon error string is brittle, and a genuinely broken
-	// environment fails the second time too.
 	var container *tcpostgres.PostgresContainer
 	var startErr error
 	for attempt := 1; attempt <= 2; attempt++ {
@@ -278,7 +249,6 @@ func (p *Postgres) start(ctx context.Context, t *testing.T, exclude []string) *i
 	return inst
 }
 
-// scripts lists MigrationsDir in apply order, minus the excluded basenames.
 func (p *Postgres) scripts(t *testing.T, exclude []string) []string {
 	t.Helper()
 
@@ -315,10 +285,6 @@ func runPostgres(ctx context.Context, templateDB string, scripts []string) (*tcp
 		tcpostgres.WithPassword(pgPassword),
 		tcpostgres.WithInitScripts(scripts...),
 		testcontainers.WithWaitStrategy(
-			// postgres started with init scripts boots twice: the first "ready" is
-			// the init phase, the second is the real server. Waiting for the port
-			// alone races that restart and yields "connection reset by peer", so we
-			// also wait for the second readiness log line.
 			wait.ForAll(
 				wait.ForLog("database system is ready to accept connections").
 					WithOccurrence(2).

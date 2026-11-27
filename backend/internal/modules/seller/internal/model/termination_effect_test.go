@@ -10,7 +10,6 @@ import (
 )
 
 func TestTerminationEffectTimingAndText(t *testing.T) {
-	// 2026-10-01 23:30:45 UTC = 台北 2026-10-02 07:30:45；預告 30 日後是台北 2026-11-01 07:30。
 	now := time.Date(2026, 10, 1, 23, 30, 45, 0, time.UTC)
 	for _, g := range TerminationGroundValues() {
 		e := NewTerminationEffect(g, now)
@@ -29,7 +28,6 @@ func TestTerminationEffectTimingAndText(t *testing.T) {
 		}
 		want := "立即生效：店家暫停營業。"
 		if g == GroundMaterialBreach {
-			// 天數是 MaterialBreachCure（7 日）；常數改了而這裡沒改，這個測試與下面的天數測試都會紅。
 			want = "立即生效：店家暫停營業。必須引用至少一筆未撤銷、已存在 7 日以上的認定。"
 		}
 		if g == GroundLinkedAccount {

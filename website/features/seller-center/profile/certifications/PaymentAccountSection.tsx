@@ -110,7 +110,6 @@ export function PaymentAccountSection({
 		}
 	}, []);
 
-	// 從金流商回來：先同步重讀（失敗不顯示），再重新讀開通摘要與帳戶。
 	const autoRefreshedRef = React.useRef(false);
 	const confirm = React.useCallback(async () => {
 		autoRefreshedRef.current = true;
@@ -119,7 +118,6 @@ export function PaymentAccountSection({
 		try {
 			await refreshPaymentAccount();
 		} catch {
-			// 重讀失敗不顯示。
 		} finally {
 			setConfirming(false);
 		}
@@ -138,7 +136,6 @@ export function PaymentAccountSection({
 		}
 	}, [platformApproved, param, confirm, begin]);
 
-	// 進入頁面：任務還沒完成（也不是鎖住）時同步重讀一次，背景進行；沒有 query 的進入才做（回跳另有 confirm）。
 	const taskState = task?.state;
 	React.useEffect(() => {
 		if (!platformApproved || summary.loading || autoRefreshedRef.current) {

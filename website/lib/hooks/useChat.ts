@@ -45,7 +45,6 @@ export function useChatSide(): ChatSide {
 /** 對方在線狀態的重新查詢間隔。 */
 export const PRESENCE_REFETCH_MS = 30_000;
 
-/* ===== Conversation list ===== */
 
 export function useConversations({
 	subscribeToSocket = true,
@@ -68,7 +67,6 @@ export function useConversations({
 		queryFn: accountQueryFn(status, () => listConversations(side)),
 	});
 
-	// 第一個 ready 是剛連上（列表剛讀過）；之後每次 ready 是斷線後重連，斷線期間的事件收不到，要重讀。
 	const readySeenRef = React.useRef(false);
 	useChatStream(side, shouldFetch && subscribeToSocket, (e) => {
 		if (e.type === "ready") {
@@ -96,7 +94,6 @@ export function useConversations({
 	};
 }
 
-/* ===== Chat thread ===== */
 
 export interface ThreadData {
 	messages: ChatMessage[];
@@ -195,7 +192,6 @@ export function useChatThread(
 					}));
 					if (!page.hasMore) return;
 					const next = lastSeq(page.messages);
-					// 還有下一頁卻沒有往前走：不再轉圈，交給整段重讀。
 					if (next <= after) throw new Error("gap fill made no progress");
 					after = next;
 				}
@@ -212,7 +208,6 @@ export function useChatThread(
 			if (e.type === "message") {
 				const m = e.message;
 				if (!conversationId) {
-					// 還沒有對話的聊天室收到訊息：可能是新對話，重讀列表。
 					void queryClient.invalidateQueries({ queryKey: conversationsKey });
 					return;
 				}
@@ -249,7 +244,6 @@ export function useChatThread(
 		onStreamEvent,
 	);
 
-	// 重連用的 cursor：這個對話手上最後的 seq。
 	const seqHere = lastSeq(data.messages);
 	React.useEffect(() => {
 		if (stream && conversationId && seqHere > 0) {
@@ -257,7 +251,6 @@ export function useChatThread(
 		}
 	}, [stream, conversationId, seqHere]);
 
-	// 已讀：對方有新訊息落在開著的聊天室時，把已讀游標推到最後一則。
 	const peerLastSeq = React.useMemo(() => {
 		let max = 0;
 		for (const m of data.messages) {
@@ -298,7 +291,6 @@ export function useChatThread(
 				messages: reconcileOptimistic(d.messages, optimisticId, server),
 			}));
 			if (!conversationId) {
-				// 第一則訊息開了新對話：之後的讀取與串流都以對話 ID 為準。
 				void queryClient.invalidateQueries({ queryKey: conversationsKey });
 			}
 		},
@@ -312,8 +304,6 @@ export function useChatThread(
 		) => {
 			if (!targetId) return;
 			setSendError(null);
-			// 取消進行中的讀取，免得晚到的歷史把樂觀訊息洗掉。
-			// 還沒有資料時不取消：取消會讓第一次讀取被丟掉、畫面永遠沒有歷史；改成送出後重讀。
 			const hadData = queryClient.getQueryData(dataKey) !== undefined;
 			if (hadData) await queryClient.cancelQueries({ queryKey: dataKey });
 			patch((d) => ({

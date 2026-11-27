@@ -20,7 +20,6 @@ import (
 // MaxPerAccount 是每個帳號同時開著的串流上限（估計值：同一個瀏覽器的幾個分頁加兩支 App，不是量測值）。
 const MaxPerAccount = 8
 
-// retryAfter 是超過上限時給 client 的重試建議。
 const retryAfter = 5 * time.Second
 
 // MaxNewItemIDs 是一個訂閱者在兩則訊號之間累積的新通知 ID 上限（估計值：夠一次 toast 一批，不是量測值）；超過就標 truncated、不再帶 ID。
@@ -72,7 +71,6 @@ type Hub struct {
 
 	backoffBase, backoffMax time.Duration
 	jitter                  func() float64
-	// now 與 sleep 讓測試不用真的等；sleep 為 nil 是可被 ctx 取消的真實等待；now 為 nil（模組不得呼叫 time.Now，沒有注入時鐘可用）時連線一律不算穩定，退避只遞增。
 	now        func() time.Time
 	sleep      func(ctx context.Context, d time.Duration)
 	listening  chan struct{}
@@ -170,7 +168,6 @@ func (h *Hub) InboxChanged(key Key, storeID int64, hint model.StateHint, itemID 
 	}
 }
 
-// workspaceChanged 把賣家工作區通知扇出給本行程這家店的 STORE 受眾訂閱者。
 func (h *Hub) workspaceChanged(storeID int64, change SellerChange) {
 	h.mu.Lock()
 	subs := make([]*Subscription, 0, len(h.byStore[storeID]))
@@ -204,7 +201,6 @@ type Subscription struct {
 	changes    []SellerChange
 }
 
-// addItem 把新通知 ID 併進累積的集合（呼叫端持有 s.mu）：超過上限就改標 truncated 並丟掉已累積的 ID。
 func (s *Subscription) addItem(id uuid.UUID) {
 	if id == uuid.Nil() || s.truncated || slices.Contains(s.newItems, id) {
 		return
@@ -271,7 +267,6 @@ func (s *Subscription) Next(ctx context.Context) (Event, error) {
 	}
 }
 
-// restoreInbox 在讀取內容失敗時把已取走的收件匣標記放回去：下一次 Next 重讀，這次合併的提示與新通知 ID 不遺失（與期間新來的取聯集，合計超過上限就標 truncated）。
 func (s *Subscription) restoreInbox(hints []model.StateHint, items []uuid.UUID, truncated bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -281,7 +276,6 @@ func (s *Subscription) restoreInbox(hints []model.StateHint, items []uuid.UUID, 
 			s.hints = append(s.hints, h)
 		}
 	}
-	// 取走的 ID 排在期間新來的前面，維持到達順序。
 	pending := s.newItems
 	s.newItems = nil
 	if truncated {

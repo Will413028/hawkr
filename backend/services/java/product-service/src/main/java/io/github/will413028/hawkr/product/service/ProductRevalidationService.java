@@ -84,7 +84,6 @@ public class ProductRevalidationService {
         return tags;
     }
 
-    // ==================== 商品集合不變：只發 product entity tag ====================
 
     /**
      * bust {@code product:<id>}（單筆商品欄位變更：改價 / 描述 / 圖片 / 庫存 / 分類）。
@@ -107,7 +106,6 @@ public class ProductRevalidationService {
         revalidateClient.bustAfterCommit(tags);
     }
 
-    // ==================== 商品集合變動 / 賣家實體變動：共發 seller tag ====================
 
     /**
      * bust {@code product:<id>} + {@code seller:<sellerId>}（改變賣家公開商品集合：建立即上架、
@@ -144,12 +142,10 @@ public class ProductRevalidationService {
         for (ProductSellerRef r : refs) {
             if (r.sellerId() != null) storeIds.add(r.sellerId());
         }
-        // 一次批次解析所有賣家的 store_code，不逐筆呼叫（賣家數 N ≪ 商品數）。
         tags.addAll(sellerTags(storeIds));
         revalidateClient.bustAfterCommit(new ArrayList<>(tags));
     }
 
-    // ==================== 分類：分類樹 surface ====================
 
     /**
      * bust {@code category:<id>}（分類新增 / 軟刪除 / 還原——改變分類樹的組成）。

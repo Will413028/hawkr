@@ -67,7 +67,6 @@ public class SalesAccumulatedConsumer {
             JsonNode root = MAPPER.readTree(body);
             orderNo = root.path("order_no").asText("");
 
-            // order_no 是唯一去重鍵：缺失即無法保證冪等，禁止無 guard 累加 → 直接 reject 進 DLQ（重試也永遠缺鍵）。
             if (orderNo.isBlank()) {
                 log.error("SalesAccumulatedConsumer.orderNo.missing",
                         "缺少 order_no，無法冪等去重，reject 進 DLQ body=" + body);
@@ -91,10 +90,8 @@ public class SalesAccumulatedConsumer {
                 return;
             }
 
-            // by productId ASC 排序避免併發死鎖（§22.1）
             items.sort(Comparator.comparingLong(SalesItem::productId));
 
-            // 同事務 claim order_no 去重 + 累計；重複事件回傳 false（未寫入 → 不需 evict）。
             boolean applied = accumulator.applyAll(orderNo, items);
             if (!applied) {
                 log.info("SalesAccumulatedConsumer.duplicate",
@@ -103,8 +100,6 @@ public class SalesAccumulatedConsumer {
                 return;
             }
 
-            // sales_count 反正規化欄位出現在 ProductDetail 與 ProductListItemDTO（35 設計書）→ 提交後清快取。
-            // applyAll 為 @Transactional bean 方法，回傳即代表已 commit，於此 evict = post-commit（#1426）。
             evictProductCache(items);
 
             log.info("SalesAccumulatedConsumer.success",
@@ -165,7 +160,7 @@ public class SalesAccumulatedConsumer {
         @Transactional
         public boolean applyAll(String orderNo, List<SalesItem> sortedItems) {
             if (dedupRepository.insertIfAbsent(orderNo) == 0) {
-                return false;   // 重複事件：dedup INSERT NO-OP → 不累計
+                return false;
             }
             for (SalesItem it : sortedItems) {
                 productRepository.incrementSalesCount(it.productId(), it.quantity());

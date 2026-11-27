@@ -6,7 +6,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// 封鎖的情境（A7-2e）：單體的語意見 A7-1b 與 block-brief.md。與舊實作刻意不同處見 SD3（封鎖不擋寫入）、SD15（封鎖過濾在分頁之前）、D2（店家封鎖只擋寫入）。
 
 func blockAuthorByCommentReferenceIsIdempotent(ctx context.Context, t ch.T, d Driver) {
 	p := newPost(ctx, t, d, ch.Seller)
@@ -17,14 +16,12 @@ func blockAuthorByCommentReferenceIsIdempotent(ctx context.Context, t ch.T, d Dr
 	if changed := ch.Must(t, ch.Ret(d.BlockAuthor(ctx, ch.Buyer, c.ID))); changed {
 		t.Errorf("重複封鎖 changed = true，封鎖要冪等")
 	}
-	// 封鎖者之後讀不到對方的頂層留言（依觀看者過濾，不留佔位）；第三人與匿名照常讀得到。
 	if list := ch.Must(t, ch.Ret(d.ListComments(ctx, ch.Buyer, p.ID))); hasComment(list, c.ID) {
 		t.Errorf("封鎖者讀得到被封鎖者的留言：%+v", list)
 	}
 	if list := ch.Must(t, ch.Ret(d.ListComments(ctx, ch.Anonymous, p.ID))); !hasComment(list, c.ID) {
 		t.Errorf("匿名讀不到被封鎖者的留言：%+v", list)
 	}
-	// 作者看不到封鎖者的留言（買家之間雙向互不可見）。
 	mine := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer, p.ID, "我的留言 "+ch.Nonce())))
 	if list := ch.Must(t, ch.Ret(d.ListComments(ctx, ch.Buyer2, p.ID))); hasComment(list, mine.ID) {
 		t.Errorf("被封鎖者讀得到封鎖者的留言：%+v", list)
@@ -69,7 +66,6 @@ func sd3StoreBlockingABuyerStopsWritesButNotReads(ctx context.Context, t ch.T, d
 	p := newPost(ctx, t, d, ch.Seller)
 	c := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, p.ID, "留言 "+ch.Nonce())))
 	ch.Must(t, ch.Ret(d.SellerBlockAuthor(ctx, ch.Seller, c.ID)))
-	// 擋寫入：被封鎖的買家在這家店留言與按讚被拒；不擋讀取。
 	_, err := d.CreateComment(ctx, ch.Buyer2, p.ID, "再留言 "+ch.Nonce())
 	ch.WantKind(t, err, ch.ErrPermission)
 	_, err = d.ToggleLike(ctx, ch.Buyer2, p.ID)
@@ -77,7 +73,6 @@ func sd3StoreBlockingABuyerStopsWritesButNotReads(ctx context.Context, t ch.T, d
 	if posts := ch.Must(t, ch.Ret(d.ListSellerPosts(ctx, ch.Buyer2, p.SellerID, 1, 20))); !hasPost(posts.Items, p.ID) {
 		t.Errorf("被店家封鎖的買家仍要讀得到店的公開貼文：%+v", posts.Items)
 	}
-	// 其他店的貼文不受影響。
 	other := newPost(ctx, t, d, ch.Seller2)
 	ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, other.ID, "別家店 "+ch.Nonce())))
 }
@@ -97,7 +92,6 @@ func storeBlockListAndUnblock(ctx context.Context, t ch.T, d Driver) {
 	}
 	_, err := d.SellerBlockedBuyers(ctx, ch.Buyer)
 	wantOwnerDenied(t, err)
-	// 解除之後買家可以再留言。
 	for _, b := range list {
 		if !b.Deleted {
 			ch.Must(t, ch.Ret(d.SellerUnblockBuyer(ctx, ch.Seller, b.BuyerID)))

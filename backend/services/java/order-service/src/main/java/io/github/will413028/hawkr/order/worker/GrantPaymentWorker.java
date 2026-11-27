@@ -128,8 +128,6 @@ public class GrantPaymentWorker {
     }
 
     private void processTask(GrantPaymentTaskEntity task) {
-        // lease CAS 搶佔（推 next_retry_time；status 一併寫 PROCESSING 供運維觀測）。
-        // claim 回 0 ⇒ 另一個 pod 持有租約 ⇒ 一個副作用都不做。
         int claimed = grantPaymentTaskRepository.claimTask(
                 task.getTaskId(), DateTimeUtils.nowUtc().plusSeconds(CLAIM_LEASE_SEC));
         if (claimed == 0) {
@@ -139,8 +137,6 @@ public class GrantPaymentWorker {
         String orderNo = task.getOrderNo();
         Long taskId = task.getTaskId();
 
-        // backend#3262 撥款資格閘門：這張訂單還會不會再生出退款？會 ⇒ 不撥，推遲後重問。
-        // 反查失敗一律視為 hold（client 端 fail-closed）——撥錯款追不回來，撥晚了只是等。
         AfterSalesGrpcClient.PayoutHold hold = afterSalesGrpcClient.getPayoutHold(orderNo);
         if (hold.hold()) {
             deferForPayoutHold(task, hold);
@@ -151,7 +147,6 @@ public class GrantPaymentWorker {
             GrantPaymentResponse response = paymentGrpcClient.grantPayment(orderNo);
 
             if (response.getCode() == 0) {
-                // 撥款成功（PROCESSING → DONE）
                 int updated = grantPaymentTaskRepository.markGrantTaskDone(taskId);
                 if (updated == 0) {
                     log.info("GrantPaymentWorker.processTask.doneSkip",
@@ -161,8 +156,6 @@ public class GrantPaymentWorker {
                 log.info("GrantPaymentWorker.processTask.success",
                         "撥款指示成功", "orderNo", orderNo);
 
-                // #1286：撥款成功發 payout.completed 通知賣家（走既有通知管線 → FCM + web SSE 雙通道）。
-                // 通知失敗只 log，不影響撥款 task 已 DONE 的事實（best-effort，notification 冪等靠 reference_id）。
                 try {
                     Long storeId = orderRepository.findStoreIdByOrderNo(orderNo);
                     Long notifySellerAccountId = 0L;
@@ -188,7 +181,6 @@ public class GrantPaymentWorker {
                             "撥款成功但 payout.completed 通知發送失敗, orderNo=" + orderNo, ex);
                 }
             } else {
-                // 業務錯誤（非暫時性，PROCESSING → MANUAL_INTERVENTION）
                 String lastError = "code=" + response.getCode() + ", message=" + response.getMessage();
                 int updated = grantPaymentTaskRepository.markGrantTaskManualIntervention(taskId, lastError);
                 if (updated == 0) {
@@ -248,7 +240,6 @@ public class GrantPaymentWorker {
                     "申訴窗未關，推遲撥款至 " + nextEligibleAt + "，" + reason,
                     "orderNo", task.getOrderNo());
         } else {
-            // 無時間界 ⇒ 需要有人看見：申訴長期未裁決、或 aftersales 反查持續失敗，都會停在這裡
             log.warn("GrantPaymentWorker.payoutHold.unbounded",
                     "撥款被無時間界 hold，推遲至 " + nextEligibleAt + " 重問，" + reason,
                     "orderNo", task.getOrderNo());
@@ -274,7 +265,6 @@ public class GrantPaymentWorker {
             log.error("GrantPaymentWorker.handleRetry.maxReached",
                     "撥款任務超過最大重試次數，轉人工介入，orderNo=" + task.getOrderNo());
         } else {
-            // 指數退避：30s, 60s, 120s, 240s...
             long delaySeconds = 30L * (1L << Math.min(retryCount - 1, 10));
             int updated = grantPaymentTaskRepository.markGrantTaskRetryScheduled(
                     taskId, retryCount,

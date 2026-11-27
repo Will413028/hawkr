@@ -138,8 +138,6 @@ const SELLER_ACTION_STATUSES = new Set([
 
 export function afterSaleNeedsSeller(c: AfterSaleCase | undefined): boolean {
 	if (!c) return false;
-	// 案件進入平台仲裁後由平台裁決，賣家無法自行處理（後端會擋寫入），
-	// 因此不再算作賣家的待辦——否則 dashboard / 訂單卡會誤導賣家去處理。
 	if (afterSaleIsUnderAppeal(c.appealState)) return false;
 	return SELLER_ACTION_STATUSES.has(c.status as never);
 }
@@ -154,13 +152,10 @@ const TERMINAL_STATUSES = new Set([
 ]);
 
 export function afterSaleIsTerminal(c: AfterSaleCase): boolean {
-	// 仲裁中的案件即使 raw status 為 60 已拒絕，也已重新進入平台審理，不算終態 ——
-	// 否則賣家預設視圖（排除終態）會把它藏進「已結案」，看不到「申訴仲裁中」。
 	if (afterSaleIsUnderAppeal(c.appealState)) return false;
 	return TERMINAL_STATUSES.has(c.status as never);
 }
 
-/* ---- Appeal lock & action predicates ------------------------------------ */
 
 /**
  * codemeta `AfterSaleAppealState` (§10.2.1): NONE=0 / APPEALED=10 /
@@ -266,7 +261,6 @@ export function afterSaleCanConfirmReceipt(
 	);
 }
 
-/* ---- Appeal-aware list/card display ------------------------------------ */
 
 /**
  * Shared appeal display strings — list/card/summary rows fold these over the
@@ -300,10 +294,8 @@ export function afterSaleDisplayTone(
 export function afterSaleGroupOf(
 	c: AfterSaleCase,
 ): Exclude<AfterSaleGroup, "all"> {
-	// 仲裁中的案件是活躍待裁決，不論 raw status（含 60 已拒絕）都歸「待處理」群組，
-	// 才不會被當作已結案而藏起來。
 	if (afterSaleIsUnderAppeal(c.appealState)) return "pending";
-	if (SELLER_ACTION_STATUSES.has(c.status as never)) return "pending"; // 0/30
+	if (SELLER_ACTION_STATUSES.has(c.status as never)) return "pending";
 	if (
 		c.status === AFTER_SALE_STATUS.RETURN_PENDING ||
 		c.status === AFTER_SALE_STATUS.RETURN_SHIPPING ||
@@ -313,7 +305,7 @@ export function afterSaleGroupOf(
 		return "returning";
 	}
 	if (c.status === AFTER_SALE_STATUS.REFUNDING) return "refunding";
-	return "closed"; // 50/60/70
+	return "closed";
 }
 
 /** One-line "現在輪到誰做什麼" narrative — drives status banners. */
@@ -348,7 +340,6 @@ export function afterSaleNarrative(status: string): string {
 	}
 }
 
-/* ---- 4-step progress --------------------------------------------------- */
 
 export type AfterSaleStepState = "done" | "current" | "upcoming" | "failed";
 
@@ -365,13 +356,12 @@ const STEP_LABELS = ["售後申請", "賣家審核", "退貨 / 退款", "完成"
  * step `failed` so the buyer sees the flow stopped rather than completed.
  */
 export function afterSaleSteps(status: string): AfterSaleStep[] {
-	// index of the "current" step; -1 means terminal handled below
 	const order = ["申請", "審核", "退貨退款", "完成"];
 	let activeIdx: number;
 	let terminalFailed = false;
 	switch (status) {
 		case AFTER_SALE_STATUS.PENDING:
-			activeIdx = 1; // 賣家審核
+			activeIdx = 1;
 			break;
 		case AFTER_SALE_STATUS.RETURN_PENDING:
 		case AFTER_SALE_STATUS.RETURN_SHIPPING:
@@ -380,10 +370,10 @@ export function afterSaleSteps(status: string): AfterSaleStep[] {
 		case AFTER_SALE_STATUS.RETURN_FAILED:
 		case AFTER_SALE_STATUS.RETURN_RECEIVED:
 		case AFTER_SALE_STATUS.REFUNDING:
-			activeIdx = 2; // 退貨/退款
+			activeIdx = 2;
 			break;
 		case AFTER_SALE_STATUS.CLOSED:
-			activeIdx = 3; // 完成
+			activeIdx = 3;
 			break;
 		case AFTER_SALE_STATUS.REJECTED:
 		case AFTER_SALE_STATUS.CANCELLED:
@@ -404,7 +394,6 @@ export function afterSaleSteps(status: string): AfterSaleStep[] {
 	});
 }
 
-/* ---- Lookup ------------------------------------------------------------ */
 
 /** Statuses excluded from the seller order-list lookup (REJECTED/CANCELLED
  * never entered the refund flow — surfacing them misleads the seller). */

@@ -174,7 +174,6 @@ func (s *Service) SetQuantity(ctx context.Context, storeID int64, key string, sk
 				return err
 			}
 		}
-		// 現值等於 expected 已由上面的條件式 UPDATE 確認，所以 expected 為 0 才是由 0 增加。
 		if expected == 0 {
 			return s.d.Restock.StockIncreased(ctx, skuID, quantity)
 		}
@@ -182,8 +181,6 @@ func (s *Service) SetQuantity(ctx context.Context, storeID int64, key string, sk
 	})
 }
 
-// replayOwn 處理同一家店同一個 key 的重送（鍵只在店家內唯一）：先確認 SKU 屬於呼叫的店家（重送時 SKU 已不屬於這家店回 ErrSkuNotFound），
-// 再比對原操作的種類與請求雜湊。
 func (s *Service) replayOwn(ctx context.Context, q *store.Queries, storeID int64, key string, skuID uuid.UUID, kind string, hash []byte) error {
 	own, err := q.SkuInStore(ctx, store.SkuInStoreParams{ID: skuID, StoreID: storeID})
 	if err != nil {
@@ -227,7 +224,6 @@ func (s *Service) Restore(ctx context.Context, key, deductKey string, items []mo
 		if err != nil {
 			return err
 		}
-		// 鎖住原扣減：同一次扣減的多筆歸還排隊，下面的累計檢查看得到前一筆已提交的歸還。
 		if _, err := q.LockStockOperation(ctx, deduct.ID); err != nil {
 			return err
 		}
@@ -271,7 +267,6 @@ func (s *Service) Restore(ctx context.Context, key, deductKey string, items []mo
 	})
 }
 
-// restorable 回傳原扣減每個 SKU 還能歸還的量（原扣減量減已歸還的累計）。
 func (s *Service) restorable(ctx context.Context, q *store.Queries, deductID uuid.UUID) (map[uuid.UUID]int32, error) {
 	moves, err := q.ListStockMovements(ctx, deductID)
 	if err != nil {
@@ -291,8 +286,6 @@ func (s *Service) restorable(ctx context.Context, q *store.Queries, deductID uui
 	return out, nil
 }
 
-// replay 處理冪等鍵已存在：內容相同回 nil，不同回 ErrIdempotencyKeyReused。
-// 歸還省略 items 的重送，只要求種類與原扣減相同（剩下的全部取決於當時，不能重算）。
 func (s *Service) replay(ctx context.Context, q *store.Queries, key, kind string, deductID *uuid.UUID, items []model.StockItem) error {
 	op, err := q.GetStockOperationByKey(ctx, key)
 	if err != nil {
@@ -323,7 +316,6 @@ func (s *Service) replay(ctx context.Context, q *store.Queries, key, kind string
 	return nil
 }
 
-// whyNotDeducted 區分扣減失敗的原因：SKU 不存在或已刪除，或庫存不足。
 func (s *Service) whyNotDeducted(ctx context.Context, q *store.Queries, sku uuid.UUID) error {
 	_, err := q.GetLiveSkuStock(ctx, sku)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -342,7 +334,6 @@ func checkKey(key string) error {
 	return nil
 }
 
-// normalize 檢查輸入並依 SKU ID 升序排好（鎖定順序與重送比對都依這個順序）。
 func normalize(key string, items []model.StockItem) ([]model.StockItem, error) {
 	if err := checkKey(key); err != nil {
 		return nil, err

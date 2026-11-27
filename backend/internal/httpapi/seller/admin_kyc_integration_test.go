@@ -25,7 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// submittedKYC 為一家新店建立並送出一份個人賣家的申請（沒有補充文件）。
 func (f *adminFixture) submittedKYC(t *testing.T, name string) (int64, seller.Store, seller.KYCApplication) {
 	t.Helper()
 	accountID, s := f.newSeller(t, name)
@@ -41,7 +40,6 @@ func (f *adminFixture) submittedKYC(t *testing.T, name string) (int64, seller.St
 	return accountID, s, submitted
 }
 
-// submittedCompanyKYC 為一家新店建立並送出一份帶兩張公司補充文件的企業賣家申請；文件放進 media 的替身（內容是 "%PDF-1.4 doc<位置>-bytes"）。
 func (f *adminFixture) submittedCompanyKYC(t *testing.T, name, taxID string) (int64, seller.Store, seller.KYCApplication) {
 	t.Helper()
 	accountID, s := f.newSeller(t, name)
@@ -72,7 +70,6 @@ func (f *adminFixture) getKYC(t *testing.T, id string) *adminsellerpb.KYCApplica
 	return resp.Msg.GetApplication()
 }
 
-// documentGET 以 token 讀補充文件端點；token 空是沒有登入。
 func (f *adminFixture) documentGET(t *testing.T, token, path string) (int, http.Header, string) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, f.server.URL+path, nil)
@@ -102,7 +99,6 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 	_, storeA, appA := f.submittedKYC(t, "甲店")
 	_, _, appB := f.submittedCompanyKYC(t, "乙店", "33330333")
 
-	// 佇列：審核中的舊到新（甲先送出）；列名是店名（D37）；讀申請不寫任何讀取紀錄。
 	queue, err := f.admin.ListKYCApplications(ctx, connect.NewRequest(&adminsellerpb.ListKYCApplicationsRequest{Status: pb.KYCStatus_KYC_STATUS_SUBMITTED, PageSize: 1}))
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +134,6 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 		got.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("application=%+v", app)
 	}
-	// 企業申請的補充文件：每張帶檢視網址與 asset_id，不帶儲存的 object key。
 	gotB := f.getKYC(t, appB.ID.String())
 	raw, _ := protojson.Marshal(gotB)
 	if len(gotB.GetDocuments()) != 2 || strings.Contains(string(raw), "secure/") {
@@ -162,7 +157,6 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 		t.Fatalf("missing: %v", err)
 	}
 
-	// 核准：沒帶 etag、舊 etag、過長的 comment 都被拒絕，什麼都不寫。
 	_, err = f.admin.ApproveKYC(ctx, connect.NewRequest(&adminsellerpb.ApproveKYCRequest{Id: appA.ID.String()}))
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "etag" {
 		t.Fatalf("field=%q", field)
@@ -185,16 +179,13 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 		a.GetReviews()[1].GetAction() != adminsellerpb.KYCReviewAction_KYC_REVIEW_ACTION_APPROVE || a.GetReviews()[1].GetReviewerAdminId() != sid(f.adminID) || a.GetReviews()[1].GetReason() != "資料齊全" {
 		t.Fatalf("approved=%+v", a)
 	}
-	// 核准生效後帶舊 etag 再核准或退回：aborted，不寫入（不推斷重送）。
 	_, err = f.admin.ApproveKYC(ctx, connect.NewRequest(&adminsellerpb.ApproveKYCRequest{Id: appA.ID.String(), Etag: app.GetEtag()}))
 	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
 	_, err = f.admin.RejectKYC(ctx, connect.NewRequest(&adminsellerpb.RejectKYCRequest{Id: appA.ID.String(), Etag: app.GetEtag(), Reason: "x", Issues: anIssue()}))
 	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
-	// 已核准的不能再退回。
 	_, err = f.admin.RejectKYC(ctx, connect.NewRequest(&adminsellerpb.RejectKYCRequest{Id: appA.ID.String(), Etag: a.GetEtag(), Reason: "x", Issues: anIssue()}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 
-	// 退回：理由必填；逐項問題至少一項，欄位與原因碼不能是 UNSPECIFIED，文件要是這份申請的，違規指到 issues[i] 的欄位。
 	bApp := f.getKYC(t, appB.ID.String())
 	_, err = f.admin.RejectKYC(ctx, connect.NewRequest(&adminsellerpb.RejectKYCRequest{Id: appB.ID.String(), Etag: bApp.GetEtag()}))
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "reason" {
@@ -244,7 +235,6 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 		last.GetInternalNote() != "疑似翻拍" || len(r.GetOutstandingIssues()) != 2 || last.GetReviewerAdminId() != sid(f.adminID) {
 		t.Fatalf("rejected=%+v", r)
 	}
-	// 佇列：兩筆都離開審核中，已核准與已退回各一。
 	if left, err := f.admin.ListKYCApplications(ctx, connect.NewRequest(&adminsellerpb.ListKYCApplicationsRequest{Status: pb.KYCStatus_KYC_STATUS_SUBMITTED})); err != nil || len(left.Msg.GetApplications()) != 0 {
 		t.Fatalf("left=%+v err=%v", left, err)
 	}
@@ -268,7 +258,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 		return n
 	}
 
-	// 沒登入 401、買家 403：沒有紀錄、媒體沒有被問。
 	for name, c := range map[string]struct {
 		token string
 		want  int
@@ -282,7 +271,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 		t.Fatalf("accesses=%d", n)
 	}
 
-	// 有權限的管理員直接讀得到（不需要先顯示全文）；標頭固定（內容是 PDF，型別由 media 依內容判定）；寫一列紀錄。
 	code, header, body := f.documentGET(t, f.adminToken, doc(app, "0"))
 	if code != 200 || body != "%PDF-1.4 doc0-bytes" {
 		t.Fatalf("code=%d body=%q", code, body)
@@ -295,7 +283,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 	if n := count(); n != 1 {
 		t.Fatalf("每次讀取各一列：%d", n)
 	}
-	// 另一位有權限的管理員讀同一張：各寫各的一列；同一位再讀一次也是新的一列。
 	if code, _, body := f.documentGET(t, f.otherAdminToken, doc(app, "1")); code != 200 || body != "%PDF-1.4 doc1-bytes" {
 		t.Fatalf("另一位管理員：code=%d body=%q", code, body)
 	}
@@ -307,7 +294,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 	if n := count(); n != 3 || admins != 2 {
 		t.Fatalf("accesses=%d admins=%d", n, admins)
 	}
-	// 沒有這個位置、格式不對的位置、沒有補充文件的個人申請：404，不寫紀錄、內容不外流。
 	for name, path := range map[string]string{"no such position": doc(app, "2"), "bad position": doc(app, "selfie"), "negative position": doc(app, "-1"), "individual": doc(individualApp, "0")} {
 		code, _, body := f.documentGET(t, f.adminToken, path)
 		if code != 404 || strings.Contains(body, "-bytes") {
@@ -317,7 +303,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 	if n := count(); n != 3 {
 		t.Fatalf("找不到的請求不寫讀取紀錄：%d", n)
 	}
-	// 角色被撤銷之後讀不到（權限在入口檢查），沒有讀取紀錄；角色補回來又讀得到。
 	ownerChange := identity.AdminRoleChangeInput{AdminID: f.adminID, Role: adminperm.RoleOwner, Reason: "測試", Source: identity.AdminRoleSourceCLI}
 	if _, err := f.id.RevokeAdminRole(ctx, ownerChange); err != nil {
 		t.Fatal(err)
@@ -332,7 +317,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 	if _, err := f.id.GrantAdminRole(ctx, ownerChange); err != nil {
 		t.Fatal(err)
 	}
-	// 讀取紀錄寫不進去：不送內容。
 	if _, err := f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses ADD CONSTRAINT test_no_writes CHECK (false) NOT VALID"); err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +327,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 	if _, err := f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses DROP CONSTRAINT test_no_writes"); err != nil {
 		t.Fatal(err)
 	}
-	// 讀取紀錄不在申請檢視裡，另外分頁：誰、哪一張、何時；新到舊。
 	listed, err := f.admin.ListKYCDocumentAccesses(ctx, connect.NewRequest(&adminsellerpb.ListKYCDocumentAccessesRequest{Id: app.ID.String(), PageSize: 2}))
 	if err != nil {
 		t.Fatal(err)
@@ -360,7 +343,6 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 	if recordedAsset != assetFor("doc1-甲店").String() {
 		t.Fatalf("讀取紀錄記實際送出的 asset_id：%q", recordedAsset)
 	}
-	// 申請檢視不內嵌讀取紀錄。
 	if view := f.getKYC(t, app.ID.String()); strings.Contains(protoText(t, view), "accessTime") {
 		t.Fatalf("view=%s", protoText(t, view))
 	}
@@ -518,7 +500,6 @@ func TestAdminKYCRegistrationCheckOverConnect(t *testing.T) {
 		len(c.GetMismatchedFields()) != 0 || len(c.GetUnverifiableFields()) != 0 {
 		t.Fatalf("etag=%q check=%+v", app.GetEtag(), c)
 	}
-	// 重新查詢：已完成的一筆之後新增第二筆；第二筆還沒查完時再查一次，會取代它（CANCELLED）並新增第三筆。
 	for range 2 {
 		if _, err := f.admin.RequeryKYCRegistration(ctx, connect.NewRequest(&adminsellerpb.RequeryKYCRegistrationRequest{Id: sub.ID.String()})); err != nil {
 			t.Fatal(err)
@@ -564,7 +545,6 @@ func TestAdminKYCRegistrationCheckOverConnect(t *testing.T) {
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 }
 
-// anIssue 是測試用的一個有效問題。
 func anIssue() []*pb.KYCIssue {
 	return []*pb.KYCIssue{{Field: pb.KYCField_KYC_FIELD_PRODUCT_TYPE, Code: pb.KYCIssueCode_KYC_ISSUE_CODE_OTHER, Message: "請確認商品類型"}}
 }

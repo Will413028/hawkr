@@ -58,10 +58,8 @@ test("server transport constructs its own narrow headers and ignores browser hea
 	await adminUpstreamFetch("/api/v1/admin/delegated-operations", {
 		method: "POST",
 		adminToken: "access-admin-jwt",
-		idempotencyKey: "018f4e24-a111-7777-8888-123456789abc", // gitleaks:allow（UUID 形式的冪等鍵範例）
+		idempotencyKey: "018f4e24-a111-7777-8888-123456789abc",
 		body: { storeId: "store_123" },
-		// Deliberately not part of AdminUpstreamRequest. Runtime callers cannot
-		// smuggle these into the constructed Headers object either.
 		browserHeaders: {
 			Authorization: "Bearer attacker",
 			"X-Admin-Actor-Id": "attacker",
@@ -72,7 +70,6 @@ test("server transport constructs its own narrow headers and ignores browser hea
 	});
 
 	const headers = new Headers(captured?.headers);
-	// 管理員的身分由 server 端轉送；瀏覽器形狀的 Authorization 進不來，cookie 一個都不帶。
 	assert.equal(headers.get("authorization"), "Bearer access-admin-jwt");
 	assert.equal(headers.get("cookie"), null);
 	assert.equal(headers.get("x-hk-operation-session"), null);

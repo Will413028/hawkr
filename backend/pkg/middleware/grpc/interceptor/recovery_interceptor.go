@@ -20,14 +20,12 @@ func RecoveryInterceptor(logger *zap.Logger) grpc.UnaryServerInterceptor {
 	) (resp interface{}, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				// Log the panic with stack trace
 				logger.Error("gRPC handler panicked",
 					zap.String("method", info.FullMethod),
 					zap.Any("panic", r),
 					zap.String("stack", string(debug.Stack())),
 				)
 
-				// Return an internal error
 				err = status.Error(codes.Internal, "internal server error")
 			}
 		}()
@@ -46,14 +44,12 @@ func StreamRecoveryInterceptor(logger *zap.Logger) grpc.StreamServerInterceptor 
 	) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				// Log the panic with stack trace
 				logger.Error("gRPC stream handler panicked",
 					zap.String("method", info.FullMethod),
 					zap.Any("panic", r),
 					zap.String("stack", string(debug.Stack())),
 				)
 
-				// Return an internal error
 				err = status.Error(codes.Internal, "internal server error")
 			}
 		}()

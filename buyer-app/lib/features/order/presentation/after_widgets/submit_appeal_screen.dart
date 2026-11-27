@@ -81,7 +81,6 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
     TruckLoadingOverlay.show(context, message: '提交中...');
 
     try {
-      // 上傳照片取得 staged tokens（沿用售後申請頁的 media 上傳流程）
       final List<String> tokens = [];
       if (_photos.isNotEmpty) {
         final mediaRepo = ref.read(mediaRepositoryProvider);
@@ -90,7 +89,6 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
             final result = await mediaRepo.uploadImage(file: file);
             tokens.add(result.stagedToken);
           } catch (_) {
-            // 單張上傳失敗不阻擋提交（與售後申請頁一致）
           }
         }
       }
@@ -144,7 +142,6 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 標題
                   Text(
                     '提交申訴',
                     style: TextStyle(
@@ -163,7 +160,6 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // 申訴原因
                   _buildSectionLabel('申訴原因', required: true),
                   SizedBox(height: 8.h),
                   ..._reasons.asMap().entries.map(
@@ -171,7 +167,6 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // 詳細說明（選填）
                   _buildSectionLabel('詳細說明（選填）'),
                   SizedBox(height: 8.h),
                   Container(
@@ -201,7 +196,6 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // 上傳照片（選填，最多 5 張）
                   _buildSectionLabel('上傳證據照片（選填）'),
                   SizedBox(height: 4.h),
                   Text(
@@ -212,7 +206,6 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
                   _buildPhotoRow(),
                   SizedBox(height: 32.h),
 
-                  // 送出申訴
                   SizedBox(
                     width: double.infinity,
                     height: 48.h,

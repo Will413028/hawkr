@@ -107,7 +107,6 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &pushWorker{s: s})
 }
 
-// pageSpec 描述一條 job 鏈的一頁：做什麼（write）、下一頁與下一個受眾的 job、全部處理完時怎麼標記。
 type pageSpec struct {
 	id           uuid.UUID
 	audience     model.Audience
@@ -118,8 +117,6 @@ type pageSpec struct {
 	markDone     func(context.Context, *store.Queries, time.Time) error
 }
 
-// page 處理一頁：讀一頁收件人、逐人寫（各自一個 transaction），再在一個 transaction 內排下一頁；這一頁不滿 Chunk 個收件人（沒有更多了）就換下一個受眾，
-// 受眾都處理完就標記完成。下一個 job 在寫完整頁之後才排，所以 job 中途失敗重跑，都從同一頁重來，已寫的收件人被唯一鍵略過。
 func (s *Service) page(ctx context.Context, p pageSpec) error {
 	ann, err := store.New(s.d.DB.Conn(ctx)).AnnouncementByID(ctx, p.id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -137,7 +134,6 @@ func (s *Service) page(ctx context.Context, p pageSpec) error {
 		switch {
 		case err == nil:
 		case permanent(err):
-			// 這個收件人永遠寫不進去（重試也一樣）：記錄後略過，游標照常前進，不讓一個人擋住整則公告。
 			s.d.Logger.ErrorContext(ctx, "公告收件人寫入失敗（永久性），略過", "announcement_id", ann.ID, "audience", p.audience, "account_id", r.AccountID, "store_id", r.StoreID, "error", err)
 		default:
 			return err
@@ -154,8 +150,6 @@ func (s *Service) page(ctx context.Context, p pageSpec) error {
 	})
 }
 
-// permanent 回報寫入錯誤是不是重試也不會好的：呼叫端給的值不合法、找不到、狀態不允許（apperr），或資料庫的資料例外與完整性違反（SQLSTATE 22、23 類）。
-// 其餘（連線中斷、逾時、取消、死結、未分類）都當暫時性，整頁交給 River 重試。
 func permanent(err error) bool {
 	if slices.Contains([]apperr.Kind{apperr.KindInvalidInput, apperr.KindNotFound, apperr.KindFailedPrecondition, apperr.KindPermissionDenied}, apperr.KindOf(err)) {
 		return true
@@ -182,7 +176,6 @@ func storeID(r Recipient) *int64 {
 	return nil
 }
 
-// writeInbox 把公告寫進一個收件人的收件匣。收件匣不可關，所以不看偏好，也不看有沒有 device token。收件人已刪除、已關閉或已退場時略過。
 func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnouncement, aud model.Audience, r Recipient) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		gone, err := intake.LockRecipient(ctx, s.d.Locks, aud, r.AccountID, r.StoreID)
@@ -205,7 +198,6 @@ func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnounce
 			return fmt.Errorf("遞增公告的收件匣人數：%w", err)
 		}
 		if s.d.Signals != nil {
-			// 與收件匣列同一個 transaction：commit 後才送達，rollback 不送；公告沒有狀態重讀提示。
 			if err := s.d.Signals.InboxChanged(ctx, r.AccountID, aud, r.StoreID, model.StateHintNone, id); err != nil {
 				return err
 			}
@@ -214,7 +206,6 @@ func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnounce
 	})
 }
 
-// writePush 為一個收件人寫公告的推播投遞紀錄並排渠道 job；收件人在偏好裡關掉公告推播時什麼都不寫。紀錄已存在（重試）時不重複排 job。
 func (s *Service) writePush(ctx context.Context, ann store.NotificationAnnouncement, aud model.Audience, r Recipient) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		gone, err := intake.LockRecipient(ctx, s.d.Locks, aud, r.AccountID, r.StoreID)

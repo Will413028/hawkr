@@ -9,8 +9,6 @@ const seen = vi.hoisted(() => ({
 	props: [] as Array<Record<string, unknown>>,
 }));
 
-// Record what NativeLink hands to next/link: the point of the component is to hand over everything
-// but the href exactly as the caller wrote it (the viewport prefetch above all).
 vi.mock("next/link", async () => {
 	const ReactModule = await import("react");
 	return {

@@ -1,18 +1,8 @@
--- coupon 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式與複合型別放 db/objects.sql
--- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（coupon.<表>），不建跨 schema 的 FK；實體的主鍵是應用層產生的 UUIDv7、不設 DEFAULT
--- （ADR 2026-09-25-row-identity-by-data-kind）；慣例見 PostgreSQL 設計規範。
--- 時間一律 timestamptz（UTC）；買家與店家用業務鍵 buyer_id、store_id（沒有 FK：它們屬於別的模組）。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA coupon;
 
--- 活動（折抵規則、總量、資格）。到期從 end_at 推導，不用排程改狀態；ENDED 是提前結束（D5）。
--- 補償券的活動是一券一活動（total_limit = 1），以 (source_type, source_id) 對應來源事件，UNIQUE 使重送只建一張（D4）。
 CREATE TABLE coupon.coupon_campaigns (
     id                  UUID        PRIMARY KEY,
     title               TEXT        NOT NULL,
@@ -20,17 +10,14 @@ CREATE TABLE coupon.coupon_campaigns (
     discount_amount     BIGINT,
     discount_percent    INTEGER,
     max_discount_amount BIGINT,
-    -- 滿額門檻（新台幣元）；0 = 無門檻。
     threshold_amount    BIGINT      NOT NULL DEFAULT 0,
     target_type         TEXT        NOT NULL,
-    -- 適用店家；NULL = 全平台。
     store_id            BIGINT,
     issuer_type         TEXT        NOT NULL,
     issuer_admin_id     BIGINT,
     issuer_store_id     BIGINT,
     start_at            TIMESTAMPTZ NOT NULL,
     end_at              TIMESTAMPTZ NOT NULL,
-    -- 總發行量；NULL = 無上限（與「上限 0」不同：上限至少 1）。
     total_limit         INTEGER,
     issued_count        INTEGER     NOT NULL DEFAULT 0,
     status              TEXT        NOT NULL,
@@ -46,17 +33,14 @@ CREATE TABLE coupon.coupon_campaigns (
         (discount_type = 'PERCENT' AND discount_percent IS NOT NULL AND discount_percent >= 1 AND discount_percent <= 99 AND max_discount_amount IS NOT NULL AND max_discount_amount > 0 AND discount_amount IS NULL)
     ),
     CONSTRAINT campaigns_threshold_check CHECK (threshold_amount >= 0),
-    -- 折抵金額不得超過門檻；門檻 0（無門檻）不套用（BD32）。
     CONSTRAINT campaigns_discount_within_threshold_check CHECK (discount_type <> 'CASH' OR threshold_amount = 0 OR discount_amount <= threshold_amount),
     CONSTRAINT campaigns_target_type_check CHECK (target_type IN ('ALL', 'MEMBER', 'DESIGNATED', 'COMPENSATION')),
     CONSTRAINT campaigns_store_check CHECK (store_id > 0),
-    -- MEMBER（在該店有消費紀錄）與補償券必須指定店家，否則缺值會被放大成全平台券。
     CONSTRAINT campaigns_store_scope_check CHECK (target_type NOT IN ('MEMBER', 'COMPENSATION') OR store_id IS NOT NULL),
     CONSTRAINT campaigns_issuer_check CHECK (
         (issuer_type = 'ADMIN' AND issuer_admin_id IS NOT NULL AND issuer_admin_id > 0 AND issuer_store_id IS NULL) OR
         (issuer_type = 'SELLER' AND issuer_store_id IS NOT NULL AND issuer_store_id > 0 AND issuer_admin_id IS NULL)
     ),
-    -- 賣家發的券只適用自己的店。
     CONSTRAINT campaigns_seller_scope_check CHECK (issuer_type <> 'SELLER' OR store_id IS NOT DISTINCT FROM issuer_store_id),
     CONSTRAINT campaigns_window_check CHECK (start_at <= end_at),
     CONSTRAINT campaigns_total_limit_check CHECK (total_limit >= 1),
@@ -69,13 +53,9 @@ CREATE TABLE coupon.coupon_campaigns (
     ),
     CONSTRAINT campaigns_source_key UNIQUE (source_type, source_id)
 );
--- 賣家的活動列表與配額計數（ACTIVE 且非補償）。
 CREATE INDEX campaigns_by_issuer_store ON coupon.coupon_campaigns (issuer_store_id, status) WHERE issuer_store_id IS NOT NULL;
--- 後台列表（ListAdminCampaigns）：不含補償活動，新到舊的 keyset 分頁。
 CREATE INDEX campaigns_admin_list ON coupon.coupon_campaigns (created_at DESC, id DESC) WHERE target_type <> 'COMPENSATION';
 
--- 買家持有的券（錢包）。領券、admin 發券、補償都只是建立一張 voucher；到期從活動的 end_at 推導。
--- order_no 是持有（鎖定或核銷）這張券的訂單；一張訂單同時只持有一張券（vouchers_order_no_key）。
 CREATE TABLE coupon.coupon_vouchers (
     id          UUID        PRIMARY KEY,
     campaign_id UUID        NOT NULL REFERENCES coupon.coupon_campaigns (id),
@@ -90,7 +70,6 @@ CREATE TABLE coupon.coupon_vouchers (
     voided_at   TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL,
     updated_at  TIMESTAMPTZ NOT NULL,
-    -- 每位買家在同一個活動只持有一張，已核銷與已作廢的也占名額。
     CONSTRAINT vouchers_campaign_buyer_key UNIQUE (campaign_id, buyer_id),
     CONSTRAINT vouchers_source_key UNIQUE (source_type, source_id),
     CONSTRAINT vouchers_buyer_check CHECK (buyer_id > 0),
@@ -112,7 +91,6 @@ CREATE UNIQUE INDEX vouchers_order_no_key ON coupon.coupon_vouchers (order_no) W
 CREATE INDEX vouchers_by_buyer ON coupon.coupon_vouchers (buyer_id, status, created_at DESC, id DESC);
 CREATE INDEX vouchers_by_campaign ON coupon.coupon_vouchers (campaign_id, status);
 
--- 資格名單：DESIGNATED 與 COMPENSATION 活動的買家。
 CREATE TABLE coupon.coupon_target_accounts (
     campaign_id UUID        NOT NULL REFERENCES coupon.coupon_campaigns (id),
     buyer_id    BIGINT      NOT NULL,
@@ -120,11 +98,8 @@ CREATE TABLE coupon.coupon_target_accounts (
     PRIMARY KEY (campaign_id, buyer_id),
     CONSTRAINT target_accounts_buyer_check CHECK (buyer_id > 0)
 );
--- 必要條件：買家刪帳時依 buyer_id 清掉名單。
 CREATE INDEX target_accounts_by_buyer ON coupon.coupon_target_accounts (buyer_id);
 
--- MEMBER 資格的消費紀錄投影（D3）：買家在該店有完成的訂單。由訂單完成事件餵入，(store_id, buyer_id) 一列、upsert 冪等；
--- 只記「有」不記次數與金額（資格只問有沒有）。
 CREATE TABLE coupon.store_buyer_membership (
     store_id   BIGINT      NOT NULL,
     buyer_id   BIGINT      NOT NULL,
@@ -133,10 +108,8 @@ CREATE TABLE coupon.store_buyer_membership (
     CONSTRAINT membership_store_check CHECK (store_id > 0),
     CONSTRAINT membership_buyer_check CHECK (buyer_id > 0)
 );
--- 必要條件：買家刪帳時依 buyer_id 清掉投影。
 CREATE INDEX membership_by_buyer ON coupon.store_buyer_membership (buyer_id);
 
--- 賣家的活動數配額（ACTIVE 且非補償的活動數上限）。沒有列等於預設 5；建立活動時鎖這一列使配額檢查與插入串行。
 CREATE TABLE coupon.seller_coupon_quotas (
     store_id           BIGINT      PRIMARY KEY,
     max_campaign_count INTEGER     NOT NULL DEFAULT 5,
@@ -145,7 +118,6 @@ CREATE TABLE coupon.seller_coupon_quotas (
     CONSTRAINT seller_quotas_max_check CHECK (max_campaign_count >= 0)
 );
 
--- 稽核紀錄：與被記的操作同一個 transaction 寫入，寫入失敗整筆失敗（BD7、BD23）。只追加。
 CREATE TABLE coupon.coupon_redemption_logs (
     id                UUID        PRIMARY KEY DEFAULT uuidv7(),
     campaign_id       UUID        NOT NULL,
@@ -156,7 +128,6 @@ CREATE TABLE coupon.coupon_redemption_logs (
     operator_admin_id BIGINT,
     operator_store_id BIGINT,
     reason            TEXT,
-    -- END_CAMPAIGN 一列記這次作廢的 AVAILABLE 券數。
     voided_count      INT,
     created_at        TIMESTAMPTZ NOT NULL,
     CONSTRAINT redemption_logs_voided_count_check CHECK (voided_count >= 0),
@@ -166,11 +137,8 @@ CREATE TABLE coupon.coupon_redemption_logs (
 CREATE INDEX redemption_logs_by_voucher ON coupon.coupon_redemption_logs (voucher_id, created_at) WHERE voucher_id IS NOT NULL;
 CREATE INDEX redemption_logs_by_campaign ON coupon.coupon_redemption_logs (campaign_id, created_at);
 
--- 到期提醒的紀錄：每張券一列，與 VoucherExpiring 同一個 transaction 寫入，主鍵讓同一張券至多提醒一次。
--- 不含 end_at：活動的 end_at 沒有修改路徑（提前結束會作廢 AVAILABLE 券）。券不在這裡刪除，紀錄不設 FK（只追加）。
 CREATE TABLE coupon.voucher_expiry_reminders (
     voucher_id  UUID        PRIMARY KEY,
     reminded_at TIMESTAMPTZ NOT NULL
 );
--- 必要條件：到期提醒的掃描以 end_at 的短窗（now, now+24h] 找活動，再經 vouchers_by_campaign 找券；沒有它只能掃全部活動。
 CREATE INDEX campaigns_by_end_at ON coupon.coupon_campaigns (end_at);

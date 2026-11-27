@@ -47,7 +47,6 @@ func (j *jobs) CancelJob(context.Context, int64) (rivertype.JobState, bool, erro
 	return rivertype.JobStateRunning, true, nil
 }
 
-// fakes 同時是搜尋、營業中、封鎖與分類末層的替身；每次外部呼叫都斷言沒有 transaction 開著（單體規則 5）。
 type fakes struct {
 	t        *testing.T
 	d        *db.DB
@@ -58,13 +57,10 @@ type fakes struct {
 	blocked  map[int64]struct{}
 	blockErr error
 	notLeaf  bool
-	// leafErr 是分類樹讀取的失敗；onLeaf 在分類檢查時呼叫。
 	leafErr error
 	onLeaf  func()
 	onPage  func()
-	// notBefore 是最近一次分類檢查收到的時間下限。
 	notBefore time.Time
-	// heldPIDs 是測試刻意持有的阻擋連線，noTx 不把它們算成外部呼叫時開著的 transaction。
 	heldPIDs []int32
 }
 
@@ -88,7 +84,6 @@ func (f *fakes) Page(_ context.Context, q candidate.Query, after candidate.Curso
 	if f.pageErr != nil {
 		return candidate.Page{}, f.pageErr
 	}
-	// 測試給的頁都是最後一頁（Next 為空）：只有第一頁（沒有游標）有內容。
 	pg, ok := f.pages[1]
 	if after != "" || !ok {
 		return candidate.Page{}, nil
@@ -144,7 +139,6 @@ type fixture struct {
 
 func ledger(d *db.DB) run.Ledger { return run.Ledger{DB: d, Now: func() time.Time { return now }} }
 
-// newFixture 建一個需求（狀態 status）與它的現行版本；kind 是品項解析的種類。
 func newFixture(t *testing.T, status, kind string) *fixture {
 	t.Helper()
 	ctx := context.Background()
@@ -392,7 +386,6 @@ func TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidate
 	var releaseOnce sync.Once
 	releaseHeld := func() { releaseOnce.Do(func() { close(release) }) }
 	dispatched := make(chan error, 1)
-	// 任何失敗路徑都先放開阻擋 transaction，再等搜尋提交結束，fixture 的清理才不會卡住。
 	t.Cleanup(func() {
 		releaseHeld()
 		select {

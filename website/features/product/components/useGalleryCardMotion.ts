@@ -112,8 +112,6 @@ export function useGalleryCardMotion(
 		let next = drag.start - dx / (drag.width + PRODUCT_GALLERY_SLIDE_GAP_PX);
 		if (next < 0) next *= 0.3;
 		else if (next > count - 1) next = count - 1 + (next - count + 1) * 0.3;
-		// MotionValue updates compositor transforms without rerendering every
-		// image and thumbnail on every pointer event.
 		position.set(next);
 	};
 	const onPointerUp = (event: PointerEvent<HTMLElement>) => {

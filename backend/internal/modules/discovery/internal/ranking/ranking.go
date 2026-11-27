@@ -23,9 +23,7 @@ import (
 const (
 	// MaxLimit 是 Recommended 一次最多回傳的店家數。
 	MaxLimit = 50
-	// pageSize 是讀取時一頁讀的快照列數，也是一次問 seller 資格的店家數（seller.MaxBatchSize）。
 	pageSize = seller.MaxBatchSize
-	// scoresJob 是快照的重算工作在 recompute_state 的鍵。
 	scoresJob = "seller_scores"
 )
 
@@ -82,13 +80,13 @@ func (s *Service) Recommended(ctx context.Context, limit int) (Recommendation, e
 		q := store.New(s.d.DB.Conn(ctx))
 		state, err := q.GetRecomputeState(ctx, scoresJob)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil // 還沒有任何一次嘗試：沒有快照。
+			return nil
 		}
 		if err != nil {
 			return err
 		}
 		if state.LastSucceededStartedAt == nil {
-			return nil // 嘗試過但從沒成功：沒有快照。
+			return nil
 		}
 		computedAt := state.LastSucceededStartedAt.UTC()
 		rec.ComputedAt = &computedAt
@@ -105,7 +103,6 @@ func (s *Service) Recommended(ctx context.Context, limit int) (Recommendation, e
 	return rec, nil
 }
 
-// read 在快照裡逐頁取出，每頁問 seller 資格，直到湊滿 limit 或快照的盡頭。
 func (s *Service) read(ctx context.Context, q *store.Queries, limit int) ([]Ranked, error) {
 	out := make([]Ranked, 0, limit)
 	var cursor *store.NextSellerScoresParams

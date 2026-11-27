@@ -53,8 +53,7 @@ export default function ProductGallery({
 
 	return (
 		<div className="flex flex-col" data-product-gallery>
-			{/* 4:3 跟隨縮圖與上傳裁切框的比例——原圖(700×525)在主圖不再被
-			    object-cover 二次裁切，主圖與縮圖呈現的構圖一致。 */}
+
 			<section
 				ref={gallerySize.ref}
 				className={`relative mb-4 aspect-[4/3] w-full overflow-hidden touch-pan-y outline-none focus-visible:ring-2 focus-visible:ring-hk-primary ${
@@ -122,9 +121,7 @@ export default function ProductGallery({
 					? `第 ${activeIndex + 1} 張商品圖片，共 ${images.length} 張`
 					: "尚無商品圖片"}
 			</p>
-			{/* 縮圖最多 9 張（對齊正式商品上架圖庫上限）：維持 5 欄佈局，
-			    第 6~9 張自然換行到第二列，不破壞既有 RWD 排版。
-			    無圖商品不顯示縮圖列（主圖已顯示空圖片 fallback）。 */}
+
 			{images.length > 0 ? (
 				<div className="grid grid-cols-5 gap-2.5 max-md:gap-1.5 max-sm:gap-1">
 					{images.map((thumb, index) => {
@@ -144,8 +141,6 @@ export default function ProductGallery({
 								<AppImage
 									className="object-cover"
 									src={thumb}
-									// The named thumb preset is square; card preserves the
-									// uploaded 4:3 composition. GIFs keep their motion preset.
 									preset={postCardPresetForMedia(thumb, "card")}
 									alt={`縮圖 ${index + 1}`}
 									fill
@@ -176,7 +171,6 @@ function GalleryCard({
 	children: React.ReactNode;
 }) {
 	const transform = useTransform(position, (current) => {
-		// Keep distant cards parked offscreen; only nearby cards change transforms.
 		const offset = Math.max(-1.2, Math.min(1.2, index - current));
 		const distance = Math.min(Math.abs(offset), 1);
 		const angle = reducedMotion ? 0 : Math.max(-1, Math.min(1, offset)) * -5;
@@ -195,8 +189,6 @@ function GalleryCard({
 	);
 }
 
-// Reuse the thumbnail URL at small sizes; only request a second image when
-// the measured box and pixel density call for a larger gateway preset.
 const GalleryImage = React.memo(function GalleryImage({
 	image,
 	alt,

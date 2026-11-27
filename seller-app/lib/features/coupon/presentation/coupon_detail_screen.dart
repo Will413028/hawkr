@@ -27,7 +27,6 @@ class CouponDetailScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 先用列表帶入的 coupon 立即渲染，同時抓詳情補上已領取 / 已使用統計。
     final detailFuture = useMemoized(
       () =>
           ref.read(couponRepositoryProvider).getCouponDetail(coupon.templateId),
@@ -36,7 +35,6 @@ class CouponDetailScreen extends HookConsumerWidget {
     final snapshot = useFuture(detailFuture);
     final detail = snapshot.data;
 
-    // 詳情回來後以 template 為準（欄位較完整），否則沿用列表資料。
     final c = detail?.template ?? coupon;
 
     return Scaffold(
@@ -49,11 +47,9 @@ class CouponDetailScreen extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── 券卡（唯讀，沿用列表卡片外觀）──
               CouponCardWidget(coupon: c),
               SizedBox(height: 24.h),
 
-              // ── 領用統計 ──
               Row(
                 children: [
                   _StatCard(
@@ -74,11 +70,9 @@ class CouponDetailScreen extends HookConsumerWidget {
               ),
               SizedBox(height: 20.h),
 
-              // ── 明細 ──
               _InfoPanel(coupon: c),
               SizedBox(height: 20.h),
 
-              // ── 唯讀說明 ──
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),

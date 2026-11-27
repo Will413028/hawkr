@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// storeNotFound 把 seller 的 NotFound 換成本模組的句子（A9-D41）；其他錯誤原樣往上。
 func storeNotFound(ctx context.Context, err error) error {
 	if err != nil && apperr.KindOf(err) == apperr.KindNotFound {
 		return apperr.NotFound("%s", text.AdminQuotaStoreNotFound(loc(ctx)))

@@ -51,8 +51,6 @@ class CartController extends _$CartController {
   @override
   Future<CartState> build() async {
     ref.keepAlive();
-    // A session change rebuilds this keepAlive controller. Guest debounces
-    // must never be allowed to flush into the newly authenticated member cart.
     _cancelTransientWork();
     _snapshotSubscription?.cancel();
     final repository = ref.watch(cartRepositoryProvider);
@@ -109,8 +107,6 @@ class CartController extends _$CartController {
         selectedAddressId: selectedAddressId,
       );
     } on Object {
-      // Guest carts and temporarily unavailable address services must not
-      // replace a successfully loaded cart.
     }
 
     try {
@@ -128,7 +124,6 @@ class CartController extends _$CartController {
         selectedStorePickupId: selectedStoreId,
       );
     } on Object {
-      // Store pickup is optional until checkout; preserve the cart snapshot.
     }
     return next;
   }
@@ -317,7 +312,6 @@ class CartController extends _$CartController {
 
   void scheduleValidation() {
     _validationTimer?.cancel();
-    // A superseded response must never restore another store's checkout data.
     _validationGeneration++;
     _shippingFeeGeneration++;
     final current = state.value;
@@ -476,9 +470,6 @@ class CartController extends _$CartController {
     }
     final shippingOption =
         current.shippingOptions[current.selectedShippingIndex];
-    // 運費精算只對「宅配到府」有意義（要用收件地址算）。
-    // 明確分派而非 `!isStorePickup`：未知 / 本版未支援的配送方式不得被當成宅配
-    // 拿去打精算 API。
     if (shippingPresentationOf(shippingOption['shippingMethod']?.toString()) !=
         ShippingPresentation.homeDelivery) {
       return;

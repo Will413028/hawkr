@@ -21,8 +21,6 @@ test("a third-party seller gets product, seller, brand — once each", () => {
 });
 
 test("the platform's own store does not repeat the brand", () => {
-	// Regression pin: prod served `「範例」Hawkr x 東河文旦 | Hawkr | Hawkr`
-	// because the seller segment and the brand segment were the same string.
 	const title = productSeoTitle(
 		{
 			name: "「範例」Hawkr x 東河文旦",
@@ -39,7 +37,6 @@ test("the platform's own store does not repeat the brand", () => {
 });
 
 test("a product whose name already carries the brand still keeps its own name", () => {
-	// Only an ADJACENT duplicate collapses; the name is the seller's wording.
 	assert.equal(
 		productSeoTitle({ name: "Hawkr", sellerName: "Hawkr" }, "zh-TW"),
 		"Hawkr",

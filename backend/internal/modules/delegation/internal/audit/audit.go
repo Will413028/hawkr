@@ -49,7 +49,6 @@ func toAuditLog(l store.DelegationAdminOperationAuditLog) model.AuditLog {
 	}
 }
 
-// storedChangedField 是 changed_fields 的 JSON 形狀（每個鍵都保留，空的 before 也是「這個欄位原本是空的」）。
 type storedChangedField struct {
 	Field  string `json:"field"`
 	Label  string `json:"label"`
@@ -68,8 +67,6 @@ func encodeChangedFields(fs []model.ChangedField) ([]byte, error) {
 	return json.Marshal(out)
 }
 
-// decodeChangedFields 讀回變更的欄位。解析不了的列回空的（一列壞掉的資料不能讓整個稽核查詢失敗），沒有欄位名的
-// 項目略過。
 func decodeChangedFields(raw []byte) []model.ChangedField {
 	if len(raw) == 0 {
 		return nil
@@ -138,12 +135,10 @@ func (m *Module) RecordDelegationAuditIntent(ctx context.Context, in model.Audit
 		ResourceVersionBefore: in.ResourceVersionBefore,
 		UserAgent:             model.Optional(in.UserAgent),
 		RiskLevel:             string(in.Action.RiskLevel()),
-		// notify_seller 只在 intent 寫入（confirm 只讀）；不能通知的動作在這裡強制為 false。
 		NotifySeller: in.NotifySeller && in.Action.MayNotifySeller(),
 		Now:          now,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		// 同一把鍵的另一個請求剛寫入：它的列就是答案。
 		intent, ok, err := replayedIntent(ctx, q, in)
 		if err == nil && !ok {
 			err = errors.New("delegation：稽核 intent 撞到冪等鍵，卻讀不到那一列")
@@ -156,9 +151,6 @@ func (m *Module) RecordDelegationAuditIntent(ctx context.Context, in model.Audit
 	return model.AuditIntent{AuditLogID: row.ID, Result: model.AuditResult(row.Result)}, nil
 }
 
-// replayedIntent 回傳同一把冪等鍵既有的列（ok 為 true）。冪等鍵綁定 (session、動作、資源、payload hash)（設計書 56
-// §6.6.1；§5.2 的 uq_aoal_session_idempotency「重放時比對 payload_hash，不同即回衝突碼」）：同一把鍵用在不同的動作、
-// 資源或內容上是 9267，不是重放。
 func replayedIntent(ctx context.Context, q *store.Queries, in model.AuditIntentInput) (model.AuditIntent, bool, error) {
 	l, err := q.GetDelegationAuditLogByIdempotencyKey(ctx, store.GetDelegationAuditLogByIdempotencyKeyParams{
 		SessionID: in.SessionID, IdempotencyKey: model.Optional(in.IdempotencyKey),
@@ -175,8 +167,6 @@ func replayedIntent(ctx context.Context, q *store.Queries, in model.AuditIntentI
 	return model.AuditIntent{AuditLogID: l.ID, Replayed: true, Result: model.AuditResult(l.Result)}, true, nil
 }
 
-// sameIntent 回傳既有的稽核列是不是同一個請求寫的。建立類在 intent 時沒有資源的 ID（confirm 才補上），重放時也不帶，
-// 所以只有帶了才比。
 func sameIntent(l store.DelegationAdminOperationAuditLog, in model.AuditIntentInput) bool {
 	if l.Action != string(in.Action) || l.ResourceType != string(in.ResourceType) {
 		return false
@@ -188,7 +178,6 @@ func sameIntent(l store.DelegationAdminOperationAuditLog, in model.AuditIntentIn
 	return (l.PayloadHash == nil) == (hash == nil) && (hash == nil || *l.PayloadHash == *hash)
 }
 
-// usableDelegationSession 是 intent 的前提：session 存在而且還能用。
 func validateIntent(in model.AuditIntentInput) error {
 	switch {
 	case !in.Action.Known():
@@ -200,7 +189,6 @@ func validateIntent(in model.AuditIntentInput) error {
 	case in.Capability == "":
 		return model.Deny(model.DenialInvalidCommand, "capability 不得為空")
 	case in.OperationReason == "" && !in.Action.DenialOnly() && in.Origin != model.AuditScheduled:
-		// 空字串存成 NULL 之後，理由就再也補不回來。
 		return model.Deny(model.DenialInvalidCommand, "operationReason 為必填")
 	case utf8.RuneCountInString(in.OperationReason) > 100:
 		return model.Deny(model.DenialInvalidCommand, "operationReason 不得超過 100 字")
@@ -208,9 +196,6 @@ func validateIntent(in model.AuditIntentInput) error {
 	return nil
 }
 
-// inheritedReason 是排程執行的操作理由：同一個 session、同一個資源、建立排程（POST_SCHEDULE）那一列的理由。執行時
-// 沒有請求可以帶理由，而寫入類的理由必填；找不到就拒絕（9279），不寫一列沒有理由的寫入。排程只有貼文；其他資源的
-// 排程是沒有定義的路徑，同樣拒絕。
 func inheritedReason(ctx context.Context, q *store.Queries, in model.AuditIntentInput) (*string, error) {
 	if in.ResourceType != model.ResourcePost {
 		return nil, model.Deny(model.DenialInvalidCommand, "origin=scheduled 不支援此 resourceType")
@@ -230,7 +215,6 @@ func inheritedReason(ctx context.Context, q *store.Queries, in model.AuditIntent
 	return reason.OperationReason, nil
 }
 
-// truncateRunes 把 s 截到 n 個字。
 func truncateRunes(s string, n int) string {
 	if r := []rune(s); len(r) > n {
 		return string(r[:n])
@@ -300,8 +284,6 @@ func (m *Module) confirmAudit(ctx context.Context, q *store.Queries, in model.Au
 	if err != nil {
 		return model.AuditLog{}, fmt.Errorf("delegation：讀取稽核：%w", err)
 	}
-	// 成功的列，能力必須在 session 的快照內。失敗的列不檢查：它們記的是「有人要了沒有授予的能力」，正是安全稽核要的
-	// 證據。
 	var session model.DelegationSession
 	if in.Result == model.AuditSucceeded {
 		if session, err = m.d.Session.Session(ctx, existing.SessionID); err != nil {
@@ -336,7 +318,6 @@ func (m *Module) confirmAudit(ctx context.Context, q *store.Queries, in model.Au
 		ResourceVersionAfter: in.ResourceVersionAfter, BizCode: bizCode, FailureReason: failureReason, Now: now, ID: in.AuditLogID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		// 已經確認過：既有的結論不被覆蓋。
 		if existing, err = q.GetDelegationAuditLog(ctx, in.AuditLogID); err != nil {
 			return model.AuditLog{}, fmt.Errorf("delegation：讀取稽核：%w", err)
 		}

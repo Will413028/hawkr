@@ -36,8 +36,6 @@ class AfterSalesEventPublisherImplTest {
      */
     @Test
     void publishRefundCompleted_realtimeCarriesStoreIdWhileDomainEventCarriesAccountId() throws Exception {
-        // 分岔賣家：store_id != login account_id。兩者相等時本測試對「有沒有反解析」零鑑別力，
-        // 而那正是這個 bug 活到部署的原因。
         long storeId = 7001L;
         long resolvedAccountId = 42L;
         assertNotEquals(storeId, resolvedAccountId, "fixture 必須用分岔身分，否則本測試無鑑別力");
@@ -50,14 +48,12 @@ class AfterSalesEventPublisherImplTest {
         ArgumentCaptor<byte[]> bodyCaptor = ArgumentCaptor.forClass(byte[].class);
         verify(obsRabbitPublisher, times(2)).publish(anyString(), anyString(), bodyCaptor.capture(), anyString());
 
-        // 第二次 publish 呼叫是 seller.after_sale.updated（第一次是 aftersales.events domain event）
         String json = new String(bodyCaptor.getAllValues().get(1));
         assertTrue(json.contains("\"sellerId\":" + storeId),
                 "realtime payload 的 sellerId 必須是 store_id(" + storeId + ")——gateway 的訂閱 topic 用 current store_id 建：" + json);
         assertFalse(json.contains("\"sellerId\":" + resolvedAccountId),
                 "反解析成 login account_id(" + resolvedAccountId + ") 會讓事件落在沒有人訂閱的 topic 上：" + json);
 
-        // domain event（notification-service 消費）維持 account_id 空間，不受本次修復影響
         String domainEventJson = new String(bodyCaptor.getAllValues().get(0));
         assertTrue(domainEventJson.contains("\"store_id\":\"" + storeId + "\""),
                 "domain event payload 必須額外帶未反解的 store_id(" + storeId + ")：" + domainEventJson);
@@ -76,8 +72,6 @@ class AfterSalesEventPublisherImplTest {
         publisher.publishRefundCompleted("A001", "O100", storeId, 2001L,
                 AfterSalePlatformDecisionOutcome.FULL_REFUND, 1000L, "CREDIT_CARD", "TXN001");
 
-        // domain event ＋ realtime 兩則都要發出。修復前 realtime 會因為反解失敗被跳過，
-        // 也就是說 seller-service 抖一下、賣家的訂單頁就靜靜地不更新。
         ArgumentCaptor<byte[]> bodyCaptor = ArgumentCaptor.forClass(byte[].class);
         verify(obsRabbitPublisher, times(2)).publish(anyString(), anyString(), bodyCaptor.capture(), anyString());
         String realtimeJson = new String(bodyCaptor.getAllValues().get(1));
@@ -88,7 +82,7 @@ class AfterSalesEventPublisherImplTest {
     @Test
     void publishCaseTransitionWithContext_resolvesStoreIdToAccountIdInDomainEventPayload() throws Exception {
         long storeId = 7001L;
-        long resolvedAccountId = 42L; // 不同於 storeId：模擬已重新上架的賣家
+        long resolvedAccountId = 42L;
         when(sellerGrpcClient.resolveAccountIdForStore(storeId)).thenReturn(resolvedAccountId);
 
         AfterSalesEventPublisherImpl publisher = new AfterSalesEventPublisherImpl(obsRabbitPublisher, sellerGrpcClient, buyerGrpcClient);
@@ -98,7 +92,6 @@ class AfterSalesEventPublisherImplTest {
         ArgumentCaptor<byte[]> bodyCaptor = ArgumentCaptor.forClass(byte[].class);
         verify(obsRabbitPublisher, times(2)).publish(anyString(), anyString(), bodyCaptor.capture(), anyString());
 
-        // 第一次 publish 呼叫是 domain event（aftersales.events），本測試斷言對象
         byte[] domainEventBody = bodyCaptor.getAllValues().get(0);
         String json = new String(domainEventBody);
         assertTrue(json.contains("\"seller_account_id\":\"" + resolvedAccountId + "\""),

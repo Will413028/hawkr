@@ -54,8 +54,6 @@ export function InvoiceComplaintActionDialog({
 		if (kind) setText("");
 	}, [kind]);
 
-	// 必填與否折在 `complaintActionFieldRule` 一處並有測試守著——三者各不相同，
-	// 而且 63 與建案完全相反（見該函式的檔內註解）。
 	const rule = complaintActionFieldRule(kind ?? "withdraw");
 	const needsReason = rule.required;
 	const hasField = rule.hasField;

@@ -35,7 +35,7 @@ public class CartCacheService {
             Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
 
             if (entries.isEmpty()) {
-                return null; // Cache Miss
+                return null;
             }
 
             List<CartItemEntity> items = new ArrayList<>();
@@ -112,11 +112,6 @@ public class CartCacheService {
                         try {
                             SellerMetaCacheEntry entry = objectMapper.readValue(val, SellerMetaCacheEntry.class);
                             if (!entry.hasStoreCode()) {
-                                // 舊版本寫入的 JSON 欄位較少時，Jackson 是「以 null 補齊」而非拋
-                                // JsonProcessingException（record canonical constructor 的預設行為），
-                                // 所以上面那個 catch 攔不到它。當成 Cache Hit 的話 store_code 會一路
-                                // 空到 TTL（24h）到期，而呼叫端不會回源、也不會有任何錯誤訊號。
-                                // 缺必要欄位的條目不是可用的快取值，直接算 Miss 讓它回源自癒（#2098）。
                                 log.info("CartCacheService.getSellerMetaBatch.staleSchema",
                                         "賣家快取缺 storeCode（舊格式），視為 Cache Miss storeId=" + storeIds.get(i));
                                 continue;
@@ -139,8 +134,6 @@ public class CartCacheService {
 
     public void setSellerMeta(Long storeId, SellerMetaCacheEntry entry) {
         if (entry == null || !entry.hasStoreCode()) {
-            // 讀取端已把缺 storeCode 的條目當 Miss，寫入端就不能再把它塞回去 ——
-            // 否則同一個殘缺值會被寫成 24h TTL，每次讀都 Miss、每次都回源寫回同一份殘缺值。
             log.error("CartCacheService.setSellerMeta.incomplete",
                     "賣家 meta 缺 storeCode，拒絕寫入快取 storeId=" + storeId);
             return;

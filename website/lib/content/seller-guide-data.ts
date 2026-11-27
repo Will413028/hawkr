@@ -296,8 +296,6 @@ export const sellerGuideChapters: SellerGuideChapter[] = [
 				summary: "依出貨階段分頁查看訂單，是每天處理出貨的主要清單。",
 				path: "/seller-center/orders",
 				steps: [
-					// 第三個分頁叫「已結束」不是「已完成」：它包含已取消與退款。名稱的唯一來源是
-					// `features/seller-center/orders/orderTabs.ts` 的 `SELLER_ORDER_TAB_LABEL`。
 					"打開「訂單管理」，用分頁切換：待出貨／配送中／已結束／售後處理（「已結束」是這筆你不用再處理了，包含已完成、退款與已取消，不是成交筆數）。",
 					"用「全部」「待處理」快速篩選縮小範圍；在「配送中」分頁還會多一個「配送異常」篩選，有配送異常的訂單會顯示「異常」標示。",
 					"在搜尋框輸入訂單編號或顧客搜尋。",

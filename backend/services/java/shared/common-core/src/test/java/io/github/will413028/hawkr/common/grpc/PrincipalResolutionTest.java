@@ -28,8 +28,8 @@ class PrincipalResolutionTest {
     void echoBackEntryIsStillUnresolved() {
         PrincipalResolution r = PrincipalResolution.of(Map.of(ID, ID), List.of(ID));
 
-        assertThat(r.principals()).containsEntry(ID, ID); // 舊呼叫端看到的東西完全沒變
-        assertThat(r.isUnresolved(ID)).isTrue();          // 新呼叫端看得出來那是回吐
+        assertThat(r.principals()).containsEntry(ID, ID);
+        assertThat(r.isUnresolved(ID)).isTrue();
     }
 
     @Test

@@ -64,18 +64,12 @@ export function beginNavPending(): (options?: EndNavPendingOptions) => void {
 	const el = root();
 	if (!el) return () => {};
 
-	// Every producer, not just the router hold: a wait that is still open when
-	// the document leaves (auth hard-navigation, the watchdog's recovery
-	// assign, a role switch) would otherwise be frozen into the bfcache entry
-	// and come back trickling forever the moment the user presses Back.
 	installLifecycleGuard();
 	activeCount += 1;
 	if (clearTimer !== null) {
 		clearTimeout(clearTimer);
 		clearTimer = null;
 	}
-	// A value change alone restarts the trickle: "done"/"abort" → "" swaps
-	// the matched animation-name, which resets the animation.
 	if (el.getAttribute(ATTR) !== "") {
 		el.setAttribute(ATTR, "");
 		pendingSince = Date.now();
@@ -89,9 +83,6 @@ export function beginNavPending(): (options?: EndNavPendingOptions) => void {
 		if (activeCount > 0) return;
 		const rootEl = root();
 		if (rootEl?.getAttribute(ATTR) !== "") return;
-		// Ended inside the reveal window: the rail was never visible — clear
-		// silently. Entering the sweep here would flash a full-width bar on
-		// every fast navigation (quick-view open/close being the hottest).
 		if (Date.now() - pendingSince < MIN_VISIBLE_FOR_SWEEP_MS) {
 			rootEl.removeAttribute(ATTR);
 			return;
@@ -101,7 +92,6 @@ export function beginNavPending(): (options?: EndNavPendingOptions) => void {
 		clearTimer = setTimeout(
 			() => {
 				clearTimer = null;
-				// Only clear if no new wait started during the sweep/fade.
 				if (activeCount === 0) root()?.removeAttribute(ATTR);
 			},
 			phase === "abort" ? ABORT_VISIBLE_MS : DONE_VISIBLE_MS,
@@ -109,18 +99,6 @@ export function beginNavPending(): (options?: EndNavPendingOptions) => void {
 	};
 }
 
-/* ── Router-transition hold ─────────────────────────────────────────────
- * 單一 producer 蓋住「每一個 push/replace soft nav」從發起到 URL commit 的
- * 等待窗。發起點是 instrumentation-client 的 onRouterTransitionStart——Next
- * 在導航開始時同步呼叫，因此程式化導航（bottom-nav 滑動手勢、分類 chip、
- * 搜尋鈕的 router.push）與 anchor 點擊一視同仁；相對地 patched pushState
- * 要到 route commit（HistoryUpdater 的 insertion effect）才跑，蓋不到窗。
- * commit 判定沿用 Link.tsx 的 location 輪詢（App Router 在 commit 時更新
- * location）。traverse 不收：popstate 當下 location 已是新 URL、輪詢無從
- * 判 commit，由 PageTransition 的 popstate 分支（React pathname commit
- * 訊號）負責。與 Link ensure hold / PageTransition loading hold 的重疊由
- * refcount 收斂。supersede（前一導航未 commit 又發起新導航）沿用同一個
- * hold、僅重掛保險絲——被 Next 放棄的導航不會 done，由保險絲 fade 收尾。 */
 
 const ROUTER_COMMIT_POLL_MS = 120;
 /** 對齊 PageTransition 的 MAX_LOADING_VISIBLE_MS：超過視為導航被放棄。 */
@@ -165,11 +143,10 @@ export function beginRouterTransitionPending(
 	} catch {
 		return;
 	}
-	// 同 URL 的 transition（refresh 類）沒有可觀察的 commit 邊界，不掛。
 	if (target === window.location.href) return;
 	installLifecycleGuard();
 	routerHoldDeadline = Date.now() + ROUTER_HOLD_FUSE_MS;
-	if (routerHoldEnd) return; // supersede：hold 沿用，保險絲已重掛
+	if (routerHoldEnd) return;
 	routerHoldSource = window.location.href;
 	routerHoldEnd = beginNavPending();
 	const tick = () => {

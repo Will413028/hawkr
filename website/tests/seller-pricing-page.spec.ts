@@ -90,13 +90,6 @@ function watchRuntimeErrors(page: Page) {
 	});
 	page.on("console", (message) => {
 		if (message.type() !== "error") return;
-		// A failed subresource load (image/font/tracking beacon from an
-		// external CDN) is not a JS runtime error — it's the browser's own
-		// network-layer console log, distinct from an uncaught exception.
-		// This function's name and every caller's intent is "did the page's
-		// own code crash", not "did every third-party asset load"; folding
-		// the two together made an external CDN having a bad moment
-		// indistinguishable from a real regression on this page.
 		if (message.text().startsWith("Failed to load resource")) return;
 		errors.push(`console: ${message.text()}`);
 	});
@@ -152,13 +145,6 @@ async function finishFaqAnimations(page: Page) {
 
 async function readPricingGeometry(page: Page): Promise<PricingGeometry> {
 	return page.evaluate(() => {
-		// 版面位置：沿 offsetParent 鏈累加 offsetTop，得到不含 CSS transform 的文件
-		// 座標。reveal 動效以 translate3d 位移元素，getBoundingClientRect 會把位移一
-		// 併算進去，於是過渡期間「畫出來的位置」與「版面位置」不同；這些斷言要問的是
-		// 「選方案有沒有造成重排」，量的必須是後者。
-		//
-		// 一定要累加到根：.sp-plan-anchor 是 position: relative，單取 offsetTop 會讓
-		// 兩張卡片各自相對自己的 anchor（同為 0），expectPlanCardsAligned 就恆真了。
 		const layoutTop = (element: HTMLElement) => {
 			let top = 0;
 			let node: HTMLElement | null = element;
@@ -198,10 +184,6 @@ async function readPricingGeometry(page: Page): Promise<PricingGeometry> {
 	});
 }
 
-// #managed-service 帶 data-sp-reveal="up"，由 IntersectionObserver 觸發
-// pending(translate3d(0, 22px, 0)) → visible(transform: none) 的 480ms 過渡。捲動把
-// 它帶進視窗的那一刻起，前後兩次量測會落在過渡曲線的不同點上。等的是可觀測終態
-// （transform 已收斂成 none），不是固定秒數，所以不隨 runner 快慢改變。
 async function settleManagedServiceReveal(page: Page) {
 	const addOn = page.locator("#plans #managed-service");
 	await expect(addOn).toHaveAttribute("data-sp-reveal-state", "visible");
@@ -607,7 +589,6 @@ test.describe("seller pricing Free and Pro", { tag: ["@ui"] }, () => {
 		await expect(
 			managedService.getByRole("checkbox", { name: /加購代行包/u }),
 		).not.toBeChecked();
-		// 2026-09-10：ThemeToggle 改 APG toggle（名稱固定「主題切換」+ aria-pressed）。
 		await page.getByRole("button", { name: "主題切換" }).click();
 		await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 		const darkIndicatorColors = await page

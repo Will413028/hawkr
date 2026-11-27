@@ -27,7 +27,6 @@ class LiveCountdownLine extends StatefulWidget {
   final String expiredText;
   final Duration urgentThreshold;
 
-  // 配色固定：normal 橘 / urgent 紅 / expired 灰，跟其他 deadline row 共用。
   static const Color kUrgent = AppColors.danger;
   static const Color kNormal = AppColors.primary;
   static const Color kExpired = AppColors.textSecondary;
@@ -74,7 +73,6 @@ class _LiveCountdownLineState extends State<LiveCountdownLine> {
   Widget build(BuildContext context) {
     final dt = tryParseTaipeiInstant(widget.deadlineIso);
     if (dt == null) {
-      // 無有效時間：靜態顯示 dash，與 _InfoLine 保持一致排版
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -112,12 +110,10 @@ class _LiveCountdownLineState extends State<LiveCountdownLine> {
         fontSize: 14,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.5,
-        // 等寬數字：tick 時不會因為字寬不同造成抖動
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
 
-    // 緊急 / 已逾時 → 把倒數值包成淡色 chip 突出，normal 維持 plain text。
     final Widget valueWidget = highlight
         ? Container(
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),

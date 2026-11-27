@@ -44,15 +44,7 @@ const UTILITY = new RegExp(
 	`\\b(${COLOR_UTILS}|shadow|rounded)-((?:hk|hkui)-[a-z0-9]+(?:-[a-z0-9]+)*)`,
 	"g",
 );
-// --- 歧義 text-[ var(--…) ]：靠「變數解析後的實際值」判定，不靠名字前綴 ---
 
-// styles/ 底下所有自訂屬性的第一份宣告（同名重宣告只換值不換型別，例如深色
-// 模式覆寫顏色，因此取第一份即可判型）。
-//
-// 必須以「宣告起點」錨定並讓值吃到下一個分號為止，不能逐行比對：本 repo 有 33
-// 處宣告是跨行的（ui-kit.css 的 --hkui-focus-ring、01-tokens-theme.css 的
-// --font-primary、home.css 的 --font-body …），逐行版本會完全看不到它們，於是
-// 把「定義好好的變數」判成未定義。
 const CSS_DECLARATION = /(?:^|[;{])\s*(--[a-zA-Z0-9_-]+)\s*:\s*([^;]*)/gm;
 const cssVarValue = new Map<string, string>();
 for (const file of walk("styles", /\.css$/)) {
@@ -96,14 +88,9 @@ function varKind(name: string, seen = new Set<string>()): VarKind {
 	return raw === undefined ? "unknown" : valueKind(raw, seen);
 }
 
-// --text-* 家族是 Tailwind 內建字級刻度（不在 styles/ 內、解析不到），且本 repo
-// 的同名家族「顏色與字級混居」（--text-body 是色、--text-sm 是級）——整族一律
-// 要求寫明型別，不走值解析。
 const MIXED_FAMILY = /^--text-/;
 const TEXT_VAR_USE = /text-\[var\((--[a-zA-Z0-9_-]+)/g;
 
-// 回傳這一行裡「歧義且會壞掉」的變數名；顏色變數的歧義形式行為確定（=color），
-// 不在此攔截。
 function ambiguousTextVars(line: string): string[] {
 	const out: string[] = [];
 	for (const m of line.matchAll(TEXT_VAR_USE)) {
@@ -113,19 +100,8 @@ function ambiguousTextVars(line: string): string[] {
 	return out;
 }
 
-// --- 未定義的 custom property ---
-//
-// 「解析不到定義」和「解析到了但判不出型別」是兩件事：後者維持放行（varKind →
-// unknown），前者可以確定是錯的——`var(--x)` 指向不存在的屬性時整條宣告無效被
-// 丟掉，class 一樣是沉默失效，只是換了成因。`--hkui-text-xsmall` 就是這樣：寫法
-// 完全正確（有 length:）卻從沒被定義過，字級照樣沒有套上。
-//
-// 有 fallback 的（`var(--x, 14px)`）不算壞——fallback 就是為此存在。
 const ARBITRARY = /\[[^\]\n]*\]/g;
 const VAR_REFERENCE = /var\(\s*(--[a-zA-Z0-9_-]+)\s*(,?)/g;
-// 同檔的行內定義：style={{ "--x": … }} 與 Tailwind 的 arbitrary property [--x:…]。
-// 兩者都是合法定義處，且都只在該檔生效，所以逐檔收集、不做全域池（全域池會讓
-// A 檔的定義替 B 檔的錯字背書）。
 const INLINE_STYLE_DEF = /["'](--[a-zA-Z0-9_-]+)["']\s*:/g;
 const ARBITRARY_PROP_DEF = /\[(--[a-zA-Z0-9_-]+)\s*:/g;
 
@@ -136,7 +112,6 @@ function locallyDefinedVars(source: string): Set<string> {
 	return out;
 }
 
-// 回傳這一行裡「引用了但哪裡都找不到定義、又沒給 fallback」的變數名。
 function undefinedVars(line: string, localVars: Set<string>): string[] {
 	const out: string[] = [];
 	for (const bracket of line.matchAll(ARBITRARY)) {
@@ -157,8 +132,6 @@ function requiredTokens(util: string, token: string): string[] {
 	return [`color-${token}`];
 }
 
-// 註解要「留白」而不是「刪掉」：刪行會讓後面每一筆 failure 的行號位移，開發者
-// 依報告跳過去會看到不相干的程式碼。
 function stripComments(source: string): string {
 	return source
 		.replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
@@ -219,7 +192,6 @@ for (const path of files) {
 				`${path}:${i + 1}: var(${name}) 未定義 — styles/ 與本檔都找不到這個 custom property，整條宣告會被丟掉（class 沉默失效）。請改用既有 token，或替它補上定義。`,
 			);
 		}
-		// 未定義是更根本的問題，同一個變數不必再抱怨一次型別歧義。
 		for (const name of ambiguousTextVars(line).filter(
 			(n) => !missing.includes(n),
 		)) {
@@ -230,7 +202,6 @@ for (const path of files) {
 	});
 }
 
-// Self-check: known-dead forms must fire; known-good forms must not.
 const selfDead: Array<[string, string]> = [
 	["bg", "hk-surface"],
 	["rounded", "hkui-xl"],
@@ -241,15 +212,6 @@ const selfAlive: Array<[string, string]> = [
 	["border", "hk-border-soft"],
 	["text", "hk-primary"],
 ];
-// 歧義規則的自檢：必攔（混居家族＋解析為長度）／必放（已寫型別＋解析為顏色）。
-// 後兩組同時是「CSS 值解析真的有在跑」的證據——styles/ 讀不到或 var() 鏈斷掉
-// 時 varKind 會退成 unknown，字級案例就攔不住，這裡直接判 gate 壞掉。
-//
-// 這些樣本要「拼」出來、不能整串寫死：Tailwind 的來源掃描包含 scripts/，看到
-// 完整 class 字面值就會當成真實用法產生 CSS。實測（2026-07-31）產物裡確實躺著
-// 一條 --text-sm 歧義形式的規則（編出來是 color:var(--text-sm)），全 repo 沒有
-// 任何元件在用，來源就是本檔舊版的自檢字串。拼接後掃描器抽不到候選字，樣本也
-// 就不再污染 bundle。
 const probe = (value: string) => `className="text-[${value}]"`;
 const selfAmbiguous = ["var(--text-sm)", "var(--hkui-text-small)"].map(probe);
 const selfTyped = [
@@ -258,8 +220,6 @@ const selfTyped = [
 	"var(--ink-soft,#6b7a5a)",
 	"var(--hkui-foreground)",
 ].map(probe);
-// 未定義規則的自檢。第一組（既有 token 不可誤報）同時證明 styles/ 真的讀進來
-// 了：cssVarValue 空掉的話它會整批誤報，gate 立刻判自己壞掉而不是靜靜放行。
 const NO_SUCH_TOKEN = "--definitely-not-a-real-token";
 const selfDefined = ["var(--hkui-danger-50)", "var(--hkui-text-tiny)"].map(
 	probe,

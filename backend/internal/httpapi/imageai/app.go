@@ -46,13 +46,11 @@ func NewApp(m Module, stores Stores, images rpc.Images, log *slog.Logger) *App {
 	return &App{m: m, stores: stores, images: images, log: log}
 }
 
-// 模組欄位違規的欄位名對到請求的 proto 路徑。
 var (
 	transformPaths = rpc.FieldPaths{"Image": "image_data", "MimeType": "mime_type", "Prompt": "prompt"}
 	listPaths      = rpc.FieldPaths{"Category": "category"}
 )
 
-// store 回傳呼叫者目前的店家 ID；帳號沒有店家（沒有賣家角色）回 permission_denied。
 func (h *App) store(ctx context.Context) (int64, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {

@@ -33,7 +33,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
   /// 編輯模式時帶入的現有商品資料
   final Map<String, dynamic>? existingProduct;
 
-  // ── L1 靜態資料 ────────────────────────────────────────────────
 
   static const List<String> _defaultTopTabs = [
     'Vegetables',
@@ -83,7 +82,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     'Flowers',
   };
 
-  // ── Build ──────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -102,7 +100,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     final l3NameToId = useState<Map<String, int>>({});
     final l1KeyToId = useState<Map<String, int>>({});
 
-    // 左側欄寬（可拖拉，Spring 動畫）
     final sidebarAnim = useAnimationController(
       lowerBound: 90.0.w,
       upperBound: 160.0.w,
@@ -141,11 +138,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
           editModeL2.value != null &&
           list.contains(editModeL2.value)) {
         activeSubcat.value = editModeL2.value;
-        // 編輯模式一律預先 populate selectedItem 讓「下一步」可點。
-        // 後端 schema 沒有 Lv4，所以 editModeL3 常常是 null — 這時從 tree 幫使用者自動挑一個：
-        //   1. 優先選跟 L2 同名的 L3（常見「預設子分類」慣例）
-        //   2. 否則挑第一個 L3
-        //   3. 樹裡根本沒 L3 就留空（selectedItem 仍然 populate，proceed 照樣可點）
         final top = activeTop.value;
         final sub = activeSubcat.value!;
         final l3Candidates = l3ByL2.value[sub] ?? const <String>[];
@@ -154,13 +146,12 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
             l3Candidates.contains(editModeL3.value)) {
           l3 = editModeL3.value!;
         } else if (l3Candidates.contains(sub)) {
-          l3 = sub; // 同名預設子分類
+          l3 = sub;
         } else if (l3Candidates.isNotEmpty) {
           l3 = l3Candidates.first;
         } else {
           l3 = '';
         }
-        // 回寫給 editModeL3，避免下一次 rebuild 又退回 null
         editModeL3.value = l3.isNotEmpty ? l3 : null;
 
         final existingCatalogId = existingProduct?['catalogId'];
@@ -170,7 +161,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
           '_selectedL1': top,
           'category': '${_topTabLabels[top] ?? top}_$sub',
           'subCategory': l3,
-          // 優先用 L3 name 對應的 id，否則 fallback 到 product 的 catalogId (backend Lv3Id)
           if (l3.isNotEmpty && l3NameToId.value.containsKey(l3))
             'id': l3NameToId.value[l3]
           else if (l3.isEmpty && l2NameToId.value.containsKey(sub))
@@ -214,10 +204,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       }
 
       () async {
-        // 效能優化：分類樹 (_load) 跟商品詳情 (_loadCategoryAsync) 互相獨立，
-        // 平行發起兩個網路請求，把總耗時從 tree+detail 降到 max(tree, detail)。
-        // _loadCategoryAsync 需要 _load 的結果才能合併 subcats，所以先 await tree 完，
-        // 但 product detail 的 Future 在 tree 開始時就 fire，等 tree 完就能立刻用。
         final needLoadDetail =
             isEditMode &&
             existingProduct != null &&
@@ -268,7 +254,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       return null;
     }, const []);
 
-    // ── Event handlers ─────────────────────────────────────────
 
     void onSearch() {
       final key = searchCtrl.text.trim().toLowerCase();
@@ -343,7 +328,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
 
           final l1Key = activeTop.value;
 
-          // 1. 即時加入本地 L2 列表，讓使用者馬上看到新分類
           final newSubByMajor = Map<String, List<String>>.from(
             subByMajor.value,
           );
@@ -354,13 +338,10 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
             subByMajor.value = newSubByMajor;
           }
 
-          // 2. 選中新分類（rebuildSubcats 會 preserve activeSubcat）
           activeSubcat.value = trimmed;
           selectedItem.value = null;
           rebuildSubcats();
 
-          // 3. 送出 L2 分類。後端會立即建立 active 分類；
-          // 同 parent 重名時會回傳既有 active 分類 id。
           final l1Id = l1KeyToId.value[l1Key];
           if (l1Id == null) return;
           try {
@@ -402,7 +383,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       if (parentName == null) return;
       final parentId = l2NameToId.value[parentName];
       if (parentId == null) {
-        // FloatingToast 需要 context，但此處 context 仍有效
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('無法取得父分類 ID')));
@@ -426,7 +406,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       );
     }
 
-    // ── UI ─────────────────────────────────────────────────────
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -451,7 +430,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
           Expanded(
             child: Stack(
               children: [
-                // 右側 L3 清單（固定起始位置，不隨抽屜寬度變動）
                 Positioned(
                   left: 90.0.w + kPickerHandleWidth,
                   top: 0,
@@ -480,7 +458,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
                     onAddSubcategory: onAddSubcategory,
                   ),
                 ),
-                // 左側抽屜（含遮罩與把手）
                 Positioned.fill(
                   child: PickerSubcatDrawer(
                     sidebarAnim: sidebarAnim,
@@ -523,7 +500,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     );
   }
 
-  // ── Static helpers ──────────────────────────────────────────
 
   static String _computeInitialActiveTop({
     required bool isEditMode,
@@ -571,13 +547,9 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     for (final key in _allowedTopKeys) {
       if (key.toLowerCase() == trimmed.toLowerCase()) return key;
     }
-    // 不在白名單但有具名 label → 直接保留原值，不要 fallback 到 Other。
-    // 過去 fallback 會把 "李"、"番茄" 這種正常 L1 都吞掉，editMode 進來時
-    // activeTop 變成 Other → L2/L3 對不上 → 右邊空清單。
     return trimmed;
   }
 
-  // ── Async loaders (static) ──────────────────────────────────
 
   /// 接收「已經發起」的 product detail Future，等其完成後把資料套進 picker state。
   /// 跟 _load (category tree) 平行跑，把兩個獨立網路 call 的總耗時從
@@ -598,13 +570,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       final productData = productResp['data'] as Map<String, dynamic>?;
       if (productData == null) return;
 
-      // 後端 schema 層級對應前端 picker：
-      //   - 後端 Lv1 (水果 / 蔬菜 ...) ↔ 前端 L1 top tab
-      //   - 後端 Lv2 (李 / 番茄 ...)   ↔ 前端 L2 left drawer
-      //   - 後端 Lv3 (黃肉李 / 小番茄) ↔ 前端 L3 right drawer
-      // 歷史備註：曾以為 backend Lv1 是 hidden root 所以讀偏一層；
-      // 後端 ProductDetail 已穩定回三層名稱，這個假設過時了。
-      // 同時保留 categoryL1/2/3 跟 categoryName 作為更舊資料 fallback。
       final l1 = (productData['categoryLv1Name'] ?? productData['categoryL1'])
           ?.toString()
           .trim();

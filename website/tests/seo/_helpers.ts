@@ -150,7 +150,6 @@ export function extractLiveEntityId(
 	return id == null ? null : String(id);
 }
 
-// Loopback by default: a spec run without env must not leave the machine.
 export const SEO_API_BASE =
 	process.env.API_BASE_URL ?? "http://127.0.0.1:9/api/v1";
 
@@ -188,12 +187,6 @@ export async function resolveSellerCanonicalId(
 	const base = `${SEO_API_BASE}/public`;
 	const res = await request.get(`${base}/sellers/${id}`).catch(() => null);
 	if (!res?.ok()) return id;
-	// camelCase — the endpoint's DTO is the gateway's `PublicSellerInfo`
-	// (`json:"storeCode"` since backend#2235). Reading `store_code` here made
-	// this helper ALWAYS return `id` unchanged, which quietly disarmed every
-	// canonical assertion built on it: the page was then fetched by the very
-	// segment it was supposed to self-correct to, so a page that had also
-	// stopped reading the field still looked correct.
 	const json = (await res.json().catch(() => null)) as {
 		data?: { storeCode?: unknown };
 	} | null;

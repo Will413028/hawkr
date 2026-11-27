@@ -59,7 +59,6 @@ describe("訂單發票 state 的橫幅折疊表", () => {
 		const unseen = foldOrderInvoiceState("PENDING_TAX_AUTHORITY_REVIEW");
 		expect(unseen?.unknown).toBe(true);
 		expect(unseen?.title.length).toBeGreaterThan(0);
-		// 未知值不得被當成失敗——那會讓買家去申訴一件其實正在正常進行的事。
 		expect(unseen?.role).toBe("status");
 	});
 
@@ -73,16 +72,13 @@ describe("訂單發票 state 的橫幅折疊表", () => {
 		const banner = foldOrderInvoiceState(ORDER_INVOICE_STATE.ORDER_CANCELLED);
 		expect(banner?.unknown).toBe(false);
 		expect(banner?.title).toBe("訂單已取消");
-		// 取消不是異常：紅色會讓買家以為發票出了問題而跑去申訴。
 		expect(banner?.role).toBe("status");
 		expect(banner?.tone).not.toBe("danger");
-		// 這個狀態不會再變，給重新整理鍵是騙人的。
 		expect(banner?.showRefresh).toBe(false);
 	});
 
 	it("已取消的訂單不得被告知「完成後會寄送 Email」", () => {
 		const hint = orderInvoiceEmptyHint(ORDER_INVOICE_STATE.ORDER_CANCELLED);
-		// 🔴 陰性斷言：這正是落 default 時會印出來的那一句。
 		expect(hint).not.toContain("寄送 Email");
 		expect(hint).not.toContain("處理");
 		expect(hint).toContain("不會開立發票");
@@ -99,14 +95,12 @@ describe("訂單發票 state 的橫幅折疊表", () => {
 		expect(states.length).toBe(9);
 		for (const state of states) {
 			const banner = foldOrderInvoiceState(state);
-			// null（ISSUED／VOIDED／ALLOWANCE_APPLIED）是刻意不出橫幅，不是落 default。
 			if (banner === null) continue;
 			expect(
 				banner.unknown,
 				`${state} 落到 default 分支了 —— 它會顯示「處理中」`,
 			).toBe(false);
 		}
-		// 控制組：真正未知的值仍然要落 default（不能為了讓上面全綠而把 default 拿掉）。
 		expect(foldOrderInvoiceState("SOMETHING_NEW")?.unknown).toBe(true);
 	});
 

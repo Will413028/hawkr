@@ -34,9 +34,6 @@ export default function SellerOrderDetailDrawer({
 			onMutated={onMutated}
 			side="right"
 			title="訂單詳情"
-			// Drawer width — the order detail's 2-column grid collapses to a single
-			// column at this width, reading as a focused side panel; stays full-width
-			// on phones (base w-full).
 			className="max-w-lg"
 		>
 			{orderNo ? <OrderDetailClient orderNo={orderNo} bare /> : null}

@@ -16,15 +16,6 @@ type routeCap struct {
 	cap    authz.Capability
 }
 
-// expectedSellerRoutes is the authoritative capability assignment for every
-// requireSeller(cap)-gated route, cross-referenced to the 06 功能矩陣 終判 and 46
-// §3.4 的 capability↔類別映射表 (source: .claude/tmp/suspension/06-功能矩陣.md).
-// The test asserts the live authz registry equals this set exactly — drift in either
-// direction (a mount changing cap, or a new gated route missing from this table)
-// fails CI.
-//
-// /app/coupon_templates 建立/列表/詳情（CAP_MARKETING）掛 requireSeller。
-// Revoke=CONTENT_CONTRACT 白名單不 deny，不掛 guard 故不在 registry。
 var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/categories", authz.CapProductManage},
 	{"GET", "/api/v1/app/coupon_templates", authz.CapMarketing},
@@ -49,10 +40,6 @@ var expectedSellerRoutes = []routeCap{
 	{"GET", "/api/v1/app/seller/after_sales/:case_no/arbitration", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/seller/after_sales/:case_no/confirm_receipt", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/seller/after_sales/:case_no/resolve", authz.CapOrderFulfill},
-	// 賣家市場行情查詢（P6+P7+#2786 categoryId 解析）：8/2 原裁決是唯讀市場資訊、
-	// 非賣家專屬資料，只掛 JWTAuth 不掛 capability——2026-08-27 推翻，改採「其餘
-	// 全鎖含純唯讀查看」原則（46 §3.4 dashboard/CRM 查詢/報表同款裁決）收斂進
-	// CAP_MARKETING（BLOCK-if-suspended，停權賣家不可見）。
 	{"POST", "/api/v1/app/shipments/:order_no/call_tcat", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/shipments/:order_no/confirm", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/shipments/:order_no/generate_home_label", authz.CapOrderFulfill},
@@ -72,53 +59,45 @@ var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/shipping_onboardings/cvs", authz.CapShippingSetup},
 	{"POST", "/api/v1/app/shipping_onboardings/home_delivery", authz.CapShippingSetup},
 	{"POST", "/api/v1/app/shipping_quotes", authz.CapProductManage},
-	// ---- 58 號《電子發票服務》賣家面（§8.1.6(b) 逐條裁決表）----
-	// 25 條 ＝ CapInvoiceTaxRemedy 8（救濟管道，停權白名單）＋ CapInvoiceManage 13
-	// （擴張型與唯讀查看，BLOCK）＋ CapOrderFulfill 4（履行既有訂單義務）。
-	// ⚠️ 設計書 §6.1.0(4) 與 §8.1.6(b) 的加總寫的是 24／12，那兩處是在端點 72
-	// （S12 賣家進項發票，CapInvoiceManage）加入 §6.1.0(15) 端點總表之前寫的，
-	// 沒有回灌。以端點總表為準 ⇒ 25／13。
-	{"GET", "/api/v1/app/seller/invoices/complaints", authz.CapOrderFulfill},                                   // 端點 34
-	{"GET", "/api/v1/app/seller/invoices/complaints/:complaint_id", authz.CapOrderFulfill},                     // 端點 35
-	{"POST", "/api/v1/app/seller/invoices/complaints/:complaint_id/responses", authz.CapOrderFulfill},          // 端點 36
-	{"GET", "/api/v1/app/seller/invoices/documents", authz.CapInvoiceManage},                                   // 端點 30
-	{"GET", "/api/v1/app/seller/invoices/documents/:document_id", authz.CapInvoiceManage},                      // 端點 31
-	{"GET", "/api/v1/app/seller/invoices/documents/:document_id/file/content", authz.CapInvoiceManage},         // 端點 PDF
-	{"POST", "/api/v1/app/seller/invoices/documents/:document_id/notification_resends", authz.CapOrderFulfill}, // 端點 32
-	{"GET", "/api/v1/app/seller/invoices/jobs/:job_id", authz.CapInvoiceManage},                                // 端點 33
-	{"POST", "/api/v1/app/seller/invoices/jobs/:job_id/external_issuances", authz.CapInvoiceTaxRemedy},         // 端點 62
-	{"GET", "/api/v1/app/seller/invoices/orders/:order_no/external_issuances", authz.CapInvoiceTaxRemedy},      // 端點 62R
-	{"GET", "/api/v1/app/seller/invoices/overview", authz.CapInvoiceManage},                                    // 端點 16
-	{"GET", "/api/v1/app/seller/invoices/provider_account", authz.CapInvoiceManage},                            // 端點 23
-	{"POST", "/api/v1/app/seller/invoices/provider_account/activations", authz.CapInvoiceManage},               // 端點 26
-	{"PUT", "/api/v1/app/seller/invoices/provider_account/credentials", authz.CapInvoiceManage},                // 端點 24
-	{"POST", "/api/v1/app/seller/invoices/provider_account/rotations", authz.CapInvoiceManage},                 // 端點 27
-	{"POST", "/api/v1/app/seller/invoices/provider_account/verifications", authz.CapInvoiceManage},             // 端點 25
-	{"GET", "/api/v1/app/seller/invoices/receipt_authorization", authz.CapInvoiceManage},                       // 端點 28
-	{"POST", "/api/v1/app/seller/invoices/receipt_authorization/confirmations", authz.CapInvoiceManage},        // 端點 29
-	{"GET", "/api/v1/app/seller/invoices/received_documents", authz.CapInvoiceManage},                          // 端點 72
-	{"GET", "/api/v1/app/seller/invoices/self_issue_attestations", authz.CapInvoiceTaxRemedy},                  // 端點 21
-	{"POST", "/api/v1/app/seller/invoices/self_issue_attestations", authz.CapInvoiceTaxRemedy},                 // 端點 22
-	{"GET", "/api/v1/app/seller/invoices/tax_profile", authz.CapInvoiceTaxRemedy},                              // 端點 17
-	{"PUT", "/api/v1/app/seller/invoices/tax_profile/draft", authz.CapInvoiceTaxRemedy},                        // 端點 18
-	{"POST", "/api/v1/app/seller/invoices/tax_profile/extension_requests", authz.CapInvoiceTaxRemedy},          // 端點 20
-	{"POST", "/api/v1/app/seller/invoices/tax_profile/submissions", authz.CapInvoiceTaxRemedy},                 // 端點 19
+	{"GET", "/api/v1/app/seller/invoices/complaints", authz.CapOrderFulfill},
+	{"GET", "/api/v1/app/seller/invoices/complaints/:complaint_id", authz.CapOrderFulfill},
+	{"POST", "/api/v1/app/seller/invoices/complaints/:complaint_id/responses", authz.CapOrderFulfill},
+	{"GET", "/api/v1/app/seller/invoices/documents", authz.CapInvoiceManage},
+	{"GET", "/api/v1/app/seller/invoices/documents/:document_id", authz.CapInvoiceManage},
+	{"GET", "/api/v1/app/seller/invoices/documents/:document_id/file/content", authz.CapInvoiceManage},
+	{"POST", "/api/v1/app/seller/invoices/documents/:document_id/notification_resends", authz.CapOrderFulfill},
+	{"GET", "/api/v1/app/seller/invoices/jobs/:job_id", authz.CapInvoiceManage},
+	{"POST", "/api/v1/app/seller/invoices/jobs/:job_id/external_issuances", authz.CapInvoiceTaxRemedy},
+	{"GET", "/api/v1/app/seller/invoices/orders/:order_no/external_issuances", authz.CapInvoiceTaxRemedy},
+	{"GET", "/api/v1/app/seller/invoices/overview", authz.CapInvoiceManage},
+	{"GET", "/api/v1/app/seller/invoices/provider_account", authz.CapInvoiceManage},
+	{"POST", "/api/v1/app/seller/invoices/provider_account/activations", authz.CapInvoiceManage},
+	{"PUT", "/api/v1/app/seller/invoices/provider_account/credentials", authz.CapInvoiceManage},
+	{"POST", "/api/v1/app/seller/invoices/provider_account/rotations", authz.CapInvoiceManage},
+	{"POST", "/api/v1/app/seller/invoices/provider_account/verifications", authz.CapInvoiceManage},
+	{"GET", "/api/v1/app/seller/invoices/receipt_authorization", authz.CapInvoiceManage},
+	{"POST", "/api/v1/app/seller/invoices/receipt_authorization/confirmations", authz.CapInvoiceManage},
+	{"GET", "/api/v1/app/seller/invoices/received_documents", authz.CapInvoiceManage},
+	{"GET", "/api/v1/app/seller/invoices/self_issue_attestations", authz.CapInvoiceTaxRemedy},
+	{"POST", "/api/v1/app/seller/invoices/self_issue_attestations", authz.CapInvoiceTaxRemedy},
+	{"GET", "/api/v1/app/seller/invoices/tax_profile", authz.CapInvoiceTaxRemedy},
+	{"PUT", "/api/v1/app/seller/invoices/tax_profile/draft", authz.CapInvoiceTaxRemedy},
+	{"POST", "/api/v1/app/seller/invoices/tax_profile/extension_requests", authz.CapInvoiceTaxRemedy},
+	{"POST", "/api/v1/app/seller/invoices/tax_profile/submissions", authz.CapInvoiceTaxRemedy},
 }
 
-// buildFullRouter builds the real route table (exercising the boot assertion).
 func buildFullRouter(t *testing.T) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	// 文件檢視器要有設定才會註冊；規格涵蓋所有環境的路由聯集。
 	docs := handler.NewDocs(config.DocsConfig{Username: "u", Password: "p", SignKey: "k"})
-	SetupRoutes(r, &handler.Holder{Docs: docs}) // panics if the boot assertion fails
+	SetupRoutes(r, &handler.Holder{Docs: docs})
 	return r
 }
 
 // The live registry must equal the 06-sourced expected table exactly.
 func TestSellerCapabilityRegistryMatchesMatrix(t *testing.T) {
-	buildFullRouter(t) // populates authz registry
+	buildFullRouter(t)
 
 	want := map[string]authz.Capability{}
 	for _, rc := range expectedSellerRoutes {
@@ -194,8 +173,7 @@ func TestViewGuardRoutesMountedButNotInRegistry(t *testing.T) {
 func TestBootAssertionPanicsOnUndeclaredSellerRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	SetupRoutes(r, &handler.Holder{}) // real router (passes)
-	// A bare seller-area route under the strict /products prefix, WITHOUT requireSeller.
+	SetupRoutes(r, &handler.Holder{})
 	r.GET(appPrefix+"/products/rogue_undeclared", func(c *gin.Context) {})
 
 	defer func() {

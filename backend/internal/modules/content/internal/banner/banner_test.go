@@ -22,14 +22,13 @@ func TestBannerActionMustBeComplete(t *testing.T) {
 		{model.BannerAction{Type: model.BannerActionURL, Target: "http://example.com"}, true},
 		{model.BannerAction{Type: model.BannerActionProduct, Target: "018f0000-0000-7000-8000-0000000000a1"}, true},
 		{model.BannerAction{Type: model.BannerActionPost, Target: "018f0000-0000-7000-8000-000000000001"}, true},
-		{model.BannerAction{}, false},                            // 被洗成 {} 的那種
-		{model.BannerAction{Type: model.BannerActionURL}, false}, // 選了 url 沒填網址
+		{model.BannerAction{}, false},
+		{model.BannerAction{Type: model.BannerActionURL}, false},
 		{model.BannerAction{Type: model.BannerActionURL, Target: " "}, false},
-		// 只有 http、https 可以開啟，後台不能對 App 觸發任意 scheme。
 		{model.BannerAction{Type: model.BannerActionURL, Target: "javascript:alert(1)"}, false},
 		{model.BannerAction{Type: model.BannerActionURL, Target: "hawkr://order/1"}, false},
 		{model.BannerAction{Type: model.BannerActionURL, Target: "https://"}, false},
-		{model.BannerAction{Type: model.BannerActionProduct}, false}, // 選了商品沒填 id
+		{model.BannerAction{Type: model.BannerActionProduct}, false},
 		{model.BannerAction{Type: "coupon", Target: "1"}, false},
 	}
 	for _, c := range cases {
@@ -74,7 +73,6 @@ func TestBannerButtonTextIsLimitedTo12Characters(t *testing.T) {
 	}
 }
 
-// fakeSocial 以固定的集合回答「公開可讀」，並記下被問的次數。
 type fakeSocial struct {
 	readable map[uuid.UUID]bool
 	err      error
@@ -154,7 +152,6 @@ var (
 	productGone   = uuid.UUID{0x01, 0x8f, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, 0xa2}
 )
 
-// fakeProducts 以固定的集合回答「商品公開可見」：不在集合裡的回 catalog.ErrProductNotFound，並記下被問的次數。
 type fakeProducts struct {
 	public map[uuid.UUID]bool
 	err    error

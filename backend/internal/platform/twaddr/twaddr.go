@@ -77,6 +77,5 @@ func Split(address string) (townCode, detail string, ok bool) {
 	if matches != 1 {
 		return "", "", false
 	}
-	// 台與臺一字換一字，字數不變，地址其後的文字照原樣保留。
 	return match.Code, strings.TrimSpace(string([]rune(trimmed)[utf8.RuneCountInString(match.CountyName+match.Name):])), true
 }

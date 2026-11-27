@@ -90,15 +90,10 @@ func loadQueries(dir string) (map[string]namedQuery, error) {
 type scenario struct {
 	label string
 	query string
-	// build 回傳語句與參數：go-jet 的 query 是 internal/reads 的建構函式，sqlc 的 query 是 .sql 原文加具名參數。
 	build func() (string, []any)
-	// anon 是觀看者變體的匿名對照（同一個 query、同一份參數，只是觀看者換成未登入）；有值時 build 與 anon 在同一輪交錯計時，
-	// 判斷看兩者的比值，不看絕對值（機器的 load 會讓同一個語句在兩次量測之間差數倍）。
 	anon     func() (string, []any)
 	keyset   bool
 	rollback bool
-	// exposureOnce 把每一列各探測一次的 `EXISTS (SELECT 1 FROM seller.pub_exposable_stores(at) e WHERE e.store_id = p.store_id)` 改成先把
-	// 可曝光的店家算成一份（MATERIALIZED CTE）再比對：量它是為了看「每個貼文各探測一次」的成本占多少，query 檔本身不變。
 	exposureOnce bool
 }
 
@@ -113,7 +108,6 @@ func exposureOnceForm(sql string) string {
 	return "WITH ex AS MATERIALIZED (SELECT store_id FROM seller.pub_exposable_stores(" + m[1] + "::timestamptz)) " + sql
 }
 
-// keyset 的第一頁用方向的極值游標（與 model.DescStart／AscStart 相同的值）：query 沒有布林開關，所有頁走同一個計畫。
 var ascQueries = map[string]bool{"ListTopLevelComments": true, "ListOwnerTopLevelComments": true, "ListReplies": true, "ListOwnerReplies": true, "ListTopLevelForumEntries": true, "ListForumReplies": true}
 
 func sentinelArg(query, param string) (any, bool) {
@@ -133,11 +127,8 @@ func sentinelArg(query, param string) (any, bool) {
 	return nil, false
 }
 
-// setDriven 是計畫由「集合」驅動、排序鍵不在驅動的索引上的 query：游標條件只能是 join 上的 Filter，成本由集合大小決定，與游標深度無關
-// （ListHiddenContentOf：該買家自己的留言與討論區留言，作者自己的有界集合）。ListHashtagPosts 的排序鍵複製在 post_hashtags 上，要求 Index Cond。
 var setDriven = map[string]bool{"ListHiddenContentOf": true}
 
-// rowCmpIndexCond 判斷計畫裡有沒有「列比較」的 Index Cond（keyset 的游標條件）。
 var rowCmpIndexCond = regexp.MustCompile(`Index Cond: .*ROW\([\w.]+, [\w.]+\) [<>] ROW\(\$\d+, \$\d+\)`)
 
 func main() {
@@ -180,7 +171,6 @@ func run(ctx context.Context, dsn string, reps int, outDir, queriesDir, only str
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 
-	// 依資料挑工作量的參數：熱門與冷門的店家、標籤、貼文，以及 keyset 的游標位置。挑參數的 SQL 是量測用的手寫 SQL（不是規則的定義）。
 	published := `p.deleted_at IS NULL AND p.status = 'PUBLISHED'`
 	exposable := `EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1::timestamptz) e WHERE e.store_id = p.store_id)`
 	hotStore := scalar[int64](ctx, conn, `SELECT p.store_id FROM social.posts p WHERE `+published+` AND `+exposable+` GROUP BY p.store_id ORDER BY count(*) DESC LIMIT 1`, now)
@@ -193,7 +183,6 @@ func run(ctx context.Context, dsn string, reps int, outDir, queriesDir, only str
 	latinContains := scalar[string](ctx, conn, `SELECT substr(h.name, 2, 2) FROM social.post_hashtags h WHERE h.name < E'\u4e00' GROUP BY 1 ORDER BY count(*) DESC LIMIT 1`)
 	hotPost := scalar[string](ctx, conn, `SELECT c.post_id::text FROM social.comments c JOIN social.posts p ON p.id = c.post_id WHERE `+published+` AND `+exposable+` GROUP BY c.post_id ORDER BY count(*) DESC LIMIT 1`, now)
 	coldPost := scalar[string](ctx, conn, `SELECT c.post_id::text FROM social.comments c JOIN social.posts p ON p.id = c.post_id WHERE `+published+` AND `+exposable+` GROUP BY c.post_id ORDER BY abs(count(*) - 5), c.post_id LIMIT 1`, now)
-	// 批次重算的範圍：500 列的 stats 主鍵範圍，一批含最熱門的貼文、一批在中段。
 	hotBatchAfter := scalar[string](ctx, conn, `SELECT COALESCE((SELECT post_id::text FROM social.post_stats WHERE post_id < $1::uuid ORDER BY post_id DESC OFFSET 249 LIMIT 1), '00000000-0000-0000-0000-000000000000')`, hotPost)
 	hotBatchUpper := scalar[string](ctx, conn, `SELECT COALESCE((SELECT post_id::text FROM social.post_stats WHERE post_id >= $1::uuid ORDER BY post_id OFFSET 250 LIMIT 1), 'ffffffff-ffff-ffff-ffff-ffffffffffff')`, hotPost)
 	coldBatchAfter := scalar[string](ctx, conn, `SELECT post_id::text FROM social.post_stats ORDER BY post_id OFFSET 40000 LIMIT 1`)
@@ -236,7 +225,6 @@ func run(ctx context.Context, dsn string, reps int, outDir, queriesDir, only str
 	sanctionMid := sqlCursor(`SELECT created_at, id::text FROM social.sanctions WHERE buyer_id = $1 ORDER BY created_at DESC, id DESC OFFSET 4 LIMIT 1`, hotSanctioned)
 	hiddenMid := sqlCursor(`SELECT h.hidden_at, h.id::text FROM social.hides h JOIN social.comments c ON c.id = h.comment_id WHERE h.restored_at IS NULL AND c.actor_kind = 'BUYER' AND c.actor_id = $1 ORDER BY h.hidden_at DESC, h.id DESC OFFSET 1 LIMIT 1`, hotHider)
 
-	// go-jet 的 query：呼叫 internal/reads 的建構函式；第一頁用方向的極值游標（model.DescStart／AscStart），所有頁走同一個 prepared statement。
 	const pageSize = 50
 	parseID := func(s string) uuid.UUID {
 		id, err := uuid.Parse(s)
@@ -263,7 +251,6 @@ func run(ctx context.Context, dsn string, reps int, outDir, queriesDir, only str
 	v := visibility.Anonymous
 	vv := visibility.Viewer{BuyerID: viewerID}
 	jet := func(st reads.Stmt) func() (string, []any) { return st.Sql }
-	// sqlc 的 query：.sql 原文加具名參數；游標參數缺時用極值（與 model 的 Key 相同）。
 	sqlc := func(name string, args map[string]any) func() (string, []any) {
 		return func() (string, []any) {
 			q, ok := queries[name]
@@ -348,8 +335,6 @@ func run(ctx context.Context, dsn string, reps int, outDir, queriesDir, only str
 		{label: "歸屬 ReadableCommentPost（留言按讚）", query: "ReadableCommentPost", build: jet(reads.ReadableCommentPost(parseID(hotParent), now, v))},
 	}
 
-	// 有觀看者的變體（A7-1b）：觀看者封鎖了數十個店與買家，也被一些買家封鎖（seed-blocks.sql）。每個變體帶匿名對照（同一個 query、同一份參數），
-	// 兩者在同一輪交錯計時，判斷看比值與計畫形狀，不看絕對值。涵蓋列表、單列歸屬與寫入前置檢查用的單列查詢（含回覆的 ParentAdmitted）。
 	if viewerID > 0 {
 		pair := func(label, query string, keyset bool, mk func(visibility.Viewer) func() (string, []any)) scenario {
 			return scenario{label: "觀看者 " + label, query: query, keyset: keyset, build: mk(vv), anon: mk(v)}
@@ -538,12 +523,10 @@ func run(ctx context.Context, dsn string, reps int, outDir, queriesDir, only str
 	return nil
 }
 
-// blocksScanRe 是對封鎖表的整表掃描：pub_blocked_*() 沒被內聯成封鎖表的索引探測時，會是 Function Scan on pub_blocked_* 或 Seq Scan on blocked_*。
 var blocksScanRe = regexp.MustCompile(`Seq Scan on blocked_(stores|buyers)|Function Scan on pub_blocked_(stores|buyers)`)
 
 func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }
 
-// seqScans 列出計畫裡的 Seq Scan 所掃的表（小表可以接受，由閱讀者判斷）。
 func seqScans(plan string) string {
 	re := regexp.MustCompile(`Seq Scan on (\S+)`)
 	seen := map[string]bool{}
@@ -588,7 +571,6 @@ func timeIt(ctx context.Context, conn *pgx.Conn, sql string, args []any, reps in
 	return durs, nil
 }
 
-// timePair 交錯計時一個觀看者語句與它的匿名對照：每一輪先匿名、再觀看者，兩者吃到同樣的機器負載。
 func timePair(ctx context.Context, conn *pgx.Conn, sql string, args []any, anonSQL string, anonArgs []any, reps int) (viewer, anon []time.Duration, err error) {
 	run := func(q string, a []any) (time.Duration, error) {
 		t0 := time.Now()
@@ -647,7 +629,6 @@ func explain(ctx context.Context, conn *pgx.Conn, sql string, args []any, rollba
 	for i, a := range args {
 		lits[i] = literal(a)
 	}
-	// PREPARE 讓 EXPLAIN 看到的是 generic plan；名稱每次不同以免衝突。
 	name := fmt.Sprintf("q_%d", time.Now().UnixNano())
 	var tx pgx.Tx
 	var err error

@@ -66,7 +66,6 @@ func LockAccountOf(ctx context.Context, q *store.Queries, storeID int64) (store.
 	if err := model.Positive(storeID); err != nil {
 		return store.SellerStore{}, err
 	}
-	// account_id 不會改變，不鎖就讀是安全的。
 	owner, err := q.StoreByID(ctx, storeID)
 	if err != nil {
 		return store.SellerStore{}, model.Error(err)
@@ -108,7 +107,6 @@ func EffectiveMany(ctx context.Context, q *store.Queries, accountIDs []int64, no
 	return out, nil
 }
 
-// effectiveAll 問全部的帳號（EffectiveMeasuresAll：只讀 measures，有固定期間與沒有固定期間的各用一個部分索引的 Index Cond 排除已結束與已撤銷的列，讀取量不隨歷史成長），只回傳有生效中措施的帳號。
 func effectiveAll(ctx context.Context, q *store.Queries, now time.Time) (map[int64]*model.Sanctions, error) {
 	rows, err := q.EffectiveMeasuresAll(ctx, now)
 	if err != nil {

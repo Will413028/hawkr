@@ -84,9 +84,6 @@ public class OrderEntity {
     /** PayUni 商家編號 */
     private String merId;
 
-    // ─── 政策快照五欄（65 Foundation，V14）────────────────────────────────
-    // 訂單成立後不因賣家後續修改物流／收款設定而改變既有訂單的履約、收款或結算語意。
-    // ⚠️ 第 5 個維度（provider）不在這五欄內：shippingMethod 已經承載它，再開一欄就是第二個真相。
 
     /**
      * 商流模式快照：{@code SELLER_DIRECT} / {@code PLATFORM_CONSIGNMENT}

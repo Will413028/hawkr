@@ -19,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// validateSubmit 一次驗證全部輸入，回傳寫入的欄位（ID 與時間由呼叫方補上）。
 func validateSubmit(in *model.SubmitReportInput) (store.InsertReportParams, error) {
 	params := store.InsertReportParams{StoreID: in.StoreID, Category: string(in.Category)}
 	if err := model.Positive(in.StoreID); err != nil {
@@ -84,11 +83,8 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitReportInput) (model
 	return result, nil
 }
 
-// submitAttempts 是一次送出寫入新通報的次數：撞到去重的那一筆在鎖住時已經有結果（剛被結案）就重做一次，那時它已離開 partial UNIQUE。
 const submitAttempts = 2
 
-// submit 在 transaction 內寫入一次送出：新通報或補充。撞到去重的 InsertReport 是 ON CONFLICT DO NOTHING（0 列），
-// 不會讓 transaction 失效，之後的 SQL 照常執行。
 func (s *Service) submit(ctx context.Context, q *store.Queries, params store.InsertReportParams, in model.SubmitReportInput, evidence []model.Evidence, now time.Time) (model.SubmitReportResult, error) {
 	for range submitAttempts {
 		row, err := q.InsertReport(ctx, params)
@@ -100,7 +96,6 @@ func (s *Service) submit(ctx context.Context, q *store.Queries, params store.Ins
 		}
 		existing, err := s.duplicate(ctx, q, params, now)
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 撞到的那一筆在兩次查詢之間有了結果，已經離開去重的範圍。
 			continue
 		}
 		if err != nil {
@@ -111,7 +106,6 @@ func (s *Service) submit(ctx context.Context, q *store.Queries, params store.Ins
 			return model.SubmitReportResult{}, err
 		}
 		if locked.Outcome != nil {
-			// 等鎖的時候它被結案了：這次是新的檢舉。
 			continue
 		}
 		return s.supplement(ctx, q, locked, params, evidence, now)
@@ -119,7 +113,6 @@ func (s *Service) submit(ctx context.Context, q *store.Queries, params store.Ins
 	return model.SubmitReportResult{}, apperr.Unavailable("%s", text.ReportSubmitConflict(uitext.LocaleFrom(ctx)).Text)
 }
 
-// created 寫入新通報的佐證、排入引用的同步並發 ReportReceived。
 func (s *Service) created(ctx context.Context, q *store.Queries, row store.SellerReport, evidence []model.Evidence, now time.Time) (model.SubmitReportResult, error) {
 	if err := s.writeEvidence(ctx, q, row.ID, nil, 0, evidence); err != nil {
 		return model.SubmitReportResult{}, err
@@ -135,12 +128,10 @@ func (s *Service) created(ctx context.Context, q *store.Queries, row store.Selle
 	return model.SubmitReportResult{ReportID: row.ID, Report: &report}, nil
 }
 
-// supplement 把這次的送出併入已鎖住、還沒有結果的原通報。
 func (s *Service) supplement(ctx context.Context, q *store.Queries, locked store.SellerReport, params store.InsertReportParams, evidence []model.Evidence, now time.Time) (model.SubmitReportResult, error) {
 	if err := s.appendSupplement(ctx, q, locked, params.Description, evidence, now); err != nil {
 		return model.SubmitReportResult{}, err
 	}
-	// 去重的鍵含買家，所以那一筆一定是呼叫者自己的：回應用它，並告訴他發生了什麼。
 	row, err := q.ReportByID(ctx, locked.ID)
 	if err != nil {
 		return model.SubmitReportResult{}, err
@@ -154,7 +145,6 @@ func (s *Service) supplement(ctx context.Context, q *store.Queries, locked store
 	return model.SubmitReportResult{ReportID: locked.ID, Supplemented: true, Report: &report, Notice: text.ReportDuplicateSupplemented(uitext.LocaleFrom(ctx))}, nil
 }
 
-// supplementBlockError 是 model.SupplementBlockOf 的結果對應的 failed_precondition；可以補充時回 nil。
 func supplementBlockError(ctx context.Context, b model.SupplementBlock) error {
 	switch b {
 	case model.SupplementBlockedByOutcome:
@@ -166,8 +156,6 @@ func supplementBlockError(ctx context.Context, b model.SupplementBlock) error {
 	return nil
 }
 
-// appendSupplement 是補充的唯一寫入路徑（去重併入與檢舉人主動補充共用）：通報已鎖住；有結果或合計已達 MaxSupplements 則時回 failed_precondition（model.SupplementBlockOf）。
-// 寫入補充與佐證、讓通報的版本前進（讀到舊版本的分案、設定結果與移動要重讀才看得到補充；不鎖、不改案件的版本），並在同一個 transaction 發帶 SupplementID 的 ReportReceived。
 func (s *Service) appendSupplement(ctx context.Context, q *store.Queries, locked store.SellerReport, description string, evidence []model.Evidence, now time.Time) error {
 	count, err := q.SupplementCount(ctx, locked.ID)
 	if err != nil {
@@ -181,7 +169,6 @@ func (s *Service) appendSupplement(ctx context.Context, q *store.Queries, locked
 		return err
 	}
 	supplementID := uuid.NewV7()
-	// 第幾則補充 = 已有的則數 + 1（通報已鎖住，所以不會撞；DB 的 seq 1..10 與每筆通報內唯一是保底）。
 	seq := int16(count) + 1 //nolint:gosec // count < MaxSupplements
 	if _, err := q.InsertReportSupplement(ctx, store.InsertReportSupplementParams{
 		ID: supplementID, ReportID: locked.ID, Seq: seq, Description: description, Now: now,
@@ -214,7 +201,6 @@ func (s *Service) AddSupplement(ctx context.Context, in model.AddSupplementInput
 	if len(in.EvidenceTokens) > 0 && in.AccountID <= 0 {
 		return model.Report{}, apperr.InvalidInputOn([]string{"AccountID"}, "附佐證時必須提供上傳者")
 	}
-	// 佐證轉正之前先確認通報是呼叫者的，別人的 id 不會讓呼叫者的檔被轉正。
 	owned, err := store.New(s.d.DB.Conn(ctx)).ReportByID(ctx, in.ReportID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && owned.ReporterBuyerID != in.BuyerID) {
 		return model.Report{}, errMyReportNotFound(ctx)
@@ -222,7 +208,6 @@ func (s *Service) AddSupplement(ctx context.Context, in model.AddSupplementInput
 	if err != nil {
 		return model.Report{}, err
 	}
-	// 佐證轉正之前先擋下（有結果或已達上限）；寫入時鎖住之後在 appendSupplement 再判斷一次。
 	count, err := store.New(s.d.DB.Conn(ctx)).SupplementCount(ctx, in.ReportID)
 	if err != nil {
 		return model.Report{}, err
@@ -279,7 +264,6 @@ func (s *Service) BuyerReport(ctx context.Context, buyerID int64, reportID uuid.
 	return out, err
 }
 
-// loadBuyerReport 讀一筆通報的內容、補充與佐證（不做擁有者檢查，呼叫方已確認）。
 func loadBuyerReport(ctx context.Context, q *store.Queries, reportID uuid.UUID) (model.Report, error) {
 	row, err := q.ReportByID(ctx, reportID)
 	if err != nil {
@@ -293,7 +277,6 @@ func loadBuyerReport(ctx context.Context, q *store.Queries, reportID uuid.UUID) 
 	return reports[0], nil
 }
 
-// writeEvidence 寫入一次送出（submissionSeq：0 是原通報、1.. 是第幾則補充）的佐證，次內位置從 0 連號（DB 的 CHECK 保證最多 5 張），補充的佐證帶 supplementID；
 func (s *Service) writeEvidence(ctx context.Context, q *store.Queries, reportID uuid.UUID, supplementID *uuid.UUID, submissionSeq int16, evidence []model.Evidence) error {
 	for i, e := range evidence {
 		if err := q.InsertReportEvidence(ctx, store.InsertReportEvidenceParams{
@@ -305,7 +288,6 @@ func (s *Service) writeEvidence(ctx context.Context, q *store.Queries, reportID 
 	return nil
 }
 
-// duplicate 讀出去重的期間內同一個買家已有、還沒有結果的通報（與 DB 的 partial UNIQUE 同一個條件）。沒有時回 pgx.ErrNoRows。
 func (s *Service) duplicate(ctx context.Context, q *store.Queries, params store.InsertReportParams, now time.Time) (store.SellerReport, error) {
 	return q.DuplicateBuyerReport(ctx, store.DuplicateBuyerReportParams{
 		BuyerID: params.ReporterBuyerID, StoreID: params.StoreID, Category: params.Category, Now: now,
@@ -447,8 +429,6 @@ func (s *Service) BuyerReports(ctx context.Context, in model.BuyerReportListInpu
 	return page, nil
 }
 
-// reportFilterCategories 是通報清單可以篩選的生效類別：檢舉人選的（ReporterSelectable）加平台判定的（Assessable），也就是除了社群類別
-// 以外的全部；社群類別只給 social 的隱藏與警告，通報不會有。
 func reportFilterCategories() []policy.Category {
 	return slices.DeleteFunc(policy.Values(), policy.Category.Community)
 }

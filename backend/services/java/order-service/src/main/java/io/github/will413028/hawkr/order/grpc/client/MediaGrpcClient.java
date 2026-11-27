@@ -59,7 +59,6 @@ public class MediaGrpcClient {
                 .addAllStagedTokens(stagedTokens)
                 .setRefType(refType)
                 .build();
-        // media-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         FinalizeImagesResponse response = getStub()
                 .withDeadlineAfter(MEDIA_DEADLINE_SEC, TimeUnit.SECONDS)
                 .finalizeImages(request);

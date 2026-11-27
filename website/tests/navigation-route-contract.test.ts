@@ -78,7 +78,6 @@ test("programmatic navigation uses the semantic observed-router layer", () => {
 	for (const sourceRoot of SOURCE_ROOTS) {
 		for (const file of walk(join(ROOT, sourceRoot))) {
 			if (!SOURCE_EXTENSIONS.has(extname(file))) continue;
-			// Co-located tests exercise the router layer; they are not navigation call sites.
 			if (/\.(?:test|spec)\.[jt]sx?$/.test(file)) continue;
 			const source = relative(ROOT, file);
 			if (DIRECT_ROUTER_INFRA_ALLOWLIST.has(source)) continue;
@@ -116,8 +115,6 @@ test("hardNavigation stays scoped to authentication boundaries", () => {
 	for (const sourceRoot of SOURCE_ROOTS) {
 		for (const file of walk(join(ROOT, sourceRoot))) {
 			if (!SOURCE_EXTENSIONS.has(extname(file))) continue;
-			// Co-located tests may mock Link props; they are not application
-			// navigation call sites and must not enter this production inventory.
 			if (/\.(?:test|spec)\.[jt]sx?$/.test(file)) continue;
 			const source = relative(ROOT, file);
 			if (source === "components/shared/view-transitions.tsx") continue;
@@ -125,9 +122,6 @@ test("hardNavigation stays scoped to authentication boundaries", () => {
 			if (source === "components/shared/PageTransition.tsx") continue;
 			const text = readFileSync(file, "utf8");
 			if (!/\bhardNavigation\b/.test(text)) continue;
-			// A full document load is the auth/recovery escape hatch, not a way to
-			// paper over an in-app navigation that misbehaves. Every ordinary route
-			// must stay a soft navigation.
 			if (!/["'`]\/login/.test(text)) offenders.push(source);
 		}
 	}
@@ -147,13 +141,9 @@ test("leaving a product quick-view is a normal top-of-page navigation", () => {
 		join(ROOT, "components/shared/PageTransition.tsx"),
 		"utf8",
 	);
-	// The pinned scroll belongs to the opener page: released without restore,
-	// and never re-pinned, when the user navigated onwards instead of back.
 	assert.match(modal, /isQuickViewOpener\(window\.location\.href\)/);
 	assert.match(modal, /restoreScrollPosition:\s*returnedToOpener/);
 	assert.match(modal, /if \(!returnedToOpener\) return;/);
-	// The instant no-scroll swap is reserved for opening the overlay and for
-	// closing it back onto its opener.
 	assert.match(transition, /isQuickViewOpener\(window\.location\.href\)/);
 });
 
@@ -168,8 +158,6 @@ function walk(directory: string): string[] {
 }
 
 function routeSegment(segment: string): string | null {
-	// `[locale]` is the first URL segment of every localized page, and zh-TW (the
-	// default locale) has no prefix: the routes below are the zh-TW URLs.
 	if (segment === "[locale]") return null;
 	if (segment.startsWith("@")) return null;
 	if (/^\([^)]+\)$/.test(segment)) return null;
@@ -213,9 +201,6 @@ function navigationText(node: ts.Node | undefined): string | null {
 	if (node && ts.isTemplateExpression(node)) {
 		let value = node.head.text;
 		for (const span of node.templateSpans) {
-			// A substitution directly appended to a literal pathname (for example
-			// `/login${condition ? ...}`) cannot be modelled as one route segment.
-			// Query substitutions and slash-delimited dynamic segments can.
 			if (
 				!/[?#]/.test(value) &&
 				!value.endsWith("/") &&
@@ -264,7 +249,6 @@ function isNavigationCall(name: string): boolean {
 		name === "router.replace" ||
 		name === "window.location.assign" ||
 		name === "window.location.replace" ||
-		// the navigation layer's own exits (lib/intl, lib/navigation): they take the locale-free app path
 		name === "commitDocumentNavigation" ||
 		name === "useLocalizedHref" ||
 		name === "localizeHref"
@@ -289,8 +273,6 @@ function collectNavigationInventory(): NavigationInventory {
 	for (const sourceRoot of SOURCE_ROOTS) {
 		for (const file of walk(join(ROOT, sourceRoot))) {
 			if (!SOURCE_EXTENSIONS.has(extname(file))) continue;
-			// Co-located tests hand components made-up targets (`/en/faq`, `/x`); they are not
-			// application navigation call sites.
 			if (/\.(?:test|spec)\.[jt]sx?$/.test(file)) continue;
 			const text = readFileSync(file, "utf8");
 			const sourceFile = ts.createSourceFile(
@@ -370,7 +352,6 @@ function routePatterns(): RegExp[] {
 	);
 	const routes = new Set(routeFiles.map(routeForFile));
 
-	// HTTP-layer aliases are valid navigation targets too.
 	const nextConfig = readFileSync(join(ROOT, "next.config.ts"), "utf8");
 	for (const match of nextConfig.matchAll(/source:\s*"([^"]+)"/g)) {
 		const source = normalizeTarget(match[1]);

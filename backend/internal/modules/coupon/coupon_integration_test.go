@@ -25,7 +25,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// base 是所有測試的起點；時間只由 fixture 的時鐘推進，不讀牆上時鐘。
 var base = time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 
 const (
@@ -39,11 +38,9 @@ const (
 	windowLen = 24 * time.Hour
 )
 
-// fakeStores 是 coupon 的 port 的替身。
 type fakeStores struct {
 	mu        sync.Mutex
 	suspended map[int64]bool
-	// calls 是 StoreSuspended 被問過的次數。
 	calls atomic.Int64
 }
 
@@ -60,7 +57,6 @@ func (f *fakeStores) set(id int64, v bool) {
 	f.suspended[id] = v
 }
 
-// fakeBuyers 是 Buyers port 的替身：預設每個買家都存在，missing 裡的不存在。
 type fakeBuyers struct {
 	mu      sync.Mutex
 	missing map[int64]bool
@@ -80,7 +76,6 @@ func (f *fakeBuyers) Existing(_ context.Context, ids []int64) ([]int64, error) {
 	return out, nil
 }
 
-// fakeDirectory 是 StoreDirectory port 的替身：預設每家店都存在且營業中，missing、closed 裡的各是不存在與已關閉。
 type fakeDirectory struct {
 	mu      sync.Mutex
 	missing map[int64]bool
@@ -105,7 +100,6 @@ type fixture struct {
 
 func (f *fixture) now() time.Time { return time.Unix(0, f.clock.Load()).UTC() }
 
-// member 經模組 API 寫入消費紀錄投影（與 legacy consumer 呼叫的是同一個入口）。
 func (f *fixture) member(buyerID, storeID int64) {
 	f.t.Helper()
 	if _, err := f.m.RecordOrderCompleted(context.Background(), storeID, buyerID); err != nil {
@@ -128,7 +122,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// campaign 建立並發布一個 admin 的全平台活動（ALL、現金折抵 100、無門檻、無總量上限、現在起 24 小時），mod 可以改輸入。
 func (f *fixture) campaign(mod ...func(*coupon.CreateCampaignInput)) coupon.Campaign {
 	f.t.Helper()
 	in := coupon.CreateCampaignInput{
@@ -222,7 +215,6 @@ func wantConstraint(t *testing.T, err error, constraint string) {
 	}
 }
 
-// parallel 同時執行 n 個 fn(i)，回傳各自的錯誤（依 i 排列）。
 func parallel(n int, fn func(i int) error) []error {
 	errs := make([]error, n)
 	var wg sync.WaitGroup
@@ -240,7 +232,6 @@ func parallel(n int, fn func(i int) error) []error {
 	return errs
 }
 
-// voucherOf 讀買家在活動的券（Issue 之後用）；領券也是冪等的，所以直接以 Claim 取回既有的那張。
 func (f *fixture) voucherOf(c coupon.Campaign, buyer int64) coupon.Voucher {
 	f.t.Helper()
 	return f.claim(c, buyer)

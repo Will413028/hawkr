@@ -56,9 +56,6 @@ const SLIDES: ShowcaseSlide[] = [
 		id: "orders",
 		tag: "#訂單管理",
 		title: "訂單來了\n不漏接、不出錯",
-		// 第三桶叫「已結束」不是「已完成」——它含已取消（80）與退款（70）。名稱的唯一
-		// 來源是 `features/seller-center/orders/orderTabs.ts` 的 `SELLER_ORDER_TAB_LABEL`；
-		// 這句是招募頁對它的描述，字不一致等於在賣家還沒進來之前就先教錯一次。
 		desc: "待出貨、配送中、已結束清楚分流，出貨與取件動作在列表上就能完成。",
 		phoneSrc: "/placeholders/app-screen.svg",
 		phoneAlt: "賣家 App 訂單列表畫面",

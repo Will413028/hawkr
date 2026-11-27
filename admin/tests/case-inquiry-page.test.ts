@@ -158,7 +158,6 @@ test("詢問區塊：固定說明、空狀態、每筆一張卡（{種類}・{�
 						state: CaseInquiryState.WITHDRAWN,
 						withdrawCause: CaseInquiryWithdrawCause.CASE_CLOSED,
 						withdrawTime: ts(T0),
-						// 伺服器只在 OPEN 時給 reply_deadline。
 						replyDeadline: undefined,
 					}),
 				],
@@ -183,7 +182,6 @@ test("詢問區塊：固定說明、空狀態、每筆一張卡（{種類}・{�
 		bodyText(),
 		/結案或撤回之後才收到的回覆，請寫在案件的內部註記。/u,
 	);
-	// 相對時間隨現在的時鐘變，這裡只看有走 DeadlineText（「剩…」或「已逾期…」）；已撤回的卡沒有期限（伺服器不給），顯示「-」。
 	assert.match(bodyText(), /期限(剩|已逾期) /u, "OPEN 的期限用相對時間");
 	assert.match(
 		bodyText(),
@@ -384,7 +382,6 @@ test("記下回覆：附件上傳成機敏檔再送出 staged token（依選檔�
 	);
 	await m.render({ settle: false });
 	const time = byId<HTMLInputElement>("record-inquiry-reply-time");
-	// 瀏覽器會把秒為 0 的值正規化成整分，所以只能看有開放秒的輸入（預設值精確到秒由 toLocalInputSeconds 的測試守）。
 	assert.equal(time.step, "1", "輸入框開放到秒");
 	await fill(
 		"record-inquiry-reply-channel",

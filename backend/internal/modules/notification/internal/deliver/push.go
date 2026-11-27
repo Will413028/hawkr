@@ -8,9 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/fcm"
 )
 
-// sendPush 在 transaction 外推給收件人在對應 App 的全部 token。至少一個 token 收下就算已送出（其餘暫時失敗的不重試，免得已收到的裝置重複收到）；
-// 沒有任何 token 收下時：有暫時性失敗或憑證錯誤就重試，有永久失敗記永久失敗，全部是失效 token 記 token_unregistered。
-// 只有 UNREGISTERED 與 SENDER_ID_MISMATCH 會停用（刪除）token。
 func (s *Service) sendPush(ctx context.Context, p plan, final bool) error {
 	results, err := s.d.Push.Send(ctx, p.tokens, pushMessage(p, p.inboxItemID, p.imageURL))
 	if err != nil {
@@ -39,8 +36,6 @@ func (s *Service) sendPush(ctx context.Context, p plan, final bool) error {
 		s.log().ErrorContext(ctx, "FCM 憑證或 APNs 認證被拒（THIRD_PARTY_AUTH_ERROR 等），推播送不出去，需要修設定", "delivery_id", p.delivery.ID, "tokens", auth)
 	}
 	if sent > 0 {
-		// 先定案再刪 token：定案後 job 不會再被重試，刪除失敗只記 log（下次推到這個 token 時 FCM 會再回失效）；順序反過來，刪除失敗的重試會對已收到的裝置重推。
-		// 取消不影響定案：provider 已經收下，帳本一定要記到。
 		err := s.settle(context.WithoutCancel(ctx), p, true, "")
 		s.dropTokens(ctx, unregistered)
 		return err
@@ -56,7 +51,6 @@ func (s *Service) sendPush(ctx context.Context, p plan, final bool) error {
 	}
 }
 
-// dropTokens 刪除失效的 token；失敗只記 log，不影響投遞結果。
 func (s *Service) dropTokens(ctx context.Context, tokens []string) {
 	if len(tokens) == 0 {
 		return

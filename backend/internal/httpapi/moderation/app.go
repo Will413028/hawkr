@@ -75,7 +75,6 @@ var submitPaths = rpc.FieldPaths{
 	"Target": "target", "Category": "category", "Description": "description", "RequestID": "request_id",
 }
 
-// target 把契約的對象轉成模組的 Target；種類沒給或 ID 的格式不對是呼叫方的錯（invalid_argument，指向 target 的欄位）。
 func target(t *pb.ReportTarget) (moderation.Target, error) {
 	kind := rpc.EnumFromProto[moderation.TargetKind](t.GetKind())
 	if kind == "" {
@@ -89,7 +88,6 @@ func target(t *pb.ReportTarget) (moderation.Target, error) {
 	return moderation.Target{Kind: kind, ContentID: id}, err
 }
 
-// targetPB 把模組的對象轉成契約的對象：內容用 UUID，買家用十進位整數字串。
 func targetPB(t moderation.Target) *pb.ReportTarget {
 	id := t.ContentID.String()
 	if t.Kind == moderation.TargetBuyer {
@@ -130,8 +128,6 @@ func (h *App) SubmitReport(ctx context.Context, req *connect.Request[pb.SubmitRe
 	}), nil
 }
 
-// chatReporter 由訊息所屬對話的歸屬推導檢舉人：買家方是呼叫者的買家身分，店家方是呼叫者此刻的店；兩邊都不是與訊息不存在回同一個 not_found（不洩漏訊息存在）。
-// 呼叫者沒有買家身分時只剩店家方的可能；兩邊都是是不變量被破壞（模組擋下自己傳訊息給自己的店）。
 func (h *App) chatReporter(ctx context.Context, messageID uuid.UUID) (moderation.SubmitInput, error) {
 	acct, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -173,13 +169,11 @@ func (h *App) chatReporter(ctx context.Context, messageID uuid.UUID) (moderation
 
 func chatMessageNotFound() error { return apperr.NotFound("找不到這則訊息") }
 
-// 合併清單的每頁筆數：預設 20、上限取兩個來源上限的較小者（合併以兩邊各回 size 筆為前提）。
 const (
 	defaultPageSize int32 = 20
 	maxPageSize           = min(moderation.MyReportsMaxPageSize, sellermod.ReportMaxPageSize)
 )
 
-// myReportsCursor 是合併清單的 page token 內容：兩個來源各自的下一頁位置。Done 的來源已經取完（Cursor 不用）；沒有 Done 而 Cursor 為 nil 是還沒讀過（第一頁）。
 type myReportsCursor struct {
 	Community     *moderation.ReportCursor `json:"c,omitempty"`
 	CommunityDone bool                     `json:"cd,omitempty"`
@@ -192,7 +186,6 @@ func (c myReportsCursor) Valid() bool {
 		(!c.CommunityDone || c.Community == nil) && (!c.StoreDone || c.Store == nil)
 }
 
-// mergedReport 是合併排序中的一筆：兩個來源各取到的檢舉，依 (create_time 新到舊、社群在前、id 新到舊) 排序。
 type mergedReport struct {
 	createdAt time.Time
 	store     bool
@@ -283,7 +276,6 @@ func (h *App) ListMyReports(ctx context.Context, req *connect.Request[pb.ListMyR
 	return connect.NewResponse(out), nil
 }
 
-// outcomePB 把檢舉的結果轉成契約：還沒有結果（案件進行中）不設值。
 func outcomePB(o moderation.Outcome) *pb.ReportOutcome {
 	if o == moderation.OutcomeNone {
 		return nil

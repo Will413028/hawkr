@@ -49,7 +49,6 @@ describe("delegatedFetch", () => {
 		expect(url).not.toContain("/app/");
 		expect(init.credentials).toBe("same-origin");
 		expect(init.cache).toBe("no-store");
-		// 3xx 一律不跟隨：跟隨會拿到一個 HTTP 200 的登入 HTML。
 		expect(init.redirect).toBe("manual");
 		expect(env.data.total).toBe("3");
 	});
@@ -59,7 +58,7 @@ describe("delegatedFetch", () => {
 		await delegatedFetch("/products/9/publish", {
 			method: "POST",
 			json: { expectedVersion: "12", operationReason: "協助上架" },
-			idempotencyKey: "adm-9-publish-1", // gitleaks:allow（測試值）
+			idempotencyKey: "adm-9-publish-1",
 		});
 
 		const { url, init, headers } = lastCall(fetchSpy);

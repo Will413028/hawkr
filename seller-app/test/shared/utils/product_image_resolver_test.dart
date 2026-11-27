@@ -2,12 +2,8 @@ import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/shared/utils/product_image_resolver.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// buildImageUrl 於 runtime 讀 F.appFlavor.mediaBaseHost；測試以 dev flavor
-// 初始化（與 media_image_test 同慣例），故 base = 本機單體（沒有 MEDIA_BASE_HOST define）。
 const String _mediaBase = 'http://localhost:8080';
 
-// ── 以下 fixture 全部取自 2026-08-05 對 dev 的實打回應，未經改寫 ──────────
-// seller 2685914682 / product 866542675787809994。
 const String _key1 =
     'public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg';
 const String _key2 =
@@ -125,9 +121,6 @@ void main() {
   });
 
   group('猜欄位防復發（後端從未回過這些欄位名）', () {
-    // 這一組是本檔存在的理由：24-key shotgun 時代，下面任何一個欄位都會被當成
-    // 圖片來源。它們在任何商品/貼文端點都不存在（2026-08-05 實打逐支確認），
-    // 所以現在必須**解不出任何圖**。若有人再把候選加回來，這裡會轉紅。
     const List<String> deadScalarFields = <String>[
       'image',
       'image_key',
@@ -177,8 +170,6 @@ void main() {
     }
 
     test('gallery 是 imageKeys 的衍生物，不再另外讀', () {
-      // product-service 由 gallery 攤平出 image_keys；只要 imageKeys 在就夠了。
-      // 單獨給 gallery（實務不會發生）解不出圖 —— 這正是「只有一個來源」的證明。
       expect(
         extractProductImageUrls(<String, dynamic>{
           'gallery': _liveProductPayload['gallery'],

@@ -226,8 +226,6 @@ export type CropPreset =
 
 export const CROP_PRESETS: Record<CropPreset, CropConfig> = {
 	product: {
-		// Every product surface shows 4:3. Keep that shared canvas, but default
-		// to fitting the complete upload inside it so packaging and text survive.
 		aspect: PRODUCT_IMAGE_ASPECT,
 		productEditor: true,
 		title: "調整商品圖片",
@@ -242,11 +240,6 @@ export const CROP_PRESETS: Record<CropPreset, CropConfig> = {
 		],
 	},
 	post: {
-		// Frame ratio is the uploader's choice (see POST_ASPECT_OPTIONS); 4:3
-		// remains the fallback for undecodable files. The surfaces below are
-		// destination shapes and stay fixed — the feed grid is a uniform 4:3
-		// board, so the preview has to show the further crop a tall or wide
-		// choice will take there.
 		aspect: POST_FEED_ASPECT,
 		aspectOptions: POST_ASPECT_OPTIONS,
 		postEditor: true,
@@ -360,9 +353,6 @@ export function ImageCropDialog({
 	} | null>(null);
 	const [cropPos, setCropPos] = React.useState<Point>({ x: 0, y: 0 });
 	const [zoom, setZoom] = React.useState(1);
-	// Explicit ratio override for the CURRENT file only — cleared per file so
-	// each photo re-defaults to its own closest shape instead of inheriting the
-	// previous one's choice.
 	const [pickedAspect, setPickedAspect] = React.useState<number | null>(null);
 	const [postAspectMode, setPostAspectMode] =
 		React.useState<PostAspectMode>("original");
@@ -434,9 +424,6 @@ export function ImageCropDialog({
 	} | null>(null);
 
 	const open = files.length > 0;
-	// Callers clear `files` as soon as close starts. Keep the last queue just
-	// beyond the shared Dialog fallback so the image/title do not turn into an
-	// empty loading state while the panel is visibly easing out.
 	React.useEffect(() => {
 		if (files.length > 0) {
 			setDisplayFiles(files);
@@ -485,8 +472,6 @@ export function ImageCropDialog({
 		return () => cancelAnimationFrame(frame);
 	}, [gifPreview, gifPreviewUrl]);
 
-	// An animation preview is valid only for the exact authored crop/settings.
-	// Drop it on interaction, including before the cropper reports new pixels.
 	React.useEffect(() => {
 		if (
 			gifPreviewState &&
@@ -508,12 +493,10 @@ export function ImageCropDialog({
 		};
 	}, [current, open]);
 
-	// New queue → start over from the first file.
 	React.useEffect(() => {
 		if (files.length > 0) setIndex(0);
 	}, [files]);
 
-	// Load the current file for the cropper and the preview strip.
 	React.useEffect(() => {
 		if (!current) return;
 		let cancelled = false;
@@ -562,8 +545,6 @@ export function ImageCropDialog({
 					nextAlphaAnalysis = analyzeImageAlpha(img);
 					setAlphaAnalysis(nextAlphaAnalysis);
 				} catch {
-					// Alpha inspection is only a fitting hint. Decoding and manual
-					// controls remain available when a browser cannot read pixels.
 					setAlphaAnalysis(null);
 				}
 				if (
@@ -593,9 +574,6 @@ export function ImageCropDialog({
 	}, [current, isAvatarEditor, isProductEditor, isSellerCoverEditor]);
 
 	const aspectOptions = config.aspectOptions;
-	// Generic aspect-option configs retain their closest-shape default. The post
-	// editor deliberately starts from the original photo and reveals presets on
-	// demand instead.
 	const autoAspect = React.useMemo(() => {
 		if (!aspectOptions?.length || naturalAspect === null) return null;
 		return closestAspectOption(aspectOptions, naturalAspect)?.aspect ?? null;
@@ -843,9 +821,6 @@ export function ImageCropDialog({
 		);
 	}, [appliedCustomAspectLabel, aspectOptions, pickedAspect, postAspectMode]);
 
-	// Switching ratio re-frames the photo, so drop the pan/zoom the uploader set
-	// against the old frame — keeping them leaves the subject off-centre in a
-	// box that no longer matches what they were aiming at.
 	const handlePickAspect = React.useCallback(
 		(next: number, mode: PostAspectMode = "preset") => {
 			setPickedAspect(next);
@@ -856,8 +831,6 @@ export function ImageCropDialog({
 			setPostCustomAspectOpen(false);
 			setCustomAspectError(null);
 			setProcessingError(null);
-			// react-easy-crop reports geometry asynchronously after the aspect prop
-			// changes. Never let Confirm consume the previous frame in that gap.
 			areaRef.current = null;
 			setCropReady(false);
 		},
@@ -1022,8 +995,6 @@ export function ImageCropDialog({
 				return;
 			}
 
-			// Cover-fit matches every destination that intentionally fills its frame,
-			// including product media and seller storefront banners.
 			if (cropAspect > targetAspect) {
 				sw = area.height * targetAspect;
 				sx = area.x + (area.width - sw) / 2;
@@ -1094,9 +1065,6 @@ export function ImageCropDialog({
 			setProcessingError(gifEditor.error ?? "正在讀取動畫資料，請稍候。");
 			return;
 		}
-		// Legacy presets can still preserve their explicit "use original" escape
-		// hatch. A post crop is an authored choice, so an unavailable frame must
-		// stay recoverable in place instead of silently uploading different pixels.
 		if (
 			decodeFailed ||
 			!imageRef.current ||
@@ -1176,7 +1144,6 @@ export function ImageCropDialog({
 							(gifDimensions.width < requestedSize.width ||
 								gifDimensions.height < requestedSize.height),
 					);
-					// Let the seller review a smaller automatic result before applying it.
 					requirePreview ||= autoResized;
 				}
 			} else {
@@ -1236,7 +1203,6 @@ export function ImageCropDialog({
 				);
 				return;
 			}
-			// Other crop presets retain their existing best-effort fallback.
 			onCropped(current, index);
 			advance();
 		} finally {
@@ -1270,10 +1236,6 @@ export function ImageCropDialog({
 			}}
 			isDismissable={!isPostEditor || !processing}
 			showCloseButton={!isPostEditor || !processing}
-			// 裁切一定是「某個介面裡的下一步」，所以它必須是最上層：ImageUploader
-			// 也出現在出貨對話框（.shipment-dialog，z-index 1300）裡，用 Dialog 預設
-			// 的 1200 會被壓在底下 —— 露在外面的按鈕按下去等於點到出貨對話框的
-			// backdrop，父層直接關掉、照片也丟了（7-11「送出照片」因此完全按不到）。
 			overlayClassName={cn("z-[1400]", isPostEditor && "max-sm:p-0")}
 			className={
 				isPostEditor
@@ -1347,8 +1309,6 @@ export function ImageCropDialog({
 							onClick={() => {
 								setCropPos({ x: 0, y: 0 });
 								setZoom(1);
-								// Back to the ratio auto-picked from the photo, not to the
-								// preset's fallback — "reset" means "as it opened".
 								setPickedAspect(null);
 								if (isSellerCoverEditor) {
 									setCoverFillMode(suggestedCoverFillMode);
@@ -1543,7 +1503,7 @@ export function ImageCropDialog({
 										aria-valuemax={100}
 										aria-valuenow={Math.round((processingProgress ?? 0) * 100)}
 									>
-										{/* scaleX, not width: width animates layout. */}
+
 										<div
 											className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-200 ease-out motion-reduce:transition-none"
 											style={{
@@ -2047,9 +2007,6 @@ export function ImageCropDialog({
 									event.stopPropagation();
 									return;
 								}
-								// react-easy-crop supports primary and middle-button panning.
-								// Block right-drag from entering that path, while preserving the
-								// browser's native context menu.
 								if (event.button === 2) {
 									event.stopPropagation();
 								} else if (event.button === 1) {
@@ -2158,10 +2115,7 @@ export function ImageCropDialog({
 									className="relative isolate overflow-hidden rounded-[22px] border border-hk-border-soft bg-hk-surface-muted [box-shadow:var(--page-crop-lens-shell-shadow)]"
 									data-avatar-fit-mode={avatarFitMode}
 								>
-									{/* The two translucent-white background literals below are pinned by
-									    tests/image-crop-presets.test.ts, which asserts the exact class
-									    string; everything else on this lens is tokenised. See the
-									    PROPOSED note on splitting this file for the follow-up. */}
+
 									<span
 										aria-hidden="true"
 										data-avatar-fit-indicator="true"

@@ -96,7 +96,6 @@ final class DeviceLineSdk implements LineSdk {
 
   @override
   Future<void> logout() async {
-    // 沒登入過就沒有 SDK 狀態可清；SDK 也還沒 setup。
     if (_setupChannelId == null) return;
     await LineSDK.instance.logout();
   }

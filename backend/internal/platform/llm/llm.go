@@ -77,14 +77,10 @@ var ErrDisabled = apperr.Unavailable("AI 助理尚未開通，請稍後再試")
 type modelSpec struct {
 	provider Provider
 	baseURL  string
-	// image 是圖片模型：只給 ImageAI 角色，其他角色不得選它。
 	image bool
-	// options 是這個模型專屬的 RequestOption；逐筆列出，讓哪個模型需要哪個 quirk 可讀。
 	options func() []option.RequestOption
 }
 
-// deepSeekOptions 是 DeepSeek 系列的 RequestOption。不帶 reasoning.effort=none 時，tool_choice 為 required 的請求會得到
-// HTTP 400 "Thinking mode does not support this tool_choice"。關掉 SDK 自帶重試，重試只留在呼叫端一層。
 func deepSeekOptions() []option.RequestOption {
 	return []option.RequestOption{
 		option.WithMaxRetries(0),
@@ -105,7 +101,6 @@ var roleProviders = map[Role][]Provider{
 	ImageAI:     {Gemini},
 }
 
-// roleDefaults 是各用途沒設定模型名時的預設；沒有列的用途取 DefaultModel。
 var roleDefaults = map[Role]string{ImageAI: GeminiImage}
 
 func defaultModel(role Role) string {
@@ -196,7 +191,6 @@ func NewModel(l model.LLM, name string, provider Provider) Model {
 
 func disabled(status Status) Model { return Model{llm: disabledLLM{}, status: status} }
 
-// build 是全服務唯一的 client 建構點；baseURLOverride 只給測試把 OpenAI 相容的端點指到替身 server。
 func build(role Role, cfg Config, log *slog.Logger, baseURLOverride string) Model {
 	if role == ImageAI {
 		log.Error("ImageAI 角色沒有 ADK model，請用 NewImage，已停用", "role", role)
@@ -215,7 +209,6 @@ func build(role Role, cfg Config, log *slog.Logger, baseURLOverride string) Mode
 	return Model{llm: llm, name: name, provider: spec.provider, status: StatusEnabled}
 }
 
-// resolve 決定 role 用哪個模型與金鑰；status 不是 StatusEnabled 時其餘回傳值無意義。
 func resolve(role Role, cfg Config, log *slog.Logger) (name string, spec modelSpec, key string, status Status) {
 	name = cfg.Models[role]
 	if name == "" {

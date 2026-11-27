@@ -22,13 +22,9 @@ describe("shouldTeardownPrivateCache — identity transition table", () => {
 	});
 
 	it("regression guard: the pre-#281 bare inequality wrongly fired on first landing", () => {
-		// The old context.tsx used `next?.accountId !== accountIdRef.current` with
-		// accountIdRef starting `undefined` — so a cold-loaded logged-in session's
-		// first landing computed `123 !== undefined === true` and purged the
-		// in-flight home.snapshot, locking the content skeleton.
 		const preFixDecision = 123 !== undefined;
-		expect(preFixDecision).toBe(true); // the bug
-		expect(shouldTeardownPrivateCache(undefined, "123")).toBe(false); // the fix
+		expect(preFixDecision).toBe(true);
+		expect(shouldTeardownPrivateCache(undefined, "123")).toBe(false);
 	});
 });
 
@@ -40,9 +36,6 @@ describe("teardownPrivateCache — effect on the public home.snapshot query", ()
 	it("first landing keeps the in-flight home.snapshot — no skeleton lock [#281]", async () => {
 		const qc = new QueryClient();
 		seedHomeSnapshot(qc);
-		// Cold-load logged-in: guest/none → account. The decision must be false, so
-		// the public snapshot survives and the homepage renders instead of the
-		// skeleton locking forever.
 		if (shouldTeardownPrivateCache(undefined, "123")) {
 			await teardownPrivateCache(qc);
 		}

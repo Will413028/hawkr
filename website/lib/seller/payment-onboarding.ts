@@ -86,7 +86,6 @@ export async function confirmPaymentReturn(deps: ConfirmDeps): Promise<void> {
 	try {
 		await deps.refreshAccount();
 	} catch {
-		// 重讀失敗不是賣家要處理的事：照常讀。
 	}
 	await deps.readAccount();
 }

@@ -97,7 +97,6 @@ function violation(id: string, findingIds: string[]): Measure {
 		basis: MeasureBasis.VIOLATION,
 		state: MeasureState.ACTIVE,
 		canEnd: false,
-		// 句子由伺服器給（model.ActionUnavailableText，VIOLATION_BASIS）；client 不寫。
 		endUnavailabilities: [
 			create(MeasureActionUnavailabilitySchema, {
 				reason: MeasureActionUnavailableReason.VIOLATION_BASIS,
@@ -188,7 +187,6 @@ test("卡片標題取自目錄、依措施的 state 與 kind：生效中的停�
 		)[0] ?? "";
 	assert.match(termination, /合作已終止/u);
 	assert.match(termination, /申覆期限：2026\/10\/19 10:00/u);
-	// 標題照 state，不寫死 ACTIVE：預定生效的終止合作不是「合作已終止」。
 	const scheduled =
 		cardsOf(
 			renderCards([
@@ -229,14 +227,12 @@ test("違規依據的停權和其他措施一樣列依據、理由與時間，�
 	assert.match(card, /依據：/u);
 	assert.match(card, /給賣家的理由：/u);
 	assert.match(card, new RegExp(VIOLATION_TEXT, "u"));
-	// 沒有給原因時仍相信 can_end=false，顯示通用文字，不自己寫句子。
 	const bare =
 		cardsOf(
 			renderCards([risk({ canEnd: false, endUnavailabilities: [] })]),
 		)[0] ?? "";
 	assert.match(bare, /目前不能操作/u);
 	assert.doesNotMatch(bare, new RegExp(VIOLATION_TEXT, "u"));
-	// 可以結束時沒有原因句。
 	assert.doesNotMatch(cardsOf(renderCards([risk()]))[0] ?? "", /目前不能操作/u);
 	for (const path of [
 		"src/app/admin/merchants/[id]/ActiveMeasuresCard.tsx",

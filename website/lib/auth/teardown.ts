@@ -1,9 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-// The one namespace whose cache is identity-free and survives an identity
-// change. Everything else embeds per-viewer state — feed `is_liked`, followed
-// lists, order history, etc. — and must be dropped so the next viewer can't
-// see the previous account's data.
 const IDENTITY_FREE_NAMESPACE = "products";
 
 function isIdentityBoundQuery(query: {
@@ -42,9 +38,7 @@ export function shouldTeardownPrivateCache(
 	prevAccountId: string | undefined,
 	nextAccountId: string | undefined,
 ): boolean {
-	// No prior real account → nothing private to tear down (first landing).
 	if (prevAccountId === undefined) return false;
-	// A different account (switch) or no account (logout) replacing a real one.
 	return nextAccountId !== prevAccountId;
 }
 
@@ -65,10 +59,6 @@ export async function teardownPrivateCache(
 		predicate: isIdentityBoundQuery,
 	});
 	queryClient.removeQueries({ predicate: isIdentityBoundQuery });
-	// One structured line per genuine switch/logout (never on a first landing or
-	// same-account backfill). If a logged-in homepage ever strands on the content
-	// skeleton again, this pins whether a private-cache purge fired next to it —
-	// the forensic hook hawkr-website#281 lacked at repro time.
 	console.warn("[auth] private cache purged on identity change", {
 		removedQueryCount: purged.length,
 		removedNamespaces: [...new Set(purged.map((q) => String(q.queryKey[0])))],

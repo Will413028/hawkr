@@ -204,7 +204,6 @@ public class ShippingService {
         this.providerCallExecutor = providerCallExecutor;
         this.fulfillmentProviders = fulfillmentProviders;
         this.meterRegistry = meterRegistry;
-        // 預先展開告警用 counter，讓「第一筆未知貨態」是 0→1 的真 increase（見常數上的說明）
         for (String m : ALERTABLE_SHIPPING_METHODS) {
             io.micrometer.core.instrument.Counter.builder(METRIC_PROVIDER_STATUS_UNKNOWN)
                     .description("物流商回報無法辨識貨態的次數（R2；raw 值另落 provider_status，此處只計趨勢）")
@@ -216,7 +215,6 @@ public class ShippingService {
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
-    // ==================== 出貨/配達日期解析（§1491） ====================
 
     /**
      * 解析 shipDate / deliveryDate，同時接受 {@code yyyy-MM-dd}（前端日曆元件 / business_days 回傳格式）
@@ -253,7 +251,6 @@ public class ShippingService {
         return date.format(DATE_FMT);
     }
 
-    // ==================== MQ 驅動自動建單 ====================
 
     /**
      * 背景自動建立物流單（order.paid MQ 事件觸發）
@@ -263,7 +260,6 @@ public class ShippingService {
      */
     @Transactional
     public ShipmentEntity createShipmentFromOrder(String orderNo) {
-        // 1. 冪等：查 DB 確認 order_no 無重複
         ShipmentEntity existing = getShipmentByOrderNo(orderNo);
         if (existing != null) {
             log.info("ShippingService.createShipmentFromOrder.idempotent",
@@ -271,15 +267,12 @@ public class ShippingService {
             return existing;
         }
 
-        // 2. 查詢訂單資訊（純內部讀，order-service #1366 後不再做歸屬校驗）
         GetOrderForShippingResponse orderResp = orderGrpcClient.getOrderForShipping(orderNo);
-        // 失敗時 order-service 會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         if (!orderResp.hasData()) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_ORDER_QUERY_FAILED, "訂單資料缺失");
         }
         OrderShippingInfo orderInfo = orderResp.getData();
 
-        // 2.5 防護 Proto 空值（避免 Strategy 內 parseLong 崩潰）
         String storeIdStr = orderInfo.getStoreId();
         if (storeIdStr == null || storeIdStr.isEmpty()) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_DATA_INCOMPLETE, "缺少賣家 store_id");
@@ -293,12 +286,10 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_DATA_INCOMPLETE, "缺少實付金額");
         }
 
-        // 3. 查詢建店設定（含寄件人資訊，物流設定獨立化後不再呼叫 Seller Service）
         long storeId = Long.parseLong(storeIdStr);
         SellerShipmentSettingEntity onboardingSetting =
                 onboardingService.findActiveSetting(storeId, orderInfo.getShippingMethod());
 
-        // 3.6 provider 若要求先建店，缺設定就不建單
         String shippingMethod = orderInfo.getShippingMethod();
         if (requiresOnboarding(storeId, shippingMethod) && onboardingSetting == null) {
             log.error("noOnboarding",
@@ -307,14 +298,6 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_SELLER_NOT_ONBOARDED, ShippingMethod.fromValue(shippingMethod).label());
         }
 
-        // 4. 🔴 BLOCKER 5：建單走 **adapter 的 CreateCapability**，不再走 ShippingService 自己的 strategyMap。
-        //
-        //    修復前這一格是 `strategyMap.get(shippingMethod)` —— lifecycle 的**第一步**
-        //    （也是唯一一個 provider 一定會被呼叫的步驟）整個在 adapter 邊界之外，
-        //    而 `service/strategy/` 又被 ratchet gate 的 EXCLUDE_DIRS 排除
-        //    ⇒ 同時在 adapter 外面、也在 gate 的觀測窗外面。
-        //    `CreateCapability.createFromOrder` 因此是零呼叫端的死碼，
-        //    而 `pendingMigration()` 回空集合的兩個 PayUni adapter 讓「已搬完」看起來成立。
         CreateCapability createCapability = fulfillmentProviders.find(shippingMethod)
                 .flatMap(adapter -> adapter.create(
                         FulfillmentContext.forStore(storeId, adapter.supportedMethod())))
@@ -326,22 +309,17 @@ public class ShippingService {
         try {
             entity = createCapability.createFromOrder(orderNo, orderInfo, onboardingSetting);
         } catch (ProviderCreateFailedException e) {
-            // 收斂規範 §8.4：失敗落地供 Admin 列表 + 閉環
             persistFailedShipmentShell(orderNo, orderInfo, shippingMethod, onboardingSetting, e);
-            throw e;   // 再拋給呼叫端（既有 catch-all 會回 5018）
+            throw e;
         }
 
-        // 5.5 寫入收寄快照（寄件人資訊來自 setting，不再來自 Seller Service）
         entity.setSenderSnapshot(buildSenderSnapshot(onboardingSetting, orderInfo.getMerId()));
         entity.setReceiverSnapshot(buildReceiverSnapshot(orderInfo));
 
-        // 5. INSERT
         shipmentMapper.insert(entity);
 
-        // 6. 記錄狀態日誌
         insertStatusLog(entity.getId(), null, ShippingStatus.UNPROCESSED, "MQ");
 
-        // 7. 發布 shipment.created MQ 事件（含 seller/buyer/amount，供 notification 賣家推播）
         publishShipmentCreatedEvent(entity, orderInfo);
 
         log.info("ShippingService.createShipmentFromOrder.success",
@@ -350,7 +328,6 @@ public class ShippingService {
         return entity;
     }
 
-    // ==================== 賣家安排出貨 ====================
 
     /** 超商列印結果（含同步等待 Webhook 回填） */
     public record CvsLabelResult(String shipmentNo, String partnerId, String odno,
@@ -367,27 +344,20 @@ public class ShippingService {
      * 事務拆分：DB 更新先 commit，再進入等待階段，避免長時間佔用 DB 連線。
      */
     public CvsLabelResult printCvsLabel(long storeId, String orderNo, String shipDate) {
-        // 寫路徑：賣家當下意願防線（§2.3.1）
         onboardingService.requireActiveSetting(storeId, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP);
 
         ShipmentEntity entity = getAndVerifyShipment(orderNo, storeId);
         requireEndpointProvider(entity, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP);
-        // 🔴 BLOCKER 3 condition 6：列印也是 write path，同樣走 canonical rule。
-        //    原本它一處都不看配送狀態 ⇒ 一張已取消的單照樣列印得出去。
         allowedActionResolver.require(FulfillmentAction.PRINT_LABEL, entity);
 
         if (entity.getShipTradeNo() == null || entity.getShipTradeNo().isBlank()) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_NO_TRADE_NO);
         }
 
-        // 已成功 → 直接回傳已有代碼（冪等）
         if (LabelPrintStatus.SUCCEEDED.value().equals(entity.getLabelPrintStatus())) {
             return handleReprintCvsLabel(entity, orderNo);
         }
 
-        // 首次/重試列印流程，走 ProviderCallExecutor（§2.4.4）
-        // PayUni race 由 §2.4.4 transient 分類 + §5.19.3.B reconcile 處理（§2.4.6），不採 cooldown
-        // §1491：shipDate 首次列印必填，同時接受 yyyy-MM-dd / yyyyMMdd，normalize 為 PayUni 需要的 yyyyMMdd
         String normalizedShipDate = toPayUniDateFormat(parseFlexibleDate(shipDate, "出貨日期"));
         return handleFirstPrintCvsLabel(entity, orderNo, normalizedShipDate);
     }
@@ -402,18 +372,13 @@ public class ShippingService {
         try {
             providerCallExecutor.execute(
                     ProviderCallContext.of("printCvsLabel", entity.getId()),
-                    // acquireRequested：4101/4104 → 4102（獨立短事務）
                     () -> requiresNewTx.execute(s -> shipmentMapper.acquireLabelPrintRequested(entity.getId())) > 0,
-                    // invoke：呼叫 PayUni 列印 API（事務外）
-                    // invoke：走 adapter 的 LabelCapability（provider 參數推導在 adapter 內部）
                     () -> {
                         requireLabelCapability(entity).requestLabel(
                                 entity, LabelCapability.LabelRequest.onShipDate(shipDate));
                         return null;
                     },
-                    // markSucceeded：超商列印的成功訊號是 webhook，不在此 transition
                     result -> {},
-                    // markFailed：依 §2.4.4 transient 分類（transient 跳過保留 4102 給 reconciliation；permanent 4102→4104）
                     ex -> {
                         if (isTransientPayUniError(ex)) {
                             log.info("ShippingService.printCvsLabel.transientErrorKept",
@@ -434,18 +399,14 @@ public class ShippingService {
         } catch (io.github.will413028.hawkr.payuni.http.PayUniApiException papi) {
             cvsPrintWaitingRegistry.waitAndRemove(entity.getShipTradeNo(), future, 0);
             if (isTransientPayUniError(papi)) {
-                // markFailed 已跳過（保留 4102），對前端報「處理中請稍候」
                 throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_CALL_IN_PROGRESS);
             }
-            // markFailed 已寫 4104；對前端透傳 PayUni 訊息
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_CALL_FAILED, papi.getMessage());
         } catch (RuntimeException e) {
-            // 其他 runtime 例外（含 ShippingBusinessException 自身）直接重拋
             cvsPrintWaitingRegistry.waitAndRemove(entity.getShipTradeNo(), future, 0);
             throw e;
         }
 
-        // 等待 Webhook（最多 55 秒）
         CvsPrintWaitingRegistry.CvsPrintResult result =
                 cvsPrintWaitingRegistry.waitAndRemove(entity.getShipTradeNo(), future, CVS_PRINT_WAIT_SECONDS);
 
@@ -516,7 +477,6 @@ public class ShippingService {
             || low.contains("timeout");
     }
 
-    // ==================== 超商確認出貨 ====================
 
     /**
      * 超商賣家確認出貨：更新狀態 921 + 處理出貨照片（選填）+ 發布事件
@@ -526,28 +486,14 @@ public class ShippingService {
     public void confirmCvsShipment(long storeId, String orderNo, List<String> stagedTokens) {
         ShipmentEntity entity = getAndVerifyShipment(orderNo, storeId);
 
-        // 冪等：已確認過的單子是「做完了」不是「不可做」——必須排在 canonical rule 之前，
-        // 否則重送會拿到一個「不可執行」的錯誤，而它其實已經成功過。
-        //
-        // ⚠️ 用 SELLER_CONFIRMED 的**字面值**比對，不呼叫 ShippingStatus.fromValue：
-        //    後者對未知值 throw IllegalArgumentException ⇒ 髒資料會在這一行變成 500，
-        //    而 canonical rule 特地設計成「parseStatus 回 null → stateGate 給業務碼」
-        //    ——那個設計會被上一行的例外搶先。
         if (ShippingStatus.SELLER_CONFIRMED.value().equals(entity.getStatus())) {
             log.info("ShippingService.confirmCvsShipment.idempotent",
                     "已確認出貨（冪等跳過）", "orderNo", orderNo);
             return;
         }
 
-        // 🔴 BLOCKER 3：canonical rule **先答**，而且它給的碼就是契約給前端的 disabledReasonCode。
-        //    原本三條 inline 守衛排在它前面，於是最常見的拒絕情境（未取號、非超商、終態）
-        //    回的是 IllegalArgumentException → 400 參數錯誤，而契約說的是 9527/9528
-        //    ⇒ 同一個拒絕原因有兩個碼、兩條 log event，那正是「兩套規則」的殘留形態。
         allowedActionResolver.require(FulfillmentAction.HANDOVER, entity);
 
-        // 縱深防禦：上面那一句已涵蓋下列全部語意（provider 有無此步驟／標籤是否取號／是否終態）。
-        // 留著是因為它們是**同一份判定的第二次求值**，成本近乎零，而拿掉之後
-        // 若有人把 require() 誤刪，這裡是最後一道。⚠️ 順序不能反過來：碼要以 canonical 為準。
         if (!FulfillmentActionPolicy.isDomainApplicable(
                 FulfillmentAction.HANDOVER, ShippingMethod.fromValue(entity.getShippingMethod()))) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_MISMATCH);
@@ -560,10 +506,8 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED);
         }
 
-        // 處理出貨照片（選填，容錯）
         processShipmentPhotos(entity, stagedTokens);
 
-        // 更新狀態 921 + 出貨照片
         int rows = shipmentMapper.updateShipmentStatus(
                 entity.getId(),
                 entity.getStatus(),
@@ -574,23 +518,17 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_CONCURRENT_CONFLICT);
         }
 
-        // 出貨照片獨立更新（如有）
         if (entity.getShipmentPhotos() != null && !entity.getShipmentPhotos().isEmpty()) {
             shipmentMapper.updateShipmentPhotos(entity.getId(), entity.getShipmentPhotos());
         }
 
-        // 記錄狀態日誌
         insertStatusLog(entity.getId(), currentStatus, ShippingStatus.SELLER_CONFIRMED, "CONFIRM_CVS");
 
         log.info("ShippingService.confirmCvsShipment.success",
                 "超商確認出貨完成，status=921(SELLER_CONFIRMED)", "orderNo", orderNo);
 
-        // [事務外] 發布照片事件（容錯）。照片引用已在 processShipmentPhotos 內於寫入前建立。
         publishShipmentPhotoEvent(entity);
 
-        // 發布 shipment.status.changed 事件
-        // notifyBuyerAccountId=0L：SELLER_CONFIRMED 從未匹配買家推播 template 的 payload_filter
-        // （id=3 只認 IN_TRANSIT），不為此額外打 buyer-service RPC。
         eventPublisher.publishShipmentStatusChanged(new ShippingEventPayload(
                 entity.getOrderNo(), entity.getShipmentNo(), entity.getShippingMethod(),
                 ShippingStatus.SELLER_CONFIRMED.value(), ShippingStatus.SELLER_CONFIRMED.label(),
@@ -600,7 +538,6 @@ public class ShippingService {
         ));
     }
 
-    // ==================== 批次超商出貨單列印 ====================
 
     public record BatchPrintResult(int totalCount, int successCount, List<BatchPrintItemResult> results) {}
     public record BatchPrintItemResult(String orderNo, String shipmentNo, boolean success, String message) {}
@@ -621,24 +558,19 @@ public class ShippingService {
      * 與 transient 分支本來就依賴的機制相同。
      */
     public BatchPrintResult batchPrintCvsLabel(long storeId, List<String> orderNos, String shipDate) {
-        // 寫路徑：賣家當下意願防線（§2.3.1）— 整批共用同一個 seller，預先檢一次
         onboardingService.requireActiveSetting(storeId, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP);
 
-        // §1491：shipDate 同時接受 yyyy-MM-dd / yyyyMMdd，normalize 為 PayUni 需要的 yyyyMMdd
         shipDate = toPayUniDateFormat(parseFlexibleDate(shipDate, "出貨日期"));
 
-        // 1. 去重
         List<String> uniqueOrderNos = orderNos.stream().distinct().toList();
         int totalCount = uniqueOrderNos.size();
 
-        // 2. 批次查詢
         List<ShipmentEntity> entities = shipmentMapper.selectList(
                 new LambdaQueryWrapper<ShipmentEntity>()
                         .in(ShipmentEntity::getOrderNo, uniqueOrderNos));
         Map<String, ShipmentEntity> entityMap = entities.stream()
                 .collect(Collectors.toMap(ShipmentEntity::getOrderNo, Function.identity()));
 
-        // 3. 逐筆驗證
         List<BatchPrintItemResult> results = new java.util.ArrayList<>();
         List<ShipmentEntity> validEntities = new java.util.ArrayList<>();
 
@@ -652,9 +584,6 @@ public class ShippingService {
                 results.add(new BatchPrintItemResult(orderNo, "", false, "賣家帳號不符，無權操作此物流單"));
                 continue;
             }
-            // 🔴 第五條 write path：批次列印原本完全沒有配送狀態檢查。
-            //    parity 測試只打 printCvsLabel，看不到它 ⇒ 「已取消的單仍列印得出去」
-            //    在批次端點原封不動。逐筆走同一份判定，拒絕者跳過而不是中斷整批。
             try {
                 allowedActionResolver.require(FulfillmentAction.PRINT_LABEL, entity);
             } catch (ShippingBusinessException e) {
@@ -678,23 +607,17 @@ public class ShippingService {
             validEntities.add(entity);
         }
 
-        // 4. 若無有效訂單，直接回傳
         if (validEntities.isEmpty()) {
             return new BatchPrintResult(totalCount, 0, results);
         }
 
-        // 5. 依 (goodsType, lgsType, shipType) 分組
         record PrintGroupKey(String goodsType, String lgsType, String shipType) {}
         Map<PrintGroupKey, List<ShipmentEntity>> groups = validEntities.stream()
                 .collect(Collectors.groupingBy(e -> new PrintGroupKey(
                         e.getGoodsType(), e.getLgsType(), e.getShipType())));
 
-        // 6. 每筆 acquireRequested → 整組呼叫 PayUni → markFailed（若失敗）
-        // 注意：批次列印每筆獨立 transition，acquire 失敗的（已是 REQUESTED/SUCCEEDED）跳過
         List<ShipmentEntity> acquiredEntities = new java.util.ArrayList<>();
         for (ShipmentEntity entity : validEntities) {
-            // claim 走獨立短交易並立即提交（與 generateHomeLabelPdf:704 同一手法）：
-            // 讓 REQUESTED 對其他 pod / 其他請求立即可見，且不把 row lock 帶進後面的 PayUni 呼叫。
             if (requiresNewTx.execute(s -> shipmentMapper.acquireLabelPrintRequested(entity.getId())) > 0) {
                 acquiredEntities.add(entity);
             } else {
@@ -721,11 +644,8 @@ public class ShippingService {
                     .collect(Collectors.joining(","));
 
             try {
-                // 分組鍵與單批上限由 LabelCapability.batchConstraints() 宣告、由 adapter 強制執行；
-                // 這裡只負責切組與逐組回報結果（key 仍保留供 log/回報使用）。
                 requireLabelCapability(groupEntities.get(0)).requestLabelBatch(
                         groupEntities, LabelCapability.LabelRequest.onShipDate(shipDate));
-                // 成功 → 不在此寫 SUCCEEDED，由 webhook 各自 transition
                 for (ShipmentEntity ge : groupEntities) {
                     results.add(new BatchPrintItemResult(ge.getOrderNo(), ge.getShipmentNo(), true, ""));
                     successCount++;
@@ -737,7 +657,6 @@ public class ShippingService {
                 String providerMessage = extractProviderMessage(e);
                 boolean transient_ = isTransientPayUniError(e);
                 if (transient_) {
-                    // §2.4.4 transient：保留 4102 給 §5.19.B reconciliation 補拉；前端見「處理中」
                     log.info("ShippingService.batchPrint.transientErrorKept",
                             "批次列印 PayUni 暫時性錯誤，保留 REQUESTED 等 reconciliation: " + providerMessage,
                             "shipTradeNos", batchShipTradeNos);
@@ -746,7 +665,6 @@ public class ShippingService {
                                 ge.getOrderNo(), ge.getShipmentNo(), false, "處理中，請稍候刷新"));
                     }
                 } else {
-                    // permanent：整組 transition 4102→4104（各自獨立短交易，與 claim 對稱）
                     for (ShipmentEntity ge : groupEntities) {
                         requiresNewTx.executeWithoutResult(s ->
                                 shipmentMapper.markLabelPrintFailed(ge.getId(), providerStatus, providerMessage));
@@ -770,7 +688,6 @@ public class ShippingService {
     public String generateHomeLabelPdf(long storeId, String orderNo,
                                         String shipDate, String deliveryDate,
                                         List<String> stagedTokens) {
-        // 寫路徑：賣家當下意願防線（§2.3.1）
         onboardingService.requireActiveSetting(storeId, ShippingMethod.TAQBIN);
 
         ShipmentEntity entity = getAndVerifyShipment(orderNo, storeId);
@@ -784,13 +701,9 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_ALREADY_LABELED);
         }
 
-        // PayUni race 由 §2.4.4 transient 分類 + §5.19.3.B reconcile 處理（§2.4.6），不採 cooldown
 
-        // 日期驗證（工作天檢查）
-        // §1491：shipDate 同時接受 yyyy-MM-dd / yyyyMMdd，parse 失敗回業務碼而非裸 DateTimeParseException(500)
         LocalDate shipDateParsed = parseFlexibleDate(shipDate, "出貨日期");
         shipDate = toPayUniDateFormat(shipDateParsed);
-        // §10.4 D5: 用台北時區避免 UTC 容器跨日邊界誤判
         if (!shipDateParsed.isAfter(DateTimeUtils.todayInTaipei())) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_DATE_MUST_FUTURE);
         }
@@ -798,13 +711,11 @@ public class ShippingService {
         if (shipHolidayName != null) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_DATE_HOLIDAY, "出貨日期", shipDate, shipHolidayName);
         }
-        // shipDate 必須在 7 個工作天內
         List<LocalDate> allowedDays = holidayService.getNextBusinessDays(7);
         if (!allowedDays.isEmpty() && shipDateParsed.isAfter(allowedDays.get(allowedDays.size() - 1))) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_DATE_OUT_OF_RANGE, allowedDays.get(allowedDays.size() - 1).format(DATE_FMT));
         }
 
-        // deliveryDate：選填，未填則 shipDate + 1 工作天
         LocalDate deliveryDateParsed;
         if (deliveryDate == null || deliveryDate.isBlank()) {
             deliveryDateParsed = holidayService.nextBusinessDay(shipDateParsed, 1);
@@ -821,7 +732,6 @@ public class ShippingService {
             }
         }
 
-        // 走 ProviderCallExecutor：acquire (4101/4104→4102) → invoke (PayUni + OSS) → markSucceeded / markFailed
         final String shipDateFinal = shipDate;
         final String deliveryDateFinal = deliveryDate;
         LabelCapability.LabelRequestOutcome result;
@@ -829,18 +739,10 @@ public class ShippingService {
             result = providerCallExecutor.execute(
                     ProviderCallContext.of("generateHomeLabelPdf", entity.getId()),
                     () -> requiresNewTx.execute(s -> shipmentMapper.acquireLabelPrintRequested(entity.getId())) > 0,
-                    // invoke：走 adapter 的 LabelCapability。
-                    // 🔴 LgsType/ShipType 這兩個 provider 參數原本在這裡即時填入，
-                    //    那是 provider 洩漏——同一組常數在 adapter 內已經有權威來源。
                     () -> requireLabelCapability(entity).requestLabel(
                             entity,
                             new LabelCapability.LabelRequest(shipDateFinal, deliveryDateFinal)),
                     r -> {
-                        // 先建立 label PDF 的 asset_reference，成功後才把 objectKey 寫進 shipments（#2222）。
-                        // 失敗即拋：DB 未寫入，剛轉正的 PDF 無人引用，由 media GC 依孤兒規則回收。
-                        // 舊版把 link 排在 mapper 之後（且 mapper 走 REQUIRES_NEW 已 commit），
-                        // link 一失敗就留下「shipments.label_object_key 指著、卻沒有引用」的 PDF，
-                        // 7 天後被 GC 連同 R2 物件實體刪除——dev 上 4 張在用的托運單即為此狀態。
                         mediaGrpcClient.linkImages(REF_TYPE_SHIPPING,
                                 String.valueOf(entity.getId()), List.of(String.valueOf(r.labelAssetId())));
                         requiresNewTx.executeWithoutResult(s -> {
@@ -860,33 +762,23 @@ public class ShippingService {
         } catch (io.github.will413028.hawkr.common.providercall.ProviderCallBusyException busy) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_CALL_IN_PROGRESS);
         } catch (io.github.will413028.hawkr.payuni.http.PayUniApiException papi) {
-            // 宅配（§2.4.4 C 類：無補拉機制）：transient 已 markFailed → 4104，賣家可重打
-            // 不再對 transient 回 IN_PROGRESS（避免「請稍候刷新」誤導 — 實際是 FAILED 需賣家主動重打）
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_CALL_FAILED, papi.getMessage());
         }
 
-        // 出貨照片處理（選填，失敗不影響主流程）
         processShipmentPhotos(entity, stagedTokens);
 
-        // 出貨照片獨立更新（如有）
         if (entity.getShipmentPhotos() != null && !entity.getShipmentPhotos().isEmpty()) {
             shipmentMapper.updateShipmentPhotos(entity.getId(), entity.getShipmentPhotos());
         }
 
-        // 引用已在寫入前建立：label PDF 於 providerCallExecutor 的 onSuccess、
-        // 出貨照片於 processShipmentPhotos（皆為 DB 寫入之前，#2222）。
         publishShipmentPhotoEvent(entity);
 
-        // 發布 shipment.status.changed 事件，回填 orders.label_url + label_expire_at
-        // status 維持 91(UNPROCESSED)，僅帶 labelUrl 和 labelExpireAt
-        // notifyBuyerAccountId=0L：UNPROCESSED 從未匹配買家推播 template 的 payload_filter
-        // （id=3 只認 IN_TRANSIT），不為此額外打 buyer-service RPC。
         LocalDateTime labelExpireAt = DateTimeUtils.nowUtc().plusHours(24);
         eventPublisher.publishShipmentStatusChanged(new ShippingEventPayload(
                 entity.getOrderNo(), entity.getShipmentNo(), entity.getShippingMethod(),
                 ShippingStatus.UNPROCESSED.value(), ShippingStatus.UNPROCESSED.label(),
                 ShippingStatus.UNPROCESSED.label(),
-                result.labelObjectKey(), entity.getShipTradeNo(), // 49 §6.3/S3：MQ 只帶 objectKey
+                result.labelObjectKey(), entity.getShipTradeNo(),
                 labelExpireAt.toString(),
                 false, null, null, entity.getBuyerId(), 0L
         ));
@@ -894,7 +786,7 @@ public class ShippingService {
         log.info("ShippingService.generateHomeLabelPdf.success",
                 "宅配取號 PDF 完成", "orderNo", orderNo);
 
-        return result.labelObjectKey(); // 49 §6.6：gRPC 回 label objectKey，Gateway 組 labelUrl
+        return result.labelObjectKey();
     }
 
     /**
@@ -919,41 +811,26 @@ public class ShippingService {
                             String isContact, String isTrolley, String memo) {
         ShipmentEntity entity = getAndVerifyShipment(orderNo, storeId);
 
-        // 冪等／已完成：排在 canonical rule 之前（同 confirmCvsShipment 的理由）。
         if (TcatCallStatus.SUCCEEDED.value().equals(entity.getTcatCallStatus())) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_TCAT_ALREADY_CALLED);
         }
-        // 🔴 BLOCKER 3：這支原本**沒有任何 status 檢查**——五條前置守衛全在子狀態機
-        //    （label／tcat）與建店設定上，而 markTcatCallSucceeded 的 WHERE 只守
-        //    tcat_call_status='4202'。後果是 QA 在 dev 實測到的 11（已取貨）→ 210（已叫件）狀態倒退。
-        //    同一句也順帶擋掉「超商單打到黑貓端點」：3002 的 dispatch capability 現在誠實地回 empty。
         allowedActionResolver.require(FulfillmentAction.DISPATCH, entity);
 
-        // 縱深防禦：canonical 的 DISPATCH 閘門已含「標籤須取號」（與本行同一條規則）。
         if (!LabelPrintStatus.SUCCEEDED.value().equals(entity.getLabelPrintStatus())) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_LABEL_REQUIRED);
         }
 
-        // 預設值處理
         final String resolvedIsContact = isContact != null && !isContact.isBlank() ? isContact : "Y";
         final String resolvedIsTrolley = isTrolley != null && !isTrolley.isBlank() ? isTrolley : "N";
 
-        // 取賣家寄件資訊（從本地 seller_shipment_settings）
-        // ⚠️ 這是第 4 份同形守衛，而 ratchet gate 從沒數到它——它跨兩行，
-        //    regex 看不到「字面值」與「== null」在同一行。一起收斂，不留半套。
-        // 🔴 「設定是否仍有效」是平台判斷，不下放給 adapter：adapter 只收已驗證過的設定
-        //    （DispatchCapability.dispatch 的 sellerSetting 參數）。
         SellerShipmentSettingEntity setting =
                 onboardingService.requireActiveSetting(storeId, ShippingMethod.TAQBIN);
 
-        // 🔴 provider 請求的組裝（溫層→件數、寄件人地址、Y/N 翻譯）已搬進 adapter。
-        //    這裡只交出中性選項：布林 ＋ 備註。
         final DispatchCapability dispatchCapability = requireDispatchCapability(entity);
         final DispatchCapability.DispatchOptions dispatchOptions =
                 new DispatchCapability.DispatchOptions(
                         "Y".equals(resolvedIsContact), "Y".equals(resolvedIsTrolley), memo);
 
-        // 走 ProviderCallExecutor
         DispatchCapability.DispatchOutcome resp;
         try {
             resp = providerCallExecutor.execute(
@@ -987,19 +864,14 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_CALL_IN_PROGRESS);
         } catch (io.github.will413028.hawkr.payuni.http.PayUniApiException papi) {
             if (isTransientPayUniError(papi)) {
-                // markFailed 已跳過（保留 4202），對前端報「處理中請稍候」
                 throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_CALL_IN_PROGRESS);
             }
-            // markFailed 已寫 4204 + provider_message；對外維持既有 SHIPMENT_TCAT_CALL_FAILED 業務碼
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_TCAT_CALL_FAILED, papi.getMessage());
         }
 
-        // 記錄狀態日誌 + 發布事件
         ShippingStatus fromStatus = ShippingStatus.fromValue(entity.getStatus());
         insertStatusLog(entity.getId(), fromStatus, ShippingStatus.TCAT_CALLED, "CALL_TCAT");
         String labelKey = labelKeyOf(entity);
-        // notifyBuyerAccountId=0L：TCAT_CALLED 從未匹配買家推播 template 的 payload_filter
-        // （id=3 只認 IN_TRANSIT），不為此額外打 buyer-service RPC。
         eventPublisher.publishShipmentStatusChanged(new ShippingEventPayload(
                 entity.getOrderNo(), entity.getShipmentNo(), entity.getShippingMethod(),
                 ShippingStatus.TCAT_CALLED.value(), ShippingStatus.TCAT_CALLED.label(),
@@ -1009,11 +881,8 @@ public class ShippingService {
                 false, null, null, entity.getBuyerId(), 0L
         ));
 
-        // §5.9 賣家完成處理（宅配叫件）→ Order 端清空倒數
         eventPublisher.publishProcessingCleared(entity.getOrderNo());
 
-        // §5.21.8 黑貓宅配 expected_delivery_date 估算：以叫件當下 UTC 日期 + 3 工作日
-        // PayUni LgsCallTcat 不含此欄位，僅供 §5.21 DELIVERY_OVERDUE 偵測使用
         try {
             java.time.LocalDate baseDate = DateTimeUtils.nowUtc().toLocalDate();
             java.time.LocalDate expectedDate = holidayService.nextBusinessDay(baseDate, 3);
@@ -1029,9 +898,7 @@ public class ShippingService {
         return resp.dispatchedAt();
     }
 
-    // ==================== 查詢 ====================
 
-    // ==================== 退貨物流 ====================
 
     /** 退貨物流建單結果（shipTradeNo 供 AfterSales 快照使用，§5.3.6） */
     public record ReturnShipmentResult(String shipmentNo, String trackingCode,
@@ -1054,7 +921,6 @@ public class ShippingService {
                                                           String merId, String buyerName,
                                                           String buyerPhone, String temperature,
                                                           long tradeAmt) {
-        // 1. 取賣家超商 setting（不過濾 onboarding_status / enabled — 見 06 設計書 §2.3.1）
         SellerShipmentSettingEntity setting =
                 onboardingService.findSettingByMethod(storeId, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
         if (setting == null) {
@@ -1067,7 +933,7 @@ public class ShippingService {
         ReturnCapability.ReturnRequest request = new ReturnCapability.ReturnRequest(
                 orderNo, storeId, merId, generateReturnShipmentNo(),
                 buyerName, buyerPhone,
-                null, null, null, null,   // 超商退貨沒有到府取件，買家地址四欄不適用
+                null, null, null, null,
                 temperature, tradeAmt);
 
         ReturnCapability.ReturnOutcome outcome = requireReturnCapability(
@@ -1091,9 +957,6 @@ public class ShippingService {
         log.info("ShippingService.createReturnCvsShipment.success",
                 "退貨超商物流單建立完成 orderNo=" + orderNo + " shipmentNo=" + entity.getShipmentNo());
 
-        // 事務 commit 後非同步觸發 provider 列印（§5.3.6）
-        // 與正向出貨「seller 手動點列印」不同，退貨由系統自動觸發
-        // webhook 回來後由既有 processWebhookPrint → MQ → AfterSales consumer 鏈路完成三段碼快照
         scheduleAsyncCvsPrint(entity);
 
         return new ReturnShipmentResult(entity.getShipmentNo(), entity.getShipTradeNo(),
@@ -1145,7 +1008,6 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_NOT_A_RETURN);
         }
 
-        // 不依賴 TX afterCommit，直接 async（retry 路徑呼叫者未必在 TX 中）
         String shipDate = java.time.LocalDate.now().format(DATE_FMT);
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
@@ -1175,14 +1037,12 @@ public class ShippingService {
                                                            String buyerPhone, String buyerCity,
                                                            String buyerDistrict, String buyerAddress,
                                                            String buyerPostalCode, String temperature) {
-        // 1. 取賣家宅配 setting（不過濾 onboarding_status / enabled — 見 06 設計書 §2.3.1）
         SellerShipmentSettingEntity setting =
                 onboardingService.findSettingByMethod(storeId, ShippingMethod.TAQBIN.value());
         if (setting == null) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_DATA_INCOMPLETE, "找不到賣家宅配退貨設定");
         }
 
-        // 2. 查原始出貨單：adapter 以它的 spec 決定逆向單規格（查無則用 provider 預設）
         ShipmentEntity forwardShipment = shipmentMapper.selectOne(
                 new LambdaQueryWrapper<ShipmentEntity>()
                         .eq(ShipmentEntity::getOrderNo, orderNo)
@@ -1320,7 +1180,6 @@ public class ShippingService {
      * @param buyerId Gateway 已解析的現任買家 buyer_id
      */
     public ShipmentEntity getBuyerTrackingByOrderNo(String orderNo, Long buyerId) {
-        // 僅正向單（is_return=FALSE）：退貨單不在買家「查看物流」頁，且其 buyer_id 可能為 NULL
         ShipmentEntity entity = shipmentMapper.selectOne(
                 new LambdaQueryWrapper<ShipmentEntity>()
                         .eq(ShipmentEntity::getOrderNo, orderNo)
@@ -1330,7 +1189,6 @@ public class ShippingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_NOT_FOUND);
         }
 
-        // Ownership：對齊賣家 getAndVerifyShipment 慣例，不符回 PERMISSION_DENIED
         if (buyerId == null || !buyerId.equals(entity.getBuyerId())) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PERMISSION_DENIED);
         }
@@ -1375,9 +1233,6 @@ public class ShippingService {
      * PayUni 配額保護由 Gateway rate limit 處理，不在 service 層做 freshness gate。
      */
     private ShipmentEntity syncAndTouch(ShipmentEntity entity) {
-        // 🔴 「這個 provider 有沒有主動回查能力」取代舊的「如果是 Uber 就 return」。
-        //    Uber 的 TrackCapability 是 empty ⇒ 一樣直接返回、一樣不打任何東西，
-        //    但新增第四個 provider 時不用回來加 if——那正是舊寫法會漏掉的地方。
         Optional<TrackCapability> track = fulfillmentProviders.find(entity.getShippingMethod())
                 .flatMap(adapter -> adapter.track(FulfillmentContext.forShipment(entity)));
         if (track.isEmpty()) {
@@ -1389,21 +1244,13 @@ public class ShippingService {
         }
 
         try {
-            // provider 呼叫（含 LgsType 之類的 provider 專屬參數推導）整段在 adapter 內部，
-            // 這裡只收正規化後的結果 ＋ provider 原生值。
             TrackCapability.TrackResult result = track.get().query(entity);
 
             if (result.normalizedStatus() == null) {
-                // 兩種都不推進狀態機，但要分開記：
-                //   providerRawStatus == null ⇒ 這次查詢沒成功（provider 短暫故障）
-                //   providerRawStatus != null ⇒ provider 回了映射表不認得的值
                 if (result.providerRawStatus() == null) {
                     log.warn("ShippingService.queryStatus.error",
                             "PayUni 查詢失敗: " + result.providerMessage());
                 } else {
-                    // 🔴 與 webhook 路徑同一個處置。這條路徑**已經走 adapter**（TrackCapability），
-                    //    所以「未知值不落庫」不是「沒走 adapter」造成的，是呼叫端合約沒被執行
-                    //    ——兩處要一起修，否則會留下一個同形的缺口。
                     persistUnknownProviderStatus(entity, result.providerRawStatus(),
                             result.providerMessage(), "QUERY");
                 }
@@ -1412,7 +1259,6 @@ public class ShippingService {
 
             ShippingStatus newStatus = ShippingStatus.fromValue(result.normalizedStatus());
 
-            // 嘗試轉移狀態
             ShippingStatus currentStatus = ShippingStatus.fromValue(entity.getStatus());
             if (statusMapper.isValidTransition(currentStatus, newStatus)) {
                 updateStatusWithParsedTime(entity, currentStatus, newStatus,
@@ -1421,8 +1267,6 @@ public class ShippingService {
 
             return entity;
         } finally {
-            // §5.19：不論成功 / 失敗 / 未變更，都要 touch last_reconciled_at
-            // 退避控制由 service 層統一負責，§5.7 按需查詢與 §5.19 排程查詢共用
             shipmentMapper.touchLastReconciledAt(entity.getId(), DateTimeUtils.nowUtc());
         }
     }
@@ -1516,20 +1360,6 @@ public class ShippingService {
     private void persistUnknownProviderStatus(ShipmentEntity entity, String rawStatus,
                                               String providerMessage, String source) {
         if (rawStatus == null || rawStatus.isBlank() || PAYUNI_DASH_PLACEHOLDER.equals(rawStatus.trim())) {
-            // 🔴 **「沒有 raw 值」與「raw 值看不懂」是兩件事**（2026-09-10 dev 實測抓到）。
-            //
-            // ⚠️ PayUni 的 `-` 哨兵屬於前者，不是後者（2026-09-11 dev 實測）：回查路徑
-            //    對「尚未進入物流流程」的單子拿回 `-`，而它一路走到這裡被當成未知貨態
-            //    ⇒ ① 告警被正常流量持續觸發（實測 25 次／2 小時，raw 全部是 `-`）
-            //      ② **更嚴重**：無條件覆寫會把原本有意義的貨態蓋成 `-`
-            //         （實測 10 張 status=91 的單，provider_status 已被蓋成 `-`）
-            //         ——與本輪修掉的「建單結果回報清空 provider_status」是同一類。
-            //    provider 送來的若根本不是貨態事件（PayUni 的建單結果回報只有 TradeStatus、
-            //    沒有 ShipStatus），這裡沒有東西可保存——而 updateProviderStatus 是無條件覆寫，
-            //    照寫下去會把 provider_status 與 provider_message **一起清成 null**，
-            //    等於用「保存證據」的名義銷毀證據。
-            //    ⚠️ 這是本波接上 canonical ingress 之後才出現的路徑：接上之前，
-            //    consumer 的 `shipStatus.isEmpty()` 早退擋住了它。
             log.warn("ShippingService.providerStatus.notAStatusEvent",
                     "回調不帶貨態欄位，非貨態事件，不寫入也不推進狀態機"
                             + "（source=" + source + ", shipmentNo=" + entity.getShipmentNo() + "）",
@@ -1575,8 +1405,6 @@ public class ShippingService {
                 .tag("shipping_method", methodTag(entity))
                 .register(meterRegistry)
                 .increment();
-        // outcome 只進 log：把它放進 label 會讓預先展開的組合數 ×3，而告警不需要區分
-        // 「落庫成功」與「影響 0 列」——兩者都代表「物流商回了看不懂的東西」。
         log.warn("ShippingService.providerStatus.unknown.outcome", "未知貨態處置結果=" + outcome,
                 "orderNo", entity.getOrderNo());
     }
@@ -1600,7 +1428,6 @@ public class ShippingService {
         return entity.getShippingMethod() == null ? "unknown" : entity.getShippingMethod();
     }
 
-    // ==================== Webhook ====================
 
     /**
      * <b>legacy 相容入口</b>：以 PayUni 欄位為參數的貨態處理。
@@ -1629,10 +1456,6 @@ public class ShippingService {
 
         Optional<InboundCapability> inbound = inboundFor(shipTradeNo);
         if (inbound.isEmpty()) {
-            // 🔴 不 silent drop：配送單存在但 provider 解析不出 inbound 能力時，
-            //    raw 值仍必須保存——那是 BLOCKER 4 的硬要求「未知 provider status：
-            //    raw value 必須保存、不得 silent success」。
-            //    只有「連配送單都查不到」（回調早於建單的 race）才什麼都不做。
             ShipmentEntity entity = findByShipTradeNo(shipTradeNo);
             if (entity == null) {
                 log.warn("ShippingService.webhook.notFound",
@@ -1683,16 +1506,6 @@ public class ShippingService {
             return;
         }
 
-        // §5.21 B-143 即時偵測（正向出貨）：PayUni 回 Webhook（代表 SUCCESS）但三段碼任一為空
-        // → 立即推 PAYUNI_LGS_NO_CODE。退貨路徑由 aftersales ShipmentLabelConsumer 偵測；
-        // 正向路徑本來只靠 reconciler 補救（延遲）。不阻斷主流程，仍照常完成 webhook 處理。
-        //
-        // **限「標籤以三段碼形式回傳」的 provider**：宅配走同步 PDF 路徑
-        // （markLabelPrintSucceededHome），by-design 不寫三段碼。PayUni 實務不對宅配發 Print
-        // webhook，加守衛防止任何未預期路徑（測試 / 模擬 webhook / PayUni 行為改變）誤觸發 anomaly。
-        //
-        // 🔴 判斷依據從「配送方式是不是 3002」換成 LabelCapability.usesThreeSegmentCode()：
-        //    宅配的 usesThreeSegmentCode() 回 false，Uber 連 LabelCapability 都沒有。
         if (usesThreeSegmentCode(entity)
                 && (partnerId == null || partnerId.isBlank()
                 || odno == null || odno.isBlank()
@@ -1709,8 +1522,6 @@ public class ShippingService {
             );
         }
 
-        // 自訂 SQL：WHERE label_print_status IN ('4102','4101') 防止併發重複回填 + status=920(CVS_CODE_RECEIVED)
-        // §2.4.5.1：transition REQUESTED → SUCCEEDED（webhook 是超商列印的成功訊號）
         String cvsStatus = ShippingStatus.CVS_CODE_RECEIVED.value();
         int rows = shipmentMapper.markLabelPrintSucceededByWebhook(entity.getId(), partnerId, odno, validationNo, cvsStatus);
 
@@ -1720,17 +1531,12 @@ public class ShippingService {
             return;
         }
 
-        // 記錄狀態日誌
         ShippingStatus fromStatus = ShippingStatus.fromValue(entity.getStatus());
         insertStatusLog(entity.getId(), fromStatus, ShippingStatus.CVS_CODE_RECEIVED, "WEBHOOK_PRINT");
 
         log.info("ShippingService.webhookPrint.success",
                 "超商列印結果已更新，status=920(CVS_CODE_RECEIVED)", "shipTradeNo", shipTradeNo);
 
-        // 發布 MQ 事件（best-effort）：
-        //   isReturn=false → Order Service 快照至 orders
-        //   isReturn=true  → AfterSales Service 快照至 aftersale_cases
-        // 兩端共用同一 routing key，消費者依 isReturn 分流（§5.3.6）
         if (entity.getOrderNo() != null && !entity.getOrderNo().isBlank()) {
             boolean isReturn = Boolean.TRUE.equals(entity.getIsReturn());
             eventPublisher.publishLabelUpdated(
@@ -1740,9 +1546,6 @@ public class ShippingService {
                             partnerId, odno, validationNo,
                             isReturn));
 
-            // 同步 shipping_status=920 到 orders 表
-            // notifyBuyerAccountId=0L：CVS_CODE_RECEIVED 從未匹配買家推播 template 的 payload_filter
-            // （id=3 只認 IN_TRANSIT），不為此額外打 buyer-service RPC。
             eventPublisher.publishShipmentStatusChanged(new ShippingEventPayload(
                     entity.getOrderNo(), entity.getShipmentNo(), entity.getShippingMethod(),
                     ShippingStatus.CVS_CODE_RECEIVED.value(), ShippingStatus.CVS_CODE_RECEIVED.label(),
@@ -1751,14 +1554,12 @@ public class ShippingService {
                     false, null, null, entity.getBuyerId(), 0L
             ));
 
-            // §5.9 賣家完成處理（CVS 取號）→ Order 端清空倒數
             if (!isReturn) {
                 eventPublisher.publishProcessingCleared(entity.getOrderNo());
             }
         }
     }
 
-    // ==================== 出貨照片處理（共用） ====================
 
     /**
      * 處理出貨照片：FinalizeImages → **LinkImages** → 才寫入 {@code entity.shipmentPhotos}（#2222）。
@@ -1807,7 +1608,6 @@ public class ShippingService {
             return;
         }
         try {
-            // 送 objectKey（49 §5.3/§6.3）；顯示 URL 由 order 消費端經 Gateway 組
             List<String> photoKeys = entity.getShipmentPhotos().stream()
                     .map(ShipmentEntity.ShipmentPhoto::getObjectKey)
                     .filter(java.util.Objects::nonNull)
@@ -1832,7 +1632,6 @@ public class ShippingService {
         return shipmentMapper.findProviderStatusByOrderNos(orderNos, isReturn);
     }
 
-    // ==================== PayUni 建單失敗落地（收斂規範 §8.4 人工介入閉環） ====================
 
     /**
      * PayUni 建單失敗時落地 shipments 表 shell row（status=CREATE_FAILED）。
@@ -1860,8 +1659,6 @@ public class ShippingService {
                 shell.setShippingMethod(shippingMethod);
                 shell.setMerId(orderInfo.getMerId());
                 shell.setStatus(ShippingStatus.CREATE_FAILED.value());
-                // V12：建單失敗是 provider 層失敗，寫 provider_error_*，
-                // 不佔用 provider_status（那是正常貨態證據欄，ADM 不得據以判異常）
                 shell.setProviderErrorCode(failure.providerStatus());
                 shell.setProviderErrorMessage(failure.providerMessage());
                 shell.setProviderErrorAt(DateTimeUtils.nowUtc());
@@ -1870,7 +1667,6 @@ public class ShippingService {
                 shell.setCvsStoreCode(orderInfo.getCvsStoreId());
                 shell.setStoreName(orderInfo.getCvsStoreName());
                 shell.setProdDesc(orderInfo.getProductName());
-                // 以下為 shipments 表 NOT NULL 欄位：失敗 shell 需補足預設值才能落地
                 shell.setServiceType(io.github.will413028.hawkr.payuni.shipping.ServiceType.NO_CASH_ON_DELIVERY.code());
                 long tradeAmt = 0L;
                 String tradeAmtStr = orderInfo.getTotalActualAmount();
@@ -1895,7 +1691,6 @@ public class ShippingService {
                             + " providerStatus=" + failure.providerStatus(),
                     "orderNo", orderNo);
         } catch (Exception persistEx) {
-            // 落地失敗不阻斷主流程（呼叫端仍會收到原失敗例外）
             log.error("ShippingService.shipmentShell.persistFailed",
                     "落地 failed shipment 失敗 orderNo=" + orderNo + " err=" + persistEx.getMessage(), persistEx);
         }
@@ -1929,7 +1724,6 @@ public class ShippingService {
         }
     }
 
-    // ==================== 私有方法 ====================
 
     /**
      * 查詢物流單並驗證賣家一致
@@ -1954,10 +1748,6 @@ public class ShippingService {
                 ? DateTimeUtils.formatIso8601(entity.getProcessingDeadline())
                 : "";
 
-        // best-effort enrich 買家暱稱/頭像（issue #686 賣家推播個人化字樣）。
-        // 失敗時兩欄皆為 null，notification template FieldSpec.Resolve 略過該欄位，
-        // 前端 _personalize helper fallback 至通用「買家」字樣。模仿
-        // order-service OrderOutboxPublisher.enrich 模式（try/catch 不中斷主流程）。
         String buyerNickname = null;
         String buyerAvatarKey = null;
         try {
@@ -1967,7 +1757,7 @@ public class ShippingService {
             io.github.will413028.hawkr.buyer.grpc.BuyerDisplay bm = metas.get(buyerId);
             if (bm != null) {
                 buyerNickname = bm.getDisplayName();
-                buyerAvatarKey = bm.getAvatarKey(); // 49 §6.6 S9：只帶 objectKey，worker 組 URL（S5）
+                buyerAvatarKey = bm.getAvatarKey();
             }
         } catch (Exception e) {
             log.error("ShippingService.publishShipmentCreatedEvent.enrichBuyerFailed",
@@ -1975,7 +1765,6 @@ public class ShippingService {
                             + "，賣家推播將 fallback 至通用「買家」字樣", e);
         }
 
-        // shipment.created 有賣家向 visible template（id=2「買家已下單」）⇒ 保守版
         Long resolvedSellerAccountId = resolveSellerAccountIdConservative(entity.getStoreId());
         io.github.will413028.hawkr.shipping.service.dto.ShipmentCreatedPayload eventPayload =
                 new io.github.will413028.hawkr.shipping.service.dto.ShipmentCreatedPayload(
@@ -1987,8 +1776,6 @@ public class ShippingService {
                         labelKey,
                         processingDeadline,
                         String.valueOf(resolvedSellerAccountId),
-                        // buyerId：刻意傳裸 buyer_id PK（本事件無買家向 template，見 payload Javadoc）。
-                        // 之後要接買家推播請新增 notifyBuyerAccountId 欄位，不要改這裡的語意。
                         orderInfo.getBuyerId(),
                         orderInfo.getTotalActualAmount(),
                         buyerNickname,
@@ -2002,9 +1789,6 @@ public class ShippingService {
                                ShippingStatus toStatus, String providerStatus,
                                String providerMessage, String statusTime,
                                String triggerSource) {
-        // §10.4 D7 修正：PayUni 給 "yyyy-MM-dd HH:mm:ss" UTC+8（含空格，非 ISO 含 T）
-        // 過去用 ISO_LOCAL_DATE_TIME parser 永遠 catch + null，導致 provider_status_time 永久缺失
-        // 正確做法：邊界轉 UTC LocalDateTime，內部與 DB 一致
         LocalDateTime providerStatusTime = DateTimeUtils.parsePayUniDateTimeToUtc(statusTime);
         if (providerStatusTime == null && statusTime != null && !statusTime.isBlank()) {
             log.warn("ShippingService.parseStatusTime.error",
@@ -2025,7 +1809,6 @@ public class ShippingService {
                                              ShippingStatus toStatus, String providerStatus,
                                              String providerMessage, LocalDateTime providerStatusTime,
                                              String triggerSource) {
-        // 樂觀鎖：WHERE status = #{currentStatus}，轉移合法性由 Java 層 isValidTransition 驗證
         int rows = shipmentMapper.updateShipmentStatus(
                 entity.getId(),
                 fromStatus.value(),
@@ -2041,30 +1824,17 @@ public class ShippingService {
             return;
         }
 
-        // 記錄狀態日誌
         insertStatusLog(entity.getId(), fromStatus, toStatus, triggerSource);
 
-        // 發布 MQ 事件
         String labelKey = labelKeyOf(entity);
         String expireAt = entity.getLabelExpireAt() != null ? entity.getLabelExpireAt().toString() : "";
-        // PayUni Webhook 有描述就用，否則用 ShippingStatus displayName
         String desc = (providerMessage != null && !providerMessage.isBlank())
                 ? providerMessage : toStatus.label();
         boolean isReturnShipment = Boolean.TRUE.equals(entity.getIsReturn());
-        // issue #2789 階段 B2：本方法底下分岔成三條 publish，而「解析不到時該不該回吐 store_id」
-        // 逐條不同 —— 判別條件必須與下方的 publish 分支**逐字同構**（同樣的 isReturnShipment /
-        // PICKED_UP 順序），否則會出現「走保守版卻發了沒有賣家 template 的事件」這種靜默錯配。
-        //   isReturn            → return.shipment.status.changed：baseline 無任何 template  ⇒ 安全版
-        //   PICKED_UP           → shipment.delivered：有賣家向 shipment.delivered.seller     ⇒ 保守版
-        //   其餘狀態             → shipment.status.changed：baseline 只有買家向 template       ⇒ 安全版
         boolean sellerTemplateReadsThisField = !isReturnShipment && toStatus == ShippingStatus.PICKED_UP;
         Long resolvedSellerAccountId = sellerTemplateReadsThisField
                 ? resolveSellerAccountIdConservative(entity.getStoreId())
                 : resolveSellerAccountIdOrZero(entity.getStoreId());
-        // notifyBuyerAccountId 只在真正會投遞給買家的兩個狀態解析（打 buyer-service RPC）：
-        // IN_TRANSIT（shipment.status.changed，template id=3，payload_filter status=IN_TRANSIT）
-        // 與 PICKED_UP（shipment.delivered，template id=15）。其餘狀態經此中央分派點時
-        // 固定 0L，不額外打 RPC。
         Long notifyBuyerAccountId = (toStatus == ShippingStatus.IN_TRANSIT || toStatus == ShippingStatus.PICKED_UP)
                 ? resolveNotifyBuyerAccountId(entity.getBuyerId())
                 : 0L;
@@ -2089,19 +1859,10 @@ public class ShippingService {
                 entity.getStoreId()
         );
 
-        // 退貨物流單使用獨立的 routing key
         if (Boolean.TRUE.equals(entity.getIsReturn())) {
             eventPublisher.publishReturnShipmentStatusChanged(payload);
         } else if (toStatus == ShippingStatus.PICKED_UP) {
             eventPublisher.publishShipmentDelivered(payload);
-            // 配送完成後解除 PDF 引用，並把 shipments 上的 PDF 欄位一起清掉（#2288）。
-            //
-            // 解除引用之後，media-service 的 GC 會在 7 天後刪掉 R2 上的 PDF——那是既定
-            // 政策。但欄位若留著就成了指向不存在物件的死指標，而 buildDetailView 在配送
-            // 完成後仍會回傳 labelKey，Gateway 照樣組出 URL，前端拿到 404。
-            //
-            // 只有解除成功才清欄位：反過來會讓引用留在 media-service 裡，那個物件就永遠
-            // 不會被 GC 回收。兩者必須同進退。
             if (labelService.unlinkLabel(entity.getId(), entity.getLabelAssetId())) {
                 shipmentMapper.clearLabelAfterDelivery(entity.getId());
                 entity.setLabelObjectKey(null);
@@ -2214,8 +1975,6 @@ public class ShippingService {
             if (!resolution.isUnresolved(buyerId)) {
                 return resolution.principals().get(buyerId);
             }
-            // buyer 軸的 ResolvePrincipals 把查無在架列的 id 原樣回吐進 map，
-            // 所以「map 裡沒有」是死碼；真正的判別依據是 unresolved_ids（issue #2789）。
             log.warn("ShippingService.resolveNotifyBuyerAccountId.unresolved",
                     "buyer-service 回報查無在架買家（unresolved_ids），買家通知帶 0，"
                             + "不回吐未驗證的 buyer_id",
@@ -2238,7 +1997,6 @@ public class ShippingService {
         statusLogMapper.insert(logEntity);
     }
 
-    // ==================== provider capability 問答（取代 shipping_method 字面分支） ====================
 
     /**
      * 建單前是否必須先完成建店。
@@ -2294,9 +2052,6 @@ public class ShippingService {
      * <p>capability 為 empty ⇒ {@code false} ⇒ 照樣硬擋，與改動前逐字相同。
      */
     private boolean requiresSellerConfirmation(ShipmentEntity entity) {
-        // 🔴 問 adapter 本身，不再繞道 DispatchCapability（BLOCKER 2）：
-        //    繞道的代價是超商軸必須讓 dispatch() 回一個會丟例外的 present 物件，
-        //    而 allowedActions 只看得到 isPresent()。
         return fulfillmentProviders.find(entity.getShippingMethod())
                 .map(FulfillmentProviderAdapter::requiresSellerConfirmation)
                 .orElse(false);
@@ -2422,7 +2177,6 @@ public class ShippingService {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    // 49 §6.6/S3：回傳 label objectKey（不組 URL）；gRPC 回應與 MQ payload 皆帶 key，Gateway/consumer 端組 URL
     private String labelKeyOf(ShipmentEntity entity) {
         if (entity.getLabelObjectKey() == null || entity.getLabelObjectKey().isBlank()) {
             return "";

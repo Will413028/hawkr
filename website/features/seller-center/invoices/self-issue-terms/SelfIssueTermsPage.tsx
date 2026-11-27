@@ -85,8 +85,6 @@ export function SelfIssueTermsPage() {
 		);
 	}
 
-	// 還沒建立稅務身分 ⇒ 這一頁在他身上還沒有意義（條款是送審流程的一部分）。
-	// 🔴 導向「先去建立」，**不是**錯誤卡：那是每個新賣家的常態。
 	if (taxProfileMissing || notStarted) {
 		return (
 			<SellerPageShell
@@ -117,7 +115,6 @@ export function SelfIssueTermsPage() {
 		);
 	}
 
-	// 🔴 這一行就是本頁的核心判準——見檔頭。
 	const reviewStatus = notStarted
 		? SellerTaxReviewStatus.NOT_STARTED
 		: (profile?.reviewStatus ?? "");
@@ -125,7 +122,6 @@ export function SelfIssueTermsPage() {
 
 	const onAccept = () => {
 		accept.accept();
-		// mutation 成功後 hook 會 invalidate；導頁交給 S02 顯示 toast（T24）。
 		router.push(`${TAX_STATUS_HREF}?submitted=1`);
 	};
 
@@ -137,7 +133,7 @@ export function SelfIssueTermsPage() {
 		>
 			<BackLink fallbackHref={OVERVIEW_HREF}>回發票與稅籍</BackLink>
 
-			{/* <768px 時條款排在同意卡之前（先讀後同意）。 */}
+
 			<div className="mt-4 flex flex-col-reverse gap-4 md:grid md:grid-cols-[minmax(0,1fr)_360px] md:items-start">
 				<section className="seller-card p-5">
 					<h2 className="text-sm font-extrabold text-foreground">
@@ -170,7 +166,7 @@ export function SelfIssueTermsPage() {
 						<h2 className="text-sm font-extrabold text-foreground flex-1">
 							具結
 						</h2>
-						{/* `effective` 可以直接點亮 chip——它答的正是「生效中沒」。 */}
+
 						<Chip
 							variant="flat"
 							color={attestation?.effective ? "success" : "warning"}
@@ -205,7 +201,6 @@ export function SelfIssueTermsPage() {
 									同意並繼續接單
 								</Button>
 								{!checked ? (
-									// disabled 一定要有可見的原因。
 									<small
 										role="status"
 										className="text-[0.625rem] text-foreground-soft"
@@ -224,8 +219,6 @@ export function SelfIssueTermsPage() {
 							</div>
 						</>
 					) : (
-						// 🔴 已具結／尚未送審 ⇒ checkbox 與主 CTA **完全不在 DOM 內**，
-						// 不是 disabled 的 checkbox。
 						<dl className="flex flex-col gap-2 text-[0.6875rem]">
 							<Row
 								label="接受時間"
@@ -236,7 +229,7 @@ export function SelfIssueTermsPage() {
 								}
 							/>
 							<Row label="條款版本" value={attestation?.termsVersion || "—"} />
-							{/* 「接受帳號」不渲染——後端恆為空字串，見檔頭。 */}
+
 						</dl>
 					)}
 
@@ -254,7 +247,7 @@ export function SelfIssueTermsPage() {
 				</section>
 			</div>
 
-			{/* 恆在，不得改寫、刪除或摺疊。 */}
+
 			<p
 				role="status"
 				className="mt-4 p-[12px_14px] rounded-hkui-lg border border-warning-200 bg-warning-50 text-[0.6875rem] leading-relaxed text-hk-ink-800"

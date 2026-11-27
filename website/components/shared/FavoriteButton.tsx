@@ -61,9 +61,6 @@ export default function FavoriteButton({
 	>(null);
 	const loading = pendingAction !== null;
 	const lastClickAtRef = React.useRef(0);
-	// 請求進行中的鎖。拿掉 DOM `disabled` 之後（它會把鍵盤焦點踢到 body），
-	// 350ms 節流擋不住比它慢的請求：toggleFavorite 是先查再寫的兩步，兩個重疊的
-	// 請求會讀到同一個舊狀態、寫兩次，計數就差一。狀態值在閉包裡會過期，所以用 ref。
 	const inFlightRef = React.useRef(false);
 	const loginPayload = React.useMemo(
 		() => ({
@@ -85,9 +82,6 @@ export default function FavoriteButton({
 		setFavCount(count);
 	}, [count]);
 
-	// Reconcile against the shared favourites set (mirrors the buyer APP). Once
-	// the bulk query has loaded the user's favourites it is the source of truth,
-	// overriding a stale `initialFavorited:false` from the cached/anon list wire.
 	React.useEffect(() => {
 		if (typeof favFlag === "boolean") setActive(favFlag);
 	}, [favFlag]);
@@ -96,7 +90,6 @@ export default function FavoriteButton({
 		setFavCount((c) => (c == null ? c : Math.max(0, c + delta)));
 
 	const handleClick = (event: React.MouseEvent) => {
-		// Cards are wrapped in <Link>; stop the click from navigating.
 		event.preventDefault();
 		event.stopPropagation();
 
@@ -119,23 +112,19 @@ export default function FavoriteButton({
 		const nextActive = !previous;
 		const delta = nextActive ? 1 : -1;
 		setPendingAction(nextActive ? "add" : "remove");
-		setActive(nextActive); // optimistic — the heart + count are the feedback
-		setFavorited(productId, nextActive); // keep sibling cards in sync
+		setActive(nextActive);
+		setFavorited(productId, nextActive);
 		bumpCount(delta);
 		try {
-			// toggleFavorite re-checks server state first, so a stale initial
-			// state can't cause an add-on-already-favorited error.
 			const serverNext = await toggleFavorite(productId);
 			setActive(serverNext);
 			setFavorited(productId, serverNext);
 			if (serverNext) {
 				trackAddToWishlist({ productId, productName });
 			}
-			// Server disagreed with our optimistic guess → correct the count so
-			// it reflects the real final state (replace our delta with the right one).
 			if (serverNext !== nextActive) bumpCount((serverNext ? 1 : -1) - delta);
 		} catch (error) {
-			setActive(previous); // rollback
+			setActive(previous);
 			setFavorited(productId, previous);
 			bumpCount(-delta);
 			if (error instanceof Error && error.name === "UnauthorizedError") {
@@ -162,19 +151,11 @@ export default function FavoriteButton({
 				radius="full"
 				isIconOnly
 				onClick={handleClick}
-				// No `disabled` / `isLoading` while the toggle is in flight. The
-				// optimistic heart (and count) IS the feedback; swapping in a loader
-				// undid it, and a DOM-disabled button drops keyboard focus to <body>
-				// on every tap. The 350ms throttle plus `inFlightRef` absorb double taps.
 				aria-busy={loading || authWaiting || undefined}
 				aria-pressed={active}
 				aria-label={label}
 				data-active={active ? "true" : undefined}
 				data-pending={loading ? "true" : undefined}
-				// `before:-inset-2` grows the hit area to 44×44 without touching the
-				// pill's painted size — the pill is a deliberately small overlay on
-				// the product photo, and 8px of transparent padding around it is what
-				// previously navigated to the product page by mistake.
 				className={`group/fav h-auto w-auto inline-flex items-center gap-[5px] rounded-full px-2.5 py-1.5 bg-[var(--page-favorite-bg)] backdrop-blur-md backdrop-saturate-150 text-white text-xs font-semibold tabular-nums shadow-[var(--page-favorite-shadow)] cursor-pointer transition-[background,color,transform] duration-150 ease-out before:absolute before:-inset-2 before:content-[''] hover:bg-[var(--page-favorite-bg-hover)] active:scale-90 motion-reduce:transition-none motion-reduce:translate-none motion-reduce:scale-100 data-[active=true]:text-[var(--page-favorite-active-fg)] ${className ?? ""}`}
 			>
 				<span className="inline-flex items-center gap-px">

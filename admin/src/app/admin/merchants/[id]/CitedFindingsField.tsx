@@ -70,7 +70,6 @@ export default function CitedFindingsField({
 		[query.data],
 	);
 
-	// 讀取帳號（店家詳情）與讀取認定是同一個欄位的兩個前後步驟，共用同一組載入與失敗的呈現。
 	const loading =
 		account.status === "loading" ||
 		(accountId !== undefined && query.isLoading);

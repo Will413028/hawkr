@@ -90,7 +90,7 @@ class MerchantItemDetailScreen extends ConsumerStatefulWidget {
 
   final String title;
   final String? imageUrl;
-  final num? price; // 未稅或含稅無硬性規定，僅展示
+  final num? price;
   final String? skuId;
   final String? merchantName;
   final String? merchantId;
@@ -114,10 +114,9 @@ class _MerchantItemDetailScreenState
   final GlobalKey _specSectionKey = GlobalKey();
   int _currentIndex = 0;
 
-  // Size Spec selection state
-  Map<String, dynamic>? _selectedGrade; // selected grade map
-  String? _selectedGradeId; // selected grade id
-  int _selectedQty = 1; // purchase surfaces share a minimum quantity of one
+  Map<String, dynamic>? _selectedGrade;
+  String? _selectedGradeId;
+  int _selectedQty = 1;
   bool _favoriteLoading = false;
   bool _shareLoading = false;
   bool _isFavorite = false;
@@ -126,12 +125,10 @@ class _MerchantItemDetailScreenState
   bool _addingToCart = false;
   bool _directingCheckout = false;
   bool _viewItemSent = false;
-  // 補貨通知訂閱狀態（#942）— 售完時 PDP 顯示鈴鐺；初始值由 _loadProductDetail 從 raw map 讀
   bool _isRestockSubscribed = false;
   bool _restockLoading = false;
   OverlayEntry? _checkoutToastEntry;
 
-  // 由 _loadProductDetail 從 seller.sellerAccountId / seller.name 解析
   String _resolvedMerchantId = '';
 
   /// 檢舉的店家 id：商品詳情解析出的 store id；自己的商品不能檢舉自己的店。
@@ -139,13 +136,11 @@ class _MerchantItemDetailScreenState
       (!_selfOwnedResolved || _selfOwned) ? '' : _resolvedMerchantId;
   String _resolvedMerchantName = '';
 
-  // 商品詳情（由 _loadProductDetail 填入）
   String _productDescription = '';
   List<Map<String, dynamic>> _productDescriptionBlocks = [];
-  // B-132 三層分類名稱（後端會在 /public/products/{id} 回傳）
   String _categoryLv1 = '';
-  String _category = ''; // = categoryLv2Name
-  String _subCategory = ''; // = categoryLv3Name
+  String _category = '';
+  String _subCategory = '';
   String _origin = '';
 
   /// 完整分類路徑（Lv1 → Lv2 → Lv3，未來商品詳情可能用於 breadcrumb）
@@ -165,36 +160,29 @@ class _MerchantItemDetailScreenState
   String _storeName = '';
   double _storeRating = 0.0;
   List<String> _shippingMethodCodes = const [];
-  // 由 /public/products/{id} 的 skus 載入的規格列表
   List<Map<String, dynamic>>? _grades;
 
   @override
   void initState() {
     super.initState();
-    // 移除示意用假圖，僅使用 API 與（必要時）單一備援網址
     _images = [];
     _pageController = PageController(initialPage: 0);
     _resolvedMerchantId = widget.merchantId?.trim() ?? '';
     _resolvedMerchantName = widget.merchantName?.trim() ?? '';
     _isRestockSubscribed = widget.initialRestockSubscribed;
 
-    // 異步載入初始圖片（獲取預簽名 URL）
     _loadInitialImage();
 
-    // 載入商品詳情（含圖片、收藏狀態）
-    // _recordProductVisit 在 _loadProductDetail 後執行，確保 _resolvedMerchantId 已填入
     _loadProductDetail().then((_) => _recordProductVisit());
   }
 
   Future<void> _recordProductVisit() async {
-    // 瀏覽 beacon 一律送出，登入的呼叫者由伺服器略過。
     final viewedProductId = (widget.skuId ?? '').trim();
     if (viewedProductId.isNotEmpty) {
       unawaited(
         ref.read(sellerRepositoryProvider).recordProductView(viewedProductId),
       );
     }
-    // 訪客（無 token）打 /app/buyers/me/browse-history 必 401，直接 skip。
     final session = ref.read(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return;
@@ -251,7 +239,6 @@ class _MerchantItemDetailScreenState
       if (!ok && mounted) {
         setState(() => _isFavorite = !target);
       }
-      // Analytics: add_to_wishlist — only on successful add (not remove)
       if (target && ok) {
         ref
             .read(analyticsEventsProvider)
@@ -347,7 +334,6 @@ class _MerchantItemDetailScreenState
         ),
       );
     } catch (_) {
-      // silently ignore — share sheet not shown
     } finally {
       if (mounted) setState(() => _shareLoading = false);
     }
@@ -413,8 +399,6 @@ class _MerchantItemDetailScreenState
           .getProductFullInfo(sid);
       if (!mounted || info.isEmpty) return;
 
-      // 圖片：49 §6.1 成對契約，優先 key 陣列 imageKeys，其次 imageUrls；
-      // imageKey/imageUrl 作為 fallback 封面圖。值一律過 buildImageUrl 顯示。
       final imagesList = info['imageKeys'] ?? info['imageUrls'];
       final List<String> imgs = [];
       if (imagesList is List) {
@@ -430,7 +414,6 @@ class _MerchantItemDetailScreenState
         if (cover.isNotEmpty && cover != 'null') imgs.add(cover);
       }
 
-      // 說明：description.blocks[].content 串接
       final desc = info['description'];
       String descText = '';
       List<Map<String, dynamic>> descBlocks = [];
@@ -450,7 +433,6 @@ class _MerchantItemDetailScreenState
         descText = desc;
       }
 
-      // 配送資訊保留後端原始 code，與快速選購彈窗共用同一個語意元件。
       final shippingMethodCodes = <String>[];
       final shippingMethods = info['shippingMethods'];
       if (shippingMethods is List) {
@@ -467,19 +449,15 @@ class _MerchantItemDetailScreenState
         );
       }
 
-      // 規格：skus 陣列（直接使用 API 欄位，不呼叫額外端點）
       final grades = normalizeProductPurchaseSpecs(info['skus']);
       final initialGrade =
           firstAvailablePurchaseSpec(grades) ??
           (grades.isNotEmpty ? grades.first : null);
 
-      // 從 seller 解析 merchantId / merchantName
       final sellerMap = info['seller'];
       final sellerInfo = sellerMap is Map
           ? Map<String, dynamic>.from(sellerMap)
           : <String, dynamic>{};
-      // 44 號身分分離：商品詳情的賣家鍵是 storeId（store surrogate），
-      // 巢狀 seller 物件與 flat 層都有。
       final sellerId = _firstNonEmpty([sellerInfo['storeId'], info['storeId']]);
       final sellerName = (sellerInfo['name'] ?? '').toString().trim();
       var sellerLocation = _buildSellerLocation(sellerInfo);
@@ -546,7 +524,6 @@ class _MerchantItemDetailScreenState
           _images = imgs;
           _currentIndex = 0;
         }
-        // B-132 三層分類（後端 /public/products/{id} 補欄位）
         _categoryLv1 = categoryLv1;
         _category = categoryLv2;
         _subCategory = categoryLv3;
@@ -585,7 +562,6 @@ class _MerchantItemDetailScreenState
         }
       });
 
-      // Analytics: view_item — fire once when product detail finishes loading
       if (!_viewItemSent) {
         _viewItemSent = true;
         final brandName = _resolvedMerchantName.isNotEmpty
@@ -593,7 +569,6 @@ class _MerchantItemDetailScreenState
             : sellerName.isNotEmpty
             ? sellerName
             : null;
-        // Use first grade's effective price if available; fall back to widget.price
         final firstGradeRawPrice = grades.isNotEmpty
             ? (grades.first['salePrice'] ?? grades.first['price'])
             : null;
@@ -612,14 +587,12 @@ class _MerchantItemDetailScreenState
             );
       }
 
-      // autoFocusSpecs：滾動到規格選擇區
       if (widget.autoFocusSpecs && _grades != null && _grades!.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToSpecSection();
         });
       }
 
-      // E2E / ui-verify：直開商品時自動滾到底部（商品說明區）
       if (const String.fromEnvironment('E2E_INITIAL_PRODUCT').isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Future.delayed(const Duration(milliseconds: 900), () {
@@ -653,7 +626,7 @@ class _MerchantItemDetailScreenState
       ctx,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      alignment: 0.1, // 區段頂部稍偏下顯示
+      alignment: 0.1,
     );
   }
 
@@ -674,9 +647,8 @@ class _MerchantItemDetailScreenState
 
   @override
   Widget build(BuildContext context) {
-    // 計算當前選擇的單價和總價（PayUni #758：salePrice 有效時用 salePrice）
     double? currentUnitPrice;
-    double? currentListPrice; // 原價（刪除線用），無特價時為 null
+    double? currentListPrice;
     if (_selectedGrade != null) {
       final rawPrice =
           _selectedGrade!['price'] ??
@@ -885,7 +857,6 @@ class _MerchantItemDetailScreenState
 
     setState(() => _directingCheckout = true);
 
-    // Show the animated checkout toast immediately (no API wait)
     _checkoutToastEntry?.remove();
     _checkoutToastEntry = OverlayEntry(
       builder: (_) => const _CheckoutTransitionToast(),
@@ -949,7 +920,6 @@ class _MerchantItemDetailScreenState
       return;
     }
 
-    // Use the selected grade's SKU ID (variant ID), not the product ID from widget.skuId
     final skuStr = (_selectedGradeId?.trim().isNotEmpty == true)
         ? _selectedGradeId!.trim()
         : (widget.skuId ?? '').trim();
@@ -978,7 +948,6 @@ class _MerchantItemDetailScreenState
           .addToCart(sidInt.toString(), _selectedQty, guestId: guestId);
       ref.invalidate(cartCountProvider);
       success = true;
-      // Analytics: add_to_cart
       final rawPrice = _selectedGrade?['salePrice'] ?? _selectedGrade?['price'];
       ref
           .read(analyticsEventsProvider)
@@ -1013,9 +982,6 @@ class _MerchantItemDetailScreenState
   }
 }
 
-// ---------------------------------------------------------------------------
-// Checkout transition toast (animated cart icon overlay)
-// ---------------------------------------------------------------------------
 class _CheckoutTransitionToast extends StatefulWidget {
   const _CheckoutTransitionToast();
 
@@ -1033,14 +999,12 @@ class _CheckoutTransitionToastState extends State<_CheckoutTransitionToast>
   @override
   void initState() {
     super.initState();
-    // One-shot entrance: fade + slide up in 280ms
     _enterCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 280),
     )..forward();
     _enterAnim = CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOut);
 
-    // Continuous sine bounce for icon
     _bounceCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -1321,9 +1285,6 @@ class _ProductSourceImage extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// 商品內容元件
-// ============================================================================
 
 /// 商品預覽媒體：置中的原圖疊在同圖模糊背景上，維持不同商品比例時的沉浸感。
 class _ProductImageSection extends StatelessWidget {
@@ -1501,8 +1462,6 @@ class _ProductInfoCardNew extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 顯示真實資料，無資料時顯示 '--'
-    // 「商品分類」改成「L2 - L3」單行格式（不再分商品分類 / 詳細分類兩欄）
     final String categoryDisplay;
     if (category.isNotEmpty && subCategory.isNotEmpty) {
       categoryDisplay = '$category - $subCategory';
@@ -1524,7 +1483,6 @@ class _ProductInfoCardNew extends StatelessWidget {
         children: [
           Text(productName, style: AppTypography.sectionTitle),
           SizedBox(height: 8.h),
-          // 商品分類：L2 - L3 合併單行顯示（移除原本的「詳細分類」獨立欄位）
           Text(
             '商品分類：$categoryDisplay',
             style: AppTypography.body,
@@ -1623,8 +1581,6 @@ class _ProductDescriptionCard extends StatelessWidget {
     for (final block in blocks) {
       final type = block['type']?.toString() ?? 'text';
       if (type == 'image') {
-        // 49 §6.1 成對契約：描述區塊的圖片欄已由 objectKey/url 收斂成
-        // imageKey/imageUrl。OssImage 兩種輸入都吃，key 優先。
         final url = (block['imageKey'] ?? block['imageUrl'] ?? '').toString();
         if (url.isNotEmpty) {
           widgets.add(
@@ -1644,7 +1600,6 @@ class _ProductDescriptionCard extends StatelessWidget {
         continue;
       }
 
-      // 表格 block（02 §3.6）：橫向捲動渲染
       if (type == 'table') {
         final tableWidget = _buildDescTable(block['tableJson']);
         if (tableWidget != null) {
@@ -1658,7 +1613,6 @@ class _ProductDescriptionCard extends StatelessWidget {
         continue;
       }
 
-      // 清單 block（02 §3.6）：有序帶序號 / 無序帶項目符號
       if (type == 'list') {
         final listWidget = _buildDescList(block['listJson']);
         if (listWidget != null) {
@@ -1672,7 +1626,6 @@ class _ProductDescriptionCard extends StatelessWidget {
         continue;
       }
 
-      // 文字 block：runs 為主（inline 粗體/斜體/底線/顏色/連結），legacy content 相容
       final styleMap = block['style'] as Map<String, dynamic>? ?? {};
       final blockFontSize = _parseFontSize(styleMap['fontSize']);
 
@@ -1719,7 +1672,6 @@ class _ProductDescriptionCard extends StatelessWidget {
         continue;
       }
 
-      // legacy content（backfill 前舊資料，整塊樣式）
       final content = (block['content'] ?? '').toString();
       if (content.isEmpty) continue;
       final isBold = styleMap['bold'] == true;
@@ -1849,7 +1801,6 @@ class _ProductDescriptionCard extends StatelessWidget {
       color: AppColors.textPrimary,
       height: 1.4,
     );
-    // 各列欄數對齊（Table 要求所有列同欄數）
     var maxCols = 0;
     for (final row in rows) {
       if (row is List && row.length > maxCols) maxCols = row.length;
@@ -2011,7 +1962,6 @@ class _MerchantInfoCardNew extends StatelessWidget {
       context.push('/merchant/$storeCode');
     }
 
-    // Figma: 40x40 圓形頭像
     Widget avatar = Container(
       width: 40.w,
       height: 40.h,
@@ -2025,8 +1975,6 @@ class _MerchantInfoCardNew extends StatelessWidget {
     );
 
     if (avatarRaw.isNotEmpty) {
-      // inline 判準只看 `data:` scheme（media_image.dart isInlineImageData）。
-      // 舊寫法「不是 http 且長度 > 60」會把 78~80 字元的 objectKey 誤判成 base64。
       final bool looksBase64 = isInlineImageData(avatarRaw);
       if (looksBase64) {
         try {
@@ -2302,7 +2250,6 @@ class ProductReviewPreviewCardState
         ? context.l10n.productReviewsTitle
         : context.l10n.productReviewsTitleWithCount(statsCount);
 
-    // 只顯示前2筆評論預覽
     final displayReviews = reviews.take(2).toList();
 
     return Padding(
@@ -2312,7 +2259,6 @@ class ProductReviewPreviewCardState
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 標題列：商品評價 (數量) + 查看全部
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2350,7 +2296,6 @@ class ProductReviewPreviewCardState
           SizedBox(height: 8.h),
           const Divider(color: AppColors.gray100, height: 1),
           SizedBox(height: 16.h),
-          // 評論列表
           _loadError != null
               ? Column(
                   key: const ValueKey('product-detail-review-load-failure'),
@@ -2415,14 +2360,12 @@ class ProductReviewPreviewCardState
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 用戶資訊列
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Row(
                   children: [
-                    // 用戶頭像 (24x24 圓形) — 有 URL 載圖片，沒有則顯示名字首字
                     ClipOval(
                       child: SizedBox(
                         width: 24.w,
@@ -2453,7 +2396,6 @@ class ProductReviewPreviewCardState
                       ),
                     ),
                     SizedBox(width: 8.w),
-                    // 用戶名與日期共用可伸縮區域，保留更多操作的完整點擊範圍。
                     Flexible(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2476,7 +2418,6 @@ class ProductReviewPreviewCardState
                   ],
                 ),
               ),
-              // 日期 + 檢舉/封鎖操作
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2500,7 +2441,6 @@ class ProductReviewPreviewCardState
             ],
           ),
           SizedBox(height: 8.h),
-          // 星星評分 (12x12)
           Row(
             children: List.generate(rating.clamp(0, 5), (index) {
               return Padding(
@@ -2513,7 +2453,6 @@ class ProductReviewPreviewCardState
               );
             }),
           ),
-          // 評論內容
           if (content.isNotEmpty) ...[
             SizedBox(height: 8.h),
             Text(
@@ -2523,7 +2462,6 @@ class ProductReviewPreviewCardState
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          // 評論圖片
           if (review.images.isNotEmpty) ...[
             SizedBox(height: 8.h),
             SizedBox(

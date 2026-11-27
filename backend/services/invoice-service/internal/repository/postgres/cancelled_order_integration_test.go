@@ -49,7 +49,6 @@ func TestIntegration_CancelledOrderIsScopedToItsBuyer(t *testing.T) {
 		t.Fatal("第一次 Insert 應該回 inserted=true")
 	}
 
-	// 陽性：本人查得到。
 	got, err := repo.IsCancelledForBuyer(ctx, orderNo, owner)
 	if err != nil {
 		t.Fatalf("IsCancelledForBuyer(owner): %v", err)
@@ -58,7 +57,6 @@ func TestIntegration_CancelledOrderIsScopedToItsBuyer(t *testing.T) {
 		t.Fatal("本人查不到自己的取消紀錄 —— 讀路徑會退回錯誤文案")
 	}
 
-	// 🔴 陰性：別人查不到。這一段才是本測試的理由。
 	got, err = repo.IsCancelledForBuyer(ctx, orderNo, stranger)
 	if err != nil {
 		t.Fatalf("IsCancelledForBuyer(stranger): %v", err)
@@ -68,7 +66,6 @@ func TestIntegration_CancelledOrderIsScopedToItsBuyer(t *testing.T) {
 			"授權述詞漏了 buyer_id，這是一個訂單存在性 oracle（Tier A／E21）")
 	}
 
-	// 不存在的訂單同樣回 false（與越權不可區分）。
 	got, err = repo.IsCancelledForBuyer(ctx, orderNo+"X", owner)
 	if err != nil {
 		t.Fatalf("IsCancelledForBuyer(missing): %v", err)
@@ -90,8 +87,6 @@ func TestIntegration_CancelledOrderInsertIsIdempotent(t *testing.T) {
 	if _, err := repo.Insert(ctx, in); err != nil {
 		t.Fatalf("first insert: %v", err)
 	}
-	// 第二次：ON CONFLICT DO NOTHING ⇒ 不得拋 23505（那會讓整個交易 aborted 25P02，
-	// 而本 handler 在同一個交易內還有 MarkProcessed 要下）。
 	inserted, err := repo.Insert(ctx, in)
 	if err != nil {
 		t.Fatalf("重投時 Insert 拋錯：%v —— ON CONFLICT DO NOTHING 沒有生效，"+
@@ -101,7 +96,6 @@ func TestIntegration_CancelledOrderInsertIsIdempotent(t *testing.T) {
 		t.Fatal("第二次 Insert 應該回 inserted=false")
 	}
 
-	// 值沒有被第二次覆蓋（DO NOTHING 不是 DO UPDATE）。
 	var reason string
 	if err := testPoolQueryRow(ctx, t, repo, orderNo, &reason); err != nil {
 		t.Fatalf("回查：%v", err)

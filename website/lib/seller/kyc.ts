@@ -76,9 +76,7 @@ export const EMPTY_KYC_DOCS: KycDocs = {
 	companyDocuments: [],
 };
 
-/* ===== 日期與地址 ===== */
 
-/* ===== 申請 → 表單 ===== */
 
 export function kycTypeOf(app: KYCApplication | null): SellerType | null {
 	switch (app?.subject.case) {
@@ -176,9 +174,7 @@ export function baselineAfterSave(
 	return next as unknown as KycForm;
 }
 
-/* ===== 輸入驗證（只決定「這個值能不能送」，缺不缺由伺服器決定） ===== */
 
-/* ===== 表單 → SaveKYCDraft ===== */
 
 type ApplicationInit = MessageInitShape<typeof KYCApplicationSchema>;
 
@@ -222,7 +218,6 @@ export function buildSaveKycDraftRequest(
 	const biz: MessageInitShape<typeof BusinessKYCSchema> = {};
 	let touchesBranch = false;
 
-	// 每個欄位只用 localName 命名一次，proto 路徑從描述取（與 SaveKYCDraft 的 update_mask 一致）。
 	const appPath = (key: keyof typeof KYCApplicationSchema.field) =>
 		KYCApplicationSchema.field[key].name;
 	const bizPath = (key: keyof typeof BusinessKYCSchema.field) =>
@@ -283,7 +278,6 @@ export function buildSaveKycDraftRequest(
 		touchesBranch = true;
 	}
 
-	// 個人沒有欄位，型態只由 subject 設定的那一支表示：已有申請從公司改成個人時，要在 update_mask 直接列 individual 並送出空的 individual。
 	if (!creating && !business && baseline.sellerType === "business") {
 		paths.push(appPath("individual"));
 		touchesBranch = true;
@@ -303,7 +297,6 @@ export function buildSaveKycDraftRequest(
 	});
 }
 
-/* ===== 續填位置與缺項 ===== */
 
 export const SECTION_LABELS: Record<CertificationSectionId, string> = {
 	company: "公司資訊",
@@ -378,7 +371,6 @@ export function resumeSectionOf(
 	return SECTION_ORDER.find((s) => sections.has(s)) ?? null;
 }
 
-/* ===== 版本衝突：保留輸入、顯示最新 ===== */
 
 /**
  * 衝突之後的表單：使用者改過的欄位（與舊 baseline 不同）保留輸入，沒改的欄位換成最新版本。
@@ -432,7 +424,6 @@ export function adoptSavedDocs(
 	};
 }
 
-/* ===== 存檔失敗的欄位對照 ===== */
 
 const FORM_KEY_OF_FIELD: Partial<Record<KYCField, keyof KycForm>> = {
 	[KYCField.KYC_FIELD_PRODUCT_TYPE]: "productType",
@@ -449,7 +440,6 @@ export function kycFormKeyOfDraftPath(path: string): keyof KycForm | undefined {
 	return field === undefined ? undefined : FORM_KEY_OF_FIELD[field];
 }
 
-/* ===== 退回的待處理問題 ===== */
 
 /** 賣家還沒處理的退回問題（伺服器的 `outstanding_issues`），整理成表單上各處要顯示的說明。 */
 export interface KycIssueMessages {
@@ -498,7 +488,6 @@ export function kycIssueMessages(
 	return out;
 }
 
-/* ===== 流程狀態 ===== */
 
 /** 表單可以編輯：沒有申請（要建立），或申請是草稿、被退回（送出審核中與已通過的申請不能改）。 */
 export function kycEditable(app: KYCApplication | null): boolean {
@@ -573,7 +562,6 @@ export function kycDocumentNotice(
 	return `${where}：${message}`;
 }
 
-/* ===== RPC ===== */
 
 type SellerClient = ReturnType<typeof sellerAppClient>;
 

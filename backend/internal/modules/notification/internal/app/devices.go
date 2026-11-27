@@ -25,7 +25,6 @@ func validToken(token string) bool { return token != "" && len(token) <= MaxToke
 
 func (a App) valid() bool { return a == AppBuyer || a == AppSeller }
 
-// lockAccount 在呼叫者的 transaction 內共享鎖住存活的帳號；帳號已刪除或不存在是競爭（呼叫者通過認證時帳號還活著），不是使用者的錯。
 func (s *Service) lockAccount(ctx context.Context, accountID int64) error {
 	deleted, err := s.d.Accounts.ShareLockAccount(ctx, accountID)
 	if err != nil {

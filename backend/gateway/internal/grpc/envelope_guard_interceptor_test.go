@@ -16,8 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// fakeInvoker returns a grpc.UnaryInvoker that fills `reply` with the canned values.
-// `replyCode` / `replyMsg` simulate what the delegation module returned in the response envelope.
 func fakeInvoker(replyCode int32, replyMsg string, retErr error) grpc.UnaryInvoker {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
 		if retErr != nil {
@@ -196,12 +194,7 @@ func TestEnvelopeGuard_KnownCodeMapping_PrefixedBizCode(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// preserveData × bizcarrier：特權只在「有人接得住」時才發
-// ---------------------------------------------------------------------------
 
-// carrierCtx 用 production 的 bizcarrier.Middleware 造一個帶 carrier 的 context，
-// 而不是自己組一個測試用的 —— 自己組的話測到的就不是實際掛在 engine 上的那條路徑。
 func carrierCtx(t *testing.T) (context.Context, *gin.Context) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -252,7 +245,6 @@ func TestEnvelopeGuard_PreserveData_NoCarrier_FailsClosed(t *testing.T) {
 		t.Fatal("沒有 carrier 時 preserveData 碼必須降級成 gRPC error，不得 return nil")
 	}
 	st, _ := status.FromError(err)
-	// 9331 兩張表都沒登記 ⇒ fallback = FailedPrecondition ＋ 保留數字碼前綴。
 	if st.Code() != codes.FailedPrecondition {
 		t.Errorf("gRPC code = %v, want FailedPrecondition", st.Code())
 	}

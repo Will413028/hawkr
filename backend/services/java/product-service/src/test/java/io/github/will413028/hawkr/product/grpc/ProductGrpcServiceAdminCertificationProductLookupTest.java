@@ -108,8 +108,6 @@ class ProductGrpcServiceAdminCertificationProductLookupTest {
                     LocalDateTime.of(2026, 8, 1, 0, 0), LocalDateTime.of(2026, 8, 20, 0, 0), null, true);
             when(productRepository.findPublicationBriefByIdsIncludingDeleted(anyCollection()))
                     .thenReturn(List.of(brief));
-            // converter 要回真的 proto——回 mock 的 null 會讓 RPC 在補完商品名之後才炸，
-            // 那樣 verify 仍會過，但測到的是一條崩掉的路徑。
             when(certificationConverter.toAdminProto(any(), any(), any()))
                     .thenReturn(ProductCertificationApplication.newBuilder()
                             .setId(String.valueOf(APPLICATION_ID))
@@ -127,13 +125,11 @@ class ProductGrpcServiceAdminCertificationProductLookupTest {
 
             verify(productRepository).findPublicationBriefByIdsIncludingDeleted(anyCollection());
 
-            // 控制組：RPC 必須真的成功走完，否則上面的 verify 可能只是「炸掉之前剛好呼叫過」。
             ArgumentCaptor<ProductCertificationApplicationAdminResponse> captor =
                     ArgumentCaptor.forClass(ProductCertificationApplicationAdminResponse.class);
             verify(responseObserver).onNext(captor.capture());
             verify(responseObserver).onCompleted();
             assertEquals(0, captor.getValue().getCode(), "RPC 必須成功；非 0 代表走進了錯誤分支");
-            // 上游確實把 brief 交給了 converter（而不是傳 null 進去）。
             verify(certificationConverter).toAdminProto(any(), eq(brief), any());
         } finally {
             Context.current().detach(previous);

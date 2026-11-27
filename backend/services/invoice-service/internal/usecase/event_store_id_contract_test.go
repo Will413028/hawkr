@@ -13,59 +13,14 @@ import (
 	"testing"
 )
 
-// ---------------------------------------------------------------------------
-// 出向事件 payload 的機械保證（第二道線；第一道是型別，見 internal/eventwire）
-//
-// 🔴 為什麼有兩道線，以及各自擋什麼——這一段是本檔存在的理由，改本檔前先讀：
-//
-//	第一道（編譯期，internal/eventwire）
-//	  StoreID／BuyerID 的底層是帶未匯出欄位的 struct ⇒ 本 package 內
-//	  **組不出**一個錯的值。`ev.StoreID = strconv.FormatInt(...)`、
-//	  `s := ...; ev.StoreID = s`、`ev.StoreID = 自己寫的 helper(...)`
-//	  三種寫法全部編不過。
-//
-//	第二道（本檔，AST）
-//	  編譯期擋不住的還有五種，全部長得像正例、全部編得過：
-//	    ① 新的 payload 型別把欄位宣告成 `StoreID string` ⇒ P0-3 原樣復活
-//	    ② 欄位整個不填（零值）⇒ wire 上是空字串或 marshal 失敗
-//	    ③ 繞開型別：`json.Marshal(map[string]any{"store_id": ...})`
-//	    ④ 新增第 7 個事件型別而**沒有** store_id 欄位 ⇒ 賣家向通知恆 skip
-//	    ⑤ 建構函式呼叫對了，**引數是就地捏出來的**：
-//	         eventwire.StoreIDOf(domain.Issuer{ID: doc.IssuerID, IssuerRefID: doc.IssuerID})
-//	       這一種是 2026-08-31 的對抗覆核抓到的，而它在補上 R8／R9 之前
-//	       **編譯期與 AST 兩道都放行**（`go build` exit 0、本檔連跑 8 次全 PASS）。
-//	       成因：舊的 isApprovedCtorCall 只比對**被呼叫者的名字文字**，從不看引數哪來的。
-//
-// 🔴 本檔的形狀是 **fail-closed**：不是「列出已知的壞寫法」而是
-// 「除非證明安全否則報錯」——
-//   - 認得出的 payload 型別，其 store_id／buyer_id 欄位的**每一個寫入點**都必須是
-//     核可的建構函式呼叫；認不出寫入點（位置參數字面量、無法解析的運算式）⇒ 報錯
-//   - 那個呼叫的**引數本身**必須追得回一個真的從 repository 取得的 domain 物件
-//     （R8）：函式參數且型別正確，或區域變數且來自某個依賴的方法呼叫。
-//     追不回來源 ⇒ **報錯，不是放行**
-//   - 本 package 內**不得就地組出**任何被追蹤的 domain 聚合（R9）。這條關的是
-//     「先在別處捏一個、再當成參數傳進來」那條路：R8 只看得到當前函式，
-//     R9 讓「捏」這個動作在整個 package 裡都無處可做
-//   - 型別宣告了 tracked 欄位卻在本 package 內**找不到任何複合字面量** ⇒ 報錯
-//     （目標不存在一律 FAIL 不 SKIP）
-//   - outbox 落點的 Payload 追不回一個已納管的型別 ⇒ 報錯
-//
-// 判定材料是**原始碼 AST**，不是任何人的自述 ⇒ 可以強制而不只是提醒。
-// 鑑別力由 TestEventPayloadGateCatchesEveryKnownBypass 證明：它把四種繞道逐一餵進去，
-// 任何一種沒被抓到就 fail。
-// ---------------------------------------------------------------------------
 
-// wireAxis 是一個「路由識別碼軸」的規格。
-//
-// 新增第三個軸（例如 recipient_store_id）時，在 wireAxes 加一條就好——所有規則都
-// 以本表驅動，沒有任何一條規則寫死 "store_id"。
 type wireAxis struct {
-	Tag      string   // wire 欄名
-	Type     string   // 欄位唯一合法的 Go 型別
-	Ctors    []string // 唯一合法的值來源（限定選擇器全名）
-	GoNames  []string // 對應的 Go 欄位識別字（用來抓「改了 tag 卻留著欄名」）
-	Required bool     // 是否每個出向事件都必須有這一欄
-	Impact   string   // 違反時的實際後果（寫進錯誤訊息，讓下一個人不用重新考古）
+	Tag      string
+	Type     string
+	Ctors    []string
+	GoNames  []string
+	Required bool
+	Impact   string
 }
 
 var wireAxes = []wireAxis{
@@ -82,7 +37,7 @@ var wireAxes = []wireAxis{
 		Tag: "buyer_id", Type: "eventwire.BuyerID",
 		Ctors:    []string{"eventwire.BuyerIDOfDocument", "eventwire.BuyerIDOfComplaint"},
 		GoNames:  []string{"BuyerID", "BuyerId"},
-		Required: false, // taxStatusChangedEvent 是純賣家向事件，沒有買家
+		Required: false,
 		Impact: "invoice_documents.recipient_ref_id 是多義欄位：BUYER ⇒ buyers.buyer_id、" +
 			"SELLER ⇒ sellers.store_id、EXTERNAL ⇒ NULL。不判 recipient_type 就填 ⇒ " +
 			"方向二／四的事件把一個 store_id 裝進 buyer_id ⇒ §6.3.9 模板的 target_user_field " +
@@ -90,18 +45,6 @@ var wireAxes = []wireAxis{
 	},
 }
 
-// wireCtorParamTypes 是「每支建構函式收哪個 domain 型別」的唯一來源。
-//
-// 🔴 兩處消費者刻意共用同一份：
-//   - R8（引數溯源）用它判定「這個識別字必須是哪個型別的參數」
-//   - TestEventWireTypesCannotBeBuiltOutsideTheirPackage 用它驗 eventwire 那邊的
-//     實際簽章
-//
-// 各寫一份的話，改了 eventwire 的簽章而忘記改 R8，R8 會開始拿舊型別去比對 ⇒
-// 所有寫入點一起紅（吵）或一起過（危險），而兩種都不會指向真正的原因。
-//
-// 值同時也是 R9 的「不得就地組出的聚合型別」清單 —— 那不是巧合：
-// 一個型別之所以能當路由識別碼的來源，正是因為取得它的正常路徑是 repository。
 var wireCtorParamTypes = map[string]string{
 	"eventwire.StoreIDOf":          "domain.Issuer",
 	"eventwire.BuyerIDOfDocument":  "domain.Document",
@@ -122,18 +65,13 @@ func (v payloadViolation) String() string {
 	return v.Pos + " " + v.Struct + "." + v.Field + " [" + v.Rule + "] " + v.Detail
 }
 
-// gateReport 是 checkEventPayloads 的完整輸出。
-//
-// 除了違規清單，它還回三個**鑑別力自檢用**的集合：辨識器若什麼都認不出來，違規清單
-// 當然是空的，而那看起來跟「全部合規」一模一樣。呼叫端必須斷言它們非空。
 type gateReport struct {
 	Violations   []payloadViolation
-	PayloadTypes []string       // 被認定為出向事件 payload 的型別名
-	OutboxTypes  []string       // 追得回 outbox 落點的 payload 型別名
-	WritePoints  map[string]int // "型別.欄位" → 找到幾個寫入點
+	PayloadTypes []string
+	OutboxTypes  []string
+	WritePoints  map[string]int
 }
 
-// checkEventPayloads 掃一組 Go 原始檔，套用 R1–R7。
 func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 	rep := gateReport{WritePoints: map[string]int{}}
 	add := func(pos token.Pos, structName, field, rule, detail string) {
@@ -142,7 +80,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 		})
 	}
 
-	// ---- 0) 收集全部 struct 宣告與 func 宣告 --------------------------------
 	structDecls := map[string]*ast.StructType{}
 	funcDecls := map[string]*ast.FuncDecl{}
 	for _, f := range files {
@@ -164,15 +101,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 		}
 	}
 
-	// ---- 1) 辨識「出向事件 payload 型別」-----------------------------------
-	//
-	// 四條並聯條件（union），任一成立即納入。用並聯而不是單一條件，是因為每一條
-	// 單獨都有明確的繞道：
-	//   (a) 名稱以 Event 結尾            → 改名叫 fooPayload 就繞過
-	//   (b) 字面量直接在 json.Marshal 裡 → 先 marshal 到變數再傳就繞過
-	//   (c) 帶 store_id / buyer_id tag   → 把 tag 改掉就繞過
-	//   (d) Go 欄名叫 StoreID / BuyerID  → 把欄名改掉就繞過
-	// 四條同時繞過 ＝ 那個值根本沒打算走 payload["store_id"]，會被 R5/R7 接住。
 	payloadTypes := map[string]*ast.StructType{}
 	markType := func(name string) {
 		if st, ok := structDecls[name]; ok {
@@ -218,10 +146,8 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 	}
 	sort.Strings(rep.PayloadTypes)
 
-	// trackedFields[型別名][Go 欄名] = 對應的軸
 	trackedFields := map[string]map[string]wireAxis{}
 
-	// ---- 2) R1 欄名 snake_case ／ R2 欄位型別 -------------------------------
 	for _, name := range rep.PayloadTypes {
 		st := payloadTypes[name]
 		for _, fld := range st.Fields.List {
@@ -261,12 +187,10 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 					}
 					trackedFields[name][goName] = ax
 				case isAxisGoName && fld.Tag != nil:
-					// 欄名叫 StoreID 卻掛了別的 tag ＝ 把值送去一個下游不會讀的鍵。
 					add(fld.Pos(), name, goName, "R2",
 						"欄位叫 "+goName+" 卻掛 json tag "+strconv.Quote(tag)+
 							"，必須是 "+strconv.Quote(ax.Tag)+"。後果："+ax.Impact)
 				case declared == ax.Type:
-					// 型別對、tag 不對：同樣送不到下游。
 					add(fld.Pos(), name, goName, "R2",
 						"欄位型別是 "+ax.Type+" 卻掛 json tag "+strconv.Quote(tag)+
 							"，必須是 "+strconv.Quote(ax.Tag))
@@ -275,16 +199,9 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 		}
 	}
 
-	// ---- 3) R3 寫入點 ------------------------------------------------------
-	//
-	// fail-closed：每一個寫入點都必須是核可建構函式的呼叫；型別宣告了 tracked 欄位
-	// 卻找不到任何複合字面量，也是違規（目標不存在一律 FAIL 不 SKIP）。
 	litCount := map[string]int{}
 	for _, f := range files {
 		for _, topDecl := range f.Decls {
-			// 🔴 逐 decl 走而不是整檔走，是為了讓 R8 拿得到**外圍函式**：引數溯源要在
-			// 那個函式的參數與區域指派裡找來源。整檔走的話這個資訊不存在，
-			// R8 就只能退回「看名字」——那正是它要修的病。
 			enclosing, _ := topDecl.(*ast.FuncDecl)
 			ast.Inspect(topDecl, func(n ast.Node) bool {
 				cl, ok := n.(*ast.CompositeLit)
@@ -305,8 +222,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 				for _, elt := range cl.Elts {
 					kv, ok := elt.(*ast.KeyValueExpr)
 					if !ok {
-						// 位置參數字面量：欄位對應關係只能靠宣告順序推，改一次欄位順序就
-						// 全錯，而且本檢查無從驗證 ⇒ 一律當違規。
 						add(elt.Pos(), id.Name, "?", "R3",
 							"事件 payload 不得使用位置參數複合字面量（無法驗證哪個值進了哪個欄位）")
 						continue
@@ -332,7 +247,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 						add(kv.Pos(), id.Name, key.Name, "R8", detail+"後果："+ax.Impact)
 					}
 				}
-				// R4：漏填 ＝ 零值。編譯得過，wire 上不是空字串就是 marshal 失敗。
 				for goName, ax := range fields {
 					if !seen[goName] {
 						add(cl.Pos(), id.Name, goName, "R4",
@@ -344,7 +258,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 			})
 		}
 	}
-	// R3 的 fail-closed 半邊：宣告了卻沒有任何字面量 ⇒ 檢查對它完全沒有鑑別力。
 	for typeName, fields := range trackedFields {
 		if litCount[typeName] == 0 {
 			for goName := range fields {
@@ -355,9 +268,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 		}
 	}
 
-	// R3 的補強：事後賦值。有了 eventwire 的不透明型別，`ev.StoreID = <字串>` 已經
-	// 編不過；這一條守的是「有人把欄位型別改回 string 而 R2 又被繞過」的組合，
-	// 以及本檢查被移植到還沒有型別保護的地方時。
 	for _, f := range files {
 		for _, topDecl := range f.Decls {
 			enclosing, _ := topDecl.(*ast.FuncDecl)
@@ -396,7 +306,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 		}
 	}
 
-	// ---- 4) R5 outbox payload 的來源必須追得回已納管的型別 ------------------
 	outboxTypes := map[string]bool{}
 	for _, f := range files {
 		for _, d := range f.Decls {
@@ -448,19 +357,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 	}
 	sort.Strings(rep.OutboxTypes)
 
-	// ---- 4.5) R9 不得就地組出被追蹤的 domain 聚合 -------------------------
-	//
-	// 🔴 這條關的是 R8 看不到的那半邊。R8 只看得到**當前函式**：引數若是一個型別正確的
-	// 參數，它就放行——而那只是把問題推給呼叫端。呼叫端在同一個 package 裡
-	// `complaintCreatedPayload(domain.Issuer{IssuerRefID: doc.IssuerID}, …)` 一樣成立。
-	//
-	// R9 讓「捏一個聚合」這個動作在整個 package 裡都無處可做。判準不是「長得可疑」而是
-	// **結構**：這三個型別的正常來源是 repository（它們是 DB 列的投影），usecase 裡出現
-	// 一個帶欄位值的字面量，就代表有人在用基本型別重建一個聚合，而重建的那一刻
-	// id ↔ ref_id 的映射就沒有任何東西在守了。
-	//
-	// 零欄位字面量（`domain.Issuer{}`）放行：那是 `return domain.Issuer{}, err` 的錯誤
-	// 回傳路徑，而 eventwire 的建構函式對零值本來就回不可 marshal 的結果。
 	aggregateTypes := map[string]bool{}
 	for _, t := range wireCtorParamTypes {
 		aggregateTypes[t] = true
@@ -487,7 +383,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 		})
 	}
 
-	// ---- 5) R6 繞開型別：直接 marshal map --------------------------------
 	for _, f := range files {
 		ast.Inspect(f, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
@@ -523,7 +418,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 		})
 	}
 
-	// ---- 6) R7 每個真的送出去的事件都要帶必填軸 ----------------------------
 	for _, tn := range rep.OutboxTypes {
 		st := payloadTypes[tn]
 		for _, ax := range wireAxes {
@@ -546,11 +440,6 @@ func checkEventPayloads(fset *token.FileSet, files []*ast.File) gateReport {
 	return rep
 }
 
-// resolvePayloadTypes 把 `Payload:` 的值追回一組事件型別名。
-//
-// 支援兩層：直接 json.Marshal(T{...})，或指向一個區域變數而該變數由
-// json.Marshal(T{...}) 或一支本 package 的函式（其函式體 marshal 了 T{...}）指派。
-// 追不動就回 false —— **不猜、不放行**。
 func resolvePayloadTypes(e ast.Expr, enclosing *ast.FuncDecl, funcs map[string]*ast.FuncDecl) ([]string, bool) {
 	switch v := e.(type) {
 	case *ast.CallExpr:
@@ -585,7 +474,6 @@ func resolvePayloadTypes(e ast.Expr, enclosing *ast.FuncDecl, funcs map[string]*
 				if !isIdent || id.Name != v.Name {
 					continue
 				}
-				// `a, b := f()` 這種單 RHS 多 LHS 的形狀取 RHS[0]。
 				rhs := assign.Rhs[0]
 				if i < len(assign.Rhs) {
 					rhs = assign.Rhs[i]
@@ -605,7 +493,6 @@ func resolvePayloadTypes(e ast.Expr, enclosing *ast.FuncDecl, funcs map[string]*
 	return nil, false
 }
 
-// marshalledTypesIn 回一段函式體內所有 json.Marshal(T{...}) 的 T。
 func marshalledTypesIn(body *ast.BlockStmt) []string {
 	var out []string
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -633,10 +520,6 @@ func calleeName(fun ast.Expr) string {
 	return ""
 }
 
-// identHasType 判斷 x 這個識別字在本檔內是否曾以 typeName 宣告或指派。
-//
-// 只認得同檔內的 `var x T`、`x := T{...}`、`x = T{...}` 三種——這是刻意的窄範圍：
-// 主保證是編譯期型別，這一條只是補強，寧可窄也不要誤報。
 func identHasType(f *ast.File, x ast.Expr, typeName string) bool {
 	id, ok := x.(*ast.Ident)
 	if !ok {
@@ -698,14 +581,6 @@ func jsonTagOf(f *ast.Field) string {
 	return strings.Split(m[1], ",")[0]
 }
 
-// approvedCtorOf 只認「對核可建構函式的直接呼叫」，並回那支建構函式的全名。
-//
-// 🔴 白名單而不是黑名單：任何其他運算式（區域變數、自寫 helper、型別轉換、
-// 三元式改寫）一律不放行。這就是 fail-closed 的具體形狀。
-//
-// ⚠️ 它**只回答「呼叫的是誰」**。「引數哪來的」是另一個問題，由 ctorArgProvenance 回答
-// —— 把兩者混成一個 bool 正是舊版的病：`eventwire.StoreIDOf(domain.Issuer{…})` 的
-// 被呼叫者完全正確，於是整道檢查放行一個就地捏出來的聚合。
 func approvedCtorOf(e ast.Expr, ctors []string) (string, bool) {
 	call, ok := e.(*ast.CallExpr)
 	if !ok {
@@ -720,19 +595,6 @@ func approvedCtorOf(e ast.Expr, ctors []string) (string, bool) {
 	return "", false
 }
 
-// ctorArgProvenance 回答「這支建構函式收到的東西，是不是真的從 repository 來的」。
-// 回 (說明, true) 代表**有問題**；(", false) 代表通過。
-//
-// 🔴 fail-closed：只有兩種來源算數，其餘一律報錯 —— 包含「追不回來源」。
-//
-//	(a) 外圍函式的參數，且宣告型別正好是這支建構函式要的 domain 型別
-//	    （型別對不上就是另一件東西；型別對得上而是捏出來的，由 R9 在來源端擋）
-//	(b) 外圍函式內的區域變數，且它由某個**依賴的方法呼叫**指派
-//	    （`u.issuers.GetByID(ctx, doc.IssuerID)` 這種形狀）
-//
-// 為什麼 (b) 只要求「是個方法呼叫」而不追進那支方法：本 package 內任何從基本型別重建
-// 聚合的動作都被 R9 擋住了，所以一個回 domain 聚合的方法呼叫，它的值只可能來自
-// repository 或另一個同樣受管的來源。兩條規則是一組，拆開任一條都會漏。
 func ctorArgProvenance(fn *ast.FuncDecl, call *ast.CallExpr, ctor string) (string, bool) {
 	want, known := wireCtorParamTypes[ctor]
 	if !known {
@@ -745,7 +607,7 @@ func ctorArgProvenance(fn *ast.FuncDecl, call *ast.CallExpr, ctor string) (strin
 
 	arg := call.Args[0]
 	for {
-		star, ok := arg.(*ast.StarExpr) // *ptr 解參照
+		star, ok := arg.(*ast.StarExpr)
 		if !ok {
 			break
 		}
@@ -775,13 +637,11 @@ func ctorArgProvenance(fn *ast.FuncDecl, call *ast.CallExpr, ctor string) (strin
 	}
 }
 
-// identProvenance 在 fn 內追一個識別字的來源。回 (說明, true) 代表有問題。
 func identProvenance(fn *ast.FuncDecl, name, want string) (string, bool) {
 	if fn == nil || fn.Body == nil {
 		return "出現在任何函式之外，無從溯源（fail-closed）。\n", true
 	}
 
-	// (a) 函式參數（含 receiver 不算：receiver 是 usecase 自己）
 	for _, fld := range fn.Type.Params.List {
 		for _, n := range fld.Names {
 			if n.Name != name {
@@ -796,7 +656,6 @@ func identProvenance(fn *ast.FuncDecl, name, want string) (string, bool) {
 		}
 	}
 
-	// (b) 函式內指派
 	found, ok := false, true
 	var detail string
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
@@ -810,7 +669,7 @@ func identProvenance(fn *ast.FuncDecl, name, want string) (string, bool) {
 				continue
 			}
 			found = true
-			rhs := assign.Rhs[0] // `a, b := f()` 取單一 RHS
+			rhs := assign.Rhs[0]
 			if i < len(assign.Rhs) {
 				rhs = assign.Rhs[i]
 			}
@@ -831,7 +690,6 @@ func identProvenance(fn *ast.FuncDecl, name, want string) (string, bool) {
 	return "", false
 }
 
-// rhsProvenance 判斷一個指派右值是不是可接受的來源。
 func rhsProvenance(rhs ast.Expr, want string) (string, bool) {
 	for {
 		star, isStar := rhs.(*ast.StarExpr)
@@ -863,7 +721,6 @@ func rhsProvenance(rhs ast.Expr, want string) (string, bool) {
 	return "由 `" + exprText(rhs) + "` 指派，追不回一個依賴的方法呼叫。\n", true
 }
 
-// rootIdent 回一個選擇器鏈最左邊的識別字（`u.issuers.GetByID` → "u"）。
 func rootIdent(e ast.Expr) string {
 	for {
 		sel, ok := e.(*ast.SelectorExpr)
@@ -878,7 +735,6 @@ func rootIdent(e ast.Expr) string {
 	return ""
 }
 
-// exprText 把運算式還原成大致的原始碼文字。
 func exprText(e ast.Expr) string {
 	switch v := e.(type) {
 	case nil:
@@ -910,7 +766,6 @@ func exprText(e ast.Expr) string {
 	}
 }
 
-// parsePackageFiles 讀一個目錄下的非測試 .go 檔。
 func parsePackageFiles(t *testing.T, dir string) (*token.FileSet, []*ast.File) {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -935,10 +790,6 @@ func parsePackageFiles(t *testing.T, dir string) (*token.FileSet, []*ast.File) {
 	return fset, files
 }
 
-// 本 package 已知的六個出向事件 payload 型別。
-//
-// 這份清單是**下界**不是白名單：多出來的型別一樣受全部規則管，但少一個就代表辨識器
-// 壞了或某個事件被默默刪掉，兩者都必須當場紅。
 var knownEventPayloadTypes = []string{
 	"issuedEvent", "issueFailedEvent", "complaintCreatedEvent",
 	"complaintRespondedEvent", "resolvedExternallyEvent", "taxStatusChangedEvent",
@@ -949,8 +800,6 @@ func TestEventPayloadsObeyWireRoutingRules(t *testing.T) {
 	fset, files := parsePackageFiles(t, ".")
 	rep := checkEventPayloads(fset, files)
 
-	// 先報違規再做鑑別力自檢：自檢是 Fatal，先跑會把真正的違規訊息蓋掉，
-	// 而「gate 抓到了什麼」正是讀的人最需要看到的那一行。
 	for _, v := range rep.Violations {
 		t.Errorf("%s", v)
 	}
@@ -958,7 +807,6 @@ func TestEventPayloadsObeyWireRoutingRules(t *testing.T) {
 		t.Logf("辨識到的事件 payload 型別：%v；追到 outbox 的：%v", rep.PayloadTypes, rep.OutboxTypes)
 	}
 
-	// 鑑別力自檢 ①：六個已知型別一個都不能少。
 	have := map[string]bool{}
 	for _, n := range rep.PayloadTypes {
 		have[n] = true
@@ -969,7 +817,6 @@ func TestEventPayloadsObeyWireRoutingRules(t *testing.T) {
 				want, rep.PayloadTypes)
 		}
 	}
-	// 鑑別力自檢 ②：六個型別全都要追得回 outbox 落點，否則 R5/R7 對它們零作用。
 	inOutbox := map[string]bool{}
 	for _, n := range rep.OutboxTypes {
 		inOutbox[n] = true
@@ -980,7 +827,6 @@ func TestEventPayloadsObeyWireRoutingRules(t *testing.T) {
 				want, rep.OutboxTypes)
 		}
 	}
-	// 鑑別力自檢 ③：每個必填軸都要真的找到寫入點。
 	for _, tn := range knownEventPayloadTypes {
 		key := tn + ".StoreID"
 		if rep.WritePoints[key] == 0 {
@@ -1263,7 +1109,6 @@ func emit(i domain.Issuer) ([]byte, error) { return json.Marshal(issuedEvent{eve
 		})
 	}
 
-	// 正例必須是乾淨的：規則若對任何東西都報警，它就沒有資訊量。
 	ok := preamble + `
 type issuedEvent struct {
 	OrderNo string            ` + bt(`json:"order_no"`) + `
@@ -1305,8 +1150,8 @@ func TestEventWireTypesCannotBeBuiltOutsideTheirPackage(t *testing.T) {
 	_, files := parsePackageFiles(t, "../eventwire")
 
 	structs := map[string]*ast.StructType{}
-	ctorsOf := map[string][]string{}  // 型別名 → 建構函式名
-	paramsOf := map[string][]string{} // 建構函式名 → 參數型別
+	ctorsOf := map[string][]string{}
+	paramsOf := map[string][]string{}
 	for _, f := range files {
 		for _, d := range f.Decls {
 			switch decl := d.(type) {
@@ -1316,7 +1161,7 @@ func TestEventWireTypesCannotBeBuiltOutsideTheirPackage(t *testing.T) {
 						if st, ok := ts.Type.(*ast.StructType); ok {
 							structs[ts.Name.Name] = st
 						} else {
-							structs[ts.Name.Name] = nil // 存在但不是 struct ⇒ 下面會紅
+							structs[ts.Name.Name] = nil
 						}
 					}
 				}
@@ -1337,8 +1182,6 @@ func TestEventWireTypesCannotBeBuiltOutsideTheirPackage(t *testing.T) {
 		}
 	}
 
-	// 🔴 期望參數型別**不在這裡另寫一份**：它與 R8 的引數溯源共用 wireCtorParamTypes。
-	// 各寫一份的話，改了 eventwire 的簽章而只更新其中一處，另一處會安靜地拿舊型別去比對。
 	wantCtorParams := map[string][]string{}
 	for full, domainType := range wireCtorParamTypes {
 		wantCtorParams[strings.TrimPrefix(full, "eventwire.")] = []string{domainType}
@@ -1347,7 +1190,6 @@ func TestEventWireTypesCannotBeBuiltOutsideTheirPackage(t *testing.T) {
 	for _, ax := range wireAxes {
 		typeName := strings.TrimPrefix(ax.Type, "eventwire.")
 
-		// ① 不透明性
 		st, declared := structs[typeName]
 		if !declared {
 			t.Fatalf("internal/eventwire 沒有宣告 %s —— R2 指向一個不存在的型別", typeName)
@@ -1372,7 +1214,6 @@ func TestEventWireTypesCannotBeBuiltOutsideTheirPackage(t *testing.T) {
 				"「漏填會失敗」這個保證不成立", typeName)
 		}
 
-		// ③ 建構函式集合 == gate 白名單（也 == wireCtorParamTypes 的鍵集合，見下方 ②）
 		var got []string
 		for _, c := range ctorsOf[typeName] {
 			got = append(got, "eventwire."+c)
@@ -1386,8 +1227,6 @@ func TestEventWireTypesCannotBeBuiltOutsideTheirPackage(t *testing.T) {
 				"白名單多一項而 eventwire 沒有 ⇒ R3 放行一個不存在的東西。", typeName, got, want)
 		}
 
-		// ②' 白名單裡的每一支都必須登記期望參數型別，否則 R8 會對它「沒有登記」而全數報錯，
-		//     或更糟——有人為了讓它安靜而把 R8 的那條 fail-closed 拿掉。
 		for _, c := range ax.Ctors {
 			if _, ok := wireCtorParamTypes[c]; !ok {
 				t.Fatalf("%s 在 gate 白名單裡，卻沒有登記 wireCtorParamTypes —— "+
@@ -1395,7 +1234,6 @@ func TestEventWireTypesCannotBeBuiltOutsideTheirPackage(t *testing.T) {
 			}
 		}
 
-		// ② 參數型別
 		for _, c := range ctorsOf[typeName] {
 			wantParams, known := wantCtorParams[c]
 			if !known {

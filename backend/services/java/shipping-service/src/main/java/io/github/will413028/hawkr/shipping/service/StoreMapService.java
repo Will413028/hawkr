@@ -75,7 +75,6 @@ public class StoreMapService {
         String merId = payUniConfig.getStoreMapMerId();
         String returnUrl = buildMapReturnUrl(appType);
 
-        // 組裝 PayUni 門市地圖內層參數
         Map<String, String> params = new LinkedHashMap<>();
         params.put("MerID", merId);
         params.put("Timestamp", String.valueOf(System.currentTimeMillis() / 1000));
@@ -90,14 +89,12 @@ public class StoreMapService {
             params.put("MapReturnURL", returnUrl);
         }
 
-        // 加密 + 簽章
         String encryptInfo = cryptoService.encrypt(params);
         String hashInfo = cryptoService.calculateHash(encryptInfo);
 
         String formAction = payUniConfig.getBaseUrl() + PayUniShippingEndpoint.PATH_STORE_MAP;
         String version = PayUniShippingEndpoint.VERSION_STORE_MAP;
 
-        // 組裝 redirectUrl（canonical 表單存 Redis 換 opaque id → /store_map/redirect?id=xxx）
         String redirectUrl = buildRedirectUrl(formAction, merId, version, encryptInfo, hashInfo);
 
         log.info("StoreMapService.buildStoreMapParams.success",
@@ -115,16 +112,13 @@ public class StoreMapService {
      * @return 解密結果（含門市資訊 + Deep Link URL）
      */
     public StoreMapDecryptResult decryptStoreMapResult(String encryptInfo, String hashInfo, String appType) {
-        // 驗簽
         if (!cryptoService.verifyHash(encryptInfo, hashInfo)) {
             throw new IllegalArgumentException("門市地圖簽章驗證失敗");
         }
 
-        // 解密
         Map<String, String> data = cryptoService.decrypt(encryptInfo);
         log.info("StoreMapService.decryptStoreMapResult.success", "解密門市資料: " + data);
 
-        // 門市資訊在 MapJson 欄位（JSON 字串），需二次解析
         String storeId = "";
         String storeName = "";
         String address = "";
@@ -146,7 +140,6 @@ public class StoreMapService {
             }
         }
 
-        // 組裝 Deep Link URL（由微服務決定 URL Scheme）
         String redirectUrl = buildDeepLink(appType, storeId, storeName, address, insularArea, storeType);
 
         return new StoreMapDecryptResult(storeId, storeName, address, insularArea, storeType, redirectUrl);
@@ -166,7 +159,6 @@ public class StoreMapService {
         return scheme + "://store_map/result?error=" + encode(errorMsg);
     }
 
-    // ==================== 私有方法 ====================
 
     /**
      * 組裝 redirectUrl（canonical 表單存 Redis 換 opaque id → GATEWAY_URL/store_map/redirect?id=xxx）

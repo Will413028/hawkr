@@ -57,8 +57,6 @@ test("market category updates immediately and the chooser closes smoothly", {
 
 	const done = dialog.getByRole("button", { name: "完成" });
 	await expect(done).toBeVisible();
-	// TanStack Query's local-only devtools badge overlaps this corner on Pixel 5.
-	// Production does not render it; force the click after the visibility gate.
 	await done.click({ force: true });
 	await expect(dialog).toBeHidden();
 	await expect(trigger).toHaveAttribute("aria-expanded", "false");

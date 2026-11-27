@@ -74,7 +74,7 @@ class OrderGrpcServiceBuyerIdentityTest {
     @DisplayName("getMyOrders uses request.getBuyerId() (resolved buyer_id), not the raw JWT login account_id")
     void getMyOrders_usesResolvedBuyerId_notLoginAccountId() {
         Context ctx = Context.current()
-                .withValue(GrpcAuthContext.ACCOUNT_ID, 99L) // pre-rollover login account_id — must NOT be used
+                .withValue(GrpcAuthContext.ACCOUNT_ID, 99L)
                 .withValue(GrpcAuthContext.ACCOUNT_TYPE, AccountType.BUYER.code());
         Context previous = ctx.attach();
         try {
@@ -85,7 +85,7 @@ class OrderGrpcServiceBuyerIdentityTest {
             OrderGrpcService service = buildService();
 
             GetMyOrdersRequest request = GetMyOrdersRequest.newBuilder()
-                    .setBuyerId(7001L) // gateway-resolved current buyer_id — MUST be used
+                    .setBuyerId(7001L)
                     .setPage(PageRequest.newBuilder().setPage("1").setSize("20").build())
                     .build();
             @SuppressWarnings("unchecked")
@@ -105,10 +105,6 @@ class OrderGrpcServiceBuyerIdentityTest {
     @Test
     @DisplayName("getOrder ownership check uses request.getBuyerId(), even when login account_id equals the order's buyer_id")
     void getOrder_ownershipCheck_usesResolvedBuyerId() {
-        // login account_id (500) deliberately equals the order's buyer_id — the OLD
-        // buggy code (GrpcAuthContext.requireAccountId()) would read 500 here too and
-        // WRONGLY ALLOW (500 == 500). The fix must reject anyway because it compares
-        // against request.getBuyerId() (999), not this context value.
         Context ctx = Context.current()
                 .withValue(GrpcAuthContext.ACCOUNT_ID, 500L)
                 .withValue(GrpcAuthContext.ACCOUNT_TYPE, AccountType.BUYER.code());
@@ -116,14 +112,14 @@ class OrderGrpcServiceBuyerIdentityTest {
         try {
             OrderEntity order = new OrderEntity();
             order.setOrderNo("ORD1");
-            order.setBuyerId(500L); // the order actually belongs to buyer_id=500
+            order.setBuyerId(500L);
 
             when(orderService.getOrderByNo("ORD1")).thenReturn(order);
 
             OrderGrpcService service = buildService();
 
             GetOrderRequest request = GetOrderRequest.newBuilder()
-                    .setBuyerId(999L) // attacker's own resolved buyer_id, does NOT match the order's buyer_id
+                    .setBuyerId(999L)
                     .setOrderNo("ORD1")
                     .build();
             @SuppressWarnings("unchecked")

@@ -27,7 +27,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// batchSize 是每一批標記或刪除的列數。
 const batchSize = 200
 
 // SweepInterval 是暫存 GC（同時補掃所有 DELETING 的列）的間隔。
@@ -188,7 +187,6 @@ func (s *Service) CollectGarbage(ctx context.Context) (Result, error) {
 	return res, err
 }
 
-// reclaimUpload 在一個 transaction 內認領並標記一筆過期暫存（與它預配或指向的資產）。輸給 Confirm、已被認領或鎖等待逾時回 false。
 func (s *Service) reclaimUpload(ctx context.Context, id uuid.UUID, now, uploadedBefore time.Time) (bool, error) {
 	won := false
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -272,8 +270,6 @@ func (s *Service) DeleteAssets(ctx context.Context) (int, error) {
 	return total, errors.Join(errs...)
 }
 
-// deleteSecureObjects 刪機敏資產的所有段物件：secure_chunks 記錄的 key，加上前綴 secure/<資產 ID>/ 下列得出的所有物件
-// （沒推進成功的孤兒嘗試、輸家沒刪掉的物件）。不存在視為成功；任何一個失敗就回錯誤，列留在 DELETING 下一輪重試。
 func (s *Service) deleteSecureObjects(ctx context.Context, assetID uuid.UUID) error {
 	chunks, err := s.q(ctx).ListSecureChunks(ctx, assetID)
 	if err != nil {
@@ -333,7 +329,6 @@ func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsR
 
 func (s *Service) deleteAsset(ctx context.Context, r store.ListDeletingAssetsRow) error {
 	if model.Visibility(r.Visibility) == model.VisibilitySecure {
-		// 機敏資產的 object_key 是前綴，不是單一物件。
 		if err := s.deleteSecureObjects(ctx, r.ID); err != nil {
 			return err
 		}

@@ -24,7 +24,7 @@ func TestJWTAuth_MissingCredential_Reject_ShapeAndAbort(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/x", nil) // 沒有身分 header -> 401
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusUnauthorized {

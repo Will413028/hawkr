@@ -9,31 +9,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// ---------------------------------------------------------------------------
-// INV.gov —— 治理到期掃描 ＋ 跨期關帳窗口唯讀掃描（§7.5.3、§8.2.3 M20、§4.5.10）
-//
-// 兩件事，都是「時間到了就轉態／就數一次」的集合式操作，不打第三方：
-//   C4  資格逾期：SELF_ISSUE_PENDING／SUPPLEMENT_REQUIRED 且 pending_valid_until
-//       到期 ⇒ EXPIRED（T10），並寫入重新申請冷卻
-//   M20 跨期關帳窗口：唯讀計數，不改任何狀態（§4.5.10 明訂）
-//
-// 🔴 **C2（停權 14 天自動恢復）刻意不在這裡**。設計書兩處對它的歸屬互相矛盾
-// （§8.5.1 A-4 說由 seller-service 既有 cron 執行、§乙丙類說是 INV.gov 的職責），
-// 而實查 seller-service：`LiftSellerSuspension` 的唯一呼叫端是
-// `LiftSellerSuspensionForAdmin`（gRPC 管理動作）、`seller_suspensions` 沒有
-// `expires_at`、`internal/worker/` 沒有 governance 排程 ⇒ **那支 cron 不存在**。
-// 三個出路與各自代價寫在 backend#2969 的 comment，需要跨服務裁決，不由本層決定。
-// 這裡留空是刻意的——假裝涵蓋它比留空更糟。
-//
-// 因為沒有外部副作用，多副本同時執行是安全的（第二個副本 rows=0）⇒ 依
-// 《多副本排程搶佔規範》規則 ①（約束的是「副作用之前」）**不需要 claim**。
-// 它也不比對兩份資料、不回填、不修正，所以不是 drift scanner。
-// ---------------------------------------------------------------------------
 
-// govBatch 是單輪處理上限（§7.5.3 FetchBatch = 500）。
 const govBatch = 500
 
-// reapplyCooldown 是 EXPIRED 之後的重新申請冷卻（§9.3.3 REAPPLY_COOLDOWN_DAYS = 7）。
 const reapplyCooldown = 7 * 24 * time.Hour
 
 // CrossPeriodWindow 是 M20 的 label 值域（§8.2.3 M20 逐字三值）。
@@ -48,14 +26,6 @@ const (
 	WindowClosed CrossPeriodWindow = "closed"
 )
 
-// crossPeriodWindow 依**台北時間的日**判定窗口（§8.2.3 M20 逐字）。
-//
-// 🔴 **判定放在產生指標的這一端，不放進 PromQL**：PromQL 沒有時區安全的日曆函式，
-// 寫成 `hour`／`day_of_month` 會用 UTC 算，**每兩個月的邊界日剛好錯 8 小時**
-// ——而那正是本指標唯一有意義的那幾天。
-//
-// 🔴 只有**單月**（奇數月，雙月制的期初）才有窗口語意；雙月一律 closed
-// ——上一期的關帳日早就過了。
 func crossPeriodWindow(now time.Time) CrossPeriodWindow {
 	lt := now.In(timeutil.LocationTaipei)
 	if int(lt.Month())%2 == 0 {
@@ -120,7 +90,6 @@ type Governance struct {
 	profiles GovernanceStore
 	counter  CrossPeriodCounter
 	obs      GovernanceObserver
-	// inbox／outboxRows 是 §5.4.6 的兩張清理表。**兩個都可以是 nil**，理由同上。
 	inbox      InboxPayloadPurger
 	outboxRows OutboxCleaner
 	log        *zap.Logger
@@ -137,14 +106,9 @@ func (u *Governance) WithRetention(inbox InboxPayloadPurger, outboxRows OutboxCl
 	return u
 }
 
-// §5.4.6 的兩個保留期。數字逐字取自設計書該節的表格，改這裡就要改那裡。
-//
-//	invoice_inbox_events   只清 payload，status IN ('PROCESSED','SKIPPED') 且 processed_at < now-90d
-//	invoice_outbox_events  整列刪，status='done' 且 completed_at < now-30d
 const (
 	inboxPayloadRetention = 90 * 24 * time.Hour
 	outboxDoneRetention   = 30 * 24 * time.Hour
-	// retentionBatch 讓單輪耗時有上界（兩支都是單句 SQL，批次上限即交易大小）。
 	retentionBatch int32 = 500
 )
 
@@ -166,16 +130,11 @@ func NewGovernance(
 func (u *Governance) RunOnce(ctx context.Context) error {
 	now := u.now()
 
-	// C4：資格逾期。集合式 UPDATE，無外部副作用 ⇒ 不需要 claim。
 	expired, err := u.profiles.ExpirePending(ctx, now, now.Add(reapplyCooldown), govBatch)
 	if err != nil {
 		u.log.Error("invoice.gov.expire_pending_failed", zap.Error(err))
 	}
 
-	// M20：跨期關帳窗口唯讀計數。**不改任何狀態**（§4.5.10）。
-	//
-	// 🔴 三個 window 每一輪都要 Set，不能只 Set 當下那一個：其餘兩個會留在上一輪的
-	// 值，而 Prometheus 分不出「這一格現在是 0」與「這一格沒被更新」。
 	count, cErr := u.counter.CountCrossPeriodPending(ctx, now)
 	if cErr != nil {
 		u.log.Error("invoice.gov.cross_period_count_failed", zap.Error(cErr))
@@ -190,23 +149,12 @@ func (u *Governance) RunOnce(ctx context.Context) error {
 		}
 	}
 
-	// #3261 ③：屆期待複審家數。與 M20 同樣是**唯讀計數、不改狀態**。
-	//
-	// 🔴 每一輪都要 Set（哪怕是 0）：Prometheus 分不出「這一格現在是 0」與
-	// 「這一格沒被更新」，理由與上面 M20 的紅字逐字相同。
 	if due, dErr := u.profiles.CountApprovalRecheckDue(ctx, now); dErr != nil {
 		u.log.Error("invoice.gov.approval_recheck_count_failed", zap.Error(dErr))
 	} else {
 		u.obs.ObserveApprovalRecheckDue(due)
 	}
 
-	// #3261 ①②：§5.4.6 的兩張清理表。**各自獨立、任何一支的錯誤都不得吃掉後面那支**
-	// （同 INV.dl 的 K04／K05／K06 編排）。兩者都是集合式 UPDATE／DELETE、無外部副作用
-	// ⇒ 不需要 claim（《多副本排程搶佔規範》§一：無副作用的集合式操作不在搶佔範圍）。
-	//
-	// 🔴 inbox 是**只清 payload 不刪列**：去重鍵 (event_type, business_dedup_key) 一旦被刪，
-	// RefundSyncWorker 的重發就變成「全新的事件」⇒ 對同一筆退款開出第二張折讓單，
-	// 而折讓單是法定憑證（設計書 §5.4.6 的 I-49 紅字）。這條保證在 SQL 裡，本處只是呼叫。
 	if u.inbox != nil {
 		n, pErr := u.inbox.PurgeProcessedPayloads(ctx, now, now.Add(-inboxPayloadRetention), retentionBatch)
 		switch {

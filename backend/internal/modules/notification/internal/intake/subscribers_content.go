@@ -11,9 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-// 內容側的同步訂閱者，規則同 subscribers.go：只做 Accept。收件人可能是買家或店家的事件各有兩個訂閱者，各自只處理自己那一種收件人。
 
-// partyOf 只認買家與店家；不認得的種類留空的 Side，worker 解析 actor 時以 ErrBadParams 永久取消，不默默當成買家。
 func partyOf(kind social.ActorKind, id int64) registry.Party {
 	switch kind {
 	case social.ActorBuyer:

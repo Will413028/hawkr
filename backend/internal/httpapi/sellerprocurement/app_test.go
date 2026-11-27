@@ -24,7 +24,6 @@ const (
 	callerStore   = 11
 )
 
-// goodID 是合法的 UUIDv4。
 const goodID = "11111111-1111-4111-8111-111111111111"
 
 var at = time.Date(2026, 11, 24, 3, 4, 5, 0, time.UTC)

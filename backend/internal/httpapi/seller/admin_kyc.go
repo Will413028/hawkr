@@ -20,9 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 後台的身分認證（KYC）審核方法。後台的訊息與前台的 KYCApplication 分開：前台的有寫入用的欄位，後台的訊息沒有任何寫入用的欄位。
 
-// 模組輸入的欄位對應到請求的路徑。
 var (
 	listKYCPaths    = rpc.FieldPaths{"Status": "status"}
 	approveKYCPaths = rpc.FieldPaths{"ExpectedVersion": "etag", "Comment": "comment"}
@@ -33,7 +31,6 @@ var (
 	}
 )
 
-// kycFieldNames 是契約的 KYCField 對應到模組的欄位路徑（model.KYCFieldNames 的反向，kycFieldPB 的逆運算）。
 var kycFieldNames = func() map[pb.KYCField]string {
 	out := map[pb.KYCField]string{}
 	for _, name := range model.KYCFieldNames() {
@@ -42,8 +39,6 @@ var kycFieldNames = func() map[pb.KYCField]string {
 	return out
 }()
 
-// issuesFromPB 把退回的問題轉成模組的輸入；UNSPECIFIED 與不認得的欄位或原因碼是 invalid_argument（指到 issues[i] 的欄位），
-// 不往下傳。其餘的規則（說明長度、文件是不是這份申請的）由模組檢查。
 func issuesFromPB(issues []*pb.KYCIssue) ([]model.KYCIssue, error) {
 	out := make([]model.KYCIssue, len(issues))
 	for i, issue := range issues {
@@ -66,7 +61,6 @@ func (h *Admin) ListKYCApplications(ctx context.Context, req *connect.Request[ad
 	if status := rpc.EnumFromProto[model.KYCStatus](msg.GetStatus()); status != "" {
 		in.Status = &status
 	}
-	// page token 只能用在同一組篩選：換了篩選就從第一頁開始（排序方向也跟著篩選變）。
 	scope := rpc.FilterScope(sellerv1alpha1connect.SellerAdminServiceListKYCApplicationsProcedure, msg.GetStatus().String(), in.Query)
 	after, err := rpc.ValidCursor[model.KYCCursor](scope, msg.GetPageToken())
 	if err != nil {
@@ -174,7 +168,6 @@ func (h *Admin) ListKYCDocumentAccesses(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(out), nil
 }
 
-// auditScope 是一筆申請的稽核紀錄的 page token scope（方法加申請 ID）。
 func auditScope(procedure string, applicationID uuid.UUID) string {
 	return procedure + "\x00" + applicationID.String()
 }
@@ -281,8 +274,6 @@ func toAdminKYC(a model.KYCAdminApplication) *adminpb.KYCApplication {
 	return out
 }
 
-// toRegistrationCheck 轉成登記資料查詢的契約型別；只有 FOUND 帶登記資料與比對結果。進行中（PENDING）的查詢沒有結果（outcome 是
-// UNSPECIFIED），只有序號、要求時間與期限。
 func toRegistrationCheck(c model.RegistrationCheck) *adminpb.KYCRegistrationCheck {
 	out := &adminpb.KYCRegistrationCheck{Seq: c.Seq}
 	if c.Outcome != model.RegistrationPending {
@@ -322,7 +313,6 @@ func toRegistrationCheck(c model.RegistrationCheck) *adminpb.KYCRegistrationChec
 	return out
 }
 
-// toCalendarDate 把日曆日（UTC 午夜）轉成 Date；零值是沒有。
 func toCalendarDate(t time.Time) *date.Date {
 	if t.IsZero() {
 		return nil

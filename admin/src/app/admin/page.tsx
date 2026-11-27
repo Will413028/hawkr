@@ -25,7 +25,6 @@ const Dashboard: React.FC = () => {
 		productCount: 0,
 		orderCount: 0,
 	});
-	// 商家數與待審核數（SellerAdminService.GetStoreStats）
 	const storeStats = useConnectQuery(
 		SellerAdminService.method.getStoreStats,
 		{},
@@ -39,7 +38,6 @@ const Dashboard: React.FC = () => {
 		try {
 			setLastUpdate(new Date().toLocaleTimeString("zh-TW"));
 
-			// GET /api/v1/admin/products → returns total
 			try {
 				const res = await api.get<{ code: number; data: { total: number } }>(
 					"/api/v1/admin/products?page=1&page_size=1",
@@ -54,7 +52,6 @@ const Dashboard: React.FC = () => {
 				console.warn("Product stats not available:", e);
 			}
 
-			// GET /api/v1/admin/orders → returns total
 			try {
 				const res = await api.get<{ code: number; data: { total: number } }>(
 					"/api/v1/admin/orders?page=1&page_size=1",
@@ -75,7 +72,6 @@ const Dashboard: React.FC = () => {
 		}
 	}, []);
 
-	// environment 是刻意的 refetch trigger:api 層由 environmentService(module singleton) 取 gateway URL,
 	// 切換環境須重載;在 body 引用 environment 使其成為 biome 可見的真實依賴。
 	useEffect(() => {
 		refreshDashboard();
@@ -84,7 +80,7 @@ const Dashboard: React.FC = () => {
 
 	return (
 		<div>
-			{/* Page Header */}
+
 			<div className="page-header">
 				<div>
 					<h1 className="page-title">平台總覽</h1>
@@ -108,7 +104,7 @@ const Dashboard: React.FC = () => {
 				</div>
 			</div>
 
-			{/* Stats Row */}
+
 			<div className="stats-row-v2">
 				<button
 					type="button"
@@ -160,7 +156,7 @@ const Dashboard: React.FC = () => {
 				</button>
 			</div>
 
-			{/* Quick Actions */}
+
 			<div className="card">
 				<div className="card-header">
 					<h3>

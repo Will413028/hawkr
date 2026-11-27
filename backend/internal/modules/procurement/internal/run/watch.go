@@ -89,7 +89,6 @@ func (w Watcher) Watch(ctx context.Context, buyerID int64, runID uuid.UUID, curs
 	}
 }
 
-// readRunError 把讀 run 的錯誤分類：run 不存在（串流中途被刪除也一樣）是 NOT_FOUND。
 func readRunError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperr.NotFound("找不到這個 run")
@@ -108,8 +107,6 @@ func parseCursor(c string) (int64, error) {
 	return n, nil
 }
 
-// drainedEndedRun：在列事件之前讀到 run 已結束（狀態與結尾事件同一個 transaction 可見），且這一頁沒有填滿，
-// 代表該送的都送完了；之後再等通知只會等到串流視窗結束。
 func drainedEndedRun(endedBeforeList bool, listed int) bool {
 	return endedBeforeList && listed < watchPage
 }

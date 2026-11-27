@@ -85,7 +85,6 @@ class OrderFlagBanner extends StatelessWidget {
           ),
         ],
       ),
-      // icon 略偏上（對齊 Figma：top 19% / bottom 24%）
       child: Align(
         alignment: const Alignment(0, -0.1),
         child: SizedBox(

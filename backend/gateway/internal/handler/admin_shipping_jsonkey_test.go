@@ -17,9 +17,6 @@ func TestAdminShipmentDTOs_OutwardJSONKeyIsStoreID(t *testing.T) {
 		},
 		{
 			name: "AdminShipmentDetailResp",
-			// CvsStoreCode / CvsStoreName carry `,omitempty` — must be
-			// non-empty or the fields drop out of the output and the
-			// assertions below would pass for the wrong reason.
 			v: AdminShipmentDetailResp{
 				StoreId:      "2688657200",
 				BuyerId:      "2688657201",

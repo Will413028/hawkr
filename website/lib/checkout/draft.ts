@@ -53,9 +53,6 @@ export interface CheckoutDraftSeller {
  * 不存 items 快照與 totals,避免 stale 資料被誤帶進 confirm payload。
  */
 export interface CheckoutDraft {
-	// version 2: items/totals 快照拿掉,改用 selectedSkuIds,checkout 頁從後端
-	// cart 動態取得真實 items。舊 version=1 draft 由 isCheckoutDraft 拒絕,
-	// 使用者落到「結帳資料已過期」自然降級。
 	version: 2;
 	createdAt: number;
 	validateAt: number;
@@ -116,8 +113,6 @@ export function readCheckoutDraft(): CheckoutDraft | null {
 		const parsed = JSON.parse(raw) as unknown;
 		if (!isCheckoutDraft(parsed)) return null;
 		const pii = readPii();
-		// Prefer sessionStorage PII; fall back to any inline PII left by a
-		// pre-split draft so an in-flight checkout doesn't lose its recipient.
 		return {
 			...parsed,
 			recipient: pii.recipient ?? parsed.recipient,
@@ -142,7 +137,6 @@ export function writeCheckoutDraft(draft: CheckoutDraft) {
 			window.sessionStorage.removeItem(CHECKOUT_DRAFT_PII_KEY);
 		}
 	} catch {
-		// sessionStorage unavailable (privacy mode) — PII just won't survive a reload.
 	}
 }
 
@@ -152,6 +146,5 @@ export function clearCheckoutDraft() {
 	try {
 		window.sessionStorage.removeItem(CHECKOUT_DRAFT_PII_KEY);
 	} catch {
-		// ignore — nothing to clean up if sessionStorage is unavailable.
 	}
 }

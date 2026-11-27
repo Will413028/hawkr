@@ -21,10 +21,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// exporterBuckets 跑一支 exporter 查詢原文，回「label 組 → cnt」。
-//
-// 與 countStranded 的差別是**不加總**：M7 的三個 bucket 必須分開看，加總會把
-// 「overdue 掉到 0、lt6h 升 1」這種桶間搬移看成沒有變化。
 func exporterBuckets(t *testing.T, ctx context.Context, pool *pgxpool.Pool, query string) map[string]float64 {
 	t.Helper()
 	rows, err := pool.Query(ctx, query)
@@ -65,9 +61,6 @@ func sumBuckets(m map[string]float64) float64 {
 	return t
 }
 
-// seedOverdueDocument 建一份**已逾法定上傳期限**的 B2C 訂單發票。
-//
-// chk_invdoc_deadline 要求 statutory_deadline_at > issue_not_before ⇒ 兩個時點一起往前推。
 func seedOverdueDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	issuerID, buyerID int64, orderNo, status string) int64 {
 	t.Helper()
@@ -90,7 +83,6 @@ func seedOverdueDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	return id
 }
 
-// seedProcessedOrderPaid 建一列已處理完的 ORDER_PAID inbox 事件（M8 的分母）。
 func seedProcessedOrderPaid(ctx context.Context, t *testing.T, pool *pgxpool.Pool, orderNo string) {
 	t.Helper()
 	mustExec(ctx, t, pool,
@@ -132,7 +124,6 @@ func TestIntegration_AwaitingManualIsInvisibleToEveryInvoiceMetric(t *testing.T)
 	seedProcessedOrderPaid(ctx, t, pool, orderNo)
 	docID := seedOverdueDocument(ctx, t, pool, issuerID, nextIssuerRefID(), orderNo, "ISSUE_FAILED")
 
-	// ── 陽性對照：ISSUE_FAILED ＋ 已逾期 ⇒ M7 的 overdue 桶看得到它。
 	got := exporterBuckets(t, ctx, pool, m7)
 	if got["overdue|"] != base7["overdue|"]+1 {
 		t.Fatalf("陽性對照失敗：ISSUE_FAILED 且已逾期，M7 overdue = %.0f，want %.0f。\n"+
@@ -145,17 +136,11 @@ func TestIntegration_AwaitingManualIsInvisibleToEveryInvoiceMetric(t *testing.T)
 			"兩支指標重疊了，會重複告警", n)
 	}
 
-	// ── 翻成 AWAITING_MANUAL（allowed-from 逐字含 ISSUE_FAILED，見
-	//    db/queries/invoice_documents.sql 的 MarkInvoiceDocumentAwaitingManual）。
 	mustExec(ctx, t, pool,
 		`UPDATE invoice_documents
 		 SET status='AWAITING_MANUAL', manual_reason_code='MIXED_TAX_CATEGORY'
 		 WHERE id=$1`, docID)
 
-	// ① M7：唯一與罰款直接相關的兩條告警（InvoiceStatutoryDeadlineApproaching／Overdue）
-	//    的資料面。述詞 status IN ('PENDING','ISSUING','ISSUE_FAILED') 不含 AWAITING_MANUAL
-	//    ⇒ 該列在轉換的那一刻**退出** M7。這是預期行為（M7 的 ③ 說明了為什麼不能含它），
-	//    但它必須是**交棒**而不是**掉地上** —— ② 驗的就是那一半。
 	got = exporterBuckets(t, ctx, pool, m7)
 	if got["overdue|"] != base7["overdue|"] {
 		t.Fatalf("M7 overdue = %.0f，want %.0f：AWAITING_MANUAL 竟然還留在 M7 裡。\n"+
@@ -163,9 +148,6 @@ func TestIntegration_AwaitingManualIsInvisibleToEveryInvoiceMetric(t *testing.T)
 			"而永久紅的告警會被靜音 ⇒ 等於沒有。", got["overdue|"], base7["overdue|"])
 	}
 
-	// ② 🔴 交棒：M32 必須在同一刻接手。這一項是本檔的**主張**本身 ——
-	//    2026-08-31 之前它是 0，於是 InvoiceStatutoryDeadlineOverdue（critical）
-	//    在票還沒開出去的情況下由 firing 轉 resolved，之後沒有任何指標數得到那一列。
 	gotAM := exporterBuckets(t, ctx, pool, m32)
 	if gotAM["overdue|"] != baseAM["overdue|"]+1 {
 		t.Fatalf("🔴 M32 overdue = %.0f，want %.0f：一份**已逾法定上傳期限**的文件翻進 "+
@@ -175,22 +157,15 @@ func TestIntegration_AwaitingManualIsInvisibleToEveryInvoiceMetric(t *testing.T)
 			gotAM["overdue|"], baseAM["overdue|"]+1, m32)
 	}
 
-	// ③ M6：AWAITING_MANUAL 的建立邊**不建 operation**（usecase/issuance.go 的
-	//    plan.makeOp = false）⇒ 待開票積壓指標結構上看不到這一類。
-	//    這裡斷言「看不到」不是為了接受它，是為了釘住 M32 存在的理由：
-	//    哪天有人以為 M6 蓋得住而想刪掉 M32，這一行會告訴他 M6 從來沒蓋住過。
 	if n := sumBuckets(exporterBuckets(t, ctx, pool, m6)); n != base6 {
 		t.Errorf("M6 = %.0f（base %.0f）：AWAITING_MANUAL 現在會建 operation 了？"+
 			"那 M32 與 M6 的分工要重新想過（可能重複告警）", n, base6)
 	}
 
-	// ④ M8：NOT EXISTS 的對象是 invoice_documents ⇒ 只要「有一份文件」就出桶，
-	//    不問那份文件是不是還需要人。同 ③，這裡釘的是「M8 蓋不住」這個事實。
 	if n := sumBuckets(exporterBuckets(t, ctx, pool, m8)); n != base8 {
 		t.Errorf("M8 = %.0f（base %.0f）：述詞變了，M32 的分工要重新想過", n, base8)
 	}
 
-	// ⑤⑥ M30／M31 是 inbox／outbox 兩張表，對 invoice_documents 結構性全盲。
 	if n := sumBuckets(exporterBuckets(t, ctx, pool, m30)); n != base30 {
 		t.Errorf("M30 意外變動：%.0f → %.0f", base30, n)
 	}

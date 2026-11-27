@@ -38,24 +38,6 @@ const LONG_PUBLIC_ROUTES = [
 	"/sellers/:id/messages",
 ] as const;
 
-// Routes whose owner has opted into progressive image loading
-// (docs/progressive-loading-bkm.md). `/products/:id` belongs here for the same
-// reason the list pages do, and has since 2026-09-07: that BKM puts 商品相簿
-// under the same policy — the active slide is prioritised, the others are
-// deferred, and the thumbnail strip rides its own small derivative rather than
-// pulling every full-size original up front. The strip's images carry
-// `loading="lazy"`, so the blanket "nothing initially rendered may be lazy"
-// rule below fails this route the moment the sampled product has any image at
-// all — which is why every nightly @live run since 2026-09-13 was red while
-// main's code sat unchanged: the invariant was measuring a policy the page
-// stopped following six days earlier.
-//
-// Nothing about the user-facing guarantee is relaxed by this entry:
-// `assertViewportImagesDecoded` still runs for every route, including this one,
-// and still fails if anything on screen is a blank box. A lazy image inside the
-// viewport loads immediately (verified on /products/880067571469812400: the
-// flagged thumbnail reports complete with a 720x540 natural size), so the
-// deferral only ever applies to what the visitor has not scrolled to.
 const PROGRESSIVE_PUBLIC_IMAGE_ROUTES = new Set<
 	(typeof LONG_PUBLIC_ROUTES)[number]
 >(["/", "/feed", "/market/products", "/products/:id", "/search"]);
@@ -181,7 +163,6 @@ function installProductionMediaDomObserver({
 				seen.add(signature);
 				target.__hkForbiddenMediaDomReferences?.push(reference);
 			} catch {
-				// A malformed candidate cannot resolve to the exact forbidden host.
 			}
 		}
 	};
@@ -330,8 +311,6 @@ async function installLayoutShiftObserver(page: Page) {
 				}
 			}).observe({ type: "layout-shift", buffered: true });
 		} catch {
-			// Older engines without Layout Instability support still run the
-			// height/fallback/request gates below.
 		}
 	});
 }
@@ -367,11 +346,6 @@ function startFallbackObserver({
 	};
 
 	const recordVisibleFallbacks = () => {
-		// On a hard entry the branded, full-viewport document loader is the sole
-		// first-paint owner. Page preparation trees may exist underneath it but
-		// are not observable by the user. The same observer runs again when that
-		// loader leaves; any fallback still visible at or after the handoff is
-		// then recorded and fails the test.
 		const initialLoader =
 			document.querySelector<HTMLElement>(".initial-loader");
 		if (ignoreInitialLoader && initialLoader && isVisible(initialLoader)) {
@@ -575,10 +549,6 @@ async function inspectInitialImageScheduling(page: Page) {
 		const pending: string[] = [];
 		const failed: string[] = [];
 
-		// Every URL an <img> in the CURRENT DOM could legitimately fetch: its own
-		// src plus each srcset candidate (an unloaded lazy image has an empty
-		// currentSrc, so the URL it will eventually pick must be derived from the
-		// markup, not from what it has already loaded).
 		const candidateUrls = (image: HTMLImageElement) => {
 			const urls = [image.currentSrc, image.src].filter(Boolean);
 			for (const entry of (image.getAttribute("srcset") ?? "").split(",")) {
@@ -587,7 +557,6 @@ async function inspectInitialImageScheduling(page: Page) {
 				try {
 					urls.push(new URL(candidate, document.baseURI).href);
 				} catch {
-					// A malformed srcset entry is not this test's subject.
 				}
 			}
 			return urls;
@@ -611,12 +580,6 @@ async function inspectInitialImageScheduling(page: Page) {
 				if (visible) lazy.push(...urls);
 				continue;
 			}
-			// Playwright still emits a request event when Chromium satisfies an
-			// eager <img> from memory cache, so event timing alone cannot prove
-			// that scroll triggered network loading. Snapshot every initial
-			// non-lazy URL, require it to finish and decode successfully before
-			// scrolling, and separately reject visible lazy images. `complete`
-			// alone is insufficient because browsers also set it after a 404.
 			scheduled.push(...urls);
 			if (!image.complete) {
 				pending.push(...urls);
@@ -698,8 +661,6 @@ async function assertViewportImagesDecoded(page: Page, route: string) {
 test.describe("long-page stability after ready", {
 	tag: ["@ui", "@live"],
 }, () => {
-	// Stability is a distributional contract. A clean retry cannot erase a real
-	// hydration/layout failure that a user already encountered.
 	test.describe.configure({ retries: 0 });
 
 	for (const route of LONG_PUBLIC_ROUTES) {
@@ -707,7 +668,6 @@ test.describe("long-page stability after ready", {
 			page,
 			request,
 		}, testInfo) => {
-			// poll 預算自 12 秒放寬到 28 秒（見下方註解），外層同步加上那 16 秒的餘裕。
 			test.setTimeout(95_000);
 			let sellerFixture: Awaited<
 				ReturnType<typeof sellerFixtureForRoute>
@@ -793,10 +753,6 @@ test.describe("long-page stability after ready", {
 			).toBeAttached({
 				timeout: 12_000,
 			});
-			// Scoped to the visible route tree: while React streams a route the
-			// same marker transiently exists twice (relocated copy under <main> +
-			// the body-level `<div hidden id="S:…">` staging container), and an
-			// unscoped strict locator polling inside that window fails instantly.
 			const readySelector = READY_SELECTOR[route];
 			if (readySelector) {
 				await expect(
@@ -842,17 +798,6 @@ test.describe("long-page stability after ready", {
 				INITIAL_CLS_LIMIT[
 					testInfo.project.name as keyof typeof INITIAL_CLS_LIMIT
 				] ?? INITIAL_CLS_LIMIT.chromium;
-			// Print the measurement on EVERY run, not just the failing ones.
-			// The budget above is a distributional claim ("this page's shift stays
-			// under X"), but a passing assertion emits nothing, so the only CLS
-			// numbers this repo has ever seen from CI are the ones from a red run
-			// — i.e. exactly the tail, never the distribution. That made
-			// "how much headroom does the current budget actually have on CI
-			// hardware?" unanswerable without deliberately breaking the build,
-			// and a budget nobody can measure margin against gets raised on the
-			// first red instead of investigated. One line of stdout per route per
-			// project turns every green run into a sample; `grep '\[cls\]'` over
-			// job logs then reconstructs the distribution retroactively.
 			console.log(
 				`[cls] project=${testInfo.project.name} route=${targetRoute} initial=${initialCls.value.toFixed(4)} limit=${initialClsLimit}`,
 			);
@@ -870,55 +815,19 @@ test.describe("long-page stability after ready", {
 						return { pending: images.pending, failed: images.failed };
 					},
 					{
-						// ⚠️ 這個預算原本是 12 秒，是照**靜態 derivative** 的體量訂的（card preset
-						// 約 32 KB）。貼文的動圖走 `original`（不經轉換的原檔，實測 10,233,546 B），
-						// 而首頁一次載 100+ 張圖共用同一個 media host —— 單獨下載那顆圖在 runner 上
-						// 只要 0.46～2.15 秒，但跟其他上百個請求分頻寬時就會超出 12 秒。
-						//
-						// 這一層要守的是「使用者不會看到圖片一格一格跳出來」，不是「每張圖都必須在
-						// 某個為靜態圖訂的秒數內載完」。頁面帶著大資產時本來就需要更久才 settle，
-						// 把預算訂在它載不完的位置，紅的是尺不是內容。
-						//
-						// ⚠️ 2026-08-27 我曾為了讓這條變綠，改掉 `postCardPresetForMedia` 讓卡片不再
-						// 送動圖 —— 那是把別人的功能關掉來遷就測試預算。順序錯了：測試過不去時先放寬
-						// 門檻，產品行為的取捨交給功能的擁有者。動圖體積的最終處置見 website#528。
 						message: `${targetRoute} still had an incomplete or undecodable image before scroll`,
-						// 28_000 是擦邊過的：main run 33093420954 實測 [mobile] / 花了
-						// 28.5 秒，只差 0.5 秒就紅。含動圖的四個面 26～28.5 秒、不含的
-						// 9.2～9.7 秒，差距全在那顆 10 MB 的貼文動圖上（website#528）。
-						// 45 秒 = 實測上限的 1.6 倍，留給 runner 負載變異。
 						timeout: 45_000,
 					},
 				)
 				.toEqual({ pending: [], failed: [] });
 			const initialImageScheduling = await inspectInitialImageScheduling(page);
-			// These public pages intentionally keep below-fold and hidden media
-			// lazy (docs/progressive-loading-bkm.md). Their declared image URLs
-			// remain subject to the same scroll/content guards below. Other routes
-			// retain the existing eager invariant over all rendered images.
 			if (!PROGRESSIVE_PUBLIC_IMAGE_ROUTES.has(route)) {
 				expect(
 					initialImageScheduling.lazy,
 					`${targetRoute} left an initially-rendered image lazy after ready`,
 				).toEqual([]);
 			}
-			// Check the initial viewport as well as every subsequent scroll stop:
-			// allowing native lazy scheduling must not leave visible images blank.
 			await assertViewportImagesDecoded(page, targetRoute);
-			// Every image URL the initial render DECLARED (src + srcset candidates
-			// of every <img> present — lazy or not, on screen or not). Scrolling may
-			// only fetch from this set: fetching a URL the initial DOM already
-			// declared is the browser honouring its own lazy-load schedule, while a
-			// URL that was nowhere in the initial markup means the page mounted new
-			// content because the user scrolled — the defect actually worth guarding.
-			//
-			// Deliberately NOT the narrower `scheduled` (non-lazy) set: that made the
-			// assertion depend on Chromium's lazy-load root margin, which is derived
-			// from the effective connection type and so differs between a dev machine
-			// and CI. Measured on one prod build of this page (#370): ect 4g ⇒
-			// ~1250px, two below-fold mascots fetched only on scroll ⇒ red; ect
-			// 3g/unknown ⇒ 2500-5000px, same URLs fetched up front ⇒ green.
-			// `assertViewportImagesDecoded` below carries the user-visible half.
 			const declaredImageUrls = new Set(initialImageScheduling.declared);
 			const heights = [initialHeight];
 			const midScrollPageRequests: string[] = [];
@@ -954,9 +863,6 @@ test.describe("long-page stability after ready", {
 				await assertNoResidualLoading(page, targetRoute);
 				await assertViewportImagesDecoded(page, targetRoute);
 			}
-			// Chromium reports unused/mis-typed link preloads a few seconds after
-			// load. Leave an explicit observation window so the test does not end
-			// before those browser warnings are emitted.
 			await page.waitForTimeout(3_500);
 			page.off("request", onRequest);
 			page.off("console", onConsole);

@@ -23,12 +23,6 @@ const layout = readFileSync(
 	"utf8",
 );
 
-/* ── 側欄切對話要瞬切 ────────────────────────────────────────────
- * 實測（Playwright，transcript 250ms／snapshot 120ms 的 mock 延遲）：
- *   改之前：切換 502ms 才有內容，中間閃約 370ms 全版骨架
- *   改之後：切回看過的 88ms／0 骨架；沒看過但滑過停 450ms 的 103ms／0 骨架
- * 右側 workspace 因 Next 路由參數變更一定 remount（側欄不會），所以關鍵是
- * 「掛載的第一個 frame 就能同步讀到快取」。 */
 
 test("transcript／snapshot 的 query key 是 identity-scoped（切帳號不得沿用他人對話）", () => {
 	assert.match(
@@ -42,14 +36,11 @@ test("transcript／snapshot 的 query key 是 identity-scoped（切帳號不得�
 });
 
 test("掛載時同步讀快取，命中就不進骨架態", () => {
-	// 純函式，同步讀 cache，兩份都要有才算命中。
 	assert.match(session, /function readCachedRestore\(/);
 	assert.match(session, /queryClient\.getQueryData<AgentTranscript>\(/);
 	assert.match(session, /queryClient\.getQueryData<ProcurementSnapshot>\(/);
 	assert.match(session, /if \(!snapshot\) return null;/);
-	// state 的 lazy initializer 直接套用 → 第一個 frame 就有內容。
 	assert.match(session, /const cached = readCachedRestore\(/);
-	// restoring 由「有沒有 requestId」推導，而不是無條件 true。
 	assert.match(session, /state\.requestId === null &&/);
 	assert.doesNotMatch(
 		session,
@@ -59,7 +50,6 @@ test("掛載時同步讀快取，命中就不進骨架態", () => {
 
 test("同步路徑與 effect 路徑共用同一支組裝函式（不得各寫一份）", () => {
 	assert.match(session, /function restoredStateFrom\(/);
-	// 三個呼叫點：readCachedRestore、還原 effect、cursor 過期後的重建。
 	assert.equal(
 		(session.match(/restoredStateFrom\(/g) ?? []).length,
 		4,
@@ -106,9 +96,7 @@ test("預抓要抓齊 transcript＋snapshot（少一份就讀不到快取、照�
 	const prefetch = hook.slice(hook.indexOf("const prefetch ="));
 	assert.match(prefetch, /queryKeys\.assistant\.transcript\(/);
 	assert.match(prefetch, /queryKeys\.assistant\.snapshot\(/);
-	// hover 反覆觸發不得洗 API。
 	assert.match(prefetch, /staleTime: 15_000/);
-	// 預抓失敗是無聲的——它只是加速，不能變成錯誤畫面。
 	assert.match(prefetch, /\.catch\(\(\) => \{\}\)/);
 	assert.match(prefetch, /if \(!shouldFetch\) return;/);
 });

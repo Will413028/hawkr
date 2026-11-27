@@ -55,14 +55,11 @@ export function NotificationToastProvider({
 		if (toast.dedupeKey) activeKeys.current.add(toast.dedupeKey);
 		setToasts((prev) => {
 			if (replacing) {
-				// Same key still on screen: update that toast in place (new id
-				// restarts its timer) instead of stacking a duplicate.
 				const at = prev.findIndex((t) => t.dedupeKey === toast.dedupeKey);
 				if (at >= 0) return prev.map((t, i) => (i === at ? next : t));
 			}
 			const merged = [...prev, next];
 			if (merged.length <= MAX_TOTAL) return merged;
-			// Drop the oldest overflow and release its dedupe key.
 			for (const dropped of merged.slice(0, merged.length - MAX_TOTAL)) {
 				if (dropped.dedupeKey) activeKeys.current.delete(dropped.dedupeKey);
 			}

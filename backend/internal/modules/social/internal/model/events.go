@@ -8,9 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 模組事件只帶領域鍵（內容 ID、互動者 (kind, id)、store_id、以 rune 截斷的預覽），不帶名稱、頭像、account_id 或留言快照：legacy
-// relay 在自己的 job 裡經 buyer、seller、social 的 API 補 wire 需要的欄位。事件在寫入的 transaction 內發布，沒有訂閱者也照發；
-// 自己通知自己的略過由消費端判斷。
 
 // PostPublished 貼文轉為公開（建立時直接發布、發布、再發布）；建立草稿不發。已經是 PUBLISHED 時再發布不再發。
 //

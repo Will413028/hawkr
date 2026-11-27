@@ -18,12 +18,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// defaultConstraint 是 fake 模擬的部分唯一索引名（styles_default_per_category）。
 const defaultConstraint = "styles_default_per_category"
 
 type txKey struct{}
 
-// fakeQ 是記憶體內的 Queries，照 SQL 的語意：條件式 UPDATE、唯一鍵與 ON CONFLICT DO NOTHING。
 type fakeQ struct {
 	styles map[uuid.UUID]store.ImageaiStyle
 	quotas map[int64]store.ImageaiQuota
@@ -182,7 +180,6 @@ func (f *fakeQ) DeleteQuota(_ context.Context, id int64) (int64, error) {
 	return 1, nil
 }
 
-// fakeAudit 只在 fakeTx 開的「transaction」內接受 Record，與 adminaudit.Log 一樣（否則 ErrNoTransaction）。
 type fakeAudit struct{ entries []adminaudit.Entry }
 
 func (a *fakeAudit) Record(ctx context.Context, e adminaudit.Entry) error {
@@ -193,12 +190,10 @@ func (a *fakeAudit) Record(ctx context.Context, e adminaudit.Entry) error {
 	return nil
 }
 
-// assetOf 是測試用的資產 ID：由名稱決定的 UUID。
 func assetOf(name string) uuid.UUID {
 	return media.AssetFor(name)
 }
 
-// fakeMedia 記錄 Confirm 與 MarkDeleted；兩者都必須在 transaction 內呼叫。
 type fakeMedia struct {
 	confirmed []string
 	deleted   []uuid.UUID
@@ -279,7 +274,6 @@ func newHarness(t *testing.T) *harness {
 	return h
 }
 
-// seed 直接放一個風格（asset 為空字串表示沒有縮圖）。
 func (h *harness) seed(name, category string, isDefault bool, asset string) store.ImageaiStyle {
 	h.ids++
 	id := uuid.MustParse("10000000-0000-7000-8000-" + strings.Repeat("0", 11) + string(rune('0'+h.ids)))

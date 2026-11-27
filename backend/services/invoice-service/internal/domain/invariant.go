@@ -97,26 +97,22 @@ func NewIssueDraft(snap OrderSnapshot, resolver TaxCategoryResolver, buyerIdenti
 func (d *IssueDraft) Validate() error {
 	h := d.Header
 
-	// A1：Σ line.gross == total_amount == orders.total_actual_amount
 	if sum := SumNetAmount(d.Lines); sum != h.TotalAmount || h.TotalAmount != d.Order.TotalActualAmount {
 		return invariantErr(CodeAmountMismatch,
 			"sum(lines)=%d header.total=%d order.total_actual=%d", sum, h.TotalAmount, d.Order.TotalActualAmount)
 	}
 
-	// A2：SalesAmount + Free + Zero + TaxAmount == TotalAmount
 	if got := h.SalesAmount + h.FreeTaxSalesAmount + h.ZeroTaxSalesAmount + h.TaxAmount; got != h.TotalAmount {
 		return invariantErr(CodeTaxSplitMismatch,
 			"sales=%d free=%d zero=%d tax=%d sum=%d total=%d",
 			h.SalesAmount, h.FreeTaxSalesAmount, h.ZeroTaxSalesAmount, h.TaxAmount, got, h.TotalAmount)
 	}
 
-	// A3：四欄非負且總額為正
 	if h.SalesAmount < 0 || h.FreeTaxSalesAmount < 0 || h.ZeroTaxSalesAmount < 0 || h.TotalAmount <= 0 {
 		return invariantErr(CodeNegativeHeaderAmount,
 			"sales=%d free=%d zero=%d total=%d", h.SalesAmount, h.FreeTaxSalesAmount, h.ZeroTaxSalesAmount, h.TotalAmount)
 	}
 
-	// A4：每個稅別桶 Σ gross >= 0（AMEGO 允許單一品項為負，但合計欄位不可為負）
 	buckets := map[TaxCategory]int64{}
 	for _, l := range d.Items {
 		buckets[l.TaxCategory] += l.NetAmount
@@ -127,7 +123,6 @@ func (d *IssueDraft) Validate() error {
 		}
 	}
 
-	// A5：PRODUCT/SHIPPING 行 gross >= 0；DISCOUNT 行 gross < 0
 	for _, l := range d.Lines {
 		switch l.LineType {
 		case lineTypeProduct, lineTypeShipping:
@@ -143,14 +138,12 @@ func (d *IssueDraft) Validate() error {
 		}
 	}
 
-	// A6：送出的行不得有 gross == 0
 	for _, l := range d.Items {
 		if l.NetAmount == 0 {
 			return invariantErr(CodeZeroLineEmitted, "line_seq=%d has zero gross but is emitted", l.LineSeq)
 		}
 	}
 
-	// A7／A8：稅額
 	var g int64
 	for _, l := range d.Items {
 		if l.TaxCategory == TaxCategoryTaxable {
@@ -168,7 +161,6 @@ func (d *IssueDraft) Validate() error {
 		return invariantErr(CodeB2CTaxNotZero, "b2c tax_amount=%d", h.TaxAmount)
 	}
 
-	// A9：表頭 TaxType 由實際輸出行推導；且每一行的 TaxCategory ∈ {1,2,3}
 	for _, l := range d.Lines {
 		if !l.TaxCategory.IsLineLevel() {
 			return invariantErr(CodeHeaderTaxTypeMismatch,
@@ -181,24 +173,20 @@ func (d *IssueDraft) Validate() error {
 
 	set := TaxCategorySet(d.Items)
 
-	// A10：稅別集合不含 2（零稅率另需 CustomsClearanceMark／ZeroTaxRateReason，Phase 1 無採集點）
 	for _, c := range set {
 		if c == TaxCategoryZeroRate {
 			return invariantErr(CodeZeroRateNotSupported, "zero-rated line present")
 		}
 	}
 
-	// A11：打統編 ⇒ 稅別集合大小 == 1（未決 U3 未查證，fail-closed）
 	if IsB2B(d.BuyerIdentifier) && len(set) > 1 {
 		return invariantErr(CodeB2BMixedTaxUnverified, "b2b with %d tax categories", len(set))
 	}
 
-	// A12：1 <= len(ProductItem) <= 9999
 	if len(d.Items) < 1 || len(d.Items) > AmegoLineCountMax {
 		return invariantErr(CodeLineCountInvalid, "emitted line count=%d", len(d.Items))
 	}
 
-	// A13：每行 Description rune 數 <= 256 且非空
 	for _, l := range d.Items {
 		if l.Description == "" {
 			return invariantErr(CodeDescriptionInvalid, "line_seq=%d empty description", l.LineSeq)
@@ -208,12 +196,10 @@ func (d *IssueDraft) Validate() error {
 		}
 	}
 
-	// A14：DetailVat == 1
 	if h.DetailVat != DetailVatInclusive {
 		return invariantErr(CodeDetailVatInvalid, "detail_vat=%d", h.DetailVat)
 	}
 
-	// A15：統編／載具／捐贈碼三選一（f0401 不擋，AMEGO 通過但憑證是錯的）
 	picked := 0
 	if IsB2B(d.BuyerIdentifier) {
 		picked++
@@ -229,12 +215,10 @@ func (d *IssueDraft) Validate() error {
 			"buyer_identifier=%q carrier=%q donation=%q", d.BuyerIdentifier, d.CarrierType, d.DonationCode)
 	}
 
-	// A20：total_amount <= MaxAmount（AMEGO 上限未載明，用我方訂單上限當代理）
 	if h.TotalAmount > MaxAmount {
 		return invariantErr(CodeAmountExceedsLimit, "total=%d max=%d", h.TotalAmount, MaxAmount)
 	}
 
-	// A21：orders.total_original_amount == Σ(unit_price × quantity)。不猜、不修正。
 	var subtotal int64
 	for _, it := range d.Order.Items {
 		subtotal += int64(it.Quantity) * it.UnitPrice
@@ -244,15 +228,11 @@ func (d *IssueDraft) Validate() error {
 			"sum(unit_price*qty)=%d total_original_amount=%d", subtotal, d.Order.TotalOriginalAmount)
 	}
 
-	// A22：折扣一律視為賣家負擔，只在「這張券不是平台出資」時成立。
-	// 判不出來的 Unknown 也擋——靜默扣掉平台補貼 ＝ 賣家短漏報銷售額。
 	if d.Order.DiscountAmount > 0 && d.Order.DiscountFunding != DiscountFundingSeller {
 		return invariantErr(CodePlatformFundedDiscount,
 			"discount=%d funding=%d", d.Order.DiscountAmount, int(d.Order.DiscountFunding))
 	}
 
-	// A23：Σ allowanceable_base（PRODUCT ＋ SHIPPING）== total_amount
-	// 漏賦值 SHIPPING 行的 allocated_discount 時 chk_invline_allowance_shape 照過 ⇒ 唯一攔截點。
 	if base := SumAllowanceableBase(d.Lines); base != h.TotalAmount {
 		return invariantErr(CodeAllowanceBaseMismatch, "sum(allowanceable_base)=%d total=%d", base, h.TotalAmount)
 	}

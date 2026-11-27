@@ -13,16 +13,12 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 詢問的方法以帳號為範圍（宣告為豁免，不要求賣家角色或店家營運中）：詢問開放中，已關閉的店家也能回覆（案件結案時系統撤回）。帳號是登入的呼叫者；
-// 詢問是不是這個帳號的店家的，由模組以 account ID 檢查，別人的與不存在的一律 not_found。
 
 var (
 	inquiryListPaths  = rpc.FieldPaths{"State": "state"}
 	inquiryReplyPaths = rpc.FieldPaths{"InquiryID": "inquiry_id", "Body": "body", "EvidenceTokens[]": "evidence_staged_tokens[]"}
 )
 
-// toSellerInquiry 轉成賣家看到的詢問：不輸出案件、店家、管理員的識別與撤回的原因；期限只在還沒結束時輸出（開始是建立時間，期限是建立時存下的）；
-// can_reply 取自模組的同一個 Availability；回覆只帶內容、管道、收到時間與附件數（賣家不讀回附件，不輸出物件鍵或網址）。
 func toSellerInquiry(i model.SellerInquiry) *pb.Inquiry {
 	out := &pb.Inquiry{
 		Id: i.ID.String(), Kind: rpc.EnumToProto[pb.InquiryKind](i.Kind), Message: i.Message, CreateTime: timestamppb.New(i.CreatedAt),

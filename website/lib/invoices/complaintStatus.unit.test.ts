@@ -27,7 +27,6 @@ describe("申訴案件狀態的折疊表", () => {
 		expect(unknown.unknown).toBe(true);
 		expect(unknown.title).toBeTruthy();
 		expect(unknown.body).toBeTruthy();
-		// 未知狀態不得宣稱已解決，也不得宣稱逾期。
 		expect(unknown.tone).toBe("info");
 		expect(unknown.showCountdown).toBe(false);
 	});
@@ -37,7 +36,6 @@ describe("申訴案件狀態的折疊表", () => {
 		const overdue = foldInvoiceComplaintStatus(InvoiceComplaintStatus.OVERDUE);
 		expect(overdue.title).not.toBe(open.title);
 		expect(overdue.body).not.toBe(open.body);
-		// 逾期是否構成違規由平台裁定，買家面不預告治理結果。
 		expect(overdue.title + overdue.body).not.toContain("違規");
 	});
 
@@ -151,7 +149,6 @@ describe("申訴的三顆動作鍵", () => {
 	});
 
 	it("真正的 RESOLVED 一律帶得到 reopenAllowedAfter ⇒ 加上這條判斷不改變既有行為", () => {
-		// 冷卻中（未到期）與冷卻已過，兩種都必須照舊渲染按鈕。
 		expect(
 			complaintActions(InvoiceComplaintStatus.RESOLVED, "0", future, now)
 				.showReopen,
@@ -201,7 +198,6 @@ describe("三支動作端點的錯誤分流", () => {
 	it("9322 用申訴語境的自有文案，9336 才直接用後端 message", () => {
 		expect(complaintActionErrorKind(9322)).toBe("versionConflict");
 		expect(complaintActionErrorKind(9336)).toBe("backendMessage");
-		// 兩者都是 409：分流只能靠業務碼，不能靠 HTTP status。
 		expect(complaintActionErrorKind(9322)).not.toBe(
 			complaintActionErrorKind(9336),
 		);

@@ -24,7 +24,6 @@ func TestSchemaCheckLimitsMatchGeneratedConstants(t *testing.T) {
 		}
 		return n
 	}
-	// 名為 constraint 的 CHECK 裡 char_length(column) <= N 的 N。
 	maxLen := func(constraint, column string) int {
 		re := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK \([^\n]*char_length\(` + column + `\) <= (\d+)`)
 		m := re.FindStringSubmatch(schema)

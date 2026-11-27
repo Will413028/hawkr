@@ -110,8 +110,6 @@ function FooterDataColumn({
 }
 
 export default async function FooterCategoryColumns() {
-	// `.catch` per source, not one shared try: a failing taxonomy read must not
-	// also blank the hashtag column.
 	const [categoryTree, trendingTags] = await Promise.all([
 		getCachedCategoryTree().catch(() => []),
 		getCachedTrendingPostTags(FOOTER_COLUMN_ITEM_CAP).catch(() => []),

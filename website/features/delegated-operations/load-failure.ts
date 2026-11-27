@@ -46,9 +46,6 @@ export function classifyDelegatedLoadFailure(
 		case DELEGATION_CAPABILITY_DENIED:
 			return "denied";
 		default:
-			// 逾時、斷線、UPSTREAM_FAILURE、以及任何還沒被這張表認得的碼。
-			// 預設倒向「可重試」是刻意的：把暫時性故障誤講成「找不到」，會讓操作者
-			// 相信目標店家真的沒有這筆資料 —— 那是本次六個 P1 的共同病灶。
 			return "temporary";
 	}
 }

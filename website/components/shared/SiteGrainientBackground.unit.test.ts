@@ -260,8 +260,6 @@ describe("site Grainient progressive enhancement", () => {
 		expect(mocks.createRenderer).not.toHaveBeenCalled();
 	});
 
-	// This is deliberately the first importing case: the real import expression
-	// waits for a deferred mocked module, instead of a pretend renderer promise.
 	it("does not initialize a late dynamic module after the owner unmounts", async () => {
 		const pendingModule = deferred();
 		mocks.moduleReady.mockImplementation(() => pendingModule.promise);

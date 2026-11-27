@@ -61,7 +61,6 @@ func (m *Model) SyncDescriptions() error {
 	return errs.err()
 }
 
-// describe 回由 proto 或變體宣告算出的說明；沒有 proto 來源的 key 回空字串。
 func (m *Model) describe(k *Key, e Entry) (string, error) {
 	var base string
 	switch k.Kind { //nolint:exhaustive // 其餘種類走預設分支

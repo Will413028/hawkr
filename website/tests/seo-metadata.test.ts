@@ -11,10 +11,8 @@ import {
 	siteNameFor,
 } from "../lib/seo/metadata";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-// The prod flavor requires its own web origin (NEXT_PUBLIC_WEB_ORIGIN); these cases describe a deployment at this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://example.com";
 
 function reset() {
@@ -73,25 +71,6 @@ test("root metadata has a title template and default OG", () => {
 });
 
 test("root declares NO social title/description, so every page fills its own", () => {
-	// The one line standing between this site and 「every page shares the home
-	// page's card」. Next resolves a social title by falling back
-	// twitter → openGraph → metadata.title, and each link only fires when the
-	// previous one is EMPTY. Segment merging keeps a parent's `openGraph` for
-	// every descendant that does not declare its own, so a title spelled out
-	// here is inherited site-wide and short-circuits the fallback at link one.
-	//
-	// That is not hypothetical: it is measured. With `openGraph.title` set here,
-	// 84 of the site's 98 routes served 「Hawkr — 在地職人的市集」 as their
-	// og:title AND twitter:title — /login, /cart, every /account and
-	// /seller-center screen, and the product page's not-found branch. The
-	// `description` twin did the same to /privacy, /terms, /return-policy,
-	// /user-policy and /cart, whose share cards described the marketplace while
-	// their own <meta name="description"> described the page.
-	//
-	// Deleting a per-page og:title is a one-page bug someone notices. Adding a
-	// value HERE is a whole-site bug nobody notices, because each page's own
-	// <title> still looks perfectly correct in the tab. Hence a test, not a
-	// comment — tests/seo/social-title.seo.spec.ts asserts the served HTML.
 	__setFlavorForTest("prod");
 	__setEnvForTest(null);
 	const og = buildRootMetadata("zh-TW").openGraph as Record<string, unknown>;
@@ -115,8 +94,6 @@ test("root declares NO social title/description, so every page fills its own", (
 	);
 	assert.equal(twitter.description, undefined);
 
-	// The identity/shape half of the root card must survive: these are the keys
-	// a page inherits and SHOULD, and deleting them is the opposite mistake.
 	assert.equal(og.siteName, "Hawkr");
 	assert.equal(og.locale, "zh_TW");
 	assert.equal(og.type, "website");
@@ -213,7 +190,6 @@ test("root metadata for en: og:locale en_US, og:url is the /en home, the glossar
 	assert.equal(og.url, `${origin()}/en`);
 	assert.equal(og.siteName, "Hawkr");
 	assert.equal(md.applicationName, "Hawkr");
-	// 術語表「品牌」一列（L0 核可）：Hawkr、`%s | Hawkr`、`Hawkr — A marketplace for local artisans`
 	assert.deepEqual(md.title, {
 		template: "%s | Hawkr",
 		default: "Hawkr — A marketplace for local artisans",
@@ -306,7 +282,6 @@ test("no hreflang while one locale is published; hreflang lists published locale
 			en: `${origin()}/en/faq`,
 			"x-default": `${origin()}/faq`,
 		});
-		// The seller surface has not published en: its pages announce nothing.
 		const seller = buildPageMetadata({
 			title: "x",
 			description: "d",

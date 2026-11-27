@@ -20,8 +20,6 @@ test("product submit body keeps stock on create and omits it on edit", () => {
 		],
 	};
 
-	// The body is serialised to the gateway's camelCase CreateSkuInput shape
-	// (skuName / stockQty / price as strings), so stock surfaces as `stockQty`.
 	const createBody = draftToSubmitBody(draft);
 	assert.equal(createBody.skus?.[0].stockQty, "7");
 	assert.equal(createBody.skus?.[0].id, "123");

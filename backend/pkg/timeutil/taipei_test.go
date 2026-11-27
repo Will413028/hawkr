@@ -40,7 +40,7 @@ func TestDefaultRangeDate(t *testing.T) {
 	cases := []struct {
 		name    string
 		daysAgo int
-		want    int // inclusive day span, e.g. 1 = today only
+		want    int
 	}{
 		{"today only", 1, 1},
 		{"zero treated as 1", 0, 1},

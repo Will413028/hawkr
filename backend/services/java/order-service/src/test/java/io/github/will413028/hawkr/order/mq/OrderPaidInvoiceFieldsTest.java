@@ -74,7 +74,6 @@ class OrderPaidInvoiceFieldsTest {
         try {
             TsidUtil.init(300, 0);
         } catch (IllegalStateException ignored) {
-            // 已初始化
         }
     }
 
@@ -165,9 +164,6 @@ class OrderPaidInvoiceFieldsTest {
     void missingCorrelationIsNullNotAFabricatedUuid() throws Exception {
         stubSnapshot(2649605557L);
 
-        // ObsContext 的狀態掛在 ThreadLocal 上，而 surefire 預設同一個執行緒跑完整個 class
-        // ⇒ 「這條鏈沒有 correlation」只有在乾淨的執行緒上才成立。開一條新執行緒是唯一
-        // 不依賴測試執行順序的做法（清 ThreadLocal 需要 ObsContext 沒有提供的 API）。
         Thread t = new Thread(() -> {
             try {
                 handler.handlePaymentSuccess(payload(), "{}", "h3");
@@ -258,7 +254,6 @@ class OrderPaidInvoiceFieldsTest {
         JsonNode sent = MAPPER.readTree(body.getValue());
         assertThat(sent.path("correlation_id").asText()).isEqualTo("corr-from-payment-chain");
         assertThat(sent.path("invoice_snapshot_id").asText()).isEqualTo("2649605557");
-        // 鑑別力錨：enrich 確實跑過（notify 欄位被解析出來），所以上面兩欄是「被保留」而非「沒被碰」
         assertThat(sent.path("notify_buyer_account_id").asLong()).isEqualTo(55L);
     }
 }

@@ -22,8 +22,6 @@ import {
 	GIF_CROP_MAX_EDGE as PROTOCOL_MAX_EDGE,
 } from "@/lib/media/gif-crop-protocol";
 
-// Keep these limits visible to upload UI/tests without making the worker import
-// this browser-facing module (which would create a worker bundle cycle).
 export const GIF_CROP_MAX_BYTES = PROTOCOL_MAX_BYTES;
 export const GIF_CROP_MAX_EDGE = PROTOCOL_MAX_EDGE;
 
@@ -127,7 +125,6 @@ export async function cropAnimatedGifFile(
 	for (let attempt = 0; attempt < outputSizes.length; attempt += 1) {
 		if (options.signal?.aborted) throw abortError();
 		if (attempt > 0) {
-			// Each attempt transfers ownership and terminates its worker before retry.
 			buffer = await normalized.arrayBuffer();
 			if (options.signal?.aborted) throw abortError();
 		}
@@ -142,7 +139,6 @@ export async function cropAnimatedGifFile(
 			try {
 				options.onProgress?.(1);
 			} catch {
-				// Presentation callbacks must not discard a completed output.
 			}
 			return result;
 		} catch (error) {
@@ -184,7 +180,6 @@ function runWorkerAttempt(
 			try {
 				options.onProgress?.(progress);
 			} catch {
-				// A presentation callback must never strand the processing promise.
 			}
 		};
 		const settleReject = (error: unknown) => {

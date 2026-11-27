@@ -133,8 +133,6 @@ describe("① 詢價快照", () => {
 		expect(screen.queryByText("買家尚未指定")).toBeNull();
 	});
 
-	// budgetPerUnit 是買家私有預算（v6.0 §V.7 不得等同 buyerRequestedRange），
-	// 沒有伺服器給的希望詢價區間時整列不顯示，不得拿任何東西頂替。
 	it("沒有希望詢價區間就不顯示那一列，也不拿買家預算頂替", () => {
 		mount({ slots: { ...slots, budgetPerUnit: 70 } });
 		expect(screen.queryByText("希望詢價")).toBeNull();
@@ -193,8 +191,6 @@ describe("① 詢價快照", () => {
 		expect(item.textContent).toContain("蘋果");
 	});
 
-	// 回覆期限的買家側來源隨 legacy quoteDeadline 一起下架；deliveryDate 是
-	// 交期不是回覆期限，不得拿它頂替。
 	it("沒有「截止」那一列，也不拿交期頂替", () => {
 		mount();
 		expect(screen.queryByText("截止")).toBeNull();
@@ -401,8 +397,6 @@ describe("這次發布的收件人", () => {
 			publication: publicationWith({ recipientCount: 5, queuedCount: 4 }),
 		});
 		const panel = screen.getByTestId("quote-batch-summary");
-		// 「已送達」只准出現在既有那句否定式界線句（「不代表通知或聯絡已送達」）
-		// 裡，所以這裡擋的是肯定式的說法。
 		expect(panel.textContent).not.toMatch(/已送出|已寄送|已通知/);
 		expect(
 			screen.getByText("這三個數字是發布當下的收件人分布，不是投遞結果。"),

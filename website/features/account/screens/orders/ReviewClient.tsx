@@ -40,8 +40,6 @@ export default function ReviewClient({ orderNo }: { orderNo: string }) {
 	);
 	const defaultErrors = useDefaultErrorText();
 	const [error, setError] = React.useState<string | null>(null);
-	// Photos crop before uploading; cropped files collect here until the
-	// queue closes, then upload as one batch.
 	const [pendingCrop, setPendingCrop] = React.useState<{
 		item: OrderItem;
 		files: File[];

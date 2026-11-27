@@ -106,7 +106,6 @@ void main() {
     expect(container.read(sessionProvider).isLoggedIn, isFalse);
     expect(effects.logins, 0);
     expect(find.byType(AuthScreen), findsOneWidget);
-    // 取消後按鈕恢復可再點
     await tester.tap(pill('line'));
     await tester.pump();
     expect(auth.calls, ['signIn google', 'signIn line']);

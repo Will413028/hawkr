@@ -38,7 +38,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// queue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
@@ -58,7 +57,6 @@ func (*queue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (
 	return true, nil
 }
 
-// noRegistry、noProducts、noOrders 是 seller 的外部 port 的替身：這裡的測試只用 seller 的守門與表，不會呼叫它們。
 type noRegistry struct{}
 
 func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
@@ -88,7 +86,6 @@ func (q *queue) count(kind string) int {
 	return n
 }
 
-// logSink 收 crm 的 log（JSON 一行一筆），測試用 levels 看層級。
 type logSink struct {
 	mu  sync.Mutex
 	buf bytes.Buffer
@@ -130,8 +127,6 @@ type fixture struct {
 	gate  *suspendable
 }
 
-// suspendable 包住真正的 seller 模組，讓測試能在兩次呼叫之間把店家變成停權（Store 的 Sanctions 是 nil 就是沒有推導過、算停權，Authorize fail-closed），
-// 守門（LockNotRetired）仍走真正的 seller。
 type suspendable struct {
 	*seller.Module
 	suspended atomic.Bool
@@ -145,9 +140,7 @@ func (g *suspendable) Store(ctx context.Context, storeID int64) (seller.Store, e
 	return st, err
 }
 
-// 預設的角色：店 storeA..storeC（10..12）與買家 100..199 在 setup 明確建立；其他 ID 的測試自己 seedBuyers／seedStores。
 
-// seedBuyers 以明確的 ID 建立營運中的買家列（最小的合法列，不經 OnAccountCreated）；守門走真正的 buyer 模組，沒有列的 ID 回 NotFound。
 func seedBuyers(t *testing.T, d *db.DB, lo, hi int64) {
 	t.Helper()
 	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
@@ -156,7 +149,6 @@ func seedBuyers(t *testing.T, d *db.DB, lo, hi int64) {
 	}
 }
 
-// seedStores 以明確的 ID 建立營運中的店家列（最小的合法列）；守門走真正的 seller 模組。
 func seedStores(t *testing.T, d *db.DB, lo, hi int64) {
 	t.Helper()
 	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
@@ -167,7 +159,6 @@ func seedStores(t *testing.T, d *db.DB, lo, hi int64) {
 
 var epoch = time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 
-// newID 產生遞增的 UUIDv7 形狀的 ID（測試要 deterministic，所以不用時鐘）。
 func newIDs() func() uuid.UUID {
 	var n atomic.Uint64
 	return func() uuid.UUID {
@@ -226,7 +217,6 @@ func (f *fixture) scalar(sql string, args ...any) int64 {
 
 func (f *fixture) count(table string) int64 { return f.scalar("SELECT count(*) FROM " + table) }
 
-// customer 回傳客戶的 total_spent、order_count 與是否存在。
 func (f *fixture) customer(storeID, buyerID int64) (spent int64, orders int64, exists bool) {
 	f.t.Helper()
 	err := f.db.Pool().QueryRow(context.Background(),
@@ -240,7 +230,6 @@ func (f *fixture) customer(storeID, buyerID int64) (spent int64, orders int64, e
 	return spent, orders, true
 }
 
-// netSum 是投影的不變量：total_spent 恆等於該客戶 completed 訂單的 SUM(GREATEST(net_amount, 0))。
 func (f *fixture) netSum(storeID, buyerID int64) int64 {
 	f.t.Helper()
 	return f.scalar("SELECT COALESCE(SUM(GREATEST(net_amount, 0)), 0)::bigint FROM crm.order_nets WHERE store_id = $1 AND buyer_id = $2 AND completed", storeID, buyerID)
@@ -276,7 +265,6 @@ func (f *fixture) mustOrder(eventID, orderNo string, storeID, buyerID, amount in
 	}
 }
 
-// parallel 讓 n 個 goroutine 同時開跑（先在柵欄前等齊），回傳每個的錯誤。
 func parallel(n int, fn func(i int) error) []error {
 	errs := make([]error, n)
 	var ready, done sync.WaitGroup
@@ -308,5 +296,4 @@ func noErrors(t *testing.T, errs []error) {
 
 func sn(n int) string { return fmt.Sprintf("%d", n) }
 
-// errOnly 只留寫入的錯誤：這些測試關心的是拒絕與副作用，不是回傳的列。
 func errOnly[T any](_ T, err error) error { return err }

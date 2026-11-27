@@ -29,7 +29,6 @@ func TestAllowance_CompleteRollsBackWhenAllowanceCapExceeded(t *testing.T) {
 	h := newAllowanceHarness(t)
 	ctx := context.Background()
 
-	// 讓落帳必然超過上限：已折 900、這一筆 300 ⇒ 1200 > total 1000。
 	h.docs.doc.AllowanceTotalAmount = 900
 	h.adjs.adj.Status = codemeta.InvoiceAdjustmentStatusWaitingConfirmation.Value
 

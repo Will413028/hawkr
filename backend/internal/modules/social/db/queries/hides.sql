@@ -1,7 +1,5 @@
--- 買家寫的留言與討論區留言的隱藏紀錄，與買家的社群處分紀錄。計數由 hides 的 trigger 維護。
 
 -- name: InsertCommentHide :one
--- 同一則留言已經有未還原的隱藏時回既有的那一列（冪等）；回傳的 id 等於傳入的 id 才是新增。
 INSERT INTO social.hides (id, comment_id, reason_category, reason_text, source_ref, admin_id, hidden_at)
 VALUES (sqlc.arg(id), sqlc.arg(comment_id), sqlc.arg(reason_category), sqlc.arg(reason_text), sqlc.narg(source_ref), sqlc.arg(admin_id), sqlc.arg(now))
 ON CONFLICT (comment_id) WHERE restored_at IS NULL AND comment_id IS NOT NULL
@@ -16,7 +14,6 @@ DO UPDATE SET forum_entry_id = EXCLUDED.forum_entry_id
 RETURNING *;
 
 -- name: RestoreCommentHide :one
--- 還原留言目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
 UPDATE social.hides
 SET restored_at = sqlc.arg(now), restored_by = sqlc.arg(admin_id), restore_reason = sqlc.arg(reason)
 WHERE comment_id = sqlc.arg(comment_id) AND restored_at IS NULL AND (sqlc.narg(source_ref)::text IS NULL OR source_ref = sqlc.narg(source_ref)::text)
@@ -40,7 +37,6 @@ VALUES (sqlc.arg(id), sqlc.arg(buyer_id), sqlc.arg(kind), sqlc.arg(reason_catego
 RETURNING *;
 
 -- name: ListSanctions :many
--- 買家自己的處分紀錄，新的在前。keyset：(created_at, id) 由大到小。
 SELECT * FROM social.sanctions
 WHERE buyer_id = sqlc.arg(buyer_id)
   AND (created_at, id) < (sqlc.arg(after_created)::timestamptz, sqlc.arg(after_id)::uuid)
@@ -48,9 +44,6 @@ ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(max_rows);
 
 -- name: ListHiddenContentOf :many
--- 買家自己被隱藏（未還原）的留言與討論區留言與理由：作者讀得到理由與自己的內容，別人讀不到。不含已刪除的內容（body 為 NULL 的列一定已刪除，
--- comments_scrubbed_check，所以這裡的 COALESCE 不會產生空字串）。
--- 新的在前，keyset：(hidden_at, id) 由大到小。留言沒有 store_id（0）、討論區留言沒有 post_id（零值 UUID）：sqlc 以第一段的型別推導欄位，不能用 NULL。
 SELECT h.id AS hide_id, c.id AS content_id, 'COMMENT'::text AS content_kind, c.post_id, 0::bigint AS store_id,
        COALESCE(c.body, '')::text AS body, c.created_at, h.reason_category, h.reason_text, h.hidden_at
 FROM social.hides h
@@ -69,23 +62,19 @@ LIMIT sqlc.arg(max_rows);
 
 
 -- name: GetPostSnapshot :one
--- 給 moderation 凍結檢舉當下的貼文內容：本文與圖片參照（唯讀，不鎖）。
 SELECT store_id, body, image_asset_id, COALESCE(published_at, created_at)::timestamptz AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.posts
 WHERE id = sqlc.arg(id);
 
 -- name: GetCommentSnapshot :one
--- 給 moderation 凍結檢舉當下的留言內容（唯讀，不鎖）；body 在作者刪帳清除後是 NULL。
 SELECT actor_kind, actor_id, body, post_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.comments
 WHERE id = sqlc.arg(id);
 
 -- name: GetForumEntrySnapshot :one
--- 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
 SELECT actor_kind, actor_id, body, thread_id, created_at AS authored_at, (deleted_at IS NULL)::boolean AS exists_now
 FROM social.forum_entries
 WHERE id = sqlc.arg(id);
 
 -- name: AvailableLinkPosts :many
--- 一批貼文裡賣家此刻點得進去的：沒有軟刪就算（下架不擋，賣家中心讀自己的貼文看得到下架的）；措施快照的連結只對這些顯示（A7-D29）。唯讀，不鎖。
 SELECT id FROM social.posts WHERE id = ANY(sqlc.arg(post_ids)::uuid[]) AND deleted_at IS NULL;

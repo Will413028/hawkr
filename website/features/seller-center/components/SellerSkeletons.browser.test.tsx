@@ -199,7 +199,6 @@ describe("Seller skeletons", () => {
 	});
 
 	it("keeps the phone disclosure skeleton the same size as the real row", async () => {
-		// .seller-mobile-disclosure-list 在 768px 以上隱藏：明確設成手機寬，tests/browser/setup.ts 的 afterEach 還原。
 		await page.viewport(390, 844);
 		const { container } = renderWithIntl(
 			<SellerShell>

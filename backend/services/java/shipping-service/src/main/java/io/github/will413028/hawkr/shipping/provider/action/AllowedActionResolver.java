@@ -121,7 +121,6 @@ public class AllowedActionResolver {
         }
         ShippingMethod method = parseMethod(shipment.getShippingMethod());
         if (method == null) {
-            // 配送方式解析不出來時契約只給 view_only ⇒ 任何 mutation 都不該通過。
             throw new ShippingBusinessException(GrpcResponseCode.FULFILLMENT_PROVIDER_NOT_ENABLED);
         }
         ActionAvailability availability = evaluate(action, shipment,
@@ -137,13 +136,11 @@ public class AllowedActionResolver {
                                         FulfillmentContext ctx) {
         java.util.List<String> actor = FulfillmentActionPolicy.actorValuesFor(action);
 
-        // 第 1 層：狀態閘門
         Integer stateReason = stateGate(action, shipment, status, method, ctx);
         if (stateReason != null) {
             return ActionAvailability.disabled(action.value(), stateReason, actor);
         }
 
-        // 第 2 層：capability 閘門 —— 🔴 只在 requiresProviderCall=true 時才問。
         if (FulfillmentActionPolicy.requiresProviderCall(action, method)
                 && !hasCapabilityFor(action, ctx)) {
             return ActionAvailability.disabled(action.value(),
@@ -162,19 +159,12 @@ public class AllowedActionResolver {
                               ShippingStatus status, ShippingMethod method, FulfillmentContext ctx) {
         switch (action) {
             case VIEW_ONLY:
-                // 兜底值：永遠可用（它指向唯讀端點，不改任何狀態）。
                 return null;
 
             case TRACK:
-                // 唯讀查詢：任何狀態都問得，包含終態（使用者要看最後的物流結果）。
                 return null;
 
             case DISPATCH:
-                // 🔴 顯式 allowed-from 優先（本波新增，為了 dispatch@3003）。
-                //    有宣告就**以它為完整閘門**，不再疊加下面兩格——下面兩格是黑貓叫件的性質
-                //    （目標狀態 210、標籤須取號），而 Uber 兩者都不成立：
-                //    3003 不經過 210，也沒有標籤概念。
-                //    理由與 991 為什麼必須被擋，寫在 FulfillmentActionPolicy.EXPLICIT_ALLOWED_FROM。
                 java.util.Set<ShippingStatus> explicitFrom =
                         FulfillmentActionPolicy.explicitAllowedFrom(action, method);
                 if (explicitFrom != null) {
@@ -182,19 +172,9 @@ public class AllowedActionResolver {
                             ? null
                             : GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED.code();
                 }
-                // 叫件會把單子推到 210 TCAT_CALLED。
                 if (status == null || !statusMapper.isValidTransition(status, ShippingStatus.TCAT_CALLED)) {
                     return GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED.code();
                 }
-                // 🔴 執行面（callTcat）要求標籤已取號才叫得了車，契約也必須這樣說。
-                //    少了這一格，契約回 enabled=true 而端點回 5011——
-                //    使用者看到可按的按鈕、按下去失敗，那是本 blocker 的同一個病、反方向。
-                //
-                //    ⚠️ **只對「派車需要打 provider」的線成立**：3005 商家自送的 dispatch
-                //    在 OVERRIDES 裡是 requiresProviderCall=false（policy 註解逐字：
-                //    「所有動作都只寫我方狀態」），而它沒有任何路徑會把 label 寫成 4103
-                //    ⇒ 無條件要求標籤會讓 dispatch@3005 **永久** SHIPMENT_LABEL_REQUIRED。
-                //    第一版就是無條件的，這一行是修那個。
                 if (FulfillmentActionPolicy.requiresProviderCall(action, method)
                         && !LabelPrintStatus.SUCCEEDED.value().equals(shipment.getLabelPrintStatus())) {
                     return GrpcResponseCode.SHIPMENT_LABEL_REQUIRED.code();
@@ -202,21 +182,9 @@ public class AllowedActionResolver {
                 return null;
 
             case HANDOVER:
-                // 🔴 provider 維度：不是每條線都有「賣家確認出貨」這一步
-                //    （黑貓是司機到府取件，賣家不需要再確認一次）。
-                //
-                //    ⚠️ 這裡**刻意不問** adapter 的 requiresSellerConfirmation()：
-                //    那個布林的預設值是 false，而預設值分不出「明確宣告沒有」與「還沒宣告」。
-                //    拿它當拒絕訊號會誤殺所有尚未宣告的 provider（Uber 實測被擋），
-                //    違反設計書 §4.4.1a 明訂的「requiresProviderCall=false 的動作
-                //    不受 capability 為 empty 影響」。
-                //    ⇒ 改用逐格明確覆寫，預設「適用」——漏列的症狀是按鈕多出來（可見），
-                //      而不是按鈕消失（靜默）。
                 if (!FulfillmentActionPolicy.isDomainApplicable(action, method)) {
                     return GrpcResponseCode.SHIPMENT_PROVIDER_MISMATCH.code();
                 }
-                // 賣家確認出貨會把單子推到 921 SELLER_CONFIRMED，
-                // 且前置條件是標籤已取得（沒有交貨便代碼就沒有東西可交寄）。
                 if (!LabelPrintStatus.SUCCEEDED.value().equals(shipment.getLabelPrintStatus())) {
                     return GrpcResponseCode.SHIPMENT_HANDOVER_NOT_ALLOWED.code();
                 }
@@ -226,36 +194,22 @@ public class AllowedActionResolver {
                 return null;
 
             case PRINT_LABEL:
-                // 🔴 列印走的是**列印狀態機**（4101~4104）而不是配送狀態機：
-                //    列印中（4102）時再按一次會撞上 acquireLabelPrintRequested 的 CAS 而 rows=0，
-                //    對使用者只會表現成「按了沒反應」。已成功（4103）仍可用——那是重印（冪等取回代碼）。
                 if (LabelPrintStatus.REQUESTED.value().equals(shipment.getLabelPrintStatus())) {
                     return GrpcResponseCode.SHIPMENT_PROVIDER_CALL_IN_PROGRESS.code();
                 }
-                // 沒有 provider 單號就沒有東西可印（建單失敗／尚未建單）。
                 if (shipment.getShipTradeNo() == null || shipment.getShipTradeNo().isBlank()) {
                     return GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED.code();
                 }
-                // 🔴 已取號且該 provider 不支援重印 ⇒ 契約要說不可用。
-                //    超商是冪等取回三段碼（可重印），黑貓的 generateHomeLabelPdf 對已取號
-                //    直接拋 SHIPMENT_ALREADY_LABELED(5003) ⇒ 契約若說 enabled，
-                //    就又是一次「看得到、按不下去」。判準問 adapter 而不是配送方式字面值。
                 if (LabelPrintStatus.SUCCEEDED.value().equals(shipment.getLabelPrintStatus())
                         && !supportsReprint(ctx)) {
                     return GrpcResponseCode.SHIPMENT_ALREADY_LABELED.code();
                 }
-                // 🔴 終態不得再列印。本分支原本**完全不看配送狀態**，
-                //    違反 stateGate 自己寫下的判準（「這個動作實際會把單子推到哪個狀態」）：
-                //    一張已取消（41）或已取貨（11）的單，label_print_status=4104 時
-                //    契約會算出 enabled=true，而列印會真的打到 provider 並改寫列印狀態機。
                 if (status == null || ShippingStatusRules.isTerminal(status)) {
                     return GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED.code();
                 }
                 return null;
 
             default:
-                // 🔴 fail-closed：SUPPORTED 加了新 action 卻忘了在這裡定義狀態閘門時，
-                //    寧可讓按鈕明確不可用（帶得出原因），也不要預設放行。
                 return GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED.code();
         }
     }
@@ -288,9 +242,6 @@ public class AllowedActionResolver {
             case CANCEL -> a -> a.cancel(ctx);
             case ARRANGE_RETURN -> a -> a.returns(ctx);
             case VIEW_POD -> a -> a.pod(ctx);
-            // 沒有對應 capability 的 action 不該走到這裡：能走到代表
-            // FulfillmentActionPolicy 宣告它 requiresProviderCall=true，
-            // 卻沒有任何 capability 承載它——那是設定錯誤，fail-closed。
             default -> a -> Optional.empty();
         };
         return lookup.apply(adapter.get()).isPresent();

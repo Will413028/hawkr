@@ -19,8 +19,6 @@ export function MaskedValue({ value, label, className }: MaskedValueProps) {
 	const spoken = [...value].join(" ");
 	return (
 		<span
-			// role="img" ＋ aria-label：讀屏會唸 aria-label 而不是把 `/T••••+P` 當成
-			// 一個念不出來的詞逐字亂讀。span 沒有隱含 role 時 aria-label 是無效的。
 			role="img"
 			className={["tabular-nums", className].filter(Boolean).join(" ")}
 			aria-label={`${label}，${spoken}`}

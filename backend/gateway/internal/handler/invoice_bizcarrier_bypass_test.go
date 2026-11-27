@@ -19,30 +19,8 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// ---------------------------------------------------------------------------
-// 這個檔案守的是什麼
-// ---------------------------------------------------------------------------
-//
-// 在 bizcarrier 之前，「handler 有沒有記得檢查 resp.GetCode()」由一道 AST gate 守
-// （TestInvoiceHandlersGuardPreserveDataCodes，掃 handler 原始碼找呼叫點之後有沒有
-// GetCode 檢查）。它被 9 種寫法繞過，全部 go build exit=0、gofmt 過、既有測試全綠。
-// 兩個根因都是「原始碼形狀」這個判定材料本身的極限：
-//
-//   - per-site fail-OPEN：`if len(after) == 0 { continue }` —— 「這個呼叫點之後找不到
-//     成功出口」被當成安全的證明，而它同樣可以只是「我看不到而已」。
-//   - 有 token ≠ 真的擋住：AST 只問得出「子樹裡存不存在一個 response.Biz 節點」，
-//     問不出「非零碼到不了成功出口」——後者是路徑性質，靜態判不了。
-//
-// 下面 9 支 handler 逐一重現那 9 種寫法。**它們全都是真的沒有守門**（或守門形同虛設），
-// 放在這裡就是要證明：判定材料換成執行期事實之後，寫成什麼形狀都不影響結論。
-//
-// 每一支的斷言都一樣：HTTP 200 ＋ envelope code 9331 ＋ data 原樣透傳。
-//
-// ⚠️ 這些 handler 只存在於測試檔，不會被路由掛載。它們不是「可接受的寫法範本」——
-// production 仍應顯式處理業務碼，carrier 是安全網不是正常路徑（每次攔截都會記
-// ERROR log ＋ gateway_bizcode_swallowed_total）。
 
-const bypassProbeCode int32 = 9331 // INVOICE_PROVIDER_CREDENTIAL_INVALID（preserveData）
+const bypassProbeCode int32 = 9331
 
 func bypassProbeData() *pb.SellerProviderAccountData {
 	return &pb.SellerProviderAccountData{
@@ -52,8 +30,6 @@ func bypassProbeData() *pb.SellerProviderAccountData {
 	}
 }
 
-// bypassServer 對本檔用到的兩支 RPC 一律回「gRPC OK ＋ envelope 9331 ＋ data 仍在」，
-// 鏡射 invoice-service 的 provider_account.go。
 type bypassServer struct {
 	pb.UnimplementedInvoiceServiceServer
 }
@@ -71,12 +47,6 @@ func (s *bypassServer) ListProviderAccountsForAdmin(_ context.Context, _ *pb.Lis
 	}, nil
 }
 
-// newBypassRouter 起 bufconn fake server ＋ production 的 EnvelopeGuardInterceptor
-// ＋ production 的 bizcarrier.Middleware，把 probe handler 掛在 /probe。
-//
-// 三者都必須是 production 的真貨：preserveData 這個概念只存在於 interceptor 的
-// `return nil` 分支，特權的發放與否只存在於 carrier 在不在場。注入 mock proto client
-// 會讓兩者的差別整個消失，那種測試無論 handler 怎麼寫都會綠。
 func newBypassRouter(t *testing.T, probe func(h *Holder) gin.HandlerFunc) http.Handler {
 	t.Helper()
 	lis := bufconn.Listen(1024 * 1024)
@@ -105,17 +75,11 @@ func newBypassRouter(t *testing.T, probe func(h *Holder) gin.HandlerFunc) http.H
 	return r
 }
 
-// assertNotSwallowed 斷言回應是「HTTP 200 ＋ code 9331 ＋ data 原樣」。
-//
-// 用 json.Decoder 讀**第一個** JSON 物件而不是整個 body：繞道 ⑥（忘了 return）與
-// ⑧（順序顛倒）會寫兩次，而客戶端解析到的就是第一個 —— 那才是使用者實際看到的東西。
 func assertNotSwallowed(t *testing.T, w *httptest.ResponseRecorder) {
 	t.Helper()
 	if w.Code != http.StatusOK {
 		t.Fatalf("HTTP status = %d, want 200；body=%s", w.Code, w.Body.String())
 	}
-	// 從字串副本讀，不從 w.Body 直接讀：json.Decoder 會消耗掉 buffer，
-	// 後續還要看 raw body 的斷言會拿到空字串。
 	var body map[string]any
 	if err := json.NewDecoder(strings.NewReader(w.Body.String())).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v；raw=%s", err, w.Body.String())
@@ -148,16 +112,7 @@ func probeCall(h *Holder, c *gin.Context) (*pb.GetProviderAccountForAdminRespons
 	return resp, true
 }
 
-// ⚠️ 繞道 ① （import 取別名 `rsp "…/response"`）在同目錄的
-// invoice_bizcarrier_alias_test.go —— 同一個檔案裡把同一個 package import 兩次會被
-// staticcheck ST1019 擋下，而那個 lint 剛好不是本次要驗的東西。
 
-// ---------------------------------------------------------------------------
-// ② RPC 呼叫抽成 helper：call 與 emit 分居兩個 function body
-//
-// 舊 gate 在 emit 所在的 body 內找不到呼叫點、在 call 所在的 body 內找不到 emit ——
-// 兩半各自「乾淨」，全部跳過。carrier 掛在 request context 上，跨任意函式邊界存活。
-// ---------------------------------------------------------------------------
 func fetchProviderHealth(h *Holder, ctx context.Context) (*pb.GetProviderAccountForAdminResponse, error) {
 	return h.Invoice.HealthCheckProviderAccountForAdmin(ctx,
 		&pb.HealthCheckProviderAccountForAdminRequest{ActorAccountId: 1, StoreId: "2685914682"})
@@ -191,7 +146,7 @@ func TestBypass03_GuardBodyNarrowedByInnerCondition(t *testing.T) {
 			}
 			data := convInvSellerProviderAccountData(resp.GetData())
 			if resp.GetCode() != 0 {
-				if resp.GetCode() == 9332 { // 9331 不在此列 ⇒ 守門形同虛設
+				if resp.GetCode() == 9332 {
 					response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 					return
 				}
@@ -237,7 +192,7 @@ func TestBypass05_ReadsCodeButNeverRejects(t *testing.T) {
 				return
 			}
 			if resp.GetCode() != 0 {
-				c.Set("observed_biz_code", resp.GetCode()) // 讀了，然後什麼也沒做
+				c.Set("observed_biz_code", resp.GetCode())
 			}
 			response.OK(c, convInvSellerProviderAccountData(resp.GetData()))
 		}
@@ -260,7 +215,7 @@ func TestBypass06_RejectWithoutReturn(t *testing.T) {
 			}
 			data := convInvSellerProviderAccountData(resp.GetData())
 			if resp.GetCode() != 0 {
-				response.Biz(c, resp.GetCode(), resp.GetMessage(), data) // 缺 return
+				response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 			}
 			response.OK(c, data)
 		}
@@ -286,7 +241,7 @@ func TestBypass07_SecondUnguardedReturnPath(t *testing.T) {
 				response.OK(c, data)
 				return
 			}
-			response.OK(c, data) // 這一條沒有任何守門
+			response.OK(c, data)
 		}
 	}))
 }
@@ -302,9 +257,9 @@ func TestBypass08_EmitBeforeGuard(t *testing.T) {
 				return
 			}
 			data := convInvSellerProviderAccountData(resp.GetData())
-			response.OK(c, data) // 先送
+			response.OK(c, data)
 			if resp.GetCode() != 0 {
-				response.Biz(c, resp.GetCode(), resp.GetMessage(), data) // 才守
+				response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 			}
 		}
 	}))
@@ -349,12 +304,6 @@ func TestBypass09_PageEmitter(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 反向鑑別力：非 preserveData 碼**不得**被 carrier 吞成 200
-//
-// 只驗「9331 會被抓到」是陽性驗證；這一支是陰性驗證 —— 證明守門沒有順手把錯誤
-// 也一起吞掉。9332 兩張表都沒登記 ⇒ fallback FailedPrecondition ⇒ HTTP 409 ＋ [9332]。
-// ---------------------------------------------------------------------------
 type nonPreserveServer struct {
 	pb.UnimplementedInvoiceServiceServer
 }
@@ -424,7 +373,6 @@ func TestBypass11_BizWithZeroCode(t *testing.T) {
 			if !ok {
 				return
 			}
-			// 沒有守門，且刻意用「非成功出口」把成功形狀寫出去。
 			response.Biz(c, 0, "success", convProbeData(resp))
 		}
 	})
@@ -444,7 +392,6 @@ func TestBypass11b_BizStatusWithZeroCode(t *testing.T) {
 			response.BizStatus(c, 0, "success")
 		}
 	})
-	// 改寫之後形狀回到 preserveData 契約：HTTP 200 ＋ 9331。
 	if w.Code != http.StatusOK {
 		t.Fatalf("HTTP status = %d, want 200；body=%s", w.Code, w.Body.String())
 	}
@@ -478,7 +425,6 @@ func TestBypass12_HandRolledEnvelopeWithDataWriter(t *testing.T) {
 			if !ok {
 				return
 			}
-			// 問過 carrier 才組 Envelope。
 			code, msg, rewrite := bizcarrier.Emit(c, 0)
 			if !rewrite {
 				code, msg = 0, "success"

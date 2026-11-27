@@ -303,9 +303,7 @@ class _AppDropdownOverlayState extends State<_AppDropdownOverlay> {
       behavior: HitTestBehavior.opaque,
       child: Stack(
         children: [
-          // Transparent background to catch taps outside
           Positioned.fill(child: Container(color: Colors.transparent)),
-          // Dropdown panel
           Positioned(
             left: widget.position.dx,
             top: widget.position.dy + widget.fieldHeight + 4,
@@ -324,7 +322,6 @@ class _AppDropdownOverlayState extends State<_AppDropdownOverlay> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Optional search bar
                     if (widget.showSearch)
                       Padding(
                         padding: const EdgeInsets.all(HkSpace.sm),
@@ -332,7 +329,6 @@ class _AppDropdownOverlayState extends State<_AppDropdownOverlay> {
                           controller: _searchController,
                         ),
                       ),
-                    // Item list
                     Flexible(
                       child: ListView.builder(
                         key: _listKey,

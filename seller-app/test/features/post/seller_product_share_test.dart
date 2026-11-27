@@ -159,7 +159,6 @@ void main() {
 
     expect(find.text(kShareFailedMessage), findsOneWidget);
     expect(find.text('分享'), findsNothing);
-    // 讓 toast 的自動關閉計時器跑完再卸載。
     await tester.pump(const Duration(seconds: 3));
   });
 }

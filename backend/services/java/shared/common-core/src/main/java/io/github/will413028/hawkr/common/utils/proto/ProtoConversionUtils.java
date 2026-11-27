@@ -23,7 +23,6 @@ public final class ProtoConversionUtils {
     private ProtoConversionUtils() {
     }
 
-    // ==================== Long 轉換 ====================
 
     /**
      * Proto string → Long（必填欄位）。
@@ -87,7 +86,6 @@ public final class ProtoConversionUtils {
         return value == null ? "" : String.valueOf(value);
     }
 
-    // ==================== UUID 轉換 ====================
 
     /**
      * Proto string → UUID（必填欄位；商品與 SKU 的 ID 是 catalog 的 UUIDv7）。
@@ -113,7 +111,6 @@ public final class ProtoConversionUtils {
         }
         try {
             UUID id = UUID.fromString(value);
-            // UUID.fromString 接受 "1-1-1-1-1" 這類縮寫；只收標準的 8-4-4-4-12 寫法。
             return id.toString().equalsIgnoreCase(value) ? id : null;
         } catch (IllegalArgumentException e) {
             return null;
@@ -127,7 +124,6 @@ public final class ProtoConversionUtils {
         return value == null ? "" : value.toString();
     }
 
-    // ==================== Integer 轉換 ====================
 
     /**
      * Proto string → int（必填欄位）。
@@ -180,7 +176,6 @@ public final class ProtoConversionUtils {
         return value == null ? "" : String.valueOf(value);
     }
 
-    // ==================== Decimal-tolerant 數字解析 ====================
 
     /**
      * Proto string → int，**接受十進位字串**並向 0 truncate。
@@ -195,7 +190,7 @@ public final class ProtoConversionUtils {
      */
     public static int parseDecimalToInt(String value, String fieldName) {
         BigDecimal d = parseDecimal(value, fieldName);
-        BigInteger big = d.toBigInteger(); // truncate towards zero
+        BigInteger big = d.toBigInteger();
         if (big.bitLength() >= 32) {
             throw new IllegalArgumentException(fieldName + " 超出 int 範圍: " + value);
         }
@@ -208,7 +203,7 @@ public final class ProtoConversionUtils {
      */
     public static long parseDecimalToLong(String value, String fieldName) {
         BigDecimal d = parseDecimal(value, fieldName);
-        BigInteger big = d.toBigInteger(); // truncate towards zero
+        BigInteger big = d.toBigInteger();
         if (big.bitLength() >= 64) {
             throw new IllegalArgumentException(fieldName + " 超出 long 範圍: " + value);
         }
@@ -226,7 +221,6 @@ public final class ProtoConversionUtils {
         }
     }
 
-    // ==================== 時間轉換 ====================
 
     /**
      * LocalDateTime(UTC) → ISO 8601 字串（帶 Z 尾綴）。
@@ -268,7 +262,6 @@ public final class ProtoConversionUtils {
 
     private static LocalDateTime parseIso8601Internal(String iso) {
         String cleaned = iso.replace("Z", "").trim();
-        // 純日期格式（YYYY-MM-DD）→ 補上 T00:00:00
         if (cleaned.length() == 10 && cleaned.charAt(4) == '-' && cleaned.charAt(7) == '-') {
             cleaned = cleaned + "T00:00:00";
         }
@@ -279,7 +272,6 @@ public final class ProtoConversionUtils {
         }
     }
 
-    // ==================== 金額轉換 ====================
 
     /**
      * Proto string → long（金額，必須 > 0）。

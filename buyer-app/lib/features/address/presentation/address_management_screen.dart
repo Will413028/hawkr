@@ -464,7 +464,6 @@ class _AddressFormSheetState extends ConsumerState<AddressFormSheet> {
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
 
-  // 縣市 + 鄉鎮市區下拉：值是 hawkr_twaddr 的 County／Town，送出的是 Town.code。
   County? _county;
   Town? _town;
   bool _isDefault = false;
@@ -506,7 +505,6 @@ class _AddressFormSheetState extends ConsumerState<AddressFormSheet> {
   Future<void> _onSave() async {
     if (!_isFormValid) return;
 
-    // 收貨人姓名顯示長度檢查（對齊後端 PayUni 約束 [4,30]）
     final nameError = RecipientNameValidator.validateAddress(
       _nameController.text,
     );

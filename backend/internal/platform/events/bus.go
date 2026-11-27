@@ -24,7 +24,6 @@ var ErrNoTransaction = errors.New("events：Publish 必須在 db.InTx 內呼叫"
 
 type handler func(context.Context, any) error
 
-// named 是一個 handler 與它的註冊名稱；一般的 Subscribe 名稱是空字串。
 type named struct {
 	name string
 	fn   handler

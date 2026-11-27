@@ -79,8 +79,6 @@ func BuildAllowanceDraft(docLines []Line, refundAmount int64, ctx AllowanceConte
 	for _, b := range base {
 		totalBase += b
 	}
-	// 守衛 I3：超額輸入在上游是合法且會發生的（aftersales 每開一張新售後單都拿
-	// orders.total_actual_amount 當可退上限、不扣既退金額）。
 	if refundAmount > totalBase {
 		return nil, invariantErr(CodeAllowanceExceedsInvoice,
 			"refund=%d exceeds remaining base=%d", refundAmount, totalBase)
@@ -100,18 +98,15 @@ func BuildAllowanceDraft(docLines []Line, refundAmount int64, ctx AllowanceConte
 	for k, i := range idx {
 		a := alloc[k]
 		if a == 0 {
-			continue // a_i == 0 的行不輸出
+			continue
 		}
 		l := docLines[i]
 		al := AllowanceLine{
 			SourceLineSeq:         l.LineSeq,
-			OriginalDescription:   l.Description, // 必須逐字照抄原發票品名
+			OriginalDescription:   l.Description,
 			OriginalInvoiceNumber: ctx.ProviderInvoiceNo,
 			OriginalInvoiceDate:   ctx.InvoiceDateTaipeiYmd,
 			TaxCategory:           l.TaxCategory,
-			// Quantity 一律 1、UnitPrice = Amount：本平台的退款是金額退款，逐行折讓額與原品項
-			// 數量沒有比例關係。硬填原數量會讓 UnitPrice 變小數，而折讓端沒有
-			// DetailAmountRound 可以鎖整數。
 			Quantity:    1,
 			GrossAmount: a,
 		}
@@ -133,11 +128,6 @@ func BuildAllowanceDraft(docLines []Line, refundAmount int64, ctx AllowanceConte
 	return d, nil
 }
 
-// absorbFullAllowanceRounding 執行 §5A.9.4 的全額折讓尾差吸收。
-//
-// 只在「全額折讓」且「原發票 TaxAmount > 0」時執行：B2C 原發票 tax_amount = 0、沒有基準可對。
-// 全額折讓時逐品項 Tax 四捨五入後加總會 != 原發票 TaxAmount，AMEGO 後台會跳
-// 「折讓單的營業稅額已大於原發票的營業稅額」。
 func (d *AllowanceDraft) absorbFullAllowanceRounding() error {
 	if !d.IsFullAllowance || d.Context.DocumentTaxAmount <= 0 {
 		return nil
@@ -160,7 +150,6 @@ func (d *AllowanceDraft) absorbFullAllowanceRounding() error {
 			target = i
 			continue
 		}
-		// 應稅行中 a_i 最大者；a_i 相同時取 line_seq 最大者。
 		t := d.Lines[target]
 		if l.GrossAmount > t.GrossAmount || (l.GrossAmount == t.GrossAmount && l.SourceLineSeq > t.SourceLineSeq) {
 			target = i
@@ -171,16 +160,13 @@ func (d *AllowanceDraft) absorbFullAllowanceRounding() error {
 			"tax delta=%d but no taxable allowance line to absorb it", delta)
 	}
 
-	// 護欄：吸收後不得讓任一欄位變負（Amount 為負會撞 3040152／4040141；Tax 為負無合法語意）。
-	// |delta| <= 應稅行數 而 target 是 a_i 最大者 ⇒ 正常情況恆安全，但那是推論不是保證——
-	// 它依賴「行數遠小於單行金額」這個沒有任何約束在守的前提。護欄成本是兩個比較。
 	if d.Lines[target].Amount-delta < 0 || d.Lines[target].Tax+delta < 0 {
 		return invariantErr(CodeAllowanceTaxMismatch,
 			"absorbing delta=%d on line_seq=%d would make amount=%d tax=%d negative",
 			delta, d.Lines[target].SourceLineSeq, d.Lines[target].Amount-delta, d.Lines[target].Tax+delta)
 	}
 	d.Lines[target].Tax += delta
-	d.Lines[target].Amount -= delta // 維持 Amount + Tax == a_i 不變
+	d.Lines[target].Amount -= delta
 	d.Lines[target].UnitPrice = d.Lines[target].Amount
 	return nil
 }
@@ -195,20 +181,16 @@ func (d *AllowanceDraft) recomputeHeader() {
 
 // Validate 執行折讓側的 A16–A19，fail-closed。
 func (d *AllowanceDraft) Validate() error {
-	// A16：TaxAmount + TotalAmount == refund_amount
 	if got := d.TaxAmount + d.TotalAmount; got != d.RefundAmount {
 		return invariantErr(CodeAllowanceSplitMismatch,
 			"tax=%d total=%d sum=%d refund=%d", d.TaxAmount, d.TotalAmount, got, d.RefundAmount)
 	}
 
-	// A17：Σ 已生效調整 + refund_amount <= invoice_documents.total_amount
 	if cum := d.Context.ExistingAllowanceTotal + d.RefundAmount; cum > d.Context.DocumentTotalAmount {
 		return invariantErr(CodeAllowanceExceedsInvoice,
 			"cumulative=%d document_total=%d", cum, d.Context.DocumentTotalAmount)
 	}
 
-	// A18：全額折讓且原發票 tax_amount > 0 ⇒ TaxAmount == 原發票 tax_amount；
-	//      且尾差吸收後每行 Amount >= 0 && Tax >= 0
 	for _, l := range d.Lines {
 		if l.Amount < 0 || l.Tax < 0 {
 			return invariantErr(CodeAllowanceTaxMismatch,
@@ -220,7 +202,6 @@ func (d *AllowanceDraft) Validate() error {
 			"full allowance tax=%d document tax=%d", d.TaxAmount, d.Context.DocumentTaxAmount)
 	}
 
-	// A19：一張折讓單只綁一張原發票（AMEGO 硬約束 4040132）
 	seen := map[string]struct{}{}
 	for _, l := range d.Lines {
 		if l.OriginalInvoiceNumber == "" {

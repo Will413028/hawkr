@@ -12,9 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔驗 A4 雙人解鎖（端點 54／55）。每一支陰性都額外數 repo 的呼叫次數——
-// 「回了錯誤碼」不足以證明什麼都沒發生，而「回了錯誤但前面已經寫了一半」正是
-// 本流程最貴的失敗形狀（解鎖列建了、job 沒轉，或反過來）。
 
 const (
 	unlockRequester = int64(4201)
@@ -22,7 +19,6 @@ const (
 	unlockCanceller = int64(4203)
 )
 
-// cancelledJob 是 A4 的合法起點：受控取消已落地，等雙人解鎖。
 func cancelledJob(version int64) domain.Operation {
 	op := opAt("CANCELLED_BY_ADMIN", version)
 	canceller := unlockCanceller
@@ -44,9 +40,6 @@ func requestInput() RequestManualUnlockInput {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 54：發起
-// ---------------------------------------------------------------------------
 
 func TestManualUnlock_Request_CreatesAwaitingRow(t *testing.T) {
 	fx := newJobFixture(cancelledJob(5), docAt("ISSUE_FAILED", ""))
@@ -64,7 +57,6 @@ func TestManualUnlock_Request_CreatesAwaitingRow(t *testing.T) {
 	if got.UnlockID == 0 {
 		t.Fatal("unlockId 不得為 0：它是端點 55 的 path param")
 	}
-	// 24 小時窗口是定版值（§6.1.14）。少了它，逾期那條路完全沒有意義。
 	if want := adminNow.Add(24 * time.Hour); !got.ExpiresAt.Equal(want) {
 		t.Fatalf("expiresAt 應為發起後 24 小時（%v），實得 %v", want, got.ExpiresAt)
 	}
@@ -78,7 +70,6 @@ func TestManualUnlock_Request_CreatesAwaitingRow(t *testing.T) {
 		t.Fatalf("Idempotency-Key 必須落進稽核 request_id，實得 %v", fx.audit.admin[0].RequestID)
 	}
 	assertNoPIIInAudit(t, fx.audit.admin[0])
-	// 查證說明是自由文字（可能寫進第三方客服姓名），不得被複製進保存 5 年的稽核列。
 	for _, blob := range [][]byte{fx.audit.admin[0].BeforeState, fx.audit.admin[0].AfterState} {
 		if containsSubstring(string(blob), "王小姐") {
 			t.Fatalf("providerCheckEvidence 不得進稽核 state：%s", blob)
@@ -115,7 +106,6 @@ func TestManualUnlock_Request_AfterExpiryCanRequestAgain(t *testing.T) {
 		t.Fatalf("第一次發起失敗：%v", err)
 	}
 
-	// 25 小時後：第一列已逾期。
 	fx.uc.WithClock(func() time.Time { return adminNow.Add(25 * time.Hour) })
 	in := requestInput()
 	in.ProviderCheckedAt = adminNow.Add(24 * time.Hour)
@@ -150,7 +140,7 @@ func TestManualUnlock_Request_RejectsNonCancelledJob(t *testing.T) {
 func TestManualUnlock_Request_RejectsVersionMismatch(t *testing.T) {
 	fx := newJobFixture(cancelledJob(6), docAt("ISSUE_FAILED", ""))
 
-	_, err := fx.uc.RequestManualUnlock(context.Background(), requestInput()) // expected=5
+	_, err := fx.uc.RequestManualUnlock(context.Background(), requestInput())
 	assertBizCode(t, err, bizcode.InvoiceJobVersionConflict)
 	if len(fx.unlocks.created) != 0 {
 		t.Fatalf("版本不符時不得建列，實得 %d", len(fx.unlocks.created))
@@ -194,9 +184,6 @@ func TestManualUnlock_Request_AcceptsExactly1000Runes(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 55：覆核
-// ---------------------------------------------------------------------------
 
 func approveFixture(t *testing.T) (*jobFixture, int64) {
 	t.Helper()
@@ -222,8 +209,6 @@ func TestManualUnlock_Approve_UnlocksJobInSameTransaction(t *testing.T) {
 	if got.Status != domain.ManualUnlockApproved {
 		t.Fatalf("解鎖狀態應為 APPROVED，實得 %q", got.Status)
 	}
-	// 🔴 兩段必須同一交易：只轉解鎖列而 job 沒進 MANUAL_PROCESS_ALLOWED，
-	// 端點 56／62 會繼續回 9349，而 ADM 看到的是「已核准」。
 	if fx.ops.stored.Status != "MANUAL_PROCESS_ALLOWED" {
 		t.Fatalf("job 必須同時進 MANUAL_PROCESS_ALLOWED，實得 %q", fx.ops.stored.Status)
 	}
@@ -240,7 +225,6 @@ func TestManualUnlock_Approve_UnlocksJobInSameTransaction(t *testing.T) {
 	if approval.ActorAccountID == derefInt64(approval.ApprovalActorAccountID) {
 		t.Fatal("chk_invadmaudit_two_person：兩個 actor 欄不得相同")
 	}
-	// 狀態歷程要記下 job 的那一次轉移（誰把它解鎖的）。
 	if len(fx.audit.entries) == 0 {
 		t.Fatal("應寫一列 invoice_status_history")
 	}
@@ -340,7 +324,6 @@ func TestManualUnlock_Approve_RejectsSecondApproval(t *testing.T) {
 	}
 	before := len(fx.ops.allowManual)
 
-	// job 的 version 已被 J29 推進 ⇒ 第二次帶舊版本，兩道守衛都會擋。
 	_, err := fx.uc.ApproveManualUnlock(context.Background(), ApproveManualUnlockInput{
 		ActorAccountID: unlockApprover, JobID: 7001, UnlockID: unlockID,
 		Approved: true, Reason: "重送", ExpectedVersion: 5,
@@ -351,14 +334,10 @@ func TestManualUnlock_Approve_RejectsSecondApproval(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 讀取面：逾期投影
-// ---------------------------------------------------------------------------
 
 func TestManualUnlock_LatestProjectsExpired(t *testing.T) {
 	fx, _ := approveFixture(t)
 
-	// 未逾期：仍是 AWAITING_SECOND_APPROVAL。
 	view, found, err := fx.uc.LatestManualUnlock(context.Background(), 7001)
 	if err != nil || !found {
 		t.Fatalf("應找得到最近一列：found=%v err=%v", found, err)
@@ -367,7 +346,6 @@ func TestManualUnlock_LatestProjectsExpired(t *testing.T) {
 		t.Fatalf("未逾期時狀態應為 AWAITING_SECOND_APPROVAL，實得 %q", view.Status)
 	}
 
-	// 逾期後：投影成 EXPIRED，且**沒有任何人改過那一列**（不需要排程器）。
 	fx.uc.WithClock(func() time.Time { return adminNow.Add(25 * time.Hour) })
 	view, _, err = fx.uc.LatestManualUnlock(context.Background(), 7001)
 	if err != nil {
@@ -388,9 +366,6 @@ func TestManualUnlock_LatestReturnsNotFoundWhenNeverRequested(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 小工具
-// ---------------------------------------------------------------------------
 
 func assertBizCode(t *testing.T, err error, want int32) {
 	t.Helper()
@@ -418,16 +393,7 @@ func containsSubstring(haystack, needle string) bool {
 	return strings.Contains(haystack, needle)
 }
 
-// ---------------------------------------------------------------------------
-// J28：CANCEL_BLOCKED_UNKNOWN 那條入口（#3089 A 組第 2 項）
-//
-// 這一組在 2026-09-04 之前**一支都不存在**，因為那條邊零呼叫端。它的價值集中在兩件
-// 逐項驗不到的事：① 同一交易內走完 J28→J29（少一段就是「ADM 看到已核准而 job 沒動」）
-// ② 兩句 CAS 的版本必須是 v 與 **v+1**（J28 的 SQL 有 version = version + 1，
-//    傳錯是靜默的 rows=0）。
-// ---------------------------------------------------------------------------
 
-// blockedJob 是 J28 的合法起點：取消已提出但 provider 狀態不明，等雙人確認。
 func blockedJob(version int64) domain.Operation {
 	op := opAt("CANCEL_BLOCKED_UNKNOWN", version)
 	canceller := unlockCanceller
@@ -464,7 +430,6 @@ func TestManualUnlock_Request_AcceptsBlockedUnknownWithEvidence(t *testing.T) {
 	if got.Status != domain.ManualUnlockAwaitingSecondApproval {
 		t.Fatalf("狀態應為 AWAITING_SECOND_APPROVAL，實得 %q", got.Status)
 	}
-	// 證據要落在那一列上——覆核者從這裡讀，讀不到就是對著看不見的東西按同意。
 	if got.CancelEvidenceKind == nil || *got.CancelEvidenceKind != "MOF_PLATFORM_SCREENSHOT" {
 		t.Fatalf("回應必須帶回證據種類，實得 %v", got.CancelEvidenceKind)
 	}
@@ -487,8 +452,6 @@ func TestManualUnlock_Request_RejectsBadEvidenceKind(t *testing.T) {
 			mut:  func(in *RequestManualUnlockInput) { in.CancelEvidenceKind = "" },
 			want: ErrUnlockEvidenceKindRequired,
 		},
-		// PROVIDER_QUERY_71 是 CodeMeta 的合法值，但**不是 J28 的合法值**：它是
-		// provider 直接作證、由 J24 自動落地。收下它等於讓人替系統蓋章。
 		"BLOCKED 帶系統自動採信的種類": {
 			op:   blockedJob(5),
 			mut:  func(in *RequestManualUnlockInput) { in.CancelEvidenceKind = "PROVIDER_QUERY_71" },
@@ -522,7 +485,7 @@ func TestManualUnlock_Approve_ChainsJ28ThenJ29(t *testing.T) {
 	got, err := fx.uc.ApproveManualUnlock(context.Background(), ApproveManualUnlockInput{
 		ActorAccountID: unlockApprover, JobID: 7001, UnlockID: unlockID,
 		Approved: true, Reason: "已複核財政部平台截圖", ExpectedVersion: 5,
-		IdempotencyKey: "idem-approve-j28", // gitleaks:allow（測試值）
+		IdempotencyKey: "idem-approve-j28",
 	})
 	if err != nil {
 		t.Fatalf("ApproveManualUnlock 失敗：%v", err)
@@ -534,7 +497,6 @@ func TestManualUnlock_Approve_ChainsJ28ThenJ29(t *testing.T) {
 		t.Fatalf("同一交易要走完 J28→J29，實得 %q", fx.ops.stored.Status)
 	}
 
-	// ── 版本鏈：J28 用 v，J29 用 v+1 ──
 	if len(fx.ops.confirmCancel) != 1 {
 		t.Fatalf("J28 應被呼叫一次，實得 %d", len(fx.ops.confirmCancel))
 	}
@@ -548,7 +510,6 @@ func TestManualUnlock_Approve_ChainsJ28ThenJ29(t *testing.T) {
 		t.Fatalf("J29 必須用 **v+1**（J28 的 UPDATE 有 version+1），實得 %d", v)
 	}
 
-	// 證據要寫進 operation，chk_invop_admin_cancel_needs_confirm 靠它放行。
 	if k := fx.ops.confirmCancel[0].Kind; k != "MOF_PLATFORM_SCREENSHOT" {
 		t.Fatalf("J28 的證據種類應由解鎖列帶過來，實得 %q", k)
 	}
@@ -559,7 +520,6 @@ func TestManualUnlock_Approve_ChainsJ28ThenJ29(t *testing.T) {
 		t.Fatal("cancel_confirmed_by 應是覆核者（第二人）")
 	}
 
-	// ── 兩列狀態歷程，reason_code 要分得出哪一列是哪一段 ──
 	codes := make([]string, 0, len(fx.audit.entries))
 	for _, e := range fx.audit.entries {
 		codes = append(codes, derefString(e.ReasonCode))
@@ -646,7 +606,6 @@ func TestManualUnlock_Request_IssuanceTypeStillAllowed(t *testing.T) {
 	}
 }
 
-// #3108：證據檔的 staged token 換發。
 
 type fakeUnlockEvidence struct {
 	key    string
@@ -694,7 +653,6 @@ func TestManualUnlock_Request_FinalizesStagedToken(t *testing.T) {
 	if len(fin.tokens) != 1 || fin.tokens[0] != "staged-abc" {
 		t.Fatalf("換發應收到 token，實得 %v", fin.tokens)
 	}
-	// 🔴 refID 必須是 operation.id——證據屬於那一件工作。
 	if len(fin.ops) != 1 || fin.ops[0] != 7001 {
 		t.Fatalf("換發的 refID 應為 operation.id=7001，實得 %v", fin.ops)
 	}
@@ -709,7 +667,7 @@ func TestManualUnlock_Request_RejectsBothKeyAndToken(t *testing.T) {
 	fx.uc.unlockEvidence = &fakeUnlockEvidence{key: "k"}
 
 	in := blockedRequestInput()
-	in.CancelEvidenceStagedToken = "staged-abc" // objectKey 已由 blockedRequestInput 填
+	in.CancelEvidenceStagedToken = "staged-abc"
 
 	_, err := fx.uc.RequestManualUnlock(context.Background(), in)
 	if !errors.Is(err, ErrUnlockEvidenceKeyConflict) {
@@ -760,7 +718,6 @@ func TestManualUnlock_ReadEvidence(t *testing.T) {
 		if string(got.Data) != "PNGDATA" || got.ContentType != "image/png" || got.FileName != "mof.png" {
 			t.Fatalf("回傳內容錯：%+v", got)
 		}
-		// 🔴 refID 必須是 operation.id——media 用 (objectKey, refID) 一起授權。
 		if len(fin.readOps) != 1 || fin.readOps[0] != 7001 {
 			t.Fatalf("refID 應為 operation.id=7001，實得 %v", fin.readOps)
 		}

@@ -44,7 +44,6 @@ type Client struct {
 	deadline time.Duration
 }
 
-// 編譯期斷言：本 client 必須滿足 consumer 宣告的 port。
 var _ invoicemq.PaymentFactsClient = (*Client)(nil)
 
 // NewClient 撥號 payment-service。
@@ -131,10 +130,6 @@ func (c *Client) GetPaymentFacts(ctx context.Context, orderNo string) (invoicemq
 		return invoicemq.PaymentFacts{}, fmt.Errorf("invoice: get payment facts (order_no=%s): pay_time is zero", orderNo)
 	}
 
-	// 🔴 三態：**不能用 GetProviderPaidAt()**。那個 getter 對 nil 回 ""，於是
-	// 「payment 端本來就沒有這個值」（ATM webhook 常態）與「有欄位但內容是空字串」
-	// （上游 bug）塌成同一件事。前者是設計上的合法值 ⇒ PaidAt() 走 COALESCE 退到
-	// pay_time；後者是壞資料 ⇒ 必須 fail-loud，不得靜默退到本地收單時間。
 	var providerPaidAt *time.Time
 	if data.ProviderPaidAt != nil {
 		raw := *data.ProviderPaidAt

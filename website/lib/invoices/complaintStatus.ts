@@ -66,8 +66,6 @@ export function foldInvoiceComplaintStatus(
 				unknown: false,
 			};
 		case InvoiceComplaintStatus.OVERDUE:
-			// 不寫「賣家違規」——逾期是否構成違規由平台裁定，在買家面預告治理
-			// 結果等於承諾一件還沒發生的事。
 			return {
 				title: "賣家尚未處理",
 				body: "已超過處理期限，平台會接手這件案子，有結果會通知你。",
@@ -163,7 +161,6 @@ export function complaintActions(
 	nowMs: number,
 ): InvoiceComplaintActions {
 	const resolved = status === InvoiceComplaintStatus.RESOLVED;
-	// 有沒有重開邊 = 後端有沒有給重開時間（見上方 K13 述詞）。
 	const hasReopenEdge = resolved && reopenAllowedAfter !== "";
 	const parsedCount = reopenCount === "" ? 0 : Number(reopenCount);
 	const count = Number.isFinite(parsedCount) ? parsedCount : 0;

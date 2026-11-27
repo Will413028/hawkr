@@ -14,15 +14,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// 向賣家收回的釋出原因碼（refunds.reversal_reason 與 refund_reversals.reason，上限 200 字）。
 const (
-	// reversalDeducted 退款已從轉帳金額扣掉（轉帳在送出前重新算定金額），不必撤回。
 	reversalDeducted = "deducted_from_transfer"
-	// reversalTransferFailed 轉帳終局失敗，錢本來就在平台手上。
 	reversalTransferFailed = "transfer_failed"
-	// reversalNothingLeft 轉帳人工結案後，provider 核實的轉帳沒有剩餘可撤額度給這筆退款。
 	reversalNothingLeft = "no_reversible_amount"
-	// reversalExceedsRemaining 開始收回時，各目標的剩餘可撤額度加起來不夠預留額（預留的不變量被破壞）。
 	reversalExceedsRemaining = "reversal_exceeds_remaining"
 )
 
@@ -31,14 +26,12 @@ func (s *Service) EnqueueReversal(ctx context.Context, refundID uuid.UUID) error
 	return enqueueReversal(ctx, s.d.Jobs, refundID)
 }
 
-// reversalTarget 是一次收回可以撤回的 provider 轉帳：refundID 是 nil 的是原轉帳，否則是擁有成功補差額轉帳的退款；free 是還沒被進行中的撤回列佔走的剩餘可撤額度。
 type reversalTarget struct {
 	refundID   *uuid.UUID
 	externalID string
 	free       int64
 }
 
-// reversalTargets 依固定順序列出付款可撤的轉帳：原轉帳第一，之後是成功的補差額轉帳（依擁有者退款 ID 升序）。呼叫方已鎖付款列與（成立的）轉帳列。
 func reversalTargets(ctx context.Context, q *store.Queries, tr store.PaymentTransfer) ([]reversalTarget, error) {
 	open, err := q.OpenReversalTotalOnTransfer(ctx, tr.PaymentOrderID)
 	if err != nil {
@@ -59,10 +52,6 @@ func reversalTargets(ctx context.Context, q *store.Queries, tr store.PaymentTran
 	return targets, nil
 }
 
-// startReversals 讓付款底下「預留在 WAITING、provider 已接受退款（REFUNDING 或 SUCCEEDED）」的退款開始收回（REVERSING）：依 reversalTargets 的順序把預留額分給各目標
-// （每個目標取 min(還沒分的額度, 目標剩餘可撤額)），每個分到額度的目標寫一列撤回，並排撤回 job。
-// 各目標的額度加起來不夠預留額（預留的不變量被破壞）時，預留縮到分得到的額度（分不到就釋出）並發 MoneyAnomaly，不讓退款卡住。
-// 呼叫方必須已鎖付款列與（成立的）轉帳列、並確認轉帳是 SUCCEEDED：收回的兩個前置事件（退款被接受、轉帳成立）誰後到，誰在自己的 transaction 內呼叫它。
 func (s *Service) startReversals(ctx context.Context, q *store.Queries, paymentID uuid.UUID) error {
 	rows, err := q.StartableReversals(ctx, paymentID)
 	if err != nil || len(rows) == 0 {
@@ -129,7 +118,6 @@ func (s *Service) startReversals(ctx context.Context, q *store.Queries, paymentI
 	return nil
 }
 
-// releaseWaitingReversals 釋出付款底下全部 WAITING 的預留（轉帳金額重新算定、或轉帳終局失敗）。呼叫方必須已鎖付款列與轉帳列。
 func (s *Service) releaseWaitingReversals(ctx context.Context, q *store.Queries, paymentID uuid.UUID, reason string) error {
 	rows, err := q.WaitingReversals(ctx, paymentID)
 	if err != nil {
@@ -185,13 +173,11 @@ func (s *Service) reverse(ctx context.Context, refundID uuid.UUID) error {
 	return errors.Join(errs...)
 }
 
-// segmentTarget 是撤回列的目標在目前的列上的狀態：transferID 只在目標是原轉帳時有值，remaining 是目標的剩餘可撤額度（累計值，不扣其他撤回列）。
 type segmentTarget struct {
 	transferID uuid.UUID
 	remaining  int64
 }
 
-// checkSegmentTarget 確認撤回列的目標仍然成立；不成立回原因碼（reason 非空）。
 func (s *Service) checkSegmentTarget(ctx context.Context, q *store.Queries, seg store.PaymentRefundReversal) (segmentTarget, string, error) {
 	if seg.TargetRefundID == nil {
 		tr, err := q.SucceededTransferByOrder(ctx, seg.PaymentOrderID)
@@ -265,7 +251,6 @@ func (s *Service) reverseSegment(ctx context.Context, seg store.PaymentRefundRev
 	return s.acceptReversal(ctx, *called, target, snap)
 }
 
-// lookupReversal 是過了 ResendWindow 的撤回：不再呼叫 provider，只依嘗試 ID 查回。
 func (s *Service) lookupReversal(ctx context.Context, seg store.PaymentRefundReversal, target segmentTarget, now time.Time) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
@@ -286,7 +271,6 @@ func (s *Service) lookupReversal(ctx context.Context, seg store.PaymentRefundRev
 	return s.releaseReversal(ctx, seg, failedNotFound)
 }
 
-// lockReversalRows 依鎖順序鎖一次撤回落地要動的列：付款列、轉帳列（目標是原轉帳時）、退款列（撤回的擁有者與補差額轉帳的擁有者，依 ID 升序）、撤回列。
 func lockReversalRows(ctx context.Context, q *store.Queries, seg store.PaymentRefundReversal, transferID uuid.UUID) error {
 	if _, _, err := lockOrder(ctx, q, seg.PaymentOrderID); err != nil {
 		return err
@@ -307,7 +291,6 @@ func lockReversalRows(ctx context.Context, q *store.Queries, seg store.PaymentRe
 	return err
 }
 
-// addTargetReversal 把成立的撤回累加到它的目標（原轉帳的 reversed_amount 或補差額轉帳的 topup_reversed_amount）；超過目標的額度時 CHECK 擋下。
 func addTargetReversal(ctx context.Context, q *store.Queries, seg store.PaymentRefundReversal, transferID uuid.UUID, now time.Time) error {
 	if seg.TargetRefundID == nil {
 		_, err := q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: transferID, Amount: seg.Amount, Now: now})
@@ -317,8 +300,6 @@ func addTargetReversal(ctx context.Context, q *store.Queries, seg store.PaymentR
 	return err
 }
 
-// acceptReversal 驗證 provider 回的撤回（呼叫的回應或查回找到的）與撤回列相符後，在一個 transaction 內累加目標的累計撤回額、把撤回列推進到 REVERSED 並重算退款的彙總；不符進 ANOMALY。
-// 退款在撤回落地時已經 FAILED（provider 接受之後才失敗）：撤回照樣成立、錢留在平台，同 transaction 發 MoneyAnomaly 交後台決定。
 func (s *Service) acceptReversal(ctx context.Context, seg store.PaymentRefundReversal, target segmentTarget, snap ReversalSnapshot) error {
 	if snap.ExternalID == "" || snap.Amount != seg.Amount {
 		return s.anomalyReversal(ctx, seg, "reply_mismatch", snap.ExternalID)
@@ -358,7 +339,6 @@ func (s *Service) acceptReversal(ctx context.Context, seg store.PaymentRefundRev
 	return err
 }
 
-// settleReversal 在撤回列改完之後重算退款的彙總；退款已經 FAILED（撤回落地時買家沒拿到錢、賣家已被收回，錢留在平台）時同 transaction 發 MoneyAnomaly。呼叫方已鎖付款列與退款列。
 func (s *Service) settleReversal(ctx context.Context, q *store.Queries, seg store.PaymentRefundReversal, detail string, now time.Time) error {
 	if err := q.SettleRefundReversal(ctx, store.SettleRefundReversalParams{ID: seg.RefundID, Now: now}); err != nil {
 		return err
@@ -373,7 +353,6 @@ func (s *Service) settleReversal(ctx context.Context, q *store.Queries, seg stor
 	return nil
 }
 
-// markReversalCalled 在獨立的 transaction 記下「撤回呼叫過」的時刻（呼叫 provider 之前提交）；撤回列已不是 REVERSING 時回 nil。
 func (s *Service) markReversalCalled(ctx context.Context, id uuid.UUID, now time.Time) (*store.PaymentRefundReversal, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -389,7 +368,6 @@ func (s *Service) markReversalCalled(ctx context.Context, id uuid.UUID, now time
 	return row, err
 }
 
-// rotateReversalKey 在 provider 已知拒絕之後換新的撤回冪等鍵；已被別的呼叫換過或撤回列已不是 REVERSING 時什麼都不做。
 func (s *Service) rotateReversalKey(ctx context.Context, id, oldKey uuid.UUID, now time.Time) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -402,7 +380,6 @@ func (s *Service) rotateReversalKey(ctx context.Context, id, oldKey uuid.UUID, n
 	})
 }
 
-// reversalLookupFailed 記一次查回失敗；連續失敗到上限進 ANOMALY（回 nil），否則回錯誤由 River 重試。
 func (s *Service) reversalLookupFailed(ctx context.Context, seg store.PaymentRefundReversal, cause error) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -436,8 +413,6 @@ func (s *Service) clearReversalLookupFailures(ctx context.Context, seg store.Pay
 	})
 }
 
-// anomalyReversal 讓 REVERSING 的撤回列進 ANOMALY、重算退款的彙總並在同一個 transaction 發 MoneyAnomaly；撤回列已不是 REVERSING 時什麼都不做。
-// 列上只存原因碼 reason（上限 200 字）；provider 的外部 ID（detail）只進 log 與事件。鎖順序：付款列、退款列。
 func (s *Service) anomalyReversal(ctx context.Context, seg store.PaymentRefundReversal, reason, detail string) error {
 	s.d.Logger.ErrorContext(ctx, "payment：退款的撤回進 ANOMALY，待人工核對 provider", "reversal_id", seg.ID.String(), "refund_id", seg.RefundID.String(), "payment_order_id", seg.PaymentOrderID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
@@ -465,8 +440,6 @@ func (s *Service) anomalyReversal(ctx context.Context, seg store.PaymentRefundRe
 	})
 }
 
-// releaseReversal 是撤回列的終局失敗（provider 永久拒絕，或查回證明上一次不存在又過了最短等待）：REVERSING 的列釋出、重算退款的彙總（其他列照常收斂，這一列的額度留在預留裡直到彙總終局），
-// 退款維持原狀，錢留在平台由平台吸收，同一個 transaction 發 MoneyAnomaly；撤回列已不是 REVERSING 時什麼都不做。鎖順序：付款列、退款列。
 func (s *Service) releaseReversal(ctx context.Context, seg store.PaymentRefundReversal, reason string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()

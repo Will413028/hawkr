@@ -67,7 +67,6 @@ export default function SellerAccountDeleteDialog({
 			const state = await onConfirm(reason.trim());
 			const result = deletionOutcome(state);
 			if (!result) {
-				// 契約的結果沒有 UNSPECIFIED；收到它就不能宣告成功。
 				setError("伺服器沒有回報刪除的結果，請重新整理確認帳號的狀態。");
 				setSubmitting(false);
 				return;
@@ -115,10 +114,8 @@ export default function SellerAccountDeleteDialog({
 			closeLabel="關閉刪除賣家帳號視窗"
 			hideClose={Boolean(outcome)}
 			onClose={onClose}
-			// 已有結果之後 Escape 不再是「取消」，只剩下完成按鈕一條路（關閉鍵本來就已隱藏）。
 			busy={submitting || Boolean(outcome)}
 			ariaBusy={submitting}
-			// `noValidate`（Dialog 固定開啟）：必填由 validateReason 統一擋，與提示文字一致（原生氣泡會搶先出現）。
 			form={outcome ? undefined : { onSubmit: handleSubmit }}
 			footer={
 				outcome ? (

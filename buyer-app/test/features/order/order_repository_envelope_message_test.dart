@@ -25,7 +25,6 @@ void main() {
   });
 
   test('舊 msg 欄名不再被讀取（沒有相容 fallback）', () {
-    // 鑑別力：上一條若靠 `body['msg'] ?? body['message']` 通過，這條會失敗。
     final repository = OrderRepository(
       _dioResolving({'code': 4091, 'msg': '訂單已結案，無法申請售後'}),
     );

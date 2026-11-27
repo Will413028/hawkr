@@ -1,4 +1,3 @@
--- 刪帳與退場的抹除：每批一個 transaction，批次取值升序。ledger 隨 order_nets（ON DELETE CASCADE）、customer_tags 隨 customers 與 tags 一起刪。
 
 -- name: DeleteOrderNetsByBuyer :execrows
 DELETE FROM crm.order_nets WHERE order_no IN (
@@ -26,8 +25,6 @@ DELETE FROM crm.tags WHERE id IN (
 );
 
 -- name: ListInactivePartiesWithData :many
--- 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中 crm 仍有資料的身分，
--- 依 (kind, party_id) 的 keyset 分頁，最多 max_rows 個；第一頁的游標是 ('', 0)。
 SELECT p.kind::text AS kind, p.party_id::bigint AS party_id FROM (
     SELECT 'BUYER' AS kind, cb.buyer_id AS party_id FROM buyer.pub_closed_buyers() AS cb
     WHERE EXISTS (SELECT 1 FROM crm.customers AS c WHERE c.buyer_id = cb.buyer_id)

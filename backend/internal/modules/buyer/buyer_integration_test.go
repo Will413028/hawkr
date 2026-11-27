@@ -41,7 +41,6 @@ type queue struct {
 	args []river.JobArgs
 	opts []*river.InsertOpts
 	fail bool
-	// outsideOK 允許在 transaction 外排入（保底掃描沒有業務寫入，不在 transaction 內）。
 	outsideOK bool
 }
 
@@ -79,7 +78,6 @@ type fixture struct {
 	module   *Module
 	bus      *events.Bus
 	jobs     *queue
-	// failMarkDeleted 讓 MarkDeleted 在真的寫入請求之後回錯，模擬同一個 transaction 的後段失敗（B1-D25：MarkDeleted 只 INSERT，不排 job）。
 	failMarkDeleted atomic.Bool
 	media           *media.Module
 	now             time.Time
@@ -128,7 +126,6 @@ func pngBytes(t *testing.T) []byte {
 	return body.Bytes()
 }
 
-// stageAvatar 以 accountID 為上傳者放一張公開 PNG，回傳可 Confirm 的 token 與資產 ID。
 func stageAvatar(t *testing.T, fixture *fixture, accountID int64) (string, uuid.UUID) {
 	t.Helper()
 	put, err := fixture.media.PutPublic(context.Background(), media.Uploader{ID: accountID}, bytes.NewReader(pngBytes(t)))
@@ -534,7 +531,6 @@ func TestRestockFanOutIsPerSKU(t *testing.T) {
 	})
 	must(t, fixture.module.SubscribeRestock(ctx, first.BuyerID, pid(11), skuOf(1)))
 	must(t, fixture.module.SubscribeRestock(ctx, second.BuyerID, pid(11), skuOf(2)))
-	// 同一個商品的另一個 SKU 與同一個 SKU 重複訂閱都冪等。
 	must(t, fixture.module.SubscribeRestock(ctx, first.BuyerID, pid(11), skuOf(2)))
 	must(t, fixture.module.SubscribeRestock(ctx, first.BuyerID, pid(11), skuOf(1)))
 	if n := count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions"); n != 3 {
@@ -657,7 +653,6 @@ func TestKeysetPaginationAndVisits(t *testing.T) {
 	}
 }
 
-// pid 是測試用的確定性商品或 SKU ID（UUID）：n 放在最後 8 個位元組，大小順序與 n 相同。
 func pid(n int64) uuid.UUID {
 	var id uuid.UUID
 	binary.BigEndian.PutUint64(id[8:], uint64(n))
@@ -665,7 +660,6 @@ func pid(n int64) uuid.UUID {
 	return id
 }
 
-// skuOf 是商品 pid(n) 的 SKU：與 n 同序，不與任何 pid 相撞。
 func skuOf(n int64) uuid.UUID { return pid(1000 + n) }
 
 func stringsOf[T ~string](values []T) []string {

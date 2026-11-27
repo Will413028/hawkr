@@ -61,9 +61,6 @@ function detailToListItem(d: MyPostDetail): PostListItem {
 	return {
 		id: d.id,
 		sellerId: d.sellerId,
-		// The detail endpoint carries no storeCode. Harmless here — this is the
-		// seller's own post list in seller-center and it renders no storefront
-		// link at all.
 		storeCode: "",
 		sellerName: d.sellerName,
 		logoKey: d.logoKey,
@@ -178,21 +175,12 @@ export default function SellerPostsClient() {
 	const scope = useSellerDataScope();
 	const delegated = scope.mode === "delegated";
 	const { data: seller, loading: sellerLoading } = useSellerSelf();
-	// 停權判斷走 `useSellerIdentity`（與 SellerCenterShell 同一個述詞、同一份
-	// seller-self 快取），不在這裡自己比對 lifecycleStatus —— 兩處各寫一份的話，
-	// 46 §3.6 那條 `suspended_governance` 只會被補進其中一處。
 	const { isSuspended } = useSellerIdentity();
 	const t = useTranslations("seller.posts");
-	// 代行的工作區不是店家自己，限制只對店家自己的賣家中心成立。
-	// 新增類動作（發布、編輯）看 MARKETING 能力：頁面對任何有 CONTENT_CONTRACT 的店家開放
-	// （待刪除、被收回行銷能力也進得來），所以不能只看停權。
 	const marketing = capabilityStatus(seller, SellerCapability.MARKETING);
 	const writeLocked =
 		!delegated &&
 		(isSuspended || (marketing !== undefined && !marketing.active));
-	// 代行下 `useSellerSelf()` 是店面那一支（scope 已換），但工作區的側欄不掛它 ——
-	// 這裡的店家鍵一律優先取工作階段下發的 `ownerStoreId`，才不會因為 storefront.read
-	// 沒核發就整頁不載入。
 	const sellerId = scope.ownerStoreId ?? storeIdOf(seller);
 	const composeHref = delegated
 		? `/adm/${encodeURIComponent(scope.ownerStoreId ?? "")}/posts/new`
@@ -206,9 +194,6 @@ export default function SellerPostsClient() {
 	const showDesktopMedia = imageViewport === "desktop";
 	const showMobileMedia = imageViewport === "mobile";
 
-	// `/app/sellers/me/posts` returns the authenticated seller's own posts
-	// (including platform-hidden ones) — no client-side seller filtering
-	// needed; the cache entry is still keyed by sellerId.
 	const postsKey = scope.keys.posts(sellerId ?? "none", { pageSize: 50 });
 	const query = useQuery({
 		queryKey: postsKey,
@@ -217,20 +202,13 @@ export default function SellerPostsClient() {
 		enabled: scope.canRead("posts", Boolean(sellerId)),
 	});
 	const items = query.data ?? [];
-	// 代行下 `useSellerSelf()` 可能根本沒掛（storefront.read 未核發），它的 loading
-	// 不能綁住貼文列表。
 	const loading = (delegated ? false : sellerLoading) || query.isLoading;
 	const error =
 		deleteError ??
 		publishError ??
 		(query.error instanceof Error ? query.error.message : null);
 
-	// Deep-link: a 賣家被留言/被回覆 notification lands on `?post=<id>` (and
-	// `&comment=<id>`, which the modal's <PostComments> reads on its own). Open
-	// the post's modal one time so the seller jumps straight to the thread.
-	// Prefer the in-list copy; if it isn't on the loaded page (older than the
 	// global 50, or a rounded TSID), fetch its detail by the exact id. Runs once
-	// per mount — manual close stays closed.
 	const [deepLinkPost, setDeepLinkPost] = React.useState<PostListItem | null>(
 		null,
 	);
@@ -261,7 +239,6 @@ export default function SellerPostsClient() {
 		};
 	}, [query.isLoading, query.data, scope.repos.posts]);
 
-	// Optimistically drop the row from the cache; roll back if the delete fails.
 	const deleteMutation = useMutation({
 		mutationFn: (id: number | string) => scope.repos.posts.deleteSellerPost(id),
 		onMutate: async (id: number | string) => {
@@ -328,9 +305,6 @@ export default function SellerPostsClient() {
 		<SellerPageShell
 			className="seller-posts"
 			title="動態管理"
-			// 代行的列表刻意含草稿與排程中的貼文（那正是要處理的那一批），所以這裡
-			// 不能沿用賣家端「已發布 N 則」——賣家自建的貼文一律直接發布，那句在
-			// 賣家路徑上為真，在代行路徑上會把草稿一起宣告成已發布。
 			subtitle={
 				delegated
 					? `共 ${items.length} 則動態`
@@ -368,12 +342,7 @@ export default function SellerPostsClient() {
 					<ul className="seller-posts__list">
 						{items.map((p) => (
 							<li key={p.id} className="seller-posts__row">
-								{/* Cover + main share one click target via a button with
-								    `display: contents`, so the row's CSS grid
-								    (132px / 1fr / auto) stays intact and the 刪除 button
-								    in the third column is unaffected by the click. Opens
-								    the in-page modal (same engagement surface buyers see,
-								    plus the comments composer the seller can reply with). */}
+
 								<button
 									type="button"
 									className="contents cursor-pointer border-0 bg-transparent p-0 text-left font-inherit text-inherit"
@@ -410,9 +379,7 @@ export default function SellerPostsClient() {
 												) : null}
 											</div>
 										)}
-										{/* 平台下架與發布狀態互斥呈現：一則貼文若被平台下架，那是更重要的
-										    資訊。發布狀態缺值時什麼都不畫 —— 賣家自己那條路徑的上游不帶
-										    publishStatus，推定成「已發布」會是一個沒有根據的宣稱。 */}
+
 										{!isPostHidden(p) && (
 											<PostPublishStatusBadge
 												publishStatus={p.publishStatus}
@@ -423,8 +390,7 @@ export default function SellerPostsClient() {
 										<p className="seller-posts__excerpt whitespace-pre-wrap">
 											{p.content?.slice(0, 120) || "(無文字)"}
 										</p>
-										{/* 代行的貼文 DTO 沒有互動計數：畫 0 是一個宣稱（「這則貼文有 0 個讚」），
-										    而拿不到權威數字時正解是不畫那個數字，不是編一個。 */}
+
 										{!delegated && (
 											<div className="seller-posts__stats">
 												<PostStat
@@ -451,14 +417,10 @@ export default function SellerPostsClient() {
 										)}
 									</div>
 								</button>
-								{/* 代行不渲染這兩顆：貼文編輯頁尚未接線，而「刪除貼文」在代行的端點
-								    總表裡根本沒有對應路徑（能做的是下架，走 /unpublish）。 */}
+
 								{!delegated && (
 									<div className="seller-posts__actions">
-										{/* 發布／下架擺在動作欄的第一顆：它改的是「這則貼文買家看不看得到」，
-										    比編輯內容更接近賣家在這一頁要做的判斷。方向由狀態決定，停權時
-										    發布方向整顆不渲染（下架留著＝收縮型自清）—— 判準全在
-										    PostPublishControl，這裡不再自行分支。 */}
+
 										<PostPublishControl
 											publishStatus={p.publishStatus}
 											hidden={isPostHidden(p)}

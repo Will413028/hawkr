@@ -114,12 +114,6 @@ public class ShipmentLabelReconcileScheduler {
 
         int processed = 0;
         for (ShipmentEntity entity : candidates) {
-            // issue #2294 L3：lease claim —— 搶到才打 provider（0 = 另一個 pod 已搶走）。
-            // ⚠️ 租約基準取 **claim 當下** 而非 tick 起點的 now：取 tick 起點 ⇒ 全批共用同一個
-            // 到期時間 ⇒ 不變式退化成「批次總耗時 < 租約」，而 batch-size 預設 50、單筆是一次
-            // provider HTTP ⇒ 那條會被 batchSize 直接打破。改在這裡取之後，不變式降為
-            // 「**單筆**最壞耗時 < 租約」，與 batchSize 無關。
-            // 述詞用的 now 維持 tick 起點：那個方向讓可搶佔集合更小，是保守的。
             LocalDateTime leaseUntil = DateTimeUtils.nowUtc().plusMinutes(LEASE_MINUTES);
             int claimed = shipmentMapper.claimLabelReconcile(
                     entity.getId(),
@@ -154,35 +148,23 @@ public class ShipmentLabelReconcileScheduler {
     private boolean reconcileOne(ShipmentEntity entity) {
         Optional<LabelCapability> label = labelCapabilityOf(entity);
         if (label.isEmpty()) {
-            // provider 沒有標籤概念（例：Uber）⇒ 本來就不該進候選集合。
-            // 靜默跳過會讓「候選查詢寫錯」看起來像正常運作，所以記一行。
             log.warn("ShipmentLabelReconcileScheduler.noLabelCapability",
                     "候選的 provider 沒有標籤能力，skip",
                     "shipmentNo", entity.getShipmentNo());
             return false;
         }
 
-        // 🔴 provider 呼叫整段在 adapter 內（含 LgsType 這類 provider 專屬參數的推導）。
-        //    這裡只讀三態結果與中性的 key→value。
         LabelCapability.LabelIdentifierLookup lookup = label.get().fetchLabelIdentifiers(entity);
 
         if (!lookup.querySucceeded()) {
             log.warn("ShipmentLabelReconcileScheduler.queryFailed",
                     "provider 查詢失敗: " + lookup.providerMessage(),
                     "shipmentNo", entity.getShipmentNo());
-            // §5.21 補拉失敗（provider 查不到）+ 卡單超過門檻 → 視為 CVS_LABEL_UNPRINTED 異常
             maybePublishCvsLabelUnprinted(entity);
             return false;
         }
 
         if (!lookup.identifiersReady()) {
-            // §5.21 B-143 保底偵測：限「標籤以三段碼形式回傳」的 provider。
-            // 宅配（3001）走同步 PDF 路徑，provider 對它的查詢回應 by-design 不帶三段碼，
-            // 不限制會誤觸發。
-            //
-            // 🔴 判斷依據是 LabelCapability.usesThreeSegmentCode()，不是配送方式字面值——
-            //    這個判斷在 ShippingService.processWebhookPrint 有第二個消費點，
-            //    兩者問的是同一個 adapter。
             if (label.get().usesThreeSegmentCode()) {
                 anomalyEventPublisher.publishAnomalyDetected(
                         ShipmentAnomalyType.PAYUNI_LGS_NO_CODE,
@@ -192,12 +174,10 @@ public class ShipmentLabelReconcileScheduler {
                         entity.getBuyerId()
                 );
             }
-            // 同時也檢查是否已 > 48h 卡 4102 → 補發 CVS_LABEL_UNPRINTED
             maybePublishCvsLabelUnprinted(entity);
             return false;
         }
 
-        // 與 Print webhook 走同一條 service path（§5.6 processWebhookPrint）
         shippingService.processWebhookPrint(entity.getShipTradeNo(), lookup.segmentCodes());
 
         log.info("ShipmentLabelReconcileScheduler.reconciled",

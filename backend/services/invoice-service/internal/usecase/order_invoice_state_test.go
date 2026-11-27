@@ -11,8 +11,6 @@ import (
 // 而後端一切正常、log 乾淨。這正是 §3.10 的形狀（看不到就放行），所以要有東西
 // 替它出聲。#2904 新增第 9 個值時，這一格是最容易漏的。
 func TestOrderInvoiceStateNoticesCoverEveryState(t *testing.T) {
-	// 值域寫在這裡而不是從 map 反推：從 orderInvoiceStateNotices 的鍵反推的話，
-	// 「新增常數但沒加文案」正好是它看不見的那一格——那會讓這支測試恆綠。
 	states := []string{
 		orderInvoiceStateAwaitingPayment,
 		orderInvoiceStateProcessing,
@@ -56,7 +54,7 @@ func TestOrderInvoiceStatesAreNotPrefixesOfDocumentStatuses(t *testing.T) {
 		for docStatus := range documentStatusToBuyerState {
 			checked++
 			if state == docStatus {
-				continue // 恆等映射，見上方註解
+				continue
 			}
 			if strings.HasPrefix(state, docStatus) || strings.HasPrefix(docStatus, state) {
 				t.Errorf("buyer state %q 與 InvoiceDocumentStatus %q 互為前綴 —— "+
@@ -72,7 +70,7 @@ func TestOrderInvoiceStatesAreNotPrefixesOfDocumentStatuses(t *testing.T) {
 // TestOrderCancelledStateIsPrefixFree 是上一支的鑑別力驗證：餵一個「長得像正例的
 // 反例」，比對邏輯必須抓得到。
 func TestOrderCancelledStateIsPrefixFree(t *testing.T) {
-	const rejected = "NOT_APPLICABLE_CANCELLED" // #2904 曾考慮、被否決的命名
+	const rejected = "NOT_APPLICABLE_CANCELLED"
 	hit := false
 	for docStatus := range documentStatusToBuyerState {
 		if rejected != docStatus && strings.HasPrefix(rejected, docStatus) {
@@ -83,7 +81,6 @@ func TestOrderCancelledStateIsPrefixFree(t *testing.T) {
 		t.Fatal("反例沒有被抓到：NOT_APPLICABLE_CANCELLED 以 document status " +
 			"NOT_APPLICABLE 為前綴，前綴檢查竟然看不到它")
 	}
-	// 而實際採用的那個名字必須是乾淨的。
 	for docStatus := range documentStatusToBuyerState {
 		if orderInvoiceStateOrderCancelled != docStatus &&
 			(strings.HasPrefix(orderInvoiceStateOrderCancelled, docStatus) ||

@@ -40,7 +40,6 @@ const APP_TYPE_TEXT: Record<Exclude<AppType, AppType.UNSPECIFIED>, string> = {
 const appTypeText = (appType: AppType): string =>
 	(APP_TYPE_TEXT as Partial<Record<AppType, string>>)[appType] ?? unknownText();
 
-// 每種 App 一組門檻（App 只發 iOS，沒有平台維度；只有編輯，無刪除）。
 const FIXED_APP_TYPES: AppType[] = [AppType.BUYER, AppType.SELLER];
 
 /** 修改時列進 update_mask 的欄位：表單上的四個欄位。 */
@@ -83,7 +82,6 @@ const labelStyle: React.CSSProperties = {
 	color: "#374151",
 };
 
-// ─── Main Component ──────────────────────────────────────────────────────────
 
 const AppVersionGateManagement: React.FC = () => {
 	const queryClient = useQueryClient();
@@ -102,7 +100,6 @@ const AppVersionGateManagement: React.FC = () => {
 	const [latest, setLatest] = useState<AppVersionGate | null>(null);
 	const { showToast } = useToast();
 
-	// 各組設定（display read）。
 	const {
 		data,
 		isLoading,
@@ -111,7 +108,6 @@ const AppVersionGateManagement: React.FC = () => {
 	} = useQuery(ContentAdminService.method.listAppVersionGates, {});
 	const gates = data?.appVersionGates ?? [];
 
-	// 後端初始為空表（查無設定＝不強更，content.md §5），買家、賣家兩列一律顯示、缺的以空值補位。
 	const rows: AppVersionGate[] = FIXED_APP_TYPES.map(
 		(appType) => gates.find((g) => g.appType === appType) ?? emptyGate(appType),
 	);
@@ -137,7 +133,6 @@ const AppVersionGateManagement: React.FC = () => {
 		setEditing((prev) => (prev ? { ...prev, [field]: value } : prev));
 	};
 
-	// 送出前二次確認（`backend/docs/modules/content.md` §6）：填錯會鎖死全體，所以驗證過了也不直接送出，先開確認視窗。
 	const handleRequestSave = () => {
 		if (!editing) return;
 		const err = validate(editing);
@@ -160,7 +155,6 @@ const AppVersionGateManagement: React.FC = () => {
 			noticeTitle: editing.noticeTitle,
 			noticeBody: editing.noticeBody,
 		};
-		// 還沒有設定的一組用 Create；已經有的用 Update，帶讀到的 etag。
 		const method = editing.etag
 			? ContentAdminService.method.updateAppVersionGate
 			: ContentAdminService.method.createAppVersionGate;
@@ -173,7 +167,6 @@ const AppVersionGateManagement: React.FC = () => {
 			} else {
 				await client.createAppVersionGate({ appVersionGate: gate });
 			}
-			// 列表交給 invalidate 重抓，不手動 patch 第二份 state
 			queryClient.invalidateQueries({
 				queryKey: createConnectQueryKey({
 					schema: ContentAdminService.method.listAppVersionGates,
@@ -187,7 +180,6 @@ const AppVersionGateManagement: React.FC = () => {
 			setConfirming(false);
 			const failure = submitError(err, defaultErrorTextZhTW, method);
 			if (failure.kind === "conflict") {
-				// 別人先改過或先建立了：保留輸入，讀最新的值給使用者對照；確認視窗的現值也跟著更新。
 				const reloaded = await refetch();
 				if (reloaded.error) {
 					setFormError(errorMessage(reloaded.error));
@@ -213,7 +205,7 @@ const AppVersionGateManagement: React.FC = () => {
 
 	return (
 		<div>
-			{/* Page Header */}
+
 			<div className="page-header">
 				<div>
 					<div className="page-title">App 版本管理</div>
@@ -224,7 +216,7 @@ const AppVersionGateManagement: React.FC = () => {
 				</div>
 			</div>
 
-			{/* 風險說明（常駐，不是只有送出時才提醒） */}
+
 			<div
 				style={{
 					padding: "12px 16px",
@@ -261,7 +253,7 @@ const AppVersionGateManagement: React.FC = () => {
 				</div>
 			)}
 
-			{/* Table */}
+
 			<div className="table-container">
 				<table className="data-table">
 					<thead>
@@ -349,7 +341,7 @@ const AppVersionGateManagement: React.FC = () => {
 				</table>
 			</div>
 
-			{/* ─── 編輯 Modal ──────────────────────────────────────────────── */}
+
 			{editing && !confirming && (
 				<Dialog
 					maxWidth={520}
@@ -448,7 +440,6 @@ const AppVersionGateManagement: React.FC = () => {
 								title="這組設定已被其他人修改"
 								busy={saving}
 								onOverwrite={() => {
-									// 帶最新的 etag 再走一次確認：確認視窗的現值已是最新的。
 									setEditing((prev) =>
 										prev ? { ...prev, etag: latest.etag } : prev,
 									);
@@ -499,7 +490,7 @@ const AppVersionGateManagement: React.FC = () => {
 				</Dialog>
 			)}
 
-			{/* ─── 二次確認 Modal（唯一防護，見 content.md §6）─────────────────── */}
+
 			{editing && confirming && (
 				<Dialog
 					maxWidth={600}

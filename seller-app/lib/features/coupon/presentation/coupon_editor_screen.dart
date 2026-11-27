@@ -59,10 +59,8 @@ class CouponEditorScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ── Scroll ──
     final scrollCtrl = useScrollController();
 
-    // ── Form controllers ──
     final nameCtrl = useTextEditingController(text: coupon?.title ?? '');
     final discountCtrl = useTextEditingController(
       text: _initialDiscountText(coupon),
@@ -74,11 +72,9 @@ class CouponEditorScreen extends HookConsumerWidget {
       text: coupon?.maxDiscountAmount ?? '',
     );
 
-    // ── Local state via hooks ──
     final discountRule = useState(_initialDiscountRule(coupon));
     final saving = useState(false);
 
-    // Date picker state
     final noExpiry = useState(_initialNoExpiry(coupon));
     final selectedDays = useState<int?>(null);
     final useCustomDate = useState(false);
@@ -88,11 +84,9 @@ class CouponEditorScreen extends HookConsumerWidget {
     );
     final calendarMonth = useState(DateTime.now());
 
-    // Target user state
     final targetUserType = useState('全部會員');
     final selectedUsers = useState<List<Map<String, String>>>([]);
 
-    // TAG 標籤狀態
     final allTags = useState<List<CustomerTag>>([]);
     final selectedTagIds = useState<Set<String>>({});
     final tagCustomers = useState<List<Customer>>([]);
@@ -114,13 +108,11 @@ class CouponEditorScreen extends HookConsumerWidget {
       ),
     );
 
-    // Photo state
     final couponPhotoBytes = useState<Uint8List?>(null);
     final couponPhotoFilename = useState<String?>(null);
     final couponPhotoUrl = useState<String?>(null);
     final photoChanged = useState(false);
 
-    // Force rebuild on text changes
     final formVersion = useState(0);
     useEffect(() {
       void onChange() => formVersion.value++;
@@ -136,7 +128,6 @@ class CouponEditorScreen extends HookConsumerWidget {
       };
     }, [nameCtrl, discountCtrl, minPurchaseCtrl, maxDiscountCtrl]);
 
-    // ── Helpers (closures) ──
     String fmtDate(DateTime d) =>
         '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -204,12 +195,9 @@ class CouponEditorScreen extends HookConsumerWidget {
       }
       saving.value = true;
       try {
-        // Map UI discount rule to API type code
         final String type = discountRule.value == '折數折抵'
             ? CouponType.percent.value
             : CouponType.cash.value;
-        // Build request body matching CreateCouponTemplateRequest
-        // targetType: 1=ALL 全體買家, 2=MEMBER 賣家會員, 3=DESIGNATED 指定買家, 4=COMPENSATION 補償券
         final String targetType;
         if (targetUserType.value == '消費過會員') {
           targetType = '2';
@@ -227,19 +215,15 @@ class CouponEditorScreen extends HookConsumerWidget {
           'startAt': fmtDate(now),
         };
 
-        // End date
         if (!noExpiry.value) {
           body['endAt'] = fmtDate(validUntil.value);
         } else {
-          // 無期限：設一年後
           body['endAt'] = fmtDate(DateTime(now.year + 1, now.month, now.day));
         }
 
-        // Threshold (minimum purchase)
         final min = minPurchaseCtrl.text.trim();
         if (min.isNotEmpty) body['thresholdAmount'] = min;
 
-        // Discount value
         final disc = discountCtrl.text.trim();
         if (disc.isNotEmpty) {
           if (type == CouponType.percent.value) {
@@ -253,9 +237,6 @@ class CouponEditorScreen extends HookConsumerWidget {
           if (maxDisc.isNotEmpty) body['maxDiscountAmount'] = maxDisc;
         }
 
-        // targetType=3 (DESIGNATED) 時附帶 buyerIds——TAG 顧客與手動查詢結果
-        // 皆為 CRM/lookup 已解析好的現任 buyer_id，不是 account_id，故送
-        // buyerIds（gateway 只驗證格式、不重複解析），不是 buyerAccountIds。
         if (targetType == '3') {
           if (targetUserType.value == 'TAG 標籤') {
             body['buyerIds'] = tagCustomers.value
@@ -308,10 +289,8 @@ class CouponEditorScreen extends HookConsumerWidget {
       ];
     }
 
-    // Touch formVersion to stay reactive
     formVersion.value;
 
-    // ── Build ──
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
@@ -321,7 +300,6 @@ class CouponEditorScreen extends HookConsumerWidget {
           children: [
             CouponTopBar(title: '優惠券設定', onBack: () => context.pop()),
 
-            // ── Content ──
             Expanded(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -356,7 +334,6 @@ class CouponEditorScreen extends HookConsumerWidget {
                             HkSpace.large,
                           ),
                           children: [
-                            // Preview card
                             CouponPreviewCard(
                               nameCtrl: nameCtrl,
                               discountCtrl: discountCtrl,
@@ -371,7 +348,6 @@ class CouponEditorScreen extends HookConsumerWidget {
                             ),
                             const SizedBox(height: HkSpace.lg),
 
-                            // Form card
                             CouponFormCard(
                               nameCtrl: nameCtrl,
                               discountCtrl: discountCtrl,
@@ -383,7 +359,6 @@ class CouponEditorScreen extends HookConsumerWidget {
                             ),
                             const SizedBox(height: HkSpace.lg),
 
-                            // Date picker card
                             CouponDatePickerCard(
                               noExpiry: noExpiry.value,
                               selectedDays: selectedDays.value,
@@ -427,14 +402,12 @@ class CouponEditorScreen extends HookConsumerWidget {
                             ),
                             const SizedBox(height: HkSpace.lg),
 
-                            // Target user card
                             CouponTargetUserCard(
                               targetUserType: targetUserType.value,
                               onTypeSelected: (v) => targetUserType.value = v,
                             ),
                             const SizedBox(height: HkSpace.lg),
 
-                            // Specify user card（僅指定會員時顯示）
                             if (targetUserType.value == '指定會員') ...[
                               CouponSpecifyUserCard(
                                 selectedUsers: selectedUsers.value,
@@ -448,7 +421,6 @@ class CouponEditorScreen extends HookConsumerWidget {
                               const SizedBox(height: HkSpace.lg),
                             ],
 
-                            // TAG 標籤選擇（僅 TAG 標籤時顯示）
                             if (targetUserType.value == 'TAG 標籤') ...[
                               CouponTagSelectionCard(
                                 allTags: allTags.value,
@@ -491,7 +463,6 @@ class CouponEditorScreen extends HookConsumerWidget {
                               const SizedBox(height: HkSpace.lg),
                             ],
 
-                            // Submit button
                             CouponSubmitButton(
                               isComplete: isFormComplete(),
                               saving: saving.value,
@@ -512,7 +483,6 @@ class CouponEditorScreen extends HookConsumerWidget {
     );
   }
 
-  // ── Static init helpers ──
 
   static String _initialDiscountRule(Coupon? c) {
     if (c == null) return '現金折抵';

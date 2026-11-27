@@ -39,7 +39,6 @@ func (stores) ActingStore(_ context.Context, a int64, _ seller.Capability) (sell
 	return seller.Store{}, apperr.NotFound("沒有店家")
 }
 
-// watcher 把測試推進來的事件交給 handler。
 type watcher struct {
 	events chan notification.StreamEvent
 	once   sync.Once
@@ -62,7 +61,6 @@ func (w *watcher) Next(ctx context.Context) (notification.StreamEvent, error) {
 
 func (w *watcher) Close() { w.once.Do(func() { close(w.done) }) }
 
-// fakeStreams 只實作串流需要的兩個方法，其餘（unary）由內嵌的 nil 介面擋住：串流 handler 不該碰它們。
 type fakeStreams struct {
 	Notifications
 	mu      sync.Mutex

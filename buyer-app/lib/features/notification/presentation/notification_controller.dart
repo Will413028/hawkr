@@ -1,7 +1,7 @@
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
     as pb;
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart'; // 手寫 FutureProvider：3.0 annotation 不再 re-export
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/session/session_provider.dart';
@@ -11,9 +11,6 @@ part 'notification_controller.g.dart';
 
 Duration? _disableNotificationAutomaticRetry(int _, Object __) => null;
 
-// ============================================================
-// 通知列表 State
-// ============================================================
 
 /// 通知列表狀態
 class NotificationListState {
@@ -53,9 +50,6 @@ class NotificationListState {
   }
 }
 
-// ============================================================
-// 通知列表 Controller
-// ============================================================
 
 /// 通知列表 AsyncNotifier
 ///
@@ -69,14 +63,10 @@ class NotificationListController extends _$NotificationListController {
 
   @override
   Future<NotificationListState> build() async {
-    // 未登入（訪客 / 登出後）不打需登入的 API，避免 401 風暴；
-    // session 變動會自動重建。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return const NotificationListState();
     }
-    // 同時載入通知列表和未讀數量。錯誤必須保留為 AsyncError，讓 UI
-    // 區分「真的沒有通知」與「尚未成功載入」。
     final results = await Future.wait([
       _repo.listInbox(pageSize: _pageSize),
       _repo.unreadCount(),
@@ -119,7 +109,6 @@ class NotificationListController extends _$NotificationListController {
       return;
     }
 
-    // Defensive guard: a malformed empty page must never access `.last`.
     if (current.notifications.isEmpty) {
       state = AsyncValue.data(
         current.copyWith(
@@ -131,7 +120,6 @@ class NotificationListController extends _$NotificationListController {
       return;
     }
 
-    // 標記正在載入
     state = AsyncValue.data(
       current.copyWith(isLoadingMore: true, clearPaginationError: true),
     );
@@ -151,7 +139,6 @@ class NotificationListController extends _$NotificationListController {
         ),
       );
     } catch (error) {
-      // 分頁錯誤是局部狀態：保留既有 records，不得把整頁改成 AsyncError。
       state = AsyncValue.data(
         current.copyWith(isLoadingMore: false, paginationError: error),
       );
@@ -166,7 +153,6 @@ class NotificationListController extends _$NotificationListController {
     try {
       await _repo.markRead(notificationId);
 
-      // 更新本地狀態
       final updated = current.notifications.map((n) {
         if (n.id == notificationId && !n.read) {
           return n.rebuild((b) => b.read = true);
@@ -181,7 +167,6 @@ class NotificationListController extends _$NotificationListController {
         ),
       );
     } catch (_) {
-      // 靜默失敗，不影響 UI
     }
   }
 
@@ -195,7 +180,6 @@ class NotificationListController extends _$NotificationListController {
       orElse: () => null,
     );
 
-    // Optimistic: 立即從列表移除
     final updated = current.notifications
         .where((n) => n.id != notificationId)
         .toList();
@@ -211,7 +195,6 @@ class NotificationListController extends _$NotificationListController {
     try {
       await _repo.deleteItems([notificationId]);
     } catch (_) {
-      // 靜默失敗，不回滾
     }
   }
 
@@ -231,7 +214,6 @@ class NotificationListController extends _$NotificationListController {
         .toList();
     final unreadDelta = targets.where((n) => !n.read).length;
 
-    // Optimistic: 立即從列表移除
     state = AsyncValue.data(
       current.copyWith(
         notifications: current.notifications
@@ -257,9 +239,6 @@ class NotificationListController extends _$NotificationListController {
   }
 }
 
-// ============================================================
-// 通知偏好設定 Controller
-// ============================================================
 
 /// 通知偏好 AsyncNotifier：伺服器依買家受眾列出實際會送出的（分類、渠道）項目，畫面只呈現這些。
 @Riverpod(keepAlive: true)
@@ -269,7 +248,6 @@ class NotificationPreferencesController
 
   @override
   Future<List<pb.PreferenceEntry>> build() async {
-    // 未登入不打需登入的 API，避免 401 風暴；session 變動會自動重建。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return const [];
@@ -318,9 +296,6 @@ class NotificationPreferencesController
   }
 }
 
-// ============================================================
-// 未讀數量 Provider（首頁鈴鐺 badge 專用）
-// ============================================================
 
 /// 通知未讀數量（輕量，不加載完整列表）
 ///
@@ -329,7 +304,6 @@ class NotificationPreferencesController
 final notificationUnreadCountProvider = FutureProvider.autoDispose<int>((
   ref,
 ) async {
-  // 訪客（無 token）呼叫需登入的 API 必被拒，直接回 0 不打 API。
   final session = ref.watch(sessionProvider).value;
   if (!hasUsableSession(session)) {
     return 0;

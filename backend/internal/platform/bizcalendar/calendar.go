@@ -169,7 +169,6 @@ func (c *Calendar) lookup(day time.Time) (Day, bool) {
 	return d, ok
 }
 
-// civil 取 t 自己的年月日（不換時區），以 UTC 午夜表示。
 func civil(t time.Time) time.Time {
 	y, m, d := t.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)

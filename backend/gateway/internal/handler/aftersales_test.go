@@ -14,8 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Mock AfterSalesServiceClient（買家 8 個 call site）====================
-// 介面 embed：未 stub 的方法呼叫即 nil-panic（沿用 seller_rekey_test.go 慣例）。
 
 type mockAftersalesBuyerServiceClient struct {
 	aftersalespb.AfterSalesServiceClient
@@ -50,12 +48,6 @@ func (m *mockAftersalesBuyerServiceClient) GetArbitration(ctx context.Context, i
 	return m.GetArbitrationFn(ctx, in, opts...)
 }
 
-// successStubMock 每個買家 call site 都回傳一組合法的成功 response（不追蹤
-// BuyerId）——TestAftersalesBuyerHandlers_NoCurrentBuyer_Forbidden 用它確認
-// resolver guard 真的擋在 gRPC 呼叫「之前」：若 guard 漏接，這組合法 stub 會讓
-// handler 順利跑到底回 200（或因跳過 resolve 直接綁 JSON body 失敗回 400），
-// 而非 403——測試用「非 403」這種乾淨的 assertion failure 曝露漏接，而非
-// nil-Fn panic。
 func successStubMock() *mockAftersalesBuyerServiceClient {
 	return &mockAftersalesBuyerServiceClient{
 		CreateAfterSaleCaseFn: func(context.Context, *aftersalespb.CreateAfterSaleCaseRequest, ...grpc.CallOption) (*aftersalespb.CreateAfterSaleCaseResponse, error) {
@@ -82,7 +74,6 @@ func successStubMock() *mockAftersalesBuyerServiceClient {
 	}
 }
 
-// ==================== router ====================
 
 func setupAftersalesBuyerRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -120,7 +111,6 @@ func doAftersalesBuyerReq(t *testing.T, r *gin.Engine, method, path, body string
 	return w
 }
 
-// ==================== happy path：BuyerId 必須是 resolved buyer_id ====================
 
 func TestCreateAfterSaleCase_UsesResolvedBuyerID(t *testing.T) {
 	var gotBuyerID int64
@@ -241,7 +231,6 @@ func TestGetArbitration_UsesResolvedBuyerID(t *testing.T) {
 	}
 }
 
-// ==================== no current buyer -> 403（全部 8 個 route）====================
 
 func TestAftersalesBuyerHandlers_NoCurrentBuyer_Forbidden(t *testing.T) {
 	cases := []struct {

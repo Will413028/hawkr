@@ -44,7 +44,7 @@ func AmegoPeriod(t time.Time) (year, period int) {
 func TaxPeriodCode(dateTaipei time.Time) string {
 	lt := dateTaipei.In(timeutil.LocationTaipei)
 	rocYear := lt.Year() - 1911
-	period := (int(lt.Month()) + 1) / 2 // 1–6
+	period := (int(lt.Month()) + 1) / 2
 	return fmt.Sprintf("%03d%02d", rocYear, period)
 }
 
@@ -66,8 +66,6 @@ func ParseTaxPeriodCode(code string) (year, period int, err error) {
 	return roc + 1911, period, nil
 }
 
-// periodBoundsTaipei 回傳該期的第一個月與「次期首月」（＝跨期後的那個單月）。
-// 期別 p（1–6）涵蓋的月份是 2p-1 與 2p；次期首月即 2p+1（p=6 時跨到隔年 1 月）。
 func periodBoundsTaipei(year, period int) (firstMonth time.Month, nextOddYear int, nextOddMonth time.Month) {
 	firstMonth = time.Month(2*period - 1)
 	nextOddYear, nextOddMonth = year, time.Month(2*period+1)
@@ -84,7 +82,6 @@ func PeriodEndTaipei(taxPeriodCode string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	_, ny, nm := periodBoundsTaipei(year, period)
-	// 次期首月 1 日往前一秒 ＝ 本期末月最後一日 23:59:59。
 	return time.Date(ny, nm, 1, 0, 0, 0, 0, timeutil.LocationTaipei).Add(-time.Second), nil
 }
 
@@ -150,10 +147,10 @@ func ReportedStatus(taxPeriodCode string, now time.Time) (string, error) {
 	nowTaipei := now.In(timeutil.LocationTaipei)
 	switch {
 	case nowTaipei.Before(end):
-		return ReportedStatusNotReported, nil // 期別尚未終結 ⇒ 法律上無從申報
+		return ReportedStatusNotReported, nil
 	case nowTaipei.After(due):
-		return ReportedStatusReported, nil // 法定申報期限已過
+		return ReportedStatusReported, nil
 	default:
-		return ReportedStatusUnknown, nil // 期已結、限未到 ⇒ fail-closed
+		return ReportedStatusUnknown, nil
 	}
 }

@@ -24,7 +24,6 @@ func (f *fixture) toggle(buyerID int64, set, candidate uuid.UUID, selected bool)
 	return f.selector().Select(context.Background(), search.SelectInput{BuyerID: buyerID, RequestID: f.request, CandidateSetID: set, CandidateID: candidate, Selected: selected})
 }
 
-// searched 跑完一次成功的搜尋（店 10、20），回候選集與它的第一個候選。
 func (f *fixture) searched() (uuid.UUID, store.ProcurementCandidate) {
 	f.t.Helper()
 	f.fakes.pages = map[int]candidate.Page{1: hits(10, 20)}
@@ -88,7 +87,6 @@ func TestToggleSelectionOnASetWhoseSearchHasNotSucceededIsAborted(t *testing.T) 
 	must(t, f.toggle(buyer, set, c.ID, true))
 	wantConflictTarget(t, f.toggle(buyer, pending.CandidateSetID, uuid.NewV7(), true), "candidate_set")
 
-	// 需求在 MATCHING 而且從沒有成功的搜尋（直接寫資料庫）：只剩「最新成功搜尋」的檢查能擋。
 	g := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
 	started := g.mustStart()
 	b := buyer

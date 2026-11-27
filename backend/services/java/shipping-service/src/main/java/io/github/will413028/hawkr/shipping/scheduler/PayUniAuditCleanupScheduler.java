@@ -25,7 +25,6 @@ public class PayUniAuditCleanupScheduler {
     @Value("${shipping.cleanup.payuni-audit-enabled:true}")
     private boolean enabled;
 
-    // 物流爭議追溯下限 7 年（2555 天）
     @Value("${shipping.cleanup.payuni-audit-retention-days:2555}")
     private int retentionDays;
 

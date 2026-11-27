@@ -266,11 +266,8 @@ test("清單與詳情的句子：指名的店家（L7）、保存（L16）、延
 	});
 	assert.equal(targetLabel(order.targets[0]), "阿里山農場");
 	assert.equal(targetLabel(order.targets[1]), "帳號 102 的全部店家");
-	// n 是不重複的店家數（3 家），不是對象數（2 個）。
 	assert.equal(namedStoresText(order), "阿里山農場 等 3 家");
-	// 一個整帳號的對象涵蓋 2 家：不是「帳號 102 的全部店家 等 1 家」，而是第一家的名稱加店家數。
 	assert.equal(namedStoresText({ targets: [order.targets[1]] }), "60 等 2 家");
-	// 只有一家店：就是它的名稱（整帳號對象也一樣）。
 	const single = create(AuthorityOrderSchema, {
 		targets: [
 			{
@@ -287,7 +284,6 @@ test("清單與詳情的句子：指名的店家（L7）、保存（L16）、延
 		],
 	});
 	assert.equal(namedStoresText(single), "梨山茶園");
-	// 沒有店家資料：第一個對象的名稱。
 	const none = create(AuthorityOrderSchema, {
 		targets: [{ accountId: "104", storeId: "", noSellerData: true }],
 	});
@@ -301,7 +297,6 @@ test("清單與詳情的句子：指名的店家（L7）、保存（L16）、延
 		holdUntilText("2027/04/19 00:00", false),
 		"保存到 2027/04/19 00:00（已到期）",
 	);
-	// 撤銷登記之後保存已解除：日期還在未來也不能寫「已到期」。
 	assert.equal(
 		holdUntilText("2027/04/19 00:00", false, true),
 		"保存到 2027/04/19 00:00（撤銷登記時解除）",

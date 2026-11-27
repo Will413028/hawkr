@@ -37,9 +37,6 @@ interface ProductsResponse {
 const Analytics: React.FC = () => {
 	const { environment } = useEnvironment();
 
-	// environment 進 queryKey 是刻意的 refetch trigger（api 層由 environmentService
-	// singleton 取 gateway URL，切環境須重載）。訂單與商品兩個 stat 各自
-	// try/catch 隔離：任一掛掉不影響其他已成功的數字。商家數走 Connect（下面的 storeStats）。
 	const {
 		data,
 		isLoading: loading,
@@ -106,7 +103,7 @@ const Analytics: React.FC = () => {
 				</div>
 			</div>
 
-			{/* 核心統計 */}
+
 			<div className="stats-row">
 				<StatCard
 					label="總訂單數"
@@ -132,7 +129,7 @@ const Analytics: React.FC = () => {
 				/>
 			</div>
 
-			{/* 商家與會員統計 */}
+
 			<div className="grid-2 mb-24">
 				<div className="card">
 					<div className="card-header">
@@ -203,7 +200,7 @@ const Analytics: React.FC = () => {
 				</div>
 			</div>
 
-			{/* 商品概覽 */}
+
 			<div className="card mb-24">
 				<div className="card-header">
 					<h3>
@@ -266,7 +263,7 @@ const Analytics: React.FC = () => {
 				</div>
 			</div>
 
-			{/* 營收趨勢 */}
+
 			<div className="card">
 				<div className="card-header">
 					<h3>

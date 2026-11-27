@@ -35,14 +35,11 @@ func TestBreakerIsSuccessful(t *testing.T) {
 	cases := []struct {
 		name string
 		err  error
-		want bool // true = 視為成功（不計失敗）
+		want bool
 	}{
 		{"nil", nil, true},
 		{"unavailable", status.Error(codes.Unavailable, "down"), false},
 		{"deadline", status.Error(codes.DeadlineExceeded, "slow"), false},
-		// #3230：ResourceExhausted 在本 repo 全部承載業務語意（節流／配額／上限），
-		// 不是「該 target 不健康」的證據 ⇒ 不得計入失敗。
-		// 這一列曾經是 false，正是它 pin 住了缺陷本身。
 		{"resource_exhausted_是業務節流不是過載", status.Error(codes.ResourceExhausted, "[9352] 重寄通知過於頻繁"), true},
 		{"invalid_argument", status.Error(codes.InvalidArgument, "bad"), true},
 		{"not_found", status.Error(codes.NotFound, "missing"), true},
@@ -57,7 +54,6 @@ func TestBreakerIsSuccessful(t *testing.T) {
 	}
 }
 
-// cbTestInvoker 回固定 error，計數呼叫次數。
 func cbTestInvoker(retErr error, calls *int) grpc.UnaryInvoker {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
 		*calls++
@@ -65,7 +61,6 @@ func cbTestInvoker(retErr error, calls *int) grpc.UnaryInvoker {
 	}
 }
 
-// dialTarget 建一個只用來提供 cc.Target() 的 ClientConn（不實際連線）。
 func dialTarget(t *testing.T, target string) *grpc.ClientConn {
 	t.Helper()
 	cc, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -137,7 +132,6 @@ func TestBreaker_QuotaErrorsDoNotTripAcrossUsers(t *testing.T) {
 	cc := dialTarget(t, "dns:///invoice-service:10041")
 
 	calls := 0
-	// 同一個賣家連續踩滿節流，服務端回 9352 -> ResourceExhausted
 	inv := cbTestInvoker(status.Error(codes.ResourceExhausted, "[9352] 重寄通知過於頻繁"), &calls)
 
 	for i := 0; i < 20; i++ {
@@ -176,7 +170,6 @@ func TestBreaker_PerTargetIsolation(t *testing.T) {
 
 func TestBreaker_HalfOpenRecovers(t *testing.T) {
 	resetBreakers()
-	// timeout 設極短，讓 open → half-open 快速發生
 	cfg := breakerConfig{minRequests: 3, failureRatio: 0.5, timeout: 20 * time.Millisecond, halfOpenMax: 1, interval: time.Minute}
 	intercept := circuitBreakerInterceptorWith(cfg)
 	cc := dialTarget(t, "dns:///svc-recover:50051")
@@ -185,7 +178,6 @@ func TestBreaker_HalfOpenRecovers(t *testing.T) {
 	failing := cbTestInvoker(status.Error(codes.Unavailable, "down"), &calls)
 	healthy := cbTestInvoker(nil, &calls)
 
-	// 打到 open
 	for i := 0; i < 5; i++ {
 		_ = intercept(context.Background(), "/m", nil, nil, cc, failing)
 	}
@@ -193,12 +185,10 @@ func TestBreaker_HalfOpenRecovers(t *testing.T) {
 		t.Fatal("expected open")
 	}
 
-	// 等過 timeout → half-open；探測成功 → closed
 	time.Sleep(40 * time.Millisecond)
 	if err := intercept(context.Background(), "/m", nil, nil, cc, healthy); err != nil {
 		t.Fatalf("half-open probe should pass through, got %v", err)
 	}
-	// 已 closed：再來一個成功請求應正常
 	if err := intercept(context.Background(), "/m", nil, nil, cc, healthy); err != nil {
 		t.Fatalf("expected closed after successful probe, got %v", err)
 	}

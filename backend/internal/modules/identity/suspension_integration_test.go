@@ -104,11 +104,9 @@ func TestUnsuspendClearsTheStateAndKeepsTheRecord(t *testing.T) {
 	if all, open := f.suspensionRows(t, id); all != 1 || open != 0 {
 		t.Fatalf("紀錄 %d 筆、未解除 %d 筆，預期 1 與 0", all, open)
 	}
-	// 沒有停權時解除是成功的空操作。
 	if _, released, err := f.m.UnsuspendAccount(ctx, id, "再解除"); err != nil || released {
 		t.Fatalf("沒有停權時解除 = %v, %v", released, err)
 	}
-	// 可以再停權，這時是新的一筆。
 	again, created, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Spam})
 	if err != nil || !created || again.ID == suspended.ID {
 		t.Fatalf("再停權 = %+v, %v, %v", again, created, err)
@@ -154,7 +152,6 @@ func TestFailedRecordWriteLeavesTheAccountNotSuspended(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	id := f.account(t, "user_1")
-	// 與 suspended_at 不一致的殘留紀錄：寫入新紀錄會違反「未解除的紀錄最多一筆」。
 	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO identity.account_suspensions (account_id, reason_category, suspended_at) VALUES ($1, 'OTHER', now())`, id); err != nil {
 		t.Fatal(err)
 	}

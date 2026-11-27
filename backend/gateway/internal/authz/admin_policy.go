@@ -83,21 +83,14 @@ func AdminSessionDenial(status string) int32 {
 // here: both need I/O (delegation 模組的授權表、seller 模組的 sellers.status)
 // and this function is pure, exactly like StoreOperable in pkg/delegation.
 func GrantedAdminCapabilities(ctx AdminDelegationContext) (granted []AdminCapability, deniedCode int32) {
-	// 1. session status.
 	if code := AdminSessionDenial(ctx.SessionStatus); code != 0 {
 		return nil, code
 	}
 
-	// 2. target store. The comparison is against the session snapshot, never
-	// against anything derived from the request; a non-positive value on either
-	// side is a mismatch rather than a wildcard.
 	if ctx.TargetStoreID <= 0 || ctx.RequestedStoreID <= 0 || ctx.TargetStoreID != ctx.RequestedStoreID {
 		return nil, bizcode.DelegationTargetMismatch
 	}
 
-	// 3. capability. Unknown tokens in the snapshot are dropped rather than
-	// trusted: the set is a closed enumeration and the Gateway is the one issuing
-	// it, so anything else in there is drift, not a permission.
 	known := make([]AdminCapability, 0, len(ctx.Capabilities))
 	holds := false
 	for _, c := range ctx.Capabilities {

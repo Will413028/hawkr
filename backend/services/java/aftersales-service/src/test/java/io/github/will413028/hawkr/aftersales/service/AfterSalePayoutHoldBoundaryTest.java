@@ -100,14 +100,12 @@ class AfterSalePayoutHoldBoundaryTest {
                 .thenAnswer(inv -> current);
     }
 
-    // ==================== deadline 附近：三個點都還在 grace 之內，必須擋 ====================
 
     @Test
     @DisplayName("deadline − 1ms / deadline / deadline + 1ms ⇒ 三者皆在 grace 內 ⇒ 一律有時間界 hold")
     void aroundDeadline_alwaysHeldWithBound() {
         nobodyHoldsLock();
         for (long deltaMillis : new long[]{-1L, 0L, +1L}) {
-            // 放行時點 = deadline + grace ⇒ 距今 = grace − delta，恆為正且達分鐘級 ⇒ 不受時鐘漂移影響
             givenReleaseInstantAt(GRACE_MINUTES * 60_000L - deltaMillis, GRACE_MINUTES);
 
             PayoutHold hold = service.getPayoutHold(ORDER_NO);
@@ -117,38 +115,32 @@ class AfterSalePayoutHoldBoundaryTest {
         }
     }
 
-    // ==================== grace 邊界：跨過去才允許考慮放行 ====================
 
     @Test
     @DisplayName("grace 邊界：尚未跨過 ⇒ 有時間界 hold；已跨過 ⇒ 才輪到持鎖探測決定")
     void graceBoundary_beforeAndAfter() {
         nobodyHoldsLock();
 
-        // 還差 2 秒才到放行時點（見類別 javadoc：此方向取秒級避免時鐘漂移翻面）
         givenReleaseInstantAt(2_000L, GRACE_MINUTES);
         PayoutHold before = service.getPayoutHold(ORDER_NO);
         assertTrue(before.hold(), "尚未跨過 deadline+grace ⇒ 必須擋");
         assertEquals(HoldReason.APPEAL_WINDOW_OPEN, before.reason());
 
-        // 已過放行時點 1ms（單調安全方向）
         givenReleaseInstantAt(-1L, GRACE_MINUTES);
         PayoutHold after = service.getPayoutHold(ORDER_NO);
         assertFalse(after.hold(), "已跨過 deadline+grace 且無人持鎖 ⇒ 放行，不得永久卡住賣家款項");
         assertEquals(HoldReason.NONE, after.reason());
     }
 
-    // ==================== grace 的角色降級：correctness 不再由它承擔 ====================
 
     @Test
     @DisplayName("在每一個『可放行』的時點上，真正決定放不放行的都是持鎖探測，不是 grace 的長度")
     void atEveryReleasableInstant_lockProbeStillDecides() {
-        // 涵蓋剛過放行時點、過很久、以及 grace=0 的極端設定
         for (int grace : new int[]{0, 1, GRACE_MINUTES, 24 * 60}) {
             for (long pastMillis : new long[]{-1L, -60_000L, -30L * 24 * 3600_000L}) {
                 AfterSalePayoutHoldService svc = newService(grace);
                 givenReleaseInstantAt(pastMillis, grace);
 
-                // 有人持鎖（＝可能有在途申訴）⇒ 不論 grace 多長多短，一律擋
                 when(caseMapper.tryLockCaseForPayoutRelease(anyString())).thenReturn(null);
                 PayoutHold locked = svc.getPayoutHold(ORDER_NO);
                 assertTrue(locked.hold(),
@@ -156,7 +148,6 @@ class AfterSalePayoutHoldBoundaryTest {
                 assertEquals(HoldReason.APPEAL_IN_FLIGHT, locked.reason());
                 assertNull(locked.holdUntil());
 
-                // 無人持鎖 ⇒ 同一個時點就放行 ⇒ 證明前一段不是恆真
                 when(caseMapper.tryLockCaseForPayoutRelease(anyString())).thenAnswer(inv -> current);
                 assertFalse(svc.getPayoutHold(ORDER_NO).hold(),
                         "grace=" + grace + "m：無人持鎖時必須放行（斷言要有鑑別力）");
@@ -164,7 +155,6 @@ class AfterSalePayoutHoldBoundaryTest {
         }
     }
 
-    // ==================== 交易內同步依賴的上界（defense-in-depth，非 correctness 依據）====================
 
     @Test
     @DisplayName("submitAppeal 交易內的 media RPC 必須有有限 deadline——否則 case row lock 持有時間無上界")

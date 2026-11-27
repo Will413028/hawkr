@@ -45,11 +45,9 @@ func riskStore(ground seller.RiskGround) seller.Store {
 var (
 	eventID    = uuid.MustParse("01990000-0000-7000-8000-000000000001")
 	occurredAt = time.Date(2026, 10, 5, 9, 30, 15, 123456789, time.FixedZone("TST", 8*3600))
-	// timestamp 是 Go time.Time 的 JSON：UTC、RFC3339Nano。
 	wireTimestamp = "2026-10-05T01:30:15.123456789Z"
 )
 
-// run 把模組事件交給 OnX，取出排入的 job，再交給 worker，回傳送出的 job 與解成 map 的 body。
 func run[E any](t *testing.T, stores Stores, on func(jobs.Enqueuer) func(context.Context, E) error, event E) (rabbitmq.PublishArgs, map[string]any) {
 	t.Helper()
 	relayed := &recordingJobs{}
@@ -84,7 +82,6 @@ func run[E any](t *testing.T, stores Stores, on func(jobs.Enqueuer) func(context
 	return a, payload
 }
 
-// work 以 relay job 的 args 呼叫對應的 worker 方法。
 func work(w *Worker, args river.JobArgs) error {
 	ctx := context.Background()
 	switch a := args.(type) {

@@ -60,7 +60,6 @@ public interface OutboxEventMapper extends BaseMapper<OutboxEvent> {
                        @Param("retryCount") Integer retryCount,
                        @Param("createdAt") java.time.LocalDateTime createdAt);
 
-    // ==================== issue #2294 H3：多副本排程搶佔（lease on next_retry_at） ====================
 
     /**
      * 搶佔一筆待派送事件（<b>lease</b>，不是永久旗標）。

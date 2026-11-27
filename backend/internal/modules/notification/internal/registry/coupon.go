@@ -22,10 +22,8 @@ type VoucherExpiringParams struct {
 
 var exampleCampaignID = uuid.MustParse("0190a000-0000-7000-8000-0000000000d2")
 
-// couponTypes 是 coupon 側型別。
 var couponTypes = []Entry{voucherExpiring}
 
-// 每張券一則：不聚合（D27），冪等鍵取 voucher_id；買家的行銷類推播受靜音時段約束（D26，由派送統一處理）。
 var voucherExpiring = Define(Definition[VoucherExpiringParams]{
 	Name:              "voucher_expiring",
 	Audiences:         []model.Audience{model.AudienceBuyer},

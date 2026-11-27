@@ -45,9 +45,7 @@ class ImageConfig {
     ImageScene.productDetail: ImagePreset.detail,
     ImageScene.orderItem: ImagePreset.thumb,
     ImageScene.reviewPhoto: ImagePreset.card,
-    // 全螢幕貼文保留完整構圖；店舖縮圖另由呼叫端明確使用 card。
     ImageScene.postImage: ImagePreset.detail,
-    // 商品圖文描述畫質敏感（含內嵌文字）→ 不轉換直出原圖。
     ImageScene.descriptionImage: ImagePreset.original,
     ImageScene.shareThumbnail: ImagePreset.thumb,
     ImageScene.chatImage: ImagePreset.chat,

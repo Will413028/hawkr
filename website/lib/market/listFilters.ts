@@ -166,22 +166,12 @@ export function mapProduct(
 
 	return {
 		id,
-		// Honest fallbacks only: a record missing name/price renders a neutral
-		// placeholder instead of leaking editorial mock data into the live list.
 		name: product?.name || "未命名商品",
-		// Empty when the product carries no image, so the card's <AppImage>
-		// renders the design-system ImageFallback (folder-image) rather than a
-		// branded stand-in.
-		// §231: the bare objectKey (SSOT) so <AppImage>/resolveCdnUrl can apply
-		// the right preset.
 		image: product?.imageKey || product?.imageKeys?.[0] || "",
 		sellerName: product?.seller?.name || product?.sellerName || "Hawkr 選品",
 		sellerAvatar: product?.seller?.logoUrl?.trim() || "",
 		sellerId: readSellerId(product),
 		sellerStoreCode: readSellerStoreCode(product),
-		// Real origin/city only — no "產地直送" placeholder. Empty string when
-		// the product carries no origin, so the card hides the "｜…" segment
-		// and shows just the seller name.
 		origin: readDisplayOrigin(product),
 		price: priceDisplay.effectiveText || "",
 		originalPrice: priceDisplay.originalText,

@@ -22,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// authorityModule 記下來函指令收到的輸入，回傳設定好的結果。
 type authorityModule struct {
 	GovernanceModule
 	create   model.CreateAuthorityOrderInput
@@ -84,7 +83,6 @@ func authorityFixture(completed bool) model.AdminAuthorityOrder {
 		},
 		HoldExtensions: []model.AuthorityHoldExtension{{From: governanceNow, To: governanceNow.Add(time.Hour), Cause: model.HoldExtensionAdmin, Reason: "訴訟", AdminID: 9, CreatedAt: governanceNow}},
 	}
-	// 處理期限由模組的讀取路徑填入（seller.review_authority_order）：處理中才有，已完成的沒有。
 	if !completed {
 		o.Deadline = &model.Deadline{Start: o.ReceivedAt, Due: o.DueAt}
 	}
@@ -431,7 +429,7 @@ func TestAuthorityOrderCarriesRevocationAndServerDerivedAvailability(t *testing.
 	}
 
 	revoked := authorityFixture(false)
-	revoked.Deadline = nil // 撤銷後函式不再回這份來函，讀取路徑不填
+	revoked.Deadline = nil
 	at := governanceNow.Add(time.Hour)
 	revoked.Revoked = &model.AuthorityRevocation{At: at, AdminID: 9, Reason: "登記錯誤"}
 	revoked.Availability = revoked.AuthorityOrder.Availability()

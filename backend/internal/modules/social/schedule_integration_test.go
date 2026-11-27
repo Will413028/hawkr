@@ -33,13 +33,11 @@ func (f *fixture) delegated(ref string) social.ScheduledBy {
 	return social.ScheduledBy{Kind: social.ScheduleByDelegation, Ref: ref}
 }
 
-// current 讀貼文此刻的狀態（排程與取消排程會遞增版本，之後的操作要帶新的）。
 func (f *fixture) current(t *testing.T, storeID int64, p social.Post) social.Post {
 	t.Helper()
 	return mustV[social.Post](t)(f.module.OwnPost(context.Background(), storeID, p.ID))
 }
 
-// schedule 以貼文此刻的版本排一個 lead 之後發布的排程。
 func (f *fixture) schedule(t *testing.T, storeID int64, p social.Post, lead time.Duration, by social.ScheduledBy) social.Schedule {
 	t.Helper()
 	s, err := f.module.SchedulePost(context.Background(), f.store(t, storeID), social.SchedulePostInput{
@@ -49,7 +47,6 @@ func (f *fixture) schedule(t *testing.T, storeID int64, p social.Post, lead time
 	return s.Schedule
 }
 
-// cancelSchedule 以貼文此刻的版本取消排程。
 func (f *fixture) cancelSchedule(t *testing.T, storeID int64, p social.Post) error {
 	t.Helper()
 	_, err := f.module.CancelPostSchedule(context.Background(), f.store(t, storeID), p.ID, f.current(t, storeID, p).Version)

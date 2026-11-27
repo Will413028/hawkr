@@ -53,18 +53,15 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  // Echo data
   List<StoreForumEntry> _echoMessages = [];
   List<EchoCommentNode> _echoCommentNodes = [];
   bool _loadingEcho = false;
   bool _echoLoaded = false;
   final Set<String> _deletingMessageIds = {};
 
-  // Reply cache
   final Map<String, List<StoreForumEntry>> _repliesByMessageId = {};
   final Set<String> _repliesLoading = {};
 
-  // Inline input bar controllers
   final TextEditingController _echoInputCtrl = TextEditingController();
   final FocusNode _echoFocusNode = FocusNode();
 
@@ -88,7 +85,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // 店家快照晚到時，自己的留言與頭像要補上。
     ref.listen(myStoreSnapshotProvider, (_, _) => _rebuildEchoTree());
     return _echoList();
   }
@@ -111,7 +107,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
 
   /// 建構單個留言節點
   EchoCommentNode _buildEchoNode(StoreForumEntry m) {
-    // 自己的發言名稱與頭像讀不到時用店家的快照。
     var userName = m.authorName;
     if (userName.isEmpty && m.isMine) userName = widget.sellerDisplayName;
     if (userName.isEmpty) userName = '用戶';
@@ -182,7 +177,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
         setState(() {
           _loadingEcho = false;
         });
-        // 載入完成後重建樹狀結構
         _rebuildEchoTree();
       } else {
         _loadingEcho = false;
@@ -210,7 +204,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
           '[EchoUI] replies loaded messageId=$messageId count=${list.length}',
         );
       } catch (_) {}
-      // 回覆載入後重建樹狀結構
       _rebuildEchoTree();
     } catch (e) {
       try {
@@ -227,7 +220,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     try {
       HKLog.logD('[EchoUI] refresh Echo');
     } catch (_) {}
-    // 可視需要清空回覆快取，避免舊資料殘留
     setState(() {
       _repliesByMessageId.clear();
       _repliesLoading.clear();
@@ -236,8 +228,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     await _loadEchoMessages();
   }
 
-  // Echo tab list wired to real API: GET /api/message/merchant/messages
-  // 重寫為樹狀結構設計
   Widget _echoList() {
     if (!_echoLoaded && !_loadingEcho) {
       Future.microtask(() => _loadEchoMessages());
@@ -250,7 +240,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       child: LayoutBuilder(
         builder: (context, constraints) => Column(
           children: [
-            // 留言列表
             Expanded(
               child: _echoCommentNodes.isEmpty
                   ? FruitRefreshIndicator(
@@ -313,7 +302,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                       ),
                     ),
             ),
-            // 底部輸入欄
             _buildEchoInputBar(availableHeight: constraints.maxHeight),
           ],
         ),
@@ -330,7 +318,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     final hasReplies = node.replies.isNotEmpty;
     const lineColor = AppColors.cardBorder;
 
-    // 無回覆：簡單渲染
     if (!hasReplies) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,12 +335,10 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 父留言 + 非最後回覆（含直線引導線）
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 頭像 + 垂直引導線向下延伸
               Column(
                 children: [
                   _buildEchoAvatar(node),
@@ -366,7 +351,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildEchoCommentContent(node, depth),
-                    // 非最後回覆（各自含向下引導線）
                     for (final reply in nonLastReplies)
                       _buildEchoReplyItem(reply),
                   ],
@@ -375,7 +359,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
             ],
           ),
         ),
-        // 最後回覆（含弧形連接線）
         _buildLastReplyWithCurve(
           lastReply,
           lineColor,
@@ -447,8 +430,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   ) async {
     await showModalBottomSheet(
       context: context,
-      // 留言 tab 位於 `StatefulShellRoute` 分支底下，分支 Navigator 在浮動導覽列
-      // 之下；不掛根 Navigator 的話 sheet 底部會被導覽列蓋住（#132）。
       useRootNavigator: true,
       backgroundColor: AppColors.bgCard,
       shape: RoundedRectangleBorder(
@@ -534,9 +515,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 名稱與時間在剩餘寬度內換行；更多按鈕保留固定操作尺寸。
-          // 此內容位於回覆引導線的 IntrinsicHeight 下，使用 Wrap 避免
-          // LayoutBuilder 無法提供 intrinsic 尺寸的限制。
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -571,7 +549,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                   ],
                 ),
               ),
-              // 更多按鈕：自己的留言依 viewer_can_edit／viewer_can_delete 編輯、刪除；他人留言依 viewer_can_delete 刪除，並依規則封鎖
               if (isSelf && (node.viewerCanEdit || node.viewerCanDelete))
                 Builder(
                   builder: (btnCtx) => HkFrostedIconButton(
@@ -605,7 +582,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
             ],
           ),
           SizedBox(height: 4.h),
-          // 留言內容
           Text(
             node.content,
             style: TextStyle(
@@ -615,7 +591,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
             ),
           ),
           SizedBox(height: 4.h),
-          // 回覆按鈕（依 viewer_can_reply）
           if (node.viewerCanReply)
             GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -655,7 +630,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
     if (node.placeholderText != null) {
       return const CircleAvatar(radius: 15, backgroundColor: AppColors.gray100);
     }
-    // 如果是自己的留言，使用商家頭像
     final isSelf = node.isMine;
 
     if (isSelf) {
@@ -667,7 +641,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       avatar = NetworkImage(node.userAvatar);
     }
 
-    // Figma 設計：30x30px 頭像
     return CircleAvatar(
       radius: 15,
       backgroundColor: AppColors.gray100,
@@ -778,8 +751,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
         : '請選擇留言回覆';
     final navigationClearance = sellerFloatingNavigationClearance(context);
     final lineHeight = MediaQuery.textScalerOf(context).scale(16.sp) * 1.5;
-    // Short windows and the keyboard reduce the space left above navigation.
-    // Keep one scrollable field and its draft; only reduce its visible lines.
     final inputBudget =
         availableHeight -
         navigationClearance -
@@ -863,7 +834,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                           fontWeight: FontWeight.w400,
                           height: 1.5,
                         ),
-                        // 外層已有圓角與底色，停用全站表單的各狀態邊框。
                         filled: false,
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -912,7 +882,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   }
 
   Future<void> _submitEchoComment() async {
-    // IME 的送出也會走這裡，不能只停用畫面上的按鈕。
     if (_echoSubmitting) return;
     final text = _echoInputCtrl.text.trim();
     final target = _editingNode ?? _replyTargetNode;
@@ -951,9 +920,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   }
 }
 
-// =============================================================================
-// Echo 留言區塊 - 樹狀結構設計
-// =============================================================================
 
 /// 弧形連接線畫筆：從父引導線彎曲連接到最後回覆頭像
 class _CurveConnectorPainter extends CustomPainter {
@@ -978,26 +944,21 @@ class _CurveConnectorPainter extends CustomPainter {
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
-    // 弧形：從父引導線 (parentLineX, 0) 向下彎到最後回覆頭像中心
     final curveRadius = 15.0;
     final path = Path();
     path.moveTo(parentLineX, 0);
-    // 直線向下到弧形起點
     if (replyAvatarCenterY > curveRadius) {
       path.lineTo(parentLineX, replyAvatarCenterY - curveRadius);
     }
-    // 弧形（垂直轉水平）
     path.quadraticBezierTo(
       parentLineX,
       replyAvatarCenterY,
       parentLineX + curveRadius,
       replyAvatarCenterY,
     );
-    // 水平線到回覆頭像中心
     path.lineTo(replyAvatarCenterX, replyAvatarCenterY);
     canvas.drawPath(path, paint);
 
-    // 如果有非最後回覆，補一段垂直短線（連接上方回覆的引導線到最後回覆頭像）
     if (hasNonLastReplies) {
       canvas.drawLine(
         Offset(replyAvatarCenterX, 0),

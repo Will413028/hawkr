@@ -18,7 +18,6 @@ import (
 	"github.com/riverqueue/river"
 )
 
-// confirmTimeout 是等 broker 確認的上限。
 const confirmTimeout = 10 * time.Second
 
 // Publisher 以 publisher confirm 送訊息；連線在第一次送出時建立，斷線後下一次重連。
@@ -110,8 +109,6 @@ type PublishArgs struct {
 
 func (PublishArgs) Kind() string { return "legacy.rabbitmq_publish" }
 
-// publishMaxAttempts 是送出的 job 最多執行的次數：River 預設的退避（attempt^4 秒）下，第 20 次大約在 2 天之後；
-// broker 在那之前恢復就不會掉訊息。
 const publishMaxAttempts = 20
 
 // InsertOpts 是排入 PublishArgs 的選項：以 EventID 做 unique（River 預設的 unique 狀態含 completed，已送出的事件

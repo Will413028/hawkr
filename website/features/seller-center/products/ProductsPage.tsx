@@ -49,8 +49,6 @@ import { useProductReviewsDrawer } from "./useProductReviewsDrawer";
 const PAGE_SIZE = 20;
 
 export default function ProductsPage() {
-	// 賣家中心與代行工作區渲染的是同一支元件；傳輸層、快取鍵、寫入前的確認關卡
-	// 全部由 scope 提供（沒有 provider ⇒ 賣家路徑，行為逐位元不變）。
 	const scope = useSellerDataScope();
 	const delegated = scope.mode === "delegated";
 	/** 代行的商品路由根（`/adm/{storeId}/products`）。賣家路徑用不到。 */
@@ -79,9 +77,6 @@ export default function ProductsPage() {
 	/** 建立商品的 capability（頂部導覽的 `＋ 上架新商品` 用同一個條件）。 */
 	const canWrite = !delegated || scope.hasCapability("products.write");
 	const productRepo = scope.repos.products;
-	// This page owns its own paginated/optimistic list; it only invalidates the
-	// shared seller-products family so the nav low-stock badge + dashboard count
-	// refetch after a create/update/status/delete.
 	const invalidateSellerProducts = useInvalidateSellerProducts();
 
 	const [items, setItems] = React.useState<SellerProductListItem[]>([]);
@@ -109,8 +104,6 @@ export default function ProductsPage() {
 	} = useProductEditDrawer();
 	const { reviewsTarget, openReviews, closeReviews } =
 		useProductReviewsDrawer();
-	// 銷量 isn't on the seller list endpoint (B-192) but IS on the public list.
-	// Backfill it in one extra request keyed by product id; merged at render.
 	const [salesMap, setSalesMap] = React.useState<Map<string, number>>(
 		new Map(),
 	);
@@ -234,7 +227,6 @@ export default function ProductsPage() {
 			setItems((prev) => [...prev, ...r.records]);
 			setPage(r.page);
 		} catch {
-			/* ignore */
 		} finally {
 			setLoadingMore(false);
 		}
@@ -328,8 +320,6 @@ export default function ProductsPage() {
 			initial?: { reason: string; notifySeller: boolean },
 		) => {
 			const publish = target === "4004";
-			// ⚠️ 代行的上／下架是兩支**命令端點**（body 只收共通三欄），不是「傳 status
-			// 值」；`/publish` 的變更恆為單一欄位，所以不畫三欄表（L3704）。
 			const decision = await scope.confirmMutation({
 				title: publish ? "檢視變更並上架" : "檢視變更並下架",
 				intent: `以 ADM 身分替「${targetStore}」${publish ? "上架" : "下架"}「${
@@ -399,9 +389,6 @@ export default function ProductsPage() {
 			setError("這個商品已不在目前的清單中，請重新整理後再試。");
 			return;
 		}
-		// 對方剛才做的可能**正是**我要做的事。此時再送一次會被 product-service 以
-		// 「狀態轉換不合法」擋下（400），而那個訊息完全看不出真正的原因是「已經做完
-		// 了」。合流的正解是把結果講出來，不是再撞一次牆。
 		if (
 			resolveShelfState(latest.status) === resolveShelfState(pending.target)
 		) {
@@ -456,15 +443,10 @@ export default function ProductsPage() {
 		void refreshSummary();
 	}, [refreshSummary]);
 
-	// All of a seller's products share the same ownerId; grab it from whichever
-	// list has loaded and backfill 銷量 from the public endpoint once.
 	const sellerStoreId =
 		items.find((p) => p.owner_id)?.owner_id ??
 		summaryItems.find((p) => p.owner_id)?.owner_id;
 	React.useEffect(() => {
-		// 代行下不做這次回填：它打的是公開列表（`/public/products`，賣家傳輸層之外的
-		// 另一條路），而代行的商品列表 DTO 本來就帶 `salesCount`。多打一次不會更準，
-		// 只會在工作區裡多一條沒有必要的跨店查詢。
 		if (delegated || !sellerStoreId) return;
 		let alive = true;
 		void fetchSellerSalesCounts(sellerStoreId).then((m) => {
@@ -484,8 +466,6 @@ export default function ProductsPage() {
 		if (!q) return filtered;
 		return filtered.filter((p) => {
 			const name = p.name?.toLowerCase() ?? "";
-			// SKU codes aren't returned by the list endpoint (need
-			// `/app/products/{id}/skus`), so search falls back to name only.
 			return name.includes(q);
 		});
 	}, [items, search, statusFilter]);
@@ -499,8 +479,6 @@ export default function ProductsPage() {
 	const [batchResult, setBatchResult] = React.useState<{
 		succeeded: number;
 		failed: number;
-		// `name` 在送出當下就記下來：批次成功後會 `handleRefresh()`，那批列可能已經
-		// 換頁或改了狀態，事後拿 id 回列表查名字會查到 undefined 而退回 TSID。
 		failures: { productId: string; name: string; code: number }[];
 	} | null>(null);
 
@@ -513,8 +491,6 @@ export default function ProductsPage() {
 	const handleBatchUnpublish = React.useCallback(async () => {
 		const commands = scope.delegatedCommands;
 		if (!commands) return;
-		// `expectedVersion` 逐項必填：沒有版本的列一律不送，而不是送一個空字串讓
-		// 後端回 9260 —— 那會讓整批看起來像「後端壞了」。
 		const selected = items.filter(
 			(p) => selectedIds.includes(String(p.id)) && p.version,
 		);
@@ -528,8 +504,6 @@ export default function ProductsPage() {
 			intent: `以 ADM 身分替「${targetStore}」下架 ${targets.length} 項商品`,
 			hint: "批次下架需先確認原因；整批共用同一個修改原因與通知設定。",
 			reasonPlaceholder: "例：依賣家來信暫停整批販售",
-			// 批次的版本是逐項送的，沒有單一 `expectedVersion` 可放 —— 逐項列出來，
-			// 才有辦法在部分失敗（9266）時對得上是哪幾筆的版本被別人先動過。
 			versionedItems: selected.map((p) => ({
 				label: p.name || "未命名商品",
 				version: String(p.version),
@@ -547,8 +521,6 @@ export default function ProductsPage() {
 			const nameById = new Map(
 				selected.map((p) => [String(p.id), p.name || "未命名商品"]),
 			);
-			// ⚠️ 只要批次被受理，頂層 `code` 恆為 0（部分失敗也是）—— 成敗看
-			// `failed`，而逐項結果必須畫得出來，否則操作者看到的是「成功」。
 			setBatchResult({
 				succeeded: result.succeeded,
 				failed: result.failed,
@@ -579,17 +551,11 @@ export default function ProductsPage() {
 	const statCardCount = delegated ? 4 : 5;
 
 	const hasMore = items.length < total;
-	// Header counts must never flash 0→N while loading: the subtitle prefers
-	// the summary total (loaded once, unaffected by status filters) and both
-	// counters show an em dash until their first data arrives.
 	const listBooting = loading && items.length === 0;
 	const knownTotal = summaryTotal || total;
 	const totalKnown = !listBooting || summaryItems.length > 0;
 	const summaryStats = React.useMemo(() => {
 		if (delegated) {
-			// 未知一律 null → 渲染破折號。`?? 0` 會把「四支探詢全部失敗」講成
-			// 「這家店一件上架商品都沒有」，而那是斷路器 half-open 時的實測畫面
-			// （成因記錄在 lib/seller-data/delegated-product-kpi.ts）。
 			return delegatedProductKpi(delegatedTotals);
 		}
 		const source = summaryItems.length > 0 ? summaryItems : items;
@@ -597,9 +563,6 @@ export default function ProductsPage() {
 			total: summaryTotal || total,
 			active: source.filter((p) => isActiveStatus(p.status)).length,
 			off: source.filter((p) => isOffStatus(p.status)).length,
-			// `stock` isn't returned by the list endpoint yet (pending backend
-			// ticket), so only count rows that actually carry a number — never
-			// treat "missing" as 0, which would flag every product.
 			lowStock: source.filter((p) => p.stock != null && p.stock <= 5).length,
 			draft: source.filter((p) => isDraftStatus(p.status)).length,
 		};
@@ -837,18 +800,10 @@ export default function ProductsPage() {
 							重新整理
 						</span>
 					</Button>
-					{/* 代行的新增商品入口（`POST .../products`，capability
-					    `products.write`）。與頂部導覽的 `＋ 上架新商品` 是**同一顆
-					    按鈕的兩個落點**，條件必須一致 —— 兩處各說各話正是它上一輪
-					    被移除的原因。缺 capability 時不渲染，不是 disabled（L3857）。 */}
+
 					{delegated && canWrite && (
 						<Link
 							href={`${delegatedProductRoot}/new`}
-							// ⚠️ `data-hkui-button` 是「這是一顆按鈕、前景色由它自己的表面決定」
-							// 的既有宣告（`Button.tsx:404`／`01-tokens-theme.css:761`）。少了它，
-							// dark 下 `body a:not([data-hkui-button])` 的 `--color-ink-200`（0-2-2）壓過
-							// `.seller-orders__btn--primary` 的白字（0-1-0），實心森林綠底就配上
-							// 一層橄欖綠字（dev 實測最亮字素 --color-ink-200，約 4.4:1）。
 							data-hkui-button=""
 							className="seller-orders__btn seller-orders__btn--primary"
 						>
@@ -858,7 +813,6 @@ export default function ProductsPage() {
 					{!delegated && (
 						<Link
 							href="/seller-center/products/new"
-							// 同上：實心表面自己擁有前景色，否則 dark 下退成橄欖綠字。
 							data-hkui-button=""
 							className="seller-orders__btn seller-orders__btn--primary"
 						>
@@ -886,20 +840,7 @@ export default function ProductsPage() {
 					tabIndex={statusFilter === undefined ? 0 : -1}
 					onClick={() => setStatusFilter(undefined)}
 				/>
-				{/* 卡片是篩選器，點下去列表那一列的狀態 pill 必須是同一個詞。代行的 pill
-				    走後端下發的 CodeMeta Label，賣家中心走自己的操作語（`上架中`／
-				    `下架中`）—— 兩邊都對，但同一個畫面裡混用就會讓人以為是兩種狀態，
-				    所以卡片跟著各自的 pill 走。
 
-				    ⚠️ 代行那一側**讀 `PRODUCT_STATUS_LABEL` 而不是抄字面值**：抄過來
-				    的字在 CodeMeta 改 Label 時不會轉紅，於是卡片說「未啟用」、它篩出來
-				    的每一列 pill 說「未上架」，而這條分界要守的正是這件事。
-
-				    ⚠️ 這條分界只管**狀態標籤**（渲染某個碼的值：pill、KPI 卡、篩選器）。
-				    **動作用語**不在其內：`上架`／`下架` 是 ADM 自己按鈕上的動詞
-				    （「檢視變更並下架」），所以「上架中無法編輯內容，請先下架」這類敘述句
-				    兩邊共用同一份文案是對的，改成「啟用中…」反而與它旁邊的按鈕對不上。
-				    代行儀表板那張同名卡片也照這條走（已由「上架中」收斂為 CodeMeta Label）。 */}
 				<SummaryStatCard
 					label={
 						delegated ? PRODUCT_STATUS_LABEL[ProductStatus.ACTIVE] : "上架中"
@@ -911,17 +852,7 @@ export default function ProductsPage() {
 					tabIndex={statusFilter === "4004" ? 0 : -1}
 					onClick={() => setStatusFilter("4004")}
 				/>
-				{/* 未上架（4003）。這一頁沒有狀態下拉，卡片就是唯一的篩選器，少了它就有
-				    一種狀態看得到、篩不到、也不計入任何一張卡，於是「總商品數 ≠ 其餘卡片
-				    之和」在畫面上無從解釋。
 
-				    ⚠️ 兩邊都要渲染，**不得再包回 `delegated &&`**（#2725）：代行建立的
-				    商品一律落 4003，而賣家在自己的商品頁完全找不到它們 —— 四張卡沒有一格
-				    收得下 4003，於是那批商品只能在清單裡逐頁翻。這條由
-				    `tests/seller-products-kpi-cards.test.ts` 守住。
-
-				    圖示用 `hide`（未陳列於店面）而不是 `danger`：賣家側「庫存預警」就在
-				    隔壁且同為 accent，兩張卡再共用同一個驚嘆號就分不出誰是誰。 */}
 				<SummaryStatCard
 					label={
 						delegated ? PRODUCT_STATUS_LABEL[ProductStatus.INACTIVE] : "下架中"
@@ -933,9 +864,7 @@ export default function ProductsPage() {
 					tabIndex={statusFilter === "4003" ? 0 : -1}
 					onClick={() => setStatusFilter("4003")}
 				/>
-				{/* B15：算不出來的那張卡不渲染。「庫存預警」需要安全庫存門檻，代行的
-				    列表 DTO 沒有這個來源（賣家路徑用的是 ≤5 的本地啟發式，那是賣家
-				    自己的視角，不該替另一家店代為定義）。 */}
+
 				{!delegated && (
 					<SummaryStatCard
 						label="庫存預警"
@@ -999,11 +928,7 @@ export default function ProductsPage() {
 					</div>
 				)}
 
-				{/* 失敗必須比成功更顯眼。這一段曾是一行純黑 13px 文字直接躺在頁面上，
-				    而成功的批次列反而有綠框 —— 於是「2 筆中 0 成功、2 失敗」讀起來像
-				    一句補充說明。失敗時改走既有的 danger 面（`.adm-batch-result--failed`
-				    沿用 `--hkui-danger-*`，與結束摘要的 `adm-end-dialog__alert` 同一組
-				    色票）＋ `role="alert"`，逐項碼也換成人看得懂的話。 */}
+
 				{delegated && batchResult && (
 					<div
 						className={`adm-batch-result${
@@ -1034,10 +959,7 @@ export default function ProductsPage() {
 					</div>
 				)}
 
-				{/* 版本衝突（9266）的 UI 契約：兩個出口、不覆寫賣家較新的修改，且與
-				    一般欄位驗證分開呈現（§3.4／L5346）。少了它，這條路徑只會吐一行
-				    「代行請求失敗（代碼 9266）」，而操作者唯一想得到的動作是再按一次
-				    —— 那必然仍是 9266。 */}
+
 				{statusConflict && (
 					<div className="adm-conflict" role="alert">
 						<div className="adm-conflict__text">
@@ -1080,11 +1002,7 @@ export default function ProductsPage() {
 				)}
 
 				<div className="seller-orders__card seller-products__card seller-mobile-disclosure-desktop">
-					{/* 卡片比表格窄時才顯示（容器查詢）。被裁掉時畫面上沒有任何痕跡——
-					    macOS 的覆蓋式捲軸不算提示。賣家路徑不渲染它：那張表的橫捲是它
-					    自己推導過的取捨（≤960px 另有凍結首欄那一套）。
-					    ⚠️ 文案跟著「操作」欄已釘在右側一起改：叫人去捲一個根本不會動的
-					    欄位，等於把提示變成另一個假訊息。 */}
+
 					{delegated && (
 						<p className="adm-products__scroll-hint">
 							<AppIcon name="arrow-right" size={14} className="shrink-0" />
@@ -1100,9 +1018,7 @@ export default function ProductsPage() {
 						>
 							<thead>
 								<tr>
-									{/* 缺 `products.publish` 時整欄不渲染（§6.4：批次操作只在具備
-									    該 capability 時出現）。停用的框仍在宣稱「勾選這件事有意義」，
-									    而批次列在這個工作階段從頭到尾不會出現 —— 勾了沒有任何去處。 */}
+
 									{canPublish && (
 										<th className="seller-products-table__check">
 											<label className="seller-products-table__check-hit">
@@ -1128,12 +1044,10 @@ export default function ProductsPage() {
 											</label>
 										</th>
 									)}
-									{/* mockup §4.7.7 的第一欄。⚠️ D7：它是 TSID 數字字串，不是
-									    `P-20250801-001` 那種對外編號，前端不得對它做前綴解析。 */}
+
 									{delegated && <th>商品 ID</th>}
 									<th>商品</th>
-									{/* 評分／收藏／上架時間：代行的列表 DTO 沒有這三欄（買家側社群
-									    數據與 `createdAt` 都不在 allow-list），恆為「—」的欄位不畫。 */}
+
 									{!delegated && <th>評分</th>}
 									<th>分類</th>
 									<th>價格</th>
@@ -1154,8 +1068,7 @@ export default function ProductsPage() {
 									/>
 								) : visibleItems.length === 0 ? (
 									<tr>
-										{/* 勾選欄在缺 `products.publish` 時整欄不畫，跨欄數要跟著減 ——
-										    多算一欄會讓空狀態把表格撐出一格看不見的空白欄。 */}
+
 										<td
 											colSpan={(delegated ? 8 : 10) + (canPublish ? 1 : 0)}
 											className="seller-orders__empty"
@@ -1221,9 +1134,7 @@ export default function ProductsPage() {
 												</td>
 											)}
 											<td data-label="商品">
-												{/* 代行下不是連結：`/seller-center/*` 會把操作者導出
-												    工作區（那條路徑吃的是他自己的賣家身分）。代行的
-												    編輯入口在「商品 ID」與「操作」兩欄，都指向 /adm。 */}
+
 												<ProductNameCell
 													delegated={delegated}
 													href={`/seller-center/products/${p.id}/edit`}
@@ -1238,10 +1149,6 @@ export default function ProductsPage() {
 																loading="eager"
 															/>
 														) : (
-															// 無圖時給一個圖示，不留純色空方塊：44px 放不下說明
-															// 文字，而空方塊在 dark 下是整頁最亮的東西，讀起來
-															// 像壞了。與動態列表 `.seller-posts__cover-placeholder`
-															// 同一支 icon、同一組色值。
 															<span aria-hidden="true">
 																<PostImageIcon size={20} />
 															</span>
@@ -1267,8 +1174,7 @@ export default function ProductsPage() {
 													data-label="評分"
 													onClick={(e) => e.stopPropagation()}
 												>
-													{/* 代行下這一欄只顯示評分：買家評論走的是賣家自助端的
-													    評論端點（代行端點總表零命中），點開只會拿到錯誤。 */}
+
 													<RatingCell
 														delegated={delegated}
 														productName={p.name || "未命名商品"}
@@ -1372,11 +1278,7 @@ export default function ProductsPage() {
 											{delegated ? (
 												<td data-label="操作">
 													<div className="adm-products__actions">
-														{/* 上架中的商品**內容**不可編輯（product-service 3019），與賣家自助端
-														    同一條規則。仍然給得進去（右欄要看狀態與版本），但入口要先說清楚
-														    為什麼欄位是鎖的。
-														    ⚠️ 商品狀態不是唯一的鎖：缺 `products.write` 時每一列都進不了
-														    編輯，字面仍寫「編輯」＝拿商品狀態去回答一個權限問題。 */}
+
 														<Link
 															href={`${delegatedProductRoot}/${encodeURIComponent(String(p.id))}/edit`}
 															className="seller-table__action"
@@ -1390,13 +1292,7 @@ export default function ProductsPage() {
 																resolveShelfState(p.status) === "active",
 															)}
 														</Link>
-														{/* 「預覽」＝買家視角，**每一種狀態都渲染**（含草稿與已下架）。
-														    它曾經連去 `/products/{id}`，於是只能在已上架時出現 —— 而那
-														    是把工具給錯了人：已上架的商品代行者本來就看得到，看不到的
-														    正是草稿。改指工作區內的自繪預覽（56 號 §2.2 第 13 列：以代行
-														    GET 的 DTO 自繪，不新增端點、不改打 `/api/v1/public/*`）之後，
-														    這個條件沒有存在的理由，而且留在 `/adm` 之下也不會把代行工作
-														    階段的上下文丟掉。 */}
+
 														<Link
 															href={`${delegatedProductRoot}/${encodeURIComponent(String(p.id))}/preview`}
 															className="seller-table__action"
@@ -1501,7 +1397,7 @@ export default function ProductsPage() {
 					</>
 				)}
 			</section>
-			{/* 代行不渲染這兩個抽屜：商品編輯尚未接線，買家評論在代行的端點總表零命中。 */}
+
 			{!delegated && (
 				<ProductEditDrawer
 					key={editProductId ?? "closed"}
@@ -1800,7 +1696,6 @@ function RowDeleteButton({
 	const k = status == null ? "" : String(status);
 	const canDelete = k === "4001" || k === "0" || k === "4003" || k === "2";
 
-	// 無可用操作（上架中 / 審核中）— drop the trigger entirely.
 	if (!canDelete) return null;
 
 	return (

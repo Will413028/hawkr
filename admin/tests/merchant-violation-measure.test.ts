@@ -62,7 +62,6 @@ test("來源通報換勾選順序：送出同一個請求（id 排序）、同�
 		["r1", "r2", "r3"],
 	);
 
-	// 第一次送出（回應遺失）之後取消勾選再勾回：集合不變、順序變了，必須沿用同一個 request_id。
 	let n = 0;
 	const generate = () => `id-${++n}`;
 	const sent = requestIdFor(
@@ -126,7 +125,6 @@ test("不同的集合還是不同的請求：少一筆或換一筆，鍵就不�
 		KEY(form({ citedFindingIds: ["f1", "f2"] })),
 		KEY(form({ citedFindingIds: ["f1"] })),
 	);
-	// 來源通報與引用的認定是兩個欄位：同一個 id 放在不同欄位不是同一個請求。
 	assert.notEqual(
 		KEY(form({ sourceReportIds: ["x1"] })),
 		KEY(form({ citedFindingIds: ["x1"] })),
@@ -153,7 +151,7 @@ test("排序不改動呼叫端的選取清單", () => {
  * 理由是建議的原文；類別不預填（發票沒有對應的政策分類，由管理員選）。
  */
 test("發票停權建議的預填：停權、結束時間是 now 加建議天數、理由是建議的原文，類別不預填", () => {
-	const now = new Date("2026-10-18T02:00:00Z"); // 台北 2026/10/18 10:00
+	const now = new Date("2026-10-18T02:00:00Z");
 	const initial = measureInitialFromSuggestion(
 		{ suggestedSuspendDays: "7", suggestedReason: "90 天內第 3 件發票違規" },
 		now,
@@ -163,7 +161,6 @@ test("發票停權建議的預填：停權、結束時間是 now 加建議天數
 		measure: { case: "suspension", endTime: "2026-10-25T10:00" },
 		statement: "90 天內第 3 件發票違規",
 	});
-	// 跨月：台北 10/30 23:30 加 3 天是 11/02 23:30。
 	assert.deepEqual(
 		measureInitialFromSuggestion(
 			{ suggestedSuspendDays: "3", suggestedReason: "x" },
@@ -210,7 +207,6 @@ test("建議天數是空字串、0 或不是正整數：不預填結束時間（
  */
 test("建議天數大到結束時間的年份超過四位數：不預填結束時間；四位數年份的最大端照常預填", () => {
 	const now = new Date("2026-10-18T02:00:00Z");
-	// 3,000,000 天後是西元 10240 年。
 	assert.deepEqual(
 		measureInitialFromSuggestion(
 			{ suggestedSuspendDays: "3000000", suggestedReason: "理由" },
@@ -218,7 +214,6 @@ test("建議天數大到結束時間的年份超過四位數：不預填結束�
 		),
 		{ measure: { case: "suspension" }, statement: "理由" },
 	);
-	// 2,900,000 天後是 9966 年，仍是四位數：守門不能把有效的值一起擋掉。
 	assert.deepEqual(
 		measureInitialFromSuggestion(
 			{ suggestedSuspendDays: "2900000", suggestedReason: "理由" },

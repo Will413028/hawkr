@@ -10,13 +10,6 @@ import (
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 )
 
-// 代行訂單搜尋比對 order_items 的 product_name／sku_name（OrderRepository.SELLER_ORDER_FILTER），
-// 而列表的商品欄只印得出件數 ⇒ 搜一個品名拿到四筆、四列全是「共 2 件」，操作者無從判斷是
-// 哪一件命中。品名一直都在上游（OrderSummaryView.items），也一直不在代行投影的 clear 清單內
-// （OrderGrpcService.java:863-885）——缺口只在 Gateway 這一層的 DTO。
-//
-// 這支測試守兩件事：欄位存在（否則前端讀到 undefined，畫面靜默退回破折號），以及取值規則
-// （只取第一件、product_name 為空退 sku_name）。
 
 func TestFirstDelegatedProductName(t *testing.T) {
 	cases := []struct {
@@ -131,12 +124,8 @@ func TestListDelegatedOrders_ResponseRowsCarryFirstProductName(t *testing.T) {
 		Meta: &orderpb.PageMeta{TotalItems: "3", CurrentPage: "1"},
 	}
 	want := map[string]string{
-		// 有商品名就用商品名，且只取第一件（第二件的「梨山高麗菜」不得出現）。
 		"O005001417": "有機小松菜",
-		// product_name 只有空白 ⇒ 退回 sku_name。keyword 比對得到 sku_name，
-		// 這一列若印破折號就是「搜得到卻看不出為什麼」。
 		"O005001418": "溫室小黃瓜 600g",
-		// 沒有品項的訂單仍要有這個鍵，值為空字串由前端走 fallback。
 		"O005001419": "",
 	}
 

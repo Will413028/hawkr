@@ -64,8 +64,6 @@ public class MediaUrlProperties {
         if (objectKey.startsWith("http://") || objectKey.startsWith("https://")) {
             return objectKey;
         }
-        // baseUrl 未設 → 回傳裸 objectKey（對齊 Go pkg/mediaurl.BuildImageURL 的語意）。
-        // 不可回傳 "/i/{preset}/{key}"：那是相對路徑，前端會再組一次而變成 /i/…/i/…。
         if (baseUrl == null || baseUrl.isEmpty()) {
             return objectKey.startsWith("/") ? objectKey.substring(1) : objectKey;
         }

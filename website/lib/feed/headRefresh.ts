@@ -79,10 +79,6 @@ export function mergeFeedHeadPages(
 		records: page.records.map((record) => {
 			const fresh = latestById.get(String(record.id));
 			if (!fresh) return record;
-			// While a reader is away from the top, content/image edits are
-			// buffered with the replacement pill. Only fixed-size counters
-			// reconcile immediately, so masonry heights and scroll anchors
-			// cannot jump under their finger.
 			return prependNew ? fresh : withFreshEngagement(record, fresh);
 		}),
 	}));
@@ -93,11 +89,6 @@ export function mergeFeedHeadPages(
 		return { pages: updatedPages, newRecords };
 	}
 
-	// Do not force the newly prepended ids back into the old fixed page
-	// cardinality. Dropping the tail would create a pagination hole because the
-	// next cursor still starts after the last page the reader already loaded.
-	// A slightly larger page one is safe; every previously rendered item and all
-	// page/cursor metadata remain intact.
 	return {
 		pages: updatedPages.map((page, index) =>
 			index === 0

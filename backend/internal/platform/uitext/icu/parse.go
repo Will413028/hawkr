@@ -37,7 +37,6 @@ func (p *parser) peek() rune {
 	return p.src[p.pos]
 }
 
-// nodes 讀到分支結尾的 }（inBranch）或字串結尾。depth 是目前 select／plural 的巢狀層數。
 func (p *parser) nodes(depth int, inBranch bool) ([]Node, error) {
 	var out []Node
 	var text strings.Builder
@@ -113,7 +112,6 @@ func (p *parser) ident(what string) (string, error) {
 	return string(p.src[start:p.pos]), nil
 }
 
-// argument 在 { 之後。
 func (p *parser) argument(depth int) (Node, error) {
 	p.skipSpace()
 	name, err := p.ident("參數名稱")
@@ -173,7 +171,7 @@ func (p *parser) argument(depth int) (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		p.pos++ // 吃掉分支結尾的 }
+		p.pos++
 		branches = append(branches, Branch{Selector: selector, Body: body})
 	}
 	if !seen["other"] {

@@ -1,16 +1,5 @@
 import type { ProcurementStepStatusValue } from "@/lib/codemeta/enums";
 
-//
-// Graph-path Activity events (T12 sub-project 3c) — a deliberately
-// isolated wire/type/trust model from steps.ts's AgentStep. steps.ts's
-// `label` is never trusted (only structured safeArgs cross the trust
-// boundary); this `text` field is a backend-guarded model-generated
-// sentence that IS trusted directly, by design. Merging the two would
-// force `label` to become conditionally trusted depending on source —
-// which is the single invariant that makes steps.ts safe today — or
-// force the gateway to translate AGENT_ACTIVITY_SNAPSHOT into the
-// step_detail proto shape, a coupling neither repo has.
-// Do not merge this into AgentStep/steps.ts.
 
 /** 值域 SSOT 是 CodeMeta 生成的 `ProcurementStepStatus`（7 個值），不是手寫
  * union——`lib/codemeta/generated.ts` 由 backend 的 generate.sh 覆蓋，後端增刪值
@@ -74,9 +63,6 @@ export function groupActivityRows(
 	const topLevel: ActivityRow[] = [];
 	const byRowId = new Map<string, ActivityRow>();
 
-	// 單趟掃描，不是「先收父列再收子列」兩趟：兩趟會把升級成 top-level 的子列
-	// 全部推到最後面，順序就不再是抵達順序了。後端保證父列先於子列送出
-	// （父列 RUNNING → 兩條 lane 開跑），所以單趟就認得出父列。
 	for (const event of events) {
 		const parent =
 			event.parentRowId === undefined
@@ -86,8 +72,6 @@ export function groupActivityRows(
 			parent.children.push(event);
 			continue;
 		}
-		// 走到這裡有三種情況：本來就是 top-level；父列還沒抵達；父列自己是子列
-		// （孫列，只會發生在契約壞掉時）。三種都攤平成 top-level。
 		const row: ActivityRow = { ...event, children: [] };
 		topLevel.push(row);
 		byRowId.set(row.rowId, row);
@@ -130,9 +114,6 @@ const ACTIVITY_TEXT_MAX_DISPLAY_LEN = 80;
 export function activityLabel(event: AgentActivityEvent): string {
 	const source = event.text !== "" ? event.text : event.label;
 	if (source === "") return "處理中…";
-	// 用 code point 而非 UTF-16 code unit 截斷——`.length`／`.slice` 是後者，
-	// 剛好切在 surrogate pair（例如 emoji）中間會留下孤兒 surrogate，
-	// 顯示成 U+FFFD 替換字元。
 	const chars = [...source];
 	return chars.length > ACTIVITY_TEXT_MAX_DISPLAY_LEN
 		? `${chars.slice(0, ACTIVITY_TEXT_MAX_DISPLAY_LEN).join("")}…`

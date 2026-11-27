@@ -47,7 +47,6 @@ func (s *Service) Style(ctx context.Context, id uuid.UUID) (model.AdminStyle, er
 	return toStyle(row), nil
 }
 
-// validateText 檢查並正規化風格的文字欄位（頭尾空白只有 trimtext 一個定義）：label 與 prompt 去空白後不可空白，prompt 以字元計 1 到 MaxPromptRunes（A9-D40）。
 func validateText(ctx context.Context, label, prompt string) (string, string, error) {
 	l := loc(ctx)
 	label = trimtext.Trim(label)
@@ -221,7 +220,6 @@ func (s *Service) SetDefault(ctx context.Context, actor model.Actor, id uuid.UUI
 	return toStyle(out), nil
 }
 
-// changedFields 列出這次修改實際改變的欄位名（稽核的 detail；不放提示詞的內容）。
 func changedFields(old, now store.ImageaiStyle, thumbnail bool) []string {
 	var out []string
 	for _, c := range []struct {
@@ -266,7 +264,6 @@ func (s *Service) DeleteStyle(ctx context.Context, actor model.Actor, id uuid.UU
 	})
 }
 
-// confirmThumbnail 在寫入風格列的 transaction 內確認縮圖的 staged token（公開可讀）；不可用回指向 ThumbnailToken 的欄位錯誤。
 func confirmThumbnail(ctx context.Context, m model.Media, adminID int64, token string) (media.ConfirmedAsset, error) {
 	return media.ConfirmField(ctx, m, media.Uploader{ID: adminID, Admin: true}, "ThumbnailToken", token, media.VisibilityPublic)
 }

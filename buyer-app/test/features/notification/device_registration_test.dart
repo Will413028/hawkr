@@ -102,7 +102,6 @@ void main() {
     final register = h.registered.single;
     expect(register.token, 'fcm-1');
     expect(register.app, NotificationApp.NOTIFICATION_APP_BUYER_APP);
-    // 契約沒有 platform 欄位：請求只有 token 與 app。
     expect(register.toProto3Json(), {
       'token': 'fcm-1',
       'app': 'NOTIFICATION_APP_BUYER_APP',
@@ -111,7 +110,6 @@ void main() {
 
   group('登出時註銷裝置', () {
     setUp(() {
-      // 冷啟動不做 FCM；登入狀態與 FCM token 由下面各測試直接給。
       PushNotificationManager.e2eDisabled = true;
       addTearDown(() => PushNotificationManager.e2eDisabled = false);
     });
@@ -128,7 +126,6 @@ void main() {
         await h.c.read(sessionProvider.notifier).logout();
 
         expect(h.deleted.single.token, 'fcm-1');
-        // 註銷在清除 session 之前送出（之後憑證就沒了）。
         expect(h.auth.calls, ['deleteDeviceToken', 'clear']);
         expect(h.c.read(sessionProvider).value, isNull);
 

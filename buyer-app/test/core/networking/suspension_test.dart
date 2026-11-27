@@ -318,7 +318,6 @@ void main() {
       try {
         await dio.post<dynamic>('/app/favorites');
       } on DioException {
-        // 結果由下面檢查。
       }
       await Future<void>.delayed(Duration.zero);
 
@@ -463,7 +462,6 @@ void main() {
       try {
         await dio.request<dynamic>(path, options: Options(method: method));
       } on DioException {
-        // 結果由各測試檢查。
       }
       await Future<void>.delayed(Duration.zero);
     }
@@ -475,7 +473,6 @@ void main() {
       expect(h.c.read(accountRestrictionProvider), isNotNull);
       expect(h.c.read(suspendedActionNoticeProvider), 1);
       expect(h.c.read(forceLogoutProvider), isFalse);
-      // 只有 rejected() 補讀細節一次，不再為確認 403 多打一次 GetSession。
       expect(h.auth.fetches, 1);
     });
 
@@ -527,7 +524,6 @@ void main() {
             options: Options(responseType: type),
           );
         } on DioException {
-          // 結果由下面檢查。
         }
         await Future<void>.delayed(Duration.zero);
 

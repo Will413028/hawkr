@@ -46,7 +46,6 @@ func One[R any](ctx context.Context, c db.DBTX, st Statement) (R, error) {
 	return pgx.CollectOneRow(rows, pgx.RowToStructByName[R])
 }
 
-// plain 把欄位逐一別名成不帶表名的欄位名：jet 預設的別名是 "表.欄"，而 pgx 的 RowToStructByName 以欄位名對應 struct。
 func plain(cols ColumnList) ProjectionList {
 	out := make(ProjectionList, len(cols))
 	for i, c := range cols {

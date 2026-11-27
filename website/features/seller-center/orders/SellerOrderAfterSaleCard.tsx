@@ -91,8 +91,6 @@ export function SellerOrderAfterSaleCard({
 			</dl>
 			<Link
 				href={href}
-				// `.seller-orders__action` 的白字（0-1-0）會被 dark 的
-				// `body a:not([data-hkui-button])`（0-2-2）換成 `--color-ink-200`。
 				data-hkui-button=""
 				className="seller-orders__action seller-orders__action--primary mt-2"
 			>

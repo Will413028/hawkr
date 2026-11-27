@@ -17,7 +17,6 @@ type Scheduler struct {
 	hasInitialDelay bool
 	initialDelay    time.Duration
 	cancel          context.CancelFunc
-	// done 由 loop 的 goroutine 在收尾時 close，是 Stop 等待的對象。
 	done chan struct{}
 }
 
@@ -62,14 +61,10 @@ func NewScheduler(
 // lifecycle ordering (a single fx.Lifecycle OnStart/OnStop pair, typically).
 func (s *Scheduler) Start(ctx context.Context) {
 	runCtx, cancel := context.WithCancel(ctx)
-	// done 先於 cancel 指派：Stop 以 cancel != nil 判斷「Start 跑過了」，兩者的順序反過來
-	// 會讓那個判斷在極短窗口內成立而 done 還是 nil。
 	done := make(chan struct{})
 	s.done = done
 	s.cancel = cancel
 	go func() {
-		// 關 goroutine 自己持有的那個 channel，不是 s.done：Start 被呼叫兩次（本 doc
-		// 上方註明會洩漏第一個 goroutine）時，第一個 goroutine 不該去關第二個的。
 		defer close(done)
 		s.loop(runCtx)
 	}()
@@ -92,7 +87,6 @@ func (s *Scheduler) Stop() {
 		return
 	}
 	s.cancel()
-	// 已 close 的 channel 讀取立刻返回 ⇒ 重複 Stop 不會 panic 也不會永久阻塞。
 	<-s.done
 }
 

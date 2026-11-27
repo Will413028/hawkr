@@ -93,8 +93,7 @@ function LineRow({ line }: { line: InvoiceLine }) {
 			<span className="text-xs text-hk-muted tabular-nums">
 				{line.quantity} × {money(line.unitPrice)}
 			</span>
-			{/* DISCOUNT 的 netAmount 本來就是負數，照原樣顯示負號，不 Math.abs()
-			    之後自己加減號——那會在後端某天改用正數表示折抵時靜默翻轉。 */}
+
 			<span className="text-sm font-semibold text-hk-body tabular-nums">
 				{money(line.netAmount)}
 			</span>
@@ -215,7 +214,6 @@ export default function InvoiceDocumentDetailClient({
 			>
 				<div className="flex max-w-[52rem] flex-col gap-[18px]">
 					{voided ? (
-						// 作廢是已成事實不是待處理的錯誤 ⇒ `status` 而不是 `alert`。
 						<section
 							className="rounded-hkui-md border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700"
 							role="status"
@@ -247,8 +245,7 @@ export default function InvoiceDocumentDetailClient({
 							) : null}
 							{detail.issuerName ? (
 								<>
-									{/* label 是「開立人」不是「賣家」：PLATFORM_RECEIPT 模式下
-									    開立人是平台，寫「賣家」會在收據情境下說謊。 */}
+
 									<dt className={DT_CLASS}>{T.fieldIssuer}</dt>
 									<dd className={DD_CLASS}>{detail.issuerName}</dd>
 								</>
@@ -271,11 +268,7 @@ export default function InvoiceDocumentDetailClient({
 									<dd className={DD_CLASS}>{detail.recipientName}</dd>
 								</>
 							) : null}
-							{/*
-							 * 🔴 **不能用純真值判斷**：B2C 的 `recipientTaxId` 是 DB CHECK
-							 * 強制的哨兵值 `"0000000000"`，它是非空字串 ⇒ truthy ⇒ 十個零
-							 * 會被當成統編印給消費者看（#3012）。判準見 `hasRecipientTaxId`。
-							 */}
+
 							{hasRecipientTaxId(
 								summary.documentKind,
 								detail.recipientTaxId,
@@ -287,9 +280,7 @@ export default function InvoiceDocumentDetailClient({
 									</dd>
 								</>
 							) : null}
-							{/* backend#3084：carrierSummary 在沒有載具時裝的是**買受人統編**，
-							    而這一頁上方已經有專屬的「買受人統編」列 ⇒ 那種情況不渲染，
-							    否則同一頁會出現兩列同值（dev 實測：兩列都是 22223223）。 */}
+
 							{carrierRowKindOf(summary.carrierSummary, summary.carrierType) !==
 							"recipientTaxId" ? (
 								<>
@@ -326,8 +317,6 @@ export default function InvoiceDocumentDetailClient({
 						</dl>
 
 						{detail.lines.length > 0 ? (
-							// `<ul>` 不是 `<table>`：repo 查無 Table primitive，為一頁新造一個
-							// 表格語彙的代價比這裡的可讀性損失大。
 							<ul className="mt-4 list-none border-t border-divider p-0">
 								{detail.lines.map((line) => (
 									<LineRow
@@ -345,10 +334,7 @@ export default function InvoiceDocumentDetailClient({
 							{INVOICE_ORDER_TEXT.shippingFeeNotice}
 						</p>
 
-						{/*
-						 * 只有三聯式需要這句：它的明細（含稅）與銷售額（未稅）加起來對不上，
-						 * 而那個落差看起來就像「稅是另外加的」。見 i18n 的 taxInclusiveNotice。
-						 */}
+
 						{summary.documentKind === "B2B" ? (
 							<p
 								className="m-0 mt-2 rounded-hkui-md border border-info-200 bg-info-50 p-3 text-xs leading-relaxed text-info-700"

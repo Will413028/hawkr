@@ -32,7 +32,6 @@ func TestFirstPageEqualsSentinelCursorAndDeepPagesHaveNoGapsOrDupes(t *testing.T
 		mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: post.ID, Body: "留言"}))
 	}
 
-	// 由大到小：店家頁。
 	at, id := model.DescStart()
 	first := mustV[social.PostPage](t)(f.module.ListStorePosts(ctx, social.Caller{}, storeID, nil, 50))
 	sent := mustV[social.PostPage](t)(f.module.ListStorePosts(ctx, social.Caller{}, storeID, &social.PostCursor{PublishedAt: at, ID: id}, 50))
@@ -67,7 +66,6 @@ func TestFirstPageEqualsSentinelCursorAndDeepPagesHaveNoGapsOrDupes(t *testing.T
 		seen[g] = true
 	}
 
-	// 由小到大：頂層留言。
 	at, id = model.AscStart()
 	cf := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, post.ID, nil, 50))
 	cs := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, post.ID, &social.CommentCursor{CreatedAt: at, ID: id}, 50))

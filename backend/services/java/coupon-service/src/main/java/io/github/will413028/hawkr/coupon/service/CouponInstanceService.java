@@ -56,21 +56,15 @@ public class CouponInstanceService {
             return ValidateResult.invalid(GrpcResponseCode.COUPON_NOT_FOUND.message());
         }
 
-        // 模板狀態
         if (!CouponTemplateStatus.ACTIVE.value().equals(template.getStatus())) {
             return ValidateResult.invalid(GrpcResponseCode.COUPON_CLAIM_REQUIRES_ACTIVE.message());
         }
 
-        // 時間檢查
         LocalDateTime now = DateTimeUtils.nowUtc();
         if (now.isBefore(template.getStartAt()) || now.isAfter(template.getEndAt())) {
             return ValidateResult.invalid(GrpcResponseCode.COUPON_CLAIM_OUT_OF_WINDOW.message());
         }
 
-        // 檢查買家是否已有 USED 或 RESERVED 的 Instance（依 §2.6.1 業務規則）
-        // - USED：此券已用於某張已付款訂單，不可再用
-        // - RESERVED：此券正鎖定於某張未付款訂單，須先完成付款或等該訂單被取消
-        // 訊息精確帶上對應 orderNo，讓前端能引導買家「去完成 / 取消」上一張單
         CouponInstanceEntity existingInstance = findByTemplateAndOwner(templateId, buyerId);
         if (existingInstance != null) {
             String existStatus = existingInstance.getStatus();
@@ -84,13 +78,11 @@ public class CouponInstanceService {
             }
         }
 
-        // Scope 檢查
         if (template.getApplicableStoreId() != null && storeId != null
                 && !template.getApplicableStoreId().equals(storeId)) {
             return ValidateResult.invalid(COUPON_NOT_APPLICABLE_TO_SELLER_MESSAGE);
         }
 
-        // 領取檢查
         if (Boolean.TRUE.equals(template.getClaimRequired())) {
             boolean claimed = claimService.isClaimed(template.getTemplateId(), buyerId);
             if (!claimed) {
@@ -99,12 +91,10 @@ public class CouponInstanceService {
             }
         }
 
-        // 門檻檢查
         if (orderAmount < template.getThresholdAmount()) {
             return ValidateResult.invalid("未達滿額門檻 " + template.getThresholdAmount() + " 元");
         }
 
-        // 計算折扣
         long discount = calculateDiscount(template, orderAmount);
         String description = buildDescription(template);
 
@@ -119,7 +109,6 @@ public class CouponInstanceService {
     @Transactional
     public Long reserveCoupon(Long templateId, Long buyerId, String orderNo,
                                Long applicableStoreId) {
-        // 領取檢查
         CouponTemplateEntity template = templateService.getById(templateId);
         if (template != null && Boolean.TRUE.equals(template.getClaimRequired())) {
             boolean claimed = claimService.isClaimed(templateId, buyerId);
@@ -129,23 +118,18 @@ public class CouponInstanceService {
             }
         }
 
-        // Pre-check 既有 instance（避開 UNIQUE 違規導致 transaction abort）
         CouponInstanceEntity existing = findByTemplateAndOwner(templateId, buyerId);
         if (existing != null) {
             String status = existing.getStatus();
             if (CouponInstanceStatus.RESERVED.value().equals(status)) {
-                // 冪等：同 orderNo 直接回傳既有 instance
                 if (orderNo.equals(existing.getReservedOrderNo())) {
                     return existing.getInstanceId();
                 }
-                // 被另一筆訂單鎖住
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_LOCKED_BY_OTHER_ORDER);
             }
             if (CouponInstanceStatus.UNUSED.value().equals(status)) {
-                // 之前 release 後重用：UNUSED → RESERVED
                 int affected = instanceMapper.reReserveCoupon(existing.getInstanceId(), orderNo);
                 if (affected == 0) {
-                    // 並發競爭：被別人搶先 reserve，重查確認
                     CouponInstanceEntity rechecked = findByTemplateAndOwner(templateId, buyerId);
                     if (rechecked != null
                             && CouponInstanceStatus.RESERVED.value().equals(rechecked.getStatus())
@@ -161,11 +145,9 @@ public class CouponInstanceService {
                                 + " templateId=" + templateId + " orderNo=" + orderNo);
                 return existing.getInstanceId();
             }
-            // USED / REVOKED / ANNUL / EXPIRED → 不可用
             throw new CouponBusinessException(GrpcResponseCode.COUPON_ALREADY_USED);
         }
 
-        // 全新 instance：直接 INSERT
         CouponInstanceEntity instance = new CouponInstanceEntity();
         instance.setInstanceId(TsidUtil.generate());
         instance.setTemplateId(templateId);
@@ -195,7 +177,6 @@ public class CouponInstanceService {
             writeLog(instanceId, null, null, CouponRedemptionAction.CONSUME, orderNo, null, null);
             return true;
         }
-        // 冪等：已為 USED 且 order_no 匹配
         return instanceMapper.countUsedWithOrderNo(instanceId, orderNo) > 0;
     }
 
@@ -208,7 +189,6 @@ public class CouponInstanceService {
             writeLog(instanceId, null, null, CouponRedemptionAction.RELEASE, orderNo, null, null);
             return true;
         }
-        // 冪等：已為 UNUSED
         return instanceMapper.countUnused(instanceId) > 0;
     }
 
@@ -309,7 +289,6 @@ public class CouponInstanceService {
         return instanceMapper.selectById(instanceId);
     }
 
-    // ==================== 內部方法 ====================
 
     /**
      * 根據 templateId + ownerBuyerId 查詢 Instance（唯一約束查詢）

@@ -159,7 +159,6 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 	return id, nil
 }
 
-// checkRequest 呼叫 CheckRequest；只有 CANDIDATE_SEARCH 用它，而且一定要給，與 PrepareCandidateSet 成對。
 func (s Submitter) checkRequest(ctx context.Context, q *store.Queries, in SubmitInput) error {
 	search := in.RunType == RunTypeCandidateSearch
 	if search != (in.CheckRequest != nil) || search != (in.PrepareCandidateSet != nil) {
@@ -171,7 +170,6 @@ func (s Submitter) checkRequest(ctx context.Context, q *store.Queries, in Submit
 	return in.CheckRequest(ctx, q)
 }
 
-// prepareCandidateSet 呼叫 PrepareCandidateSet；成對檢查已在 checkRequest 做過（run 沒有候選集就沒有搜尋的依據）。
 func (s Submitter) prepareCandidateSet(ctx context.Context, q *store.Queries, in SubmitInput) (*uuid.UUID, error) {
 	if in.PrepareCandidateSet == nil {
 		return nil, nil
@@ -183,7 +181,6 @@ func (s Submitter) prepareCandidateSet(ctx context.Context, q *store.Queries, in
 	return &id, nil
 }
 
-// insertRun 建 run 列；買家的鎖之下 (buyer, client_request_id) 不會衝突，回 0 列代表不變量被破壞。
 func (s Submitter) insertRun(ctx context.Context, q *store.Queries, p store.InsertRunParams) (int64, error) {
 	n, err := q.InsertRun(ctx, p)
 	if err != nil {
@@ -195,7 +192,6 @@ func (s Submitter) insertRun(ctx context.Context, q *store.Queries, p store.Inse
 	return n, nil
 }
 
-// checkLimits 在買家的鎖之內檢查進行中數、每分鐘送出數與同需求的進行中 run。requestID 非 nil 時檢查該需求。
 func (s Submitter) checkLimits(ctx context.Context, q *store.Queries, buyerID int64, requestID *uuid.UUID, now time.Time) error {
 	if requestID != nil {
 		n, err := q.CountRequestActiveRuns(ctx, *requestID)
@@ -225,7 +221,6 @@ func (s Submitter) checkLimits(ctx context.Context, q *store.Queries, buyerID in
 	return nil
 }
 
-// 語系在資料表裡存代碼（UPPER_SNAKE）：zh-TW 是 ZH_TW，en 是 EN。
 const (
 	localeCodeZhTW = "ZH_TW"
 	localeCodeEN   = "EN"
@@ -256,7 +251,6 @@ func LocaleOf(code string) (uitext.Locale, error) {
 // HasInput 回報這個類型的 run 是否有買家輸入列：CANDIDATE_SEARCH 沒有買家訊息，輸入只取自候選集所指的需求版本，不寫 agent_run_inputs。
 func HasInput(runType string) bool { return runType != RunTypeCandidateSearch }
 
-// start 寫輸入（有買家輸入的類型）與 run_accepted 事件、排入 job 並記下 job id。
 func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, in SubmitInput, now time.Time) error {
 	if HasInput(in.RunType) {
 		code, err := LocaleCode(in.Locale)
@@ -288,8 +282,6 @@ func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, in
 	return nil
 }
 
-// cancelSuperseded 把同一個需求裡等待輸入的 run 轉 CANCELLED（不退額度，它的 PENDING 中斷與進行中的回答 run 一併取消）：新的一輪取代它，之後不會再有人回答。
-// 只有 TURN 取代（A9-D23(2)）；逐個依全域鎖順序鎖住並重讀狀態，已被別處收斂的略過。
 func (s Submitter) cancelSuperseded(ctx context.Context, q *store.Queries, buyerID int64, requestID uuid.UUID) error {
 	ids, err := q.ListWaitingRunIDs(ctx, store.ListWaitingRunIDsParams{BuyerID: buyerID, RequestID: requestID})
 	if err != nil {

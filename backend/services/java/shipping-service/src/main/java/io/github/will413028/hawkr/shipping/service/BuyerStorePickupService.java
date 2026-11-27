@@ -38,7 +38,6 @@ public class BuyerStorePickupService {
                                                   String receiverName,
                                                   String receiverPhone,
                                                   boolean isDefault) {
-        // 檢查數量上限
         long count = pickupMapper.selectCount(
                 new LambdaQueryWrapper<BuyerStorePickupEntity>()
                         .eq(BuyerStorePickupEntity::getBuyerId, buyerId));
@@ -46,7 +45,6 @@ public class BuyerStorePickupService {
             throw new ShippingBusinessException(GrpcResponseCode.BUYER_STORE_PICKUP_LIMIT_EXCEEDED, maxPerBuyer);
         }
 
-        // 若設為預設，先清除舊的預設
         if (isDefault) {
             clearDefault(buyerId);
         }
@@ -85,7 +83,6 @@ public class BuyerStorePickupService {
             throw new ShippingBusinessException(GrpcResponseCode.BUYER_STORE_PICKUP_NOT_FOUND);
         }
 
-        // 若設為預設，先清除舊的預設
         if (isDefault) {
             clearDefault(buyerId);
         }

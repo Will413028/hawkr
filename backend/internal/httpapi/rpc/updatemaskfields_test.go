@@ -45,7 +45,6 @@ func TestWritableFieldsNestedPathsOnlyGoIntoOneofBranches(t *testing.T) {
 	if got := writable(t, app, "business"); len(got) != 6 || !slices.Contains(got, "business.company_documents") || slices.Contains(got, "business.company_type") || !slices.Contains(got, "business.company_address") {
 		t.Fatalf("business：%v", got)
 	}
-	// individual 沒有可寫的欄位（D22）：列它不報錯，也不展開成任何欄位。
 	if got := writable(t, app, "individual"); len(got) != 0 {
 		t.Fatalf("individual：%v", got)
 	}
@@ -77,13 +76,11 @@ func TestWildcardIsExactlyTheWritableFieldsOfTheDescriptor(t *testing.T) {
 			}
 		}
 	}
-	// 沒設定的那一支不展開。
 	if got := writable(t, &pb.KYCApplication{Subject: &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{}}}, "*"); slices.ContainsFunc(got, func(p string) bool { return strings.HasPrefix(p, "business.") }) {
 		t.Fatalf("沒設定的 business 被展開：%v", got)
 	}
 }
 
-// walkWritable 是獨立於 WritableFields 的實作（測試的預期）。
 func walkWritable(desc protoreflect.MessageDescriptor, msg protoreflect.Message, prefix string) []string {
 	var out []string
 	fields := desc.Fields()

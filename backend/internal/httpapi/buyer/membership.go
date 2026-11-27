@@ -109,9 +109,7 @@ func recordLess(a, b SpendingRecord) bool {
 	return a.OrderNo > b.OrderNo
 }
 
-// allSpendingRecords 逐頁讀完舊訂單來源，讓對外清單在單體接手排序前使用穩定的 keyset。
 func (h *App) allSpendingRecords(ctx context.Context, buyerID, storeID int64) ([]SpendingRecord, error) {
-	// 訂單明細 RPC 沒有 page size 上限；100 是 order-service 其他清單使用的有界批量。
 	const batchSize = 100
 	var rows []SpendingRecord
 	var total int64 = -1

@@ -70,9 +70,6 @@ export interface DelegatedProductDetail {
 	name: string;
 	status: string;
 	statusLabel: string;
-	// 買家視角的兩個判定旗標（gateway 於 #2479 補上，上游 ProductPublicationPolicy 一律填）。
-	// ⚠️ purchasable 用非可選的 boolean：預覽的 deriveDetailLayoutProps 判定是
-	// `purchasable !== false`，欄位缺席會恆為 true ⇒ 草稿預覽顯示成「可以購買」。
 	purchasable: boolean;
 	publicationState: string;
 	categoryId: string;
@@ -221,8 +218,6 @@ export function readDelegatedProductDetail(
 		name: str(raw.name),
 		status: str(raw.status),
 		statusLabel: str(raw.statusLabel),
-		// 預設 false 而不是 true：讀不到就當「不可購買」才是 fail-safe 的方向——
-		// 預覽把不可買的說成可買，比反過來嚴重。
 		purchasable: raw.purchasable === true,
 		publicationState: str(raw.publicationState),
 		categoryId: str(raw.categoryId),
@@ -281,7 +276,6 @@ export function createDelegatedProductEditRepo(
 			const body: Record<string, unknown> = {
 				expectedVersion: meta.expectedVersion,
 				operationReason: meta.operationReason.trim(),
-				// 不靠 DB DEFAULT 兜底：proto3 分不出「未設定」與 false。
 				notifySeller: meta.notifySeller ?? true,
 			};
 			if (patch.name !== undefined) body.name = patch.name;

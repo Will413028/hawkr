@@ -30,14 +30,12 @@ export function publishStatusOf(status: PostStatus): string | undefined {
 		case PostStatus.UNPUBLISHED:
 			return PostPublishStatus.UNPUBLISHED;
 		default:
-			// 不認得的狀態不猜：畫面只在有值時畫狀態標籤。
 			return undefined;
 	}
 }
 
 export function ownerListItem(post: Post): PostListItem {
 	const item = postToListItem(post);
-	// 店主自己的列表：沒有圖就是沒有圖，不補預設圖（草稿可以沒有圖）。
 	const image = imageUri(post.image, "card");
 	const publishStatus = publishStatusOf(post.status);
 	return {
@@ -55,7 +53,6 @@ export function ownerDetail(post: Post): MyPostDetail {
 	const publishStatus = publishStatusOf(post.status);
 	return {
 		...detail,
-		// 商品摘要讀不到（已刪除）時編輯頁仍以 ID 預選，名稱與價格留空。
 		products:
 			detail.products.length > 0
 				? detail.products
@@ -115,7 +112,6 @@ export function createOwnerPostApi(client: OwnerPostClient) {
 			const version = requireEtag(etag);
 			const paths = ["body"];
 			if (body.newStagedToken) paths.push("image_staged_token");
-			// null 與 undefined 要分開：進 mask 但不帶值才會清掉商品。
 			if (body.productId !== undefined) paths.push("product_id");
 			if (body.tags) paths.push("hashtag_inputs");
 			await client.updatePost({

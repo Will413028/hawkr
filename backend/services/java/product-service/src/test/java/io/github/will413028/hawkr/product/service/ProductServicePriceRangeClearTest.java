@@ -115,7 +115,6 @@ class ProductServicePriceRangeClearTest {
     void nonEmptySkuSetStillComputesRange() throws Exception {
         ProductEntity entity = new ProductEntity();
 
-        // effective = salePrice ?? price → {80, 300}；list = price → {100, 300}；sale = {80}
         invoke(entity, List.of(sku(100L, 80L), sku(300L, null)));
 
         assertEquals(80L, entity.getPriceMin());

@@ -32,21 +32,16 @@ test("原始模型推理展示已下架（doc 55 §8.1 上線阻斷項）——�
 });
 
 test("同一時間只有一個即時處理 surface，完成後沒有快照或回放", () => {
-	// 泡泡裡不得再有收合的步驟摘要；元件本身也已下架。
 	assert.doesNotMatch(source, /AgentStepSummary/);
-	// 沒有回放路徑：沒有 replayLines／replayTurn／revealed 集合。
 	assert.doesNotMatch(source, /replay/i);
 	assert.doesNotMatch(source, /revealed/);
-	// 也不留判斷「這輪是不是串流來的」的旗標——兩條路徑落地行為一致。
 	assert.doesNotMatch(source, /streamed/);
-	// 主對話區只有一個處理 slot；正式對話不另外渲染相同進度的一行摘要。
 	assert.match(source, /processing\?: React\.ReactNode/);
 	assert.match(
 		source,
 		/\{pending && processing \? \(\s*<li className="hawkr-agent-processing-row">\{processing\}<\/li>\s*\) : pending \? \(/,
 	);
 	assert.doesNotMatch(source, /AgentActivityRail/);
-	// 即時 surface 只存在於 pending turn 或 searching，完成後直接移除。
 	assert.match(
 		taskPanel,
 		/if \(stage !== "searching" && !pending\) return null;/,
@@ -59,16 +54,12 @@ test("思考步驟只存在於 Live Activity Rail，不借用 facts pill 變成�
 	assert.doesNotMatch(source, /turn\.steps/);
 	assert.doesNotMatch(source, /hawkr-agent-message__steps/);
 	assert.doesNotMatch(css, /\.hawkr-agent-message__steps/);
-	// 後端 guard 過的逐步敘述仍可在 pending rail 顯示。
 	assert.match(rail, /stepLabel\(step\)/);
 });
 
 test("allowlisted public steps 逐列呈現，並把完整 liveSteps 交給狀態軌", () => {
-	// stepFromProto 已先 fail closed；這裡把完整 liveSteps 交給狀態軌，保留
-	// §V.10.6-3 所需的 status。
 	assert.match(taskPanel, /<AgentActivityRail[\s\S]*?steps=\{liveSteps\}/);
 	assert.match(rail, /data-status=\{step\.status\}/);
-	// 停留多久由下一個 step 何時抵達決定，前端不排程。
 	assert.doesNotMatch(source, /holdMs/);
 	assert.doesNotMatch(rail, /holdMs/);
 });
@@ -89,8 +80,6 @@ test("跳過跟點 chip 一樣算『用按鈕作答』，下一題掛載要把�
 });
 
 test("狀態軌只在等待中渲染；問題卡在等待結束後才出現", () => {
-	// legacy（liveSteps）與 graph 路徑（liveActivity）任一有內容都要開閘——
-	// 兩條路徑互斥，但閘門本身得認得兩種輪子。
 	assert.match(
 		taskPanel,
 		/const hasLiveRows =\s*liveSteps\.length > 0 \|\| liveActivity\.length > 0;/,
@@ -99,8 +88,6 @@ test("狀態軌只在等待中渲染；問題卡在等待結束後才出現", ()
 		taskPanel,
 		/<AgentActivityRail[\s\S]*?steps=\{liveSteps\}[\s\S]*?activity=\{liveActivity\}[\s\S]*?motion=\{motion\}[\s\S]*?\/>/,
 	);
-	// graph 路徑的列身分鍵是後端指定的 rowId，不是（clientRequestId, code）。
-	// T23 起分成 top-level 列與 lane 子列兩層，兩層都必須用後端的 rowId 當 key。
 	assert.match(rail, /key=\{row\.rowId\}/);
 	assert.match(rail, /key=\{child\.rowId\}/);
 	assert.match(source, /!pending && question && onPickOption/);
@@ -113,14 +100,9 @@ test("狀態軌不自己計時——節奏是伺服器的，不得出現前進�
 });
 
 test("設計書 §V.10.6-1：收到幾個 step 就顯示幾列，不是只留最新一行", () => {
-	// 舊版只渲染 lines.at(-1)，前面做過什麼一換行就消失。§V.10.6-1 要求
-	// 「收到幾個不同 step 就顯示幾列，不設固定兩列上限」。
 	assert.match(rail, /steps\.map\(\(step\) =>/);
 	assert.doesNotMatch(rail, /\.at\(-1\)/);
-	// Slice A 的列身分鍵是（clientRequestId, code）——liveSteps 已按 code 收斂，
-	// 所以 heartbeat 會 upsert 原列而不是長出重複的一行。
 	assert.match(rail, /key=\{step\.code\}/);
-	// §V.10.6-3：step 完成只完成那一列，狀態掛在該列上。
 	assert.match(rail, /data-status=\{step\.status\}/);
 });
 
@@ -132,8 +114,6 @@ test("尚未收到公開步驟時中性等待，真實步驟到達後呈現完�
 });
 
 test("§V.10.10-2：尚未 ACK 的等待列只能用不循環的 SUBMITTING，不得靠 motion 猜", () => {
-	// 無列等待分支沿用 canonical Sprite 的 SUBMITTING；不把整個 run 的動態
-	// 表情套到尚未收到權威事件的等待狀態。
 	const waiting = taskPanel.slice(
 		taskPanel.indexOf('className="hawkr-agent-processing__waiting"'),
 	);
@@ -190,8 +170,6 @@ test("伺服器 label 缺席時的備援字串表守 brand voice：動詞開頭�
 });
 
 test("狀態軌對 screen reader 隱藏——逐行冒出不得進 aria-live", () => {
-	// 播報由 workspace 的 atomic polite status 負責，只播當下這一步一次
-	//（§V.11.0 Accessibility：視覺列表本身不設 live）。
 	assert.match(rail, /aria-hidden="true"/);
 	assert.doesNotMatch(rail, /aria-live/);
 });
@@ -357,18 +335,13 @@ test("已記下的條件以不可互動的霧面摘要呈現，snake/camel key �
 });
 
 test("草稿是受控的，composer 自己不持有 draft state——entry 與 thread 才可能是同一個 composer（設計書 v6 §V.11.0）", () => {
-	// 舊版把 draft 放在 composer 內部的 useState，再靠 initialDraft 從外面塞值
-	// 進去。那個結構撐不住 §V.11.0 的兩條要求：入口收合時元件換位置會重掛
-	//（草稿蒸發），而且送出後立刻清空會讓首送失敗的 prompt 消失。
 	assert.match(
 		source,
 		/value: string;\s*onValueChange: \(next: string\) => void;/,
 	);
 	assert.doesNotMatch(source, /const \[draft, setDraft\] = React\.useState/);
 	assert.doesNotMatch(source, /initialDraft/);
-	// 送出後不由 composer 自己清空——清空時機屬於持有草稿的父層。
 	assert.match(source, /setValidationError\(null\);\s*onSubmit\(message\);/);
-	// 外部可拿到 textarea ref，entry 的 chips／起手卡才能把焦點移進來。
 	assert.match(source, /const textareaRef = inputRef \?\? fallbackRef;/);
 });
 
@@ -405,8 +378,6 @@ test("quantity 複合問題卡：單位 chip 在數字欄驗證通過前 disable
 		questionCard,
 		/onPickUnit\(\{\s*slotKey: question\.slotKey,\s*unitOptionId: option\.optionId,\s*unitLabel: option\.label,/,
 	);
-	// 複合問題卡不透過 submitFreeText 送出——只有點單位 chip 才送出一次；
-	// 沒有獨立的「送出答案」按鈕，Enter 也不觸發送出。
 	assert.match(questionCard, /if \(isCompoundQuantity\) return;/);
 });
 
@@ -435,12 +406,10 @@ test("品項分類消歧 gate：D「其他」chip 不直接 onPick，而是展�
 		/const CROP_DISAMBIGUATION_SLOT_KEY = "crop_disambiguation";/,
 	);
 	assert.match(questionCard, /const CROP_OTHER_OPTION_ID = "crop-other";/);
-	// D chip 的 onClick 先判斷是不是 crop-other，是的話只開表單、不呼叫 onPick。
 	assert.match(
 		questionCard,
 		/if \(isCropOtherOption\) \{\s*openCropOtherForm\(\);\s*return;\s*\}\s*onPick\(\{/,
 	);
-	// 真候選（非 crop-other）維持原本直接 onPick 的行為，沒有被這個判斷擋住。
 	assert.match(
 		questionCard,
 		/isCropOtherOption =\s*isCropDisambiguation &&\s*option\.optionId === CROP_OTHER_OPTION_ID;/,
@@ -464,7 +433,6 @@ test("品項分類消歧 gate：D 子表單描述填了才能送出，未傳 onS
 		questionCard,
 		/disabled=\{!canSubmitCropOther \|\| !onSubmitCropOther\}/,
 	);
-	// 送出後回到未展開狀態並清空欄位，跟其他問題卡的自由文字表單同一套收尾慣例。
 	assert.match(
 		questionCard,
 		/setShowCropOtherForm\(false\);\s*setCropOtherDescription\(""\);/,

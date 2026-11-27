@@ -92,14 +92,12 @@ class OrderDetailScreen extends HookConsumerWidget {
     if (orderSn != null) {
       final orderAsync = ref.watch(orderDetailControllerProvider(orderSn!));
 
-      // 狀態重讀提示：訂單狀態變更 → 重讀本頁訂單
       ref.listen(orderStatusStreamProvider, (_, next) {
         next.whenData((_) {
           ref.read(orderDetailControllerProvider(orderSn!).notifier).refresh();
         });
       });
 
-      // 狀態重讀提示：售後案件變更 → 重讀本訂單與售後
       ref.listen(afterSaleStatusStreamProvider, (_, next) {
         next.whenData((_) {
           ref.read(orderDetailControllerProvider(orderSn!).notifier).refresh();
@@ -187,8 +185,6 @@ class OrderDetailScreen extends HookConsumerWidget {
                         orderDetailControllerProvider(orderSn!),
                       );
                       final isDelivered = orderAsync.value?.status == '40';
-                      // 已送出售後案件後就不再顯示售後按鈕，避免重複申請。
-                      // 例外：案件已取消（買家自行撤回）才允許重新申請。
                       final afterSaleCase = ref
                           .watch(_orderAfterSaleCaseProvider(orderSn!))
                           .value;
@@ -315,8 +311,6 @@ class _OrderDetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // GA4 purchase — fire once per order, guarded by session dedup.
-    // Only fires when the screen is opened directly from checkout (fresh order).
     if (fromCheckout && order.orderSn.isNotEmpty) {
       if (markPurchaseTracked(order.orderSn)) {
         ref.read(analyticsEventsProvider).trackPurchase(order);
@@ -355,8 +349,6 @@ class _OrderDetailBody extends ConsumerWidget {
                   _ItemsCard(order: order),
                   const SizedBox(height: HkSpace.lg),
                   _OrderInfoCard(order: order),
-                  // 即時物流狀態。沒有物流單的訂單自己回 SizedBox.shrink()，
-                  // 也不會去打那支 API（見 OrderLogisticsSection.hasShipment）。
                   OrderLogisticsSection(order: order),
                   const SizedBox(height: HkSpace.lg),
                   _PaymentDetailsCard(order: order),
@@ -529,7 +521,6 @@ class _OrderDetailBottomBarState extends ConsumerState<_OrderDetailBottomBar> {
             onTap: () => _handleReview(context),
           );
         }
-        // 已評價或不可評價 → 再次購買，整單商品一鍵加入購物車。
         if (order.items.isNotEmpty) {
           return (
             label: '再次購買',
@@ -538,7 +529,6 @@ class _OrderDetailBottomBarState extends ConsumerState<_OrderDetailBottomBar> {
           );
         }
         return null;
-      // 部分退款 / 全額退款 / 已取消 也可以再次購買
       case '60':
       case '70':
       case '80':
@@ -741,7 +731,6 @@ class _TransactionOverviewCard extends StatelessWidget {
     final visual = OrderStatusPresentation.fromOrder(order);
     final rows = <Widget>[];
 
-    // 待付款 → 顯示 HH:MM:SS 即時倒數（每秒 tick，逾時切灰、< 1hr 切警示紅）
     if (order.status == '0' && order.paymentDeadline.isNotEmpty) {
       rows.add(
         LiveCountdownLine(
@@ -751,7 +740,6 @@ class _TransactionOverviewCard extends StatelessWidget {
         ),
       );
     }
-    // 出貨處理期限是「日期目標」不是「倒數」— 保留靜態日期顯示
     if (order.processingDeadline.isNotEmpty &&
         (order.status == '10' || order.status == '20')) {
       rows.add(
@@ -764,14 +752,12 @@ class _TransactionOverviewCard extends StatelessWidget {
         ),
       );
     }
-    // 已送達 → 自動完成倒數也跑即時 HH:MM:SS（3 天通常會顯示 N 天 HH:MM:SS）
     if (order.status == '40' && order.autoCompleteAt.isNotEmpty) {
       rows.add(
         LiveCountdownLine(
           label: '自動完成倒數',
           deadlineIso: order.autoCompleteAt,
           expiredText: '已自動完成',
-          // 自動完成沒「緊迫」概念，永遠用 normal 色
           urgentThreshold: Duration.zero,
         ),
       );
@@ -787,7 +773,6 @@ class _TransactionOverviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Hero status block — Klarna 風格大字 status 當 page hero。
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -950,7 +935,6 @@ class _ReturnLogisticsCard extends StatelessWidget {
           value: afterSale.providerMessage,
           valueColor: abnormal ? OrderColorTokens.attention : null,
         ),
-      // 退貨相關代碼用可複製 row（原本散落 _CustomerAuditInfoSection 重複欄位）。
       _CopyableInfoRow(label: '退貨物流號', value: afterSale.returnShipmentNo),
       if (afterSale.shipTradeNo.isNotEmpty)
         _CopyableInfoRow(label: '寄件交易單', value: afterSale.shipTradeNo),
@@ -1098,8 +1082,6 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
-// `_LiveCountdownLine` 已抽至 `lib/shared/widgets/live_countdown_line.dart`
-// 並改名為 [LiveCountdownLine]，供訂單詳情、售後詳情共用，避免重複實作。
 
 class _CopyableInfoRow extends StatelessWidget {
   const _CopyableInfoRow({required this.label, required this.value});
@@ -1196,9 +1178,6 @@ class _SimpleInfoCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  Shared styles
-// ═══════════════════════════════════════════════════════════════
 
 BoxDecoration _cardDecoration() => BoxDecoration(
   color: AppColors.bgCard.withValues(alpha: 0.94),
@@ -1207,8 +1186,6 @@ BoxDecoration _cardDecoration() => BoxDecoration(
   boxShadow: HkShadows.card,
 );
 
-// ─── Unified type scale ──────────────────────────────────────────────────
-// 只引用 AppTypography 的全站字體階層，避免在訂單頁另外定義字級。
 
 TextStyle _sectionTitleStyle() => AppTypography.sectionTitle;
 
@@ -1340,9 +1317,6 @@ extension _OrderDetailStringX on String {
   String ifEmpty(String fallback) => trim().isEmpty ? fallback : this;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  Card 1: 訂單資訊
-// ═══════════════════════════════════════════════════════════════
 
 class _OrderInfoCard extends StatelessWidget {
   const _OrderInfoCard({required this.order});
@@ -1350,9 +1324,6 @@ class _OrderInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 收件資訊依配送方式**明確分派**。未知 / 本版未支援者不猜是門市取貨還是宅配
-    // （猜錯會對門市取貨單顯示「配送地址：未指定」），改用中性 label 並顯示後端
-    // 實際給到的那一個值。
     final (addressLabel, addressValue) = switch (shippingPresentationOf(
       order.shippingMethod,
     )) {
@@ -1403,9 +1374,6 @@ class _OrderInfoCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  Card 2: 商品明細
-// ═══════════════════════════════════════════════════════════════
 
 class _ItemsCard extends StatelessWidget {
   const _ItemsCard({required this.order});
@@ -1494,7 +1462,6 @@ class _OrderItemRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Product image
         ClipRRect(
           borderRadius: BorderRadius.circular(12.r),
           child: item.imageUrl.isNotEmpty
@@ -1517,7 +1484,6 @@ class _OrderItemRow extends StatelessWidget {
                 ),
         ),
         SizedBox(width: 12.w),
-        // Product info
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1579,7 +1545,6 @@ class _OrderItemRow extends StatelessWidget {
                   ),
                 ],
               ),
-              // PayUni #758: 品項分攤折抵
               if (item.shareDiscountValue > 0) ...[
                 SizedBox(height: 4.h),
                 Text(
@@ -1621,9 +1586,6 @@ String _itemRefundStatusLabel(String raw) {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  Card 3: 付款詳情
-// ═══════════════════════════════════════════════════════════════
 
 class _PaymentDetailsCard extends StatelessWidget {
   const _PaymentDetailsCard({required this.order});
@@ -1899,9 +1861,6 @@ class _PaymentRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  Card 4: 訂單備註
-// ═══════════════════════════════════════════════════════════════
 
 class _NoteCard extends StatelessWidget {
   const _NoteCard({required this.remark});
@@ -1932,13 +1891,6 @@ String _paymentMethodText(String value) =>
     PaymentMethod.fromCode(value.toUpperCase())?.label ??
     (value.isEmpty ? '付款方式未指定' : value);
 
-// ═══════════════════════════════════════════════════════════════
-//  Card 4.6: 商品評價（買家評價過此訂單後顯示自己的評分 + 評論）
-//
-//  資料來源優先順序：
-//   1. order.reviewRating > 0 → 直接用 Order 自帶
-//   2. fallback：呼叫 ReviewRepository.findMyReviewForOrderItems 以訂單項目反查我的評價
-// ═══════════════════════════════════════════════════════════════
 
 class _OrderReviewCard extends ConsumerStatefulWidget {
   const _OrderReviewCard({required this.order});
@@ -1958,15 +1910,9 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
   }
 
   Future<_ReviewData?> _loadReview() async {
-    // 優先：Order 自帶（B-145 後端補欄位後 isReviewed 通常會搭配 reviewRating>0）
-    // 注意：Order model 目前沒有 review images 欄位，所以即使 order.reviewRating>0
-    // 還是要反查 API 才拿得到圖片。等 B-145 把 review 物件完整補齊後再拿掉 fallback。
     if (widget.order.reviewRating > 0 &&
         widget.order.reviewContent.isNotEmpty) {
-      // 沒辦法靠 Order 拿到 images，退回 API fallback 同時取得 images
-      // 但 rating 跟 content 已知；先 return 這份等改善
     }
-    // Fallback：反查買家評論列表 — 用 orderItemId 比對（review entity 沒 orderNo）
     try {
       final orderItemIds = widget.order.items
           .map((i) => i.id)
@@ -1977,7 +1923,6 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
           .read(reviewRepositoryProvider)
           .findMyReviewForOrderItems(orderItemIds);
       if (review == null) {
-        // API 沒撈到但 Order 有 reviewRating（極少見），用 Order 自帶
         if (widget.order.reviewRating > 0) {
           return _ReviewData(
             rating: widget.order.reviewRating,
@@ -1989,7 +1934,6 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
       }
       return _ReviewData.fromReview(review);
     } catch (_) {
-      // API 失敗時，如果 Order 自帶 rating 仍可顯示部分資料
       if (widget.order.reviewRating > 0) {
         return _ReviewData(
           rating: widget.order.reviewRating,
@@ -2006,7 +1950,6 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
     return FutureBuilder<_ReviewData?>(
       future: _reviewFuture,
       builder: (context, snapshot) {
-        // 載入中或反查無結果都先不顯示卡片，避免空白佔位
         final data = snapshot.data;
         if (snapshot.connectionState != ConnectionState.done) {
           return const SizedBox.shrink();
@@ -2057,7 +2000,6 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
                 ],
                 if (data.images.isNotEmpty) ...[
                   SizedBox(height: 12.h),
-                  // 評論附圖 — 橫向排列，最多顯示前 4 張
                   SizedBox(
                     height: 80.w,
                     child: ListView.separated(

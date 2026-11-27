@@ -36,8 +36,6 @@ func adminCtx(id int64) context.Context {
 
 func newTestAdmin(m AdminModule) *Admin { return NewAdmin(m, rpc.Images{}, nil, fakeLinks{}, nil) }
 
-// wantInvalidArgument 確認請求被當成 client 的錯拒絕：handler 回的是模組的 invalid_input，或傳輸層的 invalid_argument（interceptor
-// 之後都是 invalid_argument）；沒帶或讀不懂的 etag 是 etag 的規則（API 設計規範（Connect）§七），傳輸層以 version_conflict 回。
 func wantInvalidArgument(t *testing.T, err error) {
 	t.Helper()
 	if err == nil {
@@ -96,7 +94,6 @@ func TestListStoresPageTokenIsBoundToItsFilters(t *testing.T) {
 		}
 		wantInvalidArgument(t, err)
 	}
-	// 同一組篩選、但解得開卻不完整的位置也不能用。
 	scope := sellerv1alpha1connect.SellerAdminServiceListStoresProcedure + "\x00x\x00\x00" + pb.KYCStatus_KYC_STATUS_UNSPECIFIED.String()
 	_, err = h.ListStores(adminCtx(1), connect.NewRequest(&adminpb.ListStoresRequest{Query: "x", PageToken: rpc.TokenFor(scope, &model.StoreCursor{})}))
 	wantInvalidArgument(t, err)

@@ -55,7 +55,6 @@ func TestUnsetWireValuesRefuseToMarshal(t *testing.T) {
 	}{}); !errors.Is(err, ErrUnsetBuyerID) {
 		t.Fatalf("零值 BuyerID 的 marshal error = %v，want ErrUnsetBuyerID", err)
 	}
-	// 沒載入的 issuer／document／complaint 同樣不得靜默產出值。
 	if _, err := json.Marshal(StoreIDOf(domain.Issuer{})); !errors.Is(err, ErrUnsetStoreID) {
 		t.Fatalf("零值 issuer 應產出不可 marshal 的 StoreID，實得 err=%v", err)
 	}
@@ -73,7 +72,7 @@ func TestUnsetWireValuesRefuseToMarshal(t *testing.T) {
 // BUYER 方向上的行為完全正確。保證的實質是「非 BUYER 不會填」。
 func TestBuyerIDOfDocumentJudgesRecipientTypeFirst(t *testing.T) {
 	const buyerKey = int64(2623900520)
-	const storeKey = int64(2685914682) // recipient_type=SELLER 時 recipient_ref_id 是這個
+	const storeKey = int64(2685914682)
 
 	cases := []struct {
 		name string

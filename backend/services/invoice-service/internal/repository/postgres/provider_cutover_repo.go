@@ -76,7 +76,6 @@ func (r *ProviderCutoverRepository) CountForAdmin(ctx context.Context, providerA
 	return r.q(ctx).CountProviderCutoversForAdmin(ctx, providerAccountID)
 }
 
-// toProviderCutover 把生成列映成 domain 型別。
 func toProviderCutover(row gen.InvoiceProviderCutover) domain.ProviderCutover {
 	return domain.ProviderCutover{
 		ID:                 row.ID,

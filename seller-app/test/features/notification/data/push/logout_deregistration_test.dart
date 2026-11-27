@@ -23,13 +23,10 @@ void main() {
 
   setUpAll(() async {
     if (!F.isInitialized) F.init(Flavor.dev);
-    // PushNotificationManager 的欄位初始化會碰 FirebaseMessaging.instance。
     setupFirebaseCoreMocks();
     await Firebase.initializeApp();
   });
 
-  // 延後到 Firebase mock 就緒後才碰 singleton：它的欄位初始化會取
-  // FirebaseMessaging.instance，在 main() body 直接取會 [core/no-app]。
   late final PushNotificationManager manager;
   setUpAll(() => manager = PushNotificationManager.instance);
 
@@ -86,7 +83,6 @@ void main() {
       );
 
       await manager.onUserLoggedOut(hasCredential: true);
-      // 第二輪：即使呼叫端仍宣稱有憑證（例如 refresh 期間的殘留 state）。
       await manager.onUserLoggedOut(hasCredential: true);
 
       expect(gateway.removeCalls, hasLength(1));
@@ -147,7 +143,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1));
       expect(released, isTrue, reason: '逾時後必須放行，不得把 15s~46s 攤到使用者身上');
 
-      // 逾時不是取消：請求已經送出，後端慢慢回來時仍然完成註銷。
       expect(gateway.removeCalls, ['fcm-token']);
       pending.complete(const DeviceMutationOutcome.success());
       await tester.pump();
@@ -162,7 +157,6 @@ void main() {
         onRegister: (_) => registerPending.future,
       );
       final coordinator = coordinatorFor(gateway);
-      // 例如回前景重註冊剛送出就卡住，使用者接著按登出。
       unawaited(coordinator.register('fcm-token'));
       manager.seedLifecycleStateForTest(
         registration: coordinator,
@@ -186,11 +180,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1));
       expect(released, isTrue, reason: '互等不得讓登出被卡住的註冊連帶拖過 deadline');
 
-      // 已知取捨：註銷排在註冊之後，此刻尚未送出——反過來讓 DELETE 先走會
-      // 製造「註冊蓋掉註銷」的錯誤終態，那個不會自癒（見 _settleOpposing）。
       expect(gateway.removeCalls, isEmpty);
 
-      // 註冊落地後，註銷才在背景依序送出。
       registerPending.complete(const DeviceMutationOutcome.success());
       await tester.pump();
       expect(gateway.removeCalls, ['fcm-token']);

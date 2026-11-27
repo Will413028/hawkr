@@ -10,17 +10,11 @@ import (
 	gobreaker "github.com/sony/gobreaker/v2"
 )
 
-// codeCase 是 §7.5.1／§4.5.6 逐碼對照表的一列。
-//
-// bucket 記的是 §7.5.1 的**落點**（operation 最後停在哪個狀態），class 記的是
-// §4.5.6 的四分類。兩欄一起寫是刻意的：§7.5.1 是 §4.5.6 在執行時視圖上的投影，
-// 對照關係為 RETRYABLE=R｜PERMANENT=P ＋ M 的「只有 ADM 能解」那一支｜UNKNOWN=Q，
-// 唯一有語意差的一格是 M 的「賣家自己能解」那一支落 SELLER_ACTION_REQUIRED。
 type codeCase struct {
 	code     string
 	msg      string
 	endpoint string
-	bucket   string // §7.5.1 落點
+	bucket   string
 
 	class        ErrorClass
 	sellerAction bool
@@ -38,13 +32,7 @@ const (
 	bucketUnknown   = "UNKNOWN"
 )
 
-// classificationTable 是**逐碼**（不是抽樣）的對照表。
-//
-// 新增或修改任何一列時，先讀 §4.5.6 的處置表與 §7.5.1 的三分類表；兩處不一致時，
-// 精確碼一律勝出於區間——那是 §7.5.1 自身的內部規則（它把 3050131 列進 RETRYABLE，
-// 同時把含它的 3050121~3050141 列進 PERMANENT）。
 var classificationTable = []codeCase{
-	// ── 通用碼 ──
 	{code: "10", bucket: bucketRetryable, class: ClassRetryable, breaker: true, known: true},
 	{code: "11", bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "12", bucket: bucketPermanent, class: ClassManual, accountLevel: true, known: true},
@@ -60,14 +48,12 @@ var classificationTable = []codeCase{
 	{code: "22", bucket: bucketPermanent, class: ClassManual, accountLevel: true, known: true},
 	{code: "23", bucket: bucketPermanent, class: ClassPermanent, known: true},
 
-	// ── 查詢／驗證類共用碼 ──
 	{code: "34", endpoint: EndpointInvoiceList, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "51", endpoint: EndpointInvoiceQuery, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "52", endpoint: EndpointInvoiceQuery, bucket: bucketRetryable, class: ClassRetryable, known: true},
 	{code: "71", endpoint: EndpointInvoiceQuery, bucket: bucketPermanent, class: ClassPermanent, notFound: true, known: true},
 	{code: "99", endpoint: EndpointTrackAll, bucket: bucketPermanent, class: ClassManual, known: true},
 
-	// ── f0401 ──
 	{code: "3040111", endpoint: EndpointIssue, bucket: bucketSeller, class: ClassManual, sellerAction: true, known: true},
 	{code: "3040191", endpoint: EndpointIssue, bucket: bucketSeller, class: ClassManual, sellerAction: true, known: true},
 	{code: "3040112", endpoint: EndpointIssue, bucket: bucketPermanent, class: ClassPermanent, known: true},
@@ -78,13 +64,11 @@ var classificationTable = []codeCase{
 	{code: "3040172", endpoint: EndpointIssue, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "3040174", endpoint: EndpointIssue, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "3040184", endpoint: EndpointIssue, bucket: bucketPermanent, class: ClassPermanent, known: true},
-	// 一碼兩義：兩個分支各一列（第三種杜撰措辭另有獨立測試）。
 	{code: "3040171", msg: "OrderId 重複，該訂單編號正在註銷重開中", endpoint: EndpointIssue,
 		bucket: bucketRetryable, class: ClassRetryable, known: true},
 	{code: "3040171", msg: "OrderId 重複", endpoint: EndpointIssue,
 		bucket: bucketUnknown, class: ClassReconcile, successEq: true, known: true},
 
-	// ── f0501 ──
 	{code: "3050113", endpoint: EndpointVoid, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "3050121", endpoint: EndpointVoid, bucket: bucketRetryable, class: ClassRetryable, known: true},
 	{code: "3050122", endpoint: EndpointVoid, bucket: bucketUnknown, class: ClassReconcile, successEq: true, known: true},
@@ -94,7 +78,6 @@ var classificationTable = []codeCase{
 	{code: "3050131", endpoint: EndpointVoid, bucket: bucketRetryable, class: ClassRetryable, known: true},
 	{code: "3050141", endpoint: EndpointVoid, bucket: bucketPermanent, class: ClassPermanent, known: true},
 
-	// ── g0401 ──
 	{code: "4040121", endpoint: EndpointAllowance, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "4040123", endpoint: EndpointAllowance, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "4040139", endpoint: EndpointAllowance, bucket: bucketPermanent, class: ClassPermanent, known: true},
@@ -105,24 +88,15 @@ var classificationTable = []codeCase{
 	{code: "4040171", endpoint: EndpointAllowance, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "4040173", endpoint: EndpointAllowance, bucket: bucketPermanent, class: ClassPermanent, known: true},
 
-	// ── g0501 ──
-	// 4050131「折讓開立中」刻意偏離 §7.5.1 的字面（該節把它留在 PERMANENT 區間）：
-	// 第三方文件明文寫「4050131 ＋ 4050141 ⇒ 剛開立的折讓單不能立刻作廢，必須等
-	// allowance_status 的 status 走到 99」——兩碼是同一個暫時狀態的兩半，而 §7.5.1
-	// 只把 4050141 列進 RETRYABLE。理由與代價見 codes.go 該列註解。
 	{code: "4050131", endpoint: EndpointVoidAllowance, bucket: bucketRetryable, class: ClassRetryable, known: true},
 	{code: "4050132", endpoint: EndpointVoidAllowance, bucket: bucketUnknown, class: ClassReconcile, successEq: true, known: true},
 	{code: "4050135", endpoint: EndpointVoidAllowance, bucket: bucketPermanent, class: ClassManual, known: true},
 	{code: "4050141", endpoint: EndpointVoidAllowance, bucket: bucketRetryable, class: ClassRetryable, known: true},
 
-	// ── barcode ──
 	{code: "9000111", endpoint: EndpointBarcode, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "9000112", endpoint: EndpointBarcode, bucket: bucketPermanent, class: ClassPermanent, known: true},
 	{code: "9000113", endpoint: EndpointBarcode, bucket: bucketPermanent, class: ClassPermanent, known: true},
 
-	// ── 兩張分類表都沒有登記的碼（走 default）──
-	// §2.3.3／§2.10 有定義但 §4.5.6 與 §7.5.1 都沒有收錄，因此走 fail-safe 的
-	// Reconcile：對唯讀查詢而言代價是多打一次 query，遠小於誤判成永久失敗。
 	{code: "3050111", endpoint: EndpointVoid, bucket: bucketUnknown, class: ClassReconcile},
 	{code: "3050112", endpoint: EndpointVoid, bucket: bucketUnknown, class: ClassReconcile},
 	{code: "4050112", endpoint: EndpointVoidAllowance, bucket: bucketUnknown, class: ClassReconcile},
@@ -228,8 +202,6 @@ func TestReissuingMarkerBranches(t *testing.T) {
 	})
 	t.Run("marker 常數就是判別依據", func(t *testing.T) {
 		t.Parallel()
-		// 這一支釘住常數本身：把 amegoReissuingMarker 改成別的字串，
-		// 「註銷重開中 → Retryable」那支必然轉紅（變異測試 ④）。
 		if !strings.Contains("OrderId 重複，該訂單編號正在註銷重開中", amegoReissuingMarker) {
 			t.Fatalf("amegoReissuingMarker = %q 不出現在官方措辭裡", amegoReissuingMarker)
 		}
@@ -282,19 +254,16 @@ func TestBreakerExclusions(t *testing.T) {
 			t.Errorf("code %s countsTowardBreaker = %v, want %v", tc.code, got, counted[tc.code])
 		}
 	}
-	// 帳號層的碼絕不可計入：一個賣家送錯統編不該讓其他賣家開不出發票。
 	for _, code := range []string{"12", "13", "19", "22", "16", "3040171"} {
 		if countsTowardBreaker(newProviderError(EndpointIssue, code, "", 200)) {
 			t.Errorf("code %s 不得計入斷路器", code)
 		}
 	}
-	// 傳輸層與解碼失敗計入。
 	for _, kind := range []string{ErrorKindTimeout, ErrorKindConn, ErrorKindDecode} {
 		if !countsTowardBreaker(&APIError{Kind: kind}) {
 			t.Errorf("kind %s 必須計入斷路器", kind)
 		}
 	}
-	// ENV_GUARD 根本沒有外呼，與 AMEGO 的健康無關。
 	if countsTowardBreaker(&APIError{Code: CodeEnvGuard, Class: ClassManual}) {
 		t.Error("ENV_GUARD 不得計入斷路器")
 	}

@@ -75,7 +75,6 @@ func (r Reader) read(ctx context.Context, buyerID int64, conversationID uuid.UUI
 	return out, nil
 }
 
-// progress 是 GetRuntimeSnapshot 與 GetSnapshot 共用的部分：需求的 run、進行中的 run、待回答的中斷與最新的發布結果。
 type progress struct {
 	runs         []model.RunSummary
 	active       *uuid.UUID
@@ -137,7 +136,6 @@ type recordedWire struct {
 	Value string `json:"value"`
 }
 
-// messagesOf 把每一輪拆成買家與助理兩則訊息（空的那則不出）。
 func messagesOf(turns []store.ProcurementTurn) ([]model.ConversationMessage, error) {
 	var out []model.ConversationMessage
 	for _, t := range turns {

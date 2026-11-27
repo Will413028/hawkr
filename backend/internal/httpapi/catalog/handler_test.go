@@ -27,7 +27,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 帳號、店家與時間的值刻意互不相同（store_id 與 account_id 給不同值）：把帳號 ID 當店家 ID、或把請求的值當店家的實作，模組收到的店家就會不同。
 const (
 	callerAccount = 3001
 	callerStore   = 9002
@@ -35,7 +34,6 @@ const (
 
 var fixedNow = time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
 
-// fakeModule 實作三組模組介面，記下收到的店家、時間與參數。
 type fakeModule struct {
 	stores   []int64
 	uploader []int64
@@ -521,7 +519,6 @@ func TestPageTokenIsBoundToTheFilter(t *testing.T) {
 			t.Errorf("%s：code=%v，預期 invalid_argument", name, codeOf(err))
 		}
 	}
-	// 賣家的 token 綁定店家：同一個 token 在另一家店不能用（這裡以另一組篩選代表）。
 	sellerFirst, err := r.app.ListMyProducts(signedIn(), connect.NewRequest(&pb.ListMyProductsRequest{}))
 	if err != nil {
 		t.Fatal(err)
@@ -703,7 +700,6 @@ func TestSellerWriteRequestsAreCheckedAtTheDoor(t *testing.T) {
 			t.Errorf("%s：code=%v 欄位=%v，預期 invalid_argument 指向 %s", c.name, codeOf(err), fields, c.field)
 		}
 	}
-	// 壞的 etag 不是格式錯誤而是版本衝突（過時的 etag 與亂寫的 etag 對 client 的處置相同：重讀）。
 	if _, err := r.app.UpdateProduct(ctx, connect.NewRequest(&pb.UpdateProductRequest{ProductId: id, Etag: "abc", Product: sampleInput()})); codeOf(err) != connect.CodeAborted {
 		t.Fatalf("亂寫的 etag：%v", err)
 	}

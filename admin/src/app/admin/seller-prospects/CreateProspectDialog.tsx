@@ -105,7 +105,6 @@ export default function CreateProspectDialog({
 	);
 	const matches: ProspectMatch[] =
 		debouncedRequest !== null ? (preview.data?.matches ?? []) : [];
-	// 統編相同（T1）幾乎確定是同一家，排最前面。
 	const sortedMatches = [...matches].sort(
 		(a, b) =>
 			Number(b.tier === ProspectMatchTier.T1_TAX_ID) -

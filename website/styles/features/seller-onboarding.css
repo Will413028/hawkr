@@ -1,9 +1,3 @@
-/* =====================================================================
-   Hawkr · /seller-onboarding page additions
-   Standalone B2B page. Re-uses .seller-cta and .seller-stats from
-   home.css for the bottom CTA + numbers, and adds a
-   step-by-step process for the application flow.
-   ===================================================================== */
 
 .seller-onboarding {
 	position: relative;
@@ -20,12 +14,6 @@
 	);
 }
 
-/*
- * Every major story beat shares one viewport-sized stage. This is a minimum
- * rather than a hard height so enlarged text and opened FAQ answers are never
- * clipped. Lenis Snap owns precision-pointer snapping; touch devices use the
- * native proximity fallback below.
- */
 .seller-onboarding .seller-snap-section {
 	display: flex;
 	flex-direction: column;
@@ -56,30 +44,12 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	}
 }
 
-/* `.hkh-page` adds padding-bottom (clamp 56–96px) so the home page's
-   rounded postcards don't sit flush against the dark footer. This page
-   ends instead on the full-bleed green `.seller-cta`, where that gap just
-   exposes the page-bg crate illustration between the CTA and the footer.
-   Zero it so the green band meets the footer directly. The compound
-   selector outranks the bare `.hkh-page` rule regardless of import order. */
 .seller-onboarding.hkh-page {
 	padding-bottom: 0;
 }
 
-/* =====================================================================
-   STATS STRIP — tight horizontal proof band, sits between hero and
-   the next section. No section header, no padding-heavy card chrome, just a
-   row of 4 numbers. Inspired by ding-go's dense layout.
-   ===================================================================== */
 
-/* =====================================================================
-   FAQ — compact accordion, sits before the apply CTA
-   Each <details> is a row with a tight summary; expands to reveal a
-   short answer. Open state gets a subtle orange accent.
-   ===================================================================== */
 .seller-faq {
-	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
-     so the section card edges line up with the nav pill above. */
 	width: calc(100% - 40px);
 	max-width: 1440px;
 	margin: 24px auto 0;
@@ -205,13 +175,7 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	}
 }
 
-/* =====================================================================
-   STORY TRAIL OVERRIDES — re-use the .story-trail look from home.css
-   but match the seller page's centered-container width math.
-   ===================================================================== */
 .seller-onboarding .story-trail {
-	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
-     so the section card edges line up with the nav pill above. */
 	width: calc(100% - 40px);
 	max-width: 1440px;
 	margin: 28px auto 0;
@@ -220,12 +184,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	box-sizing: border-box;
 }
 
-/* Seller story-trail uses its OWN scene backgrounds so it doesn't read
-   identical to /about's WHY HAWKR trail. Mapping mirrors the
-   seller's journey: 種下 → 收成 → 上市
-   - DAY 1   → scene-irrigation (planting + watering)
-   - MONTH 1 → scene-greenhouse (growing produce)
-   - YEAR 1  → scene-market    (marketplace + delivery) */
 .seller-story-trail .trail-illus--field {
 	background-image: url("/placeholders/scene-irrigation.svg");
 }
@@ -248,7 +206,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	}
 }
 
-/* Day-marker label above each trail-copy h3 */
 .trail-day {
 	display: inline-block;
 	font-family: "Roboto", "Noto Sans TC", sans-serif;
@@ -262,14 +219,8 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	margin-bottom: 14px;
 }
 
-/* HERO — uses .hero/.hero-grid/.hero-copy from home.css; minor overrides.
-   Width math matches a .showcase-row exactly: max-width 1280, with
-   6vw side margin from viewport on the outside, so the cream card
-   lines up with the glass cards below pixel-for-pixel. */
 .seller-hero {
 	position: relative;
-	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
-     so the section card edges line up with the nav pill above. */
 	width: calc(100% - 40px);
 	max-width: 1440px;
 	margin: 24px auto 0;
@@ -320,7 +271,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	margin-bottom: 0;
 }
 
-/* Large Hawkr registration badge in the hero. */
 .seller-hero::after {
 	display: none;
 }
@@ -433,13 +383,7 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	}
 }
 
-/* =====================================================================
-   PROCESS STEPS — 1·2·3 how to onboard
-   ===================================================================== */
 .seller-process {
-	/* Match the floating navbar (max-width 1440 with 20px viewport gutter)
-     so the process-glass card edges align with the nav pill and the
-     other seller-landing sections above/below. */
 	width: calc(100% - 40px);
 	max-width: 1440px;
 	margin: 0 auto;
@@ -509,10 +453,9 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	flex-direction: column;
 	padding: 14px 10px 0;
 	counter-increment: process;
-	--draw: 1; /* JS animates this from 0 → 1 on scroll-in */
+	--draw: 1;
 }
 .process-step::before {
-	/* the "border-top" — drawn from left to right via scaleX(var(--draw)) */
 	content: "";
 	position: absolute;
 	top: 0;
@@ -645,25 +588,11 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	}
 }
 
-/* =====================================================================
-   APPLY CTA strip — bottom of the page
-   Re-uses .seller-cta from home.css but with seller-page tweaks
-   ===================================================================== */
 .seller-onboarding .seller-cta {
 	margin-top: 18px;
 }
 
-/* ── Dark mode ─────────────────────────────────────────────────────────────
-   By default the seller-landing sections render as light frosted-glass cards
-   (cream veils, a solid cream hero, white FAQ rows). On the night canvas those
-   panels glare and read as a different theme, so we re-skin every surface to
-   the site's ink-glass dark tokens and lift the copy to the cream / sage
-   pairing used elsewhere in dark mode — readable, never bright or dim. The
-   story-trail is intentionally NOT re-skinned here: its surface is already
-   dark (home.css) and its copy is lifted by the shared `.hkh-page` trail
-   rules in home.css. */
 
-/* Panel surfaces — cream veils → ink glass */
 [data-theme="dark"] .seller-onboarding .seller-hero,
 [data-theme="dark"] .seller-onboarding .process-glass,
 [data-theme="dark"] .seller-onboarding .seller-faq {
@@ -671,7 +600,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	border-color: var(--theme-border-soft);
 }
 
-/* FAQ rows sit inside the FAQ panel — one rung lighter so they read as insets */
 [data-theme="dark"] .seller-onboarding .faq-item {
 	background: rgba(255, 255, 255, 0.05);
 	border-color: var(--theme-border-soft);
@@ -681,7 +609,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.5);
 }
 
-/* Headings → warm cream (not pure white, so it never glares) */
 [data-theme="dark"]
 	.seller-onboarding
 	:where(.seller-hero, .process-glass, .seller-faq)
@@ -689,7 +616,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	color: var(--theme-text-heading);
 }
 
-/* Body copy → soft sage: readable, not bright, not dim */
 [data-theme="dark"]
 	.seller-onboarding
 	:where(.seller-hero, .process-glass, .seller-faq)
@@ -697,7 +623,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	color: rgb(var(--color-ink-100-rgb) / 0.74);
 }
 
-/* Emphasis → brand gold (matches the dark CTA + spin badge) */
 [data-theme="dark"]
 	.seller-onboarding
 	:where(.seller-hero, .process-glass, .seller-faq)
@@ -722,7 +647,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	color: var(--color-accent-500, #ed954b);
 }
 
-/* FAQ toggle — flip the +/- glyph + well from ink to cream on the dark row */
 [data-theme="dark"] .seller-onboarding .faq-toggle {
 	background: rgba(245, 222, 165, 0.12);
 }
@@ -738,8 +662,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	background: var(--color-ink-900);
 }
 
-/* CTA band — the default lime→primary gradient glares on the night canvas;
-   deepen it to a rich ink so it reads as a calm brand band. */
 [data-theme="dark"] .seller-onboarding .seller-cta {
 	background:
 		radial-gradient(
@@ -755,12 +677,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 		);
 }
 
-/* =====================================================================
-   SELLER FIT — additive partner stories + application preparation
-   Uses the repository's semantic brand tokens sourced from the design-system
-   guidelines. This section intentionally avoids dashboard
-   mockups so the original partnership story remains the page's visual lead.
-   ===================================================================== */
 .seller-fit {
 	width: calc(100% - 40px);
 	max-width: 1440px;
@@ -931,8 +847,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	}
 }
 
-/* Vanta is a decorative progressive enhancement. The original CTA gradient
-   remains fully visible before loading and whenever WebGL is unavailable. */
 .seller-vanta-atmosphere {
 	position: absolute;
 	z-index: 1;
@@ -1049,12 +963,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	}
 }
 
-/* =====================================================================
-   WHOLE-PAGE INTERACTION LAYER
-   Motion uses the checked-in Hawkr semantic tokens. Every effect is a
-   progressive enhancement: the original layout and content remain complete
-   when JavaScript, WebGL, hover, or motion are unavailable.
-   ===================================================================== */
 .seller-hero {
 	--seller-pointer-x: 78%;
 	--seller-pointer-y: 18%;
@@ -1181,7 +1089,6 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	z-index: 2;
 }
 
-/* Section labels: social-native hashtags without repeated badge chrome. */
 .seller-onboarding .eyebrow {
 	position: relative;
 	isolation: isolate;

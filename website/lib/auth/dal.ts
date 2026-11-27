@@ -24,7 +24,6 @@ export const verifySession = cache(async (): Promise<SessionState> => {
 	try {
 		cookie = await sessionCookieHeader();
 	} catch (error) {
-		// Next 用帶 `digest` 的錯誤告訴 renderer 這裡是動態的，必須原樣往上丟。
 		if (error instanceof Error && "digest" in error) throw error;
 		return { status: "unavailable" };
 	}

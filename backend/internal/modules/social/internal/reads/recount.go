@@ -9,11 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/visibility"
 )
 
-// 計數的批次重算（counts-brief.md §4 第 8 點，DR-A1）：一批是 stats 主鍵的 keyset 範圍 (after, upper]。呼叫方在同一個 transaction 內先依 ID 由小到大
-// SELECT ... FOR UPDATE 鎖住這個範圍的 stats 列（LockPostStatsRange 等），再執行這裡的語句：一個語句用分組的 COUNT 算出範圍內每一列的新計數，
-// 只覆寫與現值不同的列，RETURNING 舊值與新值（漂移報告）。先鎖再算：算數是鎖之後的新 statement（READ COMMITTED 下看得到別的 transaction 已提交的
-// 加減），不蓋掉並行的寫入。計數是旗標的加總：「計入」用 visibility 的 Counted（儲存的旗標 counted），和讀取同一個來源，不重新推導；旗標本身由 reevaluate_*（trigger、買家刪帳的訂閱者、對帳的第一步）維護。
-// 重算期間買家被停用也不會讓計數與旗標不一致：停用的事實先經訂閱者在同一個 transaction 修好旗標，再有人改計數（R1）。瀏覽數是只增的事件計數，沒有可重算的來源，不在這裡。
 
 // PostDriftRow 是一篇貼文的計數被覆寫前後的值。
 type PostDriftRow struct {
@@ -42,12 +37,10 @@ type EntryDriftRow struct {
 	NewReply int64     `db:"new_reply"`
 }
 
-// within 是 keyset 範圍 (after, upper]。
 func within(col ColumnString, after, upper uuid.UUID) BoolExpression {
 	return col.GT(UUID(after)).AND(col.LT_EQ(UUID(upper)))
 }
 
-// grouped 是 "key, COUNT(*)" 依 key 分組的子查詢，key 與 n 兩欄供外層 LEFT JOIN。
 func grouped(key ColumnString, from ReadableTable, where BoolExpression, alias string) (SelectTable, ColumnString, ColumnInteger) {
 	t := SELECT(key.AS("key"), COUNT(STAR).AS("n")).FROM(from).WHERE(where).GROUP_BY(key).AsTable(alias)
 	return t, StringColumn("key").From(t), IntegerColumn("n").From(t)

@@ -31,16 +31,12 @@ export default function AccountShell({
 	const pathname = usePathname() ?? "";
 	if (!pathname) return null;
 	if (shouldHideSidebar(pathname)) {
-		// Chat owns its own layout end-to-end; render children directly so
-		// `.chat-page` can claim the full content width.
 		return <>{children}</>;
 	}
 	return (
 		<div className="account-shell grid grid-cols-[256px_1fr] max-[960px]:grid-cols-[minmax(0,1fr)] gap-6 max-[960px]:gap-0 max-w-[1440px] mx-auto p-[6px_20px_48px] max-[960px]:p-[16px_clamp(12px,3vw,24px)_32px] items-stretch min-h-[calc(100dvh-40px)]">
 			<AccountSidebar />
-			{/* pt-6 gives every account inner page the same comfortable
-			 * title breathing room as the order-detail page; individual
-			 * screens should not re-add their own top padding. */}
+
 			<div className="min-w-0 pt-6">{children}</div>
 		</div>
 	);

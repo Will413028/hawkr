@@ -27,8 +27,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// fakeAuth 以 token 決定結果：good 是賣家（每個帳號都是買家），new 是這個請求剛建立的帳號（沒有另外申請的角色），admin 是管理員，
-// dead 是無效的 token，denied 是不能登入後台的使用者，boom 是資料庫答不出來。
 type fakeAuth struct{}
 
 var entryNow = time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
@@ -85,7 +83,6 @@ func TestSessionMiddlewarePutsTheSessionAndItsCredentialSourceInContext(t *testi
 	}
 }
 
-// caller 回報 ctx 裡的呼叫者與限流身分，給中介層的測試看。
 var caller = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	p, ok := rpc.PrincipalFrom(r.Context())
 	_, _ = fmt.Fprintf(w, "principal=%v ok=%v subject=%s", p.ID, ok, rpc.SubjectFrom(r.Context()))
@@ -108,7 +105,6 @@ func entry(t *testing.T, legacy http.Handler, services ...service) http.Handler 
 	return h
 }
 
-// entryWithAuth 與 entry 相同，但認證用 fakeAuth（Deps.Identity 是具體型別，所以直接包 withSession 的那一層）。
 func entryWithAuth(t *testing.T, legacy http.Handler) http.Handler {
 	t.Helper()
 	inner := http.NewServeMux()
@@ -142,28 +138,24 @@ func TestSessionMiddleware(t *testing.T) {
 			t.Fatalf("有效的 token = %q，Set-Cookie %q", rec.Body, rec.Header().Get("Set-Cookie"))
 		}
 	}
-	// Connect 不讀 X-Active-Role（ADR 2026-10-07-connect-without-perspective）：帶不帶它，認證的結果都一樣。
 	plain := do(h, withBearer("good")).Body.String()
 	r := withBearer("good")
 	r.Header.Set("X-Active-Role", "SELLER")
 	if rec := do(h, r); rec.Body.String() != plain {
 		t.Fatalf("帶 X-Active-Role 的結果 = %q，不帶是 %q", rec.Body, plain)
 	}
-	// 兩者都帶時以 Bearer 為準（後台的 BFF 帶 Bearer，瀏覽器的 cookie 可能也在）。
 	r = withCookie("dead")
 	r.Header.Set("Authorization", "Bearer good")
 	if rec := do(h, r); !strings.Contains(rec.Body.String(), "ok=true") {
 		t.Fatalf("Bearer 應該優先：%q", rec.Body)
 	}
 
-	// 無效的 token：以訪客繼續，不改 cookie。
 	for _, r := range []*http.Request{withCookie("dead"), withBearer("dead")} {
 		if rec := do(h, r); !strings.Contains(rec.Body.String(), "ok=false") || rec.Header().Get("Set-Cookie") != "" {
 			t.Fatalf("無效的 token = %q，Set-Cookie %q", rec.Body, rec.Header().Get("Set-Cookie"))
 		}
 	}
 
-	// #2511：憑證只從 session cookie 與 Authorization: Bearer 讀，query、token header、其他 scheme、舊的 cookie 都不讀。
 	for _, r := range []*http.Request{
 		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/app/buyers/me?token=good", nil),
 		func() *http.Request {
@@ -179,7 +171,6 @@ func TestSessionMiddleware(t *testing.T) {
 		}
 	}
 
-	// 建帳事件已建立買家；入口不解析 buyer_id（buyer handler 自己查），角色 hint 不會觸發寫入。
 	newBuyerRequest := func() *http.Request {
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/hawkr.buyer.v1alpha1.BuyerAppService/GetProfile", nil)
 		r.Header.Set("Authorization", "Bearer new")
@@ -191,9 +182,8 @@ func TestSessionMiddleware(t *testing.T) {
 	r = newBuyerRequest()
 	r.Header.Set("X-Active-Role", "SELLER")
 	do(h, r)
-	do(h, withBearer("good")) // 不是新帳號：不在中介層建
+	do(h, withBearer("good"))
 
-	// 後台的使用者不是允許的帳號：回 403 與模組的文字，不以訪客繼續。
 	rec := do(h, withBearer("denied"))
 	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "不能登入後台") {
 		t.Fatalf("REST 的 403 = %d %q", rec.Code, rec.Body)
@@ -205,7 +195,6 @@ func TestSessionMiddleware(t *testing.T) {
 		t.Fatalf("Connect 的 403 = %d %q", rec.Code, rec.Body)
 	}
 
-	// 模組沒給文字時：REST 與 Connect 都用共用文案目錄的 PERMISSION_DENIED（傳輸層同一個 code 只有一份文字）。
 	want := rpc.CommonText(t.Context(), connect.CodePermissionDenied).Text
 	if want != "無權操作" {
 		t.Fatalf("目錄的 PERMISSION_DENIED = %q", want)
@@ -220,7 +209,6 @@ func TestSessionMiddleware(t *testing.T) {
 		t.Fatalf("Connect 的 403（模組沒給文字）= %d %q", rec.Code, rec.Body)
 	}
 
-	// 資料庫答不出來時回 503，不當成訪客（否則 client 會把使用者登出）。
 	rec = do(h, withCookie("boom"))
 	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `"code":503`) {
 		t.Fatalf("REST 的 503 = %d %q", rec.Code, rec.Body)
@@ -381,7 +369,6 @@ func TestFileRoutesAreRateLimitedAndNeverFallThroughToTheLegacyGateway(t *testin
 	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") == "" || rec.Header().Get("Cache-Control") != "private, no-store" || served != tierDefault.visitor {
 		t.Fatalf("超過額度 = %d retry-after=%q cache=%q served=%d", rec.Code, rec.Header().Get("Retry-After"), rec.Header().Get("Cache-Control"), served)
 	}
-	// 沒有註冊的 /api/files/ 路徑不會落到舊 gateway（前綴只有 /api/v1/ 等）。
 	if rec := do(h, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/files/app/unknown", nil)); rec.Code == http.StatusTeapot {
 		t.Fatal("/api/files/ 不能轉給 gateway")
 	}

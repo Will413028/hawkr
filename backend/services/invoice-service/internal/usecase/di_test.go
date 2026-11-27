@@ -30,8 +30,6 @@ func TestModule_GraphResolves(t *testing.T) {
 		fx.Supply(cfg, zap.NewNop()),
 		fx.Provide(
 			func() database.TxManager { return directTx{} },
-			// amego.Client 由 Layer 3 提供；這裡給一個 nil 值只是為了讓圖解得開
-			// （ValidateApp 不呼叫任何建構函式，不會 dereference 它）。
 			func() amego.Client { return nil },
 			func() domain.IssuerRepository { return nil },
 			func() domain.SellerTaxProfileRepository { return nil },
@@ -42,15 +40,11 @@ func TestModule_GraphResolves(t *testing.T) {
 			func() domain.OutboxRepository { return nil },
 			func() domain.AuditRepository { return nil },
 			func() domain.BuyerPreferenceRepository { return nil },
-			// media peer client 由 Layer 3 提供；同 amego.Client，ValidateApp 不會
-			// dereference 它。
 			func() *media.Client { return nil },
 		),
 		Module,
 		fx.Invoke(func(*Issuance) {}),
 		fx.Invoke(func(*Checkout) {}),
-		// TaxProfile 必須被 Invoke：fx.Provide 是惰性的，沒有 consumer 的 Provide
-		// 在圖上等同不存在（internal/client/di.go 檔頭的同一個教訓）。
 		fx.Invoke(func(*TaxProfile) {}),
 	); err != nil {
 		t.Fatalf("fx graph 解不開：%v", err)

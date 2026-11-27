@@ -30,7 +30,6 @@ function status(file: string): number {
 	return meta.status ?? 200;
 }
 
-// A seller workspace renders the seller header instead, and a sentinel 404 renders the not-found body.
 const OWN_CHROME = /^seller(?:-center)?(?:[/.]|$)/;
 
 test("the site header is in the static shell of every page that shows it", () => {

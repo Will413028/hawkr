@@ -52,7 +52,6 @@ export const useSellerCustomersUiStore = createLocalPrivateStore<
 			sort: state.sort,
 			tagId: state.tagId,
 		}),
-		// 版本 0 存的是字串分類與排序（含 blocklist、last_order_at）與搜尋字串，契約已沒有這些值：丟掉，回預設。
 		persistOptions: { version: 1, migrate: () => defaultState },
 	},
 );

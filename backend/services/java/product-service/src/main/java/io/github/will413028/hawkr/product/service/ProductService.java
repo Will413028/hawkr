@@ -126,8 +126,6 @@ public class ProductService {
      * Frontend SSR cache invalidation tag helpers（後端服務責任邊界規範 §9.3）。
      * caller 須在 mutation 結束前呼叫，tx commit 後 fire-and-forget HTTP POST。
      */
-    // frontend cache revalidate 統一走 ProductRevalidationService（§9，避免各處重複組 tag）
-    // 共發 seller:<id> 的判準＝該 mutation 是否改變「賣家有哪些公開商品」（改變才共發）。
     private void revalidateProductAndSeller(Long productId, Long sellerId) {
         productRevalidationService.revalidateProductAndSeller(productId, sellerId);
     }
@@ -189,7 +187,6 @@ public class ProductService {
         productRevalidationService.revalidateProduct(productId);
     }
 
-    // 商品狀態變更是否跨 ACTIVE 邊界（上架↔下架）→ 決定賣家公開商品集合是否變動。
     private static boolean crossesActiveBoundary(String oldStatus, String newStatus) {
         boolean wasActive = ProductStatus.ACTIVE.value().equals(oldStatus);
         boolean nowActive = ProductStatus.ACTIVE.value().equals(newStatus);
@@ -218,16 +215,12 @@ public class ProductService {
         if (ProductStatus.ACTIVE.value().equals(oldStatus)) return;
         if (entity.getDeletedAt() != null) return;
 
-        // 重新抓 fresh entity — 取得 stockQty、name、gallery、storeId 的最新值。
-        // 不能只 trust entity（caller-snapshot）的 name/gallery/storeId：
-        // 並行 admin tx 可能在 findById 與本 publish 之間改名 / 換主圖（review #942）。
         ProductEntity fresh = productRepository.findById(entity.getId()).orElse(null);
         if (fresh == null || fresh.getStockQty() == null || fresh.getStockQty() <= 0L) return;
 
         String objectKey = (fresh.getGallery() != null && !fresh.getGallery().isEmpty())
                 ? fresh.getGallery().get(0).getObjectKey()
                 : null;
-        // imageKey 帶商品主圖 objectKey（49 §6.3，顯示 URL 由消費端組）；無圖則為空字串。
         String imageKey = (objectKey == null || objectKey.isEmpty()) ? "" : objectKey;
 
         io.github.will413028.hawkr.product.mq.dto.ProductRestockPayload payload =
@@ -261,15 +254,12 @@ public class ProductService {
     public io.github.will413028.hawkr.product.dto.response.ProductWriteOutcome createProductWithWarnings(CreateProductDTO dto) {
         String idempotencyKey = dto.getIdempotencyKey();
 
-        // 驗證 idempotency_key 必填
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException("idempotency_key 為必填欄位");
         }
 
-        // 計算請求內容的雜湊值
         String requestHash = idempotencyService.calculateHash(dto);
 
-        // 檢查冪等性
         Optional<ProductDetailDTO> cached = idempotencyService.acquireLock(
                 idempotencyKey,
                 dto.getStoreId(),
@@ -279,36 +269,25 @@ public class ProductService {
         );
         if (cached.isPresent()) {
             log.info("idempotent", "返回先前結果", "key", idempotencyKey);
-            // 冪等重放不重跑收斂點 ⇒ 沒有新的認證警告可回（理由見 ProductWriteOutcome javadoc）
             return io.github.will413028.hawkr.product.dto.response.ProductWriteOutcome.of(cached.get(), List.of());
         }
 
         try {
-            // 0. Fail-fast 驗證（必須在任何 DB INSERT / Media finalize 等外部副作用之前）：
-            //    - description text-block 拒絕 HTML（02 §3.6 / 26-§2.3 R8）
-            //    - hashtag 字元 / 長度 / 上限 / dedup（02 §3.9 / 26-§2.3 R9）
-            //    驗證走 dto，僅純記憶體運算，避免 hashtag/HTML 違規時還跑了 INSERT product + FinalizeImages
             io.github.will413028.hawkr.product.domain.hashtag.HashtagInputValidator.requireHashtagSet(dto.getHashtags());
             validateDescriptionDtoTextBlocks(dto.getDescription());
 
-            // 1. 建立商品主體
             ProductEntity entity = productEntityConverter.toEntity(dto);
 
-            // 1.0 賣家停權 backstop（02 §5.10 步驟 5b / 46 §6.2，首次接線）：
-            // toEntity 未指定 status 時預設落地 ACTIVE（見 ProductEntityConverter.toEntity），
-            // 故 CreateProduct 與 UpdateSellerProductStatus 同樣需要此收斂點檢查。
             if (ProductStatus.ACTIVE.value().equals(entity.getStatus())) {
                 requireSellerCanManageProductsForActivation(dto.getStoreId());
             }
 
-            // 1.1 自動填入 category_lv2（從第三層分類的 parent_id 取得第二層分類 ID）
             Long categoryLv2 = categoryService.getParentId(entity.getCategory());
             if (categoryLv2 == null) {
                 throw new IllegalArgumentException("分類 ID " + entity.getCategory() + " 無對應的第二層分類");
             }
             entity.setCategoryLv2(categoryLv2);
 
-            // 1.2 自動填入 category_lv1（從第二層分類的 parent_id 取得第一層分類 ID）
             Long categoryLv1 = categoryService.getLv1Id(categoryLv2);
             if (categoryLv1 == null) {
                 throw new IllegalArgumentException("第二層分類 ID " + categoryLv2 + " 無對應的第一層分類");
@@ -320,23 +299,19 @@ public class ProductService {
 
             log.info("entityCreated", "商品主體已建立", "product_id", productId.toString());
 
-            // 2. 轉正商品展示圖片（僅 FinalizeImages，不建立引用）
             List<ProductEntity.GalleryItem> gallery = processImages(productId, dto.getImages());
             entity.setGallery(gallery);
 
-            // 2.1 轉正描述中的圖片（僅 FinalizeImages，不建立引用）
             if (entity.getDescription() != null) {
                 processDescriptionImages(productId, entity.getDescription());
             }
 
-            // 3. 驗證 SKU 欄位合法性
             if (dto.getSkus() != null) {
                 for (ProductSkuDTO skuDTO : dto.getSkus()) {
                     CodeMetaValidator.requireValidValue(WeightUnit.class, skuDTO.getUnit(), "unit");
                     if (skuDTO.getPrice() == null || skuDTO.getPrice() <= 0) {
                         throw new IllegalArgumentException("商品價格 必須大於 0");
                     }
-                    // 特價校驗（02 設計書 §2.8.2）：null=無特價；非 null 必須 > 0 且 < price
                     if (skuDTO.getSalePrice() != null) {
                         if (skuDTO.getSalePrice() <= 0) {
                             throw new IllegalArgumentException("特價 必須大於 0");
@@ -348,7 +323,6 @@ public class ProductService {
                     if (skuDTO.getStockQty() != null && skuDTO.getStockQty() < 0) {
                         throw new IllegalArgumentException("庫存數量 不可為負數");
                     }
-                    // 重量與三個材積是必填（非 optional）。理由見 requirePositive 的註解。
                     requirePositive(skuDTO.getWeight(), "商品重量");
                     requirePositive(skuDTO.getLengthCm(), "包裝長度");
                     requirePositive(skuDTO.getWidthCm(), "包裝寬度");
@@ -356,10 +330,8 @@ public class ProductService {
                 }
             }
 
-            // 3.1 驗證 SKU 配送方式合法性（賣家開通狀態 + 材積/重量限制）
             validateSkuShippingMethods(dto.getStoreId(), dto.getSkus());
 
-            // 4. 建立商品 SKU
             List<ProductSkuEntity> skus = new ArrayList<>();
             if (dto.getSkus() != null && !dto.getSkus().isEmpty()) {
                 for (ProductSkuDTO skuDTO : dto.getSkus()) {
@@ -369,73 +341,42 @@ public class ProductService {
                 }
             }
 
-            // 4. 更新價格範圍
             updatePriceRange(entity, skus);
 
-            // 4.0a 反正規化欄位 cascade（02 §3.2 / §5.13a）：
-            //      stock_qty = SUM(sku.stock_qty)、shipping_methods = SKU JSONB 聯集
-            //      favorite_count 維持 DEFAULT 0（由 §5.14 FavoriteCountConsumer 後續維護）
             entity.setStockQty(io.github.will413028.hawkr.product.service.helper.ProductAggregateRules.aggregateStock(skus));
             entity.setShippingMethods(io.github.will413028.hawkr.product.service.helper.ProductAggregateRules.mergeShippingMethods(skus));
 
-            // 4.1 [step 0 已 fail-fast 驗證 description HTML / hashtag 字元]
-            //     Hashtag UPSERT 主表 + 套用 product_hashtag（同事務）
-            //     建立時 status = ACTIVE（4004），counter delta 立即生效
             List<HashtagService.UpsertedHashtag> upserted = hashtagService.upsertHashtags(dto.getHashtags());
             boolean isActive = ProductStatus.ACTIVE.value().equals(entity.getStatus());
             hashtagService.applyProductHashtags(productId, upserted);
 
-            // 4.3 計算 pure_description + cat_*_name + searchable_text 並寫回 entity
             enrichSearchableFields(entity, upserted, skus);
 
-            // 5. 更新商品（含 gallery、價格範圍、cat_*_name、pure_description、searchable_text、stock_qty、shipping_methods）— 業務資料落盤
             requireInsertedRowWritten(productRepository.updateById(entity), productId);
 
-            // 5.1 認證收斂點（19 號設計書 §6.1 W1）— 跨 bean 呼叫，join 本交易（Propagation.REQUIRED）。
-            //     🔴 位置必須在步驟 5 的 updateById 之後：entity.certifications 在記憶體中是空陣列
-            //     （ProductEntityConverter.toEntity 不再直寫投影），先跑收斂點的話這個空陣列會被
-            //     updateById 原樣覆蓋回去，把剛自動核准的標章洗掉。
-            //     建立路徑沒有 update_certifications 旗標；Step 0 由「認證清單非空」決定（新商品
-            //     沒有既有 APPROVED，空清單不需要也不會撤回任何東西）。
             List<io.github.will413028.hawkr.product.dto.response.CertificationWarningDTO> certificationWarnings =
                     certificationApplicationService.syncFromProductWrite(
                             new ProductCertificationApplicationService.CertificationSyncCommand(
                                     productId,
                                     dto.getStoreId(),
-                                    // 🔴 submittedByAccountId 一律 null：CreateProductRequest 沒有
-                                    // account_id 欄位，而 store_id 是營運鍵不是登入 principal
-                                    // （CLAUDE.md §6 明令禁止互相頂替；兩者只在首任 grandfather
-                                    // 時恰好相等 ⇒ 頂替會讓 dev 與 fixture 全綠、只有 re-key 過的
-                                    // 店家錯而且沒有任何告警）。代行同理：DelegationContext 的
-                                    // operator_admin_id 是 admin_accounts.id，又是另一個 id space。
                                     null,
                                     certificationSourceOf(dto.isDelegated()),
                                     false,
                                     toCertificationInputs(dto.getCertifications())));
             refreshCertificationProjection(entity);
 
-            // 6. 業務資料寫入後、交易 commit 前建立 Media 引用（#2222）
-            //    順序：FinalizeImages → DB 寫入 → LinkImages（失敗即拋 → 回滾）
-            //    引用集合必須恆為「業務列指著的資產」的超集，否則 GC 會刪掉在用的圖
             linkGalleryImages(productId, gallery, AssetReferenceType.PRODUCT.value());
             linkDescriptionImages(productId, entity.getDescription(), AssetReferenceType.PRODUCT_DESC.value());
 
-            // 7. 轉換為 DTO（含 hashtag list 填充）
             ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
             result.setHashtags(buildHashtagItemDTOs(productId));
             applyCategoryHierarchy(result, entity);
 
-            // 8. 標記冪等成功
             idempotencyService.markSucceeded(idempotencyKey, dto.getStoreId(), result);
 
-            // 9. 清除快取
             cacheService.evictProductDetail(productId.toString());
             cacheService.evictProductListForWrite(dto.getStoreId());
 
-            // 10. 觸發 frontend SSR cache bust（後端服務責任邊界規範 §9.3）— 新建商品加入賣家 storefront。
-            //     建立即 ACTIVE（上架）→ 改變賣家公開商品集合，發完整 entity tag：product:<id> 讓新品經
-            //     web expansion 進 products:list（producer 自足原則），seller:<id> 刷 storefront；
-            //     DRAFT 等非公開狀態不進公開貨架，只需 seller:<id>。
             if (isActive) {
                 revalidateProductAndSeller(productId, dto.getStoreId());
             } else {
@@ -447,9 +388,7 @@ public class ProductService {
             return io.github.will413028.hawkr.product.dto.response.ProductWriteOutcome.of(result, certificationWarnings);
 
         } catch (Exception e) {
-            // 先記錄真正的錯誤原因（包含堆疊追蹤）
             log.error("failed", "商品建立失敗，key=" + idempotencyKey + "，error=" + e.getMessage(), e);
-            // markFailed 在新事務中執行（Propagation.REQUIRES_NEW）
             try {
                 idempotencyService.markFailed(idempotencyKey, dto.getStoreId());
             } catch (Exception markFailedException) {
@@ -477,15 +416,12 @@ public class ProductService {
     public io.github.will413028.hawkr.product.dto.response.ProductWriteOutcome updateProductWithWarnings(UpdateProductDTO dto) {
         String idempotencyKey = dto.getIdempotencyKey();
 
-        // 驗證 idempotency_key 必填
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException("idempotency_key 為必填欄位");
         }
 
-        // 計算請求內容的雜湊值
         String requestHash = idempotencyService.calculateHash(dto);
 
-        // 檢查冪等性
         Optional<ProductDetailDTO> cached = idempotencyService.acquireLock(
                 idempotencyKey,
                 dto.getStoreId(),
@@ -499,7 +435,6 @@ public class ProductService {
         }
 
         try {
-            // 驗證 product_id 格式（必須為 TSID 數字字串，不可為 UUID）
             String productIdStr = dto.getProductId();
             if (productIdStr.contains("-")) {
                 throw new IllegalArgumentException(
@@ -516,42 +451,30 @@ public class ProductService {
                 );
             }
 
-            // 1. 查詢並驗證商品存在且屬於該帳號
             ProductEntity entity = productRepository.findByIdAndStoreId(productId, dto.getStoreId())
                     .orElseThrow(() -> new ProductNotFoundException(dto.getProductId()));
 
-            // 1.0a 樂觀鎖前置比對（56 §6.6.3）：早退避開後續 media link / SKU 寫入等副作用。
-            //      真正的 CAS 由 updateById 的 OptimisticLockerInnerInterceptor 執行（見步驟 6）。
             requireExpectedVersion(entity, dto.getExpectedVersion());
 
-            // 1.1 編輯狀態守門（02 設計書 §2.8.5）：商品必須為 DRAFT(4001) 或 INACTIVE(4003) 才允許編輯
-            // 上下架狀態轉換走 updateSellerProductStatus，不受本守門影響
             String currentStatus = entity.getStatus();
             if (!ProductStatus.DRAFT.value().equals(currentStatus)
                     && !ProductStatus.INACTIVE.value().equals(currentStatus)) {
-                // 02 §2.8.5：用 PRODUCT_EDIT_REQUIRES_INACTIVE (3019) 業務碼回應「狀態不允許」
                 throw new ProductBusinessException(
                         GrpcResponseCode.PRODUCT_EDIT_REQUIRES_INACTIVE,
                         String.format(GrpcResponseCode.PRODUCT_EDIT_REQUIRES_INACTIVE.message(), currentStatus));
             }
 
-            // 1.2 Fail-fast 驗證（02 §3.6 / §3.9）：在 image finalize / SKU 更新等外部副作用前先驗
-            //     description text-block 拒絕 HTML / hashtag 字元 + 長度 + 上限（僅當 update_hashtags=true 才驗 hashtag）
             validateDescriptionDtoTextBlocks(dto.getDescription());
             if (dto.isUpdateHashtags()) {
                 io.github.will413028.hawkr.product.domain.hashtag.HashtagInputValidator.requireHashtagSet(dto.getHashtags());
             }
 
-            // 保存舊的 gallery 和 description（必須在 updateEntity 之前，
-            // 因為 updateEntity 會修改 entity 的 description，導致 oldDescription 被覆蓋）
             List<ProductEntity.GalleryItem> oldGallery = entity.getGallery() != null
                     ? new ArrayList<>(entity.getGallery()) : new ArrayList<>();
             ProductEntity.ProductDescription oldDescription = entity.getDescription();
 
-            // 2. 更新商品主體
             productEntityConverter.updateEntity(entity, dto);
 
-            // 2.1 若分類有變更，同步更新 category_lv2 和 category_lv1
             if (dto.getCategoryId() != null) {
                 Long categoryLv2 = categoryService.getParentId(entity.getCategory());
                 if (categoryLv2 == null) {
@@ -566,7 +489,6 @@ public class ProductService {
                 entity.setCategoryLv1(categoryLv1);
             }
 
-            // 3. 處理商品展示圖片更新（僅轉正，不建立/解除引用）
             if (dto.getImages() != null) {
                 List<ProductEntity.GalleryItem> newGallery = processImageUpdate(
                         productId,
@@ -576,28 +498,22 @@ public class ProductService {
                 entity.setGallery(newGallery);
             }
 
-            // 3.1 處理描述中的圖片更新（僅轉正，不建立/解除引用）
             if (dto.getDescription() != null) {
                 ProductEntity.ProductDescription newDescription = productEntityConverter.convertDescriptionToEntity(dto.getDescription());
                 processDescriptionImageUpdate(productId, oldDescription, newDescription);
                 entity.setDescription(newDescription);
             }
 
-            // 4. 驗證 SKU 欄位合法性（更新時選填，有傳才驗證）
             if (dto.getSkus() != null) {
                 for (ProductSkuDTO skuDTO : dto.getSkus()) {
                     CodeMetaValidator.validateValueIfPresent(WeightUnit.class, skuDTO.getUnit(), "unit");
                     if (skuDTO.getPrice() != null && skuDTO.getPrice() <= 0) {
                         throw new IllegalArgumentException("商品價格 必須大於 0");
                     }
-                    // 特價校驗（02 設計書 §2.8.2）：null=清空特價；非 null 必須 > 0 且 < price
-                    // 注意 price 可能由本次更新帶入（skuDTO.getPrice()）或來自 DB 既有值
                     if (skuDTO.getSalePrice() != null) {
                         if (skuDTO.getSalePrice() <= 0) {
                             throw new IllegalArgumentException("特價 必須大於 0");
                         }
-                        // 比對的 price：優先用本次 DTO 的 price，否則由 service 層在 updateSkus 套用既有 SKU price
-                        // 此處先做基礎校驗（> 0）；< price 的最終檢查在 updateSkus 內 sku entity 落地前確認
                         if (skuDTO.getPrice() != null && skuDTO.getSalePrice() >= skuDTO.getPrice()) {
                             throw new IllegalArgumentException("特價 必須低於原價");
                         }
@@ -605,7 +521,6 @@ public class ProductService {
                     if (skuDTO.getStockQty() != null && skuDTO.getStockQty() < 0) {
                         throw new IllegalArgumentException("庫存數量 不可為負數");
                     }
-                    // 重量與三個材積是必填（非 optional）。理由見 requirePositive 的註解。
                     requirePositive(skuDTO.getWeight(), "商品重量");
                     requirePositive(skuDTO.getLengthCm(), "包裝長度");
                     requirePositive(skuDTO.getWidthCm(), "包裝寬度");
@@ -613,41 +528,19 @@ public class ProductService {
                 }
             }
 
-            // 4.1 驗證 SKU 配送方式合法性（賣家開通狀態 + 材積/重量限制）
             validateSkuShippingMethods(dto.getStoreId(), dto.getSkus());
 
-            // 5. 處理 SKU 更新
             List<ProductSkuEntity> skus = updateSkus(productId, dto.getSkus());
 
-            // 5. 更新價格範圍
             updatePriceRange(entity, skus);
 
-            // 5.0a 反正規化欄位 cascade 重算（02 §3.2 / §5.13a）：
-            //      stock_qty = SUM(sku.stock_qty)（依最終 SKU 集合，含新增 / 刪除後）
-            //      shipping_methods = SKU JSONB 聯集（同組合 freeThreshold 取 MIN、feePayer 取 sku.id ASC）
-            //      favorite_count 不在 UpdateProduct 維護（由 §5.14 FavoriteCountConsumer 維護）
-            //
-            // stock_qty 只在請求確實帶了 skus 時才寫回。沒帶 skus 的純商品編輯（改名稱 / 描述 /
-            // 分類）在 updateSkus 是 no-op，這裡的 skus 就是交易開頭 findByProductId 讀到的快照；
-            // 照寫等於把那個快照的加總原樣覆蓋回 product.stock_qty。而庫存異動走
-            // reaggregateStockFromSku，它刻意不 bump product.version（56 §5.4 F41 第 11 列，已登記在
-            // scripts/check-version-bump-coverage.py 的豁免清單）⇒ 步驟 6 的 product 層 CAS 對
-            // 「表單送出期間發生的庫存異動」完全失明，該異動會被靜默覆寫回舊值；窗口是
-            // findByProductId → updateById，中間還隔著 hashtag upsert 的 DB 往返。
-            // SKU 才是庫存的真實來源（結帳的 deductStock 帶 stock_qty >= quantity 述詞，不會超賣），
-            // 但 product.stock_qty 是 ProductPublicationPolicy.isPurchasable 的判準之一，覆寫後
-            // 商品的可購買性會與實際庫存不符，直到下一次任何庫存異動把它重算回來。
-            // 設成 null 讓 MyBatis-Plus 預設的 NOT_NULL 更新策略把該欄整個排除在 UPDATE 之外
-            // （stockQty 沒有 @TableField，沿用全域預設）；回應 DTO 要用的值在落盤後補回。
             boolean skusProvided = dto.getSkus() != null && !dto.getSkus().isEmpty();
             long aggregatedStock = io.github.will413028.hawkr.product.service.helper.ProductAggregateRules.aggregateStock(skus);
             entity.setStockQty(skusProvided ? aggregatedStock : null);
             entity.setShippingMethods(io.github.will413028.hawkr.product.service.helper.ProductAggregateRules.mergeShippingMethods(skus));
 
-            // 5.1 description text-block 純文字驗證（§3.6 / 26-§2.3 R8）
             validateDescriptionTextBlocks(entity.getDescription());
 
-            // 5.2 Hashtag 集合 diff（02 §5.2.4）：僅在 update_hashtags=true 時生效
             List<HashtagService.UpsertedHashtag> finalHashtagBindings;
             if (dto.isUpdateHashtags()) {
                 List<HashtagService.UpsertedHashtag> upserted = hashtagService.upsertHashtags(dto.getHashtags());
@@ -656,63 +549,44 @@ public class ProductService {
                         hashtagService.applyProductHashtags(productId, upserted);
                 finalHashtagBindings = applyResult.finalBindings();
             } else {
-                // 維持當前綁定，從 DB 讀取 canonical names 供 searchable_text 重算
                 List<HashtagService.HashtagDisplayItem> current = hashtagService.findHashtagsByProductId(productId);
                 finalHashtagBindings = current.stream()
                         .map(h -> new HashtagService.UpsertedHashtag(null, h.canonicalName(), h.displayName()))
                         .toList();
             }
 
-            // 5.3 重算反正規化文字欄位（cat_*_name + pure_description + searchable_text）
             enrichSearchableFields(entity, finalHashtagBindings, skus);
 
-            // 6. 保存商品更新 — 業務資料落盤（version CAS）
             long versionBeforeUpdate = currentVersion(entity);
             requireRowsAffected(productRepository.updateById(entity), productId);
             entity.setVersion(versionBeforeUpdate + 1);
             if (!skusProvided) {
-                // 步驟 5.0a 刻意讓 stock_qty 不進 UPDATE；補回既有 SKU 的加總供步驟 8 的回應 DTO
-                // 使用（DB 值不受影響，與本次修改前回傳的是同一個數字）。
                 entity.setStockQty(aggregatedStock);
             }
 
-            // 6.1 認證收斂點（19 號設計書 §6.1 W2）— 跨 bean 呼叫，join 本交易。
-            //     🔴 必須在步驟 6 的 updateById 之後：entity 帶的是從 DB 讀出的舊投影，
-            //     先跑收斂點的話（a）投影會被舊值覆蓋回去（b）rebuildProjection 的 version+1
-            //     會讓步驟 6 的 CAS 直接 0 列。
-            //     🔴 Step 0 閘門條件是「旗標 OR 認證非空」（§6.3.0）；旗標與清單都原樣往下傳，
-            //     在收斂點內判定，這裡不得自行提前 return。
             List<io.github.will413028.hawkr.product.dto.response.CertificationWarningDTO> certificationWarnings =
                     certificationApplicationService.syncFromProductWrite(
                             new ProductCertificationApplicationService.CertificationSyncCommand(
                                     productId,
                                     dto.getStoreId(),
-                                    null,   // 理由同 createProduct 步驟 5.1
+                                    null,
                                     certificationSourceOf(dto.isDelegated()),
                                     dto.isUpdateCertifications(),
                                     toCertificationInputs(dto.getCertifications())));
             refreshCertificationProjection(entity);
 
-            // 7. 業務資料寫入後、交易 commit 前建立/解除 Media 引用（#2222）
-            //    Link 失敗即拋 → 回滾；Unlink 失敗只記 log（洩漏可事後清，實體刪除不能）
             linkAndUnlinkGalleryImages(productId, oldGallery, entity.getGallery());
             linkAndUnlinkDescriptionImages(productId, oldDescription, entity.getDescription());
 
-            // 8. 轉換為 DTO（含 hashtag list 填充）
             ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
             result.setHashtags(buildHashtagItemDTOs(productId));
             applyCategoryHierarchy(result, entity);
 
-            // 9. 標記冪等成功
             idempotencyService.markSucceeded(idempotencyKey, dto.getStoreId(), result);
 
-            // 10. 清除快取
             cacheService.evictProductDetail(productId.toString());
             cacheService.evictProductListForWrite(dto.getStoreId());
 
-            // 11. 觸發 frontend SSR cache bust（後端服務責任邊界規範 §9.3）
-            //     純欄位編輯不改變賣家公開商品集合 → 只發 product:<id>；storefront 列表同掛
-            //     products:list，由 web expansion（product:<id> → products:list）涵蓋。
             revalidateProduct(productId);
 
             log.info("success", "商品更新成功", "product_id", productId.toString());
@@ -753,60 +627,48 @@ public class ProductService {
      *                         ⇒ 零痕跡跨店讀取（56 §7.1.2 Q4）
      */
     public ProductDetailDTO getProduct(String productId, Long storeId, boolean requireOwnership) {
-        // 1. 查詢資料庫（不使用快取，因為需要檢查權限）
         Long id = Long.parseLong(productId);
         ProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
-        // 1.1 Q4 歸屬斷言（代行路徑）：必須在既有權限檢查之前，否則 ACTIVE 商品會被既有述詞先放行
         if (requireOwnership) {
             DelegationContextValidator.requireResourceOwned(
                     entity.getStoreId() != null ? entity.getStoreId() : 0L,
                     storeId != null ? storeId : 0L);
         }
 
-        // 2. 權限檢查
         String status = entity.getStatus();
         boolean isOwner = storeId != null && storeId > 0 && storeId.equals(entity.getStoreId());
         boolean isActive = ProductStatus.ACTIVE.value().equals(status);
 
-        // 賣家已刪除後又復活：舊商品對其隱形（等同不存在）。public 非-owner 由下方既有檢查擋；
-        // admin 走 getProductForAdmin 不經此（Part A / doc 44 §11）。
         if (entity.getSellerDeletedAt() != null && isOwner && !isActive) {
             throw new ProductNotFoundException(productId);
         }
 
-        // 允許查看的狀態（對於 store_id owner）：DRAFT / PENDING_REVIEW / ACTIVE / INACTIVE
-        // 賣家必須能查看自己下架的商品，才能重新上架或編輯
         boolean isAllowedForOwner = ProductStatus.DRAFT.value().equals(status)
                 || ProductStatus.PENDING_REVIEW.value().equals(status)
                 || ProductStatus.INACTIVE.value().equals(status)
                 || isActive;
 
         if (!isActive && !isOwner) {
-            // 非 ACTIVE 狀態且不是 store_id owner，拒絕存取
             log.warn("accessDenied", "非 store_id owner 無法查看非上架商品，product_id=" + productId + "，status=" + status);
             throw new ProductAccessDeniedException(productId, "商品不存在或無權存取");
         }
 
         if (isOwner && !isAllowedForOwner) {
-            // store_id owner 也無法查看某些狀態（例如 INACTIVE 由管理員控制）
             log.warn("accessDenied", "store_id owner 無法查看此狀態的商品，product_id=" + productId + "，status=" + status);
             throw new ProductAccessDeniedException(productId, "商品不存在或無權存取");
         }
 
-        // 3. 查詢 SKU
         List<ProductSkuEntity> skus = productSkuRepository.findByProductId(id);
 
-        // 4. 轉換為 DTO
         ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
 
-        // 5. 填充三層分類（不限狀態，含軟刪除分類；§2.5.2 買家破口修復）
         if (entity.getCategory() != null) {
             CategoryHierarchyDTO hierarchy = categoryService.getCategoryHierarchy(
                     entity.getCategory(), entity.getCategoryLv2());
             if (hierarchy != null) {
-                result.setCategoryName(hierarchy.getLv3Name()); // 向後相容
+                result.setCategoryName(hierarchy.getLv3Name());
                 result.setCategoryLv3Id(hierarchy.getLv3Id());
                 result.setCategoryLv3Name(hierarchy.getLv3Name());
                 result.setCategoryLv2Id(hierarchy.getLv2Id());
@@ -816,15 +678,11 @@ public class ProductService {
             }
         }
 
-        // 6. 填充商家資訊（從 Seller Service 取得 name/rate/logo/address）
         SellerInfoDTO sellerInfo = buildSellerInfo(entity.getStoreId());
         result.setSeller(sellerInfo);
 
-        // 7. 填充評論預覽（預留呼叫點）
         result.setReviews(new ArrayList<>());
-        // TODO: 接通 Review Service 後取得前兩筆評論
 
-        // 8. 填充 hashtag list（依 position 升序，含讀取時計算的公開商品數；02 §5.4）
         result.setHashtags(buildHashtagItemDTOs(id));
 
         log.info("success", "查詢商品成功，product_id=" + productId + "，store_id=" + storeId);
@@ -848,7 +706,7 @@ public class ProductService {
         if (hierarchy == null) {
             return;
         }
-        result.setCategoryName(hierarchy.getLv3Name()); // 向後相容
+        result.setCategoryName(hierarchy.getLv3Name());
         result.setCategoryLv3Id(hierarchy.getLv3Id());
         result.setCategoryLv3Name(hierarchy.getLv3Name());
         result.setCategoryLv2Id(hierarchy.getLv2Id());
@@ -868,20 +726,15 @@ public class ProductService {
      * @throws ProductNotFoundException 商品不存在
      */
     public ProductDetailDTO getProductForAdmin(String productId) {
-        // 1. 查詢資料庫（不使用快取，管理員需看到即時資料）
         Long id = Long.parseLong(productId);
         ProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
-        // 2. 不做權限檢查、不限狀態
 
-        // 3. 查詢 SKU
         List<ProductSkuEntity> skus = productSkuRepository.findByProductId(id);
 
-        // 4. 轉換為 DTO
         ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
 
-        // 5. 填充三層分類（不限狀態，含軟刪除分類）
         if (entity.getCategory() != null) {
             CategoryHierarchyDTO hierarchy = categoryService.getCategoryHierarchy(
                     entity.getCategory(), entity.getCategoryLv2());
@@ -896,16 +749,13 @@ public class ProductService {
             }
         }
 
-        // 6. 填充商家資訊
         SellerInfoDTO sellerInfo = SellerInfoDTO.builder()
                 .storeId(entity.getStoreId())
                 .build();
         result.setSeller(sellerInfo);
 
-        // 7. 填充評論預覽（預留呼叫點）
         result.setReviews(new ArrayList<>());
 
-        // 8. 填充 hashtag list（02 §5.4）
         result.setHashtags(buildHashtagItemDTOs(id));
 
         log.info("success", "管理員查詢商品成功，product_id=" + productId);
@@ -924,7 +774,6 @@ public class ProductService {
      * @throws ProductNotFoundException 商品不存在或非 ACTIVE 狀態
      */
     public ProductDetailDTO getPublicProduct(String productId) {
-        // 0. 先查 DB 取得 seller，計算 onboarding 指紋（cache key 用，02 §2.7.2）
         Long id = Long.parseLong(productId);
         Optional<ProductEntity> found = productRepository.findByIdIncludingDeleted(id);
         if (found.isEmpty()) {
@@ -933,7 +782,6 @@ public class ProductService {
         }
         ProductEntity entity = found.get();
 
-        // 0.1 公開生命週期獨立於銷售狀態：曾公開後暫時下架仍保留穩定 PDP。
         var publicationState = io.github.will413028.hawkr.product.domain.ProductPublicationPolicy.deriveState(
                 entity.getFirstPublishedAt(), entity.getStatus(),
                 entity.getDeletedAt(), entity.getSellerDeletedAt(), isStoreExposable(entity));
@@ -945,26 +793,21 @@ public class ProductService {
         OnboardingSnapshot onboarding = fetchOnboardingSnapshot(storeId);
         String onboardingSig = SellerShippingFilter.onboardingSig(storeId, onboarding.availableKeys);
 
-        // 1. 用 (productId, onboardingSig) 查 Redis 快取
         Optional<ProductDetailDTO> cached = cacheService.getProductDetail(productId, onboardingSig);
         if (cached.isPresent()) {
             return cached.get();
         }
 
-        // 4. 查詢 SKU
         List<ProductSkuEntity> skus = productSkuRepository.findByProductId(id);
 
-        // 5. 轉換為 DTO（含 product 原始 shipping_methods）
         ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
 
-        // 5.1 套用 onboarding filter（02 §2.7.2）：剔除賣家當下未啟用的 shipping methods
         applyOnboardingFilterToDetail(result, onboarding.availableKeys);
 
-        // 6. 填充三層分類（不限狀態，§2.5.2 買家破口修復）
         if (entity.getCategory() != null) {
             CategoryHierarchyDTO hierarchy = categoryService.getCategoryHierarchy(entity.getCategory(), entity.getCategoryLv2());
             if (hierarchy != null) {
-                result.setCategoryName(hierarchy.getLv3Name()); // 向後相容
+                result.setCategoryName(hierarchy.getLv3Name());
                 result.setCategoryLv3Id(hierarchy.getLv3Id());
                 result.setCategoryLv3Name(hierarchy.getLv3Name());
                 result.setCategoryLv2Id(hierarchy.getLv2Id());
@@ -974,18 +817,13 @@ public class ProductService {
             }
         }
 
-        // 7. 填充商家資訊（從 Seller Service 取得 name/rate/logo/address）
         SellerInfoDTO sellerInfo = buildSellerInfo(entity.getStoreId());
         result.setSeller(sellerInfo);
 
-        // 8. 填充評論預覽（預留呼叫點）
         result.setReviews(new ArrayList<>());
-        // TODO: 接通 Review Service 後取得前兩筆評論
 
-        // 8.1 填充 hashtag list（02 §5.5；快取會包含此 list，TTL 1h）
         result.setHashtags(buildHashtagItemDTOs(id));
 
-        // 9. 寫入 Redis 快取（含 onboarding 指紋）
         cacheService.cacheProductDetail(productId, onboardingSig, result);
 
         log.info("success", "公開查詢商品成功，product_id=" + productId);
@@ -993,7 +831,6 @@ public class ProductService {
         return result;
     }
 
-    // ==================== 02 §2.7.2 onboarding-aware read path 共用 ====================
 
     /**
      * 賣家 onboarding 狀態快照（per-request 用，包含已啟用方式 key set + 指紋）。
@@ -1047,7 +884,7 @@ public class ProductService {
      */
     private void applyOnboardingFilterToDetail(ProductDetailDTO dto, Set<String> availableKeys) {
         if (availableKeys.contains("*:*")) {
-            return; // 兜底放行，shipping-service 故障時不過濾
+            return;
         }
         if (dto.getShippingMethods() == null || dto.getShippingMethods().isEmpty()) {
             return;
@@ -1098,7 +935,6 @@ public class ProductService {
      * - 賣家 API：Gateway 傳入 ownerStoreId，status 可選
      */
     public ProductListResultDTO getProductList(ProductQueryDTO query) {
-        // 02 §5.3.4 入口驗證：delivery_temp_filter 合法值（docs/開發規範/Java 微服務開發規範.md §6.4）
         if (query.getDeliveryTempFilter() != null) {
             for (String v : query.getDeliveryTempFilter()) {
                 io.github.will413028.hawkr.common.utils.code.CodeMetaValidator.requireValidValue(
@@ -1107,7 +943,6 @@ public class ProductService {
             }
         }
 
-        // 商家所在地由 seller SSOT 解析；與顯式 store_ids 同時存在時取交集。
         if (query.getSellerCityCode() != null && !query.getSellerCityCode().isBlank()) {
             List<Long> cityStoreIds = sellerGrpcClient.listPublicStoreIdsByCityCode(query.getSellerCityCode());
             List<Long> intersected = io.github.will413028.hawkr.product.domain.ProductSellerCityFilterPolicy
@@ -1118,8 +953,6 @@ public class ProductService {
             query.setStoreIds(intersected);
         }
 
-        // 02 §5.3.4 followed_product_only filter 預處理：必須有 viewerBuyerId（觀看者的 buyer_id，
-        // 由 gateway 解析後傳入），呼叫 buyer 拿收藏 id list
         if (query.isFollowedProductOnly()) {
             Long viewerId = query.getViewerBuyerId();
             if (viewerId == null || viewerId <= 0) {
@@ -1127,13 +960,11 @@ public class ProductService {
             }
             List<Long> favoritedIds = buyerGrpcClient.listFavoritedProductIds(viewerId);
             if (favoritedIds == null || favoritedIds.isEmpty()) {
-                // 收藏為空 → 直接回空 list，不打 DB
                 log.info("followedProductOnly.emptyFavorites",
                         "followed_product_only=true 但無收藏，回空 list",
                         "viewer_buyer_id", String.valueOf(viewerId));
                 return emptyResult(query);
             }
-            // 02 §5.3.4 上限 5000
             if (favoritedIds.size() > 5000) {
                 log.warn("followedProductOnly.truncate",
                         "favorited ids 超過 5000，截斷 viewer_buyer_id=" + viewerId
@@ -1143,9 +974,6 @@ public class ProductService {
             query.setFollowedProductIds(favoritedIds);
         }
 
-        // 02 §5.3.4 followed_seller_only filter 預處理：必須有 viewerBuyerId（由 gateway 解析後傳入），
-        // 呼叫 buyer 拿追蹤的 seller id list，解析後與既有 storeIds 取交集（不另開 SQL 路徑，重用
-        // idx_product_status_store_id 索引）
         if (query.isFollowedSellerOnly()) {
             Long viewerId = query.getViewerBuyerId();
             if (viewerId == null || viewerId <= 0) {
@@ -1158,14 +986,12 @@ public class ProductService {
                         "viewer_buyer_id", String.valueOf(viewerId));
                 return emptyResult(query);
             }
-            // 02 §5.3.4 上限 1000
             if (subscribedSellerIds.size() > 1000) {
                 log.warn("followedSellerOnly.truncate",
                         "subscribed seller ids 超過 1000，截斷 viewer_buyer_id=" + viewerId
                                 + ", size=" + subscribedSellerIds.size());
                 subscribedSellerIds = subscribedSellerIds.subList(0, 1000);
             }
-            // 與既有 storeIds 取交集（若 query 有指定）
             List<Long> existing = query.getStoreIds();
             if (existing != null && !existing.isEmpty()) {
                 java.util.Set<Long> intersect = new java.util.HashSet<>(existing);
@@ -1182,13 +1008,10 @@ public class ProductService {
             }
         }
 
-        // 直接使用 Gateway 傳入的 status（由入口控制）
         String effectiveStatus = query.getStatus();
 
-        // 生成快取鍵
         String cacheKey = cacheService.generateListCacheKey(query);
 
-        // 1. 先查快取（cache 存 pre-filter snapshot，public 場景仍須套 onboarding filter）
         Optional<ProductListResultDTO> cached = cacheService.getProductList(cacheKey);
         if (cached.isPresent()) {
             log.info("cacheHit", "列表快取命中", "cache_key", cacheKey);
@@ -1199,9 +1022,6 @@ public class ProductService {
             return cachedResult;
         }
 
-        // 2. 分類層級偵測（cache miss 才執行；02 §5.3.1 多值聯集）：
-        //    對每個 id 偵測 level，分組為 lv1/lv2/lv3 三組；SQL 三組 IN 用 OR 串接（命中任一即可）。
-        //    天然支援「遞迴含子分類」（lv1=X 匹配商品 lv1=X，含其下所有 lv2/lv3）。
         List<Long> categoryLv1Ids = null;
         List<Long> categoryLv2Ids = null;
         List<Long> categoryLv3Ids = null;
@@ -1227,24 +1047,18 @@ public class ProductService {
             if (categoryLv3Ids.isEmpty()) categoryLv3Ids = null;
         }
 
-        // 3. 分頁查詢（不 join product_spec）
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<ProductEntity> page =
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(
                         query.getPage(),
                         query.getPageSize()
                 );
 
-        // storeId 優先（公開 API 篩選指定賣家），否則用 ownerStoreId（賣家管理自己商品）
         Long ownerFilter = query.getStoreId() != null ? query.getStoreId() : query.getOwnerStoreId();
 
-        // seller_deleted exclude 只在「賣家看自己」時套（ownerStoreId 是 owner 且非公開 storeId 路徑）；
-        // 公開 storeId 篩選、admin（ownerStoreId=null）皆不 exclude（Part A / doc 44 §11）。
         boolean excludeSellerDeleted = query.getStoreId() == null && query.getOwnerStoreId() != null;
 
-        // 多 token 關鍵字（02 §5.3.3）：tokenize 後 OR 命中 + hit_count 排序
         List<String> tokens = io.github.will413028.hawkr.product.domain.text.KeywordTokenizer.tokenize(query.getKeyword());
 
-        // Hashtag 精確篩選（02 §3.9）：normalize 為 canonical 後比對
         List<String> canonicalHashtags = hashtagService.normalizeForFilter(query.getHashtags());
 
         com.baomidou.mybatisplus.core.metadata.IPage<ProductEntity> result = productRepository.findPageByCondition(
@@ -1269,19 +1083,15 @@ public class ProductService {
                 query.isPublicApi()
         );
 
-        // 3. 轉換為 ListItemDTO（不含 variants）
         List<ProductListItemDTO> items = result.getRecords().stream()
                 .map(productEntityConverter::toListItemDTO)
                 .collect(Collectors.toList());
 
-        // 4. 填充 categoryName
-        // 公開 API 與賣家管理 API 都透過分類服務解析名稱；商品 owner scope 使用 storeId。
         Set<Long> categoryIdsForName = items.stream()
                 .map(ProductListItemDTO::getCategoryId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         if (!categoryIdsForName.isEmpty()) {
-            // 不限狀態填充分類名稱（§2.5.2 買家破口修復：商品掛在軟刪除分類下時仍顯示分類名）
             Map<Long, String> categoryNames = categoryService.getCategoryNames(categoryIdsForName);
             for (ProductListItemDTO item : items) {
                 if (item.getCategoryId() != null) {
@@ -1290,7 +1100,6 @@ public class ProductService {
             }
         }
 
-        // 4.5 填充商家資訊（公開 API 才需要；list / detail 共用 SellerInfoAssembler，02 §5.3.5）
         if (query.isPublicApi()) {
             Set<Long> storeIds = items.stream()
                     .map(ProductListItemDTO::getStoreId)
@@ -1307,7 +1116,6 @@ public class ProductService {
             }
         }
 
-        // 4.6 填充 SKU 規格名稱
         List<Long> productIds = items.stream()
                 .map(item -> {
                     try { return Long.parseLong(item.getId()); }
@@ -1332,7 +1140,6 @@ public class ProductService {
             }
         }
 
-        // 4.7 填充 hashtag list（02 §5.3）
         if (!productIds.isEmpty()) {
             Map<Long, List<HashtagService.HashtagDisplayItem>> hashtagMap =
                     hashtagService.findHashtagsByProductIds(productIds);
@@ -1356,10 +1163,7 @@ public class ProductService {
             }
         }
 
-        // deliveryTemp 派生已移到 ProductEntityConverter.toListItemDTO（02 §5.3.6 本期改為從 product.shipping_methods 派生）
-        // 不再需要 product_sku.shipping_method JSONB GROUP BY pipeline
 
-        // 5. 組裝結果（pre-filter；shipping_methods 為 product 原始 snapshot）
         ProductListResultDTO listResult = ProductListResultDTO.builder()
                 .products(items)
                 .total(result.getTotal())
@@ -1367,12 +1171,10 @@ public class ProductService {
                 .pageSize(query.getPageSize())
                 .build();
 
-        // 5. 寫入快取（pre-filter snapshot，避免 stale；02 §2.7.2）
         cacheService.cacheProductList(cacheKey, listResult);
 
         log.info("success", "查詢商品列表成功，total=" + result.getTotal() + "，page=" + query.getPage());
 
-        // 6. 對外回傳前套 onboarding filter（02 §2.7.2 公開 read path；賣家中心不過濾）
         if (query.isPublicApi()) {
             applyOnboardingFilterToList(listResult);
         }
@@ -1387,8 +1189,6 @@ public class ProductService {
         if (listResult == null || listResult.getProducts() == null || listResult.getProducts().isEmpty()) {
             return;
         }
-        // 不對賣家中心 / admin 視角過濾 — 只對 publicApi 過濾
-        // 列表進入此 method 一律視為「公開」場景；賣家中心走的是 getSellerProducts 等另外路徑
         Map<Long, OnboardingSnapshot> perSeller = new HashMap<>();
         for (ProductListItemDTO item : listResult.getProducts()) {
             Long sellerId = item.getStoreId();
@@ -1420,7 +1220,6 @@ public class ProductService {
      */
     @Transactional
     public ProductDetailDTO updateProductStatus(String productId, String status) {
-        // 1. 驗證狀態值合法
         boolean validStatus = false;
         for (ProductStatus ps : ProductStatus.values()) {
             if (ps.value().equals(status)) {
@@ -1432,20 +1231,16 @@ public class ProductService {
             throw new IllegalArgumentException("無效的商品狀態碼: " + status);
         }
 
-        // 2. 查詢商品（不檢查 owner）
         Long id = Long.parseLong(productId);
         ProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
-        // 賣家已刪除：禁止把 flagged 商品重新上架到 public（doc 44 §11 / Part A）。
-        // admin 仍可看、可改其他狀態，就是不能轉 ACTIVE。ProductBusinessException 由 GrpcErrorHandler catch-all 映業務碼。
         if (entity.getSellerDeletedAt() != null
                 && ProductStatus.ACTIVE.value().equals(status)) {
             throw new ProductBusinessException(
                     GrpcResponseCode.INVALID_STATUS, "該商品所屬賣家已刪除，不可重新上架");
         }
 
-        // 3. 更新狀態
         String oldStatus = entity.getStatus();
         entity.setFirstPublishedAt(io.github.will413028.hawkr.product.domain.ProductPublicationPolicy.firstPublishedAtOnActivation(
                 entity.getFirstPublishedAt(), status, java.time.LocalDateTime.now()));
@@ -1454,27 +1249,17 @@ public class ProductService {
         requireAdminCasHit(productRepository.updateById(entity), id);
         entity.setVersion(versionBeforeUpdate + 1);
 
-        // 3.2 02 §5.13b 補貨 transition：上架 + stock>0 時 afterCommit 發 product.restock
         detectAndPublishRestockOnStatusChange(entity, oldStatus, status);
 
-        // 4. 清除快取（狀態變更影響公開列表，需一併清除）
         cacheService.evictProductDetail(productId);
         cacheService.evictProductListForWrite(entity.getStoreId());
 
-        // 5. 查詢 SKU 並轉為 DTO（含 hashtag list 填充）
-        //    toDetailDTO 讀 product 表，hashtags 在 product_hashtag ⇒ 不補這一行，
-        //    回應的 hashtags 恆為空。消費者看到的是「這個商品沒有標籤」而不是「本次
-        //    沒查標籤」，兩者在 DTO 上無法區分。同檔另外五條產出 ProductDetailDTO 的
-        //    路徑都有這一行。
         List<ProductSkuEntity> skus = productSkuRepository.findByProductId(id);
         ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
         result.setHashtags(buildHashtagItemDTOs(id));
 
-        // 6. 填充三層分類
         applyCategoryHierarchy(result, entity);
 
-        // 觸發 frontend SSR cache bust（後端服務責任邊界規範 §9.3）
-        // 跨 ACTIVE 邊界（上架／下架）改變賣家公開商品集合 → 共發 seller:<id>；未跨界只動商品本身。
         if (crossesActiveBoundary(oldStatus, status)) {
             revalidateProductAndSeller(entity.getId(), entity.getStoreId());
         } else {
@@ -1533,16 +1318,13 @@ public class ProductService {
             ProductEntity entity = productRepository.findById(pid).orElse(null);
             if (entity == null) return false;
 
-            // 取 hashtag canonical names（依 position）
             List<HashtagService.HashtagDisplayItem> hashtags = hashtagService.findHashtagsByProductId(pid);
             List<HashtagService.UpsertedHashtag> hashtagInputs = hashtags.stream()
                     .map(h -> new HashtagService.UpsertedHashtag(null, h.canonicalName(), h.displayName()))
                     .toList();
 
-            // 取 sku list
             List<ProductSkuEntity> skus = productSkuRepository.findByProductId(pid);
 
-            // 重算 cat_l*_name + pure_description + searchable_text
             enrichSearchableFields(entity, hashtagInputs, skus);
 
             if (productRepository.updateById(entity) > 0) {
@@ -1588,29 +1370,23 @@ public class ProductService {
     @Transactional
     public ProductDetailDTO updateSellerProductStatus(String productId, Long storeId, String status,
                                                       String expectedVersion) {
-        // 1. 驗證目標狀態碼合法
         if (!ProductStatus.isValidValue(status)) {
             throw new IllegalArgumentException("無效的商品狀態碼: " + status);
         }
 
-        // 2. 查詢商品並驗證擁有者
         Long id = Long.parseLong(productId);
         ProductEntity entity = productRepository.findByIdAndStoreId(id, storeId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
-        // 2.1 樂觀鎖前置比對（真正的 CAS 在步驟 4 的 updateById）
         requireExpectedVersion(entity, expectedVersion);
 
-        // 3. 驗證狀態轉換合法性
         String oldStatus = entity.getStatus();
         validateSellerStatusTransition(oldStatus, status);
 
-        // 3.1 賣家停權 backstop（02 §5.10 步驟 5b / 46 §6.2，首次接線）：目標為 ACTIVE 時強制檢查
         if (ProductStatus.ACTIVE.value().equals(status)) {
             requireSellerCanManageProductsForActivation(storeId);
         }
 
-        // 4. 更新狀態
         entity.setStatus(status);
         entity.setFirstPublishedAt(io.github.will413028.hawkr.product.domain.ProductPublicationPolicy.firstPublishedAtOnActivation(
                 entity.getFirstPublishedAt(), status, java.time.LocalDateTime.now()));
@@ -1619,28 +1395,17 @@ public class ProductService {
         requireRowsAffected(productRepository.updateById(entity), id);
         entity.setVersion(versionBeforeUpdate + 1);
 
-        // 4.2 02 §5.13b 補貨 transition：上架 + stock>0 時 afterCommit 發 product.restock
         detectAndPublishRestockOnStatusChange(entity, oldStatus, status);
 
-        // 5. 清除快取
         cacheService.evictProductDetail(productId);
         cacheService.evictProductListForWrite(entity.getStoreId());
 
-        // 6. 查詢 SKU 並轉為 DTO（含 hashtag list 填充）
-        //    ⚠️ 這一行曾經缺席，代價不只是「回應少一欄」：56 號代行上下架把寫入回應
-        //    當成 after 快照去 diff，於是每一次上／下架的稽核列都虛報一列「主題標籤
-        //    被清空」，而 product_hashtag 一列未動。稽核列是爭議時的舉證，記到假的
-        //    比少記更糟。
         List<ProductSkuEntity> skus = productSkuRepository.findByProductId(id);
         ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
         result.setHashtags(buildHashtagItemDTOs(id));
 
-        // 7. 填充三層分類
         applyCategoryHierarchy(result, entity);
 
-        // 觸發 frontend SSR cache bust（後端服務責任邊界規範 §9.3）
-        // — DRAFT→ACTIVE / ACTIVE→INACTIVE / INACTIVE→ACTIVE 都需即時 propagate（#1035 #5 觸發來源）
-        // 跨 ACTIVE 邊界（上架／下架）改變賣家公開商品集合 → 共發 seller:<id>；未跨界只動商品本身。
         if (crossesActiveBoundary(oldStatus, status)) {
             revalidateProductAndSeller(entity.getId(), storeId);
         } else {
@@ -1831,19 +1596,17 @@ public class ProductService {
     }
 
     private void validateSellerStatusTransition(String fromStatus, String toStatus) {
-        // PENDING_REVIEW 狀態的商品，賣家完全不可操作
         if (ProductStatus.PENDING_REVIEW.value().equals(fromStatus)) {
             throw new IllegalArgumentException("審核中的商品僅管理員可操作");
         }
 
-        // 檢查允許的轉換
         boolean allowed = false;
         if (ProductStatus.DRAFT.value().equals(fromStatus) && ProductStatus.ACTIVE.value().equals(toStatus)) {
-            allowed = true; // DRAFT → ACTIVE
+            allowed = true;
         } else if (ProductStatus.ACTIVE.value().equals(fromStatus) && ProductStatus.INACTIVE.value().equals(toStatus)) {
-            allowed = true; // ACTIVE → INACTIVE
+            allowed = true;
         } else if (ProductStatus.INACTIVE.value().equals(fromStatus) && ProductStatus.ACTIVE.value().equals(toStatus)) {
-            allowed = true; // INACTIVE → ACTIVE
+            allowed = true;
         }
 
         if (!allowed) {
@@ -1876,13 +1639,10 @@ public class ProductService {
         }
     }
 
-    // package-visible test seam：直接驗證 ACTIVE transition backstop 規則本身，
-    // 不需 bootstrap 整條 updateSellerProductStatus() / createProduct() pipeline。
     void requireSellerCanManageProductsForActivationForTest(Long storeId) {
         requireSellerCanManageProductsForActivation(storeId);
     }
 
-    // ==================== 私有輔助方法 ====================
 
     /**
      * 處理新建商品的圖片
@@ -1893,7 +1653,6 @@ public class ProductService {
             return new ArrayList<>();
         }
 
-        // 收集所有 staged_token
         List<String> stagedTokens = images.stream()
                 .filter(img -> img.getStagedToken() != null && !img.getStagedToken().isEmpty())
                 .map(ProductImageDTO::getStagedToken)
@@ -1903,18 +1662,12 @@ public class ProductService {
             return new ArrayList<>();
         }
 
-        // 轉正失敗一律往外拋，與業務落盤後的 linkGalleryImages 同一條原則（#2222）：
-        // 拋出 → 交易回滾 → 沒有任何列宣稱擁有這些圖。吞掉則會 commit 出一個「操作者送了
-        // N 張圖、回 code: 0、實際一張都沒掛上」的成功回應，而更新路徑的 images 是整份替換，
-        // 連既有圖片都會一起消失（56 P0-1 的實際症狀）。
         List<MediaGrpcClient.FinalizedImage> finalized =
                 mediaGrpcClient.finalizeImages(stagedTokens, AssetReferenceType.PRODUCT.value());
 
-        // 依 staged_token 建立 mapping（media.proto:41 契約要求），避免依賴回傳順序
         Map<String, MediaGrpcClient.FinalizedImage> tokenToFinalized = finalized.stream()
                 .collect(Collectors.toMap(MediaGrpcClient.FinalizedImage::getStagedToken, f -> f, (a, b) -> a));
 
-        // 依輸入圖片順序組裝 gallery（決定 gallery 顯示位置）
         List<ProductEntity.GalleryItem> result = new ArrayList<>();
         for (ProductImageDTO img : images) {
             if (img.getStagedToken() == null || img.getStagedToken().isEmpty()) {
@@ -1940,29 +1693,22 @@ public class ProductService {
             List<ProductEntity.GalleryItem> existingGallery,
             List<ProductImageDTO> newImages
     ) {
-        // 處理新增的圖片（有 staged_token，僅轉正，不建立引用）
         List<String> stagedTokens = newImages.stream()
                 .filter(img -> img.getStagedToken() != null && !img.getStagedToken().isEmpty())
                 .map(ProductImageDTO::getStagedToken)
                 .collect(Collectors.toList());
 
-        // 轉正失敗往外拋，理由同 processImages：這裡吞掉的後果最嚴重——images 是整份替換，
-        // 送進來的新圖沒轉正成功時，賣家原本的圖也已經不在 result 裡了。
         List<MediaGrpcClient.FinalizedImage> newFinalized = new ArrayList<>();
         if (!stagedTokens.isEmpty()) {
             newFinalized = mediaGrpcClient.finalizeImages(stagedTokens, AssetReferenceType.PRODUCT.value());
         }
 
-        // 依 staged_token 建立 mapping（media.proto:41 契約要求），避免依賴回傳順序
         Map<String, MediaGrpcClient.FinalizedImage> tokenToFinalized = newFinalized.stream()
                 .collect(Collectors.toMap(MediaGrpcClient.FinalizedImage::getStagedToken, f -> f, (a, b) -> a));
 
-        // 依 newImages 原始輸入順序逐項組裝 gallery，讓最終順序完全等於前端送出的陣列順序（#1424）。
-        // 既有圖（assetId）與新圖（stagedToken）可交錯混用，單一迴圈避免「既有群組 → 新增群組」的兩段式重排。
         List<ProductEntity.GalleryItem> result = new ArrayList<>();
         for (ProductImageDTO img : newImages) {
             if (img.getAssetId() != null && !img.getAssetId().isEmpty()) {
-                // 既有圖：從現有 gallery 以 assetId 對應保留（找不到則略過）
                 if (existingGallery != null) {
                     existingGallery.stream()
                             .filter(g -> g.getAssetId() != null && g.getAssetId().equals(img.getAssetId()))
@@ -1970,7 +1716,6 @@ public class ProductService {
                             .ifPresent(result::add);
                 }
             } else if (img.getStagedToken() != null && !img.getStagedToken().isEmpty()) {
-                // 新圖：以 staged_token 從轉正 mapping 取得（轉正失敗／查無則略過）
                 MediaGrpcClient.FinalizedImage finalized = tokenToFinalized.get(img.getStagedToken());
                 if (finalized != null) {
                     ProductEntity.GalleryItem item = new ProductEntity.GalleryItem();
@@ -2016,36 +1761,16 @@ public class ProductService {
      * {@code ProductServiceUpdateSkusEmptyListTest} 守著。
      */
     private List<ProductSkuEntity> updateSkus(Long productId, List<ProductSkuDTO> skuDTOs) {
-        // 查詢現有 SKU
         List<ProductSkuEntity> existingSkus = productSkuRepository.findByProductId(productId);
         Map<String, ProductSkuEntity> existingMap = existingSkus.stream()
                 .collect(Collectors.toMap(s -> s.getId().toString(), s -> s));
 
         List<ProductSkuEntity> resultSkus = new ArrayList<>();
 
-        // 空清單 = 「本次不動 SKU」，不是「清空 SKU」。
-        //
-        // proto3 的 `repeated ProductSku skus` 無法區分「欄位缺席」與「空陣列」——前端
-        // PUT /app/products/{id} 只想改商品名稱、完全不帶 skus 時，到這裡就是一個空 List。
-        // 舊實作把它讀成「清空 SKU」，於是一次局部更新會實體刪光該商品所有 SKU
-        // （dev 實測：帶 1 個 SKU 的商品送 {"name": "..."} → HTTP 200 → product_sku 0 rows）。
-        // 商品無 SKU 是不可購買的破損狀態（createProduct 已要求至少一個 SKU），
-        // 因此「清空」本來就不是合法操作，直接讓空清單成為 no-op。
         if (skuDTOs == null || skuDTOs.isEmpty()) {
             return existingSkus;
         }
 
-        // 帶 id 的 SKU 必須確實屬於本商品，否則整個請求失敗（#2544）。
-        //
-        // 舊實作對 existingMap 查無的 id 是「靜默略過」：該 id 既不進 resultSkus 也不進 keepIds，
-        // 於是下方的刪除步驟會把**全部**既有 SKU 算成「不在保留清單」而實體刪除，同事務接著
-        // 以空集合重算 stock_qty（aggregateStock(∅) 回原生 0）→ 商品變成 0 SKU、庫存 0，HTTP 仍 200。
-        // 商品歸屬已在 updateProduct 步驟 1 的 findByIdAndStoreId 驗過，所以這不是越權，
-        // 但賣家送一個打錯的 skuId 就能清空自己商品的全部規格，且沒有任何錯誤訊息。
-        //
-        // 驗證刻意放在寫入迴圈之前（fail-fast）：拖到迴圈內才拋，前面幾個 SKU 的
-        // INSERT/UPDATE 已經送出，只能倚賴外層 @Transactional 回滾；先驗完再寫，
-        // 讓不合法輸入根本不產生副作用。
         for (ProductSkuDTO skuDTO : skuDTOs) {
             String skuId = skuDTO.getId();
             if (skuId != null && !skuId.isEmpty() && !existingMap.containsKey(skuId)) {
@@ -2059,7 +1784,6 @@ public class ProductService {
 
         for (ProductSkuDTO skuDTO : skuDTOs) {
             if (skuDTO.getId() != null && !skuDTO.getId().isEmpty()) {
-                // 更新現有 SKU（上方已驗證必定命中，不再有「查無就略過」的分支）
                 ProductSkuEntity existing = existingMap.get(skuDTO.getId());
                 productSkuConverter.updateEntity(existing, skuDTO);
                 applySkuExpectedVersion(existing, skuDTO.getExpectedVersion());
@@ -2071,14 +1795,12 @@ public class ProductService {
                 resultSkus.add(existing);
                 keepIds.add(skuDTO.getId());
             } else {
-                // 新增 SKU
                 ProductSkuEntity newSku = productSkuConverter.toEntity(skuDTO, productId);
                 productSkuRepository.insert(newSku);
                 resultSkus.add(newSku);
             }
         }
 
-        // 刪除不在保留清單中的 SKU
         List<Long> deleteIds = existingSkus.stream()
                 .filter(s -> !keepIds.contains(s.getId().toString()))
                 .map(ProductSkuEntity::getId)
@@ -2108,7 +1830,6 @@ public class ProductService {
             if (sku.getShippingMethods() == null || sku.getShippingMethods().isEmpty()) {
                 continue;
             }
-            // 跳過缺少材積或重量的 SKU
             if (sku.getLengthCm() == null || sku.getWidthCm() == null
                     || sku.getHeightCm() == null || sku.getWeight() == null || sku.getUnit() == null) {
                 continue;
@@ -2178,7 +1899,6 @@ public class ProductService {
             return;
         }
 
-        // 原價區間（永遠以 SKU.price 彙總）
         Long listMin = skus.stream()
                 .map(ProductSkuEntity::getPrice)
                 .filter(Objects::nonNull)
@@ -2190,7 +1910,6 @@ public class ProductService {
                 .max(Long::compareTo)
                 .orElse(null);
 
-        // 特價區間（皆無特價時為 null）
         Long saleMin = skus.stream()
                 .map(ProductSkuEntity::getSalePrice)
                 .filter(Objects::nonNull)
@@ -2202,7 +1921,6 @@ public class ProductService {
                 .max(Long::compareTo)
                 .orElse(null);
 
-        // 實際售價區間（effective_price = salePrice ?? price）
         Long effectiveMin = skus.stream()
                 .map(sku -> sku.getSalePrice() != null ? sku.getSalePrice() : sku.getPrice())
                 .filter(Objects::nonNull)
@@ -2262,7 +1980,7 @@ public class ProductService {
                 case "text" -> validateTextBlock(block);
                 case "table" -> validateTableBlock(block);
                 case "list" -> validateListBlock(block);
-                default -> { /* image / 其他 type 無文字驗證 */ }
+                default -> {  }
             }
         }
     }
@@ -2396,7 +2114,6 @@ public class ProductService {
             ProductEntity entity,
             List<HashtagService.UpsertedHashtag> hashtags,
             List<ProductSkuEntity> skus) {
-        // 三層分類名稱快照
         Set<Long> ids = new HashSet<>();
         if (entity.getCategoryLv1() != null) ids.add(entity.getCategoryLv1());
         if (entity.getCategoryLv2() != null) ids.add(entity.getCategoryLv2());
@@ -2406,11 +2123,9 @@ public class ProductService {
         entity.setCatL2Name(nameMap.get(entity.getCategoryLv2()));
         entity.setCatL3Name(nameMap.get(entity.getCategory()));
 
-        // pure_description
         String pureDesc = io.github.will413028.hawkr.product.domain.text.DescriptionTextExtractor.extract(entity.getDescription());
         entity.setPureDescription(pureDesc);
 
-        // searchable_text 拼接
         List<String> hashtagCanonicals = (hashtags == null) ? List.of() :
                 hashtags.stream().map(HashtagService.UpsertedHashtag::canonical).toList();
         List<String> skuNames = (skus == null) ? List.of() :
@@ -2430,7 +2145,6 @@ public class ProductService {
         entity.setSearchableText(searchableText);
     }
 
-    // ==================== Description 圖片處理方法 ====================
 
     /**
      * 處理新建商品的描述圖片
@@ -2444,7 +2158,6 @@ public class ProductService {
             return;
         }
 
-        // 收集所有 image 類型 block 的 staged_token
         List<ProductEntity.DescriptionBlock> imageBlocks = description.getBlocks().stream()
                 .filter(block -> "image".equals(block.getType()))
                 .filter(block -> block.getStagedToken() != null && !block.getStagedToken().isEmpty())
@@ -2458,22 +2171,18 @@ public class ProductService {
                 .map(ProductEntity.DescriptionBlock::getStagedToken)
                 .collect(Collectors.toList());
 
-        // 轉正失敗往外拋，理由同 processImages。這裡吞掉的形狀更隱蔽：block 會留著
-        // staged_token 落庫，而那是一個短期憑證，過期之後那個 block 永遠指不到任何資產。
         List<MediaGrpcClient.FinalizedImage> finalized =
                 mediaGrpcClient.finalizeImages(stagedTokens, AssetReferenceType.PRODUCT_DESC.value());
 
-        // 依 staged_token 建立 mapping（media.proto:41 契約要求），避免依賴回傳順序
         Map<String, MediaGrpcClient.FinalizedImage> tokenToFinalized = finalized.stream()
                 .collect(Collectors.toMap(MediaGrpcClient.FinalizedImage::getStagedToken, f -> f, (a, b) -> a));
 
-        // 更新 description blocks
         for (ProductEntity.DescriptionBlock block : imageBlocks) {
             MediaGrpcClient.FinalizedImage img = tokenToFinalized.get(block.getStagedToken());
             if (img != null) {
                 block.setAssetId(img.getAssetId());
                 block.setObjectKey(img.getObjectKey());
-                block.setStagedToken(null); // 清除 staged_token
+                block.setStagedToken(null);
             }
         }
 
@@ -2497,7 +2206,6 @@ public class ProductService {
             return;
         }
 
-        // 收集新描述中需要轉正的圖片（有 staged_token）
         List<ProductEntity.DescriptionBlock> newImageBlocks = new ArrayList<>();
         if (newDescription.getBlocks() != null) {
             for (ProductEntity.DescriptionBlock block : newDescription.getBlocks()) {
@@ -2508,8 +2216,6 @@ public class ProductService {
             }
         }
 
-        // 處理新增的圖片（僅轉正，不建立引用）。轉正失敗往外拋，理由同
-        // processDescriptionImages：吞掉會把短期憑證 staged_token 留在 block 裡落庫。
         if (!newImageBlocks.isEmpty()) {
             List<String> stagedTokens = newImageBlocks.stream()
                     .map(ProductEntity.DescriptionBlock::getStagedToken)
@@ -2518,17 +2224,15 @@ public class ProductService {
             List<MediaGrpcClient.FinalizedImage> finalized =
                     mediaGrpcClient.finalizeImages(stagedTokens, AssetReferenceType.PRODUCT_DESC.value());
 
-            // 依 staged_token 建立 mapping（media.proto:41 契約要求），避免依賴回傳順序
             Map<String, MediaGrpcClient.FinalizedImage> tokenToFinalized = finalized.stream()
                     .collect(Collectors.toMap(MediaGrpcClient.FinalizedImage::getStagedToken, f -> f, (a, b) -> a));
 
-            // 更新 description blocks
             for (ProductEntity.DescriptionBlock block : newImageBlocks) {
                 MediaGrpcClient.FinalizedImage img = tokenToFinalized.get(block.getStagedToken());
                 if (img != null) {
                     block.setAssetId(img.getAssetId());
                     block.setObjectKey(img.getObjectKey());
-                    block.setStagedToken(null); // 清除 staged_token
+                    block.setStagedToken(null);
                 }
             }
 
@@ -2536,7 +2240,6 @@ public class ProductService {
         }
     }
 
-    // ==================== Media 引用關係方法（業務落盤後呼叫） ====================
 
     /**
      * 建立商品展示圖片的 Media 引用關係。
@@ -2578,16 +2281,13 @@ public class ProductService {
         Set<String> oldAssetIds = new HashSet<>(collectGalleryAssetIds(oldGallery));
         Set<String> newAssetIds = new HashSet<>(collectGalleryAssetIds(newGallery));
 
-        // 新增的 assetId → 建立引用
         List<String> toLink = newAssetIds.stream()
                 .filter(id -> !oldAssetIds.contains(id))
                 .collect(Collectors.toList());
-        // Link 失敗往外拋 → 交易回滾（#2222）：吞掉會 commit 出「gallery 指著、卻沒有引用」的列。
         if (!toLink.isEmpty()) {
             mediaGrpcClient.linkImages(toLink, AssetReferenceType.PRODUCT.value(), productId.toString());
         }
 
-        // 移除的 assetId → 解除引用
         List<String> toUnlink = oldAssetIds.stream()
                 .filter(id -> !newAssetIds.contains(id))
                 .collect(Collectors.toList());
@@ -2613,16 +2313,13 @@ public class ProductService {
         Set<String> oldAssetIds = new HashSet<>(collectDescriptionAssetIds(oldDescription));
         Set<String> newAssetIds = new HashSet<>(collectDescriptionAssetIds(newDescription));
 
-        // 新增的 assetId → 建立引用
         List<String> toLink = newAssetIds.stream()
                 .filter(id -> !oldAssetIds.contains(id))
                 .collect(Collectors.toList());
-        // Link 失敗往外拋 → 交易回滾（#2222），理由同 gallery。
         if (!toLink.isEmpty()) {
             mediaGrpcClient.linkImages(toLink, AssetReferenceType.PRODUCT_DESC.value(), productId.toString());
         }
 
-        // 移除的 assetId → 解除引用
         List<String> toUnlink = oldAssetIds.stream()
                 .filter(id -> !newAssetIds.contains(id))
                 .collect(Collectors.toList());
@@ -2670,7 +2367,6 @@ public class ProductService {
         return mediaReferenceLinker.collectDescriptionAssetIds(description);
     }
 
-    // ==================== 輕量查詢（Cart Service 呼叫） ====================
 
     /**
      * 根據 SKU ID 查詢 SKU（Cart AddItem 驗證用）
@@ -2735,7 +2431,6 @@ public class ProductService {
 
         List<ProductEntity> entities = productRepository.selectBatchIds(productIds);
 
-        // includeInactive=false 是買家可見的路徑：店家不可曝光（含沒有 store_exposure 列）的商品不回
         Set<Long> exposableStores = Set.of();
         if (!includeInactive) {
             Set<Long> storeIds = entities.stream().map(ProductEntity::getStoreId)
@@ -2768,43 +2463,28 @@ public class ProductService {
     public void softDeleteProduct(String productId, long storeId) {
         Long id = Long.parseLong(productId);
 
-        // 1. 查詢商品
         ProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
-        // 2. 檢查已刪除
         if (entity.getDeletedAt() != null) {
             throw new ProductNotFoundException(productId);
         }
 
-        // 3. 驗證擁有者
         if (!entity.getStoreId().equals(storeId)) {
             throw new ProductAccessDeniedException(productId, "非商品擁有者");
         }
 
         boolean wasActive = ProductStatus.ACTIVE.value().equals(entity.getStatus());
 
-        // 3.2 連帶撤回待審的認證申請（#2820）：softDeleteProduct 原本完全不觸及
-        //     product_certification_application，而 19 §8.3 明令禁止掃 PENDING 的排程
-        //     ⇒ SUBMITTED 的申請會永久留在 ADM 待審佇列，且沒有任何路徑會收掉。
-        //     只收 SUBMITTED，APPROVED 刻意保留（理由見該方法 javadoc）。
-        //     跨 bean 呼叫，本方法的 @Transactional 會傳播過去（§11.1 禁的是 self-invocation）。
         certificationApplicationService.withdrawSubmittedOnProductDeleted(id);
 
-        // 4. 軟刪除：公開生命週期會由 deleted_at 推導為 REMOVED，不另寫第二套狀態。
         productRepository.deleteById(id);
 
-        // 5. 釋放展示圖 / 描述圖的 Media 引用（#1489）：刪除後不再引用，讓 GC 回收孤兒資產。
-        //    與 create/update 的 link/unlink 一致，緊接業務寫入呼叫、best-effort（失敗不擋刪除）。
         releaseProductMediaReferences(id);
 
-        // 6. 清除快取
         cacheService.evictProductDetail(productId);
         cacheService.evictProductListForWrite(storeId);
 
-        // 7. 觸發 frontend SSR cache bust（後端服務責任邊界規範 §9.3）
-        // 刪除前為 ACTIVE（在公開貨架上）→ 賣家公開商品集合變動，共發 seller:<id>；
-        // 非 ACTIVE 的刪除不改公開集合，只需 product:<id> 讓 PDP 失效。
         if (wasActive) {
             revalidateProductAndSeller(id, storeId);
         } else {
@@ -2824,12 +2504,10 @@ public class ProductService {
      */
     public List<io.github.will413028.hawkr.product.repository.ProductRepository.OriginSummaryRow>
             getPublicOriginsSummary(Long categoryId, int limit) {
-        // limit clamp
         int effectiveLimit = limit;
         if (effectiveLimit <= 0) effectiveLimit = 50;
         if (effectiveLimit > 100) effectiveLimit = 100;
 
-        // 分類層級偵測（§5.3.1 同邏輯）
         int categoryLevel = 0;
         Long categoryFilter = categoryId;
         if (categoryFilter != null && categoryFilter > 0) {
@@ -2841,7 +2519,6 @@ public class ProductService {
             categoryFilter = null;
         }
 
-        // cache key
         String cacheKey = cacheService.generateOriginsSummaryCacheKey(categoryFilter, effectiveLimit);
         Optional<List<io.github.will413028.hawkr.product.repository.ProductRepository.OriginSummaryRow>> cached =
                 cacheService.getOriginsSummary(cacheKey);
@@ -2899,7 +2576,6 @@ public class ProductService {
         return sellerInfoAssembler.from(storeId, meta);
     }
 
-    // ==================== Admin 分類管理（搭配 CategoryService 軟刪除/批次更換） ====================
 
     /**
      * 是否有商品掛在指定分類下（依層級用對應反正規化欄位查）。
@@ -2995,7 +2671,6 @@ public class ProductService {
         int affected = productRepository.batchUpdateCategoryHierarchy(
                 ids, targetCategoryId, lv2Id, lv1Id, updatedBy);
 
-        // Cascade reflow（02 §5.11.4）：同事務內重算受影響 product 的 cat_*_name + searchable_text
         productCascadeService.reflow(ids, "BATCH_CHANGE_CATEGORY");
 
         cacheService.evictAllProductLists();
@@ -3003,9 +2678,6 @@ public class ProductService {
             cacheService.evictProductDetail(String.valueOf(id));
         }
 
-        // frontend cache bust（§9.3）：改分類影響 cat_*_name / searchable_text，顯示於 PDP 與
-        // storefront 商品卡；不改變任何賣家的公開商品集合 → 只發 product:<id>×N，
-        // 列表面由 web expansion（product:<id> → products:list）涵蓋。
         productRevalidationService.revalidateProducts(ids);
 
         log.info("batchChangeProductCategory.success",

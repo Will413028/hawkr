@@ -95,7 +95,6 @@ class AfterSaleResolutionServiceTest {
         when(caseMapper.selectOne(any())).thenReturn(pendingCase());
     }
 
-    // ---- #1150 觸發點：補償券 grant 失敗（amount=0 被 coupon-service 擋）----
     @Test
     void couponCompensation_grantFailed_throwsAndDoesNotCloseCase() {
         when(couponGrpcClient.grantSellerCompensationCoupon(
@@ -103,20 +102,18 @@ class AfterSaleResolutionServiceTest {
                 .thenReturn(GrantSellerCompensationCouponResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
                         .setMessage("補償金額必須大於 0")
-                        .build());  // envelope-code 失敗，data 空
+                        .build());
 
         AfterSalesBusinessException ex = assertThrows(AfterSalesBusinessException.class, () ->
                 service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.COUPON_COMPENSATION.value(),
                         null, null, null, null, 0L, 500L, "補償"));
 
         assertEquals(GrpcResponseCode.AFTERSALE_COUPON_COMPENSATION_FAILED.code(), ex.code());
-        // 關鍵：不 insert resolution、不關案
         verify(resolutionMapper, never()).insert(any());
         verify(caseMapper, never()).closeByCouponCompensation(anyString(), any());
         verify(afterSalesEventPublisher, never()).publishCaseTransition(any(), any(), any(), any(), any(), any(), any());
     }
 
-    // ---- success path：grant 成功正常關案 ----
     @Test
     void couponCompensation_grantSuccess_insertsAndClosesCase() {
         when(couponGrpcClient.grantSellerCompensationCoupon(
@@ -134,7 +131,6 @@ class AfterSaleResolutionServiceTest {
         verify(caseMapper, times(1)).closeByCouponCompensation(eq(CASE_NO), any());
     }
 
-    // ---- D4：補償券的冪等鍵是售後單 id，必須送到 coupon ----
     @Test
     void couponCompensation_sendsTheCaseIdAsSourceId() {
         when(couponGrpcClient.grantSellerCompensationCoupon(
@@ -153,7 +149,6 @@ class AfterSaleResolutionServiceTest {
                 eq(CASE_NO), eq(String.valueOf(CASE_ID)));
     }
 
-    // ---- #1150 同類：退貨建單失敗不推進 ----
     @Test
     void returnRefund_shipmentFailed_throwsAndDoesNotAdvance() {
         when(shippingGrpcClient.createReturnCvsShipment(
@@ -161,7 +156,7 @@ class AfterSaleResolutionServiceTest {
                 .thenReturn(CreateReturnShipmentResponse.newBuilder()
                         .setCode(GrpcResponseCode.INTERNAL_ERROR.code())
                         .setMessage("PayUni 物流建單失敗 SHIP02080")
-                        .build());  // envelope-code 失敗
+                        .build());
 
         AfterSalesBusinessException ex = assertThrows(AfterSalesBusinessException.class, () ->
                 service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.RETURN_REFUND.value(),
@@ -172,12 +167,9 @@ class AfterSaleResolutionServiceTest {
         verify(caseMapper, never()).markReturnPending(anyString(), any(), anyString(), any(), any());
     }
 
-    // ==================== Plan C Phase 3: account_id vs store_id 判別 ====================
 
     @Test
     void resolve_callerIdDiffersFromCaseStoreId_throwsNotOwner() {
-        // pendingCase() 的 store_id = SELLER(2683382637L)；呼叫端傳入明顯不同的 id
-        // 模擬賣家重新上架後 store_id 已換發、呼叫端誤傳舊/其他 id 的情境。
         Long wrongCallerId = 9999999999L;
 
         AfterSalesBusinessException ex = assertThrows(
@@ -187,7 +179,6 @@ class AfterSaleResolutionServiceTest {
         assertEquals(GrpcResponseCode.AFTERSALE_NOT_OWNER.code(), ex.code());
     }
 
-    // ==================== 退款決議：建 PENDING 退款任務，交給 RefundTaskWorker ====================
 
     @Test
     @DisplayName("全額退款（免退貨）→ 建 PENDING 退款任務，不發額外的買家操作事件")

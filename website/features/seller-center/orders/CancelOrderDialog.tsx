@@ -38,9 +38,6 @@ export default function CancelOrderDialog({
 	);
 	const [remark, setRemark] = React.useState("");
 	const [busy, setBusy] = React.useState(false);
-	// 同一個 Dialog instance 在賣家中心切換不同訂單 reuse 時(父層用 portal
-	// 維持 mount),order.orderNo 變化代表是新訂單的取消行為,resetKey 確保
-	// 前次失敗訊息不殘留。
 	const [error, setError] = useResettableError(order.orderNo);
 
 	const submit = async () => {

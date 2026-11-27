@@ -21,7 +21,7 @@ import (
 // 為什麼那一格原本會回 true：`tax_period_code` 被無條件填給了收據（實測收據帶著
 // 11505，而收據根本沒有稅期別）⇒ WithinVoidWindow 照樣成立。
 func TestCanRequestCorrection_FalseForReceipt(t *testing.T) {
-	period := "11505" // 收據不該有稅期別，但實際資料就是這樣 —— 守衛不能依賴它為空
+	period := "11505"
 	receipt := domain.Document{
 		DocumentKind:  codemeta.InvoiceDocumentKindReceipt.Value,
 		Status:        codemeta.InvoiceDocumentStatusIssued.Value,
@@ -45,8 +45,6 @@ func TestCanRequestCorrection_FalseForReceipt(t *testing.T) {
 // 用「除了 document_kind 之外完全相同」的兩份文件對照：收據 false、發票 true。
 // 只驗收據那一格的話，把 `return false` 寫成無條件也會綠。
 func TestCanRequestCorrection_ReceiptGuardDoesNotAffectInvoices(t *testing.T) {
-	// 2026-05 期（11505）的申報截止在 2026-07-15 之前 ⇒ 拿一個**還在窗口內**的
-	// 固定時點注入 clock，不用真實時間（時間敏感邏輯一律注入 clock）。
 	period := "11505"
 	q := (&Query{}).WithClock(func() time.Time {
 		return time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
@@ -98,7 +96,6 @@ func TestCorrectionIntake_RejectsReceipt(t *testing.T) {
 	}
 }
 
-// fakeReceiptDocs 只實作這條路徑真正會用到的那一支。
 type fakeReceiptDocs struct {
 	domain.DocumentRepository
 	doc domain.Document
@@ -135,9 +132,8 @@ func TestCanRequestCorrection_ClosedBeforeFilingDueIsNotOffered(t *testing.T) {
 		Status:        codemeta.InvoiceDocumentStatusIssued.Value,
 		TaxPeriodCode: &period,
 	}
-	// 全部用台北中午對應的 UTC 時點，避開日界誤差。
 	taipeiNoon := func(y int, m time.Month, d int) time.Time {
-		return time.Date(y, m, d, 4, 0, 0, 0, time.UTC) // 台北 12:00
+		return time.Date(y, m, d, 4, 0, 0, 0, time.UTC)
 	}
 	for _, tc := range []struct {
 		name string
@@ -146,11 +142,9 @@ func TestCanRequestCorrection_ClosedBeforeFilingDueIsNotOffered(t *testing.T) {
 	}{
 		{"期中（未申報）⇒ 開入口", taipeiNoon(2026, 10, 15), true},
 		{"期末當天仍在期內 ⇒ 開入口", taipeiNoon(2026, 10, 31), true},
-		// 🔴 這三天就是缺口：WithinVoidWindow 仍為 true，而寫端必拒。
 		{"期末後第 1 天（UNKNOWN）⇒ 不開", taipeiNoon(2026, 11, 1), false},
 		{"期末後第 3 天（UNKNOWN）⇒ 不開", taipeiNoon(2026, 11, 3), false},
 		{"關帳牆當天（UNKNOWN）⇒ 不開", taipeiNoon(2026, 11, 5), false},
-		// 關帳牆之後 WithinVoidWindow 自己就會擋，兩道各自成立。
 		{"關帳牆之後 ⇒ 不開", taipeiNoon(2026, 11, 6), false},
 		{"申報期限之後 ⇒ 不開", taipeiNoon(2026, 11, 20), false},
 	} {

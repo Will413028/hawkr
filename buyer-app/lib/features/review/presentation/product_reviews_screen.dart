@@ -58,7 +58,6 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   bool _listLoading = false;
   int _epoch = 0;
 
-  // 統計數據
   int _totalCount = 0;
   double _avgRating = 0.0;
   Map<int, int> _ratingDistribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};

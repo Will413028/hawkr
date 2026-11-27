@@ -58,9 +58,6 @@ func (s *Service) ReceiveEvent(ctx context.Context, header http.Header, body []b
 	})
 }
 
-// handleEvent 是收款事件的 inbox handler（派送 job 的 transaction 內）：外部帳戶對得到本地帳戶時排入該擁有者的同步 job（以 store_id 為唯一鍵），
-// 不標記已處理：事件只是「重讀帳戶」的訊號，由涵蓋它的同步標記（被執行中的同步合併時，那一輪結束後 RoutePending 讓它再跑一輪）。對不到本地帳戶
-// 的事件（含只有外部 ID、還沒完成建立的半建立列）只留紀錄、直接標記已處理（帳戶之後才完成建立時，建立 job 會排入同步，讀到的是最新狀態）。
 func (s *Service) handleEvent(ctx context.Context, e inbox.Event) error {
 	acct, err := store.New(s.d.DB.Conn(ctx)).PaymentAccountByExternal(ctx, store.PaymentAccountByExternalParams{Provider: e.Provider, ExternalAccountID: &e.RouteKey})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -75,8 +72,6 @@ func (s *Service) handleEvent(ctx context.Context, e inbox.Event) error {
 	return enqueueSync(ctx, s.d.Jobs, acct.StoreID)
 }
 
-// staleEventStores 是 inbox 有 eventGrace 之前收到卻還沒處理的事件的帳戶（事件在同步寫入快照之後、job 標記完成之前到達時，排入被執行中的 job 合併掉；
-// inbox 是唯一不會漏的來源），依外部帳戶 ID 分批，回傳下一批的起點。
 func (s *Service) staleEventStores(ctx context.Context, provider, after string) (ids []int64, next string, err error) {
 	routes, err := s.d.Inbox.StaleRoutes(ctx, provider, s.d.Now().UTC().Add(-eventGrace), after, sweepBatch)
 	if err != nil || len(routes) == 0 {

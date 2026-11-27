@@ -17,8 +17,6 @@ import {
 } from "@hawkr/ui-text/zh-TW";
 import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-// 措施收件匣（/admin/measures）的純邏輯：分頁對應的伺服器篩選、請求種類與狀態的文字、已等候天數。時間一律由呼叫端傳入（now）。
-// 排序由伺服器決定（ListMeasures：複審到期在前，其次依請求提出時間舊到新），這裡與畫面都不重排。
 
 export type MeasureTabKey = "pending" | "review-due" | "active" | "all";
 
@@ -69,8 +67,6 @@ export function measureListRequest(
 	return { ...tab.filter, pageToken, pageSize };
 }
 
-// ---------------------------------------------------------------------------
-// 請求（申覆、解除請求）
 
 /** 請求種類的顯示文字，取自共用文案目錄；UNSPECIFIED 與不認得的值是「未知」。 */
 export function requestKindLabel(kind: MeasureRequestKind): string {

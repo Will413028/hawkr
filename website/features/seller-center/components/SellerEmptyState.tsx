@@ -91,7 +91,6 @@ const VARIANT_CONFIG: Record<SellerEmptyVariant, VariantConfig> = {
 		title: "目前沒有違規紀錄",
 		description: "保持良好營運狀況，這裡會維持空空如也。",
 	},
-	// 58 號電子發票（S01 ⑤／S06）。
 	invoices: {
 		icon: "paper",
 		title: "還沒有發票或收據紀錄",

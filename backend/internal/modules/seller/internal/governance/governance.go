@@ -52,14 +52,12 @@ func New(d Deps) *Service {
 	return &Service{d: d}
 }
 
-// now 是寫入用的現在：截到微秒（Postgres 的 timestamptz 精度），之後與已存的時間比較才不會被奈秒的差異誤判。
 func (s *Service) now() time.Time { return s.d.Now().UTC().Truncate(time.Microsecond) }
 
 func pageSize(size int32) (int32, error) {
 	return pagination.PageSize(size, model.ReportDefaultPageSize, model.ReportMaxPageSize)
 }
 
-// inquiryPageSize 是詢問清單的每頁筆數：預設 50，上限 100（一個案件的詢問不多，通常一頁讀完）。
 func inquiryPageSize(size int32) (int32, error) { return pagination.PageSize(size, 50, 100) }
 
 func errReportNotFound() error { return apperr.NotFound("%s", text.ReportNotFound().Text) }
@@ -95,7 +93,6 @@ func errCategoryCaseOpened() error {
 	return apperr.VersionConflict("%s", text.CaseCategoryCaseOpened().Text).WithMetadata(ConflictTargetKey, ConflictTargetCategoryCaseOpened)
 }
 
-// reportBlocked 是通報不能做動作的錯誤：訊息是第一個原因的句子（API 的 can_* 看同一份原因）；沒有原因回 nil。
 func reportBlocked(blocks []model.ReportBlock) error {
 	if len(blocks) == 0 {
 		return nil
@@ -103,7 +100,6 @@ func reportBlocked(blocks []model.ReportBlock) error {
 	return apperr.FailedPrecondition("%s", blocks[0].Text().Text)
 }
 
-// caseBlocked 是案件不能做動作的錯誤：訊息是第一個原因的句子；沒有原因回 nil。
 func caseBlocked(blocks []model.CaseBlock, action model.CaseAction) error {
 	if len(blocks) == 0 {
 		return nil
@@ -111,7 +107,6 @@ func caseBlocked(blocks []model.CaseBlock, action model.CaseAction) error {
 	return apperr.FailedPrecondition("%s", blocks[0].Text(action).Text)
 }
 
-// invalidOn 是指向欄位 field 的 invalid_argument，訊息是模組文字。
 func invalidOn(field string, m interface{ String() string }) error {
 	return apperr.InvalidInputOn([]string{field}, "%s", m.String())
 }
@@ -135,7 +130,6 @@ func toReport(row store.SellerReport) model.Report {
 	return r
 }
 
-// reportRow 是一筆通報加上讀取時要的店家與補充摘要（ReportDetails、AdminReports、AdminReportsQueue 三支查詢的共同形狀）。
 type reportRow struct {
 	report              store.SellerReport
 	storeName           *string
@@ -145,7 +139,6 @@ type reportRow struct {
 	latestSupplementAt  *time.Time
 }
 
-// timeOf 把 sqlc 對 max(timestamptz) 的結果（interface{}：它不知道欄位會不會是 NULL）轉成時間；NULL 是 nil。
 func timeOf(v any) *time.Time {
 	if t, ok := v.(time.Time); ok {
 		return &t
@@ -176,7 +169,6 @@ func toCase(row store.SellerCase, storeName *string) model.Case {
 	return c
 }
 
-// caseRow 是一個案件加上店名、店家是否已關閉與個資是否已清理（CasesByIDs、AdminCases 兩支查詢的共同形狀）。
 type caseRow struct {
 	row         store.SellerCase
 	storeName   *string
@@ -184,9 +176,6 @@ type caseRow struct {
 	storePurged bool
 }
 
-// caseFacts 讀一批案件的事實：成員統計（成員數、沒有結果的、已採取措施的、有補充還沒看過的）、導出的措施數（案件導出的措施的定義在 CaseMeasureCounts）
-// 與詢問（還沒結束的那一筆、「待決定」重新起算的時間）。
-// 每批固定七次查詢以內；同一個讀取快照或指令裡鎖住案件之後呼叫。
 func caseFacts(ctx context.Context, q *store.Queries, rows []caseRow) (map[uuid.UUID]model.CaseFacts, error) {
 	out := make(map[uuid.UUID]model.CaseFacts, len(rows))
 	if len(rows) == 0 {
@@ -232,7 +221,6 @@ func caseFacts(ctx context.Context, q *store.Queries, rows []caseRow) (map[uuid.
 	return out, nil
 }
 
-// caseFactsByIDs 讀一批案件（CasesByIDs）的事實；不存在的 ID 不在結果裡。
 func caseFactsByIDs(ctx context.Context, q *store.Queries, ids []uuid.UUID) (map[uuid.UUID]model.CaseFacts, error) {
 	if len(ids) == 0 {
 		return map[uuid.UUID]model.CaseFacts{}, nil
@@ -248,7 +236,6 @@ func caseFactsByIDs(ctx context.Context, q *store.Queries, ids []uuid.UUID) (map
 	return caseFacts(ctx, q, cases)
 }
 
-// adminCases 把案件的事實變成後台的檢視（含此刻可以做的動作）。
 func adminCases(rows []caseRow, facts map[uuid.UUID]model.CaseFacts, now time.Time) []model.AdminCase {
 	out := make([]model.AdminCase, len(rows))
 	for i, r := range rows {
@@ -258,7 +245,6 @@ func adminCases(rows []caseRow, facts map[uuid.UUID]model.CaseFacts, now time.Ti
 	return out
 }
 
-// adminReports 把一批通報變成後台的檢視（含此刻可以做的動作）。事實固定五次查詢以內（所在案件的事實、認定的來源），與清單的大小無關；detail 時另載入補充與佐證（單筆讀取與匯出）。
 func adminReports(ctx context.Context, q *store.Queries, rows []reportRow, detail bool, now time.Time) ([]model.AdminReport, error) {
 	reports := make([]model.Report, len(rows))
 	reportIDs := make([]uuid.UUID, len(rows))
@@ -306,8 +292,6 @@ func adminReports(ctx context.Context, q *store.Queries, rows []reportRow, detai
 	return out, nil
 }
 
-// loadTriageDeadlines 一次讀出這批通報的分案期限（TriageDeadline）。成員、開始與期限只在 seller.review_report_triage(at)（db/objects.sql）；
-// 不是待分案的通報不在函式的結果裡，維持 nil。reports 與 ids 同序。
 func loadTriageDeadlines(ctx context.Context, q *store.Queries, now time.Time, ids []uuid.UUID, reports []model.Report) error {
 	if len(ids) == 0 {
 		return nil
@@ -326,8 +310,6 @@ func loadTriageDeadlines(ctx context.Context, q *store.Queries, now time.Time, i
 	return nil
 }
 
-// loadCaseDeadlines 一次讀出這批案件的決定期限（DecideDeadline），填進 facts。成員、開始與期限只在
-// seller.review_case_decision(at)（db/objects.sql）；義務不在時維持 nil。
 func loadCaseDeadlines(ctx context.Context, q *store.Queries, now time.Time, facts map[uuid.UUID]model.CaseFacts) error {
 	if len(facts) == 0 {
 		return nil
@@ -348,7 +330,6 @@ func loadCaseDeadlines(ctx context.Context, q *store.Queries, now time.Time, fac
 	return nil
 }
 
-// loadReportDetail 載入一批通報的補充與佐證（原通報與補充的佐證依送出的順序編號；每則補充帶它的佐證序號）。reports 與 ids 同序。
 func loadReportDetail(ctx context.Context, q *store.Queries, ids []uuid.UUID, reports []model.Report) error {
 	if len(ids) == 0 {
 		return nil
@@ -371,13 +352,11 @@ func loadReportDetail(ctx context.Context, q *store.Queries, ids []uuid.UUID, re
 		reports[i].Supplements = append(reports[i].Supplements, supplement)
 	}
 	for _, row := range evidence {
-		// 「第 n 張」依送出的順序與次內位置編號（查詢已排序），是讀取時算的序號，不存。
 		i := byReport[row.ReportID]
 		reports[i].Evidence = append(reports[i].Evidence, model.Evidence{
 			AssetID: row.AssetID, ObjectKey: row.ObjectKey, Position: len(reports[i].Evidence), SupplementID: row.SupplementID,
 		})
 	}
-	// 補充的佐證位置要等 Supplements 的切片不再成長之後才能取指標，所以分兩輪。
 	for i := range reports {
 		r := &reports[i]
 		index := make(map[uuid.UUID]int, len(r.Supplements))
@@ -395,7 +374,6 @@ func loadReportDetail(ctx context.Context, q *store.Queries, ids []uuid.UUID, re
 	return nil
 }
 
-// lockReport 鎖住通報並比對版本：版本不符回版本衝突（版本與狀態都不符時先回版本衝突）。
 func lockReport(ctx context.Context, q *store.Queries, reportID uuid.UUID, expected int64) (store.SellerReport, error) {
 	row, err := q.LockReport(ctx, reportID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -410,7 +388,6 @@ func lockReport(ctx context.Context, q *store.Queries, reportID uuid.UUID, expec
 	return row, nil
 }
 
-// readReport 讀一筆通報的後台檢視（含補充、佐證與此刻可以做的動作）；在 q 的連線上執行，所以可以在讀取快照裡，也可以在指令的 transaction 裡讀自己寫的。
 func readReport(ctx context.Context, q *store.Queries, reportID uuid.UUID, now time.Time) (model.AdminReport, error) {
 	rows, err := q.ReportDetails(ctx, []uuid.UUID{reportID})
 	if err != nil {
@@ -435,8 +412,6 @@ func readReport(ctx context.Context, q *store.Queries, reportID uuid.UUID, now t
 	return view, nil
 }
 
-// triageTargets 是通報分案或移動時每個平台判定類別的去處：這家店那個類別進行中的案件（加入它），沒有就是開新案件。每個可判定的類別一筆（順序同政策分類），
-// 移動時不含目前的類別。不鎖就讀，client 把它放進請求的意圖，由指令在鎖內驗證仍然成立（joinCase）。
 func triageTargets(ctx context.Context, q *store.Queries, r model.Report, triage bool) ([]model.TriageTarget, error) {
 	open, err := q.OpenCasesOfStore(ctx, r.StoreID)
 	if err != nil {
@@ -446,7 +421,6 @@ func triageTargets(ctx context.Context, q *store.Queries, r model.Report, triage
 	for i, c := range open {
 		ids[i] = c.ID
 	}
-	// 帶成員數的案件（說明「會加入哪個案件」）；不鎖。
 	facts, err := caseFactsByIDs(ctx, q, ids)
 	if err != nil {
 		return nil, err
@@ -469,7 +443,6 @@ func triageTargets(ctx context.Context, q *store.Queries, r model.Report, triage
 	return out, nil
 }
 
-// readCase 讀一個案件的後台檢視（含移動紀錄、期限與此刻可以做的動作）；在 q 的連線上執行，同 readReport。now 是讀取的時間（期限以它判斷）。
 func readCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, now time.Time) (model.AdminCase, error) {
 	facts, err := caseFactsByIDs(ctx, q, []uuid.UUID{caseID})
 	if err != nil {
@@ -494,7 +467,6 @@ func readCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, now time.
 	return model.AdminCase{Case: f.Case, Availability: f.Availability()}, nil
 }
 
-// facts 組出一筆已鎖住的通報的事實：店家是否已關閉、是不是認定的來源、所在案件的事實（案件已鎖住）。
 func reportFactsOf(ctx context.Context, q *store.Queries, report store.SellerReport, storeClosed bool) (model.ReportFacts, error) {
 	facts := model.ReportFacts{Report: toReport(report), StoreClosed: storeClosed}
 	sources, err := q.ReportFindingSources(ctx, []uuid.UUID{report.ID})
@@ -514,7 +486,6 @@ func reportFactsOf(ctx context.Context, q *store.Queries, report store.SellerRep
 	return facts, nil
 }
 
-// validAssessed 驗證平台判定類別：必須選、而且在 Assessable 的子集（OTHER 只給檢舉人選，分案時要改判成有依據的類別，或直接設定結果）。
 func validAssessed(category policy.Category) error {
 	switch {
 	case category == policy.Other:
@@ -525,7 +496,6 @@ func validAssessed(category policy.Category) error {
 	return nil
 }
 
-// validSeverity 驗證嚴重度是合法的值。
 func validSeverity(severity model.Severity) error {
 	if !slices.Contains(model.SeverityValues(), severity) {
 		return invalidOn("Severity", text.SeverityRequired())

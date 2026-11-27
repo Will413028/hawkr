@@ -19,41 +19,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// 本檔是 B07「未收到發票／收據申訴」的寫入面（§6.1.6 端點 13／63／64／65 ＝ §7.3.5 的
-// K01／K07／K11／K13）。讀取面（端點 14／15）在 query_read.go 與 query.go。
-//
-// 四條貫穿全檔的約束：
-//
-//	① **Tier A（§8.1.4(b)）**：buyerID 一律進 SQL 的 WHERE——讀用 GetForBuyer、
-//	   三支轉移的 CAS 自己也帶 complainant_buyer_id。越權與查無共用 9309、同一段
-//	   message、同一行程式碼。**不得**改成 GetByID ＋ Go 端比對：那會多出一個可以
-//	   回不同 code／message 的分支，而所有測試照樣綠（§8.6 T-10）。
-//	② **狀態轉移一律 CAS，rows=0 不是成功**：三支轉移的 allowed-from ＋ 版本 ＋
-//	   （K13 的）次數與冷卻全部寫在 SQL 的 WHERE，本層只判 ok 並回 9336。
-//	③ **一次動作 ＝ 一個交易**：狀態轉移 ＋ 時間軸事件 ＋（K01 的）outbox 必須同進同退。
-//	   少了交易，會出現「案件建了但賣家永遠收不到通知」或「狀態轉了但時間軸沒有那一筆」，
-//	   兩者都不報錯。
-//	④ **工作天曆是唯一的期限來源**：sla_due_at 由 BusinessCalendar 在建案當下算好落庫
-//	   （§5.1.14），前端禁止自算（§6.1.6 第 1 條）。
 
 const (
-	// complaintTextMaxRunes 是三個自由文字欄的長度上限（58A B07：`maxLength={500}`）。
-	//
-	// 在這裡擋而不是讓 DB 擋：description／message 都是 text 欄，DB 根本不會擋——
-	// 少了本檢查，前端的 maxLength 是唯一防線，而那是 client-side 的。
 	complaintTextMaxRunes = 500
 
-	// complaintWithdrawQuota 是 K01 守衛②：同一 document 已 WITHDRAWN 的案件數必須 < 2。
-	//
-	// WITHDRAWN 不在 uq_invcomp_open_per_document 的述詞內 ⇒ 撤回之後可以對同一份
-	// document 重新申訴（誤開案要的正是這個行為），但它同時是一條繞過 reopen_count ≤ 2
-	// 上限的路 ⇒ 配額由本常數守，不成立回 9336（§7.3.5 K11 下方紅字）。
 	complaintWithdrawQuota = 2
 
-	// complaintCalendarLookahead／Lookbehind 是讀鏡像時的窗口。
-	//
-	// 前看必須 ≥ ComplaintSlaHardCapDays，否則硬上限那一段的假日查不到；後看讓
-	// 「已逾期 X 個工作天」也算得出來。
 	complaintCalendarLookahead  = domain.ComplaintSlaHardCapDays + 1
 	complaintCalendarLookbehind = 30
 )
@@ -76,19 +47,9 @@ type Complaint struct {
 	tx         database.TxManager
 	complaints domain.ComplaintRepository
 	documents  domain.DocumentRepository
-	// issuers 只為了一件事：把 invoice_complaints.issuer_id（PK）翻成
-	// invoice_issuers.issuer_ref_id（＝ sellers.store_id）填進出向事件。
-	// 少了它，P8 的 store_id 會是 TSID ⇒ 賣家收件人恆解不出來 ⇒ 靜默 0 投遞。
 	issuers     domain.IssuerRepository
 	outbox      domain.OutboxRepository
 	businessDay domain.BusinessDayRepository
-	// audit 是 I7 的寫入面（#3109，2026-09-04 補）。
-	//
-	// 🔴 **AppendEvent 不能代替它**：invoice_complaint_events 是**買家可見的時間軸**
-	// （K01–K13 的事件型別），invoice_status_history 是**稽核**（§5.1.12，七個 aggregate
-	// 共用一張表，A10 與 AuditTrailDrawer 讀它）。兩者用途不同、值域不同、保存義務不同。
-	// 在這之前申訴軸只寫前者 ⇒ dev 上 subject_type='COMPLAINT' 的歷程只有 1 列，
-	// 而那一列是 K09 違規計數專用的，K01–K13 的狀態轉移一列都沒有。
 	audit domain.AuditRepository
 
 	newID func() int64
@@ -96,9 +57,6 @@ type Complaint struct {
 	log   *zap.Logger
 }
 
-// NewComplaint 組出 B07 的寫入 usecase。
-// subjectComplaint 是 invoice_status_history.subject_type 的申訴軸
-// （chk_invhist_subject 七值之一，§5.1.12）。
 const subjectComplaint = "COMPLAINT"
 
 func NewComplaint(
@@ -185,14 +143,11 @@ func (u *Complaint) File(ctx context.Context, in FileComplaintInput) (FileCompla
 		if err != nil {
 			return err
 		}
-		// Tier A：別人的訂單得到空清單 ⇒ 與「這張訂單還沒有發票文件」共用 9301。
 		if len(docs) == 0 {
 			return documentNotFound()
 		}
 
 		now := u.now()
-		// 9311 時間閘（§6.1.6 第 3 條）：不設這個閘 ⇒ 申訴變成催單管道 ⇒ 灌爆賣家的
-		// 3 工作天 SLA ⇒ A07 誤判違規 ⇒ 觸發 C1 停權門檻。
 		if now.Before(complaintOpensAt(docs)) {
 			return complaintBiz(bizcode.InvoiceComplaintNotOpenYet)
 		}
@@ -202,11 +157,8 @@ func (u *Complaint) File(ctx context.Context, in FileComplaintInput) (FileCompla
 			return err
 		}
 
-		// 申訴掛在**最新一份**主文件上（作廢重開鏈的最後一份）：uq_invcomp_open_per_document
-		// 與撤回配額都是 document-scoped。
 		target := docs[0]
 
-		// 守衛①：已有未結案案件 ⇒ 不是錯誤，導向既有那一件。
 		if existing, found, err := findOpenComplaint(ctx, u.complaints, in.BuyerID, in.OrderNo); err != nil {
 			return err
 		} else if found {
@@ -218,7 +170,6 @@ func (u *Complaint) File(ctx context.Context, in FileComplaintInput) (FileCompla
 			return nil
 		}
 
-		// 守衛②：撤回額度。放在建案端（可數、可回明確業務碼），不放進唯一索引。
 		withdrawn, err := u.complaints.CountWithdrawnByDocument(ctx, target.ID)
 		if err != nil {
 			return err
@@ -245,15 +196,11 @@ func (u *Complaint) File(ctx context.Context, in FileComplaintInput) (FileCompla
 			return err
 		}
 		if !inserted {
-			// 守衛①與 INSERT 之間仍有一個極窄的窗口（別的分頁同時送出），
-			// uq_invcomp_open_per_document 擋下它 ⇒ 走與守衛①相同的出口。
 			existing, found, err := findOpenComplaint(ctx, u.complaints, in.BuyerID, in.OrderNo)
 			if err != nil {
 				return err
 			}
 			if !found {
-				// 索引擋下了，卻查不到那一件 ⇒ 述詞與索引述詞已經漂移。
-				// 回錯讓整筆 rollback：放行會讓買家看到一個空的成功回應。
 				return errComplaintIndexDrift
 			}
 			view, err := u.viewOf(ctx, existing, cal, now)
@@ -267,8 +214,6 @@ func (u *Complaint) File(ctx context.Context, in FileComplaintInput) (FileCompla
 		event, err := u.complaints.AppendEvent(ctx, domain.NewComplaintEvent{
 			ComplaintID: row.ID,
 			EventType:   codemeta.InvoiceComplaintEventTypeCreated.Value,
-			// action 留空：InvoiceComplaintAction 的 6 值是「賣家／ADM 點了哪一顆」，
-			// 買家的動作不進那個軸（§7.3.5 逐字）。
 			ActorType:      complaintActorBuyer,
 			ActorAccountID: in.BuyerID,
 			Message:        in.Description,
@@ -278,7 +223,6 @@ func (u *Complaint) File(ctx context.Context, in FileComplaintInput) (FileCompla
 			return err
 		}
 
-		// 🔴 store_id 走 invoice_issuers.issuer_ref_id，不是 row.IssuerID（那是 PK）。
 		issuer, err := u.issuers.GetByID(ctx, row.IssuerID)
 		if err != nil {
 			return err
@@ -353,8 +297,6 @@ func (u *Complaint) Reopen(ctx context.Context, in ComplaintActionInput) (Compla
 	}
 	return u.transition(ctx, in, complaintTransition{
 		eventType: codemeta.InvoiceComplaintEventTypeReopened.Value,
-		// 重開把案件推回 OPEN ⇒ SLA 重新起算（與 K10 同理）。不重置的話這一列一進 OPEN
-		// 就落回逾期掃描的候選集合，賣家連看都還沒看到就被標成 OVERDUE。
 		apply: func(ctx context.Context, cal domain.BusinessCalendar, now time.Time) (bool, error) {
 			return u.complaints.Reopen(ctx, in.ComplaintID, in.BuyerID, in.ExpectedVersion,
 				u.slaDueAt(cal, now), now)
@@ -362,31 +304,21 @@ func (u *Complaint) Reopen(ctx context.Context, in ComplaintActionInput) (Compla
 	})
 }
 
-// complaintTransition 是三支買家動作的共通形狀。
 type complaintTransition struct {
 	eventType string
 	apply     func(ctx context.Context, cal domain.BusinessCalendar, now time.Time) (bool, error)
 }
 
-// transition 跑「讀 → 驗版本 → CAS → 寫時間軸 → 回轉移後的單筆」這條共通路徑。
-//
-// 一律回**轉移後**的完整單筆（§6.1.6 共通形狀）：前端據此直接覆蓋 query cache，
-// 不必再打一次端點 15；少了它，兩次請求之間的窗口會讓畫面顯示轉移前的狀態。
 func (u *Complaint) transition(ctx context.Context, in ComplaintActionInput, t complaintTransition) (ComplaintView, error) {
 	var out ComplaintView
 	err := u.tx.WithTx(ctx, func(ctx context.Context) error {
-		// 🔴 GetForBuyer 不是 GetByID：擁有者述詞在 SQL 的 WHERE，越權與查無由
-		// 同一行程式碼回同一個 9309（§8.1.4(b)）。
 		c, err := u.complaints.GetForBuyer(ctx, in.ComplaintID, in.BuyerID)
 		if err != nil {
 			return err
 		}
-		// 第二段述詞走同一個出口，不另開碼。
 		if in.OrderNo != "" && derefString(c.OrderNo) != in.OrderNo {
 			return complaintNotFound()
 		}
-		// 版本不符回 9322（§6.1.6 共通形狀）。CAS 仍然帶 version ⇒ 本判斷是為了給出
-		// 可分辨的訊息，不是正確性防線；真正的防線在 SQL 的 WHERE。
 		if c.Version != in.ExpectedVersion {
 			return complaintVersionConflict()
 		}
@@ -400,8 +332,6 @@ func (u *Complaint) transition(ctx context.Context, in ComplaintActionInput, t c
 		if err != nil {
 			return err
 		}
-		// 🔴 rows=0 ＝ 守衛不成立（allowed-from 不符／版本被搶先／重開次數用完／冷卻未到），
-		// 不得當成功往下走——那正是靜默失敗的形狀。三種情境共用 9336，訊息由 CodeMeta 給。
 		if !ok {
 			return complaintBiz(bizcode.InvoiceComplaintActionNotAllowed)
 		}
@@ -417,20 +347,12 @@ func (u *Complaint) transition(ctx context.Context, in ComplaintActionInput, t c
 			return err
 		}
 
-		// 重讀而不是就地拼裝：version、sla_due_at、reopen_count 這些欄位的新值由 SQL
-		// 算出（version+1、reopen_count+1），Go 端拼一份等於維護第二套算式。
 		updated, err := u.complaints.GetForBuyer(ctx, in.ComplaintID, in.BuyerID)
 		if err != nil {
 			return err
 		}
 
-		// I7：每一次 status 轉移都要有一列 invoice_status_history（#3109）。
-		//
-		// 放在重讀之後：to 取**實際落地的值**而不是 t.eventType 推導的期望值——
-		// K13 重開的目標狀態由 SQL 依 reopen_count 決定，Go 端猜一份就是第二套算式。
-		// 自轉移不寫（狀態沒變的動作由 complaint_events 表達）。
 		if u.audit != nil && updated.Status != c.Status {
-			// actor 是**買家**：硬寫 SYSTEM 會讓稽核看不出這一步是誰按的。
 			buyerID := in.BuyerID
 			if err := appendStatusHistoryActor(ctx, u.audit, subjectComplaint, c.ID,
 				c.Status, updated.Status, t.eventType, in.Reason,
@@ -447,35 +369,20 @@ func (u *Complaint) transition(ctx context.Context, in ComplaintActionInput, t c
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// 工作天曆
-// ---------------------------------------------------------------------------
 
-// calendarAround 讀一次鏡像，組出涵蓋「倒數 ＋ 硬上限」所需區間的行事曆快照。
-//
-// 一個請求只讀一次：sla_due_at 與 remainingBusinessDays 用的是同一份快照，
-// 分兩次讀會讓兩者在鏡像剛好被推送覆寫的那一瞬間互相矛盾。
 func (u *Complaint) calendarAround(ctx context.Context, now time.Time) (domain.BusinessCalendar, error) {
 	return loadBusinessCalendar(ctx, u.businessDay,
 		now.AddDate(0, 0, -complaintCalendarLookbehind),
 		now.AddDate(0, 0, complaintCalendarLookahead))
 }
 
-// slaDueAt 算出一件申訴的 sla_due_at（K01 建案與 K13 重開共用）。
 func (u *Complaint) slaDueAt(cal domain.BusinessCalendar, now time.Time) time.Time {
 	if !cal.Covers(now, now.AddDate(0, 0, domain.ComplaintSlaHardCapDays)) {
-		// 推送的涵蓋區間沒有罩住這段期間（或從未推送）⇒ 未涵蓋的日期一律視為假日、落在硬上限（偏晚）。
-		// 這裡只留一行 WARN：告警的資料面是 invoice_business_day_coverage，
-		// 由 Prometheus 規則 InvoiceBusinessDayMirrorEmpty／InvoiceBusinessDayMirrorStale（指標 invoice_business_day_mirror_age_seconds，sql-exporter 讀 coverage.synced_at）負責，不在請求路徑上重造一套。
 		u.logger().Warn("invoice.complaint.business_calendar_stale")
 	}
 	return cal.ComplaintSlaDueAt(now)
 }
 
-// loadBusinessCalendar 由鏡像組出一份行事曆快照；假日與涵蓋區間來自同一份一致的讀取（Snapshot）。
-//
-// 兩端各外擴一天：ComplaintSlaDueAt 是從「起算日的次一天」開始推的，區間切齊會讓
-// 邊界那一天的假日查不到而被當成工作天（偏早）。
 func loadBusinessCalendar(ctx context.Context, repo domain.BusinessDayRepository, from, to time.Time) (domain.BusinessCalendar, error) {
 	if from.After(to) {
 		from, to = to, from
@@ -487,7 +394,6 @@ func loadBusinessCalendar(ctx context.Context, repo domain.BusinessDayRepository
 	return domain.NewBusinessCalendar(holidays, coverage), nil
 }
 
-// viewOf 補上時間軸與工作天倒數。
 func (u *Complaint) viewOf(ctx context.Context, c domain.Complaint, cal domain.BusinessCalendar, now time.Time) (ComplaintView, error) {
 	events, err := u.complaints.ListEvents(ctx, c.ID)
 	if err != nil {
@@ -496,7 +402,6 @@ func (u *Complaint) viewOf(ctx context.Context, c domain.Complaint, cal domain.B
 	return viewWith(c, events, cal, now), nil
 }
 
-// viewWith 是不再打 DB 的那一半（建案路徑手上已經有事件列）。
 func viewWith(c domain.Complaint, events []domain.ComplaintEvent, cal domain.BusinessCalendar, now time.Time) ComplaintView {
 	view := ComplaintView{Complaint: c, Events: events}
 	applyComplaintCountdown(&view, cal, now)
@@ -510,29 +415,13 @@ func (u *Complaint) logger() *zap.Logger {
 	return u.log
 }
 
-// ---------------------------------------------------------------------------
-// 共用小工具
-// ---------------------------------------------------------------------------
 
-// complaintActorBuyer 是 invoice_complaint_events.actor_type 的買家值
-// （chk_invcompev_actor 四值之一）。
 const complaintActorBuyer = "BUYER"
 
-// outboxAggregateComplaint 是 invoice_outbox_events.aggregate_type 的申訴軸
-// （§23／36 號：一張表以 aggregate_type 區分 DOCUMENT／ADJUSTMENT／COMPLAINT／TAX_PROFILE）。
 const outboxAggregateComplaint = "COMPLAINT"
 
-// complaintReasonNotReceived 是 Phase 1 唯一的申訴原因（§6.1.6／proto 逐字）。
-//
-// ⚠️ **CodeMeta 沒有這個值域**（`invoice_complaints.reason_code` 只有 DB 的
-// DEFAULT 'NOT_RECEIVED'，沒有 CHECK、沒有生成 enum）⇒ 這裡是全服務唯一的字面值。
-// Phase 2 增加第二個原因時正解是先補 CodeMeta 再回來刪掉它。缺口登記在交付回報。
 const complaintReasonNotReceived = "NOT_RECEIVED"
 
-// normalizeComplaintReasonCode 把空字串補成 Phase 1 的唯一值，其餘一律拒絕。
-//
-// 不猜也不放行：reason_code 會落進 DB 並出現在 ADM 的篩選器，收一個值域外的字串
-// 等於讓那個篩選器從此少一類案件而沒有人會發現。
 func normalizeComplaintReasonCode(code string) (string, error) {
 	if code == "" || code == complaintReasonNotReceived {
 		return complaintReasonNotReceived, nil
@@ -540,23 +429,12 @@ func normalizeComplaintReasonCode(code string) (string, error) {
 	return "", ErrComplaintReasonCodeInvalid
 }
 
-// errComplaintIndexDrift 是「唯一索引擋下了，但用同一組條件查不到那一件」。
-//
-// 它是故障不是業務結果 ⇒ 刻意不是 DomainError，走 codes.Internal。
 var errComplaintIndexDrift = errors.New("invoice: complaint insert was rejected by the open-per-document index but no open case was found")
 
-// complaintOpensAt 回申訴入口的開放時刻（§6.1.6 第 3 條的 9311 時間閘）。
-//
-// 以**最早**一份文件的建立時間起算：作廢重開不該讓買家的申訴窗口重新倒數。
-// 🔴 端點 8 的 complaintOpensAt 與端點 13 的閘門必須是同一個算式——兩份實作漂移的
-// 症狀是「按鈕可以按，按下去回 9311」，而畫面上沒有任何線索。
 func complaintOpensAt(docs []domain.Document) time.Time {
 	return docs[len(docs)-1].CreatedAt.Add(complaintOpenDelay)
 }
 
-// findOpenComplaint 找這張訂單底下這位買家的進行中申訴。
-//
-// buyerID 是 ListForBuyerOrder 的述詞之一（SQL 的 WHERE）⇒ 別人的案件在這裡查不到。
 func findOpenComplaint(ctx context.Context, repo domain.ComplaintRepository, buyerID int64, orderNo string) (domain.Complaint, bool, error) {
 	rows, err := repo.ListForBuyerOrder(ctx, domain.BuyerComplaintQuery{
 		BuyerID: buyerID,
@@ -574,10 +452,6 @@ func findOpenComplaint(ctx context.Context, repo domain.ComplaintRepository, buy
 	return domain.Complaint{}, false, nil
 }
 
-// applyComplaintCountdown 補上 remaining／overdue 兩個工作天欄位。
-//
-// 算不出來時**保持 nil**（未計算）：回 0 會被前端讀成「今天到期」，而用自然日代替
-// 會偏早 ⇒ 賣家被誤判逾期 ⇒ 違規計數 +1（§5.1.14 表格逐字）。
 func applyComplaintCountdown(v *ComplaintView, cal domain.BusinessCalendar, now time.Time) {
 	remaining, ok := cal.RemainingBusinessDays(now, v.Complaint.SlaDueAt)
 	if !ok {
@@ -596,20 +470,11 @@ func complaintBiz(code int32) error {
 	return pkgerrors.NewBusiness(code, bizcode.Message(code))
 }
 
-// complaintVersionConflict 借 9322（碼名是稅務側的）。
-//
-// ⚠️ 碼名與語意不一致是設計書指定的（§6.1.6 共通形狀「版本不符 9322」、58A 錯誤表
-// 逐字「碼名是稅務側的，但申訴動作的 expectedVersion 衝突共用它」）。正解是新增一個
-// 通用的樂觀鎖碼，登記在交付回報。
 func complaintVersionConflict() error {
 	return pkgerrors.NewBusiness(bizcode.SellerTaxProfileVersionConflict,
 		bizcode.Message(bizcode.SellerTaxProfileVersionConflict))
 }
 
-// complaintCreatedEvent 是 invoice.complaint.created 的 payload。
-//
-// payload 邊界（36 號逐字）：禁止放載具識別碼、買受人統編、email、電話、隨機碼與任何
-// provider credential。本事件只放路由與顯示所需的識別碼與期限。
 type complaintCreatedEvent struct {
 	NotificationRefID string            `json:"notification_ref_id"`
 	ComplaintID       string            `json:"complaint_id"`
@@ -624,8 +489,6 @@ type complaintCreatedEvent struct {
 
 func complaintCreatedPayload(issuer domain.Issuer, c domain.Complaint, doc domain.Document, now time.Time) (json.RawMessage, error) {
 	return json.Marshal(complaintCreatedEvent{
-		// 冪等鍵形狀取自 36 號的 `INVCPL:{complaint_id}:{phase}`：少了 phase，
-		// 同一件案子的 created／responded 兩則通知會被 notification-service 去重掉一則。
 		NotificationRefID: "INVCPL:" + strconv.FormatInt(c.ID, 10) + ":created",
 		ComplaintID:       strconv.FormatInt(c.ID, 10),
 		InvoiceDocumentID: strconv.FormatInt(doc.ID, 10),
@@ -638,15 +501,7 @@ func complaintCreatedPayload(issuer domain.Issuer, c domain.Complaint, doc domai
 	})
 }
 
-// ---------------------------------------------------------------------------
-// K05：申訴逾 3 工作天未回覆（P10，#3055 的橫向稽查）
-// ---------------------------------------------------------------------------
 
-// complaintOverdueEvent 是 P10（`invoice.complaint.overdue`，58 §6.3.9 定版 13 列第 11 列）。
-//
-// 該模板刻意**沒有** refType／refId（同 P9，它指向的是申訴列表不是單一憑證），
-// 也刻意不用 overdue_hours ——「少一個必填 key，解除條件就少一個可能對不上的地方」是
-// migration 檔頭的原話。這裡仍然帶齊業務欄位，模板用不到的欄位不會造成任何問題。
 type complaintOverdueEvent struct {
 	NotificationRefID string            `json:"notification_ref_id"`
 	ComplaintID       string            `json:"complaint_id"`
@@ -660,8 +515,6 @@ type complaintOverdueEvent struct {
 
 func complaintOverduePayload(issuer domain.Issuer, c domain.Complaint, now time.Time) (json.RawMessage, error) {
 	return json.Marshal(complaintOverdueEvent{
-		// 冪等鍵的 phase 是 `overdue`（36 號的 `INVCPL:{complaint_id}:{phase}`）：
-		// 與同一件案子的 created／responded 分開，否則三則會被去重成一則。
 		NotificationRefID: "INVCPL:" + strconv.FormatInt(c.ID, 10) + ":overdue",
 		ComplaintID:       strconv.FormatInt(c.ID, 10),
 		InvoiceDocumentID: strconv.FormatInt(c.DocumentID, 10),
@@ -695,11 +548,6 @@ func (u *Complaint) SweepOverdueComplaints(ctx context.Context, now time.Time) (
 			return err
 		}
 		for _, c := range rows {
-			// I7：K04 逾期轉態也要留痕（#3109）。
-			//
-			// 🔴 from 寫死 OPEN 而不是 c.Status：MarkOverdue 回的是**已更新**的列，
-			// c.Status 此刻已經是 OVERDUE，拿它當 from 會寫出一條 OVERDUE → OVERDUE
-			// 的自轉移。K04 的 allowed-from 在 SQL 裡就是 OPEN 單值。
 			if u.audit != nil {
 				if err := appendStatusHistory(ctx, u.audit, subjectComplaint, c.ID,
 					codemeta.InvoiceComplaintStatusOpen.Value, c.Status,
@@ -707,8 +555,6 @@ func (u *Complaint) SweepOverdueComplaints(ctx context.Context, now time.Time) (
 					return err
 				}
 			}
-			// issuer 讀不到就整批 rollback：用 issuer_id（PK）頂替 store_id 的症狀是
-			// 下游解析不到賣家、通知靜默不送，而該筆已經離開候選集合 ⇒ 永遠不會再試。
 			issuer, ierr := u.issuers.GetByID(ctx, c.IssuerID)
 			if ierr != nil {
 				return ierr
@@ -770,9 +616,6 @@ func (u *Complaint) EscalateOverdueComplaints(ctx context.Context, now time.Time
 			return err
 		}
 		for _, c := range rows {
-			// from 寫死 OVERDUE 而不是 c.Status，理由與 K04 那一段逐字相同：
-			// EscalateOverdue 回的是**已更新**的列，c.Status 此刻已經是 ESCALATED_TO_ADM，
-			// 拿它當 from 會寫出一條自轉移。K05 的 allowed-from 在 SQL 裡是 OVERDUE 單值。
 			if u.audit != nil {
 				if err := appendStatusHistory(ctx, u.audit, subjectComplaint, c.ID,
 					codemeta.InvoiceComplaintStatusOverdue.Value, c.Status,
@@ -821,8 +664,6 @@ func (u *Complaint) ResolveExpiredBuyerReviews(ctx context.Context, now time.Tim
 			return err
 		}
 		for _, c := range rows {
-			// from 寫死 SELLER_RESPONDED，理由與 K04／K05 逐字相同：rows 回的是**已更新**
-			// 的列，c.Status 此刻已是 RESOLVED。K06 的 allowed-from 在 SQL 裡是單值。
 			if u.audit != nil {
 				if err := appendStatusHistory(ctx, u.audit, subjectComplaint, c.ID,
 					codemeta.InvoiceComplaintStatusSellerResponded.Value, c.Status,
@@ -840,24 +681,10 @@ func (u *Complaint) ResolveExpiredBuyerReviews(ctx context.Context, now time.Tim
 	return resolved, nil
 }
 
-// reopenCooldownWindow 是 K06 結案後的重開冷卻（端點 65 的守衛與 B07 重開鍵讀
-// reopen_allowed_after）。數字取自 ResolveExpiredBuyerReviews 的 SQL 註解「now + 24h」。
 const reopenCooldownWindow = 24 * time.Hour
 
-// reasonBuyerReviewExpired 是 K06 在**稽核軸**（invoice_status_history.reason_code，
-// 無值域約束）上的理由碼。刻意不借用 InvoiceComplaintEventType 的任何值——見
-// ResolveExpiredBuyerReviews 的註解。
 const reasonBuyerReviewExpired = "BUYER_REVIEW_EXPIRED"
 
-// escalateOverdueWindow 是 K05 的等待期：進 OVERDUE 之後再給賣家 24 小時。
-//
-// 數字取自 `EscalateOverdueComplaints` 的 SQL 註解（「OVERDUE 且 now >= overdue_at + 24h」）
-// 與 CodeMeta `InvoiceComplaintStatusOverdue` 的描述（「24 小時後自動升級 ADM」）——
-// 三處必須同值，改一處就要一起改。
 const escalateOverdueWindow = 24 * time.Hour
 
-// overdueSweepBatch 是一輪最多標幾筆。
-//
-// 與 INV.dl 的 tick（5 分鐘）搭配：逾期是**時間到就成立**的事實，不會突然湧入幾千筆；
-// 而批次上限的作用是讓單輪耗時有上界（整批在同一個交易內，見上面的註解）。
 const overdueSweepBatch int32 = 100

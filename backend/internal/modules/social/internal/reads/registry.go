@@ -21,7 +21,6 @@ type Entry struct {
 	Keyset bool
 }
 
-// 樣本參數：固定值，golden 檔才穩定。
 var (
 	sampleNow  = time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
 	sampleID   = uuid.UUID{0x01, 0x8f, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, 0x01}

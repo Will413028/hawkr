@@ -31,8 +31,8 @@ class SellerProductOffShelfServiceTest {
 
     SellerProductOffShelfService service;
 
-    private static final String ACTIVE = ProductStatus.ACTIVE.value();     // 4004
-    private static final String INACTIVE = ProductStatus.INACTIVE.value(); // 4003
+    private static final String ACTIVE = ProductStatus.ACTIVE.value();
+    private static final String INACTIVE = ProductStatus.INACTIVE.value();
     private static final long STORE_ID = 7412345678901234567L;
 
     @BeforeEach
@@ -51,22 +51,17 @@ class SellerProductOffShelfServiceTest {
 
         assertEquals(3, count);
 
-        // 1. 批次 ACTIVE → INACTIVE，updated_by = 該賣家 storeId
         verify(productRepository).batchUpdateStatusByIds(activeIds, INACTIVE, STORE_ID);
 
-        // 2. 每筆 hashtag -1 + 詳情快取失效
         for (Long id : activeIds) {
             verify(cacheService).evictProductDetail(String.valueOf(id));
         }
 
-        // 3. 列表快取：寫入路徑統一走 evictProductListForWrite（內部清賣家私有 bucket + 公開 bucket 0）
         verify(cacheService).evictProductListForWrite(STORE_ID);
 
-        // 4. frontend cache bust：賣家公開商品集合整批變動 → 共發 seller entity tag（§9.3）
         verify(productRevalidationService).revalidateProductsWithSellers(activeIds);
         verify(productRevalidationService, never()).revalidateProducts(anyList());
 
-        // 蓋章：全狀態商品標記 seller_deleted_at
         verify(productRepository).stampSellerDeletedByMerchant(STORE_ID);
     }
 
@@ -79,11 +74,8 @@ class SellerProductOffShelfServiceTest {
         int count = service.offShelfAllByMerchant(STORE_ID);
 
         assertEquals(0, count);
-        // 蓋章必須發生（early-return 之前）
         verify(productRepository).stampSellerDeletedByMerchant(STORE_ID);
-        // 蓋章改動了 seller_deleted_at，賣家私有列表查詢結果變了 → 仍需 bust 列表快取
         verify(cacheService).evictProductListForWrite(STORE_ID);
-        // 其餘下架副作用不發生
         verify(productRepository, never()).batchUpdateStatusByIds(anyList(), anyString(), anyLong());
         verify(cacheService, never()).evictProductDetail(anyString());
     }

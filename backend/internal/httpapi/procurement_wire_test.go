@@ -11,9 +11,6 @@ import (
 	procurementv1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1"
 )
 
-// procurement 模組不能 import 這裡的生成碼，它的 turn_result 事件與中斷 payload 是手工組的 proto JSON（A9-3b-2c G12）。
-// 模組的測試把產生器輸出釘成 golden（testdata），這裡以 protojson（DiscardUnknown=false）把同一批 golden 解析回 proto：
-// 欄位名或列舉值名漂移時，一邊的測試會紅。
 const turnTestdata = "../modules/procurement/internal/turn/testdata"
 
 func readGolden(t *testing.T, name string) []byte {

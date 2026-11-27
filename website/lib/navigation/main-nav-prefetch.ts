@@ -33,8 +33,6 @@ export type MainNavPrefetchIntent = "pointer" | "focus" | "touch" | "idle";
 type PrefetchRouter = Pick<ReturnType<typeof useRouter>, "prefetch">;
 type PrefetchOptions = NonNullable<Parameters<PrefetchRouter["prefetch"]>[1]>;
 
-// Next types this public option with an internal enum. Keep the dependency
-// type-only; do not import its router implementation into the application.
 const HOME_PREFETCH_OPTIONS: PrefetchOptions = {
 	kind: "full" as PrefetchOptions["kind"],
 };
@@ -73,13 +71,6 @@ type IdleCapableWindow = Window & {
 const routeSet = new Set<string>(MAIN_NAV_PREFETCH_ROUTES);
 const POINTER_DWELL_MS = 80;
 const IDLE_ROUTE_GAP_MS = 240;
-// Match the short-lived App Router dynamic prefetch window. This prevents a
-// long-lived shell from treating an old warm as fresh forever while still
-// single-flighting repeated hover/focus events during real interaction.
-// Touch intentionally starts no request below: pointer-down and the resulting
-// click are the same gesture, so every speculative request started there takes
-// priority away from the real navigation. Idle warming prepares the anonymous
-// route payload before the gesture; hover/focus share its deduplication.
 const PREFETCH_DEDUPE_TTL_MS = 30 * 1000;
 
 const warmedRoutes = new Map<MainNavPrefetchRoute, WarmedRoute>();
@@ -146,24 +137,16 @@ function warmRoute(
 	});
 
 	if (href === "/" && intent !== "idle") {
-		// Retain the explicit-intent client snapshot warm. Idle prefetch already
-		// prepares the SSR snapshot and must not add a second data request.
 		void preloadHomeTabBootstrap().catch(() => undefined);
 	}
 
 	try {
 		if (href === "/") {
-			// The initial Home tree is already known to Next, but this deployment
-			// serves full Flight responses to its automatic segment prefetches.
-			// Full prefetch can reuse the rendered tree or cache a compatible Flight
-			// instead. Keep other tabs' working automatic prefetch path unchanged.
 			router.prefetch(href, HOME_PREFETCH_OPTIONS);
 		} else {
 			router.prefetch(href);
 		}
 	} catch {
-		// Prefetch is an optional enhancement. A synchronous router failure must
-		// neither affect the click nor suppress the next valid warm attempt.
 		warmedRoutes.delete(href);
 	}
 }
@@ -180,8 +163,6 @@ export function prefetchMainNavOnIntent({
 	intent: MainNavPrefetchIntent;
 }) {
 	if (intent === "touch") {
-		// Stop the entire remaining batch before a tap can begin navigation.
-		// Next does not expose cancellation for requests already in flight.
 		scheduledIdleWarmCleanup?.();
 		cancelScheduledIntent();
 		return;
@@ -209,8 +190,6 @@ export function prefetchMainNavOnIntent({
 		return;
 	}
 
-	// Focus is an explicit prefetch intent. Touch only cancels/suppresses weaker
-	// speculation so the real click owns the connection.
 	cancelScheduledIntent();
 	warmRoute(router, route, currentPathname, intent);
 }
@@ -292,13 +271,9 @@ export function scheduleMainNavIdleWarm({
 	) {
 		return cleanup;
 	}
-	// A pathname effect may run before the previous transition's progress hold
-	// clears. Wait for that handoff; a later navigation cancels this new batch.
 	let waitingForCommitHandoff =
 		document.documentElement.getAttribute("data-nav-pending") === "";
 
-	// Pathname effects only clean up after commit. Cancel queued work at the
-	// beginning of navigation, including programmatic push/replace and Back.
 	navigationObserver = new MutationObserver(() => {
 		const pending =
 			document.documentElement.getAttribute("data-nav-pending") === "";
@@ -342,9 +317,6 @@ export function scheduleMainNavIdleWarm({
 					if (!idleSuppressedRoutes.has(route)) {
 						warmRoute(router, route, currentPathname, "idle");
 					}
-					// Prefetch returns void. Space at most three calls; the router
-					// owns network scheduling, and already-started work cannot be
-					// aborted. Do not add duplicate API-only warming alongside it.
 					warmNext(index + 1);
 				},
 				index === 0 ? 0 : IDLE_ROUTE_GAP_MS,
@@ -371,9 +343,6 @@ export function scheduleMainNavIdleWarm({
 		!document.querySelector(ROUTE_TERMINAL_READY_SELECTOR) &&
 		isPublicInitialContentReady(currentPathname);
 
-	// Route prefetch may insert CSS into the document. Use the same hydration
-	// barrier as other head mutations, then require this tab's committed content
-	// (a marker in React's hidden Flight staging tree is not ready).
 	const waitForContent = () => {
 		void whenDocumentSettled().then(() => {
 			if (!canWarm()) {
@@ -398,7 +367,6 @@ export function scheduleMainNavIdleWarm({
 				attributes: true,
 				attributeFilter: ["hidden"],
 			});
-			// A broken/terminal page never earns speculative work.
 			readyTimeout = setTimeout(cleanup, 10_000);
 		});
 	};

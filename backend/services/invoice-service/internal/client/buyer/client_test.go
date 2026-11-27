@@ -14,8 +14,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// 真的 gRPC server（bufconn）而不是 interface 假物件：只有過一趟 gRPC，
-// 「deadline 有沒有被設上」才驗得到（那個值走 wire 上的 grpc-timeout header）。
 type fakeBuyer struct {
 	pb.UnimplementedBuyerServiceServer
 
@@ -62,9 +60,6 @@ func TestBatchGetBuyerDisplay(t *testing.T) {
 		Buyers: map[int64]*pb.BuyerDisplay{
 			11: {DisplayName: "陳小明", Deleted: false},
 			12: {DisplayName: "已註銷的買家", Deleted: true},
-			// 🔴 送 nil，但**收到的是空 message 不是 nil**（protobuf map 的 wire 行為）。
-			// 這一格釘住那件事：判準必須是「有沒有名字」而不是「指標是不是 nil」，
-			// 後者在 in-process 假物件上看起來有效、一上 wire 就永遠不成立。
 			13: nil,
 		},
 	}}
@@ -77,9 +72,6 @@ func TestBatchGetBuyerDisplay(t *testing.T) {
 	if got[11].DisplayName != "陳小明" || got[11].Deleted {
 		t.Fatalf("11 錯：%#v", got[11])
 	}
-	// 🔴 Deleted 必須帶出來：呼叫端靠它決定要不要遮罩（墓碑不是個資，遮了讀不懂）。
-	// 少了這一欄，唯一的替代做法是拿 DisplayName 去跟墓碑字串比對，
-	// 而 proto 註解明令禁止那件事。
 	if !got[12].Deleted {
 		t.Fatalf("12 的 Deleted 沒帶出來：%#v", got[12])
 	}

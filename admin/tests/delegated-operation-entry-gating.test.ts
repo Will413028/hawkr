@@ -143,9 +143,6 @@ const ALLOWED_PREFLIGHT = {
 test("① 操作者無 session-create capability：入口整個不渲染，且原因不得把它救回來", () => {
 	assert.equal(renderEntry({ storeId: "2685914682", enabled: false }), "");
 
-	// 這一條才是 6.1 驗收真正要擋的東西：目標店家同時也不合格時，仍然**不准**退化成
-	// 一顆停用按鈕 —— 那就是拿 disabled 掩飾權限。②「有原因就渲染」若寫在權限閘門
-	// 之前，這裡會吐出整顆按鈕。
 	assert.equal(
 		renderEntry({
 			storeId: "2685914682",
@@ -172,12 +169,9 @@ test("② 目標店家不合格：按鈕仍在原位，disabled，且 label 就�
 		/\sdisabled\b/u,
 		`按鈕沒有 disabled ⇒ 不可代行的店家看起來可以按：${button[0]}`,
 	);
-	// 原因必須是按鈕自己的文字（可讀名稱），不是藏在 title／tooltip 裡。
 	assert.equal(button[1].trim(), "帳號停權中，無法代行。");
-	// 通用 label 不得蓋掉原因 —— 顯示「代行營運」等於又把原因藏起來了。
 	assert.doesNotMatch(button[0], /代行營運/u);
 
-	// 停用態不得帶對話框語意：它不會打開任何東西。
 	assert.doesNotMatch(button[0], /aria-haspopup/u);
 	assert.doesNotMatch(button[0], /aria-expanded/u);
 });
@@ -289,8 +283,6 @@ test("③ 權限閘門仍在最前面：enabled=false 時 resolveEligibility 救
 test("賣家列把入口永遠掛上去，原因只來自伺服器給的 delegationUnavailabilities，client 沒有本地判準", async () => {
 	const page = await readFile("src/app/admin/merchants/page.tsx", "utf8");
 
-	// 修前是 `{canStartDelegatedOperation && <MerchantOperationEntry …>}`：不合格的
-	// 列連 DOM 都沒有，於是原因無處可放。
 	assert.doesNotMatch(
 		page,
 		/canStartDelegatedOperation && \(?\s*<MerchantOperationEntry/u,
@@ -299,13 +291,11 @@ test("賣家列把入口永遠掛上去，原因只來自伺服器給的 delegat
 	assert.match(page, /<MerchantOperationEntry/u);
 	assert.match(page, /blockedReason=\{delegationBlockedReason\}/u);
 
-	// 原因只讀伺服器的原因清單（店家狀態：已關閉、等待刪除、停權；句子由伺服器給）。
 	assert.match(
 		page,
 		/const delegationBlockedReason =\s*m\.delegationUnavailabilities\.length > 0\s*\?\s*unavailableLabels\(m\.delegationUnavailabilities\)\[0\]\s*:\s*undefined;/u,
 		"原因不再來自 delegationUnavailabilities ⇒ client 又在自己推導",
 	);
-	// 不得有本地判準：清單頁不讀 StoreStatus、isSuspended、canStartDelegatedOperation 與 rowState(...).isActive && 這類資格。
 	assert.doesNotMatch(
 		page,
 		/StoreStatus\.|isSuspended|canStartDelegatedOperation|rowState\(m\)\.isActive\s*&&|lifecycleBlockedLabel|delegationBlockedLabel/u,
@@ -389,6 +379,5 @@ test("代行原因群組一進場就標示必選，與案件欄同一種寫法",
 		/（必選）/u,
 		`代行原因沒有必填標示（legend 為「${legend[1]}」）⇒ 必填性只在送出失敗後才揭露，而同一張表單的案件欄一進場就講明了`,
 	);
-	// 標示是加在既有問句上，不是把問句換掉。
 	assert.match(legend[1], /這次為什麼需要代行？/u);
 });

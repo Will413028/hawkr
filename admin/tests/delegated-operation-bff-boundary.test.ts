@@ -64,12 +64,8 @@ test("catch-all BFF forwards representation metadata but not browser identity", 
 	for (const header of [
 		"Authorization",
 		"Cookie",
-		// 跨來源的防護在後台自己的 middleware（src/lib/cross-origin.ts）；後端收到的是伺服器的請求，
-		// 轉送瀏覽器的 Origin 只會讓後端多信任一個 origin。
 		"Origin",
 		"X-Requested-With",
-		// 後台沒有視角（ADR 2026-10-07-connect-without-perspective）：BFF 不轉送 X-Active-Role，
-		// 單體對後台身分只看 Cloudflare Access 的 JWT，不看 client 的工作區提示。
 		"X-Active-Role",
 		"x-active-role",
 		"X-Admin-Actor-Id",

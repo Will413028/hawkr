@@ -163,7 +163,6 @@ describe("ChatEventStream", () => {
 		expect(h.opens[0]).toEqual({});
 		expect(h.opens[1]).toEqual({ c1: BigInt(4), c2: BigInt(9) });
 		expect(h.stream.lastEnd).toBe("normal");
-		// 正常結束不排 backoff：沒有手動觸發任何 timer 就已經重連。
 		h.stream.stop();
 	});
 
@@ -215,7 +214,7 @@ describe("ChatEventStream", () => {
 		h.stream.start();
 		await h.flush();
 		expect(h.opens).toHaveLength(1);
-		const backoff = h.live().find((t) => t.ms === 500); // 0.5 * 1000ms
+		const backoff = h.live().find((t) => t.ms === 500);
 		expect(backoff).toBeDefined();
 		backoff?.fn();
 		await h.flush();
@@ -257,7 +256,7 @@ describe("ChatEventStream", () => {
 			},
 		]);
 		for (let i = 1; i <= 60; i++) h.stream.noteSeq(`c${i}`, i);
-		h.stream.noteSeq("c1", 99); // 最舊的對話又有動靜，應留下
+		h.stream.noteSeq("c1", 99);
 		h.stream.start();
 		await h.flush();
 		expect(Object.keys(h.opens[0])).toHaveLength(50);
@@ -288,7 +287,7 @@ describe("ChatEventStream", () => {
 		await h.flush();
 		const watchdog = h.live().find((t) => t.ms === 20_000);
 		expect(watchdog).toBeDefined();
-		watchdog?.fn(); // 兩倍心跳間隔沒有任何 frame
+		watchdog?.fn();
 		await h.flush();
 		expect(h.stream.lastEnd).toBe("timeout");
 		h.live()

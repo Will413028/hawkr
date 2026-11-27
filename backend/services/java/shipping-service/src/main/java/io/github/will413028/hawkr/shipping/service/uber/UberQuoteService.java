@@ -141,14 +141,10 @@ public class UberQuoteService {
     /** 取得（或沿用）一筆可用的報價。 */
     public Outcome quote(Ask ask) {
         if (!enabled) {
-            // 🔴 總開關關閉時連 store mapping 都不查：那會在 log 上製造
-            //    「有人在用 Uber」的假象，而實際上一筆都不會成立。
             return Outcome.unavailable("UBER_DISABLED");
         }
         ShippingMethodConfigEntity config = shippingFeeService.getConfig(METHOD_UBER, ask.deliveryTemp());
         if (config == null) {
-            // getConfig 只載 enabled=true 的列 ⇒ 這一格同時涵蓋「3003 該溫層未開通」
-            // 與「整個 3003 還沒 enabled」。66 §12.2 步 9 之前這是<b>預期</b>結果。
             return Outcome.unavailable("UBER_METHOD_NOT_ENABLED");
         }
         Optional<UberStoreMappingEntity> mappingOpt = storeResolver.activeMapping(ask.sellerStoreId());
@@ -159,9 +155,6 @@ public class UberQuoteService {
 
         PackingPolicyEntity policy = activePolicy();
         if (policy == null) {
-            // 🔴 沒有生效政策 ⇒ 分箱沒有依據 ⇒ 不可用。
-            //    用一組寫死的預設值繼續算，會讓 uber_quotes.packing_policy_version 指向不存在的版本，
-            //    而那一欄的用途正是「這張訂單當時用什麼規則算的」。
             return Outcome.unavailable("PACKING_POLICY_MISSING");
         }
 
@@ -185,13 +178,9 @@ public class UberQuoteService {
 
         UberQuoteEntity reusable = reusableQuote(ask.buyerId(), ask.sellerStoreId(), payloadHash);
         if (reusable != null) {
-            // 🔴 不打 Uber：E1 的 token 有 100 req/hr 上限，而結帳頁每次重算都會走到這裡。
             return new Outcome(reusable, null);
         }
 
-        // hash 不同或沒有可用的 ⇒ 舊的換手再重報。
-        // ⚠️ 換手必須在打 Uber **之前**：打完才換手的話，E1 失敗會留下一筆
-        //    hash 已經不符當下購物車、狀態卻仍是 CREATED 的報價。
         writer.supersedeCreated(ask.buyerId(), ask.sellerStoreId());
 
         QuoteResult result;
@@ -202,7 +191,6 @@ public class UberQuoteService {
                     dropoff,
                     UberFieldFormat.pickupReadyDt(Instant.now(clock), mapping.getPrepSlaMinutes())));
         } catch (UberApiException e) {
-            // E1 無副作用（66 §4.5.0）⇒ 失敗就是「這個選項這次算不出價」，不是錯誤狀態。
             log.warn("UberQuoteService.quote.e1Failed", "Uber 報價失敗：" + e.getMessage());
             return Outcome.unavailable("QUOTE_FAILED");
         }
@@ -248,8 +236,6 @@ public class UberQuoteService {
         if (sameQuote) {
             return new Revalidation(fresh.quote(), false, null);
         }
-        // 換了一張報價：只有在金額也不同時才需要使用者重新確認。
-        // 🔴 金額相同就不打擾使用者——INV-U1 要守的是「金額」不是「quote_id」。
         boolean priceChanged = current == null
                 || !fresh.quote().getFeeAmount().equals(current.getFeeAmount());
         return new Revalidation(fresh.quote(), priceChanged, null);
@@ -272,7 +258,6 @@ public class UberQuoteService {
         return writer.markCheckoutAccepted(quoteId, orderNo) == 1;
     }
 
-    // ==================== internals ====================
 
     /** 生效版本＝{@code effective_from <= now} 中 version 最大者（66 §5.1.8）。 */
     private PackingPolicyEntity activePolicy() {
@@ -316,8 +301,6 @@ public class UberQuoteService {
         Double lat = parseCoordinate(validation.getData().getLat());
         Double lng = parseCoordinate(validation.getData().getLng());
         if (lat == null || lng == null) {
-            // 🔴 fail-closed：Uber 建單的 dropoff_latitude／longitude 是必填（官方總覽 §2.2）。
-            //    沒有座標就寫進 quote 的話，炸掉的時點是買家付完錢之後的建單。
             throw new UberAddressUnparseableException("地址驗證沒有回經緯度");
         }
         return new UberWaypoint(
@@ -332,9 +315,6 @@ public class UberQuoteService {
     /** 分箱結果 → Uber {@code manifest_items}。{@code size} 取該箱的 {@code size_class}。 */
     private List<ManifestItem> manifestItems(List<UberPackingPlanner.Item> items,
                                              UberPackingPlanner.Plan plan) {
-        // 🔴 size 目前一律取第一箱的 size_class：66 未列出 Uber size 的值域（U-K／N4），
-        //    在 sandbox 坐實之前不發明「哪一件放在哪一箱」的對應。
-        //    ⚠️ 這一格是 Enablement Blocker，不是可以靜默放過的簡化。
         String size = plan.packages().isEmpty() ? null : plan.packages().get(0).getSizeClass();
         List<ManifestItem> out = new ArrayList<>();
         for (UberPackingPlanner.Item item : items) {
@@ -363,7 +343,6 @@ public class UberQuoteService {
         try {
             return Double.valueOf(raw.trim());
         } catch (NumberFormatException e) {
-            // 🔴 不猜、不回 0：0,0 是幾內亞灣，而那會變成一筆看起來合法的報價。
             return null;
         }
     }

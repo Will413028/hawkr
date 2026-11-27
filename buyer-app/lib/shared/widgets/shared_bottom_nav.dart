@@ -166,8 +166,6 @@ class _SharedBottomNavState extends ConsumerState<SharedBottomNav>
       return;
     }
 
-    // Route/PageView resolution normally clears pending in didUpdateWidget.
-    // The fallback protects callbacks that accept a request but do not move.
     _pendingFallback = Timer(const Duration(milliseconds: 1200), () {
       if (!mounted || _pendingIndex == null) return;
       setState(() => _pendingIndex = null);

@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
-// F4: a stream that exhausts its downtime budget lands in "unavailable" and
-// stops retrying. It must be revived when the tab becomes visible again (the
-// commonest case: notifications froze while the tab was backgrounded), and stay
-// dead while still hidden. We force "unavailable" with maxDowntimeMs=0 and a
-// fetch that always rejects, then drive the visibilitychange listener.
 
 const realFetch = globalThis.fetch;
 
@@ -53,7 +48,7 @@ async function openDeadStream() {
 	const client = new SseClient({
 		path: "/notifications/stream",
 		mode: "public",
-		maxDowntimeMs: 0, // first failed connect goes straight to "unavailable"
+		maxDowntimeMs: 0,
 		handlers: {
 			onEvent: () => {},
 			onReady: () => {},

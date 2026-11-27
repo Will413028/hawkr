@@ -47,9 +47,7 @@ const (
 	DefaultMaxConcurrentTurns = 2
 	// DefaultMaxSubmitsPerMinute 是每位買家每分鐘的送出次數上限。
 	DefaultMaxSubmitsPerMinute = 10
-	// submitWindow 是送出次數的計算窗口。
 	submitWindow = time.Minute
-	// concurrentRetryAfter 是同時輪次已滿時建議的重試間隔。
 	concurrentRetryAfter = 5 * time.Second
 
 	minBufferCapacity = 2
@@ -94,7 +92,6 @@ type Ref struct {
 type turnState struct {
 	buyerID int64
 	buf     *buffer
-	// stop 取消這一輪的執行；由 e.mu 保護，固定文案的輪次沒有。
 	stop context.CancelFunc
 }
 
@@ -109,15 +106,12 @@ type Executor struct {
 	mu     sync.Mutex
 	closed bool
 	turns  map[string]*turnState
-	active map[string]struct{} // 進行中的對話，鍵是 buyerID/sessionID
-	// running 是每位買家進行中的輪次數；recent 是每位買家最近一分鐘內的送出時間。
+	active map[string]struct{}
 	running map[int64]int
 	recent  map[int64][]time.Time
 	idem    map[string]*idemEntry
 }
 
-// idemEntry 是一個冪等鍵的紀錄：請求內容的雜湊與第一次受理的結果。ready 關閉後 ok、ref 才可讀；
-// ok 為 false 表示第一次受理失敗（紀錄已移除，等待者自己重試）。
 type idemEntry struct {
 	hash  [sha256.Size]byte
 	ready chan struct{}
@@ -133,7 +127,6 @@ func New(cfg Config) *Executor {
 	if cfg.BufferCapacity <= 0 {
 		cfg.BufferCapacity = DefaultBufferCapacity
 	}
-	// 緩衝最後一格留給終止事件，所以至少要有一格一般事件加一格終止事件。
 	cfg.BufferCapacity = max(cfg.BufferCapacity, minBufferCapacity)
 	if cfg.Retention <= 0 {
 		cfg.Retention = DefaultRetention
@@ -167,7 +160,6 @@ func (e *Executor) Shutdown(ctx context.Context) error {
 	}
 }
 
-// pruneBefore 回 ts 中不早於 cutoff 的部分（ts 依時間遞增）。
 func pruneBefore(ts []time.Time, cutoff time.Time) []time.Time {
 	i := 0
 	for i < len(ts) && ts[i].Before(cutoff) {
@@ -176,7 +168,6 @@ func pruneBefore(ts []time.Time, cutoff time.Time) []time.Time {
 	return ts[i:]
 }
 
-// rateWaitLocked 在持鎖時回買家的每分鐘送出次數是否已滿，已滿時回要等多久；不記錄。
 func (e *Executor) rateWaitLocked(buyerID int64, now time.Time) (time.Duration, bool) {
 	ts := pruneBefore(e.recent[buyerID], now.Add(-submitWindow))
 	e.recent[buyerID] = ts
@@ -186,7 +177,6 @@ func (e *Executor) rateWaitLocked(buyerID int64, now time.Time) (time.Duration, 
 	return 0, false
 }
 
-// admitLocked 在持鎖時檢查買家的每分鐘送出次數，通過就記一次；同時輪次數由呼叫者先檢查。
 func (e *Executor) admitLocked(buyerID int64, now time.Time) error {
 	if wait, full := e.rateWaitLocked(buyerID, now); full {
 		return &model.LimitError{Err: model.ErrRateLimited, RetryAfter: wait}
@@ -195,7 +185,6 @@ func (e *Executor) admitLocked(buyerID int64, now time.Time) error {
 	return nil
 }
 
-// unadmit 撤回 admitLocked 在 at 記下的那一次：受理失敗的送出不留紀錄，也就不佔每分鐘的名額。
 func (e *Executor) unadmit(buyerID int64, at time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -227,13 +216,11 @@ func (e *Executor) sweepLocked(now time.Time) {
 	}
 }
 
-// register 登記一輪並回它的 ID：隨機 UUID（ADK 的 platform.NewUUID），輪次 ID 同時要買家相符才能訂閱，不是憑證。
 func (e *Executor) register(ctx context.Context, buyerID int64) (string, *turnState) {
 	t := &turnState{buyerID: buyerID, buf: newBuffer(e.cfg.BufferCapacity)}
 	return e.install(ctx, t), t
 }
 
-// install 登記一輪並回輪次 ID。
 func (e *Executor) install(ctx context.Context, t *turnState) string {
 	id := platform.NewUUID(ctx)
 	e.mu.Lock()
@@ -283,7 +270,6 @@ func (e *Executor) Submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	}
 }
 
-// submitOwning 受理第一次的請求並結算它的冪等紀錄；panic 也要關閉 ready，等待者才不會卡住。
 func (e *Executor) submitOwning(ctx context.Context, in SubmitInput, key string, ent *idemEntry) (ref Ref, err error) {
 	succeeded := false
 	defer func() {
@@ -301,7 +287,6 @@ func (e *Executor) submitOwning(ctx context.Context, in SubmitInput, key string,
 	return ref, err
 }
 
-// inputHash 是請求內容的雜湊（不含 RequestID）：每個欄位前加長度，避免欄位邊界混淆。
 func inputHash(in SubmitInput) [sha256.Size]byte {
 	h := sha256.New()
 	write := func(s string) {
@@ -350,8 +335,6 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	}
 	userID := strconv.FormatInt(in.BuyerID, 10)
 
-	// 順序：檢查 closed、佔用對話與買家上限、wg.Add 都在同一把鎖內，session ID 由伺服器先產生，之後才寫 session。
-	// 任何一步失敗都釋放佔用並 wg.Done，不留下沒有輪次的 session。
 	sessionID := in.SessionID
 	newSession := sessionID == ""
 	if newSession {
@@ -392,7 +375,6 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 	}()
 
 	if newSession {
-		// 買家 ID 以字串寫入：數字經 JSONB 往返會被 float64 改寫。
 		if _, err := e.cfg.Sessions.Create(ctx, &session.CreateRequest{
 			AppName:   buyeragent.AppName,
 			UserID:    userID,
@@ -426,7 +408,6 @@ func (e *Executor) submit(ctx context.Context, in SubmitInput) (Ref, error) {
 		defer e.wg.Done()
 		defer cancel()
 		defer stop()
-		// 先釋放對話、再發出終止事件：client 一收到結束就重送，不會撞到上一輪的佔用。
 		terminal := e.execute(runCtx, t, in, userID, sessionID, content, loc)
 		if terminal.Kind == model.EventError {
 			slog.WarnContext(runCtx, "assistant：這一輪以失敗結束", "turn_id", turnID, "failure", int(terminal.Failure))
@@ -462,7 +443,6 @@ func (e *Executor) release(buyerID int64, key string) {
 }
 
 func (e *Executor) submitReturnPolicy(ctx context.Context, in SubmitInput, loc uitext.Locale) (Ref, error) {
-	// 事件先寫進還沒登記的緩衝，寫成功才登記：失敗時沒有輪次留在 e.turns（沒有對話佔用，固定文案不建 session）。
 	buf := newBuffer(e.cfg.BufferCapacity)
 	if !writeReturnPolicy(buf, in.SessionID, loc, e.cfg.Now()) {
 		return Ref{}, errors.New("assistant：退貨政策事件寫入緩衝失敗")
@@ -471,17 +451,11 @@ func (e *Executor) submitReturnPolicy(ctx context.Context, in SubmitInput, loc u
 	return Ref{TurnID: turnID, SessionID: in.SessionID}, nil
 }
 
-// writeReturnPolicy 把固定文案與終止事件寫進緩衝；任何一次寫入失敗回 false。照搬：固定文案不建 session，finished 帶的是請求的 session_id（可為空）。
 func writeReturnPolicy(buf *buffer, sessionID string, loc uitext.Locale, now time.Time) bool {
 	body := text.ReturnPolicyTitle(loc).Text + "\n\n" + text.ReturnPolicyFacts(loc).Text + "\n\n" + text.ReturnPolicyClosing(loc).Text
 	return buf.append(model.Event{Kind: model.EventText, Text: body}, now) && buf.append(model.Event{Kind: model.EventFinished, SessionID: sessionID}, now)
 }
 
-// execute 跑 agent 並回這一輪的終止事件；panic 也以失敗事件回傳。
-//
-// finished 的條件：事件迭代正常結束，而且看過根 agent 的最終回應（IsFinalResponse），該回應的 FinishReason 是 STOP。
-// 串流被提早關閉時聚合器仍會送出非 Partial 的最終回應，但結束原因是空值或 UNSPECIFIED；MAX_TOKENS、SAFETY 等也不算完成，一律走 fail()。
-// 取消、逾時、模型安靜停下、事件數超過上限，只要最終回應沒有出現，一律是 error；迴圈之後不再看 ctx.Err()。
 func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, userID, sessionID string, content *genai.Content, loc uitext.Locale) (terminal model.Event) {
 	var sent strings.Builder
 	fail := func() model.Event {
@@ -497,7 +471,6 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 		}
 	}()
 
-	// 緩衝寫滿（事件數超過上限）時停掉這一輪：取消 runner，讓它在最終回應之前結束，走 fail()。
 	ctx, stopRun := context.WithCancel(ctx)
 	defer stopRun()
 	var overflow atomic.Bool
@@ -548,8 +521,6 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 		return fail()
 	}
 
-	// ADK 的 SSE 模式先送多個 Partial 的 chunk，最後送一個完整的非 Partial 回應。sent 記這一段已送出的文字：
-	// 非 Partial 到達時只補送沒送過的尾巴；tool 回應代表新一段文字開始，重置。
 	finalSeen := false
 	for ev, err := range r.Run(ctx, userID, sessionID, content, agent.RunConfig{StreamingMode: agent.StreamingModeSSE}) {
 		if err != nil {
@@ -593,7 +564,7 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 		}
 		for _, part := range ev.Content.Parts {
 			if part.Thought {
-				continue // thought 不得以一般文字外流
+				continue
 			}
 			if part.Text != "" {
 				if emit(model.Event{Kind: model.EventText, Text: part.Text}) {

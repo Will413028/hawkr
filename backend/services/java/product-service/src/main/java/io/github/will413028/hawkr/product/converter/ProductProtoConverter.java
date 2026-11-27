@@ -21,7 +21,6 @@ import java.util.stream.Collectors;
 @Component
 public class ProductProtoConverter {
 
-    // ==================== Request 轉換 ====================
 
     /**
      * CreateProductRequest (Proto) → CreateProductDTO
@@ -37,7 +36,6 @@ public class ProductProtoConverter {
         dto.setOrigin(request.getOrigin());
         dto.setStatus(request.getStatus());
 
-        // 轉換圖片
         if (request.getImagesCount() > 0) {
             List<ProductImageDTO> images = request.getImagesList().stream()
                     .map(this::toImageDTO)
@@ -45,7 +43,6 @@ public class ProductProtoConverter {
             dto.setImages(images);
         }
 
-        // 轉換 SKU
         if (request.getSkusCount() > 0) {
             List<ProductSkuDTO> skus = request.getSkusList().stream()
                     .map(this::toSkuDTO)
@@ -53,7 +50,6 @@ public class ProductProtoConverter {
             dto.setSkus(skus);
         }
 
-        // 轉換認證
         if (request.getCertificationsCount() > 0) {
             List<CertificationDTO> certs = request.getCertificationsList().stream()
                     .map(this::toCertificationDTO)
@@ -61,12 +57,10 @@ public class ProductProtoConverter {
             dto.setCertifications(certs);
         }
 
-        // Hashtag（02 §3.9 / §4.2.2）
         if (request.getHashtagsCount() > 0) {
             dto.setHashtags(new java.util.ArrayList<>(request.getHashtagsList()));
         }
 
-        // 代行語境：只影響認證申請的 source（19 §4.1），不影響任何商品欄位
         dto.setDelegated(request.hasDelegation());
 
         return dto;
@@ -88,7 +82,6 @@ public class ProductProtoConverter {
         dto.setStatus(request.getStatus());
         dto.setExpectedVersion(request.getExpectedVersion());
 
-        // 轉換圖片
         if (request.getImagesCount() > 0) {
             List<ProductImageDTO> images = request.getImagesList().stream()
                     .map(this::toImageDTO)
@@ -96,7 +89,6 @@ public class ProductProtoConverter {
             dto.setImages(images);
         }
 
-        // 轉換 SKU
         if (request.getSkusCount() > 0) {
             List<ProductSkuDTO> skus = request.getSkusList().stream()
                     .map(this::toSkuDTO)
@@ -104,19 +96,6 @@ public class ProductProtoConverter {
             dto.setSkus(skus);
         }
 
-        // 轉換認證。
-        //
-        // proto3 的 repeated 分不出「空清單」與「未提供」，所以單看 count>0 等於宣告
-        // 認證只增不減：使用者按了移除、UI 也顯示移除了、PATCH 回 200，DTO 卻是 null
-        // ⇒ 下游 ProductEntityConverter 的 null 判斷讓它整段跳過，資料原封不動，而稽核
-        // 仍記成 SUCCEEDED（changed_fields 為空）。認證是賣家對買家的法規宣稱，「掛得上
-        // 拿不下來」比一般欄位嚴重。同檔下方的 hashtags 早就用布林旗標解了同一個問題。
-        //
-        // 相容舊 client（未帶旗標但送了非空清單）仍視為要更新：product-service 與
-        // gateway 是分開部署的，少了這一半，先上的那個服務會讓認證更新在窗口內全失效。
-        // ⚠️ 旗標原值必須原樣帶下去（19 §6.3.0）：Step 0 閘門要的是「旗標 OR 清單非空」，
-        //    而 dto.certifications == null 分不出「未提供」與「明確清空」——
-        //    update_certifications=true + 空陣列是唯一合法的清空表達，少了旗標就永遠清不掉。
         dto.setUpdateCertifications(request.getUpdateCertifications());
         if (request.getUpdateCertifications() || request.getCertificationsCount() > 0) {
             List<CertificationDTO> certs = request.getCertificationsList().stream()
@@ -127,7 +106,6 @@ public class ProductProtoConverter {
 
         dto.setDelegated(request.hasDelegation());
 
-        // Hashtag（02 §4.2.2）：update_hashtags=true 才取代當前綁定，否則維持
         dto.setUpdateHashtags(request.getUpdateHashtags());
         if (request.getHashtagsCount() > 0) {
             dto.setHashtags(new java.util.ArrayList<>(request.getHashtagsList()));
@@ -146,7 +124,6 @@ public class ProductProtoConverter {
      * category_id, page, page_size 從 string 轉為數字
      */
     public ProductQueryDTO toQueryDTO(GetProductListRequest request) {
-        // 02 §5.3.1 分類多值聯集：過濾 "0" / 空 → trim → 去重 → 上限 50
         List<Long> categoryIds = null;
         int rawCatCount = request.getCategoryIdCount();
         if (rawCatCount > 0) {
@@ -173,17 +150,14 @@ public class ProductProtoConverter {
         Integer page = parseIntTreatingZeroAsAbsent(request.getPage());
         Integer pageSize = parseIntTreatingZeroAsAbsent(request.getPageSize());
 
-        // storeId：公開 API 篩選指定賣家的商品（單一）
         Long storeId = parseLong(request.getStoreId());
 
-        // Hashtag 篩選與匹配模式（02 §3.9 / §5.3）
         List<String> hashtags = request.getHashtagsCount() > 0
                 ? new java.util.ArrayList<>(request.getHashtagsList())
                 : null;
         boolean matchAll = request.getHashtagMatchMode()
                 == io.github.will413028.hawkr.product.grpc.HashtagMatchMode.HASHTAG_MATCH_ALL;
 
-        // 02 §5.3.4 server-side filter
         List<String> deliveryTempFilter = request.getDeliveryTempFilterCount() > 0
                 ? new java.util.ArrayList<>(request.getDeliveryTempFilterList())
                 : null;
@@ -229,7 +203,6 @@ public class ProductProtoConverter {
                 .build();
     }
 
-    // ==================== Response 轉換 ====================
 
     /**
      * ProductDetailDTO → ProductDetail (Proto)
@@ -262,7 +235,6 @@ public class ProductProtoConverter {
                 .setVersion(dto.getVersion() != null ? String.valueOf(dto.getVersion()) : "0")
                 .setCategoryName(dto.getCategoryName() != null ? dto.getCategoryName() : "");
 
-        // 轉換 gallery：服務側只填 objectKey，顯示 URL 由 Gateway 組（49 §6.6，過濾 null 元素）
         List<String> imageKeys = new ArrayList<>();
         if (dto.getGallery() != null) {
             List<GalleryItem> galleryItems = dto.getGallery().stream()
@@ -279,13 +251,11 @@ public class ProductProtoConverter {
             builder.addAllGallery(galleryItems);
         }
 
-        // 設定 image_key（第一張圖 objectKey）和 image_keys（所有圖片 objectKey）；Gateway 組 imageUrl/imageUrls
         if (!imageKeys.isEmpty()) {
             builder.setImageKey(imageKeys.get(0));
         }
         builder.addAllImageKeys(imageKeys);
 
-        // 轉換 certifications（過濾 null 元素）
         if (dto.getCertifications() != null) {
             List<Certification> certs = dto.getCertifications().stream()
                     .filter(c -> c != null)
@@ -297,7 +267,6 @@ public class ProductProtoConverter {
             builder.addAllCertifications(certs);
         }
 
-        // 轉換 skus（過濾 null 元素）
         if (dto.getSkus() != null) {
             List<ProductSku> skus = dto.getSkus().stream()
                     .filter(v -> v != null)
@@ -306,7 +275,6 @@ public class ProductProtoConverter {
             builder.addAllSkus(skus);
         }
 
-        // 三層分類
         if (dto.getCategoryLv3Id() != null) {
             builder.setCategoryLv3Id(String.valueOf(dto.getCategoryLv3Id()));
         }
@@ -326,7 +294,6 @@ public class ProductProtoConverter {
             builder.setCategoryLv1Name(dto.getCategoryLv1Name());
         }
 
-        // 配送溫層（含顯示名稱）
         if (dto.getDeliveryTemp() != null) {
             List<String> filteredDeliveryTemp = dto.getDeliveryTemp().stream()
                     .filter(d -> d != null)
@@ -334,7 +301,6 @@ public class ProductProtoConverter {
             builder.addAllDeliveryTemp(filteredDeliveryTemp);
         }
 
-        // 運送方式（聚合自所有 SKU）
         if (dto.getShippingMethods() != null) {
             List<ShippingMethod> methods = dto.getShippingMethods().stream()
                     .filter(sm -> sm != null)
@@ -348,7 +314,6 @@ public class ProductProtoConverter {
             builder.addAllShippingMethods(methods);
         }
 
-        // 商家資訊（含 logo、地址、city / district 對稱欄位）
         if (dto.getSeller() != null) {
             SellerInfo.Builder sellerBuilder = SellerInfo.newBuilder();
             if (dto.getSeller().getStoreId() != null) {
@@ -378,7 +343,6 @@ public class ProductProtoConverter {
             builder.setSeller(sellerBuilder.build());
         }
 
-        // 評論預覽
         if (dto.getReviews() != null) {
             List<ReviewPreview> reviews = dto.getReviews().stream()
                     .filter(r -> r != null)
@@ -393,7 +357,6 @@ public class ProductProtoConverter {
             builder.addAllReviews(reviews);
         }
 
-        // Hashtag list（02 §4.2.2）
         if (dto.getHashtags() != null && !dto.getHashtags().isEmpty()) {
             builder.addAllHashtags(toHashtagItemProtos(dto.getHashtags()));
         }
@@ -446,7 +409,6 @@ public class ProductProtoConverter {
                 .setCategoryLv2Id(dto.getCategoryId() != null ? String.valueOf(dto.getCategoryId()) : "0")
                 .setCategoryLv2Name(dto.getCategoryName() != null ? dto.getCategoryName() : "");
 
-        // 填充商家資訊（含 city / district / address 對稱欄位）
         if (dto.getSeller() != null) {
             SellerInfo.Builder sellerBuilder = SellerInfo.newBuilder();
             if (dto.getSeller().getStoreId() != null) {
@@ -476,7 +438,6 @@ public class ProductProtoConverter {
             builder.setSeller(sellerBuilder.build());
         }
 
-        // 轉換 gallery：服務側只填 objectKey，顯示 URL 由 Gateway 組（49 §6.6）
         List<String> listImageKeys = new ArrayList<>();
         if (dto.getGallery() != null) {
             List<GalleryItem> galleryItems = dto.getGallery().stream()
@@ -492,28 +453,23 @@ public class ProductProtoConverter {
             builder.addAllGallery(galleryItems);
         }
 
-        // 設定 image_key（第一張圖 objectKey）和 image_keys（所有圖片 objectKey）；Gateway 組 imageUrl/imageUrls
         if (!listImageKeys.isEmpty()) {
             builder.setImageKey(listImageKeys.get(0));
         }
         builder.addAllImageKeys(listImageKeys);
 
-        // SKU 規格名稱
         if (dto.getSkuNames() != null && !dto.getSkuNames().isEmpty()) {
             builder.addAllSkuNames(dto.getSkuNames());
         }
 
-        // Hashtag list（02 §4.2.2）
         if (dto.getHashtags() != null && !dto.getHashtags().isEmpty()) {
             builder.addAllHashtags(toHashtagItemProtos(dto.getHashtags()));
         }
 
-        // 配送溫層聯集（02 §5.3.6）
         if (dto.getDeliveryTemp() != null && !dto.getDeliveryTemp().isEmpty()) {
             builder.addAllDeliveryTemp(dto.getDeliveryTemp());
         }
 
-        // 運送方式聯集（02 §3.2 / §5.13a，本期新增反正規化欄位）
         if (dto.getShippingMethods() != null && !dto.getShippingMethods().isEmpty()) {
             List<ShippingMethod> methods = dto.getShippingMethods().stream()
                     .filter(java.util.Objects::nonNull)
@@ -527,7 +483,6 @@ public class ProductProtoConverter {
             builder.addAllShippingMethods(methods);
         }
 
-        // 認證列表（02 §5.3.4，商品卡 badge；過濾 null 元素）
         if (dto.getCertifications() != null) {
             List<Certification> certs = dto.getCertifications().stream()
                     .filter(c -> c != null)
@@ -542,7 +497,6 @@ public class ProductProtoConverter {
         return builder.build();
     }
 
-    // ==================== 輔助轉換方法 ====================
 
     /**
      * ProductImage (Proto) → ProductImageDTO
@@ -565,23 +519,14 @@ public class ProductProtoConverter {
                 .skuName(sku.getSkuName().isEmpty() ? null : sku.getSkuName())
                 .weight(parseBigDecimal(sku.getWeight()))
                 .unit(sku.getUnit().isEmpty() ? null : sku.getUnit())
-                .price(parsePrice(sku.getPrice()))  // String → Long（"0" 視為 null，沿用既有 parsePrice 約定）
-                // 特價：空字串=null（無特價）；"0"/"-1" 等 invalid 值保留為原 Long，由 service 層校驗 § 2.8.2 拒絕
+                .price(parsePrice(sku.getPrice()))
                 .salePrice(ProtoConversionUtils.parseLongOrNull(sku.getSalePrice()))
-                // ⚠️ 不可用本類的 parseInt：它把 "0" 當成「未提供」回 null，而
-                // ProductSkuConverter.updateEntity 對 null 是「跳過不更新」⇒ 賣家把庫存
-                // 改成 0（售完）永遠不會生效，且 HTTP 200、稽核記 SUCCEEDED、DB 原封不動。
-                // 庫存的 0 是一個**真實的值**（售完），不是「沒填」。空字串才是沒填，
-                // 而 parseIntOrNull 對空字串本來就回 null。
                 .stockQty(ProtoConversionUtils.parseIntOrNull(sku.getStockQty()))
                 .lengthCm(parseBigDecimal(sku.getLengthCm()))
                 .widthCm(parseBigDecimal(sku.getWidthCm()))
                 .heightCm(parseBigDecimal(sku.getHeightCm()))
-                // SKU 層樂觀鎖 token（#2545）。空字串 = client 沒帶 = 不比對；
-                // 不轉成 null 的話 ProductService.applySkuExpectedVersion 會拿空字串去 parseLong。
                 .expectedVersion(sku.getExpectedVersion().isEmpty() ? null : sku.getExpectedVersion());
 
-        // 運送方式（從 SKU 層級讀取）
         if (sku.getShippingMethodsCount() > 0) {
             List<ShippingMethodDTO> methods = sku.getShippingMethodsList().stream()
                     .map(sm -> ShippingMethodDTO.builder()
@@ -623,10 +568,8 @@ public class ProductProtoConverter {
                 .setLengthCm(dto.getLengthCm() != null ? dto.getLengthCm().toPlainString() : "0")
                 .setWidthCm(dto.getWidthCm() != null ? dto.getWidthCm().toPlainString() : "0")
                 .setHeightCm(dto.getHeightCm() != null ? dto.getHeightCm().toPlainString() : "0")
-                // SKU 樂觀鎖版本（#2545）。不下發，client 就沒有東西可以在下次寫回時回送。
                 .setVersion(dto.getVersion() != null ? dto.getVersion() : "");
 
-        // 運送方式（從 SKU 層級輸出）
         if (dto.getShippingMethods() != null) {
             List<ShippingMethod> methods = dto.getShippingMethods().stream()
                     .filter(sm -> sm != null)
@@ -722,7 +665,6 @@ public class ProductProtoConverter {
         return DateTimeUtils.fromEpochSeconds(timestamp);
     }
 
-    // ==================== Description 轉換方法 ====================
 
     /**
      * ProductDescription (Proto) → ProductDescriptionDTO
@@ -754,11 +696,9 @@ public class ProductProtoConverter {
         dto.setType(proto.getType().isEmpty() ? null : proto.getType());
         dto.setId(proto.getId().isEmpty() ? null : proto.getId());
 
-        // text 類型欄位
         dto.setContent(proto.getContent().isEmpty() ? null : proto.getContent());
         dto.setStyleJson(proto.getStyleJson().isEmpty() ? null : proto.getStyleJson());
 
-        // image 類型欄位
         dto.setStagedToken(proto.getStagedToken().isEmpty() ? null : proto.getStagedToken());
         dto.setAssetId(proto.getAssetId().isEmpty() ? null : proto.getAssetId());
         dto.setObjectKey(proto.getObjectKey().isEmpty() ? null : proto.getObjectKey());
@@ -767,7 +707,6 @@ public class ProductProtoConverter {
         dto.setHeight(parseIntTreatingZeroAsAbsent(proto.getHeight()));
         dto.setAlt(proto.getAlt().isEmpty() ? null : proto.getAlt());
 
-        // inline-run 模型欄位（02 §3.6）
         if (proto.getRunsCount() > 0) {
             dto.setRuns(proto.getRunsList().stream()
                     .map(this::toInlineRunDTO)
@@ -827,11 +766,9 @@ public class ProductProtoConverter {
                         .setType(dto.getType() != null ? dto.getType() : "")
                         .setId(dto.getId() != null ? dto.getId() : "");
 
-        // text 類型欄位
         builder.setContent(dto.getContent() != null ? dto.getContent() : "");
         builder.setStyleJson(dto.getStyleJson() != null ? dto.getStyleJson() : "");
 
-        // image 類型欄位：服務側只填 objectKey，顯示 URL 由 Gateway 組（49 §6.6，url 留空）
         builder.setAssetId(dto.getAssetId() != null ? dto.getAssetId() : "");
         builder.setObjectKey(dto.getObjectKey() != null ? dto.getObjectKey() : "");
 
@@ -839,7 +776,6 @@ public class ProductProtoConverter {
         builder.setHeight(dto.getHeight() != null ? String.valueOf(dto.getHeight()) : "0");
         builder.setAlt(dto.getAlt() != null ? dto.getAlt() : "");
 
-        // inline-run 模型欄位（02 §3.6）
         if (dto.getRuns() != null) {
             for (InlineRunDTO run : dto.getRuns()) {
                 builder.addRuns(toInlineRunProto(run));

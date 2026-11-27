@@ -33,9 +33,6 @@ vi.mock("@/components/shared/Link", () => ({
 	}: React.AnchorHTMLAttributes<HTMLAnchorElement> & { scroll?: boolean }) =>
 		React.createElement("a", props),
 }));
-// A render probe at a direct child of the REAL card. The REAL list and masonry
-// still run their hydration, append and measured-layout passes. Network/actions
-// are isolated; this is a render-count test, not authenticated checkout evidence.
 vi.mock("@/components/shared/AppImage", () => ({
 	default: (props: { alt: string }) => {
 		imageRender(props.alt);
@@ -333,7 +330,6 @@ describe("product list append render isolation", () => {
 			}),
 		);
 		const link = screen.getByRole("link", { name: "查看商品：商品 0" });
-		// Prevent jsdom navigation only after the real card's analytics callback.
 		document.addEventListener("click", (event) => event.preventDefault(), {
 			once: true,
 		});

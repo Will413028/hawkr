@@ -122,7 +122,6 @@ func (h *Admin) CreateCampaign(ctx context.Context, req *connect.Request[adminpb
 	return connect.NewResponse(&adminpb.CreateCampaignResponse{Campaign: toAdminCampaign(c, false)}), nil
 }
 
-// adminSpecOf 把請求的活動內容轉成模組的規則（同 specOf，admin 的輸入多一個 store_id，折抵型別共用）。
 func adminSpecOf(in *adminpb.AdminCampaignInput) (coupon.CampaignSpec, error) {
 	spec := coupon.CampaignSpec{Title: in.GetTitle(), ThresholdAmount: in.GetThresholdAmount()}
 	switch d := in.GetDiscount().(type) {
@@ -351,7 +350,6 @@ func (h *Admin) ListBuyerVouchers(ctx context.Context, req *connect.Request[admi
 	return connect.NewResponse(&adminpb.ListBuyerVouchersResponse{Vouchers: out, NextPageToken: nextToken(scope, page.Next)}), nil
 }
 
-// toAdminCampaign 轉成後台看到的活動：店家看到的內容加上發行者；expired 由模組用自己的時鐘判斷。
 func toAdminCampaign(c coupon.Campaign, expired bool) *adminpb.AdminCampaign {
 	out := &adminpb.AdminCampaign{Campaign: toSellerCampaign(c, expired)}
 	switch {

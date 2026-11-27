@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// terminate 以指定事由建立終止合作（預設不帶認定；MATERIAL_BREACH 與 LINKED_ACCOUNT 用 createTermination 另給）。
 func (f *fixture) terminate(t *testing.T, storeID int64, ground TerminationGround) Measure {
 	t.Helper()
 	r, err := f.createTermination(storeID, ground, nil)
@@ -47,13 +46,11 @@ func (f *fixture) storeRow(t *testing.T, storeID int64) Store {
 	return s
 }
 
-// effect 跑一次終止生效的 job（內容）。
 func (f *fixture) effect(t *testing.T, m Measure) {
 	t.Helper()
 	must(t, f.module.EffectTermination(context.Background(), m.ID))
 }
 
-// terminationJobs 是排入的終止生效 job：測量 id 與排程時間。
 func (f *fixture) terminationJobs(measureID uuid.UUID) (scheduled []time.Time) {
 	f.jobs.mu.Lock()
 	defer f.jobs.mu.Unlock()
@@ -114,7 +111,6 @@ func TestNoticeTerminationIsScheduledThenTakesEffect(t *testing.T) {
 		t.Fatalf("SCHEDULED 清單=%+v", stores.Items)
 	}
 
-	// 生效的前一刻：job 提早（時鐘慢）也以 starts_at 為準；有未結訂單時只暫停營業、不關店。
 	f.orders.open = true
 	f.now = starts.Add(-time.Microsecond)
 	if got := f.measureOf(t, m.ID).State; got != StateScheduled {
@@ -133,7 +129,6 @@ func TestNoticeTerminationIsScheduledThenTakesEffect(t *testing.T) {
 		t.Fatalf("有未結訂單不關店：%+v", got)
 	}
 
-	// 沒有未結訂單才關店；預告終止隨關店結束，系統作者。
 	f.orders.open = false
 	f.effect(t, m)
 	closed := f.storeRow(t, s.StoreID)
@@ -201,7 +196,6 @@ func TestTerminationSchemaConstraints(t *testing.T) {
 			t.Errorf("%s：要被 %s 擋下：%v", name, tc.want, tc.err)
 		}
 	}
-	// 合法的形狀可以寫入（延遲的外鍵在 commit 才檢查，這裡 rollback）。
 	if err := insert("TERMINATION", "CONTRACT", "CEASED_BUSINESS", 0, nil, nil, nil, nil); err != nil {
 		t.Errorf("合法形狀：%v", err)
 	}
@@ -237,7 +231,6 @@ func TestCreateTerminationValidates(t *testing.T) {
 			t.Errorf("%s：err=%v fields=%v，要 invalid_input 指 %s", name, err, errField(err), tc.field)
 		}
 	}
-	// 句子本身也釘住：事由名稱來自共用文案目錄（後台受眾），契約限定的事由兩個都要有。
 	for ground, want := range map[TerminationGround]string{
 		GroundNotice:        "預告終止（第 21.2 條）只能依據契約條款，不可以帶認定",
 		GroundLinkedAccount: "關聯帳號只能依據契約條款，不可以帶認定",
@@ -279,7 +272,6 @@ func TestImmediateTerminationSuspendsAtOnceAndSnapshotsTheIdentityPerMeasure(t *
 		t.Fatal("已因其他措施停權的帳號上建立的 21.3 終止要有身分快照")
 	}
 	_ = accountID
-	// 預告終止從頭到尾沒有快照。
 	_, s2, _ := f.submitted(t)
 	notice := f.terminate(t, s2.StoreID, GroundNotice)
 	f.now = f.now.Add(721 * time.Hour)
@@ -320,7 +312,6 @@ func TestTerminationClosesTheStoreOnlyWithoutOpenOrdersAndFailsClosed(t *testing
 	if got := f.measureOf(t, m.ID); got.State != StateActive || got.EndsAt != nil {
 		t.Fatalf("21.3 關店後措施仍生效、沒有結束時間：%+v", got)
 	}
-	// 重跑沒有副作用。
 	versionBefore := f.storeRow(t, s.StoreID).Version
 	f.effect(t, m)
 	if f.storeRow(t, s.StoreID).Version != versionBefore {
@@ -388,13 +379,11 @@ func TestReconcileTerminationsCoversALostJob(t *testing.T) {
 	if closed.Status != Closed || closed.Closure == nil || *closed.Closure.MeasureID != m.ID || f.isSeller(t, accountID) {
 		t.Fatalf("closed=%+v", closed)
 	}
-	// 沒有目前 stint 的帳號不掃。
 	scanned, err = f.module.ReconcileTerminations(ctx)
 	must(t, err)
 	if scanned != 0 {
 		t.Fatalf("已關店的帳號不再掃描：%d", scanned)
 	}
-	// 事件加速：店家的訂單結案。
 	_, s2 := f.open(t)
 	m2 := f.terminate(t, s2.StoreID, GroundBankruptcy)
 	f.orders.open = true
@@ -500,7 +489,6 @@ func TestTerminationOnAnAccountWithoutACurrentStint(t *testing.T) {
 	if m.State != StateActive || m.StoreID != first.StoreID || m.AccountID != accountID {
 		t.Fatalf("m=%+v", m)
 	}
-	// 開了新店（沒有被擋的帳號）：舊的 stint 不再是最近的。
 	f2 := setup(t)
 	account2, a := f2.open(t)
 	_, err = f2.module.CloseCurrent(ctx, account2)
@@ -539,7 +527,6 @@ func TestMaterialBreachNeedsAFindingOlderThanSevenDays(t *testing.T) {
 	if res.Measure.Basis != BasisViolation || len(res.Measure.Findings) != 1 || res.Measure.Findings[0].ID != finding || res.Measure.State != StateActive {
 		t.Fatalf("m=%+v", res.Measure)
 	}
-	// 已撤銷的認定不算。
 	_, s2 := f.open(t)
 	warn2 := f.violate(t, s2.StoreID, SeverityLow, MeasureWarning, nil)
 	f.now = f.now.Add(8 * 24 * time.Hour)

@@ -66,8 +66,6 @@ func (m *Module) ActiveSessionsOfStore(ctx context.Context, storeID int64, now t
 	})
 }
 
-// 結束摘要的「履約、金流」計數以子字串比對動作（設計書 56 §8.1.0 的禁區清單）：要偵測的是只有封鎖被打穿之後才會出現
-// 的動作，名稱今天不存在，列舉登錄的 19 個動作只會得到恆為零的計數。
 var (
 	fulfillmentAreaTerms = []string{"fulfillment", "shipment", "cancel"}
 	financeAreaTerms     = []string{"refund", "payment", "finance"}
@@ -96,7 +94,6 @@ func (m *Module) DelegationSessionSummary(ctx context.Context, id int64) (model.
 		return model.DelegationSummary{}, fmt.Errorf("delegation：計算代行摘要：%w", err)
 	}
 	now := m.d.Now()
-	// 三個候選取最早的：撤銷或主動結束的時刻、閒置逾時時的最後活動、hard 到期。都沒有時是現在（還在進行）。
 	end := now
 	if s.EndedAt != nil && s.EndedAt.Before(end) {
 		end = *s.EndedAt
@@ -137,7 +134,6 @@ func (m *Module) DelegationSessions(ctx context.Context, f model.DelegationSessi
 	case f.StoreID != nil && *f.StoreID <= 0:
 		return model.DelegationSessionPage{}, model.Deny(model.DenialInvalidCommand, "targetStoreId 不正確")
 	case f.DisplayCode != "" && !validDisplayCode(f.DisplayCode):
-		// 打錯的代號回 9260，不是一頁空白（讀起來像「沒有這個代行」）。
 		return model.DelegationSessionPage{}, model.Deny(model.DenialInvalidCommand, "displayCode 格式不正確")
 	}
 	if err := model.ValidateRange(f.From, f.To); err != nil {
@@ -181,7 +177,6 @@ func (m *Module) DelegationSessions(ctx context.Context, f model.DelegationSessi
 	return page, nil
 }
 
-// validDisplayCode 是 display_code 的形狀（DB 的 delegated_operation_sessions_display_code_check）。
 func validDisplayCode(s string) bool {
 	if len(s) != 17 || s[:4] != "OPS-" {
 		return false

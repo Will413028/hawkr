@@ -16,15 +16,9 @@ func TestCartClient_CtxWithAccount_SurvivesAuthMetadataInterceptor(t *testing.T)
 
 	baseCtx := WithAuthContext(context.Background(), rawAccountID, "3")
 
-	// Simulate a cart handler resolving buyer_id and calling into CartClient
-	// with the resolved value (mirrors cart.go's resolveCartBuyerID +
-	// CartClient.AddItem call chain).
 	rpcCtx, cancel := ctxWithAccount(baseCtx, time.Second, resolvedBuyerID)
 	defer cancel()
 
-	// AuthMetadataInterceptor runs on every outgoing call via
-	// DefaultDialOpts — invoke it directly to see what actually reaches the
-	// wire, the same way grpc-go's interceptor chain would.
 	intercept := AuthMetadataInterceptor()
 	var captured context.Context
 	invoker := func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, opts ...grpc.CallOption) error {

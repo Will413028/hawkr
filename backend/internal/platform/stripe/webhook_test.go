@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-// clock 是測試開始時的真實時間：SDK 以系統時間驗時間戳，所以簽章用它起算，邊界測試離容許值留 10 秒餘裕。
 var clock = time.Now()
 
 func webhookClient(t *testing.T) *Client {

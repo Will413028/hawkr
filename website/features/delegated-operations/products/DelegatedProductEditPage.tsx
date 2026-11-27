@@ -98,9 +98,6 @@ export default function DelegatedProductEditPage({
 	const scope = useSellerDataScope();
 	const { summary, hasCapability } = useDelegatedSession();
 	const storeId = scope.ownerStoreId ?? summary?.target.storeId ?? "";
-	// 確認抽屜的提示卡要指名店家（§6.5）。情境列是畫面上唯一寫著店名的地方，而它
-	// 不 sticky —— 捲到下半段再開抽屜時，這一句就是操作者確認「是不是這一家」的
-	// 唯一憑據。
 	const targetStore = targetStoreLabel(summary?.target.storeName, storeId);
 	const repo = React.useMemo(
 		() => createDelegatedProductEditRepo(storeId),
@@ -204,9 +201,6 @@ export default function DelegatedProductEditPage({
 		try {
 			hydrate(await repo.detail(productId));
 		} catch (e) {
-			// 讀取失敗要留下的是**業務碼分類**，不是那句組好的字串：「找不到／不屬於
-			// 本店」與「上游暫時掛掉」對操作者是兩個完全不同的下一步，而 message 把
-			// 它們攤平成同一句話。
 			setLoadFailure(classifyDelegatedLoadFailure(e));
 			setError(e instanceof Error ? e.message : "載入商品失敗");
 		} finally {
@@ -296,8 +290,6 @@ export default function DelegatedProductEditPage({
 	);
 
 	const handleFailure = React.useCallback((e: unknown) => {
-		// 9266 是版本衝突：賣家（或另一個管理員）在這段期間改過同一個商品。它與一般
-		// 欄位驗證要分開呈現，否則操作者會以為「再按一次」就好，而再按一次仍然是 9266。
 		if (e instanceof ApiClientError && e.code === 9266) {
 			setConflict(true);
 			setError(null);
@@ -311,7 +303,6 @@ export default function DelegatedProductEditPage({
 		const decision = await scope.confirmMutation({
 			title: "檢視變更並儲存",
 			intent: `以 ADM 身分替「${targetStore}」編輯「${detail.name || "未命名商品"}」`,
-			// 動到認證標章時多一句法規宣稱的提醒（§4.1 高風險確認要求的第二道）。
 			hint: "請確認以下變更內容無誤後儲存。",
 			reasonPlaceholder: "例：協助修正商品說明與售價",
 			changes,
@@ -326,7 +317,6 @@ export default function DelegatedProductEditPage({
 				...decision.meta,
 				expectedVersion: detail.version,
 			} satisfies DelegatedMutationMeta);
-			// 版本在寫入後一定變了：不重抓就會讓下一次送出必然撞 9266。
 			hydrate(await repo.detail(productId));
 		} catch (e) {
 			handleFailure(e);
@@ -343,10 +333,6 @@ export default function DelegatedProductEditPage({
 			intent: `以 ADM 身分替「${targetStore}」${publish ? "上架" : "下架"}「${
 				detail.name || "未命名商品"
 			}」`,
-			// `/publish`／`/unpublish` 的 body 只有共通三欄，變更恆為 `status` 單一欄位，
-			// 所以這張表只有一列 —— 但 §4.1 對 `ADMIN_PRODUCT_PUBLISH` 的確認要求是
-			// 「diff＋二次確認＋通知」，一列不等於不畫。庫存不在這裡：那是 PATCH，另一支
-			// 端點、另一個 capability、另一筆稽核列（B5）。
 			changes: [shelfStatusChange(detail, target)],
 			hint: `這是與內容修改分開的一次寫入，會另外產生一筆代行紀錄。`,
 			reasonPlaceholder: publish
@@ -411,8 +397,6 @@ export default function DelegatedProductEditPage({
 	}
 
 	if (!detail) {
-		// capability 不足與「讀不到這筆」是兩件事：前者整個面都不該出現，後者只是這一
-		// 筆。共用一個畫面會讓操作者以為店裡沒有這個商品。
 		if (loadFailure === "denied") {
 			return (
 				<DelegatedAreaUnauthorized
@@ -426,9 +410,7 @@ export default function DelegatedProductEditPage({
 		return (
 			<section className="adm-panel">
 				<h1 className="adm-panel__title">{failure.title}</h1>
-				{/* 這裡刻意**不印** `error`：那句話是 `代行請求失敗（HTTP 502／代碼
-				    UPSTREAM_FAILURE）`，對操作者既不可行動、也不穩定（9280 正在從 502
-				    改成 424）。要診斷的人看 log 的 traceId，不是看畫面。 */}
+
 				<p className="adm-panel__hint">{failure.hint}</p>
 				{failure.retryable ? (
 					<button
@@ -441,9 +423,6 @@ export default function DelegatedProductEditPage({
 				) : null}
 				<Link
 					href={productsHref}
-					// 上面那顆「重新載入」是 `<button>`，dark 的 `body a:not(…)` 不會打到它；
-					// 這顆是 `<a>`，少了 `data-hkui-button` 就只有它的白字被換成 `--color-ink-200`，
-					// 於是同一排兩顆同款鈕字色不同。
 					data-hkui-button=""
 					className="adm-blocked__link"
 				>
@@ -473,13 +452,7 @@ export default function DelegatedProductEditPage({
 				subtitle={`商品管理 / ${detail.name || "未命名商品"}`}
 				actions={
 					<>
-						{/* 買家視角預覽（56 號 §2.2 第 13 列）。
-						    ⚠️ 刻意**不走 `OperationConfirmDrawer`**：那支關卡強制收
-						    `operationReason`（每一次代行寫入的必填欄），而預覽是唯讀、不
-						    產生稽核列 —— 為一次唯讀動作要求填寫修改原因，會讓那一欄在操作者
-						    眼中從「這次改了什麼」退化成一道形式手續，代價落在真正的寫入上。
-						    ⚠️ 也不新開分頁：預覽在 `/adm` 之下，同分頁返回才留得住工作階段
-						    的上下文（右上角的情境列與剩餘時間）。 */}
+
 						<Link
 							href={`${productsHref}/${encodeURIComponent(productId)}/preview`}
 							className="seller-orders__btn"
@@ -504,9 +477,7 @@ export default function DelegatedProductEditPage({
 								}
 							</span>
 						</div>
-						{/* 契約明列的兩個出口（L5346）。只給「重新載入」等於要求操作者把剛
-						    才打的字再打一次；只給「複製我的內容」則會變成覆寫賣家的修改 ——
-						    兩顆都在，才是「不覆寫較新的內容」＋「不必白打一次」。 */}
+
 						<div className="adm-conflict__actions">
 							<Button
 								type="button"
@@ -532,9 +503,7 @@ export default function DelegatedProductEditPage({
 				{contentLocked ? (
 					<div className="adm-product-edit__locked" role="note">
 						<AppIcon name="lock" size={16} />
-						{/* 全形逗號後面原本還打了一個半形空白（源碼裡的字，不是換行折出來的，
-						    所以 check-jsx-cjk-linebreak 看不到它）。順手拿掉，其餘空白照舊：
-						    「規則 3019」與破折號兩側的空白都是刻意的。 */}
+
 						<span>
 							{
 								"上架中的商品內容不可編輯（後端規則 3019）。請先按「檢視變更並下架」，修改後再上架 —— 上下架與內容修改本來就是分開的兩次寫入。"
@@ -605,9 +574,7 @@ export default function DelegatedProductEditPage({
 								))}
 								{editable && images.length < IMAGE_MAX ? (
 									<li className="adm-product-edit__image-add">
-										{/* 走共用 Button 的 loading 契約：原生 button 自己畫「上傳中…」是
-									    `button-loading-contract` 明令的違規（那個文案的唯一合法出處是
-									    共用元件的 `loadingLabel`）。 */}
+
 										<Button
 											type="button"
 											variant="light"
@@ -653,8 +620,6 @@ export default function DelegatedProductEditPage({
 									noResultsLabel="找不到符合的分類"
 									value={path[0] || undefined}
 									onChange={(id: string) => {
-										// 上層一改，下層的既有選擇就不再成立；`categoryId` 一併清空，
-										// 避免「看起來已改分類、其實還送著舊的葉節點」。
 										setCategoryId("");
 										setPath([id, "", ""]);
 									}}
@@ -695,8 +660,6 @@ export default function DelegatedProductEditPage({
 								/>
 							</div>
 							{categoryQuery.isError ? (
-								// 樹載不到時分類不可改，但要說清楚「目前是什麼、不動就不會被送出」——
-								// 三個空下拉單獨出現，看起來像分類被清掉了。
 								<p className="adm-product-edit__error" role="alert">
 									分類暫時無法載入，請稍後再試。目前分類為「
 									{detail.categoryName || detail.categoryId || "未設定"}
@@ -704,8 +667,6 @@ export default function DelegatedProductEditPage({
 								</p>
 							) : null}
 							{path[0] !== "" && categoryId === "" ? (
-								// 選到一半的路徑不會送出任何 categoryId（空值是 9260）。不說的話
-								// 畫面顯示新分類、送出後分類沒變，而三欄表也不會有這一列。
 								<p className="adm-product-edit__note" role="status">
 									分類尚未選到最後一層，本次不會變更商品分類。
 								</p>
@@ -782,8 +743,6 @@ export default function DelegatedProductEditPage({
 											onChange={(e) => patchSku({ stockQty: e.target.value })}
 											disabled={!editable}
 											endContent={
-												// D1：單位是 SKU 層的 CodeMeta 值（`WeightUnit`），不是可以
-												// 自由填寫的中文字。這裡唯讀顯示它的 Label。
 												<span className="adm-product-edit__affix">
 													單位：{unitText(sku.unit)}
 												</span>
@@ -842,8 +801,7 @@ export default function DelegatedProductEditPage({
 									status={detail.status}
 									statusLabel={statusLabel}
 								/>
-								{/* 動作按鈕在 capability 不足時**不渲染**（不是 disabled，L3857）。
-								    上／下架是獨立的一次寫入，與上面的內容修改分開送（B5）。 */}
+
 								{canPublish && shelfState !== "review" ? (
 									<Button
 										type="button"

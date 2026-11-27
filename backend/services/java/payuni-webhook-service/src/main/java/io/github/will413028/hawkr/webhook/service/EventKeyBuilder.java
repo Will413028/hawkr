@@ -28,7 +28,6 @@ public final class EventKeyBuilder {
         String merId = payload.getOrDefault("MerID", "UNKNOWN");
         return switch (type) {
             case SHIPPING_STATUS -> {
-                // 貨態更新有 ShipStatus；建單結果只有 TradeStatus
                 String statusValue = payload.getOrDefault("ShipStatus", "");
                 if (statusValue.isEmpty()) {
                     statusValue = payload.getOrDefault("TradeStatus", "");
@@ -48,7 +47,6 @@ public final class EventKeyBuilder {
                     merId,
                     payload.getOrDefault("MerStatus", ""),
                     payload.getOrDefault("ExecuteTime", ""));
-            // UNKNOWN：使用 timestamp 確保唯一，避免去重 UNIQUE 衝突
             case UNKNOWN -> merId + ":UNKNOWN:" + System.currentTimeMillis();
         };
     }

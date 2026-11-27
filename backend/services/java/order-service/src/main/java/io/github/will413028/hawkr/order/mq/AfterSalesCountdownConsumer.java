@@ -70,11 +70,8 @@ public class AfterSalesCountdownConsumer {
                         "未預期的 routing key，ACK skip", "routingKey", routingKey);
             } else {
                 switch (AfterSalesEventType.fromValue(routingKey)) {
-                    // 暫停
                     case CASE_APPLIED, APPEAL_SUBMITTED, CASE_AUTO_ESCALATED ->
                             countdownService.pause(orderNo, routingKey);
-                    // 恢復（嘗試）；REFUND_COMPLETED 已收斂至 AfterSalesEventConsumer（ORD-02），
-                    // broker 舊 binding 殘留的訊息落 default 分支 ACK skip
                     case CASE_REJECTED, CASE_AUTO_REJECTED, CASE_CANCELLED_BY_BUYER,
                          CASE_COUPON_COMPENSATED, PLATFORM_DECISION_MADE,
                          CASE_AUTO_COMPLETED_RETURN_PENDING_TIMEOUT ->

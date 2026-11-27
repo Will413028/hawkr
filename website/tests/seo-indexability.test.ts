@@ -13,7 +13,7 @@ test("public storefront paths are indexable", () => {
 	assert.equal(isIndexable("/"), true);
 	assert.equal(isIndexable("/market/products"), true);
 	assert.equal(isIndexable("/products/123"), true);
-	assert.equal(isIndexable("/seller"), true); // public become-a-seller funnel
+	assert.equal(isIndexable("/seller"), true);
 	assert.equal(isIndexable("/sellers/9"), true);
 });
 
@@ -33,7 +33,6 @@ test("private / thin paths are not indexable", () => {
 });
 
 test("the public /seller funnel is not mistaken for /seller-center", () => {
-	// guards the startsWith boundary: "/seller" must NOT match "/seller-center"
 	assert.equal(PRIVATE_PREFIXES.includes("/seller-center"), true);
 	assert.equal(isIndexable("/seller"), true);
 });
@@ -92,6 +91,5 @@ test("UGC prefixes match on a segment boundary: /sellers is UGC, /seller-guide a
 test("a private page is not indexable in any locale", () => {
 	assert.equal(isIndexable("/account", "en"), false);
 	assert.equal(isIndexable("/seller-center/orders", "en"), false);
-	// the locale rule is only the part the locale adds
 	assert.equal(isLocaleNoindex("/account", "en"), false);
 });

@@ -27,13 +27,6 @@ export function correctionResultNotice(result: {
 	const base = result.statusNotice || "已收到你的修改申請。";
 	const label = INVOICE_CORRECTION_REJECT_REASON_LABEL[result.rejectReasonCode];
 	if (!label) return base;
-	// 後端那句以「，請見下方原因」收尾（指向這裡要接上的東西）。直接串會變成
-	// 「請見下方原因原因：已存在折讓。」——2026-09-05 dev 實拍到的就是這個。
-	// 剝掉那個引導句再接，讀起來才是一句話。
-	//
-	// ⚠️ 這條正則綁的是後端當下的措辭。後端改字時它會安靜地不匹配，退化成
-	// 「…請見下方原因原因：X。」——**難看但不是錯的**（理由仍然看得到），
-	// 刻意選這個退化方向，而不是用「後端沒說對就不顯示理由」那種會把資訊藏起來的寫法。
 	const lead = base.replace(/[，,]?\s*請見下方原因[。.]?\s*$/u, "");
 	const joiner = lead === base ? "" : "。";
 	return `${lead}${joiner}原因：${label}。`;

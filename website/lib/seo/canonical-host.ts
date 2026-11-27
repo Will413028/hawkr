@@ -45,7 +45,6 @@ function isLoopbackHost(hostname: string): boolean {
 /** Lower-cased hostname without the port, for the `Host` header's shapes. */
 function hostnameOf(host: string): string {
 	const trimmed = host.trim().toLowerCase();
-	// IPv6 literals keep their brackets; only a trailing `:port` is stripped.
 	if (trimmed.startsWith("[")) {
 		const close = trimmed.indexOf("]");
 		return close === -1 ? trimmed : trimmed.slice(0, close + 1);

@@ -54,7 +54,6 @@ class RefundTaskWorkerClaimTest {
 
     @BeforeAll
     static void initLambdaCache() {
-        // LambdaUpdateWrapper 需要 MyBatis-Plus 的 lambda column cache 才能解析 method reference
         MybatisConfiguration config = new MybatisConfiguration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(config, "");
         TableInfoHelper.initTableInfo(assistant, RefundTaskEntity.class);
@@ -84,8 +83,6 @@ class RefundTaskWorkerClaimTest {
 
     @Test
     void claimLost_doesNotCallCreateRefund() {
-        // 租約由另一個 pod 持有 ⇒ 本 pod 不得打 PayUni。
-        // 沒有這一支斷言，claim 閘門形同虛設（Mockito int 預設 0 只會讓上面那支紅）。
         when(refundTaskMapper.update(any(), any())).thenReturn(0);
 
         worker.processRefundTasks();

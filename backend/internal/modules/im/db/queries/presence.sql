@@ -1,10 +1,8 @@
--- 串流的存活標記（presence 與並行上限）與 NOTIFY。時間只由 SQL 的 now() 產生與比較，沒有時間參數。
 
 -- name: Notify :exec
 SELECT pg_notify('im_events', sqlc.arg(payload)::text);
 
 -- name: LockPartyStreams :exec
--- 同一個 Party 的訂閱以 transaction 層級的 advisory lock 序列化（不鎖業務列，不在鎖序裡）。
 SELECT pg_advisory_xact_lock(hashtextextended('im.streams:' || sqlc.arg(kind)::text || ':' || sqlc.arg(party_id)::bigint::text, 0));
 
 -- name: CountLivePartyStreams :one
@@ -16,7 +14,6 @@ INSERT INTO im.presence_streams (stream_id, kind, party_id, expires_at)
 VALUES (sqlc.arg(stream_id), sqlc.arg(kind), sqlc.arg(party_id), now() + sqlc.arg(ttl_ms)::bigint * interval '1 millisecond');
 
 -- name: ExtendPresenceStreams :execrows
--- 延長仍在跑的串流的存活期；列被清掉（過期超過清理門檻、或資料庫重啟後 UNLOGGED 表是空的）的串流以同一句補回，所以仍被計數、仍顯示在線。
 INSERT INTO im.presence_streams (stream_id, kind, party_id, expires_at)
 SELECT a.stream_id, k.kind, p.party_id, now() + sqlc.arg(ttl_ms)::bigint * interval '1 millisecond'
 FROM unnest(sqlc.arg(ids)::uuid[]) WITH ORDINALITY AS a(stream_id, n)
@@ -28,8 +25,6 @@ ON CONFLICT (stream_id) DO UPDATE SET expires_at = EXCLUDED.expires_at;
 DELETE FROM im.presence_streams WHERE stream_id = ANY(sqlc.arg(ids)::uuid[]);
 
 -- name: PresenceForParty :many
--- 一次處理整批對話的在線狀態：只回呼叫者這一方的對話（授權的述詞；缺列由呼叫端判成 NotFound），對方是否已關閉或退場、買家是否封鎖了店、
--- 對方是否有未過期的串流。對方的 kind 由呼叫者的 kind 決定；時間只用資料庫的 now()。店家封鎖買家在 seller，由呼叫端另查。
 SELECT c.id, c.buyer_id, c.store_id,
        (CASE WHEN sqlc.arg(kind)::text = 'BUYER'
              THEN EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)

@@ -50,7 +50,6 @@ export async function listLatestMessages(
 		conversationId,
 		pageSize: MESSAGES_PAGE_SIZE,
 	});
-	// 伺服器預設 seq 由大到小，畫面由舊到新。
 	return {
 		messages: res.messages.map(messageFromProto).reverse(),
 		hasMore: res.hasMore,

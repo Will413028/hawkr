@@ -73,7 +73,6 @@ class SellerCancelServiceTest {
         try {
             TsidUtil.init(700, 0);
         } catch (IllegalStateException alreadyInitialized) {
-            // 同一個 JVM 內已由其他測試初始化，忽略
         }
     }
 
@@ -100,20 +99,6 @@ class SellerCancelServiceTest {
     void cancelShipment_callerIdMatchesOrderStoreId_proceedsPastOwnershipCheck() {
         when(cancelMapper.selectCount(any())).thenReturn(0L);
 
-        // Downstream order fields (buyerId, totalActualAmount, etc.) are
-        // intentionally left unstubbed on the order view, so the flow throws
-        // past the ownership check without needing to stub the entire
-        // downstream flow. The assertThrows/isNotOwnerRejection check alone
-        // only proves the exception wasn't a NOT_OWNER rejection — it does NOT
-        // by itself prove the ownership check was reached (e.g. a regression
-        // in the earlier reason-code validation at cancelShipment's top would
-        // also throw a non-NOT_OWNER RuntimeException and pass that check
-        // vacuously). The verify() below closes that gap: cancelMapper
-        // .selectCount(...) is only invoked after both the ownership check
-        // (store_id match) and the status check succeed, so observing exactly
-        // one call to it proves execution actually passed the ownership check
-        // for a matching id, not merely that some non-NOT_OWNER exception was
-        // thrown.
         RuntimeException ex = assertThrows(
                 RuntimeException.class,
                 () -> service.cancelShipment(ORDER_STORE_ID, "O001", "9202", null));

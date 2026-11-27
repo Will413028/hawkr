@@ -16,22 +16,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// authorityIn 是「這位管理員現在能不能代行這家店」述詞的輸入。述詞是 preflight（開始代行）與排程發布到點重驗共用的唯一一份；
-// 並行上限（管理員或店家已在代行）、TTL、閒置不是授權，不在述詞內。
 type authorityIn struct {
 	AdminID, StoreID int64
 	Now              time.Time
-	// Eligibility 以不鎖的讀取檢查管理員的代行資格。StartDelegation 在自己的 transaction 內鎖著讀，這裡不重複。
 	Eligibility bool
-	// Permission 以不鎖的讀取檢查角色有 delegation.sessions.create。StartDelegation 在 transaction 內以 FOR SHARE 讀（與撤銷角色互相等待），這裡不重複。
 	Permission bool
-	// MissingAdminDenies 為真時管理員不存在是拒絕；否則是錯誤（gateway 從有效的管理員 session 解出的 ID 找不到，是不變量被打破）。
 	MissingAdminDenies bool
-	// Capability 非空時，店家授權的能力要含它。
 	Capability model.Capability
 }
 
-// authorityState 是述詞讀到的事實與結論：Denial 為零表示成立。沒走到的步驟，對應的欄位維持零值。
 type authorityState struct {
 	Admin      identity.Admin
 	Store      model.StoreState
@@ -48,8 +41,6 @@ func (s *authorityState) deny(d model.DelegationDenial) {
 	s.Denial, s.Label = d, model.DeniedLabel(d)
 }
 
-// checkAuthority 依序判斷：管理員存在、開通資格、角色權限、店家存在、授權存在、店家可營運、授權有效、授權含指定能力。所有讀取都不鎖；
-// 讀取失敗回錯誤，不當成拒絕（店家狀態讀取失敗也是 seller 的錯誤）。
 func (m *Module) checkAuthority(ctx context.Context, q *store.Queries, in authorityIn) (authorityState, error) {
 	var s authorityState
 	admin, err := m.d.Identity.Admin(ctx, in.AdminID)
@@ -92,7 +83,6 @@ func (m *Module) checkAuthority(ctx context.Context, q *store.Queries, in author
 	}
 	s.Store, s.StoreFound = st, true
 
-	// 授權在判斷能不能營運之前讀：不允許時 preflight 也要回「這家店會被核發的集合」。
 	auth, err := q.GetDelegationAuthorizationForStore(ctx, in.StoreID)
 	s.HasAuth = err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -100,7 +90,6 @@ func (m *Module) checkAuthority(ctx context.Context, q *store.Queries, in author
 	}
 	s.Auth = auth
 	if !st.Operable {
-		// 句子由 seller 給（StoreActionDelegate 的第一個原因）；沒有句子是程式錯誤，不寫通用句。
 		if st.UnavailableText == "" {
 			return s, fmt.Errorf("delegation：店家 %d 不可營運但 seller 沒有給原因", in.StoreID)
 		}
@@ -111,7 +100,6 @@ func (m *Module) checkAuthority(ctx context.Context, q *store.Queries, in author
 		s.Denial, s.Label = d, st.UnavailableText
 		return s, nil
 	}
-	// 從來沒有開通（9286，引導去開通）與已撤回或到期（9264，引導去重新開通）刻意分開。
 	switch {
 	case !s.HasAuth:
 		s.deny(model.DenialAuthorizationNotFound)

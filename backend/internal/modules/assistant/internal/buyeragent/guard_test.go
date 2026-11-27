@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// fakeInner 是替身的 callable：Run 回傳設定的結果、錯誤，或 panic。
 type fakeInner struct {
 	name   string
 	result map[string]any
@@ -154,7 +153,6 @@ func TestStatusGuideListsExactlyTheOrderStatusCodesOfTheAuthoritativeSource(t *t
 			t.Errorf("狀態碼表多了 %s，CodeMeta 沒有", code)
 		}
 	}
-	// 追蹤 tool 查的狀態集合（D16 第 1 點）：已建物流單、配送中、待取貨、物流異常、已送達、配送失敗未退款。
 	wantTracking := map[string]string{"20": "待出貨", "30": "配送中", "32": "待取貨", "35": "物流異常", "40": "已送達", "54": "配送失敗未退款（終態）"}
 	gotTracking := strings.Split(trackingStatuses, ",")
 	slices.Sort(gotTracking)

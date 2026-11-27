@@ -47,8 +47,6 @@ func (h *Holder) SearchAdminProducts(c *gin.Context) {
 		resolved, err := h.Store.CurrentStoreID(c.Request.Context(), identity.AccountID(ownerID))
 		if err != nil {
 			if errors.Is(err, storeid.ErrNoCurrentStore) {
-				// 該帳號目前沒有現任店（已刪除未重開）→ 沒有「目前」商品可言，
-				// 回空清單而非 403：admin 查詢容許查到「沒店」的帳號。
 				response.Page(c, []ProductItem{}, "0", page, size)
 				return
 			}
@@ -58,7 +56,6 @@ func (h *Holder) SearchAdminProducts(c *gin.Context) {
 		ownerID = int64(resolved)
 	}
 
-	// Hashtag 精確篩選（02 §4.1.3 / §3.9）
 	var hashtags []string
 	if raw := c.DefaultQuery("hashtags", ""); raw != "" {
 		for _, h := range strings.Split(raw, ",") {
@@ -101,7 +98,6 @@ func (h *Holder) SearchAdminProducts(c *gin.Context) {
 			ReviewCount:  p.ReviewCount,
 			StoreID:      p.StoreId,
 			Hashtags:     toHashtagItems(p.Hashtags),
-			// 反正規化欄位（02 §3.2 / §5.14；本期新增，與 /public/products / /app/products 對齊）
 			Stock:           p.StockQty,
 			SalesCount:      p.SalesCount,
 			FavoriteCount:   p.FavoriteCount,

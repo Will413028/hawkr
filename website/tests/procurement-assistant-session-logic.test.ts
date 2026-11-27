@@ -67,9 +67,6 @@ test("deriveStageFromStatus maps CLARIFYING to clarifying and everything else to
 	assert.equal(deriveStageFromStatus("CANDIDATES_READY"), "ready");
 });
 
-// 這支測試是「無限輪詢」這個故障模式的唯一自動化防線：isTerminalCandidateStatus 是
-// useProcurementSession 每 1.5s 一次的輪詢的唯一終止條件，漏判一個終態值就是永遠停在
-// 「正在搜尋候選」——而且 HTTP 一路 200 OK，不會進入任何錯誤狀態。
 test("isTerminalCandidateStatus 認得契約凍結後的終態", () => {
 	assert.equal(isTerminalCandidateStatus("QUEUED"), false);
 	assert.equal(isTerminalCandidateStatus("RUNNING"), false);
@@ -77,9 +74,6 @@ test("isTerminalCandidateStatus 認得契約凍結後的終態", () => {
 	assert.equal(isTerminalCandidateStatus("FAILED"), true);
 });
 
-// 舊值不得再被當成終態。少了這支，把 legacy 分支偷偷加回來不會有任何測試變紅——
-// 而「兩組值並存」正是本波要收掉的過渡狀態。型別已不含這些值，故用 as 繞過型別層，
-// 因為要驗的正是「執行期收到型別外的字串時會怎樣」。
 test("isTerminalCandidateStatus 不再認改名前的舊值", () => {
 	const legacy = ["COMPLETED", "PARTIAL"] as unknown as Array<
 		Parameters<typeof isTerminalCandidateStatus>[0]

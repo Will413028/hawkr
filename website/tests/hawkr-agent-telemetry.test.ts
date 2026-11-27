@@ -177,7 +177,6 @@ test("rail reducer 只接受 authoritative terminal，以 operation epoch 隔離
 	const exactRetryTerminal = observeRailCommit(exactRetryPending.state, {
 		pending: false,
 		visibleStepCount: 0,
-		// 即使測試時鐘解析度讓 timestamp 相同，新 operation 也要獨立發送。
 		terminalObservedAt: 100,
 		terminalOperationGeneration: 2,
 		duplicateStepSuppressedCount: 0,
@@ -368,23 +367,11 @@ test("終態 commit 時前景、rAF 時轉背景，仍送 aggregate 但不送 la
 	assert.equal(calls[0].params.duplicate_step_suppressed_count, 1);
 });
 
-// Source pin，不是行為測試。graph 路徑的接線都寫在 AssistantWorkspace.tsx
-// 的 render body 裡，沒有可獨立呼叫的純函式，所以單元測試碰不到它們的行為。
-// 這些 regex 能做到的只有一
-// 件事：擋住有人把它們改回「只讀 liveSteps／只讀 latestStep」。真正的行為驗
-// 證要靠跑一輪 graph turn 的 e2e。
 test("[source pin] 遙測與小精靈 motion 都看得到 graph 路徑的 Activity", () => {
-	// graph turn 填 liveActivity、legacy turn 填 liveSteps，同輪互斥；只數
-	// liveSteps 會讓 graph turn 的 terminal_rendered 永遠回報 0 列。
-	// 對話現在跨 stage 常駐，候選階段提交修改也會顯示 pending turn 的 rail，
-	// 不能再限於 clarifying／ready。仍須 pendingTurn 才計數，終態不可算舊列；
-	// 搜尋 run 的 searchActivity 不混入 turn terminal 的遙測分母。
 	assert.match(
 		workspace,
 		/const visibleStepCount =\s*session\.pendingTurn\s*\?\s*session\.liveActivity\.length\s*\|\|\s*session\.liveSteps\.length\s*:\s*0;/,
 	);
-	// graph 與 legacy 都只在權威 turn-start 後取狀態；優先進行中列，沒有時
-	// 回退這輪最後一列，不能因活動清單含 PENDING 子列就遺失目前 motion。
 	assert.match(
 		workspace,
 		/const latestActivity = session\.turnStartObserved\s*\?\s*\(lastRunningActivity\(session\.liveActivity\)\s*\?\?\s*session\.liveActivity\.at\(-1\)\s*\?\?\s*null\)\s*:\s*null;/,
@@ -393,7 +380,6 @@ test("[source pin] 遙測與小精靈 motion 都看得到 graph 路徑的 Activi
 		workspace,
 		/const latestStep = session\.turnStartObserved\s*\?\s*\(session\.liveSteps\.findLast\(\(step\) => step\.status === "RUNNING"\)\s*\?\?\s*session\.liveSteps\.at\(-1\)\s*\?\?\s*null\)\s*:\s*null;/,
 	);
-	// 只讀 latestStep?.code 會讓 graph turn 整輪停在 submitting 的表情。
 	assert.match(
 		workspace,
 		/latestStepCode: latestActivity\?\.code \?\? latestStep\?\.code \?\? null,/,

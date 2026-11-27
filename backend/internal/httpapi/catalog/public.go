@@ -145,7 +145,6 @@ func (h *Public) ListCategories(ctx context.Context, _ *connect.Request[pb.ListC
 	return connect.NewResponse(&pb.ListCategoriesResponse{Categories: categoryTree(cats, uitext.LocaleFrom(ctx))}), nil
 }
 
-// categoryTree 把模組回傳的分類（頂層在前、同層依 position）組成兩層的樹。
 func categoryTree(cats []catalog.Category, loc uitext.Locale) []*pb.Category {
 	byParent := map[string][]*pb.Category{}
 	var top []*pb.Category

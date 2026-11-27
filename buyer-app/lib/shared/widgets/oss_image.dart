@@ -73,11 +73,8 @@ class OssImage extends StatelessWidget {
     if (isInlineImageData(imageSource)) {
       url = imageSource.trim();
     } else if (scene != null) {
-      // 配置表模式：使用集中管理的場景 preset
       url = ImageConfig.urlFor(imageSource, scene!);
     } else {
-      // 動態模式：無場景時走 detail preset（長邊 scale-down、不裁切）；
-      // 顯示尺寸交由下方 memCacheWidth 本地降採樣。
       url = buildImageUrl(imageSource, ImagePreset.detail);
     }
 
@@ -90,10 +87,6 @@ class OssImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
-      // 只設 memCacheWidth、不設 memCacheHeight。
-      // 同時指定兩者會讓底層 instantiateImageCodec(targetWidth, targetHeight)
-      // 把點陣圖「強制」解碼成該寬高 → 長寬比被拉歪（首頁商品卡變形主因）。
-      // 只給一邊，decoder 會自動依原圖比例算另一邊；最終裁切/縮放交給外層 BoxFit。
       memCacheWidth: _memCacheWidth(),
       memCacheHeight: null,
       errorWidget: _buildErrorWidget(),

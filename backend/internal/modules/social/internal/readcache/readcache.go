@@ -18,7 +18,6 @@ type Stores interface {
 	Store(ctx context.Context, storeID int64) (seller.Store, error)
 }
 
-// maxPostsPerJob 是一個失效 job 帶的貼文 tag 數（website 的請求上限 64 KiB）。
 const maxPostsPerJob = 200
 
 // Cache 排入失效 job。

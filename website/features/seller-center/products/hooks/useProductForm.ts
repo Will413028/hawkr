@@ -103,14 +103,7 @@ export function useProductForm({
 	const [submitting, setSubmitting] = React.useState(false);
 	const [errors, setErrors] = React.useState<string[]>([]);
 	const submitInFlight = React.useRef(false);
-	// Signature of the gallery as loaded on edit. Lets submit() detect an
-	// untouched gallery and skip re-staging every existing image. `null` until
-	// an edit draft hydrates (create flow never sets it), so create / unhydrated
-	// submits never count as "unchanged".
 	const initialImagesSig = React.useRef<string | null>(null);
-	// Hydrate edit drafts from the API; the create flow keeps emptyDraft.
-	// Exposed as `reload` so the drawer can re-fetch after an unshelf without a
-	// hard page reload.
 	const loadDraft = React.useCallback(async () => {
 		if (mode !== "edit" || !productId) return;
 		setLoading(true);
@@ -188,14 +181,6 @@ export function useProductForm({
 			setErrors([]);
 			let succeeded = false;
 			try {
-				// Gallery images go out as `{ stagedToken }` (new upload) or
-				// `{ assetId }` (an image the product already owns). The backend
-				// rebuilds the whole gallery from exactly this array, so anything left
-				// out is deleted — `resolveStagedImages` must therefore be handed the
-				// complete draft gallery, not just the new entries. Omitting `images`
-				// altogether is the one way to say "unchanged": updateProduct only
-				// touches the gallery when the field is present, so an untouched
-				// gallery skips the array (and any restage work) entirely.
 				const galleryUnchanged =
 					mode === "edit" &&
 					initialImagesSig.current !== null &&
@@ -203,9 +188,6 @@ export function useProductForm({
 				const images = galleryUnchanged
 					? undefined
 					: await resolveStagedImages(draft.images ?? []);
-				// Stock is editable in both create AND edit — the seller can adjust
-				// per-SKU 庫存 straight from the product form (the update payload now
-				// carries `stock`, instead of deferring solely to 庫存管理).
 				const body = draftToSubmitBody(draft, undefined, {
 					includeStock: true,
 					...(images ? { images } : {}),
@@ -215,18 +197,11 @@ export function useProductForm({
 					void invalidateSellerProducts();
 				} else if (productId) {
 					await updateProduct(productId, body);
-					// 後端 updateProduct 忽略 body.status，上下架要另打 PUT /status。
 					if (action === "publish") {
 						await updateProductStatus(productId, "4004");
 					}
 				}
-				// 讓 seller-products query family（Shell 低庫存徽章 + Dashboard 商品數）
-				// 失效並重抓。Drawer 路徑靠父頁 onMutated 也會 invalidate，但全頁路徑
-				// 只 router.push soft-nav，不清 TanStack cache → 不補這行會停在舊清單
-				// （與 Drawer 路徑不對稱）。invalidate 冪等，重複觸發無害。
 				void invalidateSellerProducts();
-				// Drawer: 通知父頁即時重新同步（清單 + 統計卡）；開關抽屜是抽屜自己的
-				// 事（依 truthy 回傳關閉）。Page: 導向商品列表（原行為）。
 				if (onMutated) {
 					setSubmitting(false);
 					onMutated();
@@ -240,7 +215,6 @@ export function useProductForm({
 				setSubmitting(false);
 				return false;
 			} finally {
-				// Keep the guard closed during successful navigation.
 				submitInFlight.current = succeeded;
 			}
 		},
@@ -255,17 +229,12 @@ export function useProductForm({
 		],
 	);
 
-	// 上架商品內容不可改，編輯前必須先下架。status-only，不走 updateProduct。
-	// Drawer: re-fetch in place so the gate lifts and the form becomes editable
-	// without losing the drawer. Page: hard reload (its prior behaviour).
 	const unshelf = React.useCallback(async () => {
 		if (!productId) return;
 		setSubmitting(true);
 		setErrors([]);
 		try {
 			await updateProductStatus(productId, "4003");
-			// 就地重抓讓表單解鎖可編輯，並在抽屜情境通知父頁同步清單與統計。
-			// 獨立編輯頁也沿用同一路徑，避免整頁 reload 清掉步驟與捲動位置。
 			await loadDraft();
 			onMutated?.();
 			setSubmitting(false);

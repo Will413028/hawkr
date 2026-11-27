@@ -60,7 +60,7 @@ def main() -> int:
     ap.add_argument("--today", default=datetime.date.today().isoformat())
     args = ap.parse_args()
 
-    args.module = args.module.removeprefix("./")  # go.work 的 DiskPath 帶 "./"，清單裡不帶
+    args.module = args.module.removeprefix("./")
     messages = load_messages(args.report)
     if not any("progress" in m and "Checking" in m["progress"].get("message", "") for m in messages) and not any(
         "config" in m for m in messages

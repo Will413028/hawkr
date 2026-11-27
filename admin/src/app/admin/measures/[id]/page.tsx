@@ -89,7 +89,6 @@ export default function MeasureDetailPage() {
 	});
 	const measure = detail.data?.measure;
 
-	// 寫入成功後措施（詳情、清單、註記）與店家（active_measures）整組失效。
 	const invalidate = () => {
 		const keys = [
 			createConnectQueryKey({

@@ -28,9 +28,6 @@ List<String> _productImageKeys(Map<String, dynamic> product) {
   final seen = <String>{};
 
   void add(dynamic raw) {
-    // 值依契約恆為 objectKey；仍過 [mediaObjectKey] 還原裸 key，順帶剝掉誤入的
-    // `i/{preset}/` 前綴，避免 #1659 的 double-preset 404。無法還原（外部域名）
-    // 視同無圖。
     final key = mediaObjectKey((raw ?? '').toString());
     if (key.isEmpty) return;
     if (seen.add(key)) keys.add(key);
@@ -42,7 +39,6 @@ List<String> _productImageKeys(Map<String, dynamic> product) {
       add(raw);
     }
   }
-  // 貼文關聯商品只有單數欄位；商品端點的單數 == imageKeys[0]，會被 seen 去重。
   add(product['imageKey']);
 
   return keys;

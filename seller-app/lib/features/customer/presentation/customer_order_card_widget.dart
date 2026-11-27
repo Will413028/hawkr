@@ -43,7 +43,6 @@ class CustomerOrderCardWidget extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Card body
           Container(
             width: double.infinity,
             padding: EdgeInsets.all(16.w),
@@ -64,7 +63,6 @@ class CustomerOrderCardWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Row 1: #orderId + date — w-293 (card minus badge area)
                 Padding(
                   padding: EdgeInsets.only(right: 48.w),
                   child: Row(
@@ -77,7 +75,7 @@ class CustomerOrderCardWidget extends StatelessWidget {
                             fontSize: 16.sp,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
-                            height: 1.5, // lineHeight 24
+                            height: 1.5,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -91,7 +89,7 @@ class CustomerOrderCardWidget extends StatelessWidget {
                             fontSize: 14.sp,
                             fontWeight: FontWeight.w400,
                             color: AppColors.textPrimary.withValues(alpha: 0.8),
-                            height: 1.43, // lineHeight 20
+                            height: 1.43,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -101,7 +99,6 @@ class CustomerOrderCardWidget extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 6.h),
-                // Row 2: items + $amount — w-293
                 Padding(
                   padding: EdgeInsets.only(right: 48.w),
                   child: Row(
@@ -136,7 +133,6 @@ class CustomerOrderCardWidget extends StatelessWidget {
               ],
             ),
           ),
-          // Shield badge — top-right
           Positioned(
             top: -5.h,
             right: 16.w,

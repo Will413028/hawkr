@@ -30,9 +30,6 @@ export function whenDocumentSettled(): Promise<void> {
 			window.removeEventListener("load", trySettle);
 			window.requestAnimationFrame(() => {
 				window.requestAnimationFrame(() => {
-					// Observable proof this barrier released — third-party mounts
-					// gated behind it (GA4, Sonner) are otherwise invisible from
-					// outside this module.
 					root.setAttribute("data-hk-document-settled", "true");
 					resolve();
 				});

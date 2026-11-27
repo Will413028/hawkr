@@ -29,7 +29,6 @@ func TestAddressDetailOf(t *testing.T) {
 			want: "忠孝東路一段1號",
 		},
 		{
-			// 🔴 陰性對照：沒有 city 就整段原樣回。
 			name: "舊資料（address_city 為 NULL）：整段原樣回",
 			p: domain.SellerTaxProfile{
 				BusinessAddress: sp("台北市大安區忠孝東路一段1號"),
@@ -74,7 +73,6 @@ func TestToSellerTaxIdentity_SplitsAddress(t *testing.T) {
 		t.Fatalf("detail 應只剩詳細地址，實得 %q", got.GetAddressDetail())
 	}
 
-	// 舊資料：三格加起來仍等於原本那一整段，一個字都不能少。
 	old := toSellerTaxIdentity(domain.SellerTaxProfile{
 		BusinessAddress: sp("台北市大安區忠孝東路一段1號"),
 	})

@@ -13,7 +13,6 @@ class ProductRepository with ApiRequestHelper {
   @override
   Dio get dio => _dio;
 
-  // ── 商品列表 ─────────────────────────────────────────
 
   Future<Map<String, dynamic>> getMyProducts({
     int page = 1,
@@ -31,7 +30,6 @@ class ProductRepository with ApiRequestHelper {
     );
   }
 
-  // ── 商品 CRUD ────────────────────────────────────────
 
   Future<Map<String, dynamic>> createProduct({
     required String idempotencyKey,
@@ -124,13 +122,11 @@ class ProductRepository with ApiRequestHelper {
     );
   }
 
-  // ── 商品詳情 ─────────────────────────────────────────
 
   Future<Map<String, dynamic>> getProductSkus(dynamic productId) async {
     return apiGet('/api/v1/app/products/$productId/skus');
   }
 
-  // ── 配送計算 ──────────────────────────────────────────
 
   /// 取得賣家可用的配送方式（含 onboarding 狀態）
   /// GET /app/shipping_methods
@@ -169,7 +165,6 @@ class ProductRepository with ApiRequestHelper {
     );
   }
 
-  // ── 商品詳情 ─────────────────────────────────────────
 
   /// 取得超商門市地圖參數（PayUni Form POST）
   /// POST /app/store_map_sessions
@@ -188,7 +183,6 @@ class ProductRepository with ApiRequestHelper {
     return apiGet('/api/v1/app/products/$productId');
   }
 
-  // ── 分類 ─────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> fetchCategories({
     bool forceRefresh = false,
@@ -255,19 +249,16 @@ class ProductRepository with ApiRequestHelper {
     return [];
   }
 
-  // ── 商家商品列表 ──────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getSellerProducts(String sellerId) async {
     final result = await getMyProducts();
     final data = result['data'];
-    // data 是 {"records":[...],"total":N,...} 分頁結構
     if (data is Map<String, dynamic>) {
       final records = data['records'];
       if (records is List) {
         return records.cast<Map<String, dynamic>>();
       }
     }
-    // 向後相容：如果 data 直接是 List
     if (data is List) {
       return data.cast<Map<String, dynamic>>();
     }

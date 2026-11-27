@@ -47,7 +47,6 @@ const (
 	backoffBase = time.Minute
 	backoffMax  = time.Hour
 	runTimeout  = 4 * time.Minute
-	// stopMargin 是 job 時限前多久不再認領新的一批；failTimeout 是 ctx 取消後記錄失敗的時限。
 	stopMargin  = 15 * time.Second
 	failTimeout = 10 * time.Second
 )
@@ -130,7 +129,6 @@ func (s *Service) stopping(ctx context.Context) bool {
 	return ok && time.Until(dl) < stopMargin
 }
 
-// process 處理一個認領的商品：成功（含商品不存在）就在同 transaction 內收尾；失敗回滾後在同列記失敗。
 func (s *Service) process(ctx context.Context, c claimed) error {
 	procErr := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		if err := s.project(ctx, c.productID); err != nil {
@@ -147,7 +145,6 @@ func (s *Service) process(ctx context.Context, c claimed) error {
 	return s.fail(ctx, c, procErr)
 }
 
-// project 在一個 transaction 內重算一個商品：先鎖 catalog 商品列（下層，之後讀 review 不再往下層等鎖），無鎖讀統計，與目前的不同才寫入並清快取。
 func (s *Service) project(ctx context.Context, productID uuid.UUID) error {
 	cur, err := s.d.Catalog.LockProduct(ctx, productID)
 	if err != nil {
@@ -167,7 +164,6 @@ func (s *Service) project(ctx context.Context, productID uuid.UUID) error {
 	return s.bust(ctx, cur.StoreID, productID)
 }
 
-// bust 排商品頁與店家頁的快取失效（店家頁的商品卡顯示評分與則數）；店家已不存在就只排商品頁。必須在 transaction 內呼叫。
 func (s *Service) bust(ctx context.Context, storeID int64, productID uuid.UUID) error {
 	tags := []string{revalidate.ProductTag(productID)}
 	st, err := s.d.Stores.Store(ctx, storeID)
@@ -181,7 +177,6 @@ func (s *Service) bust(ctx context.Context, storeID int64, productID uuid.UUID) 
 	return s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: tags}, nil)
 }
 
-// settle 在處理的 transaction 內收尾：seq 與 claim_token 都沒變就刪列；刪不到就重排（處理中又有新請求）或放手（租約已被接手）。
 func (s *Service) settle(ctx context.Context, c claimed) error {
 	n, err := s.q(ctx).FinishRatingRecompute(ctx, store.FinishRatingRecomputeParams{ProductID: c.productID, Seq: c.seq, ClaimToken: c.token})
 	if err != nil {
@@ -193,7 +188,6 @@ func (s *Service) settle(ctx context.Context, c claimed) error {
 	return nil
 }
 
-// rearm 放掉租約、立即到期，讓下一輪重做；失敗次數保留。claim_token 不是自己的（租約已被別人接手，或列已被處理掉）回 0 列：不動，記一筆警告。
 func (s *Service) rearm(ctx context.Context, c claimed, due time.Time) error {
 	n, err := s.q(ctx).RearmRatingRecompute(ctx, store.RearmRatingRecomputeParams{ProductID: c.productID, DueAt: due, ClaimToken: c.token})
 	if err != nil {
@@ -205,8 +199,6 @@ func (s *Service) rearm(ctx context.Context, c claimed, due time.Time) error {
 	return nil
 }
 
-// fail 在處理的 transaction 之外記失敗（ctx 已取消也要記：脫離取消、給短時限）：同列次數加一、退避，達上限停手；
-// seq 變了（處理中有新請求）改為重排，claim_token 不是自己的（租約已被接手）不動。
 func (s *Service) fail(ctx context.Context, c claimed, procErr error) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), failTimeout)
 	defer cancel()

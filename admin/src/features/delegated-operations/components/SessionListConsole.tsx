@@ -113,8 +113,6 @@ export default function SessionListConsole() {
 		filters.storeId === "" &&
 		filters.dateFrom === "" &&
 		filters.dateTo === "";
-	// 「重設」要連**還沒套用的草稿**一起清掉，否則按完之後篩選框裡還留著字，而列表
-	// 已經是全集——兩者互相矛盾，正是這一頁最該避免的狀態。
 	const hasFilters = displayCode !== "" || !isBlank(applied);
 	const canReset = hasFilters || !isBlank(draft);
 
@@ -159,7 +157,6 @@ export default function SessionListConsole() {
 			}
 		}
 		if (draft.dateFrom && draft.dateTo && draft.dateFrom > draft.dateTo) {
-			// 後端對顛倒的區間回 9260。先擋下來，錯誤訊息才說得出是哪裡錯。
 			setFilterError("起始時間不得晚於結束時間。");
 			return;
 		}
@@ -187,9 +184,7 @@ export default function SessionListConsole() {
 					</p>
 				</div>
 				<div className="adm-audit-header-actions">
-					{/* 跨工作階段視角的入口（backend#2740）。兩者不互相取代：這一頁答
-					    「誰代行了哪些店」，那一頁答「這家店／這位管理員歷來被改過什麼」。
-					    端點在 PR #2723 就交付了，缺的一直是這顆按鈕。 */}
+
 					<Link
 						className="adm-audit-detail-trigger"
 						href="/admin/delegated-operations/audit-logs"
@@ -323,8 +318,7 @@ export default function SessionListConsole() {
 					</div>
 				)}
 
-				{/* 時間篩選比對的是 `issuedAt`（建立時刻），不是結束時刻——不講明的話，
-				    「昨天結束的那一場」用昨天的區間會查不到。 */}
+
 				<p className="adm-audit-summary-note">
 					時間區間比對工作階段的<strong>開始時間</strong>。
 				</p>
@@ -389,9 +383,7 @@ export default function SessionListConsole() {
 													<span>案件編號 {record.caseReference}</span>
 												)}
 											</td>
-											{/* 授權範圍是「這次代行拿到什麼權限」，而它正是回看時第一個
-											    要問的問題。逐項列出而不是只給數量：「6 項能力」讀不出
-											    到底包不包含上架。 */}
+
 											<td className="adm-audit-col-summary">
 												{record.capabilities.length === 0
 													? "—"

@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// b2bThreeLines 造出 §5A.9.4 的實例：三行各 300 元、全應稅、B2B。
 func b2bThreeLines(t *testing.T) (*IssueDraft, AllowanceContext) {
 	t.Helper()
 	d := newExampleDraft(t, []exItem{
@@ -74,7 +73,6 @@ func TestAllowance_SecondPartialUsesRemainingBase(t *testing.T) {
 	if err := first.Validate(); err != nil {
 		t.Fatalf("first validate: %v", err)
 	}
-	// 寫回 allowanced_amount（usecase 在同一交易內做的事）。
 	for _, al := range first.Lines {
 		lines[al.SourceLineSeq-1].AllowancedAmount += al.GrossAmount
 	}
@@ -192,7 +190,7 @@ func TestAllowanceDraftValidate_MutationPerAssertion(t *testing.T) {
 		}},
 		{"A18 尾差吸收後金額為負", CodeAllowanceTaxMismatch, func(d *AllowanceDraft) {
 			d.Lines[0].Tax += d.Lines[0].Amount + 5
-			d.Lines[0].Amount = -5 // 維持 A16（Amount + Tax 不變）
+			d.Lines[0].Amount = -5
 		}},
 		{"A18 全額折讓稅額不等於原發票", CodeAllowanceTaxMismatch, func(d *AllowanceDraft) {
 			d.Context.DocumentTaxAmount = 44
@@ -223,7 +221,7 @@ func TestAllowanceDraftValidate_MutationPerAssertion(t *testing.T) {
 		})
 		covered[tc.code] = struct{}{}
 	}
-	for i := 15; i <= 18; i++ { // A16–A19
+	for i := 15; i <= 18; i++ {
 		if _, ok := covered[allInvariantCodes[i]]; !ok {
 			t.Errorf("A%d (%s) has no mutation case", i+1, allInvariantCodes[i])
 		}

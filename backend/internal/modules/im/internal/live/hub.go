@@ -96,7 +96,6 @@ func (c Config) withDefaults() Config {
 	return c
 }
 
-// partyKey 含 kind：buyer_id 5 與 store_id 5 是不同的 Party。
 type partyKey struct {
 	kind model.PartyKind
 	id   int64
@@ -211,7 +210,6 @@ func (h *Hub) all() []*Subscription {
 	return out
 }
 
-// endAll 以 reason 結束本進程所有訂閱，並一次刪掉它們的存活標記。
 func (h *Hub) endAll(reason EndReason) {
 	subs := h.all()
 	if len(subs) == 0 {
@@ -227,7 +225,6 @@ func (h *Hub) endAll(reason EndReason) {
 	}
 }
 
-// shutdown 結束所有訂閱並拒絕之後的 Subscribe。
 func (h *Hub) shutdown() {
 	h.mu.Lock()
 	h.down = true
@@ -235,7 +232,6 @@ func (h *Hub) shutdown() {
 	h.endAll(EndShutdown)
 }
 
-// dispatch 把一則通知交給本進程裡相關的訂閱者；sub 的 mark 永不阻塞。
 func (h *Hub) dispatch(raw string) {
 	h.received.Add(1)
 	p, conv, err := Decode(raw)
@@ -274,7 +270,6 @@ func (h *Hub) dispatch(raw string) {
 	}
 }
 
-// epoch 在監聽連線重連成功後通知每個訂閱補洞；lastOK 是前一條連線最後確認存活的資料庫時間，補洞起點往回放 model.RecoveryMargin。
 func (h *Hub) epoch(lastOK time.Time) {
 	since := lastOK.Add(-model.RecoveryMargin)
 	for _, s := range h.all() {
@@ -296,8 +291,6 @@ func (h *Hub) Run(ctx context.Context, dial Dial) error {
 	return nil
 }
 
-// beatLoop 每 PresenceBeat 延長本進程所有串流的存活標記；連續 2 次失敗（下一次就可能過期）就結束本進程所有訂閱，
-// 讓全域並行上限不因延長失敗而放寬，client 依游標重連。
 func (h *Hub) beatLoop(ctx context.Context) {
 	tick, stop := h.cfg.NewTicker(h.cfg.PresenceBeat)
 	defer stop()

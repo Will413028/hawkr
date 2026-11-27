@@ -87,24 +87,21 @@ Future<void> _initializeFirebaseMessaging() async {
     HKLog.logI('Firebase Messaging 初始化成功');
   } catch (e, stackTrace) {
     HKLog.logE('Firebase Messaging 初始化失敗', e, stackTrace);
-    // Messaging 失敗不阻止 app 運行
   }
 }
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // 禁止 GoogleFonts 於執行時抓遠端字型，避免桌面環境封網導致閃退
   GoogleFonts.config.allowRuntimeFetching = false;
 
   final flavor = _resolveFlavorFromEnv();
-  // API 主機是必要設定：stage 與 prod 缺少 GATEWAY_HOST 時在 runApp 前直接失敗。
   flavor.requireCoreConfig();
 
   SentryFlutter.init(
     (options) {
       options.dsn = flavor.sentryDsn;
       options.environment = flavor.name;
-      options.tracesSampleRate = 0; // error-only rollout；不開 performance tracing
+      options.tracesSampleRate = 0;
       options.sendDefaultPii = false;
       options.beforeSend = (event, hint) => scrubSentryEvent(event, hint);
     },
@@ -129,17 +126,11 @@ Future<void> _requestNotificationPermissionAndToken() async {
 }
 
 Future<Widget> _bootstrapApplication() async {
-  // ============ E2E auth inject（debug build only）============
-  // `--dart-define=E2E_AUTH_TOKEN=<token>` 以固定的 Bearer 取代 identity 的 session token（見
-  // auth_session_provider.dart），GetSession 讀取對應的帳號。release build 不讀它。
   if (kDebugMode && _e2eMode) {
     PushNotificationManager.e2eDisabled = true;
   }
   if (e2eAuthEnabled) HKLog.logI('[E2E] auth token injected → bypass OAuth');
 
-  // ============ Flavor 配置 ============
-  // 優先使用程式碼設定的 Flavor（如測試時直接指定），
-  // 若未設定則從 --flavor 參數（FLUTTER_APP_FLAVOR）讀取
   if (!F.isInitialized) {
     F.init(_resolveFlavorFromEnv());
   }
@@ -148,8 +139,6 @@ Future<Widget> _bootstrapApplication() async {
   HKLog.logI('[Main] Gateway: ${F.appFlavor.gatewayHost}');
   HKLog.logI('[Main] API Base: ${F.appFlavor.apiBaseUrl}');
 
-  // 建立共享 container — 必須在 PushNotificationManager.init() 之前，
-  // 讓 manager 可注入後在 _handleForegroundMessage 讀 activeChatGateProvider。
   final container = ProviderContainer(
     overrides: [
       authLoggerProvider.overrideWithValue((level, message, error, stack) {
@@ -166,13 +155,6 @@ Future<Widget> _bootstrapApplication() async {
     () => !container.read(sessionProvider).isLoading,
   );
 
-  // ============ App 版本 gate（`packages/hawkr_app_update/docs/spec.md`）============
-  // 位置刻意排在 bootstrap 最前段：此處早於推播初始化，`getInitialMessage()`
-  // 的導航還沒 arm，不需要另建抑制機制。
-  //
-  // ⚠️ 例外必須在此自行吃掉：`BrandStartupGate._runBootstrap` 的 catch 只
-  // reportError、不 setState、不解除 splash（brand_startup_splash.dart:75-84），
-  // 例外一旦冒上去就是**永遠卡在啟動畫面**。這是 fail-open 的落地點。
   try {
     await AppVersionHeaders.initialize();
     await container.read(forceUpdateProvider.notifier).check();
@@ -180,9 +162,6 @@ Future<Widget> _bootstrapApplication() async {
     HKLog.logE('[Main] App 版本檢查失敗，fail-open 繼續啟動', e, s);
   }
 
-  // ============ Firebase 初始化 ============
-  // 沒有設定（缺 FIREBASE_* define）時整體停用：不初始化、不註冊推播與分析，
-  // App 仍可啟動與登入。熱重啟的 duplicate-app 由 initializeFirebase 處理。
   final firebaseReady = await initializeFirebase(
     options: F.appFlavor.firebaseOptions,
     appName: F.appFlavor.firebaseAppName,
@@ -195,23 +174,14 @@ Future<Widget> _bootstrapApplication() async {
     HKLog.logW('[Main] Firebase 未設定，推播與分析停用');
   }
 
-  // 裝置註冊走 container 的中央 Dio，session 還原（下面的 sessionProvider.future）之前就要注入。
   PushNotificationManager.instance.injectContainer(container);
 
   if (!_appStoreScreenshotMode && !_e2eMode && isFirebaseInitialized) {
-    // 初始化推播通知管理器（在 bootstrap 內完成，確保監聽器在 UI 就緒前已註冊）
     await _initializeFirebaseMessaging();
   }
 
-  // Session restoration belongs to the single branded startup gate. Waiting
-  // here prevents a second welcome/loading screen and avoids a guest-state
-  // flash before the first real application frame.
   await container.read(sessionProvider.future);
 
-  // ============ Analytics collection gate ============
-  // prod + dev emit (each flavor's Firebase project routes to its own GA4
-  // property, so dev never pollutes prod); stage stays off. Reuse the single
-  // predicate so this SDK master switch and analyticsServiceProvider agree.
   if (isFirebaseInitialized) {
     await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(
       analyticsEnabledForFlavor(F.appFlavor),
@@ -225,7 +195,6 @@ Future<Widget> _bootstrapApplication() async {
 class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
-  // 全域 keys，用於在任何地方顯示 toast
   static GlobalKey<NavigatorState> get navigatorKey => rootNavigatorKey;
   static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -241,16 +210,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    // App 回前景時節流重新註冊 device token（讓後端 updated_at 反映活躍度，供 staleness reaper）。
     WidgetsBinding.instance.addObserver(this);
     registerAnalyticsIdentity(ref);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationRouter.flushPending();
     });
-    // 監聽聊天串流的新訊息事件（StreamEvents）
-    // Eagerly create chatRepository (registers WidgetsBindingObserver via constructor).
     _messageSub = ref.read(chatRealtimeProvider).events.listen(_onChatEvent);
-    // 通知即時訊號：登入中常駐，驅動未讀數、收件匣與訂單、售後的重讀。
     ref.read(notificationSignalsProvider);
   }
 
@@ -266,8 +231,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       NotificationRouter.flushPending();
       PushNotificationManager.instance.onAppResumed();
-      // 版本 gate 前景恢復重檢（`packages/hawkr_app_update/docs/spec.md`）；節流錨點是「上次成功
-      // 檢查」，門檻 10 分鐘，判斷在 provider 內，失敗 fail-open。
       unawaited(ref.read(forceUpdateProvider.notifier).checkThrottled());
     }
   }
@@ -275,12 +238,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Future<void> _onChatEvent(chat_pb.ChatEvent event) async {
     if (event.whichEvent() != chat_pb.ChatEvent_Event.message) return;
     final msg = event.message.message;
-    // 只通知店家新寄來的訊息：自己發的、可見度改變的都不通知。
     if (event.message.updated ||
         msg.sender != chat_pb.ChatParty.CHAT_PARTY_STORE) {
       return;
     }
-    // 使用者正在這個對話裡就不彈通知（對話 ID 是推播與串流共同的識別）。
     final viewing = await activeChatCovers(
       () => ref.read(activeChatGateProvider),
       ref.read(chatRepositoryProvider),
@@ -288,10 +249,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     );
     if (viewing || !mounted) return;
 
-    // 震動反饋
     HapticFeedback.mediumImpact();
 
-    // 顯示頂部滑入式通知橫幅
     _showChatBanner(msg);
   }
 
@@ -299,7 +258,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final overlay = MyApp.navigatorKey.currentState?.overlay;
     if (overlay == null) return;
 
-    // 移除上一個通知
     _activeToast?.remove();
 
     final locale = ref.read(uiLocaleProvider);
@@ -322,7 +280,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           onTap: () {
             entry.remove();
             _activeToast = null;
-            // 導航到聊天室
             final ctx = MyApp.navigatorKey.currentContext;
             if (ctx != null) {
               GoRouter.of(ctx).push(
@@ -342,7 +299,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     _activeToast = entry;
     overlay.insert(entry);
 
-    // 4 秒後自動消失
     Future.delayed(const Duration(seconds: 4), () {
       if (entry.mounted) {
         entry.remove();
@@ -355,8 +311,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     final appTextSize = ref.watch(appTextSizeProvider);
-    // ScreenUtil 僅保留給仍在遷移中的寬高尺寸；文字固定使用 logical px。
-    // 版面透過 LayoutBuilder / breakpoint 重排，不能隨螢幕寬度把字縮小。
     return ScreenUtilInit(
       designSize: const Size(414, 896),
       enableScaleWH: () => false,
@@ -389,7 +343,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               child: inner,
             );
 
-            // Token 過期提醒 + 強制登出；對話框透過 rootNavigatorKey 顯示。
             final guarded = ForceLogoutListener(
               navigatorKey: rootNavigatorKey,
               currentPath: () =>
@@ -400,7 +353,6 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               },
               child: navigationFramed,
             );
-            // 使用者主動的寫入被停權擋下時的提示；停權不登出。
             final suspensionAware = SuspendedActionListener(
               navigatorKey: rootNavigatorKey,
               onViewDetails: () => AccountRestrictedScreen.open(router),
@@ -410,19 +362,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
               child: suspensionAware,
             );
 
-            // 非 prod 環境注入 FCM debug 浮動按鈕
             final appSurface = _appStoreScreenshotMode || !F.showFcmDebugOverlay
                 ? keyboardDismissible
-                // fit: StackFit.expand 讓 guarded 填滿全螢幕，否則會靠左貼齊導致整個 app 偏左
                 : Stack(
                     fit: StackFit.expand,
                     children: [keyboardDismissible, const FcmDebugOverlay()],
                   );
 
-            // Keep the router, global navigation, environment banner and
-            // debug overlay under one typography policy. Wrapping only the
-            // router child would leave bottom-navigation labels at a
-            // different user-selected size.
             return MediaQuery(data: mq, child: appSurface);
           },
         );

@@ -34,7 +34,6 @@ const BUYER_REPO = "lib/invoices/buyer-repo.ts";
 test("B05 渲染重寄通知入口，且閘門是可重寄狀態表", () => {
 	const source = stripComments(read(B05));
 
-	// 錨在 **JSX 使用點**，不是那些字串出現過——見檔頭失效方式 ①。
 	assert.ok(
 		/<ResendNotificationCard\b/.test(source),
 		"B05 定義了重寄卡卻沒有渲染它 ⇒ 買家沒有重寄入口，只能去開一張申訴",
@@ -57,8 +56,6 @@ test("端點 71 的呼叫在 repo 層，且帶得出冪等鍵", () => {
 		repo.includes("export async function resendBuyerInvoiceNotification"),
 		"buyer-repo 沒有匯出 resendBuyerInvoiceNotification",
 	);
-	// `Idempotency-Key` 是 gateway 標成必填的 header；漏了會 400，而那個 400
-	// 在畫面上與「後端壞了」長得一模一樣。
 	assert.ok(
 		/resendBuyerInvoiceNotification\([\s\S]{0,400}?idempotent\(idempotencyKey\)/.test(
 			repo,
@@ -74,8 +71,6 @@ test("可重寄的狀態集合與 invoice-service 的 resendableStatus 一致", 
 		InvoiceDocumentStatus.RESOLVED_EXTERNALLY,
 		InvoiceDocumentStatus.VOIDED,
 	]);
-	// 對 CodeMeta 的**全值域**逐一比對，不是只測那三個：新增狀態時預設要是
-	// fail-closed（不渲染），而只測三個正例的話新值落哪一邊都全綠。
 	for (const status of Object.values(InvoiceDocumentStatus)) {
 		assert.equal(
 			canResendInvoiceNotification(status),

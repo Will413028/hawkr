@@ -54,8 +54,6 @@ void main() {
                     ),
                     child: child!,
                   ),
-                  // Simulate returning from a dark-cover page. The order header
-                  // must own its status contrast all the way to screen y=0.
                   home: AnnotatedRegion<SystemUiOverlayStyle>(
                     value: SystemUiOverlayStyle.light,
                     child: RepaintBoundary(
@@ -91,8 +89,6 @@ void main() {
           );
           expect(adapter.paths, contains('/api/v1/app/orders'));
 
-          // Compare actual painted pixels across the former safe-area seam.
-          // The glass gradient may change gradually, but cannot restart here.
           final boundary = tester.renderObject<RenderRepaintBoundary>(
             find.byKey(captureKey),
           );

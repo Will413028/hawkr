@@ -67,7 +67,6 @@ export default function DecideMeasureRequestDialog({
 
 	const showRevokeFindings =
 		kind === "appeal" && accept === true && measure.canRevokeFindings;
-	// 理由太長時按鈕停用，原因就地顯示（不是無聲地停用）；空的理由由必填標記與停用的按鈕表達。
 	const reasonError = reason.trim() === "" ? undefined : validateDecision(form);
 	const shownError = error ?? reasonError ?? null;
 

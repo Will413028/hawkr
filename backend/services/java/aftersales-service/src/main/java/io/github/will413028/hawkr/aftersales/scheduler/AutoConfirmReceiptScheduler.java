@@ -69,7 +69,6 @@ public class AutoConfirmReceiptScheduler {
         int errors = 0;
         for (String caseNo : expiredCaseNos) {
             try {
-                // issue #2294 B5：反解必須先於 tx（見類別 javadoc）
                 EventPrincipals principals = returnReceiptService.resolvePrincipalsForCaseStrict(caseNo);
                 boolean ok = returnReceiptService.autoConfirmReceipt(caseNo, principals);
                 if (ok) {
@@ -85,7 +84,6 @@ public class AutoConfirmReceiptScheduler {
                 errors++;
                 log.error("AutoConfirmReceiptScheduler.error",
                         "處理 auto confirm 異常, caseNo=" + caseNo, e);
-                // 不中斷整批，繼續處理其他 case
             }
         }
 

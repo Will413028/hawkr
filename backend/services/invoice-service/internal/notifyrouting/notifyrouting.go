@@ -62,10 +62,6 @@ func Apply(ctx context.Context, raw []byte, sellers SellerAccountResolver, log *
 	raw2, present := payload[KeyStoreID]
 	switch {
 	case !present:
-		// 🔴 這一支曾經是完全靜默的：沒有這個鍵就直接跳過，連一行 warn 都沒有。
-		// 而「payload 根本沒有 store_id」正是 P0-4（全 camelCase）與「新增事件型別忘了
-		// 帶 store_id」兩種缺陷在**執行期**的樣子 —— 兩者都會讓賣家向通知 100% 消失。
-		// 本 repo 的六個出向事件全部都有 store_id ⇒ 缺席一律是生產者的 bug。
 		log.Warn("invoice.ob.store_id_absent",
 			zap.String("impact", "賣家向通知 100% 不會送達；買家向不受影響"),
 			zap.String("likely_cause", "payload 欄名不是 snake_case，或新增的事件型別漏了 store_id"))

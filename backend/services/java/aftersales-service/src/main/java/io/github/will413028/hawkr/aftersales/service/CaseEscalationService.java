@@ -78,7 +78,6 @@ public class CaseEscalationService {
         event.setDescription("賣家未在 " + hours + " 小時內處理，案件自動升級至平台仲裁");
         appealEventMapper.insert(event);
 
-        // issue #2294 B3：publish 收進本 tx，失敗即 rollback（原本在 worker、tx 之外 best-effort）
         boolean published = eventPublisher.tryPublishCaseAutoEscalated(
                 caseNo, orderNo, buyerId, storeId, hours, principals);
         if (!published) {

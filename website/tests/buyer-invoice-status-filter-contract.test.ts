@@ -53,7 +53,6 @@ function oneToOneStatuses(): Set<string> {
 	return out;
 }
 
-/* ── 測量本身要有鑑別力：任一邊退化成空集合，⊆ 會變成恆真 ────────────── */
 
 test("B09 推導前提成立（值域、pill、1:1 集合都不是空的）", () => {
 	assert.ok(
@@ -70,7 +69,6 @@ test("B09 推導前提成立（值域、pill、1:1 集合都不是空的）", ()
 	);
 });
 
-/* ── 主契約 ──────────────────────────────────────────────────────────── */
 
 test("B09 每顆狀態 pill 都是買家投影 1:1 的原值（折疊值不得開 pill）", () => {
 	const buckets = bucketsByFoldedLabel();
@@ -96,8 +94,6 @@ test("B09 每顆狀態 pill 都是買家投影 1:1 的原值（折疊值不得�
 });
 
 test("B09 pill 上的標籤＝該筆文件在列表列上顯示的標籤", () => {
-	// pill 走 `statusLabel()`（CodeMeta 原 label），列表列走 fold 的投影 label。
-	// 兩者只有在 1:1 時才會一致——不一致代表使用者按了 A、看到滿頁 B。
 	for (const value of PILL_VALUES) {
 		const pillLabel = INVOICE_DOCUMENT_STATUS_LABEL[value] ?? value;
 		const rowLabel = foldInvoiceDocumentStatus(value).label;
@@ -110,10 +106,6 @@ test("B09 pill 上的標籤＝該筆文件在列表列上顯示的標籤", () =>
 });
 
 test("B09 fold 表覆蓋 CodeMeta 全值域（新增狀態不得靜默落 default）", () => {
-	// `foldInvoiceDocumentStatus` 的 default 分支是**執行期**的安全網（後端先上線、
-	// CodeMeta 拷貝還沒同步時，顯示「處理中」比白畫面好）。但只要那個值已經進了
-	// 本 repo 的 CodeMeta 拷貝，它就必須被顯式折過一次——否則新狀態會靜默混進
-	// 「處理中」桶，而沒有任何人決定過它該長什麼樣。
 	const unhandled = ALL_STATUSES.filter(
 		(status) => foldInvoiceDocumentStatus(status).unknown,
 	);

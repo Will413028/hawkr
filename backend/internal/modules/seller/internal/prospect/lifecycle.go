@@ -82,7 +82,6 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreProspectInput) (m
 		case model.ProspectStatusConverted:
 			return apperr.FailedPrecondition("已轉成店家的業者不需要還原")
 		case model.ProspectStatusActive:
-			// 重送：已經是進行中，回傳目前的業者。
 		case model.ProspectStatusArchived:
 			if row.MergedInto != nil {
 				return apperr.FailedPrecondition("已被合併的業者不可還原")
@@ -211,7 +210,6 @@ func (s *Service) Merge(ctx context.Context, in model.MergeProspectsInput) (mode
 		if err := q.RepointMergedProspects(ctx, store.RepointMergedProspectsParams{WinnerID: &winner.ProspectID, LoserID: &loser.ProspectID}); err != nil {
 			return err
 		}
-		// 輸家的統編在封存時清掉（兩列都 live，同一個號碼不能並存），贏家沒有統編才收下。
 		if _, err := q.ArchiveMergedLoser(ctx, store.ArchiveMergedLoserParams{
 			WinnerID: &winner.ProspectID, LoserID: loser.ProspectID, AdminID: &in.AdminID, Now: now,
 		}); err != nil {
@@ -220,7 +218,6 @@ func (s *Service) Merge(ctx context.Context, in model.MergeProspectsInput) (mode
 		if err := s.retireImages(ctx, loser); err != nil {
 			return err
 		}
-		// 輸家的封存只由 ProspectMerged 表達（不另發 ProspectStatusArchived）。
 		if err := events.Publish(ctx, s.d.Events, model.ProspectMerged{
 			EventID: uuid.NewV7(), OccurredAt: now, SourceProspectID: loser.ProspectID, TargetProspectID: winner.ProspectID,
 		}); err != nil {

@@ -26,8 +26,6 @@ func (f *fixture) suspend(t *testing.T) {
 	}
 }
 
-// relogin 以新登入取得 session 並換掉 fixture 的 client。停權在同一個 transaction 刪該帳號全部的 session，原 session 隨即失效；
-// 停權的帳號仍可登入（ADR identity-self-hosted-federated-login、A7-D18），所以要重新登入才看得到停權中的狀態。
 func (f *fixture) relogin(t *testing.T) {
 	t.Helper()
 	tok, err := f.id.DevSession(context.Background(), f.accountID)

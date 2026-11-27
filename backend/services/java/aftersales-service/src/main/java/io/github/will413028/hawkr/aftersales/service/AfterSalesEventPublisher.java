@@ -100,7 +100,6 @@ public interface AfterSalesEventPublisher {
                                            String actor,
                                            java.util.Map<String, Object> extraPayload);
 
-    // ==================== issue #2294 前置 (i)：會傳遞失敗的變體 ====================
 
     /**
      * {@link #publishCancelCompleted} 的會傳遞失敗變體。

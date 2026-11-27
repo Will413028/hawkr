@@ -18,7 +18,6 @@ test('"0" 是無價格的表達，不得印成 NT$ 0', () => {
 	assert.equal(formatProductPriceRange("0", "0"), "--");
 	assert.equal(formatProductPriceRange("0", undefined), "--");
 	assert.equal(formatProductPriceRange(undefined, "0"), "--");
-	// 單邊為 "0"：那一邊視為缺席，只印有價格的那一邊，不得出現 "NT$ 0" 字樣
 	assert.equal(formatProductPriceRange("0", "250"), "NT$ 250");
 	assert.equal(formatProductPriceRange("250", "0"), "NT$ 250");
 });
@@ -26,7 +25,6 @@ test('"0" 是無價格的表達，不得印成 NT$ 0', () => {
 test("兩端皆缺席時回佔位符而非空白或 undefined", () => {
 	assert.equal(formatProductPriceRange(undefined, undefined), "--");
 	assert.equal(formatProductPriceRange(null, null), "--");
-	// 鍵存在但不是數字（後端漏欄或型別漂移）同樣不得把原字串直出
 	assert.equal(formatProductPriceRange("abc", "abc"), "--");
 	assert.equal(formatProductPriceRange("", ""), "--");
 });
@@ -43,7 +41,6 @@ test("單一價格與區間的格式，含千分位", () => {
 		"NT$ 1,200 - NT$ 35,000",
 	);
 	assert.equal(formatProductPriceRange("1200", "1200"), "NT$ 1,200");
-	// 數字型別也要接受（後端未來若改回 number 不應該靜默壞掉）
 	assert.equal(formatProductPriceRange(1200, 1200), "NT$ 1,200");
 });
 
@@ -68,7 +65,6 @@ test("兩張商品表格都走同一個 helper，沒有裸插值", () => {
 			!/NT\$\s*\{?\s*p\.price(Min|Max)/.test(src),
 			`${rel} 仍有裸插值的價格輸出（NT$ {p.priceMin...}），"0" 會被印成 NT$ 0`,
 		);
-		// 第二份同責 helper ＝ 兩頁再度漂移的起點
 		assert.ok(
 			!/function\s+formatPriceRange/.test(src),
 			`${rel} 不應自己再定義一份價格區間 formatter`,

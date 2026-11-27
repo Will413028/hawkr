@@ -47,7 +47,6 @@ Future<void> _pumpScreen(
   _MockRepo repo, {
   QuoteIdempotencyKeyBook? keys,
 }) async {
-  // 表單很長，把 viewport 拉高讓 ListView 一次把欄位都建出來。
   tester.view.physicalSize = const Size(420, 5200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -126,8 +125,6 @@ void main() {
     ]) {
       expect(find.text(value), findsOneWidget, reason: value);
     }
-    // 這張 fixture 沒有補充說明 ⇒ 整個區塊不得出現。空字串畫成一個標著標題的
-    // 空框，賣家會以為載入失敗。
     expect(find.text('買家的補充說明'), findsNothing);
   });
 
@@ -232,13 +229,11 @@ void main() {
 
     expect(find.textContaining('與你填的總金額不一致'), findsOneWidget);
 
-    // 使用者輸入的總金額原封不動留在欄位裡。
     final totalField = tester.widget<TextField>(
       find.ancestor(of: find.text('總金額'), matching: find.byType(TextField)),
     );
     expect(totalField.controller!.text, '11000');
 
-    // 改成一致的值後提示轉為一致，欄位仍是使用者輸入的字面值。
     await tester.enterText(
       find.ancestor(of: find.text('總金額'), matching: find.byType(TextField)),
       '11025',
@@ -292,7 +287,6 @@ void main() {
     expect(submitCalls, 1);
     expect(find.textContaining('你的報價已經變動'), findsOneWidget);
     expect(find.text('重新載入最新版本'), findsOneWidget);
-    // 送出鈕在重新載入之前不得再送。
     final submitButton = tester.widget<FilledButton>(
       find.ancestor(of: find.text('送出改版'), matching: find.byType(FilledButton)),
     );
@@ -319,12 +313,10 @@ void main() {
   test(
     'picker default is one day after now, as Taipei wall clock, on any device offset',
     () {
-      // 2026-07-30 20:00 UTC is 2026-07-31 04:00 Taipei; one day later is 08-01 04:00 Taipei.
       final now = DateTime.utc(2026, 7, 30, 20);
       final t = taipeiPickerInitial(quotePickerSeed(null, now));
       expect(t.initialDate, DateTime(2026, 8, 1));
       expect(t.initialTime, (hour: 4, minute: 0));
-      // An existing UTC value is shown as Taipei wall clock.
       final c = taipeiPickerInitial(
         quotePickerSeed(DateTime.utc(2026, 7, 30, 16), now),
       );

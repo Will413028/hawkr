@@ -192,7 +192,6 @@ function openingAnchorTags(text: string): { index: number; tag: string }[] {
 				i += 1;
 				continue;
 			}
-			// 註解：整段丟掉，換成一個空白以免把兩個 token 黏起來。
 			if (c === "/" && text[i + 1] === "/") {
 				const end = text.indexOf("\n", i);
 				i = end === -1 ? text.length : end;
@@ -221,8 +220,6 @@ function openingAnchorTags(text: string): { index: number; tag: string }[] {
 
 test("實心主 CTA 只要是連結就必須帶 data-hkui-button（全 repo）", () => {
 	const ctaClasses = solidCtaClasses();
-	// 鑑別力①：推導本身要有結果。token 改名或 CSS 搬檔會讓集合塌成空的，
-	// 那時掃描永遠通過 —— 這條把它變紅。
 	assert.ok(
 		ctaClasses.size >= 20,
 		`從 styles/ 推導出的實心 CTA class 只有 ${ctaClasses.size} 個，判準大概壞了`,
@@ -269,8 +266,6 @@ test("實心主 CTA 只要是連結就必須帶 data-hkui-button（全 repo）",
 		[],
 		`實心 CTA 連結少了 data-hkui-button ⇒ dark 下白字被換成 #b7cc89：\n  ${offenders.join("\n  ")}`,
 	);
-	// 鑑別力②：掃描真的看得到那些連結。選擇器改名／JSX 改寫後這條會先轉紅，
-	// 而不是讓「零命中」被當成「全部合規」。
 	assert.ok(
 		guarded >= 10,
 		`只掃到 ${guarded} 顆帶標記的實心 CTA 連結，掃描面大概斷了`,
@@ -300,8 +295,6 @@ test("名片不顯示網址，並保留置中的商店 ID", () => {
  */
 test("代行商品表的「操作」欄釘在右側", () => {
 	const text = css(DELEGATED_CSS);
-	// 錨點是 `:last-child` 而不是第 9 欄：勾選欄只在具備 `products.publish` 時渲染
-	// （§6.4），欄數因此有 9 與 8 兩種，寫死序號會讓唯讀工作階段釘到「狀態」欄上。
 	const block = text.match(
 		/\.seller-products-table--delegated thead th:last-child, \.seller-products-table--delegated tbody td:last-child:not\(\.seller-orders__empty\) \{([^}]*)\}/,
 	);
@@ -313,7 +306,6 @@ test("代行商品表的「操作」欄釘在右側", () => {
 		/background:/,
 		"sticky 格必須有不透明底色，否則捲過去的內容會從底下透出來",
 	);
-	// 提示列的文案必須跟著改：叫人去捲一個不會動的欄位就是另一個假訊息。
 	const page = source("features/seller-center/products/ProductsPage.tsx");
 	assert.ok(
 		!/請左右捲動查看「狀態」與「操作」欄/.test(page),
@@ -347,7 +339,6 @@ test("窄視窗的 ADM 橫條：品牌與連結不換行、不被壓縮", () => 
  */
 test("商品縮圖框的底色要透得出主題色，且無圖時有圖示", () => {
 	const text = css(SELLER_CSS);
-	// 同名選擇器有兩份（另一份是 ≤960px 只改 width／height 的縮圖尺寸），取宣告底色的那一份。
 	const block = [
 		...text.matchAll(/\.seller-products-table__thumb \{([^}]*)\}/g),
 	].find((m) => m[1].includes("background:"));
@@ -429,7 +420,6 @@ test("金色情境列必須釘在視窗頂端，且底下要有一層不透明�
 	);
 	assert.match(bar[1], /top:\s*0/, "釘在頂端才叫「上方…固定可見」");
 
-	// 貼頂之後表單會從它底下捲過去，兩層半透明金色薄膜擋不住。
 	const layers = backgroundLayers(bar[1]);
 	assert.ok(
 		layers.length >= 2,
@@ -482,7 +472,6 @@ test("店面設定的儲存列在所有寬度都釘住，不只 ≤540px", () =>
 		/background:/,
 		"sticky 之後表單會從它下面捲過去，沒有底色就是一層透光的疊層",
 	);
-	// 代行時那句警語是「這次寫入不是賣家自己做的」的唯一提示，跟送出鈕同一列。
 	const client = source(
 		"features/seller-center/profile/SellerProfileClient.tsx",
 	);
@@ -538,7 +527,6 @@ test("兩條常駐列的祖先鏈上不得出現捲動容器", () => {
 			}
 		}
 	}
-	// 鑑別力：掃描面要真的掃得到那些選擇器，零命中不能被當成全部合規。
 	assert.ok(scanned >= STICKY_ANCESTORS.length, `只掃到 ${scanned} 條祖先規則`);
 	assert.deepEqual(
 		offenders,
@@ -548,10 +536,6 @@ test("兩條常駐列的祖先鏈上不得出現捲動容器", () => {
 });
 
 test("html/body 的 overflow-x 最後一手必須是 clip 而不是 hidden", () => {
-	// `decorations-overlays.css` 在 ≤768px 留了一份 `html, body { overflow-x: hidden }`
-	// —— body 的 overflow-y 會因此算成 auto，body 變捲動容器，兩條 sticky 一起失效。
-	// 它現在被較晚 import 的 `floating-navigation.css` 的 clip 蓋掉；這條測試守的是
-	// **import 順序**，因為兩者特異度相同、誰後誰贏。
 	const imports = [
 		...cssKeepLines("styles/globals.css").matchAll(/@import\s+"\.\/([^"]+)"/g),
 	].map((m) => `styles/${m[1]}`);

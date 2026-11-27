@@ -7,7 +7,6 @@ import {
 	QueryClient,
 } from "@tanstack/react-query";
 
-// Connect 的錯誤中，transport 已經上報的（伺服器端的失敗）與預期中的狀態（取消、未登入、無權限）不再上報。
 const CONNECT_NOT_REPORTED = new Set([
 	Code.Canceled,
 	Code.Unauthenticated,
@@ -33,9 +32,6 @@ declare module "@tanstack/react-query" {
 	}
 }
 
-// 同 fingerprint 60s 內只報一次：backend outage 時大量 query/mutation 會同時
-// 失敗，transport 的 reportApiFailure 有 30s dedupe，這層沒有的話事件量會
-// 倍增（照抄 lib/api/client.ts 的 process-local map 手法）。
 const DATA_LAYER_DEDUP_MS = 60_000;
 const recentDataLayerErrors = new Map<string, number>();
 
@@ -142,8 +138,6 @@ export function createAppQueryClient() {
 		defaultOptions: {
 			queries: {
 				refetchOnWindowFocus: false,
-				// 重試只在 transport 做一層（錯誤模型 ADR 2026-09-25-api-error-model D7）：REST 由 lib/api/client.ts
-				// 對 GET 的 5xx 與網路錯誤重試一次，Connect 由 lib/connect/transport.ts 依 D7 重試。
 				retry: false,
 				staleTime: 30_000,
 			},

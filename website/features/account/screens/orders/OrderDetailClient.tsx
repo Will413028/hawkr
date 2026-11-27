@@ -50,7 +50,6 @@ function OrderSellerRow({ order }: { order: Order }) {
 	const name = view?.name || order.sellerName?.trim() || "";
 	const sellerHref = view?.href ?? "";
 
-	// 完全沒有賣家資訊就不顯示，避免空白列
 	if (!sellerHref && !name) return null;
 
 	const displayName = name || "賣家";
@@ -124,7 +123,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 	const [pendingAction, setPendingAction] =
 		React.useState<OrderPendingAction>(null);
 	const busy = pendingAction !== null;
-	// 所有錯誤訊息走頂部下拉 toast（cancelOrder / confirmReceipt）。
 	const notify = useNotificationToast();
 
 	if (loading && !order) {
@@ -166,8 +164,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 			)
 		: null;
 
-	// Map known timestamps onto the timeline's step keys. Missing stamps
-	// simply don't render under their step — partial data is fine.
 	const paidStamp = order.paidAt ?? order.payment?.paidAt ?? null;
 	const timelineEvents: Partial<Record<string, number>> = {};
 	if (order.createdAt) timelineEvents.pending_payment = order.createdAt;
@@ -203,8 +199,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 	};
 
 	const handleConfirm = async () => {
-		// 已送達訂單一律可確認收貨（後端 confirm_receipt 的語意），其餘狀態才看
-		// canConfirm 旗標。
 		if (!order.canConfirm && order.status !== "delivered") return;
 		if (
 			!window.confirm(
@@ -268,10 +262,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 						shippingMethod={order.shipping?.method}
 					/>
 
-					{/* Pending-payment surface — mirrors APP order_card.dart's
-					    待付款 layout: a prominent "尚未付款" banner with 再次付款
-					    + 取消訂單 CTAs. 再次付款 goes to the payment step
-					    (`/orders/{orderNo}`), which creates or resumes the payment. */}
+
 					{order.status === "pending_payment" ? (
 						<PendingPaymentBanner
 							order={order}
@@ -291,13 +282,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 						/>
 					) : null}
 
-					{/* 已送達後的主要動作，對齊 APP：確認收貨（提前完成、觸發撥款）
-					    或申請退換貨。已送達狀態一律提供這兩個動作（後端 confirm_
-					    receipt 即「對已送達訂單確認收貨」），不再依賴可能未回傳的
-					    canConfirm/canRefund 旗標。倒數暫停（countdownPausedAt）代表
-					    售後／爭議處理中，此時不再提供「申請退換貨」入口。售後 CTA 在此
-					    狀態由本卡片擁有，下方 OrderAfterSaleSummary 以 hideApplyCta 隱藏
-					    重複按鈕。 */}
+
 					{order.status === "delivered" ? (
 						<section className="flex flex-col gap-3 rounded-hkui-lg border border-divider bg-content1 p-4 sm:flex-row sm:items-center sm:justify-between">
 							<p className="m-0 text-sm text-hk-body">
@@ -385,8 +370,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 										? ` · ${order.shipping.receiverPhone}`
 										: ""}
 								</dd>
-								{/* 店到店（7-11）沒有收件地址，formatShippingAddress 回
-								    "—"，此時整列隱藏，只保留取貨門市；宅配才顯示地址。 */}
+
 								{formatShippingAddress(order.shipping) !== "—" ? (
 									<>
 										<dt className="m-0 text-[0.8125rem] text-hk-muted max-[540px]:mt-2 max-[540px]:first-of-type:mt-0">
@@ -474,8 +458,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 						</dl>
 					</section>
 
-					{/* 發票是付款的後果，順序即「交易 → 憑證 → 評價」。零元訂單與尚未
-					    成立開立義務的訂單由這個元件自己 return null（端點 8 回 9301）。 */}
+
 					<OrderInvoiceSection
 						orderNo={order.orderNo}
 						sellerName={order.sellerName?.trim() || ""}
@@ -490,15 +473,7 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 					/>
 
 					<section className="flex gap-2 flex-wrap justify-end mt-4">
-						{/*
-						 * 這裡曾有第二顆「取消訂單」，閘門是
-						 * `order.canCancel && order.status !== "pending_payment"`。
-						 * 兩半都不成立：`canCancel` 後端不送（恆 undefined），而
-						 * order-service 的 `cancelOrder` **只接受 PENDING_PAYMENT**
-						 * ——非待付款訂單按下去必得「僅待付款訂單可取消」。
-						 * 待付款的取消鍵在 `PendingPaymentBanner` 內，那是唯一一顆。
-						 * 非待付款要退款走售後（`OrderAfterSaleSummary`）。
-						 */}
+
 						{order.status === "shipping" ? (
 							<Button
 								href={`/account/orders/${order.orderNo}/tracking`}
@@ -530,7 +505,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 	);
 }
 
-// 兩者現在是同一件事：`formatTaipeiDateTime` 收 Date 也收 unix 秒／毫秒。
 const formatStamp = formatTaipeiDateTime;
 const formatStampShort = formatTaipeiDateTime;
 
@@ -732,9 +706,6 @@ function PendingPaymentBanner({
 	onCancel,
 }: PendingPaymentBannerProps) {
 	const amount = Number(order.totalActualAmount).toLocaleString();
-	// 走共用判準而不是 `order.canCancel`（後端不送那一欄，見 `lib/orders/repo.ts`）。
-	// 本 banner 只在待付款時渲染，所以這裡恆為 true——但判準只留一份，才不會在
-	// banner 的渲染條件哪天放寬時，這一顆鍵默默跟著出現在不能取消的訂單上。
 	const canCancel = canBuyerCancelOrder(order);
 	return (
 		<section

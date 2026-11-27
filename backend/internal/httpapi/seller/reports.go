@@ -20,9 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 檢舉人的入口（SellerReportAppService）：檢舉人是買家，不是店家，所以這個 service 不掛
-// 賣家能力的 interceptor（宣告表只涵蓋 SellerAppService）。送出的額度見 ReportSubmitQuotas。只能檢舉曾經公開過的店、不能檢舉自己的店是模組的規則
-// （seller.SubmitReport）。
 
 // ReportModule 是通報入口使用的模組方法。
 type ReportModule interface {
@@ -64,8 +61,6 @@ func NewReports(m ReportModule, buyers Buyers, limiter Limiter) (*Reports, error
 	return &Reports{m: m, buyers: buyers, limiter: limiter}, nil
 }
 
-// countSubmit 為帳號送出通報計一次：兩個時間窗全部在額度內才一起計，任何一個超過就回 resource_exhausted（帶 RetryInfo），
-// 都不計。
 func (h *Reports) countSubmit(accountID int64, procedure string) error {
 	limits := make([]Limit, len(ReportSubmitQuotas))
 	for i, q := range ReportSubmitQuotas {
@@ -82,7 +77,6 @@ func (h *Reports) countSubmit(accountID int64, procedure string) error {
 
 var createReportPaths = rpc.FieldPaths{"EvidenceTokens[]": "evidence_staged_tokens[]"}
 
-// callerBuyer 是登入的帳號與它目前的買家；買家不存在是不變量被破壞（存活的帳號都是買家），沒有分類（internal）。
 func (h *Reports) callerBuyer(ctx context.Context) (accountID, buyerID int64, err error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -134,7 +128,6 @@ func (h *Reports) CreateReport(ctx context.Context, req *connect.Request[pb.Crea
 		return nil, rpc.WithFieldPaths(err, createReportPaths)
 	}
 	if result.Report == nil {
-		// 送出一定帶回那一筆（新的，或補充到的原本那一筆）；沒有是模組的不變量被破壞，沒有分類（internal）。
 		return nil, fmt.Errorf("httpapi/seller：登入的檢舉沒有帶回通報 %s", result.ReportID)
 	}
 	out := &pb.CreateReportResponse{Report: ToStoreReport(*result.Report), Supplemented: result.Supplemented}
@@ -192,7 +185,6 @@ func (h *Reports) AddReportSupplement(ctx context.Context, req *connect.Request[
 	}), nil
 }
 
-// toReportDetail 是一筆讀到補充與佐證的通報的契約形狀。
 func toReportDetail(r model.Report) (*pb.StoreReport, []*pb.ReportSupplement, []*pb.ReportEvidence) {
 	supplements := make([]*pb.ReportSupplement, len(r.Supplements))
 	for i, sp := range r.Supplements {

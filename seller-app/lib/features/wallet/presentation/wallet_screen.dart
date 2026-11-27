@@ -101,7 +101,6 @@ class WalletScreen extends HookConsumerWidget {
     }
     final marketing =
         my?.can(SellerCapability.SELLER_CAPABILITY_MARKETING) ?? false;
-    // 收款帳戶的讀取失敗只在平台審核完成而且收款帳戶任務還沒完成時有意義（否則畫面是認證閘門或沒有面板）。
     final reviewStatus = kyc.value?.reviewStatus;
     final summary = onboarding.value;
     final approved = platformReviewCompleted(summary);

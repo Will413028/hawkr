@@ -8,8 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 )
 
-// 取代 Java 的 IssuerIdentityMigrationIT：schema 的 CHECK 與 UNIQUE 直接在 DB 層守住（BD31）。
-// 欄位順序：id、折抵 amount、門檻、issuer_type、issuer_admin_id、issuer_store_id、store_id。
 const insertCampaignSQL = `
 INSERT INTO coupon.coupon_campaigns (id, title, discount_type, discount_amount, threshold_amount, target_type, store_id,
     issuer_type, issuer_admin_id, issuer_store_id, start_at, end_at, status, created_at, updated_at)
@@ -54,13 +52,11 @@ func TestSchemaChecksAndUniqueKeys(t *testing.T) {
 	wantConstraint(t, f.exec("UPDATE coupon.coupon_campaigns SET target_type = 'MEMBER' WHERE id = $1", c.ID), "campaigns_store_scope_check")
 	wantConstraint(t, f.exec("UPDATE coupon.coupon_campaigns SET title = ' x' WHERE id = $1", c.ID), "campaigns_title_check")
 
-	// 券的狀態與欄位互斥：LOCKED 要有 order_no 與 locked_at，AVAILABLE 不能有。
 	wantConstraint(t, f.exec("UPDATE coupon.coupon_vouchers SET status = 'LOCKED' WHERE id = $1", v.ID), "vouchers_state_check")
 	wantConstraint(t, f.exec("UPDATE coupon.coupon_vouchers SET order_no = 'O1' WHERE id = $1", v.ID), "vouchers_state_check")
 	wantConstraint(t, f.exec("UPDATE coupon.coupon_vouchers SET origin = 'BUY' WHERE id = $1", v.ID), "vouchers_origin_check")
 	wantConstraint(t, f.exec("UPDATE coupon.coupon_vouchers SET status = 'VOIDED' WHERE id = $1", v.ID), "vouchers_state_check")
 
-	// 每位買家在同一個活動只有一張；一筆訂單只持有一張；補償來源只能用一次。
 	const insertVoucher = `INSERT INTO coupon.coupon_vouchers (id, campaign_id, buyer_id, origin, status, order_no, locked_at, created_at, updated_at)
 		VALUES ($1, $2, $3, 'CLAIM', $4, $5, $6, now(), now())`
 	wantConstraint(t, f.exec(insertVoucher, "00000000-0000-7000-8000-000000000201", c.ID, buyer1, "AVAILABLE", nil, nil), "vouchers_campaign_buyer_key")
@@ -77,7 +73,6 @@ func TestSchemaChecksAndUniqueKeys(t *testing.T) {
 	wantConstraint(t, f.exec(insertComp, "00000000-0000-7000-8000-000000000205", c.ID, buyer3), "vouchers_source_key")
 	wantConstraint(t, f.exec("UPDATE coupon.coupon_vouchers SET source_id = NULL WHERE id = $1", "00000000-0000-7000-8000-000000000204"), "vouchers_source_check")
 
-	// 沒有跨 schema 的 FK、稽核紀錄不擋刪除；稽核理由頭尾不得有空白。
 	wantConstraint(t, f.exec(`INSERT INTO coupon.coupon_redemption_logs (campaign_id, action, reason, created_at) VALUES ($1, 'VOID', ' x', now())`, c.ID), "redemption_logs_reason_check")
 	wantConstraint(t, f.exec(`INSERT INTO coupon.coupon_redemption_logs (campaign_id, action, created_at) VALUES ($1, 'REFUND', now())`, c.ID), "redemption_logs_action_check")
 }

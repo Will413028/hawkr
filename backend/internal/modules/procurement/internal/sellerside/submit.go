@@ -121,7 +121,6 @@ func (s Service) Submit(ctx context.Context, in SubmitInput) (model.SellerRespon
 	return out, err
 }
 
-// replay 回第一次送出的版本（報價 hash 與三個 expected 欄位都相同），不建新版本；任一不同回 INVALID_ARGUMENT（client_request_id）。
 func replay(first store.ProcurementSellerResponseVersion, resp store.ProcurementSellerResponse, v view, hash string, in SubmitInput, expectedPublication, expectedResponse int32, now time.Time) (model.SellerResponseVersion, error) {
 	qt, err := quote.QuoteOf(first)
 	if err != nil {
@@ -131,7 +130,6 @@ func replay(first store.ProcurementSellerResponseVersion, resp store.Procurement
 	if err != nil {
 		return model.SellerResponseVersion{}, err
 	}
-	// 第一次成功時 expected 值必然等於當時的狀態：發布版本等於存下的 publication_version、賣家可見內容的 hash 由不可變的列決定、回價版本是新版的前一版。
 	if firstHash != hash || expectedPublication != first.PublicationVersion || in.ExpectedSellerFacingHash != v.hash || expectedResponse != first.Version-1 {
 		return model.SellerResponseVersion{}, quote.IdempotencyMismatch()
 	}

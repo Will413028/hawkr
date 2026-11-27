@@ -28,8 +28,6 @@ public class RevalidateAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(RevalidateClient.class)
     public RevalidateClient revalidateClient(WebRevalidateProperties properties) {
-        // 部署漏設 WEB_REVALIDATE_* 時 client 靜默 no-op → 前端快取永不失效卻無訊號。
-        // 啟動時發一次 WARN（不 fail startup，本地無此 config 仍可開發）。§9.5
         if (!properties.isEnabled()) {
             log.warn("RevalidateClient.disabled hawkr.web-revalidate.base-url / secret 未設定，前端快取將不失效");
         }

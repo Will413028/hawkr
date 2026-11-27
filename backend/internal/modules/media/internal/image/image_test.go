@@ -22,7 +22,6 @@ import (
 
 const gpsMarker = "GPS-25.0330N-121.5654E-SERIAL-A1B2C3"
 
-// 測試用的小上限：真正的值在 model，image 不依賴 model；這裡只驗「比較」的行為。
 var testLimits = image.Limits{FramePixels: 1_000_000, AnimatedPixels: 1_500_000, MaxDimension: 65500}
 
 func sanitize(d []byte) (image.Result, error) {
@@ -49,7 +48,6 @@ func pngBytes(t *testing.T, img stdimage.Image) []byte {
 	return b.Bytes()
 }
 
-// exifWithGPS 是含 Orientation 與一個含 gpsMarker 的 GPS IFD 欄位的 EXIF 區段內容（含 "Exif\0\0" 前綴）。
 func exifWithGPS(orientation uint16) []byte {
 	marker := append([]byte(gpsMarker), 0)
 	var tiff bytes.Buffer
@@ -74,7 +72,6 @@ func exifWithGPS(orientation uint16) []byte {
 	return append([]byte("Exif\x00\x00"), tiff.Bytes()...)
 }
 
-// withAPP1 在 SOI 之後插入一個 APP1 區段。
 func withAPP1(jpg, payload []byte) []byte {
 	seg := []byte{0xFF, 0xE1, byte((len(payload) + 2) >> 8), byte(len(payload) + 2)}
 	out := append([]byte{}, jpg[:2]...)
@@ -122,7 +119,6 @@ func wantNoMetadata(t *testing.T, img *vips.Image, raw []byte) {
 	}
 }
 
-// p3JPEG 是 40x20、內嵌 Display P3 描述檔、像素值已換成 P3 數值的 JPEG；來源色是 sRGB c。
 func p3JPEG(t *testing.T, c color.NRGBA) []byte {
 	t.Helper()
 	img, err := vips.NewPngloadBuffer(pngBytes(t, solid(40, 20, c)), nil)
@@ -237,7 +233,6 @@ func TestMalformedImageIsRejected(t *testing.T) {
 	}
 }
 
-// hugeHeaderPNG 只有標頭宣告的尺寸、沒有像素資料：若上限檢查在解碼之後才做，會得到 ErrMalformed 而不是 ErrTooLarge。
 func hugeHeaderPNG(w, h uint32) []byte {
 	chunk := func(typ string, data []byte) []byte {
 		var b bytes.Buffer
@@ -265,7 +260,6 @@ func TestPixelCapIsRejectedFromTheHeader(t *testing.T) {
 }
 
 func TestPixelCapAllowsTheLimitItself(t *testing.T) {
-	// 剛好等於上限的尺寸通過檢查（之後因沒有像素資料而是 ErrMalformed，不是 ErrTooLarge）。
 	_, err := sanitize(hugeHeaderPNG(1000, 1000))
 	if errors.Is(err, image.ErrTooLarge) {
 		t.Fatalf("剛好等於上限不該被擋：%v", err)
@@ -328,7 +322,6 @@ func TestAnimatedWebPKeepsFrameCount(t *testing.T) {
 }
 
 func TestAnimatedFramePixelCapIsRejected(t *testing.T) {
-	// 單格 1000x1000 = 1 MP 在單格上限內，2 格合計 2 MP 超過動態總量上限 1.5 MP。
 	const w, h, n = 1000, 1000, 2
 	if int64(w*h) > testLimits.FramePixels || int64(w*h)*n <= testLimits.AnimatedPixels {
 		t.Fatal("fixture 與上限不符")
@@ -367,7 +360,7 @@ func TestNonInputFailuresAreNotInputErrors(t *testing.T) {
 		t.Run(stage, func(t *testing.T) {
 			in := src
 			if stage == image.StageFlatten {
-				in = opaqueRGBAPNG(t, 8, 8) // 標準庫的編碼器會把不透明圖寫成 RGB，flatten 需要真的帶 alpha 通道的輸入
+				in = opaqueRGBAPNG(t, 8, 8)
 			}
 			_, err := image.SanitizeFailing(context.Background(), in, testLimits, stage, boom)
 			if err == nil || !errors.Is(err, boom) {
@@ -442,7 +435,6 @@ func pngChunk(typ string, data []byte) []byte {
 	return b.Bytes()
 }
 
-// insertPNGChunks 把區段插在 IHDR 之後（IDAT 之前）。
 func insertPNGChunks(src []byte, chunks ...[]byte) []byte {
 	const ihdrEnd = 8 + 12 + 13
 	out := append([]byte{}, src[:ihdrEnd]...)
@@ -482,7 +474,6 @@ func TestTransparentPNGOutputCarriesNoMetadata(t *testing.T) {
 	wantNoMetadata(t, load(t, res.Data, image.PNG), res.Data)
 }
 
-// withGIFExtensions 在全域色盤之後插入一個註解與一個 XMP application 延伸區塊。
 func withGIFExtensions(t *testing.T, g []byte) []byte {
 	t.Helper()
 	p := 13
@@ -513,7 +504,6 @@ func TestAnimatedGIFOutputCarriesNoMetadata(t *testing.T) {
 	wantNoMetadata(t, load(t, res.Data, image.GIF), res.Data)
 }
 
-// withWebPMetadata 在動態 WebP 加上 EXIF 與 XMP 區段（設 VP8X 旗標並更新 RIFF 長度）。
 func withWebPMetadata(t *testing.T, w []byte) []byte {
 	t.Helper()
 	if string(w[12:16]) != "VP8X" {
@@ -634,7 +624,6 @@ func TestAlphaOpaqueRejectsUnknownBandFormat(t *testing.T) {
 	}
 }
 
-// opaqueRGBAPNG 手寫 color type 6（RGBA）的 PNG，alpha 全為 255。
 func opaqueRGBAPNG(t *testing.T, w, h int) []byte {
 	t.Helper()
 	var raw bytes.Buffer

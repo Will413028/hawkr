@@ -60,7 +60,6 @@ export default function RecordInquiryReplyDialog({
 
 	const submit = async () => {
 		if (submitting) return;
-		// 份數上限是伺服器的（reply_evidence_max）；超過就在上傳之前擋下，不浪費機敏上傳。
 		if (form.files.length > inquiry.replyEvidenceMax) {
 			setError(inquiryEvidenceOverText(inquiry.replyEvidenceMax));
 			return;
@@ -69,7 +68,6 @@ export default function RecordInquiryReplyDialog({
 		setSubmitting(true);
 		const staged: string[] = [];
 		try {
-			// 只有上傳步驟的失敗用固定的失敗句（J15）：上傳的錯誤是內部字串（缺 token、逾時、Failed to fetch），不給使用者看。
 			for (const file of form.files) {
 				let token = tokens.current.get(file);
 				if (token === undefined) {

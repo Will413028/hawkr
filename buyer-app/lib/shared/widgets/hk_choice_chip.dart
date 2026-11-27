@@ -34,8 +34,6 @@ class HkChoiceChip extends StatelessWidget {
             onTap: onTap,
             customBorder: const StadiumBorder(),
             child: Center(
-              // widthFactor 讓整顆收斂成膠囊寬度；少了它，chip 會撐滿整行，
-              // Wrap 會變成一行一顆。
               widthFactor: 1,
               child: AnimatedContainer(
                 duration: HkMotion.duration,
@@ -44,20 +42,10 @@ class HkChoiceChip extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                   horizontal: HkControl.compactChoiceHorizontalPadding,
                 ),
-                // 這裡不能用 Container 的 alignment：一旦設了 alignment，
-                // Container 就會撐滿可用寬度，Wrap 會變成一行一顆。垂直置中
-                // 改由下面的 Align 負責（見該處註解）。
                 decoration: ShapeDecoration(
-                  // 未選中吃淡色實底而不是描邊：頁面本身就是米白，14% 透明度的
-                  // 細框疊上去只會讀成一圈沒畫完的灰線。對應網頁 Chip 的 default
-                  // solid（`border-transparent bg-[var(--hkui-default-100)]`，該
-                  // token 即 neutral-whisper，與這裡的 gray100 是同一個色票）。
                   color: selected ? AppColors.actionPrimary : AppColors.gray100,
                   shape: const StadiumBorder(),
                 ),
-                // 固定高度會把 tight constraint 一路傳到 Text，文字就會被釘在
-                // 盒子頂端。Align 的 heightFactor 留 null 以撐滿這 32dp 並把
-                // 文字垂直置中，widthFactor: 1 則讓寬度仍然收斂成文字寬度。
                 child: Align(
                   alignment: Alignment.center,
                   widthFactor: 1,
@@ -67,9 +55,6 @@ class HkChoiceChip extends StatelessWidget {
                     style: TextStyle(
                       fontSize: HkControl.compactChoiceFontSize,
                       height: 1,
-                      // 字重固定。選取時若從 w500 跳到 w700，膠囊寬度會跟著變，
-                      // 而篩選面板是 Wrap 排版，每點一下整排就重新換行。選取狀態
-                      // 交給實底與反白文字表達，已經夠明確。
                       fontWeight: FontWeight.w500,
                       color: selected
                           ? AppColors.textInverse

@@ -70,13 +70,11 @@ class OrderCancelTimestampSqlTest {
     private static final Map<String, Boolean> STATUS_WRITERS = new LinkedHashMap<>();
 
     static {
-        // —— 非取消：推進 / 退款 / 完成，各有自己的業務時間欄（confirmed_at、delivered_at…）
-        STATUS_WRITERS.put("updatePaymentConfirmed", false);          // → PAID，寫 pay_time
-        STATUS_WRITERS.put("updateStatusIfMatchAny", false);          // 物流推進 20/30/32/35 與全額退款 70
-        STATUS_WRITERS.put("applyPartialRefundByStatus", false);      // 50 → 60（CASE），不是終態取消
-        STATUS_WRITERS.put("updateOrderDelivered", false);            // → DELIVERED，寫 delivered_at
-        STATUS_WRITERS.put("completeDeliveredOrderByStatus", false);  // → COMPLETED，寫 confirmed_at
-        // —— 取消：三條入口（賣家／售後、買家自願、系統逾時／停權），全部必須寫 cancelled_at
+        STATUS_WRITERS.put("updatePaymentConfirmed", false);
+        STATUS_WRITERS.put("updateStatusIfMatchAny", false);
+        STATUS_WRITERS.put("applyPartialRefundByStatus", false);
+        STATUS_WRITERS.put("updateOrderDelivered", false);
+        STATUS_WRITERS.put("completeDeliveredOrderByStatus", false);
         STATUS_WRITERS.put("cancelOrderInternalCas", true);
         STATUS_WRITERS.put("cancelOrderByBuyerCas", true);
         STATUS_WRITERS.put("cancelOrderByPaymentExpireCas", true);
@@ -205,7 +203,6 @@ class OrderCancelTimestampSqlTest {
             throw new UncheckedIOException(e);
         }
 
-        // 取出每一段 UPDATE orders … 的 SET 子句（到 WHERE 為止）
         Matcher m = Pattern.compile("UPDATE\\s+orders\\b(.*?)\\bWHERE\\b",
                 Pattern.DOTALL | Pattern.CASE_INSENSITIVE).matcher(code);
         int updates = 0;
@@ -222,8 +219,6 @@ class OrderCancelTimestampSqlTest {
                     .doesNotContain("total_actual_amount");
         }
 
-        // 🔴 對照組：真的抓到了 UPDATE 句，而且抓得到「確實會被改的欄位」。
-        //    少了它，regex 落空時本測試會 0 次迴圈然後安靜地通過。
         assertThat(updates)
                 .as("抓到的 UPDATE orders 句數異常偏低 ⇒ regex 落空，綠燈是假的")
                 .isGreaterThan(10);
@@ -232,7 +227,6 @@ class OrderCancelTimestampSqlTest {
                 .contains("refund_total_amount");
     }
 
-    // ==================== helpers ====================
 
     /**
      * 讀 {@link OrderRepository} 上每個 {@code @Update} 的字面值，取 SET 到 WHERE 之間那段。

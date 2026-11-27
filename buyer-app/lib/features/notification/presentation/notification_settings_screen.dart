@@ -23,7 +23,6 @@ import 'widgets/notification_type_icon.dart';
 class NotificationSettingsScreen extends HookConsumerWidget {
   const NotificationSettingsScreen({super.key});
 
-  // 分類 → 圖示（只決定圖示，不含文字）。
   static const _categoryIcon = <NotificationCategory, NotificationIconKind>{
     NotificationCategory.NOTIFICATION_CATEGORY_ORDER:
         NotificationIconKind.order,

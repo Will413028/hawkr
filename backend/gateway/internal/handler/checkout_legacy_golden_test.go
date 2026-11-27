@@ -22,51 +22,10 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// ---------------------------------------------------------------------------
-// 這個檔案問一個問題：**結帳被打壞了沒有？**
-// ---------------------------------------------------------------------------
-//
-// 既有的 checkout_preservedata_e2e_test.go 斷言的是「形狀對不對」——它自己寫下
-// 期望值，然後檢查回應符合期望。那證明得了「現在的行為符合我認為正確的樣子」，
-// 證明不了「現在的行為與改動之前逐位元相同」。兩者的差別正是回歸測試的全部價值：
-// 期望值是我寫的，我如果對舊行為的理解本身就錯了，斷言會跟著錯。
-//
-// 所以本檔不寫期望值，改成**兩套 stack 跑同一份 proto fake，比對 body bytes**：
-//
-//	legacy  ＝ 改動前的 gateway：interceptor 對 preserveData 碼無條件 return nil
-//	          ＋ 完全沒有 bizcarrier.Middleware（⇒ response 層的 guard 全程 no-op）
-//	current ＝ 現在的 gateway：production 的 EnvelopeGuardInterceptor ＋ bizcarrier.Middleware
-//
-// legacy 那半邊的 interceptor 是從 `git diff gateway/internal/grpc/
-// envelope_guard_interceptor.go` 的**被刪除行**逐行抄回來的（見 legacyEnvelopeGuard
-// 的註解），不是我對舊行為的印象。
-//
-// 第三套 stack（noCarrier ＝ production interceptor 但沒掛 middleware）是
-// **Arm 失敗的劇本**：它不是假想的，它就是「有人把 r.Use(bizcarrier.Middleware())
-// 移到 SetupRoutes 之後」「有人在另一個 engine 上掛了結帳路由」「有人把 checkout
-// 的 RPC 改成吃 detached context」這三件事共同的可觀測結果。本檔把那個結果的
-// **實際 body** 記下來，讓「降級有多痛」不再是形容詞。
 
-// ---------------------------------------------------------------------------
-// legacy replica
-// ---------------------------------------------------------------------------
 
-// legacyPreserveData 是改動前 envelopeCodePreserveData 名單裡與結帳有關的三個碼。
-// 本檔只餵這三個碼與 0，所以複製這三筆就足以忠實重現舊行為；其餘碼走下面的
-// fallback（與舊碼同一支 `{FailedPrecondition, preserveBizCode:true}`）。
 var legacyPreserveData = map[int32]bool{4001: true, 4091: true, 4092: true}
 
-// legacyEnvelopeGuard 是改動**前**的 EnvelopeGuardInterceptor。
-//
-// 逐行對照 `git diff` 的被刪除行：
-//
-//	if !ok || resp.GetCode() == 0 { return nil }        // 合成一條，且沒有 Disarm
-//	code := resp.GetCode()
-//	msg  := ...
-//	if envelopeCodePreserveData[code] { return nil }    // 🔴 無條件，沒有 Arm
-//	mapping, found := envelopeCodeToGRPC[code]
-//	if !found { mapping = {FailedPrecondition, preserveBizCode:true} }
-//	...
 func legacyEnvelopeGuard() gogrpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any,
 		cc *gogrpc.ClientConn, invoker gogrpc.UnaryInvoker, opts ...gogrpc.CallOption) error {
@@ -89,16 +48,12 @@ func legacyEnvelopeGuard() gogrpc.UnaryClientInterceptor {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 可腳本化的 order-service 替身（四支結帳 RPC 全含）
-// ---------------------------------------------------------------------------
 
 type checkoutScript struct {
 	preview     *orderpb.CheckoutPreviewResponse
 	confirm     *orderpb.CheckoutConfirmResponse
 	validate    *orderpb.CheckoutValidateResponse
 	shippingFee *orderpb.CheckoutShippingFeeResponse
-	// byCheckoutID 讓同一台 server 依請求內容回不同腳本，供併發污染測試使用。
 	byCheckoutID map[string]*orderpb.CheckoutConfirmResponse
 }
 
@@ -131,9 +86,9 @@ func (g *checkoutGoldenServer) CheckoutShippingFee(context.Context, *orderpb.Che
 type stackMode int
 
 const (
-	stackLegacy    stackMode = iota // 改動前
-	stackCurrent                    // 改動後（production 接線）
-	stackNoCarrier                  // 改動後但 carrier 缺席 ⇒ Arm 回 false
+	stackLegacy    stackMode = iota
+	stackCurrent
+	stackNoCarrier
 )
 
 func newCheckoutGoldenRouter(t *testing.T, s *checkoutScript, mode stackMode) http.Handler {
@@ -168,8 +123,6 @@ func newCheckoutGoldenRouter(t *testing.T, s *checkoutScript, mode stackMode) ht
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	if mode == stackCurrent {
-		// production 掛在 newEngine 的全域鏈上（infrastructure/di.go）；
-		// legacy 沒有它，noCarrier 刻意不掛。
 		r.Use(bizcarrier.Middleware())
 	}
 	app := r.Group("/api/v1/app/checkout")
@@ -191,16 +144,12 @@ func goldenPOST(t *testing.T, r http.Handler, path string, body map[string]any) 
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1"+path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
-	// 🔴 fakeJWTAuth 靠這個 header 認人；漏掉的話每一條請求都在 handler 之前就被
-	// 401 擋掉，而「401 vs 401」逐位元相同 —— 本檔第一版就是這樣 12/12 全綠地
-	// 什麼都沒測到（量測要有鑑別力）。assertReachedHandler 是為此加的護欄。
 	req.Header.Set("X-Account-Id", "100")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
 }
 
-// assertReachedHandler 擋住「兩邊都被 middleware 攔掉，於是逐位元相同」這種假綠。
 func assertReachedHandler(t *testing.T, w *httptest.ResponseRecorder, who string) {
 	t.Helper()
 	if w.Code == http.StatusUnauthorized || w.Code == http.StatusNotFound {
@@ -209,13 +158,8 @@ func assertReachedHandler(t *testing.T, w *httptest.ResponseRecorder, who string
 	}
 }
 
-// ---------------------------------------------------------------------------
-// fixtures（形狀全部來自 api/proto/order/order.proto，不是手寫的「我以為的」回應）
-// ---------------------------------------------------------------------------
 
 func goldenUnavailable() []*orderpb.UnavailableItem {
-	// 四個 reason 全覆蓋：proto 的註解列的就是這四個
-	// （DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）。
 	return []*orderpb.UnavailableItem{
 		{SkuId: "510", SkuName: "有機高麗菜", Reason: "INSUFFICIENT_STOCK", RequestedQty: "5", AvailableQty: "2"},
 		{SkuId: "511", SkuName: "溫室小黃瓜", Reason: "OUT_OF_STOCK", RequestedQty: "1", AvailableQty: "0"},
@@ -267,9 +211,6 @@ func goldenConfirmReq(checkoutID string) map[string]any {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 主測試：legacy vs current 逐位元
-// ---------------------------------------------------------------------------
 
 type goldenCase struct {
 	name   string

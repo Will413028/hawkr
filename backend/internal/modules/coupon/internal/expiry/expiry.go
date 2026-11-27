@@ -94,7 +94,6 @@ func (s *Service) Run(ctx context.Context) (int, error) {
 	}
 }
 
-// process 在一個 transaction 內處理最多 limit 張券；回傳鎖到的券 id（失敗時也回傳，供呼叫端逐張重試）與成功發布的數量。
 func (s *Service) process(ctx context.Context, now time.Time, after uuid.UUID, only *uuid.UUID, limit int32) (ids []uuid.UUID, emitted int, err error) {
 	onlyID := pgtype.UUID{}
 	if only != nil {

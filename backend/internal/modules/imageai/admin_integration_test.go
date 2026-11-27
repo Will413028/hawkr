@@ -22,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// wednesdayWeekStart 是 wednesday 所在那週的起點（週一 00:00 Asia/Taipei）。
 func wednesdayWeekStart() time.Time { return time.Date(2026, 11, 23, 0, 0, 0, 0, twtime.Taipei) }
 
 var admin = imageai.Actor{AdminID: 9, Action: "/test/Admin"}
@@ -297,11 +296,9 @@ func TestDefaultStyleRulesAgainstTheRealConstraints(t *testing.T) {
 	if n := f.auditRows(t, "ai_style", created.ID.String()); n != 2 {
 		t.Fatalf("新預設的稽核列數 = %d，預期 2（新增與設成預設）", n)
 	}
-	// 已經是預設：成功、不寫稽核。
 	if _, err := f.m.SetDefaultStyle(ctx, admin, created.ID, 0); err != nil || f.auditRows(t, "ai_style", created.ID.String()) != 2 {
 		t.Fatalf("重複設定：err = %v", err)
 	}
-	// 停用的風格不能設成預設（CHECK 之前就被擋）。
 	other, err := f.m.CreateStyle(ctx, newStyle("t2"))
 	if err != nil {
 		t.Fatal(err)
@@ -313,7 +310,6 @@ func TestDefaultStyleRulesAgainstTheRealConstraints(t *testing.T) {
 	if _, err := f.m.SetDefaultStyle(ctx, admin, disabled.ID, 0); kind(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("設定停用的風格：err = %v", err)
 	}
-	// 舊預設現在可以刪。
 	if err := f.m.DeleteStyle(ctx, admin, oldDefault.ID, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +389,6 @@ func TestQuotaAdminAgainstTheRealStore(t *testing.T) {
 	if _, err := f.m.UpdateQuota(ctx, imageai.UpdateQuotaInput{Actor: admin, StoreID: 404, WeeklyLimit: 4}); kind(err) != apperr.KindNotFound {
 		t.Fatalf("店不存在：err = %v", err)
 	}
-	// 用量讀回本週已用的次數。
 	exec(t, f.d, `INSERT INTO imageai.usage (store_id, period_start, used, updated_at) VALUES (11, $1, 2, now())`, wednesdayWeekStart())
 	got, err = f.m.GetQuota(ctx, 11)
 	if err != nil || got.WeeklyUsage != 2 || got.WeeklyLimit != 3 || !got.Custom {

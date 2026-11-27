@@ -76,8 +76,6 @@ describe("Dropdown", () => {
 	});
 
 	it.each([
-		// A resting floating label stands in for the placeholder, so no value
-		// text is shown or named until the field is focused or filled.
 		["visible label only", visibleLabelOnly, "產地 請選擇產地"],
 		["floatingLabel only", floatingLabelOnly, "產地"],
 	])(

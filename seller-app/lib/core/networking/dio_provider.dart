@@ -43,17 +43,14 @@ Dio dio(Ref ref) {
       baseUrl: F.appFlavor.gatewayHost,
       connectTimeout: Duration(milliseconds: F.appFlavor.apiTimeout),
       receiveTimeout: Duration(milliseconds: F.appFlavor.apiTimeout),
-      // X-App-*（可觀測性）與 X-Active-Role（視角），都不是授權依據。
       headers: {'Content-Type': 'application/json', ...appVersionHeaders()},
     ),
   );
 
   dio.addSentry();
 
-  // ─── 1. Auth Interceptor ───
   dio.interceptors.add(sessionTokenInterceptor(() => currentSessionToken(ref)));
 
-  // ─── 2. Logging Interceptor ───
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) {
@@ -98,8 +95,6 @@ Dio dio(Ref ref) {
             '  Status: ${response.statusCode} ${response.statusMessage}',
           );
           if (response.data != null) {
-            // Binary 響應（例如 ResponseType.bytes 下載圖片）直接印長度，
-            // 不要嘗試 JSON encode — 否則會變成 [137, 80, 78, ...] 的 byte array。
             if (response.requestOptions.responseType == ResponseType.bytes ||
                 response.data is List<int>) {
               final len = response.data is List
@@ -163,13 +158,7 @@ Dio dio(Ref ref) {
     ),
   );
 
-  // ─── 3. Unauthorized Interceptor ───────────────────────────────────────────
-  //
-  // token 是 Keychain 裡的 opaque token（ADR 2026-10-30-identity-self-hosted-federated-login），不換新：401 代表
-  // session 已結束（過期或被撤銷），登出時清除 token，由 router redirect 回到登入頁。
 
-  // 停權的帳號對 REST 的非 GET／HEAD 回 403，envelope 的 reason 是 ACCOUNT_SUSPENDED：前景請求進入受限狀態；
-  // 沒有 reason 的 403 是一般拒絕，不觸發任何事。背景寫入靜默。
   void handleAccountSuspended(
     int? status,
     RequestOptions options,
@@ -189,7 +178,6 @@ Dio dio(Ref ref) {
 
   dio.interceptors.add(
     InterceptorsWrapper(
-      // 處理 validateStatus: (_) => true 的情況（ApiRequestHelper 預設）
       onResponse: (response, handler) async {
         handleAccountSuspended(
           response.statusCode,
@@ -201,7 +189,6 @@ Dio dio(Ref ref) {
         }
         return handler.next(response);
       },
-      // 處理預設 validateStatus（Dio 對 401 拋出 DioException）的情況
       onError: (error, handler) async {
         handleAccountSuspended(
           error.response?.statusCode,
@@ -216,13 +203,6 @@ Dio dio(Ref ref) {
     ),
   );
 
-  // ─── 4. Suspension Interceptor（46 §7.2）───
-  //
-  // 賣家帳號停權時，能力層 deny 一律回 envelope code=9240（HTTP 409，已登錄
-  // Gateway bizCodePassthrough，非 message `[NNNN]` 前綴 fallback）。
-  // ApiRequestHelper 走 `validateStatus:(_)=>true`，409 落在 onResponse；
-  // 未走該 helper 的直接 dio 呼叫（預設 validateStatus）409 會拋 DioException
-  // 落在 onError——比照上面 401 攔截器，兩條路徑都要攔，否則會漏判。
   void handleSuspensionSignal(dynamic data) {
     if (!isSellerSuspensionPayload(data)) return;
     ref.read(sessionProvider.notifier).onSellerSuspendedSignal();

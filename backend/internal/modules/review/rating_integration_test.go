@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// runRatings 跑一輪評分投影（週期 job 的內容）。
 func (f *fixture) runRatings(t *testing.T) {
 	t.Helper()
 	if err := f.module.RunRatingProjection(context.Background()); err != nil {

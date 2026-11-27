@@ -41,7 +41,6 @@ type Resumer struct {
 	Submitter run.Submitter
 }
 
-// 欄位違規指出的欄位名（ResumeInput 的 Go 欄位名）。
 const (
 	fieldOptionID = "OptionID"
 	fieldFreeText = "FreeText"
@@ -81,7 +80,6 @@ func (r Resumer) Resume(ctx context.Context, in ResumeInput) (Resumed, error) {
 	return Resumed{RunID: got.ID, Status: got.Status}, nil
 }
 
-// checkShape 把 CheckAnswer 的結果轉成帶欄位違規的 INVALID_ARGUMENT。
 func checkShape(p InterruptPayload, in ResumeInput) error {
 	if utf8.RuneCountInString(trimtext.Trim(in.FreeText)) > MaxFreeTextRunes {
 		return apperr.InvalidInputOn([]string{fieldFreeText}, "回答的文字不能超過 %d 個字元", MaxFreeTextRunes)

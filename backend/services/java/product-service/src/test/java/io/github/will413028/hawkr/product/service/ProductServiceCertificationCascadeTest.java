@@ -43,7 +43,6 @@ class ProductServiceCertificationCascadeTest {
         e.setId(PRODUCT_ID);
         e.setStoreId(STORE_ID);
         e.setDeletedAt(null);
-        // 非 ACTIVE：略過 hashtag 與共發 seller tag 的 revalidate 分支，聚焦本測試的關注點
         e.setStatus(ProductStatus.INACTIVE.value());
         return e;
     }
@@ -78,7 +77,6 @@ class ProductServiceCertificationCascadeTest {
         try {
             productService.softDeleteProduct(String.valueOf(PRODUCT_ID), STORE_ID + 1);
         } catch (RuntimeException expected) {
-            // ProductAccessDeniedException
         }
 
         verify(certificationApplicationService, org.mockito.Mockito.never())
@@ -95,7 +93,6 @@ class ProductServiceCertificationCascadeTest {
         try {
             productService.softDeleteProduct(String.valueOf(PRODUCT_ID), STORE_ID);
         } catch (RuntimeException expected) {
-            // ProductNotFoundException
         }
 
         verify(certificationApplicationService, org.mockito.Mockito.never())

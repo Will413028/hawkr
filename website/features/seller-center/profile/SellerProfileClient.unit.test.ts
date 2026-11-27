@@ -25,7 +25,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Init = Parameters<typeof create<typeof GetMyStoreResponseSchema>>[1];
 
-// 店家 query 的快取：換掉它就像 invalidate 之後 refetch 帶回新資料，訂閱者會重新渲染。
 const cache = vi.hoisted(() => {
 	const listeners = new Set<() => void>();
 	let current: unknown = null;
@@ -343,7 +342,6 @@ describe("SellerProfileClient writes", () => {
 		});
 		await save();
 		await waitFor(() => expect(mocks.updateMyStore).toHaveBeenCalledTimes(1));
-		// 背景 refetch 帶回別人寫入的版本：不可被當成自己的版本。
 		cache.set(
 			store({
 				...FIRST,
@@ -367,7 +365,6 @@ describe("SellerProfileClient writes", () => {
 		mocks.updateMyStore
 			.mockRejectedValueOnce(conflict())
 			.mockResolvedValueOnce({ etag: "e3" });
-		// 另一個 session 在這段期間改了介紹，版本推進到 e2。
 		const latest = store({
 			...FIRST,
 			store: { ...FIRST.store, description: "別處改過的介紹", etag: "e2" },
@@ -384,7 +381,6 @@ describe("SellerProfileClient writes", () => {
 		expect(mocks.toastError.mock.calls[0]?.[0]).toBe(
 			"商店資料已在其他地方更新",
 		);
-		// 使用者輸入保留，沒改的欄位顯示最新版本。
 		expect((screen.getByLabelText("商店名稱") as HTMLInputElement).value).toBe(
 			"衝突時輸入的店名",
 		);
@@ -412,7 +408,6 @@ describe("SellerProfileClient writes", () => {
 		fireEvent.change(await screen.findByLabelText("商店名稱"), {
 			target: { value: "輸入的店名" },
 		});
-		// 視窗聚焦的 refetch 早已把快取換成最新版本，衝突後的 invalidate 不會再改變它。
 		cache.set(store({ ...FIRST, store: { ...FIRST.store, etag: "e9" } }));
 		await save();
 		await waitFor(() => expect(mocks.toastError).toHaveBeenCalled());

@@ -56,9 +56,6 @@ function num(value: string | number | null | undefined): number {
 	return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-// #758 的 legacy fallback 到此為止：`handler.ProductItem` / `ProductDetail`
-// 的價格欄一律 camelCase（product.go:187-190、490-492），snake 分支從來沒有被
-// 走到過，而它的存在讓「後端還沒穩定」這個早就不成立的前提繼續看起來成立。
 function pickEffectiveMin(p: PriceFields): number {
 	return num(p.priceMin);
 }

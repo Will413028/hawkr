@@ -11,27 +11,7 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-// ---------------------------------------------------------------------------
-// 「同一判斷兩份實作」——#3089 第 8 項的缺陷類
-//
-// 讀端（can_retry，賣家／ADM 畫面上那顆按鈕的可見性）與寫端（applyRetry，端點 52）
-// 曾經各存一份狀態清單：讀端只認 FAILED_PERMANENT、寫端接受三個。後果是
-// FAILED_RETRY_EXHAUSTED 與 SELLER_ACTION_REQUIRED 下端點 52 實打回 200、
-// status→READY，而 ADM 畫面上那顆「安全重試」鍵**根本不渲染**（前端是條件渲染
-// 不是 disabled）⇒ 功能做好了，使用者按不到。
-//
-// 兩份清單已經合併成 adminRetryKindOf 一支。本測試守的是「未來有人又把它拆開」，
-// 以及**更上游的那一層**：Go 的清單與 SQL 的 allowed-from 是不是還對得上。
-//
-// 🔴 **fixture 從 SQL 原始碼解析，不手寫**（§0.3）：手寫一份「我覺得 SQL 是這樣寫的」
-// 清單，就是自己跟自己對，SQL 改了它不會紅。那正是這個缺陷類的成因。
-// ---------------------------------------------------------------------------
 
-// allowedFromInSQL 從 db/queries/invoice_operations.sql 解出某一支 CAS 的 allowed-from。
-//
-// 只認 `AND status = 'X'` 與 `AND status IN ('X', 'Y')` 兩種形態；解不出來就 Fatal
-// ——**看不到就要報錯，不是看不到就放行**（§3.10）。SQL 改成別的寫法時，
-// 正確的反應是本測試爆炸要人來看，而不是靜默回一個空集合然後全綠。
 func allowedFromInSQL(t *testing.T, queryName string) map[string]bool {
 	t.Helper()
 	path := filepath.Join("..", "..", "db", "queries", "invoice_operations.sql")
@@ -45,12 +25,10 @@ func allowedFromInSQL(t *testing.T, queryName string) map[string]bool {
 	if start < 0 {
 		t.Fatalf("SQL 裡找不到 %q —— 它被改名或刪掉了，而 Go 這邊沒跟上", queryName)
 	}
-	// 到下一支 query 為止（或檔尾）。
 	body := src[start:]
 	if next := strings.Index(body[len("-- name: "):], "-- name: "); next >= 0 {
 		body = body[:next+len("-- name: ")]
 	}
-	// 只看述詞，不看註解：註解裡也寫著狀態名，算進來就會得到一份「看起來對」的假清單。
 	var stmt strings.Builder
 	for _, line := range strings.Split(body, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), "--") {
@@ -78,8 +56,6 @@ func TestAdminRetryKindMatchesSQLAllowedFrom(t *testing.T) {
 	afterFix := allowedFromInSQL(t, "AdminRetryInvoiceOperationAfterFix")
 	reset := allowedFromInSQL(t, "AdminResetInvoiceOperationAttempts")
 
-	// 兩支 CAS 的 allowed-from 不得重疊：重疊代表同一個狀態有兩條 J 邊，
-	// 而 applyRetry 只會走其中一條 ⇒ 另一條永遠不會發生，卻沒有人知道。
 	for s := range afterFix {
 		if reset[s] {
 			t.Errorf("%s 同時出現在兩支 CAS 的 allowed-from —— applyRetry 只走得到一條", s)

@@ -79,7 +79,6 @@ test("BadRequest 轉成以 proto 路徑為 key 的欄位錯誤", () => {
 		kind: "fields",
 		fields: {
 			"banner.title": "請輸入標題",
-			// 沒有 LocalizedMessage 時用 InvalidArgument 的預設文字，不退回開發者看的 description。
 			"banner.end_time": "參數錯誤",
 		},
 		message: "資料有誤",
@@ -122,7 +121,6 @@ test("fieldMessage 比對完整路徑、子欄位與索引，不比對同前綴�
 		fieldMessage({ "banner.actions_note": "x" }, "banner.action"),
 		undefined,
 	);
-	// 多個路徑依序找第一個有錯誤的。
 	assert.equal(
 		fieldMessage(fields, "banner.title", "banner.action"),
 		"網址格式錯誤",

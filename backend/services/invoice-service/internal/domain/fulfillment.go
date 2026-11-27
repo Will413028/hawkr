@@ -68,20 +68,6 @@ func ResolveFulfillmentMode(in FulfillmentInput) FulfillmentDecision {
 
 	switch in.SellerReviewStatus {
 	case codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value:
-		// 免用統一發票賣家：這條線是**收據**不是發票，本地產生收據 PDF、不打 AMEGO
-		// （§7.1.2 S-6：「INV.op 不打 AMEGO，改走本地 PDF 產生」）。
-		//
-		// 🔴 授權是硬前置，不是「有更好、沒有也行」（#3026，2026-09-02）：
-		// 收據的出據人是**賣家**（Q-B7），平台是代製方。沒有 S05 授權就產出一份
-		// 印著他的法定名稱、統編與營業地址的對外文件，等於以他的名義出具他沒同意的東西。
-		// ⇒ 未授權時落 AWAITING_MANUAL ＋ RECEIPT_AUTH_MISSING，讓 ADM 去催。
-		//
-		// ⚠️ **不落 NOT_APPLICABLE**：那是終態，這筆訂單會再也沒有人回頭補收據
-		// ——那正是 #3022→#3026 那一輪的教訓（誠實地說「沒開通」，然後買家永遠沒有憑證）。
-		//
-		// 歷史：2026-09-02 之前這一格因收據產製未落地而落 NOT_APPLICABLE ＋
-		// RECEIPT_NOT_AVAILABLE（#3022 的短期修法）。收據產製上線後那個理由碼成為死碼，
-		// 已依 §8.5 從碼表移除。
 		if !in.SellerReceiptAuthorized {
 			return FulfillmentDecision{
 				FulfillmentMode:  codemeta.InvoiceFulfillmentModePlatformReceipt.Value,
@@ -103,9 +89,7 @@ func ResolveFulfillmentMode(in FulfillmentInput) FulfillmentDecision {
 			NotApplicableReason: codemeta.InvoiceNotApplicableReasonSelfIssue.Value,
 		}
 	case codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value:
-		// 落到下面的 provider／切點判定。
 	default:
-		// DRAFT / SUBMITTED / UNDER_REVIEW / SUPPLEMENT_REQUIRED / REJECTED / EXPIRED / REVOKED
 		return FulfillmentDecision{
 			FulfillmentMode:     codemeta.InvoiceFulfillmentModeLegacyManual.Value,
 			DocumentKind:        kind,
@@ -132,7 +116,6 @@ func ResolveFulfillmentMode(in FulfillmentInput) FulfillmentDecision {
 		}
 	}
 
-	// fail-closed 三格。順序即優先序：平台出資券最先（它是稅務錯誤而不只是流程例外）。
 	if reason := failClosedReason(in); reason != "" {
 		return FulfillmentDecision{
 			FulfillmentMode:  codemeta.InvoiceFulfillmentModeAmegoAuto.Value,
@@ -177,8 +160,6 @@ func documentKindOf(buyerHasTaxID bool) string {
 	return codemeta.InvoiceDocumentKindB2c.Value
 }
 
-// providerUsable 正面列舉可用的 provider 狀態（§7.1.3 的 C 節點）。
-// 正面列舉而非 NOT IN：值域日後長胖時，新狀態預設是「不可用」而不是「靜默放行」。
 func providerUsable(status string) bool {
 	switch status {
 	case codemeta.InvoiceProviderAccountStatusActive.Value,

@@ -17,8 +17,6 @@ const (
 	testUnregisteredMethod = "/hawkr.account.AccountService/GetAccount"
 )
 
-// runLogging drives the unary interceptor once and returns the single log entry
-// it emitted for the call's outcome (the ".start" entry is filtered out).
 func runLogging(t *testing.T, fullMethod string, handlerErr error, opts ...LoggingOption) (observer.LoggedEntry, error) {
 	t.Helper()
 

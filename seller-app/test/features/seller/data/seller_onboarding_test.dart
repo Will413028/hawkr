@@ -212,7 +212,6 @@ void main() {
     });
 
     test('can_apply_store 為 false 而原因是空（未知值解碼後即為空）：仍擋，但沒有可顯示的原因', () {
-      // 這個版本不認得的值在 protobuf-dart 解碼時就被丟棄，所以線上形狀等同空列表。
       final block = storeOpeningBlock(
         GetMyStoreOpeningResponse(canApplyStore: false),
       );

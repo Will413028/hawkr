@@ -14,11 +14,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// correlationIDOf 取這一次往返的追查識別碼（#3031）。
-//
-// 先問 CorrelationInterceptor 種在 ctx 的值（gRPC 請求路徑），沒有就退回 OTel 的
-// trace id（排程 worker 路徑）。兩者都沒有時回空字串——那是合法的（例如本機測試），
-// 欄位保持 NULL 而不是塞一個編出來的值。
 func correlationIDOf(ctx context.Context) string {
 	if cid := interceptor.CorrelationIDFromContext(ctx); cid != "" {
 		return cid
@@ -29,13 +24,6 @@ func correlationIDOf(ctx context.Context) string {
 	return ""
 }
 
-// repoAuditSink 把 AMEGO 的每一次往返落進 invoice_provider_audit_logs（§8.2.1 的
-// 三種必要紀錄之一，5 年保存）。
-//
-// 在它接上之前這裡是 amego.NoopAuditSink ⇒ **發票開得出來、稽核表一列都沒有**。
-// 2026-08-30 的 dev E2E 實際踩到：document 是 ISSUED、發票號碼回填了，而
-// invoice_provider_audit_logs 是 0 列。沒有任何測試會紅，因為沒有任何斷言看它。
-// 那張表是 5 年後被稽核時「我方到底送了什麼給光貿」的唯一證據。
 type repoAuditSink struct {
 	repo domain.AuditRepository
 	log  *zap.Logger
@@ -61,7 +49,6 @@ func (s *repoAuditSink) Record(ctx context.Context, ex amego.Exchange) {
 		s.logFail(ex, "marshal request", err)
 		return
 	}
-	// ResponseMasked 是原文字串；包成 JSON 字串以符合 jsonb 欄位。
 	respJSON, err := json.Marshal(ex.ResponseMasked)
 	if err != nil {
 		s.logFail(ex, "marshal response", err)
@@ -91,9 +78,6 @@ func (s *repoAuditSink) Record(ctx context.Context, ex amego.Exchange) {
 		c := ex.ProviderCode
 		entry.ProviderCode = &c
 	}
-	// #3089 第 7 項：與 provider_code 成對的訊息原文。proto 的
-	// ProviderExchangeItem.provider_message 逐字要求「必須同時保存 msg」，
-	// 而在此之前**這一欄根本不存在於 DB**，ADM 因此分不出同一個數字碼的兩種語意。
 	if ex.ProviderMessage != "" {
 		m := ex.ProviderMessage
 		entry.ProviderMessage = &m
@@ -102,16 +86,6 @@ func (s *repoAuditSink) Record(ctx context.Context, ex amego.Exchange) {
 		k := ex.ErrorKind
 		entry.ErrorKind = &k
 	}
-	// #3031：correlation_id ——「這一次往返」在我方 log／trace 上的識別碼。
-	//
-	// 🔴 在此之前**從來沒有人填它**（dev 實測 2397 列全部 NULL），而
-	// ProviderExchangeItem.request_id 與 SellerProviderAccountData.last_request_id
-	// 兩個對外欄位都以它為來源 ⇒ 那兩欄接上之後仍然恆為空。
-	// 「有賦值但值恆為空」是 producer gate 第一種擋不住的形態，只有實機驗得到。
-	//
-	// 兩段來源：gRPC 請求路徑由 CorrelationInterceptor 種進 ctx；排程 worker
-	// （INV.op 是主要的呼叫者）沒有請求可種 ⇒ 退回 OTel 的 trace id，
-	// 那也是拿去 Loki／Tempo 追同一次呼叫的那個值。
 	if cid := correlationIDOf(ctx); cid != "" {
 		entry.CorrelationID = &cid
 	}
@@ -125,8 +99,6 @@ func (s *repoAuditSink) Record(ctx context.Context, ex amego.Exchange) {
 }
 
 func (s *repoAuditSink) logFail(ex amego.Exchange, stage string, err error) {
-	// 🔴 遞增在 nil-logger 早退**之前**：計數是這條路徑的唯一機械訊號，
-	// 讓它依賴「有沒有裝 logger」等於把訊號綁在一個與失敗無關的條件上。
 	amego.ObserveAuditWriteFailed()
 	if s.log == nil {
 		return

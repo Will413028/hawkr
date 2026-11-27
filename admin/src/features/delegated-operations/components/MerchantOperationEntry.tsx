@@ -41,9 +41,6 @@ function startErrorMessage(code: string): string {
 	const fallback = `代行營運服務拒絕了這次申請（代碼 ${code}）。`;
 	const known = START_ERROR_MESSAGES[code];
 	if (known) return known;
-	// 純數字 ⇒ 上游的業務碼（BFF 的 `safeUpstreamError` 會原樣帶過來）。文案走
-	// `authorization.ts` 那份既有的「業務碼 → 下一步」對照，不在這裡另建第二份：
-	// 兩份對照必然各自漂移，而漂移的方向剛好是同一個碼在兩個畫面上講不同的話。
 	if (/^\d+$/u.test(code)) {
 		return delegationAuthorizationErrorMessage(Number(code), fallback);
 	}
@@ -101,28 +98,18 @@ export default function MerchantOperationEntry({
 	const startErrorTraceId = startErrorCode
 		? searchParams.get("delegation_trace")
 		: null;
-	// 建立被拒的那一次 303 只帶得回機器碼，帶不回原因（原因是自由文字，塞進
-	// query 等於把可反射的文字放進網址）。改為重問一次 preflight —— 它是唯讀、
-	// 明文標示可安全重複呼叫的端點，且回的是**當下**的權威原因。
 	const startDenied = startErrorCode === "DELEGATED_OPERATION_DENIED";
 	const preflightQuery = useQuery({
 		queryKey: ["delegated-operation", "preflight", storeId],
 		queryFn: () => getDelegatedOperationPreflight(storeId),
-		// 商家列表可能同時顯示多個合格店家。只有管理員主動開啟對話框後
-		// 才向伺服器確認資格，避免每次列表 render 都批量核發 preflight。
-		// `resolveEligibility` 是單店畫面的例外（見 props 註解）。
 		enabled: enabled && (resolveEligibility || dialogOpen || startDenied),
 		retry: false,
 		staleTime: 30_000,
-		// 資格會在別的分頁被改掉（自己在另一家店開了工作階段、同事撤了授權）。
-		// 詳情頁的按鈕既然宣稱反映當下資格，回到這個分頁時就得重問一次。
 		refetchOnWindowFocus: dialogOpen || resolveEligibility,
 	});
 
 	if (!enabled) return null;
 
-	// 不合格的店家留一顆停用按鈕在原位：操作欄空白只說得出「這一列不能按」，說不出
-	// 為什麼，而原因就在該列自己的狀態裡（不必再問伺服器一次）。
 	if (blockedReason) {
 		return (
 			<div className="adm-operation-entry">
@@ -152,9 +139,7 @@ export default function MerchantOperationEntry({
 					title:
 						error instanceof DelegatedOperationClientError &&
 						error.status === 403
-							? // 中性標題：403 的成因不只「這家店不行」——9268 是「你自己
-								// 已有進行中的工作階段」，店家其實沒問題。真正的原因在
-								// message（後端下發的 deniedLabel）。
+							?
 								"目前無法開始代行"
 							: error instanceof DelegatedOperationClientError &&
 									(error.status === 404 || error.status === 503)
@@ -175,27 +160,13 @@ export default function MerchantOperationEntry({
 				}
 			: undefined;
 
-	// preflight 回 403 ⇒ 這一刻不能開始。原因是後端下發的 deniedLabel：9286「從未
-	// 開通」、9264「已撤回或已到期」、9272「已停權或關閉」、9269「別人正在代行」
-	// 的下一步各不相同，壓成同一句就把後端已經講清楚的事丟掉了。
 	const preflightDenial =
 		error instanceof DelegatedOperationClientError && error.status === 403
 			? error
 			: null;
 
-	// 建立失敗導回本頁時，優先顯示重問 preflight 拿到的當下原因；拒絕已解除
-	// （preflight 這次通過）就退回通用句 —— 那是一件已經發生過的事，不能宣稱
-	// 它現在還被拒。
 	const currentDenial = startDenied ? preflightDenial : null;
 
-	// 解析資格的畫面上，按鈕本身就是答案（設計書 6.1 的拒絕分支表：「入口按鈕不可用、
-	// 顯示原因」）。這與 entry-gating ①「不得用 disabled 掩飾權限」不衝突：那條守的是
-	// 前端已知的 session-create capability（`enabled`，已在上面早退），而 deniedLabel 是
-	// 伺服器逐次下發的原因，把它畫出來正是「不要掩飾」。
-	//
-	// 只有 403 進這裡。404／503／502 是「問不到」不是「不行」，那時保留可按的入口讓對話
-	// 框顯示錯誤與重試 —— 把暫時性故障畫成永久停用，管理員連重試的入口都沒有；伺服器端
-	// 本來就 fail-closed，前端不必替它再擋一次。
 	const eligibilityGateLabel = !resolveEligibility
 		? undefined
 		: preflightDenial

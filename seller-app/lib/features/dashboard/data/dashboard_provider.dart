@@ -57,7 +57,6 @@ class StoreDashboard extends _$StoreDashboard {
       if (!response.hasDashboard()) {
         throw StateError('GetMyDashboard 的回應沒有儀表板');
       }
-      // 被取代的讀取（之後又 build 過、或已釋放）的結果不算：狀態由最新的那次決定，保鮮期也只看它。
       if (generation == _generation) _refresher.markSucceeded();
       return response.dashboard;
     } catch (error) {

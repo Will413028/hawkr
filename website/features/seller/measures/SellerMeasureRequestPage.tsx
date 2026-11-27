@@ -256,7 +256,6 @@ function RequestForm({
 			leave();
 			return;
 		} catch (e) {
-			// 重讀這一筆用本檔匯入的 `fetchMyMeasure`，由伺服器判斷的欄位決定留下還是離開。
 			const outcome = await rules.settle(
 				e,
 				defaults,
@@ -277,8 +276,6 @@ function RequestForm({
 				case "fields":
 					setReasonError(outcome.fields.reason ?? null);
 					setEvidenceError(outcome.fields.evidence ?? null);
-					// `evidence_staged_tokens[i]` 指的是送出的第 i 個 token，用 token 記錄錯誤才不會因為之後
-					// 增刪照片而標錯張。
 					setItemErrors(
 						Object.fromEntries(
 							Object.entries(outcome.fields.evidenceByIndex).flatMap(

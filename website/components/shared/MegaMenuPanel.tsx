@@ -88,10 +88,7 @@ const BannerCarousel = dynamic(
 	() => import("@/components/shared/banner/BannerCarousel"),
 	{
 		ssr: false,
-		// Covers the brief gap before the carousel chunk mounts. A pulsing
-		// skeleton in the exact feature-card footprint (no animation, so the
 		// truck JSON stays out of the global navbar bundle) — once mounted the
-		// carousel takes over with the truck loader, then the real banner.
 		loading: () => <BannerLoadingSkeleton />,
 	},
 );
@@ -102,8 +99,6 @@ export interface MegaMenuPanelProps {
 	close: () => void;
 }
 
-// Only mounted inside an opened menu. Keep gateway reads out of the root
-// server streaming boundary and off the idle Navbar hydration path.
 export default function MegaMenuPanel({
 	item,
 	dynamicLinks: initialDynamicLinks,
@@ -139,16 +134,8 @@ export default function MegaMenuPanel({
 			{activeItem?.panel &&
 				(() => {
 					const allCols = activeItem.panel.columns;
-					// All text columns (商品分類 + 熱門 hashtag) stack vertically in
-					// the left rail; the right slot is reserved for the full banner
-					// block — matching the Hawkr 動態 panel's left-rail / right-feature
-					// split.
 
 					const renderColumn = (col: (typeof allCols)[number]) => {
-						// When a column is marked `source`, swap its static links
-						// for the prefetched list passed in via props. Empty source
-						// data renders a tasteful empty state (icon + message)
-						// inside the column instead of hiding or showing fake links.
 						const source = col.source;
 						const renderedLinks: NavMegaLink[] = source
 							? (dynamicLinks?.[source] ?? [])
@@ -183,10 +170,6 @@ export default function MegaMenuPanel({
 									>
 										{renderedLinks.map((link) =>
 											source === "hashtags" ? (
-												// Soft sage pill chips matching the Hawkr 動態 feed's
-												// hashtag UI (.post-viewer__hashtag): rounded, brand-
-												// green tint, wrapping horizontally — instead of a
-												// plain vertical link list.
 												<li key={link.href + link.label}>
 													<Link
 														href={link.href}
@@ -227,11 +210,6 @@ export default function MegaMenuPanel({
 					};
 
 					return (
-						// Panel surface: warm off-white base with barely-there sage
-						// (top-left) and honey (bottom-right) corner glows plus a soft
-						// top sheen for paper-like depth in light mode; dark mode drops
-						// the glow layers and switches to the glass tint that pairs
-						// with the dark:backdrop-blur utilities below.
 						<>
 							<div className="flex-[0_0_280px] grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[var(--hkui-space-8)] [@media(max-width:840px)]:w-full [@media(max-width:840px)]:flex-none max-[768px]:grid-cols-1 max-[768px]:gap-[var(--hkui-space-5)]">
 								{allCols.map(renderColumn)}
@@ -326,25 +304,18 @@ function WeeklyTopPostCarousel({
 	const [drag, setDrag] = React.useState(0);
 	const [dragging, setDragging] = React.useState(false);
 	const startX = React.useRef<number | null>(null);
-	// Tracks whether the current gesture moved far enough to count as a
-	// swipe — used to swallow the click on <Link> so a drag never also
-	// navigates to the post.
 	const movedRef = React.useRef(false);
 	const multi = posts.length > 1;
-	// `aria-controls` target for the dot tablist.
 	const slideRegionId = React.useId();
 	const reducedMotion = usePrefersReducedMotion();
 
 	const step = React.useCallback(
 		(dir: number) => {
-			// Swipe stops at the ends; autoplay below ping-pongs to loop.
 			setActive((i) => Math.max(0, Math.min(posts.length - 1, i + dir)));
 		},
 		[posts.length],
 	);
 
-	// Autoplay ping-pongs (0→…→last→…→0) so each tick is a single adjacent
-	// slide — a modulo wrap would slide the whole track back across every card.
 	const dirRef = React.useRef(1);
 	const advance = React.useCallback(() => {
 		setActive((i) => {
@@ -362,7 +333,6 @@ function WeeklyTopPostCarousel({
 		onTick: advance,
 	});
 
-	// Snap back to a valid index if the source list shrinks.
 	React.useEffect(() => {
 		if (active >= posts.length) setActive(0);
 	}, [active, posts.length]);
@@ -378,8 +348,6 @@ function WeeklyTopPostCarousel({
 		if (startX.current === null) return;
 		let dx = e.clientX - startX.current;
 		if (Math.abs(dx) > 6) movedRef.current = true;
-		// Rubber-band resistance at the ends — nothing to reveal past the
-		// first / last post.
 		if ((active === 0 && dx > 0) || (active === posts.length - 1 && dx < 0))
 			dx *= 0.3;
 		setDrag(dx);
@@ -412,12 +380,9 @@ function WeeklyTopPostCarousel({
 			 *  biome-ignore lint/a11y/noStaticElementInteractions: swipe is a progressive enhancement; the dot tablist and each 看貼文 link remain the accessible, keyboard-operable controls. */}
 			<div
 				id={slideRegionId}
-				// gap-[16px] puts space between slides; the translate offsets by
-				// that same 16px per slide so the active card still lands flush.
 				className="flex w-full gap-[16px] select-none touch-pan-y [&_img]:pointer-events-none"
 				style={{
 					transform: `translate3d(calc(${-active * 100}% - ${active * 16}px + ${drag}px),0,0)`,
-					// Reduced motion still swaps the slide, it just does not slide.
 					transition:
 						dragging || reducedMotion
 							? "none"
@@ -467,8 +432,7 @@ function WeeklyTopPostCarousel({
 										</svg>
 									</div>
 								)}
-								{/* gentle bottom scrim so the overlaid chips stay legible
-								    over busy product photos */}
+
 								<div className="absolute inset-x-0 bottom-0 h-1/3 bg-[linear-gradient(to_top,var(--page-mega-scrim),transparent)] pointer-events-none" />
 								<span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-[var(--page-mega-chip-bg)] backdrop-blur-sm px-2 py-0.5 text-xs font-bold tracking-[0.04em] text-white">
 									本週主題
@@ -506,8 +470,6 @@ function WeeklyTopPostCarousel({
 								<Link
 									href={`/feed?post=${encodeURIComponent(String(p.id))}`}
 									onClick={(e) => {
-										// A swipe ends with a synthetic click — swallow it so
-										// dragging the track never navigates.
 										if (movedRef.current) {
 											e.preventDefault();
 											return;

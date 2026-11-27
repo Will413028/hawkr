@@ -72,7 +72,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 	useEffect(() => {
 		const host = document.createElement("div");
-		// body 的直接子項：帶 exempt，否則有 modal（含手機導覽抽屜）開著時整個被 inert 與 aria-hidden。
 		host.setAttribute(MODAL_EXEMPT_ATTRIBUTE, "");
 		document.body.appendChild(host);
 		setBodyHost(host);
@@ -85,7 +84,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 	const showToast = useCallback(
 		(message: string, tone: ToastTone = "success") => {
 			setToast({ message, tone });
-			// 新的 toast 取代舊的，舊的計時器不能把新的關掉。
 			clearTimeout(timer.current);
 			timer.current = setTimeout(() => setToast(null), TOAST_MS);
 		},

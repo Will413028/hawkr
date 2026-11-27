@@ -238,7 +238,6 @@ class ProfileScreen extends HookConsumerWidget {
         if (image == null) return;
         if (!context.mounted) return;
 
-        // 顯示確認對話框（附預覽）
         final confirm = await showDialog<bool>(
           context: context,
           barrierDismissible: false,

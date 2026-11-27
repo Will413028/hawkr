@@ -109,8 +109,6 @@ export default function BrandLogo({
 				decoding="async"
 				loading={loading}
 				draggable={false}
-				// 兩個 SVG 都不是 LCP 候選；low 拿掉 React 19 SSR 自動塞的 preload
-				// （每頁 4 條），瀏覽器仍在首次繪製就抓，畫面行為不變。
 				fetchPriority="low"
 			/>
 			{darkSrc && (

@@ -142,7 +142,6 @@ func TestConcurrentOrderAndRefundOnSameOrder(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	const n = 12
-	// 訂單與全額退款：兩種順序的結果都是 0。
 	errs := parallel(2*n, func(i int) error {
 		o := fmt.Sprintf("OF%d", i/2)
 		buyer := buyer1 + int64(i/2)
@@ -161,7 +160,6 @@ func TestConcurrentOrderAndRefundOnSameOrder(t *testing.T) {
 		}
 		f.assertInvariant(storeA, buyer1+int64(i))
 	}
-	// 訂單與部分退款：兩種順序的結果都是 700。
 	seedBuyers(t, f.db, buyer2+1000, buyer2+1000+int64(n)-1)
 	errs = parallel(2*n, func(i int) error {
 		o := fmt.Sprintf("OP%d", i/2)
@@ -195,8 +193,6 @@ func TestConcurrentOrdersOfOneCustomer(t *testing.T) {
 		}
 		want += amount - refund
 	}
-	// 客戶列被更新後多持有 20ms 才放開（只拉寬「後到的語句在前一個 transaction 未提交時開始」的窗口，不是時間斷言）：
-	// 以 SUM 子查詢重算 total_spent 時，後到者用語句開始時的快照，會漏掉前一個剛提交的訂單。
 	f.exec(`CREATE FUNCTION crm.hold_customer_row() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.02); RETURN NULL; END $$`)
 	f.exec(`CREATE TRIGGER hold_customer_row AFTER INSERT OR UPDATE ON crm.customers FOR EACH ROW EXECUTE FUNCTION crm.hold_customer_row()`)
 	errs := parallel(orders*2, func(i int) error {

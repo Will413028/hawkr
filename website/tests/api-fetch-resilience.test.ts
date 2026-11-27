@@ -31,9 +31,6 @@ const okEnvelope = () =>
 		headers: { "content-type": "application/json" },
 	});
 
-// A mutation on one URI does not invalidate a sibling GET in the browser HTTP
-// cache, so authed/dynamic gateway reads must opt out of it — otherwise a soft
-// navigation serves stale data until a hard reload (the 下架→編輯 stale-status bug).
 test("browser-side requests opt out of the HTTP cache (no-store)", async () => {
 	respond = okEnvelope;
 	(globalThis as { window?: unknown }).window = {};
@@ -47,8 +44,6 @@ test("browser-side requests opt out of the HTTP cache (no-store)", async () => {
 });
 
 test("server-side requests do not force no-store (Data Cache intact)", async () => {
-	// No window stub → server branch. Forcing no-store here would opt cached
-	// routes out of Next's Data Cache / Cache Components.
 	respond = okEnvelope;
 	const { apiClient } = await import("../lib/api/client");
 	await apiClient.authed.get("/products/1");
@@ -63,11 +58,6 @@ test("an explicit cache option overrides the browser default", async () => {
 	assert.equal(lastInit?.cache, "force-cache");
 });
 
-// Regression: callers that treat "no session" as a normal outcome pass
-// throwOnHttpError:false and must NOT get a throw on the 401 — else they abort
-// mid-flight and Sentry logs a spurious UnauthorizedError. (logout() takes the
-// throwing default instead and tolerates UnauthorizedError itself, so a 503 —
-// the gateway saying it did NOT revoke — cannot pass for a sign-out.)
 test("401 with throwOnHttpError:false returns the envelope instead of throwing", async () => {
 	respond = () =>
 		new Response(
@@ -98,9 +88,6 @@ test("401 still throws UnauthorizedError by default (throwOnHttpError unset)", a
 	);
 });
 
-// D6 (ADR 2026-10-30-identity-self-hosted-federated-login): a server-originated request has no
-// Sec-Fetch-Site / Origin, so the monolith refuses a cookie-authenticated write. The caller hands the
-// visitor's session cookie over and it is forwarded on reads only.
 test("server side: an authed GET forwards the cookie the caller handed over, and never a Bearer", async () => {
 	respond = okEnvelope;
 	const { apiClient } = await import("../lib/api/client");

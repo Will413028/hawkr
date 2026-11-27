@@ -73,10 +73,6 @@ export default function CategoryFilterPopover({
 	tree,
 	selected,
 }: CategoryFilterPopoverProps) {
-	// The route is ISR: writing `?categories` via history.pushState re-reads the
-	// URL on the client (useUrlSearchParams) and re-filters in place — no server
-	// round trip, no useSearchParams bailout. Legacy single-value `category` and
-	// the stable-id csv `categories` are updated together.
 	const selectedKey = selected.join("\u001f");
 
 	const [open, setOpen] = React.useState(false);
@@ -188,12 +184,6 @@ export default function CategoryFilterPopover({
 		setOpen(true);
 	}, [updateCoords]);
 
-	// Recompute the panel anchor whenever the trigger could have moved
-	// (scroll / resize). Mobile CSS pins to bottom so the coordinates
-	// become a no-op there. We skip scrolls that originate inside the
-	// panel itself — the L2 list and chips strip both scroll internally,
-	// and re-running getBoundingClientRect on every keystroke of scroll
-	// caused the panel to thrash on re-render.
 	React.useEffect(() => {
 		if (!open) return;
 		updateCoords();
@@ -228,9 +218,6 @@ export default function CategoryFilterPopover({
 		};
 	}, [mounted, open, releaseMobileScrollLock]);
 
-	// Re-sync local state if the URL changes underneath us (e.g. user removes
-	// a chip from the applied-filters strip while the popover is closed). While
-	// open, the local selection intentionally stays ahead of streamed SSR props.
 	React.useEffect(() => {
 		if (open || isApplying) return;
 		const nextSelected =
@@ -238,7 +225,6 @@ export default function CategoryFilterPopover({
 		setChecked(new Set(nextSelected));
 	}, [isApplying, open, selectedKey]);
 
-	// Click-outside + Escape close the chooser. Checkbox changes already apply.
 	React.useEffect(() => {
 		if (!open) return;
 		const onKey = (e: KeyboardEvent) => {
@@ -272,7 +258,6 @@ export default function CategoryFilterPopover({
 			setAnnouncement("正在更新商品");
 			try {
 				updateUrlParams({
-					// Every new write removes the legacy name-only value.
 					category: null,
 					categories: next.size === 0 ? null : Array.from(next).join(","),
 				});
@@ -315,8 +300,6 @@ export default function CategoryFilterPopover({
 		void commitSelection(next);
 	};
 
-	// Map L1 name -> count of selected descendants (any depth), used for
-	// the badge on the master column entries.
 	const countsByL1 = React.useMemo(() => {
 		const out = new Map<string, number>();
 		for (const l1 of tree) {
@@ -479,9 +462,6 @@ export default function CategoryFilterPopover({
 																		onChange={() => {
 																			const wasChecked = isChecked;
 																			toggle(l2Token);
-																			// Mirror L3 expansion to the L2 check state:
-																			// checking expands the sub-options, unchecking
-																			// collapses them — a single click drives both.
 																			if (l3List.length > 0) {
 																				setExpandedL2((prev) => {
 																					const next = new Set(prev);

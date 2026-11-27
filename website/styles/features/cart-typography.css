@@ -1,7 +1,3 @@
-/* Hawkr cart type roles, adapted from Material 3's title/body scales.
- * Values are nominal at the default 16px root; existing user text settings
- * continue to scale rem units. No global font overrides.
- * Reference and platform mapping: design-system/cart-typography.md. */
 :where(
 		.cart-shell-page,
 		.cart-page__seller-group,

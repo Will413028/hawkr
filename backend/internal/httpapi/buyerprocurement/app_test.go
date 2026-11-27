@@ -45,7 +45,6 @@ func (buyerLookup) CurrentBuyerID(_ context.Context, account int64) (int64, erro
 	return 0, errors.New("沒有買家")
 }
 
-// fakeModule 的擁有者檢查與真實模組相同：不是自己的 run、中斷、對話回 NOT_FOUND。
 type fakeModule struct {
 	submitted []procurement.SubmitTurnInput
 	submitErr error
@@ -147,7 +146,6 @@ func (f *fakeModule) GetRuntimeSnapshot(_ context.Context, buyer int64, conv uui
 	return f.snapshot, nil
 }
 
-// cardStub 給每家店一張有名字的卡片，但店 404 沒有卡片（從沒公開過）。
 type cardStub struct{}
 
 func (cardStub) StoreCards(_ context.Context, ids []int64) ([]seller.StoreCard, error) {
@@ -682,7 +680,7 @@ func TestSubmitAnswerAndRewindMapModuleErrors(t *testing.T) {
 			if connect.CodeOf(err) != tc.code || reasonOf(t, err) != tc.reason {
 				t.Errorf("%s %s：%v，要 %v／%q", rpcName, name, err, tc.code, tc.reason)
 			}
-			if len(tc.fields) > 0 && (rpcName == "SubmitAnswer" || tc.fields[0] == "slot_key" || tc.fields[0] == "client_request_id") { // 倒回只有這兩個欄位違規
+			if len(tc.fields) > 0 && (rpcName == "SubmitAnswer" || tc.fields[0] == "slot_key" || tc.fields[0] == "client_request_id") {
 				if got := violationFields(t, err); fmt.Sprint(got) != fmt.Sprint(tc.fields) {
 					t.Errorf("%s %s：欄位 = %v，要 %v", rpcName, name, got, tc.fields)
 				}

@@ -124,7 +124,6 @@ class _CatalogPageState extends State<_CatalogPage> {
   @override
   void initState() {
     super.initState();
-    // Expose real Flutter controls for browser inspection.
     if (kIsWeb) {
       _semanticsHandle = SemanticsBinding.instance.ensureSemantics();
     }

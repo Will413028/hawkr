@@ -29,7 +29,6 @@ describe("付款完成頁的 invoiceMode 狀態句", () => {
 		for (const mode of ["", "AMEGO_SEMI_AUTO", "未來才會有的值"]) {
 			expect(checkoutPaidInvoiceNotice(mode)).not.toBe("");
 		}
-		// default 走的是最安全的方向：不宣稱已開立、也不把開票責任指給任何一方。
 		expect(checkoutPaidInvoiceNotice("AMEGO_SEMI_AUTO")).toBe(
 			checkoutPaidInvoiceNotice("AMEGO_AUTO"),
 		);

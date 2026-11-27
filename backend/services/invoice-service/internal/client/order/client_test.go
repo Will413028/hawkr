@@ -17,8 +17,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// fakeOrder 是一個真的 gRPC server（bufconn），不是 stub interface 的假物件：
-// deadline 是用 wire 上的 grpc-timeout header 傳的，換成假物件就完全測不到。
 type fakeOrder struct {
 	pb.UnimplementedOrderServiceServer
 
@@ -29,7 +27,6 @@ type fakeOrder struct {
 	gotDeadline time.Duration
 	hadDeadline bool
 
-	// Revise 那一支的錄音與腳本
 	reviseResp  *pb.ReviseOrderInvoiceSnapshotInternalResponse
 	reviseErr   error
 	gotRevise   *pb.ReviseOrderInvoiceSnapshotInternalRequest
@@ -142,7 +139,6 @@ func TestGetOrderInvoiceSnapshot_FieldMapping(t *testing.T) {
 	if len(s.Items) != 2 {
 		t.Fatalf("items 數 = %d", len(s.Items))
 	}
-	// 順序即 line_seq（§5A.3）：本層原樣保留 proto 的順序，不重排。
 	if s.Items[0].OrderItemID != 2685914682000001 || s.Items[0].SkuID != "0192a3b4-0000-7000-8000-000000000011" ||
 		s.Items[0].ProductName != "有機高麗菜" || s.Items[0].SkuName != "大顆" ||
 		s.Items[0].Quantity != 2 || s.Items[0].UnitPrice != 300 {
@@ -157,7 +153,7 @@ func TestGetOrderInvoiceSnapshot_FieldMapping(t *testing.T) {
 // 不能掉精度。用小數字測不出來。
 func TestGetOrderInvoiceSnapshot_TSIDPrecision(t *testing.T) {
 	d := fullSnapshot()
-	d.Items[0].OrderItemId = "9007199254740993" // 2^53 + 1：float64 表達不了
+	d.Items[0].OrderItemId = "9007199254740993"
 	srv := &fakeOrder{resp: okResp(d)}
 	c := newTestClient(t, srv, newPrefs(), 2*time.Second)
 
@@ -195,9 +191,9 @@ func TestGetOrderInvoiceSnapshot_FailClosedDiscountFunding(t *testing.T) {
 	}{
 		{"SELLER", "100", false},
 		{"PLATFORM", "100", true},
-		{"", "100", true},          // 判不出來 ⇒ fail-closed
-		{"", "0", false},           // 沒有折扣 ⇒ 資金來源無意義
-		{"WHO_KNOWS", "100", true}, // 值域外 ⇒ 同樣 fail-closed
+		{"", "100", true},
+		{"", "0", false},
+		{"WHO_KNOWS", "100", true},
 	}
 	for _, tc := range cases {
 		d := fullSnapshot()
@@ -270,7 +266,6 @@ func TestGetOrderInvoiceSnapshot_OwnershipMismatchSurfaces(t *testing.T) {
 	d.CarrierSelectionMode = codemeta.InvoiceCarrierSelectionModeExplicitPreference.Value
 	d.BuyerInvoicePreferenceId = "2685914682123456"
 
-	// 這一列屬於別的買家。
 	prefs := newPrefs(mobilePref(testPrefID, otherBuyerID))
 	prefs.plaintext[testPrefID] = "/T7R3U+P"
 
@@ -287,7 +282,6 @@ func TestGetOrderInvoiceSnapshot_OwnershipMismatchSurfaces(t *testing.T) {
 	if got.CarrierType.Code != "" || got.CarrierID1 != "" {
 		t.Fatalf("歸屬錯誤時不得交出載具：%+v", got)
 	}
-	// 陰性：品項與金額照樣要在（AWAITING_MANUAL 的文件仍要落明細供 ADM 判定）。
 	if len(got.Snapshot.Items) != 2 || got.Snapshot.TotalActualAmount != 980 {
 		t.Fatalf("歸屬錯誤不該連品項一起吞掉：%+v", got.Snapshot)
 	}
@@ -312,9 +306,6 @@ func TestGetOrderInvoiceSnapshot_DownstreamErrorsNeverReturnZeroValue(t *testing
 		{"gRPC NotFound", &fakeOrder{err: status.Error(codes.NotFound, "no such order")}, ErrOrderSnapshotNotFound},
 		{"gRPC Unavailable", &fakeOrder{err: status.Error(codes.Unavailable, "down")}, nil},
 		{"envelope code != 0", &fakeOrder{resp: &pb.GetOrderInvoiceSnapshotInternalResponse{Code: 4004, Message: "查無快照"}}, ErrOrderSnapshotNotFound},
-		// 🔴 code != 0 **且** data 非空：只有這一格驗得到「client 真的讀了 code」。
-		// 只給「code != 0 ＋ 無 data」時，拿掉 code 檢查後 data==nil 那條會回同一個
-		// 錯誤 ⇒ 假綠（PAY client 那側實測過）。
 		{"envelope code != 0 ＋ data 非空", &fakeOrder{resp: &pb.GetOrderInvoiceSnapshotInternalResponse{
 			Code: 4004, Message: "查無快照", Data: fullSnapshot()}}, ErrOrderSnapshotNotFound},
 		{"code=0 但 data 為 nil", &fakeOrder{resp: okResp(nil)}, ErrOrderSnapshotNotFound},
@@ -334,7 +325,6 @@ func TestGetOrderInvoiceSnapshot_DownstreamErrorsNeverReturnZeroValue(t *testing
 			if tc.wantIs != nil && !errors.Is(err, tc.wantIs) {
 				t.Fatalf("errors.Is(err, %v) = false；err = %v", tc.wantIs, err)
 			}
-			// 陰性：回 error 時不得同時交出一個看起來可用的快照。
 			if got.SnapshotVersion != 0 || len(got.Snapshot.Items) != 0 || got.Snapshot.TotalActualAmount != 0 {
 				t.Fatalf("回 error 時仍交出了部分值：%+v", got)
 			}

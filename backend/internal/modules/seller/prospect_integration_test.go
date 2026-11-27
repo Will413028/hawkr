@@ -25,10 +25,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// prospectAdmin 是管理員的 ID（沒有 FK，只記是誰做的）。
 const prospectAdmin = int64(9001)
 
-// newProspect 建立一個業者，mutate 改輸入。名稱預設唯一（T3 的名稱相同要刻意製造）。
 func (f *fixture) newProspect(t *testing.T, name string, mutate func(*CreateProspectInput)) Prospect {
 	t.Helper()
 	in := CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: name, VendorType: VendorBusiness}}
@@ -40,7 +38,6 @@ func (f *fixture) newProspect(t *testing.T, name string, mutate func(*CreatePros
 	return p
 }
 
-// contactList 把每個有值的欄位變成該類型唯一的（也是主要的）聯絡方式。
 func contactList(email, phone, website, social string) []ContactPoint {
 	var out []ContactPoint
 	for _, c := range []ContactPoint{{Kind: ContactEmail, Value: email}, {Kind: ContactPhone, Value: phone}, {Kind: ContactWebsite, Value: website}, {Kind: ContactSocial, Value: social}} {
@@ -63,7 +60,6 @@ func text(s string) *string {
 	return &s
 }
 
-// contactsOf 把聯絡方式寫成「類型:值」，主要的加 *，排序後比較。
 func contactsOf(p Prospect) []string {
 	out := make([]string, 0, len(p.Contacts))
 	for _, c := range p.Contacts {
@@ -77,7 +73,6 @@ func contactsOf(p Prospect) []string {
 	return out
 }
 
-// matchKeys 是業者的聯絡方式在資料庫裡的比對鍵（解析器的輸出，不對外）。
 func (f *fixture) matchKeys(t *testing.T, id int64) []string {
 	t.Helper()
 	ctx := context.Background()
@@ -101,7 +96,6 @@ func (f *fixture) prospectRow(t *testing.T, id int64) Prospect {
 	return p
 }
 
-// archive 以目前的版本封存。
 func (f *fixture) archive(t *testing.T, id int64) Prospect {
 	t.Helper()
 	p, err := f.module.ArchiveProspect(context.Background(), ArchiveProspectInput{ProspectID: id, AdminID: prospectAdmin, ExpectedVersion: f.prospectRow(t, id).Version})
@@ -109,7 +103,6 @@ func (f *fixture) archive(t *testing.T, id int64) Prospect {
 	return p
 }
 
-// merge 以兩邊目前的版本合併。
 func (f *fixture) merge(t *testing.T, winner, loser int64) Prospect {
 	t.Helper()
 	p, err := f.module.MergeProspects(context.Background(), f.mergeInput(t, winner, loser))
@@ -127,7 +120,6 @@ func (f *fixture) restore(t *testing.T, id int64, confirmed ...int64) (Prospect,
 	return f.module.RestoreProspect(context.Background(), RestoreProspectInput{ProspectID: id, AdminID: prospectAdmin, ConfirmedDistinct: confirmed})
 }
 
-// distinctPairs 是資料庫裡全部「不是同一家」的配對（小的在前，依序）。
 func (f *fixture) distinctPairs(t *testing.T) [][2]int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -144,7 +136,6 @@ func (f *fixture) distinctPairs(t *testing.T) [][2]int64 {
 	return out
 }
 
-// duplicatePairs 走完疑似重複清單的每一頁（每頁 1 筆，驗證分頁不漏不重）。
 func (f *fixture) duplicatePairs(t *testing.T) [][2]int64 {
 	t.Helper()
 	var pairs [][2]int64
@@ -168,7 +159,6 @@ func (f *fixture) duplicatePairs(t *testing.T) [][2]int64 {
 	}
 }
 
-// insertSharedKey 繞過模組，把一個聯絡方式（比對鍵相同）直接寫給另一個業者：模擬並行建立漏網的重複。
 func (f *fixture) insertContact(t *testing.T, prospectID int64, kind, value, matchKey string, primary bool) {
 	t.Helper()
 	ctx := context.Background()
@@ -176,7 +166,6 @@ func (f *fixture) insertContact(t *testing.T, prospectID int64, kind, value, mat
 	must(t, err)
 }
 
-// wantUniqueViolation 確認錯誤是資料庫的唯一性違反（繞過應用層直接寫入時的保底）。
 func wantUniqueViolation(t *testing.T, err error, constraint string) {
 	t.Helper()
 	var pgErr *pgconn.PgError
@@ -192,7 +181,6 @@ func wantKind(t *testing.T, err error, kind apperr.Kind) {
 	}
 }
 
-// wantMatchFound 確認錯誤是 PROSPECT_MATCH_FOUND（FailedPrecondition），而且 metadata 列出的相符業者剛好是 ids（由小到大）。
 func wantMatchFound(t *testing.T, err error, ids ...int64) {
 	t.Helper()
 	labels := make([]string, len(ids))
@@ -280,17 +268,14 @@ func TestTaxIDIsUniqueAmongLiveProspects(t *testing.T) {
 	first := f.newProspect(t, "甲", func(in *CreateProspectInput) { in.Fields.TaxID = text("12345678") })
 	_, err := f.module.CreateProspect(ctx, CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: "乙", VendorType: VendorBusiness, TaxID: text("12345678")}})
 	wantKind(t, err, apperr.KindAlreadyExists)
-	// 資料庫本身也拒絕（繞過應用層）。
 	_, err = f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.prospects (display_name, vendor_type, tax_id, created_at, updated_at) VALUES ('丙', 'BUSINESS', '12345678', now(), now())`)
 	wantUniqueViolation(t, err, "prospects_tax_id")
 	if _, err := f.module.CreateProspect(ctx, CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: "丁", VendorType: VendorBusiness, TaxID: text("1234567")}}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("bad format: %v", err)
 	}
-	// 修改撞到統編是 FailedPrecondition（該做的是合併），確認不是同一家也繞不過它。
 	other := f.newProspect(t, "戊", nil)
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: other.ID, ExpectedVersion: other.Version, AdminID: prospectAdmin, TaxID: ptr("12345678"), ConfirmedDistinct: []int64{first.ID}})
 	wantKind(t, err, apperr.KindFailedPrecondition)
-	// 封存之後統編讓出來。
 	f.archive(t, first.ID)
 	f.newProspect(t, "乙", func(in *CreateProspectInput) { in.Fields.TaxID = text("12345678") })
 }
@@ -319,11 +304,9 @@ func TestSharedContactKeyNeedsConfirmationThenIsRemembered(t *testing.T) {
 	if n := f.prospectCount(t); n != before || len(f.distinctPairs(t)) != 0 {
 		t.Fatalf("a rejected create wrote something: prospects %d -> %d pairs=%v", before, n, f.distinctPairs(t))
 	}
-	// 確認一個不相干的 ID 不算確認相符的那一個，也不會被記下。
 	stranger := f.newProspect(t, "路人", nil)
 	_, err := f.module.CreateProspect(ctx, CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: "乙", VendorType: VendorBusiness}, Contacts: contactList("sales@example.com", "", "", ""), ConfirmedDistinct: []int64{stranger.ID}})
 	wantMatchFound(t, err, holder.ID)
-	// 確認之後建立成功，配對在同一個 transaction 記下（較小的 ID 在前），而且不記沒有相符的 ID。
 	second, err := f.module.CreateProspect(ctx, CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: "乙", VendorType: VendorBusiness}, Contacts: contactList("sales@example.com", "", "", ""), ConfirmedDistinct: []int64{holder.ID, stranger.ID}})
 	must(t, err)
 	if got := f.distinctPairs(t); !slices.Equal(got, [][2]int64{{holder.ID, second.ID}}) {
@@ -337,14 +320,12 @@ func TestSharedContactKeyNeedsConfirmationThenIsRemembered(t *testing.T) {
 	if pairs := f.duplicatePairs(t); len(pairs) != 0 {
 		t.Fatalf("a confirmed pair is still listed: %v", pairs)
 	}
-	// 第三家撞到前兩家：兩家都要確認；只確認一家仍然被擋。
 	_, err = f.module.CreateProspect(ctx, CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: "丁", VendorType: VendorBusiness}, Contacts: contactList("SALES@example.com", "", "", ""), ConfirmedDistinct: []int64{holder.ID}})
 	wantMatchFound(t, err, holder.ID, second.ID)
 	f.newProspect(t, "丁", func(in *CreateProspectInput) {
 		withContact("SALES@example.com", "", "", "")(in)
 		in.ConfirmedDistinct = []int64{second.ID, holder.ID}
 	})
-	// 資料庫不強制比對鍵唯一（並行建立的兩筆都會成功）。
 	loose := f.newProspect(t, "戊", nil)
 	f.insertContact(t, loose.ID, "EMAIL", "sales@example.com", "EMAIL:sales@example.com", true)
 }
@@ -370,7 +351,6 @@ func TestDuplicatesAreUnresolvedPairsBySameNameOrSharedKey(t *testing.T) {
 	if got := f.duplicatePairs(t); !slices.Equal(got, want) {
 		t.Fatalf("pairs=%v, want %v", got, want)
 	}
-	// 每一對都說明命中的原因：名稱相同是 name，比對鍵相同是鍵的種類；名稱與鍵都相同時兩個都列。
 	h := f.newProspect(t, "雙重", withContact("both@example.com", "", "", ""))
 	i := f.newProspect(t, "雙重", nil)
 	f.insertContact(t, i.ID, "EMAIL", "both@example.com", "EMAIL:both@example.com", true)
@@ -391,10 +371,8 @@ func TestDuplicatesAreUnresolvedPairsBySameNameOrSharedKey(t *testing.T) {
 			t.Fatalf("pair %v matched_on=%v, want %v", pair, reasons[pair], on)
 		}
 	}
-	// 這兩筆只為了上面的斷言，封存之後不影響後面的清單。
 	f.archive(t, h.ID)
 	f.archive(t, i.ID)
-	// 標記不是同一家之後，那一對不再出現：名稱相同的一對（直接標記）與比對鍵相同的一對（經修改聯絡方式的確認流程）。
 	_, err = f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.prospect_distinct_pairs VALUES ($1, $2, $3, now())", a.ID, b.ID, prospectAdmin)
 	must(t, err)
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: e.ID, ExpectedVersion: e.Version, AdminID: prospectAdmin, Contacts: &[]ContactPoint{{Kind: ContactEmail, Value: "shared@example.com", Primary: true}, {Kind: ContactPhone, Value: "02-1111-2222", Primary: true}}})
@@ -404,7 +382,6 @@ func TestDuplicatesAreUnresolvedPairsBySameNameOrSharedKey(t *testing.T) {
 	if got, want := f.duplicatePairs(t), [][2]int64{{a.ID, c.ID}, {b.ID, c.ID}}; !slices.Equal(got, want) {
 		t.Fatalf("pairs=%v, want %v", got, want)
 	}
-	// 封存的不在清單裡。
 	f.archive(t, c.ID)
 	if got := f.duplicatePairs(t); len(got) != 0 {
 		t.Fatalf("pairs=%v", got)
@@ -419,13 +396,11 @@ func TestUpdateProspectReplacesTheContactListAndKeepsOmittedFields(t *testing.T)
 		withContact("old@example.com", "02-1111-2222", "", "")(in)
 		in.Fields.Category, in.Fields.ProductSummary = text("水果"), text("芒果")
 	})
-	// 沒有帶 Contacts：聯絡方式原樣保留。
 	same, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin + 1, Region: ptr("台南")})
 	must(t, err)
 	if got := contactsOf(same); !slices.Equal(got, []string{"EMAIL:old@example.com*", "PHONE:02-1111-2222*"}) || *same.Category != "水果" || *same.Region != "台南" || *same.UpdatedByAdminID != prospectAdmin+1 || *same.CreatedByAdminID != prospectAdmin {
 		t.Fatalf("same=%+v", same)
 	}
-	// 整批替換：新的主要 email、舊的留成非主要；電話原樣。
 	updated, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: same.Version, AdminID: prospectAdmin, Contacts: &[]ContactPoint{
 		{Kind: ContactEmail, Value: "New@Example.com", Primary: true}, {Kind: ContactEmail, Value: "old@example.com", Primary: false}, {Kind: ContactPhone, Value: "02-1111-2222", Primary: false},
 	}})
@@ -436,7 +411,6 @@ func TestUpdateProspectReplacesTheContactListAndKeepsOmittedFields(t *testing.T)
 	if got, want := f.matchKeys(t, p.ID), []string{"EMAIL:new@example.com", "EMAIL:old@example.com", "PHONE:0211112222"}; !slices.Equal(got, want) {
 		t.Fatalf("keys=%v, want %v", got, want)
 	}
-	// 同一批再送一次：沒有改變，不寫入（版本不變）。
 	again, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: updated.Version, AdminID: prospectAdmin, Contacts: &[]ContactPoint{
 		{Kind: ContactPhone, Value: "02-1111-2222", Primary: true}, {Kind: ContactEmail, Value: "old@example.com", Primary: false}, {Kind: ContactEmail, Value: " New@Example.com ", Primary: true},
 	}})
@@ -444,7 +418,6 @@ func TestUpdateProspectReplacesTheContactListAndKeepsOmittedFields(t *testing.T)
 	if again.Version != updated.Version || !again.UpdatedAt.Equal(updated.UpdatedAt) {
 		t.Fatalf("an unchanged contact list wrote the row: %+v", again)
 	}
-	// 同類型多個而沒有（或有兩個）主要的：拒絕，什麼都不寫。
 	for name, bad := range map[string][]ContactPoint{
 		"沒有主要的": {{Kind: ContactEmail, Value: "a@example.com", Primary: false}, {Kind: ContactEmail, Value: "b@example.com", Primary: false}},
 		"兩個主要的": {{Kind: ContactEmail, Value: "a@example.com", Primary: true}, {Kind: ContactEmail, Value: "b@example.com", Primary: true}},
@@ -455,7 +428,6 @@ func TestUpdateProspectReplacesTheContactListAndKeepsOmittedFields(t *testing.T)
 			t.Fatalf("%s: err=%v", name, err)
 		}
 	}
-	// 空清單清掉全部聯絡方式與它們的比對鍵；舊的 email 讓出來，別人可以用而不需要確認。
 	cleared, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: updated.Version, AdminID: prospectAdmin, Contacts: &[]ContactPoint{}})
 	must(t, err)
 	if len(cleared.Contacts) != 0 || len(f.matchKeys(t, p.ID)) != 0 || cleared.Version != updated.Version+1 {
@@ -488,10 +460,8 @@ func TestUpdateProspectContactMatchNeedsConfirmation(t *testing.T) {
 	if got := f.distinctPairs(t); !slices.Equal(got, [][2]int64{{taken.ID, p.ID}}) {
 		t.Fatalf("pairs=%v", got)
 	}
-	// 同一對已經確認過：再改聯絡方式（仍含同一個鍵）不再被擋，也不必再帶確認。
 	next, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: moved.Version, AdminID: prospectAdmin, Contacts: &[]ContactPoint{{Kind: ContactEmail, Value: "Taken@example.com", Primary: true}, {Kind: ContactPhone, Value: "02-1111-2222", Primary: true}}})
 	must(t, err)
-	// 沒有改到聯絡方式的修改，不查比對。
 	third := f.newProspect(t, "丙", nil)
 	f.insertContact(t, third.ID, "EMAIL", "taken@example.com", "EMAIL:taken@example.com", true)
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: next.Version, AdminID: prospectAdmin, ProductSummary: ptr("摘要")})
@@ -505,7 +475,7 @@ func TestUpdateProspectOptimisticLock(t *testing.T) {
 	ctx := context.Background()
 	p := f.newProspect(t, "甲", nil)
 	_, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, AdminID: prospectAdmin, DisplayName: ptr("新")})
-	wantKind(t, err, apperr.KindInvalidInput) // 沒帶版本
+	wantKind(t, err, apperr.KindInvalidInput)
 	same, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, DisplayName: ptr("甲")})
 	must(t, err)
 	if same.Version != p.Version || !same.UpdatedAt.Equal(p.UpdatedAt) {
@@ -515,10 +485,8 @@ func TestUpdateProspectOptimisticLock(t *testing.T) {
 	must(t, err)
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, DisplayName: ptr("丙")})
 	wantKind(t, err, apperr.KindVersionConflict)
-	// 過期的版本即使沒有改變也衝突。
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, DisplayName: ptr("乙")})
 	wantKind(t, err, apperr.KindVersionConflict)
-	// 招商狀態不能手動設成已入駐。
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version + 1, AdminID: prospectAdmin, OutreachStatus: ptr(OutreachConverted)})
 	wantKind(t, err, apperr.KindInvalidInput)
 }
@@ -531,7 +499,6 @@ func TestArchiveNeedsTheCurrentVersionAndYieldsTaxIDAndMatching(t *testing.T) {
 		withContact("shared@example.com", "", "", "")(in)
 		in.Fields.TaxID = text("11111111")
 	})
-	// 過期或沒帶的版本：衝突或 InvalidInput，什麼都不寫。
 	_, err := f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: a.ID, AdminID: prospectAdmin})
 	wantKind(t, err, apperr.KindInvalidInput)
 	edited, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: a.ID, ExpectedVersion: a.Version, AdminID: prospectAdmin, Region: ptr("台北")})
@@ -546,18 +513,15 @@ func TestArchiveNeedsTheCurrentVersionAndYieldsTaxIDAndMatching(t *testing.T) {
 	if archived.Status != ProspectStatusArchived || archived.Version != edited.Version+1 || !slices.Equal(contactsOf(archived), []string{"EMAIL:shared@example.com*"}) {
 		t.Fatalf("archived=%+v", archived)
 	}
-	// 重新讀到封存之後的版本再送一次是 no-op。
 	again, err := f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: a.ID, AdminID: prospectAdmin, ExpectedVersion: archived.Version})
 	must(t, err)
 	if again.Version != archived.Version {
 		t.Fatalf("archive is not idempotent: %+v", again)
 	}
-	// 封存的業者讓出統編，也不再被比對：別人用同一個 email 與統編建立不需要確認。
 	b := f.newProspect(t, "乙", func(in *CreateProspectInput) {
 		withContact("shared@example.com", "", "", "")(in)
 		in.Fields.TaxID = text("11111111")
 	})
-	// 統編被拿走：還原回 FailedPrecondition，確認不是同一家也一樣；沒有寫任何東西。
 	_, err = f.restore(t, a.ID)
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	if _, err = f.restore(t, a.ID, b.ID); apperr.KindOf(err) != apperr.KindFailedPrecondition {
@@ -570,7 +534,6 @@ func TestArchiveNeedsTheCurrentVersionAndYieldsTaxIDAndMatching(t *testing.T) {
 	if got := f.prospectRow(t, a.ID); got.Status != ProspectStatusArchived || len(f.distinctPairs(t)) != 0 {
 		t.Fatalf("failed restore changed the row: %+v pairs=%v", got, f.distinctPairs(t))
 	}
-	// 統編讓出之後，剩下聯絡方式的比對鍵被 b 佔著：回 PROSPECT_MATCH_FOUND，確認不是同一家才還原並記下配對。
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: b.ID, ExpectedVersion: b.Version, AdminID: prospectAdmin, TaxID: ptr("")})
 	must(t, err)
 	_, err = f.restore(t, a.ID)
@@ -583,7 +546,6 @@ func TestArchiveNeedsTheCurrentVersionAndYieldsTaxIDAndMatching(t *testing.T) {
 	if restored.Status != ProspectStatusActive || restored.Version != archived.Version+1 || !slices.Equal(f.distinctPairs(t)[0][:], []int64{a.ID, b.ID}) {
 		t.Fatalf("restored=%+v pairs=%v", restored, f.distinctPairs(t))
 	}
-	// 已經是進行中的重送回傳目前的業者。
 	resent, err := f.restore(t, a.ID)
 	must(t, err)
 	if resent.Version != restored.Version {
@@ -623,7 +585,7 @@ func TestMergeUnionsContactsAndRepointsDistinctPairs(t *testing.T) {
 			{Kind: ContactPhone, Value: "+886-2-3333-4444", Primary: true}, {Kind: ContactWebsite, Value: "https://www.loser.tw", Primary: true},
 		}
 		in.CategoryIDs = []string{"fruit", "veg"}
-		in.ConfirmedDistinct = []int64{winner.ID} // 與贏家共用 w@example.com：確認不是同一家，記下 (贏家, 輸家) 這一對
+		in.ConfirmedDistinct = []int64{winner.ID}
 	})
 	other := f.newProspect(t, "旁人", nil)
 	third := f.newProspect(t, "第三人", nil)
@@ -642,11 +604,9 @@ func TestMergeUnionsContactsAndRepointsDistinctPairs(t *testing.T) {
 	if gone.Status != ProspectStatusArchived || gone.MergedInto == nil || *gone.MergedInto != winner.ID || len(gone.Contacts) != 0 || len(gone.CategoryIDs) != 0 {
 		t.Fatalf("loser=%+v", gone)
 	}
-	// 配對：贏家的（含已有的重複，只留一列）加上輸家改掛過來的；輸家的與贏家對輸家的標記都消失（明確合併就是撤銷那個標記）。
 	if got, want := f.distinctPairs(t), [][2]int64{{winner.ID, other.ID}, {winner.ID, third.ID}}; !slices.Equal(got, want) {
 		t.Fatalf("pairs=%v, want %v", got, want)
 	}
-	// 輸家的 email 之後再建立：撞到贏家，預覽也指向贏家。
 	_, err := f.module.CreateProspect(ctx, CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: "再匯入", VendorType: VendorBusiness}, Contacts: contactList("L@example.com", "", "", "")})
 	wantMatchFound(t, err, winner.ID)
 	matches, err := f.module.PreviewProspect(ctx, ProspectPreviewInput{Contacts: contactList("l@example.com", "+886-2-3333-4444", "", "")})
@@ -654,14 +614,12 @@ func TestMergeUnionsContactsAndRepointsDistinctPairs(t *testing.T) {
 	if len(matches) != 1 || matches[0].Prospect.ID != winner.ID || !slices.Equal(matches[0].MatchedOn, []MatchReason{ReasonEmail, ReasonPhone}) {
 		t.Fatalf("preview=%+v", matches)
 	}
-	// 被合併的列不可還原，也不能再被合併或轉換。
 	_, err = f.restore(t, loser.ID)
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	_, err = f.module.MergeProspects(ctx, f.mergeInput(t, winner.ID, loser.ID))
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	_, err = f.module.MergeProspects(ctx, MergeProspectsInput{WinnerID: winner.ID, LoserID: winner.ID, AdminID: prospectAdmin, WinnerVersion: 1, LoserVersion: 1})
 	wantKind(t, err, apperr.KindInvalidInput)
-	// 合併帶來的聯絡方式可以移除；沒移除的不會弄丟。
 	updated, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: winner.ID, ExpectedVersion: merged.Version, AdminID: prospectAdmin, Contacts: &[]ContactPoint{
 		{Kind: ContactEmail, Value: "w@example.com", Primary: true}, {Kind: ContactEmail, Value: "l@example.com", Primary: false}, {Kind: ContactPhone, Value: "02-1111-1111", Primary: true}, {Kind: ContactWebsite, Value: "https://www.loser.tw", Primary: true},
 	}})
@@ -704,11 +662,11 @@ func TestStaleVersionsRejectMergeConvertAndArchiveWithoutWriting(t *testing.T) {
 	_, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: loser.ID, ExpectedVersion: loser.Version, AdminID: prospectAdmin, Region: ptr("花蓮")})
 	must(t, err)
 	in := MergeProspectsInput{WinnerID: winner.ID, LoserID: loser.ID, AdminID: prospectAdmin, WinnerVersion: winner.Version, LoserVersion: loser.Version}
-	_, err = f.module.MergeProspects(ctx, in) // 輸家過期
+	_, err = f.module.MergeProspects(ctx, in)
 	wantKind(t, err, apperr.KindVersionConflict)
 	fresh := in
 	fresh.LoserVersion = f.prospectRow(t, loser.ID).Version
-	fresh.WinnerVersion = winner.Version + 1 // 贏家過期
+	fresh.WinnerVersion = winner.Version + 1
 	_, err = f.module.MergeProspects(ctx, fresh)
 	wantKind(t, err, apperr.KindVersionConflict)
 	for _, bad := range []MergeProspectsInput{{WinnerID: winner.ID, LoserID: loser.ID, AdminID: prospectAdmin, WinnerVersion: winner.Version}, {WinnerID: winner.ID, LoserID: loser.ID, AdminID: prospectAdmin, LoserVersion: loser.Version}} {
@@ -730,7 +688,6 @@ func TestStaleVersionsRejectMergeConvertAndArchiveWithoutWriting(t *testing.T) {
 	if len(merged.all()) != 0 || len(archived.all()) != 0 {
 		t.Fatalf("events: merged=%+v archived=%+v", merged.all(), archived.all())
 	}
-	// 帶目前的版本就成功。
 	f.merge(t, winner.ID, loser.ID)
 	if len(merged.all()) != 1 {
 		t.Fatalf("merged=%+v", merged.all())
@@ -786,7 +743,6 @@ func TestMergeTaxIDAndPathCompression(t *testing.T) {
 	if got := f.prospectRow(t, withTax.ID); got.TaxID != nil {
 		t.Fatalf("loser kept its tax id: %+v", got)
 	}
-	// 贏家已經有統編：輸家的不搬，也釋放（之後別人可以用）。
 	has := f.newProspect(t, "贏家有統編", func(in *CreateProspectInput) { in.Fields.TaxID = text("33333333") })
 	loserTax := f.newProspect(t, "輸家有統編", func(in *CreateProspectInput) { in.Fields.TaxID = text("44444444") })
 	merged, err = f.module.MergeProspects(ctx, f.mergeInput(t, has.ID, loserTax.ID))
@@ -795,7 +751,6 @@ func TestMergeTaxIDAndPathCompression(t *testing.T) {
 		t.Fatalf("winner's tax id was overwritten: %+v", merged)
 	}
 	f.newProspect(t, "拿走 4444", func(in *CreateProspectInput) { in.Fields.TaxID = text("44444444") })
-	// 路徑壓縮：absorbed 併進 mid，mid 再併進 top，absorbed 直接指向 top。
 	top := f.newProspect(t, "top", nil)
 	mid := f.newProspect(t, "mid", nil)
 	absorbed := f.newProspect(t, "absorbed", nil)
@@ -810,7 +765,6 @@ func TestMergeTaxIDAndPathCompression(t *testing.T) {
 	}
 }
 
-// stageProspectImage 以管理員為上傳者放一張公開圖片。
 func (f *fixture) stageProspectImage(t *testing.T) (string, uuid.UUID) {
 	t.Helper()
 	return f.stagePublic(t, media.Uploader{ID: prospectAdmin, Admin: true})
@@ -838,7 +792,6 @@ func TestProspectImagesAreConfirmedWithTheProspectAndUseVersion(t *testing.T) {
 	}
 	f.wantAsset(t, one, "ACTIVE")
 	f.wantAsset(t, cover, "ACTIVE")
-	// 只換 logo：封面原樣保留；被換掉的 logo 標為刪除。
 	twoToken, two := f.stageProspectImage(t)
 	again, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: updated.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: twoToken}})
 	must(t, err)
@@ -848,7 +801,6 @@ func TestProspectImagesAreConfirmedWithTheProspectAndUseVersion(t *testing.T) {
 	f.wantAsset(t, two, "ACTIVE")
 	f.wantAsset(t, one, "DELETING")
 	f.wantAsset(t, cover, "ACTIVE")
-	// 被換掉的圖不能寫回：同一個 staged token 重新確認會落在已標為刪除的資產上。
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: again.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: oneToken}})
 	wantKind(t, err, apperr.KindInvalidInput)
 }
@@ -979,7 +931,6 @@ func TestArchiveAndMergeMarkImagesDeleted(t *testing.T) {
 	for _, id := range archivedAssets {
 		f.wantAsset(t, id, "DELETING")
 	}
-	// 封存、還原、換圖：新圖確認，舊圖不會回來。
 	newToken, newAsset := f.stageProspectImage(t)
 	restored, err := f.restore(t, archived.ID)
 	must(t, err)
@@ -988,7 +939,6 @@ func TestArchiveAndMergeMarkImagesDeleted(t *testing.T) {
 	f.wantAsset(t, newAsset, "ACTIVE")
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: archived.ID, ExpectedVersion: changed.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: archivedTokens[0]}})
 	wantKind(t, err, apperr.KindInvalidInput)
-	// 合併的輸家一樣。
 	winner := f.newProspect(t, "贏家", nil)
 	loser, loserAssets, _ := withImages("輸家")
 	_, err = f.module.MergeProspects(ctx, f.mergeInput(t, winner.ID, loser.ID))
@@ -1017,18 +967,15 @@ func TestConvertProspectToStore(t *testing.T) {
 	if s.StoreID == accountID {
 		t.Fatal("fixture must keep store_id and account_id apart")
 	}
-	// 二次轉換：同一個業者轉到別的店家，也被擋（不會覆蓋 converted_store_id）。
 	_, other := f.open(t)
 	_, err = f.module.ConvertProspect(ctx, ConvertProspectInput{ProspectID: p.ID, StoreID: other.StoreID, AdminID: prospectAdmin, ExpectedVersion: converted.Version})
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	if got := f.prospectRow(t, p.ID); *got.ConvertedStore != s.StoreID {
 		t.Fatalf("second conversion overwrote converted_store_id: %+v", got)
 	}
-	// 同一個店家被另一個業者認領：AlreadyExists。
 	q := f.newProspect(t, "乙", nil)
 	_, err = f.module.ConvertProspect(ctx, ConvertProspectInput{ProspectID: q.ID, StoreID: s.StoreID, AdminID: prospectAdmin, ExpectedVersion: q.Version})
 	wantKind(t, err, apperr.KindAlreadyExists)
-	// 店家不存在、已關閉都是 NotFound；錯誤的轉換不改業者。
 	_, err = f.module.ConvertProspect(ctx, ConvertProspectInput{ProspectID: q.ID, StoreID: s.StoreID + 9999, AdminID: prospectAdmin, ExpectedVersion: q.Version})
 	wantKind(t, err, apperr.KindNotFound)
 	_, err = f.module.CloseCurrent(ctx, accountID)
@@ -1038,7 +985,6 @@ func TestConvertProspectToStore(t *testing.T) {
 	if got := f.prospectRow(t, q.ID); got.Status != ProspectStatusActive {
 		t.Fatalf("failed conversion changed the prospect: %+v", got)
 	}
-	// 已入駐的業者不能封存或修改，但仍佔著比對鍵。
 	_, err = f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: p.ID, AdminID: prospectAdmin, ExpectedVersion: converted.Version})
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	_, err = f.module.CreateProspect(ctx, CreateProspectInput{AdminID: prospectAdmin, Fields: ProspectFields{DisplayName: "丙", VendorType: VendorBusiness}, Contacts: contactList("conv@example.com", "", "", "")})
@@ -1114,7 +1060,6 @@ func TestTaxIDMatchesAreKeyedByStoreID(t *testing.T) {
 			t.Fatalf("matched the closed stint: %+v", m)
 		}
 	}
-	// 轉成店家之後不再出現在對帳。
 	_, err = f.module.ConvertProspect(ctx, ConvertProspectInput{ProspectID: newOne.ID, StoreID: newStint.StoreID, AdminID: prospectAdmin, ExpectedVersion: newOne.Version})
 	must(t, err)
 	page, err = f.module.ProspectTaxIDMatches(ctx, 10, nil)
@@ -1220,7 +1165,6 @@ func TestSearchProspectsSemantics(t *testing.T) {
 			}
 		}
 	}
-	// Limit 是安全上限。
 	hits, err = f.module.SearchProspects(ctx, ProspectSearchInput{Limit: 2})
 	must(t, err)
 	if len(hits) != 2 {
@@ -1269,7 +1213,6 @@ func TestProspectContactForVendorPortal(t *testing.T) {
 	}
 	_, err = f.module.ProspectContact(ctx, without.ID+999)
 	wantKind(t, err, apperr.KindNotFound)
-	// 封存的業者仍讀得到（邀請流程不因名單整理而斷）。
 	_, err = f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: with.ID, AdminID: prospectAdmin, ExpectedVersion: with.Version})
 	must(t, err)
 	c, err = f.module.ProspectContact(ctx, with.ID)
@@ -1345,7 +1288,6 @@ func TestProspectContactInTransactionBlocksArchiveUntilCommit(t *testing.T) {
 	close(release)
 	<-committed
 	for range 2 {
-		// 一個成功、另一個依狀態成功或回 FailedPrecondition，這裡只確認都放行了。
 		if err := <-archived; err != nil {
 			t.Logf("放行後的結果：%v", err)
 		}
@@ -1389,7 +1331,7 @@ func TestListProspectsFiltersAndPaginates(t *testing.T) {
 		}
 		after = page.Next
 	}
-	if want := []int64{ids[3], ids[2], ids[1], ids[0]}; !slices.Equal(got, want) { // 新到舊，預設不含封存
+	if want := []int64{ids[3], ids[2], ids[1], ids[0]}; !slices.Equal(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 	archived := ProspectStatusArchived
@@ -1401,10 +1343,9 @@ func TestListProspectsFiltersAndPaginates(t *testing.T) {
 	individual := VendorIndividual
 	page, err = f.module.Prospects(ctx, ProspectListInput{VendorType: &individual, Category: "水果"})
 	must(t, err)
-	if len(page.Items) != 2 { // 業者 0 與 2（4 已封存）
+	if len(page.Items) != 2 {
 		t.Fatalf("individuals=%d", len(page.Items))
 	}
-	// % 與 _ 只當字面比對：「%%」不是萬用字元，「_」不會比對任意一個字。
 	for keyword, want := range map[string]int{"100%": 2, "under_score": 2, "業者1": 1, "%%": 0, "under_scor_": 0, "不存在": 0} {
 		page, err = f.module.Prospects(ctx, ProspectListInput{Keyword: keyword})
 		must(t, err)
@@ -1429,7 +1370,6 @@ func TestArchiveProspectPublishesInTheTransactionOnlyOnTheTransition(t *testing.
 	if evs := archived.all(); len(evs) != 1 || evs[0].ProspectID != a.ID || !evs[0].OccurredAt.Equal(f.now) || evs[0].EventID == (uuid.UUID{}) {
 		t.Fatalf("archived=%+v", evs)
 	}
-	// 重送是 no-op，不發事件；還原不發事件。
 	_, err = f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: a.ID, AdminID: prospectAdmin, ExpectedVersion: got.Version})
 	must(t, err)
 	restored, err := f.restore(t, a.ID)
@@ -1437,7 +1377,6 @@ func TestArchiveProspectPublishesInTheTransactionOnlyOnTheTransition(t *testing.
 	if len(archived.all()) != 1 || len(merged.all()) != 0 || got.Status != ProspectStatusArchived {
 		t.Fatalf("archived=%+v merged=%+v", archived.all(), merged.all())
 	}
-	// 還原之後再封存是新的轉移，再發一次。
 	_, err = f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: a.ID, AdminID: prospectAdmin, ExpectedVersion: restored.Version})
 	must(t, err)
 	if len(archived.all()) != 2 {
@@ -1473,7 +1412,6 @@ func TestMergeProspectsPublishesOnlyProspectMerged(t *testing.T) {
 	if len(evs) != 1 || evs[0].SourceProspectID != loser.ID || evs[0].TargetProspectID != winner.ID || !evs[0].OccurredAt.Equal(f.now) || evs[0].EventID == (uuid.UUID{}) {
 		t.Fatalf("merged=%+v", evs)
 	}
-	// 輸家雖然被封存，封存只由 ProspectMerged 表達。
 	if len(archived.all()) != 0 || f.prospectRow(t, loser.ID).Status != ProspectStatusArchived {
 		t.Fatalf("archived=%+v", archived.all())
 	}
@@ -1518,7 +1456,6 @@ func TestExactlyOnePrimaryContactPerKindIsEnforcedByTheDatabase(t *testing.T) {
 	if !errors.As(err, &pgErr) || pgErr.ConstraintName != "prospect_contacts_has_primary" {
 		t.Fatalf("deleting the primary but keeping the others: %v", err)
 	}
-	// 同一個 transaction 內換主要的是合法的。
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
 		if _, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.prospect_contacts SET is_primary = false WHERE prospect_id = $1 AND value = 'a@example.com'`, p.ID); err != nil {
 			return err
@@ -1529,7 +1466,6 @@ func TestExactlyOnePrimaryContactPerKindIsEnforcedByTheDatabase(t *testing.T) {
 	if got := contactsOf(f.prospectRow(t, p.ID)); !slices.Equal(got, []string{"EMAIL:a@example.com", "EMAIL:b@example.com*"}) {
 		t.Fatalf("contacts=%v", got)
 	}
-	// 配對的格式：較小的 ID 在前。
 	other := f.newProspect(t, "乙", nil)
 	err = exec(`INSERT INTO seller.prospect_distinct_pairs VALUES ($1, $2, $3, now())`, other.ID, p.ID, prospectAdmin)
 	if !errors.As(err, &pgErr) || pgErr.ConstraintName != "prospect_distinct_pairs_order_check" {
@@ -1675,13 +1611,11 @@ func TestStaleEtagAfterArchiveMergeAndConvertConflicts(t *testing.T) {
 	if len(archivedEvents.all()) != 1 || version(a.ID) != first.Version {
 		t.Fatalf("stale archive wrote: events=%d version=%d", len(archivedEvents.all()), version(a.ID))
 	}
-	// 帶目前的版本封存已封存的業者：回傳目前的列，不寫入、不發事件。
 	same, err := f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: a.ID, AdminID: prospectAdmin, ExpectedVersion: first.Version})
 	must(t, err)
 	if same.Version != first.Version || len(archivedEvents.all()) != 1 {
 		t.Fatalf("archive at the current version: %+v events=%d", same, len(archivedEvents.all()))
 	}
-	// 還原之後（別的寫入）同樣的舊版本一樣是衝突。
 	_, err = f.restore(t, a.ID)
 	must(t, err)
 	_, err = f.module.ArchiveProspect(ctx, archiveIn)
@@ -1699,12 +1633,10 @@ func TestStaleEtagAfterArchiveMergeAndConvertConflicts(t *testing.T) {
 	if len(mergedEvents.all()) != 1 || version(winner.ID) != merged.Version {
 		t.Fatalf("stale merge wrote: events=%d version=%d", len(mergedEvents.all()), version(winner.ID))
 	}
-	// 贏家之後又被改過：同樣的舊版本一樣是衝突。
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: winner.ID, ExpectedVersion: merged.Version, AdminID: prospectAdmin, Region: ptr("花蓮")})
 	must(t, err)
 	_, err = f.module.MergeProspects(ctx, mergeIn)
 	wantKind(t, err, apperr.KindVersionConflict)
-	// 輸家已經併進別人：用輸家的舊版本併進另一個贏家，也是衝突（版本先於狀態）。
 	other := f.newProspect(t, "別的贏家", nil)
 	_, err = f.module.MergeProspects(ctx, MergeProspectsInput{WinnerID: other.ID, LoserID: loser.ID, AdminID: prospectAdmin, WinnerVersion: other.Version, LoserVersion: mergeIn.LoserVersion})
 	wantKind(t, err, apperr.KindVersionConflict)
@@ -1723,11 +1655,9 @@ func TestStaleEtagAfterArchiveMergeAndConvertConflicts(t *testing.T) {
 	if got := f.prospectRow(t, c.ID); got.Version != converted.Version || got.ConvertedStore == nil || *got.ConvertedStore != s.StoreID {
 		t.Fatalf("stale convert wrote: %+v", got)
 	}
-	// 帶目前的版本再轉：轉過的回 FailedPrecondition（既有的狀態規則）。
 	convertIn.ExpectedVersion = converted.Version
 	_, err = f.module.ConvertProspect(ctx, convertIn)
 	wantKind(t, err, apperr.KindFailedPrecondition)
-	// 轉換之前有別的寫入：舊版本是衝突。
 	d := f.newProspect(t, "有人先改", nil)
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: d.ID, ExpectedVersion: d.Version, AdminID: prospectAdmin, Region: ptr("宜蘭")})
 	must(t, err)
@@ -1828,7 +1758,6 @@ func TestMarkProspectsDistinctDismissesACandidatePair(t *testing.T) {
 	mark := func(admin, x, y int64) error {
 		return f.module.MarkProspectsDistinct(ctx, MarkProspectsDistinctInput{FirstID: x, SecondID: y, AdminID: admin})
 	}
-	// ID 的順序不影響：較大的在前也寫成較小的在前。
 	must(t, mark(prospectAdmin, b.ID, a.ID))
 	must(t, mark(prospectAdmin, e.ID, g.ID))
 	if got := f.duplicatePairs(t); len(got) != 0 {
@@ -1837,7 +1766,6 @@ func TestMarkProspectsDistinctDismissesACandidatePair(t *testing.T) {
 	if got, want := f.distinctPairs(t), [][2]int64{{a.ID, b.ID}, {e.ID, g.ID}}; !slices.Equal(got, want) {
 		t.Fatalf("pairs=%v, want %v", got, want)
 	}
-	// 重送（連同別的管理員）：成功，第一次的管理員與時間不變。
 	var firstAdmin int64
 	var firstAt time.Time
 	row := f.db.Conn(ctx).QueryRow(ctx, "SELECT confirmed_by_admin_id, confirmed_at FROM seller.prospect_distinct_pairs WHERE low_prospect_id = $1", a.ID)
@@ -1850,7 +1778,6 @@ func TestMarkProspectsDistinctDismissesACandidatePair(t *testing.T) {
 	if firstAdmin != prospectAdmin || admin2 != firstAdmin || !at2.Equal(firstAt) || len(f.distinctPairs(t)) != 2 {
 		t.Fatalf("重送改寫了第一次的紀錄：%d %v → %d %v", firstAdmin, firstAt, admin2, at2)
 	}
-	// 標記之後，聯絡方式相同也不再擋（比對只看沒有標記的）。
 	if _, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: e.ID, ExpectedVersion: e.Version, AdminID: prospectAdmin,
 		Contacts: &[]ContactPoint{{Kind: ContactEmail, Value: "shared@example.com", Primary: true}, {Kind: ContactPhone, Value: "02-1111-2222", Primary: true}}}); err != nil {
 		t.Fatalf("標記過的配對不該再擋：%v", err)
@@ -1868,7 +1795,6 @@ func TestMarkProspectsDistinctDismissesACandidatePair(t *testing.T) {
 	}
 }
 
-// wantTaxIDHeld 確認錯誤是 PROSPECT_TAX_ID_HELD：錯誤碼、metadata 的持有者 ID 與句子都符合。
 func wantTaxIDHeld(t *testing.T, err error, kind apperr.Kind, holder int64, message string) {
 	t.Helper()
 	var ae *apperr.Error
@@ -1894,7 +1820,6 @@ func metadataOf(err error) map[string]string {
 	return nil
 }
 
-// taxIDHolders 建立兩個持有者：進行中的與已入駐的，各有自己的統編。
 func (f *fixture) taxIDHolders(t *testing.T) (active, converted Prospect) {
 	t.Helper()
 	active = f.newProspect(t, "進行中的持有者", func(in *CreateProspectInput) { in.Fields.TaxID = text("12345678") })
@@ -1947,8 +1872,6 @@ func TestTaxIDHeldCarriesTheReasonHolderAndASentencePerOperationAndHolderStatus(
 	}
 }
 
-// raceOnTaxID 讓另一個 transaction 先取得 taxID 的 advisory lock、寫入持有 taxID 的業者但不 commit；op 的檢查必須等在這把鎖上
-// （pg_stat_activity 的 wait_event 是 advisory），等到持有者 commit 才往下，所以看得到持有者。
 func raceOnTaxID(t *testing.T, f *fixture, taxID string, op func() error) (holder int64, err error) {
 	t.Helper()
 	ctx := context.Background()

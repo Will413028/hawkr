@@ -9,43 +9,8 @@ import (
 	"testing"
 )
 
-// ---------------------------------------------------------------------------
-// 讓 domain/fsm 真的成為 allowed-from 的 SSOT（#3089 §1.5 T3）
-//
-// 🔴 在這支測試之前，`internal/domain/fsm` **全 repo 零 import、零消費者**。
-// `domain/repository.go` 有一行註解稱它為「allowed-from 的 SSOT」——
-// 而那是一個**沒有人讀的 SSOT**，也沒有任何東西拿它與 SQL 述詞對帳。
-//
-// 後果不是「多了一份死碼」而是：它會**安靜地與 SQL 漂移**，而任何人照著它
-// 施工都會做出錯的東西。本測試第一次跑就抓到三處漂移：
-//
-//	J06  SQL 含 CREATED（作廢重開那次加的），fsm 與該支 SQL 自己的註解都只寫四個
-//	J11  SQL 含 RETRY_SCHEDULED（pkg/outbox 在預算用完時呼叫），fsm 只寫 SENDING
-//	FailOpenInvoiceOperationsForIssuer  整條邊 fsm 沒有（見下方登記表）
-//
-// 這正是 A 組那批「狀態沒有執行者」能持續發生的機制成因：**沒有人在對帳**。
-//
-// ## 對帳方向與它的觀測窗（§3.10：gate 要誠實標明自己看得到什麼）
-//
-//	驗的是   SQL 的 allowed-from ⊆ fsm 中「To 相符」那些轉移的 From 聯集
-//	看得到   SQL 放寬了而 fsm 沒跟上；新增一條寫 status 的 UPDATE 而 fsm 沒有
-//	看不到   fsm 有而 SQL 沒有（那不是錯：有些邊在 usecase 層跨表完成）
-//	         跨表的守衛（例如 R03 要先搶到 HELD）——那不在單句 SQL 的述詞裡
-//
-// 用**聯集**而不是「單一轉移涵蓋」是刻意的：一支 SQL 服務多條 J 邊是合法且常見的
-// （J13／J31 都寫 WAITING_CONFIRMATION、J19／J33／J34 都寫 READY）。
-// ---------------------------------------------------------------------------
 
-// sqlEdgesNotInFSM 是「這一支 SQL 的邊還沒進 fsm」的登記表。
-//
-// 🔴 每一筆都要有理由，而理由只有一種合法形態：**它需要一個新的 J 代號，
-// 而代號由設計書 §7.3.2 定版**（Code 一經定版即凍結，不由這裡自行編號）。
-// 不准寫「暫時沒對上」。
 var sqlEdgesNotInFSM = map[string]string{
-	// P14／P16 的批次 fail-open：issuer 被停用時，把它底下所有非終態的 operation
-	// 一次推進 FAILED_PERMANENT。它的 allowed-from 是 16 個狀態（幾乎是全集），
-	// 與 J11（單筆、SENDING／RETRY_SCHEDULED）完全不同形狀 ⇒ 不能併進 J11。
-	// 要納入需要一個新的 J 代號，而那要先改設計書 §7.3.2。
 	"FailOpenInvoiceOperationsForIssuer": "需要新的 J 代號（P14／P16 的批次 fail-open，16 個來源狀態），代號由設計書 §7.3.2 定版",
 }
 
@@ -63,14 +28,6 @@ type sqlEdge struct {
 	to    string
 }
 
-// parseStatusEdges 從 db/queries 讀出每一支寫 <table>.status 的 UPDATE 的 (allowed-from → to)。
-//
-// 🔴 註解行先剝掉：註解裡也寫著狀態名（例如 J06 那句），算進來會得到一份
-// 「看起來對」的假清單 —— 而那正是本測試要抓的東西之一。
-//
-// ⚠️ 檔名與表名都是參數：原本兩者寫死成 invoice_operations，於是 M1（documents）
-// 那一半**沒有任何對帳**——而 `fsm.DocumentTransitions`／`CheckDocument` 在非測試碼
-// 零 import，正是這支測試自己檔頭批評的「沒有人讀的 SSOT」。
 func parseStatusEdges(t *testing.T, fileName, tableName string) []sqlEdge {
 	t.Helper()
 	path := filepath.Join("..", "..", "..", "db", "queries", fileName)
@@ -103,7 +60,7 @@ func parseStatusEdges(t *testing.T, fileName, tableName string) []sqlEdge {
 		}
 		to := reSetStatus.FindStringSubmatch(body)
 		if to == nil {
-			continue // 不寫 status 的 UPDATE（租約、attempt 簿記等）
+			continue
 		}
 		var from []string
 		if m := reStatusIn.FindStringSubmatch(body); m != nil {
@@ -121,12 +78,10 @@ func parseStatusEdges(t *testing.T, fileName, tableName string) []sqlEdge {
 
 func TestOperationFSMMatchesSQL(t *testing.T) {
 	edges := parseStatusEdges(t, "invoice_operations.sql", "invoice_operations")
-	// 🔴 解析壞掉的症狀是「什麼都沒查到」＝ 全綠。下界取自本次實測的 20 支。
 	if len(edges) < 15 {
 		t.Fatalf("只解析到 %d 支寫 status 的 UPDATE，遠少於預期 —— 解析壞了", len(edges))
 	}
 
-	// To → 該 To 的所有 fsm 轉移的 From 聯集。
 	allowed := map[string]map[string]bool{}
 	for _, tr := range OperationTransitions {
 		if allowed[tr.To] == nil {
@@ -160,7 +115,6 @@ func TestOperationFSMMatchesSQL(t *testing.T) {
 		}
 	}
 
-	// 登記表保鮮：SQL 被改名或刪掉之後，殘留的條目會讓下一個人以為那還是缺口。
 	for q := range sqlEdgesNotInFSM {
 		if !used[q] {
 			t.Errorf("sqlEdgesNotInFSM 的 %q 已經不成立（該 SQL 被改名或刪掉，"+
@@ -200,8 +154,6 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
-// sqlDocEdgesNotInFSM 是 M1 側的登記表，規則與 sqlEdgesNotInFSM 逐字相同：
-// 每一筆都要有理由，而理由只有一種合法形態——它需要設計書 §7.3.1 定版一條新轉移。
 var sqlDocEdgesNotInFSM = map[string]string{}
 
 // TestDocumentFSMMatchesSQL 是 M1 側的對帳，與 TestOperationFSMMatchesSQL 同一把尺。
@@ -223,7 +175,6 @@ var sqlDocEdgesNotInFSM = map[string]string{}
 // ——那比沒有更糟（`.claude/rules/06-no-small-tails.md` §3.10）。
 func TestDocumentFSMMatchesSQL(t *testing.T) {
 	edges := parseStatusEdges(t, "invoice_documents.sql", "invoice_documents")
-	// 🔴 解析壞掉的症狀是「什麼都沒查到」＝ 全綠。下界取自本次實測的 14 支。
 	if len(edges) < 10 {
 		t.Fatalf("只解析到 %d 支寫 invoice_documents.status 的 UPDATE，遠少於預期 —— 解析壞了", len(edges))
 	}

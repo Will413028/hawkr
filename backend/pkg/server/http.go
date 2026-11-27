@@ -73,8 +73,6 @@ func NewInternalHTTPServer(p HTTPServerParams) *http.Server {
 	return srv
 }
 
-// newRouter builds the gin.Engine backing NewInternalHTTPServer. Split out
-// so tests can inspect the registered route surface without binding a port.
 func newRouter(cfg ServerConfig, serviceName string, logger *zap.Logger) *gin.Engine {
 	if IsProductionEnv(cfg.Env) {
 		gin.SetMode(gin.ReleaseMode)

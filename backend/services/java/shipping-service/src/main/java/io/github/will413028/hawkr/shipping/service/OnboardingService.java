@@ -97,7 +97,6 @@ public class OnboardingService {
         this.fulfillmentProviders = fulfillmentProviders;
     }
 
-    // §2.4.4 transient vs permanent helper（與 ShippingService 同步維護）
     private static boolean isTransientPayUniError(Throwable ex) {
         if (!(ex instanceof io.github.will413028.hawkr.payuni.http.PayUniApiException papi)) return false;
         if ("IO_ERROR".equals(papi.getErrorCode())) return true;
@@ -123,7 +122,6 @@ public class OnboardingService {
         return ex.getMessage() != null ? ex.getMessage() : ex.toString();
     }
 
-    // ==================== 超商 C2C 建店 ====================
 
     /**
      * 超商 C2C 建店
@@ -144,11 +142,8 @@ public class OnboardingService {
                                                           String returnStoreAddress,
                                                           String senderName,
                                                           String senderPhone) {
-        // 參數驗證
         String mappedGoodsType = mapGoodsType(goodsType);
         if (mappedGoodsType == null) {
-            // 若 goodsType 是合法 enum value(僅 7-11 業務不支援該溫層,如冷藏)→ 用 label 提示;
-            // 若連 enum value 都不合法 → 透傳原值供前端排錯
             String label;
             try {
                 label = ShippingTemperature.fromValue(goodsType).label();
@@ -160,19 +155,15 @@ public class OnboardingService {
         if (returnStoreCode == null || !returnStoreCode.matches("^\\d{6}$")) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_RETURN_STORE_CODE_INVALID);
         }
-        // 寄件人姓名送 PayUni 超商建店 ContactName（顯示長度上限 10），源頭驗證避免開通失敗（#1187 同類）
         InputValidator.requireDisplayLengthBetween(senderName, 1,
                 PayUniShippingConstraints.CVS_SENDER_NAME_MAX, "寄件人姓名");
         InputValidator.requireMobile(senderPhone, "寄件人電話");
 
-        // 從 seller-service 取得 merId、sellerName（labelCompanyName 用）、contactEmail
         SellerMeta sellerMeta = getSellerMeta(storeId);
         String merId = sellerMeta.getPayuniMerId();
         String labelCompanyName = truncateToMaxLength(sellerMeta.getSellerName(), LABEL_NAME_MAX_LENGTH);
-        // contactEmail 需從 getSellerShippingProfile 取得（SellerMeta 無此欄位）
         String contactEmail = getSellerContactEmail(storeId);
 
-        // 查詢既有記錄
         SellerShipmentSettingEntity existing = findSetting(storeId, SHIPPING_TYPE_CVS, goodsType);
 
         if (existing != null) {
@@ -184,13 +175,11 @@ public class OnboardingService {
                     null, null, null, null, null, null);
         }
 
-        // 首次建店：呼叫 PayUni
         return submitCvsToPayUni(storeId, merId, contactEmail, senderName, senderPhone,
                 mappedGoodsType, goodsType,
                 returnStoreCode, returnStoreName, returnStoreAddress, labelCompanyName);
     }
 
-    // ==================== 宅配建店 ====================
 
     /**
      * 宅配建店
@@ -225,11 +214,9 @@ public class OnboardingService {
                                                             String returnDistrict,
                                                             String returnAddressDetail,
                                                             String returnPostalCode) {
-        // 參數驗證
         if (productCategory == null || !productCategory.matches("^\\d{4}$")) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_PRODUCT_CATEGORY_INVALID);
         }
-        // 寄件人姓名送 PayUni 宅配建店 SenderName（顯示長度上限 30），源頭驗證避免開通失敗（#1187 同類）
         InputValidator.requireDisplayLengthBetween(senderName, 1,
                 PayUniShippingConstraints.HOME_SENDER_NAME_MAX, "寄件人姓名");
         InputValidator.requireMobile(senderPhone, "寄件人電話");
@@ -238,10 +225,7 @@ public class OnboardingService {
         InputValidator.requireAddress(senderAddressDetail, "寄件詳細地址");
         InputValidator.requireNotEmpty(senderPostalCode, "寄件郵遞區號");
 
-        // 退貨地址若為空，後端自動複製寄件地址
-        // 退貨欄位選填：有填則驗證格式，未填則複製寄件資訊
         if (!isBlank(returnName)) {
-            // 退貨收件人姓名送 PayUni 宅配退貨 SenderName（顯示長度上限 30），有值才驗
             InputValidator.requireDisplayLengthBetween(returnName, 1,
                     PayUniShippingConstraints.HOME_SENDER_NAME_MAX, "退貨收件人姓名");
         }
@@ -258,11 +242,9 @@ public class OnboardingService {
         String effectiveReturnAddressDetail = isBlank(returnAddressDetail) ? senderAddressDetail : returnAddressDetail;
         String effectiveReturnPostalCode = isBlank(returnPostalCode) ? senderPostalCode : returnPostalCode;
 
-        // 從 seller-service 取得 merId
         SellerMeta sellerMeta = getSellerMeta(storeId);
         String merId = sellerMeta.getPayuniMerId();
 
-        // 查詢既有記錄（宅配不分 goodsType）
         SellerShipmentSettingEntity existing = findSetting(storeId, SHIPPING_TYPE_HOME, null);
 
         if (existing != null) {
@@ -276,7 +258,6 @@ public class OnboardingService {
                     effectiveReturnAddressDetail, effectiveReturnPostalCode);
         }
 
-        // 首次建店：呼叫 PayUni
         return submitHomeToPayUni(storeId, merId, productCategory,
                 senderName, senderPhone, senderCity, senderDistrict, senderAddressDetail, senderPostalCode,
                 effectiveReturnName, effectiveReturnPhone,
@@ -284,7 +265,6 @@ public class OnboardingService {
                 effectiveReturnAddressDetail, effectiveReturnPostalCode);
     }
 
-    // ==================== 查詢 ====================
 
     /**
      * 列出賣家所有建店設定
@@ -310,7 +290,6 @@ public class OnboardingService {
         return entity;
     }
 
-    // ==================== 賣家配送方式查詢 ====================
 
     /**
      * 固定 4 個配送方式槽位定義
@@ -333,26 +312,21 @@ public class OnboardingService {
      * 查詢賣家所有可用配送方式（固定 4 槽位 + 建店狀態）
      */
     public List<SellerShippingMethodSlot> listSellerShippingMethods(long storeId) {
-        // 一次查詢該賣家所有建店設定
         List<SellerShipmentSettingEntity> allSettings = settingMapper.selectList(
                 new LambdaQueryWrapper<SellerShipmentSettingEntity>()
                         .eq(SellerShipmentSettingEntity::getStoreId, storeId));
 
-        // 以 shippingType + goodsType 為 key 建立查找表
         Map<String, SellerShipmentSettingEntity> settingMap = allSettings.stream()
                 .collect(Collectors.toMap(
                         s -> buildSlotKey(s.getShippingType(), s.getGoodsType()),
                         Function.identity(),
-                        (a, b) -> a));  // 重複取第一筆
+                        (a, b) -> a));
 
         List<SellerShippingMethodSlot> result = new ArrayList<>();
         for (SlotDef slot : SLOT_DEFINITIONS) {
-            // 系統層級檢查:該 method 是否有任何 enabled config(如 Uber Phase 1 預留無 config row → 全系統暫停)
-            // 任何 slot 不論是否需建店,系統層級不可用一律 available=false
             boolean systemAvailable = shippingFeeService.hasAnyEnabledConfig(slot.shippingMethod());
 
             if (!slot.onboardingRequired()) {
-                // 不需建店(如 Uber): available 完全取決於系統層級
                 result.add(new SellerShippingMethodSlot(
                         slot.shippingMethod(), orEmpty(slot.goodsType()),
                         slot.displayName(), slot.description(),
@@ -360,18 +334,15 @@ public class OnboardingService {
                 continue;
             }
 
-            // 需建店:查找對應設定
             String key = buildSlotKey(slot.shippingType(), slot.goodsType());
             SellerShipmentSettingEntity setting = settingMap.get(key);
 
             if (setting == null) {
-                // 尚未建店
                 result.add(new SellerShippingMethodSlot(
                         slot.shippingMethod(), orEmpty(slot.goodsType()),
                         slot.displayName(), slot.description(),
                         false, true, "", null, ""));
             } else {
-                // 系統可用 + onboarding ACTIVE + enabled 三者皆需為 true
                 boolean available = systemAvailable
                         && OnboardingStatus.ACTIVE.value().equals(setting.getOnboardingStatus())
                         && Boolean.TRUE.equals(setting.getEnabled());
@@ -469,8 +440,6 @@ public class OnboardingService {
                         .eq(SellerShipmentSettingEntity::getShippingType, shippingType)
                         .eq(SellerShipmentSettingEntity::getOnboardingStatus, OnboardingStatus.ACTIVE.value())
                         .eq(SellerShipmentSettingEntity::getEnabled, true)
-                        // 選列確定化：見本方法 javadoc。MyBatis-Plus 的 last() 一律附加在 SQL 尾端，
-                        // 所以與 orderBy 的呼叫先後無關，生成的都是 `... ORDER BY id ASC LIMIT 1`。
                         .orderByAsc(SellerShipmentSettingEntity::getId)
                         .last("LIMIT 1"));
     }
@@ -552,7 +521,6 @@ public class OnboardingService {
                 new LambdaQueryWrapper<SellerShipmentSettingEntity>()
                         .eq(SellerShipmentSettingEntity::getStoreId, storeId)
                         .eq(SellerShipmentSettingEntity::getShippingType, shippingType)
-                        // 選列確定化：見本方法 javadoc。
                         .orderByAsc(SellerShipmentSettingEntity::getId)
                         .last("LIMIT 1"));
     }
@@ -567,7 +535,6 @@ public class OnboardingService {
         return settingMapper.selectById(settingId);
     }
 
-    // ==================== 啟用/停用切換 ====================
 
     /**
      * 切換建店設定的啟用/停用狀態（純平台內部，不與 PayUni 溝通）
@@ -582,7 +549,6 @@ public class OnboardingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_ONBOARDING_UPDATE_DENIED);
         }
 
-        // INV-3 對齊：只更新 enabled 欄位，避免全欄位覆蓋
         settingMapper.updateEnabled(entity.getId(), enabled);
         entity.setEnabled(enabled);
 
@@ -594,7 +560,6 @@ public class OnboardingService {
         return entity;
     }
 
-    // ==================== 私有方法 ====================
 
     /**
      * 處理既有建店設定（依據當前狀態決定行為）
@@ -627,7 +592,6 @@ public class OnboardingService {
 
         switch (currentStatus) {
             case ACTIVE, REJECTED -> {
-                // 重新提交 PayUni（允許重複送，等同更新資訊）
                 if (SHIPPING_TYPE_CVS.equals(existing.getShippingType())) {
                     return resubmitCvsToPayUni(existing, merId, contactEmail,
                             senderName, senderPhone, returnStoreCode, labelCompanyName);
@@ -678,7 +642,6 @@ public class OnboardingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_ONBOARDING_FAILED, e.getMessage());
         }
 
-        // PayUni 回傳失敗時直接拋異常，不建立設定記錄
         if (!payUniResp.isSuccess()) {
             String errorMsg = describePayUniOnboardError(payUniResp);
             log.warn("OnboardingService.submitCvs.payuniFailed",
@@ -686,7 +649,6 @@ public class OnboardingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_ONBOARDING_FAILED, errorMsg);
         }
 
-        // PayUni 成功，建立設定記錄
         OnboardingStatus status = OnboardingStatusRules.fromPayUniSetStatus(payUniResp.setStatus());
 
         SellerShipmentSettingEntity entity = new SellerShipmentSettingEntity();
@@ -710,12 +672,10 @@ public class OnboardingService {
         entity.setProviderStatus(payUniResp.setStatus()); entity.setProviderMessage(payUniResp.apiResponse().message() != null ? payUniResp.apiResponse().message() : "");
         entity.setOnboardingStatus(status.value());
         entity.setEnabled(true);
-        // 首次 INSERT 直接寫 SUCCEEDED（PayUni 同步呼叫已成功，§2.4.5.3）
         entity.setPayuniSubmitStatus(io.github.will413028.hawkr.common.utils.code.PayUniSubmitStatus.SUCCEEDED.value());
         entity.setPayuniSubmittedAt(io.github.will413028.hawkr.common.utils.DateTimeUtils.nowUtc());
         settingMapper.insert(entity);
 
-        // 記錄日誌
         insertLog(entity.getId(), storeId, ACTION_PAYUNI,
                 "{\"shippingType\":\"" + SHIPPING_TYPE_CVS + "\",\"goodsType\":\"" + goodsType + "\"}",
                 "{\"partnerId\":\"" + payUniResp.partnerId() + "\",\"setStatus\":\"" + payUniResp.setStatus() + "\"}",
@@ -766,7 +726,6 @@ public class OnboardingService {
                                                             String returnDistrict,
                                                             String returnAddressDetail,
                                                             String returnPostalCode) {
-        // 防 app 端誤把全址塞進 detail 欄位導致拼接後 city+district 重複（PayUni 回 DEF01003）
         final String normalizedSenderDetail = AddressNormalizer.normalizeAddressDetail(senderCity, senderDistrict, senderAddressDetail);
         final String normalizedReturnDetail = AddressNormalizer.normalizeAddressDetail(returnCity, returnDistrict, returnAddressDetail);
 
@@ -790,7 +749,6 @@ public class OnboardingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_ONBOARDING_FAILED, e.getMessage());
         }
 
-        // PayUni 回傳失敗時直接拋異常，不建立設定記錄
         if (!payUniResp.isSuccess()) {
             String errorMsg = describePayUniOnboardError(payUniResp);
             log.warn("OnboardingService.submitHome.payuniFailed",
@@ -798,7 +756,6 @@ public class OnboardingService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_ONBOARDING_FAILED, errorMsg);
         }
 
-        // PayUni 成功，建立設定記錄
         OnboardingStatus status = OnboardingStatusRules.fromPayUniSetStatus(payUniResp.setStatus());
 
         SellerShipmentSettingEntity entity = new SellerShipmentSettingEntity();
@@ -824,12 +781,10 @@ public class OnboardingService {
         entity.setProviderStatus(payUniResp.setStatus()); entity.setProviderMessage(payUniResp.apiResponse().message() != null ? payUniResp.apiResponse().message() : "");
         entity.setOnboardingStatus(status.value());
         entity.setEnabled(true);
-        // 首次 INSERT 直接寫 SUCCEEDED（PayUni 同步呼叫已成功，§2.4.5.3）
         entity.setPayuniSubmitStatus(io.github.will413028.hawkr.common.utils.code.PayUniSubmitStatus.SUCCEEDED.value());
         entity.setPayuniSubmittedAt(io.github.will413028.hawkr.common.utils.DateTimeUtils.nowUtc());
         settingMapper.insert(entity);
 
-        // 記錄日誌
         insertLog(entity.getId(), storeId, ACTION_PAYUNI,
                 "{\"shippingType\":\"" + SHIPPING_TYPE_HOME + "\",\"productCategory\":\"" + productCategory + "\"}",
                 "{\"partnerId\":\"" + payUniResp.partnerId() + "\",\"setStatus\":\"" + payUniResp.setStatus() + "\"}",
@@ -879,14 +834,12 @@ public class OnboardingService {
                     () -> shippingClient.onboardCvsShipping(merId, payUniReq),
                     payUniResp -> {
                         if (!payUniResp.isSuccess()) {
-                            // PayUni 回業務錯誤（Status != SUCCESS）→ 走 markFailed 路徑
                             String errMsg = describePayUniOnboardError(payUniResp);
                             throw new io.github.will413028.hawkr.payuni.http.PayUniApiException(
                                     payUniResp.setStatus() != null ? payUniResp.setStatus() : "PAYUNI_FAILED",
                                     errMsg, 0);
                         }
                         OnboardingStatus newStatus = OnboardingStatusRules.fromPayUniSetStatus(payUniResp.setStatus());
-                        // 1. 寫 PayUni 回傳欄位 + transition 4302→4303
                         settingMapper.markPayUniSubmitSucceeded(
                                 settingId,
                                 payUniResp.partnerId(),
@@ -894,7 +847,6 @@ public class OnboardingService {
                                 newStatus.value(),
                                 payUniResp.setStatus(),
                                 payUniResp.apiResponse().message() != null ? payUniResp.apiResponse().message() : "");
-                        // 2. 同步更新賣家輸入的非 PayUni 欄位（COALESCE 模式，傳 null 不變）
                         settingMapper.updateCvsSellerInputFields(
                                 settingId, senderName, senderPhone,
                                 returnStoreCode, null, null,
@@ -916,7 +868,6 @@ public class OnboardingService {
         } catch (ProviderCallBusyException busy) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_ONBOARDING_FAILED, "建店進行中或已成功，請稍後重試");
         } catch (io.github.will413028.hawkr.payuni.http.PayUniApiException papi) {
-            // markFailed 已執行（transient 跳過 / permanent 寫 4304）；對外保持既有契約
             insertLog(settingId, existing.getStoreId(), ACTION_PAYUNI,
                     "{\"action\":\"RESUBMIT\"}", null, RESULT_FAILED, null);
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_ONBOARDING_FAILED, papi.getMessage());
@@ -925,7 +876,6 @@ public class OnboardingService {
         insertLog(settingId, existing.getStoreId(), ACTION_PAYUNI,
                 "{\"action\":\"RESUBMIT\"}", null, RESULT_SUCCESS, null);
 
-        // 回傳重新查詢的 entity 給 caller（含 markPayUniSubmitSucceeded + updateCvsSellerInputFields 的最新值）
         return settingMapper.selectById(settingId);
     }
 
@@ -949,15 +899,11 @@ public class OnboardingService {
                                                                String returnDistrict,
                                                                String returnAddressDetail,
                                                                String returnPostalCode) {
-        // 防 app 端誤把全址塞進 detail 欄位導致拼接後 city+district 重複（PayUni 回 DEF01003）
         final String normalizedSenderDetail = AddressNormalizer.normalizeAddressDetail(senderCity, senderDistrict, senderAddressDetail);
         final String normalizedReturnDetail = AddressNormalizer.normalizeAddressDetail(returnCity, returnDistrict, returnAddressDetail);
 
-        // 注意：判斷 alreadySubmitted 必須在 acquireRequested 之前（後者會把狀態改為 4302 失去判斷依據）
         final boolean alreadySubmitted = PayUniSubmitStatus.SUCCEEDED.value().equals(existing.getPayuniSubmitStatus());
 
-        // PayUni 已提交過：地址不允許更新，使用 DB 中的原始地址送 PayUni
-        // （對 DB 既有資料也 normalize，防舊資料含全址 detail）
         final String effectiveSenderAddress;
         if (alreadySubmitted) {
             String dbCleanSenderDetail = AddressNormalizer.normalizeAddressDetail(
@@ -993,7 +939,6 @@ public class OnboardingService {
                                     errMsg, 0);
                         }
                         OnboardingStatus newStatus = OnboardingStatusRules.fromPayUniSetStatus(payUniResp.setStatus());
-                        // 1. 寫 PayUni 回傳欄位 + transition 4302→4303
                         settingMapper.markPayUniSubmitSucceeded(
                                 settingId,
                                 payUniResp.partnerId(),
@@ -1001,8 +946,6 @@ public class OnboardingService {
                                 newStatus.value(),
                                 payUniResp.setStatus(),
                                 payUniResp.apiResponse().message() != null ? payUniResp.apiResponse().message() : "");
-                        // 2. 同步更新賣家輸入的非 PayUni 欄位
-                        // 已 SUCCEEDED 過：地址鎖定，傳 null 給 COALESCE；非地址欄位（姓名/電話/商品類別）始終可更新
                         settingMapper.updateHomeSellerInputFields(
                                 settingId,
                                 senderName, senderPhone, productCategory,
@@ -1050,7 +993,6 @@ public class OnboardingService {
     private SellerMeta getSellerMeta(long storeId) {
         BatchGetSellerMetaResponse resp =
                 sellerGrpcClient.batchGetSellerMeta(List.of(storeId));
-        // 失敗時 seller-service 會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         SellerMeta meta = resp.getSellersMap().get(storeId);
         if (meta == null) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPPING_SELLER_META_NOT_FOUND);

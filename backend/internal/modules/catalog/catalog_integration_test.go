@@ -20,8 +20,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// setup 給這支測試一個套用了本模組與它依賴的 migration的 database：integration 測試只跑在自己的 schema 上。
-// 庫存增加時 catalog 讀 seller 的 pub_exposable_stores 判斷可不可買，所以 seller 的表一定要在。獨立的測試開頭呼叫 t.Parallel()。
 func setup(t *testing.T) *db.DB {
 	t.Helper()
 	return pg.NewDB(t, testdb.Migrations(
@@ -32,14 +30,11 @@ func setup(t *testing.T) *db.DB {
 	))
 }
 
-// recordingNotifier 記下 catalog 的 worker 呼叫補貨 port 的每一次呼叫。
 type recordingNotifier struct {
 	mu       sync.Mutex
 	notified []RestockedSKU
 	purged   [][]uuid.UUID
-	// onNotify 在通知呼叫內執行（在 mu 之外），模擬 worker 處理中發生的並行寫入。
 	onNotify func()
-	// failNotify 與 failPurge 非空時，對應的呼叫回這個錯誤（仍記下呼叫）。
 	failNotify, failPurge error
 }
 

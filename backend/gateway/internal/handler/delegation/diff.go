@@ -78,27 +78,15 @@ var DelegationDiffRules = map[string]map[string]FieldRule{
 		"categoryName": {Label: "商品分類", Formatter: FormatterPlain, InSnapshot: true},
 		"description":  {Label: "商品介紹", Formatter: FormatterTruncate, Arg: "60", InSnapshot: true},
 		"origin":       {Label: "產地", Formatter: FormatterPlain, InSnapshot: true},
-		// status / priceMin / priceMax / stockQty are read-only observations: they
-		// still go into the snapshot, but a PATCH carrying them is ignored. The
-		// denormalised writers behind the three aggregates deliberately do not bump
-		// version, so expectedVersion is blind to them — making them editable would
-		// let a delegated operator read a stale value and write it back with no
-		// signal at all.
 		"status":   {Label: "發布狀態", Formatter: FormatterEnum, Arg: "ProductStatus", InSnapshot: true},
 		"priceMin": {Label: "最低售價", Formatter: FormatterMoney, InSnapshot: true},
 		"priceMax": {Label: "最高售價", Formatter: FormatterMoney, InSnapshot: true},
 		"stockQty": {Label: "庫存數量", Formatter: FormatterQty, Arg: "件", InSnapshot: true},
-		// skus / images project to a COUNT, not to content: the content difference
-		// blows past KB per row, and the three-column UI wants "規格從 2 項變 3 項".
 		"skus":     {Label: "商品規格", Formatter: FormatterQty, Arg: "項", InSnapshot: true},
 		"images":   {Label: "商品圖片", Formatter: FormatterQty, Arg: "張", InSnapshot: true},
 		"hashtags": {Label: "主題標籤", Formatter: FormatterTruncate, Arg: "60", InSnapshot: true},
-		// `enum` 而不是 `truncate`：投影層 join 的是 CertificationType **碼值**
-		// （`3701、3702`），不像 hashtags join 的是本來就可讀的標籤名。詳見 §6.1.12。
 		"certifications": {Label: "產品驗證", Formatter: FormatterEnum, Arg: "CertificationType", InSnapshot: true},
 	},
-	// order is read-only: ORDER_PII_REVEAL changes no field, so the rule table is
-	// empty and both snapshots carry {"revealedFields":[…]} — never the PII itself.
 	"order": {},
 }
 
@@ -162,9 +150,6 @@ func Diff(resourceType string, before, after map[string]any, scope []string) []*
 		return nil
 	}
 	fields := make([]string, 0, len(rules))
-	// len(scope)==0 而不是 scope==nil：非 nil 的空 slice 若走收窄分支，for-loop 跑零次
-	// ⇒ changed_fields 恆為空，而 AST 閘門只看 key 在不在、看不出這種寫法。退回全表
-	// 最壞只是「沒收窄」——那會被逐 action 的範圍測試當場抓到，不會靜默。
 	if len(scope) == 0 {
 		for f := range rules {
 			fields = append(fields, f)
@@ -192,14 +177,6 @@ func Diff(resourceType string, before, after map[string]any, scope []string) []*
 			continue
 		}
 		beforeText, afterText := format(rule, bv, bok), format(rule, av, aok)
-		// 單側缺鍵時，缺席那一側渲染成該 formatter 的空形（qty 是「0 張」、plain 與
-		// truncate 是「—」）。若在場那一側**也**渲染成同一個字串，這一列描述的是「從沒有
-		// 變成沒有」——它不是變更，而它汙染的是不可竄改的稽核列。
-		// 建立類沒有 before，因此缺席側與零值或空字串渲染成同一字串時不寫入假的 0→0 列。
-		// 「從無到有」不受影響：after 有內容時兩側渲染必然不同，那一列照樣輸出。
-		//
-		// ⚠️ 兩側都在場時**不得**改用顯示值比較：truncate(60) 會讓只差在第 200 個字的
-		// 兩段長文渲染成同一字串，那條真實變更會整個消失（見本函式開頭的比較順序說明）。
 		if (!bok || !aok) && beforeText == afterText {
 			continue
 		}
@@ -216,8 +193,6 @@ func Diff(resourceType string, before, after map[string]any, scope []string) []*
 	return out
 }
 
-// rawEqual compares projected values. Projections are scalars by construction, so
-// string comparison of the canonical rendering is exact here and avoids reflect.
 func rawEqual(a, b any) bool {
 	return rawString(a) == rawString(b)
 }
@@ -243,10 +218,6 @@ func rawString(v any) string {
 	}
 }
 
-// format renders one projected value for the three-column UI. present=false means the
-// key was absent on that side; the output is the formatter's empty form, never null or
-// undefined — ChangedField.before/.after are proto strings and the UI does not handle
-// a missing value.
 func format(rule FieldRule, v any, present bool) string {
 	if !present {
 		v = nil
@@ -274,8 +245,6 @@ func format(rule FieldRule, v any, present bool) string {
 		if raw == "" {
 			return "—"
 		}
-		// Only the last segment, and never a full URL: the complete key stays in the
-		// snapshot, the display value only has to be recognisable.
 		if i := strings.LastIndex(raw, "/"); i >= 0 && i+1 < len(raw) {
 			return raw[i+1:]
 		}
@@ -298,7 +267,7 @@ func format(rule FieldRule, v any, present bool) string {
 			return "—"
 		}
 		return enumLabelList(rule.Arg, raw)
-	default: // FormatterPlain
+	default:
 		if raw == "" {
 			return "—"
 		}
@@ -306,14 +275,6 @@ func format(rule FieldRule, v any, present bool) string {
 	}
 }
 
-// enumLabelList resolves a projected scalar that may hold several CodeMeta values
-// joined with "、" (the projection layer's array normalisation, §6.1.12). A single
-// value is the degenerate case — no separator means one segment — so this stays ONE
-// formatter rather than a list-flavoured eighth one.
-//
-// Segments that resolve to nothing pass through as-is instead of collapsing the whole
-// cell to "—": certifications are regulatory claims, and dropping one because a
-// sibling code is unrecognised would erase it from the audit record.
 func enumLabelList(enumName, raw string) string {
 	parts := strings.Split(raw, "、")
 	for i, p := range parts {
@@ -322,10 +283,6 @@ func enumLabelList(enumName, raw string) string {
 	return strings.Join(parts, "、")
 }
 
-// enumLabel resolves a CodeMeta value to its Chinese label through the generated
-// pkg/codemeta table. Writing a second Chinese table by hand fails as DRIFT rather
-// than as an error: CodeMeta changes a label, the copy keeps compiling, no test turns
-// red, and the audit record silently shows last year's wording.
 func enumLabel(enumName, value string) string {
 	switch enumName {
 	case "ProductStatus":
@@ -364,9 +321,6 @@ func groupThousands(n string) string {
 	return out
 }
 
-// snapshotMaxBytes is asserted in the application layer, not by the database. The
-// column is jsonb and would accept far more; the limit exists so one oversized
-// description cannot make an audit row unreadable.
 const snapshotMaxBytes = 64 * 1024
 
 // MarshalSnapshot serialises a projection for before_snapshot_json /

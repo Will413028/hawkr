@@ -39,7 +39,6 @@ test("access classes are resolved from one table: buyer, seller, account, public
 	]) {
 		assert.equal(requiredAccessForPath(pathname), "account", pathname);
 	}
-	// The recruiting pages and onboarding sit under /seller but need no access class.
 	for (const pathname of [
 		"/seller",
 		"/seller/pricing",

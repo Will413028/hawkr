@@ -10,7 +10,7 @@ import (
 
 func TestSendDiscordWebhook_TransportErrorDoesNotLeakToken(t *testing.T) {
 	srv := httptest.NewServer(nil)
-	srv.Close() // 立即關閉，確定性觸發 dial 失敗
+	srv.Close()
 
 	webhookURL := srv.URL + "/api/webhooks/123456789/hunter2-secret-token"
 	err := sendDiscordWebhook(webhookURL, discordWebhook{Content: "test"})

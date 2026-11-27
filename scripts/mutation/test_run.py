@@ -14,7 +14,6 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run  # noqa: E402
 
-# 假的測試指令：檔案內容含 MUTATED 就失敗；RAISE 環境變數存在時，執行測試本身丟例外。
 CHECK = "import sys;sys.exit(1 if 'MUTATED' in open(sys.argv[1]).read() else 0)"
 
 

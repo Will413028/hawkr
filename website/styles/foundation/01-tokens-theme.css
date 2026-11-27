@@ -1,26 +1,11 @@
-/* Extracted from styles/globals.css.
- * Design tokens, page surfaces, and site-wide dark-mode foundations.
- * Keep import order in styles/globals.css unless intentionally changing cascade.
- */
 
-/* ============================================================
-   HAWKR v2 - Complete Stylesheet
-   Architecture: Design Tokens > Reset > Typography > Layout >
-   Navigation > Footer > Shared Components > Pages > Decorations >
-   Preserved Components > Responsive Overrides
-   ============================================================ */
 
-/* ===========================================
-   1. DESIGN TOKENS (:root custom properties)
-   =========================================== */
 :root {
-	/* === Hawkr Brand Kit Tokens === */
 	--brand-soft-surface-wash: var(--theme-surface-page);
 	--brand-text-black: var(--color-neutral-ink);
 	--brand-text-gray: var(--color-neutral-body);
 	--brand-whisper-gray: var(--color-neutral-whisper);
 
-	/* === Hawkr Semantic Design Tokens === */
 	--surface-page: var(--theme-surface-page);
 	--surface-card: var(--theme-surface-card);
 	--surface-muted: var(--theme-surface-muted);
@@ -46,14 +31,12 @@
 	--brand-pattern-cream: linear-gradient(transparent, transparent);
 	--brand-pattern-blue: linear-gradient(transparent, transparent);
 
-	/* === Brand Colors === */
 	--color-primary: var(--action-primary);
 	--color-secondary: var(--color-brand-primary-strong);
 	--color-accent-orange: var(--color-brand-secondary);
 	--color-accent-blue: var(--color-status-info);
 	--color-accent-brown: var(--color-brand-ink);
 
-	/* === Neutral Colors === */
 	--color-black: var(--brand-text-black);
 	--color-gray-dark: var(--brand-text-gray);
 	--color-gray-mid: var(--color-neutral-500);
@@ -61,7 +44,6 @@
 	--color-white: var(--color-neutral-white);
 	--color-surface-wash: var(--brand-soft-surface-wash);
 
-	/* === Semantic Tokens === */
 	--text-heading: var(--ink-heading);
 	--text-body: var(--ink-body);
 	--text-price: var(--color-accent-orange);
@@ -80,31 +62,16 @@
 	--border-input: var(--theme-border-input);
 	--border-input-focus: var(--color-primary);
 
-	/* === Font Families ===
-	   Two-tier system, single source of truth for the whole site:
-	   • --font-primary : body / UI text everywhere. Roboto leads for Latin +
-	     digits (Latin-only webfont), then the platform CJK gothics. System
-	     CJK = 0 download, identical-enough across OSes.
-	   • --font-brand   : rounded jf-openhuninn for page / section TITLES
-	     (h1·h2 + marketing headlines). The brand accent. */
 	--font-primary:
 		var(--font-roboto), system-ui, -apple-system, BlinkMacSystemFont,
 		"Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Heiti TC",
 		sans-serif;
-	/* Back-compat aliases — both now resolve to the unified body stack. */
 	--font-secondary: var(--font-primary);
 	--font-chinese: var(--font-primary);
-	/* Falls back to a rounded local face, then the body stack, so a missing
-	   webfont or glyph degrades gracefully instead of jumping to a flat sans.
-	   NOTE: only reference globally-defined vars here (--font-openhuninn is on
-	   <body>; --font-zen-maru is .hkh-page-scoped, so it is deliberately NOT in
-	   this chain — an undefined var() would invalidate the whole declaration
-	   and drop brand headings back to the body font on app pages). */
 	--font-brand:
 		var(--font-openhuninn), "Hiragino Maru Gothic ProN", "Yuanti TC",
 		"Yuanti SC", var(--font-primary);
 
-	/* === Font Sizes === */
 	--text-xs: 0.75rem;
 	--text-sm: 0.875rem;
 	--text-base: 1rem;
@@ -115,18 +82,15 @@
 	--text-4xl: 2.25rem;
 	--text-5xl: 3rem;
 
-	/* === Font Weights === */
 	--weight-regular: 400;
 	--weight-medium: 500;
 	--weight-bold: 700;
 	--weight-black: 900;
 
-	/* === Line Heights === */
 	--leading-tight: 1.2;
 	--leading-normal: 1.5;
 	--leading-relaxed: 1.7;
 
-	/* === Spacing Scale (4px base) === */
 	--space-1: 0.25rem;
 	--space-2: 0.5rem;
 	--space-3: 0.75rem;
@@ -140,44 +104,24 @@
 	--space-20: 5rem;
 	--space-24: 6rem;
 
-	/* === Layout === */
-	--nav-height: 80px; /* snap-section calibrated offset — do not use for page-content */
-	--site-nav-v-padding: 20px; /* .site-nav top & bottom padding */
-	--site-nav-inner-height: 100px; /* .site-nav__inner height */
+	--nav-height: 80px;
+	--site-nav-v-padding: 20px;
+	--site-nav-inner-height: 100px;
 	--max-width: 1440px;
 	--content-width: 1320px;
 	--content-padding: 0px;
 	--content-padding-tablet: 0px;
 	--content-padding-mobile: 0px;
 
-	/* === Border Radius ===
-	 * Canonical scale — feature CSS should pick from these tiers.
-	 * Migrate hardcoded 6/8/10/12/14/16/18/20/22/24/28/30px to the
-	 * closest token. brand-radius-* aliases retained for legacy.
-	 */
-	--radius-xs: 6px; /* tiny tags, inline pills */
-	--radius-sm: var(--brand-radius-sm); /* 8px — chips, inputs */
-	--radius-md: var(--brand-radius-md); /* 12px — cards, buttons */
-	--radius-lg: var(--brand-radius-lg); /* 16px — feature panels */
-	--radius-xl: var(--brand-radius-xl); /* 24px — hero blocks */
-	--radius-2xl: var(--brand-radius-2xl); /* 32px — full-bleed surfaces */
-	--radius-pill: 999px; /* pill buttons, segmented chips */
-	--radius-circle: 50%; /* avatars, icon dots */
+	--radius-xs: 6px;
+	--radius-sm: var(--brand-radius-sm);
+	--radius-md: var(--brand-radius-md);
+	--radius-lg: var(--brand-radius-lg);
+	--radius-xl: var(--brand-radius-xl);
+	--radius-2xl: var(--brand-radius-2xl);
+	--radius-pill: 999px;
+	--radius-circle: 50%;
 
-	/* === Shadows ===
-	 * Canonical elevation ladder. Theme-shadow-* values auto-flip in
-	 * dark mode via 00-color-config.css. New tokens xs/xl/2xl below
-	 * are also overridden in the [data-theme="dark"] block.
-	 *
-	 *   xs   — 1-2px subtle outline (inputs, hover indicators)
-	 *   sm   — 2-4px lift (chips, tooltips, small popovers)
-	 *   md   — card surface (default elevation)
-	 *   lg   — hovered/active card, dropdown
-	 *   xl   — popovers, large dropdowns
-	 *   2xl  — modals, dialogs, drawers
-	 *   focus-* — keyboard focus rings (3px outer halo, ~18% alpha)
-	 *   inset-top — 1px highlight on raised pill/glass surfaces
-	 */
 	--shadow-xs: 0 1px 2px rgb(var(--color-neutral-ink-rgb) / 0.05);
 	--shadow-sm: 0 2px 6px rgb(var(--color-neutral-ink-rgb) / 0.06);
 	--shadow-md: var(--theme-shadow-brand-soft);
@@ -188,8 +132,8 @@
 	--shadow-2xl:
 		0 24px 60px rgb(var(--color-neutral-ink-rgb) / 0.2),
 		0 8px 18px rgb(var(--color-neutral-ink-rgb) / 0.08);
-	--shadow-card: var(--shadow-md); /* legacy alias */
-	--shadow-card-hover: var(--shadow-lg); /* legacy alias */
+	--shadow-card: var(--shadow-md);
+	--shadow-card-hover: var(--shadow-lg);
 	--shadow-nav: var(--theme-shadow-nav);
 	--shadow-dropdown: var(--theme-shadow-dropdown);
 	--shadow-focus-warm: 0 0 0 3px rgb(var(--color-brand-secondary-rgb) / 0.2);
@@ -197,21 +141,6 @@
 	--shadow-focus-ring: var(--shadow-focus-cool);
 	--shadow-inset-top: inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.55);
 
-	/* === Z-Index Scale ===
-	 * Strict ladder. Feature CSS must pick a token — never use raw
-	 * numeric values like 999, 1000, 2000, 10000.
-	 *
-	 *   base    — normal flow
-	 *   raised  — local stacking inside a section (hovered card)
-	 *   dropdown — menus, comboboxes, autocomplete
-	 *   sticky  — sticky table headers, sticky bars
-	 *   nav     — site navigation, sub-nav
-	 *   overlay — drawer scrims, side panels
-	 *   modal   — dialogs, full-screen modals
-	 *   popover — popovers anchored above modals
-	 *   tooltip — last-mile hints
-	 *   toast   — transient feedback (always on top)
-	 */
 	--z-base: 0;
 	--z-raised: 10;
 	--z-dropdown: 100;
@@ -223,57 +152,23 @@
 	--z-tooltip: 600;
 	--z-toast: 700;
 
-	/* === Transitions === */
 	--transition-fast: 150ms ease;
 	--transition-base: 250ms ease;
 	--transition-slow: 350ms ease;
 
-	/* === Easing curves ===
-	 * Pick the right curve for the moment:
-	 *   --ease-standard — default for hover/state changes. Tight,
-	 *     decelerating, no overshoot. Use for 90% of transitions.
-	 *   --ease-emphasized — page transitions, sheet open/close.
-	 *     A touch more deceleration than standard, still no overshoot.
-	 *   --ease-bounce — delight only: one-shot intro pops, chip scale
-	 *     on hover. Never on primary navigation or page transitions.
-	 *   --ease-linear-out — explicit linear-out (rare; subtle slides).
-	 */
 	--ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
 	--ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
 	--ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 	--ease-linear-out: cubic-bezier(0.5, 0, 0.5, 1);
 
-	/* === Legacy support === */
 	--intro-shift-x: 22px;
 }
 
-/* ===========================================
-   Hawkr editorial marketplace refresh
-   =========================================== */
-/* The buyer navbar is a floating, transparent pill with a top gap, so the
- * area behind/around it shows the <body> background. The page surface must
- * be painted ONCE, on <body>, so that one field runs continuously from
- * above the navbar through the content — two paint sources read as stacked
- * blocks with a seam at the navbar's lower edge. That single paint is
- * `body { background: var(--surface-page) }` in 02-reset-layout.css; the
- * old `--theme-page-content-bg` gradient that used to live here was dead
- * (always overridden by import order) and would re-introduce the seam if
- * it ever won, so it was removed rather than left as a trap. */
 
 body .page-content {
 	background: transparent;
 }
 
-/* ===== Site-wide dark mode (toggled via the navbar pill) =====
- *
- * Scopes a dark palette under [data-theme="dark"]. We mostly
- * flip the hkui token layer — most components consume tokens already, so
- * cards / inputs / chips inherit dark colors automatically. Buyer pages
- * keep working since the page-content gradient is also overridden here.
- *
- * The seller workspace has its own deeper override under
- * styles/features/seller-center.css ([data-theme="dark"] .seller-shell)
- * which builds on this base. */
 [data-theme="dark"] {
 	color-scheme: dark;
 	--hkui-background: var(--theme-surface-page);
@@ -290,14 +185,9 @@ body .page-content {
 	--hkui-default-400: rgb(var(--color-ink-500-rgb) / 0.62);
 	--hkui-divider: rgb(var(--color-ink-100-rgb) / 0.1);
 
-	/* On the dark surface a dark border vanishes; lift the
-	 * bare-control treatment to a light hairline. */
 	--hkui-input-border: rgb(var(--color-ink-100-rgb) / 0.14);
 	--hkui-input-focus-ring: 0 0 0 3px rgb(var(--color-brand-primary-rgb) / 0.24);
 
-	/* Legacy buyer-side tokens — flipping these makes most cards / panels /
-	 * search boxes / hero blocks inherit dark mode without per-component
-	 * overrides. Same dark palette the seller workspace uses. */
 	--surface-page: var(--theme-surface-page);
 	--surface-card: var(--theme-surface-card);
 	--surface-muted: var(--theme-surface-muted);
@@ -312,10 +202,6 @@ body .page-content {
 	--brand-soft-surface-wash: var(--theme-surface-page);
 	--brand-whisper-gray: rgb(var(--color-ink-800-rgb) / 0.58);
 
-	/* Dark-mode elevation: dark-on-dark flattens depth, so we layer a
-	 * subtle 1px inner highlight (white at low alpha) plus the existing
-	 * darker shadow. xs/sm/xl/2xl get the same treatment.
-	 */
 	--shadow-xs:
 		inset 0 1px 0 rgb(var(--color-neutral-white-rgb) / 0.04),
 		0 1px 2px rgb(var(--color-neutral-black-rgb) / 0.32);
@@ -333,8 +219,6 @@ body .page-content {
 	--shadow-focus-warm: 0 0 0 3px rgb(var(--color-brand-secondary-rgb) / 0.36);
 	--shadow-focus-cool: 0 0 0 3px rgb(var(--color-brand-primary-rgb) / 0.36);
 }
-/* Both themes use the original market solid base. The persistent decorative
- * layer is owned by AppProviders, never painted again inside a page shell. */
 [data-theme="dark"] body {
 	color: var(--hkui-foreground);
 	background: var(--site-grainient-base);
@@ -346,12 +230,7 @@ body .page-content {
 	color: var(--hkui-foreground);
 }
 
-/* ===== Buyer-side dark mode — hardcoded cream backgrounds ===== */
 
-/* Card surfaces — frosted glass overlays that blend with the body sky
- * instead of painting a saturated primary block. Low-opacity white wash
- * + heavy blur gives subtle elevation so cards still feel like cards
- * without dividing the page into two visually-distinct backgrounds. */
 [data-theme="dark"] .feed-card,
 [data-theme="dark"] .market-product-card,
 [data-theme="dark"] .market-content-page,
@@ -388,9 +267,6 @@ body .page-content {
 		0 14px 30px rgba(0, 0, 0, 0.38);
 }
 
-/* UI Kit "blurred" surfaces — all hard-code rgba cream + backdrop-blur,
- * which still reads as a bright pane in dark mode even with my token
- * flip. Force them to the same frosted-glass overlay. */
 [data-theme="dark"] .hkui-navbar--blurred,
 [data-theme="dark"] .hkui-seller-profile__login-popover {
 	background: rgb(var(--color-ink-900-rgb) / 0.72);
@@ -398,8 +274,6 @@ body .page-content {
 	color: var(--hk-text-body);
 }
 
-/* The popover's rim light and arrow are hard-coded cream in ui-kit.css;
- * dim the inset line and repaint the arrow to match the dark pane. */
 [data-theme="dark"] .hkui-seller-profile__login-popover {
 	box-shadow:
 		0 18px 42px rgba(0, 0, 0, 0.5),
@@ -416,9 +290,6 @@ body .page-content {
 		0 14px 30px rgba(0, 0, 0, 0.4);
 }
 
-/* App-download banner — uses --hkui-content2 token (auto-flips), but
- * paint explicitly so it's guaranteed dark even where the cascade is
- * fighting older !important cream rules. */
 [data-theme="dark"] .hkui-app-banner {
 	background: rgb(var(--color-ink-950-rgb) / 0.68);
 	-webkit-backdrop-filter: blur(12px) saturate(120%);
@@ -430,9 +301,6 @@ body .page-content {
 	background: rgba(245, 222, 165, 0.07);
 }
 
-/* Shipment dialog (seller-center) — was hard-coded #fff across the
- * panel + many child sub-panels. Use `[class^="shipment-dialog__"]`
- * to catch every child without listing them all. */
 [data-theme="dark"] .shipment-dialog__panel {
 	background: var(--color-ink-900);
 	border: 1px solid rgba(245, 222, 165, 0.18);
@@ -456,15 +324,11 @@ body .page-content {
 	color: var(--hk-text-body);
 }
 
-/* Img-uploader cream hover states */
 [data-theme="dark"] .img-uploader__btn:hover,
 [data-theme="dark"] .img-uploader__icon-btn:hover:not(:disabled) {
 	background: rgba(245, 222, 165, 0.1);
 }
 
-/* MegaMenu dropdown panel — was `var(--color-white)` plus cream
- * shadow. Force a dark glass treatment so the hover panel matches the
- * dark navbar pill above it. */
 html[data-theme="dark"] .mega-panel {
 	background: rgb(var(--color-ink-950-rgb) / 0.92);
 	border: 1px solid rgba(245, 222, 165, 0.18);
@@ -503,29 +367,10 @@ html[data-theme="dark"] .mega-panel__badge {
 	border-color: rgba(241, 205, 112, 0.4);
 }
 
-/* Shipping toggle thumb stays white (intentional contrast) — no change */
 
-/* ============================================================
- *           Catch-all sweep — paint any remaining "white" surface
- *
- * Hard-coded `background: #fff` / `background: white` literals scattered
- * across older feature CSS keep landing as bright pills/panels even
- * after every targeted dark rule I add. This rule walks the cascade
- * one more time at high specificity:
- *   - If an element's inline computed bg is white-ish, the rule below
- *     re-tints it to frosted glass.
- * We can't conditionally test computed style in CSS, so we use a wide
- * attribute selector that matches common "white" inline-style values.
- *
- * If a rendered surface should stay white in dark mode (toggle thumb,
- * brand mark, etc.) add it to the exclusion list. */
 
-/* Circular category nav icons — same frosted glass treatment so they
- * don't look like floating white buttons on the sky. */
 
-/* Section panels that should look like solid surfaces (not glass cards) */
 
-/* Headings + body text — the cream theme uses near-black; flip to wheat */
 [data-theme="dark"] body h1,
 [data-theme="dark"] body h2,
 [data-theme="dark"] body h3,
@@ -545,7 +390,6 @@ html[data-theme="dark"] .mega-panel__badge {
 	color: var(--ink-body);
 }
 
-/* Search box, market chips, sort pills, sub-nav pills */
 [data-theme="dark"] .search-box input,
 [data-theme="dark"] .market-search-box input {
 	background: rgb(var(--color-ink-950-rgb) / 0.72);
@@ -556,7 +400,6 @@ html[data-theme="dark"] .mega-panel__badge {
 	color: rgb(var(--color-ink-100-rgb) / 0.45);
 }
 
-/* Side filter rail */
 [data-theme="dark"] .market-filter h2 {
 	color: var(--ink-heading);
 }
@@ -570,27 +413,8 @@ html[data-theme="dark"] .mega-panel__badge {
 	color: #ffeec0;
 }
 
-/* Empty / "no results" hint cards */
 
-/* PDP / product detail page */
 
-/* ============================================================
- *           Universal text-readability tier (dark mode)
- *
- * Two readable tiers are enforced across every page:
- *
- *   --hk-text-strong  (#f5e9c3)    — headings, page titles, card titles,
- *                                    KPI numbers, primary stats
- *   --hk-text-body    (--color-ink-100) — body copy, secondary
- *                                    text, labels
- *   --hk-text-soft    (--color-ink-100) — captions, hints,
- *                                    sub-labels, eyebrow rows
- *
- * The selectors are broad so any future page inherits the right tier
- * without per-page overrides. Hard-coded near-black `color: #...` rules
- * earlier in this stylesheet are beaten by `[data-theme="dark"] body`
- * (specificity (0,1,1)) plus a more specific element selector below.
- * ============================================================ */
 [data-theme="dark"] {
 	--hk-text-strong: var(--color-brand-ink-on-dark);
 	--hk-text-body: rgb(var(--color-brand-ink-on-dark-rgb) / 0.82);
@@ -610,25 +434,6 @@ html[data-theme="dark"] .mega-panel__badge {
 	color: var(--hk-text-body);
 }
 
-/* A button's label is not body text. The rule above targets bare `span` /
- * `label`, which is exactly what a button wraps its text in — so in dark mode
- * the label was repainted to `--hk-text-body` while the button itself, and any
- * icon painted from the same token, kept the intended colour. The result was a
- * two-tone control: cream text over a dark-brown glyph on the gold 立即購買 and
- * 聊天 CTAs, both of which already declared `dark:text-[#2d2010]`.
- *
- * Scoped to buttons in general, not to `components/ui/Button.tsx`: 聊天 is a
- * hand-rolled `<button>`, and "the surface owns its foreground" is true of
- * every button, not only the ones built from the shared component. A button
- * that sets no colour of its own still lands on `--hk-text-body`, inherited
- * from `body` via the same rule above.
- *
- * `:where()` cannot carry this — it contributes zero specificity, so the
- * selector would score below the `body span` rule it has to beat.
- *
- * `inherit` is the right answer here (unlike the `a[data-hkui-button]` case
- * further down, which needs its own class colour): the button root already
- * carries the correct foreground, so the label just has to stop overriding it. */
 [data-theme="dark"] body button span,
 [data-theme="dark"] body button label,
 [data-theme="dark"] body [role="button"] span,
@@ -660,14 +465,6 @@ html[data-theme="dark"] .mega-panel__badge {
 	color: var(--hk-text-soft);
 }
 
-/* Links inside text — lifted to the secondary color so they read on dark.
- *
- * `<Button href>` is excluded rather than listed in the `color: inherit`
- * opt-out below: this rule outranks Tailwind's single-class specificity, so an
- * opt-out that *sets* `inherit` would still bury the button's own foreground
- * token. Not matching at all is what lets components/ui/Button.tsx drop the
- * `!important` from its solid text colours — which is in turn what lets a
- * caller repaint a button's label together with its surface. */
 [data-theme="dark"] body a:not([data-hkui-button]) {
 	color: var(--color-brand-secondary);
 }
@@ -675,9 +472,6 @@ html[data-theme="dark"] .mega-panel__badge {
 	color: #eadcae;
 }
 
-/* Buyer pages often use Tailwind `dark:bg-white/*` directly, which bypasses
- * the token layer above. Keep the override scoped to buyer roots so seller
- * tooling and generic chrome can keep their local dark treatments. */
 [data-theme="dark"]
 	:where(.account-shell, .market-page, .pd-main, .cart-shell-page)
 	[class*="dark:bg-white/4"] {
@@ -695,8 +489,6 @@ html[data-theme="dark"] .mega-panel__badge {
 	[class*="dark:bg-white/8"] {
 	background-color: rgb(var(--color-ink-950-rgb) / 0.78) !important;
 }
-/* Don't repaint links that are wrapping cards / nav items / buttons —
- * those have their own background-driven contrast already. */
 [data-theme="dark"] body a.market-product-card,
 [data-theme="dark"] body a.feed-card,
 [data-theme="dark"] body a.seller-quickaction,
@@ -714,7 +506,6 @@ html[data-theme="dark"] .mega-panel__badge {
 	color: inherit;
 }
 
-/* Form fields — placeholder + value tiers */
 [data-theme="dark"] body input::placeholder,
 [data-theme="dark"] body textarea::placeholder {
 	color: var(--hk-text-soft);

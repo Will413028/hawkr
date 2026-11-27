@@ -50,9 +50,6 @@ func ValidateAuthorizers(a map[model.ScheduleKind]model.ScheduleAuthorizer) erro
 	return nil
 }
 
-// ownerAuthorizer 是店主排程的授權：與手動發布同一個店家授權（seller.Authorize 的 CapMarketing）。只有「沒有這項權利」（PermissionDenied）與「店家不存在」（NotFound）是永久的拒絕；
-// FailedPrecondition 與其他錯誤是暫時的，回傳讓 job 重試。
-// social 自己的檢查（沒刪除、沒下架、仍滿足公開要件）對每一種發起者都在到點時先做（RunScheduled）。
 type ownerAuthorizer struct{ stores readcache.Stores }
 
 func (a ownerAuthorizer) AuthorizeScheduledPublish(ctx context.Context, p model.ScheduledPublish) error {
@@ -165,7 +162,6 @@ func (s *Service) Schedule(ctx context.Context, st seller.Store, in model.Schedu
 	return model.ScheduledPost{Schedule: schedule.Of(out), PostVersion: version, Post: posted}, nil
 }
 
-// bumpVersion 遞增貼文版本並回傳新版本：排程與取消排程改變貼文的狀態組合，持有舊 etag 的編輯、發布要重新讀取。貼文列已鎖。
 func (s *Service) bumpVersion(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time) (int64, error) {
 	upd, err := q.BumpPostVersion(ctx, store.BumpPostVersionParams{ID: row.ID, Now: now, ExpectedVersion: row.Version})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -255,7 +251,6 @@ func (s *Service) PendingSchedulerRefs(ctx context.Context, kind model.ScheduleK
 	return refs, nil
 }
 
-// resolveCanceled 把排程寫成 CANCELED（原因凍結在列上），遞增貼文版本並發事件；貼文列已鎖。貼文已不存在時 bump 為 CallerBumps。不排快取失效：有待發布排程的貼文不是公開的。
 func (s *Service) resolveCanceled(ctx context.Context, q *store.Queries, id uuid.UUID, reason model.CancelReason, now time.Time, bump schedule.VersionBump) error {
 	r := string(reason)
 	row, err := q.ResolveSchedule(ctx, store.ResolveScheduleParams{ID: id, State: string(model.ScheduleCanceled), CancelReason: &r, Now: &now})

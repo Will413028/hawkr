@@ -29,8 +29,6 @@ func TestNewEngine_MountsBizCarrier(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := newEngine(&config.Config{}, zap.NewNop(), &handler.Holder{})
 
-	// 註冊在 newEngine 之後仍會套用全域鏈：gin 在註冊路由的當下才把 engine.Handlers
-	// 複製進該路由，而 r.Use(...) 全部發生在 newEngine 內。
 	var armed bool
 	r.GET("/__bizcarrier_probe", func(c *gin.Context) {
 		armed = bizcarrier.Arm(c.Request.Context(), "/probe.Service/Probe", 9331, "probe")

@@ -20,7 +20,6 @@ const (
 	fpOther  = "fp_other_bank_0002"
 )
 
-// approvedWithFingerprints 核准一家新店並讓外部帳戶回這些 fingerprint，執行同步一輪。
 func (f *fixture) approvedWithFingerprints(t *testing.T, fingerprints ...string) (int64, Store) {
 	t.Helper()
 	accountID, s, sub := f.submitted(t)

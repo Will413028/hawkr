@@ -45,7 +45,6 @@ func sourceAuthorityOrdersField(prefix string) string {
 	return prefix + ".Finding.SourceAuthorityOrderIDs"
 }
 
-// validateSourceAuthorityOrders 檢查新認定引用的來函清單的形狀：筆數上限、不可為空 ID、不可重複。來函是否存在、有沒有指名這個措施的帳號在鎖住帳號之後檢查（checkNamingOrders）。
 func validateSourceAuthorityOrders(field string, ids []uuid.UUID) error {
 	if len(ids) > model.MaxSourceAuthorityOrders {
 		return apperr.InvalidInputOn([]string{field}, "%s", text.MeasureSourceAuthorityOrdersCount().Text)
@@ -60,7 +59,6 @@ func validateSourceAuthorityOrders(field string, ids []uuid.UUID) error {
 	return nil
 }
 
-// validateSourceReports 檢查新認定的來源通報清單的形狀：筆數上限、不可為空 ID、不可重複。通報屬於哪個店家、狀態是否成立在鎖住通報之後檢查（findings）。
 func validateSourceReports(field string, ids []uuid.UUID) error {
 	if len(ids) > model.MaxSourceReports {
 		return apperr.InvalidInputOn([]string{field}, "一個認定最多 %d 筆來源通報", model.MaxSourceReports)
@@ -75,7 +73,6 @@ func validateSourceReports(field string, ids []uuid.UUID) error {
 	return nil
 }
 
-// validateSourceModerationReports 檢查新認定的 moderation 來源檢舉清單的形狀：筆數上限、不可為空 ID、不可重複。這些 ID 是不透明的外部參照，seller 不驗證它們存在。
 func validateSourceModerationReports(field string, ids []uuid.UUID) error {
 	if len(ids) > model.MaxSourceModerationReports {
 		return apperr.InvalidInputOn([]string{field}, "一個認定最多 %d 筆來源檢舉", model.MaxSourceModerationReports)
@@ -90,9 +87,6 @@ func validateSourceModerationReports(field string, ids []uuid.UUID) error {
 	return nil
 }
 
-// validateCreate 是建立措施的無狀態驗證：格式、必填、enum、依據的形狀、欄位之間的規則。結果與時間和資料庫無關，所以冪等的
-// 重送一定與第一次相同（先於 request_id 的查詢）。與時間或資料有關的驗證（結束時間與複審期限的範圍、店家、引用的認定）在
-// 查過 request_id 之後（create）。
 func validateCreate(in *model.CreateMeasureInput) error {
 	if err := model.Positive(in.StoreID, in.AdminID); err != nil {
 		return err
@@ -161,9 +155,6 @@ func validateCreate(in *model.CreateMeasureInput) error {
 	return nil
 }
 
-// validateTermination 是終止合作的無狀態驗證（條款第 21.2、21.3 條）：事由合法；終止沒有結束時間與複審期限（結束時間只有系統在預告期間內關店時寫入）；
-// 預告終止與關聯帳號只能依據契約條款（不帶認定）；重大違約必須引用認定（引用的認定夠不夠久、有沒有撤銷是有狀態的驗證，在 create）；關聯帳號必須指定來源措施，
-// 其他事由不可以。
 func validateTermination(in *model.CreateMeasureInput) error {
 	t := in.Termination
 	if err := model.OneOf(t.Ground, model.TerminationGroundValues(), terminationField+".Ground", "終止事由不合法"); err != nil {
@@ -175,7 +166,6 @@ func validateTermination(in *model.CreateMeasureInput) error {
 	case in.ReviewBy != nil:
 		return apperr.InvalidInputOn([]string{"ReviewBy"}, "終止合作沒有複審期限")
 	case t.Ground.ViolationRequirement() == model.ViolationForbidden && t.Violation != nil:
-		// 事由的名稱來自共用文案目錄（後台受眾）；OneOf 已確認事由合法，目錄沒有文字是程式錯誤。
 		groundText, ok := uitext.Staff().SellerTerminationGround(string(t.Ground))
 		if !ok {
 			return fmt.Errorf("seller：文案目錄沒有終止事由 %q 的名稱", t.Ground)
@@ -229,12 +219,10 @@ func validateViolationBasis(prefix string, b *model.ViolationBasis) error {
 	return nil
 }
 
-// sortedUUIDs 回傳 ids 依 UUID 的大端位元組順序（與資料庫的 uuid 排序相同）遞增排序的複本，不改動呼叫端的清單。
 func sortedUUIDs(ids []uuid.UUID) []uuid.UUID {
 	return slices.SortedFunc(slices.Values(ids), uuid.UUID.Compare)
 }
 
-// sortedContents 回傳內容對象依（種類位元組順序、UUID 大端位元組順序）遞增排序的複本，不改動呼叫端的清單；對象是集合，順序沒有意義。
 func sortedContents(refs []model.TakedownContent) []model.TakedownContent {
 	return slices.SortedFunc(slices.Values(refs), func(a, b model.TakedownContent) int {
 		if c := strings.Compare(string(a.Kind), string(b.Kind)); c != 0 {
@@ -244,9 +232,6 @@ func sortedContents(refs []model.TakedownContent) []model.TakedownContent {
 	})
 }
 
-// requestHash 是正規化後的建立輸入（不含 request_id；時間已截到微秒）以固定欄位順序編碼的 SHA-256：冪等重送比對「內容是否相同」的唯一
-// 定義。所有 id 清單（來源通報、引用的既有認定）都是集合，不看輸入順序，編碼排序後的複本，沒有例外（主要依據由規則決定，不編碼在位置裡，
-// 見 findings）；其他欄位照輸入。排序不改動呼叫端的清單。
 func requestHash(in model.CreateMeasureInput) []byte {
 	h := idempotency.New()
 	put := h.Put
@@ -265,7 +250,6 @@ func requestHash(in model.CreateMeasureInput) []byte {
 			for _, id := range sources {
 				put(id.String())
 			}
-			// 只在有來源來函時編碼：沒有來源來函的請求 hash 與加這個欄位之前相同。來函也是集合，編碼排序後的複本。
 			if orders := sortedUUIDs(f.SourceAuthorityOrderIDs); len(orders) > 0 {
 				put("AUTHORITY_ORDERS", strconv.Itoa(len(orders)))
 				for _, id := range orders {
@@ -311,11 +295,9 @@ func requestHash(in model.CreateMeasureInput) []byte {
 		}
 	}
 	if in.SourceCaseID != nil {
-		// 只在有來源案件時編碼：同一個 request_id 帶不同的案件是不同的請求，而沒有來源案件的請求 hash 與加這個欄位之前相同。
 		put("SOURCE_CASE", in.SourceCaseID.String())
 	}
 	if in.SourceAuthorityOrderID != nil {
-		// 同上：同一個 request_id 帶不同的來函是不同的請求。
 		put("SOURCE_AUTHORITY_ORDER", in.SourceAuthorityOrderID.String())
 	}
 	return h.Sum()
@@ -362,7 +344,6 @@ func (s *Service) CreateInTx(ctx context.Context, in model.CreateMeasureInput) (
 	return s.create(ctx, store.New(s.d.DB.Conn(ctx)), in, nil)
 }
 
-// replayOf 在已鎖住目標帳號之後查 (管理員, request_id)：命中且內容相同回傳措施目前的狀態；內容不同回 InvalidInput；沒命中回 false。
 func (s *Service) replayOf(ctx context.Context, q *store.Queries, in model.CreateMeasureInput, hash []byte) (model.CreateMeasureResult, bool, error) {
 	row, err := q.MeasureByRequest(ctx, store.MeasureByRequestParams{AdminID: in.AdminID, RequestID: in.RequestID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -495,7 +476,6 @@ func (s *Service) create(ctx context.Context, q *store.Queries, in model.CreateM
 	return model.CreateMeasureResult{Measure: measure}, err
 }
 
-// insertContentsParams 把全部對象展開成 InsertMeasureContents 的平行陣列；每個對象的快照必填，狀態一律是 CAPTURED。
 func insertContentsParams(measureID uuid.UUID, contents []model.TakedownContent) store.InsertMeasureContentsParams {
 	n := len(contents)
 	p := store.InsertMeasureContentsParams{
@@ -511,8 +491,6 @@ func insertContentsParams(measureID uuid.UUID, contents []model.TakedownContent)
 	return p
 }
 
-// checkNoActiveTakedown 拒絕目標內容已有生效中下架措施的內容下架：stint 鎖已串行同一個帳號的建立，所以這裡是給使用者的明確錯誤；
-// 跨店的並行（內容歸屬不由 seller 驗證）由唯一索引 measure_contents_one_enforced 擋下，錯誤回滾整個建立。
 func checkNoActiveTakedown(ctx context.Context, q *store.Queries, in model.CreateMeasureInput) error {
 	if in.Takedown == nil {
 		return nil
@@ -543,8 +521,6 @@ func (s *Service) ActiveTakedownOfContent(ctx context.Context, ref model.Content
 	return &id, nil
 }
 
-// requestIDTakenElsewhere 處理插入因 (管理員, request_id) 已存在而落空：stint 鎖串行了同一個帳號的重送，所以走到這裡的是目標在不同帳號的並行請求，
-// 內容一定與先到的不同（hash 含店家）。回傳的錯誤讓 transaction 回滾，這個請求寫下的認定與註記一起消失；不在同一個 transaction 繼續。
 func (s *Service) requestIDTakenElsewhere(ctx context.Context, q *store.Queries, in model.CreateMeasureInput, hash []byte) error {
 	existing, err := q.MeasureByRequest(ctx, store.MeasureByRequestParams{AdminID: in.AdminID, RequestID: in.RequestID})
 	if err != nil {
@@ -556,9 +532,6 @@ func (s *Service) requestIDTakenElsewhere(ctx context.Context, q *store.Queries,
 	return apperr.InvalidInputOn([]string{"RequestID"}, "這個 request_id 已經用在內容不同的請求")
 }
 
-// takeEffect 是限制效果的措施（停權與終止合作）建立時的副作用，都在建立的 transaction 內：建立即生效且有禁止效果的措施（停權，以及非預告的終止
-// 合作，含關聯帳號）快照身分（逐措施、在建立時取，不靠 Recompute：帳號已因其他措施停權時 Recompute 不會「發現」新措施；哪些措施帶身分效果只由 SQL 的
-// identity_effect_measures 決定，這裡對每個限制效果的措施都呼叫，不帶的什麼都不寫）、有結束時間的停權排入到期 job、終止合作排入生效 job（排在 starts_at，生效時關店）、立即生效的重算停權期間。
 func (s *Service) takeEffect(ctx context.Context, q *store.Queries, in model.CreateMeasureInput, row store.SellerMeasure, locked store.SellerStore, now time.Time) error {
 	if !in.Kind.Restrictive() {
 		return nil
@@ -576,7 +549,6 @@ func (s *Service) takeEffect(ctx context.Context, q *store.Queries, in model.Cre
 			return err
 		}
 	}
-	// 預告終止在 starts_at 才生效，建立時不重算停權期間（與身分效果無關）。
 	immediate := in.Termination == nil || in.Termination.Ground != model.GroundNotice
 	if immediate {
 		return suspension.Recompute(ctx, q, s.d.Events, s.d.Jobs, s.d.Exposure, locked.AccountID, now)
@@ -584,8 +556,6 @@ func (s *Service) takeEffect(ctx context.Context, q *store.Queries, in model.Cre
 	return nil
 }
 
-// lockStints 鎖住建立措施要碰的帳號全部的 stint 並回傳措施所在的 stint（鎖住之後才讀）。一般措施只鎖目標帳號；關聯帳號的終止要先依 account_id
-// 升序鎖住來源帳號與目標帳號（與連帶撤銷同一個順序，不會互鎖）。目標能不能建立措施在鎖住之後由 checkTarget 檢查。
 func (s *Service) lockStints(ctx context.Context, q *store.Queries, in model.CreateMeasureInput) (store.SellerStore, error) {
 	if err := model.Positive(in.StoreID); err != nil {
 		return store.SellerStore{}, err
@@ -615,8 +585,6 @@ func (s *Service) lockStints(ctx context.Context, q *store.Queries, in model.Cre
 	return locked, nil
 }
 
-// checkTarget 檢查已鎖住的 stint 能不能建立這個措施：stint 必須還沒關閉；非預告的終止合作可以建在已關閉的 stint 上，只限帳號最近的一個、而且帳號沒有目前的
-// stint（店關閉之後才發現的 21.3 事由，效果只剩禁止入駐）；預告終止只能建在開著的店。重送查詢先於這個檢查，所以措施建立後店家關閉（終止合作生效），重送仍回原本的措施。
 func (s *Service) checkTarget(ctx context.Context, q *store.Queries, in model.CreateMeasureInput, locked store.SellerStore) error {
 	target := model.TerminationTarget{Closed: locked.Status == string(model.Closed)}
 	if !target.Closed {
@@ -642,9 +610,6 @@ func (s *Service) checkTarget(ctx context.Context, q *store.Queries, in model.Cr
 	return nil
 }
 
-// checkTermination 是終止合作的有狀態驗證（帳號與來源措施已鎖住）：重大違約引用的認定至少一筆未撤銷、屬於這個帳號、而且建立它的措施早於現在七日
-// （條款第 21.3 條第 1 款要求通知後七日內未改善）；關聯帳號的來源措施必須未撤銷、是另一個帳號、事由不是預告或關聯帳號（不成鏈）的終止，而且本帳號的 KYC
-// 身分確實命中來源措施的身分（快照加上來源帳號目前的 hash；伺服器再驗證一次，與 admin 看到的 linked_accounts 同一支查詢）；同一個來源對同一個帳號第二筆在鎖住帳號後檢查並回 AlreadyExists（唯一索引只是保底）。
 func (s *Service) checkTermination(ctx context.Context, q *store.Queries, in model.CreateMeasureInput, locked store.SellerStore, now time.Time) error {
 	t := in.Termination
 	if age := t.Ground.CitedFindingMinAge(); age > 0 {
@@ -688,17 +653,12 @@ func (s *Service) checkTermination(ctx context.Context, q *store.Queries, in mod
 	if err != nil {
 		return err
 	}
-	// 銀行帳號命中只列出，不能當依據（LinkedIdentity.CountsAsGround，與列表的 can_create_linked_termination 同一個判斷）。
 	if !slices.ContainsFunc(hits, func(h model.LinkedHit) bool { return h.Identity.CountsAsGround() }) {
 		return apperr.InvalidInputOn([]string{sourceField}, "這個帳號的身分和來源措施的身分快照沒有相同")
 	}
 	return nil
 }
 
-// findings 寫入這個措施的新認定並驗證引用的既有認定，回傳主要依據 lead（lead_finding_id）與全部依據的 id。所有清單都是集合，順序沒有意義：
-// 主要依據由規則決定，不看 CitedFindingIDs 的位置。有新的認定時是新的認定（引用的認定再嚴重也不取代它）；否則（只引用既有認定，例如重大違約的
-// 終止合作）是引用的認定中最嚴重的，同嚴重度取最新建立的（model.LeadFindingOf）。
-// 引用的認定必須存在、屬於同一個帳號、仍生效；認定只由這裡建立，所以每一筆認定都有建立它的措施（origin_measure_id）。
 func (s *Service) findings(ctx context.Context, q *store.Queries, locked store.SellerStore, measureID uuid.UUID, in model.CreateMeasureInput, v *model.ViolationBasis, field string, now time.Time) (uuid.UUID, []uuid.UUID, error) {
 	var lead uuid.UUID
 	var ids []uuid.UUID
@@ -768,15 +728,11 @@ func (s *Service) findings(ctx context.Context, q *store.Queries, locked store.S
 		}
 	}
 	if !hasLead {
-		// validateViolationBasis 保證依據至少有一筆認定；走到這裡是程式錯誤。
 		return uuid.Nil(), nil, errors.New("seller：依據沒有任何認定")
 	}
 	return lead, ids, nil
 }
 
-// lockSourceReports 依 id 升序鎖住來源通報（鎖順序：店家列先於通報列，多筆通報依 id 升序，與其他鎖多筆通報的流程不會互鎖），
-// 並檢查每一筆都存在、是同一個店家的、結果沒有否定它（Report.Supporting：不是未違規、內容不足或濫報；與 API 的 can_cite_as_source 同一個規則）。
-// ids 的形狀（筆數、重複）已由 validateSourceReports 檢查。
 func lockSourceReports(ctx context.Context, q *store.Queries, storeID int64, field string, ids []uuid.UUID) error {
 	for _, id := range sortedUUIDs(ids) {
 		row, err := q.LockReport(ctx, id)
@@ -801,10 +757,6 @@ func lockSourceReports(ctx context.Context, q *store.Queries, storeID int64, fie
 	return nil
 }
 
-// checkSourceCase 檢查建立措施帶的來源案件：必須存在（invalid_argument，SourceCaseID）、是措施的店家的案件（invalid_argument）、而且能連結措施
-// （failed_precondition，句子取第一個原因）。能不能連結只問 model.CaseFacts.Availability().LinkMeasure，與 API 的 can_link_measure 是同一份判斷；
-// 這裡只帶案件列本身的事實（LinkMeasure 只看案件是否進行中，其餘事實與它無關）。
-// 不鎖案件：關閉案件的指令都先鎖同一組 stint，而呼叫方已經鎖住了它。
 func checkSourceCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, storeID int64) error {
 	c, err := q.CaseByID(ctx, caseID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -823,9 +775,6 @@ func checkSourceCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, st
 	return nil
 }
 
-// checkNamingOrders 檢查每一份來函都存在、指名了這個措施的帳號（指名店家時只算措施的那一家），而且沒有撤銷登記：不存在或沒有指名、已撤銷登記各是
-// invalid_argument，field(i) 是第 i 個 id 的欄位。來函與它的對象建立後不能改；撤銷登記會改，所以讀取時以 FOR SHARE 鎖住來函列（呼叫方已鎖住措施帳號的
-// 店家列，來函列在後），撤銷登記與建立措施在這一列上串行。
 func checkNamingOrders(ctx context.Context, q *store.Queries, ids []uuid.UUID, accountID, storeID int64, field func(int) string) error {
 	named, err := q.OrdersNamingMeasureTarget(ctx, store.OrdersNamingMeasureTargetParams{OrderIds: ids, AccountID: accountID, StoreID: &storeID})
 	if err != nil {
@@ -843,8 +792,6 @@ func checkNamingOrders(ctx context.Context, q *store.Queries, ids []uuid.UUID, a
 	return nil
 }
 
-// escalate 套用升級規則：帳號在 EscalationWindow 內已有 EscalationCount-1 筆未撤銷、原本是 MEDIUM 的認定時，這一筆 MEDIUM
-// 升為 HIGH。呼叫方已鎖住帳號的全部 stint（新 stint 繼承舊 stint 的累計：以店計會讓關店重開歸零）。
 func escalate(ctx context.Context, q *store.Queries, accountID int64, severity model.Severity, now time.Time) (model.Severity, *model.Severity, error) {
 	if severity != model.SeverityMedium {
 		return severity, nil, nil
@@ -862,7 +809,6 @@ func escalate(ctx context.Context, q *store.Queries, accountID int64, severity m
 	return model.SeverityHigh, &from, nil
 }
 
-// groundTextOf 是終止事由在錯誤句裡的名稱（共用文案目錄，後台受眾）；目錄沒有時退回事由的代碼（不會發生：事由已由 OneOf 確認合法）。
 func groundTextOf(g model.TerminationGround) string {
 	if text, ok := uitext.Staff().SellerTerminationGround(string(g)); ok {
 		return text
@@ -870,7 +816,6 @@ func groundTextOf(g model.TerminationGround) string {
 	return string(g)
 }
 
-// citedMinDays 是事由引用的認定至少要存在的天數（model.TerminationGround.CitedFindingMinAge，錯誤句與說明句同一個來源）。
 func citedMinDays(g model.TerminationGround) int {
 	return int(g.CitedFindingMinAge() / (24 * time.Hour))
 }

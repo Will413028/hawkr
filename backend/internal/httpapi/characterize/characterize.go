@@ -64,7 +64,6 @@ type Scenario[D any] struct {
 	Run  func(ctx context.Context, t T, d D)
 }
 
-// scenarioTimeout 是一個情境的時間上限。
 const scenarioTimeout = 30 * time.Second
 
 // Run 以 d 跑每個情境。沒有情境時失敗：空的清單會讓安全網看起來通過。
@@ -99,7 +98,6 @@ func Probe[D any](d D, s Scenario[D]) (failures []string) {
 	return p.failures
 }
 
-// probe 是記錄失敗的 T：Fatalf 以 panic 中止情境，由 Probe 接住。
 type probe struct{ failures []string }
 
 type probeStop struct{}

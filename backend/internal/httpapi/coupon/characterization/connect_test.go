@@ -24,24 +24,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// who 是一個呼叫者在單體裡的身分（十進位字串）。Store 只有賣家有。
 type who struct{ Account, Buyer, Store string }
 
-// connectDriver 以單體的 CouponAppService 操作 coupon。每個呼叫者一個帶著自己 Bearer token 的 client；Connect 錯誤依 ErrorInfo.reason 對應到 coupon 的錯誤，
-// 其餘以 ch.ConnectKind 分類。
-//
-// 與 REST 的 wire 不同之處由 driver 吸收，情境只看業務結果：
-//   - 舊的列表有 page、total；Connect 是 keyset，driver 翻完所有頁後切出第 Number 頁、Total 是全部的筆數（頁大小與 token 由伺服器守住）。
-//   - 舊的買家「我的券」是可領模板加已使用的券；單體是可領的活動（ListClaimableCampaigns）加持有的券（ListMyVouchers）。
-//   - 發行張數與上限不在買家的契約裡，driver 直接讀資料庫（只用在驗證計數）。
-//
-// Admin* 經單體的 CouponAdminService（每個呼叫者一個 client，帶管理員 token 的是 ch.Admin）；Connect 的錯誤分類同上，
-// 沒有 coupon 原因的 failed_precondition 在 admin 方法上對應 ErrWrongStatus。
 type connectDriver struct {
 	clients map[ch.Caller]couponv1alpha1connect.CouponAppServiceClient
 	admins  map[ch.Caller]admincouponconnect.CouponAdminServiceClient
 	ids     map[ch.Caller]who
-	// buyerOf 是帳號 ID 對買家 ID（情境以帳號 ID 指定買家）。
 	buyerOf map[string]string
 	crm     *crm.Module
 	db      *db.DB
@@ -82,7 +70,6 @@ func (d *connectDriver) BuyerID(c ch.Caller) string      { return d.ids[c].Buyer
 func (d *connectDriver) Unknown() string                 { return "00000000-0000-7000-8000-000000000001" }
 func (d *connectDriver) Malformed() string               { return "not-a-number" }
 
-// reasonErrors 是 ErrorInfo.reason 對到情境的 coupon 錯誤。
 var reasonErrors = map[string]error{
 	"COUPON_QUOTA_EXCEEDED":      ErrQuotaExceeded,
 	"COUPON_ISSUE_LIMIT_REACHED": ErrSoldOut,
@@ -91,7 +78,6 @@ var reasonErrors = map[string]error{
 	"COUPON_NOT_ELIGIBLE":        ErrNotEligible,
 }
 
-// reasonKind 回傳 Connect 錯誤帶的 coupon ErrorInfo.reason 對應的 coupon 錯誤；沒有時 ok 為 false。
 func reasonKind(err error) (error, bool) {
 	var ce *connect.Error
 	if !errors.As(err, &ce) {
@@ -111,7 +97,6 @@ func reasonKind(err error) (error, bool) {
 	return nil, false
 }
 
-// kindOf 把 Connect 錯誤分類：有 coupon 的 ErrorInfo.reason 就是對應的 coupon 錯誤，否則依 code。
 func kindOf(err error) error {
 	if err == nil {
 		return nil
@@ -122,7 +107,6 @@ func kindOf(err error) error {
 	return ch.ConnectKind(err)
 }
 
-// adminKind 是 admin 方法的錯誤分類：coupon 的原因先，沒有原因的 failed_precondition 是「狀態不允許」。
 func adminKind(err error) error {
 	if err == nil {
 		return nil
@@ -143,7 +127,6 @@ var (
 	}
 )
 
-// targetOf 取情境的資格；不認得的值送一個契約沒有的數字，讓伺服器拒絕。
 func targetOf(t Target) pb.TargetType {
 	if v, ok := targetEnum[t]; ok {
 		return v
@@ -180,7 +163,6 @@ func (d *connectDriver) campaignInput(in TemplateInput) *pb.CampaignInput {
 	return out
 }
 
-// templateOf 把契約的活動轉成情境的 Template。買家看得到的欄位來自 Campaign；發行張數與上限不在買家的契約裡，由 counts 補。
 func (d *connectDriver) templateOf(ctx context.Context, c *pb.Campaign) Template {
 	t := Template{
 		ID: c.GetId(), Title: c.GetTitle(), Target: targetFromProto(c.GetTargetType()), Status: StatusActive, Threshold: c.GetThresholdAmount(),
@@ -214,7 +196,6 @@ func statusFromProto(s pb.CampaignStatus) Status {
 	return Status("?" + s.String())
 }
 
-// counts 直接讀活動的已發行張數與上限（-1 是無上限）。
 func (d *connectDriver) counts(ctx context.Context, id string) (issued, limit int) {
 	u, err := uuid.Parse(id)
 	if err != nil {
@@ -236,7 +217,6 @@ func (d *connectDriver) sellerTemplate(ctx context.Context, c *pb.SellerCampaign
 	return t
 }
 
-// pageOf 取翻完整份之後的第 p.Number 頁（Number 0 與 1 是第一頁；不給 Size 就是全部）。
 func pageOf[T any](all []T, p Page) []T {
 	if p.Size <= 0 {
 		return all
@@ -254,7 +234,6 @@ func (d *connectDriver) ListMyCoupons(ctx context.Context, c ch.Caller, q ListQu
 	out := MyCoupons{Available: []Template{}, Used: []Instance{}}
 	wantAvailable, wantUsed := q.Status == "" || q.Status == "UNUSED", q.Status == "" || q.Status == "USED"
 	if !wantAvailable && !wantUsed {
-		// 不認得的狀態：送一個 UNSPECIFIED，伺服器要拒絕。
 		_, err := client.ListMyVouchers(ctx, connect.NewRequest(&pb.ListMyVouchersRequest{Statuses: []pb.VoucherStatus{pb.VoucherStatus_VOUCHER_STATUS_UNSPECIFIED}}))
 		return out, kindOf(err)
 	}
@@ -306,7 +285,6 @@ func (d *connectDriver) ListMyCoupons(ctx context.Context, c ch.Caller, q ListQu
 
 func (d *connectDriver) ListAvailable(ctx context.Context, c ch.Caller, q AvailableQuery) (AvailableList, error) {
 	client := d.clients[c]
-	// 結帳情境一定送出（缺店家或金額由伺服器拒絕）。
 	co := &pb.Checkout{StoreId: q.StoreID, OrderAmount: q.OrderAmount}
 	var all []AvailableCoupon
 	for token := ""; ; {
@@ -335,7 +313,6 @@ func (d *connectDriver) Claim(ctx context.Context, c ch.Caller, id string) (Clai
 	return ClaimResult{ClaimedAt: v.GetCreateTime().AsTime().Format(time.RFC3339Nano), VoucherID: v.GetId()}, nil
 }
 
-// ensureCustomers 讓情境指定的買家成為呼叫者這家店的 CRM 客戶（單體只收店家自己的客戶為指定名單；舊服務沒有這個限制）：每位記一筆完成的訂單。
 func (d *connectDriver) ensureCustomers(ctx context.Context, c ch.Caller, accounts []string) error {
 	if len(accounts) == 0 || d.ids[c].Store == "" {
 		return nil
@@ -412,7 +389,6 @@ func (d *connectDriver) SellerRevoke(ctx context.Context, c ch.Caller, id, _ str
 	return kindOf(err)
 }
 
-// 以下是 admin 的方法：經 CouponAdminService。
 
 func (d *connectDriver) AdminCreate(ctx context.Context, c ch.Caller, in TemplateInput) (Template, error) {
 	campaign := &adminpb.AdminCampaignInput{
@@ -439,7 +415,6 @@ func (d *connectDriver) AdminCreate(ctx context.Context, c ch.Caller, in Templat
 	return d.adminTemplate(ctx, res.Msg.GetCampaign()), nil
 }
 
-// adminTemplate 把後台看到的活動轉成情境的 Template：發行者看 oneof，名單與券數由 GetCampaign 補（這裡只轉規則與數量）。
 func (d *connectDriver) adminTemplate(ctx context.Context, c *adminpb.AdminCampaign) Template {
 	t := d.sellerTemplate(ctx, c.GetCampaign())
 	t.Issuer, t.IssuerStoreID = IssuerAdmin, ""

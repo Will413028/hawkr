@@ -20,7 +20,6 @@ class FloatingToast {
     Duration duration = const Duration(seconds: 3),
     VoidCallback? onTap,
   }) {
-    // 移除現有的 toast
     dismiss();
 
     final navigatorState = MyApp.navigatorKey.currentState;
@@ -48,7 +47,6 @@ class FloatingToast {
 
     overlay.insert(_currentEntry!);
 
-    // 自動移除
     Future.delayed(duration, dismiss);
   }
 

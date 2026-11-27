@@ -60,8 +60,6 @@ test.describe("procurement assistant — RFQ price review", {
 			.check();
 		await page.getByRole("button", { name: "檢視不可變 RFQ 快照" }).click();
 
-		// 稿 P-01 的主 CTA 固定價格之後直接帶買家到稿 R-01——⑤快照追蹤要顯示的
-		// snapshotHash 與有效至只有確認後才存在。
 		await expect(
 			page.getByRole("heading", { name: "重新確認 RFQ 快照" }),
 		).toBeVisible();
@@ -69,13 +67,10 @@ test.describe("procurement assistant — RFQ price review", {
 			page.getByRole("button", { name: "確認並準備發布" }),
 		).toBeDisabled();
 
-		// 回到價格那一步：「重新算一次」只有希望詢價卡上的「取得無參考價試算」一顆；
-		// 試算成功後整張卡收起。
 		await page.getByRole("button", { name: "返回調整" }).click();
 		await expect(
 			page.getByRole("button", { name: "取得無參考價試算" }),
 		).toHaveCount(0);
-		// 價格試算是純計算，不建立任何發布核准。
 		expect(publicationRequests).toHaveLength(0);
 	});
 
@@ -90,7 +85,6 @@ test.describe("procurement assistant — RFQ price review", {
 		await expect(panel).toHaveAttribute("aria-label", "採購成果");
 		await expect(panel.getByRole("tab", { name: "任務" })).toHaveCount(0);
 
-		// setup 把成果分頁開到 RFQ 草稿視圖。
 		await expect(
 			panel.getByRole("heading", { name: "確認價格範圍" }),
 		).toBeVisible();
@@ -100,7 +94,6 @@ test.describe("procurement assistant — RFQ price review", {
 		await expect(panel).toHaveCount(1);
 		await expect(page.locator(".thread-page")).toBeVisible();
 		await page.getByTestId("agent-panel-open").click();
-		// 收合仍保留 CandidateCanvas，重開後不能退回候選清單或遺失取得的價格。
 		await expect(
 			panel.getByRole("heading", { name: "確認價格範圍" }),
 		).toBeVisible();
@@ -121,7 +114,6 @@ test.describe("procurement assistant — RFQ price review", {
 		await expect(panel).toBeHidden();
 		await expect(page.locator(".thread-page")).toBeVisible();
 
-		// 成果存在時，標頭入口可再次打開同一份成果。
 		await page.getByTestId("agent-panel-open").click();
 		await expect(panel).toBeVisible();
 	});
@@ -173,31 +165,24 @@ test.describe("procurement assistant — RFQ price review", {
 			payloadHash: RFQ_SELLER_PAYLOAD_HASH,
 		});
 
-		// 發布成功之後畫布落到稿 R-02 的三區版面。這是這一格第一次在瀏覽器上
-		// 真的走得到：入口原本判 legacy `quoteBatch`，而那個 state 恆為 null。
 		await expect(
 			page.getByRole("heading", { name: "詢價已發布" }),
 		).toBeVisible();
 		const summary = page.getByTestId("quote-batch-summary");
-		// ①需求來自 slots（品項／數量／配送），不是 legacy 批次。
 		await expect(
 			summary.getByText("已建立 1 組詢價・1 筆邀請（50 KG）"),
 		).toBeVisible();
 		await expect(summary.getByText("珍珠芭樂")).toBeVisible();
 		await expect(summary.getByText("桃園市・2026/09/01")).toBeVisible();
-		// 邀請清單換成 publication 的三個 count，且明說不是投遞結果。
 		await expect(summary.getByText("這次發布的收件人")).toBeVisible();
 		await expect(
 			summary.getByText("這三個數字是發布當下的收件人分布，不是投遞結果。"),
 		).toBeVisible();
-		// ③空狀態照樣誠實：seller-responses 讀到空清單＝0 筆，不是「尚未取得」。
 		await expect(summary.getByText("0 筆")).toBeVisible();
 		await expect(summary.getByText("尚未成立")).toBeVisible();
 		await expect(summary.getByText("尚未建立")).toBeVisible();
-		// ⛔ 撤回入口已下架，不得留一顆停用的按鈕。
 		await expect(summary.getByRole("button", { name: /撤回/ })).toHaveCount(0);
 
-		// 回得去也回得來：候選檢視多一列入口，點回去仍是同一份三區版面。
 		await page.getByRole("button", { name: "返回候選資料" }).click();
 		await expect(page.getByText("這份需求已建立詢價")).toBeVisible();
 		await page.getByRole("button", { name: "查看詢價狀態" }).click();
@@ -211,8 +196,6 @@ test.describe("procurement assistant — RFQ price review", {
 	}) => {
 		test.setTimeout(45_000);
 		await setupRfqPriceReview(page, {
-			// execute 成功但 artifact 還沒落地——這正是「拿 runtime.publication 當
-			// 入口守衛」會把買家彈回候選的那個時間窗。
 			runtimeSnapshotHandler: () =>
 				runtimeSnapshotJson({ publishedRfq: undefined }),
 		});
@@ -236,7 +219,6 @@ test.describe("procurement assistant — RFQ price review", {
 		await expect(
 			summary.getByText("後端未提供不可變核准證據；此畫面不代表核准已完成。"),
 		).toBeVisible();
-		// 沒有發布事實就沒有「幾筆邀請」與收件人分布，不補 0。
 		await expect(summary.getByText(/已建立 1 組詢價/)).toHaveCount(0);
 		await expect(summary.getByText("這次發布的收件人")).toHaveCount(0);
 	});

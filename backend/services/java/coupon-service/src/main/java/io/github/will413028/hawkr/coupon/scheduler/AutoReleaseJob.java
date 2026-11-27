@@ -100,8 +100,6 @@ public class AutoReleaseJob {
                     continue;
                 }
 
-                // 其餘狀態（PAID / PENDING_SHIPMENT / IN_TRANSIT / DELIVERED / COMPLETED 等）
-                // 都代表訂單已付款，券應該為 USED；補打 consumeCoupon。
                 boolean ok = instanceService.consumeCoupon(inst.getInstanceId(), orderNo);
                 if (ok) consumed++;
             }

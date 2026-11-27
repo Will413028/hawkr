@@ -41,7 +41,6 @@ describe("發票文件狀態的折疊表", () => {
 		expect(foldInvoiceDocumentStatus(InvoiceDocumentStatus.ISSUED).label).toBe(
 			INVOICE_DOCUMENT_STATUS_LABEL.ISSUED,
 		);
-		// 「已被重開取代」對買家的意思就是已作廢——借 VOIDED 的 label，不另寫中文。
 		expect(
 			foldInvoiceDocumentStatus(InvoiceDocumentStatus.SUPERSEDED).label,
 		).toBe(INVOICE_DOCUMENT_STATUS_LABEL.VOIDED);
@@ -51,7 +50,6 @@ describe("發票文件狀態的折疊表", () => {
 		const unseen = foldInvoiceDocumentStatus("ISSUED_BY_TAX_AUTHORITY");
 		expect(unseen.unknown).toBe(true);
 		expect(unseen.label.length).toBeGreaterThan(0);
-		// 未知值不得被說成已開立或已作廢——那會讓買家對一張還沒開的發票停止追。
 		expect(unseen.label).not.toBe(INVOICE_DOCUMENT_STATUS_LABEL.ISSUED);
 		expect(unseen.label).not.toBe(INVOICE_DOCUMENT_STATUS_LABEL.VOIDED);
 	});
@@ -59,7 +57,6 @@ describe("發票文件狀態的折疊表", () => {
 
 describe("可否重寄通知（端點 71／32 的前置）", () => {
 	it("三個可重寄的狀態逐一為 true", () => {
-		// 這三值必須與 invoice-service 的 `resendableStatus` 一字不差。
 		for (const status of [
 			InvoiceDocumentStatus.ISSUED,
 			InvoiceDocumentStatus.RESOLVED_EXTERNALLY,

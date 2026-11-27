@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// defaultDelegation 是 §8.5.1 (B) 的定版預設值，代入後兩式分別為 9200／38600 ms。
 func defaultDelegation() DelegationConfig {
 	return DelegationConfig{
 		GrpcDeadlinePreflightMs:    3000,
@@ -45,7 +44,6 @@ func TestConfig_ValidateDelegationBudgets(t *testing.T) {
 
 	t.Run("single write budget exceeded", func(t *testing.T) {
 		cfg := base()
-		// DOMAIN_WRITE 調到值域上界 8000 ⇒ 800+800+800+800+8000+2000 = 13200 > 12000。
 		cfg.Delegation.GrpcDeadlineDomainWriteMs = 8000
 		err := cfg.Validate()
 		if err == nil {
@@ -58,7 +56,6 @@ func TestConfig_ValidateDelegationBudgets(t *testing.T) {
 
 	t.Run("batch write budget exceeded", func(t *testing.T) {
 		cfg := base()
-		// BATCH_DOMAIN_WRITE 調到值域上界 35000 ⇒ 800+800+3000+4000+35000+10000 = 53600 > 50000。
 		cfg.Delegation.GrpcDeadlineBatchDomainWriteMs = 35000
 		err := cfg.Validate()
 		if err == nil {
@@ -71,8 +68,6 @@ func TestConfig_ValidateDelegationBudgets(t *testing.T) {
 
 	t.Run("confirm total budget counts toward the sum", func(t *testing.T) {
 		cfg := base()
-		// confirm 那一項取 _TOTAL_BUDGET_MS（含重試之間的退避），不是 min(單次×次數)：
-		// 把它調到值域上界 5000 就會吃掉單筆式的 2800 ms 餘裕還多 200。
 		cfg.Delegation.AuditConfirmTotalBudgetMs = 5000
 		if err := cfg.Validate(); err == nil {
 			t.Fatal("expected the confirm total budget to be part of the single-item sum")

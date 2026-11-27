@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 能力集合是單體帶來的輸入（seller 模組推導）；測試以明確的清單當輸入，不在 gateway 重算。
 var (
 	suspendedCaps = []authz.Capability{
 		authz.CapAccountSelfRead, authz.CapOrderFulfill, authz.CapOrderContract, authz.CapChatSend,
@@ -35,7 +34,7 @@ func TestSellerGuardBehavior(t *testing.T) {
 	reason := ""
 
 	prevSkip := middleware.SkipRoleCheck
-	middleware.SkipRoleCheck = false // exercise the real role + suspension checks
+	middleware.SkipRoleCheck = false
 	t.Cleanup(func() { middleware.SkipRoleCheck = prevSkip })
 
 	gin.SetMode(gin.TestMode)
@@ -54,9 +53,9 @@ func TestSellerGuardBehavior(t *testing.T) {
 	build := func(accountID int64, accountType int) *gin.Engine {
 		r := gin.New()
 		r.Use(asIdentity(accountID, accountType))
-		r.GET("/block", requireSeller(authz.CapProductManage), echo)  // BLOCK-if-suspended cap
-		r.GET("/white", requireSeller(authz.CapOrderFulfill), echo)   // 白名單 cap (skips Redis)
-		r.GET("/view", sellerViewGuard(authz.CapProductManage), echo) // BLOCK cap to prove deny-path delegation
+		r.GET("/block", requireSeller(authz.CapProductManage), echo)
+		r.GET("/white", requireSeller(authz.CapOrderFulfill), echo)
+		r.GET("/view", sellerViewGuard(authz.CapProductManage), echo)
 		return r
 	}
 	do := func(r *gin.Engine, target string, hdr map[string]string) *httptest.ResponseRecorder {
@@ -114,9 +113,9 @@ func TestSellerSuspensionOnlyGuard(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	const (
-		onboardingLogin = int64(111) // accountType=1（重新登入前）, has seller record
+		onboardingLogin = int64(111)
 		suspendedLogin  = int64(222)
-		pureBuyer       = int64(333) // no seller record at all
+		pureBuyer       = int64(333)
 	)
 	ok := func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"reached": "handler"}) }
 	build := func(accountID int64, accountType int) *gin.Engine {
@@ -208,7 +207,6 @@ func TestRequireSellerChecksOnlyCapabilityMembership(t *testing.T) {
 		t.Fatalf("沒有能力集合：want 403（fail-closed），got %d %s", w.Code, w.Body)
 	}
 
-	// 能力集合是唯一依據：即使帶了停權原因，集合有這個能力就放行。
 	caps, suspended = authz.AllCapabilities, "9601"
 	if w := do("/business"); w.Code != http.StatusOK {
 		t.Fatalf("集合含 cap：want 200, got %d %s", w.Code, w.Body)

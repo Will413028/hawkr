@@ -20,12 +20,12 @@ func TestParseKey(t *testing.T) {
 		variant string
 	}{
 		{"fx.Color.COLOR_RED", KeyNoun, "fx.Color", "COLOR_RED", ""},
-		{"fx.Box.Size.SIZE_SMALL", KeyNoun, "fx.Box.Size", "SIZE_SMALL", ""}, // 巢狀 enum
+		{"fx.Box.Size.SIZE_SMALL", KeyNoun, "fx.Box.Size", "SIZE_SMALL", ""},
 		{"fx.Color.label.COLOR_RED", KeyVariant, "fx.Color.label", "COLOR_RED", "label"},
 		{"fx.Box.Size.label.SIZE_LARGE", KeyVariant, "fx.Box.Size.label", "SIZE_LARGE", "label"},
 		{"fx.Box.title", KeySentence, "fx.Box.title", "", ""},
 		{"admin.Role.ROLE_ROOT", KeyNoun, "admin.Role", "ROLE_ROOT", ""},
-		{"admin.fx.Level.LEVEL_HIGH", KeyNoun, "admin.fx.Level", "LEVEL_HIGH", ""}, // admin.fx 優先於 admin
+		{"admin.fx.Level.LEVEL_HIGH", KeyNoun, "admin.fx.Level", "LEVEL_HIGH", ""},
 		{"common.unknown", KeyUnknown, "common.unknown", "", ""},
 		{"common.error.NOT_FOUND", KeyError, "common.error", "NOT_FOUND", ""},
 	}
@@ -97,7 +97,6 @@ func TestServerOwnedAndShape(t *testing.T) {
 	if len(s.unavailableShapeErrors) != 0 {
 		t.Errorf("reason 欄位是合法形狀：%v", s.unavailableShapeErrors)
 	}
-	// repeated XxxUnavailableReason 出現在別處 → 形狀違規。
 	s2, err := LoadSchema(fixtureImage(func(fds *descriptorSet) {
 		fds.File[0].MessageType = append(fds.File[0].MessageType, &messageProto{
 			Name: ptr("Legacy"),

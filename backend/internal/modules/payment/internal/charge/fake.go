@@ -83,7 +83,6 @@ type Fake struct {
 	reversalKeys map[string]string
 	reversalOf   map[string]string
 	reversalErrs []error
-	// transferLost 與 reversalLost 是「已建立、回應遺失」的錯誤佇列；transferCalls 與 reversalCalls 計呼叫次數（失敗的也算）。
 	transferSeen  []string
 	transferSums  []int64
 	reversalSeen  []string
@@ -440,7 +439,6 @@ func (f *Fake) Violations() []string {
 	return append([]string(nil), f.violations...)
 }
 
-// check 要持有 f.mu。
 func (f *Fake) check(ctx context.Context, op string) {
 	if _, ok := db.TxFrom(ctx); ok {
 		f.violations = append(f.violations, op+" 在 DB transaction 內被呼叫")
@@ -503,14 +501,12 @@ func (f *Fake) CreatePayment(ctx context.Context, in CreateInput) (Snapshot, err
 	return f.intents[id].snap, nil
 }
 
-// lookup 計次並回注入的查回失敗；要持有 f.mu。
 func (f *Fake) lookup(ctx context.Context, op string) error {
 	f.check(ctx, op)
 	f.lookups++
 	return pop(&f.lookupErrs)
 }
 
-// stamp 回傳新物件的 created 時刻；沒有 Clock 時是零值。要持有 f.mu。
 func (f *Fake) stamp() time.Time {
 	if f.Clock == nil {
 		return time.Time{}
@@ -525,7 +521,6 @@ func (f *Fake) CreatedAfterSeen() []time.Time {
 	return slices.Clone(f.lookupBounds)
 }
 
-// visible 回傳 created 時刻的物件是否在 createdAfter 之後（含）可見；沒有 Clock 時一律可見，下限是零值也一律可見。要持有 f.mu。
 func (f *Fake) visible(created, createdAfter time.Time) bool {
 	return f.Clock == nil || createdAfter.IsZero() || !created.Before(createdAfter)
 }

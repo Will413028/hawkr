@@ -90,12 +90,10 @@ public final class UberPackingPlanner {
         int packagingWeight = policy.getPackagingWeightGram() == null ? 0 : policy.getPackagingWeightGram();
         int maxItems = policy.getMaxItemsPerPackage() == null ? 1 : policy.getMaxItemsPerPackage();
         if (maxItems <= 0) {
-            // 政策值壞掉時 fail-closed：maxItems <= 0 會讓下面的迴圈永遠開新箱子（或不前進）。
             return new Plan(List.of(), "PACKING_POLICY_INVALID");
         }
         BigDecimal voidFactor = policy.getVoidFactor() == null ? BigDecimal.ONE : policy.getVoidFactor();
 
-        // ① 單件檢查：一件自己就超過上限 ⇒ 分箱救不了
         for (Item item : items) {
             String single = rejectSingle(item, limits, packagingWeight);
             if (single != null) {
@@ -103,7 +101,6 @@ public final class UberPackingPlanner {
             }
         }
 
-        // ② 依件數與重量切箱
         List<PackagePlanEntity> out = new ArrayList<>();
         int seq = 1;
         int countInBox = 0;
@@ -176,19 +173,6 @@ public final class UberPackingPlanner {
         e.setWidthCm(side);
         e.setHeightCm(side);
         e.setWeightGram((int) weightGram);
-        // 🔴 sizeClass 刻意留 null，而且這是**決定**不是遺漏。
-        //
-        // 66 N4／U-K 說 Uber 的 `size` 是 string enum，但**沒有列出它的值域**，
-        // 本 repo 的官方總覽（docs/第三方整合/Uber Direct API 總覽.md §2.2）也只載
-        // `manifest_items` 必填、未載其子欄位。
-        //
-        // ⇒ 在 sandbox 坐實值域之前，這裡沒有任何值是我「查到」的，只有我「想得出來」的。
-        //   而 UberApiClient.manifestItems() 對 null 的處置是**不送這個欄位**——
-        //   少送一個可能是選填的欄位，比送一個我編出來的 enum 值安全：
-        //   後者會被 Uber 判成 400，而錯誤訊息會指向「品項格式不對」。
-        //
-        // ⚠️ 這一格登記為 Enablement Blocker。坐實之後要改的是**這一行**與
-        //   PackagePlanEntity.sizeClass 的 DB CHECK，不是散在別處的判斷。
         e.setSizeClass(null);
         return e;
     }

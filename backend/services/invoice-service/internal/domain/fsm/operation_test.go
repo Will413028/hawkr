@@ -6,8 +6,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-// §7.3.2 的 J01–J34，逐名獨立抄第二次：Code + allowed-from 集合 + 目標狀態。
-// 對帳用逐名 diff，不是數個數——數量相同但兩條互換來源狀態，數個數看不出來。
 var wantOperationTransitions = map[string]struct {
 	from []string
 	to   string
@@ -17,8 +15,6 @@ var wantOperationTransitions = map[string]struct {
 	"J03": {[]string{"CREATED"}, "AWAITING_TRIGGER"},
 	"J04": {[]string{"CREATED"}, "NOT_APPLICABLE"},
 	"J05": {[]string{"AWAITING_TRIGGER"}, "READY"},
-	// CREATED／RETRY_SCHEDULED 兩處於 2026-09-04 由 TestOperationFSMMatchesSQL
-	// 對帳補上：實作（SQL）早就放寬了，設計書 §7.3.2 與本抄本都沒回灌（#3089 T3）。
 	"J06": {[]string{"CREATED", "AWAITING_TRIGGER", "READY", "RETRY_SCHEDULED", "HELD"}, "CANCELLED_BEFORE_ISSUE"},
 	"J07": {[]string{"READY", "RETRY_SCHEDULED", "SENDING"}, "SENDING"},
 	"J08": {[]string{"READY", "RETRY_SCHEDULED"}, "HELD"},
@@ -160,7 +156,6 @@ func TestOperationSellerActionRequiredHasAutomaticExit(t *testing.T) {
 	if !ok || !contains(j33.From, "SELLER_ACTION_REQUIRED") || j33.To != "READY" {
 		t.Fatal("J33 必須存在且是 SELLER_ACTION_REQUIRED → READY 的自動出邊")
 	}
-	// J34（ADM 手動）不能是唯一出邊。
 	auto := 0
 	for _, tr := range OperationTransitions {
 		if contains(tr.From, "SELLER_ACTION_REQUIRED") && tr.To == "READY" {
@@ -175,7 +170,6 @@ func TestOperationSellerActionRequiredHasAutomaticExit(t *testing.T) {
 func TestOperationTerminalStates(t *testing.T) {
 	diffSets(t, "M2 終態", OperationTerminalStates,
 		[]string{"SUCCEEDED", "NOT_APPLICABLE", "CANCELLED_BEFORE_ISSUE", "RESOLVED_EXTERNALLY"})
-	// CANCEL_BLOCKED_UNKNOWN 與 MANUAL_PROCESS_ALLOWED 各有出邊，不是終態。
 	for _, s := range []string{"CANCEL_BLOCKED_UNKNOWN", "MANUAL_PROCESS_ALLOWED"} {
 		if IsOperationTerminal(s) {
 			t.Errorf("%s 不是終態", s)

@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// listWorld 開三個案件：貼文 A（進行中）、貼文 B（已結案，不違規）、留言 C（進行中）；每個案件的開案時間錯開（注入的時鐘）。
 type listWorld struct {
 	postOpen, postClosed, commentOpen Case
 }
@@ -153,7 +152,6 @@ func TestCasesRejectsInvalidFilterAndPageSize(t *testing.T) {
 	if _, err := f.module.Cases(ctx, CaseFilter{}, nil, -1); kindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("負的 page size：err = %v", err)
 	}
-	// 超過上限以上限計，不是錯誤。
 	if _, err := f.module.Cases(ctx, CaseFilter{}, nil, 10_000); err != nil {
 		t.Errorf("超過上限：err = %v", err)
 	}

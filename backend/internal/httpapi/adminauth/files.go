@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// filesPrefix 是後台檔案路由的路徑前綴（API 設計規範（Connect）§十三）。
 const filesPrefix = "/api/files/admin/"
 
 // IsAdminFileRoute 回傳 ServeMux 樣式（可帶 method，例如 "GET /api/files/admin/…"）是不是後台的檔案路由。
@@ -59,7 +58,6 @@ func GuardFile(pattern string, perm adminperm.Permission, next http.Handler, log
 	}), nil
 }
 
-// deny 回應只有 HTTP 狀態，與檔案 handler 自己的錯誤一樣不可快取、不帶細節。
 func deny(w http.ResponseWriter, status int, text string) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")

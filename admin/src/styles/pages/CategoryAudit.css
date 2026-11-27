@@ -1,24 +1,20 @@
-/* ========== 分類審核頁面樣式 ========== */
 
 .category-audit {
 	font-family: "Inter", system-ui, -apple-system, sans-serif;
 	color: #1b1b1b;
 }
 
-/* 統計卡片列 */
 .category-stats-row {
 	display: flex;
 	gap: 24px;
 	margin-bottom: 24px;
 }
 
-/* 統計卡片選中狀態 */
 .merchant-stat-card.cat-stat-active {
 	border: 2px solid var(--admin-primary-strong);
 	box-shadow: 0 0 0 1px var(--admin-primary-strong);
 }
 
-/* 搜尋列 */
 .category-search-bar {
 	background: white;
 	border: 1px solid #dadada;
@@ -49,7 +45,6 @@
 	color: rgba(86, 86, 86, 0.5);
 }
 
-/* 表格容器 */
 .category-table-container {
 	background: white;
 	border: 1px solid #dadada;
@@ -87,7 +82,6 @@
 	border-bottom: none;
 }
 
-/* 申請編號 / 時間欄 */
 .cat-app-no {
 	font-size: 13px;
 	color: rgba(86, 86, 86, 0.8);
@@ -108,7 +102,6 @@
 	color: #565656;
 }
 
-/* 申請店家欄 */
 .cat-seller-cell {
 	display: flex;
 	align-items: center;
@@ -144,7 +137,6 @@
 	white-space: nowrap;
 }
 
-/* 第一與第二分類路徑 tag */
 .cat-path-badge {
 	display: inline-flex;
 	align-items: center;
@@ -156,14 +148,12 @@
 	white-space: nowrap;
 }
 
-/* 申請分類名稱 */
 .cat-name-cell {
 	font-weight: 700;
 	font-size: 16px;
 	color: #1b1b1b;
 }
 
-/* 狀態欄 */
 .cat-status-pending {
 	display: inline-flex;
 	align-items: center;
@@ -194,7 +184,6 @@
 	line-height: 1.5;
 }
 
-/* 操作欄按鈕 */
 .cat-action-cell {
 	display: flex;
 	gap: 12px;
@@ -271,7 +260,6 @@
 	white-space: nowrap;
 }
 
-/* 分頁 */
 .category-pagination {
 	display: flex;
 	justify-content: center;
@@ -307,7 +295,6 @@
 	cursor: not-allowed;
 }
 
-/* 空狀態 */
 .category-empty {
 	text-align: center;
 	padding: 60px 20px;

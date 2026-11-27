@@ -103,7 +103,6 @@ export async function POST(request: NextRequest, context: Context) {
 			parsed.authorization.storeId !== storeId ||
 			parsed.authorization.revokedAt === null
 		) {
-			// 宣稱成功卻沒有回出「這一列已撤回」＝一份假的撤回證明。
 			return contractViolation("撤回結果與請求對象不符");
 		}
 		return ok(parsed);

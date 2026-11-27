@@ -99,7 +99,6 @@ export default function DelegatedProductPreviewPage({
 				const self = await scope.repos.storefront.fetchMyStore();
 				if (!cancelled) setStorefront(self);
 			} catch {
-				/* 賣家卡不畫；商品本體照樣預覽 */
 			}
 		})();
 		return () => {
@@ -167,11 +166,7 @@ export default function DelegatedProductPreviewPage({
 		product: delegatedPreviewProduct(detail, storeId),
 		seller,
 		sellerStats: null,
-		// 代行 DTO 沒有評論，也不該為了預覽去打買家端的評論 API：預覽的對象常常是還沒
-		// 上架、因此不可能有評論的商品。缺席時 layout 顯示「尚無評價」。
 		reviewsResult: null,
-		// 不 probe 圖片尺寸：layout 對 image block 走 fallback <img>，與正式 PDP 取不到
-		// dims 時行為一致。
 		descriptionImageDimEntries: [],
 	});
 	const statusLabel =
@@ -189,8 +184,7 @@ export default function DelegatedProductPreviewPage({
 				</Link>
 			}
 		>
-			{/* 預覽與「已上架」是兩件事。草稿／未啟用的商品在買家端根本沒有這一頁，
-			    不說清楚的話這個畫面本身就是一句「它已經上架了」。 */}
+
 			<p className="adm-panel__hint" role="note">
 				{
 					"這是依商品目前已儲存的內容算出來的買家視角。買家實際看得到這一頁，要等商品上架之後；評價與評分來自買家端，預覽一律顯示「尚無評價」。"
@@ -278,8 +272,7 @@ function PreviewSellerCard({ seller }: { seller: PreviewSellerView | null }) {
 					/>
 				</div>
 			</div>
-			{/* 買家頁在這裡有一顆「聯絡賣家」。預覽不畫它而不是畫成 disabled：代行者
-			    不是買家，那顆按鈕在這個工作階段裡沒有任何合法按法。 */}
+
 		</aside>
 	);
 }

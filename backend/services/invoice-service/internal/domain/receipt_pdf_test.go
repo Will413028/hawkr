@@ -10,15 +10,6 @@ import (
 	"time"
 )
 
-// testFont 回測試用的字型**子集**（45 KB，見 testdata/README.md）。
-//
-// 🔴 這裡刻意**不 skip**：skip 不是 PASS，而 CI 上一支永遠 skip 的測試等於不存在
-// （go test 不帶 -v 連 SKIP 都不印）。讀不到就 Fatal —— 檔案在版控裡，讀不到代表
-// 有人把它刪了，那正是要知道的事。
-//
-// ⚠️ 子集只含本檔測試字串用得到的字。它驗的是「產出是不是一份真 PDF、字型子集有沒有
-// 被內嵌」，不是「字型涵蓋多少漢字」；後者由 Dockerfile 的 SHA256 釘選 ＋ DI 的
-// fail-closed（字型讀不起來 pod 起不來）保證。
 func testFont(t *testing.T) []byte {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", "NotoSansTC-subset.ttf"))
@@ -62,8 +53,6 @@ func TestReceiptRenderer_ProducesRealPDF(t *testing.T) {
 	if !bytes.Contains(out[max(0, len(out)-1024):], []byte("%%EOF")) {
 		t.Fatal("結尾沒有 EOF 標記，檔案不完整")
 	}
-	// 🔴 字型子集必須真的被內嵌：沒有 FontFile2 代表中文會是空白方框，
-	// 而 PDF 本身完全合法、magic bytes 也對——只驗 %PDF- 抓不到這一種。
 	if !bytes.Contains(out, []byte("/FontFile2")) {
 		t.Fatal("PDF 沒有內嵌字型子集，中文會顯示不出來")
 	}
@@ -126,13 +115,11 @@ func TestMoney(t *testing.T) {
 func TestReceiptData_HasNoBuyerPIIFields(t *testing.T) {
 	banned := []string{"buyer", "recipient", "email", "phone", "mobile",
 		"address", "name", "taxid", "carrier", "account"}
-	// 出據人（賣家）那一側的欄位是合法的 —— 收據以賣家為出據人，
-	// 他的名稱、統編與營業地址本來就要印上去。
 	allowed := map[string]bool{
 		"ReceiptSeller.LegalName": true,
 		"ReceiptSeller.TaxID":     true,
 		"ReceiptSeller.Address":   true,
-		"ReceiptLine.Name":        true, // 品項名稱不是人的名字
+		"ReceiptLine.Name":        true,
 	}
 
 	var walk func(rt reflect.Type)

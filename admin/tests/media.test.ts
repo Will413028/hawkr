@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-// media.ts reads NEXT_PUBLIC_MEDIA_BASE_URL lazily inside buildImageUrl(), so we
-// can toggle the gate per test via process.env; the value is read fresh on each
-// call.
 import { buildImageUrl, isMediaGatewayEnabled } from "../src/utils/media";
 
 const MEDIA_BASE = "https://test-media.example.com";
@@ -18,7 +15,6 @@ afterEach(() => {
 	setGate(original ?? "");
 });
 
-// ---- gate OFF (legacy CDN, no processing) ----------------------------------
 beforeEach(() => setGate(""));
 
 test("gate OFF: reports disabled", () => {
@@ -61,7 +57,6 @@ test("gate OFF: empty / whitespace / nullish → empty string", () => {
 	assert.equal(buildImageUrl(undefined, "card"), "");
 });
 
-// ---- gate ON (image gateway presets) ---------------------------------------
 test("gate ON: reports enabled", () => {
 	setGate(MEDIA_BASE);
 	assert.equal(isMediaGatewayEnabled(), true);
@@ -91,7 +86,6 @@ test("gate ON: strips a single leading slash from the key", () => {
 	);
 });
 
-// ---- gate ON: URL → objectKey restoration ----------------------------------
 test("gate ON: peels a new-format gateway URL and re-applies the preset", () => {
 	setGate(MEDIA_BASE);
 	assert.equal(

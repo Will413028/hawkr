@@ -98,9 +98,6 @@ public class AfterSaleLabelRetryService {
         String caseNo = caseEntity.getCaseNo();
         String shipTradeNo = caseEntity.getShipTradeNo();
 
-        // ⚠️ 租約基準取 **claim 當下**，不是 Worker 掃描批次的起點（規範 §三 第 6 點）：
-        // 取批次起點時，第 k 筆的有效租約 = LEASE − (前 k−1 筆的耗時)，
-        // SCAN_LIMIT=50 × 單筆一次 gRPC 就足以把它侵蝕掉。
         LocalDateTime now = DateTimeUtils.nowUtc();
         LocalDateTime leaseUntil = now.plusMinutes(LABEL_RETRY_LEASE_MINUTES);
         int claimed = caseMapper.claimLabelRetry(caseNo, now, leaseUntil);
@@ -125,7 +122,6 @@ public class AfterSaleLabelRetryService {
             return false;
         }
 
-        // 觸發已確認成功才消耗預算——這一句是「已確認觸發過」的事後記錄，不是閘門。
         caseMapper.markLabelRetried(caseNo);
 
         auditService.log(caseNo, null, null,
@@ -170,8 +166,6 @@ public class AfterSaleLabelRetryService {
                             + "，0 = 期間已被他人重新 claim）caseNo=" + caseNo
                             + " reason=" + reason);
         } catch (Exception e) {
-            // 釋放失敗不是新的破口：不釋放就等於等滿一個租約，正確性仍由租約保證，
-            // 而租約值本身非 NULL ⇒ 耗盡掃描這段期間照樣看得到它。
             log.error("AfterSaleLabelRetryService.auto.leaseReleaseFailed",
                     "租約釋放失敗，本案件要等滿 " + LABEL_RETRY_LEASE_MINUTES + " 分鐘才會重試 caseNo="
                             + caseNo + " err=" + e.getMessage());
@@ -211,7 +205,6 @@ public class AfterSaleLabelRetryService {
 
         caseMapper.resetLabelRetryCount(caseNo);
 
-        // TX commit 後才呼 shipping
         org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                 new org.springframework.transaction.support.TransactionSynchronization() {
                     @Override

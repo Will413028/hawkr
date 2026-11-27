@@ -75,9 +75,6 @@ export function toHexColor(raw: string | null | undefined): string | undefined {
 	return undefined;
 }
 
-/* ============================================================
- *            Inline runs  ⇄  Editor.js inline HTML
- * ============================================================ */
 
 /** A single run → the inline HTML Editor.js understands (link outermost so a
  *  linked bold word round-trips). */
@@ -116,9 +113,6 @@ function normalizeRuns(runs: InlineRun[]): InlineRun[] {
 		if (last && styleKey(last) === styleKey(r)) {
 			last.text += r.text;
 		} else {
-			// Browser commands can wrap the same formatting in different orders
-			// (color > bold versus bold > color). Keep the serialized field order
-			// canonical too: history compares JSON signatures after re-rendering.
 			out.push({
 				text: r.text,
 				...(r.bold ? { bold: true } : {}),
@@ -134,12 +128,12 @@ function normalizeRuns(runs: InlineRun[]): InlineRun[] {
 
 function walkInline(node: Node, style: InlineRun, runs: InlineRun[]): void {
 	for (const child of Array.from(node.childNodes)) {
-		if (child.nodeType === 3 /* TEXT_NODE */) {
+		if (child.nodeType === 3 ) {
 			const text = child.textContent ?? "";
 			if (text) runs.push({ ...style, text });
 			continue;
 		}
-		if (child.nodeType !== 1 /* ELEMENT_NODE */) continue;
+		if (child.nodeType !== 1 ) continue;
 		const el = child as HTMLElement;
 		const tag = el.tagName.toLowerCase();
 		if (tag === "br") {
@@ -154,9 +148,6 @@ function walkInline(node: Node, style: InlineRun, runs: InlineRun[]): void {
 			const href = el.getAttribute("href");
 			if (href && /^https?:\/\//i.test(href)) next.href = href.trim();
 		}
-		// Browser editing commands and rich-text paste can express formatting as
-		// CSS spans after foreColor enables styleWithCSS. Persist the same runs as
-		// semantic b/i/u tags, including explicit removal inside a formatted span.
 		const weight = el.style.fontWeight;
 		if (weight === "bold" || weight === "bolder" || Number(weight) >= 600)
 			next.bold = true;
@@ -189,9 +180,6 @@ function htmlToRuns(html: string): InlineRun[] {
 	host.innerHTML = html;
 	const runs: InlineRun[] = [];
 	walkInline(host, { text: "" }, runs);
-	// Native deletion may leave <br> until a tool's keyup cleanup. Treat it
-	// like the eventual empty value so saving between input and keyup cannot
-	// create a phantom history step. Preserve all spacing around real content.
 	return runs.some((run) => run.text.trim()) ? normalizeRuns(runs) : [];
 }
 
@@ -230,9 +218,6 @@ function alignmentFromTunes(
 	return a === "center" || a === "right" ? a : undefined;
 }
 
-/* ============================================================
- *                    Table  ⇄  Editor.js table
- * ============================================================ */
 
 interface TableCell {
 	runs?: InlineRun[];
@@ -305,9 +290,6 @@ function editorDataToTableJson(data: unknown): string | null {
 	return JSON.stringify({ withHeadings: !!d?.withHeadings, rows });
 }
 
-/* ============================================================
- *                     List  ⇄  Editor.js list
- * ============================================================ */
 
 interface ListItem {
 	runs?: InlineRun[];
@@ -368,9 +350,6 @@ function editorDataToListJson(
 	});
 }
 
-/* ============================================================
- *                 backend  ⇄  Editor.js data
- * ============================================================ */
 
 /** backend description → Editor.js initial/render data. */
 export function toEditorData(
@@ -379,11 +358,6 @@ export function toEditorData(
 	const blocks: OutputBlockData[] = [];
 	for (const blk of desc?.blocks ?? []) {
 		if (blk.type === "image") {
-			// API responses carry a display URL, but local undo/redo snapshots use
-			// fromEditorData's write-safe shape and only retain the object key.
-			// Resolve that key through the shared media gateway instead of dropping
-			// the image or giving <img> a relative path. Keep an explicit URL intact
-			// (it may be signed); pending/error images must still stay excluded.
 			const displayUrl =
 				blk.imageUrl ??
 				(isRenderableImage(blk.imageKey)
@@ -436,11 +410,9 @@ export function toEditorData(
 			continue;
 		}
 
-		// text block
 		const style = sanitizeBlockStyle(blk.style);
 		const tunes = tunesForStyle(style);
 		const level = headerLevelForFontSize(style.fontSize);
-		// New rows carry `runs`; legacy rows only `content`.
 		const html =
 			blk.runs && blk.runs.length > 0
 				? runsToHtml(blk.runs)
@@ -495,11 +467,6 @@ export function fromEditorData(
 			const d = b.data as EditorImageData;
 			const displayUrl = d.file?.url ?? d.url;
 			if (!isRenderableImage(displayUrl)) continue;
-			// 10 檔 §25 / 49 §6.1：只有裸 objectKey 可以送去落庫。Gateway 現在會走
-			// resolveInputObjectKey 剝殼＋拒外來域名（seller_product.go:244-260），
-			// 但前端仍是第一道防線——新上傳的圖只帶 `file.url`（uploadImageFile 回的是
-			// 完整 CDN URL）+ stagedToken，toObjectKey 把它剝回 key；同時也把既有的
-			// 髒值在下次存檔時修回。
 			blocks.push({
 				type: "image",
 				id: b.id,
@@ -547,7 +514,6 @@ export function fromEditorData(
 			continue;
 		}
 
-		// paragraph (and any unknown tool) → text block with runs
 		const d = b.data as EditorParagraphData;
 		const runs = htmlToRuns(String(d.text ?? ""));
 		if (runs.length === 0) continue;

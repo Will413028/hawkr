@@ -47,11 +47,6 @@ export default function ErrorState({
 	reportToSentry = true,
 }: ErrorStateProps) {
 	React.useEffect(() => {
-		// Surface the real error for debugging/monitoring; the buyer-facing
-		// copy stays generic. React errors caught by a boundary never reach
-		// window.onerror, so without the explicit capture the client side of
-		// this page is invisible in Sentry（近 14 天 0 筆 client render error
-		// 不是沒發生，是沒上報）.
 		console.error(error);
 		if (reportToSentry) Sentry.captureException(error);
 	}, [error, reportToSentry]);

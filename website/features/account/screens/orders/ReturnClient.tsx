@@ -154,7 +154,7 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 					</Button>
 				}
 			>
-				{/* 1 · 訂單摘要 — 售後以整張訂單為案件，不再逐項勾選 */}
+
 				<section className="bg-content1 border border-divider p-[18px] mb-4 shadow-hk-card">
 					<header className="flex items-center justify-between gap-3 mb-3">
 						<h2 className="text-base font-bold text-foreground">訂單摘要</h2>
@@ -208,7 +208,7 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 					</div>
 				</section>
 
-				{/* 2 · 問題描述 */}
+
 				<section className="bg-content1 border border-divider p-[18px] mb-4 shadow-hk-card">
 					<h2 className="text-base font-bold text-foreground mb-4">問題描述</h2>
 					<ul className="list-none m-0 p-0 flex flex-col gap-2 mb-4">
@@ -262,7 +262,7 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 					</div>
 				</section>
 
-				{/* 3 · 照片證據 */}
+
 				<section className="bg-content1 border border-divider p-[18px] mb-4 shadow-hk-card">
 					<h2 className="text-base font-bold text-foreground mb-1">照片證據</h2>
 					<p className="text-xs text-foreground-soft mb-3">

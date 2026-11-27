@@ -24,8 +24,6 @@ func ContentDisposition(disposition, fileName, fallback string) string {
 		"; filename*=UTF-8''" + rfc5987Encode(fileName)
 }
 
-// asciiFallbackName 產生 filename= 用的退化名：非 ASCII 與控制字元一律換底線。
-// 認得 filename* 的 client 不會用到它。
 func asciiFallbackName(s, fallback string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -37,17 +35,11 @@ func asciiFallbackName(s, fallback string) string {
 	}
 	out := b.String()
 	if strings.Trim(out, "_") == "" {
-		// 整個檔名都是非 ASCII（純中文檔名很常見）⇒ 退化名沒有任何資訊。
 		return fallback
 	}
 	return out
 }
 
-// rfc5987Encode 依 RFC 5987 §3.2 把字串編成 ext-value：attr-char 以外的位元組全部
-// percent-encode。
-//
-// ⚠️ **不能用 url.PathEscape 代替**——它放行 $ & + , : ; = ? @ 等字元，而其中
-// , : ; = ? @ 在 attr-char 之外。
 func rfc5987Encode(s string) string {
 	const attrChar = "!#$&+-.^_`|~"
 	var b strings.Builder

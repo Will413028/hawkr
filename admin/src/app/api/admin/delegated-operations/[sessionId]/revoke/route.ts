@@ -50,8 +50,6 @@ export async function POST(request: NextRequest, context: Context) {
 	const { sessionId } = await context.params;
 	if (!isDelegatedSessionId(sessionId)) return invalidSessionId();
 
-	// 這支是瀏覽器 `fetch` 而不是頂層表單導覽（不跨 host），所以自訂標頭送得出去；
-	// Origin 與 `X-Requested-With` 是同一件事的兩層，跨站表單兩者都湊不齊。
 	if (!isSameOriginSubmission(request.headers)) {
 		return NextResponse.json(
 			{ code: "CROSS_ORIGIN_REJECTED", message: "來源不符" },
@@ -90,8 +88,6 @@ export async function POST(request: NextRequest, context: Context) {
 		);
 	}
 	if (!isValidIdempotencyKey(idempotencyKey)) {
-		// 重試必須沿用同一把鍵，否則「撤銷已生效但回應沒收到」的重試會被當成第二次
-		// 撤銷；由瀏覽器產生、伺服器只驗形狀。
 		return invalidRequest(
 			"IDEMPOTENCY_KEY_REQUIRED",
 			"撤銷工作階段需要有效的 Idempotency-Key",
@@ -114,7 +110,6 @@ export async function POST(request: NextRequest, context: Context) {
 		const parsed = parseDelegatedSessionRevocation(unwrapUpstreamData(payload));
 		if (!parsed) return contractViolation("撤銷代行工作階段回應無法驗證");
 		if (parsed.sessionId !== sessionId || parsed.status !== "revoked") {
-			// 宣稱成功卻沒有回出「這個工作階段已 revoked」＝一份假的撤銷證明。
 			return contractViolation("撤銷結果與請求對象不符");
 		}
 		return ok(parsed);

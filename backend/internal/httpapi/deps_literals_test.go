@@ -17,8 +17,6 @@ import (
 
 const httpapiImportPath = "github.com/Will413028/hawkr/backend/internal/httpapi"
 
-// requiredDepsFields 從 NewHandler 的原始碼取出必填欄位：`if deps.X == nil { return ..., err }`。
-// 清單不寫死，NewHandler 新增必填依賴時測試自動跟上。
 func requiredDepsFields(t *testing.T) []string {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -67,8 +65,6 @@ func requiredDepsFields(t *testing.T) []string {
 	return fields
 }
 
-// depsLiteralProblems 檢查一份 Go 原始碼裡所有 `<httpapi 別名>.Deps{...}` 字面值，回傳缺欄位的描述；
-// found 是找到的字面值數。parser 不看 build tag，帶 integration tag 的檔也會被解析。
 func depsLiteralProblems(t *testing.T, name string, src any, required []string) (problems []string, found int) {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -174,7 +170,6 @@ func TestHTTPAPIDepsLiteralsSetEveryRequiredField(t *testing.T) {
 		t.Fatal("沒掃到 buyer_integration_test.go 的 httpapi.Deps：掃描漏了帶 build tag 的檔")
 	}
 
-	// 範本是 Go template，渲染後才是 Go 原始碼；其他含 httpapi.Deps{ 的範本一併檢查。
 	tmplFound := 0
 	err := filepath.WalkDir("../../cmd/new-module/templates", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {

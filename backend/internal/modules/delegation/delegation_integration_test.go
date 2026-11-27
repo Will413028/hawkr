@@ -40,12 +40,9 @@ type fixture struct {
 	now          time.Time
 	completed    []DelegationOperationCompleted
 	completedErr error
-	// storeFn 是 seller 的替身：依店家 ID 回店家或錯誤，預設是營業中的店家。
-	storeFn func(id int64) (seller.Store, error)
-	// social 是 delegation 取消排程用的 social：setup 給沒有 social 資料的替身，setupWithSocial 給真的模組。
-	social Social
-	// realSocial 只在 setupWithSocial 有值。
-	realSocial *social.Module
+	storeFn      func(id int64) (seller.Store, error)
+	social       Social
+	realSocial   *social.Module
 	// catalog 只在 setupWithSocial 有值（商品的代行寫入）。
 	catalog *catalog.Module
 	media   *media.Fake
@@ -53,8 +50,6 @@ type fixture struct {
 	nextID  int64
 }
 
-// noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這些測試不建排程，取消沒有東西可取消。
-// 內嵌的 *social.Module 是 nil：這些測試不寫代行貼文，只滿足 delegation.Social 的方法集合，被呼叫就 panic。
 type noSchedules struct{}
 
 func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {
@@ -112,7 +107,6 @@ func build(t *testing.T, withSocial bool) *fixture {
 		})
 		f.social = f.realSocial
 		f.catalog = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return f.now }, Media: f.media, Events: f.bus, Restock: noRestock{}})
-		// 測試只關心 social 讀 seller 的店家：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 		if _, err := d.Conn(context.Background()).Exec(context.Background(), `DO $$ DECLARE r record; BEGIN
 			FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
 			         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
@@ -158,7 +152,6 @@ func (f *fixture) admin(t *testing.T, email string) int64 {
 	return id
 }
 
-// grantOwner 授予管理員 OWNER：開始代行要有 delegation.sessions.create 權限（ADR 2026-10-04-admin-roles）。
 func (f *fixture) grantOwner(t *testing.T, id int64) {
 	t.Helper()
 	_, err := f.identity.GrantAdminRole(context.Background(), identity.AdminRoleChangeInput{
@@ -169,7 +162,6 @@ func (f *fixture) grantOwner(t *testing.T, id int64) {
 	}
 }
 
-// deleteAdmin 模擬管理員的列不見了（測試顯示名稱查不到時的容錯）：角色與事件參照管理員，要先清掉。
 func (f *fixture) deleteAdmin(t *testing.T, id int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -197,7 +189,6 @@ func tokenHash(value string) []byte { hash := sha256.Sum256([]byte(value)); retu
 
 func ptr[T any](value T) *T { return &value }
 
-// queue 是 social 的 job 佇列替身：只收下排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type queue struct{}
 
 func (*queue) Enqueue(ctx context.Context, _ river.JobArgs, _ *river.InsertOpts) error {

@@ -10,7 +10,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-// ==================== DTO ====================
 
 // GetStoreMapParamsReq 取得門市地圖參數請求
 type GetStoreMapParamsReq struct {
@@ -37,7 +36,6 @@ type StoreMapResultResp struct {
 	StoreType   string `json:"storeType"`
 }
 
-// ==================== Handler ====================
 
 // GetStoreMapParams 取得超商門市地圖加密參數
 // @Summary      取得超商門市地圖參數
@@ -85,7 +83,6 @@ func (h *Holder) GetStoreMapParams(c *gin.Context) {
 		return
 	}
 
-	// 透傳微服務回傳值（redirectUrl 由 Shipping Service 組裝）
 	data := StoreMapFormDataResp{
 		FormAction:  resp.Data.GetFormAction(),
 		MerId:       resp.Data.GetMerId(),
@@ -137,7 +134,7 @@ func (h *Holder) StoreMapRedirect(c *gin.Context) {
 		Version:     resp.GetVersion(),
 		EncryptInfo: resp.GetEncryptInfo(),
 		HashInfo:    resp.GetHashInfo(),
-		IsPlatForm:  "1", // 門市地圖固定平台模式（原 hardcoded IsPlatForm=1）
+		IsPlatForm:  "1",
 	})
 }
 
@@ -154,7 +151,6 @@ func (h *Holder) StoreMapRedirect(c *gin.Context) {
 // @Failure      503  {string}  string  "服務不可用"
 // @Router       /store_map/return [post]
 func (h *Holder) StoreMapReturn(c *gin.Context) {
-	// PayUni 門市地圖以 Form POST 回傳加密結果
 	encryptInfo := c.PostForm("EncryptInfo")
 	hashInfo := c.PostForm("HashInfo")
 	appType := c.DefaultQuery("app", "buyer")
@@ -174,6 +170,5 @@ func (h *Holder) StoreMapReturn(c *gin.Context) {
 		return
 	}
 
-	// 透傳 Shipping Service 組裝的 Deep Link URL，302 redirect 讓 WebView 攔截 URL Scheme
 	c.Redirect(http.StatusFound, resp.GetRedirectUrl())
 }

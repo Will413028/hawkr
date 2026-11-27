@@ -10,11 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔守的是**單元測試零鑑別力**的那些不變式：invoice_manual_unlocks 與
-// invoice_provider_cutovers 的 CHECK、partial unique 與 CAS 述詞。
-//
-// fake repository 沒有 CHECK：「雙人不得同一人」「1–1000 字」「APPROVED 必有第二人」
-// 在單元測試裡怎麼寫都可以是綠的——真正在守的是 DB，所以要在真 DB 上弄壞它。
 
 const muEvidence = "致電光貿客服，確認 requestId 未產生任何發票"
 
@@ -31,9 +26,6 @@ func newUnlock(opID, requester int64, now time.Time) domain.NewManualUnlock {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ① 雙人守衛：CAS 的 WHERE（回 rows=0）＋ chk_invmu_two_person（兜底）
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ManualUnlock_SameActorCannotApprove(t *testing.T) {
 	ctx := context.Background()
@@ -47,7 +39,6 @@ func TestIntegration_ManualUnlock_SameActorCannotApprove(t *testing.T) {
 		t.Fatalf("Create: err=%v taken=%v", err, taken)
 	}
 
-	// 發起人自己核准 ⇒ CAS 的 `requested_by_account_id <> $approver` 不成立 ⇒ rows=0。
 	ok, err := repo.Decide(ctx, domain.DecideManualUnlock{
 		ID: row.ID, OperationID: opID, NextStatus: domain.ManualUnlockApproved,
 		ApprovedByAccountID: 4201, DecisionReason: "自己核准自己",
@@ -60,7 +51,6 @@ func TestIntegration_ManualUnlock_SameActorCannotApprove(t *testing.T) {
 		t.Fatal("同一人核准必須 rows=0——這是全案唯一的雙人機制")
 	}
 
-	// 而且那一列完全沒被動過（rows=0 的危險形狀是「擋下來了但已經寫了一半」）。
 	after, err := repo.GetByID(ctx, row.ID)
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -70,7 +60,6 @@ func TestIntegration_ManualUnlock_SameActorCannotApprove(t *testing.T) {
 		t.Fatalf("被擋下的那一列不得有任何變化：%+v", after)
 	}
 
-	// 換一個人就過得去（鑑別力：上面那個 false 不是因為別的原因）。
 	ok, err = repo.Decide(ctx, domain.DecideManualUnlock{
 		ID: row.ID, OperationID: opID, NextStatus: domain.ManualUnlockApproved,
 		ApprovedByAccountID: 4202, DecisionReason: "已複核",
@@ -99,8 +88,6 @@ func TestIntegration_ManualUnlock_CASGuardHoldsWithoutTheCheckConstraint(t *test
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	// 每支測試拿到的是自己的 database（見本 package 的 dbtest 說明）⇒ 卸掉 CHECK
-	// 不會影響其他測試。
 	mustExec(ctx, t, pool,
 		`ALTER TABLE invoice_manual_unlocks DROP CONSTRAINT chk_invmu_two_person`)
 
@@ -140,9 +127,6 @@ func TestIntegration_ManualUnlock_TwoPersonCheckRejectsDirectSQL(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ② chk_invmu_decided_pair：APPROVED／REJECTED ⇔ 有第二人且有決策時間（雙向）
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ManualUnlock_DecidedPairIsBidirectional(t *testing.T) {
 	ctx := context.Background()
@@ -156,13 +140,11 @@ func TestIntegration_ManualUnlock_DecidedPairIsBidirectional(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	// 正向：APPROVED 卻沒有第二人 ⇒ 23514。
 	if _, err := pool.Exec(ctx,
 		`UPDATE invoice_manual_unlocks SET status = 'APPROVED' WHERE id = $1`, row.ID); err == nil {
 		t.Fatal("APPROVED 卻沒有第二人／決策時間，必須被 chk_invmu_decided_pair 擋下")
 	}
 
-	// 反向同樣要擋：AWAITING 卻掛著一個 approved_by，會讓稽核上出現兩個互相矛盾的答案。
 	if _, err := pool.Exec(ctx,
 		`UPDATE invoice_manual_unlocks
 		    SET approved_by_account_id = 4202, decided_at = now()
@@ -190,7 +172,6 @@ func TestIntegration_ManualUnlock_RejectRequiresReason(t *testing.T) {
 		t.Fatal("REJECTED 沒有 decision_reason 必須被 chk_invmu_reject_reason 擋下")
 	}
 
-	// 帶了理由就過得去（鑑別力）。
 	if _, err := pool.Exec(ctx,
 		`UPDATE invoice_manual_unlocks
 		    SET status = 'REJECTED', approved_by_account_id = 4202,
@@ -219,7 +200,6 @@ func TestIntegration_ManualUnlock_EvidenceLengthBounds(t *testing.T) {
 		t.Fatal("1001 字必須被 chk_invmu_evidence_len 擋下")
 	}
 
-	// 交易在 23514 之後不會 abort（本例未包交易），改用新 pool 語句即可。
 	in = newUnlock(opID, 4201, now)
 	in.ProviderCheckEvidence = string(long[:1000])
 	if _, taken, err := repo.Create(ctx, in); err != nil || taken {
@@ -227,9 +207,6 @@ func TestIntegration_ManualUnlock_EvidenceLengthBounds(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ③ uq_invmu_open_per_operation ＋ ExpireStale 的名額釋放
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ManualUnlock_OnlyOneOpenRequestPerJob(t *testing.T) {
 	ctx := context.Background()
@@ -260,7 +237,6 @@ func TestIntegration_ManualUnlock_ExpireStaleReleasesTheSlot(t *testing.T) {
 	}
 	later := now.Add(domain.ManualUnlockExpiry + time.Minute)
 
-	// 尚未收斂 ⇒ 仍然撞唯一索引（先證明那個索引真的擋著）。
 	if _, taken, err := repo.Create(ctx, newUnlock(opID, 4201, later)); err != nil || !taken {
 		t.Fatalf("收斂前應撞唯一索引：err=%v taken=%v", err, taken)
 	}
@@ -323,9 +299,6 @@ func TestIntegration_ManualUnlock_ExpiredCannotBeApproved(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ④ J29：CANCELLED_BY_ADMIN → MANUAL_PROCESS_ALLOWED 的第二道雙人守衛
-// ---------------------------------------------------------------------------
 
 func TestIntegration_Operation_AllowManualProcessGuards(t *testing.T) {
 	ctx := context.Background()
@@ -334,7 +307,6 @@ func TestIntegration_Operation_AllowManualProcessGuards(t *testing.T) {
 	_, opID := seedManualJob(ctx, t, pool, "ISSUE_FAILED", "CANCELLED_BY_ADMIN")
 	now := time.Now().UTC()
 
-	// J29 的述詞要求 cancel_requested_by 非空（取消是雙人流程的第一步）。
 	mustExec(ctx, t, pool,
 		`UPDATE invoice_operations
 		    SET cancel_requested_by = 4203, cancel_requested_at = now()
@@ -345,7 +317,6 @@ func TestIntegration_Operation_AllowManualProcessGuards(t *testing.T) {
 		t.Fatalf("GetByID: %v", err)
 	}
 
-	// 取消發起人自己來解鎖 ⇒ rows=0。
 	ok, err := repo.AllowManualProcess(ctx, opID, op.Version, 4203, now)
 	if err != nil {
 		t.Fatalf("AllowManualProcess: %v", err)
@@ -354,7 +325,6 @@ func TestIntegration_Operation_AllowManualProcessGuards(t *testing.T) {
 		t.Fatal("取消發起人不得同時是解鎖覆核人")
 	}
 
-	// 換一個人就過得去（鑑別力）。
 	ok, err = repo.AllowManualProcess(ctx, opID, op.Version, 4202, now)
 	if err != nil || !ok {
 		t.Fatalf("第二個人應可解鎖：ok=%v err=%v", ok, err)
@@ -368,9 +338,6 @@ func TestIntegration_Operation_AllowManualProcessGuards(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑤ invoice_provider_cutovers：uq_invpc_open_per_account
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ProviderCutover_OnlyOneOpenRowPerAccount(t *testing.T) {
 	ctx := context.Background()
@@ -391,7 +358,6 @@ func TestIntegration_ProviderCutover_OnlyOneOpenRowPerAccount(t *testing.T) {
 		t.Fatal("剛建立的那一列必須是現行有效")
 	}
 
-	// 沒先關舊列就插第二列 ⇒ 23505（這正是 Activate 必須 CloseOpen 的理由）。
 	if _, err := repo.Create(ctx, domain.NewProviderCutover{
 		ProviderAccountID: accountID, IssuerID: issuerID, AccountVersion: 8,
 		CutoverAt: now.Add(2 * time.Hour), CreatedByAccountID: 2685914682, Now: now,
@@ -408,7 +374,6 @@ func TestIntegration_ProviderCutover_CloseOpenThenCreate(t *testing.T) {
 	accountID := seedProviderAccountRow(ctx, t, pool, issuerID)
 	now := time.Now().UTC()
 
-	// 第一次：沒有前一列 ⇒ CloseOpen rows=0，**那不是錯誤**。
 	n, err := repo.CloseOpen(ctx, accountID, now)
 	if err != nil {
 		t.Fatalf("CloseOpen: %v", err)
@@ -441,7 +406,6 @@ func TestIntegration_ProviderCutover_CloseOpenThenCreate(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("應有兩列，實得 %d", len(rows))
 	}
-	// 新到舊：現行那一列在最前面（ADM 一進頁面看到的就是現在生效的切點）。
 	if rows[0].DeactivatedAt != nil || rows[1].DeactivatedAt == nil {
 		t.Fatalf("排序或關列狀態不對：%+v", rows)
 	}

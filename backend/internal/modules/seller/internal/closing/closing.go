@@ -60,7 +60,6 @@ type Service struct{ d Deps }
 // New 建立服務。
 func New(d Deps) *Service { return &Service{d: d} }
 
-// now 是寫入用的現在：截到微秒（Postgres 的 timestamptz 精度），之後與已存的時間比較才不會被奈秒的差異誤判。
 func (s *Service) now() time.Time { return s.d.Now().UTC().Truncate(time.Microsecond) }
 
 // Lock 在呼叫方的 transaction 內鎖住店家所屬帳號的店家列，不改任何東西。前置條件同 BeginDeletion。
@@ -125,7 +124,6 @@ func (s *Service) BeginDeletion(ctx context.Context, storeID int64) error {
 		}); err != nil {
 			return err
 		}
-		// 營運中是可曝光的輸入：等待刪除的店不再可曝光。
 		if err := s.d.Exposure.Announce(ctx, q, now, current.StoreID); err != nil {
 			return err
 		}
@@ -150,7 +148,6 @@ func (s *Service) CloseForDeletion(ctx context.Context, storeID int64) error {
 	})
 }
 
-// closer 是這次關店的原因：賣家自己、終止合作（帶造成關店的措施）或隨帳號刪除。
 type closer struct {
 	by        model.ClosedBy
 	measureID *uuid.UUID
@@ -208,7 +205,6 @@ func (s *Service) CloseCurrent(ctx context.Context, accountID int64) (model.Stor
 	return closed, nil
 }
 
-// currentOf 從帳號全部的 stint 挑出目前的那一個（status 不是 CLOSED；帳號最多一個）。
 func currentOf(stores []store.SellerStore) (store.SellerStore, bool) {
 	for _, row := range stores {
 		if row.Status != string(model.Closed) {
@@ -218,9 +214,6 @@ func currentOf(stores []store.SellerStore) (store.SellerStore, bool) {
 	return store.SellerStore{}, false
 }
 
-// checkClosable 在 transaction 外確認帳號目前的店家可以關（有 CapAccountClose、沒有未結訂單），回傳那個 stint 的 store_id。
-// 未結訂單是遠端查詢，不在 transaction 內：這裡的讀取不加鎖，只當前置檢查，交易內鎖住之後會重新檢查能力，並確認還是同一個 stint。
-// 查完到關閉之間才進來的訂單與買家端一樣有競態（ordering 搬進單體後 port 移進 transaction）。
 func (s *Service) checkClosable(ctx context.Context, accountID int64) (int64, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	current, err := q.CurrentStore(ctx, accountID)
@@ -244,9 +237,6 @@ func (s *Service) checkClosable(ctx context.Context, accountID int64) (int64, er
 	return current.StoreID, nil
 }
 
-// close 在呼叫方的 transaction 內關閉已鎖定的 stint，是所有關店共用的唯一路徑：記下關店的原因、結束帳號上尚未結束的預告終止（條款第 21.2 條：
-// 預告期間內關店，或生效後關店，措施都隨店家關閉結束，否則 stint.Derive 會永遠擋住 21.2 的重新申請）、移除 SELLER，並發出 StoreClosed。
-// 關店可逆，所以 logo、封面與 media 的引用留著，到個資清理才釋放。停權不解除（停權以帳號為單位）。呼叫方已鎖住帳號列與帳號全部的 stint。
 func (s *Service) close(ctx context.Context, q *store.Queries, current store.SellerStore, by closer) error {
 	if current.Status == string(model.Closed) {
 		return nil
@@ -280,15 +270,12 @@ func (s *Service) close(ctx context.Context, q *store.Queries, current store.Sel
 	}); err != nil {
 		return err
 	}
-	// 關店之後不再可曝光（也補發最後公告為可曝光的店的 false）。
 	if err := s.d.Exposure.Announce(ctx, q, now, current.StoreID); err != nil {
 		return err
 	}
 	return stint.Invalidate(ctx, s.d.Jobs, current)
 }
 
-// endNotices 把帳號上 ENFORCED、事由是 NOTICE、尚未結束（預定生效或生效中）的終止合作各寫一版 ends_at = 關店時間（作者是系統，原因
-// STORE_CLOSED），並發 MeasureEnded；回傳結束的措施數。措施列在這裡鎖住（呼叫方已鎖住帳號全部的 stint）。
 func (s *Service) endNotices(ctx context.Context, q *store.Queries, accountID int64, now time.Time) (int, error) {
 	notices, err := q.OpenNoticeTerminations(ctx, accountID)
 	if err != nil {
@@ -358,8 +345,6 @@ func (s *Service) ReopenPlan(ctx context.Context, q *store.Queries, accountID in
 			return 0, nil
 		}
 	}
-	// 「保留期已過」＝第一段清理（退場）的時間條件成立而且沒有申覆的 legal hold（清理與恢復同一個判斷式）。主管機關來函的保存只擋清理、不改變業務結果：
-	// 恢復營業不問它（step10e-3cb §2.4、TestReopenIgnoresTheAuthorityHold）。
 	due, err := q.RetireDueStores(ctx, store.RetireDueStoresParams{
 		StoreIds: []int64{target.StoreID}, Now: now, AppealWindowHours: model.AppealWindowHours, Hours: model.StoreRetireAfterHours, BatchLimit: 1,
 	})

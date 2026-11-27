@@ -44,61 +44,10 @@ import {
 import { formatAmount, formatDateTime } from "@/lib/format";
 import { request } from "@/services/api";
 import { ApiClientError } from "@/services/api-error";
-// 對話框骨架（overlay、面板、標題列）在共用 Dialog 自己的 Dialog.css；這裡的 DelegatedOperations.css 只放
-// `.adm-operation-field*` 等欄位與版面 class（58A 陷阱 C07：少 import 不會報錯也不會轉紅）。
 import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A13｜發票文件詳情（58A §A13，端點 48
-// `GET /api/v1/admin/invoices/documents/{document_id}`）。
-//
-// ## 這一頁的存在理由是「四顆按鈕的共同目的地」
-//
-// A12 列尾「查看詳情」／A11 成功後的「查看這張發票」／A11 收到 9347 的導頁
-// （`?from=duplicate`）／A08 與 A06 的「查看文件詳情」。四條裡接得上三條：
-//   - A12 與 A11 的兩條都通（A11 已建，端點 57 `CreateManualIssuanceForAdmin` 在
-//     `internal/grpc/admin_write.go`；`?from=duplicate` 的橫幅就在下面）
-//   - A06 的 `AdminInvoiceJobDetail`（端點 51）與 A08 的 `InvoiceComplaintInfo`（端點 59）
-//     **都沒有 `documentId` 欄位** ⇒ 那兩顆鍵組不出 href。這不是本頁的缺，是那兩支 DTO
-//     的缺；憑語意猜一個 id 去導頁只會導到別人的發票。已列入回報。
-//   反方向（A13 → A06）走得通：`relatedJobs[].jobId` 在契約上有。
-//
-// ## 存取會留痕，而且這句話是真的
-//
-// 副標寫「開啟本頁會記錄一筆存取紀錄」——這不是嚇阻用的場面話：invoice-service 的
-// `GetInvoiceDocumentForAdmin` 逐字寫「usecase 在回資料之前先寫一列 INVOICE_PII_REVEAL
-// 稽核，寫不進去就不回（fail-closed）」，並有 `InvoicePiiRevealSpike` 告警。
-// ⚠️ **A06 不得寫這句**（陷阱 T30）：那一頁的主資料是端點 51。
-//
-// ## 唯一的寫入是「重新寄送通知」（端點 49，2026-09-02 接上）
-//
-// 作廢／折讓／重開／編輯是 job 層的操作，入口在 A06（各有雙人與樂觀鎖保護）。
-//
-// 端點 49 的 RPC **在** `internal/grpc/notification_resend.go`
-// （`ResendInvoiceNotificationForAdmin`），路徑是
-// `POST /admin/invoices/documents/{document_id}/notification_resends`
-// （gateway `AdminInvoiceDocumentResend`）。舊版寫「沒有實作」，那個結論來自把它當成
-// 掛在 job 上（`jobs/{id}/notification_resends` 回 404）——**它掛在 document 上**，
-// 所以 A13 是它唯一組得出路徑的地方。
-//
-// ## 冷卻窗口只能靠後端的 9352
-//
-// 同一份 document 每 10 分鐘只能寄一次，而且**三個入口（賣家／ADM／買家）共用同一個
-// 計數器**——ADM 幫忙點一次、賣家再點一次，買家會在十分鐘內收到兩封。
-// ⚠️ 不能用 `nextResendAvailableAt` 判斷：那一欄的 mapper 從不填 ⇒ 恆為空字串，
-// 讀它等於「隨時都可以寄」。守衛在 SQL 的 WHERE，唯一可靠的訊號是回來的 9352，
-// 而 9352 是「剛剛才寄過」不是「寄失敗」，文案不得寫成失敗。
-//
-// ## 三塊 58A 指定但畫不出來的東西（詳見 types.ts）
-//
-//   - **Section 2「憑證預覽」**：端點 48 的回應沒有 `downloadPath`，只有 `invoiceFileKey`
-//     （objectKey，58A 自己明令不顯示）。自行拼接下載路徑是陷阱 T22。且 `InvoicePdfViewer`
-//     是 WEB 側的新元件（N4），ADM 沒有、也不該為單一頁面造一個。⇒ 整區不畫，
-//     `fileAvailable === false` 時顯示 `fileUnavailableReason`。
-//   - **`idempotencyKey`**：`toAdminDocumentDetail` 從不填 ⇒ 恆為空字串。畫出
-//     「冪等鍵：—」等於宣稱這份文件沒有冪等鍵。
-//   - **`fulfillmentMode`**：詳情 DTO 上不存在（列表才有 `invoiceMode`）。
 
 function Section({
 	title,
@@ -143,8 +92,6 @@ export default function InvoiceDocumentDetailPage() {
 	const params = useParams<{ documentId: string }>();
 	const searchParams = useSearchParams();
 	const documentId = String(params?.documentId ?? "");
-	// 9347（冪等鍵命中、發票已經開好了）導過來時帶的旗標。**是 info 不是 error**：
-	// 畫成錯誤會讓管理員以為沒開成功而再送一次。
 	const fromDuplicate = searchParams.get("from") === "duplicate";
 
 	const [resendOpen, setResendOpen] = useState(false);
@@ -234,9 +181,6 @@ export default function InvoiceDocumentDetailPage() {
 					headers: { "Idempotency-Key": idempotencyKey },
 					body: JSON.stringify({
 						reason,
-						// 取 `data`（useQuery 的結果）而不是下面的 `detail`：後者宣告在
-						// 本 mutation 之後，讀它只是靠閉包在執行期才求值——能動，但把
-						// 「這一行何時可用」變成需要推理的事。
 						expectedVersion: data?.documentVersion ?? "",
 					}),
 				},
@@ -264,8 +208,6 @@ export default function InvoiceDocumentDetailPage() {
 			setIdempotencyKey(createInvoiceAdminIdempotencyKey());
 			const code = caught.code ?? 0;
 			if (code === RESEND_TOO_FREQUENT_CODE) {
-				// 🔴 這**不是失敗**：它是「剛剛才寄過」。三個入口（賣家／ADM／買家）共用
-				// 同一個 10 分鐘窗口 ⇒ 很可能是賣家剛按過。寫成紅字會讓 ADM 一直重按。
 				setResendOpen(false);
 				setBanner({
 					tone: "warning",
@@ -316,7 +258,6 @@ export default function InvoiceDocumentDetailPage() {
 			}
 			if (code === DOCUMENT_RESUME_NOT_ALLOWED_CODE) {
 				setResumeOpen(false);
-				// 後端 message 是唯一分得出「狀態不符」與「已有作業」的東西。
 				setBanner({
 					tone: "warning",
 					text: `${caught.message}（畫面已更新）`,
@@ -338,17 +279,11 @@ export default function InvoiceDocumentDetailPage() {
 	const sellerView = detail?.sellerView;
 	const doc = sellerView?.detail;
 	const summary = doc?.summary;
-	// 品項行在 DTO 上**沒有任何 id**（`InvoiceLine` 只有 lineType/name/quantity/
-	// unitPrice/netAmount/taxCategory），而同一張發票可以有兩行完全一樣的內容 ⇒
-	// 用內容當 key 會撞。這裡把序號在 JSX 之外先綁成穩定 key：這張表是唯讀的、
-	// 不排序也不增刪，序號就是它真正的身分。
 	const lineRows = (doc?.lines ?? []).map((line, index) => ({
 		key: `line-${index}`,
 		line,
 	}));
 
-	// 返回用 router.back()：四個來源各自回原處。寫死回 A12 會讓從 A08 點進來的人
-	// 掉到一個他沒去過的列表。
 	const back = () => router.back();
 
 	return (
@@ -388,11 +323,7 @@ export default function InvoiceDocumentDetailPage() {
 					</div>
 				</div>
 				<div className="header-actions">
-					{/*
-					 * 端點 49。渲染條件只有「這份文件真的存在」——**不從
-					 * `nextResendAvailableAt` 推冷卻**（那一欄的 mapper 從不填、恆為空字串，
-					 * 讀它等於「隨時都可以寄」）。窗口守衛在後端的 SQL WHERE，撞到就回 9352。
-					 */}
+
 					{detail ? (
 						<Button
 							variant="outline"
@@ -405,11 +336,7 @@ export default function InvoiceDocumentDetailPage() {
 							重新寄送通知
 						</Button>
 					) : null}
-					{/*
-					 * 端點 73。渲染條件**只看後端的 `canResumeFromManual`**——它是
-					 * 「AWAITING_MANUAL 且零 operation」那一支述詞的讀端，與寫端同一份。
-					 * 自己從 status 推會讓按鈕亮在一個 CAS 必定 rows=0 的狀態上。
-					 */}
+
 					{detail?.canResumeFromManual ? (
 						<Button
 							variant="primary"
@@ -451,10 +378,7 @@ export default function InvoiceDocumentDetailPage() {
 						</div>
 					) : null}
 
-					{/*
-					 * 這句話與事實相符（端點 48 fail-closed 落一列 INVOICE_PII_REVEAL），
-					 * 所以它是真的嚇阻而不是假保證。
-					 */}
+
 					<p className="invoice-page-notice" role="note">
 						<MaterialSymbol name="shield_lock" />
 						<span>
@@ -598,11 +522,7 @@ export default function InvoiceDocumentDetailPage() {
 														<td>{line.name || "—"}</td>
 														<td>{line.quantity || "—"}</td>
 														<td>{formatAmount(line.unitPrice)}</td>
-														{/*
-														 * DISCOUNT 行的 netAmount 是負數（AMEGO 官方範例即以負數
-														 * 明細表示折抵）⇒ 顯示為 -NT$ 120，**不取絕對值**：
-														 * 取了之後這一行看起來就像又加了一筆錢。
-														 */}
+
 														<td>{formatAmount(line.netAmount)}</td>
 														<td>
 															{codeLabel(
@@ -658,8 +578,7 @@ export default function InvoiceDocumentDetailPage() {
 												<span className="invoice-exchange__endpoint">
 													{ex.endpoint || "—"}
 												</span>
-												{/* code 與 message 成對：AMEGO 的 53 在官方錯誤表出現兩次
-												    且語意不同，只看 code 會導向錯誤的下一步。 */}
+
 												<span>
 													代碼 {ex.providerCode || "—"}：
 													{ex.providerMessage || "—"}

@@ -46,8 +46,6 @@ public class OrderReceiptConfirmedConsumer {
             JsonNode node = MAPPER.readTree(body);
             orderNo = node.path("order_no").asText("");
             String confirmType = node.path("confirm_type").asText("");
-            // #1871 OBS-09：order_no 進 MDC，讓這個方法內所有 log 行都能被 Loki structured
-            // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml）。
             MDC.put("order_no", orderNo);
 
             if (orderNo.isEmpty()) {

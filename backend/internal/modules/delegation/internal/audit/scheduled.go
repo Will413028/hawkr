@@ -55,7 +55,6 @@ func (m *Module) RecordScheduledPublish(ctx context.Context, in model.ScheduledP
 		Now:                   m.d.Now(),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		// 事件重送：同一把鍵的列已經在，它就是答案。
 		return nil
 	}
 	if err != nil {

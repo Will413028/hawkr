@@ -44,51 +44,31 @@ func (k SubjectKind) String() string {
 	}
 }
 
-// originAuthHeader carries a self-issued claim about which subject a request
-// represents. Only our own server-side callers send it.
 const originAuthHeader = "X-HK-Origin-Auth"
 
-// originAuthDomain binds the MAC to this exact purpose so a signature can never
-// be replayed against another HMAC verifier sharing a secret. Bump the suffix on
-// any payload-shape change to invalidate old signatures at the verifier.
 const originAuthDomain = "hkorigin1:"
 
-// originAuthVersion is the payload schema version carried in "v".
 const originAuthVersion = 1
 
-// originAuthSkew is how far the signed timestamp may be from now, either way.
-// Same order of magnitude as the quota window: long enough for clock drift,
-// short enough that a captured signature is worth little.
 const originAuthSkew = 60 * time.Second
 
-// origin-auth verification outcomes; these are the "result" metric label values.
 const (
 	originAuthResultOK        = "ok"
-	originAuthResultAbsent    = "absent"    // no header, or verification disabled for that class
-	originAuthResultBadSig    = "bad_sig"   // MAC mismatch, or signed method/path is not this request
-	originAuthResultExpired   = "expired"   // outside originAuthSkew
-	originAuthResultMalformed = "malformed" // undecodable / wrong version / unknown p / bad visitor ip
+	originAuthResultAbsent    = "absent"
+	originAuthResultBadSig    = "bad_sig"
+	originAuthResultExpired   = "expired"
+	originAuthResultMalformed = "malformed"
 )
 
-// originAuthPayload is the signed claim. Short field names keep the header
-// small on a header sent on every SSR subrequest.
 type originAuthPayload struct {
 	V  int    `json:"v"`
-	P  string `json:"p"`            // "visitor" | "ssr" | "ci"
-	IP string `json:"ip,omitempty"` // visitor IP, only meaningful when p=visitor
-	TS int64  `json:"ts"`           // unix seconds
-	M  string `json:"m"`            // HTTP method this signature is valid for
-	U  string `json:"u"`            // request path this signature is valid for
+	P  string `json:"p"`
+	IP string `json:"ip,omitempty"`
+	TS int64  `json:"ts"`
+	M  string `json:"m"`
+	U  string `json:"u"`
 }
 
-// originAuthKeys holds the two independent verification keys.
-//
-// They are two switches, not one. ORIGIN_AUTH_SECRET (+ _PREV for rotation) is
-// held by the website and admin workers; ORIGIN_AUTH_CI_SECRET by GitHub
-// Actions. Holders with different exposure must not share a key: whoever holds
-// the CI secret would otherwise be able to sign p=visitor with any victim's IP
-// and lock that person out of login (the auth-failure axis deliberately keeps
-// SubjectVisitor in scope) — while metering as result="ok", so no alert fires.
 type originAuthKeys struct {
 	main []byte
 	prev []byte
@@ -129,29 +109,18 @@ func announceOriginAuthKey(name string, enabled bool, l *zap.Logger) {
 	}
 	originAuthEnabled.WithLabelValues(name).Set(0)
 	if l != nil {
-		// WithOptions(zap.AddStacktrace(FatalLevel)) suppresses the stack trace
-		// zap attaches to Error by default. A missing secret is a configuration
-		// state, not a code path worth tracing — the call site is always this
-		// function, and the untrimmed trace buries the message it belongs to.
 		l.WithOptions(zap.AddStacktrace(zapcore.FatalLevel)).
 			Error("origin-auth verification DISABLED: secret not set — traffic in this class falls back to per-ClientIP quotas",
 				zap.String("key", name))
 	}
 }
 
-// rateLimitIdentity is the resolved answer for one request. clientIP is carried
-// alongside because the block log needs BOTH: subject answers "whose quota did
-// this spend", clientIP answers "which machine sent it", and under SSR / CI /
-// admin those are different answers.
 type rateLimitIdentity struct {
 	subject  string
 	kind     SubjectKind
 	clientIP string
 }
 
-// rateLimitIdentityKey is the gin-context memo key. Resolution runs once per
-// request: it is the only place gateway_origin_auth_total is incremented, and
-// several middlewares plus two handlers ask for the answer.
 const rateLimitIdentityKey = "hk_ratelimit_identity"
 
 // RateLimitSubject answers "which quota does this request spend, and of what
@@ -179,9 +148,6 @@ func rateLimitIdentityOf(c *gin.Context) rateLimitIdentity {
 	return id
 }
 
-// forensicClientIP is the real peer, for logging only — never for a quota key.
-// It exists so that "who actually sent this" is resolved in this file too, and
-// no other file needs to call c.ClientIP().
 func forensicClientIP(c *gin.Context) string { return rateLimitIdentityOf(c).clientIP }
 
 func resolveRateLimitIdentity(c *gin.Context) rateLimitIdentity {
@@ -208,22 +174,11 @@ func resolveRateLimitIdentity(c *gin.Context) rateLimitIdentity {
 	subject, kind, result := verifyOriginAuth(c, raw)
 	originAuthTotal.WithLabelValues(result).Inc()
 	if result != originAuthResultOK {
-		// fail-open: a rotation window must not take the website down, and the
-		// degraded behaviour is exactly the pre-#2264 behaviour. Alert B watches
-		// the bad_sig / expired / malformed ratio so a silently broken signing
-		// chain does not just quietly collapse everyone onto one key again.
 		return fallback
 	}
 	return rateLimitIdentity{subject: subject, kind: kind, clientIP: clientIP}
 }
 
-// visitorSubject namespaces a human under "v:".
-//
-// The prefix and the parse are both load-bearing. gin does not validate
-// CF-Connecting-IP, so without a prefix anyone able to reach the origin
-// directly could send "CF-Connecting-IP: s:ssr" and charge itself to the SSR
-// axis, which carries 20x the visitor quota. With it, an unsigned request can
-// only ever land inside the "v:" namespace.
 func visitorSubject(ip string) string {
 	parsed := net.ParseIP(ip)
 	if parsed == nil {
@@ -232,8 +187,6 @@ func visitorSubject(ip string) string {
 	return "v:" + parsed.String()
 }
 
-// verifyOriginAuth checks one signature and reports the subject it proves.
-// The returned subject is meaningful only when result == originAuthResultOK.
 func verifyOriginAuth(c *gin.Context, raw string) (string, SubjectKind, string) {
 	body, sig, found := strings.Cut(raw, ".")
 	if !found || body == "" || sig == "" {
@@ -248,9 +201,6 @@ func verifyOriginAuth(c *gin.Context, raw string) (string, SubjectKind, string) 
 		return "", SubjectVisitor, originAuthResultMalformed
 	}
 
-	// Reading p BEFORE verifying is safe: it only selects which key to check
-	// against and grants nothing. Forging p=ci to reach the CI key still has to
-	// produce a MAC under that key.
 	keys := originAuthKeyHolder.Load()
 	if keys == nil {
 		keys = &originAuthKeys{}
@@ -268,10 +218,6 @@ func verifyOriginAuth(c *gin.Context, raw string) (string, SubjectKind, string) 
 		return "", SubjectVisitor, originAuthResultMalformed
 	}
 	if len(candidates) == 0 {
-		// This class's key is unset ⇒ verification disabled ⇒ nothing was
-		// evaluated. Reported as "absent" so it stays out of alert B's ratio
-		// (whose denominator excludes absent): while a key is off, "signatures
-		// do not verify" is expected and is alert A's job, not B's.
 		return "", SubjectVisitor, originAuthResultAbsent
 	}
 
@@ -282,8 +228,6 @@ func verifyOriginAuth(c *gin.Context, raw string) (string, SubjectKind, string) 
 	if !anyMACMatches(candidates, body, gotMAC) {
 		return "", SubjectVisitor, originAuthResultBadSig
 	}
-	// Bound to this exact request so a captured signature cannot be pointed at
-	// another endpoint within its validity window.
 	if p.M != c.Request.Method || p.U != c.Request.URL.Path {
 		return "", SubjectVisitor, originAuthResultBadSig
 	}
@@ -297,9 +241,6 @@ func verifyOriginAuth(c *gin.Context, raw string) (string, SubjectKind, string) 
 	case SubjectCI:
 		return "s:ci", SubjectCI, originAuthResultOK
 	default:
-		// p=visitor without a parseable IP proves nothing about who to charge;
-		// treating it as the caller's own address would let a worker launder any
-		// junk value into a quota key.
 		ip := net.ParseIP(p.IP)
 		if ip == nil {
 			return "", SubjectVisitor, originAuthResultMalformed
@@ -318,8 +259,6 @@ func nonEmptyKeys(keys ...[]byte) [][]byte {
 	return out
 }
 
-// anyMACMatches compares in constant time against every accepted key so a
-// secret rotation has an overlap window instead of a cutover.
 func anyMACMatches(keys [][]byte, body string, got []byte) bool {
 	ok := false
 	for _, k := range keys {

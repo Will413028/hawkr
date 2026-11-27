@@ -104,7 +104,6 @@ class CartRepository {
                 ? null
                 : _moneyAsInt(item['listPrice']),
             title: item['name']?.toString(),
-            // gateway `CartItemResponse`：imageKey ＋ imageUrl 成對（49 §6.1）。
             image: item['imageUrl']?.toString() ?? item['imageKey']?.toString(),
             sellerId: int.tryParse(storeId),
             merchantName: sellerName,
@@ -123,7 +122,6 @@ class CartRepository {
               storeId: storeId,
               sellerName: sellerName,
               items: groupItems,
-              // gateway `CartGroupResponse`：logoKey ＋ logoUrl 成對（49 §6.1）。
               logoUrl: (group['logoKey'] ?? group['logoUrl'])?.toString(),
               sellerCity: group['sellerCity']?.toString() ?? '',
               sellerDistrict: group['sellerDistrict']?.toString() ?? '',
@@ -350,7 +348,6 @@ class CartRepository {
     required String storeId,
     required int orderAmount,
   }) async {
-    // store_id 是後端必填參數，沒有選定商家時直接回空，不送註定 400 的請求。
     if (storeId.isEmpty) return const [];
     try {
       final params = <String, dynamic>{

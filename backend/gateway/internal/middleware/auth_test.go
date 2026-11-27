@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// identityEcho 回傳中介層交給下游的身分：往下游的 header、gin ctx 與 gRPC 用的 Go context。
 type identityEcho struct {
 	HeaderAccountID   string `json:"headerAccountId"`
 	HeaderAccountType string `json:"headerAccountType"`
@@ -84,11 +83,8 @@ func TestJWTAuth_TrustsMonolithIdentityHeaders(t *testing.T) {
 		{"seller", map[string]string{"X-Account-Id": "101", "X-Account-Type": "2", "X-Login-Role": "2"}, 2, 2, "2"},
 		{"dual in buyer view", map[string]string{"X-Account-Id": "101", "X-Account-Type": "3", "X-Login-Role": "1"}, 3, 1, "1"},
 		{"dual in seller view", map[string]string{"X-Account-Id": "101", "X-Account-Type": "3", "X-Login-Role": "2"}, 3, 2, "2"},
-		// 沒有角色的帳號：單體不設 X-Login-Role。
 		{"no roles", map[string]string{"X-Account-Id": "101", "X-Account-Type": "0"}, 0, 0, "0"},
-		// 管理員：單體送 4；管理員沒有買家或賣家的視角，往下游與過去一樣是 0。
 		{"admin", map[string]string{"X-Account-Id": "101", "X-Account-Type": "4", "X-Login-Role": "4"}, 4, 0, "0"},
-		// 帳號沒有的角色不往下游傳：單一角色的帳號取它唯一的角色，其餘落到 0。
 		{"role not held, single role", map[string]string{"X-Account-Id": "101", "X-Account-Type": "1", "X-Login-Role": "2"}, 1, 1, "1"},
 		{"role not a role", map[string]string{"X-Account-Id": "101", "X-Account-Type": "3", "X-Login-Role": "7"}, 3, 0, "0"},
 	}

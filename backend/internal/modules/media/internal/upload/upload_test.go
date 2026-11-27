@@ -18,7 +18,7 @@ func validateErr(in BeginInput) error {
 	return err
 }
 
-const validMD5 = "1B2M2Y8AsgTpgAmY7PhCfg==" // 空內容的 MD5
+const validMD5 = "1B2M2Y8AsgTpgAmY7PhCfg=="
 
 func TestValidate(t *testing.T) {
 	ok := BeginInput{Size: 10, ContentType: "image/png", MD5: validMD5}

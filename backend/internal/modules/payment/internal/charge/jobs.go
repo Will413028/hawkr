@@ -24,13 +24,10 @@ func (CreateArgs) Kind() string { return "payment.charge_create" }
 // InsertOpts 是補做 job 的排入選項：以付款 ID 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
 func (CreateArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
 
-// enqueueCreate 立刻排入補做（掃描用：列已經閒置）。
 func enqueueCreate(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
 	return enqueueCreateAt(ctx, jc, id, time.Time{})
 }
 
-// enqueueCreateAt 排入補做，at 不是零值時延到那個時刻才跑：請求內的建立還在進行時，補做不能與它搶同一把冪等鍵（Stripe 對並行的同鍵請求回 409，也會讓先寫入的一方
-// 讓請求拿不到 client_secret），所以建立付款時排在請求內呼叫的上限之後。
 func enqueueCreateAt(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID, at time.Time) error {
 	args := CreateArgs{PaymentID: id}
 	opts := args.InsertOpts()
@@ -93,7 +90,6 @@ func enqueueTransfer(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error 
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// enqueueTransferWake 在退款進終局的 transaction 內排入喚醒轉帳的 job（同一筆退款只排一次）。
 func enqueueTransferWake(ctx context.Context, jc jobs.Enqueuer, id, refundID uuid.UUID) error {
 	args := TransferArgs{TransferID: id, WakeRefundID: refundID}
 	opts := args.InsertOpts()
@@ -177,19 +173,14 @@ func (SweepArgs) Kind() string { return "payment.charge_sweep" }
 // InsertOpts 把同一段時間內的排程與重啟合併。
 func (SweepArgs) InsertOpts() river.InsertOpts { return jobs.SweepOpts(10 * time.Minute) }
 
-// resyncDelay 是結果寫入後仍有未涵蓋的事件時，等多久再跑一輪。
 const resyncDelay = 2 * time.Second
 
-// pollInterval 是掃描的週期。
 const pollInterval = 15 * time.Minute
 
-// closeWaitDelay 是關閉付款等建立收斂時 job 的 snooze 間隔（不計嘗試）。
 const closeWaitDelay = 5 * time.Minute
 
-// transferWaitDelay 是轉帳等進行中的退款終局時 job 的 snooze 間隔，與掃描同一個週期；退款進終局時的喚醒 job 才是快路徑。
 const transferWaitDelay = pollInterval
 
-// transferJobResult 把一次轉帳的結果轉成 River 的回傳：等進行中的退款是預期的等待，snooze（不計嘗試、不當成錯誤）；其他照 jobError。
 func transferJobResult(err error) error {
 	if errors.Is(err, errRefundsInFlight) {
 		return river.JobSnooze(transferWaitDelay)

@@ -73,7 +73,6 @@ func New(d Deps) *Service {
 	return &Service{d: d, p: protector{mac: d.MAC}}
 }
 
-// contactEmail 回傳帳號的聯絡信箱，identity 已依它的規則正規化並略過格式不合的值；帳號沒有可用的信箱時 ok 是 false。在呼叫方的 transaction 內讀取。
 func (s *Service) contactEmail(ctx context.Context, accountID int64) (string, bool, error) {
 	c, ok, err := s.d.Identity.ContactEmail(ctx, accountID)
 	if err != nil || !ok {
@@ -94,7 +93,6 @@ func (s *Service) OwnerContactEmail(ctx context.Context, storeID int64) (string,
 	return s.contactEmail(ctx, owner.AccountID)
 }
 
-// requireContactEmail 是送審的檢查：帳號沒有聯絡信箱回 failed_precondition 與 CONTACT_EMAIL_REQUIRED。
 func (s *Service) requireContactEmail(ctx context.Context, accountID int64) (string, error) {
 	email, ok, err := s.contactEmail(ctx, accountID)
 	if err != nil {
@@ -108,13 +106,10 @@ func (s *Service) requireContactEmail(ctx context.Context, accountID int64) (str
 
 func errVersionConflict() error { return apperr.VersionConflict("申請資料已被修改") }
 
-// errAlreadyExists 是沒有帶版本（要建立）時店家已經有申請：與以 key 建立撞到既有的資源同一個形狀（ALREADY_EXISTS 加
-// VERSION_CONFLICT，API 設計規範 §七），client 一樣顯示最新版本讓使用者對照。
 func errAlreadyExists() error {
 	return apperr.AlreadyExists("店家已經有申請，要修改請帶讀到的版本").WithReason(apperr.ReasonVersionConflict)
 }
 
-// actingStore 回傳帳號目前的店家（停權狀態在這一刻推導），只在它有能力 c 時成功。
 func (s *Service) actingStore(ctx context.Context, q *store.Queries, accountID int64, c model.Capability) (store.SellerStore, error) {
 	row, err := q.CurrentStore(ctx, accountID)
 	if err != nil {
@@ -194,7 +189,6 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 			return err
 		}
 		if current != nil && current.Status != row.Status {
-			// 申請的狀態變了（被退回的申請回到草稿）：重新判斷可曝光並公告，店家頁的快取失效。
 			if err := s.d.Exposure.Announce(ctx, q, now, locked.StoreID); err != nil {
 				return err
 			}
@@ -218,7 +212,6 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 			return err
 		}
 		if current != nil {
-			// 退回指出的問題：這次寫入改掉的標成已處理（同一個 transaction，比對寫入前後的列與證件）。
 			if err := resolveIssues(ctx, q, row.ApplicationID, now, diff, docsBefore, docsAfter); err != nil {
 				return err
 			}
@@ -232,7 +225,6 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 	return out, nil
 }
 
-// draftBase 回傳要在它上面合併的列：已有申請時是目前的那一筆（版本要符合、狀態要能編輯），沒有時是空白的新列。
 func (s *Service) draftBase(ctx context.Context, q *store.Queries, storeID, expectedVersion int64) (row store.SellerKycApplication, create bool, err error) {
 	current, err := q.CurrentKYCApplication(ctx, storeID)
 	switch {
@@ -254,7 +246,6 @@ func (s *Service) draftBase(ctx context.Context, q *store.Queries, storeID, expe
 	return current, false, nil
 }
 
-// requireEditable 確認申請的狀態能儲存草稿與送出（model.CanEditKYC）；不能時回 model.ErrKYCNotEditable，語系取自 ctx。
 func requireEditable(ctx context.Context, row store.SellerKycApplication) error {
 	status := model.KYCStatus(row.Status)
 	if model.CanEditKYC(status) {
@@ -263,7 +254,6 @@ func requireEditable(ctx context.Context, row store.SellerKycApplication) error 
 	return model.ErrKYCNotEditable(status, uitext.LocaleFrom(ctx))
 }
 
-// lockCurrent 鎖住店家目前的申請（呼叫方已鎖住店家列：鎖順序店家列先於申請列）；沒有申請時回 nil。
 func (s *Service) lockCurrent(ctx context.Context, q *store.Queries, storeID int64) (*store.SellerKycApplication, error) {
 	current, err := q.CurrentKYCApplication(ctx, storeID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -299,18 +289,15 @@ func (s *Service) Mine(ctx context.Context, accountID int64) (model.KYCApplicati
 	return s.sellerView(ctx, q, row, storeRow.AccountID)
 }
 
-// sellerView 是賣家讀自己的申請（view）。
 func (s *Service) sellerView(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, error) {
 	return s.view(ctx, q, row, accountID)
 }
 
-// view 轉成檢視並帶上補充文件與最近一次退回。
 func (s *Service) view(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, error) {
 	out, _, err := s.viewWithReviews(ctx, q, row, accountID)
 	return out, err
 }
 
-// viewWithReviews 是 view，另外回傳讀到的審核紀錄（含逐項問題；後台的檢視要它，不必再讀一次）。
 func (s *Service) viewWithReviews(ctx context.Context, q *store.Queries, row store.SellerKycApplication, accountID int64) (model.KYCApplication, []model.KYCReview, error) {
 	out := toApplication(row, accountID)
 	docs, err := q.KYCDocuments(ctx, row.ApplicationID)
@@ -360,7 +347,6 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 		if err != nil {
 			return err
 		}
-		// 鎖住之後再檢查一次能力：讀取與拿到鎖之間，帳號可能已經被停權或店家已進入等待刪除（同 SaveDraft）。
 		if _, err := s.actingStore(ctx, q, in.AccountID, model.CapStorefrontWrite); err != nil {
 			return err
 		}
@@ -402,7 +388,6 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitKYCInput) (model.KY
 			agreement.Source{ClientIP: in.ClientIP, UserAgent: in.UserAgent}); err != nil {
 			return err
 		}
-		// 公司型的申請在同一個 transaction 內排入登記資料的查詢（外部呼叫在 job，不在 transaction 內）；個人型沒有登記資料。
 		if row.SellerType == string(model.KYCCompany) {
 			if _, err := s.requestRegistryCheck(ctx, q, row.ApplicationID, model.RegistrationRequestSubmit, nil, now); err != nil {
 				return err
@@ -444,7 +429,6 @@ func (s *Service) Cancel(ctx context.Context, in model.CancelKYCInput) (model.KY
 		if err != nil {
 			return err
 		}
-		// 鎖住之後再檢查一次能力（理由同 Submit）。
 		if _, err := s.actingStore(ctx, q, in.AccountID, model.CapStorefrontWrite); err != nil {
 			return err
 		}
@@ -479,7 +463,6 @@ func (s *Service) Cancel(ctx context.Context, in model.CancelKYCInput) (model.KY
 	return out, err
 }
 
-// lockOwn 鎖住店家目前的申請並確認版本與狀態（呼叫方已鎖住店家列）。
 func (s *Service) lockOwn(ctx context.Context, q *store.Queries, storeID, expectedVersion int64, from ...model.KYCStatus) (store.SellerKycApplication, error) {
 	current, err := s.lockCurrent(ctx, q, storeID)
 	if err != nil {
@@ -499,7 +482,6 @@ func (s *Service) lockOwn(ctx context.Context, q *store.Queries, storeID, expect
 	return store.SellerKycApplication{}, apperr.FailedPrecondition("申請目前的狀態不允許這個動作")
 }
 
-// transition 以目前的狀態與版本為條件轉移狀態；0 列（狀態或版本在鎖內被改過）當成版本衝突。
 func (s *Service) transition(ctx context.Context, q *store.Queries, row store.SellerKycApplication, to model.KYCStatus, now time.Time) (store.SellerKycApplication, error) {
 	params := store.TransitionKYCApplicationParams{
 		ApplicationID: row.ApplicationID, ExpectedVersion: row.Version, FromStatus: row.Status, ToStatus: string(to), Now: now,
@@ -518,25 +500,19 @@ func (s *Service) transition(ctx context.Context, q *store.Queries, row store.Se
 	if err != nil {
 		return updated, err
 	}
-	// 申請的狀態是「可公開曝光」的輸入（申請核准是開通的條件之一）：送出、取消、核准、退回都在同一個 transaction 內排入
-	// website 店家頁的快取失效；可曝光的公告由各個呼叫方在 transaction 的最後做（Announce 是最後一個鎖）。
 	return updated, stint.InvalidateByID(ctx, q, s.d.Jobs, row.StoreID)
 }
 
-// complete 檢查送出必填的欄位（DB 的 kyc_applications_complete_check 是保底）；一次列出全部缺的欄位。
 type requirement struct {
 	field, message string
 	absent         func(row store.SellerKycApplication) bool
 }
 
-// requirements 是送出之前必填的項目（欄位路徑與缺少時的說明）；完整性的規則只有這一份：送出（complete）與申請檢視的
-// missing_fields（missingFields）都由它推導。企業專屬的項目依 model.FieldAppliesTo 過濾。
 var requirements = []requirement{
 	{"business.company_name", "請填寫公司名稱", func(r store.SellerKycApplication) bool { return r.CompanyName == nil }},
 	{"business.tax_id", "請填寫統一編號", func(r store.SellerKycApplication) bool { return r.TaxID == nil }},
 }
 
-// missingFields 回傳還缺的欄位路徑（依 requirements 的順序）。
 func missingFields(row store.SellerKycApplication) []string {
 	out := []string{}
 	for _, r := range requirements {
@@ -547,7 +523,6 @@ func missingFields(row store.SellerKycApplication) []string {
 	return out
 }
 
-// complete 在送出時確認必填的項目齊全：缺的每一項都是一個欄位違規（欄位是 KYCFieldNames 的路徑）。
 func complete(row store.SellerKycApplication) error {
 	missing := missingFields(row)
 	if len(missing) == 0 {
@@ -561,14 +536,11 @@ func complete(row store.SellerKycApplication) error {
 	return apperr.InvalidInputFields(violations, "申請資料不完整")
 }
 
-// storeFieldLabels 是送出時缺少店家欄位的名稱。
 var storeFieldLabels = map[string]string{
 	model.StoreFieldAddress:      "店家地址",
 	model.StoreFieldSupportEmail: "客服電子信箱",
 }
 
-// storeIncomplete 是送出時店家的必填資料（地址與客服信箱）還有缺：店家的狀態不在請求裡，所以是 failed_precondition（不是欄位違規）；
-// 缺哪些由申請檢視的 missing_store_fields 取得。
 func storeIncomplete(missing []string) error {
 	labels := make([]string, 0, len(missing))
 	for _, f := range missing {
@@ -577,7 +549,6 @@ func storeIncomplete(missing []string) error {
 	return apperr.FailedPrecondition("請先到店家設定補齊%s，再送出申請", strings.Join(labels, "、"))
 }
 
-// missingStoreFields 讀店家目前的資料，回傳送出之前還缺的店家欄位（model.MissingStoreFields）。
 func (s *Service) missingStoreFields(ctx context.Context, q *store.Queries, storeID int64) ([]string, error) {
 	row, err := q.StoreByID(ctx, storeID)
 	if err != nil {
@@ -586,8 +557,6 @@ func (s *Service) missingStoreFields(ctx context.Context, q *store.Queries, stor
 	return model.MissingStoreFields(stint.ToStore(row).Profile), nil
 }
 
-// reviewParams 組審核紀錄的寫入參數。admin 是管理員的 ID（賣家自己的動作是 nil）；text 是理由或 comment，已經由呼叫方依
-// auditreason 正規化（空字串是沒有）；internalNote 同樣（只有退回有）。registrationCheckID 是核准或退回當下顯示的登記資料查詢（其他動作與沒有查詢時是 nil）。
 func reviewParams(applicationID uuid.UUID, action model.ReviewAction, admin *int64, text, internalNote string, registrationCheckID *uuid.UUID, now time.Time) store.InsertKYCReviewParams {
 	p := store.InsertKYCReviewParams{
 		ReviewID: uuid.NewV7(), ApplicationID: applicationID, Action: string(action), ReviewerAdminID: admin,

@@ -104,8 +104,6 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function descriptionImageRaw(block: Record<string, unknown>): string {
-	// description.blocks[] 的圖片欄是 imageKey/imageUrl（backend#2235 起與
-	// gallery 同名）。這裡與 deriveDetailLayoutProps 的同名函式必須一致。
 	return textOrEmpty(block.imageUrl) || textOrEmpty(block.imageKey);
 }
 
@@ -408,10 +406,7 @@ export default function ProductDetailLayout({
 								</div>
 							</div>
 							{sellerStoreId
-								? // 預覽 & 正式 PDP 共用同一條 path — 預覽端只要把當下登入賣家
-									// 的 storeId 填進 product 就會走真實賣家卡，缺資料就不顯示。
-									// 正式 PDP 改傳 sellerIntroSlot（<Suspense> 串流），把 seller +
-									// stats fetch 移出關鍵路徑；預覽端不帶 slot，內嵌即時渲染。
+								?
 									(sellerIntroSlot ?? (
 										<ProductSellerIntro
 											sellerId={sellerStoreId}
@@ -612,9 +607,6 @@ export default function ProductDetailLayout({
 										/>
 									);
 								}
-								// dims 無法解析 → 直接走原 <img> + 縮圖 preset。載入前用
-								// 4:3 保留空間；`auto` 會在圖片 metadata 可用後改採原始比例，
-								// 讓直式說明圖完整鋪滿內容寬度，不被橫式 placeholder 留白。
 								return (
 									// biome-ignore lint/performance/noImgElement: description image without resolvable dimensions
 									<img

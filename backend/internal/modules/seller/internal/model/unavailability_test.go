@@ -36,7 +36,6 @@ func TestEveryUnavailableReasonHasTextInEveryLocale(t *testing.T) {
 			}
 		}
 	}
-	// Message.Locale 是實際使用的語系：請求 en 而缺字時，文字是 zh-TW 的就必須標 zh-TW，不能標 en（ADR D3）。
 	checkLocale := func(what string, zh, got uitext.Message) {
 		t.Helper()
 		if zh.Locale != uitext.ZhTW {

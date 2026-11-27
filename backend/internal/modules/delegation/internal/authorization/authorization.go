@@ -16,8 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
-// authorizationEffective 回傳授權此刻是否有效：沒有撤回、已經生效、還沒到期。與 ListDelegationAuthorizations 的 SQL
-// 篩選是同一個定義。
 func authorizationEffective(a store.DelegationSellerDelegationAuthorization, now time.Time) bool {
 	return model.IsAuthorizationEffective(a.RevokedAt, a.EffectiveFrom, a.EffectiveUntil, now)
 }
@@ -78,15 +76,12 @@ func toAuthorizationAuditEntry(e store.DelegationDelegationAuthorizationAuditLog
 	return out
 }
 
-// governingAdmin 是六個治理動作共用的唯一閘門：管理員要開通代行（與發起代行同一把尺）。規則只在這一個地方，
-// 日後要「核准者不得是操作者」時改這裡，不是改六個分散的 if。
 func (m *Module) governingAdmin(ctx context.Context, adminID int64) (identity.Admin, error) {
 	if adminID <= 0 {
 		return identity.Admin{}, model.Deny(model.DenialAdminRequired, "缺少管理員身分")
 	}
 	a, err := m.d.Identity.Admin(ctx, adminID)
 	if err != nil {
-		// gateway 從有效的管理員 session 解析出來的 ID 在這裡找不到，是不變量被打破。
 		return a, fmt.Errorf("delegation：讀取管理員 %d：%w", adminID, err)
 	}
 	eligible, err := m.d.Session.AdminEligible(ctx, adminID)
@@ -200,8 +195,6 @@ func validateAuthorizationChange(in model.DelegationAuthorizationChange) error {
 	case !in.Source.Valid():
 		return model.Deny(model.DenialInvalidCommand, "source 不在允許的選項內")
 	}
-	// 依據編號：4–200 字、至少一個數字（是編號，不是說明）。DB 的 CHECK 是保證，這裡給訊息（讓 CHECK 擋會中止
-	// transaction，變成 500）。
 	if n := utf8.RuneCountInString(in.SourceReference); n < 4 || n > 200 {
 		return model.Deny(model.DenialInvalidCommand, "sourceReference 長度必須介於 4 與 200 之間")
 	}
@@ -211,7 +204,6 @@ func validateAuthorizationChange(in model.DelegationAuthorizationChange) error {
 	if n := utf8.RuneCountInString(in.OperationReason); n < 1 || n > 200 {
 		return model.Deny(model.DenialInvalidCommand, "operationReason 必須為 1–200 字")
 	}
-	// 能力的相依（例如 write 要有 read）由 gateway 的 authz 檢查，那是九個值唯一的擁有者；這裡只守值域。
 	return model.ValidateCapabilities("grantedCapabilities", in.Capabilities)
 }
 
@@ -227,7 +219,6 @@ func (m *Module) GrantDelegationAuthorization(ctx context.Context, in model.Dele
 		return model.GrantedAuthorization{}, err
 	}
 	now := m.d.Now()
-	// 生效時間是 now：已經過去的期限會違反 CHECK。
 	if in.EffectiveUntil != nil && !in.EffectiveUntil.After(now) {
 		return model.GrantedAuthorization{}, model.Deny(model.DenialInvalidCommand, "effectiveUntil 必須晚於現在")
 	}
@@ -261,7 +252,6 @@ func (m *Module) GrantDelegationAuthorization(ctx context.Context, in model.Dele
 		if err != nil {
 			return fmt.Errorf("delegation：開通代行授權：%w", err)
 		}
-		// 重新開通時主鍵不變，回傳的 id 是哪一個分支唯一可信的證據。
 		outcome, action := model.GrantReinstated, model.AuthorizationReinstate
 		if granted.ID == id {
 			outcome, action = model.GrantCreated, model.AuthorizationGrant
@@ -279,16 +269,12 @@ func (m *Module) GrantDelegationAuthorization(ctx context.Context, in model.Dele
 	return out, err
 }
 
-// grantReplay 處理 Grant 沒有寫入的分支：已經有有效的授權。兩種成因要相反的答案：別人開通了這家店（9285），或這個
-// 請求第二次抵達（回應遺失）——後者要回第一次的答案。治理歷史分得出兩者：它與授權同一個 transaction 寫入，所以這把
-// 鍵在這列授權上有紀錄，若且唯若這把鍵開通了它。
 func (m *Module) grantReplay(ctx context.Context, q *store.Queries, in model.DelegationAuthorizationChange, before store.DelegationSellerDelegationAuthorization, found bool, now time.Time) (model.GrantedAuthorization, error) {
 	alreadyActive := model.Deny(model.DenialAuthorizationAlreadyActive, "此店家已開通代行營運授權")
 	if in.IdempotencyKey == "" {
 		return model.GrantedAuthorization{}, alreadyActive
 	}
 	if !found {
-		// 另一個 transaction 在鎖定讀取與 upsert 之間建立了這一列：現在讀得到它。
 		var err error
 		if before, found, err = lockAuthorization(ctx, q, in.StoreID); err != nil {
 			return model.GrantedAuthorization{}, err
@@ -345,11 +331,8 @@ func (m *Module) UpdateDelegationAuthorization(ctx context.Context, in model.Del
 		case before.RevokedAt != nil:
 			return model.Deny(model.DenialAuthorizationRevoked, "此店家的代行營運授權已撤回，請改用重新開通")
 		case in.EffectiveUntil != nil && !in.EffectiveUntil.After(before.EffectiveFrom):
-			// 調整不動生效時間，期限與這一列自己的生效時間比。
 			return model.Deny(model.DenialInvalidCommand, "effectiveUntil 必須晚於授權生效時間")
 		}
-		// 重放的檢查在寫入之前：這個 CAS 第二次照樣成立，會把同樣的值再套一次（updated_at 往前推，而且第二列歷史被
-		// 唯一鍵擋下之後，這次變更就沒有任何紀錄）。
 		if in.IdempotencyKey != "" {
 			e, err := q.GetDelegationAuthorizationAuditLogByIdempotencyKey(ctx, store.GetDelegationAuthorizationAuditLogByIdempotencyKeyParams{
 				AuthorizationID: before.ID, IdempotencyKey: &in.IdempotencyKey,
@@ -370,7 +353,6 @@ func (m *Module) UpdateDelegationAuthorization(ctx context.Context, in model.Del
 			EffectiveUntil: in.EffectiveUntil, Now: now, TargetStoreID: in.StoreID,
 		})
 		if err != nil {
-			// 上面鎖住的讀取已經排除兩種成因，沒有列只可能是不變量被打破。
 			return fmt.Errorf("delegation：調整代行授權：%w", err)
 		}
 		if err := m.writeAuthorizationAudit(ctx, q, authorizationAudit{
@@ -402,8 +384,6 @@ func (m *Module) RevokeDelegationAuthorization(ctx context.Context, in model.Del
 	var out model.RevokedAuthorization
 	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
-		// 順序：取消這家店代行發起的排程 → 鎖授權列 → 撤銷進行中的 session。social 的貼文列在 delegation 之前鎖（單體規則 4），
-		// 所以取消一定在鎖授權列之前；授權列不存在或已撤回時取消是 no-op 的語意也成立（沒有授權就沒有可發布的排程）。
 		if err := m.d.CancelSchedulesOfStore(ctx, in.StoreID); err != nil {
 			return err
 		}
@@ -425,8 +405,6 @@ func (m *Module) RevokeDelegationAuthorization(ctx context.Context, in model.Del
 		if err != nil {
 			return fmt.Errorf("delegation：撤回代行授權：%w", err)
 		}
-		// 固定的理由：稽核以它機械地區分撤銷的來源。要找回是哪一次治理動作，比對同一個 transaction 的時刻（這家店
-		// REVOKE 那一列的 created_at 截秒等於 session 的 revoked_at）。
 		sessions, err := m.d.Session.RevokeActiveOfStore(ctx, model.RevokeStoreSessionsInput{StoreID: in.StoreID, AdminID: in.AdminID, Now: now})
 		if err != nil {
 			return fmt.Errorf("delegation：撤銷店家的代行：%w", err)
@@ -481,8 +459,6 @@ func (m *Module) DelegationAuthorizationHistory(ctx context.Context, in model.De
 	return page, nil
 }
 
-// lockAuthorization 鎖住店家層級的授權列並回傳變更前的狀態；沒有這一列時 found 是 false。它不參與判定（判定一律看 CAS
-// 的列數），只讓歷史的 before 真的是這次取代的狀態。
 func lockAuthorization(ctx context.Context, q *store.Queries, storeID int64) (store.DelegationSellerDelegationAuthorization, bool, error) {
 	a, err := q.LockDelegationAuthorizationOfStore(ctx, storeID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -494,8 +470,6 @@ func lockAuthorization(ctx context.Context, q *store.Queries, storeID int64) (st
 	return a, true, nil
 }
 
-// sameAuthorizationChange 回傳既有的歷史是不是同一個請求寫的。operationReason 不比（它是動作的理由，不是內容：換個說法
-// 重試不該變成 9267）；能力以集合比。REVOKE 的歷史沒有 source，永遠不相同。
 func sameAuthorizationChange(e store.DelegationDelegationAuthorizationAuditLog, in model.DelegationAuthorizationChange) bool {
 	if e.Source == nil || *e.Source != string(in.Source) || e.SourceReference == nil || *e.SourceReference != in.SourceReference {
 		return false
@@ -511,7 +485,6 @@ func sameAuthorizationChange(e store.DelegationDelegationAuthorizationAuditLog, 
 	}
 }
 
-// errKeyReusedForAuthorization 是「這把鍵已經在這家店做過別的事」的唯一答案；恢復方式都是換一把鍵。
 func errKeyReusedForAuthorization() error {
 	return model.Deny(model.DenialIdempotencyKeyReused, "此冪等鍵已用於這家店的另一次治理動作，請改用新的 Idempotency-Key")
 }
@@ -528,8 +501,6 @@ type authorizationAudit struct {
 	correlationID string
 }
 
-// writeAuthorizationAudit 在呼叫方的 transaction 內寫一列治理歷史。冪等鍵已經在這列授權上做過事時回 9267：授權的寫入
-// 已經執行了，讓它沒有紀錄地 commit 正是這張表要防的事，所以整個 transaction rollback。
 func (m *Module) writeAuthorizationAudit(ctx context.Context, q *store.Queries, a authorizationAudit, now time.Time) error {
 	params := store.InsertDelegationAuthorizationAuditLogParams{
 		ID:               m.d.NewID(),
@@ -538,7 +509,6 @@ func (m *Module) writeAuthorizationAudit(ctx context.Context, q *store.Queries, 
 		ActorAdminID:     a.admin.ID,
 		ActorDisplayName: a.admin.Email,
 		OperationReason:  a.reason,
-		// 撤回不改能力，before 與 after 相同；是 action 說明授權沒了。
 		CapabilitiesAfter:   a.row.GrantedCapabilities,
 		EffectiveUntilAfter: a.row.EffectiveUntil,
 		IdempotencyKey:      model.Optional(a.key),
@@ -553,7 +523,6 @@ func (m *Module) writeAuthorizationAudit(ctx context.Context, q *store.Queries, 
 		params.CapabilitiesBefore = a.before.GrantedCapabilities
 		params.EffectiveUntilBefore = a.before.EffectiveUntil
 	}
-	// 撤回不改依據；記下沒變的值會讀成「這次撤回把依據設成 X」。
 	if a.action != model.AuthorizationRevoke {
 		params.Source, params.SourceReference = &a.row.Source, &a.row.SourceReference
 	}

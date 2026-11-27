@@ -75,7 +75,6 @@ public class WebhookOutboxTxOps {
                     now);
 
             if (affected == 0) {
-                // §4.5.3 replay-safe：前次 T2 commit 後在某處中斷；本次重放時 outbox 已存在
                 log.warn("WebhookOutboxTxOps.outbox.alreadyExists",
                         "outbox 已存在，視為 replay-safe 跳過 aggregateId=" + route.eventKey()
                                 + " exchange=" + route.exchange() + " topic=" + route.topic(),

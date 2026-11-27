@@ -57,7 +57,6 @@ class UberConfigProvisioningTest {
     @Test
     @DisplayName("🔴 起得來 ≠ 放行：憑證缺席時 Uber 一律不可用（fail-closed）")
     void startingUpDoesNotMeanUsable() {
-        // 帶空字串去打 API 的後果是一連串 401，而 401 對外看起來像我們被停權（66 §4.5.1）。
         runner.run(ctx -> assertThat(ctx.getBean(UberConfig.UberAvailability.class).usable())
                 .isFalse());
     }
@@ -123,12 +122,6 @@ class UberConfigProvisioningTest {
             return Mockito.mock(MediaGrpcClient.class);
         }
 
-        // ── 以下是 uberQuoteService 的依賴（W2-2 報價，2026-09-12 新增）──
-        //
-        // 🔴 它們與本測試要守的性質**無關**，但必須在 slice 裡存在，否則 context
-        //    會因為「缺 mapper」而起不來——而那個失敗訊息長得跟「缺了 : 預設值」
-        //    一模一樣（都是 context refresh 失敗），會把本測試變成一支**指向錯誤
-        //    根因**的紅燈。本測試的鑑別力來自「它只可能因為 placeholder 而紅」。
 
         @Bean
         UberQuoteMapper uberQuoteMapper() {

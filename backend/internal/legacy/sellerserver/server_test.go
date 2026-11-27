@@ -67,7 +67,6 @@ func TestSellerMetaTruthTable(t *testing.T) {
 	active := seller.Store{Status: seller.Active, Sanctions: seller.NoSanctions(), StoreID: 7, StoreCode: 2600000001, AccountID: 3, LogoKey: text("logo")}
 	active.StoreName = "範例小農"
 	active.TownCode = text("63000050")
-	// seller 讀出的條件（Store.Conditions）；各列只改測試要的那一項。
 	active.Conditions = seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true, KYCApproved: true, TransfersActive: true, StoreName: true, Logo: true, TownCode: true}
 	ground := seller.RiskFraud
 	with := func(f func(s *seller.Store)) seller.Store { s := active; f(&s); return s }

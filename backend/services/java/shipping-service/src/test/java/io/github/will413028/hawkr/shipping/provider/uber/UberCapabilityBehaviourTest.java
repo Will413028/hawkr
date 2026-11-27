@@ -36,9 +36,6 @@ class UberCapabilityBehaviourTest {
     private static final String DELIVERY_ID = "del_test";
     private static final String BASE_URL = "https://api.uber.test/v1";
 
-    // ==================================================================
-    // cancel（E6）—— 四個 provider 裡唯一真的打 provider 的取消
-    // ==================================================================
 
     @Nested
     @DisplayName("cancel（E6）")
@@ -59,8 +56,6 @@ class UberCapabilityBehaviourTest {
         @Test
         @DisplayName("🔴 noncancelable_delivery ⇒ 9522，**且不得**回一個會讓呼叫端落終態的 outcome")
         void noncancelableNeverYieldsATerminalOutcome() {
-            // 66 §7.6 逐字：「不得直接寫 41——它是 T1 終態，provider 未確認前寫入
-            // ＝ 對買家宣告取消而貨照送」。
             assertThatThrownBy(() -> cancel(new FakeUberTransport()
                     .respondWith(400, "{\"code\":\"noncancelable_delivery\"}")))
                     .isInstanceOf(ShippingBusinessException.class)
@@ -97,9 +92,6 @@ class UberCapabilityBehaviourTest {
         }
     }
 
-    // ==================================================================
-    // track（E4）
-    // ==================================================================
 
     @Nested
     @DisplayName("track（E4）")
@@ -129,7 +121,6 @@ class UberCapabilityBehaviourTest {
                     "{\"id\":\"" + DELIVERY_ID + "\",\"status\":\"pickup_complete\","
                             + "\"courier\":{\"name\":\"Ku\",\"phone_number\":\"+886912345678\"}}"));
 
-            // 🔴 硬寫 "930"：期望值跟著 ShippingStatus 一起變的話這條就驗不到東西
             assertThat(r.normalizedStatus()).isEqualTo("930");
             assertThat(r.providerRawStatus()).isEqualTo("pickup_complete");
             assertThat(r.providerMessage())
@@ -167,9 +158,6 @@ class UberCapabilityBehaviourTest {
         }
     }
 
-    // ==================================================================
-    // pod（E7）
-    // ==================================================================
 
     @Nested
     @DisplayName("pod（E7）")
@@ -194,8 +182,6 @@ class UberCapabilityBehaviourTest {
         @Test
         @DisplayName("404（窗口未到／沒有這一種 POD）⇒ empty，不是例外")
         void notFoundYieldsEmpty() {
-            // 66 §7.8：leave_at_door 只有 picture、需簽收才有 signature
-            // ⇒ INV-U5 是「≥1 筆」而不是「三種都要有」。
             Optional<PodCapability.PodResult> r = capability(new FakeUberTransport()
                     .respondWith(404, "{}")).pod(ctx()).orElseThrow().fetchPod(shipment());
 
@@ -205,8 +191,6 @@ class UberCapabilityBehaviourTest {
         @Test
         @DisplayName("保留窗口是 7 天（T-12 取 U-F 照片 7 天與 U-G 簽名 30 天的最短者）")
         void retentionWindowIsSevenDays() {
-            // ⚠️ 硬寫 168：拿 30 天當計畫的後果是爭議發生時照片剛好在第 7 天過期，
-            //    而我們在那天才發現（66 §0.5）。
             assertThat(capability(new FakeUberTransport()).pod(ctx()).orElseThrow()
                     .retentionWindowHours()).isEqualTo(168);
         }
@@ -227,15 +211,10 @@ class UberCapabilityBehaviourTest {
         }
     }
 
-    // ==================================================================
-    // onboard —— 沒有 provider 端點，回的是 uber_store_mapping 的狀態
-    // ==================================================================
 
     @Test
     @DisplayName("🔴 onboard：Uber 沒有建店槽位 ⇒ shippingTypeValue() 為 null（不得硬塞既有值）")
     void onboardHasNoShippingTypeSlot() {
-        // 硬塞一個既有 ShippingType 會讓 Uber 的建單去查別條線的 seller_shipment_settings，
-        // 而 buildSlotKey 的鍵一撞就是靜默取到別人的設定。
         assertThat(capability(new FakeUberTransport()).onboard(ctx()).orElseThrow()
                 .shippingTypeValue()).isNull();
     }
@@ -255,7 +234,6 @@ class UberCapabilityBehaviourTest {
                 .doesNotContain("store_ext_1");
     }
 
-    // ==================== fixtures ====================
 
     private static UberDirectAdapter capability(FakeUberTransport transport) {
         return builder(transport).build();

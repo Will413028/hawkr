@@ -11,9 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 賣家入帳帳本（D15）：轉帳、收回、補差額三種列，金額帶正負，以店家為範圍。
 
-// paidTransferred 建立店家 storeID 的一張已入帳、已轉帳的訂單（amount 元）。
 func (f *chargeFixture) paidTransferred(t *testing.T, orderNo string, storeID, amount int64) PaymentTransfer {
 	t.Helper()
 	f.order(orderNo, 11, storeID, amount)

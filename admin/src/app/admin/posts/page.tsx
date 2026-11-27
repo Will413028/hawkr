@@ -261,7 +261,6 @@ export default function PostManagementPage() {
 						try {
 							await createMeasure.mutateAsync(request);
 						} catch (caught) {
-							// 列表重新讀取後會顯示既有的下架；對話框留著顯示伺服器的句子。
 							if (isTakedownAlreadyActive(caught)) refresh();
 							throw caught;
 						}

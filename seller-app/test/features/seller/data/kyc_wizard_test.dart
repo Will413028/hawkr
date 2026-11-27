@@ -265,7 +265,6 @@ void main() {
   setUp(() {
     server = KycFakeServer();
     final container = server.build();
-    // 讓 wizard 在整個測試期間存活（autoDispose）。
     final sub = container.listen(kycWizardProvider, (_, _) {});
     addTearDown(sub.close);
     addTearDown(container.dispose);
@@ -378,14 +377,12 @@ void main() {
       );
       expect(wizard.rejection?.reason, '舊的退回');
 
-      // 逐項都處理完了、還沒重送：總理由仍在，沒有待處理的標記。
       await server.boot(
         kyc: myKycOf(individualApplication(rejection: rejection)),
       );
       expect(wizard.rejection?.reason, '舊的退回');
       expect(wizard.outstandingIssues, isEmpty);
 
-      // 沒有被退回過：伺服器不回 last_rejection。
       await server.boot(kyc: myKycOf(individualApplication()));
       expect(wizard.rejection, isNull);
     });

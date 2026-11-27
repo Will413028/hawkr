@@ -315,7 +315,6 @@ void main() {
   });
 
   group('續填、退回、可編輯', () {
-    // 平台只收市集登記資料（D22）：身分、銀行與證件欄位不在表單裡，沒有所在的一步。
     const supported = {
       KYCField.KYC_FIELD_PRODUCT_TYPE,
       KYCField.KYC_FIELD_WEBSITE_URL,

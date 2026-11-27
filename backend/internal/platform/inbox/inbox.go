@@ -38,23 +38,17 @@ const Schema = "inbox"
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生
+		panic(err)
 	}
 	return sub
 }
 
 const (
-	// maxAttempts 是派送 job 暫時性失敗時 River 重試的上限（退避是 River 預設的 attempt^4 秒）；用完之後由補掃重派。
 	maxAttempts = 8
-	// dispatchTimeout 是一次派送的上限。
 	dispatchTimeout = 30 * time.Second
-	// sweepGrace 是事件收到多久之後仍沒有派送成功、也沒有處理時由補掃重派。
 	sweepGrace = 5 * time.Minute
-	// sweepInterval 是補掃與清理的週期。
 	sweepInterval = 15 * time.Minute
-	// deadAfter 是事件收到多久之後仍沒有處理就標成死信。比補掃與各模組的重試都長：到這個時間還沒處理，代表重試沒有用，要人看。
 	deadAfter = 7 * 24 * time.Hour
-	// batch 是補掃與清理一次處理的上限。
 	batch = 500
 )
 

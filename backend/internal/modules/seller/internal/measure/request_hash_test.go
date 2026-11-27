@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// ids 回傳 n 個依位元組遞增排序的固定 UUID（a < b < c ...），測試用它們組出各種順序。
 func ids(n int) []uuid.UUID {
 	out := make([]uuid.UUID, n)
 	for i := range out {
@@ -21,7 +20,6 @@ func ids(n int) []uuid.UUID {
 	return out
 }
 
-// violationInput 是依據認定的警告輸入；finding 為 nil 時沒有新的認定（只引用既有的）。
 func violationInput(finding *model.NewFinding, cited ...uuid.UUID) model.CreateMeasureInput {
 	return model.CreateMeasureInput{
 		AdminID: 7, StoreID: 100, Kind: model.MeasureWarning, StatementToSeller: "商品頁宣稱有機", Note: "客服轉來兩筆檢舉",
@@ -33,7 +31,6 @@ func newFinding(sources ...uuid.UUID) *model.NewFinding {
 	return &model.NewFinding{Category: policy.Fraud, Severity: model.SeverityHigh, SourceReportIDs: sources}
 }
 
-// terminationInput 是重大違約的終止合作輸入：沒有新的認定，依據是引用的認定。
 func terminationInput(cited ...uuid.UUID) model.CreateMeasureInput {
 	return model.CreateMeasureInput{
 		AdminID: 7, StoreID: 100, Kind: model.MeasureTermination, StatementToSeller: "未改善", Note: "內部",
@@ -102,7 +99,6 @@ func TestRequestHashIgnoresTheOrderOfCitedFindingsWithANewFinding(t *testing.T) 
 			t.Errorf("%s：不同的引用組合不能有相同的 hash", name)
 		}
 	}
-	// 來源通報與引用的認定是兩個欄位：同一個 id 放在不同欄位不是同一個請求。
 	if bytes.Equal(requestHash(violationInput(newFinding(f[0]))), requestHash(violationInput(newFinding(), f[0]))) {
 		t.Error("同一個 id 在來源通報與引用的認定，hash 不能相同")
 	}
@@ -133,7 +129,6 @@ func TestRequestHashIgnoresTheOrderOfCitedFindingsWithoutANewFinding(t *testing.
 			}
 		}
 	}
-	// 沒有新的認定與有新的認定是不同的請求（主要依據的來源不同）。
 	if bytes.Equal(requestHash(violationInput(nil, f[0])), requestHash(violationInput(newFinding(), f[0]))) {
 		t.Error("有沒有新的認定要反映在 hash")
 	}

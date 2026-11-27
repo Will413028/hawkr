@@ -20,7 +20,6 @@ enum ChatConnectionState { disconnected, connecting, connected, reconnecting }
 ChatRealtime chatRealtime(Ref ref) {
   final realtime = ChatRealtime(ref.watch(chatRepositoryProvider));
   ref.onDispose(realtime.dispose);
-  // 換帳號或登出：上一個帳號的 cursors 與未讀數不能留給下一個。
   ref.listen(sessionProvider, (prev, next) {
     if ((prev?.value?.userId ?? '') != (next.value?.userId ?? '')) {
       realtime.resetSession();
@@ -154,7 +153,6 @@ class ChatRealtime with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed || !isActive) return;
     if (currentState == ChatConnectionState.connected) return;
-    // 回前景時不等 backoff，立即重連。
     final wake = _backoffWake;
     if (wake != null && !wake.isCompleted) wake.complete();
   }

@@ -80,48 +80,35 @@ public class ShippingAdminQueryService {
 
         LambdaQueryWrapper<ShipmentEntity> q = new LambdaQueryWrapper<>();
 
-        // 異常 filter
-        //
-        // 🔴 provider 側判準是 provider_error_code（V12 拆出的失敗代碼欄），**不是** provider_status。
-        // provider_status 保存的是物流商原始貨態（含正常軌跡與尚未 mapping 的未知值），
-        // 以「有值」判定異常會讓每一張正常單都進異常清單——那正是 V12 要修掉的 regression。
-        // 未知貨態的可觀測性由 metric hawkr_shipping_provider_status_unknown 承擔，不走本清單。
         if (abnormalOnly) {
             q.and(w -> w.in(ShipmentEntity::getStatus, ABNORMAL_SHIPMENT_STATUS_VALUES)
                     .or()
                     .apply("provider_error_code IS NOT NULL AND provider_error_code <> ''"));
         }
 
-        // 具體 provider_status exact
         if (StringUtils.hasText(providerStatus)) {
             q.eq(ShipmentEntity::getProviderStatus, providerStatus);
         }
-        // status 多值
         if (StringUtils.hasText(statusCsv)) {
             List<String> statusList = Arrays.asList(statusCsv.split(","));
             q.in(ShipmentEntity::getStatus, statusList);
         }
-        // is_return
         if ("true".equalsIgnoreCase(isReturn)) {
             q.eq(ShipmentEntity::getIsReturn, true);
         } else if ("false".equalsIgnoreCase(isReturn)) {
             q.eq(ShipmentEntity::getIsReturn, false);
         }
-        // shipping_method
         if (StringUtils.hasText(shippingMethod)) {
             q.eq(ShipmentEntity::getShippingMethod, shippingMethod);
         }
-        // store_id（surrogate；proto 欄位 Phase 2 已改名 store_id，見 :75）
         if (StringUtils.hasText(sellerIdStr)) {
             try {
                 q.eq(ShipmentEntity::getStoreId, Long.parseLong(sellerIdStr));
-            } catch (NumberFormatException ignore) { /* 忽略非法值 */ }
+            } catch (NumberFormatException ignore) {  }
         }
-        // order_no
         if (StringUtils.hasText(orderNo)) {
             q.eq(ShipmentEntity::getOrderNo, orderNo);
         }
-        // 時間範圍
         if (createdFrom != null) {
             q.ge(ShipmentEntity::getCreatedAt, createdFrom);
         }
@@ -221,7 +208,6 @@ public class ShippingAdminQueryService {
         return builder.build();
     }
 
-    // ---- 轉換 ----
 
     private AdminShipmentSummary toSummary(ShipmentEntity e) {
         return AdminShipmentSummary.newBuilder()
@@ -279,7 +265,6 @@ public class ShippingAdminQueryService {
                 .setLabelPrintStatus(nullToEmpty(e.getLabelPrintStatus()))
                 .setTcatCallStatus(nullToEmpty(e.getTcatCallStatus()))
                 .setTcatCallTime(formatIso(e.getTcatCallTime()))
-                // 49 §6.6：只填 objectKey，Gateway 組 labelUrl
                 .setLabelKey(e.getLabelObjectKey() != null ? e.getLabelObjectKey() : "")
                 .setLastReconciledAt(formatIso(e.getLastReconciledAt()))
                 .setCreatedAt(formatIso(e.getCreatedAt()))
@@ -288,7 +273,7 @@ public class ShippingAdminQueryService {
         if (e.getShipmentPhotos() != null) {
             for (ShipmentEntity.ShipmentPhoto p : e.getShipmentPhotos()) {
                 if (p != null && p.getObjectKey() != null) {
-                    b.addShipmentPhotoKeys(p.getObjectKey()); // 49 §6.6：只填 key，Gateway 組 URL
+                    b.addShipmentPhotoKeys(p.getObjectKey());
                 }
             }
         }
@@ -314,7 +299,6 @@ public class ShippingAdminQueryService {
                 .build();
     }
 
-    // ---- 排序 ----
 
     private String normalizeSort(String sort) {
         if (!StringUtils.hasText(sort)) return "updated_at_desc";
@@ -343,7 +327,6 @@ public class ShippingAdminQueryService {
         }
     }
 
-    // ---- 小工具 ----
 
     private int parseIntOrDefault(String s, int fallback) {
         if (!StringUtils.hasText(s)) return fallback;

@@ -6,8 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// registerCheckoutRoutes 配置結帳相關路由
-// /api/v1/app/checkout — BUYER 角色
 func registerCheckoutRoutes(app *gin.RouterGroup, h *handler.Holder) {
 	checkout := app.Group(CheckoutPath)
 	checkout.Use(middleware.JWTAuth())

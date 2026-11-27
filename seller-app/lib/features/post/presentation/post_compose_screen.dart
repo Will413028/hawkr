@@ -27,7 +27,6 @@ import '../data/post_hashtag_extractor.dart';
 import '../data/post_publish.dart';
 import '../../photo_editor/presentation/photo_editor_args.dart';
 import '../../../config/image_config.dart';
-// if needed
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/utils/image_format_detector.dart';
 import '../../../shared/utils/price_display.dart';
@@ -55,7 +54,6 @@ class PostComposeScreen extends HookConsumerWidget {
 
     final currentContentType = useState(contentType);
     final currentImagePreview = useState(imagePreview);
-    // 主色背景（跟商品上架同一套邏輯：dominantColor blend 到 page 背景的 0.45）
     final dominantColor = useState<Color?>(null);
     useEffect(() {
       final bytes = currentImagePreview.value;
@@ -118,8 +116,6 @@ class PostComposeScreen extends HookConsumerWidget {
 
     Future<void> pickNewImage() async {
       final picker = ImagePicker();
-      // 不指定 imageQuality，避免額外要求相簿轉碼；選取後仍依檔頭判斷格式。
-      // 靜態圖由共用上傳層沿用原本壓縮策略。
       final picked = await picker.pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
@@ -199,9 +195,6 @@ class PostComposeScreen extends HookConsumerWidget {
           }
         }
 
-        // 建立貼文只送 product_id：關聯商品的 name / price / image 全部由後端
-        // 自 product 帶出（`PostProductData`），前端組出來的那份從未被送出，
-        // 2026-08-05 已移除。
         final selectedIndex = selectedProductIndex.value;
         final dynamic linkedProductId =
             (selectedIndex != null && selectedIndex < products.value.length)
@@ -234,7 +227,6 @@ class PostComposeScreen extends HookConsumerWidget {
       }
     }
 
-    // UI Builders
     Widget buildEmptyProductsState() {
       return Column(
         children: [
@@ -269,7 +261,6 @@ class PostComposeScreen extends HookConsumerWidget {
           product['skuName'] ??
           product['productName'] ??
           '未命名商品';
-      // PayUni #758: 取 salePrice ?? price 作為主價，原價（hasSale）顯示刪除線
       final rawPrice = product['price'] ?? product['priceMin'];
       final rawSalePrice = product['salePrice'] ?? product['sale_price'];
       final eff = PriceDisplay.effectiveSkuPrice(
@@ -283,8 +274,6 @@ class PostComposeScreen extends HookConsumerWidget {
       );
       final original = PriceDisplay.parseMoney(rawPrice);
       final unit = product['unit'] ?? '組';
-      // 商品圖欄位判定統一走 product_image_resolver（`image` / `pic` 不是後端會
-      // 回的欄位，2026-08-05 實打確認）。
       final productImageUrl = extractPrimaryProductImageUrl(product);
 
       return GestureDetector(

@@ -199,8 +199,6 @@ class StatusInfoBox extends StatelessWidget {
                       width: 50.w,
                       height: 50.w,
                       fit: BoxFit.cover,
-                      // URL 有可能是 stale staged previewUrl（後端 finalize 後失效）；
-                      // 失敗時用素淨灰塊，不要顯示醒目的破圖 icon 讓 list view 看起來都壞了
                       errorWidget: ColoredBox(color: AppColors.gray100),
                     ),
                   ),

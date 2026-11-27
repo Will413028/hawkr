@@ -46,7 +46,6 @@ class _StoreMapWebViewScreenState extends State<StoreMapWebViewScreen> {
   }
 
   NavigationDecision _onNavigationRequest(NavigationRequest request) {
-    // 攔截 deep link scheme（必須在 Uri.tryParse 之前，custom scheme 可能解析失敗）
     if (request.url.startsWith('hawkrbuyer://') ||
         request.url.startsWith('hawkrseller://')) {
       final uri = Uri.parse(request.url);

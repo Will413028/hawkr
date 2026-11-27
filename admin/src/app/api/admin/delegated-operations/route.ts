@@ -55,11 +55,6 @@ const MAX_START_REQUEST_BYTES = 16 * 1024;
  * 帶回商家頁由入口元件顯示。
  */
 const REDIRECT_HEADERS: Record<string, string> = {
-	// Location 帶著一次性兌換碼，不得進任何快取。
-	// `Referrer-Policy` 不在這裡設：`next.config.ts` 的 `headers()` 會覆蓋同名值
-	// （實測本機回應為全站的 strict-origin-when-cross-origin），寫了也不生效。
-	// 真正需要壓住 Referer 的是「帶著 ?code= 的那一份文件」，而那一跳在 website
-	// 的 `/adm/enter` 自己送 `Referrer-Policy: no-referrer`。
 	"Cache-Control": "no-store",
 };
 
@@ -212,8 +207,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-	// 頂層表單提交送不出自訂標頭，原本靠 Idempotency-Key 標頭順帶擋下的跨站
-	// 提交改由 Origin 檢查承擔（`SameSite=Lax` 是另一層）。
 	if (!isSameOriginSubmission(request.headers)) {
 		return NextResponse.json(
 			{ code: "CROSS_ORIGIN_REJECTED", message: "來源不符" },
@@ -273,8 +266,6 @@ export async function POST(request: NextRequest) {
 			{ status: 400 },
 		);
 	}
-	// 沒有設定兌換去向就沒有安全的導向可走，且絕不從 Host 推導。在打任何上游
-	// 之前擋下：否則會建出一個沒有人接得住的工作階段，佔住 partial UNIQUE。
 	if (!WEB_ORIGIN) {
 		return startFailure({
 			code: "WEB_ORIGIN_NOT_CONFIGURED",
@@ -284,8 +275,6 @@ export async function POST(request: NextRequest) {
 	}
 
 	try {
-		// Re-fetch preflight on the server so browser-supplied capabilities, TTL,
-		// reason codes, or case rules can never define the authority request.
 		const preflightUpstream = await adminUpstreamFetch(
 			DELEGATED_OPERATION_UPSTREAM.preflight(startRequest.storeId),
 			{ adminToken },
@@ -333,10 +322,6 @@ export async function POST(request: NextRequest) {
 				idempotencyKey,
 			});
 		}
-		// 只看被選中的那一個原因。preflight 頂層的 `caseReferenceRequired` 是
-		// 「任一選項需要」的 OR（gateway `admin_delegation.go` 的 DTO 註解），
-		// 拿它當本次必填等於：選單裡只要還有一個需要編號的原因，每一個不需要
-		// 編號的原因都會被擋在 CASE_REFERENCE_REQUIRED。
 		if (
 			selectedReason.caseReferenceRequired === true &&
 			!startRequest.caseReference
@@ -348,8 +333,6 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-		// The dialog may pick a shorter window; the preflight value stays the
-		// ceiling so a browser-supplied number can only narrow the audited window.
 		const requestedTtlSeconds = Math.min(
 			startRequest.ttlSeconds ?? preflight.ttlSeconds,
 			preflight.ttlSeconds,
@@ -369,10 +352,6 @@ export async function POST(request: NextRequest) {
 			},
 		);
 		const payload = await readUpstreamJson(upstream);
-		// 建立端點的 404 有兩種來源，下一步相反：路由不存在（這個環境沒有代行
-		// 營運，該找維運）vs 9286「這家店從來沒有授權列」（該去按開通）。以
-		// envelope 的業務碼分派而不是以 status 分派，否則後者會被講成前者。
-		// 帶不出業務碼的 404 才是真的「這裡沒有這支端點」。
 		if (upstream.status === 404) {
 			const error = safeUpstreamError(payload);
 			return startFailure({
@@ -395,8 +374,6 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-		// Backend contract; this is never substituted with a dev fixture:
-		// { code: 0, data: { handoffCode?, session } }.
 		const data = unwrapUpstreamData(payload);
 		const handoffCode = isRecord(data) ? data.handoffCode : null;
 		if (
@@ -456,7 +433,6 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-		// Reconcile by session ID under the administrator's own identity.
 		const currentUpstream = await adminUpstreamFetch(
 			DELEGATED_OPERATION_UPSTREAM.summary(sessionId),
 			{
@@ -505,7 +481,6 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-		// 對帳通過才把兌換碼交出去；工作區的憑證由 website 在兌換時取得。
 		return redirect(buildHandoffLocation(WEB_ORIGIN, handoffCode));
 	} catch (error) {
 		const timedOut = error instanceof Error && error.name === "AbortError";

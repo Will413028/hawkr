@@ -85,7 +85,6 @@ test("三面具名路由都在渲染賣家中心元件之前過 capability 閘�
 		const file = source(`app/(delegated)/adm/[storeId]/${face}/page.tsx`);
 		assert.match(file, /<DelegatedCapabilityGate\b/u, face);
 		assert.match(file, new RegExp(`capability="${capability}"`), face);
-		// 閘門要**包住**元件，不是擺在它旁邊。
 		assert.ok(
 			file.indexOf("<DelegatedCapabilityGate") < file.indexOf(`<${client} `),
 			`${face}：賣家中心元件必須在閘門之內`,
@@ -172,22 +171,18 @@ test("閘門把 capability 真的接到工作階段（不是恆真）", () => {
 			),
 		);
 
-	// 核發了：children 出現，空狀態不出現。
 	const granted = render(["posts.read", "orders.read"]);
 	assert.ok(granted.includes("共 11 則動態"), granted);
 	assert.ok(!granted.includes("不在本次代行授權範圍"), granted);
 
-	// 沒核發：children 一個字都不得出現。這一格就是「把 granted 寫死成 true」會紅的地方。
 	const denied = render(["orders.read"]);
 	assert.ok(
 		!denied.includes("共 11 則動態"),
 		"閘門沒有真的看 capability ⇒ 等於沒有閘門",
 	);
 	assert.ok(denied.includes("不在本次代行授權範圍"), denied);
-	// 出口的 storeId 取自工作階段（不是路由參數），順帶釘住這一段接線。
 	assert.ok(denied.includes("/adm/2685914682/posts"), denied);
 
-	// 反向鑑別：換一個 capability 名，同一份工作階段就該翻面 —— 防「只要清單非空就放行」。
 	const otherCapability = renderToStaticMarkup(
 		withAppRouter(
 			React.createElement(
@@ -262,8 +257,6 @@ test("結束摘要標「成功操作」並寫明口徑，不得再宣稱「總�
 	const dialog = source(
 		"features/delegated-operations/components/OperationEndDialog.tsx",
 	);
-	// 逐 `label="…"` 取值再比對，不對整份原始碼做字串搜尋：這幾個詞在註解裡也會出現，
-	// 而註解不是任何人看得到的畫面（同源教訓：grep 命中註解 ≠ 命中程式碼）。
 	const labels = [...dialog.matchAll(/label="([^"]+)"/gu)].map((m) => m[1]);
 	assert.ok(labels.includes("成功操作"), labels.join("／"));
 	assert.ok(

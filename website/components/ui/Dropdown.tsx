@@ -134,9 +134,6 @@ export function Dropdown({
 }: DropdownProps) {
 	const fieldId = useFieldId(id);
 	const triggerRef = React.useRef<HTMLButtonElement>(null);
-	// The menu aligns to the WRAPPER (border box), not the inner trigger button.
-	// The button is inset by the wrapper's padding + border, so measuring it
-	// would make the menu narrower than the field and leave a vertical gap.
 	const wrapRef = React.useRef<HTMLDivElement>(null);
 	const menuRef = React.useRef<HTMLDivElement>(null);
 	const searchRef = React.useRef<HTMLInputElement>(null);
@@ -145,8 +142,6 @@ export function Dropdown({
 	const [position, setPosition] = React.useState<MenuPosition | null>(null);
 	const [query, setQuery] = React.useState("");
 	const [activeIdx, setActiveIdx] = React.useState(-1);
-	// 滑鼠停留只是視覺，不動鍵盤游標：舊版 hover 會改 activeIdx，於是
-	// aria-activedescendant 跟著跳，讀屏收到「使用者根本沒按鍵」的假宣告。
 	const [hoverIdx, setHoverIdx] = React.useState(-1);
 	/** type-ahead：500ms 內連打的字母累積成前綴，跳到第一個符合的選項。 */
 	const typeaheadRef = React.useRef({ buffer: "", at: 0 });
@@ -171,7 +166,6 @@ export function Dropdown({
 	const invalid = isInvalid || Boolean(errorMessage);
 	const hasContent = Boolean(shownItem);
 
-	/* ===== Open / close ===== */
 
 	const recomputePosition = React.useCallback(() => {
 		const anchor = wrapRef.current ?? triggerRef.current;
@@ -230,7 +224,6 @@ export function Dropdown({
 		[filtered, onChange, closeMenu],
 	);
 
-	// Close on outside click / Esc / scroll / resize while open
 	React.useEffect(() => {
 		if (!open) return;
 		const onMouseDown = (e: MouseEvent) => {
@@ -259,14 +252,6 @@ export function Dropdown({
 		};
 	}, [open, closeMenu, recomputePosition]);
 
-	// Move keyboard focus into the popup. Searchable menus use the query field;
-	// compact menus keep aria-activedescendant on the focused listbox.
-	//
-	// The old version waited a hard-coded 30ms — on a busy main thread the
-	// listbox could still be unmounted when the timer fired, leaving focus on
-	// the trigger and the arrow keys dead. A layout effect runs after the menu
-	// has committed, and the rAF is only a fallback for the (portal) case where
-	// the node is not queryable yet.
 	React.useLayoutEffect(() => {
 		if (!open) return;
 		const focusTarget = () => {
@@ -281,7 +266,6 @@ export function Dropdown({
 		return () => cancelAnimationFrame(raf);
 	}, [open, searchable]);
 
-	// Keep the highlighted row in view
 	React.useEffect(() => {
 		if (!open || activeIdx < 0) return;
 		const el = menuRef.current?.querySelector<HTMLLIElement>(
@@ -290,7 +274,6 @@ export function Dropdown({
 		el?.scrollIntoView({ block: "nearest" });
 	}, [open, activeIdx]);
 
-	// Re-clamp activeIdx when filter shrinks the list
 	React.useEffect(() => {
 		if (activeIdx >= filtered.length) {
 			setActiveIdx(filtered.length > 0 ? filtered.length - 1 : -1);
@@ -339,8 +322,6 @@ export function Dropdown({
 				closeMenu();
 				break;
 			default: {
-				// type-ahead：非搜尋型下拉在 50 個選項下只能靠方向鍵一格一格爬。
-				// 搜尋型的輸入框自己會吃字，不攔。
 				if (searchable) break;
 				if (e.key.length !== 1 || e.altKey || e.ctrlKey || e.metaKey) break;
 				const now = Date.now();
@@ -353,8 +334,6 @@ export function Dropdown({
 						(it) => !it.disabled && it.label.toLowerCase().startsWith(prefix),
 					);
 				let idx = match(state.buffer);
-				// 累積的前綴找不到就退回「只用最後一個字」，避免打錯一個字之後
-				// 整段 type-ahead 死掉直到逾時。
 				if (idx < 0 && state.buffer.length > 1) {
 					state.buffer = char;
 					idx = match(char);
@@ -368,7 +347,6 @@ export function Dropdown({
 		}
 	};
 
-	/* ===== Trigger keyboard ===== */
 
 	const handleTriggerKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
 		if (disabled) return;
@@ -389,7 +367,6 @@ export function Dropdown({
 		}
 	};
 
-	/* ===== Render ===== */
 
 	const wrapperClasses = [
 		inputWrapperClasses({
@@ -407,9 +384,6 @@ export function Dropdown({
 		.join(" ");
 
 	const valueId = `${fieldId}-value`;
-	// The one element that carries the accessible name: the explicit
-	// aria-label (sr-only span), else the visible label, else the floating
-	// label. With none of them the listbox falls back to the trigger itself.
 	const nameSource = ariaLabel
 		? "aria-label"
 		: label
@@ -480,10 +454,6 @@ export function Dropdown({
 					onBlur={() => setFocused(false)}
 				>
 					<span
-						// `data-slot` (not the BEM class) is the hook the floating-label
-						// vertical layout targets: Tailwind reads `_` inside an arbitrary
-						// variant as a descendant combinator, so `.hkui-dropdown__value`
-						// cannot be addressed from a utility at all.
 						id={valueId}
 						data-slot="dropdown-value"
 						className={`hkui-dropdown__value${shownItem ? "" : " is-placeholder"}`}
@@ -513,10 +483,7 @@ export function Dropdown({
 					</label>
 				)}
 			</div>
-			{/* Portal to <body>: the doc comment always promised this, but the
-			 * menu was rendered inline inside the field, so `position: fixed`
-			 * was defeated by any ancestor with transform / filter / contain
-			 * (DatePicker.tsx already fixed the same bug for its popover). */}
+
 			{open && position && typeof document !== "undefined"
 				? createPortal(
 						<DropdownMenu
@@ -638,8 +605,6 @@ const DropdownMenu = React.forwardRef<HTMLDivElement, DropdownMenuProps>(
 							aria-activedescendant={
 								activeIdx >= 0 ? `${labelledBy}-opt-${activeIdx}` : undefined
 							}
-							// 02-reset-layout 的 bare-control baseline 會給沒有 data-slot
-							// 的 input 補品牌邊框＋focus ring — 在藥丸搜尋框裡變成內外雙框。
 							data-slot="control"
 						/>
 					</div>
@@ -755,7 +720,6 @@ function DropdownOption({
 			onMouseEnter={() => !item.disabled && onHover(idx)}
 			onMouseLeave={() => !item.disabled && onHover(-1)}
 			onMouseDown={(e) => {
-				// prevent the trigger from blurring before click fires
 				e.preventDefault();
 			}}
 			onClick={() => !item.disabled && onSelect(idx)}

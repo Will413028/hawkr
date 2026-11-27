@@ -29,7 +29,7 @@ const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
  * 協商已由 cache key 併入 `__fmt` 處理（見 buildCacheKeyUrl），同樣不需 `Vary: Accept`。
  */
 const CORS_ALLOW_ORIGIN = "*";
-const PREFLIGHT_MAX_AGE = "86400"; // 24h：preset/路由穩定，preflight 可長快取
+const PREFLIGHT_MAX_AGE = "86400";
 
 /** `/i/{preset}/{objectKey}`，objectKey 本身可含 `/`。 */
 const ROUTE_PATTERN = /^\/i\/([^/]+)\/(.+)$/;
@@ -38,8 +38,6 @@ type NegotiatedFormat = "image/avif" | "image/webp" | "image/jpeg" | "image/gif"
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // CORS preflight：實際 GET/HEAD 圖片請求多為 simple request（無自訂 header）不觸發
-    // preflight，但前端若帶非 safelisted header 會先送 OPTIONS——回 204 放行 GET/HEAD。
     if (request.method === "OPTIONS") {
       return preflightResponse();
     }
@@ -96,9 +94,6 @@ async function buildResponse(
 
   const contentType = object.httpMetadata?.contentType ?? "application/octet-stream";
   const contentDisposition = object.httpMetadata?.contentDisposition;
-  // 一次讀完 body 到記憶體：objectKey 前綴白名單只放行 public/（有上傳大小上限，49 號
-  // §8.1），且轉換失敗時需要原封不動 fallback 直出——緩衝一份可重複使用的 bytes，
-  // 避免對同一個單次可讀 ReadableStream 重複讀取。
   const bytes = await object.arrayBuffer();
 
   if (preset === ORIGINAL_PRESET_NAME || !contentType.startsWith("image/") || format === null) {
@@ -108,8 +103,6 @@ async function buildResponse(
   try {
     return await transformedResponse(env, bytes, preset, format);
   } catch (err) {
-    // Images binding transform 失敗（例如來源非 Images 支援的編碼）→ degrade 直出原檔，
-    // 不破圖（49 號 §7.3）。
     console.error(`ImageGateway.transform.fallback preset=${preset} key=${objectKey}`, err);
     return originalResponse(bytes, contentType, contentDisposition);
   }
@@ -132,19 +125,12 @@ async function transformedResponse(
   format: NegotiatedFormat,
 ): Promise<Response> {
   const config = PRESETS[preset];
-  // 傳 `bytes.slice(0)`（複本）而非 `bytes` 本身：避免任何底層實作萬一轉移
-  // （detach）傳入的 ArrayBuffer 所有權，波及 buildResponse() fallback 分支要重複使用的
-  // 原始 `bytes`。
   const result = await env.IMAGES.input(new Response(bytes.slice(0)).body!)
     .transform(config.transform)
     .output(outputOptionsFor(preset, format));
 
   const raw = result.response();
   const outputBytes = await raw.arrayBuffer();
-  // 實測（本機 workerd/Miniflare Images 模擬器）：餵入無法解碼的來源時，`.output()`
-  // 不會拋 ImagesError，而是靜默回傳 200 + 0 bytes 的「成功」回應。若照字面只信任
-  // try/catch 會把這種空殼回應當正常轉換結果快取下來，等同破圖。故顯式檢查輸出長度，
-  // 空輸出視同轉換失敗，交由呼叫端 fallback 直出原檔（49 號 §7.3 degrade 語意）。
   if (outputBytes.byteLength === 0) {
     throw new Error("Images binding produced empty output (source likely undecodable)");
   }
@@ -184,9 +170,6 @@ export function outputOptionsFor(
 export function negotiateFormat(acceptHeader: string | null, animated = false): NegotiatedFormat {
   const accept = acceptHeader ?? "";
   if (animated) {
-    // 動圖 preset 只在能動的格式之間選。avif 不納入：CF Images 的 animated AVIF
-    // 支援不穩定，而這裡「動不動」是功能本身，不是畫質偏好——寧可退回 gif 也不能
-    // 賭一個會靜默變成單張的格式。
     return accept.includes("image/webp") ? "image/webp" : "image/gif";
   }
   if (accept.includes("image/avif")) {
@@ -236,7 +219,6 @@ function preflightResponse(): Response {
   const headers = new Headers();
   headers.set("Access-Control-Allow-Origin", CORS_ALLOW_ORIGIN);
   headers.set("Access-Control-Allow-Methods", "GET, HEAD");
-  // 反射瀏覽器請求的自訂 header（若有）；GET/HEAD 圖片請求通常無，缺省時不設。
   headers.set("Access-Control-Allow-Headers", "*");
   headers.set("Access-Control-Max-Age", PREFLIGHT_MAX_AGE);
   return new Response(null, { status: 204, headers });

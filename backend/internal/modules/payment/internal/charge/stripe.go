@@ -19,10 +19,8 @@ const StripeName = "stripe_payments"
 // StripeCurrency 是付款與轉帳的幣別（ADR D67）：訂單的整數金額當 USD 的最小單位（cent）照搬，不做匯率；port 與資料模型不帶幣別。
 const StripeCurrency = "usd"
 
-// metadataValueMax 是 Stripe metadata 值的長度上限（500 字元）：超過會被拒絕，所以訂單編號串太長就不寫，只留 order_count。
 const metadataValueMax = 500
 
-// stripeBalanceInsufficient 是平台餘額不足的 error code（樣本 transfer_platform_insufficient_funds）：沒有執行，補錢後重試會成功。
 const stripeBalanceInsufficient = "balance_insufficient"
 
 // Stripe 是 Provider 的 Stripe 實作：PaymentIntent、退款、轉帳與撤回都經 internal/platform/stripe 的遮罩 client
@@ -44,11 +42,6 @@ var _ Provider = (*Stripe)(nil)
 // Name 實作 Provider。
 func (s *Stripe) Name() string { return StripeName }
 
-// classifyMoney 把搬錢的建立呼叫的錯誤分成三種（D10、ADR D68；依 HTTP 狀態與 error code，訊息只進 log，spikes.md）：
-//   - 429、平台餘額不足（balance_insufficient）：Stripe 明確拒絕、沒有執行，包 ErrRetryableRefusal；
-//   - 其他 4xx（400 參數與狀態不合、404、402，以及 409 idempotency_error：同一把鍵搭配了不同的參數）：包 ErrPermanent；
-//   - 401／403（金鑰或權限壞了）：結果不明（D60 的金鑰輪替設計，D-F 維持），包成 AuthRejectedError 讓呼叫方告警，分類不變——不得歸類成可重試拒絕或終局；
-//   - 其餘（連線、逾時與 ctx 結束、5xx、408、其他 409、讀不懂的回應）：原樣回傳，結果不明——不得歸類成可重試拒絕或終局。
 func classifyMoney(err error) error {
 	var api *stripe.APIError
 	if !errors.As(err, &api) {
@@ -65,7 +58,6 @@ func classifyMoney(err error) error {
 	return err
 }
 
-// classifyRead 是讀取的錯誤分類：確定的 4xx（物件不存在等）包 ErrPermanent；限流、逾時、5xx 等原樣回傳，由呼叫方重試。
 func classifyRead(err error) error {
 	var api *stripe.APIError
 	if errors.As(err, &api) && api.Status != http.StatusTooManyRequests && api.Permanent() {

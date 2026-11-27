@@ -161,7 +161,6 @@ func AccountSuspendedTTL(bearerTTL time.Duration) time.Duration {
 	return AccountBlockedTTL()
 }
 
-// envIntDefault reads a positive integer env var, falling back to def.
 func envIntDefault(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {

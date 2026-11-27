@@ -64,8 +64,6 @@ public interface ReturnCapability {
 
         public ReturnOutcome {
             if (shipment == null) {
-                // 🔴 契約而非防禦：允許 null 就等於允許「provider 拒絕了、但我方沒有任何一列可落地」，
-                //    而那正是收斂規範 §8.4 要消滅的靜默失敗。
                 throw new IllegalArgumentException(
                         "ReturnOutcome.shipment 不得為 null——受理與拒絕都必須交得出一列可落地的配送單");
             }

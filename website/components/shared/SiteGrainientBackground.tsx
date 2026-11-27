@@ -65,7 +65,6 @@ export default function SiteGrainientBackground() {
 				const { createGrainientRenderer } = await import(
 					"@/lib/animation/grainient-renderer"
 				);
-				// Imports cannot be aborted. Re-check every gate before allocating GPU resources.
 				if (disposed || !allowed() || !onScreen()) return;
 				const styles = getComputedStyle(viewport);
 				const colors = [
@@ -90,7 +89,6 @@ export default function SiteGrainientBackground() {
 				setSiteBackgroundAvailable(true);
 				if (!getSiteBackgroundState().paused) renderer.resume();
 			} catch {
-				// Unsupported WebGL, shader/context failure or a failed chunk: keep CSS.
 				fail();
 			} finally {
 				importing = false;
@@ -139,7 +137,6 @@ export default function SiteGrainientBackground() {
 						sync();
 					});
 		observer?.observe(viewport);
-		// Without visibility evidence keep the static fallback; never guess GPU eligibility.
 		const hide = () => {
 			pageHidden = true;
 			sync();

@@ -218,7 +218,6 @@ export interface InvoiceDocumentDetail {
 	timeline: InvoiceTimelineItem[];
 }
 
-/* ===== B07｜未收到發票／收據申訴（端點 13／14／15／63／64／65） ===== */
 
 /**
  * 申訴案件歷程的一筆（gateway `ComplaintResponseItem`）。

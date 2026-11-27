@@ -17,13 +17,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-// tokenPurgeSubscribers 是 subscribers.go 裡允許做排意圖以外事情的訂閱者：裝置 token 的同步刪除（隨停權、帳號刪除在同一個
-// transaction 刪 token）。加進來要寫理由，並且只能刪 token（TestTokenPurgeSubscribersOnlyDeleteTokens）。
 var tokenPurgeSubscribers = []string{"PurgeTokensOnSuspended", "PurgeTokensOnAccountDeleted"}
 
 var majorVersion = regexp.MustCompile(`^v[0-9]+$`)
 
-// importNames 回傳檔案裡每個 import 在檔內使用的名稱與它的完整路徑。
 func importNames(f *ast.File) map[string]string {
 	out := map[string]string{}
 	for _, imp := range f.Imports {
@@ -43,9 +40,6 @@ func importNames(f *ast.File) map[string]string {
 	return out
 }
 
-// calls 回傳函式本體裡每個呼叫，解析成「完整套件路徑.名稱」：套件限定的呼叫（store.New）取 import 的完整路徑，
-// 值上的方法呼叫（s.d.Registry.Lookup）寫成「.名稱」（不看型別，只看名稱），同套件的函式寫成「名稱」。
-// 所以允許 store.New 不會連帶允許別的套件的 New。
 func calls(fn *ast.FuncDecl, imports map[string]string) []string {
 	var out []string
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
@@ -120,7 +114,6 @@ func TestSynchronousSubscribersOnlyAccept(t *testing.T) {
 	}
 }
 
-// pureSubscriberHelpers 是訂閱者可以呼叫的純函式（只把事件欄位換成參數欄位，不碰資料）；本身也不算訂閱者。
 var pureSubscriberHelpers = []string{"partyOf"}
 
 // Accept 是同步路徑上唯一碰資料的函式：只登記意圖列、排 job，不讀偏好、不寫收件匣、不鎖帳號。

@@ -14,9 +14,7 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 主管機關來函（step10e-reports-brief R5、設計 step10e-3cb-design §1.4、§4）。
 
-// 模組輸入的欄位對應到請求的路徑。
 var (
 	createAuthorityOrderPaths = rpc.FieldPaths{
 		"Agency": "agency", "DocumentNo": "document_no", "ReceivedAt": "receive_time", "Kind": "kind", "Summary": "summary", "Targets": "targets",
@@ -51,7 +49,6 @@ func toAuthorityNotice(n *model.AuthorityNotice) *adminpb.AuthorityTargetNotice 
 	return out
 }
 
-// authorityUnavailabilities 把不能做的原因轉成契約；句子與指令被擋下時的錯誤是同一個函式（AuthorityOrderBlock.Text）。
 func authorityUnavailabilities(blocks []model.AuthorityOrderBlock) []*adminpb.AuthorityOrderUnavailability {
 	var out []*adminpb.AuthorityOrderUnavailability
 	for _, b := range blocks {
@@ -62,7 +59,6 @@ func authorityUnavailabilities(blocks []model.AuthorityOrderBlock) []*adminpb.Au
 	return out
 }
 
-// toAuthorityOrder 把後台看到的來函轉成契約：期限只在處理中時輸出（義務還在時才輸出）；can_* 與 *_unavailabilities 取自同一個 Availability。
 func toAuthorityOrder(o model.AdminAuthorityOrder) *adminpb.AuthorityOrder {
 	out := &adminpb.AuthorityOrder{
 		Id: o.ID.String(), Agency: o.Agency, DocumentNo: o.DocumentNo, ReceiveTime: timestamppb.New(o.ReceivedAt),
@@ -91,7 +87,6 @@ func toAuthorityOrder(o model.AdminAuthorityOrder) *adminpb.AuthorityOrder {
 		if t.StoreID != nil {
 			pt.StoreId = rpc.FormatID(*t.StoreID)
 		}
-		// 指名了單一店家時 store_name 是那一家的名字；不指定店家時不輸出（逐家的名字在 covered_stores）。
 		for _, s := range t.Stores {
 			name := derefString(s.StoreName)
 			pt.CoveredStores = append(pt.CoveredStores, &adminpb.AuthorityTargetStore{
@@ -113,7 +108,6 @@ func toAuthorityOrder(o model.AdminAuthorityOrder) *adminpb.AuthorityOrder {
 	return out
 }
 
-// noticeInputFrom 轉換請求裡的告知；告知的日期不是有效日期時 RecheckOn 是零值（模組回「請填寫確認日期」）。
 func noticeInputFrom(n *adminpb.AuthorityTargetNotice) model.AuthorityNoticeInput {
 	return model.AuthorityNoticeInput{
 		Kind: rpc.EnumFromProto[model.AuthorityNoticeKind](n.GetKind()), NotifiedAt: optionalTime(n.GetNotifyTime()), Note: n.GetNote(),

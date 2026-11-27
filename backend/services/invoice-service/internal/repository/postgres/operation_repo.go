@@ -139,8 +139,6 @@ func (r *OperationRepository) MarkRecheckResolved(ctx context.Context, in domain
 		ProviderCode:    in.ProviderCode,
 		ProviderMessage: in.ProviderMessage,
 		CompletedAt:     in.CompletedAt,
-		// J24 專屬。SQL 那側是 COALESCE(narg, 原值) ⇒ J23／J25 傳 nil 不會抹掉
-		// 端點 54 已寫好的 A4 取消證據。
 		CancelEvidenceKind: in.CancelEvidenceKind,
 		CancelConfirmedAt:  in.CancelConfirmedAt,
 		Now:                ts(in.Now),
@@ -249,9 +247,6 @@ func (r *OperationRepository) PromoteSellerActionRequired(ctx context.Context, i
 		gen.PromoteSellerActionRequiredOperationsParams{Now: ts(now), IssuerID: issuerID})
 }
 
-// ---------------------------------------------------------------------------
-// M2 的業務轉移（J01–J04、J13、J14、J32）——排程以外的人走的邊
-// ---------------------------------------------------------------------------
 
 // Create 建立一列 operation。inserted=false 有兩種意義（見 domain 介面註解），
 // 呼叫端必須用 GetByKey 分辨，不是猜。
@@ -401,13 +396,6 @@ func (r *OperationRepository) ListByDocument(ctx context.Context, documentID int
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// ADM 寫入面（§6.1.14 端點 52／53／56）
-// ---------------------------------------------------------------------------
-//
-// 三支都回 CAS 的 rows>0。false ＝ 守衛不成立（allowed-from 不符或版本被搶先），
-// 呼叫端必須回明確業務碼——把 false 當成功往下走就是靜默失敗：ADM 按下去沒反應、
-// 狀態沒動，而且不會有任何錯誤訊號。
 
 // AdminRetryAfterFix 是 J18 FAILED_PERMANENT → READY（ADM 修正資料後重試）。
 //

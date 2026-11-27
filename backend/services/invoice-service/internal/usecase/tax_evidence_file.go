@@ -40,8 +40,6 @@ type TaxEvidenceFile struct {
 	log      *zap.Logger
 }
 
-// auditResourceTaxEvidence 是稅籍佐證讀取的稽核資源類型（resource_id ＝ 稅務資格 id）。
-// invoice_admin_audit_logs.resource_type 是 varchar(32)、沒有 CHECK 限制值域，不需要 migration。
 const auditResourceTaxEvidence = "INVOICE_TAX_EVIDENCE"
 
 // TaxEvidenceContent 是下載結果。
@@ -120,8 +118,6 @@ func (u *TaxEvidenceFile) Read(ctx context.Context, actorAccountID, storeID, doc
 	return TaxEvidenceContent{Data: data, ContentType: contentType, FileName: fileName}, nil
 }
 
-// taxEvidenceLookupError 把兩段查無（issuer、profile）折成 9301，其餘錯誤原樣往上：
-// 連線斷了不能被講成「文件不存在」（同 sellerIssuer 的規則）。
 func taxEvidenceLookupError(err error) error {
 	if isBizCode(err, bizcode.InvoiceProviderAccountNotFound) || isBizCode(err, bizcode.SellerTaxProfileNotFound) {
 		return errDocumentNotFound()
@@ -129,8 +125,6 @@ func taxEvidenceLookupError(err error) error {
 	return err
 }
 
-// recordAccess 留一列 INVOICE_PII_REVEAL 稽核（action 與 M13 告警共用）：誰、讀了哪個稅務資格的第幾份、哪個 objectKey。
-// request_id 傳 nil：uq_invadmaudit_client_request 會把同一 ADM 的重複讀取摺成一列（見 recordPIIReveal）。
 func (u *TaxEvidenceFile) recordAccess(ctx context.Context, actor, profileID, position int64, objectKey string) error {
 	corr := interceptor.CorrelationIDFromContext(ctx)
 	var corrPtr *string

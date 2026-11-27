@@ -120,7 +120,7 @@ func (r *OutboxRepository) CountPending(ctx context.Context) (int64, error) {
 func (r *OutboxRepository) OldestPendingCreatedAt(ctx context.Context) (*time.Time, error) {
 	v, err := r.q(ctx).OldestPendingInvoiceOutboxEventsCreatedAt(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil // 一則都沒積壓，不是錯誤
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err

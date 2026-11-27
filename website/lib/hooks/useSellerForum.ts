@@ -193,7 +193,6 @@ export function useSellerForum(
 		() => (initialData ? seedPages(initialData) : undefined),
 		[initialData],
 	);
-	// 單一討論串頁與店家討論區列表是兩份快取：任一邊的修改都讓另一邊過期。
 	const invalidateOtherView = React.useCallback(() => {
 		void queryClient.invalidateQueries({
 			queryKey: threadId
@@ -206,9 +205,7 @@ export function useSellerForum(
 		enabled: Boolean(sellerId),
 		initialPageParam: FIRST_PAGE_PARAM,
 		getNextPageParam: nextPageParam,
-		// SSR 帶入的真資料才走 initialData；缺席時沒有資料，請求完成前是 loading。
 		initialData: seed,
-		// 討論串頁的 SSR 資料是匿名讀取（沒有 `viewer_can_*`），掛載時一定要用 viewer 重讀。
 		initialDataUpdatedAt: seed && threadId ? 0 : undefined,
 		queryFn: ({ pageParam, signal }) =>
 			threadId
@@ -279,7 +276,6 @@ export function useSellerForum(
 		onMutate: async (v) => {
 			await cancelListRefetch(queryClient, forumKey);
 			const current = queryClient.getQueryData<ForumData>(forumKey);
-			// 伺服器把新發言放在最後：最後一頁還沒載入時它不在已載入的資料裡。
 			if (!current || !lastPageLoaded(current)) return {};
 			const optimistic = optimisticEntry(
 				storeId,
@@ -404,7 +400,6 @@ export function useSellerForum(
 		async (target: SellerForumComment, content: string) => {
 			const body = content.trim();
 			if (!sellerId || !body) return;
-			// 伺服器的討論區只有兩層：parent_id 是頂層留言，reply_to_id 是針對的那一則。
 			await replyAsync({
 				content: body,
 				requestId: crypto.randomUUID(),
@@ -616,7 +611,6 @@ export function useForumReplies(
 		enabled: Boolean(sellerId) && enabled,
 		initialPageParam: FIRST_PAGE_PARAM,
 		getNextPageParam: nextPageParam,
-		// SSR 的第一頁回覆是匿名讀取：掛載時用 viewer 重讀。
 		initialData: initialReplies ? seedPages(initialReplies) : undefined,
 		initialDataUpdatedAt: initialReplies ? 0 : undefined,
 		queryFn: ({ pageParam, signal }) =>

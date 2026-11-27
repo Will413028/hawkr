@@ -37,21 +37,12 @@ export function TaxExtensionSection({
 
 	const pending = profile.pendingExtensionRequest;
 
-	// 🔴 只看後端旗標——見檔頭。
 	if (!profile.canRequestExtension) return null;
 
 	return (
 		<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 			<strong className="text-sm font-bold">需要更多時間準備文件？</strong>
-			{/*
-			 * 🔴 已送出的申請。**這一塊是賣家判斷「剛才那一按有沒有送出去」的唯一依據**：
-			 * 端點 20 只寫一列稽核歷程、不碰 seller_tax_profiles 的任何一欄 ⇒ 在
-			 * pendingExtensionRequest 出現之前（2026-09-05），按下去 extensionCount 與
-			 * deadlineAt 都不變、canRequestExtension 仍是 true，畫面與按之前一模一樣。
-			 *
-			 * ⚠️ 有申請在等時**不停用按鈕**：後端沒有擋重複申請，而賣家補一個更完整的
-			 * 理由是合理的（平台看的是最新那一筆）。停用會把「我想改理由」變成做不到。
-			 */}
+
 			{pending ? (
 				<div
 					data-testid="tax-extension-pending"

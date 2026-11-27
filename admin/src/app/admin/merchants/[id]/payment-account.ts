@@ -7,7 +7,6 @@ import {
 import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import { skipToken } from "@tanstack/react-query";
 
-// 商家詳情收款帳戶卡的純邏輯（讀取狀態、快取 key）；元件在 PaymentAccountCard.tsx，查詢 hook 在 use-store-detail.ts。
 
 export type PaymentAccountState =
 	| { state: "loading" }

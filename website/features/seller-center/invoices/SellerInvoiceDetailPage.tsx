@@ -109,10 +109,6 @@ export function SellerInvoiceDetailPage({
 			) : loading && !detail ? (
 				<DocumentSkeleton />
 			) : !detail ? (
-				// 端點 31 對「越權」與「真的不存在」回同一個 404＋9301（Tier A）⇒
-				// 文案必須完全相同，不得寫「沒有權限」。
-				// 致命錯誤態判 `!detail` 而不是 `error || !detail`：背景 refetch 失敗時
-				// 保留最後一份好資料，只有真的沒東西可顯示才換頁。
 				<section
 					role="alert"
 					className="seller-card flex flex-col items-center gap-[var(--hkui-space-3)] p-6 text-center"
@@ -203,8 +199,7 @@ function DocumentBody({
 						</dd>
 					</div>
 					<div>
-						{/* 發票號碼三端皆完整不遮（58 §8.1.3(c) 裁定 1）：它是對獎／報帳／
-						    申訴的唯一憑據，而且同時印在發票上、寄在信裡、存在載具裡。 */}
+
 						<dt>發票號碼</dt>
 						<dd className="tabular-nums">{dash(summary.invoiceNumber)}</dd>
 					</div>
@@ -212,8 +207,7 @@ function DocumentBody({
 						<dt>開立時間</dt>
 						<dd>{dash(formatTaipeiDateTime(summary.issuedAt))}</dd>
 					</div>
-					{/* 「開立人」兩種語意都要顯示，不得因為「反正是自己」就省略：
-					    進項時它是平台的抬頭與統編，銷項時是自己的稅籍抬頭。 */}
+
 					<div>
 						<dt>開立人</dt>
 						<dd>{dash(detail.issuerName)}</dd>
@@ -230,31 +224,19 @@ function DocumentBody({
 							<dd>{detail.recipientName}</dd>
 						</div>
 					) : null}
-					{/*
-					 * 🔴 與 B05 共用同一個判準（#3012）：B2C 的 `recipientTaxId` 是 DB
-					 * CHECK 強制的哨兵值 `"0000000000"`，純真值判斷會把它當資料印出來。
-					 * 賣家面與買家面印的是同一份資料的同一個欄位，判準寫兩份就會分岔。
-					 */}
+
 					{hasRecipientTaxId(summary.documentKind, detail.recipientTaxId) ? (
 						<div>
 							<dt>買受人統編</dt>
 							<dd className="tabular-nums">{detail.recipientTaxId}</dd>
 						</div>
 					) : null}
-					{/* backend#3084：沒有載具時後端**刻意**把買受人統編放進 carrierSummary
-					    （B2B 列表要看得到開給哪個統編，那是裁決 B 保留的行為）⇒ 只看
-					    carrierSummary 分不出兩者，判別欄是 carrierType。上面已經有專屬的
-					    「買受人統編」列，這裡再渲染一次就是同一頁兩列同值、而且下面那列
-					    標成「載具」——那是在法定憑證上標錯欄位。
-					    買家側（InvoiceDocumentDetailClient）已經這樣做，這裡是同一份判準的
-					    第二個消費者，**複用 carrierRowKindOf 而不是再寫一份**。
-					    dev 實測（2026-09-05，document 7501682805689024512）：DB 的 carrier
-					    欄位全 NULL，而畫面顯示「載具 10000004」＝上一行的買受人統編。 */}
+
 					{carrierRowKindOf(summary.carrierSummary, summary.carrierType) ===
 					"carrier" ? (
 						<div>
 							<dt>載具</dt>
-							{/* 遮罩值用 <span> 而非 <code>，避免螢幕閱讀器逐字讀 `*`。 */}
+
 							<dd>
 								<span>{summary.carrierSummary}</span>
 							</dd>
@@ -282,12 +264,7 @@ function DocumentBody({
 				<InvoiceSnapshotBreakdown detail={detail} />
 			</section>
 
-			{/*
-			 * 重寄通知（端點 32）。**只在銷項渲染**：進項是平台開給我的，
-			 * 收件人不是我的買家，重寄沒有意義也不該由我發動。
-			 * 銷項／進項由入口帶進來的 `?kind=received` 決定——端點 31 的回應沒有
-			 * issuerType／recipientType 兩欄（見檔頭）。
-			 */}
+
 			{received ? null : <ResendNotice documentId={documentId} />}
 
 			{detail.timeline.length > 0 ? (

@@ -37,7 +37,6 @@ func TestModuleSQLDoesNotTrim(t *testing.T) {
 			t.Error(v)
 		}
 	}
-	// 掃不到任何 trimtext.Check 的展開代表比對的寫法與 schema.sql 不同，上面的檢查形同虛設。
 	if canonical == 0 {
 		t.Fatal("沒有任何 schema.sql 用 trimtext.Check 的展開，檢查範圍不對")
 	}

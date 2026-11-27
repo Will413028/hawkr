@@ -141,9 +141,6 @@ export default function ProcurementClarifyChat({
 	const ut = useUiText();
 	const buyerName = identity?.nickname?.trim() || undefined;
 	const buyerAvatarLabel = buyerName ? `${buyerName} 的大頭貼` : "你的大頭貼";
-	// Date.now() 不能直接在 SSR/hydration render 裡呼叫：跨過午夜或只差幾毫秒
-	// 都可能讓 server/client 產出不同 separator。首屏用 turn 自己的時間作穩定
-	// fallback；hydrate 後再一次校正「今天／日期」。
 	const [groupNow, setGroupNow] = React.useState<number | null>(null);
 	React.useEffect(() => {
 		setGroupNow(Date.now());
@@ -166,8 +163,6 @@ export default function ProcurementClarifyChat({
 			) : null}
 
 			{turns.map((turn, index) => {
-				// 時間戳不再掛在每個氣泡上：只有這一則與上一則隔得夠久（或跨日）
-				// 才在前面插一條置中分隔線，同一批連續對話共用一個時間。
 				const startsGroup = shouldStartGroup(turn, turns[index - 1]);
 				return (
 					<React.Fragment key={turn.id}>
@@ -191,16 +186,6 @@ export default function ProcurementClarifyChat({
 								}
 							>
 								{turn.role === "assistant" ? (
-									/* §V.10.6-4：assistant 完成回覆採**無泡泡正文**，每個語意
-									 * block 左側一枚 allowlisted AppIcon，且不重複 Agent
-									 * avatar。#2549 Phase 2 起優先使用後端真正的 blocks[]；缺席
-									 * （pre-Phase-2 回應，或舊資料列重播）時才落回把整包 reply
-									 * 包成單一 SUMMARY block 的 legacy 規則，不自己切段猜語意。
-									 * #2549 Phase 3：只有 justCompletedTurnId 對得上這一輪
-									 * 才套交錯淡入——歷史 turn（reload／scroll 出來的）與 buyer
-									 * 自己的 turn 都不套，見 useProcurementSession.ts
-									 * justCompletedTurnId 的 doc comment。純前端動畫，blocks[]
-									 * 本身沿用既有終態一次性交付，沒有新的 wire 事件。 */
 									(turn.blocks ?? legacyReplyToBlocks(turn.text)).map(
 										(block, index) => {
 											const icon = narrativeIcon(block.kind);
@@ -223,10 +208,6 @@ export default function ProcurementClarifyChat({
 													{icon ? (
 														<AppIcon name={icon} size={18} aria-hidden="true" />
 													) : (
-														// icon 為 null（未知 kind）時仍需佔住 grid 第一欄——容器是
-														// grid-template-columns: 18px minmax(0, 1fr)，沒有第一欄
-														// 元素時 CSS auto-placement 會把 <p> 擠進 18px 欄，配上
-														// overflow-wrap: anywhere 讓整段文字變成逐字換行的豎排。
 														<span aria-hidden="true" />
 													)}
 													<p>
@@ -310,18 +291,10 @@ export default function ProcurementClarifyChat({
 				);
 			})}
 
-			{/* 等待中且已收到即時步驟 → 顯示當下那一步（節奏由伺服器決定）。
-			 * 等待中但還沒有任何步驟 → 中性三點指示，不編造階段。
-			 * 回覆落地後兩者都消失——思考過程只在思考的時候存在。 */}
+
 			{pending && processing ? (
 				<li className="hawkr-agent-processing-row">{processing}</li>
 			) : pending ? (
-				/* 還沒收到第一個合法 public step ＝ 尚未觀察到伺服器開始處理；這不等於
-				 * durable ACK。§V.10.6-2：只顯示中性等待，不編造步驟；§V.10.10-2
-				 * 也禁止在這裡循環播放，所以 motion 一律是不循環的 SUBMITTING。
-				 *
-				 * 顯示收到的步驟不是 §V.10.6-2 的「編造步驟」；這一列也不是
-				 * §V.10.6-3 保護的對話紀錄。 */
 				<HawkrAgentTypingRow
 					label={latestActivityLabel}
 					motion="SUBMITTING"
@@ -369,8 +342,6 @@ export default function ProcurementClarifyChat({
 								}
 							: undefined
 					}
-					// 上一題是點 chip 答的 → 新卡掛載時把焦點還給第一顆選項，
-					// 鍵盤流程不落回 <body>（surface 契約的 focus return）。
 					autoFocusFirstOption={answeredViaChipRef.current}
 				/>
 			) : null}
@@ -446,17 +417,12 @@ export function ProcurementClarifyComposer({
 	const overLimit = draftLength > maxLength;
 	const hasError = overLimit || Boolean(validationError);
 	const canSend = Boolean(value.trim()) && !overLimit && !pending;
-	// 按得下去的唯一條件：伺服器指得出這一輪進行中的 run，而且這次還沒收到過
-	// 回執。已經 settled 之後再按沒有第二件事可做；`error` 是例外——
-	// 那一次命令沒有成立，重試是有意義的。
 	const stopAnswered = stopState.status === "settled";
 	const canPressStop =
 		Boolean(onStop) &&
 		canStop &&
 		stopState.status !== "requesting" &&
 		!stopAnswered;
-	// 四個 disposition 各講各的話：只有 REQUESTED 是「正在停止」，另外三個
-	// 講的是這一輪已經到終點、已完成的結果沒有被作廢（runCancelCopy）。
 	const stopNotice =
 		stopState.status === "settled"
 			? runCancelCopy(ut, stopState.disposition)
@@ -466,7 +432,7 @@ export function ProcurementClarifyComposer({
 	const fallbackRef = React.useRef<HTMLTextAreaElement | null>(null);
 	const textareaRef = inputRef ?? fallbackRef;
 	React.useLayoutEffect(() => {
-		void value; // 草稿改變後重新量測換行高度。
+		void value;
 		const textarea = textareaRef.current;
 		if (!textarea) return;
 		const resize = () => {
@@ -518,8 +484,6 @@ export function ProcurementClarifyComposer({
 				<p
 					id="procurement-clarify-stop-status"
 					data-testid="agent-stop-status"
-					// 只有真的失敗才用 alert 的 danger 色。四個 disposition 都是成功
-					// 回應，把「這一輪已經跑完了」畫成紅字等於把一個正常結果講成錯誤。
 					className={
 						stopState.status === "error"
 							? "thread-page__notice hawkr-agent-phase1__compose-alert"

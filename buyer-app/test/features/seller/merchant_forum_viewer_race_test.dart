@@ -126,7 +126,6 @@ void main() {
       },
     );
     await _pump(tester, public);
-    // 第二次讀取（換觀看者）卡住前，先換成第三位，使第二次讀取成為舊的。
     _session.signIn();
     await tester.pump();
     _session.switchTo('account-3002');

@@ -50,7 +50,6 @@ class NotificationsScreen extends HookConsumerWidget {
     final selectedIds = useState(<String>{});
     final inboxMessages = ref.watch(notificationInboxStreamProvider);
 
-    // 每次進入頁面時靜默刷新通知列表（不顯示 loading 遮罩）
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(notificationListControllerProvider.notifier).silentRefresh();
@@ -58,8 +57,6 @@ class NotificationsScreen extends HookConsumerWidget {
       return null;
     }, const []);
 
-    // 訂閱 FCM 訊息總線：收到任何推播 / 使用者點擊後台通知，
-    // 都在 300ms 內觸發一次 silentRefresh，讓新通知即時出現在列表
     useEffect(() {
       Timer? debounce;
       final sub = inboxMessages.listen((_) {
@@ -74,7 +71,6 @@ class NotificationsScreen extends HookConsumerWidget {
       };
     }, [inboxMessages]);
 
-    // 分頁滾動
     useEffect(() {
       void onScroll() {
         if (scrollController.position.pixels >=
@@ -204,7 +200,6 @@ class NotificationsScreen extends HookConsumerWidget {
             ),
           ),
 
-          // 刪除模式底部欄
           if (isDeleteMode.value)
             Positioned(
               left: 0,
@@ -325,9 +320,6 @@ class _PaginationErrorRetry extends ConsumerWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 通知卡片
-// ══════════════════════════════════════════════════════════════
 
 class _NotificationCard extends ConsumerStatefulWidget {
   final pb.InboxItem notification;
@@ -408,8 +400,6 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // The whole row is the checkbox target in delete mode.
-                    // Keep this visual compact and exclude duplicate semantics.
                     if (widget.isDeleteMode)
                       Padding(
                         padding: EdgeInsets.only(right: 12.w, top: 4.h),
@@ -444,7 +434,6 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                         ),
                       ),
 
-                    // 圓形圖標（未讀時右上角顯示紅點）
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -466,12 +455,10 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                     ),
                     SizedBox(width: 12.w),
 
-                    // 內容
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 標題 + 時間（同行）
                           Row(
                             children: [
                               Expanded(
@@ -497,7 +484,6 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                             ],
                           ),
                           SizedBox(height: 4.h),
-                          // Body
                           Text(
                             content,
                             style: TextStyle(
@@ -578,9 +564,6 @@ class _NotificationSenderAvatar extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 全部已讀確認彈窗
-// ══════════════════════════════════════════════════════════════
 
 class _MarkAllReadDialog extends StatelessWidget {
   const _MarkAllReadDialog();
@@ -657,9 +640,6 @@ class _MarkAllReadDialog extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// 刪除模式底部欄
-// ══════════════════════════════════════════════════════════════
 
 class _DeleteBottomBar extends StatelessWidget {
   final int count;

@@ -95,9 +95,6 @@ class MediaRepository {
   String _rejectText(RejectReason reason) =>
       reason.uiText(_locale()) ?? _defaults(Code.internal);
 
-  // ============================================================
-  // 頭像上傳
-  // ============================================================
 
   /// 上傳頭像（Session 流程 + 前端預處理）
   Future<MediaUploadResult> uploadAvatar({
@@ -116,13 +113,10 @@ class MediaRepository {
     return uploadWithSession(
       bytes: finalBytes,
       filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      compress: false, // 已預處理
+      compress: false,
     );
   }
 
-  // ============================================================
-  // 聊天圖片上傳
-  // ============================================================
 
   /// 上傳聊天圖片
   Future<MediaUploadResult> uploadChatImage({required Uint8List bytes}) async {
@@ -135,9 +129,6 @@ class MediaRepository {
     );
   }
 
-  // ============================================================
-  // 批次上傳
-  // ============================================================
 
   /// 批次上傳圖片（最多 9 個）
   Future<List<MediaUploadResult>> uploadBatch({
@@ -177,9 +168,6 @@ class MediaRepository {
     return results;
   }
 
-  // ============================================================
-  // 私密文件上傳
-  // ============================================================
 
   /// 上傳私密文件（伺服器端加密），回傳 staged token。
   Future<String> uploadPrivateDocument({required Uint8List bytes}) async {
@@ -206,9 +194,6 @@ class MediaRepository {
     }
   }
 
-  // ============================================================
-  // 媒體 URL 解析（靜態，無網路呼叫）
-  // ============================================================
 
   /// 將 objectKey 或 URL 轉換為可顯示的 URL
   ///
@@ -245,9 +230,6 @@ class MediaRepository {
     return null;
   }
 
-  // ============================================================
-  // 內部工具
-  // ============================================================
 
   /// 是否要在上傳前進入 JPEG 壓縮器。
   ///
@@ -297,9 +279,6 @@ const _serverImageTypes = {
   'image/gif',
 };
 
-// ============================================================
-// Riverpod Provider
-// ============================================================
 
 /// MediaRepository Provider
 final mediaRepositoryProvider = Provider<MediaRepository>((ref) {

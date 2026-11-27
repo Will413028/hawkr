@@ -30,8 +30,6 @@ test("mega menu keeps SSR triggers while loading its heavy panel only from an as
 	]);
 
 	assert.match(menu, /motion\.span/);
-	// The panel is a content section, not a menu, so the trigger dropped
-	// aria-haspopup for the disclosure pair (aria-expanded + aria-controls).
 	assert.match(menu, /aria-expanded=\{isOpen\}/);
 	assert.match(menu, /aria-controls=\{panelId\}/);
 	assert.match(menu, /<section/);
@@ -152,7 +150,6 @@ test("seller and development role chrome stay outside the guest and buyer entry 
 		loader,
 		/createSellerNavbarResource\(\s*\(\) => import\("@\/components\/shared\/SellerNavbar"\)/,
 	);
-	// The UiIcon shim is retired; the seller header names the registry directly.
 	assert.match(seller, /from "@\/components\/shared\/AppIcon"/);
 
 	assert.match(layout, /DEV_OVERLAYS_ENABLED &&/);

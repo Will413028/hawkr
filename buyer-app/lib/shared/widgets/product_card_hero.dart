@@ -59,10 +59,6 @@ Widget productCardHeroFlightShuttleBuilder(
       : toHeroContext;
   final cardHero = cardHeroContext.widget as Hero;
   final renderObject = cardHeroContext.findRenderObject();
-  // Hero 所在的 ListView 可能把垂直 constraints 設為 unbounded；飛行途中若
-  // 直接沿用 constraints.biggest，來源卡片會被目的頁的 tight constraints
-  // 重排，造成 RenderFlex overflow。實際 render size 才是使用者看到的卡片
-  // 尺寸，也能讓商品圖片與圓角在整段動畫維持原比例。
   final cardSize = renderObject is RenderBox && renderObject.hasSize
       ? renderObject.size
       : null;

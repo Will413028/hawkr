@@ -48,7 +48,6 @@ class ReturnTwentyFourHourWarnSchedulerTest {
     @BeforeEach
     void setUp() {
         scheduler = new ReturnTwentyFourHourWarnScheduler(caseMapper, eventPublisher);
-        // 三個分支預設空候選，個別測試再覆寫自己那一支
         when(caseMapper.findStorePickup24hWarnCandidates(any(), any(), eq(200))).thenReturn(List.of());
         when(caseMapper.findConfirmReceipt24hWarnCandidates(any(), any(), eq(200))).thenReturn(List.of());
         when(caseMapper.findShipBack24hWarnCandidates(any(), any(), eq(200))).thenReturn(List.of());
@@ -73,7 +72,6 @@ class ReturnTwentyFourHourWarnSchedulerTest {
                 eq(MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_AT_STORE_24H),
                 eq("A001"), eq("O100"), eq(2001L), eq(1001L), eq("system"), anyMap());
 
-        // 例外 B 的核心不變式：stamp 必須發生在 publish **之後**
         InOrder inOrder = inOrder(eventPublisher, caseMapper);
         inOrder.verify(eventPublisher).tryPublishCaseTransitionWithContext(
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(), anyMap());
@@ -82,8 +80,6 @@ class ReturnTwentyFourHourWarnSchedulerTest {
 
     @Test
     void storePickup_publishFails_doesNotStamp() {
-        // A1 的整個修復目的：publish 失敗 → 不 stamp → 下一輪重發
-        // （舊順序下 publish 失敗＝該筆預警永久遺失，因為 stamp 已經寫進去了）
         AfterSaleCaseEntity entity = caseWith("A002", "O200", "26", "3002");
         entity.setStorePickupDeadlineAt(LocalDateTime.of(2026, 5, 23, 1, 0));
 
@@ -145,7 +141,6 @@ class ReturnTwentyFourHourWarnSchedulerTest {
 
     @Test
     void shipBack_candidateMatches_publishesThenStamps() {
-        // A3（2026-06-15 新增的第三個分支）先前完全沒有測試覆蓋
         AfterSaleCaseEntity entity = caseWith("C001", "O300", "20", "3001");
         entity.setShipBackDeadlineAt(LocalDateTime.of(2026, 6, 20, 1, 0));
 

@@ -10,25 +10,16 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// harness
-// ---------------------------------------------------------------------------
 
-// fakePrefRepo 嵌入介面（見 fake_test.go 檔頭）：沒被覆寫的方法是 nil，呼叫即 panic
-// 並指名方法 —— 「這條路徑本來就不該被走到」與「回了零值」因此分得開。
 type fakePrefRepo struct {
 	domain.BuyerPreferenceRepository
 
-	// byID 是 GetByID 的回應。err 非 nil 時優先回它。
 	byID domain.BuyerPreference
 	err  error
 
-	// def / defFound 是 GetDefault 的回應。
 	def      domain.BuyerPreference
 	defFound bool
 
-	// gotByID 記下 GetByID 實際收到的 (id, buyerID)。歸屬驗證是「buyerID 有沒有進到
-	// 查詢述詞」，而那件事只有記下實參才驗得到。
 	gotByID [2]int64
 }
 
@@ -62,8 +53,6 @@ func newCheckoutHarness(t *testing.T, profile domain.SellerTaxProfile, account d
 	return &checkoutHarness{uc: uc, prefs: prefs}
 }
 
-// previewOf 跑一次 preview（100 元商品、無運費、無折扣），與 issuance_test.go 的
-// baseInput 是同一張訂單。
 func (h *checkoutHarness) previewOf(t *testing.T, mutate func(*ResolveModeInput)) ResolveModeOutput {
 	t.Helper()
 	in := ResolveModeInput{
@@ -95,12 +84,6 @@ func assertLeaf(t *testing.T, got ResolveModeOutput, wantMode, wantKind, wantNA 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §7.1.3 決策樹：逐葉一支測試
-//
-// 刻意**不用表格迴圈**：迴圈少一個 case 不會有任何訊號，而決策樹最常見的改法正是
-// 「新增一格分支」。一葉一函式時，漏掉的那一葉在檔案裡看得見。
-// ---------------------------------------------------------------------------
 
 func TestResolveMode_LeafNA1_ZeroAmount(t *testing.T) {
 	h := newCheckoutHarness(t, approvedProfile(1), activeAccount())
@@ -119,7 +102,6 @@ func TestResolveMode_LeafR1_InvoiceExemptToPlatformReceipt(t *testing.T) {
 		ReceiptAuthorizedAt: &authorized,
 	}, activeAccount())
 	got := h.previewOf(t, nil)
-	// #3026：已授權 ⇒ 收據會被產製，preview 不帶 notApplicableReason。
 	assertLeaf(t, got,
 		codemeta.InvoiceFulfillmentModePlatformReceipt.Value,
 		codemeta.InvoiceDocumentKindReceipt.Value,
@@ -193,7 +175,6 @@ func TestResolveMode_LeafS4_CutoverNotReached(t *testing.T) {
 	h := newCheckoutHarness(t, approvedProfile(1), domain.ProviderAccount{
 		ID:     555,
 		Status: codemeta.InvoiceProviderAccountStatusActive.Value,
-		// cutover 未設定 ＝ 尚未切過去。
 	})
 	got := h.previewOf(t, nil)
 	assertLeaf(t, got,
@@ -230,15 +211,6 @@ func TestResolveMode_LeafB2B_AmegoAuto(t *testing.T) {
 	}
 }
 
-// AM-a／AM-b／AM-c：fail-closed 三格。
-//
-// 這三葉在 §7.1.3 上的差異是 document.status（AWAITING_MANUAL）與 manual_reason_code，
-// **fulfillment_mode 仍是 AMEGO_AUTO**。preview 不回那兩個欄位，所以這三支測試驗的是
-// 那個「不變」：preview 說 AMEGO_AUTO 而實際落 AWAITING_MANUAL，**不是矛盾**，
-// 而 preview 若因為這三格改口說成別的模式，前端就會顯示錯的法定告知。
-//
-// 三支各自獨立，因為它們是三個獨立的偵測（平台出資券／和單／混合稅別），
-// 合成一支的話刪掉其中一個偵測不會轉紅。
 
 func TestResolveMode_LeafAMa_PlatformFundedDiscountKeepsAmegoAuto(t *testing.T) {
 	assertPreviewMatchesPrepare(t, approvedProfile(1), activeAccount(),
@@ -251,7 +223,6 @@ func TestResolveMode_LeafAMb_ConsolidatedOrderKeepsAmegoAuto(t *testing.T) {
 }
 
 func TestResolveMode_LeafAMc_MixedTaxCategoryKeepsAmegoAuto(t *testing.T) {
-	// 免稅賣家 ＋ 應稅運費 ⇒ 混合稅別（運費行恆為應稅，§7.1.3 FC 表）。
 	exempt := approvedProfile(int16(domain.TaxCategoryExempt))
 	assertPreviewMatchesPrepare(t, exempt, activeAccount(),
 		func(in *OrderPaidInput) {
@@ -275,9 +246,6 @@ func taxIDPreference() domain.BuyerPreference {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// preview 的三個對外欄位
-// ---------------------------------------------------------------------------
 
 func TestResolveMode_PreviewExpiresAtComesFromBackend(t *testing.T) {
 	h := newCheckoutHarness(t, approvedProfile(1), activeAccount())
@@ -293,7 +261,7 @@ func TestResolveMode_AmountBreakdownIsClampedAtZero(t *testing.T) {
 	got := h.previewOf(t, func(in *ResolveModeInput) {
 		in.ProductAmount = 100
 		in.ShippingAmount = 60
-		in.DiscountAmount = 500 // 折抵超過總額
+		in.DiscountAmount = 500
 	})
 	if got.Amount.InvoiceAmount != 0 {
 		t.Errorf("invoiceAmount = %d, want 0（與 OrderSnapshot.TotalActualAmount 的 max(0,…) 同式）",
@@ -344,8 +312,8 @@ func TestResolveMode_IntakeLimitIsOrNotAnd(t *testing.T) {
 		DefaultTaxCategory:      1,
 		PendingOrderLimitCount:  50,
 		PendingOrderLimitAmount: 100000,
-		PendingOrderCount:       50, // 筆數到頂
-		PendingOrderAmount:      10, // 金額還很空
+		PendingOrderCount:       50,
+		PendingOrderAmount:      10,
 	}, activeAccount())
 	if !h.previewOf(t, nil).IntakeLimit.Blocked {
 		t.Error("筆數已達上限即應 blocked（兩個上限是 OR 不是 AND）")
@@ -390,9 +358,6 @@ func blockedPendingProfile() domain.SellerTaxProfile {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// confirm：六個失敗分支 ＋ 快照
-// ---------------------------------------------------------------------------
 
 func baseValidateInput() ValidateInvoiceInput {
 	return ValidateInvoiceInput{
@@ -418,10 +383,6 @@ func (h *checkoutHarness) validate(t *testing.T, mutate func(*ValidateInvoiceInp
 	return out
 }
 
-// assertRejected 同時斷言三件事：不放行、碼對、**data 不是空的**。
-//
-// 第三項是本檔最容易被改壞的一條：把 data 拿掉之後所有「回 code≠0」的測試照樣綠，
-// 而 9326 的 `data.intakeLimit`（§6.1.2 明文要求）就永遠到不了前端。
 func assertRejected(t *testing.T, out ValidateInvoiceOutput, wantCode int32) {
 	t.Helper()
 	if out.Valid {
@@ -443,7 +404,7 @@ func assertRejected(t *testing.T, out ValidateInvoiceOutput, wantCode int32) {
 
 func TestValidateInput_OmittedInvoiceBlockIsAccepted(t *testing.T) {
 	h := newCheckoutHarness(t, approvedProfile(1), activeAccount())
-	out := h.validate(t, nil) // Present=false ＝ 整包省略
+	out := h.validate(t, nil)
 	if !out.Valid {
 		t.Fatalf("整包省略 invoice 必須放行（已上架 App 直接呼叫此端點），實得 code=%d", out.BizCode)
 	}
@@ -635,10 +596,6 @@ func TestValidateInput_TargetConflictGoesThroughA15(t *testing.T) {
 	}
 }
 
-// conflictPreference 造一列刻意違反三選一的常用發票資料。
-//
-// 這種列在 DB 上被 chk_bip_shape 擋著，但它模擬的是「規則收緊之前的存量列」與
-// 「有人繞過端點 2 直接寫庫」——結帳是最後一道，不能假設上游一定乾淨。
 func conflictPreference(withTaxID bool, carrierValue, donation string) domain.BuyerPreference {
 	p := domain.BuyerPreference{ID: 8801, BuyerID: 2623900520, CreatedAt: testNow, UpdatedAt: testNow}
 	switch {
@@ -685,15 +642,13 @@ func TestValidateInput_InvoiceAmountIsRecomputedNotTrusted(t *testing.T) {
 	out := h.validate(t, func(in *ValidateInvoiceInput) {
 		in.Amount = CheckoutAmount{
 			ProductAmount: 100, ShippingAmount: 60, DiscountAmount: 10,
-			InvoiceAmount: 999999, // 惡意／錯誤的總額
-			TaxCategory:   9,      // 值域外
+			InvoiceAmount: 999999,
+			TaxCategory:   9,
 		}
 	})
 	if !out.Valid {
 		t.Fatalf("金額本身合法，應放行，實得 code=%d", out.BizCode)
 	}
-	// 重算後是 150；若採信 request，A1 會在 forecastDraft 上炸成一行 WARN 而不是被修正。
-	// 直接驗 usecase 的重算結果。
 	got := buildCheckoutAmount(100, 60, 10, approvedProfile(1))
 	if got.InvoiceAmount != 150 {
 		t.Fatalf("重算的 invoiceAmount = %d, want 150", got.InvoiceAmount)

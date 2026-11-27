@@ -6,13 +6,6 @@ import (
 	"unicode"
 )
 
-// 業者名稱歸屬比對（`backend/docs/modules/seller.md` §1.3）：政府證書查驗回的業者名稱，是不是屬於送出證書的賣家。名字是個資（身分證上的姓名），
-// 所以比對留在 seller 模組，呼叫方（legacy 的 product-service）只拿到判定與哪個欄位相符，拿不到名字。
-//
-// 規則照設計書：正規化是寬鬆比對，寬鬆的方向是減少誤判為不符（誤判不符只多一筆人工審核，代價可控；不符一律轉人工，不是拒絕）；
-// 去掉空白、全半形、大小寫與公司型態後綴，後綴表照設計書明列（含農場、商行、工作室等商號常用詞），所以「陽光農場」與「陽光果園」會
-// 正規化成同一個名字、判為相符；除此之外不做子字串包含，也不做編輯距離。比對基準只有已通過人工核准的 KYC 名稱（賣家自己填、
-// 平台沒驗過的名稱不能當基準）。
 
 // CertHolderField 是業者名稱相符的欄位；值是 legacy 的 `MatchCertificateHolderResponse.matched_field`，稽核只記欄位名稱。
 type CertHolderField string
@@ -33,16 +26,11 @@ type CertHolderMatch struct {
 	HasReference bool
 }
 
-// holderNoise 是去掉公司型態之後留在尾端的標點（只從右邊修剪）。
 const holderNoise = ".,-_·、。"
 
-// holderSuffixes 是從名稱尾端依序剝掉的公司型態與商號用詞（設計書 §8.5.1 的後綴表），寫成已正規化的形狀（小寫、半形、無空白），
-// 最長的先比。只剝後綴、不剝前綴（這些詞夠短，剝前綴會弄壞一般名稱）；單獨的 "co" 刻意不在裡面（很多一般英文字的結尾），縮寫 "co." 沒有歧義。
 var holderSuffixes = sortByLengthDesc([]string{
-	// 中文
 	"股份有限公司", "有限責任公司", "有限公司", "無限公司", "兩合公司", "股份公司", "(股)公司", "有限合夥",
 	"企業社", "合作社", "產銷班", "工作室", "商行", "商號", "農場", "牧場", "農園", "果園", "公司",
-	// 英文（正規化後已無空白，所以含連寫的變體）
 	"company,ltd.", "companylimited", "incorporated", "corporation", "colimited", "co.,ltd.", "co.,ltd", "co.ltd.",
 	"co.ltd", "l.l.c.", "company", "limited", "corp.", "ltd.", "llc.", "inc.", "corp", "ltd", "llc", "inc", "co.",
 })
@@ -67,7 +55,6 @@ func NormalizeHolderName(name string) string {
 	return stripHolderSuffixes(strings.ToLower(b.String()))
 }
 
-// narrowRune 把全形的 ASCII（U+FF01 到 U+FF5E）轉成半形，其餘（含中文）不動。
 func narrowRune(r rune) rune {
 	if r >= 0xFF01 && r <= 0xFF5E {
 		return r - 0xFEE0
@@ -75,8 +62,6 @@ func narrowRune(r rune) rune {
 	return r
 }
 
-// stripHolderSuffixes 從尾端依序剝掉公司型態直到沒有可剝的；每一輪都修剪尾端標點，所以 "co.,ltd" 拆成兩輪也剝得掉。每一輪都讓
-// 字串變短，迴圈一定結束。
 func stripHolderSuffixes(s string) string {
 	for {
 		s = strings.TrimRight(s, holderNoise)

@@ -222,8 +222,6 @@ test("shared pagination keeps phone navigation labels on one local rail", () => 
 	);
 	assert.match(
 		pagination,
-		// 44px (was 40): the page numbers are the densest tap target on the
-		// shared pagination rail.
 		/flex h-11 min-w-11 shrink-0 items-center/,
 		"page-number controls must not shrink the navigation labels",
 	);
@@ -241,8 +239,6 @@ test("summary card groups opt into one device-width horizontal rail", () => {
 		assert.match(staticRail, /aria-label="[^"]+"[\s\S]*?tabIndex=\{0\}/);
 	}
 
-	// These contain workflow warnings or compact navigation, not overview KPI
-	// cards. Keep their information visible instead of hiding it in this rail.
 	assert.doesNotMatch(
 		orders,
 		/seller-orders__status-tabs[^"`]*seller-summary-rail/,

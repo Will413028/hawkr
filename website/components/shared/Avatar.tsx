@@ -95,8 +95,6 @@ export default function Avatar({
 	className,
 	fallbackClassName,
 	fallback,
-	// No default: an avatar that turns out to be in the first render must not
-	// be lazy. Lazy is opt-in per call site (see BrandLogo for the same rule).
 	loading,
 	fetchPriority,
 	size = 80,
@@ -109,10 +107,6 @@ export default function Avatar({
 		setBroken(false);
 	}
 
-	// An <img> rendered on the server can finish — or fail — before hydration
-	// attaches the handlers below, and React never replays the event it missed.
-	// Read the element's own state once per src so a server-rendered avatar that
-	// already failed still reaches its fallback instead of sitting blank.
 	const imgRef = React.useRef<HTMLImageElement | null>(null);
 	React.useEffect(() => {
 		const img = imgRef.current;
@@ -121,8 +115,6 @@ export default function Avatar({
 
 	const fallbackClasses = cn(className, fallbackClassName) || undefined;
 	const altText = alt ?? name ?? "";
-	// Buyer avatars only: a seller slot with no logo is deliberately empty (see
-	// the component docblock), and must never gain a generic name.
 	const unnamed = entity === "buyer" && alt === undefined && !name?.trim();
 
 	const strategy: NonNullable<AvatarProps["fallback"]> =
@@ -130,15 +122,6 @@ export default function Avatar({
 			? "empty"
 			: (fallback ?? (name?.trim() ? "initial" : "placeholder"));
 
-	// While the browser is still working on the request the <img> STAYS — the
-	// fallback is painted under it, never in place of it. A cold CDN
-	// image-transform cache miss can leave an avatar pending for many seconds
-	// with neither load nor error firing; the previous version of this component
-	// gave that a 4s grace period and then swapped the element out for the
-	// fallback, which is a one-way door: the swap unmounts the <img>, the
-	// in-flight request is abandoned, and the photo can never come back even
-	// though it was seconds away (#410). Only a real `error` — which is terminal
-	// for a given src, and which a new src resets — replaces the image.
 	if (resolved && !broken) {
 		return (
 			// biome-ignore lint/performance/noImgElement: Avatars are user-supplied CDN paths, not statically known at build time.
@@ -146,9 +129,6 @@ export default function Avatar({
 				ref={imgRef}
 				src={resolved}
 				alt={altText}
-				// `alt=""` passed explicitly is a decorative decision and is honoured.
-				// alt AND name simply *missing* is not a decision — the avatar silently
-				// became decorative — so name it generically instead.
 				role={unnamed ? "img" : undefined}
 				aria-label={unnamed ? "使用者頭像" : undefined}
 				width={size}

@@ -7,7 +7,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 )
 
-// cursor 是列表 page token 的內容：模組游標的排序鍵與商品 ID。token 以 scope（procedure 加篩選）綁定，換了篩選就不能用。
 type cursor struct {
 	Key int64     `json:"k"`
 	ID  uuid.UUID `json:"i"`
@@ -30,7 +29,6 @@ func nextToken(scope string, next *catalog.ListCursor) string {
 	return rpc.TokenFor(scope, cursor{Key: next.Key, ID: next.ID})
 }
 
-// checkPageSize 擋負數（0 是預設值，上限由模組夾住）。
 func checkPageSize(n int32) error {
 	if n < 0 {
 		return fieldError("page_size", "page_size 不得為負數")
@@ -38,7 +36,6 @@ func checkPageSize(n int32) error {
 	return nil
 }
 
-// checkMaxResults 擋負數的 max_results（0 是預設值，上限由模組夾住）。
 func checkMaxResults(n int32) error {
 	if n < 0 {
 		return fieldError("max_results", "max_results 不得為負數")

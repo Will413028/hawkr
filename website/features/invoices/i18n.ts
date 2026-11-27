@@ -104,7 +104,6 @@ export const INVOICE_ORDER_TEXT = {
 	fieldIssuedAt: "開立日期",
 	fieldAmount: "發票金額",
 	fieldCarrier: "載具",
-	// backend#3084：carrierSummary 沒有載具時裝的是買受人統編，卡片要能改標籤。
 	fieldRecipientTaxId: "買受人統編",
 	fieldNotifiedEmail: "通知信箱",
 	noCarrier: "無載具",
@@ -237,7 +236,6 @@ export const INVOICE_DOCUMENT_TEXT = {
 	downloadPdf: "下載 PDF",
 	relatedDocument: "查看關聯文件",
 	emptyTimeline: "目前沒有歷程紀錄。",
-	/* 端點 71｜重寄通知 */
 	cardResend: "沒收到通知？",
 	resendBody: "可以請系統再寄一次到你的原始通知信箱。先確認一下垃圾郵件匣。",
 	resendAction: "重寄通知",
@@ -271,12 +269,10 @@ export const INVOICE_CHECKOUT_TEXT = {
  * CodeMeta `InvoiceComplaintAction`（§0.4 ⑤），**不得手抄那六句**。
  */
 export const INVOICE_COMPLAINT_TEXT = {
-	/* 入口（B04 動作列） */
 	entryCta: "沒有收到？提出申訴",
 	/** `canFileComplaint === false` 且有 `complaintOpensAt` 時的灰字。 */
 	notOpenYet: (opensAt: string) => `${opensAt} 之後可提出申訴`,
 
-	/* 建案 Dialog（端點 13） */
 	createTitle: "提出申訴",
 	/**
 	 * **不照抄既有售後的「每筆售後僅能申訴一次…」**——發票申訴結案後買家可重新
@@ -296,7 +292,6 @@ export const INVOICE_COMPLAINT_TEXT = {
 	submitting: "送出申訴中",
 	cancel: "取消",
 
-	/* 案件區塊 */
 	sectionTitle: "發票申訴",
 	caseNoLabel: (caseNo: string) => `案件編號 ${caseNo}`,
 	copyCaseNo: "複製案件編號",
@@ -312,7 +307,6 @@ export const INVOICE_COMPLAINT_TEXT = {
 	buyerReviewDue: (deadline: string) =>
 		`${deadline} 前可提出異議，逾期視為已解決`,
 
-	/* 端點 63 */
 	rejectCta: "這樣沒有解決",
 	rejectTitle: "這樣沒有解決",
 	rejectDescription:
@@ -320,7 +314,6 @@ export const INVOICE_COMPLAINT_TEXT = {
 	rejectFieldLabel: "請說明還缺什麼",
 	rejectToast: "已轉由平台處理",
 
-	/* 端點 64 */
 	withdrawCta: "撤回申訴",
 	withdrawTitle: "要撤回這件申訴嗎？",
 	/**
@@ -332,7 +325,6 @@ export const INVOICE_COMPLAINT_TEXT = {
 	withdrawConfirm: "撤回申訴",
 	withdrawToast: "申訴已撤回",
 
-	/* 端點 65 */
 	reopenCta: "重新提出",
 	reopenTitle: "重新提出這件申訴",
 	reopenDescription: (remaining: number) =>
@@ -346,7 +338,6 @@ export const INVOICE_COMPLAINT_TEXT = {
 	reopenCooldown: (allowedAfter: string) => `${allowedAfter} 之後可重新提出`,
 	reopenExhausted: "已重新提出 2 次，如仍未解決請聯絡客服",
 
-	/* 送出結果 */
 	createdToastTitle: "申訴已送出",
 	createdToastBody: (caseNo: string) =>
 		`案件編號 ${caseNo}，我們會通知賣家處理。`,

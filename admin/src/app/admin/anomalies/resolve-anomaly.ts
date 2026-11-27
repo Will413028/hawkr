@@ -17,8 +17,6 @@ import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { paymentPaymentAnomalyResolutionReason } from "@hawkr/ui-text/keys";
 import { staffTextOrUnknown } from "@/lib/ui-text";
 
-// 異常的人工結案（PaymentAdminService.ResolvePaymentAnomaly）：哪些物件可以結案、表單的驗證與請求。
-// 契約：id 是付款、轉帳、退款的 ID；收回是撤回列 ID；補差額是退款 ID。成功結案要附金流商物件 ID，失敗結案可省略。
 
 /** 列上可結案的位置；稱呼用 `TARGET_NOUN[slot]`，不從 enum 成員選文字（這個 enum 的文字不在共用目錄）。 */
 export type ResolveSlot =

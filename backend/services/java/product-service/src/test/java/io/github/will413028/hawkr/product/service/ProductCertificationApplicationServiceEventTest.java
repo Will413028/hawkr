@@ -98,7 +98,6 @@ class ProductCertificationApplicationServiceEventTest {
         try {
             TsidUtil.init(200, 0);
         } catch (IllegalStateException ignored) {
-            // 同一個 JVM 內的其他測試已初始化
         }
     }
 
@@ -108,7 +107,6 @@ class ProductCertificationApplicationServiceEventTest {
                 applicationRepository, reviewEventRepository, productRepository,
                 govCertificationService, cacheService, revalidationService, idempotencyService,
                 new ObjectMapper(), eventPublisher, sellerGrpcClient, redisTemplate);
-        // 重新查驗租約：預設「拿得到」，個別測試再覆寫成 false 模擬併發
         when(redisTemplate.opsForValue()).thenReturn(redisValueOps);
         when(redisValueOps.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
 
@@ -133,15 +131,10 @@ class ProductCertificationApplicationServiceEventTest {
                 .thenReturn(Optional.empty());
         when(govCertificationService.readCachedResult(anyString(), any())).thenReturn(null);
         when(sellerGrpcClient.getSellerMetaOrThrow(anyLong())).thenReturn(sellerMeta());
-        // §8.5.1 第五個自動核准資格條件：政府回的業者名稱必須屬於這個賣家。
-        // 本檔測的是「事件發不發／發給誰」，不是歸屬比對本身 ⇒ fixture 一律表達
-        // 「歸屬成立的正常賣家」，否則每個自動核准案例都會落進 NO_HOLDER_NAME 轉人工而不發事件。
-        // 歸屬比對的各個分支由 ProductCertificationApplicationServiceTest.HolderAttribution 覆蓋。
         when(sellerGrpcClient.matchCertificateHolder(STORE_ID, HOLDER_NAME))
                 .thenReturn(new SellerGrpcClient.HolderMatch(true, true, "REAL_NAME", true));
     }
 
-    // ==================== ① §12.3 推播策略三情境 ====================
 
     @Nested
     @DisplayName("§12.3 推播策略：即刻核准不發／背景補課發／人工裁決發")
@@ -260,7 +253,6 @@ class ProductCertificationApplicationServiceEventTest {
         }
     }
 
-    // ==================== ② §12.1 verify.requested ====================
 
     @Nested
     @DisplayName("§12.1 verify.requested：只有 PENDING 才排背景查驗")
@@ -326,7 +318,6 @@ class ProductCertificationApplicationServiceEventTest {
         }
     }
 
-    // ==================== ③ §12.4 收件人解析 fail-closed ====================
 
     @Nested
     @DisplayName("§12.4 sellerAccountId：fail-closed，且必須是 account_id")
@@ -370,7 +361,6 @@ class ProductCertificationApplicationServiceEventTest {
         }
     }
 
-    // ==================== ④ wire 形狀 ====================
 
     @Nested
     @DisplayName("§12.4 wire 形狀：snake_case、id 為字串、internalNote 不外洩")
@@ -393,8 +383,6 @@ class ProductCertificationApplicationServiceEventTest {
             String json = new ObjectMapper().writeValueAsString(captor.getValue());
             assertFalse(json.contains("內部備註"), "internalNote 洩漏到 payload: " + json);
             assertFalse(json.contains("internal"), "payload 出現 internal 欄位: " + json);
-            // 沒帶 @JsonNaming 就會發出 camelCase key，而 contract gate 只驗
-            // 「template 讀的 key ⊆ golden」、不驗「golden ⊆ publisher 實發」⇒ 全程無訊號
             assertFalse(json.contains("sellerAccountId"), "wire key 是 camelCase: " + json);
             assertFalse(json.contains("applicationId"), "wire key 是 camelCase: " + json);
 
@@ -403,7 +391,6 @@ class ProductCertificationApplicationServiceEventTest {
             assertTrue(wire.containsKey("seller_account_id"), "wire key 不是 snake_case: " + wire.keySet());
             assertTrue(wire.containsKey("reason_code"));
             assertTrue(wire.containsKey("public_reason"));
-            // TSID 以 JSON number 傳出去會被 generic-map 消費端的 float64 截斷
             assertEquals(String.class, wire.get("application_id").getClass());
             assertEquals(String.class, wire.get("seller_account_id").getClass());
         }
@@ -440,7 +427,6 @@ class ProductCertificationApplicationServiceEventTest {
         }
     }
 
-    // ==================== fixtures ====================
 
     private ProductCertificationDecidedPayload captureApproved() {
         ArgumentCaptor<ProductCertificationDecidedPayload> captor =
@@ -484,7 +470,6 @@ class ProductCertificationApplicationServiceEventTest {
         app.setGovVerifyState(govState);
         app.setVersion(version);
         app.setSubmittedAt(LocalDateTime.now());
-        // 查驗通過的申請一定帶著政府回的 payload；少了 holderName 就走不到自動核准（§8.5.1）。
         ProductCertificationApplicationEntity.GovVerifyPayload payload =
                 new ProductCertificationApplicationEntity.GovVerifyPayload();
         payload.setCertType(String.valueOf(ORGANIC));

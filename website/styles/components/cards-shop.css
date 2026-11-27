@@ -1,14 +1,4 @@
-/* Extracted from styles/globals.css.
- * Active shared glass surfaces and cart-shell dark treatment.
- * Keep import order in styles/globals.css unless intentionally changing cascade.
- */
 
-/* --- Glass Card (Reusable Frosted Glass) --- */
-/* Glassmorphism treatment (ref: Medium/hybrid-x):
-   1. Ultra-thin surface gradient (white 0.1 → clear)
-   2. Light backdrop blur for transparency
-   3. Gradient border: white highlight (top-left) → green accent (bottom-right)
-   4. Soft shadow for floating depth */
 .glass-card {
 	background: linear-gradient(
 		135deg,
@@ -49,9 +39,6 @@
 	padding: 46px 65px;
 }
 
-/* Frosted-but-readable variant: keeps the blur + diagonal sheen of
-   .glass-card but raises the surface opacity so text-heavy cards (e.g. FAQ
-   answer cards) don't read as see-through over busy backgrounds. */
 .glass-card--solid {
 	background: linear-gradient(
 		135deg,

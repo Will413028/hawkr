@@ -9,8 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 通報與案件（step10e-reports-brief R2、R3、R7；設計 step10e-3ca-design §3）。通報是一位檢舉人的一次送出，有自己的結果；同一家店、同一個平台判定類別，
-// 同時最多一個進行中的案件，決定即結案。處理狀態（ReportState、CaseState）、可以做的動作（Availability）都在讀取時由事實推導，不存。
 
 // Outcome 是一筆通報的結果；值與 DB 的 reports_outcome_check、契約的 ReportOutcome 一致。
 type Outcome string
@@ -534,7 +532,6 @@ func (f ReportFacts) Availability() ReportAvailability {
 		a.Move = append(a.Move, ReportBlockFindingSource)
 	}
 	if f.Case != nil && f.Case.Case.ReportCount == 1 {
-		// 案件唯一的成員移走，案件就空了（以 NO_REPORTS 關閉）：案件上已經有措施時不行。
 		if f.Case.ResultingMeasures > 0 {
 			a.Move = append(a.Move, ReportBlockLastReportWithMeasure)
 		}

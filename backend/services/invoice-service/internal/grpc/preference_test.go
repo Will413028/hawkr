@@ -13,24 +13,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// 本檔驗 B08 寫入面的**型別邊界與 Tier A 出口形狀**；業務規則本身在
-// internal/usecase/preference_test.go。
-//
-// 🔴 這裡的核心斷言是「越權與查無的回應逐位元相同」，而且是用 proto.Marshal 比對
-// 不是比 code：比 code 只證明兩者同碼，證明不了 message、data 或任何未來新增的欄位
-// 沒有洩漏「這筆資料存在，只是不是你的」。
 
 const (
 	pBuyerA int64 = 2623900520
 	pBuyerB int64 = 2688637900
 )
 
-// pfxTx 直接執行 callback（交易語意由 usecase 的單元測試守）。
 type pfxTx struct{}
 
 func (pfxTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) error { return fn(ctx) }
 
-// pfxPrefs 照 SQL 述詞回應：id ＋ buyer_id ＋ 存活，四條缺一即「查不到」。
 type pfxPrefs struct {
 	domain.BuyerPreferenceRepository
 	rows map[int64]domain.BuyerPreference
@@ -81,9 +73,6 @@ func prefRow(id, buyerID int64, isDefault bool) domain.BuyerPreference {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tier A：越權與查無**逐位元**相同
-// ---------------------------------------------------------------------------
 
 // TestPreference_TierA_ByteIdentical 是 §8.1.4(b) 的機械保證。
 //
@@ -116,7 +105,6 @@ func TestPreference_TierA_ByteIdentical(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			// foreignID 屬於 buyer B 且真的存在；missingID 不存在。
 			s := newPrefServer(prefRow(foreignID, pBuyerB, false))
 
 			foreign, err := c.call(s, foreignID)
@@ -159,9 +147,6 @@ func bizCodeOf(t *testing.T, m proto.Message) int32 {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 型別邊界
-// ---------------------------------------------------------------------------
 
 // TestPreference_ProfileIDZeroIsRejected 釘住 §6.1.1「端點 2／3／4 的 profile_id = "0"
 // 一律 400」：它是「清除預設」的哨兵，不是一筆資料。
@@ -238,7 +223,6 @@ func TestPreference_CreateReturnsMaskedValue(t *testing.T) {
 	}
 }
 
-// pfxCreateRepo 是 Create 路徑的最小 repo：空集合 ＋ 一定插得進去。
 type pfxCreateRepo struct {
 	domain.BuyerPreferenceRepository
 }

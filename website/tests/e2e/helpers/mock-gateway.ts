@@ -40,7 +40,6 @@ export async function seedStoredActiveRole(
 				localStorage.setItem(key, value);
 				sessionStorage.setItem(seededKey, "1");
 			} catch {
-				// A browser that refuses storage simply has no stored role.
 			}
 		},
 		[ACTIVE_ROLE_STORAGE_KEY, role] as const,
@@ -288,7 +287,6 @@ export function myStoreJson(store: MockStore) {
 			status: `STORE_STATUS_${store.status ?? "ACTIVE"}`,
 			etag: store.etag ?? "e1",
 		},
-		// proto3 JSON 不輸出預設值 false。
 		...(store.suspended ? { suspended: true } : {}),
 		capabilities: [
 			...ALL_SELLER_CAPABILITIES.map((c) => ({
@@ -1417,7 +1415,6 @@ export async function setupGatewayMocks(
 	const appStatus = opts.appStatus ?? 200;
 	const state: GatewayMockState = { appActiveRole: null };
 
-	// 1. Generic authed catch-all (registered first → lowest priority).
 	await page.route(`${API}/app/**`, (route) => {
 		state.appActiveRole = route.request().headers()["x-active-role"] ?? null;
 		route.fulfill({
@@ -1431,7 +1428,6 @@ export async function setupGatewayMocks(
 		});
 	});
 
-	// 2. 賣家登入後的開店判斷（GetMyStore）。
 	if (opts.needsOnboarding !== undefined) {
 		const needsOnboarding = opts.needsOnboarding;
 		await page.route(GET_MY_STORE_URL, (route) => {
@@ -1445,7 +1441,6 @@ export async function setupGatewayMocks(
 		});
 	}
 
-	// 2a. 買家資料與賣家儀表板的讀取：預設回空，個別 mock 較晚註冊會蓋過。
 	await mockBuyerDefaults(page, identity.accountId);
 	await mockStoreCards(page);
 	await mockMyDashboard(page, {});
@@ -1456,15 +1451,12 @@ export async function setupGatewayMocks(
 	await mockNotificationDefaults(page);
 	await mockCrmDefaults(page);
 
-	// 2b. 措施與申覆（ListMyMeasures）：預設空。
 	await mockMyMeasures(page, opts.measures ?? []);
 
-	// 2b''. 平台詢問（ListMyInquiries，賣家導覽的待回覆徽章）：預設空。
 	await page.route(LIST_MY_INQUIRIES_URL, (route) => {
 		void fulfillConnect(route, {});
 	});
 
-	// 2f. 我的檢舉：列表預設空；單筆預設一筆有效的店家檢舉（無 outcome，顯示審核中）。個別 spec 較晚註冊的 mock 會蓋過。
 	await page.route(LIST_MY_REPORTS_URL, (route) => {
 		void fulfillConnect(route, {});
 	});
@@ -1484,22 +1476,18 @@ export async function setupGatewayMocks(
 		});
 	});
 
-	// 2b'. 封鎖的買家（ListBlockedBuyers）：預設空。
 	await page.route(LIST_BLOCKED_BUYERS_URL, (route) => {
 		void fulfillConnect(route, {});
 	});
 
-	// 2c. 開店可用性（GetMyStoreOpening）：預設可以開店。
 	await mockStoreOpening(page, opts.storeOpeningUnavailabilities ?? []);
 
-	// 2d. 已連結的登入方式（ListLinkedIdentities，設定頁的「登入方式」）：預設只連結 Google。
 	await page.route(LIST_LINKED_IDENTITIES_URL, (route) => {
 		void fulfillConnect(route, {
 			identities: [{ provider: "LOGIN_PROVIDER_GOOGLE" }],
 		});
 	});
 
-	// 3. The signed-in account: the session cookie carries it to the server's GetSession.
 	if (opts.session === "identity") {
 		await signInWithSessionCookie(page, identity);
 	}

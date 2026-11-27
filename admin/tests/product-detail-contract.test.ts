@@ -45,16 +45,12 @@ const PRODUCT_DETAIL_FIXTURE: ProductDetail = {
 	gallery: [
 		{
 			assetId: "a1",
-			// 49 §6.1/§6.6.1：gallery 的圖欄收斂成 imageKey（objectKey SSOT）
-			// ＋ imageUrl（Gateway 組），不再是 objectKey / url。
 			imageKey: "public/a1.jpg",
 			imageUrl: "https://test-media.example.com/i/original/public/a1.jpg",
 		},
 	],
 	shippingMethods: [
 		{
-			// CodeMeta Value：3001=黑貓宅急便、3102=賣方
-			// （backend-payuni services/java/shared/common-core .../code/ShippingMethod.java 等）
 			type: "3001",
 			freeThreshold: "1000",
 			feePayer: "3102",
@@ -65,9 +61,6 @@ const PRODUCT_DETAIL_FIXTURE: ProductDetail = {
 			id: "sku-1",
 			skuName: "1台斤裝",
 			weight: "1.000",
-			// CodeMeta WeightUnit Value：3301=公斤、3302=台斤、3303=公克
-			// （backend-payuni `backend/docs/代碼管理（CodeMeta）/業務類型碼.md` WeightUnit）。
-			// wire 送的是數字碼，不是中文標籤 —— dev product_sku 280 筆全為 3301/3302/3303。
 			unit: "3302",
 			price: "89",
 			stockQty: "150",
@@ -146,8 +139,6 @@ test("description 的 list block 可用 parseListJson 解析出真實 items", ()
 test("gallery / description 圖欄名為 imageKey + imageUrl，舊的 objectKey / url 不存在", () => {
 	const g = PRODUCT_DETAIL_FIXTURE.gallery?.[0];
 	assert.ok(g, "fixture 需要一筆 gallery");
-	// gateway `GalleryItem` 兩欄都是 omitempty，但成對產生（imageUrl 由 imageKey
-	// 組），所以有 key 就有 url —— 這條同時釘住「成對」這個不變式。
 	assert.ok(
 		g.imageUrl?.startsWith("http"),
 		"imageUrl 是 Gateway 組好的顯示 URL",
@@ -171,8 +162,6 @@ test("gallery / description 圖欄名為 imageKey + imageUrl，舊的 objectKey 
 });
 
 test("只給舊欄名的 gallery / block 讀不到圖（fallback 復活會轉紅）", () => {
-	// 舊形狀原樣：assetId + objectKey + url。收斂後前端只讀 imageKey/imageUrl，
-	// 因此這兩個取值必須是 undefined —— 任何 `imageUrl ?? url` 的相容層會在此轉紅。
 	const legacyGallery = {
 		assetId: "a1",
 		objectKey: "public/a1.jpg",
@@ -195,24 +184,16 @@ test("只給舊欄名的 gallery / block 讀不到圖（fallback 復活會轉紅
 
 test("SKU unit 是 CodeMeta WeightUnit 的數字碼，不是中文標籤（wire 形狀）", () => {
 	const unit = PRODUCT_DETAIL_FIXTURE.skus?.[0]?.unit;
-	// 後端送 Value（3301/3302/3303）。fixture 若寫回「台斤」這類人工占位字串，
-	// 就再也釘不住 wire，也就抓不到「畫面直接印碼」這個 bug。
 	assert.match(unit ?? "", /^\d{4}$/);
 	assert.ok(unit && unit in WEIGHT_UNIT_LABEL, `${unit} 不在 WeightUnit 值域`);
 });
 
 test("WEIGHT_UNIT_LABEL 覆蓋 WeightUnit 的完整值域，且 fixture 的碼翻得出標籤", () => {
-	// ⚠️ 這裡**刻意不列出中文標籤**。以前這支斷言把三個標籤逐字抄一份，那在
-	// src/lib/codemeta.ts 還是手寫鏡像的年代有意義；現在碼表是生成物，再抄一次
-	// 就只是「第 N 份會漂移的鏡像」，而且會在 SSOT 正當改字時假性轉紅。
-	// 標籤內容的正確性由 CI 的 CodeMeta drift 檢查（生成物與 Markdown 一致）保證，
-	// 這裡只驗「值域完整」與「翻得出來」這兩件本頁真正在乎的事。
 	assert.deepEqual(
 		Object.keys(WEIGHT_UNIT_LABEL).sort(),
 		Object.values(WeightUnit).sort(),
 	);
 	const unit = PRODUCT_DETAIL_FIXTURE.skus?.[0]?.unit;
-	// codeLabel 未命中會原樣回傳碼值 —— 回傳值不等於輸入，才代表真的翻譯到了。
 	assert.notEqual(codeLabel(WEIGHT_UNIT_LABEL, unit), unit);
 });
 
@@ -223,8 +204,6 @@ test("商品詳情頁的重量/單位欄一律經 codeLabel 轉標籤，不得�
 		/codeLabel\(\s*WEIGHT_UNIT_LABEL\s*,\s*sku\.unit\s*\)/,
 		"重量/單位欄必須用 codeLabel(WEIGHT_UNIT_LABEL, sku.unit)",
 	);
-	// 把合法用法挖掉後，不該還有裸的 sku.unit —— 任何回歸成
-	// `${sku.weight} ${sku.unit}` 的寫法會在這裡轉紅（畫面會顯示「1.000 3301」）。
 	const stripped = source.replace(
 		/codeLabel\(\s*WEIGHT_UNIT_LABEL\s*,\s*sku\.unit\s*\)/g,
 		"",

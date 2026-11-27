@@ -80,7 +80,6 @@ const ORDER_STATUS_COUNTS = {
 };
 
 async function prepareSellerOrdersPage(page: Page, baseURL: string) {
-	// 最低優先度的安全網：頁面周邊的雜項查詢（通知、標籤…）不該讓測試紅。
 	await page.route("**/api/v1/**", (route) =>
 		route.fulfill({
 			status: 200,
@@ -95,14 +94,11 @@ async function prepareSellerOrdersPage(page: Page, baseURL: string) {
 		},
 		session: "identity",
 	});
-	// 之後註冊的 handler 優先，所以這三支具體路由會壓過上面的 catch-all。
 	await mockMyStore(page, SELLER_STORE);
 	await mockMyKyc(page, { status: "APPROVED" });
 	await mockMyDashboard(page, { orderStatusCounts: ORDER_STATUS_COUNTS });
 	await page.route("**/api/v1/app/orders?**", (route) => {
 		const url = new URL(route.request().url());
-		// useAllSellerOrders 只有帶 view=seller 才是履約佇列；買家視角回空集合，
-		// 這樣「清單空掉」若源自 view 掉了，測試會抓到而不是被 mock 補起來。
 		const isSellerView = url.searchParams.get("view") === "seller";
 		const records = isSellerView ? COMPLETED_ORDERS : [];
 		route.fulfill({
@@ -173,8 +169,6 @@ function emptyOrdersState(page: Page) {
 async function captureEvidence(page: Page, name: string) {
 	const dir = process.env.EVIDENCE_DIR;
 	if (!dir) return;
-	// 首屏 loader 是覆蓋層：toBeVisible 不看遮擋，所以不等它卸載就截圖會拍到滿版
-	// logo（實測踩過）。等 .initial-loader 脫離 DOM 才是真的看得到頁面。
 	await expect(page.locator(".initial-loader")).toHaveCount(0);
 	await page.locator(".seller-inventory__stats").scrollIntoViewIfNeeded();
 	await page.screenshot({ path: `${dir}/${name}.png` });
@@ -190,22 +184,16 @@ test.describe("賣家訂單管理：統計數字與清單的對帳", { tag: ["@u
 
 		await page.goto("/seller-center/orders");
 
-		// 頁首彙總 = dashboard 三桶相加，與截圖上的「共 27 筆訂單」同一個數字。
 		await expect(page.getByText(`共 ${COMPLETED_COUNT} 筆訂單`)).toBeVisible();
-		// 統計卡：已結束 27、待出貨 0（標籤取自 SELLER_ORDER_TAB_LABEL.completed，
-		// 不是「已完成」——見 orderTabs.ts 的說明，該桶含取消／退款，不是成交數）。
 		await expect(statCard(page, "已結束")).toContainText(
 			String(COMPLETED_COUNT),
 		);
 		await expect(statCard(page, "待出貨")).toContainText("0");
 
-		// #377 截圖的狀態：停在預設「待出貨」tab。全部 chip = 0、清單空 —— 這是
-		// 正確渲染（該賣家真的 0 筆待出貨），不是數字與清單打架。
 		await expect(quickFilterChip(page, "全部")).toContainText("0");
 		await expect(emptyOrdersState(page)).toBeVisible();
 		await captureEvidence(page, "377-item3-default-tab");
 
-		// 切到已結束：同一份資料必須把 27 筆放出來。若這裡是 0，才是真的 bug。
 		await statCard(page, "已結束").click();
 		await expect(quickFilterChip(page, "全部")).toContainText(
 			String(COMPLETED_COUNT),
@@ -216,7 +204,6 @@ test.describe("賣家訂單管理：統計數字與清單的對帳", { tag: ["@u
 		).toBeVisible();
 		await captureEvidence(page, "377-item3-completed-tab");
 
-		// 「載入更多」把剩下的 7 筆補齊，總數回到 27。
 		await visibleOrdersSurface(page)
 			.getByRole("button", { name: "載入更多" })
 			.click();
@@ -235,8 +222,6 @@ test.describe("賣家訂單管理：統計數字與清單的對帳", { tag: ["@u
 		test.skip(!baseURL, "baseURL is required");
 		await prepareSellerOrdersPage(page, baseURL as string);
 
-		// 直接用 URL 帶著 filter=pending_action 進站，模擬 #377 懷疑的第二種成因：
-		// 帶著上一個 tab 的 quick-filter 切過去，讓新 tab 看起來是空的。
 		await page.goto("/seller-center/orders?tab=pending&filter=pending_action");
 		await expect(emptyOrdersState(page)).toBeVisible();
 		await page.evaluate(() => {
@@ -271,8 +256,6 @@ test.describe("賣家訂單管理：統計數字與清單的對帳", { tag: ["@u
 		});
 
 		await statCard(page, "已結束").click();
-		// tab + filter 由同一次 URL/view-state commit 切換；不只驗最終態，
-		// MutationObserver 也會抓中間空態與舊 tab 回彈。
 		await expect(quickFilterChip(page, "全部")).toContainText(
 			String(COMPLETED_COUNT),
 		);

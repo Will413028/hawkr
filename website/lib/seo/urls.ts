@@ -35,9 +35,6 @@ export function absoluteUrl(path: string, locale: AppLocale): string {
 	if (!path.startsWith("/")) {
 		throw new Error(`absoluteUrl: path must start with "/" (got "${path}")`);
 	}
-	// The home path "/" maps to the bare origin (no trailing slash) so it matches
-	// the root canonical Next.js actually renders — it strips the root slash, e.g.
-	// https://example.com (not …/). Keeps canonical, og:url and sitemap aligned.
 	const localized = withLocale(path, locale);
 	if (localized === "/") {
 		return siteUrl();

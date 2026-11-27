@@ -44,7 +44,6 @@ class ProductServiceOwnerRekeyTest {
     @Mock SellerGrpcClient sellerGrpcClient;
     @Mock SellerInfoAssembler sellerInfoAssembler;
     @Mock ProductRevalidationService productRevalidationService;
-    // #2820：softDeleteProduct 會連帶撤回待審認證申請 —— 不 mock 會 NPE
     @Mock ProductCertificationApplicationService certificationApplicationService;
     @InjectMocks ProductService productService;
 
@@ -57,11 +56,10 @@ class ProductServiceOwnerRekeyTest {
         e.setId(PID);
         e.setStatus(status);
         e.setStoreId(OWNER_SURROGATE);
-        e.setCreatedBy(OLD_LOGIN_ID); // audit 值刻意 ≠ owner
+        e.setCreatedBy(OLD_LOGIN_ID);
         return e;
     }
 
-    // ==== getProduct（ProductService:584 isOwner） ====
 
     @Test
     @DisplayName("getProduct：INACTIVE + 請求者 == store_id（≠ created_by）→ 視為 owner，可見")
@@ -86,7 +84,6 @@ class ProductServiceOwnerRekeyTest {
                 () -> productService.getProduct(String.valueOf(PID), OLD_LOGIN_ID));
     }
 
-    // ==== softDeleteProduct（ProductService:2242 擁有者驗證） ====
 
     @Test
     @DisplayName("softDelete：請求者 == store_id → 通過擁有者驗證並軟刪")

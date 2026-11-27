@@ -59,7 +59,7 @@ import static org.mockito.Mockito.when;
 class GovCertificationServiceTest {
 
     /** 假金鑰，只用來斷言「這串字不得出現在 log 裡」。 */
-    private static final String API_KEY = "TESTAPIKEYFAKEVALUE7Q4W8E2R6T0Y5"; // gitleaks:allow（測試用的假 key）
+    private static final String API_KEY = "TESTAPIKEYFAKEVALUE7Q4W8E2R6T0Y5";
 
     @Mock
     private StringRedisTemplate redisTemplate;
@@ -81,12 +81,9 @@ class GovCertificationServiceTest {
         props.setApiKey1(API_KEY);
 
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        when(valueOps.get(anyString())).thenReturn(null); // 快取與 circuit 都不命中
+        when(valueOps.get(anyString())).thenReturn(null);
 
         service = new GovCertificationService(props, redisTemplate);
-        // GovCertificationService 是 @Service，Spring 靠「唯一建構子」自動注入，因此不為了
-        // 測試多開一個建構子（多一個就會變成沒有 @Autowired 的多建構子，啟動即失敗）。
-        // 這裡改用 ReflectionTestUtils 換掉內建的 HttpClient。
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
 
         logbackLogger = (Logger) LoggerFactory.getLogger(GovCertificationService.class);
@@ -115,17 +112,16 @@ class GovCertificationServiceTest {
         return sb.toString();
     }
 
-    // ==================== (a) 入口白名單 ====================
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "1-008-131005",      // 有機（設計書 §7.1 與 seed data 實際樣本）
-            "1-009-300022",      // 有機（設計書 §3 時序圖樣本）
-            "TAP-2025-0032",     // 產銷履歷
-            "CAS-2025-1234",     // CAS
-            "ALI-TEA-2026-015",  // seed data 產地證明
-            "abc_123",           // 底線
-            "A",                 // 單字元下界
+            "1-008-131005",
+            "1-009-300022",
+            "TAP-2025-0032",
+            "CAS-2025-1234",
+            "ALI-TEA-2026-015",
+            "abc_123",
+            "A",
     })
     @DisplayName("合法 cert_no（英數 / 連字號 / 底線）一律放行")
     void acceptsWhitelistedCertNo(String certNo) {
@@ -134,19 +130,19 @@ class GovCertificationServiceTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "1-008 131005",       // 空白 → URI.create 直接爆
-            "1-008-131005<x>",    // 角括號
-            "abc{}",              // 大括號
-            "abc|def",            // 直線
-            "abc^def",            // caret
-            "%41",                // 裸百分號
-            "abc&api_key=stolen", // 塞第二個 api_key 參數
-            "abc?x=1",            // 塞問號
-            "abc#frag",           // fragment
-            "有機認證",             // 非 ASCII
-            "abc/def",            // 路徑分隔
-            "",                   // 空字串
-            "   ",                // 全空白
+            "1-008 131005",
+            "1-008-131005<x>",
+            "abc{}",
+            "abc|def",
+            "abc^def",
+            "%41",
+            "abc&api_key=stolen",
+            "abc?x=1",
+            "abc#frag",
+            "有機認證",
+            "abc/def",
+            "",
+            "   ",
     })
     @DisplayName("含非白名單字元的 cert_no 一律拒絕")
     void rejectsNonWhitelistedCertNo(String certNo) {
@@ -168,9 +164,6 @@ class GovCertificationServiceTest {
                 () -> service.verify("1-008-131005<x>", CertificationType.ORGANIC));
 
         verify(httpClient, never()).send(any(), any());
-        // openCircuit 與快取寫回共用同一個 4 參數 set()：一次都不該被呼叫。
-        // 修前這條路徑會走進 catch-all → openCircuit，等於任何人送一個爛 cert_no
-        // 就能讓該認證類型的驗證停擺 60 秒。
         verify(valueOps, never()).set(anyString(), anyString(), anyLong(), any());
     }
 
@@ -185,14 +178,10 @@ class GovCertificationServiceTest {
                 "log 外洩 api_key：" + capturedLogText());
     }
 
-    // ==================== (b) catch-all 分支縱深防禦 ====================
 
     @Test
     @DisplayName("catch-all 分支：底層例外訊息含 api_key 時，不得把整個例外物件交給 logger")
     void catchAllMustNotLeakApiKey() throws Exception {
-        // 真實觸發者是 URI.create(url) 的 IllegalArgumentException——訊息內嵌整條含
-        // api_key 的 URL。這裡直接注入同型例外，避免測試綁死特定 JDK 的訊息措辭；
-        // 白名單擋掉這個入口之後，這條分支仍要對其他未列舉的例外保持不外洩。
         String leakyMessage = "Illegal character in query at index 60: "
                 + props.getOrganicUrl() + "?CertOrganicSn=bad&$top=1&api_key=" + API_KEY;
         when(httpClient.send(any(), any())).thenThrow(new IllegalArgumentException(leakyMessage));
@@ -214,10 +203,9 @@ class GovCertificationServiceTest {
         assertThrows(GovCertificationService.GovApiUnavailableException.class,
                 () -> service.verify("1-008-131005", CertificationType.ORGANIC));
 
-        verify(valueOps).set(anyString(), anyString(), anyLong(), any()); // openCircuit
+        verify(valueOps).set(anyString(), anyString(), anyLong(), any());
     }
 
-    // ==================== 既有正常路徑不得被白名單擋掉 ====================
 
     /**
      * ⚠️ fixture 必須帶 {@code Status} 與 {@code EffectiveDate}：查驗語意已收窄成
@@ -233,7 +221,6 @@ class GovCertificationServiceTest {
         when(response.statusCode()).thenReturn(200);
         when(response.body()).thenReturn("{\"RS\":\"OK\",\"Data\":[{\"CertOrganicSn\":\"1-008-131005\","
                 + "\"Status\":\"通過\",\"EffectiveDate\":\"2099/12/31\"}],\"Next\":false}");
-        // send() 是泛型方法，when(...) 推不出 HttpResponse<String>，改用 doReturn 繞開型別推導
         doReturn(response).when(httpClient).send(any(), any());
 
         assertTrue(service.verify("1-008-131005", CertificationType.ORGANIC));

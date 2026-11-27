@@ -35,7 +35,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// governanceModule 記下每個指令收到的輸入，回傳設定好的通報、案件與措施。
 type governanceModule struct {
 	GovernanceModule
 	report            model.AdminReport
@@ -208,19 +207,16 @@ func (m *governanceModule) AdminViolations(_ context.Context, in model.Violation
 
 var governanceNow = time.Date(2026, 10, 4, 2, 0, 0, 0, time.UTC)
 
-// foodSafetyReport 是一筆待分案的食安通報（沒有案件也沒有結果，所以此刻可以分案、設定除了已採取措施以外的結果）。
 func foodSafetyReport() model.AdminReport {
 	r := model.Report{
 		ID: uuid.NewV7(), StoreID: 12, Category: policy.FoodSafety, Description: "吃了不舒服", Version: 4,
 		ReporterBuyerID: 500, CreatedAt: governanceNow, UpdatedAt: governanceNow,
 		Evidence: []model.Evidence{{AssetID: secretAssets[0], ObjectKey: "secure/governance/k1"}, {AssetID: secretAssets[1], ObjectKey: "secure/governance/k2"}},
-		// 分案期限由模組的讀取路徑填入（seller.review_report_triage）；emitter 只轉換。
 		TriageDeadline: &model.Deadline{Start: governanceNow, Due: governanceNow.Add(4 * time.Hour)},
 	}
 	return model.AdminReport{Report: r, Availability: model.ReportFacts{Report: r}.Availability()}
 }
 
-// caseFixture 是一個進行中的食安案件（嚴重度高、有 3 筆通報、有導出的措施），此刻可以選兩個決定的哪些由 facts 決定。
 func caseFixture(facts model.CaseFacts) model.AdminCase {
 	facts.Case.ID, facts.Case.StoreID, facts.Case.Category, facts.Case.Severity = uuid.NewV7(), 12, policy.FoodSafety, model.SeverityHigh
 	facts.Case.Version, facts.Case.OpenedAt, facts.Case.OpenedByAdminID, facts.Case.UpdatedAt = 6, governanceNow, 7, governanceNow
@@ -1064,7 +1060,6 @@ func TestMarkReportSupplementsSeenForwardsTheEtag(t *testing.T) {
 	}
 }
 
-// ownsEverything 回報每則內容都存在、是 storeID 這家店寫的。
 type ownsEverything struct{ storeID int64 }
 
 func (o ownsEverything) ContentSnapshot(_ context.Context, t social.Target) (social.ContentSnapshot, error) {

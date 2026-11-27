@@ -55,7 +55,6 @@ const TONE_CLASS: Record<InvoiceComplaintTone, string> = {
 function actorLabel(actor: string): string {
 	if (actor === "SELLER") return T.actorSeller;
 	if (actor === "ADMIN") return T.actorAdmin;
-	// 後端加了第三種角色時退回原字串，至少看得出是誰做的（§0.6 C11）。
 	return actor;
 }
 
@@ -125,8 +124,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 	const [submitting, setSubmitting] = React.useState(false);
 	const [actionError, setActionError] = React.useState("");
 	const [copied, setCopied] = React.useState(false);
-	// 一次「使用者意圖」一把（§0.4 ②）：開啟確認 Dialog 時 mint，重試沿用同一把，
-	// 只有 9350（payload mismatch）才換新的。
 	const idemKeyRef = React.useRef("");
 
 	const openAction = (kind: ComplaintActionKind) => {
@@ -158,7 +155,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 	}
 
 	if (!complaint) {
-		// 端點 15 失敗時只有本區塊變成錯誤態——發票卡其餘部分不受影響。
 		if (!error) return null;
 		return (
 			<section ref={ref} className="mt-4 border-t border-divider pt-4">
@@ -186,8 +182,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 		complaint.reopenAllowedAfter,
 		Date.now(),
 	);
-	// 後端上線了一個前端還不知道的狀態時一顆動作鍵都不渲染：對一個我們讀不懂的
-	// 狀態送出動作，比暫時少一顆按鈕危險得多。
 	const showActions = !banner.unknown;
 
 	const submit = async (reason: string) => {
@@ -220,7 +214,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 					idemKeyRef.current,
 				);
 			}
-			// 三支都回轉移後的完整單筆 ⇒ 直接覆蓋快取，不再打一次端點 15。
 			replace(next);
 			toast.show({
 				variant: "success",
@@ -236,7 +229,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 		} catch (err) {
 			const code = invoiceBizCode(err);
 			if (code === INVOICE_BIZ_CODE.IDEMPOTENCY_PAYLOAD_MISMATCH) {
-				// 只有這個碼才換新鍵——其餘一律沿用，否則後端會把重試當成第二次操作。
 				console.error("invoice complaint idempotency mismatch", err);
 				idemKeyRef.current = newIdempotencyKey();
 			}
@@ -244,8 +236,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 				code === INVOICE_BIZ_CODE.COMPLAINT_ACTION_NOT_ALLOWED ||
 				code === INVOICE_BIZ_CODE.VERSION_CONFLICT
 			) {
-				// 兩者都代表「我手上的版本已經過時」⇒ 關掉確認框並重抓，讓使用者看到
-				// 現況再決定。9336 的那句話直接來自後端。
 				setPending(null);
 				await refresh();
 				toast.show({
@@ -309,8 +299,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 											setCopied(true);
 											window.setTimeout(() => setCopied(false), 1500);
 										})
-										// 剪貼簿權限被拒時靜默——複製失敗不是使用者要處理的事，
-										// 案件編號本來就在畫面上讀得到。
 										.catch(() => {});
 								}}
 							>
@@ -326,8 +314,7 @@ export const InvoiceComplaintSection = React.forwardRef<
 					<Chip variant="flat" color="default" size="sm">
 						{statusChipLabel(complaint.status)}
 					</Chip>
-					{/* 「已重啟」不是狀態、是屬性：重開把案件推回 OPEN 並把 reopen_count
-					    ＋1，買家在等的事情與第一次完全相同。 */}
+
 					{reopenCount > 0 ? (
 						<Chip variant="flat" color="warning" size="sm">
 							{T.reopenedChip}
@@ -344,8 +331,7 @@ export const InvoiceComplaintSection = React.forwardRef<
 				<strong className="mt-2 block text-base">{banner.title}</strong>
 				<p className="m-0 mt-1 leading-relaxed">{banner.body}</p>
 
-				{/* 這一句是「這樣沒有解決」那顆鍵的說明——沒有它，買家看得到按鈕卻不
-				    知道有期限，過期按下去只會拿到 9336。空字串時整句不渲染。 */}
+
 				{actions.canReject && reviewDue ? (
 					<p className="m-0 mt-1 text-xs">{T.buyerReviewDue(reviewDue)}</p>
 				) : null}
@@ -446,8 +432,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 							variant="bordered"
 							color="warning"
 							size="lg"
-							// 冷卻中／已達上限一律 disabled 但**不隱藏**：案件已在畫面上，
-							// 突然沒有出口比看得到、按不動更難理解。
 							disabled={!actions.canReopen}
 							onClick={() => openAction("reopen")}
 						>
@@ -457,9 +441,7 @@ export const InvoiceComplaintSection = React.forwardRef<
 				</div>
 			) : null}
 
-			{/* 兩種 disabled 各有各的說明句。第三種情況（後端沒給冷卻結束時間）
-			    自 #2911 起不會走到這裡——`showReopen` 本身就吃 `reopenAllowedAfter`，
-			    沒有重開邊時整顆按鈕不渲染。留著這個空字串分支當防線，不亂猜一句話。 */}
+
 			{showActions && reopenHint ? (
 				<p className="m-0 mt-2 text-xs text-hk-muted">{reopenHint}</p>
 			) : null}

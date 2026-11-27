@@ -9,8 +9,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// 契約的列舉與模組的值（ADR 2026-09-25-codemeta-retirement D3）：proto 的值名去掉型別的前綴就是模組的值，
-// 例如 APP_TYPE_BUYER ↔ BUYER。前綴取自零值的名稱（APP_TYPE_UNSPECIFIED 去掉 UNSPECIFIED）。
 
 type protoEnum interface {
 	~int32

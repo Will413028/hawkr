@@ -29,7 +29,6 @@ func TestIdentityInputOnlyKnowsTheTaxID(t *testing.T) {
 }
 
 func TestParseDate(t *testing.T) {
-	// 2026-10-01 23:30 UTC 是台北的 10 月 2 日：台北的今天是有效的日期，明天不是。
 	now := time.Date(2026, 10, 1, 23, 30, 0, 0, time.UTC)
 	for raw, ok := range map[string]bool{
 		"1990-05-06": true, "2026-10-02": true, "2026-10-03": false, "2025-02-29": false, "2024-02-29": true,
@@ -57,9 +56,9 @@ func TestNormalizeTaxID(t *testing.T) {
 	}
 	for in, want := range map[string]bool{
 		"33330333": true, "71777777": true, "00000000": true, "11111101": true,
-		"10458570": true,  // 第 7 位是 7，總和 25
-		"10000073": true,  // 第 7 位是 7，總和 14，加 1 是 5 的倍數
-		"10000030": false, // 總和 14，第 7 位不是 7：不適用加 1
+		"10458570": true,
+		"10000073": true,
+		"10000030": false,
 		"12345678": false, "22099132": false, "": false, "1234567": false, "1234567a": false, "１２３４５６７８": false,
 	} {
 		if got, ok := NormalizeTaxID(in); ok != want {

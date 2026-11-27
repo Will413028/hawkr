@@ -16,8 +16,6 @@ import (
 // routes must receive X-Account-Id=909 (ownership unaffected by active role) —
 // the structural #832 fix: no role-mismatch 401/403.
 func TestRoleAsClaim_DualRoleSession_PassesAllGates(t *testing.T) {
-	// ensure the role gates actually run (not short-circuited by SKIP_ROLE_CHECK),
-	// so this test proves authz passes on the role SET, not because checks are off.
 	prevSkip := middleware.SkipRoleCheck
 	middleware.SkipRoleCheck = false
 	t.Cleanup(func() { middleware.SkipRoleCheck = prevSkip })
@@ -32,14 +30,12 @@ func TestRoleAsClaim_DualRoleSession_PassesAllGates(t *testing.T) {
 			"loginRole": c.Request.Header.Get("X-Login-Role"),
 		})
 	}
-	// requireSeller 檢查角色集合，再檢查單體帶來的能力集合有 CapOrderFulfill。
 	app.GET("/seller-only", middleware.JWTAuth(), requireSeller(authz.CapOrderFulfill), echo)
 	app.GET("/buyer-only", middleware.JWTAuth(), requireBuyer(), echo)
-	app.GET("/payment-like", middleware.JWTAuth(), echo) // JWTAuth only, like /app/payments
+	app.GET("/payment-like", middleware.JWTAuth(), echo)
 
 	get := func(path string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1"+path, nil)
-		// 單體認證後設上的身分：帳號有買家與賣家（3），這個請求以賣家看（2）。
 		req.Header.Set("X-Account-Id", "909")
 		req.Header.Set("X-Account-Type", "3")
 		req.Header.Set("X-Login-Role", "2")

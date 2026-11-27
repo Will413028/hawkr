@@ -58,9 +58,6 @@ export function useCarouselAutoplay<T extends HTMLElement = HTMLElement>({
 		onTickRef.current = onTick;
 	}, [onTick]);
 
-	// Pointer AND keyboard hold. `focusin` / `focusout` bubble (unlike
-	// focus/blur), so one pair of listeners on the container covers every
-	// control inside it.
 	React.useEffect(() => {
 		if (!node) return;
 		const hold = () => setHeld(true);
@@ -77,8 +74,6 @@ export function useCarouselAutoplay<T extends HTMLElement = HTMLElement>({
 		};
 	}, [node]);
 
-	// A background tab must not burn ticks (and must not have silently
-	// advanced twenty slides by the time the user comes back).
 	React.useEffect(() => {
 		const sync = () => setDocumentHidden(document.hidden);
 		sync();

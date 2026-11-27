@@ -137,7 +137,6 @@ func (m *Module) RecordOperation(ctx context.Context, in model.OperationAuditInp
 	return nil
 }
 
-// sameOperation 回傳既有的稽核列是不是同一個請求寫的：動作、資源種類與內容雜湊相同，請求帶了資源 ID 時也要相同。
 func sameOperation(l store.DelegationAdminOperationAuditLog, in model.OperationAuditInput) bool {
 	if l.Action != string(in.Action) || l.ResourceType != string(in.ResourceType) {
 		return false

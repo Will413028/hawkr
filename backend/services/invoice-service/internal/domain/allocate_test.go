@@ -66,7 +66,6 @@ func TestAllocateLargestRemainder_Deterministic(t *testing.T) {
 			}
 		}
 	}
-	// 全部權重相同 ⇒ index ASC 決勝 ⇒ 前 3 個各拿 1。
 	want := []int64{1, 1, 1, 0, 0, 0, 0}
 	for j := range want {
 		if first[j] != want[j] {
@@ -159,7 +158,6 @@ func TestAllocateLargestRemainder_PropertySweep(t *testing.T) {
 // 升冪排列後恰好也是金額降冪（1250 在前、750 在後），index ASC 會得到同一個答案 ⇒ 拿掉
 // weights DESC 例 2 照樣綠。真正有鑑別力的是「小額在前」的順序，本測試補上。
 func TestAllocateLargestRemainder_WeightDescTiebreakIsLoadBearing(t *testing.T) {
-	// 餘數同為 1000，金額 750 / 1250。weights DESC ⇒ 大的先拿 ⇒ [112, 188]。
 	got, err := AllocateLargestRemainder([]int64{750, 1250}, 300)
 	if err != nil {
 		t.Fatal(err)
@@ -167,7 +165,6 @@ func TestAllocateLargestRemainder_WeightDescTiebreakIsLoadBearing(t *testing.T) 
 	if got[0] != 112 || got[1] != 188 {
 		t.Fatalf("got %v, want [112 188] —— 若得到 [113 187] 表示排序鍵第二段（weights DESC）已失效", got)
 	}
-	// 對照組：同一組權重換成升冪輸入，兩者的「大額拿到 +1」必須一致。
 	rev, err := AllocateLargestRemainder([]int64{1250, 750}, 300)
 	if err != nil {
 		t.Fatal(err)

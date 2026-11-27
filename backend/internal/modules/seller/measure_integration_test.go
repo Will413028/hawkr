@@ -30,7 +30,6 @@ func (f *fixture) openPeriods(t *testing.T) int64 {
 	return f.count(t, "SELECT count(*) FROM seller.suspension_periods WHERE ended_at IS NULL")
 }
 
-// waitForLockWaiters 等到至少 n 個連線在等列鎖：測試先自己拿住鎖，確定請求都卡住了才放開。
 func (f *fixture) waitForLockWaiters(t *testing.T, n int64) {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
@@ -62,7 +61,6 @@ func expiryJobs(t *testing.T, f *fixture) map[string]time.Time {
 	return out
 }
 
-// 帳號任何一個消費者看到的停權：讀店家、能力缺 NOT_SUSPENDED、ActingStore 拒絕、後台清單的停權篩選。
 type consumers struct{ store, capability, acting, listed bool }
 
 func (f *fixture) consumersOf(t *testing.T, accountID int64, storeID int64) consumers {
@@ -236,7 +234,6 @@ func TestMeasureSchemaConstraints(t *testing.T) {
 		}
 	}
 
-	// 依據認定的措施在 commit 時一定要有依據的認定（主要依據在 measure_findings 裡）；警告不能是 RISK。
 	id := uuid.NewV7()
 	tx, err := f.db.Pool().Begin(ctx)
 	must(t, err)
@@ -276,7 +273,6 @@ func TestMeasureSchemaConstraints(t *testing.T) {
 			t.Errorf("%s：要被 measures_statement_check 擋下：%v", name, err)
 		}
 	}
-	// 認定一定有建立它的措施（commit 時檢查）。
 	tx, err = f.db.Pool().Begin(ctx)
 	must(t, err)
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -304,7 +300,6 @@ func TestMeasureOnClosedStintIsRejected(t *testing.T) {
 			Violation: &ViolationBasis{Finding: &NewFinding{Category: policy.Fraud, Severity: SeverityHigh}}},
 		"RISK 停權": {AdminID: 7, StoreID: s.StoreID, Kind: MeasureSuspension, StatementToSeller: "y", Note: "x", ReviewBy: &review, Risk: &RiskBasis{Ground: RiskFraud}},
 	} {
-		// 店家存在而狀態不允許：failed_precondition，句子與 GetStore 的 create_measure_unavailabilities 同一個函式（StoreActionUnavailableText）。
 		if _, err := f.module.CreateMeasure(ctx, in); apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), StoreActionUnavailableText(StoreReasonStoreClosed, StoreActionCreateMeasure).Text) {
 			t.Fatalf("%s on a closed stint: %v", name, err)
 		}
@@ -370,7 +365,6 @@ func TestCreateMeasureValidates(t *testing.T) {
 			t.Errorf("%s：%v", name, err)
 		}
 	}
-	// 引用的認定已撤銷也不行；不成立的通報不能成立認定（TestMeasureRejectsADismissedSourceReport）。
 	own := f.violate(t, s.StoreID, SeverityLow, MeasureWarning, nil)
 	_, err := f.module.RevokeMeasure(ctx, RevokeMeasureInput{MeasureID: own.ID, ExpectedVersion: own.Version, AdminID: 7, Reason: RevokeAdminCorrection, RevokeFindings: true})
 	must(t, err)
@@ -427,7 +421,6 @@ func TestEscalationCountsTheAccountAcrossStints(t *testing.T) {
 	if v := third.Findings[0]; v.Severity != SeverityHigh || v.EscalatedFrom == nil || v.AccountID != accountID || v.StoreID != b.StoreID {
 		t.Fatalf("關店重開不能讓升級歸零：%+v", v)
 	}
-	// 別的帳號不受影響。
 	_, other := f.open(t)
 	if m := f.violate(t, other.StoreID, SeverityMedium, MeasureWarning, nil); m.Findings[0].EscalatedFrom != nil {
 		t.Fatal("別的帳號的累計不能算進來")
@@ -491,7 +484,6 @@ func TestCreateMeasureRequestIDIsIdempotent(t *testing.T) {
 		t.Fatal("第一次不是重送")
 	}
 
-	// 同 id、同內容：回傳同一個措施、一列、事件一次；奈秒精度不同視為相同（正規化到微秒）。
 	nano := review.Add(300 * time.Nanosecond)
 	same := in
 	same.ReviewBy = &nano
@@ -504,7 +496,6 @@ func TestCreateMeasureRequestIDIsIdempotent(t *testing.T) {
 		t.Fatalf("measures=%d created=%d suspended=%d", n, len(created.all()), len(suspended.all()))
 	}
 
-	// 建立之後措施被改過：重送回傳措施「目前的狀態」與目前的 etag（AIP-155 的 stale-success 例外）。
 	statement := "改過的理由"
 	updated, err := f.module.UpdateMeasure(ctx, UpdateMeasureInput{MeasureID: first.Measure.ID, AdminID: 8, ExpectedVersion: first.Measure.Version, StatementToSeller: &statement})
 	must(t, err)
@@ -512,25 +503,21 @@ func TestCreateMeasureRequestIDIsIdempotent(t *testing.T) {
 		t.Fatalf("重送回傳目前的狀態：%+v err=%v", r, err)
 	}
 
-	// 先建立、再關店、再同 id 重送：回傳原措施，不跑有狀態的驗證。
 	_, err = f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
 	if r, err := f.module.CreateMeasure(ctx, in); err != nil || !r.Replayed || r.Measure.ID != first.Measure.ID {
 		t.Fatalf("關店之後重送：%+v err=%v", r, err)
 	}
-	// 把複審期限推到過去（時間過了三十天）。
 	f.now = f.now.Add(40 * 24 * time.Hour)
 	if r, err := f.module.CreateMeasure(ctx, in); err != nil || !r.Replayed || r.Measure.ID != first.Measure.ID {
 		t.Fatalf("複審期限過了之後重送：%+v err=%v", r, err)
 	}
-	// 沒有 request_id 的同樣內容，這時候是新的請求：店家已關閉。
 	noID := in
 	noID.RequestID = nil
 	if _, err := f.module.CreateMeasure(ctx, noID); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("沒有 request_id 的請求照常驗證：%v", err)
 	}
 
-	// 同 id、不同內容：invalid_argument，欄位 RequestID。
 	different := in
 	different.StatementToSeller = "不一樣的理由"
 	_, err = f.module.CreateMeasure(ctx, different)
@@ -610,7 +597,6 @@ func TestConcurrentCreateMeasureWithTheSameRequestIDWritesOneRow(t *testing.T) {
 	}
 }
 
-// cascade 建立：M1 建立認定 F（停權 30 天）；M2 建立認定 G 並引用 F（停權 30 天）。兩個措施同時生效。
 func (f *fixture) cascadeWorld(t *testing.T) (accountID int64, s Store, m1, m2 Measure) {
 	t.Helper()
 	accountID, s = f.open(t)
@@ -635,7 +621,6 @@ func (f *fixture) findingStatus(t *testing.T, id uuid.UUID) (ViolationStatus, *R
 	return v.Status, v.RevokedReason
 }
 
-// 措施的跨表不變量：接受申覆 ⇔ APPEAL_ACCEPTED；FINDING_REVOKED ⇒ 依據裡有被撤銷的認定；撤銷的措施沒有待處理的請求。
 func (f *fixture) assertMeasureInvariants(t *testing.T) {
 	t.Helper()
 	for name, query := range map[string]string{
@@ -1063,7 +1048,6 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 			return err
 		}, nil},
 	}
-	// 賣家的兩個請求被拒絕時，錯誤的訊息必須是可用性清單第一筆的句子（同一個函式）；可以做時清單是空的。
 	firstMessages := map[string]func(m Measure) string{
 		"賣家申訴": func(m Measure) string {
 			if us := m.AppealUnavailabilities(uitext.ZhTW); len(us) > 0 {
@@ -1111,7 +1095,6 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 	}
 	f.now = base
 
-	// 必含的格。
 	_, ended := violation(MeasureSuspension, short())()
 	f.now = base.Add(2 * time.Hour)
 	ended = f.measureOf(t, ended.ID)
@@ -1132,7 +1115,6 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 		t.Fatalf("依據認定的措施不能 End：%v", err)
 	}
 
-	// 檢舉人的補充：Report.CanSupplement 與 AddReportSupplement 是同一個判斷（沒有結果且未達上限才成功）。
 	supplementScenarios := []struct {
 		name  string
 		build func() SubmitReportResult
@@ -1224,7 +1206,6 @@ func TestEndTimeRules(t *testing.T) {
 		t.Errorf("依據認定的停權不能清除結束時間：%v", err)
 	}
 	warning := f.violate(t, s.StoreID, SeverityLow, MeasureWarning, nil)
-	// 結束時間不能調的措施先走可用性：failed_precondition，LocalizedMessage 等於 API 對應動作的第一個原因的文字（一個事實一句話），不是另一句 invalid_argument。
 	unavailable := func(name string, m Measure, ends *time.Time, action MeasureAction) {
 		t.Helper()
 		_, err := update(m, ends)
@@ -1243,7 +1224,6 @@ func TestEndTimeRules(t *testing.T) {
 		t.Errorf("警告清除結束時間是沒有改變：%+v %v", same, err)
 	}
 
-	// RISK：無期限 → 有期限是縮短（凍結後仍可）；有期限 → 清除是延長（凍結後不可）。
 	accountID, rs := f.open(t)
 	risk := f.riskSuspend(t, rs.StoreID)
 	shortened, err := update(risk, ptr(f.now.Add(48*time.Hour)))
@@ -1286,7 +1266,6 @@ func TestMeasureIsFrozenFromTheAppealSubmission(t *testing.T) {
 	must(t, err)
 	m := r.Measure
 
-	// 沒申覆過：延長與改理由都可以。
 	freeStatement := "沒申訴過可以改的理由"
 	free, err := f.module.UpdateMeasure(ctx, UpdateMeasureInput{
 		MeasureID: m.ID, AdminID: 7, ExpectedVersion: m.Version, StatementToSeller: &freeStatement, ChangeEndsAt: true, EndsAt: ptr(m.EndsAt.Add(48 * time.Hour)),
@@ -1313,7 +1292,6 @@ func TestMeasureIsFrozenFromTheAppealSubmission(t *testing.T) {
 			if apperr.KindOf(err) != apperr.KindFailedPrecondition || len(errField(err)) != 0 {
 				t.Fatalf("%s: %s must be failed_precondition without a field: %v", stage, name, err)
 			}
-			// 錯誤文字就是 API 回給 client 的那個原因的文字（同一個函式）。
 			reasons := cur.ActionUnavailableReasons(c.action)
 			var ae *apperr.Error
 			if len(reasons) == 0 || !errors.As(err, &ae) || ae.Message != ActionUnavailableText(reasons[0], c.action).Text {
@@ -1374,7 +1352,6 @@ func TestSellerAndAdminEtagsFollowWhatEachSideSees(t *testing.T) {
 	if seller.ReviewBy != nil && !seller.ReviewBy.Equal(newReview) {
 		t.Fatalf("seller=%+v", seller)
 	}
-	// admin 改理由 → 賣家的舊 etag 申覆衝突。
 	statement := "更新後的理由"
 	edited, err := f.module.UpdateMeasure(ctx, UpdateMeasureInput{MeasureID: risk.ID, AdminID: 9, ExpectedVersion: reviewed.Version, StatementToSeller: &statement})
 	must(t, err)
@@ -1421,7 +1398,6 @@ func TestReviewDueListsOnlyDueActiveRiskMeasuresOldestFirst(t *testing.T) {
 	if got := due(); len(got) != 0 {
 		t.Fatalf("還沒進入複審（review_by 前 24 小時以前）：%v", got)
 	}
-	// 提前 24 小時進入：soon 的 review_by 在 1 天後，現在就在收件匣；later 還沒進入。
 	f.now = f.now.Add(12 * time.Hour)
 	if got := due(); !slices.Equal(got, []uuid.UUID{soon.ID}) {
 		t.Fatalf("review_by 前 24 小時進入，還沒到 review_by 也在：%v", got)
@@ -1658,7 +1634,6 @@ func TestShorteningRecomputesAndAnEndedMeasureCannotBeExtended(t *testing.T) {
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("改已結束措施的理由：%v %+v", err, same)
 	}
-	// 再限制：另立一個引用同一筆認定的新措施。
 	again, err := f.module.CreateMeasure(ctx, CreateMeasureInput{
 		AdminID: 7, StoreID: s.StoreID, Kind: MeasureSuspension, StatementToSeller: "再限制", Note: "n", EndsAt: &longer,
 		Violation: &ViolationBasis{CitedFindingIDs: []uuid.UUID{v.Findings[0].ID}},
@@ -1697,9 +1672,9 @@ func TestReconcileScansOnlyAccountsWithAnOpenPeriodOrAnEffectiveSuspension(t *te
 	must(t, err)
 
 	f.now = short.Add(time.Minute)
-	must(t, f.module.ExpireMeasure(ctx, h.ID, short)) // history 的結束 job 有跑
+	must(t, f.module.ExpireMeasure(ctx, h.ID, short))
 	if _, err := f.db.Conn(ctx).Exec(ctx, "DELETE FROM seller.suspension_periods WHERE store_id=$1 AND ended_at IS NULL", lostPeriod.StoreID); err != nil {
-		t.Fatal(err) // 模擬寫入的 transaction 之外出了差錯：有生效中的措施、沒有期間
+		t.Fatal(err)
 	}
 	suspendedBefore, unsuspendedBefore := len(suspended.all()), len(unsuspended.all())
 
@@ -1904,7 +1879,7 @@ func TestAppealAcceptEndsTheEffectInTheSameTransaction(t *testing.T) {
 	if rolledBack.Status != MeasureStatusEnforced || rolledBack.Appeal().State != RequestPending || !f.isSuspended(t, s.StoreID) || rolledBack.Version != admin.Version {
 		t.Fatalf("partial decide committed: %+v", rolledBack)
 	}
-	unsuspended.items = nil // 回滾的 transaction 裡發過的事件，handler 已經看過；只看成功的那一次
+	unsuspended.items = nil
 	failing = false
 	accepted, err := f.module.DecideAppeal(ctx, DecideAppealInput{MeasureID: m.ID, ExpectedVersion: admin.Version, AdminID: 9, Outcome: RequestAccepted, Reason: "接受"})
 	must(t, err)
@@ -2055,7 +2030,6 @@ func TestMeasureListsAcrossStintsAndFilters(t *testing.T) {
 		t.Fatalf("all=%d byStore=%d byAccount=%d byBasis=%d appeals=%d", len(all.Items), len(byStore.Items), len(byAccount.Items), len(byBasis.Items), len(appeals.Items))
 	}
 
-	// 待裁定的申覆收件匣：依提出時間舊到新。
 	f.now = f.now.Add(time.Hour)
 	f.appeal(t, accountID, f.measureOf(t, suspension.ID), "晚的申訴")
 	f.now = f.now.Add(-time.Minute)
@@ -2109,7 +2083,6 @@ func TestAdminMeasuresCarryTheStoreNameAndActionReasons(t *testing.T) {
 		t.Fatalf("警告的原因：extend=%v update=%v revoke=%v", single.ExtendUnavailableReasons(), single.UpdateStatementUnavailableReasons(), single.RevokeUnavailableReasons())
 	}
 
-	// 寫入的回應也帶店名。
 	f.now = f.now.Add(time.Minute)
 	ends := f.now.Add(48 * time.Hour)
 	suspension := f.violate(t, a.StoreID, SeverityHigh, MeasureSuspension, &ends)
@@ -2126,7 +2099,6 @@ func TestAdminMeasuresCarryTheStoreNameAndActionReasons(t *testing.T) {
 		t.Fatalf("RevokeMeasure 回應店名=%q want=%q", revoked.StoreName, a.StoreName)
 	}
 
-	// 個資清理之後店名是 NULL，措施的店名是空字串（列表與單筆）。
 	if _, err := f.module.CloseCurrent(ctx, accountB); err != nil {
 		t.Fatal(err)
 	}
@@ -2211,9 +2183,8 @@ func TestReportSchemaConstraints(t *testing.T) {
 	f.foodSafetyReport(t, s.StoreID, 9)
 	c, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 2)
 	foreign, _ := f.newCase(t, other.StoreID, policy.Fraud, SeverityLow, 1)
-	foreignSecond, _ := f.newCase(t, other.StoreID, policy.Counterfeit, SeverityLow, 1) // 別家店的第二個案件：移動紀錄的來源與目標要不同
+	foreignSecond, _ := f.newCase(t, other.StoreID, policy.Counterfeit, SeverityLow, 1)
 	m := f.violate(t, s.StoreID, SeverityLow, MeasureWarning, nil)
-	// 同一位買家再送一次：members[0] 有一則補充（下面的佐證用它）。
 	if r, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: members[0].ReporterBuyerID, Category: policy.Fraud, Description: "補充"}); err != nil || !r.Supplemented {
 		t.Fatalf("supplement=%+v err=%v", r, err)
 	}
@@ -2265,13 +2236,11 @@ func TestReportSchemaConstraints(t *testing.T) {
 	} {
 		f.wantViolates(t, v.name, v.constraint, strings.ReplaceAll(v.sql, "$1", storeID))
 	}
-	// 沒有匿名檢舉：檢舉人是 NOT NULL（CHECK 對 NULL 不會失敗，所以由欄位的 NOT NULL 擋下）。
 	_, nullErr := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.reports (id, store_id, category, description, created_at, updated_at) VALUES (uuidv7(), $1, 'FOOD_SAFETY', 'x', now(), now())", s.StoreID)
 	var notNull *pgconn.PgError
 	if !errors.As(nullErr, &notNull) || notNull.Code != "23502" || notNull.ColumnName != "reporter_buyer_id" {
 		t.Errorf("reporter_buyer_id 為 NULL 的通報要被 NOT NULL 擋下：%v", nullErr)
 	}
-	// 每次送出各自編號：原通報（第 0 次）與第 1 則補充各接受次內位置 0 到 4，同一次送出的同一個位置不能重複。
 	for _, e := range []struct{ seq, position int }{{0, 0}, {0, model.MaxEvidence - 1}} {
 		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, $2, $3, '019c0000-0000-7000-8000-0000000000a1', 'k')", members[0].ID, e.seq, e.position); err != nil {
 			t.Errorf("第 %d 次送出的位置 %d 的佐證要接受：%v", e.seq, e.position, err)
@@ -2282,7 +2251,6 @@ func TestReportSchemaConstraints(t *testing.T) {
 			t.Errorf("補充的位置 %d 的佐證要接受：%v", position, err)
 		}
 	}
-	// 同一次送出的同一個位置不能重複（主鍵有 evidence_accesses 的外鍵依賴，wantViolates 的「拿掉再試」做不了，這裡只比對被擋下的約束）。
 	_, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, 0, 0, '019c0000-0000-7000-8000-0000000000a1', 'k')", members[0].ID)
 	var pg *pgconn.PgError
 	if !errors.As(err, &pg) || pg.ConstraintName != "report_evidence_pkey" {
@@ -2379,7 +2347,6 @@ func TestMeasureCommandsRequireTheCurrentVersion(t *testing.T) {
 	}
 	accountID, _, m := f.appealable(t)
 
-	// 沒帶版本：InvalidInput，不寫入。
 	if _, err := f.module.RevokeMeasure(ctx, RevokeMeasureInput{MeasureID: m.ID, AdminID: 7, Reason: RevokeOther}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("revoke 沒帶版本：%v", err)
 	}
@@ -2390,7 +2357,6 @@ func TestMeasureCommandsRequireTheCurrentVersion(t *testing.T) {
 		t.Fatalf("decide 沒帶版本：%v", err)
 	}
 
-	// 過時的版本：撤銷、申覆都被擋下，措施不變。
 	updated := stale(m)
 	if _, err := f.module.RevokeMeasure(ctx, RevokeMeasureInput{MeasureID: m.ID, AdminID: 7, ExpectedVersion: m.Version, Reason: RevokeOther}); apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("revoke 過時版本：%v", err)
@@ -2402,7 +2368,6 @@ func TestMeasureCommandsRequireTheCurrentVersion(t *testing.T) {
 		t.Fatalf("被擋下的指令不能改版本：%d", got.Version)
 	}
 
-	// 申覆：成功之後賣家的 etag 沒有改變（內容沒變），重送是「已申覆過」；後台的版本加一、事件一次。
 	appealed := f.appeal(t, accountID, updated, "誤判")
 	if appealed.Version != updated.Version+1 || appealed.SellerVersion() != updated.SellerVersion() {
 		t.Fatalf("appealed version=%d seller=%d", appealed.Version, appealed.SellerVersion())
@@ -2414,7 +2379,6 @@ func TestMeasureCommandsRequireTheCurrentVersion(t *testing.T) {
 		t.Fatalf("申訴重送不能寫入：version=%d events=%d", got.Version, len(submitted.all()))
 	}
 
-	// 裁定：管理員在申覆待裁定時縮短了結束時間，依舊版本的裁定被擋下。
 	shorter := appealed.EndsAt.Add(-time.Hour)
 	changed, err := f.module.UpdateMeasure(ctx, UpdateMeasureInput{MeasureID: m.ID, AdminID: 7, ExpectedVersion: appealed.Version, ChangeEndsAt: true, EndsAt: &shorter})
 	must(t, err)
@@ -2435,12 +2399,10 @@ func TestMeasureCommandsRequireTheCurrentVersion(t *testing.T) {
 	if got := f.measureOf(t, m.ID); got.Version != accepted.Version || len(decided.all()) != 1 || len(revokedEvents.all()) != 1 {
 		t.Fatalf("裁定重送不能寫入：version=%d decided=%d revoked=%d", got.Version, len(decided.all()), len(revokedEvents.all()))
 	}
-	// 帶目前的版本再裁定：沒有待裁定的申覆。
 	if _, err := f.module.DecideAppeal(ctx, DecideAppealInput{MeasureID: m.ID, AdminID: 7, ExpectedVersion: accepted.Version, Outcome: RequestAccepted, Reason: "接受"}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("帶目前版本再裁定：%v", err)
 	}
 
-	// 撤銷：過時、重送。
 	_, s := f.open(t)
 	w := f.violate(t, s.StoreID, SeverityMedium, MeasureWarning, nil)
 	w2 := stale(w)
@@ -2546,7 +2508,6 @@ func TestEvidenceFailuresPointAtTheFailingToken(t *testing.T) {
 	accountID, s, m := f.appealable(t)
 	f.everExposed(t, s.StoreID)
 	f.media.setFailConfirm("down", errors.New("media：確認失敗（內部錯誤）"))
-	// "ok" 開頭的名字放一份真的機敏佐證；其他名字原樣當 token（無效、空白、注入失敗的）。
 	stage := func(uploader media.Uploader, names []string) []string {
 		tokens := make([]string, len(names))
 		for i, name := range names {
@@ -2587,14 +2548,12 @@ func TestEvidenceFailuresPointAtTheFailingToken(t *testing.T) {
 				t.Errorf("%s／%s：欄位 = %v，預期 %v", name, c.name, got, c.want)
 			}
 		}
-		// 欄位錯誤的文字（進 log）仍留著 media 的原因與是哪一張。
 		if err := submit("ok", "expired"); err == nil || !strings.Contains(err.Error(), "確認 EvidenceTokens[1]") {
 			t.Errorf("%s：缺少 media 的原因：%v", name, err)
 		}
 		if err := submit("ok", "down"); err == nil || apperr.KindOf(err) == apperr.KindInvalidInput {
 			t.Errorf("%s：media 的內部錯誤不能變成欄位錯誤：%v", name, err)
 		}
-		// 每張都確認並檢查：兩張都不是機敏上傳時，兩張都回報。
 		var publicTokens []string
 		uploader := media.Uploader{ID: accountID + 1000}
 		if name == "申訴" {

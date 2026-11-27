@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 測試用的幾個時長互不相同，fakeClock 以它們辨識計時器；jitter 0.5 時壽命正好是 MaxLifetime。
 func testStreamConfig() streamConfig {
 	return streamConfig{
 		HeartbeatEvery: 15 * time.Second, RecheckEvery: 60 * time.Second, MaxLifetime: 900 * time.Second,
@@ -37,7 +36,6 @@ type streamHarness struct {
 	log       *callLog
 	guardRuns chan struct{}
 	done      chan error
-	// finished 在 runStream 返回後關閉：等待來源或 Guard 的 helper 據此在 runStream 提早結束時立刻失敗，而不是等到逾時。
 	finished chan struct{}
 	cancel   context.CancelFunc
 }
@@ -59,7 +57,6 @@ func (c *callLog) all() []string {
 	return slices.Clone(c.l)
 }
 
-// startStream 跑一條 runStream；guard 依序回 guards 的結果（用完回 nil），mod 可改 spec。
 func startStream(t *testing.T, guards []error, mod func(*streamSpec[string], *streamHarness)) *streamHarness {
 	t.Helper()
 	h := &streamHarness{t: t, clk: newFakeClock(t), src: newFakeSource(), frames: make(chan string, 64), log: &callLog{}, guardRuns: make(chan struct{}, 64), done: make(chan error, 1), finished: make(chan struct{})}
@@ -102,7 +99,7 @@ func (h *streamHarness) push(ev string, err error) {
 	case h.src.results <- fakeResult{ev, err}:
 	case <-h.finished:
 		h.t.Fatal("runStream 提早結束，來源的結果沒有被取走")
-	case <-time.After(5 * time.Second): // 只防測試卡死，不是行為的閾值
+	case <-time.After(5 * time.Second):
 		h.t.Fatal("來源的結果沒有被 runStream 取走")
 	}
 }
@@ -117,7 +114,7 @@ func (h *streamHarness) awaitGuard() {
 		default:
 			h.t.Fatal("runStream 在 Guard 被呼叫之前就結束了")
 		}
-	case <-time.After(5 * time.Second): // 只防測試卡死
+	case <-time.After(5 * time.Second):
 		h.t.Fatal("Guard 沒有被呼叫")
 	}
 }
@@ -132,7 +129,7 @@ func (h *streamHarness) result() error {
 			h.t.Error("runStream 返回時沒有呼叫 Close")
 		}
 		return err
-	case <-time.After(5 * time.Second): // 只防測試卡死
+	case <-time.After(5 * time.Second):
 		h.t.Fatal("runStream 沒有結束")
 		return nil
 	}
@@ -158,7 +155,7 @@ func TestStreamDoesNotWriteHeartbeatsWhileEventsFlow(t *testing.T) {
 	h := startStream(t, nil, nil)
 	h.push("a", nil)
 	h.push("b", nil)
-	h.clk.await(hbTimer, 3) // 每個 frame 寫出後閒置計時重新武裝：1 次建立 + 2 個事件
+	h.clk.await(hbTimer, 3)
 	if got, want := len(h.frames), 2; got != want {
 		t.Fatalf("frame 數 = %d，預期只有 2 個事件", got)
 	}
@@ -208,7 +205,6 @@ func TestStreamSetsTheWriteDeadlineBeforeEveryFrame(t *testing.T) {
 	<-h.frames
 	h.cancel()
 	_ = h.result()
-	// 取消寫入期限（零值）相對於時鐘的差不是 10 秒：只比對「設定在寫入之前、期限是 WriteTimeout」。
 	got := h.log.all()
 	if len(got) < 5 || got[0] != "deadline:10s" || got[1] != "write" || got[3] != "deadline:10s" || got[4] != "write" {
 		t.Fatalf("每個 frame 前都要先設 10 秒寫入期限：%v", got)

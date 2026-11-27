@@ -29,13 +29,6 @@ test("guest login leaves the document without a route or splash transition", {
 		}
 	});
 
-	// 首頁／/feed／/search／/sellers/:id/posts 的貼文卡片會送動圖原檔（10 MB，
-	// card preset 的 312 倍），而它在首頁是 eager 載入 ⇒ 直接擋 `load` 與
-	// `networkidle`。2026-08-27 main run 33093420954 實測：含動圖的四個面
-	// 26～28.5 秒 settle，不含的 9.2～9.7 秒 —— 差距全落在這一顆上。
-	// 預設的 15 秒導航預算因此不夠。放寬而不是把動畫關掉：卡片會動是刻意的
-	// 產品行為（GIF 逐幀取景是 2026-08-26 的功能），體積的正解是給它一個有界的
-	// 動圖 derivative，追在 website#528。**#528 落地後這裡要跟著調回去。**
 	await page.goto("/", { timeout: 45_000 });
 	await expect(page.locator(".initial-loader")).toBeHidden({ timeout: 15_000 });
 	const login = page.getByRole("link", { name: /登入/ }).first();
@@ -65,10 +58,6 @@ test("product quick-view exits to the top of the seller storefront", {
 		page.locator('[data-hk-market-products-hydrated="true"]'),
 	).toBeAttached();
 
-	// Open the quick-view from a scrolled list. The offset is the whole point:
-	// the modal pins it, and that pin used to be replayed onto whatever route
-	// the user left for — stranding the storefront mid-content (or clamped to
-	// its bottom), which reads as "the tap did nothing".
 	await page.evaluate(() => window.scrollTo(0, 800));
 	const listScrollY = await page.evaluate(() => window.scrollY);
 	expect(listScrollY).toBeGreaterThan(0);
@@ -85,25 +74,11 @@ test("product quick-view exits to the top of the seller storefront", {
 	const dialog = page.getByRole("dialog", { name: "商品詳情" });
 	await expect(dialog).toBeVisible();
 	const seller = dialog.getByRole("link", { name: /查看 .+ 的店家頁/ });
-	// Leaving for the storefront stays an in-app navigation — a full document
-	// load here would be a reliability patch, not a fix.
 	await expect(seller).not.toHaveAttribute("data-hk-hard-navigation", "");
 	const sellerPath = new URL(
 		(await seller.getAttribute("href")) ?? "/sellers/__missing__",
 		page.url(),
 	).pathname;
-	// The card links by `store_id` while the storefront is canonical on
-	// `store_code`, so the destination is whatever middleware settles on — not
-	// the href. Asserting the href would be asserting a link-building detail
-	// that canonicalization is allowed to change. What this test is actually
-	// about survives either way: arriving at the top of the storefront without
-	// a document load.
-	//
-	// Both paths are watched, but only to cover the pre-redirect hop as well:
-	// measured under an induced hard navigation, the destination alone already
-	// registers it (1 request), and watching both simply also catches the one
-	// aimed at the href (2). The `toBe(0)` below is what does the catching —
-	// this set does not make it stricter.
 	const linkedSegment = sellerPath.split("/")[2] ?? "";
 	const canonicalSegment = /^\d+$/.test(linkedSegment)
 		? ((await canonicalSellerSegment(request, linkedSegment)) ?? linkedSegment)

@@ -36,7 +36,6 @@ import {
 	logout,
 } from "./auth";
 
-// 契約（identity.proto）：每個帳號都是買家，roles 只列另外申請的 ROLE_SELLER；工作區是 client 的狀態，GetSession 不回。
 describe("GetSession → Identity", () => {
 	beforeEach(() => rpc.getSession.mockReset());
 

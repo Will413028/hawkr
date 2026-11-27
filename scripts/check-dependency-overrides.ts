@@ -67,8 +67,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// 根目錄的 workspace（pnpm-workspace.yaml 與 node_modules/.pnpm 都在這裡），
-// 由腳本位置推得，從任何 app 目錄呼叫結果相同；測試用 CHECK_OVERRIDES_ROOT 指向 fixture。
 const root = process.env.CHECK_OVERRIDES_ROOT ?? join(import.meta.dirname, "..");
 const failures: string[] = [];
 
@@ -90,9 +88,6 @@ type Override = {
 	line: number;
 };
 
-/* ------------------------------------------------------------------ *
- * semver helpers (kept deliberately small — no runtime dep for a gate)
- * ------------------------------------------------------------------ */
 
 type Version = [number, number, number];
 
@@ -104,8 +99,6 @@ function parseNotes(text: string): {
 	const removeWhen = text.match(
 		/REMOVE-WHEN:\s*requesters-demand\s*>=\s*([0-9][^\s.]*(?:\.[0-9][^\s.]*)*)/,
 	);
-	// Stop at the em dash so a trailing prose reason on the same line ("— the
-	// advisory covers the whole declared range") is not read as a package name.
 	const exceeds = text.match(/EXCEEDS-UPSTREAM:\s*([^—]*)/);
 	return {
 		removeWhen: removeWhen ? removeWhen[1] : null,
@@ -157,7 +150,6 @@ function rangeInterval(range: string): Interval | null {
 	const gte = r.startsWith(">=");
 	const caret = r.startsWith("^");
 	const tilde = r.startsWith("~");
-	// `>x`, `<x`, `<=x` and anything else exotic: skip rather than guess.
 	if (!gte && !caret && !tilde && !/^\d/.test(r)) return null;
 
 	const lo = parseVersion(r.replace(/^[\^~>=\s]+/, ""));
@@ -165,14 +157,11 @@ function rangeInterval(range: string): Interval | null {
 
 	if (gte) return { lo, hi: null };
 	if (caret) {
-		// The whole point of this rule: on 0.x, `^` does NOT open the minor.
-		// `^0.34.5` is `<0.35.0`; `^0.0.3` is `<0.0.4`; `^1.2.3` is `<2.0.0`.
 		if (lo[0] > 0) return { lo, hi: [lo[0] + 1, 0, 0] };
 		if (lo[1] > 0) return { lo, hi: [0, lo[1] + 1, 0] };
 		return { lo, hi: [0, 0, lo[2] + 1] };
 	}
 	if (tilde) return { lo, hi: [lo[0], lo[1] + 1, 0] };
-	// Exact version.
 	return { lo, hi: [lo[0], lo[1], lo[2] + 1] };
 }
 
@@ -188,14 +177,10 @@ function containsInterval(outer: Interval, inner: Interval): boolean {
 function isBounded(value: string): boolean {
 	const v = value.trim();
 	if (!v || /^[*x]$/.test(v)) return false;
-	// `>=x` / `>x` are open-ended; `^x` / `~x` / exact / `<x` are not.
 	if (/^>=?[^=]/.test(v)) return false;
 	return true;
 }
 
-/* ------------------------------------------------------------------ *
- * Parse the `overrides:` block of pnpm-workspace.yaml
- * ------------------------------------------------------------------ */
 
 const workspacePath = join(root, "pnpm-workspace.yaml");
 const workspaceLines = readFileSync(workspacePath, "utf8").split("\n");
@@ -212,7 +197,6 @@ for (let i = 0; i < workspaceLines.length; i++) {
 		continue;
 	}
 	if (!inOverrides) continue;
-	// A non-indented, non-empty line ends the block.
 	if (line.trim() !== "" && !/^\s/.test(line)) break;
 	if (line.trim() === "") continue;
 
@@ -228,7 +212,6 @@ for (let i = 0; i < workspaceLines.length; i++) {
 	const rawKey = entry[1].trim().replace(/^['"]|['"]$/g, "");
 	const value = entry[2].trim().replace(/^['"]|['"]$/g, "");
 
-	// Split on the last `@` so scoped names (`@scope/pkg@^1.0.0`) survive.
 	const at = rawKey.lastIndexOf("@");
 	const scoped = at > 0;
 	const name = scoped ? rawKey.slice(0, at) : rawKey;
@@ -258,9 +241,6 @@ if (overrides.length === 0) {
 	process.exit(1);
 }
 
-/* ------------------------------------------------------------------ *
- * Collect declared dependency ranges from the installed store
- * ------------------------------------------------------------------ */
 
 const pnpmStore = join(root, "node_modules/.pnpm");
 
@@ -319,8 +299,6 @@ for (const entry of storeEntries) {
 		continue;
 	}
 	for (const child of children) {
-		// Real directories are the store entry's own package; siblings are
-		// symlinks to its dependencies and would double-count.
 		if (!child.isDirectory()) continue;
 		if (child.name.startsWith("@")) {
 			let inner: import("node:fs").Dirent[];
@@ -338,9 +316,6 @@ for (const entry of storeEntries) {
 	}
 }
 
-/* ------------------------------------------------------------------ *
- * Apply the rules
- * ------------------------------------------------------------------ */
 
 type Requester = { name: string; by: string; range: string };
 
@@ -351,7 +326,6 @@ type Requester = { name: string; by: string; range: string };
  */
 function checkOverride(o: Override, where: string, all: Requester[], inTree: boolean): void {
 
-	// Rule 1 — a stated exit condition.
 	if (!o.removeWhen) {
 		failures.push(
 			`${where}\n    missing REMOVE-WHEN. Add a comment above the entry:\n` +
@@ -369,7 +343,6 @@ function checkOverride(o: Override, where: string, all: Requester[], inTree: boo
 		return;
 	}
 
-	// Rule 2 — bounded value.
 	if (!isBounded(o.value)) {
 		failures.push(
 			`${where}\n    override value "${o.value}" is open-ended.\n` +
@@ -380,7 +353,6 @@ function checkOverride(o: Override, where: string, all: Requester[], inTree: boo
 		return;
 	}
 
-	// Rule 3 — still in the tree.
 	if (!inTree) {
 		failures.push(
 			`${where}\n    no longer present in the dependency tree — this override is dead\n` +
@@ -389,7 +361,6 @@ function checkOverride(o: Override, where: string, all: Requester[], inTree: boo
 		return;
 	}
 
-	// Rule 4 — redundancy.
 	const selectorMajor = o.selector ? rangeFloor(o.selector)?.[0] : undefined;
 
 	const relevant: {
@@ -401,7 +372,6 @@ function checkOverride(o: Override, where: string, all: Requester[], inTree: boo
 	for (const r of all) {
 		const floor = rangeFloor(r.range);
 		if (!floor) continue;
-		// A `pkg@range` key targets one line only; ignore requesters on others.
 		if (selectorMajor !== undefined && floor[0] !== selectorMajor) continue;
 		relevant.push({ ...r, floor });
 	}
@@ -422,10 +392,8 @@ function checkOverride(o: Override, where: string, all: Requester[], inTree: boo
 		}
 	}
 
-	// Rule 5 — an override that lands outside a requester's declared range must
-	// say so, and must name exactly the requesters it overshoots.
 	const forced = rangeInterval(o.value);
-	const exceeded = new Map<string, string>(); // requester name -> declared range
+	const exceeded = new Map<string, string>();
 	if (forced) {
 		for (const r of relevant) {
 			const declared = rangeInterval(r.range);
@@ -480,17 +448,6 @@ for (const o of overrides) {
 	);
 }
 
-/* ------------------------------------------------------------------ *
- * Rules 1-5 for npm `overrides` (backend/workers/image-gateway)
- *
- * npm overrides are scoped under the requester they act on:
- *   "overrides": { "<requester>": { "<dep>": "<value>" } }
- * and each one carries its notes in `//overrides`, keyed "<requester> > <dep>",
- * written in the same vocabulary as the pnpm comments:
- *   "EXCEEDS-UPSTREAM: <requester> — <why>. REMOVE-WHEN: requesters-demand >=<version>"
- * The lockfile keeps what each package declared (not the override), so the
- * declared ranges come from package-lock.json.
- * ------------------------------------------------------------------ */
 
 const npmDir = "backend/workers/image-gateway";
 let npmCount = 0;
@@ -501,7 +458,6 @@ let npmCount = 0;
 	try {
 		pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
 	} catch {
-		// no npm project here (fixtures, or the worker was removed): nothing to check
 	}
 	let lockOk = true;
 	if (pkg?.overrides) {
@@ -513,7 +469,6 @@ let npmCount = 0;
 			lockOk = false;
 		}
 		if (!lockOk) {
-			// one error is enough; the remaining npm checks all depend on the lockfile
 		} else {
 		const notes = (pkg["//overrides"] ?? {}) as Record<string, string>;
 		if (typeof pkg["//overrides"] !== "object" || pkg["//overrides"] === null) {
@@ -580,7 +535,6 @@ let npmCount = 0;
 	}
 }
 
-// Rule 6 — every `allowBuilds` entry is still in the tree.
 const allowBuilds: { name: string; line: number }[] = [];
 let inAllowBuilds = false;
 for (let i = 0; i < workspaceLines.length; i++) {

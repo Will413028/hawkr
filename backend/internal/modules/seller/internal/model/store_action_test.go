@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// storeIn 造一個店家：條件依 status 推導（與 seller.store_requirement_flags 的 active／not_pending_deletion 同義），suspended 決定停權。
 func storeIn(status Status, suspended bool) Store {
 	s := Store{Status: status, Sanctions: NoSanctions(), Conditions: Conditions{
 		Derived: true, Active: status != Closed, NotPendingDeletion: status != PendingDeletion,
@@ -113,13 +112,11 @@ func TestDelegateReasonsAreTheMissingStorefrontWriteRequirements(t *testing.T) {
 			if (len(got) == 0) != s.Can(CapStorefrontWrite) {
 				t.Errorf("%s suspended=%v：原因 %v 與 Can(CapStorefrontWrite)=%v 不一致", status, suspended, got, s.Can(CapStorefrontWrite))
 			}
-			// 集合相同即可：原因的先後是 DELEGATE 規則表的順序（已關閉、等待刪除、停權），不是 Requirements() 的順序。
 			if !slices.Equal(slices.Sorted(slices.Values(got)), slices.Sorted(slices.Values(want))) {
 				t.Errorf("%s suspended=%v：原因 %v，缺的條件對應 %v", status, suspended, got, want)
 			}
 		}
 	}
-	// 停權的已關閉店家：第一個是 STORE_CLOSED。
 	if got := storeIn(Closed, true).ActionUnavailableReasons(StoreActionDelegate); got[0] != StoreReasonStoreClosed {
 		t.Errorf("已關閉而且停權：%v", got)
 	}

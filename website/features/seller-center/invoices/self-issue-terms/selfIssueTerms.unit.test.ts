@@ -36,13 +36,10 @@ describe("自行開票責任條款", () => {
 	});
 
 	it("勾選框文字表達的是「自行負責開立及交付」而不是「同意條款」", () => {
-		// 勾選本身就是明示同意 ⇒ 文字必須說出承擔的是什麼，不能只寫「我同意」。
 		expect(SELF_ISSUE_CONSENT_LABEL).toContain("自行負責開立及交付發票");
 	});
 
 	it("前端沒有硬編碼條款版本號", () => {
-		// 版本的權威是後端的 SelfIssueTermsVersion，經端點 21 的 currentTermsVersion
-		// 送來。前端寫死一份必然漂移，而漂移的症狀是按「同意」被 400 拒。
 		const source = readFileSync(
 			new URL("./selfIssueTerms.ts", import.meta.url),
 			"utf8",

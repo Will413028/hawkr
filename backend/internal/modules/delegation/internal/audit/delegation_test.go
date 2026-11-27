@@ -16,7 +16,6 @@ func TestChangedFieldsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 空的 before 也要留著：「原本是空的」正是差異的一部分。
 	if !strings.Contains(string(raw), `"before":""`) {
 		t.Fatalf("%s", raw)
 	}

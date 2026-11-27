@@ -99,7 +99,6 @@ class ProductServiceUpdateProductStockQtyTest {
         e.setStoreId(STORE);
         e.setStatus(ProductStatus.INACTIVE.value());
         e.setName("有機小松菜");
-        // 三層分類必須有值：enrichSearchableFields 會拿它們查 categoryService 的名稱快照
         e.setCategoryLv1(11L);
         e.setCategoryLv2(12L);
         e.setCategory(13L);
@@ -132,8 +131,6 @@ class ProductServiceUpdateProductStockQtyTest {
             stockSeenByUpdate.add(((ProductEntity) inv.getArgument(0)).getStockQty());
             return 1;
         });
-        // converter 是 mock（預設 no-op），但「帶 skus」那條路要真的把請求庫存套進 entity，
-        // 否則兩條路徑的加總都會是 DB 快照值，測試分辨不出差別。
         org.mockito.Mockito.doAnswer(inv -> {
             ProductSkuEntity target = inv.getArgument(0);
             ProductSkuDTO source = inv.getArgument(1);
@@ -191,7 +188,6 @@ class ProductServiceUpdateProductStockQtyTest {
 
         productService.updateProduct(dto(null));
 
-        // 落盤後補回：DB 沒動，但回應 DTO 讀的是 entity，不補回前端會看到「庫存消失」
         org.mockito.ArgumentCaptor<ProductEntity> forDto =
                 org.mockito.ArgumentCaptor.forClass(ProductEntity.class);
         org.mockito.Mockito.verify(productEntityConverter).toDetailDTO(forDto.capture(), any(), anyBoolean());

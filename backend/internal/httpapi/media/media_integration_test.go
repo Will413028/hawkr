@@ -55,7 +55,6 @@ type stack struct {
 	client mediav1alpha1connect.MediaAppServiceClient
 }
 
-// start 以真的 media 模組、真的資料庫與記憶體的物件儲存掛上 Connect handler；header X-Test-Account 是帳號 ID，X-Test-Admin 非空時是管理員。
 func start(t *testing.T) *stack {
 	t.Helper()
 	t.Parallel()

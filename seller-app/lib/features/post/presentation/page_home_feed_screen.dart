@@ -55,10 +55,9 @@ import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
     show SellerCapability;
 
 const Color _kGray100 = AppColors.textPrimary;
-const Color _kGray50 = AppColors.textSecondary; // rgba(86,86,86,0.5)
+const Color _kGray50 = AppColors.textSecondary;
 const Color _kBorder = Color(0x1442493F);
 
-// ─── 留言分組：頂層留言，各串的回覆各自讀（ListComments 以 parent_id 取回覆） ────────
 final _postCommentsProvider = FutureProvider.autoDispose
     .family<List<PostComment>, int>(
       (ref, postId) => ref.watch(postRepositoryProvider).listComments(postId),
@@ -127,7 +126,6 @@ class PageHomeFeedScreen extends HookConsumerWidget {
     bool canMarket,
   ) {
     return postsAsync.when(
-      // 重讀失敗時 state 帶著舊列表：繼續顯示它，不換成錯誤畫面。
       skipError: true,
       data: (posts) {
         if (posts.isEmpty) return _buildEmptyState();
@@ -271,7 +269,6 @@ class _FeedPager extends HookWidget {
             imageSource: posts[initialIndex].imageUrl,
           ),
         ),
-        // 左右切換店舖貼文；說明與留言各自保留可捲動空間。
         Positioned.fill(
           child: PageView.builder(
             key: const ValueKey('seller-post-card-page-view'),
@@ -313,7 +310,6 @@ class _FeedPager extends HookWidget {
 String _mutationErrorMessage(Object error, WidgetRef ref) =>
     errorText(error, defaults: ref.read(defaultErrorTextProvider));
 
-// ─── 單篇預覽（對齊 buyer MerchantPostsFeedScreen）──────────────────
 class _PostPage extends HookConsumerWidget {
   const _PostPage({
     super.key,
@@ -341,8 +337,6 @@ class _PostPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // objectKey 直接交給 OptimizedNetworkImage，由 buildImageUrl（唯一組裝入口）
-    // 依 postImage 場景組顯示 URL；不要在這裡自行拼域名。
     final imageSource = post.imageUrl;
     final dateStr = _formatDate(context, post.createdAt);
     final statusBadge = postStatusBadgeOf(post);
@@ -351,8 +345,6 @@ class _PostPage extends HookConsumerWidget {
     final commentFocus = useFocusNode();
     final submitting = useState(false);
     final deletingCommentIds = useRef(<String>{});
-    // 回覆對象：apiParentId 固定掛頂層留言（以 parent_id 串 thread），
-    // replyToId 是回覆針對的那一則；name 顯示被回覆者
     final replyTarget = useState<_PostReplyTarget?>(null);
     final captionExpanded = useState(false);
     final commentsOpen = useRef(false);
@@ -368,21 +360,17 @@ class _PostPage extends HookConsumerWidget {
       commentFocus.requestFocus();
     }
 
-    // 監看 notifier 讓列表 provider 在這個 widget 存活期間不被釋放，留言數的加減才改得到它。
     final postList = ref.watch(postListProvider.notifier);
     void refreshComments() {
       ref.invalidate(_postCommentsProvider(post.id));
       ref.invalidate(_threadRepliesProvider);
     }
 
-    // 校正的流水號：每次本地加減都緊接著發一次校正，所以只有最後發出的校正算數，亂序回來的舊結果丟掉。
     final reconcileSeq = useRef(0);
     void adjustCount(int delta) {
       postList.adjustCommentCount(post.id, delta);
     }
 
-    // 以伺服器的 comment_count 校正本地加減的漂移（別人的留言與刪除）。postList 由這個 widget 監看而存活；
-    // 不擋畫面，失敗就維持本地值。
     Future<void> reconcileCount() async {
       if (!context.mounted) return;
       final seq = ++reconcileSeq.value;
@@ -402,7 +390,6 @@ class _PostPage extends HookConsumerWidget {
       try {
         final target = replyTarget.value;
         if (target != null) {
-          // 回覆巢狀留言時補 @name 前綴，讓對象在 thread 內可辨識
           final text = target.isReplyToReply ? '@${target.name} $raw' : raw;
           await ref
               .read(postRepositoryProvider)
@@ -461,7 +448,6 @@ class _PostPage extends HookConsumerWidget {
     final store = ref.watch(myStoreSnapshotProvider);
     final publishing = useState(false);
     final target = postPublishTarget(post.status);
-    // 能力還沒讀到（store 為 null）時不下結論，伺服器是最後一道。
     final canPublish = ref.watch(canMarketPostsProvider);
     final canUnpublish =
         store?.can(SellerCapability.SELLER_CAPABILITY_CONTENT_CONTRACT) ?? true;
@@ -490,7 +476,6 @@ class _PostPage extends HookConsumerWidget {
             .read(postListProvider.notifier)
             .setPublished(post.id, publish: publish);
         if (!refreshed && context.mounted) {
-          // 發布或下架已成功，只是重讀列表失敗：不說「失敗」，只交代重讀的原因。
           final error = ref.read(postListProvider).error;
           FloatingToast.error(context, _mutationErrorMessage(error ?? '', ref));
         }
@@ -597,8 +582,6 @@ class _PostPage extends HookConsumerWidget {
             ),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // Keep the top controls and the 64px action row reachable even
-                // in short landscape windows. Only the content panel scrolls.
                 final contentSpace = math.max(0.0, constraints.maxHeight - 64);
                 final panelMaxHeight = math.min(
                   math.min(contentSpace * 0.60, 520.0),
@@ -1060,8 +1043,6 @@ class _PostLinkedProduct extends StatelessWidget {
                               )
                             : OptimizedNetworkImage(
                                 imageUrl: imageUrl,
-                                // Decode one axis only; a square decode budget
-                                // stretches non-square photos before cover crops.
                                 width: 44,
                                 maxPixels: 240,
                                 fit: BoxFit.cover,
@@ -1412,8 +1393,6 @@ class _PostCommentsSheet extends HookConsumerWidget {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final viewport = MediaQuery.sizeOf(context);
     useEffect(() {
-      // A short keyboard viewport changes the sheet's scrolling arrangement.
-      // Keep the existing focused field visible after its new parent lays out.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final fieldContext = focusNode.context;
         if (context.mounted && focusNode.hasFocus && fieldContext != null) {
@@ -1695,7 +1674,6 @@ class _PostCommentComposer extends StatelessWidget {
   );
 }
 
-// ─── Inline 留言輸入框（鍵盤 send 鍵觸發送出；對齊 buyer） ─────────────
 class _InlineCommentField extends StatelessWidget {
   const _InlineCommentField({
     super.key,
@@ -1846,7 +1824,6 @@ String _visibleEngagementCount(int count) {
 }
 
 // ─── 留言單則（對齊 buyer _CommentRow：avatar 30 + name + 時間 + ⋯ +
-// 內文 + 「💬 回覆」；reply 左縮排，引導線由 _CommentGroup 統一畫） ─────────
 class _CommentRow extends ConsumerWidget {
   const _CommentRow({
     required this.comment,
@@ -1878,7 +1855,6 @@ class _CommentRow extends ConsumerWidget {
       viewerCanDelete: comment.viewerCanDelete,
       authorIsBuyer: comment.authorIsBuyer,
     );
-    // 刪除依伺服器的 viewer_can_delete；買家作者而店家有封鎖能力時額外提供封鎖
     final v = await showMenu<String>(
       context: context,
       position: position,
@@ -2059,7 +2035,6 @@ class _CommentGroup extends ConsumerWidget {
     if (parent.replyCount <= 0) return rowFor(parent, isReply: false);
     final key = (postId: postId, parentId: parent.id);
     final repliesAsync = ref.watch(_threadRepliesProvider(key));
-    // 只把網路錯誤（Exception）當成這一串讀取失敗；Error 是程式缺陷，原樣往上丟。
     final failure = repliesAsync.error;
     if (failure is Error) {
       Error.throwWithStackTrace(failure, repliesAsync.stackTrace!);
@@ -2088,19 +2063,15 @@ class _CommentGroup extends ConsumerWidget {
     final replies = repliesAsync.value ?? const <PostComment>[];
     if (replies.isEmpty) return rowFor(parent, isReply: false);
 
-    // 父 avatar 中心 X = 10w (row left pad) + 15.sp (avatar radius)
     final parentLineX = 10.w + 15.sp;
-    // reply avatar 中心 X = 46w (row left pad) + 15.sp (avatar radius)
     final replyAvatarCenterX = 46.w + 15.sp;
-    // reply row 內 avatar 中心 Y = 8h (row top pad) + 15.sp (avatar radius)
     final replyAvatarCenterY = 8.h + 15.sp;
 
     return Stack(
       children: [
-        // 主垂直線：從 parent avatar 底部延伸到 group 底（穿過所有 replies）
         Positioned(
           left: parentLineX - 0.5,
-          top: 8.h + 30.sp, // parent avatar bottom (row top pad + avatar size)
+          top: 8.h + 30.sp,
           bottom: 0,
           child: Container(width: 1, color: _kBorder),
         ),

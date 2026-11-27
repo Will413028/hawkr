@@ -12,11 +12,8 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 )
 
-// statsBudget 是店面頁讀每一項統計（粉絲、評價）的時間上限：統計是店面的附屬資訊，讀不到就不設欄位，不能讓一個慢的上游拖住
-// 店面。沿用舊 seller-service 評價統計的 300 ms（reviewStatsTimeout）；粉絲數用同一個額度。店家卡片的批次評價讀取也用這個額度。
 const statsBudget = 300 * time.Millisecond
 
-// maxRatingBatch 是 Ratings.StoreRatingStats 一次最多接受的店家數（review-service 的上限）；卡片比這多時分批。
 const maxRatingBatch = 100
 
 // StatsSource 是店家統計與卡片評分的組裝：前台店面頁（GetStore）、賣家自己的店（GetMyStore）與所有顯示店家卡片的清單共用這一份，
@@ -47,7 +44,6 @@ func NewStatsSource(followers FollowerCounts, ratings Ratings, log *slog.Logger)
 	return &StatsSource{followers: followers, ratings: ratings, log: log}, nil
 }
 
-// count32 把計數轉成契約的 int32；放不下時不設（回 nil），與「讀取失敗」同樣不會變成一個錯的數字。
 func count32(n int64) *int32 {
 	if n < 0 || n > math.MaxInt32 {
 		return nil
@@ -101,7 +97,6 @@ func (s *StatsSource) reviewStats(ctx context.Context, storeID int64) (count *in
 	return ratingFields(ratings, storeID)
 }
 
-// ratingFields 把評價來源對一家店的回答轉成契約的欄位：沒有出現在結果裡的店是確實沒有評價（評價數 0、平均不設）。
 func ratingFields(ratings map[int64]RatingStats, storeID int64) (count *int32, average *float32) {
 	r, reviewed := ratings[storeID]
 	if !reviewed {

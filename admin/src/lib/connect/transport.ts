@@ -7,8 +7,6 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import { classifyError, factsFromError } from "@hawkr/api/connect/errors";
 import { retryInterceptor } from "@hawkr/api/connect/retry";
 
-// 對外 API（Protobuf＋Connect）的 transport。瀏覽器只打同源的 BFF（/api/bff），BFF 以 Access token
-// 轉到後端（單體）的 /{service}/{method}，與 services/api.ts 的 REST 呼叫同一條路。
 
 /** 同 services/api.ts 的逾時。 */
 const TIMEOUT_MS = 10_000;
@@ -21,12 +19,10 @@ export interface AdminTransportOptions {
 export function adminTransport(opts: AdminTransportOptions = {}): Transport {
 	const interceptors: Interceptor[] = [retryInterceptor()];
 	if (opts.onUnauthenticated) {
-		// 放在最外層：看到的是重試之後的結果。
 		interceptors.unshift(sessionInterceptor(opts.onUnauthenticated));
 	}
 	return createConnectTransport({
 		baseUrl: "/api/bff",
-		// 讀取（NO_SIDE_EFFECTS）以 GET 呼叫。
 		useHttpGet: true,
 		defaultTimeoutMs: TIMEOUT_MS,
 		interceptors,

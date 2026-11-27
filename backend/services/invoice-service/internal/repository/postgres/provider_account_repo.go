@@ -148,13 +148,6 @@ func (r *ProviderAccountRepository) Create(ctx context.Context, in domain.NewPro
 		return err
 	}
 	if rows == 0 {
-		// rows=0 的唯一成因是 uq_ipa_fingerprint 撞到：這組（統編, AppKey）已被
-		// 另一個 issuer 綁走（§8.1.1(f) U1——由 DB 唯一約束承擔，不是應用層先查再寫，
-		// 後者在併發下擋不住）。
-		//
-		// ⚠️ **不能回 9331**（憑證驗證失敗，請確認統一編號與 AppKey）：那會把賣家
-		// 引導去改一把其實正確的金鑰，而正解是「這組憑證已被別人綁走」。兩者的處置
-		// 完全相反。9337 是 2026-08-29 為此新增的專屬碼。
 		return biz(bizcode.InvoiceProviderCredentialTaken)
 	}
 	return nil
@@ -275,13 +268,6 @@ func (r *ProviderAccountRepository) WithDecryptedCredential(ctx context.Context,
 	return fn(row.ProviderTaxID, appKey)
 }
 
-// ---------------------------------------------------------------------------
-// §6.1.8／§6.1.13 的狀態轉移（端點 24／25／26／27／44／45／66／67）
-//
-// 七支共通的形狀：allowed-from 與 expectedVersion 都在 SQL 的 WHERE，本層只把
-// rows>0 折成 bool。**rows=0 不是錯誤也不是成功**，是「守衛不成立」——呼叫端必須
-// 回明確業務碼（§7.3.0 規則 4）。
-// ---------------------------------------------------------------------------
 
 // ResubmitCredential 是端點 24 的覆寫分支。
 //

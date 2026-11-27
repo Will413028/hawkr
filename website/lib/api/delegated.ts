@@ -86,8 +86,6 @@ async function parseEnvelope<T>(res: Response): Promise<ApiEnvelope<T> | null> {
 	const text = await res.text();
 	if (!text.trim()) return null;
 	try {
-		// 與 client.ts 同一支 parser：訂單編號、商品 id 是 TSID，經 JSON.parse 會被
-		// 進位成另一個數字，而它看起來仍然是一個合法的 id。
 		return parseJsonSafe<ApiEnvelope<T>>(text);
 	} catch {
 		return null;
@@ -95,7 +93,6 @@ async function parseEnvelope<T>(res: Response): Promise<ApiEnvelope<T> | null> {
 }
 
 function failure(code: number | undefined, status: number): string {
-	// BFF 不透傳上游 message（同一個碼兩份文案必然漂移），所以訊息由這裡產生。
 	return code == null
 		? `代行請求失敗（HTTP ${status}）`
 		: `代行請求失敗（HTTP ${status}／代碼 ${code}）`;
@@ -106,8 +103,6 @@ export async function delegatedFetch<T = unknown>(
 	opts: DelegatedFetchOptions = {},
 ): Promise<ApiEnvelope<T>> {
 	if (typeof window === "undefined") {
-		// 相對 URL 在伺服器上 fetch 不了，而且代行憑證只存在於瀏覽器的 cookie jar：
-		// 讓它在這裡明講，比讓 undici 丟一句 "Failed to parse URL" 有用。
 		throw new Error(
 			"delegatedFetch 只能在瀏覽器使用：代行憑證是 Path=/adm 的 httpOnly cookie，伺服器側沒有它",
 		);
@@ -122,7 +117,6 @@ export async function delegatedFetch<T = unknown>(
 			headers.set("Content-Type", "application/json");
 		body = JSON.stringify(opts.json);
 	}
-	// BFF 的 CSRF 檢查同時要求它與同源 Origin（L1045）。
 	if (UNSAFE.has(method)) headers.set("X-Requested-With", "XMLHttpRequest");
 	if (opts.idempotencyKey) headers.set("Idempotency-Key", opts.idempotencyKey);
 
@@ -135,12 +129,8 @@ export async function delegatedFetch<T = unknown>(
 		method,
 		headers,
 		body,
-		// 同源請求本來就會送 cookie；寫出來是為了讓「憑證怎麼過去的」在這一支檔案裡
-		// 讀得到，而不是散落在呼叫端的預設值知識裡。
 		credentials: "same-origin",
 		cache: "no-store",
-		// 代行回應一律不是 3xx。真的收到就是 middleware 把 BFF 導去了登入頁，此時
-		// 跟隨導向會拿到一個 HTTP 200 的 HTML —— 那個失敗形狀無從診斷。
 		redirect: "manual",
 		signal: composeSignals(
 			opts.signal,

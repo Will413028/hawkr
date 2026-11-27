@@ -69,7 +69,6 @@ void main() {
           final height = tester
               .getSize(find.byKey(const ValueKey('home-banner-viewport')))
               .height;
-          // banner 卡片固定 16:9，高度由卡片寬度換算，不隨字級變動。
           final cardWidth = width - HkBreakpoints.pageGutter(width) * 2;
           expect(height, closeTo(cardWidth * 9 / 16, 0.5));
 

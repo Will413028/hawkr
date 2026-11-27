@@ -29,8 +29,6 @@ export default async function SellerIntroAsync({
 	sellerId: string;
 	productSeller: unknown;
 }) {
-	// Seller enrichment is optional to the PDP. Keep the embedded product-seller
-	// identity usable when the store read is temporarily unavailable.
 	const storeCode = String(
 		(productSeller as { storeCode?: unknown } | null)?.storeCode ?? "",
 	).trim();
@@ -46,7 +44,6 @@ export default async function SellerIntroAsync({
 				console.warn("[SellerIntroAsync] store read failed", error);
 			}
 		}
-		// 讀取失敗是暫時的，保留內嵌的 storeCode；讀到「沒有這家店」才拿掉連結的來源。
 		const absent = !readFailed && store === null;
 		return (
 			<ProductSellerIntro

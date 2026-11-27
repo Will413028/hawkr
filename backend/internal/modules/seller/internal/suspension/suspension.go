@@ -84,8 +84,6 @@ func Recompute(ctx context.Context, q *store.Queries, bus *events.Bus, enqueuer 
 	if err := recomputePeriods(ctx, q, bus, enqueuer, stores, accountID, now); err != nil {
 		return err
 	}
-	// 停權是帳號的可曝光輸入：帳號還沒關閉的店家（鎖順序：店家列在前，公告列最後）在措施生效或結束後重新公告，
-	// 以重算期間用的同一個時間點（now）判斷停權，期間與公告不會對同一刻有兩種答案。
 	var live []int64
 	for _, row := range stores {
 		if row.Status != string(model.Closed) {
@@ -95,10 +93,7 @@ func Recompute(ctx context.Context, q *store.Queries, bus *events.Bus, enqueuer 
 	return ex.Announce(ctx, q, now, live...)
 }
 
-// recomputePeriods 是 Recompute 的期間與事件部分；stores 是已鎖住的帳號全部的 stint。
 func recomputePeriods(ctx context.Context, q *store.Queries, bus *events.Bus, enqueuer jobs.Enqueuer, stores []store.SellerStore, accountID int64, now time.Time) error {
-	// 已撤銷或已結束的措施不再需要它的身分快照（撤銷、結束、到期 job 與對帳都經這裡，在同一個 transaction 刪除）；生效中的
-	// 措施與停權狀態來自同一次 stint.Effective。
 	sanctions, err := stint.PruneIdentities(ctx, q, accountID, now)
 	if err != nil {
 		return err
@@ -109,7 +104,7 @@ func recomputePeriods(ctx context.Context, q *store.Queries, bus *events.Bus, en
 		return err
 	}
 	byID := make(map[int64]store.SellerStore, len(stores))
-	var holder *store.SellerStore // 期間應該在的 stint
+	var holder *store.SellerStore
 	for i, row := range stores {
 		byID[row.StoreID] = row
 		if row.Status != string(model.Closed) {
@@ -146,7 +141,6 @@ func recomputePeriods(ctx context.Context, q *store.Queries, bus *events.Bus, en
 	return stint.Invalidate(ctx, enqueuer, *holder)
 }
 
-// endPeriod 結束一段進行中的停權期間，發 StoreUnsuspended 並排入快取失效。
 func endPeriod(ctx context.Context, q *store.Queries, bus *events.Bus, enqueuer jobs.Enqueuer, row store.SellerStore, period store.SellerSuspensionPeriod, now time.Time) error {
 	ended, err := q.EndSuspensionPeriod(ctx, store.EndSuspensionPeriodParams{PeriodID: period.PeriodID, Now: &now})
 	if err != nil {

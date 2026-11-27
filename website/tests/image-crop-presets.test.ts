@@ -140,10 +140,7 @@ test("AI-enhanced product images enter the same full-image-first editor", () => 
 });
 
 test("post uploads offer the feed ratio band, product uploads do not", () => {
-	// Posts land on a uniform 4:3 board but the uploader chooses the frame.
 	assert.equal(CROP_PRESETS.post.aspectOptions, POST_ASPECT_OPTIONS);
-	// Product surfaces are all 4:3 — a picker there would promise a shape the
-	// PDP / market card / cart thumb cannot honour.
 	assert.equal(CROP_PRESETS.product.aspectOptions, undefined);
 	assert.equal(CROP_PRESETS.avatar.aspectOptions, undefined);
 	assert.equal(CROP_PRESETS.sellerCover.aspectOptions, undefined);
@@ -170,7 +167,6 @@ test("post crop viewport and feed-card preview share the canonical 4:3 contract"
 test("post ratio band spans the supported feed range, tall to wide", () => {
 	const ratios = POST_ASPECT_OPTIONS.map((o) => o.aspect);
 	assert.deepEqual(ratios, [4 / 5, 1, 4 / 3, 1.91]);
-	// Ordered so the control reads like a slider.
 	for (let i = 1; i < ratios.length; i += 1) {
 		assert.ok(ratios[i] > ratios[i - 1]);
 	}
@@ -180,23 +176,16 @@ test("closestAspectOption picks the nearest shape in log space", () => {
 	const pick = (natural: number) =>
 		closestAspectOption(POST_ASPECT_OPTIONS, natural)?.aspect;
 
-	// Exact matches.
 	assert.equal(pick(4 / 5), 4 / 5);
 	assert.equal(pick(1), 1);
 	assert.equal(pick(1.91), 1.91);
 
-	// A 3:4 portrait (0.75) is nearer 4:5 (0.8) than square.
 	assert.equal(pick(3 / 4), 4 / 5);
-	// 16:9 (1.78) is nearer 1.91 than 4:3.
 	assert.equal(pick(16 / 9), 1.91);
-	// 3:2 (1.5) sits between 4:3 (1.33) and 1.91 — log distance favours 4:3.
 	assert.equal(pick(3 / 2), 4 / 3);
-	// Extremes clamp to the ends of the band rather than falling through.
 	assert.equal(pick(9 / 16), 4 / 5);
 	assert.equal(pick(3), 1.91);
 
-	// A 5:4 (1.25) and its reciprocal 4:5 (0.8) must not both collapse onto the
-	// wider option — that is the linear-distance bug this helper avoids.
 	assert.equal(pick(0.8), 4 / 5);
 	assert.equal(pick(1.25), 4 / 3);
 });
@@ -217,7 +206,6 @@ test("custom post ratios accept positive decimal dimensions inside the feed band
 	assert.equal(parseCustomAspectInput("1", "1"), 1);
 	assert.equal(parseCustomAspectInput("3", "2"), 3 / 2);
 	assert.equal(parseCustomAspectInput("1.91", "1"), 1.91);
-	// Whitespace is harmless and the bounds are inclusive.
 	assert.equal(parseCustomAspectInput(" 4 ", " 5 "), 4 / 5);
 });
 
@@ -274,8 +262,6 @@ test("post crop failures stay recoverable instead of silently uploading the orig
 	assert.match(confirm, /setProcessingError\(/);
 	assert.match(confirm, /return;/);
 	assert.match(confirm, /catch/);
-	// Other legacy crop presets may still fall back after their explicit branch,
-	// but a post failure must first stop inside the recoverable error branch.
 	assert.match(
 		confirm,
 		/catch[\s\S]*?if \(isPostEditor\)[\s\S]*?setProcessingError\([\s\S]*?return;[\s\S]*?onCropped\(current, index\)/,

@@ -94,7 +94,6 @@ func SuspensionFrom(ctx context.Context) (at time.Time, ok bool) {
 	return at, ok
 }
 
-// authorize 依 service 的使用者類別檢查 ctx 裡的呼叫者。
 func authorize(ctx context.Context, procedure string) error {
 	audience, ok := AudienceOf(procedure)
 	if !ok {

@@ -27,11 +27,10 @@ import (
 //go:embed templates
 var templates embed.FS
 
-// data 是模板的參數。
 type data struct {
-	Name   string // 模組名稱，也是 Go package 與 DB schema 的名稱
-	Legacy string // 舊服務的名稱（例如 content-service）；沒有時是空字串
-	Module string // 單體的 Go module path
+	Name   string
+	Legacy string
+	Module string
 }
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
@@ -150,8 +149,6 @@ func newCharacterization(root string, d data) error {
 	return nil
 }
 
-// render 把 src 底下的每個模板渲染到 dst：檔名去掉 .tmpl（rename 有列的改名），skip 列的不產生。
-// 目的地已經存在時不覆寫任何東西。
 func render(src, dst string, d data, rename map[string]string, skip map[string]bool) error {
 	if _, err := os.Stat(dst); err == nil {
 		return fmt.Errorf("%s 已經存在，不覆寫", dst)
@@ -204,7 +201,6 @@ func writeFiles(files []generatedFile) error {
 	return nil
 }
 
-// execute 渲染一個模板；Go 檔再經過 gofmt，模板的縮排因此不必完全照 gofmt 寫。
 func execute(path string, d data) ([]byte, error) {
 	raw, err := templates.ReadFile(path)
 	if err != nil {
@@ -244,7 +240,6 @@ func spliceGo(path string, edit func(string) (string, error)) ([]byte, error) {
 	return out, nil
 }
 
-// register 把模組加到 cmd/hawkr/modules.go 的 modules() 最後面（順序就是 migrate 套用的順序）。
 func register(path string, d data) ([]byte, error) {
 	return spliceGo(path, func(src string) (string, error) {
 		const list = "return []migrate.Module{\n"

@@ -29,8 +29,6 @@ test("WEB_ORIGIN 只接受乾淨的 origin", () => {
 		"example.com",
 		"//example.com",
 		"javascript:alert(1)",
-		// 帶路徑／查詢／片段的值會讓 `${origin}/adm/enter` 組出一個看起來合法、
-		// 實際打到別處的網址。
 		"https://example.com/adm",
 		"https://example.com/?next=x",
 		"https://example.com/#x",
@@ -87,7 +85,6 @@ test("handoff code 形狀：dhof_ ＋ 43 字 base64url", () => {
 		42,
 		"dhof_short",
 		`${valid}x`,
-		// credential 的前綴，不是兌換碼
 		"dops_9tJ0mQx7Kd2ZfVb3Rn8sYuC1Ea6Ph4Lw5Ti0Og2NkJ8",
 		"dhof_4kR2sPy8Mf3ZgWc5Tn9uZvD1Fb7Qi6Nx8Uj0Rh3Pm!2",
 	]) {
@@ -130,7 +127,6 @@ test("same-origin 檢查：Origin 與 Host 必須同時存在且相符", () => {
 	assert.equal(of({ host: "admin.example.com" }), false);
 	assert.equal(of({ origin: "https://admin.example.com" }), false);
 	assert.equal(of({ origin: "null", host: "admin.example.com" }), false);
-	// port 不同就是不同 origin。
 	assert.equal(
 		of({ origin: "http://localhost:3000", host: "localhost:3001" }),
 		false,

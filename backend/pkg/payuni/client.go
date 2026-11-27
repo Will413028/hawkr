@@ -24,9 +24,6 @@ type Client struct {
 	IsSandbox  bool
 	HTTPClient *http.Client
 
-	// testBaseURL overrides BaseURL() when set. Test-only seam (same-package
-	// tests construct Client via struct literal); zero value never affects
-	// production callers, which always go through NewClient.
 	testBaseURL string
 }
 
@@ -159,7 +156,6 @@ type SearchSellerApiResponse struct {
 
 // BindMerchant calls /api/agent/bind_merchant
 func (c *Client) BindSeller(ctx context.Context, req *BindSellerRequest) (*AgentApiResponse, error) {
-	// Encrypt
 	encryptInfo, err := Encrypt(req, c.HashKey, c.HashIV)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt failed: %w", err)
@@ -265,25 +261,17 @@ func (c *Client) GetSellerStatus(ctx context.Context, merID string) (*SellerStat
 		return nil, fmt.Errorf("missing EncryptInfo in response: %s", string(respBody))
 	}
 
-	// Decrypt
 	decryptedJson, err := Decrypt(apiResp.EncryptInfo, c.HashKey, c.HashIV)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt failed: %w", err)
 	}
 
-	// Decrypted data is URL ENCODED query string
-	// "Status=SUCCESS&Message=...&MerStatus=1..."
-	// We need to parse this into SellerStatusResponse
 
 	vals, err := url.ParseQuery(decryptedJson)
 	if err != nil {
 		return nil, fmt.Errorf("parse decrypted query string failed: %w", err)
 	}
 
-	// Preserve every key PayUni returned (including those the struct doesn't
-	// decode — Reason / Red / UnionPay / Inst3-30 / ForeignCard / SamsungPay /
-	// CVS / ICASH / AFTEE / JKoPay / SP* / HOME) so callers can persist as
-	// jsonb and query later.
 	rawMap := make(map[string]string, len(vals))
 	for k, v := range vals {
 		if len(v) > 0 {
@@ -295,9 +283,6 @@ func (c *Client) GetSellerStatus(ctx context.Context, merID string) (*SellerStat
 		return nil, fmt.Errorf("marshal raw response map: %w", err)
 	}
 
-	// PayUni's official spec names the channel fields CREDIT / ApplePay /
-	// GooglePay / ATM (no "Status" suffix). The previous SDK used
-	// CreditStatus / ApplePayStatus / etc. and silently got empty strings.
 	resp := &SellerStatusResponse{
 		Status:          vals.Get("Status"),
 		Message:         vals.Get("Message"),

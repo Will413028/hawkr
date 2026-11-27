@@ -142,12 +142,6 @@ public class PaymentGrpcClient {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             builder.setRefundNo(idempotencyKey);
         }
-        // envelope-code 檢查（依《Java gRPC 錯誤處理規範》§7.0 現行約定）：
-        // payment 業務失敗（PayUni 拒退 RefundStatus.FAILED 等）以 envelope code≠0 回傳（onNext，非
-        // StatusRuntimeException），必須檢查。失敗拋 IllegalStateException，由 caller 既有 catch 處理：
-        // AutoRefundWorker → updateFailed → retry → MANUAL_INTERVENTION（不標 DONE）；
-        // PaymentEventHandler ATM 預建 → log + 不中斷主流程（#1150 同類：原本不檢查 code 直接取
-        // getData().getRefundNo()，FAILED 退款被當成功標 task DONE，買家錢未退）。
         CreateRefundResponse response = paymentStub
                 .withDeadlineAfter(MONEY_MOVEMENT_DEADLINE_SEC, TimeUnit.SECONDS)
                 .createRefund(builder.build());

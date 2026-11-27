@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 )
 
-// 型別層級的保證：reviewOrders 滿足 review.Orders，所以 review 的組裝點只能接這個轉接器（或日後的 in-process 實作）。
 var _ review.Orders = reviewOrders{}
 
 type reviewOrderRPC struct {

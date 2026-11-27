@@ -61,7 +61,6 @@ class OrderNotifyBuyerFieldTest {
         long resolvedBuyer = 55L;
         long storeId = 7001L;
 
-        // core payload：dispatch 前尚未 enrich，notify 欄位為 null（鏡像 order.paid 初次落 outbox 的形狀）
         OrderPaidPayload core = new OrderPaidPayload(
                 "ORD1", "HOME_DELIVERY", "2026-08-01T00:00:00Z",
                 buyerId, null, storeId, 1000L,
@@ -84,7 +83,6 @@ class OrderNotifyBuyerFieldTest {
         SellerGrpcClient sellerGrpcClient = mock(SellerGrpcClient.class);
         BuyerGrpcClient buyerGrpcClient = mock(BuyerGrpcClient.class);
 
-        // seller/buyer meta 皆 best-effort：拋例外驗證不阻斷派送（sellerName/buyerNickname 留 null）
         when(sellerGrpcClient.getSellerMeta(storeId)).thenThrow(new RuntimeException("meta unavailable"));
         when(buyerGrpcClient.batchGetBuyerDisplayByBuyerIds(List.of(buyerId)))
                 .thenThrow(new RuntimeException("meta unavailable"));
@@ -133,7 +131,6 @@ class OrderNotifyBuyerFieldTest {
 
         consumer.onShipmentDelivered(message, channel, 1L);
 
-        // ① consumer 側：事務內寫進 outbox 的 core payload 帶 raw buyer_id、notify 欄位留白
         ArgumentCaptor<OrderOutboxEntity> outboxCaptor = ArgumentCaptor.forClass(OrderOutboxEntity.class);
         verify(outboxMapper).insert(outboxCaptor.capture());
         OrderOutboxEntity written = outboxCaptor.getValue();
@@ -146,7 +143,6 @@ class OrderNotifyBuyerFieldTest {
                 "consumer 的短事務內不得有 gRPC —— notify 欄位必須留給 dispatch 時 enrich");
         verify(channel).basicAck(1L, false);
 
-        // ② dispatch 側：enrichDelivered 把 buyer_id 反解成登入 account_id
         ObsRabbitPublisher rabbitPublisher = mock(ObsRabbitPublisher.class);
         BuyerGrpcClient buyerGrpcClient = mock(BuyerGrpcClient.class);
         when(buyerGrpcClient.resolvePrincipals(List.of(buyerId))).thenReturn(PrincipalResolution.allResolved(Map.of(buyerId, resolvedBuyer)));

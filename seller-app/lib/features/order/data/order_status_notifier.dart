@@ -11,7 +11,7 @@ class OrderStatusEvent {
   final String? orderId;
   final String? orderSn;
   final String
-  eventType; // ORDER_PAID, ORDER_SHIPPED, ORDER_COMPLETED, ORDER_CANCELLED, etc.
+  eventType;
   final int? status;
   final Map<String, dynamic>? data;
   final DateTime timestamp;
@@ -79,7 +79,7 @@ class OrderStatusNotifier {
   static const Duration _pollingInterval = Duration(seconds: 60);
 
   /// 最大 polling 次數（防止無限 polling）
-  static const int _maxPollingCount = 60; // 60秒 * 60 = 1小時
+  static const int _maxPollingCount = 60;
 
   final _orderEventController = StreamController<OrderStatusEvent>.broadcast();
   Timer? _pollingTimer;
@@ -105,7 +105,6 @@ class OrderStatusNotifier {
     _pollingCount = 0;
     HKLog.logI('[OrderStatusNotifier] Start listening');
 
-    // 只有明確需要時才開始 polling（一般情況依賴 Silent Push）
     if (enablePolling) {
       _startPolling();
     }
@@ -155,10 +154,7 @@ class OrderStatusNotifier {
 
   /// 手動獲取訂單列表（可選的 polling 方法）
   Future<void> fetchOrders() async {
-    // 這裡可以呼叫 API 獲取訂單列表
-    // 目前主要依賴 Silent Push，不主動 polling
     try {
-      // 可選：呼叫 ApiService.getOrders() 或類似方法
       HKLog.logD('[OrderStatusNotifier] Fetch orders (backup polling)');
     } catch (e) {
       HKLog.logE('[OrderStatusNotifier] Fetch orders error', e);

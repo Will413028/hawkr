@@ -67,7 +67,6 @@ class _CallTcatDialogState extends State<CallTcatDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header ──────────────────────────────────────────
                   Row(
                     children: [
                       Container(
@@ -101,7 +100,6 @@ class _CallTcatDialogState extends State<CallTcatDialog> {
                   ),
                   SizedBox(height: 16.h),
 
-                  // ── Toggle 選項區塊 ──────────────────────────────────
                   Container(
                     decoration: BoxDecoration(
                       color: _lightGray,
@@ -128,7 +126,6 @@ class _CallTcatDialogState extends State<CallTcatDialog> {
                   ),
                   SizedBox(height: 14.h),
 
-                  // ── 備註 label ───────────────────────────────────────
                   Row(
                     children: [
                       HkIcon(
@@ -148,7 +145,6 @@ class _CallTcatDialogState extends State<CallTcatDialog> {
                   ),
                   SizedBox(height: 6.h),
 
-                  // ── 備註 textarea ────────────────────────────────────
                   Container(
                     height: 80.h,
                     decoration: BoxDecoration(
@@ -175,7 +171,6 @@ class _CallTcatDialogState extends State<CallTcatDialog> {
                   ),
                   SizedBox(height: 18.h),
 
-                  // ── 呼叫按鈕 ─────────────────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     height: HkControl.minTap,
@@ -274,7 +269,7 @@ class CallTcatParams {
     required this.isTrolley,
     required this.memo,
   });
-  final String isContact; // Y/N
-  final String isTrolley; // Y/N
+  final String isContact;
+  final String isTrolley;
   final String memo;
 }

@@ -312,7 +312,6 @@ test("驗證：依據的認定依選項的需求，不依事由：REQUIRED 至�
 		errorOf(choice(TerminationViolationRequirement.FORBIDDEN, [])),
 		undefined,
 	);
-	// 不比較事由：重大違約若伺服器說 OPTIONAL，就是選填。
 	assert.equal(
 		errorOf(
 			choice(
@@ -337,7 +336,6 @@ test("請求：事由是選項的 ground，依據只帶選項要的欄位，沒�
 		ready({
 			statement: "  店家已停業 ",
 			note: " 電話確認\n",
-			// 選填而沒選：不送 violation。
 			choice: available(
 				TerminationGround.CEASED_BUSINESS,
 				TerminationViolationRequirement.OPTIONAL,
@@ -368,7 +366,6 @@ test("請求：事由是選項的 ground，依據只帶選項要的欄位，沒�
 			),
 		}),
 	);
-	// 引用的認定是集合：排序後送出（勾選順序是 f2、f1）。
 	assert.deepEqual(breach.measure, {
 		case: "termination",
 		value: {
@@ -377,7 +374,6 @@ test("請求：事由是選項的 ground，依據只帶選項要的欄位，沒�
 		},
 	});
 
-	// 選填而有選：送出；需求是 FORBIDDEN 時殘留的勾選不送（伺服器會拒絕）。
 	assert.deepEqual(
 		buildCreateTermination(
 			"rid",
@@ -522,7 +518,6 @@ test("引用的認定是集合：換勾選順序（取消再勾回）是同一�
 			},
 		},
 	);
-	// 不同的集合還是不同的請求。
 	assert.notEqual(
 		terminationRequestKey("100", breach(["f1", "f2"])),
 		terminationRequestKey("100", breach(["f1", "f3"])),
@@ -532,7 +527,6 @@ test("引用的認定是集合：換勾選順序（取消再勾回）是同一�
 		terminationRequestKey("100", breach(["f1", "f2", "f3"])),
 	);
 
-	// 重送：同一組認定換了順序，沿用上一次的 request_id。
 	let n = 0;
 	const generate = () => `id-${++n}`;
 	const sent = requestIdFor(
@@ -548,7 +542,6 @@ test("引用的認定是集合：換勾選順序（取消再勾回）是同一�
 		),
 		sent,
 	);
-	// 呼叫端的清單不被改動。
 	const selection = ["f3", "f1", "f2"];
 	buildCreateTermination("rid", "100", breach(selection));
 	terminationRequestKey("100", breach(selection));
@@ -571,14 +564,12 @@ test("說明文字（T7）：第一則取伺服器給的完整說明句（生效
 		),
 		["伺服器的重大違約句", TERMINATION_COMMON_TEXT],
 	);
-	// 關聯帳號不再有 client 寫的來源說明：條件在伺服器的句子裡。
 	assert.deepEqual(
 		terminationExplanation(
 			withMessage(TerminationGround.LINKED_ACCOUNT, "伺服器的關聯句"),
 		),
 		["伺服器的關聯句", TERMINATION_COMMON_TEXT],
 	);
-	// 伺服器沒給說明句：沒有第一則，client 不補。
 	assert.deepEqual(
 		terminationExplanation(
 			option(
@@ -679,7 +670,6 @@ test("終止合作的可用性全來自伺服器：旗標與可選事由缺一�
 		canCreate: false,
 		options: [],
 	});
-	// 已關閉的店：伺服器只給第 21.3 條事由，預告不在內；旗標為真就有入口，下拉只有這些（整筆選項帶說明句與依據的需求）。
 	assert.deepEqual(
 		terminationAvailability({
 			canCreateTermination: true,
@@ -706,7 +696,6 @@ test("終止合作的可用性全來自伺服器：旗標與可選事由缺一�
 		false,
 		"旗標為真但沒有可選事由：不留沒有選項的入口",
 	);
-	// 順序照伺服器給的，不重排；只丟掉沒有顯示文字的事由（UNSPECIFIED、不認得的值）。
 	assert.deepEqual(
 		availableTerminationOptions([
 			option(

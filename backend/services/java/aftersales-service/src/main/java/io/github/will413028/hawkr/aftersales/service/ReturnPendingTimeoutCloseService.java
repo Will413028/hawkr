@@ -77,8 +77,6 @@ public class ReturnPendingTimeoutCloseService {
                                      EventPrincipals principals) {
         String caseNo = entity.getCaseNo();
 
-        // CAS 自動關案：status='20' AND ship_back_deadline_at <= NOW → status='33'
-        // 競態：買家壓哨寄出 20→25 搶先 → affected=0 skip
         int affected = caseMapper.markReturnPendingTimeoutAutoClosed(caseNo, now);
         if (affected == 0) {
             log.info("ReturnPendingTimeoutCloseService.cas_skip",
@@ -86,7 +84,6 @@ public class ReturnPendingTimeoutCloseService {
             return false;
         }
 
-        // 寫 audit log（新流程改用 RETURN_TIMEOUT_AUTO_CLOSED，舊 RETURN_TIMEOUT_ESCALATED 已 Deprecated）
         int timeoutDays = properties.getReturnConfig().getTimeoutDays();
         LocalDateTime returnPendingAt = entity.getShipBackDeadlineAt() != null
                 ? entity.getShipBackDeadlineAt().minusDays(timeoutDays)
@@ -101,7 +98,6 @@ public class ReturnPendingTimeoutCloseService {
                 AfterSaleAuditAction.RETURN_TIMEOUT_AUTO_CLOSED.value(),
                 auditDetail);
 
-        // publish event（tx 內）：notification-service 推買賣雙方；order-service 嘗試恢復倒數
         Map<String, Object> extraPayload = new HashMap<>();
         extraPayload.put("shipping_method", entity.getReturnShippingMethod());
         extraPayload.put("deadline_at", entity.getShipBackDeadlineAt() != null

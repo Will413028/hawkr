@@ -10,7 +10,6 @@ var now = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 
 func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 
-// one 算單一店家（候選集合只有它自己）。
 func one(t *testing.T, in Input) Score {
 	t.Helper()
 	got, err := Compute([]Input{in}, now)
@@ -42,7 +41,6 @@ func TestDemandIsZeroWhenNobodyHasBuyers(t *testing.T) {
 }
 
 func TestQualityIsBayesianAverageTowardTheWeightedGlobalMean(t *testing.T) {
-	// 全域平均 = (100·5 + 0·0 + 10·3)/110 = 530/110；評價少的店向它收斂。
 	got, err := Compute([]Input{
 		{StoreID: 1, PublishedAt: now.AddDate(-1, 0, 0), RatingCount: 100, RatingAverage: 5},
 		{StoreID: 2, PublishedAt: now.AddDate(-1, 0, 0)},
@@ -60,7 +58,6 @@ func TestQualityIsBayesianAverageTowardTheWeightedGlobalMean(t *testing.T) {
 			t.Fatalf("store %d quality = %v, want %v", i+1, got[i].Quality, w)
 		}
 	}
-	// 沒有評價的店等於全站平均；一則 5 星不會贏過一百則 4.8 星。
 	if !near(got[1].Quality, (m-1)/4) {
 		t.Fatalf("no reviews: %v", got[1].Quality)
 	}
@@ -161,7 +158,6 @@ func TestScoreStaysWithinDocumentedBounds(t *testing.T) {
 }
 
 func TestZeroDataRanksByNewnessThenPublishedAt(t *testing.T) {
-	// 沒有任何訂單與評價：所有店的需求、品質、扣分都相同，分數只差新店加分，所以越新的店分數越高。
 	got, err := Compute([]Input{
 		{StoreID: 1, PublishedAt: now.AddDate(0, 0, -10)},
 		{StoreID: 2, PublishedAt: now.AddDate(0, 0, -2)},
@@ -174,7 +170,6 @@ func TestZeroDataRanksByNewnessThenPublishedAt(t *testing.T) {
 	if !(got[1].Score > got[0].Score && got[0].Score > got[2].Score) {
 		t.Fatalf("scores: %v %v %v", got[1].Score, got[0].Score, got[2].Score)
 	}
-	// 超過 30 天的店分數相同（同分），由讀取端的 published_at DESC、store_id DESC 決定順序。
 	if got[2].Score != got[3].Score {
 		t.Fatalf("old stores should tie: %v %v", got[2].Score, got[3].Score)
 	}

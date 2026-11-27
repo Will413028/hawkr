@@ -48,7 +48,6 @@ func ledger(d *db.DB, at time.Time) run.Ledger {
 	return run.Ledger{DB: d, Now: func() time.Time { return at }}
 }
 
-// recordingJobs 記下排入與取消的 job；failWith 不為 nil 時排入失敗；cancelState 是取消之後回報的 job 狀態（預設 running）；missingJob 為真時回報 job 列已不存在。
 type recordingJobs struct {
 	n           atomic.Int32
 	failWith    error
@@ -399,7 +398,7 @@ func TestSubscriptionsShareOneListenConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := ledger(d, now)
-	for { // 等 LISTEN 生效：通知到得了探針才算
+	for {
 		if _, err := l.Append(ctx, id, "text", []byte(`{"text":{"text":"a"}}`)); err != nil {
 			t.Fatal(err)
 		}

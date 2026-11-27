@@ -177,7 +177,6 @@ export function turnResultJson(
 	};
 }
 
-// ---- RFQ／發布流程 e2e 用的補充 helper（mock-procurement-rfq.ts 與相關 spec 使用）----
 
 /** 一元方法的處理器回傳它，代表這個請求要在網路層中斷（沒有回應）。 */
 export const ABORT_REQUEST = Symbol("abort-request");

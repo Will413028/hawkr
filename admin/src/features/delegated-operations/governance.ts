@@ -286,8 +286,6 @@ export type DelegatedLookupIntent =
  */
 export function resolveDelegatedLookup(raw: string): DelegatedLookupIntent {
 	const trimmed = raw.trim();
-	// 兩個候選都先算出來：`isDelegatedSessionId` 是型別謂詞，在它之後 `trimmed` 會被
-	// 窄化成 never，那時再取 `toUpperCase()` 是編譯錯。
 	const upper = trimmed.toUpperCase();
 	if (isDelegatedSessionId(trimmed)) {
 		return { kind: "session", sessionId: trimmed };
@@ -440,10 +438,6 @@ export function parseDelegatedAuditLogEntry(
 	const caseReference = parseNullableText(value.caseReference, 200);
 	const changedFields = parseChangedFields(value.changedFields);
 	const actionLabel = parseText(value.actionLabel, 60);
-	// 缺欄視同「沒有說明」而不是契約違反：這一欄是後端 deploy 後才出現的，而 ADM 與
-	// gateway 各自 promote。要求它存在，會讓兩者之間的那段窗口整頁報錯——為了一行
-	// 補充說明把整份稽核紀錄擋掉，代價不對等。型別錯仍舊整頁失敗。
-	// 長度上限取 400（同 changedFields 的前後值）：錯誤碼表最長的一條約 120 字。
 	const bizCodeLabel = parseNullableText(value.bizCodeLabel, 400);
 	const resourceName = parseText(value.resourceName, 160);
 	const resourceImageKey = parseText(value.resourceImageKey, 255);
@@ -665,7 +659,6 @@ export function buildDelegatedAuditLogSearch(
 	return search;
 }
 
-// ==================== 工作階段列表（56 §11.3 P1） ====================
 
 /**
  * `GET /api/v1/admin/delegated-operations` 的一列。

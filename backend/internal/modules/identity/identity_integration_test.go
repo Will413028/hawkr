@@ -37,7 +37,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// token 是測試的後台 token：沒有簽章，只有 Authenticate 選 application 時讀的 iss 與 fakeAdmin 讀的 sub。
 func token(issuer, sub string) string {
 	b, _ := json.Marshal(map[string]string{"iss": issuer, "sub": sub})
 	return "e30." + base64.RawURLEncoding.EncodeToString(b) + ".sig"
@@ -75,15 +74,14 @@ type fixture struct {
 	deps       Deps
 	db         *db.DB
 	now        time.Time
-	emails     map[string]string // f.account 建帳時用的 email，鍵是使用者（登入身分的 subject）
+	emails     map[string]string
 	admins     *fakeAdmin
 	deleted    []AccountDeleted
 	createdMu  sync.Mutex
 	sessionSeq atomic.Int64
-	created    []AccountCreated // 已 commit 與回滾的建帳事件都會記下；只在建帳成功時斷言
+	created    []AccountCreated
 }
 
-// setup 起一個只套用了本模組 migration 的空 database：integration 測試只跑在自己的 schema 上。
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: Migrations()}))
@@ -132,8 +130,6 @@ func wantReason(t *testing.T, err error, want apperr.Reason) {
 	}
 }
 
-// account 直接寫入一個帳號與它的登入身分（GOOGLE，subject 是 user；email 取自 f.emails）。買家不是角色（W5）：
-// 建帳之後沒有任何角色。
 func (f *fixture) account(t *testing.T, user string) int64 {
 	t.Helper()
 	var email *string
@@ -153,7 +149,6 @@ func (f *fixture) account(t *testing.T, user string) int64 {
 	return id
 }
 
-// sessionToken 為帳號直接寫入一個 App 種類的 session（時間取 f.now）並回傳 token，不經 Login。
 func (f *fixture) sessionToken(t *testing.T, accountID int64) string {
 	t.Helper()
 	tok := fmt.Sprintf("%043d", f.sessionSeq.Add(1))
@@ -166,7 +161,6 @@ func (f *fixture) sessionToken(t *testing.T, accountID int64) string {
 	return tok
 }
 
-// authenticate 認證登入身分 user 的帳號（沒有時建立）：為它寫一個 session 再認證，等於這個帳號帶著 session 打進來。
 func (f *fixture) authenticate(t *testing.T, user string) (Authenticated, error) {
 	t.Helper()
 	var id int64
@@ -235,7 +229,7 @@ func TestSuspendedAccountStillAuthenticatesAndCarriesTheSuspensionTime(t *testin
 	if a, err := f.authenticate(t, "user_1"); err != nil || a.SuspendedAt != nil {
 		t.Fatalf("未停權的帳號 = %+v, %v", a, err)
 	}
-	for range 2 { // 冪等：已經停權時不再寫第二筆
+	for range 2 {
 		if _, _, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: id, Category: policy.Other, Reason: "檢舉成立"}); err != nil {
 			t.Fatal(err)
 		}
@@ -261,7 +255,7 @@ func TestDeletionLeavesATombstoneAndKeepsTheLoginIdentity(t *testing.T) {
 	ctx := context.Background()
 	f.emails["user_1"] = "alice@example.com"
 	id := f.account(t, "user_1")
-	for range 2 { // 冪等
+	for range 2 {
 		if err := f.m.DeleteAccount(ctx, id); err != nil {
 			t.Fatal(err)
 		}
@@ -273,7 +267,6 @@ func TestDeletionLeavesATombstoneAndKeepsTheLoginIdentity(t *testing.T) {
 	if err != nil || !acc.Deleted || acc.Email != "" || len(acc.Roles) != 0 {
 		t.Fatalf("墓碑 = %+v, %v", acc, err)
 	}
-	// 同一個登入身分不會再建一個帳號：身分列留作墓碑。
 	_, err = f.authenticate(t, "user_1")
 	wantKind(t, err, apperr.KindUnauthenticated)
 	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 1 {
@@ -294,7 +287,6 @@ func TestRemoveRole(t *testing.T) {
 	ctx := context.Background()
 	id := f.account(t, "user_1")
 
-	// 重複授予同一個角色不變。
 	for range 2 {
 		if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: id, Role: RoleSeller}); err != nil {
 			t.Fatal(err)
@@ -304,11 +296,9 @@ func TestRemoveRole(t *testing.T) {
 	if !slices.Equal(a.Roles, []Role{RoleSeller}) {
 		t.Fatalf("角色 = %v", a.Roles)
 	}
-	// 角色的變更下一個請求就生效：每個請求都讀。
 	if got, err := f.authenticate(t, "user_1"); err != nil || !slices.Equal(got.Principal.Roles, []Role{RoleSeller}) {
 		t.Fatalf("認證的角色 = %+v, %v", got, err)
 	}
-	// 移除最後一個角色不刪帳號（W5：帳號活著就是買家，刪帳由 accountdeletion 編排），重送也一樣。
 	for range 2 {
 		if err := f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: id, Role: RoleSeller}); err != nil {
 			t.Fatal(err)
@@ -320,10 +310,8 @@ func TestRemoveRole(t *testing.T) {
 	if a, _ := f.m.Account(ctx, id); a.Deleted || len(a.Roles) != 0 || len(f.deleted) != 0 {
 		t.Fatalf("帳號 = %+v，AccountDeleted %d 次", a, len(f.deleted))
 	}
-	// 買家不是角色：舊的 BUYER 值授予或移除都回 InvalidInput，不碰資料庫。
 	wantKind(t, f.m.GrantRole(ctx, GrantRoleInput{AccountID: id, Role: "BUYER"}), apperr.KindInvalidInput)
 	wantKind(t, f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: id, Role: "BUYER"}), apperr.KindInvalidInput)
-	// 已刪除的帳號：移除角色成功、不做任何事；授予回 NotFound。從來不存在的帳號回 NotFound。
 	if err := f.m.DeleteAccount(ctx, id); err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +345,6 @@ func TestAdminsAreCreatedForAccessSubjects(t *testing.T) {
 	if n := f.count(t, `SELECT count(*) FROM identity.admins`); n != 1 {
 		t.Fatalf("管理員數 = %d", n)
 	}
-	// 後台的使用者與顧客的帳號各自發號：同號時不互相認證成對方。
 	id := f.account(t, "user_ops")
 	if id != a.Principal.ID {
 		t.Fatalf("前提：兩邊都是第一筆（帳號 %d、管理員 %d）", id, a.Principal.ID)
@@ -481,7 +468,6 @@ func TestListAccounts(t *testing.T) {
 		!slices.Equal(page.Accounts[0].Roles, []Role{RoleSeller}) {
 		t.Fatalf("賣家 = %+v, %v", page, err)
 	}
-	// 使用者輸入的 _ 是字元本身，不是萬用字元：a_1 只找到 a_1，找不到其他。
 	page, err = f.m.ListAccounts(ctx, ListAccountsInput{Filter: AccountFilter{Query: "A_1"}, After: nil, Size: 0})
 	if err != nil || len(page.Accounts) != 1 || page.Accounts[0].ID != ids[0] {
 		t.Fatalf("搜尋 email = %+v, %v", page, err)
@@ -514,11 +500,9 @@ func TestListAccountsByExactEmail(t *testing.T) {
 		}
 		return page
 	}
-	// 大小寫與前後空白不影響；"myshop@example.com" 包含 "shop@example.com" 但不是完全相符，不得命中。
 	if page := list("  shop@EXAMPLE.com "); len(page.Accounts) != 1 || page.Accounts[0].ID != ids[0] || page.Total != 1 {
 		t.Fatalf("完全相符 = %+v", page)
 	}
-	// _ 是字元本身，不是萬用字元。
 	if page := list("x_y@example.com"); len(page.Accounts) != 1 || page.Accounts[0].ID != ids[2] || page.Total != 1 {
 		t.Fatalf("含底線 = %+v", page)
 	}
@@ -527,11 +511,9 @@ func TestListAccountsByExactEmail(t *testing.T) {
 			t.Fatalf("%q 不是完全相符，卻命中 %+v", partial, page)
 		}
 	}
-	// 空字串不篩選。
 	if page := list(""); page.Total != 4 {
 		t.Fatalf("空 email 應列出全部 = %+v", page)
 	}
-	// 和其他篩選取交集。
 	page, err := f.m.ListAccounts(ctx, ListAccountsInput{Filter: AccountFilter{Email: "shop@example.com", Role: RoleSeller}, After: nil, Size: 0})
 	if err != nil || len(page.Accounts) != 0 {
 		t.Fatalf("沒有賣家角色的帳號不該命中 = %+v, %v", page, err)
@@ -611,7 +593,7 @@ func TestDeletionPendingRefusesGrantRole(t *testing.T) {
 	if a, _ := f.m.Account(ctx, id); a.Lifecycle != LifecycleActive {
 		t.Fatalf("lifecycle = %s", a.Lifecycle)
 	}
-	for range 2 { // 冪等
+	for range 2 {
 		if err := f.m.BeginDeletion(ctx, id); err != nil {
 			t.Fatal(err)
 		}

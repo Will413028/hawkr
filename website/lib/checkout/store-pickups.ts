@@ -23,8 +23,7 @@ export interface StorePickup {
 	id: string;
 	receiverName: string;
 	receiverPhone: string;
-	storeId: string; // backend `storeCode` — kept as `storeId` here to match the
-	// checkout API's field name (`/app/checkout/preview` uses `storeId`)
+	storeId: string;
 	storeName: string;
 	storeAddress?: string;
 	isDefault?: boolean;
@@ -116,9 +115,6 @@ export async function deleteStorePickup(id: string): Promise<void> {
 	});
 }
 
-/* =============================================================
- *           PayUni 7-11 電子地圖 (store map) flow
- * ============================================================= */
 
 export interface StoreMapSession {
 	redirectUrl?: string;
@@ -176,9 +172,6 @@ export function openStoreMapPopup(
 			reject(new Error("openStoreMapPopup requires a browser"));
 			return;
 		}
-		// Size the popup as ~80% of the opener's viewport, clamped to a band
-		// where PayUni's 7-11 map stays usable: too narrow squashes the store
-		// list, too tall on 4K screens leaves the controls floating.
 		const vw = window.innerWidth || window.screen.width || 1024;
 		const vh = window.innerHeight || window.screen.height || 768;
 		const width = Math.round(Math.min(1100, Math.max(480, vw * 0.8)));
@@ -239,7 +232,6 @@ export function openStoreMapPopup(
 			try {
 				popup.close();
 			} catch {
-				/* popup may be cross-origin at close-time; ignore */
 			}
 			resolve({
 				storeId: payload.storeId,

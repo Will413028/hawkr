@@ -49,8 +49,7 @@ async function DelegatedUnavailableContent({
 			<div className="adm-blocked__card" role="alert">
 				<h1 className="adm-blocked__title">{copy.title}</h1>
 				<p className="adm-blocked__body">{copy.body}</p>
-				{/* `data-hkui-button`：實心底的白字會被 dark 的
-				    `body a:not([data-hkui-button])` 換成 `--color-ink-200`（見 A4 不變式）。 */}
+
 				<a
 					data-hkui-button=""
 					className="adm-blocked__link"

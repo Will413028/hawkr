@@ -23,7 +23,6 @@ type Purger struct {
 	Ledger Ledger
 }
 
-// purgeBatch 是一次清除處理的 run 數上限，避免一個 statement 持有大量列鎖與長時間的 transaction。
 const purgeBatch = 100
 
 // Purge 分批清除，直到沒有符合條件的 run，回傳刪除的事件數。
@@ -38,7 +37,6 @@ func (p Purger) Purge(ctx context.Context) (int64, error) {
 	})
 }
 
-// drainExpired 重複呼叫 step 直到它推進的 run 數為 0，回傳刪除的事件總數。
 func drainExpired(ctx context.Context, step func(context.Context) (runs, events int64, err error)) (int64, error) {
 	var total int64
 	for {

@@ -32,46 +32,7 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A12｜全平台發票文件查詢（58A §A12，端點 47
-// `GET /api/v1/admin/invoices/documents`）。
-//
-// A01 的下鑽、A13 的父頁。**完全唯讀**：
-//   - 沒有任何寫入請求。重寄通知刻意留在 A13 而不放在列尾——逐列出現一顆會發信的鍵
-//     是一個誤點就寄出的設計。
-//   - **不做跨賣家金額加總**：加總是對帳語意，而月結匯出已移出 Phase 1。給一個沒有
-//     匯出、也沒有對帳定義的總和，只會被當成帳用。
-//   - **不做表頭排序**（端點 47 無 `sort` query）、**不做自動輪詢**（tierDefault 限流桶
-//     與該管理員的其他請求共用額度）。
-//   - **不畫下載鍵**，即使 `fileAvailable === true`：列表 DTO 沒有 `downloadPath`
-//     （那一欄只在端點 48 的回應上），自行拼接是陷阱 T22——拼出來的是一條死鍵，而前端
-//     沒有任何東西會擋。下載一律走 A13。
-//
-// ## 與 58A §A12 的三處欄位落差（全部是「規格有、契約沒有」，詳見 types.ts）
-//
-//   1. `storeId` / `storeName`　→ 端點 47 回的是 `[]SellerInvoiceDocumentItem` 本身，
-//      沒有 admin 專屬型別 ⇒ 「訂單／賣家」只畫得出訂單。賣家維度只剩 store_id 篩選框。
-//   2. `paidAt`　　　　　　　　→ **已修**（backend#3019）：取 `invoice_documents.paid_at`。
-//      2026-09-02 之前建的文件該欄是 NULL ⇒ 那些列仍是空字串，那是誠實的「不知道」。
-//   3. `shipmentStatus`　　　　→ **已修**（同上），由 invoice-service 逐頁向 shipping-service
-//      批次查。58A 要求它「獨立一欄、獨立 badge，禁止與發票狀態合成綜合狀態」⇒ 本頁
-//      畫成獨立的第二顆 badge，絕不與發票狀態合成。
-//
-//      🔴 **空字串只有在 `shipmentStatusDegraded === false` 時才等於「還沒出貨」。**
-//      這正是這一欄原本不敢畫的理由：shipping-service 抖動時每一列都會是空字串，
-//      而空白會被讀成「還沒出貨」——一句我們無從得知的話。降級時本頁改畫「暫時無法取得」
-//      並在表格上方掛一條說明，不讓任何一列說謊。
-//
-// ## `invoiceNumber` 不遮罩，而且不得由前端補遮
-//
-// 58A 兩處寫 `invoiceNoMasked`（「例 AB1000****」），而 proto 逐字寫「完整值，**不遮罩**，
-// §8.1.3 (b) 判為 O 類」，invoice-service 更註明「§8.1.3(c) 裁定 1 **逐字推翻** img-05
-// 的遮罩畫法」。發票號碼是對獎／報帳／申訴的唯一憑據，同時印在發票上、寄在通知信裡、
-// 存在載具裡。⇒ 原樣顯示（§0.4 ③：遮罩一律後端做）。
 
-// shipmentStatusCell 只做「三態 → JSX」的對應；**判定本身在
-// features/invoices/documents.ts 的 shipmentStatusDisplay**，那裡有單元測試守著
-// 「degraded 與 none 不得塌成同一格」——寫在 .tsx 裡就只驗得到字串出現與否，
-// 而那種斷言在把 if (degraded) 整段刪掉之後照樣是綠的（實測過）。
 function shipmentStatusCell(code: string, degraded: boolean) {
 	const view = shipmentStatusDisplay(code, degraded);
 	if (view.kind === "degraded") {
@@ -112,7 +73,6 @@ const isBlank = (f: FilterDraft): boolean =>
 export default function InvoiceDocumentsPage() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	// deep-link：A01 頁尾與未來的 KPI 下鑽都可能帶著條件進來。
 	const seeded: FilterDraft = {
 		storeId: searchParams.get("store_id") ?? "",
 		orderNo: searchParams.get("order_no") ?? "",
@@ -150,8 +110,6 @@ export default function InvoiceDocumentsPage() {
 			return {
 				records: res?.data?.records ?? [],
 				total: Number(res?.data?.total) || 0,
-				// 預設 false：舊版後端不回這個 key ⇒ undefined ⇒ 退回「空字串就是沒出貨」，
-				// 也就是這一波之前的行為。不預設 true，否則每一頁都會掛降級提示。
 				shipmentStatusDegraded: res?.data?.shipmentStatusDegraded === true,
 			};
 		},
@@ -264,8 +222,7 @@ export default function InvoiceDocumentsPage() {
 						))}
 					</select>
 				</div>
-				{/* type="date" 而非 datetime-local：端點 47 的契約是 YYYY-MM-DD，
-				    理由全文見 features/invoices/date-range.ts。 */}
+
 				<div className="adm-operation-field">
 					<label htmlFor="invoice-doc-from">開立起始日期</label>
 					<input
@@ -365,7 +322,7 @@ export default function InvoiceDocumentsPage() {
 										<div className="cell-sub">{row.summary.documentId}</div>
 									</td>
 									<td>
-										{/* 完整值，前端不還原也不補遮（見檔頭）。 */}
+
 										<div className="cell-main">
 											{row.summary.invoiceNumber || "—"}
 										</div>
@@ -407,8 +364,7 @@ export default function InvoiceDocumentsPage() {
 											)}
 										</StatusBadge>
 									</td>
-									{/* 🔴 獨立的第二顆 badge，**絕不與發票狀態合成綜合狀態**（58A §A12）：
-									    合成之後前端就無法履行「發票狀態不影響出貨」這句話。 */}
+
 									<td>
 										{shipmentStatusCell(row.shipmentStatus, shipmentDegraded)}
 									</td>

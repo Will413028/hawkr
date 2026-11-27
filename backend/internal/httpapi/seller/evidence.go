@@ -10,9 +10,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 後台讀治理佐證的端點（遷移計畫 A3b 步驟 8g，Will 2026-10-04：佐證是機敏檔，只經擁有者的端點讀、每次讀取都記錄）。傳輸規則
-// 與 KYC 證件的端點相同（files.go）；授權是後台的權限（adminauth.GuardFile 宣告），沒有理由或限時授權：看佐證是審案的本體。
-// 以 (通報或請求, 位置) 定址，不以 asset ID。
 
 // 佐證端點的 ServeMux 樣式：通報的佐證以通報 ID、措施上請求（申覆）的佐證以請求 ID、詢問回覆的附件以詢問 ID 定址。
 const (
@@ -56,7 +53,6 @@ func (h *AdminEvidence) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// 格式不對的 ID 與位置與一般的找不到同一種回應（404）。
 	id, err := uuid.Parse(r.PathValue(h.idParam))
 	position, perr := strconv.Atoi(r.PathValue("position"))
 	if err != nil || perr != nil || position < 0 {

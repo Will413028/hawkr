@@ -38,7 +38,7 @@ const AuditTargetType = "holiday_calendar"
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生
+		panic(err)
 	}
 	return sub
 }
@@ -74,8 +74,6 @@ type ImportResult struct {
 }
 
 const (
-	// 一次匯入就是整年每一天，所以逐日 upsert 就是整年取代；同時匯入同一年的兩個 transaction 由主鍵與列鎖序列化，不會留下半年資料。
-	// 輸入已依 day 升序（importColumns），兩個 transaction 取列鎖的順序一致，不會死結。xmax <> 0 是被取代的既有列。
 	upsertSQL = `WITH up AS (
 INSERT INTO bizcalendar.days (day, holiday, note)
 SELECT t.day, t.holiday, t.note FROM unnest($1::date[], $2::boolean[], $3::text[]) AS t(day, holiday, note) ORDER BY t.day
@@ -84,7 +82,6 @@ RETURNING (xmax <> 0) AS replaced)
 SELECT count(*) FILTER (WHERE replaced) FROM up`
 )
 
-// importColumns 把 days 依日期升序攤成 upsert 的三個欄位陣列（同層多列依 ID 升序的規則）；不改動 days。
 func importColumns(days []Day) (dates []time.Time, holidays []bool, notes []string) {
 	sorted := slices.SortedFunc(slices.Values(days), func(a, b Day) int { return a.Date.Compare(b.Date) })
 	dates = make([]time.Time, len(sorted))

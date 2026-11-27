@@ -24,7 +24,6 @@ import (
 )
 
 type paymentAdminModule struct {
-	// 清單與人工結案：記下收到的篩選、排序鍵與頁大小，回固定的一頁。
 	paymentFilter  payment.PaymentFilter
 	refundFilter   payment.RefundFilter
 	transferFilter payment.TransferFilter
@@ -35,14 +34,12 @@ type paymentAdminModule struct {
 	refunds        payment.RefundRecordPage
 	resolved       []resolveCall
 	account        payment.Account
-	// refreshedAccount 是 RefreshAccount 回的重讀後帳戶，和 account（Get 回的舊快取）分開，測試才分得出回應用的是哪一個。
 	refreshedAccount payment.Account
 	refreshed        int64
 	retried          int64
 	retriedAck       bool
 	purgeRetried     int64
 	mappingDeleted   int64
-	// actors 是三個寫入方法收到的操作者（依呼叫順序）。
 	actors []payment.AdminActor
 	err    error
 }
@@ -247,14 +244,12 @@ func TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken(t *testing.
 	if got.Msg.GetNextPageToken() == "" {
 		t.Fatal("有下一頁卻沒有 token")
 	}
-	// token 帶回同一組篩選：排序鍵原樣交給模組。
 	if _, err := h.ListPayments(adminCtx(1), connect.NewRequest(&adminpb.ListPaymentsRequest{Status: &st, OrderNo: "O1", PageToken: got.Msg.GetNextPageToken()})); err != nil {
 		t.Fatal(err)
 	}
 	if m.gotAfter == nil || m.gotAfter.ID != next {
 		t.Fatalf("排序鍵 %v", m.gotAfter)
 	}
-	// 換了篩選的 token 不能用。
 	_, err = h.ListPayments(adminCtx(1), connect.NewRequest(&adminpb.ListPaymentsRequest{Status: &st, OrderNo: "O2", PageToken: got.Msg.GetNextPageToken()}))
 	if codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("換篩選的 token err=%v", err)
@@ -408,7 +403,6 @@ func TestResolvePaymentAnomalyRejectsUnspecifiedKindOutcomeAndBadIDsBeforeTheMod
 	}
 }
 
-// fieldViolations 取出錯誤的 BadRequest 欄位路徑（以空白連接）。
 func fieldViolations(err error) string {
 	var out []string
 	for _, d := range rpc.ConnectError(context.Background(), err).Details() {

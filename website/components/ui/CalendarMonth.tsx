@@ -209,9 +209,6 @@ export const CalendarMonth = React.forwardRef<
 		startOfMonth(defaultMonth ?? selectedDate ?? new Date()),
 	);
 	const visibleMonth = startOfMonth(isControlled ? month : internalMonth);
-	// One formatter per locale instead of one per cell per render: the old
-	// code allocated 42 `Intl.DateTimeFormat` instances on every keystroke
-	// inside DatePicker (`Intl` construction is the expensive part).
 	const titleFormatter = React.useMemo(
 		() => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }),
 		[locale],
@@ -234,10 +231,6 @@ export const CalendarMonth = React.forwardRef<
 		weekStartsOn,
 	});
 
-	// Resolve year range — explicit `yearRange` wins; otherwise derive from
-	// min/maxDate; finally fall back to ±50 years around today. This lets
-	// `<DatePicker maxDate={todayISO} />` (the birthday case) auto-expose a
-	// "1925..2026" jump select without callers having to spell it out.
 	const todayYear = today.getFullYear();
 	const resolvedYearRange = React.useMemo(() => {
 		if (yearRange) return yearRange;
@@ -268,13 +261,6 @@ export const CalendarMonth = React.forwardRef<
 		setVisibleMonth(new Date(visibleMonth.getFullYear(), monthIndex, 1));
 	};
 
-	/* ===== APG grid: roving tabIndex + arrow-key navigation =====
-	 *
-	 * Before this, all 42 cells were tabbable and there was no arrow-key
-	 * handling, so crossing one month from the keyboard took 42 Tab presses.
-	 * Now exactly one cell is in the tab order (the selected day, else today,
-	 * else the 1st) and the arrows move a virtual cursor, pulling the visible
-	 * month along when the cursor leaves it. */
 	const gridRef = React.useRef<HTMLDivElement>(null);
 	const [focusDate, setFocusDate] = React.useState<Date | null>(null);
 	const pendingFocusRef = React.useRef(false);
@@ -293,9 +279,6 @@ export const CalendarMonth = React.forwardRef<
 	const focusDayCell = React.useCallback((key: string) => {
 		gridRef.current
 			?.querySelector<HTMLButtonElement>(`[data-day-key="${key}"]`)
-			// preventScroll: DatePicker closes its popover when the trigger
-			// scrolls out of view, and letting the browser scroll an ancestor
-			// here would make the popover close the instant it opened.
 			?.focus({ preventScroll: true });
 	}, []);
 
@@ -431,8 +414,6 @@ export const CalendarMonth = React.forwardRef<
 						</select>
 					</fieldset>
 				) : (
-					// `aria-live`: the prev/next buttons keep their own label, so
-					// without this the month silently changes under the user.
 					<TitleTag className="hkui-calendar__title" aria-live="polite">
 						{title}
 					</TitleTag>
@@ -447,11 +428,7 @@ export const CalendarMonth = React.forwardRef<
 				</button>
 			</div>
 
-			{/* 月曆是 APG 的 grid pattern。這些 role 不能換成 <table>/<tr>/<td>：
-			 * 版面靠 CSS grid/flex，而一旦把 display 從 table-* 改掉，瀏覽器就會
-			 * 把表格語意拿掉，還是得手動補回同一組 role（繞一圈回到原點）。
-			 * grid / row / rowgroup 是容器，鍵盤焦點停在 gridcell（日期鈕）上，
-			 * 所以容器不需要、也不該進入 tab 序。 */}
+
 			{/* biome-ignore lint/a11y/useSemanticElements: 見上方註解 */}
 			<div
 				ref={gridRef}
@@ -496,8 +473,6 @@ export const CalendarMonth = React.forwardRef<
 											.filter(Boolean)
 											.join(" ")}
 										disabled={day.isDisabled || hiddenAdjacent}
-										// Roving tabIndex: only the cursor cell is tabbable, so
-										// Tab leaves the grid instead of walking 42 buttons.
 										tabIndex={day.key === activeKey ? 0 : -1}
 										aria-selected={day.isSelected}
 										aria-current={day.isToday ? "date" : undefined}

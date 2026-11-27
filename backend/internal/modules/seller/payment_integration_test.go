@@ -14,19 +14,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 收款帳戶由 payment 模組擁有（收款開通 ADR D28）：這裡測 seller 這一側——核准經 payment 的公開 API 寫帳戶列、PayoutAccountChanged 的訂閱者更新
-// 開通閘門的副本。payment 自己的 job、inbox 與輪詢在 payment 模組的 integration 測試。
 
 const kindPaymentEnsure = "payment.account_ensure"
 
 var (
 	enabledSnapshot = payment.Snapshot{Transfers: payment.CapabilityActive, PayoutsActive: true}
-	// needsSellerSnapshot 是賣家要補資料（新帳戶的樣子）；rejectedSnapshot 是被金流商拒絕。
 	needsSellerSnapshot = payment.Snapshot{Transfers: payment.CapabilityRestricted, Details: []payment.StatusDetail{{Resolution: payment.ResolutionSellerAction, Reason: "routine_onboarding"}}}
 	rejectedSnapshot    = payment.Snapshot{Transfers: payment.CapabilityRejected, Details: []payment.StatusDetail{{Resolution: payment.ResolutionPlatformAction, Reason: "rejected.fraud"}}}
 )
 
-// queuedStoreIDs 是 fake queue 裡某個種類的 job 排入過的店家（依排入順序，不去重）。
 func (q *queue) queuedStoreIDs(t *testing.T, kind string) []int64 {
 	t.Helper()
 	q.mu.Lock()
@@ -47,7 +43,6 @@ func (q *queue) queuedStoreIDs(t *testing.T, kind string) []int64 {
 	return out
 }
 
-// listingMissing 是店家 PUBLIC_LISTING 缺的條件。
 func listingMissing(s Store) []Requirement {
 	for _, st := range CapabilitiesOf(s) {
 		if st.Capability == CapPublicListing {
@@ -64,7 +59,6 @@ func (f *fixture) paymentAccount(t *testing.T, storeID int64) payment.Account {
 	return a
 }
 
-// ensureAccount 執行 payment 的建立 job 一輪，回傳外部帳戶 ID。
 func (f *fixture) ensureAccount(t *testing.T, storeID int64) string {
 	t.Helper()
 	must(t, f.payments.EnsureAccount(context.Background(), storeID, false))
@@ -75,8 +69,6 @@ func (f *fixture) ensureAccount(t *testing.T, storeID int64) string {
 	return *a.ExternalAccountID
 }
 
-// setPayment 讓店家的外部帳戶回這個快照，並執行 payment 的同步 job 一輪（還沒有外部帳戶時先建立）；同步發的 PayoutAccountChanged 經 seller 的訂閱者
-// 更新閘門的副本。
 func (f *fixture) setPayment(t *testing.T, storeID int64, s payment.Snapshot) {
 	t.Helper()
 	external := ""
@@ -93,7 +85,6 @@ func (f *fixture) setPayment(t *testing.T, storeID int64, s payment.Snapshot) {
 	}
 }
 
-// setContactEmails 設定帳號的已驗證 email 與自填信箱（nil 是沒有）。
 func (f *fixture) setContactEmails(t *testing.T, accountID int64, verified, selfEntered *string) {
 	t.Helper()
 	ctx := context.Background()
@@ -164,7 +155,6 @@ func TestCreateUsesTheSelfEnteredEmailWhenThereIsNoVerifiedOne(t *testing.T) {
 	}
 }
 
-// reapprove 模擬同一家店再一次核准：舊的申請已取消（唯一索引只允許一筆沒取消的申請），帳號換了（已驗證的）聯絡信箱後賣家送出新申請並核准。
 func (f *fixture) reapprove(t *testing.T, accountID int64, email string) {
 	t.Helper()
 	ctx := context.Background()
@@ -277,7 +267,6 @@ func TestExposureRequiresTheTransfersCapabilityOfThePaymentAccount(t *testing.T)
 	if got := f.exposed(t, s.StoreID); len(got) != 0 {
 		t.Fatalf("轉帳能力又失效後仍可曝光：%v", got)
 	}
-	// 沒有帳戶列的已核准店家不通過閘門。
 	accountID2, s2, sub2 := f.submitted(t)
 	_ = accountID2
 	must(t, approve(f, sub2))

@@ -37,7 +37,7 @@ public final class DescriptionTextExtractor {
                 case "table" -> appendTable(sb, block.getTableJson());
                 case "list" -> appendList(sb, block.getListJson());
                 case "image" -> appendFragment(sb, block.getAlt());
-                default -> { /* 未知 type 略過 */ }
+                default -> {  }
             }
         }
         return sb.toString().trim();
@@ -72,7 +72,6 @@ public final class DescriptionTextExtractor {
                 }
             }
         } catch (Exception e) {
-            // table_json 解析失敗不阻斷萃取（後端 opaque，容錯）
         }
     }
 
@@ -91,7 +90,6 @@ public final class DescriptionTextExtractor {
                 }
             }
         } catch (Exception e) {
-            // list_json 解析失敗不阻斷萃取（後端 opaque，容錯）
         }
     }
 

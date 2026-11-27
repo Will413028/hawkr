@@ -53,8 +53,6 @@ public class ShipmentCreationFailedConsumer {
                 return;
             }
 
-            // #1871 OBS-09：order_no 進 MDC，讓這個 handler 內所有 log 行都能被 Loki structured
-            // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml）。
             MDC.put("order_no", orderNo);
 
             sellerCancelService.cancelShipmentBySystem(orderNo, OrderCancelReason.SHIPMENT_CREATE_TIMEOUT);

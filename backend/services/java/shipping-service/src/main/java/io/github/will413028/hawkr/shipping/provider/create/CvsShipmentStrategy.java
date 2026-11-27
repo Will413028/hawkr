@@ -54,7 +54,6 @@ public class CvsShipmentStrategy implements ShipmentStrategy {
         Long shipmentId = TsidUtil.generate();
         String shipmentNo = generateShipmentNo();
         String goodsType = PayUniParamMapper.toGoodsType(orderInfo.getDeliveryTemp());
-        // 商品名稱為系統背景填寫（訂單商品撈取），送 PayUni 前依超商約束截斷（顯示長度上限 500），避免超長建單失敗（06 §2.5）
         String goodsName = InputValidator.truncateByDisplayLength(
                 orderInfo.getProductName(), PayUniShippingConstraints.CVS_GOODS_NAME_MAX);
 
@@ -62,12 +61,10 @@ public class CvsShipmentStrategy implements ShipmentStrategy {
                 "超商物流單建立",
                 "orderNo", orderNo);
 
-        // 寄件人資訊來自 seller_shipment_settings（物流設定獨立化）
         String senderName = onboardingSetting.getSenderName();
         String senderPhone = onboardingSetting.getSenderPhone();
         String merId = orderInfo.getMerId();
 
-        // 組裝 PayUni 超商物流單請求（MerTradeNo 統一使用 orderNo）
         CreateCvsShipmentRequest payUniReq = new CreateCvsShipmentRequest(
                 orderNo,
                 SHIP_TYPE_SEVEN_ELEVEN,
@@ -84,7 +81,6 @@ public class CvsShipmentStrategy implements ShipmentStrategy {
                 onboardingSetting.getReturnStoreCode()
         );
 
-        // 呼叫 PayUni API 建立超商物流單（收斂規範 §8.1：同步 retry 最多一次）
         CreateCvsShipmentResponse payUniResp = shippingClient.createCvsShipment(merId, payUniReq);
         if (!payUniResp.isSuccess()) {
             log.warn("CvsShipmentStrategy.createShipment.retry",
@@ -105,7 +101,6 @@ public class CvsShipmentStrategy implements ShipmentStrategy {
         log.info("CvsShipmentStrategy.createShipment.success",
                 "PayUni 超商建單成功，shipTradeNo=" + payUniResp.shipTradeNo());
 
-        // 組裝 Entity
         ShipmentEntity entity = new ShipmentEntity();
         entity.setId(shipmentId);
         entity.setShipmentNo(shipmentNo);
@@ -129,7 +124,6 @@ public class CvsShipmentStrategy implements ShipmentStrategy {
         entity.setStoreName(orderInfo.getCvsStoreName());
         entity.setProdDesc(orderInfo.getProductName());
 
-        // §5.9 賣家處理期限：店到店 3 自然日（72 小時）
         entity.setProcessingDeadline(DateTimeUtils.nowUtc().plusHours(72));
 
         return entity;

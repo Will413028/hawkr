@@ -11,8 +11,6 @@ const connectSrc = buildContentSecurityPolicy({
 assert.ok(connectSrc);
 
 test("connect-src allowlists the exact Google Signals host", () => {
-	// Leading space and the terminator lookahead keep a lookalike such as
-	// stats.g.doubleclick.net.attacker.test from satisfying the assertion.
 	assert.match(connectSrc, / https:\/\/stats\.g\.doubleclick\.net(?=[\s;"]|$)/);
 });
 
@@ -27,8 +25,6 @@ function directive(name: string): string {
 	return entry;
 }
 
-// Stripe Connect embedded components:
-// https://docs.stripe.com/connect/get-started-connect-embedded-components (CSP section)
 test("script-src and frame-src allow the Stripe Connect embedded component hosts", () => {
 	for (const name of ["script-src", "frame-src"]) {
 		const entry = directive(name);

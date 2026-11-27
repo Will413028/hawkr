@@ -17,10 +17,6 @@ test("desktop product click keeps the source page until the complete quick view 
 			exact: true,
 		});
 
-		// Production is allowed to have an explicitly empty pre-launch catalogue.
-		// Keep this interaction coverage live-data-backed when a product exists,
-		// but do not turn the product-domain empty state into a navigation failure.
-		// Await the data-backed branch before deciding; missing both still fails.
 		await expect(productLink.or(emptyState)).toBeVisible();
 		if (await emptyState.isVisible()) {
 			await expect(productLink).toHaveCount(0);

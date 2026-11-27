@@ -103,8 +103,6 @@ class PageHeaderLayoutSpec {
       width: available - 20,
       lines: 2,
     ).height.clamp(18.0, double.infinity);
-    // Match the Wrap below, including the unchanged 16px icon + 4px gap.
-    // Use the wider rating state so an async rating cannot grow the header.
     final ratingWidth = [
       measure('--', meta).width,
       measure('5.0', meta).width,
@@ -260,9 +258,6 @@ class PageHeader extends StatelessWidget {
           left: 0,
           right: 0,
           height: bannerBottom,
-          // Keep light status icons attached to the actual dark cover. The
-          // settings header scrolls away; annotating the whole page would leave
-          // white icons above the cream form after the cover is offscreen.
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             key: const ValueKey('seller-store-banner-system-ui'),
             value: SystemUiOverlayStyle.light.copyWith(

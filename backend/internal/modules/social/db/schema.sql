@@ -1,25 +1,8 @@
--- social 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式、trigger 與複合型別放 db/objects.sql
--- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（social.<表>），不建跨 schema 的 FK；實體的主鍵是應用層產生的 UUIDv7、不設 DEFAULT
--- （ADR 2026-09-25-row-identity-by-data-kind）；值的集合與關聯表用複合自然鍵。店家（store_id）、買家（buyer_id）與管理員（admin_id）
--- 是別的模組擁有的業務鍵，只存 BIGINT。慣例見 PostgreSQL 設計規範。
---
--- 文字欄位頭尾沒有空白的 CHECK 是 platform/trimtext.Check 的展開（單體規則 9，登記在 cmd/hawkr 的 trimmedColumns）；長度上限
--- 同時是寫入端的第一道檢查（internal/model 的 MaxPostBodyRunes、MaxCommentBodyRunes）與這裡的後備。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA social;
 
--- 貼文。status 是 DRAFT → PUBLISHED → UNPUBLISHED → PUBLISHED，刪除是軟刪（deleted_at）；DRAFT 還沒發布過所以沒有 published_at，
--- 發布過的（PUBLISHED、UNPUBLISHED）一定有：published_at 是第一次發布的時間，之後不變（下架不清它，再發布沿用）（動態牆與熱門的時間窗都以它為準）。
--- 公開要件（恰好一張圖、內文必填）在轉為 PUBLISHED 時由寫入端檢查，草稿可以不完整，所以內文可以是空字串。version 是樂觀鎖，
--- 對外是 etag（ADR 2026-09-25-optimistic-concurrency-etag）；按讚、瀏覽等計數不在這張表，放在 post_stats，不和編輯搶鎖。
--- image_key 是顯示用的 object key，image_asset_id 是 media 的資產 ID（UUID v7）：寫入在同一個 transaction 內 Confirm 新資產、MarkDeleted 被換掉或終態的資產。
--- product_id 是商品（catalog 的 UUID），寫入時驗證存在、上架中且屬於該店，讀取時不重驗。
 CREATE TABLE social.posts (
     id             UUID        PRIMARY KEY,
     store_id       BIGINT      NOT NULL,
@@ -45,13 +28,9 @@ CREATE TABLE social.posts (
     CONSTRAINT posts_published_at_check CHECK ((status = 'DRAFT') = (published_at IS NULL)),
     CONSTRAINT posts_version_check CHECK (version >= 1)
 );
--- 動態牆與熱門：最新發布的在前（keyset：published_at DESC, id DESC）。
 CREATE INDEX posts_feed ON social.posts (published_at DESC, id DESC) WHERE status = 'PUBLISHED' AND deleted_at IS NULL;
--- 店家頁：該店已發布的貼文。
 CREATE INDEX posts_store_feed ON social.posts (store_id, published_at DESC, id DESC) WHERE status = 'PUBLISHED' AND deleted_at IS NULL;
--- 店主看自己的貼文（含草稿與下架）：最新建立的在前。
 CREATE INDEX posts_store_mine ON social.posts (store_id, created_at DESC, id DESC) WHERE deleted_at IS NULL;
--- 後台貼文列表（不含草稿與刪除，跨店）：最新建立的在前；述詞與 ListAdminPosts 逐字一致，索引才用得上。
 CREATE INDEX posts_admin_list ON social.posts (created_at DESC, id DESC) WHERE deleted_at IS NULL AND status <> 'DRAFT';
 
 COMMENT ON COLUMN social.posts.status IS '貼文狀態：DRAFT、PUBLISHED、UNPUBLISHED（儲存的代碼是 UPPER_SNAKE，舊的 publish_status 4401、4402、4403 依序對應）';
@@ -60,10 +39,6 @@ COMMENT ON COLUMN social.posts.version IS '樂觀鎖的版本，對外是 etag�
 COMMENT ON COLUMN social.posts.request_id IS '建立時 client 帶的 request_id（AIP-155，選填）；範圍是 (店家, request_id)，同一家店重送回這一列；貼文刪除後它仍占著，重送回原本那一列（刪除的貼文讀不到，回 not_found）';
 COMMENT ON COLUMN social.posts.request_hash IS '建立輸入（內文、圖片 token、商品、標籤、是否發布）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 
--- 貼文的排程發布：一次排程一列，永不重用；唯一的真相是這張表，River job 只帶 id、是到點的觸發器。state 是 PENDING → PUBLISHED 或 CANCELED，
--- 取消原因凍結在列上（cancel_reason 只在 CANCELED 有值，resolved_at 在離開 PENDING 時寫）：貼文的狀態之後會變，事後反查會得到錯的答案。
--- scheduled_by_kind 是排程的發起者種類（OWNER 店主、DELEGATION 代行），scheduled_by_ref 是發起者擁有格式的不透明字串（DELEGATION 放 session ID）。
--- 同一篇貼文同時最多一個 PENDING（重排時舊的先轉 REPLACED）。鎖順序：貼文列 → 排程列。
 CREATE TABLE social.post_schedules (
     id                UUID        PRIMARY KEY,
     post_id           UUID        NOT NULL REFERENCES social.posts (id),
@@ -83,21 +58,13 @@ CREATE TABLE social.post_schedules (
     CONSTRAINT post_schedules_reason_state_check CHECK ((state = 'CANCELED') = (cancel_reason IS NOT NULL)),
     CONSTRAINT post_schedules_resolved_check CHECK ((state = 'PENDING') = (resolved_at IS NULL))
 );
--- 一篇貼文同時最多一個待發布的排程。
 CREATE UNIQUE INDEX post_schedules_post_pending ON social.post_schedules (post_id) WHERE state = 'PENDING';
--- 取消某個發起者（例如某個代行 session）的待發布排程。
 CREATE INDEX post_schedules_by_pending ON social.post_schedules (scheduled_by_kind, scheduled_by_ref) WHERE state = 'PENDING';
--- 取消與列出某家店的待發布排程。
 CREATE INDEX post_schedules_store_pending ON social.post_schedules (store_id) WHERE state = 'PENDING';
 
 COMMENT ON COLUMN social.post_schedules.scheduled_by_ref IS '發起者擁有格式的不透明字串；DELEGATION 放代行 session 的 ID，OWNER 放店家帳號 ID 的十進位字串';
 COMMENT ON COLUMN social.post_schedules.cancel_reason IS '取消原因，凍結在列上：AUTHORITY_LOST 到點時授權已失效、DELETED 貼文被刪、TAKEN_DOWN 貼文被下架措施、REPLACED 被立即發布或新排程取代、OWNER_CANCELED 店主取消、NOT_PUBLISHABLE 到點時貼文不再滿足公開要件、RETRY_EXHAUSTED 到點發布重試用盡、EXPIRED 到點時已超過可補發的期限';
 
--- 貼文的留言：兩層（回覆的父一律是頂層，由寫入端保證，DB 保證同篇與 reply_to 在同一串）。actor_kind、actor_id 是互動者 (kind, id)，由伺服器依資源歸屬推導
--- （ADR 2026-10-17-social-actor-identity）：BUYER 的 actor_id 是 buyer_id，STORE 的是 store_id。不存作者名稱與頭像快照，讀取時由
--- buyer、seller 批次補。同篇靠 UNIQUE (post_id, id) 與複合 FK：parent_id 指到別篇的留言時 DB 就拒絕；reply_to 在同一串靠產生欄位
--- thread_id（頂層留言是自己，回覆是它的父）與 UNIQUE (post_id, thread_id, id)：reply_to_fk 要求被回覆的留言的串等於這則回覆的父，
--- 所以 reply_to 只能是父本身，或父底下的另一則回覆。
 CREATE TABLE social.comments (
     id          UUID        PRIMARY KEY,
     post_id     UUID        NOT NULL REFERENCES social.posts (id),
@@ -128,14 +95,9 @@ CREATE TABLE social.comments (
     CONSTRAINT comments_parent_check CHECK (parent_id IS NULL OR parent_id <> id),
     CONSTRAINT comments_reply_to_check CHECK (reply_to_id IS NULL OR (parent_id IS NOT NULL AND reply_to_id <> id))
 );
--- 頂層留言的列表（keyset：created_at, id）：已刪除與被隱藏的頂層留言底下還有可見的回覆時要出現佔位項目，所以不排除 deleted_at。
 CREATE INDEX comments_top_level ON social.comments (post_id, created_at, id) WHERE parent_id IS NULL;
--- 店家的「未回覆」留言：探測某則頂層留言底下有沒有仍計入的店家回覆（actor_kind = 'STORE'）；只收店家的回覆，所以很小。
 CREATE INDEX comments_store_replies ON social.comments (parent_id) WHERE counted AND actor_kind = 'STORE';
--- 回覆的列表與「底下有沒有可見的回覆」的探測。述詞是旗標：讀取只看 counted（visibility.Counted），planner 無法從 counted 推出 deleted_at IS NULL，
--- 索引的述詞若是 deleted_at IS NULL 就用不上（量測：熱門貼文頂層留言 p50 1.7 ms 變 196 ms，Seq Scan comments）。
 CREATE INDEX comments_replies ON social.comments (parent_id, created_at, id) WHERE counted;
--- 買家的清除 job 與「我的留言」：以作者找。
 CREATE INDEX comments_actor ON social.comments (actor_kind, actor_id, id);
 
 COMMENT ON COLUMN social.comments.counted IS '此刻是否計入貼文的留言數與父留言的回覆數（沒有刪除、沒有未還原的隱藏、沒有內容下架、作者不在 inactive_authors，在 social.reevaluate_comments 求值）；只由 social.reevaluate_comments 維護，讀取直接用它，貼文的 comment_count 與留言的 reply_count 是這個旗標的加總';
@@ -145,7 +107,6 @@ COMMENT ON COLUMN social.comments.request_id IS '建立時 client 帶的 request
 COMMENT ON COLUMN social.comments.request_hash IS '建立輸入（貼文、父留言、被回覆的留言、內文）的 SHA-256；同一個 request_id 重送時比對內容是否相同，與 request_id 同時有或同時沒有';
 COMMENT ON COLUMN social.comments.actor_kind IS '互動者的種類：BUYER（actor_id 是 buyer_id）、STORE（actor_id 是 store_id）；買家與店家各自連號，同一個數值在兩邊是不同的人';
 
--- 留言的讚：互動者是 (kind, id)，複合鍵保證重複按讚冪等（INSERT ... ON CONFLICT DO NOTHING）。
 CREATE TABLE social.comment_likes (
     comment_id UUID        NOT NULL REFERENCES social.comments (id),
     actor_kind TEXT        NOT NULL,
@@ -157,7 +118,6 @@ CREATE TABLE social.comment_likes (
 );
 CREATE INDEX comment_likes_actor ON social.comment_likes (actor_kind, actor_id, comment_id);
 
--- 貼文的讚：只有買家按得到（店家本人的讚不在貼文上，不存 kind）。
 CREATE TABLE social.post_likes (
     post_id    UUID        NOT NULL REFERENCES social.posts (id),
     buyer_id   BIGINT      NOT NULL,
@@ -167,8 +127,6 @@ CREATE TABLE social.post_likes (
 );
 CREATE INDEX post_likes_buyer ON social.post_likes (buyer_id, post_id);
 
--- 店家討論區的留言：容器是店家（store_id），其餘同 comments；不和 comments 合成一張（容器不同、討論區留言沒有讚，合併要「容器恰好
--- 一個」的 CHECK 與兩套讀取）。
 CREATE TABLE social.forum_entries (
     id          UUID        PRIMARY KEY,
     store_id    BIGINT      NOT NULL,
@@ -209,13 +167,6 @@ CREATE INDEX forum_entries_top_level ON social.forum_entries (store_id, created_
 CREATE INDEX forum_entries_replies ON social.forum_entries (parent_id, created_at, id) WHERE counted;
 CREATE INDEX forum_entries_actor ON social.forum_entries (actor_kind, actor_id, id);
 
--- 貼文的 hashtag：貼文的值的集合（隨貼文整批讀寫、不被以 ID 指稱，ADR 2026-09-25-row-identity-by-data-kind D1），整批替換。
--- name 是正規化後的名稱（NFC、ASCII 小寫；字元集 a-z、0-9 與漢字由寫入端的 internal/hashtag 檢查，DB 不重寫一份 Unicode 的 Han 範圍），
--- display_name 是使用者輸入的樣子；position 是顯示順序。沒有 hashtags 實體表，也不存
--- post_count：數量在讀取時依公開可讀的貼文計算（SD16）。
--- published_at 是貼文 published_at 的複本，讓某個標籤的貼文列表能以 (name, published_at, post_id) 的索引直接走 keyset：貼文第一次發布時
--- 由 trigger 寫進它所有的標籤列，標籤列在貼文已發布後才寫入時由 trigger 帶入；貼文的 published_at 發布後不變（trigger 擋改動），所以複本之後不需要再同步。
--- 草稿的標籤列是 NULL（貼文還沒有 published_at）。
 CREATE TABLE social.post_hashtags (
     post_id      UUID     NOT NULL REFERENCES social.posts (id),
     position     SMALLINT NOT NULL,
@@ -232,10 +183,6 @@ CREATE INDEX post_hashtags_name ON social.post_hashtags (name, post_id);
 CREATE INDEX post_hashtags_feed ON social.post_hashtags (name, published_at DESC, post_id DESC) WHERE published_at IS NOT NULL;
 COMMENT ON COLUMN social.post_hashtags.published_at IS '貼文 posts.published_at 的複本（trigger 維護，貼文發布後不變）；草稿的標籤列是 NULL';
 
--- 買家的內容的隱藏紀錄：理由、來源、還原與稽核在同一處，可以多次隱藏與還原（還原留列不刪，之後可以再隱藏）。只收買家寫的留言與討論區
--- 留言：貼文與店家身分的內容走 seller 的內容下架措施（措施是店家處分效果的唯一來源）。reason_category 是 PolicyCategory 的社群子集
--- （platform/policy.CommunityAssessable，模組的 TestChecksMatchGo）；source_ref 是 moderation 的案件的不透明參照（social 不讀 moderation）。
--- 同一則內容未還原的隱藏最多一筆（兩個部分唯一索引）。
 CREATE TABLE social.hides (
     id              UUID        PRIMARY KEY,
     comment_id      UUID        REFERENCES social.comments (id),
@@ -261,16 +208,9 @@ CREATE TABLE social.hides (
 );
 CREATE UNIQUE INDEX hides_active_comment ON social.hides (comment_id) WHERE restored_at IS NULL AND comment_id IS NOT NULL;
 CREATE UNIQUE INDEX hides_active_forum_entry ON social.hides (forum_entry_id) WHERE restored_at IS NULL AND forum_entry_id IS NOT NULL;
--- 還原後可以再隱藏，歷史的列要能依內容找：作者讀「我被隱藏的內容」、管理員看紀錄。
 CREATE INDEX hides_comment ON social.hides (comment_id, hidden_at) WHERE comment_id IS NOT NULL;
 CREATE INDEX hides_forum_entry ON social.hides (forum_entry_id, hidden_at) WHERE forum_entry_id IS NOT NULL;
 
--- 內容下架的複本：seller 擁有措施（seller.measures、measure_contents），social 在同一個 transaction 的訂閱者（MeasureCreated、MeasureRevoked 中的
--- 內容下架）裡寫一列一個（措施，內容），所以貼文的公開讀取與留言、討論區留言的 counted 旗標只依 social 自己的表求值。與 inactive_authors 同一個形狀，
--- 差別是措施可以撤銷：建立插入，撤銷刪除，並讓受影響的內容重新求值。同一則內容同時至多一個生效中的下架措施（seller 的 measure_contents_one_enforced），複本以內容為唯一鍵（三個部分唯一索引，每則內容至多一列）鏡射它：
--- 撤銷的 transaction 先刪舊措施的列，新措施才可能存在，所以合法路徑不會撞到；對帳補漏與撤銷的競爭由補漏鎖住 seller 的列序列化（seller.pub_lock_content_takedowns）。
--- 每日對帳拿 seller.pub_content_takedowns() 雙向核對。貼文沒有計入旗標，公開讀取的述詞對 post_id 做 NOT EXISTS（visibility.ReadablePosts）；
--- 貼文底下的留言跟著父貼文，不另寫列。
 CREATE TABLE social.content_takedowns (
     measure_id     UUID        NOT NULL,
     post_id        UUID        REFERENCES social.posts (id),
@@ -281,13 +221,10 @@ CREATE TABLE social.content_takedowns (
 CREATE UNIQUE INDEX content_takedowns_measure_post ON social.content_takedowns (measure_id, post_id) WHERE post_id IS NOT NULL;
 CREATE UNIQUE INDEX content_takedowns_measure_comment ON social.content_takedowns (measure_id, comment_id) WHERE comment_id IS NOT NULL;
 CREATE UNIQUE INDEX content_takedowns_measure_forum_entry ON social.content_takedowns (measure_id, forum_entry_id) WHERE forum_entry_id IS NOT NULL;
--- 每則內容至多一列，同時是讀取與重新求值依內容探測「有沒有下架」的索引；撤銷依措施找列走上面 (措施, 內容) 的索引。
 CREATE UNIQUE INDEX content_takedowns_post ON social.content_takedowns (post_id) WHERE post_id IS NOT NULL;
 CREATE UNIQUE INDEX content_takedowns_comment ON social.content_takedowns (comment_id) WHERE comment_id IS NOT NULL;
 CREATE UNIQUE INDEX content_takedowns_forum_entry ON social.content_takedowns (forum_entry_id) WHERE forum_entry_id IS NOT NULL;
 
--- 買家的社群處分紀錄（處分紀錄與效果在同一個模組、同一個 transaction，只有一個寫入者，10e R12）。kind 初始只有 WARNING；之後加限制
--- 種類只加值與規則（買家條款訂出後）。A7 只有永久效果、沒有到期欄位（A7-D16）。
 CREATE TABLE social.sanctions (
     id              UUID        PRIMARY KEY,
     buyer_id        BIGINT      NOT NULL,
@@ -306,18 +243,12 @@ CREATE TABLE social.sanctions (
 );
 CREATE INDEX sanctions_buyer ON social.sanctions (buyer_id, created_at DESC, id DESC);
 
--- 不再營運中的買家（刪除中與已關閉）作者的複本：buyer 擁有這個事實（buyer.pub_inactive_buyers），social 在同一個 transaction 的訂閱者裡
--- （BuyerDeletionRequested、BuyerDeleted；直接從營運中關閉的路徑只發 BuyerDeleted，所以兩個都訂）寫一列，並讓該作者的內容重新求值，
--- 所以「是否計入」的旗標只依 social 自己的表求值。買家的狀態不會回到營運中（刪帳申請不能撤回），因此只插入不刪除，冪等
--- （ON CONFLICT DO NOTHING）。每日對帳拿 buyer.pub_inactive_buyers 核對，缺的補上並記漂移。since 是事件發生的時間。
 CREATE TABLE social.inactive_authors (
     buyer_id BIGINT      PRIMARY KEY,
     since    TIMESTAMPTZ NOT NULL,
     CONSTRAINT inactive_authors_buyer_check CHECK (buyer_id > 0)
 );
 
--- 計數：全部存在獨立的 stats 表（不放在實體列上，按讚與瀏覽不和貼文編輯的 version CAS 搶鎖）。「是否計入」的單一定義與維護它的 trigger 在
--- objects.sql（counts-brief.md §4）；trigger 是計數唯一的維護路徑，寫入端不直接改這些表（重算除外：先鎖列再覆寫）。列隨實體建立（trigger）。
 CREATE TABLE social.post_stats (
     post_id       UUID   PRIMARY KEY REFERENCES social.posts (id),
     like_count    BIGINT NOT NULL DEFAULT 0,
@@ -343,8 +274,6 @@ CREATE TABLE social.forum_entry_stats (
 COMMENT ON COLUMN social.post_stats.comment_count IS '留言數含回覆：旗標 comments.counted 為真的列數；計入的定義在 social.reevaluate_comments（只讀 social 自己的表）';
 COMMENT ON COLUMN social.post_stats.view_count IS '只增的事件計數（去重後的瀏覽），沒有可重算的來源，不進每日對帳';
 
--- 瀏覽的去重：(貼文, 台北日, 觀看者鍵) 的主鍵就是去重，插入成功才把 post_stats.view_count 加一。viewer_key 是以當日 salt 做的
--- HMAC-SHA256（登入者是帳號、匿名是貼文 + IP + User-Agent），表裡沒有可回推的帳號或 IP。只留當日與前一日，之後由週期 job 刪。
 CREATE TABLE social.post_views (
     post_id    UUID  NOT NULL REFERENCES social.posts (id),
     view_day   DATE  NOT NULL,
@@ -354,14 +283,12 @@ CREATE TABLE social.post_views (
 );
 CREATE INDEX post_views_day ON social.post_views (view_day);
 
--- 每個台北日一把 salt，跨實例共用（第一次需要時 INSERT ... ON CONFLICT DO NOTHING 後讀回）；前一日以前的列由週期 job 刪。
 CREATE TABLE social.view_salts (
     view_day DATE  PRIMARY KEY,
     salt     BYTEA NOT NULL,
     CONSTRAINT view_salts_salt_check CHECK (octet_length(salt) = 32)
 );
 
--- 貼文的分享：同一位買家同一篇只算一次，主鍵就是去重；分享數由 trigger 加減。
 CREATE TABLE social.post_shares (
     post_id    UUID        NOT NULL REFERENCES social.posts (id),
     buyer_id   BIGINT      NOT NULL,

@@ -12,16 +12,10 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔守的是**單元測試零鑑別力**的那些不變式：DB CHECK 與 CAS 述詞。
-// fake repository 沒有 CHECK ⇒ 「三個 external_* 欄同進同出」「version CAS 真的擋得住」
-// 在單元測試裡怎麼寫都是綠的。
 
-// seedManualJob 建一份 ISSUE_FAILED 的 document ＋ 一列指定狀態的 operation。
 func seedManualJob(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	docStatus, opStatus string) (docID, opID int64) {
 	t.Helper()
-	// storeID 逐次取新值：uq_invoice_issuers_ref 是 (issuer_type, issuer_ref_id) 的
-	// UNIQUE，subtest 共用同一顆 DB 時固定值會在第二次 seed 撞 23505。
 	issuerID := seedIssuerFor(ctx, t, pool, nextID()%1_000_000_000)
 	docID = nextID()
 	mustExec(ctx, t, pool,
@@ -41,15 +35,6 @@ func seedManualJob(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 		docID, issuerID, "O"+time.Now().Format("20060102150405")+itoa(docID%1000), docStatus)
 
 	opID = nextID()
-	// cancel_evidence_kind 只在 CANCELLED_BY_ADMIN 時補：chk_invop_admin_cancel_needs_confirm
-	// 要求該狀態必須有 cancel_confirmed_by 或一個列舉內的證據種類，否則 23514。這不是為了
-	// 繞過約束——一列「ADM 取消卻沒有任何證據」的資料本來就不該存在（見
-	// 20260904172018_fix_admin_cancel_evidence_check：舊寫法在兩欄皆 NULL 時算出 NULL，
-	// 而 CHECK 只拒絕 FALSE，所以它對自己要擋的那一格一直是 no-op），補上證據才是這些
-	// 測試想模擬的真實狀態。其餘 cancel_* 欄位維持 NULL，因此 chk_invop_two_person 與
-	// chk_invop_cancel_pair 都不會被觸發。
-	// 在 Go 端決定而不是寫成 SQL 的 CASE：$5 若同時當 status 的值又當 CASE 的比較對象，
-	// Postgres 會推不出一致型別（42P08）。
 	var cancelEvidence any
 	if opStatus == "CANCELLED_BY_ADMIN" {
 		cancelEvidence = "PROVIDER_QUERY_71"
@@ -63,11 +48,6 @@ func seedManualJob(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	return docID, opID
 }
 
-// seedComplaintOn 在**呼叫端自己那顆 pool** 上建 issuer ＋ document。
-//
-// 🔴 不能沿用 newComplaintFixture：它內部自己 testPool(t) 一個新的 database，
-// 而本檔的斷言要在同一顆 DB 上下 SQL ⇒ 兩邊會是不同的庫，CAS 永遠 rows=0
-// 而錯誤訊息看起來像「狀態機不對」。
 func seedComplaintOn(ctx context.Context, t *testing.T, pool *pgxpool.Pool) (*ComplaintRepository, int64, int64, string) {
 	t.Helper()
 	issuerID := seedIssuerFor(ctx, t, pool, nextID()%1_000_000_000)
@@ -76,7 +56,6 @@ func seedComplaintOn(ctx context.Context, t *testing.T, pool *pgxpool.Pool) (*Co
 	return NewComplaintRepository(pool), issuerID, docID, orderNo
 }
 
-// mustScan 跑一句 SELECT 並掃進 dest；失敗即 t.Fatal（測試裡讀不到資料就是測試壞了）。
 func mustScan(ctx context.Context, t *testing.T, pool *pgxpool.Pool, sql string, args []any, dest ...any) {
 	t.Helper()
 	if err := pool.QueryRow(ctx, sql, args...).Scan(dest...); err != nil {
@@ -105,7 +84,6 @@ func TestIntegration_AdminWrite_ResolvedExternallyRequiresVersion(t *testing.T) 
 	repo := NewOperationRepository(pool)
 	_, opID := seedManualJob(ctx, t, pool, "ISSUE_FAILED", "MANUAL_PROCESS_ALLOWED")
 
-	// 版本不符 ⇒ rows=0（DB DEFAULT 是 0，這裡故意帶 99）。
 	ok, err := repo.MarkResolvedExternally(ctx, opID, 99, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("MarkResolvedExternally: %v", err)
@@ -113,14 +91,12 @@ func TestIntegration_AdminWrite_ResolvedExternallyRequiresVersion(t *testing.T) 
 	if ok {
 		t.Fatal("version 不符時必須 rows=0——否則樂觀鎖是假的")
 	}
-	// 狀態必須沒動。
 	var status string
 	mustScan(ctx, t, pool, `SELECT status FROM invoice_operations WHERE id = $1`, []any{opID}, &status)
 	if status != "MANUAL_PROCESS_ALLOWED" {
 		t.Fatalf("守衛不成立卻改了狀態：%q", status)
 	}
 
-	// 版本正確 ⇒ rows=1。
 	ok, err = repo.MarkResolvedExternally(ctx, opID, 0, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("MarkResolvedExternally: %v", err)
@@ -184,7 +160,6 @@ func TestIntegration_AdminWrite_DocumentResolvedExternallyWritesAllThreeColumns(
 		t.Fatalf("三個 external_* 欄必須與狀態同進同出：status=%q no=%q date=%v at=%v",
 			status, extNo, extDate, reportedAt)
 	}
-	// chk_invdoc_external_excl：平台不冒充開立人。
 	if providerNo != nil {
 		t.Fatalf("provider_invoice_no 必須保持 NULL，實得 %q", *providerNo)
 	}
@@ -227,13 +202,11 @@ func TestIntegration_AdminWrite_DecideEscalatedWritesResolvedAt(t *testing.T) {
 	mustScan(ctx, t, pool,
 		`SELECT status, resolved_at, decided_by_account_id FROM invoice_complaints WHERE id = $1`,
 		[]any{c.ID}, &status, &resolvedAt, &decidedBy)
-	// chk_invcomp_violation_needs_decider ＋ chk_invcomp_resolved_pair 一起看。
 	if status != "VIOLATION_CONFIRMED" || resolvedAt == nil || decidedBy == nil {
 		t.Fatalf("VIOLATION_CONFIRMED 必須同時帶 resolved_at 與 decided_by：%q %v %v",
 			status, resolvedAt, decidedBy)
 	}
 
-	// 違規計數以**去重後的訂單數**計，且只計 VIOLATION_CONFIRMED。
 	count, err := repo.CountConfirmedViolationOrders(ctx, issuerID, now.AddDate(0, 0, -90))
 	if err != nil {
 		t.Fatalf("CountConfirmedViolationOrders: %v", err)
@@ -323,11 +296,7 @@ func TestIntegration_AdminAuditLog_ReturnsRealRowID(t *testing.T) {
 	if first == second {
 		t.Fatalf("兩次插入回了同一個 id（%d）—— 那是 rows 不是 id", first)
 	}
-	// ⚠️ 刻意不斷言「id > 1」：測試庫的表是空的，合法的第一列 id 本來就是 1。
-	// 那種啟發式會在乾淨的庫上假紅（本測試第一版就是這樣）。真正有鑑別力的是
-	// 上面的「兩次必須不同」與下面的「查得回同一列」。
 
-	// ① 回傳值要對得上 DB 裡真的那一列。
 	var reason string
 	if err := pool.QueryRow(ctx,
 		`SELECT reason_detail FROM invoice_admin_audit_logs WHERE id = $1`, first,
@@ -339,11 +308,6 @@ func TestIntegration_AdminAuditLog_ReturnsRealRowID(t *testing.T) {
 	}
 }
 
-// seedIssuedDocument 建一份**已開立**的文件。
-//
-// 不能直接用 seedManualJob("ISSUED")：chk_invdoc_issued_has_no 要求
-// `AMEGO_AUTO + ISSUED ⇒ provider_invoice_no 非空`，而那支 seed 不寫號碼 ⇒ 23514。
-// 兩件事一句寫完（狀態與號碼同進），正是那條 CHECK 要求的形狀。
 func seedIssuedDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool) int64 {
 	t.Helper()
 	docID, _ := seedManualJob(ctx, t, pool, "ISSUE_FAILED", "SUCCEEDED")
@@ -354,12 +318,6 @@ func seedIssuedDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool) i
 	return docID
 }
 
-// ---------------------------------------------------------------------------
-// 重寄窗口（§6.1.10 端點 32／49／71）
-//
-// 窗口述詞是 SQL 的 WHERE，fake 對它零鑑別力：無條件回 claimed=true 的替身會讓
-// 「十分鐘內只能一次」那組測試全綠，而那正是「買家十分鐘內收到兩封」唯一的防線。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_NotificationResend_TenMinuteWindow(t *testing.T) {
 	ctx := context.Background()
@@ -369,24 +327,20 @@ func TestIntegration_NotificationResend_TenMinuteWindow(t *testing.T) {
 	now := time.Now().UTC()
 	const window = 10 * time.Minute
 
-	// 第一次：從未重寄過（notification_resent_at IS NULL）⇒ 放行，seq = 1。
 	seq, claimed, err := repo.ClaimNotificationResend(ctx, docID, now.Add(-window), now)
 	if err != nil || !claimed || seq != 1 {
 		t.Fatalf("第一次應放行且 seq=1：seq=%d claimed=%v err=%v", seq, claimed, err)
 	}
 
-	// 立刻再來一次 ⇒ 窗口內，rows=0。
 	if _, claimed, err = repo.ClaimNotificationResend(ctx, docID, now.Add(-window), now); err != nil || claimed {
 		t.Fatalf("窗口內必須擋下（那是 9352 唯一的防線）：claimed=%v err=%v", claimed, err)
 	}
 
-	// 9 分鐘後仍在窗口內。
 	at9 := now.Add(9 * time.Minute)
 	if _, claimed, err = repo.ClaimNotificationResend(ctx, docID, at9.Add(-window), at9); err != nil || claimed {
 		t.Fatalf("9 分鐘仍在窗口內：claimed=%v err=%v", claimed, err)
 	}
 
-	// 剛好 10 分鐘：述詞是 `<= now - 10min` ⇒ 邊界值放行，且 seq 遞增到 2。
 	at10 := now.Add(window)
 	seq, claimed, err = repo.ClaimNotificationResend(ctx, docID, at10.Add(-window), at10)
 	if err != nil || !claimed || seq != 2 {

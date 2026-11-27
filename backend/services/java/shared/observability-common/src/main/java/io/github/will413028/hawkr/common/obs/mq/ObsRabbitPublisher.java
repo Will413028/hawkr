@@ -170,8 +170,6 @@ public final class ObsRabbitPublisher {
             if (confirm == null || !confirm.isAck()) {
                 return false;
             }
-            // mandatory + publisher-returns: unroutable message populates the
-            // returned message on the correlation data before the future acks.
             return correlationData.getReturned() == null;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();

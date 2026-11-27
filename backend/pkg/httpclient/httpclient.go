@@ -22,8 +22,6 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-// defaultTimeout 只是一個保守預設；有明確時間預算的呼叫端一律用 WithTimeout
-// 顯式覆寫，不要依賴這個值。
 const defaultTimeout = 30 * time.Second
 
 // Option 調整工廠產出的 *http.Client。Transport 刻意不開放覆寫——可覆寫的話

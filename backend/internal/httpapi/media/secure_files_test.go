@@ -33,7 +33,6 @@ type fakeSecure struct {
 	previewWho media.Uploader
 	preview    string
 	previewErr error
-	// previewReader 非 nil 時取代 preview 當讀取來源。
 	previewReader io.Reader
 }
 
@@ -83,7 +82,6 @@ func secureServer(t *testing.T, f *fakeSecure, timeout time.Duration) *httptest.
 	return srv
 }
 
-// reply 是已讀完並關閉 body 的回應。
 type reply struct {
 	StatusCode int
 	Header     http.Header
@@ -400,7 +398,6 @@ func delegatedSecureServer(t *testing.T, f *fakeSecure, timeout time.Duration) *
 	return delegatedSecureServerWith(t, f, timeout, delegatedSessions())
 }
 
-// delegatedSessions 是代行路由預設的代行 session：憑證 "cred" 是管理員 7 在店家 5 上的 ACTIVE session，帶 media.upload。
 func delegatedSessions() *fakeSessions {
 	return &fakeSessions{sessions: map[string]moddelegation.DelegationSession{
 		"cred": {ID: 9, Status: moddelegation.DelegationActive, Capabilities: []moddelegation.Capability{moddelegation.CapabilityMediaUpload},

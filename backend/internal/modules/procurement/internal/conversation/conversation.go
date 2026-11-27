@@ -39,9 +39,8 @@ type Service struct {
 	Canceller run.Canceller
 }
 
-// token 是 next_page_token 的內容：上一頁最後一列的 (updated_at, id)，base64url 的 JSON，對 client 不透明。
 type token struct {
-	UpdatedAt int64     `json:"u"` // Unix 微秒（與 timestamptz 同精度）
+	UpdatedAt int64     `json:"u"`
 	ID        uuid.UUID `json:"i"`
 }
 
@@ -65,8 +64,6 @@ func decodeToken(raw string) (token, bool) {
 	return t, true
 }
 
-// minTokenMicro 是 Postgres timestamptz 的下界（4713 BC）；範圍外的值送進查詢會變成 INTERNAL。
-// 上界不用檢查：int64 微秒最多到 294247 AD，在 timestamptz 的上界 294276 AD 之內。
 var minTokenMicro = time.Date(-4712, 1, 2, 0, 0, 0, 0, time.UTC).UnixMicro()
 
 // List 回傳買家自己的對話，依 (updated_at, id) 由新到舊，已刪除的不列。pageSize 為 0 用預設，超過上限以上限計，負數回 INVALID_ARGUMENT（欄位 page_size）；

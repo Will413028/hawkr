@@ -32,15 +32,11 @@ const PROTECTED_STATIC_PAGE_ROUTES = STATIC_PAGE_ROUTES.flatMap((route) => {
 	return access ? [{ route, access }] : [];
 });
 
-// 訪客被導去 /login 時帶的 role：buyer／seller 帶工作區，`account` 不帶（登入頁用預設分頁）。
 function expectedLoginRole(
 	access: NonNullable<ReturnType<typeof requiredAccessForPath>>,
 ): string | null {
 	return ACCESS_CLASSES[access].workspace;
 }
-// 只做 redirect() 的 page.tsx 永遠回 307，不是 200 —— 它們與 next.config 的
-// permanent redirect 同類，只是宣告在頁面裡而不是設定檔裡（見
-// discoverRedirectOnlyPages 的註解說明為什麼不把它們改成 config redirect）。
 const REDIRECT_ONLY_PAGE_ROUTES = new Set(discoverRedirectOnlyPages());
 const PUBLIC_STATIC_PAGE_ROUTES = STATIC_PAGE_ROUTES.filter(
 	(route) =>
@@ -48,25 +44,12 @@ const PUBLIC_STATIC_PAGE_ROUTES = STATIC_PAGE_ROUTES.filter(
 		!PERMANENT_REDIRECT_SOURCES.has(route) &&
 		!REDIRECT_ONLY_PAGE_ROUTES.has(route),
 );
-// 上面那個排除把 redirect-only 的**公開**頁從 PUBLIC 拿掉了，於是它不再屬於
-// 任何一個回應類別 —— 「每個靜態頁恰好屬於一類」那條斷言因此必然紅。正解不是
-// 把它塞回 PUBLIC（它不回 200），而是承認它就是第四類，並且給這一類自己的
-// HTTP 契約（見下面「每個 redirect-only 公開頁在 HTTP 層轉址」）。
-//
-// 為什麼要扣掉受角色保護與 next.config 永久轉址的那些：`/seller-center` 與
-// `/seller-center/shipments/anomalies` 同時是 redirect-only **且**受保護，而
-// middleware 先跑 —— 訪客拿到的是 307 → /login，不是頁面自己的 redirect()。
-// 它們的契約歸 PROTECTED 那一類，重複列進來會讓分類集合出現重複項。
 const REDIRECT_ONLY_PUBLIC_PAGE_ROUTES = STATIC_PAGE_ROUTES.filter(
 	(route) =>
 		REDIRECT_ONLY_PAGE_ROUTES.has(route) &&
 		!requiredAccessForPath(route) &&
 		!PERMANENT_REDIRECT_SOURCES.has(route),
 );
-// 「訪客導 /login」這條契約只適用於吃 JWT 角色的路由。代行工作區（access
-// `delegated`）不在其中：它不看角色，`requiredAccessForPath` 對它一律回 null，
-// 守門由工作階段承擔，因此它回的是 200 骨架而不是 307。混進來會讓下面那條
-// 斷言把「設計如此」報成失敗。代行自己的契約在本檔尾段獨立斷言。
 const PROTECTED_DYNAMIC_ROUTES = DYNAMIC_ROUTE_CATALOG.flatMap((route) =>
 	route.access === "public" || route.access === "delegated"
 		? []
@@ -224,11 +207,6 @@ async function discoverPublicDynamicFixtures(
 		"the first product fixture must expose its numeric seller account id",
 	).not.toBe("");
 
-	// `null` here means the backend answered and this seller has no store_code —
-	// middleware only redirects a key it could resolve, so it serves its document
-	// from this path. A lookup that never got an answer throws instead of
-	// reaching this `??`: middleware would still resolve the code server-side and
-	// 308 us, turning one flaky lookup into a page full of unexplained redirects.
 	const sellerId = (await canonicalSellerSegment(request, storeId)) ?? storeId;
 	return { productId, sellerId, sellerStoreId: storeId };
 }
@@ -459,10 +437,6 @@ test.describe("whole-site route and link contract", () => {
 	test("every redirect-only public page redirects instead of rendering", {
 		tag: ["@ui"],
 	}, async ({ request }) => {
-		// 這一類的存在理由在上面 REDIRECT_ONLY_PUBLIC_PAGE_ROUTES 的註解裡。這條
-		// 斷言是它的入場費：沒有它，第四個類別就只是一個「分不出去的丟這裡」的
-		// 桶子，新頁面只要被 discoverRedirectOnlyPages 認出來就再也沒有任何契約
-		// 守著它。307 + 一個不指回自己的 Location = 它真的把人送去了別的地方。
 		const failures: string[] = [];
 		for (const route of REDIRECT_ONLY_PUBLIC_PAGE_ROUTES) {
 			const response = await request.get(route, {
@@ -538,13 +512,6 @@ test.describe("whole-site route and link contract", () => {
 	test("delegated workspace routes stay guest-safe and unindexed", {
 		tag: ["@ui", "@live"],
 	}, async ({ request }) => {
-		// 代行工作區不吃 JWT 角色，所以匿名訪客拿得到文件——這是設計（守門在
-		// client 端的工作階段）。真正要守的不變式是**那份文件裡沒有賣家資料**：
-		// 每一頁都只是外框，內容全部由帶 operation credential 的 client 呼叫填入。
-		//
-		// 這條斷言存在的理由：把 /adm 登記進路由清冊只讓比對測試變綠，本身
-		// 不保證任何事。哪天有人替某一頁加上 server 端取數（那在 Next 裡是一行
-		// await 的事），骨架就會開始夾帶賣家資料，而清冊完全看不出來。
 		const failures: string[] = [];
 		for (const entry of DELEGATED_DYNAMIC_ROUTES) {
 			const route = materializeDynamicRoute(entry);
@@ -560,27 +527,9 @@ test.describe("whole-site route and link contract", () => {
 			if (!/<meta[^>]+name="robots"[^>]+noindex/i.test(html)) {
 				failures.push(`${route} 缺 noindex`);
 			}
-			// 佔位 storeId 不存在，任何真實店名/商品名都不該出現在骨架裡。
-			//
-			// ⚠️ **不得**把樣式寫成帶等號的 `data-seller-name=`。這個子樹的 server
-			// 端產物幾乎永遠不會變成 HTML 屬性：`DelegatedWorkspaceFrame` 在
-			// `loading` 為真時只畫「正在確認代行工作階段…」而**不渲染 children**，
-			// 而 SSR 那一拍 `loading` 必然為真。於是頁面（server component）的產物
-			// 只會以 RSC flight payload 的形式躺在 `self.__next_f.push(...)` 裡，
-			// 序列化成 **JSON**：`{"data-store-name":"範例門市-9000"}` —— 沒有
-			// 等號。帶等號的樣式因此對它被寫來攔的那個洩漏形狀 100% 失明。
-			// web#529 實測：在 `[storeId]/storefront/page.tsx` 加一行 server 端
-			// await 取數並寫進屬性，匿名 curl 拿得到店名，而斷言命中 0、測試全綠。
 			if (/data-(seller|store)-name/i.test(html)) {
 				failures.push(`${route} 骨架含賣家資料屬性`);
 			}
-			// 上面那條是黑名單，只擋得住「剛好叫這兩個名字」的屬性；
-			// `<h1>{seller.name}</h1>` 這種無屬性洩漏它抓不到。這一條是它的正面
-			// 對偶：匿名訪客拿到的必須就是工作階段確認畫面本身。工作區外框只有在
-			// 工作階段驗過之後才渲染（`DelegatedWorkspaceFrame` 的 `.seller-shell`
-			// 帶著 `data-hk-seller-workspace-ready`），它出現在匿名骨架裡就代表
-			// 整個工作區被搬到了 server 端 —— 那時洩漏的欄位叫什麼名字都無所謂。
-			// 它是 client component 的**輸出**而非 props，不會被 flight payload 誤觸發。
 			if (/data-hk-seller-workspace-ready/i.test(html)) {
 				failures.push(`${route} 骨架已渲染工作區外框（工作階段閘門被繞過）`);
 			}
@@ -591,11 +540,6 @@ test.describe("whole-site route and link contract", () => {
 	test("工作區索引在 HTTP 層轉址，且不吃掉同層的具名路由", {
 		tag: ["@ui"],
 	}, async ({ request }) => {
-		// `/adm/{storeId}` 沒有落地頁，導向固定 /products（與 /adm/enter 兌換成功的
-		// 落點同一個），不需要任何 lookup ⇒ 佔位 id 隨便給，只要是數字。
-		//
-		// 這條要抓的是「200 包著 client 導向」那種降級：瀏覽器點連結時它看起來完全
-		// 正常，只有真的發一次 HTTP 請求才分得出來。maxRedirects: 0 是重點。
 		const index = await request.get("/adm/1", {
 			failOnStatusCode: false,
 			maxRedirects: 0,
@@ -603,8 +547,6 @@ test.describe("whole-site route and link contract", () => {
 		expect(index.status()).toBe(307);
 		expect(index.headers().location).toMatch(/\/adm\/1\/products$/);
 
-		// redirects() 在 filesystem routes 之前求值：規則放寬成裸 `:storeId` 會把
-		// 代行唯一入口 /adm/enter 一起吃掉，而那是靜默的（使用者只看到轉址）。
 		const siblings = await Promise.all(
 			["/adm/enter", "/adm/unavailable"].map(async (path) => {
 				const res = await request.get(path, {
@@ -620,8 +562,6 @@ test.describe("whole-site route and link contract", () => {
 	test("every callback public dynamic page serves a real guest document", {
 		tag: ["@ui", "@live"],
 	}, async ({ request }) => {
-		// Order-callback routes materialize deterministic placeholders, so they
-		// stay fully asserted even when the public catalog carries no data.
 		const failures: string[] = [];
 
 		for (const entry of PUBLIC_CALLBACK_DYNAMIC_ROUTES) {
@@ -652,10 +592,6 @@ test.describe("whole-site route and link contract", () => {
 	}, async ({ request }) => {
 		test.setTimeout(120_000);
 		const fixtures = await discoverPublicDynamicFixtures(request);
-		// With a legitimately empty catalog (pre-launch prod) there is no real
-		// product/seller id to materialize these routes with; they resume as soon
-		// as the catalog carries a product. Broken fixtures and 5xx still fail
-		// inside discoverPublicDynamicFixtures.
 		test.skip(
 			fixtures === null,
 			"public catalog legitimately empty (pre-launch prod)",

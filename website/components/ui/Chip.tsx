@@ -51,9 +51,6 @@ export const Chip: React.FC<ChipProps> = ({
 	className = "",
 	children,
 }) => {
-	// A removable chip carries a touch target; a purely decorative status chip
-	// does not. Only the former grows to 44px, and only on coarse pointers, so
-	// dense desktop rows keep their density.
 	const interactive = Boolean(onClose);
 	const classes = cn(
 		"inline-flex max-w-full shrink-0 items-center justify-center whitespace-nowrap border font-medium tracking-normal transition-[background,border-color,color,opacity] duration-200 ease-[var(--hkui-ease)] motion-reduce:transition-none",
@@ -77,11 +74,6 @@ export const Chip: React.FC<ChipProps> = ({
 			{onClose && (
 				<button
 					type="button"
-					// The visible dot stays 20px so the chip keeps its density;
-					// the `before:` pseudo-element grows the *hit area* past
-					// 40px (48px on touch) without changing a single pixel of
-					// the layout. `text-current` at full strength on hover/focus
-					// keeps the glyph readable on the flat variants.
 					className="relative -mr-1 inline-grid size-5 place-items-center rounded-full text-current/70 transition-colors hover:bg-current/10 hover:text-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--hkui-focus)] motion-reduce:transition-none before:absolute before:-inset-2.5 before:content-[''] pointer-coarse:before:-inset-3"
 					onClick={onClose}
 					aria-label="移除"

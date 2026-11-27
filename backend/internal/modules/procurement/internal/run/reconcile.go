@@ -41,9 +41,6 @@ type outcome struct {
 	refund bool
 }
 
-// decide 是 reconciler 的對照表（A9-D22、A9-D23）：run 的狀態與 job 的狀態決定怎麼收斂。
-// job 還在進行中（排隊、等重試、執行中）一律略過；job 已死：要求取消中的 run 收斂到 CANCELLED（不退額度），
-// 其餘 FAILED 並退回額度（job 正常結束卻沒收尾的是執行者違約，沿用該 run 類型的 pipeline 失敗原因，其餘是 WORKER_LOST）。
 func decide(r store.ProcurementAgentRun, state rivertype.JobState, found bool) outcome {
 	reason := FailureWorkerLost
 	if found {
@@ -63,7 +60,6 @@ func decide(r store.ProcurementAgentRun, state rivertype.JobState, found bool) o
 	return outcome{action: actionFail, reason: reason, refund: true}
 }
 
-// converge 把 run 依 outcome 收斂：失敗退額度，取消不退。
 func (l Ledger) converge(ctx context.Context, id uuid.UUID, o outcome) error {
 	var err error
 	switch o.action {
@@ -129,8 +125,6 @@ type txRunner interface {
 	InTx(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// reconcileEach 逐一處理 ids，每個 id 一個 transaction；某個 id 失敗就記錄並繼續下一個。
-// ctx 結束（關機）就停下並回傳 ctx 的錯誤，不逐列記錄失敗。
 func reconcileEach(ctx context.Context, tx txRunner, ids []uuid.UUID, process func(ctx context.Context, id uuid.UUID) (action, error), log *slog.Logger) (ReconcileResult, error) {
 	var res ReconcileResult
 	for _, id := range ids {

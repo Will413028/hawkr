@@ -146,7 +146,6 @@ public class ShipmentAnomalyService {
                                                                 String anomalyType,
                                                                 ShipmentAnomalyAckAction action) {
         ShipmentEntity shipment = requireShipment(shipmentId, anomalyType);
-        // 防 IDOR：shipment 必須屬於該 seller
         if (shipment.getStoreId() == null || shipment.getStoreId() != sellerId) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PERMISSION_DENIED);
         }
@@ -166,7 +165,6 @@ public class ShipmentAnomalyService {
 
     /** anomalyType 合法值驗證 + shipment 存在性檢查。 */
     private ShipmentEntity requireShipment(long shipmentId, String anomalyType) {
-        // §8.4 CodeMeta 合法值驗證
         try {
             CodeMetaValidator.requireValidValue(ShipmentAnomalyType.class, anomalyType, "anomalyType");
         } catch (IllegalArgumentException e) {
@@ -193,7 +191,6 @@ public class ShipmentAnomalyService {
                                                           ShipmentAnomalyAckAction action) {
         LocalDateTime now = DateTimeUtils.nowUtc();
 
-        // UNIQUE (shipment_id, anomaly_type, actor_type)：先查（帶 actor_type）再 insert / update
         QueryWrapper<ShipmentAnomalyAcknowledgmentEntity> qw = new QueryWrapper<>();
         qw.eq("shipment_id", shipment.getId())
           .eq("anomaly_type", anomalyType)

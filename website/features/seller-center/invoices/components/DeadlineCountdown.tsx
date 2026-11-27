@@ -33,8 +33,6 @@ const TONE_CLASS = {
 
 export function DeadlineCountdown({ deadlineAt, className }: Props) {
 	const days = taipeiDaysUntil(deadlineAt);
-	// 讀不出來就整個不渲染。**不要顯示「剩餘 0 天」**——那會被讀成「今天到期」，
-	// 而實際情況是我們根本不知道期限。
 	if (days === null) return null;
 
 	const tone = days < 0 ? "danger" : days <= 2 ? "warning" : "neutral";

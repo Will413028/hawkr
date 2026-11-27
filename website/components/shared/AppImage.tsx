@@ -67,14 +67,11 @@ export default function AppImage(allProps: AppImageProps) {
 		fallbackLabel,
 		...props
 	} = allProps;
-	// 有 image 這個屬性（即使值是 undefined）就是 API 的圖片：網址已經由伺服器組好，只換 preset。
 	const fromApi = "image" in allProps;
 	const src: ImageProps["src"] = fromApi
 		? (imageUri(image, preset) ?? "")
 		: (legacySrc ?? "");
 	const [errored, setErrored] = React.useState(false);
-	// Reset the error flag when the caller swaps in a new src (render-phase
-	// state sync, no effect needed — same pattern as <Avatar>).
 	const [lastSrc, setLastSrc] = React.useState(src);
 	if (lastSrc !== src) {
 		setLastSrc(src);
@@ -82,10 +79,6 @@ export default function AppImage(allProps: AppImageProps) {
 	}
 
 	if (!hasUsableSrc(src) || errored) {
-		// Distinguish the two fallback reasons: an empty src means the record
-		// simply has no image yet (an empty state), while `errored` means a real
-		// image URL failed to load. Only the latter is "圖片無法顯示"; an empty
-		// state reads as "尚無圖片" (mirrors the card's "尚無評價" wording).
 		const label = fallbackLabel ?? (errored ? "圖片無法顯示" : "尚無圖片");
 		return (
 			<ImageFallback
@@ -98,21 +91,10 @@ export default function AppImage(allProps: AppImageProps) {
 		);
 	}
 
-	// The media gateway exposes named presets, not arbitrary Next.js widths.
-	// Resolve string keys once and render the requested named preset unoptimized;
-	// otherwise Next asks the custom loader for a width ladder it cannot produce
-	// and emits a warning for every image. Static imports can still use Next's
-	// build-time image metadata normally. buildImageUrl also restores an existing
-	// /i/{preset}/ URL to its object key before applying `preset`, so an explicit
-	// card/thumb request can never be rewritten back to the original object.
 	const resolvedSrc =
 		!fromApi && typeof src === "string" ? buildImageUrl(src, preset) : src;
 	const shouldBypassOptimization =
 		typeof src === "string" || unoptimized === true;
-	// When the caller supplies its own onError it owns the fallback (e.g.
-	// swapping img.src to a domain-specific placeholder like a seller avatar),
-	// so we defer to it and skip the fallback. Only images with no
-	// fallback of their own fall through to the "圖片無法顯示" placeholder.
 	const handleError: React.ReactEventHandler<HTMLImageElement> = (event) => {
 		if (onError) {
 			onError(event);
@@ -121,8 +103,6 @@ export default function AppImage(allProps: AppImageProps) {
 		setErrored(true);
 	};
 
-	// `fill` mode is mutually exclusive with width/height in next/image,
-	// so skip the defaults when caller opts into fill.
 	if (fill) {
 		return (
 			<Image
@@ -140,9 +120,6 @@ export default function AppImage(allProps: AppImageProps) {
 		process.env.NODE_ENV !== "production" &&
 		(width === undefined || height === undefined)
 	) {
-		// 800×600 is not this image's shape — it is a guess, and it reserves a 4:3
-		// box that the real picture then has to be squeezed into or repaint over.
-		// That guess IS the layout shift the width/height pair exists to prevent.
 		console.warn(
 			`AppImage: ${String(src)} was rendered without width/height and without \`fill\`. ` +
 				"Pass the rendered box (or `fill` inside a positioned parent); the 800×600 " +

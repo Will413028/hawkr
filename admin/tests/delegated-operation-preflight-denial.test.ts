@@ -32,8 +32,6 @@ const actor = { adminId: "2661027599", displayName: "alexischen" };
 const reasonOptions = [
 	{ code: "seller_request", label: "賣家請求", caseReferenceRequired: false },
 ];
-// ⚠️ 拒絕時 reasonOptions／capabilities 仍必須非空（56 §6.1.2）：parser 在讀到
-// allowed 之前就對這兩欄做非空校驗，空陣列會讓整份回應被判契約錯誤。
 const capabilities = ["storefront.read"];
 
 function deniedPayload(deniedCode: number, deniedLabel: unknown) {
@@ -80,7 +78,6 @@ test("parser 保留 deniedCode／deniedLabel，並擋掉不合形狀的標籤", 
 		deniedLabel: "此店家已有其他管理員正在代行",
 	});
 
-	// 上游來的自由文字會直接進畫面，形狀不對就不採用（退回通用句，而不是照印）。
 	for (const badLabel of [
 		"",
 		"  前後有空白  ",
@@ -95,13 +92,11 @@ test("parser 保留 deniedCode／deniedLabel，並擋掉不合形狀的標籤", 
 			`deniedLabel=${JSON.stringify(badLabel)} 不該被採用`,
 		);
 	}
-	// 缺碼也不採用：只有標籤沒有碼，客服無從追。
 	assert.equal(
 		parseDelegatedOperationPreflightDenial(deniedPayload(0, "沒有碼")),
 		null,
 	);
 
-	// 但「這是不是一次拒絕」在上面每一種輸入下都必須仍然成立 —— 兩支分開的理由。
 	for (const badLabel of ["", 42, null]) {
 		assert.equal(
 			isDelegatedOperationPreflightDenied(deniedPayload(9269, badLabel)),
@@ -128,7 +123,6 @@ test("BFF 把後端下發的拒絕原因原樣帶到前端（三種碼各自不�
 		assert.equal(body.deniedCode, code);
 		seen.add(body.message);
 	}
-	// 鑑別力：四個碼必須產生四句不同的話。全部壓成同一句正是修前的行為。
 	assert.equal(seen.size, cases.length);
 });
 
@@ -186,13 +180,11 @@ test("service 把 deniedCode 一路帶到瀏覽器端的例外物件上", async 
 			(error: unknown) => {
 				assert.ok(error instanceof DelegatedOperationClientError);
 				assert.equal(error.status, 403);
-				// 這兩件是 UI 分別要顯示的東西：句子給人看，碼給客服追。
 				assert.equal(error.message, "此店家已有其他管理員正在代行");
 				assert.equal(error.deniedCode, 9269);
 				return true;
 			},
 		);
-		// 不合形狀的碼不得被當成碼帶上去（0／負數／非整數都不是業務碼）。
 		for (const bad of [0, -1, 1.5, "9269"]) {
 			globalThis.fetch = async () =>
 				Response.json(

@@ -268,9 +268,6 @@ export function SellerInvoiceDocumentsSkeletonRows({ rows = 8 }: RowsProps) {
 	);
 }
 
-/* ------------------------------------------------------------------ */
-/* Non-table page skeletons                                            */
-/* ------------------------------------------------------------------ */
 
 interface PostsSkeletonProps {
 	count?: number;

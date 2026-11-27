@@ -120,7 +120,6 @@ func TestPreparePublic_WaitsForADecodeSlotAndReturnsTheCtxErrorWhenCancelled(t *
 	}
 }
 
-// waitSignalCtx 在有人開始等 ctx.Done()（acquire 的等待分支）時發出訊號。
 type waitSignalCtx struct {
 	context.Context
 	waiting chan struct{}

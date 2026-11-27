@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// markInactive 讓擁有者的狀態變成已停用（買家 CLOSED、店家已退場）：crm 只讀擁有者的 pub 函式，不存複本。
 func (f *fixture) markInactive(kind string, id int64) {
 	f.t.Helper()
 	ctx := context.Background()
@@ -172,7 +171,6 @@ func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 						skipped = append(skipped, id)
 						continue
 					}
-					// 第一列已鎖住才放行投影：重疊從這裡開始是確定的。
 					startOnce.Do(func() { close(started) })
 					if err := f.retireLocked(ctx, id); err != nil {
 						return err

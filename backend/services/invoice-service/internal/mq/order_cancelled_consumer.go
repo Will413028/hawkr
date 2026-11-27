@@ -106,9 +106,6 @@ func (c *OrderCancelledConsumer) WithClock(now func() time.Time) *OrderCancelled
 func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, body []byte) error {
 	var p orderCancelledPayload
 	if err := json.Unmarshal(body, &p); err != nil {
-		// 與 C1／C2 同一條理由，但這裡的代價小得多（顯示文案錯，不是發票沒開）。
-		// 仍然 return error：ACK 丟棄的那一則在**每一個觀測點**都看不見
-		// （inbox 沒有列、DLQ 是 0、業務 metric 的基準是「有那一列」）。
 		observeEventDropped(string(pkgmq.EventTypeOrderCancelled), "unmarshal_failed")
 		c.log.Error("invoice.order_cancelled.unmarshal_failed",
 			zap.String("routing_key", routingKey), zap.Error(err))
@@ -120,10 +117,6 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 		return fmt.Errorf("invoice: order.cancelled payload has empty order_no (event_id=%s)", p.EventID)
 	}
 	if p.BuyerID <= 0 {
-		// 🔴 buyer_id 是讀路徑的**授權述詞**（Tier A），不是可有可無的欄位。
-		// 吞成 0 會寫出一列永遠對不到任何買家的死資料：畫面上沒有任何症狀
-		// （買家仍看到舊的錯誤文案），而 DB 裡多了一列看起來已經修好的紀錄
-		// —— 那比沒有那一列更糟，它會讓下一個人相信這條路徑已經在動了。
 		observeEventDropped(string(pkgmq.EventTypeOrderCancelled), "empty_buyer_id")
 		return fmt.Errorf("invoice: order.cancelled %s has non-positive buyer_id %d", p.OrderNo, p.BuyerID)
 	}
@@ -140,9 +133,6 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 	aggregateRef := p.OrderNo
 	deduped := false
 
-	// 🔴 一個交易包住三件事：去重列、業務事實、終態標記。
-	// 任何一步失敗 ⇒ 整批 rollback ⇒ 去重鍵沒有留下 ⇒ 重投會真的重跑 ⇒ 打滿
-	// MaxRetries 之後進 DLQ。這正是 C1／C2 拿不到的性質（見型別註解）。
 	err = c.tx.WithTx(ctx, func(ctx context.Context) error {
 		inboxID, inserted, err := c.inbox.Insert(ctx, domain.NewInboxEvent{
 			EventID:          p.EventID,
@@ -153,10 +143,6 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 			AggregateRef:     &aggregateRef,
 			Payload:          json.RawMessage(body),
 			Status:           inboxStatusReceived,
-			// 寫 `now` 而不是 `now + handlerLease`：那個租約是給 C1／C2 用的，
-			// 它防的是「兜底掃描搶走一列正在被處理的事件」。本 handler 在同一個
-			// 交易內就把這一列推進終態 ⇒ 它從來不會以非終態的形式對外可見，
-			// 沒有任何掃描器搶得走它（INV.dl 的 FetchDueByType 也只撈 ORDER_PAID）。
 			NextAttemptAt: now,
 			OccurredAt:    occurredAt,
 			Now:           now,
@@ -165,7 +151,6 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 			return fmt.Errorf("insert inbox: %w", err)
 		}
 		if !inserted {
-			// 正常的去重結果不是錯誤 ⇒ 交易正常結束、handler ACK，不重做業務。
 			deduped = true
 			return nil
 		}
@@ -180,9 +165,6 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 			return fmt.Errorf("insert cancelled order: %w", err)
 		}
 
-		// 同一個交易內標終態。allowed-from 含 RECEIVED ⇒ 這裡必定 rows=1；
-		// rows=0 代表 SQL 述詞被改過，那是不變式破了，要 fail-loud 而不是記一行 log
-		// 就算了（C1 那邊只能記 log，因為它的業務已經完成、rollback 不回去）。
 		ok, err := c.inbox.MarkProcessed(ctx, inboxID, now)
 		if err != nil {
 			return fmt.Errorf("mark inbox processed: %w", err)
@@ -193,9 +175,6 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 		return nil
 	})
 	if err != nil {
-		// 失敗的歸宿**是 DLQ**（本 handler 全程單交易，去重列已隨之 rollback）。
-		// 這一行與 C1 的 handed_off_to_deadline_scan 刻意講不同的話：兩條路徑的
-		// 歸宿真的不同，寫成一樣會讓 on-call 去翻一張不會有東西的表。
 		c.log.Error("invoice.order_cancelled.failed",
 			zap.String("order_no", p.OrderNo),
 			zap.String("impact", "整個交易已 rollback（含去重列）；本則訊息會重投，打滿 MaxRetries 後進 invoice.order.cancelled.dlq"),
@@ -206,7 +185,6 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 	if deduped {
 		return nil
 	}
-	// 慣例③：真的寫入了才記 Info。
 	c.log.Info("invoice.order_cancelled.recorded",
 		zap.String("order_no", p.OrderNo),
 		zap.Int64("buyer_id", p.BuyerID),

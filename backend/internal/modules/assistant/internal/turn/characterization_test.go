@@ -18,17 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 這支測試鎖的是舊 AI 服務 買家助理「現在的行為」（錄下來的 fixture），不是判斷那些行為是否正確。
-// 舊路徑只送 text／done／error 三種事件；新串流多了 tool_result，且 error 是終止事件，所以比對規則是：
-//   - text：種類、順序、每段文字完全相同。
-//   - done → finished（帶 session ID）；error 之後舊路徑還會送 done，新串流 error 之後沒有事件，只比到 error。
-//   - error：code 500 的兩句文案對應 FailureNoOutput（查詢失敗）與 FailureInterrupted（回應中斷），文字相同。
-//   - tool_result：舊路徑沒有，tool 身分取自 scripted_llm 的 function_call（限三支 tool，agenttool 的委派不算），
-//     成功與否取自 observed_llm_requests 裡回給 LLM 的 function response 有沒有 error；
-//     所有 fixture 的對外文字都在 tool 呼叫之後，所以預期序列是 tool_result 在前、舊事件在後，實際序列不同就失敗。
-//     事件不帶參數：tool 名稱與參數改由 Config.ToolObserver 觀察到的呼叫與 scripted_llm 的 function_call 逐一比對。
-//   - 刻意偏離：回給 LLM 的 tool 結果不再帶中文狀態標籤與下游錯誤文字，改為狀態代碼與錯誤代碼；
-//     追蹤 tool 的查詢狀態集合改為 20、30、32、35、40、54，單筆詳情失敗改為回 note 代碼；見 fedBackDeviations、fedBackSubstitutions 與 statusRemap，每一筆有理由與明確的替換。
 
 const fixtureDir = "../../../../../docs/plans/2026-11-19-a9-agent/fixtures/assistant"
 
@@ -91,15 +80,11 @@ type observed struct {
 	HistoryContents       int              `json:"history_contents"`
 }
 
-// skippedFixtures 是驗 RPC 回應、不是輪次事件的 fixture（GetLatestAssistantSession，在 internal/history 比對）。
 var skippedFixtures = map[string]string{
 	"latest_session_after_chat": "BuyerLatestSession 是 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器；由 internal/history 的測試比對這份 fixture",
 	"latest_session_empty":      "BuyerLatestSession 是 GetLatestAssistantSession（讀 session 歷史），不在輪次執行器；由 internal/history 的測試比對這份 fixture",
 }
 
-// recordedDefaultMessages 是舊服務按鈕端點在空訊息時代填的預設訊息（orders_happy_path、tracking_partial_detail_failure 的錄製以它送出）。
-// 新服務不再有預設訊息：入口層對空訊息回 INVALID_ARGUMENT，這兩份 fixture 在測試裡補回當時的文字，輪次與 LLM 請求的比對維持不變。
-// 退貨政策不看訊息，不在表內。
 var recordedDefaultMessages = map[string]string{
 	"BuyerOrders":   "查詢我的訂單",
 	"BuyerTracking": "查詢包裹狀態",
@@ -111,8 +96,6 @@ var toolIDs = map[string]model.Tool{
 	"track_my_package":       model.ToolTrackMyPackage,
 }
 
-// fedBackDeviations 列出回給 LLM 的 tool 結果刻意與錄製不同的 fixture及理由；
-// 其餘 fixture 必須逐字相同。每一筆偏離在 fedBackSubstitutions 有明確的替換，比對時對錄製值套用替換後必須與實際相同。
 var fedBackDeviations = map[string]string{
 	"orders_happy_path":                  "status 由中文標籤改為狀態代碼（A9-D15 第 2 點）：「待出貨（物流單已建立，待出貨）」→ 20、「配送中」→ 30",
 	"llm_error_after_tool_call":          "同 orders_happy_path：status 由標籤改為代碼",
@@ -127,7 +110,6 @@ var statusLabelToCode = map[string]string{
 	"配送中": "30",
 }
 
-// replaceStatusLabels 遞迴把 key 為 status 的中文標籤換成代碼。
 func replaceStatusLabels(v any) any {
 	switch x := v.(type) {
 	case map[string]any:
@@ -153,7 +135,6 @@ func replaceStatusLabels(v any) any {
 	}
 }
 
-// withNote 刪掉舊的 message、加上 note 代碼。
 func withNote(note string) func(any) any {
 	return func(v any) any {
 		m := v.(map[string]any)
@@ -168,7 +149,6 @@ func withNote(note string) func(any) any {
 	}
 }
 
-// fedBackSubstitutions 是每筆偏離的明確替換：作用在每個 tool 的 function response 的 response 值上。
 var fedBackSubstitutions = map[string]func(any) any{
 	"orders_happy_path":                  replaceStatusLabels,
 	"llm_error_after_tool_call":          replaceStatusLabels,
@@ -180,7 +160,6 @@ var fedBackSubstitutions = map[string]func(any) any{
 	},
 }
 
-// substituteFedBack 對錄製的 function response 套用該 fixture 的替換；coordinator 委派的回應（response 是 specialist 的文字）不受影響。
 func substituteFedBack(scenario string, recorded []map[string]any) []map[string]any {
 	sub, ok := fedBackSubstitutions[scenario]
 	if !ok {
@@ -201,8 +180,6 @@ func substituteFedBack(scenario string, recorded []map[string]any) []map[string]
 	return out
 }
 
-// statusRemap 是追蹤 tool 查詢狀態改變帶來的 fixture 輸入調整：舊 tool 只查狀態 20，新 tool 查 20、30、32、35、40、54；
-// 為了讓被選中的訂單與原錄製相同，fixture 裡原本不會被選中的狀態 30 改成不在追蹤集合的 50，其餘輸入不動。
 var statusRemap = map[string]string{
 	"tracking_no_packages":            "舊 tool 只選狀態 20：fixture 的 30（新集合會選中）改為 50，被選中的訂單與原錄製相同",
 	"tracking_partial_detail_failure": "同 tracking_no_packages",
@@ -288,7 +265,6 @@ func topicOf(t *testing.T, rpc string) model.Topic {
 	return 0
 }
 
-// expectedEvents 把舊事件序列翻成新串流的事件（不含 cursor）。sessionID 取代 fixture 的 <SESSION_ID>。
 func (f fixture) expectedEvents(sessionID string) []model.Event {
 	var tools []model.Event
 	failedTool := map[string]bool{}
@@ -326,7 +302,7 @@ func (f fixture) expectedEvents(sessionID string) []model.Event {
 				ev.Failure = model.FailureInterrupted
 			}
 			out = append(out, ev)
-			return out // 新串流 error 即終止；舊路徑接著的 done 不比
+			return out
 		case "done":
 			sid := e.SessionID
 			if sid == "<SESSION_ID>" {
@@ -399,7 +375,6 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 				wj, _ := json.MarshalIndent(want, "", " ")
 				t.Fatalf("事件序列不同\n got: %s\nwant: %s", gj, wj)
 			}
-			// tool 名稱與參數：由觀察點與錄製的 function_call 逐一比對（事件不帶參數）。
 			obsMu.Lock()
 			gotCalls := append([]buyeragent.ToolCall(nil), calls...)
 			obsMu.Unlock()
@@ -428,7 +403,6 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 				t.Fatal("非退貨政策的輪次要有 session ID")
 			}
 
-			// 每個 fixture 的 text 串接結果（錄製時的「增量串接」）。
 			var gotText, wantText strings.Builder
 			for _, ev := range got {
 				gotText.WriteString(ev.Text)
@@ -440,7 +414,6 @@ func TestCharacterizationBuyerAssistantMatchesRecordedOldBehavior(t *testing.T) 
 				t.Fatalf("文字串接結果不同：%q vs %q", gotText.String(), wantText.String())
 			}
 
-			// 送給 LLM 的請求：路由到哪個 agent、使用者文字、圖片、回給 LLM 的 tool 結果、歷史長度。
 			seen := llm.seen()
 			obs := f.observedRequests(t)
 			if len(seen) != len(f.Script) {

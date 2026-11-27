@@ -128,16 +128,12 @@ async function installAvatarCounter(page: Page, selector: string) {
 	}, selector);
 }
 
-// A 6s stall plus a throttled shell plus a dev-server compile is not a 30s test.
 test.describe.configure({ timeout: 300_000 });
 
 test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", () => {
 	test("the <img> is never unmounted, and a 6s-late image still paints", {
 		tag: ["@ui", "@live"],
 	}, async ({ page }) => {
-		// -------------------------------------------------------------- arrange
-		// Land on the home page first: the navigation under test has to be a
-		// client-side one, and `page.goto` is by definition not that.
 		await gotoStreamed(page, "/");
 		await expect(page.locator(".initial-loader")).toBeHidden({
 			timeout: 60_000,
@@ -148,10 +144,6 @@ test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", ()
 		await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
 		await cdp.send("Network.emulateNetworkConditions", MOBILE_SHELL);
 
-		// Hold every avatar for 6 seconds, THEN answer with a real image. This
-		// is the case #430 proved was unrecoverable: the old code fired at 4s,
-		// the element was gone, and the bytes arriving at 6s had nothing to
-		// paint into ("14 秒後 DOM 中 avatar <img> 仍為 0").
 		let avatarRequests = 0;
 		await page.route(AVATAR_GLOB, async (route) => {
 			avatarRequests += 1;
@@ -166,9 +158,6 @@ test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", ()
 
 		await installAvatarCounter(page, AVATAR_SELECTOR);
 
-		// ----------------------------------------------------------------- act
-		// Count document requests so "SPA navigation" is asserted, not assumed:
-		// a reload server-renders the avatars, where the bug never existed.
 		const marketDocumentRequests: string[] = [];
 		page.on("request", (request) => {
 			if (
@@ -184,12 +173,8 @@ test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", ()
 			.first();
 		await expect(toMarket).toBeVisible({ timeout: 60_000 });
 		await toMarket.click();
-		// NOT `waitForURL`: its default `waitUntil: "load"` waits on a load
-		// event that a client-side navigation never fires.
 		await expect(page).toHaveURL(/\/market\/products/, { timeout: 120_000 });
 
-		// The list is client-rendered; its avatars are created by JS, which is
-		// the only situation in which the old timer ever armed.
 		await expect(
 			page.locator('[data-hk-market-products-hydrated="true"]'),
 		).toBeAttached({ timeout: 120_000 });
@@ -197,14 +182,9 @@ test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", ()
 			timeout: 60_000,
 		});
 
-		// Start the observation window here. Before this point a momentary 0 is
-		// legitimate — the previous route's avatars are gone and this route's
-		// are not mounted yet — and asserting over it would test the router's
-		// transition, not the component.
 		await page.evaluate(() => window.__hkResetAvatarSamples?.());
 		await page.waitForTimeout(OBSERVATION_MS);
 
-		// -------------------------------------------------------------- assert
 		const samples = (await page.evaluate(
 			() => window.__hkAvatarSamples ?? [],
 		)) as AvatarSample[];
@@ -213,8 +193,6 @@ test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", ()
 			marketDocumentRequests,
 			"the click caused a full page load — the soft navigation this condition depends on did not happen, so nothing here was actually tested",
 		).toEqual([]);
-		// Guard against a vacuous pass: with no avatar and no request there is
-		// no invariant to violate and "never dropped to 0" would be a lie.
 		expect(
 			avatarRequests,
 			"no avatar image was requested — the fixture, not the component, is broken",
@@ -228,18 +206,12 @@ test.describe("avatar survives a slow image on an SPA navigation (#430 D10)", ()
 			"the observation window opened with no avatar in the DOM",
 		).toBeGreaterThan(0);
 
-		// THE invariant. Once an avatar exists, nothing may take it away while
-		// its request is still alive — slowness is not failure.
 		const collapsed = samples.filter((s) => s.n === 0);
 		expect(
 			collapsed,
 			`avatar <img> count fell to 0 while the requests were still in flight — the element was unmounted mid-request. First collapse at t=${collapsed[0]?.t}ms of a ${OBSERVATION_MS}ms window that opened with ${samples[0].n} avatars`,
 		).toEqual([]);
 
-		// And the second half of the condition: the late bytes actually become a
-		// picture. `complete && naturalWidth > 0` is the browser's own answer to
-		// "did this element paint an image", so an element that merely exists
-		// cannot satisfy it.
 		await expect
 			.poll(
 				() =>

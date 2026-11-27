@@ -109,7 +109,6 @@ describe("lgsTypeForShippingMethod", () => {
 });
 
 describe("progressPercentFor", () => {
-	// PayUni 原始 shipStatus：11 在超商表是 80%（到店），在宅配表不存在。
 	const code = 11;
 
 	it("兩條已知軸各自有自己的百分比", () => {
@@ -162,8 +161,6 @@ describe("nextShipmentAction", () => {
 	});
 
 	it("[禁 fallback] 已取號的 odno 也不能讓未知 provider 冒出「出貨確認」", () => {
-		// 這是舊行為最危險的一格：odno 是超商交貨便代碼，未知 provider 若帶了
-		// 任何 odno（例如後端沿用同一欄位），舊版會直接畫出「出貨確認」按鈕。
 		const action = nextShipmentAction(
 			"O1",
 			shipping(ShippingMethod.MERCHANT_DELIVERY, {

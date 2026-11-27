@@ -74,7 +74,6 @@ func Wrap(code ErrorCode, message string, cause error) *DomainError {
 	return &DomainError{Code: code, Message: message, Cause: cause}
 }
 
-// --- Convenience constructors ---
 
 // NewNotFound creates a NotFound error.
 func NewNotFound(message string) *DomainError {

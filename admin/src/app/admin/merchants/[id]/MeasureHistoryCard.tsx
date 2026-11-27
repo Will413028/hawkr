@@ -81,7 +81,7 @@ export default function MeasureHistoryCard({
 								<th>依據</th>
 								<th>給賣家的理由</th>
 								<th>結束時間</th>
-								{/* 「操作者 ID」：後台只顯示管理員 ID，不查姓名（K16）。 */}
+
 								<th>操作者 ID</th>
 								<th>狀態</th>
 								<th>請求</th>

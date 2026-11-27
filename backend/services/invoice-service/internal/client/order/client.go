@@ -55,7 +55,6 @@ type Client struct {
 	deadline time.Duration
 }
 
-// 編譯期斷言：本 client 必須滿足 consumer 宣告的 port。
 var _ invoicemq.OrderFactsClient = (*Client)(nil)
 
 // NewClient 撥號 order-service。interceptor 與 lifecycle 的理由見 payment client 同名函式。
@@ -125,8 +124,6 @@ func (c *Client) GetOrderInvoiceSnapshot(ctx context.Context, orderNo string, bu
 		return invoicemq.OrderFacts{}, fmt.Errorf("invoice: get order invoice snapshot (order_no=%s): %w", orderNo, err)
 	}
 
-	// 載具解析用**外層** ctx（不是 callCtx）：它是一次本地 DB 讀，不該被 gRPC 的
-	// per-call deadline 綁住；而 callCtx 在本函式返回時就被 cancel 了。
 	prefID, err := parseOptionalID(data.GetBuyerInvoicePreferenceId(), "buyer_invoice_preference_id")
 	if err != nil {
 		return invoicemq.OrderFacts{}, fmt.Errorf("invoice: get order invoice snapshot (order_no=%s): %w", orderNo, err)
@@ -168,8 +165,6 @@ func (c *Client) ReviseOrderInvoiceSnapshot(ctx context.Context, in domain.Revis
 		return 0, fmt.Errorf("invoice: revise order invoice snapshot: empty order_no")
 	}
 	if in.IdempotencyKey == "" {
-		// 空冪等鍵會讓每次重試都變成一次新的更正（order-service 側的 partial unique index
-		// 對 NULL 不生效）⇒ 在這裡就擋掉，不要送出去。
 		return 0, fmt.Errorf("invoice: revise order invoice snapshot (order_no=%s): empty idempotency_key", in.OrderNo)
 	}
 
@@ -195,7 +190,6 @@ func (c *Client) ReviseOrderInvoiceSnapshot(ctx context.Context, in domain.Revis
 	}
 	switch code := resp.GetCode(); code {
 	case 0:
-		// 正常
 	case orderSnapshotVersionConflictCode:
 		return 0, fmt.Errorf("%w (order_no=%s expected_version=%d)",
 			ErrOrderSnapshotVersionConflict, in.OrderNo, in.ExpectedSnapshotVersion)
@@ -215,8 +209,6 @@ func (c *Client) ReviseOrderInvoiceSnapshot(ctx context.Context, in domain.Revis
 			in.OrderNo, raw, err)
 	}
 	if next <= in.ExpectedSnapshotVersion {
-		// 對方宣稱成功，卻回了一個不比舊版新的號碼。這不是可以容忍的邊界情況：
-		// 拿它去更新 document 會讓內容軸倒退，而冪等鍵是用它算的。
 		return 0, fmt.Errorf(
 			"invoice: revise order invoice snapshot (order_no=%s): snapshot_version %d not newer than %d",
 			in.OrderNo, next, in.ExpectedSnapshotVersion)
@@ -224,12 +216,8 @@ func (c *Client) ReviseOrderInvoiceSnapshot(ctx context.Context, in domain.Revis
 	return next, nil
 }
 
-// orderSnapshotVersionConflictCode ＝ CodeMeta INVOICE_SNAPSHOT_VERSION_CONFLICT（9308）。
-// 寫成常數而不是 import bizcode：這裡讀的是 **order-service 回傳的** envelope code，
-// 與本服務自己丟出的業務碼是兩件事，混用會讓「誰產生了這個碼」在讀 code 時失焦。
 const orderSnapshotVersionConflictCode int32 = 9308
 
-// formatOptionalID：0 ⇒ 空字串（proto 沒有 null，空字串就是「未提供」）。
 func formatOptionalID(id int64) string {
 	if id == 0 {
 		return ""
@@ -237,17 +225,12 @@ func formatOptionalID(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
 
-// mapSnapshot 把 proto 的字串數字攤成 OrderFacts 的原生型別。
-//
-// 每一次轉換都 fail-loud：`strconv` 失敗回 error 而不是零值。金額欄位吞成 0 的後果
-// 是開出一張金額錯誤的發票（不可回收），而不是一次 500。
 func mapSnapshot(d *pb.OrderInvoiceSnapshotData) (invoicemq.OrderFacts, error) {
 	version, err := parseRequiredInt(d.GetSnapshotVersion(), "snapshot_version")
 	if err != nil {
 		return invoicemq.OrderFacts{}, err
 	}
 	if version < 1 {
-		// chk_ois_version；I-50 說本服務只能從回傳值複製，不能自己遞增，也就不能自己補值。
 		return invoicemq.OrderFacts{}, fmt.Errorf("snapshot_version must be >= 1, got %d", version)
 	}
 	original, err := parseRequiredInt(d.GetTotalOriginalAmount(), "total_original_amount")
@@ -285,26 +268,18 @@ func mapSnapshot(d *pb.OrderInvoiceSnapshotData) (invoicemq.OrderFacts, error) {
 			Items:               items,
 		},
 		NotifyEmail: d.GetNotifyEmail(),
-		// 🔴 fail-closed：`discount_funding` 為 "" ＝ order-service 判不出來（U-7），
-		// **不得**當成 SELLER。把平台補貼的那一段從賣家銷售額扣掉 ＝ 賣家短漏報銷售額。
-		// 折扣為 0 時資金來源無意義，此格才不成立。
 		HasPlatformFundedDiscount: discount > 0 && funding != domain.DiscountFundingSeller,
 		IsConsolidatedOrder:       d.GetIsConsolidatedOrder(),
 	}, nil
 }
 
 func mapItems(in []*pb.OrderInvoiceSnapshotItem) ([]domain.OrderItem, error) {
-	// 順序即 line_seq（§5A.3）：proto 註解要求依 order_items.id 升冪，本層原樣保留，
-	// 不重排也不依賴 map 迭代序。
 	out := make([]domain.OrderItem, 0, len(in))
 	for i, it := range in {
 		itemID, err := parseRequiredInt(it.GetOrderItemId(), fmt.Sprintf("items[%d].order_item_id", i))
 		if err != nil {
 			return nil, err
 		}
-		// non-catalog line（RFQ 成交）沒有平台 SKU ⇒ order-service 輸出空字串。
-		// 空字串承載「無此值」，最終由 repository 寫成 NULL。
-		// ⚠️ 只有 sku_id 可缺：其餘數值欄位仍走 parseRequiredInt。
 		skuID, err := parseOptionalUUID(it.GetSkuId(), fmt.Sprintf("items[%d].sku_id", i))
 		if err != nil {
 			return nil, err
@@ -332,11 +307,6 @@ func mapItems(in []*pb.OrderInvoiceSnapshotItem) ([]domain.OrderItem, error) {
 	return out, nil
 }
 
-// fundingFromWire 把 proto 的三態字串換成 domain 值。
-//
-// 🔴 未知值一律回 Unknown（＝ fail-closed），**不得** default 成 Seller：
-// A22 的判定是 `DiscountAmount > 0 && funding != Seller`，把未知當成 Seller
-// 會讓平台出資的折扣靜默通過那道閘門。
 func fundingFromWire(s string) domain.DiscountFunding {
 	switch s {
 	case "SELLER":
@@ -348,7 +318,6 @@ func fundingFromWire(s string) domain.DiscountFunding {
 	}
 }
 
-// parseRequiredInt 解析必填的數字字串。空字串是錯誤不是 0。
 func parseRequiredInt(s, field string) (int64, error) {
 	if s == "" {
 		return 0, fmt.Errorf("%s is empty (numeric fields are required, not optional)", field)
@@ -360,8 +329,6 @@ func parseRequiredInt(s, field string) (int64, error) {
 	return v, nil
 }
 
-// parseOptionalUUID 解析**允許缺值**的 UUID 欄位：空字串原樣回傳（代表 NULL），
-// 非空必須是合法 UUID，回傳正規化（小寫）字串。非空但格式錯是上游壞了，不是缺值。
 func parseOptionalUUID(s, field string) (string, error) {
 	if s == "" {
 		return "", nil
@@ -373,7 +340,6 @@ func parseOptionalUUID(s, field string) (string, error) {
 	return v.String(), nil
 }
 
-// parseOptionalID 解析「"" ＝ NULL」的 id 欄位。空字串回 0，其餘必須是正整數。
 func parseOptionalID(s, field string) (int64, error) {
 	if s == "" {
 		return 0, nil

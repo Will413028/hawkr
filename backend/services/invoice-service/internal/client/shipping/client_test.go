@@ -15,9 +15,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// fakeShipping 是一個真的 gRPC server（跑在 bufconn 上），不是 stub interface 的假物件：
-// 只有真的過一趟 gRPC，「deadline 有沒有被設上」才驗得到——那個值是用 wire 上的
-// grpc-timeout header 傳的，換成 interface 假物件就完全測不到。
 type fakeShipping struct {
 	pb.UnimplementedShippingServiceServer
 
@@ -70,13 +67,12 @@ func TestBatchGetShipmentStatus_MapsOrderNoToStatus(t *testing.T) {
 	srv := &fakeShipping{resp: &pb.GetShipmentsByOrderNosResponse{
 		Code: 0,
 		Data: []*pb.ShipmentDetailView{
-			{OrderNo: "O1", Status: "210"}, // TCAT_CALLED
-			{OrderNo: "O2", Status: "11"},  // PICKED_UP
+			{OrderNo: "O1", Status: "210"},
+			{OrderNo: "O2", Status: "11"},
 		},
 	}}
 	c := newTestClient(t, srv, 500*time.Millisecond)
 
-	// O3 刻意沒有物流單：它必須**不在** map 內，呼叫端才回得出誠實的空字串。
 	got, err := c.BatchGetShipmentStatus(context.Background(), []string{"O1", "O2", "O3"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -153,7 +149,7 @@ func TestBatchGetShipmentStatus_DuplicateOrderNoKeepsFirst(t *testing.T) {
 		Data: []*pb.ShipmentDetailView{
 			{OrderNo: "O1", Status: "31"},
 			{OrderNo: "O1", Status: "51"},
-			{OrderNo: "", Status: "99"}, // 沒有 order_no 的列必須被濾掉，不得建出 "" 這個 key
+			{OrderNo: "", Status: "99"},
 		},
 	}}
 	c := newTestClient(t, srv, 500*time.Millisecond)

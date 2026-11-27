@@ -1,8 +1,5 @@
 package pagination
 
-// integer is the set of integer types page/pageSize are typically stored as
-// across services: usecase-layer code tends to use int, proto-generated
-// request fields use int32, and database-facing code may use int64.
 type integer interface {
 	~int | ~int32 | ~int64
 }

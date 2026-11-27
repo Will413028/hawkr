@@ -41,7 +41,6 @@ class PickerL3ContentPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // 頂部統計
         Padding(
           padding: EdgeInsets.all(8.w),
           child: Text(
@@ -49,7 +48,6 @@ class PickerL3ContentPanel extends StatelessWidget {
             style: TextStyle(fontSize: 14.sp, color: AppColors.textEmphasis),
           ),
         ),
-        // 清單
         Expanded(
           child: Builder(
             builder: (_) {
@@ -59,7 +57,6 @@ class PickerL3ContentPanel extends StatelessWidget {
 
               final sections = <Widget>[];
 
-              // 新增子分類按鈕
               if (activeSubcat != null && activeSubcat!.isNotEmpty) {
                 sections.add(
                   Padding(

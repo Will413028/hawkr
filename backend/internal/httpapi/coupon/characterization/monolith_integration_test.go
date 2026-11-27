@@ -79,10 +79,8 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
 }
 
-// 圖片參照是全數字的 token，轉正一律成功。
 func newMedia() *media.Fake { return media.NewFake() }
 
-// exposableStore 為帳號開一家可以公開曝光的店（直接寫 seller 的表，最小的列；與 social 的 integration fixture 相同，KYC 的約束先放寬）。
 func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -103,14 +101,12 @@ func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	if err := d.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}
-	// 店家的公告列開店時與店家列一起建立；撤銷措施會重算停權並重新公告，沒有這一列會回 internal。
 	exec(`INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
 	exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, now, uuid.NewV7())
 	exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
 }
 
-// sellerStores 是 coupon 的 Stores port 的 adapter（與 cmd/hawkr 的 couponStores 同一個做法：問 seller 店家是不是停權）。
 type sellerStores struct{ sellers *seller.Module }
 
 func (s sellerStores) StoreSuspended(ctx context.Context, storeID int64) (bool, error) {
@@ -133,7 +129,6 @@ func (s sellerStores) StoreState(ctx context.Context, storeID int64) (coupon.Sto
 	return coupon.StoreState{Exists: true, Closed: st.Status == seller.Closed}, nil
 }
 
-// buyerExists 是 coupon 的 Buyers port 的 adapter（與 cmd/hawkr 的 couponBuyers 同一個做法）。
 type buyerExists struct{ buyers *buyer.Module }
 
 func (b buyerExists) Existing(ctx context.Context, ids []int64) ([]int64, error) {
@@ -148,7 +143,6 @@ func (b buyerExists) Existing(ctx context.Context, ids []int64) ([]int64, error)
 	return out, nil
 }
 
-// monolith 是單體的 Connect 入口加它的資料庫、identity 與 coupon 模組：handler 與 production 一樣由 httpapi.NewHandler 組出，資料庫是 testdb 的真實 Postgres。
 type monolith struct {
 	db       *db.DB
 	identity *identity.Module
@@ -157,7 +151,6 @@ type monolith struct {
 	coupon   *coupon.Module
 	crm      *crm.Module
 	srv      *httptest.Server
-	// adminToken 是已授予 OWNER 的 dev 管理員 token。
 	adminToken string
 }
 
@@ -219,7 +212,6 @@ func startMonolith(t *testing.T) *monolith {
 	return &monolith{db: d, identity: id, buyers: buyers, sellers: sellers, coupon: couponModule, crm: crmModule, srv: srv, adminToken: adminToken}
 }
 
-// newCustomer 建立一個 dev session 帳號；withStore 為真時再為它開一家可曝光的店。回傳 token 與身分。
 func (m *monolith) newCustomer(t *testing.T, withStore bool) (string, who) {
 	t.Helper()
 	ctx := t.Context()

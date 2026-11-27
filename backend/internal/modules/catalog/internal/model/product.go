@@ -134,7 +134,6 @@ func SuggestedSafetyStock(weeklySales []int32) int32 {
 	if sum <= 0 {
 		return SafetyStockNoSales
 	}
-	// ceil(avg × 2) = ceil(sum × 2 / weeks)
 	n := (sum*SafeCoverWeeks + SalesWindowWeeks - 1) / SalesWindowWeeks
 	return int32(min(max(n, int64(SafetyStockFloor)), int64(math.MaxInt32)))
 }

@@ -21,9 +21,6 @@ export default function AnchorLink({
 	...rest
 }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
 	return (
-		// `rest` 先展開：href / onClick 是本元件的契約，呼叫端傳同名 prop 時
-		// 應該被「合成」而不是「取代」——原本的順序會讓一個 onClick 整段換掉
-		// 平滑捲動與 reduced-motion 判斷。
 		<a
 			{...rest}
 			href={href}
@@ -37,8 +34,6 @@ export default function AnchorLink({
 					behavior: prefersReducedMotion() ? "auto" : "smooth",
 					block: "start",
 				});
-				// 區塊本身多半不可聚焦；給它一個程式化的落腳點，用完即拿掉，
-				// 這樣它不會出現在 Tab 順序裡，只是接住這一次跳轉。
 				if (!target.hasAttribute("tabindex")) {
 					target.setAttribute("tabindex", "-1");
 					target.addEventListener(

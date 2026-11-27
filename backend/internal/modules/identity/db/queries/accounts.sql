@@ -1,48 +1,37 @@
 -- name: GetAccount :one
--- 含已刪除的帳號（墓碑）：舊服務要查得到「已刪除」。
 SELECT * FROM identity.accounts WHERE id = $1;
 
 -- name: GetAccounts :many
 SELECT * FROM identity.accounts WHERE id = ANY(sqlc.arg(ids)::bigint[]) ORDER BY id;
 
 -- name: LockLiveAccount :one
--- 鎖住存活的帳號，讓同一個帳號的角色變更、停權與刪除依序執行。
 SELECT * FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE;
 
 -- name: ShareLockLiveAccount :one
--- 共享鎖住存活的帳號：只要求帳號列在 transaction commit 之前不被刪除或改動，不擋其他讀者的共享鎖（給只讀取帳號狀態、不改帳號的呼叫者）。
 SELECT id FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR SHARE;
 
 -- name: SuspendAccount :execrows
--- 已經停權時沒有列被更新（冪等）。
 UPDATE identity.accounts
 SET suspended_at = sqlc.arg(now)::timestamptz, updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND suspended_at IS NULL;
 
 -- name: UnsuspendAccount :execrows
--- 沒有停權時沒有列被更新（冪等）。
 UPDATE identity.accounts
 SET suspended_at = NULL, updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND suspended_at IS NOT NULL;
 
 -- name: DeleteAccount :execrows
--- 留下沒有個資的墓碑（accounts_deleted_check）。已經刪除時沒有列被更新（冪等）。
 UPDATE identity.accounts
 SET deleted_at = sqlc.arg(now)::timestamptz, email = NULL, self_entered_email = NULL, suspended_at = NULL, deletion_pending_at = NULL,
     updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: MarkDeletionPending :execrows
--- 帳號進入等待刪除；已經在等待時沒有列被更新（冪等）。
 UPDATE identity.accounts
 SET deletion_pending_at = sqlc.arg(now)::timestamptz, updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND deletion_pending_at IS NULL;
 
 -- name: ListAccounts :many
--- 後台的帳號清單：存活的帳號，新到舊。role 空字串不篩選角色；pattern 空字串不篩選，否則比對 email 包含這段文字
--- （呼叫方已跳脫 % 與 _），或帳號 ID 等於 account_id（搜尋的文字不是數字時是 0，不會命中）；email 空字串不篩選，否則
--- 要 lower(email) 等於它（呼叫方已去空白並轉小寫）。keyset 分頁：
--- has_cursor 時從 (after_created, after_id) 之後開始。
 SELECT a.* FROM identity.accounts a
 WHERE a.deleted_at IS NULL
   AND (sqlc.arg(role)::text = ''
@@ -55,7 +44,6 @@ ORDER BY a.created_at DESC, a.id DESC
 LIMIT sqlc.arg(max_rows);
 
 -- name: CountAccounts :one
--- 與 ListAccounts 相同的篩選，給後台顯示頁數。
 SELECT count(*) FROM identity.accounts a
 WHERE a.deleted_at IS NULL
   AND (sqlc.arg(role)::text = ''
@@ -64,27 +52,22 @@ WHERE a.deleted_at IS NULL
   AND (sqlc.arg(email)::text = '' OR lower(a.email) = sqlc.arg(email)::text);
 
 -- name: InsertFederatedAccount :one
--- 聯合登入的新帳號。email 是 provider 回報的已驗證 email（沒有時 NULL）。
 INSERT INTO identity.accounts (email, created_at, updated_at)
 VALUES (sqlc.narg(email), sqlc.arg(now), sqlc.arg(now))
 RETURNING id;
 
 -- name: UpdateAccountEmail :execrows
--- 登入時以已驗證 email 更新寄件地址（ADR 2026-10-30-identity-self-hosted-federated-login D4）；墓碑不更新。
 UPDATE identity.accounts
 SET email = sqlc.arg(email), updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS DISTINCT FROM sqlc.arg(email);
 
 
 -- name: SetSelfEnteredEmail :execrows
--- 自填聯絡信箱：呼叫方已在同一個 transaction 內鎖住帳號列（LockLiveAccount）並以 Go 的 validEmail 確認沒有可用的已驗證 email；
--- 「可用」的規則只在 Go（emailaddr.Normalize），SQL 不重述它。依 id 寫入存活的帳號，受影響列數必為 1（相同值也寫入，不是 no-op）。
 UPDATE identity.accounts
 SET self_entered_email = sqlc.arg(self_entered_email), updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 
 -- name: SetPreferredLocale :execrows
--- 語系與目前的值不同時才寫（相同是 no-op，不動 updated_at、不留下列鎖）；墓碑不更新。受影響列數 1 表示有改。
 UPDATE identity.accounts
 SET preferred_locale = sqlc.arg(locale), updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND preferred_locale <> sqlc.arg(locale);

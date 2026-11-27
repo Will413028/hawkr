@@ -17,31 +17,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/notifyrouting"
 )
 
-// ---------------------------------------------------------------------------
-// 行為層第二道線：**每一個**出向事件的 store_id 都解得回賣家的通知目標
-//
-// 🔴 為什麼需要這一層，而型別 ＋ AST 不夠：前兩道守的是「值從哪裡來」，守不了
-// 「那個值到了下游解不解得開」。P0-3 的原始形狀就是**來源看起來完全合理**
-// （invoice_issuers.id，一個真實存在的欄位），只是下游解不出賣家。
-//
-// 🔴 本檔刻意**不寫任何手工 payload fixture**：payload 一律由**真正的生產者函式**
-// 產出，解析一律走 **internal/notifyrouting 的真正那一份**（不是抄一份）。
-// 兩端都由同一份想像產生、自己跟自己對必然全綠——那正是 2026-08-30 四個 P0 的
-// 共同結構性成因（見 .claude/skills/mq-wire-contract）。
-//
-// 🔴 fixture 的鑑別力來自「每一個候選值都不同」：
-//
-//	issuer.ID          7304857280000000001  ← 填這個就是 P0-3（TSID，解不出賣家）
-//	issuer.IssuerRefID 2685914682           ← 唯一正確的 store_id
-//	doc.ID             7304857280000000002
-//	doc.IssuerID       7304857280000000001
-//	buyerRefID         2623900520           ← recipient_type=BUYER 時的 buyer_id
-//	sellerRefID        2632049831           ← recipient_type=SELLER 時 recipient_ref_id
-//	                                          裝的是**另一個賣家的 store_id**
-//	complainantBuyerID 2688637900
-//
-// 任何兩個值相同的 fixture 都會讓這些測試證明一件現實中不存在的事。
-// ---------------------------------------------------------------------------
 
 const (
 	fxIssuerPK      int64 = 7304857280000000001
@@ -53,10 +28,6 @@ const (
 	fxSellerAccount int64 = 4242424242
 )
 
-// resolveOnlyStoreID 只認得**真正的 store_id**，其餘一律回錯。
-//
-// 🔴 鑑別力全在「其餘一律回錯」：一個接受任何 int64 的 resolver 會讓 publisher 填
-// invoice_issuers 的 PK 也照樣通過 —— 而那正是原缺陷的形狀。
 type resolveOnlyStoreID struct {
 	asked []int64
 }
@@ -76,8 +47,6 @@ func fxIssuer() domain.Issuer {
 	}
 }
 
-// fxDoc 造一份 document。recipientType 與 recipientRef 由呼叫端指定，因為
-// buyer_id 的正確性**只在非 BUYER 方向上才觀測得到**。
 func fxDoc(recipientType string, recipientRef *int64) domain.Document {
 	order := "O000000001"
 	return domain.Document{
@@ -101,28 +70,12 @@ func fxComplaint() domain.Complaint {
 func ptrInt64(v int64) *int64    { return &v }
 func ptrString(v string) *string { return &v }
 
-// producer 是一個出向事件生產點。
-//
-// Type 是它產出的 payload 型別名，而且**不是標籤而是斷言**：
-// TestEveryScannedPayloadTypeHasABehaviouralProducer 會拿 AST 掃到的型別清單與這裡的
-// Type 雙向對拍，並用該型別的 json tag 集合驗證實際 marshal 出來的 key ——
-// Type 填錯會當場紅，不會靜默變成一個好聽的字串。
 type producer struct {
 	Name    string
 	Type    string
 	Payload []byte
 }
 
-// eventProducers 是**全部**出向事件的生產點。
-//
-// 🔴 這份清單曾經是**硬寫的七項**，而它的下界檢查也是硬寫的 `len(producers) < 7`。
-// 那組合有一個安靜的缺口：新增第 7 個事件型別的人**不會**想到要回來加一項，
-// 於是那個事件完全沒有行為層覆蓋——而行為層正是「型別 ＋ AST 都放行的繞道」
-// 唯一擋得住的那道線。現在下界由 checkEventPayloads 掃出來的型別清單推導
-// （TestEveryScannedPayloadTypeHasABehaviouralProducer），新事件不可能沒有生產點。
-//
-// 這份清單與 event_store_id_contract_test.go 的 knownEventPayloadTypes 互相釘住：
-// 那邊的 AST gate 保證「型別都存在且都追得回 outbox」，這邊保證「都真的解得回賣家」。
 func eventProducers(t *testing.T, doc domain.Document) []producer {
 	t.Helper()
 	now := time.Now().UTC()
@@ -182,11 +135,6 @@ func eventProducers(t *testing.T, doc domain.Document) []producer {
 				codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value, now))},
 		{"P1/P6 issuedEvent（重寄）", "issuedEvent", fromOutbox("重寄", resendOutbox,
 			resendUC.emitResend(ctx, doc, 1, now))},
-		// P5：原票號取自**原 document**、新票號取自 provider 回應，兩者填反的症狀是
-		// 「原發票 X 已作廢並重新開立，新發票號碼 X」——同一個號碼且不會有東西報錯，
-		// 所以這裡刻意讓兩個號碼取不同的值（#3055）。
-		// P4：折讓開立。冪等鍵用 **adjustment id** 而不是 document id ——
-		// 同一張發票可以分多次折讓，共用 document id 會讓第二張折讓單的通知被去重掉。
 		{"P4 allowanceIssuedEvent", "allowanceIssuedEvent", must((&Allowance{}).allowanceIssuedPayload(
 			issuer, doc,
 			domain.Adjustment{
@@ -196,14 +144,10 @@ func eventProducers(t *testing.T, doc domain.Document) []producer {
 				NetAmountExTax:  ptrInt64(300),
 				TaxAmount:       ptrInt64(15),
 			}, now))},
-		// P10：申訴逾期。它與 P8（created）、P9（responded）是同一件案子的三個 phase，
-		// 冪等鍵靠 phase 分開 —— 三者共用一個鍵的話 notification 端會去重成一則。
 		{"P10 complaintOverdueEvent", "complaintOverdueEvent", must(complaintOverduePayload(issuer, c, now))},
-		// P3：作廢可以單獨發生（退款折讓路徑不重開）⇒ 它與 P5 是兩件事，各自要有生產點。
 		{"P3 voidedEvent", "voidedEvent", fromOutbox("P3", voidOutbox,
 			(&Voiding{outbox: voidOutbox, issuers: &fakeIssuerRepo{issuer: issuer}}).
 				emitVoided(ctx, doc, now))},
-		// P7：fail-closed 落點的賣家通知。兩條路（建單、收據）共用同一個 emitter。
 		{"P7 reviewRequiredEvent", "reviewRequiredEvent", fromOutbox("P7", reviewOutbox,
 			(&Issuance{outbox: reviewOutbox}).emitReviewRequired(
 				ctx, issuer, doc, codemeta.InvoiceManualReasonReceiptAuthMissing.Value, now))},
@@ -219,9 +163,6 @@ func eventProducers(t *testing.T, doc domain.Document) []producer {
 func TestEveryOutgoingEventResolvesToTheSellerNotifyTarget(t *testing.T) {
 	doc := fxDoc(codemeta.InvoiceRecipientTypeBuyer.Value, ptrInt64(fxBuyerID))
 	producers := eventProducers(t, doc)
-	// 🔴 下界由 AST 掃出來的型別清單推導，不再是硬寫的數字（見
-	// TestEveryScannedPayloadTypeHasABehaviouralProducer）。硬寫 `< 7` 的問題是
-	// 「第 7 個事件型別」不會讓它變紅——它本來就是 7。
 	assertProducersCoverEveryPayloadType(t, producers)
 
 	for _, p := range producers {
@@ -236,19 +177,16 @@ func TestEveryOutgoingEventResolvesToTheSellerNotifyTarget(t *testing.T) {
 				t.Fatalf("unmarshal: %v", err)
 			}
 
-			// ① store_id 必須是 issuer_ref_id，不是 invoice_issuers 的 PK
 			if got["store_id"] != "2685914682" {
 				t.Fatalf("store_id = %#v，want \"2685914682\"（invoice_issuers.issuer_ref_id）。\n"+
 					"若它等於 %d，就是又填回了 invoice_issuers 的 PK。",
 					got["store_id"], fxIssuerPK)
 			}
-			// ② dispatcher 真的拿它去問了（而不是根本沒有這個鍵）
 			if len(r.asked) != 1 || r.asked[0] != fxStoreID {
 				t.Fatalf("dispatcher 拿去解析的值 = %v，want [%d]。\n"+
 					"空陣列代表 payload 根本沒有 store_id 鍵 —— 賣家向通知 100%% 消失。",
 					r.asked, fxStoreID)
 			}
-			// ③ 解出來的 account_id 不是 "0"（"0" ＝ 下游會 skip 該則通知）
 			if got["notify_seller_account_id"] != "4242424242" {
 				t.Fatalf("notify_seller_account_id = %#v，want \"4242424242\"。"+
 					"它是 \"0\" 就代表賣家向通知會被下游 skip。",
@@ -269,7 +207,6 @@ func TestBuyerIDNeverCarriesAStoreIDAcrossEveryProducer(t *testing.T) {
 		name          string
 		recipientType string
 		recipientRef  *int64
-		// wantDocBuyer 是**文件衍生**事件（P1/P2/P12/重寄）該有的 buyer_id。
 		wantDocBuyer string
 	}{
 		{"方向一 BUYER", codemeta.InvoiceRecipientTypeBuyer.Value, ptrInt64(fxBuyerID), "2623900520"},
@@ -290,11 +227,8 @@ func TestBuyerIDNeverCarriesAStoreIDAcrossEveryProducer(t *testing.T) {
 				}
 				raw, present := got["buyer_id"]
 				if !present {
-					continue // P11 是純賣家向事件，沒有 buyer_id 欄位
+					continue
 				}
-				// 申訴類事件的 buyer_id 來自 complainant_buyer_id，與 recipient_type 無關。
-				// P10 同屬這一類（#3055 的橫向稽查）：逾期是那件**申訴**的屬性，
-				// 不是被申訴文件的收件人。
 				want := c.wantDocBuyer
 				switch p.Name {
 				case "P8 complaintCreatedEvent", "P9 complaintRespondedEvent",
@@ -313,26 +247,12 @@ func TestBuyerIDNeverCarriesAStoreIDAcrossEveryProducer(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 行為層的覆蓋下界：從 AST 掃到的型別清單推導，不是硬寫的數字（丙）
-// ---------------------------------------------------------------------------
 
-// assertProducersCoverEveryPayloadType 是本檔所有「逐生產點」測試共用的**下界**。
-//
-// 🔴 它取代的是 `if len(producers) < 7`。那個寫法有一個安靜的缺口：
-// 新增第 7 個事件型別的人不會回來改這裡的 7，而 7 本來就是 7 ⇒ 那個新事件
-// **完全沒有行為層覆蓋**。而行為層正是「型別 ＋ AST 兩道都放行的繞道」唯一擋得住的線
-// （本輪的第六種繞道就是那個形狀），所以它漏掉的正好是最需要它的那一格。
-//
-// 現在的下界是：**checkEventPayloads 掃到的每一個 payload 型別都必須有生產點**。
-// 那份清單是從原始碼 AST 來的（不是任何人的自述），所以新增事件型別而沒有生產點時，
-// 這裡會直接指名那個型別轉紅。
 func assertProducersCoverEveryPayloadType(t *testing.T, producers []producer) {
 	t.Helper()
 	fset, files := parsePackageFiles(t, ".")
 	rep := checkEventPayloads(fset, files)
 
-	// 鑑別力自檢：辨識器認不出任何型別時，「每個型別都有生產點」會空洞地成立。
 	if len(rep.PayloadTypes) == 0 {
 		t.Fatal("AST 掃不到任何事件 payload 型別 —— 這不是「全部都有生產點」，是下界失效了")
 	}
@@ -351,8 +271,6 @@ func assertProducersCoverEveryPayloadType(t *testing.T, producers []producer) {
 		}
 		covered[p.Type] = true
 
-		// Type ↔ payload 的綁定：實際 marshal 出來的 key 集合必須等於該型別的 json tag
-		// 集合。少了這一步，Type 只是一個沒人驗的字串，填成任何已存在的型別名都會過。
 		var got map[string]any
 		if err := json.Unmarshal(p.Payload, &got); err != nil {
 			t.Fatalf("%s: unmarshal: %v", p.Name, err)
@@ -390,11 +308,6 @@ func TestEveryScannedPayloadTypeHasABehaviouralProducer(t *testing.T) {
 	assertProducersCoverEveryPayloadType(t, eventProducers(t, doc))
 }
 
-// payloadJSONTags 回「型別名 → 它的 json tag 清單」。
-//
-// 只收 tag 非空且不是 "-" 的欄位；這些 struct 全部沒有 omitempty（有的話 key 集合會
-// 隨值變動，本比對就必須改成子集關係）。真的出現 omitempty 時這裡會誤報，那是刻意的：
-// 一個會依值消失的 wire 欄位，下游拿到的是 undefined，本來就該當場被看見。
 func payloadJSONTags(t *testing.T, fset *token.FileSet, files []*ast.File) map[string][]string {
 	t.Helper()
 	rep := checkEventPayloads(fset, files)

@@ -30,17 +30,14 @@ export default function BannerLoadingCard({
 			role="status"
 			aria-live="polite"
 		>
-			{/* No `aria-label` on the live region: it would win over the contents
-			    and make the heading + status line get read twice on mount. The
-			    visible 「新鮮內容運送中…」 line already says what is happening. */}
+
 			{heading ? (
 				<h3 className="m-0 text-[length:var(--text-sm)] font-bold leading-normal text-[var(--page-banner-heading-fg)] tracking-[0.5px]">
 					{heading}
 				</h3>
 			) : null}
 			<div className={`${FEATURE_CARD_WELL} aspect-[16/9]`}>
-				{/* Truck bobs in place while the dashed road scrolls beneath it —
-				 *  the same "driving" illusion as TruckOverlay. */}
+
 				<span
 					className="absolute bottom-3 left-1/2 -translate-x-1/2"
 					aria-hidden="true"

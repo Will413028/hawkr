@@ -57,7 +57,6 @@ describe("代行訂單時間軸：結案節點的時間戳", () => {
 	});
 
 	it("有時間戳 → 判準為真 → 那一行畫得出來", () => {
-		// 台北時間，實際字面交給 formatTaipeiDateTime；這裡只斷言它非空。
 		expect(formatOrderDateTime("2026-08-05T09:30:00Z")).not.toBe("");
 	});
 
@@ -81,7 +80,6 @@ describe("代行訂單時間軸：結案節點的時間戳", () => {
 
 	it("那個判準確實還接在渲染上", () => {
 		const src = read(PANEL);
-		// 判準：算出來的 time 為真才渲染 __time；改成無條件渲染或換成別的來源即轉紅。
 		expect(src).toMatch(
 			/const time = formatOrderDateTime\(entry\.occurredAt\);/,
 		);

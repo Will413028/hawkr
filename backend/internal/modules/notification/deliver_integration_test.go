@@ -27,7 +27,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// fakeContacts 取代 identity 的聯絡信箱：沒登記的帳號沒有信箱。
 type fakeContacts struct {
 	mu sync.Mutex
 	m  map[int64]identity.ContactEmail
@@ -101,7 +100,6 @@ func (f *fixture) tokens(t *testing.T, account int64) []string {
 	return out
 }
 
-// pushDelivery 走真的管線：事件 → 意圖 → worker，回傳 BUYER 帳號的推播投遞紀錄。
 func (f *fixture) pushDelivery(t *testing.T, account int64, event string) uuid.UUID {
 	t.Helper()
 	f.accept(t, "test_push", pushParams{AccountID: account, EventID: event})
@@ -109,7 +107,6 @@ func (f *fixture) pushDelivery(t *testing.T, account int64, event string) uuid.U
 	return f.deliveryID(t, account, "PUSH")
 }
 
-// emailDelivery 以停權事件走真的管線，回傳 BUYER 帳號的 email 投遞紀錄（account_suspended 是有 email 渠道的真型別）。
 func (f *fixture) emailDelivery(t *testing.T, account int64) uuid.UUID {
 	t.Helper()
 	f.publish(t, suspended(account, uuid.NewV7()))
@@ -386,7 +383,6 @@ func TestStaleDeviceTokensArePurgedAfterSixtyDays(t *testing.T) {
 	}
 }
 
-// testAddressHash 是名單裡位址的雜湊（HMAC-SHA256 of 正規化位址）。
 func testAddressHash(key []byte, normalized string) []byte {
 	m := hmac.New(sha256.New, key)
 	m.Write([]byte(normalized))
@@ -479,7 +475,6 @@ func TestDeliveryToADeletedRecipientFailsWithoutSentText(t *testing.T) {
 	}
 }
 
-// beforeSend 在 provider 收到請求之前先執行 hook（模擬送出途中收件人被刪除）。
 type beforeSend struct {
 	push *fcm.Fake
 	mail *resend.Fake
@@ -526,7 +521,6 @@ func TestTokenDeleteFailureAfterASuccessfulPushStillSettlesSent(t *testing.T) {
 	}
 }
 
-// deletingService 組一個渠道 job：provider 收到請求之前先刪除帳號（模擬送出途中收件人被刪除）。
 func (f *fixture) deletingService(acct int64) *deliver.Service {
 	hook := beforeSend{push: f.push, mail: f.mail, hook: func() {
 		if err := f.identity.DeleteAccount(context.Background(), acct); err != nil {

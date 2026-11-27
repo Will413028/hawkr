@@ -79,8 +79,7 @@ export default function AuditDetailDialog({
 				<h3>變更內容（系統紀錄）</h3>
 				{entry.changedFields.length === 0 ? (
 					<p className="adm-audit-detail-placeholder">
-						{/* 失敗的那一列是「寫入沒有發生」，不是「執行了但沒改到東西」。
-									    這一頁的讀者正是在判斷代行者到底動了什麼，兩者不可共用一句。 */}
+
 						{entry.result === "FAILED"
 							? "這次操作未寫入，因此沒有欄位差異。"
 							: entry.result === "PENDING"
@@ -99,7 +98,7 @@ export default function AuditDetailDialog({
 						<tbody>
 							{entry.changedFields.map((field) => (
 								<tr key={field.field}>
-									{/* label 一律用後端下發的值。 */}
+
 									<th scope="row">{field.label}</th>
 									<td>{field.before || "—"}</td>
 									<td>{field.after || "—"}</td>
@@ -122,12 +121,7 @@ export default function AuditDetailDialog({
 				</span>
 				{entry.result === "FAILED" && entry.bizCode !== 0 && (
 					<>
-						{/*
-										說明一律用後端下發的 bizCodeLabel（同 changedFields 的
-										label）。前端自建碼→文案對照表就是第二份 CodeMeta 鏡像。
-										拿不到說明時只留原碼：顯示原碼還追得到，自己編一句話會
-										蓋掉唯一的線索。
-									*/}
+
 						{entry.bizCodeLabel && (
 							<span className="adm-audit-detail-sub">{entry.bizCodeLabel}</span>
 						)}
@@ -191,15 +185,14 @@ export default function AuditDetailDialog({
 				<CopyableValue value={entry.idempotencyKey} label="冪等鍵" />
 			</DetailRow>
 			<DetailRow label="裝置">
-				{/* userAgent 是後端存的原文，不解析成「Chrome 126 (macOS)」——那會是
-							    第二份會隨 UA 慣例過時的衍生值。 */}
+
 				<span className="adm-audit-detail-ua">{entry.userAgent || "—"}</span>
 				<span className="adm-audit-detail-sub">來源 · {entry.origin}</span>
 			</DetailRow>
 			<DetailRow label="賣家通知狀態">
 				{entry.notifiedAt ? (
 					<>
-						{/* 語意是「事件已發布至 MQ」，不是「賣家已讀」。 */}
+
 						<span className="adm-audit-notify">
 							<MaterialSymbol name="notifications_active" />
 							已透過站內訊息通知賣家
@@ -220,8 +213,7 @@ export default function AuditDetailDialog({
 				</span>
 			</DetailRow>
 			<DetailRow label="紀錄時間">
-				{/* 與左表同一個格式化函式：後端回 UTC，這一頁一律顯示本地時間。
-							    兩邊各印各的，同一列會變成表格 08:03、面板 23:03Z。 */}
+
 				<span>{formatClockTime(entry.createdAt)}</span>
 				<span className="adm-audit-detail-sub">
 					確認時間 ·{" "}

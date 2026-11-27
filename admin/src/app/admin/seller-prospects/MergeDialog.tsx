@@ -173,7 +173,6 @@ export default function MergeDialog({
 				return;
 			}
 			if (result.kind === "message") {
-				// 沒收到回應或其他失敗：合併可能已完成，清單類查詢一併失效重讀
 				cache.written();
 				await reloadBoth().catch(() => undefined);
 			}
@@ -332,7 +331,7 @@ export default function MergeDialog({
 							</div>
 						</div>
 						<ul>
-							{/* 每一條都寫成單一模板字串，避免 JSX 在文字節點與運算式邊界之間插入非預期的空格。 */}
+
 							<li>
 								{`「${loserName}」會被封存，並在其資料列指向「${winnerName}」`}
 							</li>

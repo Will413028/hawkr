@@ -19,28 +19,11 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// 商品認證五個業務碼的 HTTP status 分流，**走 production 逐位元相同的那條路**（#2755）。
-//
-// ⚠️ 這支測試存在的理由是 TestCertificationEndpoints_BusinessCodeMapsToHTTPStatus
-// 全綠而 dev 上 3025／3028 雙雙回 409。那支用 grpcclient.NewProductClientForTest(mock)
-// 注入 mock proto client，那條路**沒有 *grpc.ClientConn**，於是
-// EnvelopeGuardInterceptor 根本不會跑，mock 回的 {Code: 3025} 原樣抵達 handler 並走進
-// `resp.GetCode() != 0` 那條分支 —— 而 production 走不到那裡：interceptor 會把
-// 「gRPC OK ＋ 非零 envelope code」轉成 gRPC error（未登錄於 envelopeCodeToGRPC 的碼
-// 一律 FailedPrecondition ＋ "[NNNN] " 前綴），業務碼是從 err 那一側回來的。
-//
-// 所以這裡起一台 bufconn 上的假 ProductService，掛真的 EnvelopeGuardInterceptor。
-// 每個案例同時斷言 HTTP status **與** envelope code：只斷言 status 的話，「把所有錯誤
-// 都回 404」也會綠。
 
 type certBizStatusServer struct {
 	productpb.UnimplementedProductServiceServer
-	// code 非零時回 gRPC OK ＋ 該 envelope code，鏡射 product-service 的
-	// `catch (ProductBusinessException e) { onNext(...setCode(e.code())) }`：
-	// 業務拒絕從來不是 gRPC error。
 	code int32
 	msg  string
-	// transportErr 非 nil 時直接回它，鏡射真正問不到答案的那一側。
 	transportErr error
 }
 
@@ -79,10 +62,6 @@ func (s *certBizStatusServer) RejectProductCertificationForAdmin(_ context.Conte
 	return &productpb.ProductCertificationApplicationAdminResponse{Code: s.code, Message: s.msg}, nil
 }
 
-// newCertBizStatusRouter 起 bufconn 假 server，並以掛真 EnvelopeGuardInterceptor 的
-// 連線建 ProductClient —— 那正是 production DefaultDialOpts 中 envelope guard 的位置。
-// 其餘 auth／breaker interceptor 與本主張無關故不掛（breaker 的 registry 以 cc.Target()
-// 為鍵，掛上去會讓幾個 subtest 共用同一顆計數器）。
 func newCertBizStatusRouter(t *testing.T, srv productpb.ProductServiceServer) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -158,13 +137,11 @@ func TestCertificationEndpoints_BizCodeStatusThroughEnvelopeGuard(t *testing.T) 
 		wantStatus int
 	}{
 		{
-			// 這一條就是 dev 上實測回 409 的那個案例。
 			name: "3025 認證申請不存在 → 404", code: bizcode.CertApplicationNotFound, msg: "認證申請不存在",
 			method: http.MethodGet, path: adminDetail, accountID: "2701338845",
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			// 這一條同上：駁回少帶 reasonCode 是請求本身寫錯了，不是版本衝突。
 			name: "3028 缺駁回原因 → 400", code: bizcode.CertReviewReasonRequired, msg: "請填寫駁回原因",
 			method: http.MethodPost, path: adminReject, body: reviewBody, accountID: "2701338845",
 			wantStatus: http.StatusBadRequest,
@@ -180,14 +157,11 @@ func TestCertificationEndpoints_BizCodeStatusThroughEnvelopeGuard(t *testing.T) 
 			wantStatus: http.StatusConflict,
 		},
 		{
-			// 賣家側同樣要分流：非本人商品／不存在 → 404，而不是一個空列表也不是 409。
 			name: "賣家列表 3025 → 404", code: bizcode.CertApplicationNotFound, msg: "認證申請不存在",
 			method: http.MethodGet, path: sellerList, accountID: "777",
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			// 鑑別力控制組：未登錄的鄰居碼仍須塌縮 409。少了它，「把 FailedPrecondition
-			// 整條改成 404」也會讓上面兩條綠。
 			name: "未登錄的 3024 仍塌縮 409", code: 3024, msg: "其他認證錯誤",
 			method: http.MethodGet, path: adminDetail, accountID: "2701338845",
 			wantStatus: http.StatusConflict,
@@ -201,8 +175,6 @@ func TestCertificationEndpoints_BizCodeStatusThroughEnvelopeGuard(t *testing.T) 
 			if w.Code != tc.wantStatus {
 				t.Errorf("HTTP %d, want %d（body=%s）", w.Code, tc.wantStatus, w.Body.String())
 			}
-			// status 對了還不夠：業務碼必須原樣送到前端，否則前端分不出同一個 status
-			// 底下的不同原因（也會讓「所有錯誤都回 404」這種假修復通過）。
 			if got := certEnvelopeCode(t, w); got != tc.code {
 				t.Errorf("envelope code = %d, want %d（body=%s）", got, tc.code, w.Body.String())
 			}

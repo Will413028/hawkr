@@ -20,7 +20,6 @@ import (
 
 const geoMarker = "GPS-25.0330N-121.5654E-SERIAL-A1B2C3"
 
-// realModule 換成不注入 Process 的 Module，走模組內建的 public 圖片處理。
 func realModule(f *fixture) {
 	f.m = media.New(media.Deps{
 		DB: f.d, Jobs: f.jobs, Store: f.store, NewID: uuid.NewV7, Now: f.clock.Now,
@@ -28,7 +27,6 @@ func realModule(f *fixture) {
 	})
 }
 
-// jpegWithGPS 是帶 GPS 與方向 6 的 JPEG（EXIF 的 GPS IFD 指向含 geoMarker 的 ASCII 欄位）。
 func jpegWithGPS(t *testing.T) []byte {
 	t.Helper()
 	var plain bytes.Buffer
@@ -55,7 +53,6 @@ func md5b64(b []byte) string {
 	return base64.StdEncoding.EncodeToString(s[:])
 }
 
-// processReal 宣告 declared、實際上傳 actual，然後跑處理 job。
 func processReal(t *testing.T, f *fixture, declaredSize int64, declaredMD5 string, actual []byte) media.BeginResult {
 	t.Helper()
 	res, err := f.m.BeginUpload(t.Context(), owner, media.BeginInput{

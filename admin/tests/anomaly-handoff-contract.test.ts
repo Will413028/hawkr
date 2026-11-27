@@ -26,9 +26,6 @@ function q(search: string): URLSearchParams {
 	return new URLSearchParams(search);
 }
 
-/* ============================================================
-   一、parser
-   ============================================================ */
 
 test("四個鍵逐字讀進來", () => {
 	assert.deepEqual(
@@ -54,7 +51,6 @@ test("tab 只收五個合法值，其餘退回 null 讓頁面用自己的預設"
 	for (const key of ["shipping", "orders", "payments", "refunds", "grants"]) {
 		assert.equal(parseAnomalyHandoff(q(`tab=${key}`)).tab, key);
 	}
-	// 猜一個近似值（例如把 orders 寫成 order）會落在一個操作者沒有要求的 tab 上。
 	for (const bad of ["order", "ORDERS", "", "../"]) {
 		assert.equal(
 			parseAnomalyHandoff(q(`tab=${encodeURIComponent(bad)}`)).tab,
@@ -80,9 +76,6 @@ test("空白字串與純空白一律當成沒帶", () => {
 	assert.equal(parsed.orderNo, null);
 });
 
-/* ============================================================
-   二、頁面真的用了它（parser 對了但沒接線＝白做）
-   ============================================================ */
 
 test("異常監控頁把交接參數接進 tab、查詢與畫面", () => {
 	const text = source(PAGE);

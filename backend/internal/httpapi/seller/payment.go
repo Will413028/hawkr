@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// returnPage 轉成 rpc 的回跳頁；UNSPECIFIED 與不認得的值回 invalid_argument。
 func returnPage(d pb.OnboardingReturnDestination) (rpc.ReturnPage, error) {
 	switch d {
 	case pb.OnboardingReturnDestination_ONBOARDING_RETURN_DESTINATION_WEBSITE_CERTIFICATION:
@@ -95,7 +94,6 @@ func (h *App) CreatePaymentOnboardingSession(ctx context.Context, req *connect.R
 	return connect.NewResponse(out), nil
 }
 
-// embeddedRuntimes 把呼叫端宣告的內嵌執行環境轉成 payment 的型別；UNSPECIFIED 與不認得的值忽略（呼叫端可能比伺服器新）。
 func embeddedRuntimes(in []paymentpb.EmbeddedOnboardingRuntime) []payment.EmbeddedRuntime {
 	var out []payment.EmbeddedRuntime
 	for _, r := range in {
@@ -109,7 +107,6 @@ func embeddedRuntimes(in []paymentpb.EmbeddedOnboardingRuntime) []payment.Embedd
 	return out
 }
 
-// sessionToProto 把 payment 的 session 轉成回應的 oneof；不認得的形狀是伺服器的錯（payment 新增形狀時要同步改這裡）。
 func sessionToProto(session payment.OnboardingSession) (*pb.CreatePaymentOnboardingSessionResponse, error) {
 	switch v := session.(type) {
 	case payment.HostedSession:
@@ -139,7 +136,6 @@ func (h *App) RefreshMyPaymentAccount(ctx context.Context, _ *connect.Request[pb
 	return connect.NewResponse(&pb.RefreshMyPaymentAccountResponse{}), nil
 }
 
-// earningsToProto 轉成帳本的一列；種類與狀態由模組的值對應到 proto 的列舉。
 func earningsToProto(e payment.EarningsEntry) *paymentpb.EarningsEntry {
 	return &paymentpb.EarningsEntry{
 		Id:         e.ID.String(),

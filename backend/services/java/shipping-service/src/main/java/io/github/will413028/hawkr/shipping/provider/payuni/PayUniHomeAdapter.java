@@ -299,7 +299,6 @@ public class PayUniHomeAdapter extends AbstractPayUniAdapter {
                     yesNo(options.needTrolley()),
                     options.memo());
 
-            // 收斂規範 §8.1：同步 retry 最多一次
             CallTcatResponse resp = shippingClient.callTcat(shipment.getMerId(), req);
             if (!resp.isSuccess()) {
                 log.warn("PayUniHomeAdapter.dispatch.retry",
@@ -317,8 +316,6 @@ public class PayUniHomeAdapter extends AbstractPayUniAdapter {
                         errStatus != null ? errStatus : "TCAT_FAILED", errMsg, 0);
             }
 
-            // providerReference = null：LgsCallTcat 的回應不含取件單號，只有受理時間。
-            // 硬湊一個值（例如回填 shipTradeNo）會讓「provider 給了識別」變成假的。
             return new DispatchOutcome(null, resp.apiResponse().message(), resp.callTime());
         }
 
@@ -389,12 +386,12 @@ public class PayUniHomeAdapter extends AbstractPayUniAdapter {
 
             CreateHomeRefundRequest payUniReq = new CreateHomeRefundRequest(
                     returnMerTradeNo(request.orderNo()),
-                    null,                      // 不帶 ShipTradeNo，避免 PayUni 檢查原單狀態限制
+                    null,
                     goodsType,
-                    returnName,                // 收件人 = 賣家退貨聯絡人
+                    returnName,
                     returnPhone,
                     consigneeAddress,
-                    request.buyerName(),       // 退貨人 = 買家
+                    request.buyerName(),
                     request.buyerPhone(),
                     consignorAddress,
                     DeliveryTimeTag.ANY.code(),
@@ -403,7 +400,6 @@ public class PayUniHomeAdapter extends AbstractPayUniAdapter {
                     "退貨商品",
                     null);
 
-            // 收斂規範 §8.1：同步 retry 最多一次
             CreateHomeRefundResponse resp = shippingClient.createHomeRefund(request.merId(), payUniReq);
             if (!resp.isSuccess()) {
                 resp = shippingClient.createHomeRefund(request.merId(), payUniReq);
@@ -415,9 +411,6 @@ public class PayUniHomeAdapter extends AbstractPayUniAdapter {
                 String providerStatus = resp.apiResponse().status();
                 String providerMessage = resp.apiResponse().message();
                 entity.setStatus(ShippingStatus.CREATE_FAILED.value());
-                // V12：建單失敗是 provider 層失敗，寫 provider_error_*。
-                // provider_status 是「正常貨態證據」欄，把失敗代碼寫進去會讓 ADM 的
-                // 異常判準只能寫成「有值即異常」，於是每張正常單都被撈進異常清單。
                 entity.setProviderErrorCode(providerStatus);
                 entity.setProviderErrorMessage(providerMessage);
                 entity.setProviderErrorAt(io.github.will413028.hawkr.common.utils.DateTimeUtils.nowUtc());
@@ -447,7 +440,7 @@ public class PayUniHomeAdapter extends AbstractPayUniAdapter {
             entity.setMerId(request.merId());
             entity.setGoodsType(goodsType);
             entity.setServiceType(ServiceType.NO_CASH_ON_DELIVERY.code());
-            entity.setTradeAmt(0L);   // 宅配逆向不代收
+            entity.setTradeAmt(0L);
             entity.setSenderName(request.buyerName());
             entity.setSenderPhone(request.buyerPhone());
             entity.setSenderCity(request.buyerCity());
@@ -522,7 +515,6 @@ public class PayUniHomeAdapter extends AbstractPayUniAdapter {
                     setting.getReturnDistrict(),
                     setting.getReturnAddressDetail(),
                     setting.getReturnPostalCode());
-            // provider 側識別：宅配建店回的是 eshipId（超商是 partnerId）
             return new OnboardOutcome(
                     saved.getEshipId(), saved.getPayuniSubmitStatus(), saved.getProviderMessage());
         }

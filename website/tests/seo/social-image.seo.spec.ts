@@ -33,7 +33,6 @@ const INHERITING = [
 	"/cart",
 	"/payment/return",
 	"/seller/onboarding",
-	// Route-level 404 (notFound() inside a [locale] route) and the app-wide one.
 	"/products/99999999",
 	"/this-route-does-not-exist",
 ] as const;
@@ -58,8 +57,6 @@ for (const route of [...INHERITING, ...DECLARING]) {
 			new URL(image ?? "").pathname,
 			`${route}: og:image is not the site card`,
 		).toBe(SHARE_IMAGE_PATH);
-		// Next fills the twitter card from openGraph; a divergence means a twitter
-		// image is declared somewhere and pins the card.
 		expect(metaFromHtml(html, "twitter:image"), `${route}: twitter:image`).toBe(
 			image,
 		);
@@ -70,8 +67,6 @@ for (const route of INHERITING) {
 	test(`${route} describes its share picture`, async ({ request }) => {
 		const response = await request.get(route, { maxRedirects: 0 });
 		const html = await response.text();
-		// What the file convention publishes for the picture; the inheriting pages
-		// carry the same description.
 		expect(metaFromHtml(html, "og:image:width"), `${route}`).toBe("1200");
 		expect(metaFromHtml(html, "og:image:height"), `${route}`).toBe("630");
 		expect(metaFromHtml(html, "og:image:type"), `${route}`).toBe("image/png");

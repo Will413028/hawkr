@@ -111,8 +111,6 @@ export default function SearchResultsClient({
 					strict: true,
 				});
 			},
-			// Sorting the same keyword keeps its known cards in place until the
-			// requested order arrives. Never relabel another keyword's products.
 			placeholderData: (previous, previousQuery) =>
 				previousQuery?.queryKey[2] === query ? previous : undefined,
 			staleTime: 30_000,
@@ -210,20 +208,12 @@ export default function SearchResultsClient({
 				<div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-5 max-[680px]:grid-cols-2 max-[680px]:gap-3">
 					{products.slice(0, 16).map((product, index) => {
 						const id = String(product.id || index);
-						// Empty when absent → MarketProductCard's <AppImage> shows the
-						// design-system ImageFallback (folder-image) rather than a
-						// branded stand-in.
-						// B-238: render seller identity only from the canonical URL.
 						const image = product.imageKey || product.imageKeys?.[0] || "";
 						const sellerName = product.sellerName || product.seller?.name || "";
 						const sellerAvatar = product.seller?.logoUrl?.trim() || "";
 						const sellerId =
 							String(product.storeId ?? product.seller?.storeId ?? "") ||
 							undefined;
-						// Prefer the seller's city as 產地 (the search hit's own
-						// `origin` is unreliable — often echoes the store name).
-						// Fall back to a legit product origin, else 產地直送 — matching
-						// the market card's `readDisplayOrigin(...) || "產地直送"`.
 						const origin =
 							product.seller?.city ||
 							(product.origin && product.origin !== sellerName
@@ -267,8 +257,6 @@ export default function SearchResultsClient({
 					})}
 				</div>
 			) : showEmpty ? (
-				// data-search-empty 是給 CSS 用的鉤子：0 結果時空態內的入口才是
-				// 主要 CTA，搜尋框下方那顆要讓位，避免同一屏出現兩個一樣的入口。
 				<div
 					data-search-empty
 					className="grid justify-items-center gap-5 px-6 py-[60px] text-center rounded-2xl bg-[var(--surface-card,rgba(255,255,255,0.7))] border border-dashed border-[var(--border-soft,rgb(var(--color-ink-950-rgb)/0.12))] text-[var(--ink-soft)] dark:bg-white/4 dark:border-[rgba(245,222,165,0.18)]"

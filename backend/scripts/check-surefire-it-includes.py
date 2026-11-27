@@ -56,8 +56,6 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
-    # 🔴 對照組：先證明「找得到 *IT.java」這件事是有效的。
-    #    少了這一條，glob 寫錯／路徑錯都會讓本檢查變成恆真。
     total_its = sum(len(list((m / "src" / "test").rglob(IT_GLOB)))
                     for m in modules if (m / "src" / "test").is_dir())
     if total_its == 0:

@@ -114,8 +114,6 @@ function pick(id: string, value: number | string) {
 	});
 }
 
-// ---------------------------------------------------------------------------
-// 分案
 
 const FOOD = PolicyCategory.FOOD_SAFETY;
 const FRAUD = PolicyCategory.FRAUD;
@@ -304,8 +302,6 @@ test("分案：送出中不能用 Escape 或取消關閉", async () => {
 	assert.ok(buttonByText("取消")?.disabled);
 });
 
-// ---------------------------------------------------------------------------
-// 移到其他案件
 
 test("移動：新的類別只列伺服器給的去處（不含目前的類別）；已有進行中的案件就加入、沒有就要選嚴重度；請求帶 etag", async () => {
 	const requests: unknown[] = [];
@@ -358,8 +354,6 @@ test("移動：新的類別只列伺服器給的去處（不含目前的類別�
 	assert.ok(maybeById("move-report-severity"));
 });
 
-// ---------------------------------------------------------------------------
-// 設定結果
 
 function resolveReport(
 	patch: Parameters<typeof report>[0] = {},
@@ -542,8 +536,6 @@ test("設定結果：措施還在讀的時候不能送出", async () => {
 	assert.ok(buttonByText("確認設定")?.disabled);
 });
 
-// ---------------------------------------------------------------------------
-// 結案
 
 function decideCase(patch: Parameters<typeof kase>[0] = {}) {
 	return kase({
@@ -690,8 +682,6 @@ test("結案：沒有還沒結果的通報時，帶入說明只說不能重開",
 	assert.match(bodyText(), /結案後不能重開。/u);
 });
 
-// ---------------------------------------------------------------------------
-// 改嚴重度
 
 test("改嚴重度：要選嚴重度、不能和目前相同、原因必填；請求帶原因與 etag", async () => {
 	const requests: unknown[] = [];

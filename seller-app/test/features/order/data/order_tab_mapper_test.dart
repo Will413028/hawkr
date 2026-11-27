@@ -71,11 +71,6 @@ void main() {
     });
   });
 
-  // 桶的成員與桶的名字要對得上。第三桶含 80 已取消 / 70 全額退款，所以不能叫
-  // 「已完成」—— 那會讓賣家把它讀成成交數（dev 實測同店 81 筆時顯示 75，實際成交
-  // 只有 19 筆）。「已完成」是 CodeMeta OrderStatus 50 單一狀態的 Label。
-  // 對應的另兩支：backend OrderServiceSellerStatusCountsTest、
-  // web tests/seller-order-tab-labels.test.ts。
   group('sellerOrderTabLabels', () {
     test('第三桶不得叫「已完成」——它含已取消/全額退款', () {
       expect(completedOrderStatuses, contains(80));

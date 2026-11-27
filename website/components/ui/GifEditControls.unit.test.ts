@@ -51,7 +51,6 @@ afterEach(cleanup);
 describe("GIF editor source lifecycle", () => {
 	it("keeps a replacement locked when its predecessor finishes inspecting", async () => {
 		const original = sourceFile("a");
-		// Matching name, length and mtime still represent different source files.
 		const replacement = sourceFile("b");
 		const first = pendingInspection();
 		const second = pendingInspection();
@@ -71,7 +70,6 @@ describe("GIF editor source lifecycle", () => {
 		expect(firstSignal?.aborted).toBe(true);
 		expect(secondSignal?.aborted).toBe(false);
 
-		// Deliberately resolve after abort: the reader cannot always stop its I/O.
 		await act(async () => first.resolve(sourceMetadata));
 		expect(hook.result.current.ready).toBe(false);
 		expect(hook.result.current.loading).toBe(true);
@@ -214,7 +212,6 @@ describe("GIF editor trim and preview validity", () => {
 		const fullAnimationOptions = hook.result.current.options;
 		act(() => hook.result.current.setStartSeconds(""));
 		expect(hook.result.current.ready).toBe(false);
-		// Invalid input has no usable trim, yet cannot reuse the old preview key.
 		expect(hook.result.current.options).toEqual(fullAnimationOptions);
 		expect(hook.result.current.key).not.toBe(previewKey);
 		act(() => hook.result.current.setStartSeconds("0"));

@@ -107,8 +107,6 @@ void main() {
   testWidgets('編輯與刪除選單只看 viewer_can_edit、viewer_can_delete', (tester) async {
     await _pump(tester, _forum());
 
-    // 自己的 c-1 是編輯與刪除的 ⋯ 選單；別人的 c-2、c-3 只有檢舉與封鎖的 ⋯；
-    // 別人的 c-4 店主能刪，刪除與檢舉、封鎖合成同一個 ⋯（沒有第二顆）。
     expect(find.byTooltip('更多留言操作'), findsNWidgets(2));
     expect(find.byTooltip('檢舉或封鎖'), findsNWidgets(2));
     await tester.tap(find.byTooltip('更多留言操作').first);

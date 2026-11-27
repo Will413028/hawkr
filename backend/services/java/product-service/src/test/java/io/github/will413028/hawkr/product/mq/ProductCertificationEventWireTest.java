@@ -75,7 +75,6 @@ class ProductCertificationEventWireTest {
         assertTrue(node.get("requires_manual_review").isBoolean());
     }
 
-    // ==================== helper ====================
 
     private ProductCertificationDecidedPayload decided(ProductEventType type,
                                                        String reasonCode, String publicReason) {

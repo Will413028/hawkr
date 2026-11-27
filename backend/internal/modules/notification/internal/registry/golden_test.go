@@ -45,7 +45,6 @@ func TestGoldenRendering(t *testing.T) {
 			},
 		},
 		{
-			// 目錄不認得的語系：整則用 zh-TW，Rendered.Locale 是文字真正的語系，不是請求的 "ja"。
 			typ: "account_suspended", locale: uitext.Locale("ja"),
 			params: `{"suspension_id":"0190a000-0000-7000-8000-000000000001","category":"FRAUD","suspended_at":"2026-11-23T04:30:00Z"}`,
 			want: Rendered{

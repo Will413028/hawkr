@@ -122,7 +122,6 @@ class SellerGrpcClientBatchMetaTest {
     @Test
     @DisplayName("非 0 業務碼視為失敗（會重試），不是「成功但沒有任何賣家」")
     void nonZeroBusinessCode_isTreatedAsFailure_notEmptySuccess() throws IOException {
-        // gRPC status 是 OK，錯誤只放在 payload 的 code 欄位 —— 這正是舊實作看不見的形狀。
         SellerGrpcClient client = clientBackedBy((attempt, observer) -> {
             observer.onNext(BatchGetSellerMetaResponse.newBuilder()
                     .setCode(9233)

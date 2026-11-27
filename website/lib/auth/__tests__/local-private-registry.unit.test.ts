@@ -94,7 +94,6 @@ describe("本地私有狀態 registry 完整性", () => {
 	const registered = new Set(LOCAL_PRIVATE_KEY_SPECS.map((spec) => spec.key));
 
 	it("掃得到原始碼（掃描器本身沒壞）", () => {
-		// 沒有這條，掃描器若因路徑改動掃到 0 個檔案，下面每條都會「通過」。
 		expect(files.length).toBeGreaterThan(200);
 	});
 
@@ -111,8 +110,6 @@ describe("本地私有狀態 registry 完整性", () => {
 	});
 
 	it("zustand persist 只能經由 createLocalPrivateStore 使用", () => {
-		// 直接用 persist() 就能繞過 registry 綁定與記憶體 reset 註冊——那正是
-		// cartUiStore 與賣家中心 5 個 store 當初漏掉的方式。
 		const offenders = files.filter((file) => {
 			if (file.endsWith(join("lib", "state", "createLocalPrivateStore.ts")))
 				return false;

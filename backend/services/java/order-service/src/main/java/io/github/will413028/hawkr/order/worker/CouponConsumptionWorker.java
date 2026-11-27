@@ -71,7 +71,6 @@ public class CouponConsumptionWorker {
     }
 
     private void processTask(CouponConsumptionTaskEntity task) {
-        // 檢查是否超過最大重試次數
         if (task.getRetryCount() >= task.getMaxRetryCount()) {
             couponConsumptionTaskRepository.markManualIntervention(task.getTaskId());
             log.info("CouponConsumptionWorker.manualIntervention", "超過最大重試次數，轉人工處理",
@@ -79,7 +78,6 @@ public class CouponConsumptionWorker {
             return;
         }
 
-        // Claim 任務（lease）。claim 回 0 ⇒ 另一個 pod 持有租約 ⇒ 一個副作用都不做。
         int claimed = couponConsumptionTaskRepository.claimTask(
                 task.getTaskId(), DateTimeUtils.nowUtc().plusSeconds(CLAIM_LEASE_SEC));
         if (claimed == 0) {

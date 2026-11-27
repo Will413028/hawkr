@@ -18,21 +18,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-// 56 號 ADM 代行營運的六支工作階段端點（S1–S6）。
-//
-// 三種身分來源，一支端點只屬於一組（§6.1.0）：
-//
-//	S1 preflight／S2 create／S5 revoke  ADM session（既有 requireAdmin），失效 → 9261 / 401
-//	S3 GET current／S4 DELETE current   operation credential，handler 自己解析
-//	S6 handoff redeem                  無身分，授權完全由一次性 handoff code 承擔
-//
-// 9261 與 9274 永遠不會同時出現在同一支端點上。把 9261 掛到 www host 組的症狀是
-// 代行工作區的每一次請求都 401、而 ADM 那邊完全正常。
-//
-// ⚠️ 內部錯誤一律 424 ＋ 9280。503 與 404 被前端讀成「此環境尚未部署代行營運服務」
-// 並讓入口永久消失；裸 500 沒有業務碼，前端分不出可否重試。**也不得用 5xx**：
-// Cloudflare 會把 origin 5xx 的 body 換成自己的錯誤頁，前端連 9280 都收不到
-// （推導與實測見 internal/response/bizhttp.go 的登錄表註解）。
 
 const (
 	// HeaderOperationCredential 是 www host 組的身分本體：那些請求沒有 ADM cookie
@@ -46,23 +31,11 @@ const (
 )
 
 var (
-	// §4.4.2：所有 mutation 的冪等鍵格式。不符即「參數格式錯」→ 9260。值域與 gateway
-	// 其餘 mutation 共用同一份（`middleware.IdempotencyKeyPattern`，58 號
-	// §6.1.0(10) 定版）——這裡不掛 middleware.RequireIdempotencyKey：本路徑的違規
-	// 回應是 9260 而非 400，換掉會改變代行的對外契約，但正則只能有一份。
 	delegationIdempotencyKeyRE = middleware.IdempotencyKeyPattern
-	// sessionId 是 TSID 數字字串。
 	delegationSessionIDRE = regexp.MustCompile(`^\d{1,19}$`)
-	// handoff code：`dhof_` ＋ 43 字 base64url ＝ 48 字（§8.1.6）。前綴刻意與
-	// credential 的 `dops_` 不同，兩者在除錯時才分得出來。
 	delegationHandoffCodeRE = regexp.MustCompile(`^dhof_[A-Za-z0-9_-]{43}$`)
 )
 
-// ==================== 回應 DTO ====================
-//
-// 代行 DTO 一律是獨立的 exported struct，不共用 /app/* 的 DTO，也不把 proto struct
-// 直接丟進 data：protoc-gen-go 的 tag 是 snake_case ＋ omitempty，直出即欄名全錯、
-// 且 false／0／null 整個欄位消失。
 
 // DelegationTargetData 是代行對象店家。
 type DelegationTargetData struct {
@@ -185,7 +158,6 @@ type DelegationRedeemData struct {
 	Session             DelegationSessionData `json:"session"`
 }
 
-// ==================== 請求 DTO ====================
 
 // CreateDelegatedOperationRequest 是 S2 的 body。
 type CreateDelegatedOperationRequest struct {
@@ -210,14 +182,7 @@ type RedeemDelegationHandoffRequest struct {
 	HandoffCode string `json:"handoffCode"`
 }
 
-// ==================== 共用小工具 ====================
 
-// delegationLocalMessage 只涵蓋 Gateway 自己產生的拒絕碼。上游帶回來的 message 一律
-// 原樣透傳，避免同一個碼在兩個地方各有一份會漂移的文案。
-//
-// 這些字串使用者永遠看不到（前端把上游 message 換成固定字串，只留 code 與 traceId），
-// 它們的讀者是 log 與直接讀原始回應的人——這也正是每個失敗情境都必須有唯一數字碼、
-// 不得用 message 區分語意的理由。
 func delegationLocalMessage(code int32) string {
 	switch code {
 	case bizcode.DelegationInvalidCommand:
@@ -237,7 +202,6 @@ func delegationLocalMessage(code int32) string {
 	}
 }
 
-// delegationDeny 送出 Gateway 自己判定的拒絕。
 func delegationDeny(c *gin.Context, code int32, detail string) {
 	msg := detail
 	if msg == "" {
@@ -246,12 +210,6 @@ func delegationDeny(c *gin.Context, code int32, detail string) {
 	response.BizStatus(c, code, msg)
 }
 
-// delegationUpstreamDeny 透傳上游 envelope 內的業務碼與訊息；上游沒給訊息才用本地文案。
-//
-// ⚠️ 實務上這條路徑很少被走到，但它不是死碼：`EnvelopeGuardInterceptor` 會先把
-// 「gRPC OK ＋ resp.Code != 0」轉成 gRPC error（見 delegationGrpcFailure），只有列進
-// `envelopeCodePreserveData` 的碼才會原樣抵達 handler。9266（版本衝突要帶 diff
-// payload，§6.6.4）正是未來必須進那張清單的候選，屆時這裡就是它的出口。
 func delegationUpstreamDeny(c *gin.Context, code int32, msg string) {
 	if msg == "" {
 		msg = delegationLocalMessage(code)
@@ -259,24 +217,8 @@ func delegationUpstreamDeny(c *gin.Context, code int32, msg string) {
 	response.BizStatus(c, code, msg)
 }
 
-// delegationBizPrefixRE 解析 "[NNNN] message" —— 業務碼經 gRPC status 傳回時的形狀。
 var delegationBizPrefixRE = regexp.MustCompile(`^\[(\d+)\]\s*(.*)$`)
 
-// delegationGrpcFailure 處理一個 gRPC 呼叫失敗，並把夾帶其中的業務碼還原出來。
-//
-// ⚠️ 這不是防禦性寫法，而是本 repo 的正常路徑：Gateway 的 client 端
-// `EnvelopeGuardInterceptor`（grpc/envelope_guard_interceptor.go）把「gRPC OK ＋
-// resp.Code != 0」統一轉成 gRPC error，未知業務碼一律 FailedPrecondition ＋ 保留
-// "[NNNN] " 前綴 ⇒ **代行的每一個業務拒絕都是從 err 這一側回來的**，handler 裡
-// `resp.GetCode() != 0` 的分支只涵蓋 preserveData 名單內的碼。
-//
-// 漏了這一層的症狀是所有業務拒絕都塌成 424／9280（實測：handoff code 重放本該是
-// 410／9282「此連結已失效，返回 ADM」，掉成 9280 之後前端走的是「結果不明」，操作者
-// 卡在一個沒有下一步的畫面）。
-//
-// 為什麼不直接用 response.GrpcErr：它的 FailedPrecondition 分支硬寫 409，而代行需要
-// 400／401／403／410／422 分流（§6.5.2 的登錄表就是為此存在）。這裡改走 BizStatus，
-// 由同一張登錄表決定 status，未登錄的碼仍塌縮 409 與既有行為一致。
 func delegationGrpcFailure(c *gin.Context, event string, err error) {
 	if st, ok := grpcstatus.FromError(err); ok {
 		if m := delegationBizPrefixRE.FindStringSubmatch(st.Message()); m != nil {
@@ -289,7 +231,6 @@ func delegationGrpcFailure(c *gin.Context, event string, err error) {
 	delegationUpstreamFailure(c, event, err)
 }
 
-// delegationUpstreamFailure 是所有「問不到答案」的唯一出口：424 ＋ 9280。
 func delegationUpstreamFailure(c *gin.Context, event string, err error) {
 	if err != nil {
 		pkglogger.Info(c.Request.Context(), event, zap.Error(err))
@@ -300,10 +241,6 @@ func delegationUpstreamFailure(c *gin.Context, event string, err error) {
 		delegationLocalMessage(bizcode.DelegationUpstreamUnavailable))
 }
 
-// delegationAdminID 取 ADM session 解析出的管理員 id。
-//
-// requireAdmin 已經擋在前面，這裡取不到值只可能是 session 中途失效或本機
-// SkipRoleCheck 模式——兩者都回 9261，讓 ADM 前端回登入頁而不是顯示一個泛用錯誤。
 func delegationAdminID(c *gin.Context) (int64, bool) {
 	id, ok := getAccountID(c)
 	if !ok || id <= 0 {
@@ -313,18 +250,12 @@ func delegationAdminID(c *gin.Context) (int64, bool) {
 	return id, true
 }
 
-// delegationCredential 讀出 operation credential 並從請求上移除。
-//
-// 移除是為了讓它不可能被任何下游轉發沿用：它是「單獨持有即可操作」的憑證，暴露面
-// 必須壓到最小（樣板 router/seller_capability.go 的同款 Header.Del）。
 func delegationCredential(c *gin.Context) string {
 	v := c.GetHeader(HeaderOperationCredential)
 	c.Request.Header.Del(HeaderOperationCredential)
 	return v
 }
 
-// delegationIdempotencyKey 驗證冪等鍵。header 也是參數的一種，格式不符即 9260，
-// 不另開新碼。
 func delegationIdempotencyKey(c *gin.Context) (string, bool) {
 	key := c.GetHeader(headerIdempotencyKey)
 	if !delegationIdempotencyKeyRE.MatchString(key) {
@@ -334,7 +265,6 @@ func delegationIdempotencyKey(c *gin.Context) (string, bool) {
 	return key, true
 }
 
-// hasControlChar 判斷字串是否含 ASCII 控制字元（含 DEL）。
 func hasControlChar(s string) bool {
 	for _, r := range s {
 		if r < 0x20 || r == 0x7f {
@@ -344,9 +274,6 @@ func hasControlChar(s string) bool {
 	return false
 }
 
-// isDelegationOpaqueID 是 storeId 這類對外 id 的共通值域：1–128 字、已 trim、無控制
-// 字元、不得含 `/` 或 `\`。本專案的實際值是 TSID 數字字串，但契約刻意只約束到這裡
-// ——前端不得對它做前綴解析或格式驗證（產品需求畫的 `S9001` 那種短碼是 mockup）。
 func isDelegationOpaqueID(v string) bool {
 	if v == "" || len([]rune(v)) > 128 {
 		return false
@@ -357,16 +284,9 @@ func isDelegationOpaqueID(v string) bool {
 	return !strings.ContainsAny(v, `/\`)
 }
 
-// parseDelegationCaseReference 解出 caseReference 三態：顯式 null、合法字串、或非法。
-//
-// 值域：4–200 字、已 trim、無控制字元、**至少含一個數字**。刻意不做形狀驗證
-// （例如 HK-YYYY-NNNN）：格式驗證只能證明它長得像、不能證明它存在，反而製造假的
-// 確定性，而 content_governance 要填的本來就是純數字 TSID。
 func parseDelegationCaseReference(raw json.RawMessage) (*string, bool) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 {
-		// 欄位整個缺席。契約要求顯式送 null，因為「沒填」與「不需要填」是兩件事，
-		// 而 BFF 會把 create body 逐欄與 preflight 的選擇比對。
 		return nil, false
 	}
 	if string(trimmed) == "null" {
@@ -386,12 +306,6 @@ func parseDelegationCaseReference(raw json.RawMessage) (*string, bool) {
 	return &v, true
 }
 
-// validateDelegationCapabilities 驗證請求的能力集合：非空、不重複、全部落在九個封閉
-// 列舉內。
-//
-// 「已知但這個工作階段沒被核發」不在這裡判——那是伺服端當下重新評估的結果，由
-// delegation 模組回 9262（fail-closed，禁止靜默剔除）。Gateway 只擋根本不存在的
-// token，那是格式錯（9260）。
 func validateDelegationCapabilities(caps []string) bool {
 	if len(caps) == 0 {
 		return false
@@ -409,12 +323,9 @@ func validateDelegationCapabilities(caps []string) bool {
 	return true
 }
 
-// toDelegationSessionData 把工作階段快照投影成對外 DTO。
 func toDelegationSessionData(s *accountpb.OperationSessionSummary) DelegationSessionData {
 	caps := s.GetCapabilities()
 	if caps == nil {
-		// 契約要求非空陣列；即使上游給了 nil 也不能讓 JSON 變成 null，那會讓前端在
-		// 進入 status 分支之前就判契約錯誤。
 		caps = []string{}
 	}
 	out := DelegationSessionData{
@@ -440,9 +351,6 @@ func toDelegationSessionData(s *accountpb.OperationSessionSummary) DelegationSes
 		Status:       s.GetStatus(),
 		Revision:     s.GetRevision(),
 	}
-	// proto3 optional：未設定即 JSON null。**契約上仍必須輸出 null 而不是省略欄位**
-	// （前端以欄位存在與否區分「沒有值」與「壞掉的回應」）。⚠️ 自 #2749 起三個 reason
-	// 一律必填，所以新建的工作階段不會有 null；此分支保留是為了 #2749 之前建立的既有列。
 	if s.CaseReference != nil {
 		v := s.GetCaseReference()
 		out.CaseReference = &v
@@ -450,7 +358,6 @@ func toDelegationSessionData(s *accountpb.OperationSessionSummary) DelegationSes
 	return out
 }
 
-// ==================== S1 preflight ====================
 
 // GetDelegatedOperationPreflight 判定此刻能否對該店家開始代行
 // GET /api/v1/admin/sellers/{store_id}/delegated-operation/preflight
@@ -495,8 +402,6 @@ func (h *Holder) GetDelegatedOperationPreflight(c *gin.Context) {
 		delegationUpstreamFailure(c, "代行 preflight 回應缺少 data", nil)
 		return
 	}
-	// 拒絕卻沒有拒絕碼，前端會在讀到 allowed 之前就把整份回應判成契約錯誤，操作者
-	// 只看得到「代行不可用」。與其送出一份注定被丟掉的 200，不如誠實回 424 讓它可重試。
 	if !data.GetAllowed() && data.GetDeniedCode() == 0 {
 		delegationUpstreamFailure(c, "代行 preflight 拒絕但未帶 deniedCode", nil)
 		return
@@ -536,7 +441,6 @@ func (h *Holder) GetDelegatedOperationPreflight(c *gin.Context) {
 	})
 }
 
-// ==================== S2 建立工作階段 ====================
 
 // CreateDelegatedOperation 建立代行工作階段
 // POST /api/v1/admin/delegated-operations
@@ -590,17 +494,6 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 		delegationDeny(c, bizcode.DelegationInvalidCommand, "capabilities 必須非空、不重複且為已知能力")
 		return
 	}
-	// 依賴閉包（#2744）。授權列端（admin_delegation_authorization.go）一直有這道檢查，
-	// 工作階段端沒有 —— 而它只驗「已知／不重複／是授權集合的子集」，子集本身可以不自洽。
-	//
-	// 後果不是「少一道檢查」而是**把失敗延後並換掉主體**：只勾 products.write 的工作階段
-	// 建得起來，操作者進到編輯畫面時才被 orchestrator 的 ReadBefore（products.read）以
-	// 9262「此代行工作階段未取得該項操作權限」擋下 —— 憑證已經發出去了，而訊息看起來
-	// 像是他的授權有問題。9287 的文案（「選擇編輯或發布時必須同時包含對應的檢視權限」）
-	// 逐字就是這件事，只是先前沒有人在這條路徑上呼叫它。
-	//
-	// 同一個錯誤在授權列是「送出前擋下並告訴你缺哪一項」，在工作階段是「先發憑證、
-	// 操作到一半才失敗且不說原因」。
 	{
 		typed := make([]authz.AdminCapability, 0, len(req.Capabilities))
 		for _, v := range req.Capabilities {
@@ -616,8 +509,6 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 			return
 		}
 	}
-	// clamp 是伺服端的義務，前端夾一次不會錯，但一旦被當成唯一防線，curl 直打就繞
-	// 過去了。這裡擋值域，真正的封頂（min(requested, MAX)）在 delegation 模組。
 	if req.TTLSeconds == nil || *req.TTLSeconds < 1 || *req.TTLSeconds > 1800 {
 		delegationDeny(c, bizcode.DelegationInvalidCommand, "ttlSeconds 必須為 1–1800 的整數")
 		return
@@ -627,9 +518,6 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 		ActorAdminId:  strconv.FormatInt(adminID, 10),
 		TargetStoreId: req.StoreID,
 		ReasonCode:    req.ReasonCode,
-		// ActorDisplayName 刻意留空：Gateway 手上只有 ADM session 的 account id，
-		// 管理員的顯示名由 delegation 模組從自己的權威資料補（preflight 同一支
-		// 判定的 actor）。在這裡塞一個猜來的值只會讓稽核列記錯人。
 		RequestedCapabilities: req.Capabilities,
 		RequestedTtlSeconds:   *req.TTLSeconds,
 		IdempotencyKey:        idempotencyKey,
@@ -651,7 +539,6 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 		return
 	}
 	data := resp.GetData()
-	// session 缺失時不能對帳；handoffCode 在已兌換的重放中可以缺席。
 	if data == nil || data.GetSession() == nil {
 		delegationUpstreamFailure(c, "建立代行工作階段回應不完整", nil)
 		return
@@ -663,7 +550,6 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 	})
 }
 
-// ==================== S3 查詢當前工作階段 ====================
 
 // GetCurrentDelegatedOperation 由 credential 反查當前工作階段
 // GET /api/v1/admin/delegated-operations/current
@@ -684,7 +570,6 @@ func (h *Holder) GetCurrentDelegatedOperation(c *gin.Context) {
 		return
 	}
 
-	// counts_as_activity 恆為 false：這是六支 session 端點之一，而本支被輪詢。
 	resp, err := h.Account.GetCurrentDelegationSession(c.Request.Context(), credential, false,
 		h.Delegation.GrpcDeadlineCurrentMs)
 	if err != nil {
@@ -697,8 +582,6 @@ func (h *Holder) GetCurrentDelegatedOperation(c *gin.Context) {
 	}
 	data := resp.GetData()
 	if data == nil {
-		// 9274 表達的只有「不存在」。前端對它保留 cookie、不宣稱已結束，所以回 401
-		// 是安全的；反過來不得用 404，那會與「endpoint 沒部署」混淆。
 		delegationDeny(c, bizcode.DelegationCredentialInvalid, "")
 		return
 	}
@@ -706,7 +589,6 @@ func (h *Holder) GetCurrentDelegatedOperation(c *gin.Context) {
 	response.OK(c, toDelegationSessionData(data))
 }
 
-// ==================== S4 結束工作階段 ====================
 
 // EndCurrentDelegatedOperation 結束當前工作階段
 // DELETE /api/v1/admin/delegated-operations/current
@@ -722,25 +604,17 @@ func (h *Holder) GetCurrentDelegatedOperation(c *gin.Context) {
 func (h *Holder) EndCurrentDelegatedOperation(c *gin.Context) {
 	credential := delegationCredential(c)
 	if credential == "" {
-		// 沒有 credential 就沒有要結束的東西，ended 在客戶端關心的層次上為真。
-		// 回應不因 credential 是否存在而不同，因此也不洩漏任何資訊。
 		response.OK(c, DelegationEndData{Ended: true})
 		return
 	}
 
-	// EndSession／RevokeSession 沿用 create 的 deadline（§7.3.1 未另立參數）。
 	resp, err := h.Account.EndDelegationSession(c.Request.Context(), credential, c.GetString("request_id"),
 		h.Delegation.GrpcDeadlineCreateMs)
 	if err != nil {
-		// 這一支刻意不走 delegationGrpcFailure：它的失敗情境表只有 9280 一列，把上游
-		// 的業務碼原樣分流出去會讓「credential 無法解析」變成 401／410，而那正是本端點
-		// 明令要回 200 的情境（回 401/404 會把工作區寫入永久封鎖）。
 		delegationUpstreamFailure(c, "結束代行工作階段失敗", err)
 		return
 	}
 	if resp.GetCode() != 0 {
-		// 契約上這支沒有業務拒絕。真的收到一個，代表工作階段沒有被終止，此時宣稱
-		// ended:true 就是一份假的終止證明——回可重試的 424 才誠實。
 		delegationUpstreamFailure(c, "結束代行工作階段回應非零業務碼", nil)
 		return
 	}
@@ -748,7 +622,6 @@ func (h *Holder) EndCurrentDelegatedOperation(c *gin.Context) {
 	response.OK(c, DelegationEndData{Ended: true})
 }
 
-// ==================== S5 撤銷工作階段 ====================
 
 // RevokeDelegatedOperation 撤銷指定工作階段
 // POST /api/v1/admin/delegated-operations/{session_id}/revoke
@@ -775,7 +648,6 @@ func (h *Holder) RevokeDelegatedOperation(c *gin.Context) {
 	}
 	sessionID := c.Param("session_id")
 	if !delegationSessionIDRE.MatchString(sessionID) {
-		// 形狀不對的 sessionId 與查無此列是同一件事：那個工作階段不存在。
 		delegationDeny(c, bizcode.DelegationSessionNotFound, "")
 		return
 	}
@@ -824,7 +696,6 @@ func (h *Holder) RevokeDelegatedOperation(c *gin.Context) {
 	})
 }
 
-// ==================== S6 handoff 兌換 ====================
 
 // RedeemDelegationHandoff 兌換一次性 handoff code
 // POST /api/v1/admin/delegated-operations/handoff/redeem
@@ -840,8 +711,6 @@ func (h *Holder) RevokeDelegatedOperation(c *gin.Context) {
 // @Router       /admin/delegated-operations/handoff/redeem [post]
 func (h *Holder) RedeemDelegationHandoff(c *gin.Context) {
 	var req RedeemDelegationHandoffRequest
-	// body 壞掉或 code 形狀不對，同樣回 9282 而不是 9260：任何能區分「這把 code 格式
-	// 對但不存在」與「格式就不對」的回應，都是一支可用來收窄猜測空間的探測器。
 	if err := c.ShouldBindJSON(&req); err != nil || !delegationHandoffCodeRE.MatchString(req.HandoffCode) {
 		delegationDeny(c, bizcode.DelegationHandoffInvalid, "")
 		return

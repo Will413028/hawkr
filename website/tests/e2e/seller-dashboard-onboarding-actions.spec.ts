@@ -87,8 +87,6 @@ async function prepareSellerPage(
 	baseURL: string,
 	fixture: SellerFixture,
 ): Promise<{ productListRequests: ProductListRequest[] }> {
-	// Lowest-priority fallback for secondary dashboard/destination queries. The
-	// gateway helper and exact fixtures below are registered later, so they win.
 	await page.route("**/api/v1/**", (route) => {
 		void route.fulfill({
 			status: 200,
@@ -97,7 +95,6 @@ async function prepareSellerPage(
 		});
 	});
 
-	// 其餘 Connect 方法（買家資料、通知…）：與上面的 REST 萬用規則同一個角色，回空訊息。
 	await page.route("**/api/connect/**", (route) => {
 		void fulfillConnect(route, {});
 	});
@@ -164,8 +161,6 @@ async function prepareSellerPage(
 	await page.addInitScript(
 		([loaderKey, dashboardUiKey]) => {
 			sessionStorage.setItem(loaderKey, "1");
-			// A previous run may have persisted a collapsed card or another active
-			// task. Each navigation in this matrix must start from product defaults.
 			localStorage.removeItem(dashboardUiKey);
 		},
 		[LOADER_KEY, DASHBOARD_UI_KEY] as const,
@@ -183,8 +178,6 @@ async function openDashboardTasks(page: Page): Promise<Locator> {
 	const card = page.locator(".seller-onboarding-progress");
 	await expect(card).toBeVisible();
 	const body = card.locator(".seller-onboarding-progress__body");
-	// 卡片在 seller-self、KYC 等資料回來前就渲染，且先是展開的；「公開前必須」全部滿足的帳號在資料
-	// 回來後才預設收合。所以只點一次會被這個轉變抵消：重試到展開狀態穩定為止。
 	const toggle = card.locator(".seller-onboarding-progress__toggle");
 	await expect(async () => {
 		if ((await toggle.getAttribute("aria-expanded")) !== "true") {
@@ -406,7 +399,6 @@ test.describe("seller dashboard onboarding task actions", {
 				groups.nth(1).getByRole("button", { name: new RegExp(`^${title}，`) }),
 			).toBeVisible();
 		}
-		// 發布動態不是任何一組的任務。
 		await expect(card.getByRole("button", { name: /^發布動態，/ })).toHaveCount(
 			0,
 		);
@@ -471,7 +463,6 @@ test.describe("seller dashboard onboarding task actions", {
 	}) => {
 		test.skip(!baseURL, "Playwright baseURL is required");
 
-		// GetMyKYC 說已核准，摘要說平台審核還要送件：畫面跟摘要。
 		await prepareSellerPage(page, baseURL as string, {
 			store: NOT_STARTED_STORE,
 			flow: "APPROVED",

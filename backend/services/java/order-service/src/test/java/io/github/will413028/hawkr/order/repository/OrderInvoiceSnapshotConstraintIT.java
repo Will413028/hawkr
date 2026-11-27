@@ -96,7 +96,6 @@ class OrderInvoiceSnapshotConstraintIT {
         jdbc.update("DELETE FROM order_invoice_snapshots");
     }
 
-    // ==================== helpers ====================
 
     /** 直接走 SQL 而非 Entity：要測的是 DB 層的 CHECK，不能被 Java 端的驗證擋在前面。 */
     private void insertRaw(long id, String orderNo, String kind, String mode,
@@ -148,7 +147,6 @@ class OrderInvoiceSnapshotConstraintIT {
         assertSqlState(e, sqlState, null);
     }
 
-    // ==================== 合法輸入必須進得去 ====================
 
     @Test
     @DisplayName("缺省快照（B2C ＋ USE_BUYER_DEFAULT，三個目標全 NULL）寫得進去，且每一欄映得回 Entity")
@@ -191,7 +189,6 @@ class OrderInvoiceSnapshotConstraintIT {
                 .isEqualTo(3);
     }
 
-    // ==================== 每一條 CHECK 都要有一筆被擋下的 INSERT ====================
 
     @Test
     @DisplayName("chk_ois_kind：invoice_kind 只有 B2C／B2B（RECEIPT 是 invoice_documents 的值域，不是本表的）")
@@ -266,12 +263,6 @@ class OrderInvoiceSnapshotConstraintIT {
     @Test
     @DisplayName("三選一：任兩個目標同時有值一律進不去（AMEGO 不擋，DB 這一層擋）")
     void rejectsTwoTargetsAtOnce() {
-        // ⚠️ 這裡刻意**不指名 chk_ois_exclusive**。實測發現：pref_pair 與 donation_pair 都是
-        // 「mode ⟺ 該欄非空」的雙條件式，而 mode 只有一個值 ⇒ 只要有兩個目標同時非空，
-        // 必然先違反其中一條 pair 約束（本例回的是 chk_ois_donation_pair）。
-        // 換句話說 **chk_ois_exclusive 是一條到不了的備援**——它單獨不可能是第一個被報出來的
-        // 約束，而 PostgreSQL 也不保證多條 CHECK 的評估順序。把它寫進斷言等於斷言一個
-        // 實作細節，會在 PostgreSQL 換順序時假紅。要守的不變式是「兩個目標寫不進去」。
         assertSqlStateOnly(
                 () -> insertRaw(20L, "O1", "B2B", "NONE", null, "12345678", "抬頭", "5238", null),
                 "23514");
@@ -286,7 +277,6 @@ class OrderInvoiceSnapshotConstraintIT {
         assertCheckViolation(
                 () -> insertRaw(31L, "O1", "B2C", "USE_BUYER_DEFAULT", null, null, null, null, "not-an-email"),
                 "chk_ois_notify_email");
-        // NULL 必須放行——否則沒填信箱的買家一律結不了帳
         insertRaw(32L, "O2", "B2C", "USE_BUYER_DEFAULT", null, null, null, null, null);
     }
 
@@ -309,27 +299,16 @@ class OrderInvoiceSnapshotConstraintIT {
                 "23505", "uk_order_invoice_snapshots");
     }
 
-    // ==================== 索引取捨（§5.4.3 刻意不建單欄索引）====================
 
     @Test
     @DisplayName("刻意不建 (order_no) 單欄索引：唯一鍵的前綴已足夠，多一個窄索引只是結帳 hot path 的寫入放大")
     void hasNoRedundantSingleColumnIndexOnOrderNo() {
-        // 🔴 **改成逐名比對，不是數個數**（2026-09-17）。
-        //    原本 pin 的是「恰好 2 個索引」，而 V13 合法新增了 uk_ois_revision_idem
-        //    （B06／R03 更正的冪等鍵）之後這個數字就過期了——而它**沒有被任何人發現**，
-        //    因為 @Tag("integration") 讓這支測試從來沒有在 CI 跑過。
-        //    ⇒ 純計數的 pin 有兩個問題：① 合法新增索引時它會紅，而修法只是「把 2 改成 3」，
-        //    那等於把 gate 關掉 ② 它**分不出**新增的是正當索引還是本測試要禁的
-        //    (order_no) 單欄索引——兩者都只是讓數字 +1。
-        //    逐名比對讓「新增索引」變成一個必須在 diff 裡寫清楚的動作，
-        //    而下面那條 order_no 單欄索引的禁令則獨立成立、與索引總數無關。
         List<String> indexes = jdbc.queryForList("""
                 SELECT indexname FROM pg_indexes
                 WHERE tablename = 'order_invoice_snapshots'
                 ORDER BY indexname
                 """, String.class);
 
-        // 對照組：查詢真的看得到這張表（空清單時下面兩條斷言都會空過）。
         assertThat(indexes)
                 .as("量測本身失效：order_invoice_snapshots 一個索引都查不到 ⇒ 查詢或 schema 不對")
                 .isNotEmpty();
@@ -338,16 +317,10 @@ class OrderInvoiceSnapshotConstraintIT {
                 .as("索引清單變了。新增索引請在這裡具名登記，並在 PR 說明它的讀取端收益；"
                         + "這張表在結帳 hot path 上，每個索引都是寫入放大")
                 .containsExactlyInAnyOrder(
-                        // PK
                         "order_invoice_snapshots_pkey",
-                        // 業務唯一鍵（order_no 是它的前綴 ⇒ 單欄查詢已經走得到）
                         "uk_order_invoice_snapshots",
-                        // V13：B06／R03 更正的冪等鍵（partial，NULL 不參與）
                         "uk_ois_revision_idem");
 
-        // 🔴 本測試 DisplayName 的那條禁令，獨立於索引總數成立：
-        //    uk_order_invoice_snapshots 的前綴已經是 order_no ⇒ 再建一個 (order_no) 單欄索引
-        //    對讀取零收益、對結帳寫入是純成本。
         List<String> onOrderNoOnly = jdbc.queryForList("""
                 SELECT indexname FROM pg_indexes
                 WHERE tablename = 'order_invoice_snapshots'

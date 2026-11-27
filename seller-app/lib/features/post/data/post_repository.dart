@@ -55,7 +55,6 @@ class PostRepository with ApiRequestHelper {
   @override
   Dio get dio => _dio;
 
-  // ── Path prefixes ──────────────────────────────────────
   static const _app = '/api/v1/app';
 
   static const _maxPageSize = 50;
@@ -198,7 +197,6 @@ class PostRepository with ApiRequestHelper {
     }
   }
 
-  // --- 貼文留言（SocialPublicService 讀、SocialAppService 寫） ---
 
   /// 讀貼文的頂層留言，或 [parentId] 那則頂層留言的回覆；逐頁讀到沒有下一頁。
   /// 店主讀自己的貼文不受公開狀態限制，所以草稿、下架與店家不公開時也讀得到。
@@ -253,7 +251,6 @@ class PostRepository with ApiRequestHelper {
     );
   }
 
-  // ── 店家討論區 ─────────────────────────────────────────
 
   /// 讀店家討論區的頂層發言，或 [parentId] 那則的回覆；逐頁讀到沒有下一頁。
   Future<List<StoreForumEntry>> listForumEntries(
@@ -337,7 +334,6 @@ class PostRepository with ApiRequestHelper {
     return null;
   }
 
-  // ── 貼文更新 ───────────────────────────────────────────
 
   /// 修改貼文內文、商品與標籤；[imageStagedToken] 是 `null` 時保留現有圖片，非 null 時換成該 token
   /// （空字串是清掉圖）。[updateProduct] 為 true 時才改關聯商品，[productId] 是 `null` 即清掉商品；

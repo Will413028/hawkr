@@ -105,7 +105,7 @@ export default function SellerPostDetailModal({
 					<CloseIcon />
 				</button>
 
-				{/* Media — left on desktop, top on mobile */}
+
 				<div className="seller-post-modal__media relative grid flex-1 min-w-0 place-items-center bg-default-100 min-h-[320px] max-md:flex-none max-md:aspect-[4/3]">
 					{imageKey ? (
 						<AppImage
@@ -122,7 +122,7 @@ export default function SellerPostDetailModal({
 					)}
 				</div>
 
-				{/* Aside — right on desktop, bottom on mobile */}
+
 				<aside className="seller-post-modal__aside flex w-[420px] max-w-full shrink-0 flex-col overflow-y-auto border-l border-divider max-md:w-full max-md:border-l-0 max-md:border-t">
 					<header
 						id="seller-post-modal-title"
@@ -158,8 +158,7 @@ export default function SellerPostDetailModal({
 						</div>
 					</header>
 
-					{/* 列表上標了、點進來卻沒標，等於把剛建立的判斷又拆掉一次 —— 代行者
-					    正是從列表點進這裡確認內容的。 */}
+
 					{!isPostHidden(post) && (
 						<PostPublishStatusBadge
 							publishStatus={post.publishStatus}
@@ -197,8 +196,7 @@ export default function SellerPostDetailModal({
 							{tNotice(POST_COMMENTS_NOTICE_KEY[commentsNotice])}
 						</p>
 					) : null}
-					{/* 留言權限、留言身分與「封鎖此人」都由伺服器的 viewer_* 欄位決定；
-					    店主不論這則動態公不公開都讀得到、刪得了留言。 */}
+
 					<PostComments
 						postId={post.id}
 						viewer={post.viewer}

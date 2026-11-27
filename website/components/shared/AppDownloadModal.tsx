@@ -48,9 +48,7 @@ export default function AppDownloadModal({
 			bodyClassName="flex flex-col items-center gap-[var(--hkui-space-3)] text-center"
 		>
 			<div className="inline-flex items-center justify-center rounded-[var(--hkui-radius-lg)] bg-[var(--color-neutral-cream)] p-[var(--hkui-space-4)] shadow-[0_8px_24px_rgb(15_33_15_/_0.12),0_1px_0_rgb(255_255_255_/_0.9)_inset] [&_svg]:block [&_svg]:size-[192px] max-[640px]:[&_svg]:size-[168px]">
-				{/* QR sits on a light card in BOTH themes, so the modules are a
-				    fixed dark ink — a theme-var foreground would flip light in
-				    dark mode and leave a light-on-light, unscannable code. */}
+
 				<QRCodeSVG
 					value={APP_STORE_URL}
 					size={192}
@@ -61,9 +59,7 @@ export default function AppDownloadModal({
 				/>
 			</div>
 
-			{/* Not a `nav`: a landmark nested inside a modal dialog is announced
-			    as a page-level region that a screen-reader user cannot navigate
-			    away to. A labelled group says the same thing without lying. */}
+
 			<fieldset
 				aria-label="App 商店連結"
 				className="m-0 mt-[var(--hkui-space-3)] grid w-full grid-cols-2 gap-[var(--hkui-space-3)] border-0 p-0"

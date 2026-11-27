@@ -58,8 +58,6 @@ class EventPrincipalPreResolutionTest {
         publisher = new AfterSalesEventPublisherImpl(obsRabbitPublisher, sellerGrpcClient, buyerGrpcClient);
     }
 
-    // ==================== tx 內零身分反解 gRPC ====================
-    // 本組只 verifyNoInteractions seller／buyer 兩個 client。
 
     @Test
     @DisplayName("B2 tryPublishCaseAutoRejected(principals)：tx 內零身分反解 gRPC，payload 用預解值")
@@ -97,12 +95,10 @@ class EventPrincipalPreResolutionTest {
         assertEquals("55", payload.get("notify_buyer_account_id"));
     }
 
-    // ==================== strict 解析語意 ====================
 
     @Test
     @DisplayName("resolveEventPrincipals：seller 反解失敗 → 拋，不降級")
     void resolveEventPrincipals_sellerFailure_throws() {
-        // SellerGrpcClient 內部 catch 後回 null ＝ 該次 gRPC 失敗（非 null storeId 成功時必回非 null）
         when(sellerGrpcClient.resolveAccountIdForStore(STORE_ID)).thenReturn(null);
 
         assertThrows(PrincipalResolutionFailedException.class,

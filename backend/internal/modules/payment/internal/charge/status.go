@@ -10,7 +10,6 @@ import (
 // ErrAnomaly 標示 provider 的快照與本地列對不起來（金額不符、外部 ID 換了、入帳沒有 charge）：不寫入，記 error log；同步 job 把它當永久失敗取消。
 var ErrAnomaly = fmt.Errorf("%w：provider 的快照與付款列不一致", ErrPermanent)
 
-// errUnknownState 標示快照的狀態不認得：不是有效值，不寫入；暫時性（provider 之後可能回已知狀態，或 adapter 補上對應），由 job 重試。
 var errUnknownState = errors.New("charge: provider 回了不認得的 PaymentIntent 狀態")
 
 // Next 由列目前的狀態與 provider 的快照推導下一個狀態。provider 是真相：除了入帳（終局，之後的任何快照都不倒退它，#35–#39 的 FAILED 不覆蓋 PAID）以外，

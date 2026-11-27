@@ -17,14 +17,12 @@ class InternalAuthSignerTest {
 
     private static final String SECRET = "test-shared-secret-please-change";
 
-    // 黃金值一：帶 accountId
     private static final String SVC_1 = "order-service";
     private static final String TS_1 = "1700000000";
     private static final String NONCE_1 = "00112233445566778899aabbccddeeff";
     private static final String ACCT_1 = "123456789";
     private static final String GOLDEN_SIG_1 = "TXm3Uefzoq0Z8ru9n++yFm4DjaEs9XZ2GWMpHsi3BOk=";
 
-    // 黃金值二：空 accountId
     private static final String SVC_2 = "crm-service";
     private static final String TS_2 = "1700000000";
     private static final String NONCE_2 = "abcdef00112233445566778899aabbcc";
@@ -54,10 +52,8 @@ class InternalAuthSignerTest {
 
             assertTrue(InternalAuthVerifier.verify("buyer-service", ts, nonce, "555", sig),
                     "有效簽章應驗過");
-            // 抽換 accountId → 簽章不再相符
             assertFalse(InternalAuthVerifier.verify("buyer-service", ts, nonce, "999", sig),
                     "換 accountId 後應驗不過（簽章綁 accountId）");
-            // 亂改簽章
             assertFalse(InternalAuthVerifier.verify("buyer-service", ts, nonce, "555", "tampered"),
                     "竄改簽章應驗不過");
         } finally {
@@ -69,7 +65,7 @@ class InternalAuthSignerTest {
     void verifyRejectsOutOfWindowTimestamp() {
         InternalAuthConfig.configure(InternalAuthConfig.MODE_PERMISSIVE, SECRET, "", 300L);
         try {
-            long staleTsVal = (System.currentTimeMillis() / 1000L) - 10_000L; // 遠超 300s 窗
+            long staleTsVal = (System.currentTimeMillis() / 1000L) - 10_000L;
             String ts = Long.toString(staleTsVal);
             String nonce = InternalAuthSigner.newNonce();
             String sig = InternalAuthSigner.sign(SECRET, InternalAuthSigner.canonical("buyer-service", ts, nonce, "555"));
@@ -82,7 +78,6 @@ class InternalAuthSignerTest {
 
     @Test
     void verifyAcceptsPrevSecretDuringRotation() {
-        // current = 新密鑰，prev = 舊密鑰；用舊密鑰簽的訊息在輪替窗內仍應被接受
         InternalAuthConfig.configure(InternalAuthConfig.MODE_PERMISSIVE, "new-secret", SECRET, 300L);
         try {
             String ts = InternalAuthSigner.currentTs();

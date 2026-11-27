@@ -35,7 +35,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// stubLLM 是替身模型：reply 決定每次呼叫的回應文字；回 block 為真時阻塞到 ctx 結束（模擬進行中的 run）。
 type stubLLM struct {
 	reply   func(call int) string
 	block   bool
@@ -63,7 +62,6 @@ func (l *stubLLM) GenerateContent(ctx context.Context, _ *adkmodel.LLMRequest, _
 
 type taxonomy struct{}
 
-// catID 是測試用的確定性分類 ID：同一個數字永遠得到同一個 UUID，且不是零值。
 func catID(n int) uuid.UUID {
 	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
 }
@@ -108,7 +106,6 @@ func (entitlements) Entitlement(context.Context, int64) (buyer.Entitlement, erro
 	return buyer.Entitlement{MonthlyAnswerLimit: 10, PeriodStart: start, PeriodEnd: start.AddDate(0, 1, 0)}, nil
 }
 
-// lateQueue 讓模組先建好、River client 之後才指定（worker 要先登記模組的 worker 才能建）。
 type lateQueue struct{ q procurement.JobQueue }
 
 func (l *lateQueue) EnqueueJob(ctx context.Context, a river.JobArgs, o *river.InsertOpts) (int64, error) {
@@ -119,7 +116,6 @@ func (l *lateQueue) CancelJob(ctx context.Context, id int64) (rivertype.JobState
 	return l.q.CancelJob(ctx, id)
 }
 
-// newClient 組出真正的模組（真的 Postgres、River worker、LISTEN hub、替身 LLM），經 Connect 測試 server 呼叫 handler；不經單體的掛載。
 func newClient(t *testing.T, l *stubLLM) procurementv1alpha1connect.BuyerProcurementAppServiceClient {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "procurement", Dir: procurement.Migrations()}), testdb.Jobs())
@@ -148,7 +144,6 @@ func newClient(t *testing.T, l *stubLLM) procurementv1alpha1connect.BuyerProcure
 	return setup(t, m)
 }
 
-// watch 訂閱到串流結束，回全部事件。
 func watch(t *testing.T, c procurementv1alpha1connect.BuyerProcurementAppServiceClient, runID string, account int64) []*pb.WatchRunResponse {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
@@ -231,7 +226,6 @@ func TestSubmitTurnThenWatchRunFinishesAndTheSnapshotReflectsIt(t *testing.T) {
 	if result == nil || result.GetSlots().GetItem() != "小白菜" || result.GetRunId() != sub.GetRunId() {
 		t.Fatalf("turn_result = %v", result)
 	}
-	// 從最後一個 cursor 接續沒有新事件；重送回同一個 run。
 	rest := watchFrom(t, c, sub.GetRunId(), evs[len(evs)-1].GetCursor())
 	if len(rest) != 0 {
 		t.Errorf("接續 = %v", rest)
@@ -251,7 +245,6 @@ func TestSubmitTurnThenWatchRunFinishesAndTheSnapshotReflectsIt(t *testing.T) {
 		t.Errorf("別的買家讀快照 = %v", err)
 	}
 
-	// StartCandidateSearch：需求已齊備，搜尋成功後轉 MATCHING。
 	start, err := c.StartCandidateSearch(t.Context(), as(connect.NewRequest(&pb.StartCandidateSearchRequest{RequestId: sub.GetRequestId(), ClientRequestId: cid2}), accountID))
 	if err != nil || start.Msg.GetRunId() == "" || start.Msg.GetCandidateSetId() == "" || start.Msg.GetRequestId() != sub.GetRequestId() {
 		t.Fatalf("StartCandidateSearch = %v, %v", start, err)
@@ -297,7 +290,6 @@ func watchErr(t *testing.T, c procurementv1alpha1connect.BuyerProcurementAppServ
 	return out, st.Err()
 }
 
-// watchUntilTurnResult 訂閱到 turn_result 就收線：停在 WAITING_FOR_INPUT 的 run 不會有 finished，串流會開到視窗結束。
 func watchUntilTurnResult(t *testing.T, c procurementv1alpha1connect.BuyerProcurementAppServiceClient, runID string, account int64) *pb.TurnResult {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
@@ -331,7 +323,6 @@ func TestResumeRunAnswersTheClarificationThenWatchRunFinishes(t *testing.T) {
 		t.Fatalf("等待回答的快照 = %v", snap)
 	}
 
-	// 回答不合：選項不在卡上 → INVALID_ARGUMENT，路徑在巢狀的 clarification 底下。
 	_, err := c.ResumeRun(t.Context(), as(connect.NewRequest(&pb.ResumeRunRequest{InterruptId: oc.GetInterruptId(), ClientRequestId: cid2,
 		Response: &pb.ResumeRunRequest_Clarification{Clarification: &pb.ClarificationResponse{OptionId: "nope"}}}), accountID))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
@@ -416,7 +407,6 @@ func TestSubmitTurnRejectsMessagesAndUnknownRequestsBeforeAnyRun(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("不存在的需求 = %v", err)
 	}
-	// 別的買家的需求：同樣 NOT_FOUND。
 	sub := submit(t, c, "", cid3)
 	_, err = c.SubmitTurn(t.Context(), as(connect.NewRequest(&pb.SubmitTurnRequest{RequestId: sub.GetRequestId(), Message: "x", ClientRequestId: cid2}), accountID+1))
 	if connect.CodeOf(err) != connect.CodeNotFound {

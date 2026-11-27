@@ -14,11 +14,6 @@ const nextLinkCapture = vi.hoisted(() => ({
 	props: null as CapturedNextLinkProps | null,
 }));
 
-// ChatBubble renders through NavBubbleLink, which uses the SHARED transition
-// link (it used to reach for next/link directly and so opted this one bubble
-// out of the app's role-aware navigation). The capture therefore mocks the
-// shared link; the contract under test — `prefetch` stays false until the user
-// shows intent — is unchanged.
 vi.mock("@/components/shared/Link", async () => {
 	const ReactModule = await vi.importActual<typeof import("react")>("react");
 	return {

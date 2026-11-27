@@ -75,9 +75,6 @@ class ProductRepository {
       final data = resp.data;
       if (data is List) return data;
       if (data is Map) {
-        // 支援兩種格式：
-        // 1. {data: [...]}
-        // 2. {data: {records: [...], total: N}}
         final inner = data['data'];
         if (inner is List) return inner;
         if (inner is Map) {
@@ -89,7 +86,6 @@ class ProductRepository {
         }
       }
     } on DioException {
-      // fall through
     }
     return [];
   }
@@ -149,7 +145,6 @@ class ProductRepository {
             .toString();
       }
     } on DioException {
-      // fall through
     }
     return null;
   }
@@ -163,7 +158,6 @@ class ProductRepository {
         return data['data'] as Map<String, dynamic>? ?? data;
       }
     } on DioException {
-      // fall through
     }
     return {};
   }
@@ -178,7 +172,6 @@ class ProductRepository {
         return data['data'] as Map<String, dynamic>? ?? data;
       }
     } on DioException {
-      // fall through
     }
     return {};
   }
@@ -202,9 +195,6 @@ class ProductRepository {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Visit & Favorites (used by my_subscription_screen, merchant_item_detail)
-  // ---------------------------------------------------------------------------
 
   Future<bool> addFavoriteProduct({required String productId}) async {
     try {
@@ -235,19 +225,13 @@ class ProductRepository {
     required String productName,
   }) async {
     if (merchantId.isEmpty || productId.isEmpty) return;
-    // §4：RecordVisitReq.productId 為 TSID 數字字串，送 number 會 400
-    // "cannot unmarshal number into ... of type string"（2026-07-03 實測）
     if (int.tryParse(productId) == null) return;
     try {
       await _buyer.recordVisit(buyer.RecordVisitRequest(productId: productId));
     } catch (_) {
-      // best-effort, ignore errors
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Restock Subscriptions (#942)
-  // ---------------------------------------------------------------------------
 
   /// 訂閱規格（SKU）的補貨通知。後端冪等：已訂閱再呼叫直接回成功；規格目前有貨時後端拒絕。
   Future<bool> subscribeRestock(String productId, String skuId) async {

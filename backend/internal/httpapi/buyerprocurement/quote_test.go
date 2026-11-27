@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// quoteFake 記下回價比較與接受四支方法收到的輸入，並回預設的結果或指定的錯誤。
 type quoteFake struct {
 	lists    []procurement.ListSellerResponsesInput
 	puts     []int32

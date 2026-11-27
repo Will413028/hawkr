@@ -57,8 +57,6 @@ void main() {
           'status': '32',
           'statusLabel': '待取貨',
           'storeName': '統一超商測試門市',
-          // 🔴 `cvsStoreCode` 是 `store_id` 的正名（proto 已 reserved 舊欄）。
-          //    讀錯名字的症狀是門市代號永遠空白，而沒有任何東西會報錯。
           'cvsStoreCode': '252698',
         },
       }),
@@ -135,8 +133,6 @@ void main() {
         recipientName: '',
         createdAt: '',
       );
-      // App 的 CodeMeta 是拷貝，後端新增狀態時它一定比較舊。
-      // 那時猜「配送中」等於對使用者陳述一件沒有發生的事。
       expect(track.normalizedStatusLabel, '狀態 9999');
       expect(track.isKnownStatus, isFalse);
     });

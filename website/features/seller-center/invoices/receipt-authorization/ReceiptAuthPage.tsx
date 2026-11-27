@@ -69,14 +69,8 @@ export function ReceiptAuthPage() {
 
 	const revokedOrExpired = isRevokedOrExpired(authorization.ineligibleReason);
 	const authorized = Boolean(authorization.authorizedAt);
-	// 端點 28 不回 `taxReviewStatus`，`approvedAt` 是唯一分得出「已核定」與「審核
-	// 進行中」的欄位：它在核准那一句才寫（`AdminApproveSellerTaxProfile`），審核進行
-	// 中的賣家恆為 NULL。複審中的賣家仍留著值，那是對的——核定確實發生過，複審不
-	// 追溯已代製的收據（`AdminReopenSellerTaxProfileReview` 刻意不動這兩欄）。
 	const approved = Boolean(authorization.approvedAt);
 
-	// 從來沒核定過 ⇒ 沒有歷史資料可看，整頁只有 gate。
-	// 撤銷／到期 ⇒ 歷史核定資料仍要顯示（見下方），只是不能新增授權。
 	if (!authorization.eligible && !revokedOrExpired) {
 		return (
 			<SellerPageShell title="收據代製授權" eyebrow="發票與稅籍">
@@ -102,12 +96,12 @@ export function ReceiptAuthPage() {
 		>
 			<BackLink fallbackHref={OVERVIEW_HREF}>回發票與稅籍</BackLink>
 
-			{/* 資格已失效：整頁唯讀，但歷史核定資料照常顯示。 */}
+
 			{revokedOrExpired ? (
 				<GateBanner reason={authorization.ineligibleReason} />
 			) : null}
 
-			{/* ③ 核准狀態 */}
+
 			<section className="seller-card mt-4 p-5">
 				<div className="flex items-center gap-2 mb-3">
 					<h2 className="text-sm font-extrabold text-foreground flex-1">
@@ -147,7 +141,6 @@ export function ReceiptAuthPage() {
 				</dl>
 				<div className="mt-3 pt-3 border-t border-divider">
 					{approved ? (
-						// 🔴 兩種 unavailableReason 對賣家的文案逐字相同——區分只在後端稽核。
 						<small
 							role="status"
 							className="text-[0.6875rem] text-foreground-soft"
@@ -155,7 +148,6 @@ export function ReceiptAuthPage() {
 							依據文件尚未提供，請洽平台客服。
 						</small>
 					) : (
-						// 還沒核定就沒有核定依據文件，這不是缺漏，不要叫他洽客服。
 						<small
 							role="status"
 							className="text-[0.6875rem] text-foreground-soft"
@@ -166,7 +158,7 @@ export function ReceiptAuthPage() {
 				</div>
 			</section>
 
-			{/* ④ 說明 */}
+
 			<section className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground">
 					平台代製收據的意思
@@ -182,7 +174,7 @@ export function ReceiptAuthPage() {
 				</ul>
 			</section>
 
-			{/* ⑤ 收據樣式 */}
+
 			{templateUrl ? (
 				<section className="seller-card mt-4 p-5">
 					<h2 className="text-sm font-extrabold text-foreground mb-2">
@@ -200,7 +192,7 @@ export function ReceiptAuthPage() {
 				</section>
 			) : null}
 
-			{/* ⑥ 授權 */}
+
 			<section className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground mb-3">授權</h2>
 				{authorized ? (

@@ -41,7 +41,6 @@ public class CouponGrpcClient {
                                                                                String refCaseNo,
                                                                                String sourceId) {
         if (sourceId == null || sourceId.isBlank()) {
-            // source_id 是補償券的冪等鍵（D4）：空值不能送出去，否則重送會重複發券。
             throw new IllegalArgumentException("source_id（售後單 id）必填");
         }
         log.info("CouponGrpcClient.grantSellerCompensationCoupon.start", "發放補償優惠券", "caseNo", refCaseNo);

@@ -23,10 +23,7 @@ import (
 // `writeUpstreamFailureEnvelope` 的路徑（值寫死正確，但不受表約束）。
 func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 	t.Run("router 套件：路由宣告", func(t *testing.T) {
-		// key = "檔名:代理建構函式:第一個參數（service 常數）"，value = 宣告的失敗模式。
 		expected := map[string]string{
-			// 發票／收據 PDF 授權下載（58 §6.1.4）：買家／賣家／ADM 三條子路由同檔同
-			// 常數，消費者全是我們自己的前端 ⇒ 只需要這一列。
 			"routes_invoice.go:CreateProxy:ServiceInvoice": "proxy.FailClientFacing",
 			// routes_seller.go:CreateProxy:ServiceSeller 已於 #2813 移除——那是條死路由
 			// （seller 模組未實作 /app/sellers/{id}、四個前端 repo 零呼叫端），
@@ -50,10 +47,7 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 	})
 
 	t.Run("proxy 套件：writeUpstreamFailureEnvelope 的呼叫點", func(t *testing.T) {
-		// key = "檔名:所在函式"，value = 傳給第 3 個參數（status）的運算式。
 		expected := map[string]string{
-			// 泛用建構函式：模式由呼叫端傳入，答案在上面那張表。這裡把值釘成參數名，
-			// 是為了在有人把它寫死成某個常數時轉紅（那會讓上面那張表失去效力）。
 			"reverse_proxy.go:CreateProxy": "onUpstreamFailure",
 		}
 		got := scan(t, filepath.Join("..", "proxy"), func(fn string, call *ast.CallExpr, file, enclosing string) (string, string, bool) {
@@ -70,8 +64,6 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 	})
 }
 
-// scan 解析 dir 下的非測試 .go 檔，對每個 CallExpr 呼叫 pick 取出 (key, value)。
-// skipFuncs 內的函式整個不進掃描（泛用 wrapper）。
 func scan(
 	t *testing.T,
 	dir string,

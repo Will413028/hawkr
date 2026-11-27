@@ -24,9 +24,6 @@ interface Props {
  * gone" rather than an error.
  */
 export default function ProductUnavailableView({ productId }: Props) {
-	// Read the origin on the client so the server render stays cache-friendly
-	// (this view only appears for the rare removed-product case). Defaults to
-	// the favourites flavour, then switches if the link came from history.
 	const [fromRecent, setFromRecent] = React.useState(false);
 	React.useEffect(() => {
 		if (typeof window === "undefined") return;

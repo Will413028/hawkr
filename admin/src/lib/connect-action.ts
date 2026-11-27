@@ -43,7 +43,6 @@ export function actionErrorText(
 	fallback: string,
 	conflictText: ConflictText,
 ): string {
-	// 網路層失敗（沒有收到回應）的訊息對操作者沒有意義，用 fallback。
 	if (isNoResponse(caught)) return fallback;
 	const failure = submitError(caught, defaultErrorTextZhTW);
 	if (failure.kind === "conflict") {

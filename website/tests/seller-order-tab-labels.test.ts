@@ -84,8 +84,6 @@ test("說明文字列舉分頁時，第三格必須是 SELLER_ORDER_TAB_LABEL.co
 	for (const relativePath of TAB_PROSE_COPIES) {
 		const text = readFileSync(join(root, relativePath), "utf8");
 		const slots = [...text.matchAll(TAB_ENUMERATION)].map((m) => m[1]);
-		// 鑑別力：這一份手抄本必須真的還在列舉分頁。改寫成完全不列舉時要轉紅，
-		// 而不是「零命中 ⇒ 通過」——那正是這條要防的失明。
 		assert.ok(
 			slots.length > 0,
 			`${relativePath} 找不到分頁列舉；若它真的不再列舉，請從 TAB_PROSE_COPIES 移除並說明`,

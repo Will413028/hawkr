@@ -27,8 +27,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// atlasModule 建一個帶正確 atlas.sum 的模組。sum 的算法同 Atlas（migrate 自己的測試逐位元比對過）；
-// 這裡算錯的話 migrate.Apply 會拒絕，測試直接失敗，不會默默通過。
 func atlasModule(name string, files map[string]string) migrate.Module {
 	names := make([]string, 0, len(files))
 	fsys := fstest.MapFS{}
@@ -146,7 +144,7 @@ func TestTemplateBuildAcrossProcessesIsSerializedByAdvisoryLock(t *testing.T) {
 	for i := range 6 {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			t.Parallel()
-			d := pg.Peer().NewDB(t, step) // 每個 Peer 有自己的 sync.Once 表，等於另一個行程
+			d := pg.Peer().NewDB(t, step)
 			if n := count(t, d, "SELECT count(*) FROM platform.schema_migrations WHERE module = 'shop'"); n != 3 {
 				t.Fatalf("migration 紀錄 = %d 列，預期 3", n)
 			}

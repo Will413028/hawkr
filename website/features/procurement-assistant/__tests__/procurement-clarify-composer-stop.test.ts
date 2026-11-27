@@ -43,7 +43,6 @@ class NoopResizeObserver {
 
 beforeAll(() => {
 	vi.stubGlobal("ResizeObserver", NoopResizeObserver);
-	// composer 的 scroll hook 會問 prefers-reduced-motion；jsdom 沒有這支 API。
 	vi.stubGlobal("matchMedia", (query: string) => ({
 		matches: false,
 		media: query,

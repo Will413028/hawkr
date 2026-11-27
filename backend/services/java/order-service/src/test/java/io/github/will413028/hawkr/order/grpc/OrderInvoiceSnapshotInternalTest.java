@@ -77,7 +77,6 @@ class OrderInvoiceSnapshotInternalTest {
         invoiceSnapshotRepository = mock(OrderInvoiceSnapshotRepository.class);
     }
 
-    // ==================== fixtures ====================
 
     private static OrderEntity order(String merId) {
         OrderEntity o = new OrderEntity();
@@ -114,11 +113,9 @@ class OrderInvoiceSnapshotInternalTest {
         i.setSkuName(sku);
         i.setQuantity(qty);
         i.setUnitPrice(unitPrice);
-        // actual_pay_amount / share_discount 刻意不設：本 RPC 不得回它們（浮點分攤器的結果）
         return i;
     }
 
-    // ==================== 呼叫工具 ====================
 
     private record Result(GetOrderInvoiceSnapshotInternalResponse response, Throwable error) {
     }
@@ -152,7 +149,6 @@ class OrderInvoiceSnapshotInternalTest {
         return new Result(resp.get(), errors.isEmpty() ? null : errors.get(0));
     }
 
-    // ==================== 測試 ====================
 
     @Test
     @DisplayName("非內部呼叫一律 PERMISSION_DENIED（少了這道閘門＝任何買家可讀走任何訂單的明細，且不報錯）")
@@ -204,7 +200,6 @@ class OrderInvoiceSnapshotInternalTest {
         assertThat(r.response().getCode()).isZero();
         OrderInvoiceSnapshotData d = r.response().getData();
 
-        // --- 快照 9 欄 ---
         assertThat(d.getOrderNo()).isEqualTo(ORDER_NO);
         assertThat(d.getSnapshotVersion()).isEqualTo("1");
         assertThat(d.getInvoiceKind()).isEqualTo(InvoiceDocumentKind.B2B.value());
@@ -215,19 +210,16 @@ class OrderInvoiceSnapshotInternalTest {
         assertThat(d.getDonationCode()).isEmpty();
         assertThat(d.getNotifyEmail()).isEqualTo("buyer@example.com");
 
-        // --- 金額 4 欄（取自 orders，不是請求）---
         assertThat(d.getTotalOriginalAmount()).isEqualTo("1000");
         assertThat(d.getShippingFee()).isEqualTo("60");
         assertThat(d.getDiscountAmount()).isEqualTo("100");
         assertThat(d.getTotalActualAmount()).isEqualTo("960");
 
-        // --- fail-closed 兩欄 ---
         assertThat(d.getDiscountFunding())
                 .as("CouponValidateResult 不帶 issuer_type（58 U-7）⇒ 判不出來就送空字串，"
                         + "呼叫端必須 fail-closed 轉 AWAITING_MANUAL，不得當成 SELLER")
                 .isEmpty();
 
-        // --- 品項 6 欄 × 2 ---
         assertThat(d.getItemsCount()).isEqualTo(2);
         OrderInvoiceSnapshotItem first = d.getItems(0);
         assertThat(first.getOrderItemId()).isEqualTo("7001");

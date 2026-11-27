@@ -9,9 +9,6 @@ import { localeFromParam } from "@/lib/seo/metadata";
  * the right place.
  */
 
-// Same as /seller-center: the redirect resolves on the client because the
-// document has already started streaming, so this route really does serve a
-// full head and needs a title of its own.
 export const metadata = { title: "出貨異常 — 賣家中心" };
 
 export default async function Page({

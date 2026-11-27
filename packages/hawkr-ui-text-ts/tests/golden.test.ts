@@ -16,7 +16,6 @@ function translatorFor(locale: string): Translate {
 	const t = createTranslator({
 		locale,
 		messages,
-		// 缺 key、格式錯誤都要讓測試失敗，不吞成後備文字。
 		onError: (error) => {
 			throw error;
 		},
@@ -28,8 +27,6 @@ function translatorFor(locale: string): Translate {
 		);
 }
 
-// 共用 golden（backend/internal/platform/uitext/testdata/golden.gen.json 的複本，期望值由 icu 參考格式器算出）：
-// 預設受眾對 use-intl 的 createTranslator（next-intl 用的同一個實作），staff 對 zh-tw.gen.ts 的 formatStaff。
 describe("共用 golden", () => {
 	const ui = {
 		"zh-TW": createUiText(translatorFor("zh-TW")),
@@ -38,7 +35,6 @@ describe("共用 golden", () => {
 
 	it("每一筆都與參考格式器一致", () => {
 		const failures: string[] = [];
-		// 有 staff 案例的 key，其 formatStaff 走 staff 表；其餘的 key formatStaff 退回 zh-tw.gen.ts 的預設受眾表。
 		const staffKeys = new Set(
 			cases.filter((c) => c.audience === "staff").map((c) => c.key),
 		);
@@ -51,7 +47,6 @@ describe("共用 golden", () => {
 				got = formatStaff(msg);
 			} else {
 				got = ui[c.locale as "zh-TW" | "en"](msg);
-				// 預設受眾表（zh-tw.gen.ts 的 DEFAULT）也要與 golden 一致（設計 §2.4）。
 				if (c.locale === "zh-TW" && !staffKeys.has(c.key)) {
 					const viaDefaultTable = formatStaff(msg);
 					if (viaDefaultTable !== c.want) {

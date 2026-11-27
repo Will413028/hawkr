@@ -136,7 +136,6 @@ Future<_FakeRepository> _pump(
   if (settle) {
     await tester.pumpAndSettle();
   } else {
-    // 處理中的按鈕有不會結束的 spinner。
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
   }

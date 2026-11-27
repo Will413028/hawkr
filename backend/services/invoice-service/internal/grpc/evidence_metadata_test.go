@@ -62,8 +62,6 @@ func TestToTaxDocuments_FillsMetadata(t *testing.T) {
 		docs[0].GetUploadedAt() != "2026-09-01T07:28:15Z" {
 		t.Fatalf("其餘中介資料沒填：%#v", docs[0])
 	}
-	// 🔴 media 查不到的那一份**仍然要出現在清單裡**（file_key 是本服務自己存的）：
-	// 整列消失會讓賣家以為自己的佐證不見了，而那份檔案其實還在。
 	if docs[1].GetFileKey() != "secure/tax/missing.pdf" {
 		t.Fatalf("查不到中介資料的那一份不得從清單消失：%#v", docs[1])
 	}
@@ -82,7 +80,6 @@ func TestResolveEvidenceMetadata_Degrades(t *testing.T) {
 	if got := s2.resolveEvidenceMetadata(context.Background(), []string{"k"}, 7001); len(got) != 0 {
 		t.Fatalf("nil resolver 應回空 map")
 	}
-	// taxProfileID 為 0 ⇒ 授權述詞的 ref_id 組不出來，不得發出 RPC。
 	r := &fakeEvidenceMeta{}
 	s3 := &InvoiceServer{evidenceMeta: r, log: zap.NewNop()}
 	s3.resolveEvidenceMetadata(context.Background(), []string{"k"}, 0)

@@ -17,8 +17,6 @@ import {
 } from "@/tests/browser/description-image-fixtures";
 import { expectAbsent, expectTextContains, waitFor } from "@/tests/browser/dom";
 
-// 媒體 origin 要在被測模組載入前就設定（getEnv 會記住第一次的結果）。fixture 攔的是 test-media.example.com，
-// 與 .github/workflows/website-e2e.yml 的 NEXT_PUBLIC_MEDIA_BASE_URL 相同；沒設時 buildImageUrl 不組網址，圖片區塊會被判定資料無效。
 vi.hoisted(() => {
 	process.env.NEXT_PUBLIC_MEDIA_BASE_URL = "https://test-media.example.com";
 });
@@ -34,8 +32,6 @@ afterEach(() => {
 const newImageKey = "public/fixtures/image-new.svg";
 
 const uploaded: UploadedAsset = {
-	// 上傳結果的 previewUrl 要落在設定的媒體 origin 才會還原成 object key（lib/media/cdn.ts），
-	// 所以跟著 NEXT_PUBLIC_MEDIA_BASE_URL，不寫死主機。
 	previewUrl: `${getEnv().mediaBaseUrl}/${newImageKey}`,
 	stagedToken: "fixture-image-upload-token",
 };
@@ -93,8 +89,6 @@ async function insertImage(dialog: HTMLElement) {
 		within(dialog).getByRole("button", { name: "插入或直接貼上圖片" }),
 	);
 	await waitFor(() => {
-		// The hidden file input can exist while the new block is still being
-		// revealed. Upload stories must wait for the same usable control as users.
 		expect(fileInput(dialog)).toBeInTheDocumentSync();
 		const choose = within(dialog).getByRole("button", {
 			name: /加入商品圖片/,
@@ -221,8 +215,6 @@ describe("DescriptionEditorImage", () => {
 			),
 		);
 		await expect(args.uploadImageFile).toHaveBeenCalledTimes(2);
-		// vitest/browser 的 upload 在頁面內重建 File：不能比對測試端那個物件的身分，
-		// 改驗檔名與型別，並驗重試帶的是第一次的同一個 File。
 		const firstUpload = args.uploadImageFile.mock.calls[0]?.[0];
 		expect(firstUpload?.name).toBe(selected.name);
 		expect(firstUpload?.type).toBe(selected.type);
@@ -257,8 +249,6 @@ describe("DescriptionEditorImage", () => {
 		);
 		await assertRejected("請選擇圖片檔案。");
 
-		// Keep the oversized fixture valid SVG; whitespace after the root is
-		// valid XML, so rejection specifically exercises the original file size.
 		const oversized = new File(
 			[
 				descriptionImageSvg,
@@ -381,8 +371,6 @@ describe("DescriptionEditorImage", () => {
 			);
 		});
 
-		// The network response arrives only after the block is gone. Let the
-		// upload continuation run, then serialize through the actual preview UI.
 		complete(uploaded);
 		await pending;
 		await new Promise<void>((resolve) =>

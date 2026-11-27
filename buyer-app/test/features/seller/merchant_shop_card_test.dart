@@ -58,7 +58,6 @@ void main() {
     (viewport: 320, cardWidth: 296),
     (viewport: 390, cardWidth: 358),
     (viewport: 430, cardWidth: 398),
-    // 768dp storefront uses two columns: (720 - 16 gap) / 2 = 352.
     (viewport: 768, cardWidth: 352),
   ];
 
@@ -512,8 +511,6 @@ void main() {
     expect(find.text('已開啟補貨通知，補貨時會通知你'), findsOneWidget);
     expect(find.text('已開啟補貨通知'), findsOneWidget);
 
-    // A parent rebuild can still carry the stale list value `false`; the
-    // successful local state must stay disabled and avoid a duplicate POST.
     await tester.tap(
       find.byKey(const ValueKey('merchant-shop-favorite-action')),
     );

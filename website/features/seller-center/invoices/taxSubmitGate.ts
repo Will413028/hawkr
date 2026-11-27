@@ -55,12 +55,9 @@ interface GateInput {
 
 export function taxSubmitGate(input: GateInput): TaxSubmitGate {
 	if (!input.editable) return { visible: false, blocker: "not-editable" };
-	// 尚未建立任何資料：可編輯，但沒有東西可送 ⇒ 區塊要出現並說明下一步，
-	// 不是安靜地消失（安靜消失的話新賣家看不到任何入口）。
 	if (input.notStarted || input.profile === null) {
 		return { visible: true, blocker: "not-started" };
 	}
-	// 冷卻優先於欄位檢查：冷卻期間就算資料齊全也送不出去，先講那件事比較有用。
 	if (input.cooldownActive) return { visible: true, blocker: "cooldown" };
 	if (!isIdentityComplete(input.profile)) {
 		return { visible: true, blocker: "identity-incomplete" };
@@ -92,7 +89,6 @@ export function isIdentityComplete(profile: SellerTaxProfile): boolean {
 	) {
 		return false;
 	}
-	// 自述「應開統一發票」必須有統編；自述值未填（UNKNOWN／空）一律視為不齊。
 	if (id.claimedStatus === SellerTaxObligation.REQUIRED) return id.taxId !== "";
 	return id.claimedStatus === SellerTaxObligation.EXEMPT;
 }

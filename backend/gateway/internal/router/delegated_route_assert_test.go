@@ -43,11 +43,6 @@ func TestDelegatedRouteInventory(t *testing.T) {
 		t.Errorf("白名單雙向比對不通過：%v", p)
 	}
 
-	// 十四支 ADM host 端點必須留在 requireAdmin 那一組。#2444 那七支（授權列治理）
-	// 掉進 credential-only 群組的後果比前五支更嚴重：那是「誰可以被代行」的寫入面，
-	// 掛錯之後任何持有 operation credential 的人都能替自己擴權。§11.3 P1 那兩支同理，
-	// 方向相反但一樣嚴重：它們列的是**全平台**的代行活動（其他 admin 的 actor、其他
-	// 店家的 target），掛到 credential-only 就等於把跨店治理視野發給每一個代行憑證。
 	admOnly := delegatedAdmHostRoutes()
 	noAuthSet := map[string]struct{}{}
 	for _, k := range noAuth {
@@ -79,8 +74,6 @@ func TestDelegatedSessionSummaryRequiresAdmin(t *testing.T) {
 	}
 }
 
-// delegatedAdmHostRoutes 是十四支 ADM host 端點。抽成函式讓限流登錄的那支測試共用同一
-// 份清單——兩份手抄清單遲早只有一份被更新，而那時兩支測試都還是綠的。
 func delegatedAdmHostRoutes() []string {
 	return []string{
 		"GET " + adminPrefix + "/sellers/:store_id/delegated-operation/preflight",
@@ -172,7 +165,6 @@ func regsFrom(entries []string) []authz.RegisteredAdminRoute {
 	return out
 }
 
-// ── 四條 boot 斷言的鑑別力：每一條都用違規輸入證明它會轉紅 ────────────────────
 
 func TestBootCheckD_CapabilityDeclared(t *testing.T) {
 	clean := make([]authz.RegisteredAdminRoute, 0, 2)
@@ -181,10 +173,6 @@ func TestBootCheckD_CapabilityDeclared(t *testing.T) {
 		t.Fatalf("正常註冊表不該有 finding：%v", p)
 	}
 
-	// dirty must be a genuinely independent slice, not clean grown in place: this
-	// test's whole point is comparing "clean" against "clean + one bad route", so
-	// clean's backing array must stay untouched for the earlier assertion to mean
-	// anything on a re-run.
 	dirty := append([]authz.RegisteredAdminRoute{}, clean...)
 	dirty = append(dirty, authz.RegisteredAdminRoute{Method: "POST", Path: adminPrefix + "/sellers/:store_id/posts", Cap: ""})
 	p := checkAdminCapabilityDeclared(dirty)
@@ -203,8 +191,6 @@ func TestBootCheckE_ForbiddenWords(t *testing.T) {
 		t.Fatalf("正常註冊表不該有 finding：%v", p)
 	}
 
-	// param 名必須是 :store_id——換名會先炸在 gin 的 wildcard 衝突而不是禁字斷言，
-	// 給出一個看起來正確的假紅燈。
 	dirty := append([]authz.RegisteredAdminRoute{}, clean...)
 	dirty = append(dirty, authz.RegisteredAdminRoute{
 		Method: "POST", Path: adminPrefix + "/sellers/:store_id/shipments", Cap: authz.AdminCapOrdersRead,
@@ -217,7 +203,6 @@ func TestBootCheckE_ForbiddenWords(t *testing.T) {
 		t.Errorf("訊息未指出命中的是哪一個禁字：%s", p[0])
 	}
 
-	// 十個禁字每一個都要有鑑別力，不能只有第一個生效。
 	for _, w := range delegatedPathForbiddenWords {
 		route := []authz.RegisteredAdminRoute{{Method: "GET", Path: adminPrefix + "/sellers/:store_id/" + w + "s", Cap: authz.AdminCapOrdersRead}}
 		if got := checkAdminPathForbiddenWords(route); len(got) == 0 {
@@ -252,7 +237,6 @@ func TestBootCheckG_NoAuthWhitelist(t *testing.T) {
 		t.Fatalf("一致時不該有 finding：%v", p)
 	}
 
-	// 方向一：白名單以外多出一支略過 requireAdmin 的路由。
 	rogue := "POST " + adminPrefix + "/sellers/:store_id/suspend"
 	mountedRogue := map[string]struct{}{whitelist[0]: {}, rogue: {}}
 	p := checkAdminNoAuthWhitelist(mountedRogue, append([]string{rogue}, whitelist...), whitelist)
@@ -260,7 +244,6 @@ func TestBootCheckG_NoAuthWhitelist(t *testing.T) {
 		t.Fatalf("多出的 credential-only 路由未被指名：%v", p)
 	}
 
-	// 方向二：白名單內有一支沒被掛載。
 	p = checkAdminNoAuthWhitelist(map[string]struct{}{}, nil, whitelist)
 	if len(p) != 1 || !strings.Contains(p[0], "未被掛載") {
 		t.Fatalf("白名單殘留項未被指名：%v", p)
@@ -272,7 +255,7 @@ func TestBootCheckG_NoAuthWhitelist(t *testing.T) {
 func TestAssertRouteCoveragePanicsOnRogueCredentialOnlyRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	SetupRoutes(r, &handler.Holder{}) // 乾淨的真實路由表：不 panic
+	SetupRoutes(r, &handler.Holder{})
 
 	rogue := "POST " + adminPrefix + "/sellers/:store_id/payouts"
 	adminNoAuthMu.Lock()

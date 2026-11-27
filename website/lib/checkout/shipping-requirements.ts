@@ -37,9 +37,6 @@ export function shippingDestinationKind(
 		case ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP:
 			return "store-pickup";
 		default:
-			// 3003 Uber（已刪除的功能）、3005 商家自送與後端未來新增的
-			// 任何 provider 都走這裡。
-			// 它們各自需要什麼收件資料尚未定義，現在猜一個等於放行。
 			return "unsupported";
 	}
 }

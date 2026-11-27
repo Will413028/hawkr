@@ -51,7 +51,5 @@ export async function submitSellerLeadRequest(
 			serviceInterest: submission.serviceInterest,
 		});
 	} catch {
-		// Analytics must not turn an accepted lead into a visible submission error
-		// or encourage the user to send the same contact details twice.
 	}
 }

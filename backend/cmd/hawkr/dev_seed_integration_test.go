@@ -22,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// setSellerEnv 設定組裝 seller 的子命令（openSeller）必填的依賴：media 的儲存設定與金鑰環（物件儲存惰性連線，子命令不碰物件）、兩個服務位址（惰性連線，子命令不呼叫它們）與 KYC 金鑰。
 func setSellerEnv(t *testing.T) {
 	t.Helper()
 	setMediaEnv(t, "dev1:ZGV2LW9ubHktbWVkaWEta2VrLTAwMDAwMDAwMDAwMDA=")
@@ -30,8 +29,6 @@ func setSellerEnv(t *testing.T) {
 	t.Setenv("KYC_HASH_KEYS", "test1:dGVzdC1reWMtaGFzaC1obWFjLWtleS0wMDAwMDAwMDE=")
 }
 
-// devSeedEnv 把 dev-seed 與 reannounce-exposures 需要的環境設成本機開發的樣子（與 Makefile 的 MONOLITH_ENV 同一組必填設定；
-// 金鑰用整合測試自己的一組），回傳 migrate 過的資料庫。
 func devSeedEnv(t *testing.T) *db.DB {
 	t.Helper()
 	ctx := context.Background()
@@ -56,7 +53,6 @@ func devSeedEnv(t *testing.T) *db.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(d.Close)
-	// 01-account.sql 建立的種子帳號（infra/seed-data）：帶登入信箱，建立收款帳戶時向它讀聯絡信箱。
 	for id, email := range map[int64]string{9: "seller1@hawkr.test", 4: "seller2@hawkr.test"} {
 		if _, err := d.Pool().Exec(ctx, `INSERT INTO identity.accounts (id, email) OVERRIDING SYSTEM VALUE VALUES ($1, $2)`, id, email); err != nil {
 			t.Fatal(err)
@@ -123,7 +119,6 @@ func TestDevSeedWritesStoresThatTheModuleServesAsExposable(t *testing.T) {
 		if provider != "fake" || paymentStatus != "ENABLED" || !transfers {
 			t.Errorf("店 %d 的收款帳戶 = (%s, %s, transfers_active %v)，want (fake, ENABLED, true)", s.StoreID, provider, paymentStatus, transfers)
 		}
-		// 開通閘門的副本由 PayoutAccountChanged 的訂閱者寫入（種子不直接寫 seller 的表）。
 		if err := d.Pool().QueryRow(ctx, `SELECT transfers_active FROM seller.payout_capabilities WHERE store_id = $1`, s.StoreID).Scan(&copied); err != nil || !copied {
 			t.Errorf("店 %d 的閘門副本 = %v（%v），want true", s.StoreID, copied, err)
 		}
@@ -274,7 +269,6 @@ func TestDevSeedRerunLeavesNoOrphanedViewRows(t *testing.T) {
 	}
 }
 
-// newAccount 以固定 ID 建立帳號（identity.accounts 的主鍵是 IDENTITY）。
 func newAccount(t *testing.T, d *db.DB, id int64) {
 	t.Helper()
 	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO identity.accounts (id) OVERRIDING SYSTEM VALUE VALUES ($1)`, id); err != nil {
@@ -282,7 +276,6 @@ func newAccount(t *testing.T, d *db.DB, id int64) {
 	}
 }
 
-// openStore 經模組的開店路徑（Apply：建店、授予 SELLER 在同一個 transaction）替帳號開一家店。
 func openStore(t *testing.T, accountID int64, name string) int64 {
 	t.Helper()
 	c, err := openSeller(context.Background(), nil)
@@ -315,7 +308,6 @@ func exposureVersions(t *testing.T, d *db.DB) map[int64]int64 {
 	return out
 }
 
-// rowJSON 是一列的完整內容（比較「完全沒動」用）。
 func rowJSON(t *testing.T, d *db.DB, query string, args ...any) string {
 	t.Helper()
 	var s string
@@ -344,8 +336,6 @@ func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.
 	}
 	newAccount(t, d, 50001)
 	userStore := openStore(t, 50001, "使用者的店")
-	// 種子店家被使用過：留下已撤銷的停權措施與已結束的期間、改了店名與地址（沒有生效中的生命週期狀態：那些種子會拒絕，見
-	// TestDevSeedRefusesLifecycleStateItWouldHaveToRevert）。
 	insertRiskSuspension(t, d, ids[0], true)
 	exec(`INSERT INTO seller.suspension_periods (store_id, started_at, ended_at) VALUES ($1, now() - interval '2 hours', now() - interval '1 hour')`, ids[0])
 	exec(`UPDATE seller.stores SET store_name = '被改過', town_code = '63000050', prize = '獎', version = version + 1 WHERE store_id = $1`, ids[1])
@@ -401,7 +391,6 @@ func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.
 		}
 	}
 	if got, want := after[userStore], before[userStore]+1; got != want {
-		// 全量重新公告對每一家店加一，使用者的店只因為它而變。
 		t.Errorf("使用者的店的公告版本 = %d，want %d（只有全量重新公告加一）", got, want)
 	}
 	if now := rowJSON(t, d, `SELECT to_jsonb(s)::text FROM seller.stores s WHERE store_id = $1`, userStore); now != userBefore {
@@ -455,14 +444,12 @@ func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 9 AND role = 'SELLER'`); n != 1 {
 		t.Errorf("SELLER 角色被動過")
 	}
-	// 沒有種子店家的種子帳號（這裡是 2001）名下種子以外的未關閉店家同樣擋下。
 	newAccount(t, d, 2001)
 	buyerStore := openStore(t, 2001, "買家帳號的店")
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err == nil || !strings.Contains(err.Error(), "店家 "+strconv.FormatInt(buyerStore, 10)) {
 		t.Fatalf("種子買家帳號名下的店家應該被擋下：%v", err)
 	}
 	closeStoreRow(t, d, buyerStore)
-	// 佔用種子 store_code 的非種子店家同樣擋下（unique 衝突會讓 upsert 失敗在半途）。
 	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET account_id = 60000, store_code = 9 WHERE store_id = $1`, other); err != nil {
 		t.Fatal(err)
 	}
@@ -505,7 +492,6 @@ func mustExec(t *testing.T, d *db.DB, query string, args ...any) {
 	}
 }
 
-// insertRiskSuspension 寫一個 RISK 停權措施（沒有固定結束時間）；revoked 為 true 時是已撤銷的。
 func insertRiskSuspension(t *testing.T, d *db.DB, storeID int64, revoked bool) {
 	t.Helper()
 	status := "ENFORCED"
@@ -521,7 +507,6 @@ func insertRiskSuspension(t *testing.T, d *db.DB, storeID int64, revoked bool) {
 		SELECT id, 1, 's', 1, now() - interval '2 hours' FROM m`, storeID, status)
 }
 
-// insertTermination 寫一個生效中的終止合作措施（契約依據，沒有結束時間）。
 func insertTermination(t *testing.T, d *db.DB, storeID int64) {
 	t.Helper()
 	mustExec(t, d, `WITH m AS (
@@ -532,8 +517,6 @@ func insertTermination(t *testing.T, d *db.DB, storeID int64) {
 		SELECT id, 1, 's', 1, now() - interval '2 hours' FROM m`, storeID)
 }
 
-// insertViolationMeasure 在一個 transaction 內寫一個依據認定的措施（認定與措施互相指向，約束可延遲到 commit）、它的版本與內部註記；
-// withAppeal 時再加一筆待處理的申訴與它的一張佐證。
 func insertViolationMeasure(t *testing.T, d *db.DB, storeID int64, id, kind string, withAppeal bool) {
 	t.Helper()
 	ctx := context.Background()
@@ -664,7 +647,6 @@ func TestDevSeedRefusesSanctionOnAnotherStintOfASeedAccount(t *testing.T) {
 	}
 }
 
-// closeStoreRow 把店家列直接設成已關閉（關閉的同一個 transaction 會移除 SELLER 角色，這裡一併刪）：測試的前置，不經 CloseCurrent（它要問訂單服務）。
 func closeStoreRow(t *testing.T, d *db.DB, storeID int64) {
 	t.Helper()
 	mustExec(t, d, `WITH c AS (INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, '2026-01-01T00:00:00Z', 'ACCOUNT_OWNER') RETURNING closed_at)

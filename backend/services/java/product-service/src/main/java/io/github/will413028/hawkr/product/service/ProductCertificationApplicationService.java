@@ -111,7 +111,6 @@ public class ProductCertificationApplicationService {
         this.redisTemplate = redisTemplate;
     }
 
-    // ==================== 對外型別 ====================
 
     /** 一筆認證輸入（賣家送來的原始值，可能非法）。 */
     public record CertificationInput(String certificationType, String certificateNo) {
@@ -137,7 +136,6 @@ public class ProductCertificationApplicationService {
     public record Paged<T>(List<T> records, long total) {
     }
 
-    // ==================== §6.3 寫入收斂 ====================
 
     /**
      * 五條商品寫入路徑的唯一認證收斂點（§6.3 Step 0–6 ＋ §6.4 全量取代）。
@@ -165,7 +163,6 @@ public class ProductCertificationApplicationService {
     public List<CertificationWarningDTO> syncFromProductWrite(CertificationSyncCommand cmd) {
         List<CertificationInput> raw = cmd.certifications() == null ? List.of() : cmd.certifications();
 
-        // ---- Step 0：前置閘門 ----
         boolean effectiveUpdate = cmd.updateCertifications() || !raw.isEmpty();
         if (!effectiveUpdate) {
             return List.of();
@@ -173,9 +170,6 @@ public class ProductCertificationApplicationService {
 
         List<CertificationWarningDTO> warnings = new ArrayList<>();
 
-        // ---- 第二道防線：非法輸入剔除（§6.2.1 層 ②）----
-        // Gateway handler 的 filter 是第一道；這裡接住 gRPC 直呼與未來新增的第五條路徑。
-        // 一律「剔除該筆 ＋ warn log ＋ 落進 warnings」，不拋例外、不回 4xx（§6.2.2）。
         List<NormalizedCertification> accepted = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (CertificationInput input : raw) {
@@ -191,10 +185,6 @@ public class ProductCertificationApplicationService {
                 continue;
             }
 
-            // §6.2.9：certNo 的合法性「依類型而異」。對六型一律套嚴格白名單，
-            // ISO 22000:2018（含冒號）與 HACCP／GMP（含空格、斜線）的真實編號會被剔除
-            // ⇒ 賣家送出成功、不建申請、不回錯 ⇒ 零訊號。
-            // 🔴 驗什麼就存什麼：底下用的是回傳值（放寬類已 trim），不是原值。
             CertificationType certType = CertificationType.fromValue(type);
             String certNo = ProductCertificationRules.normalizeCertNo(certType, rawCertNo);
             if (certNo == null) {
@@ -204,16 +194,11 @@ public class ProductCertificationApplicationService {
                 warnings.add(CertificationWarningDTO.invalidCertNo(type, rawCertNo));
                 continue;
             }
-            // 同一次請求送了兩筆完全相同的 (type, certNo)：後者是純重複，不是衝突，不發 warning。
-            // 去重鍵用正規化後的值，否則「同一個編號、尾端多一個空白」會被當成兩筆。
             if (seen.add(type + "|" + certNo)) {
                 accepted.add(new NormalizedCertification(certType, certNo));
             }
         }
 
-        // ---- Step 1–6：逐組 (type, certNo) ----
-        // Step 6 的自動核准會自己重建投影（approveInternal 內），這裡不重複計數 ——
-        // 否則同一次寫入會對 product 下兩次 UPDATE，白白多 bump 一次 version。
         for (NormalizedCertification cert : accepted) {
             CertificationWarningDTO warning = syncOne(cmd, cert);
             if (warning != null) {
@@ -221,10 +206,7 @@ public class ProductCertificationApplicationService {
             }
         }
 
-        // ---- §6.4 全量取代：該 type 完全沒送 ----
         boolean approvedSetChanged = false;
-        // 粒度是 certification_type 而非 (type, certNo)：換號時舊號碼必須保持公開到新號碼核准為止。
-        // SUBMITTED 刻意不在撤回範圍內（待審是進行中的請求，只能由明確 withdraw 撤銷）。
         List<Integer> submittedTypes = accepted.stream()
                 .map(c -> Integer.valueOf(c.type().value()))
                 .distinct()
@@ -250,7 +232,6 @@ public class ProductCertificationApplicationService {
             }
         }
 
-        // ---- §7.2 投影重建（觸發點：APPROVE 已由 approveInternal 觸發，此處補 WITHDRAW）----
         if (approvedSetChanged) {
             rebuildProjection(cmd.productId());
         }
@@ -267,42 +248,25 @@ public class ProductCertificationApplicationService {
         Integer typeValue = Integer.valueOf(cert.type().value());
         String certNo = cert.certNo();
 
-        // Step 1：同 (product, type, certNo) 已 APPROVED ⇒ no-op。
-        //
-        // 🔴 必須在最前面。新列一律以 SUBMITTED 插入，同 (type, certNo) 已 APPROVED 時
-        // 不觸發任何唯一索引衝突（uk_pca_pending 的謂詞是 status='SUBMITTED'）
-        // ⇒ 而全量取代語意下每次商品編輯都會把整份 approved 投影原樣送回
-        // ⇒ 少了這一步，每存一次商品就替每個已核准認證多建一筆 SUBMITTED，ADM 佇列被灌爆。
-        // 命中即跳過也連帶不執行 Step 4 ⇒ 不會誤殺賣家正在等待的換號申請。
         if (!applicationRepository.findByProductTypeCertNoAndStatuses(productId, typeValue, certNo,
                 List.of(ProductCertificationStatus.APPROVED.value())).isEmpty()) {
             return null;
         }
 
-        // Step 2：同組已在待審 ⇒ no-op（冪等：賣家重送同號碼）
         if (!applicationRepository.findByProductTypeCertNoAndStatuses(productId, typeValue, certNo,
                 List.of(ProductCertificationStatus.SUBMITTED.value())).isEmpty()) {
             return null;
         }
 
-        // Step 3：曾被 REJECTED／REVOKED ⇒ 建 SUBMITTED 但標 requiresManualReview
-        // （§5.3：不得讓重送繞過 ADM 的裁決；但仍要排背景查驗，ADM 重審需要政府資料當依據）
         boolean requiresManualReview = !applicationRepository.findByProductTypeCertNoAndStatuses(
                 productId, typeValue, certNo,
                 List.of(ProductCertificationStatus.REJECTED.value(),
                         ProductCertificationStatus.REVOKED.value())).isEmpty();
 
-        // Step 4：同 type 的異號待審 ⇒ SUPERSEDED（每一列都要寫 review_event）
         supersedeOtherPendingOfSameType(productId, typeValue, certNo);
 
-        // §8.2 同步階段：只讀結構化快取，一律不發外部呼叫
         GovSnapshot snapshot = resolveGovSnapshotFromCache(cert);
 
-        // Step 5：一律以 status='SUBMITTED' 插入 ＋ ON CONFLICT DO NOTHING
-        //
-        // 🔴 絕不可直接以 APPROVED 插入：uk_pca_active 的謂詞是 status='APPROVED'，
-        // 同 (product, type) 已有別的號碼是 APPROVED 時會撞唯一索引，而 DO NOTHING
-        // 會靜默丟棄新申請（無列、無錯）。
         Long applicationId = TsidUtil.generate();
         LocalDateTime now = DateTimeUtils.nowUtc();
         int inserted = applicationRepository.insertSubmittedIfAbsent(
@@ -311,9 +275,6 @@ public class ProductCertificationApplicationService {
                 snapshot.state(), snapshot.payload(), snapshot.verifiedAt(), now);
 
         if (inserted == 0) {
-            // 序列情境插不出衝突（Step 4 已清掉同 type 的異號待審）⇒ 只有併發才會到這裡。
-            // 商品路徑不 rollback、不回 4xx（舊 App 不得收到 4xx，且認證層級的競態不該讓
-            // 整次商品儲存失敗），但必須明列在 certificationWarnings[]，否則賣家永遠不知道。
             log.warn("syncFromProductWrite.concurrentConflict",
                     "ON CONFLICT DO NOTHING 未插入任何列，已跳過該筆認證",
                     "product_id", String.valueOf(productId));
@@ -328,15 +289,8 @@ public class ProductCertificationApplicationService {
                 ProductCertificationRules.actorRoleForSource(cmd.source()),
                 cmd.submittedByAccountId(), null, null, null, created.getVersion());
 
-        // Step 6：同步快取命中「有效」⇒ 在同一交易內接著走 §6.6 的核准實作。
-        // 走 private 實作而非 approveBySystem()：同 bean 內以 this. 呼叫自家 @Transactional
-        // 方法，Spring proxy 不攔截（#1370 的形狀）。這裡本來就在外層交易內，行為相同，
-        // 但不留下一個「看起來有交易語意、實際不會生效」的呼叫。
-        // 核准成功時 approveInternal 已重建投影，此處不再回報 approvedSetChanged。
-        // notifySeller=false：即刻核准的賣家當下畫面就看到標章，不再推播（§12.3）。
         approveBySystemInternal(applicationId, false);
 
-        // §12.1：同步快取未命中（PENDING）⇒ 於 afterCommit 排背景查驗。
         publishVerifyRequestedIfPending(created, snapshot.state());
         return null;
     }
@@ -372,7 +326,6 @@ public class ProductCertificationApplicationService {
         }
     }
 
-    // ==================== §7.2 投影重建 ====================
 
     /**
      * 由該商品當前所有 {@code APPROVED} 申請重算 {@code product.certifications} 公開投影（§7.2）。
@@ -395,7 +348,6 @@ public class ProductCertificationApplicationService {
         List<ProductEntity.CertificationItem> projection = new ArrayList<>(approved.size());
         for (ProductCertificationApplicationEntity app : approved) {
             ProductEntity.CertificationItem item = new ProductEntity.CertificationItem();
-            // 投影的 name 欄位是 CertificationType 的 value（"3701"…），不是中文標籤
             item.setName(String.valueOf(app.getCertificationType()));
             item.setCertNo(app.getCertificateNo());
             projection.add(item);
@@ -436,7 +388,6 @@ public class ProductCertificationApplicationService {
         return true;
     }
 
-    // ==================== §6.6 核准 transaction ====================
 
     /**
      * 系統自動核准入口（§6.3 Step 6 同步快取命中／§8.3 背景查驗補課共用）。
@@ -451,9 +402,6 @@ public class ProductCertificationApplicationService {
      */
     @Transactional(propagation = Propagation.REQUIRED)
     public boolean approveBySystem(Long applicationId) {
-        // notifySeller=true：這是「背景補課核准」的入口（唯一的 bean 外呼叫端是
-        // CertificationVerifyConsumer）。賣家的畫面停在「審核中」，不通知他永遠不會知道
-        // 已經通過了（§12.3）——與 syncOne／doSubmitForSeller 的即刻核准剛好相反。
         return approveBySystemInternal(applicationId, true);
     }
 
@@ -473,7 +421,6 @@ public class ProductCertificationApplicationService {
                 : app.getGovVerifyPayload().getHolderName();
         String reason;
         if (holderName == null || holderName.isBlank()) {
-            // 查驗通過卻沒帶業者名稱 ⇒ 無從歸屬，同樣不放行（3702 就沒有這個欄位）。
             reason = "NO_HOLDER_NAME";
         } else {
             SellerGrpcClient.HolderMatch match =
@@ -521,10 +468,6 @@ public class ProductCertificationApplicationService {
             return false;
         }
 
-        // 🔴 第五個條件（§8.5.1）：這張證書必須是**這個賣家的**。
-        //    前四條只證明「這個編號存在且有效」——政府 API 不回答「屬於誰」。
-        //    少了這一問，任何賣家填入一個查得到的他人編號就會被自動核准並公開標章
-        //    （2026-08-27 實測：1-009-300022／持有人 Acme Road LLC 被自動核准到別家的文旦禮盒上）。
         if (!holderBelongsToSeller(app)) {
             return false;
         }
@@ -533,8 +476,6 @@ public class ProductCertificationApplicationService {
                 ProductCertificationReviewAction.AUTO_APPROVE.value(),
                 ProductCertificationRules.ACTOR_SYSTEM, null, null, null, null);
         if (!ok) {
-            // 持有 FOR UPDATE 的情況下 CAS 結構上不會失敗；真的失敗只可能是同交易內的重入，
-            // 一律跳過該筆、不拋例外（不得讓商品儲存整批失敗）。
             log.warn("approveBySystem.casFailed", "系統自動核准 CAS 失敗，已放棄",
                     "application_id", String.valueOf(applicationId));
             return false;
@@ -610,7 +551,6 @@ public class ProductCertificationApplicationService {
                                     String internalNote) {
         LocalDateTime now = DateTimeUtils.nowUtc();
 
-        // ① 同 type 舊 APPROVED → SUPERSEDED（必須在前）
         Optional<ProductCertificationApplicationEntity> old = applicationRepository
                 .findApprovedByProductAndType(app.getProductId(), app.getCertificationType());
         if (old.isPresent() && !old.get().getId().equals(app.getId())) {
@@ -629,8 +569,6 @@ public class ProductCertificationApplicationService {
             }
         }
 
-        // ② 本筆 SUBMITTED → APPROVED（必須在後）
-        // reviewed_by_account_id：自動核准為 null（actor 由 review_event 的 SYSTEM 標示，§4.1）
         int rows = applicationRepository.casTransitionStatus(
                 app.getId(), expectedVersion,
                 ProductCertificationStatus.SUBMITTED.value(),
@@ -646,7 +584,6 @@ public class ProductCertificationApplicationService {
                 actorRole, actorAccountId, reasonCode, publicReason, internalNote,
                 expectedVersion + 1);
 
-        // §7.2 觸發點：APPROVE（人工＋系統）＋ 連帶的 SUPERSEDE
         rebuildProjection(app.getProductId());
         return true;
     }
@@ -690,7 +627,6 @@ public class ProductCertificationApplicationService {
                 ProductCertificationRules.ACTOR_ADMIN, adminAccountId,
                 reasonCode, publicReason, internalNote, expectedVersion + 1);
 
-        // REJECT 不改 approved 集合，但為統一亦呼叫（§7.2；集合沒變即 no-op）
         rebuildProjection(app.getProductId());
         publishDecidedAfterCommit(app, ProductEventType.PRODUCT_CERTIFICATION_REJECTED,
                 ProductCertificationDecidedPayload.DECIDED_BY_ADMIN, reasonCode, publicReason);
@@ -742,7 +678,6 @@ public class ProductCertificationApplicationService {
                 ProductCertificationRules.ACTOR_ADMIN, adminAccountId,
                 reasonCode, publicReason, internalNote, expectedVersion + 1);
 
-        // §7.2 觸發點：REVOKE（標章必須立刻從公開投影消失）
         rebuildProjection(app.getProductId());
         publishDecidedAfterCommit(app, ProductEventType.PRODUCT_CERTIFICATION_REVOKED,
                 ProductCertificationDecidedPayload.DECIDED_BY_ADMIN, reasonCode, publicReason);
@@ -750,7 +685,6 @@ public class ProductCertificationApplicationService {
         return requireFresh(applicationId);
     }
 
-    // ==================== §9.1 賣家 ====================
 
     /**
      * 賣家專用申請端點（§9.1 {@code POST .../certification_applications}）。
@@ -791,8 +725,6 @@ public class ProductCertificationApplicationService {
         if (certificateNo == null || certificateNo.isBlank()) {
             throw new ProductBusinessException(GrpcResponseCode.CERT_NO_REQUIRED);
         }
-        // 與收斂點同一支規則（§6.2.9）：3701–3703 嚴格且對原值判、3704–3706 放寬並回傳 trim 後的值。
-        // 🔴 驗什麼就存什麼——底下寫進 DB 的是這個回傳值。
         String certNo = ProductCertificationRules.normalizeCertNo(certType, certificateNo);
         if (certNo == null) {
             throw new ProductBusinessException(GrpcResponseCode.INVALID_PARAM, "認證編號格式不正確");
@@ -800,7 +732,6 @@ public class ProductCertificationApplicationService {
 
         Integer typeValue = Integer.valueOf(type);
 
-        // Step 1／Step 2：已核准或已在待審 ⇒ 直接回既有那筆（冪等）
         List<ProductCertificationApplicationEntity> existing =
                 applicationRepository.findByProductTypeCertNoAndStatuses(productId, typeValue, certNo,
                         List.of(ProductCertificationStatus.APPROVED.value(),
@@ -833,7 +764,6 @@ public class ProductCertificationApplicationService {
                 ProductCertificationRules.ACTOR_SELLER, accountId, null, null, null,
                 created.getVersion());
 
-        // notifySeller=false：同 syncOne，即刻核准不推播（§12.3）
         approveBySystemInternal(applicationId, false);
         publishVerifyRequestedIfPending(created, snapshot.state());
         evictAfterCommit(productId, storeId);
@@ -867,7 +797,6 @@ public class ProductCertificationApplicationService {
                                                                       Long expectedVersion) {
         ProductCertificationApplicationEntity app = applicationRepository.findByIdForUpdate(applicationId)
                 .orElseThrow(() -> new ProductBusinessException(GrpcResponseCode.CERT_APPLICATION_NOT_FOUND));
-        // 非本人商品 / 對不上的 productId 一律當成不存在（防 IDOR 枚舉）
         if (!Objects.equals(app.getStoreId(), storeId) || !Objects.equals(app.getProductId(), productId)) {
             throw new ProductBusinessException(GrpcResponseCode.CERT_APPLICATION_NOT_FOUND);
         }
@@ -893,7 +822,6 @@ public class ProductCertificationApplicationService {
                 ProductCertificationRules.ACTOR_SELLER, accountId, null, null, null,
                 casVersion + 1);
 
-        // §7.2 觸發點：WITHDRAW —— 只有「由 APPROVED 轉出」才改變 approved 集合
         if (ProductCertificationStatus.APPROVED.value().equals(fromStatus)) {
             rebuildProjection(app.getProductId());
         }
@@ -911,7 +839,6 @@ public class ProductCertificationApplicationService {
                 applicationRepository.countByProductAndStore(productId, storeId, status));
     }
 
-    // ==================== §9.2 Admin 讀取 ====================
 
     public Paged<ProductCertificationApplicationEntity> listForAdmin(String status,
                                                                      Integer certificationType,
@@ -953,7 +880,6 @@ public class ProductCertificationApplicationService {
                 reviewEventRepository.countByApplicationId(applicationId));
     }
 
-    // ==================== §9.3 ADM 重新查驗 ====================
 
     /**
      * ADM「重新查驗」（§9.3）：同步跑一次背景查驗邏輯（90 秒 timeout、繞過同步用斷路器），
@@ -1005,9 +931,6 @@ public class ProductCertificationApplicationService {
     private ProductCertificationApplicationEntity doReverifyForAdmin(Long applicationId) {
         requireCooldownElapsed(requireFresh(applicationId));
 
-        // 🔴 租約必須在外部呼叫「之前」取得。只靠 gov_verified_at 的時間差擋不住
-        //    「呼叫還在飛」的那 90 秒：第二個管理員在這段期間讀到的仍是舊時間戳
-        //    ⇒ 照樣放行 ⇒ 同一筆同時打兩次農業部。那正是本護欄要防的兩個情境。
         String leaseKey = REVERIFY_LEASE_PREFIX + applicationId;
         if (!tryAcquireReverifyLease(leaseKey)) {
             throw cooldownException("另一個查驗正在進行中");
@@ -1015,8 +938,6 @@ public class ProductCertificationApplicationService {
         try {
             return runVerify(applicationId, true);
         } finally {
-            // 用完即還（§29：lease 不是永久旗標）。查完之後由 gov_verified_at 的
-            // 時間差接手擋剩下的冷卻窗——兩段窗口相接，中間沒有空隙。
             releaseReverifyLease(leaseKey);
         }
     }
@@ -1033,14 +954,10 @@ public class ProductCertificationApplicationService {
         if (lastVerifiedAt == null) {
             return;
         }
-        // 時鐘往回跳（跨 pod skew）時 elapsed 會是負的。夾到 0 而不是放行：
-        // 負值代表那個時間戳「剛被寫下」，正是最該擋的時候。
         long elapsed = Math.max(0, ChronoUnit.SECONDS.between(lastVerifiedAt, DateTimeUtils.nowUtc()));
         if (elapsed >= REVERIFY_COOLDOWN_SECONDS) {
             return;
         }
-        // elapsed 為 0 是「連按兩下」的常態，而「剛在 0 秒前查驗過」讀起來像壞掉的字串。
-        // 最常撞到冷卻的那一次，訊息不能是最難讀的那一句。
         String when = elapsed == 0
                 ? "剛剛查驗過"
                 : String.format("剛在 %d 秒前查驗過", elapsed);
@@ -1076,7 +993,6 @@ public class ProductCertificationApplicationService {
         try {
             redisTemplate.delete(leaseKey);
         } catch (DataAccessException e) {
-            // 沒還成也不會卡死：TTL 到期就自動釋放。
             log.warn("reverifyLease.releaseFailed", "重新查驗租約釋放失敗: " + e.getMessage());
         }
     }
@@ -1113,7 +1029,6 @@ public class ProductCertificationApplicationService {
 
         GovSnapshot snapshot;
         if (!CertificationTypeRules.isVerifiable(certType)) {
-            // 3704／3705／3706 無政府開放資料介面 ⇒ 落 UNSUPPORTED，不打任何外部 API
             snapshot = new GovSnapshot(ProductCertificationGovVerifyState.UNSUPPORTED.value(),
                     null, DateTimeUtils.nowUtc());
         } else {
@@ -1123,7 +1038,6 @@ public class ProductCertificationApplicationService {
         int rows = applicationRepository.casUpdateGovVerifyResult(
                 applicationId, app.getVersion(), snapshot.state(), snapshot.payload(), snapshot.verifiedAt());
         if (rows == 0) {
-            // 期間已被人工裁決（version 已變）⇒ 放棄回寫，回傳最新狀態讓呼叫端自己看
             log.warn("runVerify.casFailed", "查驗結果回寫時版本已變，略過回寫",
                     "application_id", String.valueOf(applicationId));
         }
@@ -1140,8 +1054,6 @@ public class ProductCertificationApplicationService {
             return toSnapshot(result);
         } catch (GovCertificationService.GovApiUnavailableException
                  | GovCertificationService.GovApiResponseException e) {
-            // 🔴 上游故障絕不得落成 NOT_FOUND（§8.4 防線 1）：金鑰失效／配額用盡時政府 API
-            // 回 HTTP 200 且完全沒有 Data 欄，判成「查無」等於全站認證靜默變成假的。
             log.warn("runGovVerify.govUnavailable", "政府查驗服務不可用: " + e.getMessage());
             return new GovSnapshot(ProductCertificationGovVerifyState.UNAVAILABLE.value(), null, now);
         } catch (RuntimeException e) {
@@ -1150,7 +1062,6 @@ public class ProductCertificationApplicationService {
         }
     }
 
-    // ==================== 內部 helper ====================
 
     /**
      * §8.2 同步階段：<b>只查結構化快取，一律不發外部呼叫</b>。
@@ -1163,13 +1074,11 @@ public class ProductCertificationApplicationService {
     private GovSnapshot resolveGovSnapshotFromCache(NormalizedCertification cert) {
         LocalDateTime now = DateTimeUtils.nowUtc();
         if (!CertificationTypeRules.isVerifiable(cert.type())) {
-            // 3704／3705／3706：直接 UNSUPPORTED，不排背景查驗
             return new GovSnapshot(ProductCertificationGovVerifyState.UNSUPPORTED.value(), null, now);
         }
         GovCertificationService.GovVerifyResult cached =
                 govCertificationService.readCachedResult(cert.certNo(), cert.type());
         if (cached == null) {
-            // 未命中 ⇒ PENDING ＋ 排入背景查驗（事件發布由背景查驗那一批接線）
             return new GovSnapshot(ProductCertificationGovVerifyState.PENDING.value(), null, null);
         }
         return toSnapshot(cached);
@@ -1181,7 +1090,6 @@ public class ProductCertificationApplicationService {
             case VALID -> ProductCertificationGovVerifyState.VERIFIED.value();
             case NOT_FOUND -> ProductCertificationGovVerifyState.NOT_FOUND.value();
             case EXPIRED, TERMINATED, SUSPENDED -> ProductCertificationGovVerifyState.EXPIRED.value();
-            // UNKNOWN ＝ 我方或上游故障／回應無法判讀，不是查驗結論（§8.3.1）
             case UNKNOWN -> ProductCertificationGovVerifyState.UNAVAILABLE.value();
         };
         LocalDateTime verifiedAt;
@@ -1269,7 +1177,6 @@ public class ProductCertificationApplicationService {
                     new CertificationApplicationRefDTO(String.valueOf(result.getId())));
             return result;
         } catch (RuntimeException e) {
-            // markFailed 走 REQUIRES_NEW，外層 rollback 也留得下失敗標記
             idempotencyService.markFailed(idempotencyKey, subjectId);
             throw e;
         }
@@ -1404,7 +1311,6 @@ public class ProductCertificationApplicationService {
         return traceId == null || traceId.isBlank() ? null : traceId;
     }
 
-    // ==================== §12 MQ 事件 ====================
 
     /**
      * §12.1：新建的 {@code SUBMITTED} 申請若停在 {@code PENDING}（同步快取未命中），
@@ -1459,8 +1365,6 @@ public class ProductCertificationApplicationService {
                                            String reasonCode,
                                            String publicReason) {
         long sellerAccountId = sellerGrpcClient.getSellerMetaOrThrow(app.getStoreId()).getAccountId();
-        // 商品不存在（或名稱為空）時回空字串而非 null：payload 是 NON_NULL 序列化，
-        // null 會讓 product_name 這個 key 直接消失，notification 端的 #{productName} 就渲染不出來。
         String productName = productRepository.findByIdIncludingDeleted(app.getProductId())
                 .map(ProductEntity::getName)
                 .orElse("");
@@ -1522,7 +1426,6 @@ public class ProductCertificationApplicationService {
             cacheService.evictProductListForWrite(storeId);
             revalidationService.revalidateProduct(productId);
         } catch (RuntimeException e) {
-            // 失敗不阻斷業務；TTL 自然收斂（§16.2）
             log.warn("evictAfterCommit.failed", "認證裁決後清快取失敗: " + e.getMessage(),
                     "product_id", String.valueOf(productId));
         }
@@ -1536,7 +1439,6 @@ public class ProductCertificationApplicationService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    // ==================== 內部型別 ====================
 
     /** 通過第二道防線的一筆認證（type 已解析成 enum、certNo 已 trim）。 */
     private record NormalizedCertification(CertificationType type, String certNo) {

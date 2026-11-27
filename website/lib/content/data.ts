@@ -19,7 +19,6 @@ export interface FaqCategory {
 }
 
 export const faqCategories: FaqCategory[] = [
-	// ───────────────────────── 買家 BUYER ─────────────────────────
 	{
 		id: "buyer-account",
 		name: "帳號與登入",
@@ -240,7 +239,6 @@ export const faqCategories: FaqCategory[] = [
 			},
 		],
 	},
-	// ───────────────────────── 賣家 SELLER ─────────────────────────
 	{
 		id: "store",
 		name: "店舖管理",
@@ -614,11 +612,6 @@ export const navItems: NavItem[] = [
 		label: "Hawkr 動態",
 		href: "/feed",
 		panel: {
-			// 熱門 hashtag column is the only entry here — its links get
-			// injected client-side by Navbar's `withTrendingHashtags` from
-			// /public/tags/trending. The right slot renders the week's
-			// most-viewed post (see `weeklyPost` below) so nothing on this
-			// panel is hardcoded — all content is backed by real data.
 			columns: [
 				{
 					title: "熱門 hashtag",
@@ -632,19 +625,10 @@ export const navItems: NavItem[] = [
 		label: "Hawkr 市集",
 		href: "/market/products",
 		panel: {
-			// Both columns render dynamic data prefetched by the root layout
-			// — categories from /public/categories/tree (first level),
-			// hashtags from /public/tags/trending (sorted by post count
-			// desc). Static `links` stay empty; MegaMenu fills them from
-			// its `dynamicLinks` prop at render time. Empty source data =
-			// column skipped entirely (no hardcoded fallback).
 			columns: [
 				{ title: "商品分類", links: [], source: "categories" },
 				{ title: "熱門 hashtag", links: [], source: "hashtags" },
 			],
-			// Right slot renders a <BannerCarousel size="compact"> with
-			// heading "最新消息" — replaces both the old 產地專區 column
-			// and the 主題活動 feature card in one go.
 			banners: true,
 		},
 	},

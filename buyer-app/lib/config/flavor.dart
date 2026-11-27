@@ -62,12 +62,6 @@ class F {
   static bool get showFcmDebugOverlay => _appFlavor == Flavor.dev;
 }
 
-// ============================================================
-// Flavor Extension — 買家端
-//
-// 所有 flavor-dependent 的設定都集中在此 extension，
-// 是 config 唯一的 source of truth。
-// ============================================================
 
 extension FlavorExtension on Flavor {
   /// 環境顯示名稱

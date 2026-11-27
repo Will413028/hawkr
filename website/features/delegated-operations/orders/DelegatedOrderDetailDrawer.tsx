@@ -26,8 +26,7 @@ export default function DelegatedOrderDetailDrawer({
 			title="訂單詳情"
 			className="max-w-md"
 		>
-			{/* `key` 不是效能考量：換一筆訂單要讓面板整個重建，上一筆揭露出來的完整
-			    收件資訊才會隨狀態一起消失。 */}
+
 			{orderNo ? (
 				<DelegatedOrderDetailPanel key={orderNo} orderNo={orderNo} />
 			) : null}

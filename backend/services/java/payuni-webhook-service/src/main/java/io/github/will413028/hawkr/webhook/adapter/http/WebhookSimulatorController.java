@@ -135,12 +135,10 @@ public class WebhookSimulatorController {
         Map<String, Object> result = new LinkedHashMap<>();
 
         try {
-            // 1. 加密 payload
             Map<String, String> params = request.params();
             String encryptInfo = cryptoService.encrypt(params);
             String hashInfo = cryptoService.calculateHash(encryptInfo);
 
-            // 組裝加密前原始 payload（debug 用）
             TreeMap<String, String> sorted = new TreeMap<>(params);
             StringBuilder raw = new StringBuilder();
             sorted.forEach((k, v) -> {
@@ -149,7 +147,6 @@ public class WebhookSimulatorController {
             });
             result.put("rawPayload", raw.toString());
 
-            // 2. POST 到目標 URL（模擬 PayUni form-urlencoded）
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
@@ -192,7 +189,6 @@ public class WebhookSimulatorController {
             Map<String, String> params
     ) {}
 
-    // ==================== HTML 頁面 ====================
 
     private static final String SIMULATOR_HTML = """
 <!DOCTYPE html>

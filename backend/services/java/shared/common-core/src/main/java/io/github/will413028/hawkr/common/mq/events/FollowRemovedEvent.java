@@ -22,7 +22,7 @@ public class FollowRemovedEvent extends BaseEvent {
     private Long followId;
     private Long followerId;
     private Long followeeId;
-    private String followeeType;  // USER, SELLER
+    private String followeeType;
 
     public static FollowRemovedEvent create(Long followId, Long followerId, Long followeeId, String followeeType) {
         FollowRemovedEvent event = FollowRemovedEvent.builder()

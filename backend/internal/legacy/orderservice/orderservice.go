@@ -82,13 +82,6 @@ func (c *Client) HasOpenOrders(ctx context.Context, buyerID int64) (bool, error)
 	return open, nil
 }
 
-// openStatuses 是舊契約的訂單狀態（CodeMeta〈業務狀態碼〉的 OrderStatus，擁有者是 ordering）是否算未結：
-// 付款前到送達都算，完成、退款、取消與配送失敗結案不算。不在表內的狀態一律當成錯誤，不推定為已結。買家與店家兩側共用
-// 這張表。來源：backend/docs/代碼管理（CodeMeta）/業務狀態碼.md 的 OrderStatus（Java 的 OrderStatus.java 同值）；
-// TestOpenStatusesCoverCodeMetaOrderStatus 比對兩邊。
-//
-//	未結：0 待付款、10 已付款、20 待出貨、30 配送中、32 待取貨、35 物流異常、40 已送達（買家還沒確認收貨）
-//	已結：50 已完成、54 配送失敗未退款、60 部分退款、70 全額退款、80 已取消
 var openStatuses = map[string]bool{
 	"0": true, "10": true, "20": true, "30": true, "32": true, "35": true, "40": true,
 	"50": false, "54": false, "60": false, "70": false, "80": false,
@@ -172,10 +165,8 @@ func (c *Client) SpendingRecords(ctx context.Context, buyerID, storeID int64, pa
 // 都不是「不存在」，呼叫端不得當成不存在處理。
 var ErrOrderNotFound = errors.New("orderservice：訂單不存在")
 
-// grpcNotFound 是 GrpcResponseCode.NOT_FOUND（Java common-core）。
 const grpcNotFound = 404
 
-// 評價快照寫進 review.reviews，長度上限與該表的 CHECK 相同（order_no 1..64、sku_name <= 255，以字元計）。
 const (
 	maxReviewOrderNoRunes = 64
 	maxReviewSkuNameRunes = 255
@@ -265,7 +256,6 @@ func (c *Client) OrderForReview(ctx context.Context, orderNo string) (ReviewOrde
 	return out, nil
 }
 
-// optionalUUID 解析 UUID 字串；空字串是沒有（全零），其他不合法的值是錯誤。
 func optionalUUID(raw string) (uuid.UUID, error) {
 	if raw == "" {
 		return uuid.Nil(), nil
@@ -293,8 +283,6 @@ func nonnegativeAmount(raw string) (int64, error) {
 	return v, nil
 }
 
-// openStatusFilter 是 GetSellerOrders 的 status_filter：全部未結的狀態，逗號分隔（含 0 待付款：買家還能付款的訂單也會讓
-// 店家關店後出問題，所以 GetSellerOrderStatusCounts 的四桶不夠，它不計 0，見 Java 的 getSellerOrderStatusCounts）。
 var openStatusFilter = func() string {
 	var codes []int
 	for status, open := range openStatuses {
@@ -341,7 +329,6 @@ func (c *Client) sellerOrdersOpen(ctx context.Context, storeID int64) (bool, err
 	if resp.Msg.GetCode() != 0 {
 		return false, fmt.Errorf("orderservice：GetSellerOrders code=%d", resp.Msg.GetCode())
 	}
-	// 篩選之後回來的每一筆都該是未結的；不認得或已結的狀態表示篩選沒有照預期運作，總數不可信。
 	for _, order := range resp.Msg.GetOrders() {
 		if open, known := openStatuses[order.GetStatus()]; !known {
 			return false, fmt.Errorf("orderservice：未知訂單狀態 %q", order.GetStatus())
@@ -381,8 +368,7 @@ type StoreOrderStats struct {
 }
 
 const (
-	statsPageSize = 1000 // 舊服務的上限
-	// statsMaxPages 是翻頁的保險：一千頁等於一百萬家店，遠超過平台規模；超過代表游標沒有前進。
+	statsPageSize = 1000
 	statsMaxPages = 1000
 )
 
@@ -466,7 +452,6 @@ type PeriodOrderStats struct {
 }
 
 const (
-	// periodStatsMaxWindows 與 periodStatsMaxSpan 是舊服務的上限（GetStorePeriodOrderStats 超過回 INVALID_PARAM）。
 	periodStatsMaxWindows = 4
 	periodStatsMaxSpan    = 90 * 24 * time.Hour
 )

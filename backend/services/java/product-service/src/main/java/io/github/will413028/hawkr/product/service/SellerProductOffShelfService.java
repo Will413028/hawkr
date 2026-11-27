@@ -54,35 +54,24 @@ public class SellerProductOffShelfService {
         String active = ProductStatus.ACTIVE.value();
         String inactive = ProductStatus.INACTIVE.value();
 
-        // 0. 無條件蓋章：該賣家全部狀態商品標記 seller_deleted_at（賣家復活後對其隱形；Part A / doc 44 §11）。
-        //    必須在下方 ACTIVE 早退之前——只剩 INACTIVE/DRAFT（無 ACTIVE）的賣家也要蓋。
-        //    與下架同一 @Transactional；seller_deleted_at IS NULL guard → 冪等。
         productRepository.stampSellerDeletedByMerchant(storeId);
 
         List<Long> ids = productRepository.findProductIdsBySellerAndStatus(storeId, active);
         if (ids.isEmpty()) {
-            // 無 ACTIVE 可下架，但蓋章改動了 seller_deleted_at → 賣家私有列表查詢（seam 1 exclude）結果變了，
-            // 仍需 bust 列表快取，否則 stale 到 TTL（與下方 ACTIVE 分支一致）。
             cacheService.evictProductListForWrite(storeId);
             log.info("SellerProductOffShelf.noop",
                     "無 ACTIVE 商品可下架 storeId=" + storeId);
             return 0;
         }
 
-        // 1. 批次 ACTIVE → INACTIVE
         productRepository.batchUpdateStatusByIds(ids, inactive, storeId);
 
-        // 2. 商品詳情快取失效
         for (Long id : ids) {
             cacheService.evictProductDetail(String.valueOf(id));
         }
 
-        // 3. 列表快取失效：賣家私有列表 + 公開列表（account_id=0）
         cacheService.evictProductListForWrite(storeId);
 
-        // 4. frontend cache bust（§9.3）：賣家刪除後其商品應從 storefront / PDP 消失，
-        //    必須 bust seller:<storeId>（列表 + 賣家 profile，賣家刪除路徑本身無 revalidate producer）
-        //    + product:<id>×N（詳情），否則已刪賣家商品 stale 到 TTL（#1271）。
         productRevalidationService.revalidateProductsWithSellers(ids);
 
         log.info("SellerProductOffShelf.done",

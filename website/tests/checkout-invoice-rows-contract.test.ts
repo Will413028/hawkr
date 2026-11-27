@@ -19,7 +19,6 @@ const stripComments = (source: string) =>
 const SUCCESS = "features/checkout/screens/CheckoutSuccessClient.tsx";
 const ROWS = "features/invoices/checkout/CheckoutInvoiceRows.tsx";
 
-/* ── B03 掛在哪一頁 ───────────────────────────────────────────────────── */
 
 test("付款成功頁掛上發票三列", () => {
 	assert.match(
@@ -29,7 +28,6 @@ test("付款成功頁掛上發票三列", () => {
 	);
 });
 
-/* ── 這一頁不得引入刷新機制，也不得把發票資料落地 ─────────────────────── */
 
 test("發票三列零輪詢、零 SSE 訂閱", () => {
 	const source = stripComments(read(ROWS));
@@ -46,7 +44,6 @@ test("發票三列零輪詢、零 SSE 訂閱", () => {
 });
 
 test("發票三列不把 ?order= 對應的資料寫進瀏覽器儲存", () => {
-	// `?order=` 是網址上的可控參數，落地就等於把買受人統編與載具識別碼留在裝置上。
 	const source = stripComments(read(ROWS));
 	for (const banned of ["localStorage", "sessionStorage", "document.cookie"]) {
 		assert.ok(!source.includes(banned), `${ROWS} 出現 ${banned}`);
@@ -54,9 +51,6 @@ test("發票三列不把 ?order= 對應的資料寫進瀏覽器儲存", () => {
 });
 
 test("9301 與查詢失敗都不渲染，這一頁不長出任何錯誤訊息", () => {
-	// 端點 8 是 Tier A：越權與不存在回同一個 9301。前端只要在畫面上分得出來（一句
-	// 錯誤訊息就夠），就等於把後端刻意拿掉的那個旗標補了回去。而 5xx 在這一頁同樣
-	// 靜默——付款完成頁的工作是告知「錢付了、單成立了」。
 	const source = stripComments(read(ROWS));
 	assert.match(source, /if\s*\(notFound\)\s*return null;/);
 	assert.ok(

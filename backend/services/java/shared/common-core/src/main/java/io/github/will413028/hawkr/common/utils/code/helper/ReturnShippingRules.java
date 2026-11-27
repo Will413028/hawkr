@@ -83,24 +83,17 @@ public final class ReturnShippingRules {
             throw new IllegalArgumentException("ReturnShippingRules.dispositionOf: status 不得為 null");
         }
         return switch (status) {
-            // ── 退貨運送中 ──
             case IN_TRANSIT, PROCESSING, HANDED_OVER -> Disposition.RETURN_IN_TRANSIT;
-            // ── 配達退貨門市 ──
             case WAITING_PICKUP -> Disposition.RETURN_STORE_ARRIVED;
-            // ── 已送達賣家 ──
             case PICKED_UP -> Disposition.RETURN_DELIVERED;
-            // ── 異常 ──
             case ABNORMAL, RETURN_TO_WAREHOUSE, PACKAGE_LOST -> Disposition.RETURN_ABNORMAL;
-            // ── 賣家未取 ──
             case SELLER_NOT_PICKED -> Disposition.SELLER_NOT_PICKED;
-            // ── 明確不處理（包裹尚未離開買家，或與逆向 leg 無關的正向／中繼狀態）──
             case UNPROCESSED, PENDING_SHIPMENT, LOGISTICS_CHECK,
                  COURIER_ASSIGNED, TCAT_CALLED, CVS_CODE_RECEIVED, SELLER_CONFIRMED,
                  CREATE_FAILED, CREATE_UNKNOWN, CANCEL_PENDING,
                  CLAIM_PENDING, COMPENSATION, PACKAGE_ABANDONED, RETURN_GENERAL,
                  BUYER_NOT_PICKED, RETURN_BY_HOME_DELIVERY, STORE_TRANSFER,
                  PENDING_HOME_RETURN -> Disposition.NO_OP;
-            // ── 值域內但逆向 leg 無對應語意（UP-8）──
             case CANCELLED -> Disposition.REQUIRES_MANUAL_REVIEW;
         };
     }

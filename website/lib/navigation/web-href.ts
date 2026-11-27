@@ -46,7 +46,6 @@ export function normalizeWebHref(
 			return url.toString();
 		}
 	} catch {
-		// Invalid backend/user-provided href: render the surface as non-clickable.
 	}
 	return undefined;
 }

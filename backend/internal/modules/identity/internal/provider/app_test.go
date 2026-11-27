@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity/internal/model"
 )
 
-// appIdP 是假的 Google 與 LINE 的公鑰端點：Google 發 RS256，LINE 原生 SDK 發 ES256。
 type appIdP struct {
 	t      *testing.T
 	srv    *httptest.Server
@@ -66,7 +65,6 @@ func (p *appIdP) sign(alg jose.SignatureAlgorithm, key any, kid string, claims m
 	return raw
 }
 
-// appClaims 合併 claims，後面的覆寫前面的，值為 nil 表示刪掉。
 func appClaims(layers ...map[string]any) map[string]any {
 	c := map[string]any{"iat": webNow.Add(-time.Minute).Unix(), "exp": webNow.Add(time.Hour).Unix(), "sub": "sub-1", "nonce": "n1"}
 	for _, layer := range layers {

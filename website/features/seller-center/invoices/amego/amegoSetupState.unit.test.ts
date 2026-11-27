@@ -6,7 +6,6 @@ const ALL = Object.values(InvoiceProviderAccountStatus);
 
 describe("amegoSetupState", () => {
 	it("13 個值域內的值全部有歸屬，沒有一個落 default", () => {
-		// 🔴 鑑別力的來源：default 若寫成把已知值一併吃掉的萬用分支，這條會紅。
 		expect(ALL).toHaveLength(13);
 		for (const value of ALL) {
 			expect(
@@ -35,7 +34,6 @@ describe("amegoSetupState", () => {
 		expect(after.step).toBe(5);
 		expect(after.pillLabel).toBe("已啟用");
 		expect(after.activated).toBe(true);
-		// 同一個 status、兩種呈現 —— 這正是本檔存在的理由。
 		expect(before.pillLabel).not.toBe(after.pillLabel);
 	});
 
@@ -67,16 +65,11 @@ describe("amegoSetupState", () => {
 			expect(s.step).toBe(3);
 			expect(s.credentialEditable).toBe(false);
 			expect(s.canActivate).toBe(false);
-			// 🔴 兩態都必須讓「測試連線」按得下去：端點 24 只把憑證收下，
-			// 真正打 AMEGO 的是端點 25。按鈕鎖住 ⇒ 賣家永遠出不了這個狀態。
 			expect(s.canVerify, `${v} 必須能按測試連線`).toBe(true);
 		}
 	});
 
 	it("CREDENTIAL_VERIFYING 的文案不得暗示系統正在跑", () => {
-		// 端點 24 送出憑證後就是這個狀態，而**沒有任何東西在驗**（真正打 AMEGO 的是
-		// 端點 25）。寫「測試中」會讓賣家以為只要等 —— dev 實測 4 個帳號因此停在這裡
-		// 1~3 天，歷程上只有 SUBMITTED、沒有 VERIFICATION_STARTED。
 		const s = amegoSetupState(
 			InvoiceProviderAccountStatus.CREDENTIAL_VERIFYING,
 			false,
@@ -98,7 +91,6 @@ describe("amegoSetupState", () => {
 	});
 
 	it("CONFIG_ERROR 顯示配置錯誤，不是狀態更新中", () => {
-		// 投影值有沒有真的進 map —— 58A §S03 驗收 6。
 		const s = amegoSetupState(InvoiceProviderAccountStatus.CONFIG_ERROR, false);
 		expect(s.pillLabel).toBe("配置錯誤");
 		expect(s.unknown).toBe(false);

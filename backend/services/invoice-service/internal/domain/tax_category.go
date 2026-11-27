@@ -41,7 +41,7 @@ func (tc TaxCategory) String() string { return strconv.Itoa(int(tc)) }
 // Value = "1"/"2"/"3"），也是唯一會踩到型別轉換的：registry struct 每個欄位都是 string，
 // 而 DB 欄位是 smallint。轉換只寫在本檔一處。
 func TaxCategoryToDB(tc codemeta.InvoiceTaxCategory) (int16, error) {
-	n, err := strconv.Atoi(tc.Value) // Value 恆為 "1"/"2"/"3"
+	n, err := strconv.Atoi(tc.Value)
 	if err != nil {
 		return 0, fmt.Errorf("tax category value not numeric: %q", tc.Value)
 	}
@@ -53,13 +53,6 @@ func TaxCategoryFromDB(v int16) (codemeta.InvoiceTaxCategory, bool) {
 	return codemeta.InvoiceTaxCategoryFromValue(strconv.Itoa(int(v)))
 }
 
-// 三個容易寫錯的地方：
-//   ① 寫 DB 前先過 TaxCategoryToDB，不要直接 int16(row.TaxCategory)（後者拿到的是 Code 字串）
-//   ② 讀回來要 strconv.Itoa 再 FromValue，拿 Code 去 FromValue 必然 ok=false
-//   ③ 轉換失敗不要 fallback 成 1（應稅）—— 那會把一張免稅發票靜默開成應稅；
-//      失敗一律 fail-closed 轉 AWAITING_MANUAL ＋ manual_reason_code='MIXED_TAX_CATEGORY'
-//
-// 送 AMEGO 用的是 tc.Value（字串 "1"）不是 TaxCategoryToDB 的結果（AMEGO 的 TaxType 是字元）。
 
 // TaxCategoryToAmego 回傳送給 AMEGO 的 ProductItem.TaxType 字元。
 func TaxCategoryToAmego(tc TaxCategory) (string, error) {

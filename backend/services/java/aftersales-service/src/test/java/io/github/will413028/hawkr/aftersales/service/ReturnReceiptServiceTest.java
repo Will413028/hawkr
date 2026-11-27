@@ -75,8 +75,7 @@ class ReturnReceiptServiceTest {
 
     @BeforeAll
     static void initTsid() {
-        // TsidUtil 在 ReturnReceiptService 中用於生成 RefundTaskEntity.id；測試環境直接初始化避免 IllegalStateException。
-        try { TsidUtil.init(700, 0); } catch (IllegalStateException ignored) { /* 已初始化 */ }
+        try { TsidUtil.init(700, 0); } catch (IllegalStateException ignored) {  }
     }
 
     @BeforeEach
@@ -89,9 +88,6 @@ class ReturnReceiptServiceTest {
         service = new ReturnReceiptService(
                 caseMapper, resolutionMapper, refundTaskMapper, auditService,
                 properties, eventPublisher, evidenceService, caseService);
-        // issue #2294 B5/B6/B7：publish 改用會傳遞失敗的變體，Mockito 對 boolean 預設回 false
-        // ⇒ 不 stub 的話每個 happy path 都會被判為「publish 失敗」而拋例外。預設補成成功。
-        // （帶 EventPrincipals 的零 gRPC 多載；不帶的那些留給 never() 斷言，刻意不 stub）
         when(eventPublisher.tryPublishCaseTransitionWithContext(
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(),
                 any(), any(EventPrincipals.class)))
@@ -113,7 +109,6 @@ class ReturnReceiptServiceTest {
                 any());
     }
 
-    // ==================== autoConfirmReceipt（27→30，CONFIRM_RECEIPT_TIMEOUT）====================
 
     @Test
     void autoConfirmReceipt_status27_marksFromDeliveredAndPublishesTimeoutEvent() {
@@ -142,8 +137,6 @@ class ReturnReceiptServiceTest {
         Map<String, Object> extra = extraCap.getValue();
         assertEquals("3001", extra.get("shipping_method"));
         assertNotNull(extra.get("deadline_at"));
-        // B5：tx 內零身分反解 gRPC —— 退回不帶 principals 的多載即轉紅
-        // （範圍限定見 EventPrincipalPreResolutionTest 的同名註解）
         assertNoGrpcDoingPublishOverloadUsed();
     }
 
@@ -164,8 +157,6 @@ class ReturnReceiptServiceTest {
 
     @Test
     void autoConfirmReceipt_raceLost_returnsFalse() {
-        // 競態：load 時 status=27，但 markAutoCompletedFromDelivered 卻 affected=0
-        // （表示賣家剛搶先手動 confirm 或 Admin force completed）
         AfterSaleCaseEntity entity = caseWith("A003", "O300", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -175,13 +166,11 @@ class ReturnReceiptServiceTest {
         boolean ok = service.autoConfirmReceipt("A003", PRINCIPALS);
 
         assertFalse(ok);
-        // race lost：不應該繼續推進到 markRefundProcessingFromReceived
         verify(caseMapper, never()).markRefundProcessingFromReceived(anyString());
         verify(eventPublisher, never()).tryPublishCaseTransitionWithContext(
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(), any(), any(EventPrincipals.class));
     }
 
-    // ==================== autoCompleteFromAtStore（26→30，STORE_PICKUP_TIMEOUT）====================
 
     @Test
     void autoCompleteFromAtStore_status26_marksFromAtStoreAndPublishesTimeoutEvent() {
@@ -211,7 +200,6 @@ class ReturnReceiptServiceTest {
         assertEquals("3002", extra.get("shipping_method"));
         assertNotNull(extra.get("deadline_at"));
 
-        // B6：tx 內零身分反解 gRPC
         assertNoGrpcDoingPublishOverloadUsed();
     }
 
@@ -232,8 +220,6 @@ class ReturnReceiptServiceTest {
 
     @Test
     void autoCompleteFromAtStore_raceLost_returnsFalse() {
-        // 競態：load 時 status=26，但 markAutoCompletedFromAtStore affected=0
-        // （表示賣家剛從超商取貨觸發 26→27 或 Admin force completed）
         AfterSaleCaseEntity entity = caseWith("A006", "O600", "26", "3002",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -248,12 +234,9 @@ class ReturnReceiptServiceTest {
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(), any(), any(EventPrincipals.class));
     }
 
-    // ==================== issue #2294 B5/B6/B7：publish 失敗必須讓短 tx rollback ====================
 
     @Test
     void autoConfirmReceipt_publishFails_throwsSoTxRollsBack() {
-        // B5：status='32' 是永久轉換，publish 失敗若不 rollback ⇒ 事件永久遺失（row 已離開候選集合）。
-        // 契約：tryPublish 回 false ⇒ 拋 EventPublishFailedException ⇒ @Transactional rollback ⇒ 下一 tick 重來。
         AfterSaleCaseEntity entity = caseWith("A010", "O1000", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         entity.setAutoConfirmAt(LocalDateTime.of(2026, 5, 22, 1, 0));
@@ -270,7 +253,6 @@ class ReturnReceiptServiceTest {
 
     @Test
     void autoCompleteFromAtStore_publishFails_throwsSoTxRollsBack() {
-        // B6：與 B5 逐字同形（status='31'）。兩處必須一起改，否則同一支 service 兩種保證等級。
         AfterSaleCaseEntity entity = caseWith("A011", "O1100", "26", "3002",
                 PaymentMethod.CREDIT_CARD.value());
         entity.setStorePickupDeadlineAt(LocalDateTime.of(2026, 5, 22, 1, 0));
@@ -285,11 +267,9 @@ class ReturnReceiptServiceTest {
         assertThrows(EventPublishFailedException.class, () -> service.autoCompleteFromAtStore("A011", PRINCIPALS));
     }
 
-    // ==================== confirmReceipt（賣家手動，前置必須 status=27）====================
 
     @Test
     void confirmReceipt_status26_isRejected() {
-        // §5.3.7：賣家確認收貨前置必須 status=27（已送達）；26 RETURN_AT_STORE 屬於到店待取，禁止 confirm
         AfterSaleCaseEntity entity = caseWith("A007", "O700", "26", "3002",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -305,12 +285,9 @@ class ReturnReceiptServiceTest {
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString());
     }
 
-    // ==================== Plan C Phase 3: account_id vs store_id 判別 ====================
 
     @Test
     void confirmReceipt_callerIdDiffersFromCaseStoreId_throwsNotOwner() {
-        // caseWith(...) 的 store_id 固定為 1001L（helper 內建）；呼叫端傳入不同的 id
-        // 模擬賣家重新上架後 store_id 已換發、呼叫端誤傳舊 id 的情境，必須被拒絕。
         AfterSaleCaseEntity entity = caseWith("A099", "O990", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -323,11 +300,9 @@ class ReturnReceiptServiceTest {
         verify(caseMapper, never()).markReturnReceived(anyString());
     }
 
-    // ==================== forceConfirmReceiptByAdmin（Admin force，允許 status=26）====================
 
     @Test
     void forceConfirmReceiptByAdmin_status26_allowedWithExtendedAllowList() {
-        // 2026-05-22 ADMIN_FORCE_ALLOWED_STATUSES 已擴增 26 RETURN_AT_STORE
         AfterSaleCaseEntity entity = caseWith("A008", "O800", "26", "3002",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -342,7 +317,6 @@ class ReturnReceiptServiceTest {
         assertEquals(1200L, result.finalRefundAmount());
         assertNotNull(result.refundTaskId());
         verify(caseMapper).markReturnReceivedByAdmin("A008");
-        // issue #2294 B7：Admin 路徑同樣走零 gRPC 多載（語意仍是 best-effort，回傳值不影響流程）
         verify(eventPublisher).tryPublishCaseTransitionWithContext(
                 eq("aftersales.case.return_received"),
                 eq(MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_RECEIVED),
@@ -353,8 +327,6 @@ class ReturnReceiptServiceTest {
 
     @Test
     void forceConfirmReceiptByAdmin_transitionPublishFails_stillSucceeds() {
-        // API 路徑的 CASE_RETURN_RECEIVED 維持 best-effort：MQ 故障只是少一則通知，
-        // 不該讓 Admin 的強制確認整筆失敗。
         AfterSaleCaseEntity entity = caseWith("A014", "O1400", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -372,7 +344,6 @@ class ReturnReceiptServiceTest {
 
     @Test
     void confirmReceipt_transitionPublishFails_stillSucceeds() {
-        // 同上，賣家手動路徑。
         AfterSaleCaseEntity entity = caseWith("A015", "O1500", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -389,11 +360,9 @@ class ReturnReceiptServiceTest {
         assertNoGrpcDoingPublishOverloadUsed();
     }
 
-    // ==================== issue #2294 B5/B6/B7：tx 外的身分反解 ====================
 
     @Test
     void resolvePrincipalsForCaseStrict_delegatesToStrictResolver() {
-        // 排程路徑：反解失敗必須拋（該筆本輪不做、下一 tick 重試），不得降級
         AfterSaleCaseEntity entity = caseWith("A016", "O1600", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -407,7 +376,6 @@ class ReturnReceiptServiceTest {
 
     @Test
     void resolvePrincipalsForCaseBestEffort_delegatesToBestEffortResolver() {
-        // API 路徑：走 best-effort（永不拋）——反解抖動不得升級成使用者可見的失敗
         AfterSaleCaseEntity entity = caseWith("A017", "O1700", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -423,7 +391,6 @@ class ReturnReceiptServiceTest {
 
     @Test
     void forceConfirmReceiptByAdmin_statusOutsideAllowList_isRejected() {
-        // CLOSED(50) 不在 ADMIN_FORCE_ALLOWED_STATUSES 內
         AfterSaleCaseEntity entity = caseWith("A009", "O900", "50", "3002",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -435,7 +402,6 @@ class ReturnReceiptServiceTest {
         verify(caseMapper, never()).markReturnReceivedByAdmin(anyString());
     }
 
-    // ==================== helpers ====================
 
     private AfterSaleCaseEntity caseWith(String caseNo, String orderNo, String status,
                                           String returnShippingMethod, String paymentMethod) {

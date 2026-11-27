@@ -11,7 +11,6 @@ import (
 	"connectrpc.com/connect"
 )
 
-// pageTokenVersion 是 token 格式的版本；格式改了就加一，舊的 token 一律無法解讀。
 const pageTokenVersion = 1
 
 // EncodePageToken 把上一頁最後一筆的排序鍵（key，由各 handler 自己編碼）編成不透明的 page token

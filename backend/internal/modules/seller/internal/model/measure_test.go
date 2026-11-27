@@ -79,11 +79,9 @@ func TestTerminationTimeConstants(t *testing.T) {
 	if AppealWindow < 184*24*time.Hour {
 		t.Fatalf("申覆期間 %s 短於任何連續六個曆月的最大長度（184 天）", AppealWindow)
 	}
-	// 關店後的個資保留期不短於任何連續六個曆月的最大長度（詐欺犯罪危害防制條例第 37 條第 1 項的六個月）：最長的六個曆月（7～12 月、12～5 月）是 184 天。
 	if StoreRetention < 184*24*time.Hour {
 		t.Fatalf("保留期 %s 短於任何連續六個曆月的最大長度（184 天）", StoreRetention)
 	}
-	// 防詐保存期（D3）：5 年，不短於任何連續五個曆年（最長 1826 天），而且是 StoreRetention 之外的另一個常數。
 	if IdentityHashRetention != 1826*24*time.Hour || IdentityHashRetentionHours != 43824 {
 		t.Fatalf("防詐保存期 %s／%d", IdentityHashRetention, IdentityHashRetentionHours)
 	}
@@ -184,7 +182,6 @@ func TestRemediationCooldownCountsRejectionsOfEveryKind(t *testing.T) {
 		cause := CloseCauseEnded
 		return MeasureRequest{Kind: RequestKindRemediation, State: RequestClosed, DecidedAt: &decided, CloseCause: &cause}
 	}
-	// 新到舊：n 次駁回，第一次是申覆，其餘是解除請求；最近一次在 read 前 1 天。
 	build := func(n int, extra ...MeasureRequest) []MeasureRequest {
 		var out []MeasureRequest
 		for i := n; i >= 1; i-- {
@@ -366,7 +363,6 @@ func TestRemediationUnavailableReasonsAgreeWithCanRequestRemediationOnEveryCell(
 						name += "/冷卻"
 					}
 
-					// 期望：照規則逐條寫。已結束措施上待處理的解除請求沒有標的，不算待處理。
 					var want []RemediationUnavailableReason
 					if basis != BasisRisk {
 						want = append(want, ReasonNotRisk)
@@ -610,7 +606,6 @@ func TestUnknownOpeningBlockerIsNotAValidReason(t *testing.T) {
 	}
 }
 
-// legacyActionPredicates 是改成原因清單之前的四個布林判斷，逐字照舊；資料集測試用它當對照，鎖住「哪些狀態允許哪個動作」沒有改變。
 func legacyActionPredicates(m Measure) (update, extend, shorten, revoke bool) {
 	update = m.Status == MeasureStatusEnforced && (m.State == StateIssued || m.State == StateActive || m.State == StateScheduled) && m.Appeal() == nil && m.PendingRemediation() == nil
 	extend = m.Kind == MeasureSuspension && m.State == StateActive && m.Appeal() == nil && m.PendingRemediation() == nil
@@ -627,7 +622,6 @@ func TestActionUnavailableReasonsAgreeWithTheLegacyPredicatesOnEveryCell(t *test
 		kind   MeasureKind
 		state  MeasureState
 	}
-	// 只取 StateOf 推得出的組合：撤銷一定是 REVOKED，沒有限制效果的種類（警告、內容下架）未撤銷一定是 ISSUED，停權與終止不會是 ISSUED。
 	var cells []cell
 	for _, kind := range MeasureKindValues() {
 		cells = append(cells, cell{MeasureStatusRevoked, kind, StateRevoked})
@@ -693,8 +687,6 @@ func TestActionUnavailableReasonsAgreeWithTheLegacyPredicatesOnEveryCell(t *test
 	}
 }
 
-// legacyCanEnd 是改成原因清單之前的結束判斷：只限生效中的 RISK 措施，而且沒有待處理的解除請求；加上內容下架一律不能結束（它沒有結束入口，
-// 本來也不會有 ACTIVE 與 RISK，這裡明列是為了讓全部格子的驗證涵蓋這個種類）。
 func legacyCanEnd(m Measure) bool {
 	return m.Kind != MeasureContentTakedown && m.State == StateActive && m.Basis == BasisRisk && m.PendingRemediation() == nil
 }
@@ -733,7 +725,6 @@ func TestEndUnavailableReasonsAgreeWithTheLegacyPredicateOnEveryCell(t *testing.
 	if checked != len(MeasureKindValues())*3*5*2 {
 		t.Fatalf("checked=%d", checked)
 	}
-	// 內容與順序（獨立於實作的預期表）。
 	active := Measure{Kind: MeasureSuspension, Basis: BasisRisk, Status: MeasureStatusEnforced, State: StateActive, ReadAt: read}
 	for name, tc := range map[string]struct {
 		m    Measure
@@ -751,7 +742,6 @@ func TestEndUnavailableReasonsAgreeWithTheLegacyPredicateOnEveryCell(t *testing.
 			t.Errorf("%s：%v，要 %v", name, got, tc.want)
 		}
 	}
-	// 違規依據的句子與原本 admin 狀態卡寫死的字相同（搬到伺服器，不是新文案）。
 	if got := ActionUnavailableText(ActionReasonViolationBasis, MeasureActionEnd).Text; got != "因違規處分停權；違規認定只供查閱，撤銷要對這個措施進行。" {
 		t.Errorf("違規依據的句子：%q", got)
 	}
@@ -1036,7 +1026,6 @@ func TestExcerptTruncatesAtRunesAndMarksOnlyWhenLonger(t *testing.T) {
 	}
 }
 
-// 清單讀取由資料庫截出前綴與「是否更長」，組摘要與整段本文截斷是同一條規則。
 func uid(n byte) uuid.UUID { var u uuid.UUID; u[15] = n; return u }
 
 func TestExcerptOfMatchesTruncatingTheFullBody(t *testing.T) {

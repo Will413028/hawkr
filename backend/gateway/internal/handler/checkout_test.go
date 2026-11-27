@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ==================== router ====================
 
 func setupCheckoutRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -31,7 +30,6 @@ func setupCheckoutRouter(h *Holder) *gin.Engine {
 	return r
 }
 
-// ==================== CheckoutValidate ====================
 
 func TestCheckoutValidate_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -98,7 +96,6 @@ func TestCheckoutValidate_Success(t *testing.T) {
 func TestCheckoutValidate_BadRequest(t *testing.T) {
 	h := &Holder{BuyerID: buyerGrandfatherResolverForTest()}
 	router := setupCheckoutRouter(h)
-	// Missing required "items" field
 	body, _ := json.Marshal(map[string]interface{}{})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/app/checkout/validate", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -111,7 +108,6 @@ func TestCheckoutValidate_BadRequest(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-// ==================== CheckoutPreview ====================
 
 func TestCheckoutPreview_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -194,7 +190,6 @@ func TestCheckoutPreview_GrpcError(t *testing.T) {
 	assertCode(t, resp, 500)
 }
 
-// ==================== CheckoutConfirm ====================
 
 func TestCheckoutConfirm_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -261,7 +256,6 @@ func TestCheckoutConfirm_Success(t *testing.T) {
 func TestCheckoutConfirm_BadRequest(t *testing.T) {
 	h := &Holder{BuyerID: buyerGrandfatherResolverForTest()}
 	router := setupCheckoutRouter(h)
-	// Missing required "checkoutId" field
 	body, _ := json.Marshal(map[string]interface{}{
 		"shippingMethod": "TAQBIN",
 		"deliveryTemp":   "CHILLED",
@@ -282,7 +276,6 @@ func TestCheckoutConfirm_BadRequest(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-// ==================== CheckoutShippingFee ====================
 
 func TestCheckoutShippingFee_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -324,7 +317,6 @@ func TestCheckoutShippingFee_Success(t *testing.T) {
 	}
 }
 
-// ==================== ② buyer store-stint re-key: surrogate pinning ====================
 
 func TestCheckoutValidate_UsesResolvedBuyerID(t *testing.T) {
 	var captured *orderpb.CheckoutValidateRequest

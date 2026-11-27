@@ -52,7 +52,6 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
     final orderDetail = useState<OrderSummary?>(initialSummary);
     final rawJson = useState<Map<String, dynamic>?>(null);
     final loading = useState(initialSummary == null);
-    // 遞增此 counter 觸發 useEffect 重新載入（FCM / lifecycle 用）
     final reloadTick = useState(0);
 
     useEffect(() {
@@ -70,7 +69,6 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
               .fetchMatchedOrderDetails(orderSn: orderId);
           if (!disposed) orderDetail.value = detail;
         } catch (_) {
-          // Keep initial fallback data if detail fetch fails.
         } finally {
           if (!disposed) loading.value = false;
         }
@@ -91,7 +89,6 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
       return () => disposed = true;
     }, [orderId, reloadTick.value]);
 
-    // FCM Silent Push: 訂單狀態變更，僅當事件 orderSn 與本頁訂單相符才 reload
     ref.listen(orderStatusStreamProvider, (_, next) {
       next.whenData((event) {
         if (event.orderSn == orderId || event.orderId == orderId) {
@@ -100,7 +97,6 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
       });
     });
 
-    // FCM Silent Push: 售後案件狀態變更（買家申請/補件等），僅與本訂單相關才 reload
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((event) {
         if (event.orderNo == orderId) {
@@ -124,12 +120,7 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
           raw?['note'] ??
           raw?['remark'],
     );
-    // 訂單詳情不再顯示「照片舉證」card（屬於售後爭議流程，已移除）。
-    // shipmentPhotoUrls / receiptPhotoUrls 在售後 detail 那邊單獨呈現。
 
-    // 訂單評分（買家評論這筆訂單後可見）
-    // 優先從 detail API 自帶欄位讀；沒回的話會在 _OrderRatingCard 內部
-    // fallback 到 ListOwnStoreReviews 反查（B-145 完成前的解法）。
     final orderRating = _parseRating(
       raw?['rating'] ?? raw?['reviewRating'] ?? raw?['review']?['rating'],
     );
@@ -137,7 +128,6 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
         (raw?['review']?['content'] ?? raw?['reviewContent'] ?? '').toString();
     final isReviewed = raw?['isReviewed'] == true;
 
-    // 收集 OrderItem id 集合給 review 反查用
     final orderItemIds = <String>{};
     final itemsRaw = raw?['items'];
     if (itemsRaw is List) {
@@ -303,9 +293,6 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
                     ],
                   ),
                 ],
-                // 商品評分區塊：買家評價過此訂單才顯示
-                // 反查 review 是 async，spacing 由 card 內部依
-                // 顯示與否管控，避免反查無結果時留下空白 16.h。
                 if (isReviewed)
                   _OrderRatingCard(
                     fallbackRating: orderRating,
@@ -720,7 +707,6 @@ class _OrderInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 收件資訊依配送方式**明確分派**；未知 / 本版未支援者不猜是門市還是宅配。
     final shipping = shippingPresentationOf(order?.shippingMethod);
     final dateSource = order?.dateTime.isNotEmpty == true
         ? order!.dateTime
@@ -918,7 +904,6 @@ int _resolveSubtotal(OrderSummary? detail, int? fallbackAmount) {
     if (detail.items.isNotEmpty) {
       var subtotal = 0;
       for (final item in detail.items) {
-        // PayUni #758: 小計優先用 actualPayAmount（已含 shareDiscount）
         final actual = num.tryParse(item.actualPayAmount);
         if (actual != null && actual > 0) {
           subtotal += actual.round();
@@ -1173,7 +1158,6 @@ class _ProductRowRich extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // PayUni #758: 顯示 effectiveUnitPrice，有 sale 時旁邊加 listPrice 刪除線
     final unitDisp = item.effectiveUnitPrice;
     final listDisp = item.effectiveListPrice;
     final showStrike = item.shouldStrikeListPrice;
@@ -1188,8 +1172,6 @@ class _ProductRowRich extends StatelessWidget {
           borderRadius: BorderRadius.circular(12.r),
           child: item.imageKey.isNotEmpty
               ? OptimizedNetworkImage(
-                  // 傳 objectKey：[OptimizedNetworkImage] 內部走
-                  // `ImageConfig.urlFor` → `buildImageUrl` 這個唯一組裝入口。
                   imageUrl: item.imageKey,
                   scene: ImageScene.orderItem,
                   width: 80.w,
@@ -1278,14 +1260,6 @@ String _itemLineTotal(OrderItem item) {
   return total.toStringAsFixed(2);
 }
 
-// ─────────────────────────────────────────────────────────────────
-// 商品評分區塊（買家評價這筆訂單後顯示）
-//
-// 資料來源優先順序：
-// 1. caller 傳入 fallbackRating > 0 → 用 detail API 自帶（B-145 之後生效）
-// 2. fallback：呼叫 ReviewRepository.findOwnStoreReviewByOrderItems 在自己店的評價
-//    （ReviewAppService.ListOwnStoreReviews）依 order_item_id 比對找出對應 review
-// ─────────────────────────────────────────────────────────────────
 
 class _OrderRatingCard extends ConsumerStatefulWidget {
   const _OrderRatingCard({
@@ -1319,7 +1293,6 @@ class _OrderRatingCardState extends ConsumerState<_OrderRatingCard> {
 
   Future<({int rating, String content, List<String> images})?>
   _loadReview() async {
-    // 優先 detail API 自帶
     if (widget.fallbackRating > 0) {
       return (
         rating: widget.fallbackRating,
@@ -1327,7 +1300,6 @@ class _OrderRatingCardState extends ConsumerState<_OrderRatingCard> {
         images: const <String>[],
       );
     }
-    // Fallback：在自己店的評價裡依訂單項目 ID 找。讀取失敗丟出例外，與「買家還沒評價」（null）分開。
     if (widget.orderItemIds.isEmpty) return null;
     final review = await ref
         .read(reviewRepositoryProvider)

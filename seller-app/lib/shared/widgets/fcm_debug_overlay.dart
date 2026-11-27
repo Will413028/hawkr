@@ -13,9 +13,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../app.dart';
 import '../../features/notification/data/push/manager.dart';
 
-// ─────────────────────────────────────────────
-// 資料模型
-// ─────────────────────────────────────────────
 
 class FcmDebugRecord {
   final DateTime receivedAt;
@@ -54,9 +51,6 @@ class FcmDebugRecord {
   }
 }
 
-// ─────────────────────────────────────────────
-// 浮動按鈕（注入至 app.dart Stack）
-// ─────────────────────────────────────────────
 
 class FcmDebugOverlay extends StatelessWidget {
   const FcmDebugOverlay({super.key});
@@ -126,7 +120,6 @@ class FcmDebugOverlay extends StatelessWidget {
   }
 
   void _openPanel(BuildContext context, List<FcmDebugRecord> records) {
-    // 使用 navigatorKey 的 context，避免 builder 層的 context 在 Navigator 之上
     final navContext = MyApp.navigatorKey.currentContext ?? context;
     showModalBottomSheet(
       context: navContext,
@@ -137,9 +130,6 @@ class FcmDebugOverlay extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// Bottom Sheet 面板
-// ─────────────────────────────────────────────
 
 class FcmDebugPanel extends StatefulWidget {
   const FcmDebugPanel({super.key});
@@ -352,9 +342,6 @@ class _FcmDebugPanelState extends State<FcmDebugPanel> {
   }
 }
 
-// ─────────────────────────────────────────────
-// 單筆記錄 Item — JSON 展示
-// ─────────────────────────────────────────────
 
 class _FcmDebugItem extends StatelessWidget {
   final FcmDebugRecord record;
@@ -383,7 +370,6 @@ class _FcmDebugItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header：来源标签 + 时间 + 复制按钮 ──
           Row(
             children: [
               Container(
@@ -413,7 +399,6 @@ class _FcmDebugItem extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // 复制 JSON 按钮
               GestureDetector(
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: jsonStr));
@@ -436,7 +421,6 @@ class _FcmDebugItem extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // ── JSON 内容 ──
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),

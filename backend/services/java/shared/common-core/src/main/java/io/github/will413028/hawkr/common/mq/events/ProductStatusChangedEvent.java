@@ -21,9 +21,9 @@ public class ProductStatusChangedEvent extends BaseEvent {
 
     private Long productId;
     private Long sellerAccountId;
-    private Integer oldStatus;  // 0=draft, 1=published, 2=delisted
+    private Integer oldStatus;
     private Integer newStatus;
-    private String reason;  // e.g., "out of stock", "seller request"
+    private String reason;
 
     public static ProductStatusChangedEvent create(Long productId, Long sellerAccountId,
                                                     Integer oldStatus, Integer newStatus, String reason) {

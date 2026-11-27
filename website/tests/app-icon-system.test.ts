@@ -33,9 +33,6 @@ test("produce icons rotate through generic Material glyphs without changing AppI
 });
 
 test("seller navigation draws its icons through SellerSidebarIcon", () => {
-	// 選單資料（含每一項的 icon）住在 sellerNav.tsx，登出鈕的 icon 仍在 shell —
-	// ADM 代行工作區沿用同一份資料（56 號 §6.1.14）。這道斷言守的是「賣家導覽用
-	// 專屬 icon 組」，它與資料放在哪一支檔案無關，所以兩支一起掃。
 	const shell = [
 		source("../features/seller-center/components/SellerCenterShell.tsx"),
 		source("../features/seller-center/components/sellerNav.tsx"),
@@ -135,7 +132,6 @@ test("AppIcon is decorative by default, named with a title, and fill selects the
 	assert.match(labelled, /aria-label="關閉"/);
 	assert.doesNotMatch(labelled, /aria-hidden=/);
 	assert.match(labelled, /width="19" height="19"/);
-	// `spin` carries its own reduced-motion escape hatch.
 	assert.match(
 		labelled,
 		/class="hk-app-icon animate-spin motion-reduce:animate-none probe"/,

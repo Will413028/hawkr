@@ -229,7 +229,6 @@ describe("isBlockedByCapabilities", () => {
 		suspended: true,
 		capabilities: capabilityStatuses(SUSPENDED, [R.NOT_SUSPENDED]),
 	});
-	// 營業中、沒停權，只是認證還沒核准：物流建店缺 ONBOARDING_COMPLETE，其他能力都有。
 	const kycPending = create(GetMyStoreResponseSchema, {
 		store: store(StoreStatus.ACTIVE),
 		capabilities: [
@@ -241,7 +240,6 @@ describe("isBlockedByCapabilities", () => {
 			publicListingStatus([R.ONBOARDING_COMPLETE]),
 		],
 	});
-	// 認證已核准但被停權：物流建店只缺 NOT_SUSPENDED（不再缺 ONBOARDING_COMPLETE）。
 	const kycApprovedSuspended = create(GetMyStoreResponseSchema, {
 		store: store(StoreStatus.ACTIVE),
 		suspended: true,

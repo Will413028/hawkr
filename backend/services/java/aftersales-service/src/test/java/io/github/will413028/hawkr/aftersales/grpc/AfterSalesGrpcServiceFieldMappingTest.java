@@ -80,14 +80,12 @@ class AfterSalesGrpcServiceFieldMappingTest {
         properties = new AfterSalesProperties();
         properties.getCaseConfig().setProcessDeadlineHours(72);
 
-        // buildDetailView 中所有非新欄位 side-effect 的 mock 預設：
         when(caseItemMapper.selectList(any())).thenReturn(List.of());
         when(evidenceMapper.selectList(any())).thenReturn(List.of());
         when(resolutionMapper.selectList(any())).thenReturn(List.of());
         when(refundTaskMapper.selectOne(any())).thenReturn(null);
         when(appealService.computeAppealDeadline(any())).thenReturn(null);
         when(appealService.canAppeal(any())).thenReturn(false);
-        // orderGrpcClient 拋出例外是合法的（buildDetailView 內部 try-catch，降級為空陣列）
         when(orderGrpcClient.getOrderForAfterSales(any()))
                 .thenThrow(new RuntimeException("test stub: skip shipment photos"));
 
@@ -104,7 +102,6 @@ class AfterSalesGrpcServiceFieldMappingTest {
         buildDetailView.setAccessible(true);
     }
 
-    // ==================== 6 個新欄位映射 ====================
 
     @Test
     @DisplayName("detail 寫入 storeArrivedAt / storePickupDeadlineAt / sellerPickedUpAt 三個 timestamp")
@@ -121,7 +118,6 @@ class AfterSalesGrpcServiceFieldMappingTest {
         assertNotEquals("", invokeGetter(detail, "getSellerPickedUpAt"));
     }
 
-    // ==================== helpers ====================
 
     private AfterSaleCaseEntity baseEntity(String caseNo, String status) {
         AfterSaleCaseEntity e = new AfterSaleCaseEntity();

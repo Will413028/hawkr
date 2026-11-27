@@ -30,9 +30,6 @@ const MemberList: React.FC = () => {
 	const [appliedKeyword, setAppliedKeyword] = useState("");
 	const pageSize = 10;
 
-	// 賣家已經有獨立的「賣家管理 / 審核」頁面，這裡固定只看買家，不開放身份篩選。
-	// 每個帳號都是買家（買家不是契約的 Role），所以不帶角色篩選就是全部買家。
-	// query key 由 connect-query 以方法與請求（含 page token 與關鍵字）組成。
 	const listQuery = useConnectQuery(
 		IdentityAdminService.method.listAccounts,
 		{
@@ -46,12 +43,10 @@ const MemberList: React.FC = () => {
 	const accountList = listQuery.data?.accounts ?? [];
 	const page = currentPage(pageTokens);
 	const totalPages = pageCount(listQuery.data?.totalSize ?? 0, pageSize);
-	// 換頁載入時畫面還是上一頁的資料，它的 next_page_token 已經用過，不能再往下翻。
 	const nextPageToken = listQuery.isPlaceholderData
 		? ""
 		: (listQuery.data?.nextPageToken ?? "");
 
-	// page token 綁定篩選條件：換關鍵字時回到第一頁。
 	const applySearch = () => {
 		setPageTokens(firstPage());
 		setAppliedKeyword(searchKeyword);

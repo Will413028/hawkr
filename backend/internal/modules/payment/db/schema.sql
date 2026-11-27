@@ -1,41 +1,8 @@
--- payment 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式與複合型別放 db/objects.sql
--- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（payment.<表>），不建跨 schema 的 FK；慣例見 PostgreSQL 設計規範。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA payment;
 
--- 收款帳戶：擁有者在金流商那邊的外部帳戶的本地快取（收款開通 ADR D13、D19、D28）。擁有者鍵現階段是 store_id（seller 的店家；不建跨 schema 的 FK，
--- 出現第二種擁有者時再通用化）。一個擁有者一列，關店再開沿用；只存狀態與能力快照，不存聯絡信箱（D23）。
--- seller 核准的 transaction 只 INSERT「建立中」的列（external_account_id 是 NULL、status 是 NOT_CREATED；ON CONFLICT DO NOTHING，既有的列不改）
--- 並排入建立 job；之後的寫入都由本模組的 job 與管理員的指令做：建立 job 在 transaction 外分兩步建立外部帳戶（取得 ID、完成設定，D55），第一步拿到外部 ID 就填上，
--- 第二步成功才記 create_completed_at；同步 job 重讀外部帳戶後整列覆寫（沒有觀測歷史，重讀即最新）。
--- 「已建立」看 create_completed_at，不看有沒有外部 ID（D59）：有外部 ID 而 create_completed_at 是 NULL 的是半建立的列，對外仍是未建立（status 維持 NOT_CREATED，
--- 不可開通、不輪詢、不同步）。create_called_at 是第一次呼叫金流商之前寫入的時刻（NULL 表示從沒呼叫過，這種列沒有外部帳戶，清理時直接刪）；
--- 管理員確認金流商那邊沒有這家店的帳戶而換新冪等鍵時改成新鍵第一次呼叫之前的時刻（D63）。「呼叫過、沒有外部 ID」的列（結果不明）由週期掃描以同一把鍵重送取回
--- ID；從 create_called_at 起 7 天（小於金流商保存冪等鍵的 30 天）仍了結不了就進終局：非清理的列記 create_failed_at（建立失敗的待辦），清理的列進 purge_blocked（原因 unresolved_creation），
--- 不重送、不換新鍵、不列出帳戶。
--- status 是中立的五個狀態，由轉帳能力的狀態與 status_details 推導；transfers_active 與 payouts_active 是外部帳戶的能力是否啟用（seller 的開通閘門讀
--- 經 PayoutAccountChanged 複製的 transfers_active；ENABLED 等於 transfers_active）。requirements 是快照的原始內容，status_reason 是導出目前狀態的金流商原因碼（只給後台；外部帳戶已在金流商關閉時是 closed，終局，不再輪詢，D61）。
--- create_failed_at 是建立重試用完的時刻（只有還沒完成建立的列才有；後台待辦 PAYMENT_ACCOUNT_CREATE_FAILED 的開始時間，重試建立時清空）。
--- create_refused_at 是建立失敗是「金流商明確拒絕（永久失敗）」時的標記（與 create_failed_at 同時寫、同時清；重試用完的暫時性失敗沒有它）：呼叫過、沒有外部 ID 的列有它時，週期掃描不再以同一把鍵重送
--- （重送只會再被拒絕），管理員重試建立與重試關閉不看它。
--- seller_read_claimed_at 是上次賣家觸發的讀取被受理的時刻（含失敗與並行的；條件式 UPDATE 搶名額），同步 job 不讀寫。
--- purge_pending_at 是擁有者的清理已要求、還沒完成的時刻，與有沒有外部 ID 無關（清理 job 呼叫 provider 之前先標；刪列之前一直在）：本地列留著（保住 store_id 與外部 ID 或冪等鍵的對應），
--- 不被建立、不進同步輪詢、不被賣家／管理員的重新整理讀，由 payment 的週期掃描重排「關閉後刪除」，關閉（沒有外部 ID 的列先以冪等鍵取得外部帳戶）成功才刪列。
--- requirements_deadline 是同步讀到的待補條件的最早期限（Stripe v2 帳戶的 requirements.summary.minimum_deadline.time；沒有待補條件或沒有期限是 NULL），每次同步整列覆寫；
--- first_activated_at 是轉帳能力第一次啟用的同步時間，之後不再改（之後停用、再啟用都不重設），只有那一次同步發布的 PayoutAccountChanged 帶 FirstActivation（D23）。
--- purge_blocked_at 與 purge_blocked_reason 是清理的終局（D59、D60）：關閉被金流商拒絕、或標成等待清理後 7 天仍然關不掉或問不到金流商；列留著，不再被週期掃描重排，
--- 出現在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，由管理員「重試關閉」（清除終局並重新計算期限；原因是 unresolved_creation 的，冪等鍵保存期內以同一把鍵重送取回 ID 再關閉，超過保存期不能重試）或「已在金流商處理，刪除對應」（同一個 transaction 寫一筆 adminaudit 的後台紀錄並刪列，D62）。
--- purge_replay_requested_at 是管理員對清理終局（unresolved_creation）的列要求「以同一把鍵重送」的時刻（RetryPurge 排入 Replay job 時寫，重送結束不論結果都清除，取回 ID 重啟清理時一併清除）：
--- 有它表示重送排隊中或進行中，這段期間後端拒絕「刪除對應」與再次「重試關閉」，避免重送取回的帳戶 ID 因列被刪而無人關閉（K1）。只有終局的列才有（CHECK accounts_purge_replay_check）。
--- create_idempotency_key 是寫入「建立中」的列時產生的隨機 UUID（v4），建立外部帳戶的每次重試都用它當冪等鍵（Stripe 建議每個邏輯請求用隨機 UUID；
--- 不用 store_id，兩個資料庫共用同一個 Stripe 帳號時才不會撞到別人的帳戶）。同一個理由，建立外部帳戶時除了 metadata.store_id 還寫 metadata.hawkr_namespace
--- （設定 STRIPE_ACCOUNT_NAMESPACE，每個環境不同，D61）；程式不以 metadata 列出對帳（D63），寫它是為了之後要做全平台孤兒帳戶稽核時不必回填。
 CREATE TABLE payment.accounts (
     store_id               BIGINT      PRIMARY KEY,
     provider               TEXT        NOT NULL,
@@ -88,20 +55,6 @@ CREATE INDEX accounts_purge_pending ON payment.accounts (store_id) WHERE purge_p
 CREATE INDEX accounts_unresolved ON payment.accounts (store_id) WHERE external_account_id IS NULL AND create_called_at IS NOT NULL AND create_completed_at IS NULL AND purge_pending_at IS NULL AND create_refused_at IS NULL;
 CREATE INDEX accounts_purge_blocked ON payment.accounts (purge_blocked_at) WHERE purge_blocked_at IS NOT NULL;
 
--- 付款：買家一次結帳的一次收款，一個 PaymentIntent 對 N 張訂單應收（payment_orders；計畫 2026-11-23-b2-payment 的 D7、D8、D9、D13）。實體，主鍵 UUIDv7（應用層產生，不設 DEFAULT，row-identity ADR D1）；
--- 這一列是群組：amount 是各訂單應收的總額（跨列加總，單列 CHECK 守不住，由建立付款的 transaction 守），轉帳、退款與撤回都以 payment_orders 為單位；轉帳的 transfer_group 是這一列的 ID（一個 charge、N 筆轉帳）。
--- 同時只有一個有效的 PaymentIntent，重試在同一列上（D8；每次嘗試的 PaymentIntent 留在 payment_attempts）。amount 是整數，不帶幣別（D9：幣別由 adapter 的設定決定）。不建跨 schema 的 FK：
--- buyer_id 與各訂單的 store_id、order_no 是組裝點注入的訂單 port 在建立當下回的事實，寫成快照。
--- 建立付款分兩段（規則 5）：請求內的 transaction 只寫「建立中」的列（CREATING，沒有外部 ID）並排補做 job，提交之後在 transaction 外帶 create_idempotency_key
--- 呼叫 provider；成功就在新的 transaction 寫外部 ID 與狀態，失敗或逾時留 CREATING，補做 job 與週期掃描以同一把鍵重送。create_called_at 是第一次呼叫 provider
--- 之前寫入的時刻（NULL 表示從沒呼叫過）：「呼叫過、沒有外部 ID」是結果不明（ADR D68），冪等鍵保存期的下限之前以同一把鍵重送，之後只查回：找到就收下，
--- 查無要再過最短等待才進 CREATE_FAILED（failure_reason）；provider 已知拒絕（可重試）換新鍵，舊嘗試記 superseded_at、新嘗試另寫一列 payment_attempts，不計期限；
--- 與 provider 對不起來或查回連續失敗（create_lookup_failures）進 ANOMALY（failure_reason 記原因，佔住這張訂單的唯一性，補掃不再重試，由後台人工結案）。
--- CREATE_FAILED 與 CANCELED 的列在買家再次建立同一張訂單的付款時換新鍵重設回 CREATING。
--- status：CREATING 等建立；AWAITING_PAYMENT 已建立、等買家付款（含需要 3DS）；PROCESSING 付款處理中；SUCCEEDED 已入帳（終局，external_charge_id 是轉帳的
--- source_transaction，paid_at 是入帳時刻）；CANCELED 已取消（取消後仍可能因競態變成 SUCCEEDED：provider 的成功一律勝出）；CREATE_FAILED 建立的終局；ANOMALY 待人工結案。
--- 狀態只由 provider 的快照推導（讀取即最新），external_charge_id 與 paid_at 只在 SUCCEEDED 有。fetched_at 是寫入快照的讀取開始時間：較早開始的讀取不覆蓋較晚的（同 accounts 的 D32）。
--- last_error 是最近一次付款嘗試失敗的 provider 原因碼（只給後台與事件；成功後清除）。client_secret 不存：它是持有即授權的憑證，GetPayment 每次向 provider 讀。
 CREATE TABLE payment.payments (
     id                     UUID        PRIMARY KEY,
     buyer_id               BIGINT      NOT NULL,
@@ -141,10 +94,6 @@ CREATE UNIQUE INDEX payments_external ON payment.payments (provider, external_pa
 CREATE INDEX payments_creating ON payment.payments (created_at) WHERE status = 'CREATING';
 CREATE INDEX payments_open ON payment.payments (id) WHERE status IN ('AWAITING_PAYMENT', 'PROCESSING');
 
--- 訂單應收（D13）：一筆付款底下每張訂單一列，轉帳、退款、撤回與補差額都以它為鍵。實體，主鍵 UUIDv7。order_no 是訂單的人看的編號，UNIQUE：一張訂單只屬於一筆付款（唯一索引 payment_orders_order）。
--- 一張訂單只屬一家店（store_id，轉帳的去向依它）；amount 是這張訂單的應收金額（整數，D9），也是它的退款上限（扣掉非失敗退款）與轉帳金額的起點，以訂單一方給的應付金額為準、payment 不自己算。
--- N 在過渡期是 1（Java 一次結帳一張單）。列只在建立付款的 transaction 與買家重付的重設（付款未入帳，條款以重讀的訂單為準）寫入；付款入帳之後 store_id 與 amount 不再改。
--- 鎖順序：付款列、訂單應收列（同付款多列依 ID 升序）、轉帳列、退款列、撤回列。
 CREATE TABLE payment.payment_orders (
     id         UUID        PRIMARY KEY,
     payment_id UUID        NOT NULL REFERENCES payment.payments (id),
@@ -159,13 +108,6 @@ CREATE TABLE payment.payment_orders (
 CREATE UNIQUE INDEX payment_orders_order ON payment.payment_orders (order_no);
 CREATE INDEX payment_orders_payment ON payment.payment_orders (payment_id);
 
--- 付款嘗試歷程（D8 補充）：一張訂單的付款列一對多，每次建立 PaymentIntent 的嘗試一列（provider、外部 ID、冪等鍵、建立與呼叫時刻）。實體，主鍵 UUIDv7。
--- 一張訂單同時只有一個有效的 PaymentIntent：superseded_at 為 NULL 的是有效的那一個，唯一索引 payment_attempts_effective 守它；付款列的 external_payment_id、
--- create_idempotency_key、create_called_at 是有效嘗試的鏡像。買家在 Stripe 取消後重付時，舊嘗試記 superseded_at、新的嘗試另寫一列，舊 PaymentIntent 的外部 ID 留在這裡：
--- 事件與同步依外部 ID 經這張表對回付款列，舊 PaymentIntent 晚到的成功不會因為付款列已換新 ID 而找不到。
--- state 是這個 PaymentIntent 最近一次讀到的 provider 狀態（NULL 表示還沒讀過），fetched_at 是寫入它的讀取開始時間（較早開始的讀取不覆蓋較晚的）。
--- 舊嘗試晚到成功時，付款列還沒入帳就把它換成有效的嘗試（記成功並發事件，新的嘗試排取消）；付款列已經以另一個 PaymentIntent 入帳時，這一列記 excess_paid_at
--- （重複入帳：同一張訂單有兩個 PaymentIntent 都扣到款，不自動退款，由訂單一方發起退款或後台處理；索引 payment_attempts_excess 給後台查）。
 CREATE TABLE payment.payment_attempts (
     id                  UUID        PRIMARY KEY,
     payment_id          UUID        NOT NULL REFERENCES payment.payments (id),
@@ -191,16 +133,6 @@ CREATE UNIQUE INDEX payment_attempts_key ON payment.payment_attempts (idempotenc
 CREATE INDEX payment_attempts_payment ON payment.payment_attempts (payment_id);
 CREATE INDEX payment_attempts_excess ON payment.payment_attempts (excess_paid_at) WHERE excess_paid_at IS NOT NULL;
 
--- 轉帳：訂單完成後平台把這張訂單應收的款項轉給賣家（separate charges and transfers，D1、D6、D13；同一個 charge 可以拆成 N 筆轉帳，帶同一個 transfer_group 與 source_transaction）。
--- 一張訂單應收最多一筆有效轉帳：唯一索引 transfers_active_order 涵蓋 PENDING、SUCCEEDED 與 ANOMALY（FAILED 不佔，失敗後可以重建；ANOMALY 與 provider 對不起來，不能確定沒有搬錢，所以佔位）。
--- amount 是轉給賣家的整數金額，在 job 每把冪等鍵第一次送出前（claim）鎖付款列、以「訂單應收金額減這張訂單的非失敗退款」算定，與 called_at 同一個 transaction 寫入（D11、D13、ADR D69）；
--- 寫列時的 amount 只是暫定值，called_at 為空時不當成已承諾的金額（退款據此判斷要不要撤回），called_at 不為空時同一把鍵的 amount 不再改。算出來不大於 0 時不呼叫 provider：退款全部終局才進 FAILED（fully_refunded），
--- 還有進行中的退款（PENDING、REFUNDING、ANOMALY）時轉帳保持 PENDING、不承諾金額，等它們終局（失敗的退款不在金額裡，賣家照常收到）。destination_account_id 是寫列當下賣家收款帳戶的外部 ID 快照（帳戶列日後被清理刪除時，轉帳仍查得到去向）。
--- status：PENDING 已寫列、尚未呼叫或結果不明；SUCCEEDED provider 已建立轉帳（external_transfer_id）；FAILED 終局失敗（failure_reason）；ANOMALY 待人工結案（failure_reason 記原因，補掃不再重試）。
--- called_at 是這把鍵第一次呼叫 provider 之前寫入的時刻，語意同 payments.create_called_at；idempotency_key 是呼叫 provider 的冪等鍵，結果不明時每次重送沿用，
--- provider 已知拒絕（可重試）時換新鍵並清掉 called_at（下一次送出重新 claim、重算 amount）；它也是寫進 provider 物件的嘗試 ID，查回依它比對。lookup_failures 是連續查回失敗的次數。
--- 部分撤回：退款先退買家、provider 接受之後才向賣家收回。每一次對 provider 的撤回呼叫記一列 payment.refund_reversals，累計撤回額 reversed_amount 記在轉帳列，
--- 同一個 transaction 內鎖轉帳列後更新；reversed_amount 不超過 amount（CHECK transfers_reversed_check），剩餘可撤額是 amount - reversed_amount。賣家餘額不足不是錯誤，所以沒有對應的狀態。
 CREATE TABLE payment.transfers (
     id                     UUID        PRIMARY KEY,
     payment_order_id       UUID        NOT NULL REFERENCES payment.payment_orders (id),
@@ -234,27 +166,6 @@ CREATE UNIQUE INDEX transfers_active_order ON payment.transfers (payment_order_i
 CREATE UNIQUE INDEX transfers_external ON payment.transfers (external_transfer_id) WHERE external_transfer_id IS NOT NULL;
 CREATE INDEX transfers_pending ON payment.transfers (updated_at, id) WHERE status = 'PENDING';
 
--- 退款：一張訂單應收可以同時有多筆進行中的退款（D4、D13），累計上限（這張訂單的非失敗退款加總不超過它的應收金額，ANOMALY 也算）由退款 use case 在同 transaction 鎖付款列與訂單應收列後加總來守
--- （跨列加總，單列 CHECK 守不住；鎖順序：付款列、訂單應收列、轉帳列、退款列，同層多列依 ID 升序）。request_key 是呼叫端給的冪等鍵，(payment_order_id, request_key) 唯一：同一把鍵重送得到同一列。
--- auto 標示自動退款（D5 修訂：由訂單一方發起，payment 只標記原因，完成時發 AutoRefundCompleted）。
--- 退款狀態機（D11、ADR D69）：PENDING 已寫列、尚未呼叫 provider；REFUNDING 已呼叫（refund_called_at，冪等鍵 idempotency_key，同時是嘗試 ID）、provider 回了物件（external_refund_id）而還沒終局；
--- SUCCEEDED；FAILED（failure_reason，不佔額度）；ANOMALY 待人工結案（failure_reason 記原因，佔額度，補掃不再重試）。轉帳的任何狀態都可以退款。
--- 向賣家收回是退款列上並行的另一條狀態 reversal_status，只存彙總：reversal_amount 是預留要收回的總額，reversal_recovered 是已成立的撤回加總。
--- 一次收回可以跨多個 provider 轉帳（原轉帳與成功的補差額轉帳，各自有 provider 上的剩餘可撤額），每一次 provider 撤回呼叫是一列 payment.refund_reversals，各自收斂（D10、D68）。
--- NONE 不需要收回（reversal_amount = 0）；WAITING 已預留 reversal_amount、尚未開始（等「provider 接受退款（REFUNDING 或 SUCCEEDED）且轉帳 SUCCEEDED」，兩個事件誰後到誰開始）；
--- REVERSING 撤回列已建立、至少一列進行中；REVERSED 全部撤回列成立（reversal_recovered = reversal_amount）；RELEASED 預留已釋出（reversal_reason 記原因；撤回列終局但不是全部成立，
--- 或在撤回列建立前釋出，已成立的部分留在 reversal_recovered）；ANOMALY 至少一列與 provider 對不起來，預留持續佔住直到人工結案（reversal_reason 記原因）。
--- 彙總狀態由撤回列推導（ANOMALY 優先於 REVERSING，再來是 RELEASED、REVERSED），與撤回列的改動同一個 statement 重算。
--- 預留額 = WAITING、REVERSING、ANOMALY 的 reversal_amount - reversal_recovered 加總；新退款的 reversal_amount = min(退款額, 轉帳 amount - reversed_amount
--- + 成功的補差額轉帳的（退款額 - topup_reversed_amount）- 其他預留)。
--- 補差額轉帳（D11 補充）：transfer_deducted 為真表示這筆退款已算進有效轉帳的金額（轉帳在某把鍵第一次送出時以「付款金額減非失敗退款」算定，當時它不是 FAILED），
--- 由轉帳的 claim 在同一個 transaction 依當下的退款重寫，轉帳終局失敗時清掉；它之後才失敗，賣家就少收了這筆錢，要補一筆轉帳給賣家（topup_*），不留在平台。
--- topup_status：NONE 不需要補（退款沒有算進轉帳金額，或沒有失敗）；WAITING 退款已失敗、轉帳金額含它，等轉帳 SUCCEEDED（兩個事件誰後到誰排 job）；SENDING 補差額轉帳進行中
--- （topup_idempotency_key 同時是嘗試 ID，呼叫前記 topup_called_at，收斂同轉帳，D68；金額一律是退款額，帶同一個 transfer_group 與來源 charge，查回依嘗試 ID）；DONE 已補（topup_external_id）；
--- RELEASED 不補了（topup_reason 記原因：轉帳失敗或重新算定金額時它不在內，或補差額永久被拒絕）；ANOMALY 與 provider 對不起來，待人工結案（topup_reason 記原因）。
--- 補差額轉帳不是轉帳列：不佔 transfers_active_order，也不動轉帳列的 amount 與 reversed_amount；它只存在於已失敗的退款列上，一筆退款最多一筆。
--- 補差額轉帳成功（DONE）後也是一個可以被撤回的 provider 轉帳：topup_reversed_amount 是它累計已撤回的額度（不超過退款額，CHECK refunds_topup_reversed_check），
--- 同一個 transaction 內鎖該退款列後更新，剩餘可撤額是 amount - topup_reversed_amount。
 CREATE TABLE payment.refunds (
     id                       UUID        PRIMARY KEY,
     payment_order_id         UUID        NOT NULL REFERENCES payment.payment_orders (id),
@@ -317,12 +228,6 @@ CREATE UNIQUE INDEX refunds_topup_external ON payment.refunds (topup_external_id
 CREATE INDEX refunds_topup_sending ON payment.refunds (updated_at, id) WHERE topup_status = 'SENDING';
 CREATE INDEX refunds_open ON payment.refunds (updated_at, id) WHERE status IN ('PENDING', 'REFUNDING');
 
--- 向賣家收回的撤回列：每一次 provider 撤回呼叫一列（D10、D11、ADR D69）。一筆退款的收回依固定順序分給可撤的轉帳：先原轉帳（seq 0，target_refund_id 是 NULL），
--- 再依退款 ID 升序的成功補差額轉帳（target_refund_id 是擁有那筆補差額轉帳的退款，seq 1 起）；每個目標取 min(還沒分的額度, 目標剩餘可撤額 - 進行中的撤回列)，
--- 所以一筆退款最多 1 + N 列（N 是這張訂單應收上成功的補差額轉帳數；撤回只在這張訂單的轉帳上，不碰同付款別張訂單的轉帳）。target_external_id 是目標在 provider 上的轉帳 ID 快照。
--- status：REVERSING 進行中（開始收回時建立，idempotency_key 同時是嘗試 ID，呼叫前記 called_at，收斂同轉帳，D68；lookup_failures 是連續查回失敗次數）；
--- REVERSED 撤回成立（external_id，目標的累計撤回額同一個 transaction 累加）；RELEASED 沒有撤回（reason 記原因：provider 永久拒絕、查無）；ANOMALY 與 provider 對不起來，
--- 佔住目標的額度直到人工結案（reason 記原因）。進行中與 ANOMALY 的列佔目標的額度。鎖順序：付款列、訂單應收列、轉帳列、退款列（依 ID 升序，含補差額轉帳的擁有者）、撤回列（依 ID 升序）。
 CREATE TABLE payment.refund_reversals (
     id                 UUID        PRIMARY KEY,
     refund_id          UUID        NOT NULL REFERENCES payment.refunds (id),

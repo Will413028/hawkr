@@ -313,7 +313,6 @@ describe("shared Link intent prefetch", () => {
 			});
 			const props = renderLink({ href: "/faq" });
 
-			// onMouseEnter (pointer) is suppressed on 3G
 			props.onMouseEnter?.(
 				intentEvent(
 					"https://example.com/faq",
@@ -321,7 +320,6 @@ describe("shared Link intent prefetch", () => {
 			);
 			expect(prefetch).not.toHaveBeenCalled();
 
-			// onFocus is allowed on 3G
 			props.onFocus?.(
 				intentEvent(
 					"https://example.com/faq",

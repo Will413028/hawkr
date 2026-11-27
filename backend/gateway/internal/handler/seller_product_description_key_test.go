@@ -13,12 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 商品描述 block 的 imageKey（對外欄名；proto 側仍叫 object_key）是前端可控寫入面
-// （49 號 §25 / 10 檔 §25）。
-// product-service 只在 stagedToken finalize 成功時覆寫該欄位，因此任何未經正規化
-// 的值會直接落進 products.description，並隨「載入→再送出」自我複製。
-// 以下測試釘住 Gateway 邊界的四種輸入行為：裸 key 原樣、我方 URL 剝殼、外來域名 400、
-// 非白名單前綴 400。
 
 const descKeyTestMediaBase = "https://test-media.example.com"
 
@@ -61,9 +55,6 @@ func descHolderWithCapture(t *testing.T) (*Holder, func() *productpb.ProductDesc
 	return h, captured, func() bool { return called }
 }
 
-// minimalSku 是通過 CreateProductRequest 驗證所需的最小 SKU（建立商品必填至少一個 SKU，
-// 且每個 SKU 的 skuName/unit/price/stockQty/weight/材積都必填——見 CreateSkuInput）。
-// 本檔測的是 description objectKey 的處理，SKU 只是讓請求合法的背景資料。
 const minimalSku = `{"skuName":"s1","unit":"3301","price":"100","stockQty":"5",` +
 	`"weight":"1","lengthCm":"10","widthCm":"10","heightCm":"10"}`
 

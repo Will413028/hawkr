@@ -84,7 +84,6 @@ public class ShippingFeeService implements ComponentReadiness {
     }
 
     private void loadCache() {
-        // 載入 configs
         List<ShippingMethodConfigEntity> configs = configMapper.selectList(
                 new LambdaQueryWrapper<ShippingMethodConfigEntity>()
                         .eq(ShippingMethodConfigEntity::getEnabled, true));
@@ -94,7 +93,6 @@ public class ShippingFeeService implements ComponentReadiness {
             newConfigCache.put(configKey(c.getShippingMethod(), c.getDeliveryTemp()), c);
         }
 
-        // 載入 tiers
         List<ShippingFeeTierEntity> tiers = tierMapper.selectList(
                 new LambdaQueryWrapper<ShippingFeeTierEntity>()
                         .eq(ShippingFeeTierEntity::getEnabled, true)
@@ -106,14 +104,12 @@ public class ShippingFeeService implements ComponentReadiness {
                         ConcurrentHashMap::new,
                         Collectors.toList()));
 
-        // 原子替換
         this.configCache = newConfigCache;
         this.tierCache = newTierCache;
         this.allConfigs = List.copyOf(configs);
         this.allTiers = List.copyOf(tiers);
     }
 
-    // ==================== 查詢 API ====================
 
     /**
      * 取得配送方式設定
@@ -159,13 +155,11 @@ public class ShippingFeeService implements ComponentReadiness {
         }
 
         for (ShippingFeeTierEntity tier : tiers) {
-            // maxDimensionCm=0 表示統一價
             if (tier.getMaxDimensionCm() == 0 || dimensionSum <= tier.getMaxDimensionCm()) {
                 return tier.getFee();
             }
         }
 
-        // 超過最大級距
         return null;
     }
 
@@ -202,31 +196,26 @@ public class ShippingFeeService implements ComponentReadiness {
             deliveryZone = DeliveryZoneKey.DOMESTIC.value();
         }
 
-        // 依溫層分組
         Map<ShippingTemperature, List<ShippingOptionItem>> grouped = new LinkedHashMap<>();
 
         for (ShippingTemperature temp : ShippingTemperature.values()) {
             List<ShippingOptionItem> methods = new ArrayList<>();
 
             for (ShippingMethod method : List.of(ShippingMethod.TAQBIN, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP)) {
-                // 賣家開通狀態過濾（物流設定獨立化）
                 if (sellerAvailableMethods != null) {
-                    // 宅配不分溫層，key 為 "TAQBIN:"
-                    // 超商分溫層，key 為 "SEVEN_ELEVEN_STORE_PICKUP:AMBIENT" 或 "SEVEN_ELEVEN_STORE_PICKUP:FROZEN"
                     String filterKey = method == ShippingMethod.TAQBIN
                             ? method.value() + ":"
                             : method.value() + ":" + temp.value();
                     if (!sellerAvailableMethods.contains(filterKey)) {
-                        continue; // 賣家未開通此配送方式
+                        continue;
                     }
                 }
 
                 ShippingMethodConfigEntity config = getConfig(method.value(), temp.value());
                 if (config == null) {
-                    continue; // 該組合不可用（如 7-11 冷藏）
+                    continue;
                 }
 
-                // 檢查限制
                 if (config.getMaxDimensionSumCm() > 0 && dimensionSum > config.getMaxDimensionSumCm()) {
                     continue;
                 }
@@ -237,14 +226,13 @@ public class ShippingFeeService implements ComponentReadiness {
                     continue;
                 }
 
-                // 店到店固定 DOMESTIC
                 String zone = method == ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP
                         ? DeliveryZoneKey.DOMESTIC.value()
                         : deliveryZone;
 
                 Long fee = lookupFee(method.value(), temp.value(), zone, dimensionSum);
                 if (fee == null) {
-                    continue; // 無對應費率
+                    continue;
                 }
 
                 methods.add(new ShippingOptionItem(
@@ -267,7 +255,6 @@ public class ShippingFeeService implements ComponentReadiness {
         return new CalculateResult(grouped, weightGrams, dimensionSum, longestSide);
     }
 
-    // ==================== 商品配送驗證 ====================
 
     /**
      * 驗證商品配送方式合法性（材積、重量、賣家開通狀態）
@@ -280,7 +267,6 @@ public class ShippingFeeService implements ComponentReadiness {
         List<ValidationResultItem> results = new ArrayList<>();
         boolean allValid = true;
 
-        // 反推「該 method 是否有任何溫層已開通」— 用於區分 METHOD_NOT_ONBOARDED vs TEMPERATURE_NOT_ONBOARDED
         Set<String> sellerOnboardedMethods = sellerAvailableMethods == null
                 ? null
                 : sellerAvailableMethods.stream()
@@ -296,7 +282,6 @@ public class ShippingFeeService implements ComponentReadiness {
             String methodLabel = methodLabel(method);
             String tempLabel = temperatureLabel(temp);
 
-            // 0. 系統層級檢查:該 method 是否有任何 enabled config(如 Uber Phase 1 預留全系統暫停)
             if (!hasAnyEnabledConfig(method)) {
                 allValid = false;
                 results.add(new ValidationResultItem(
@@ -307,7 +292,6 @@ public class ShippingFeeService implements ComponentReadiness {
                 continue;
             }
 
-            // 1. 賣家開通狀態檢查（(method, temperature) 配對粒度）
             if (sellerAvailableMethods != null) {
                 String filterKey = ShippingMethod.TAQBIN.value().equals(method)
                         ? method + ":"
@@ -334,7 +318,6 @@ public class ShippingFeeService implements ComponentReadiness {
                 }
             }
 
-            // 2. 配送方式+溫層組合是否存在
             ShippingMethodConfigEntity config = getConfig(method, temp);
             if (config == null) {
                 allValid = false;
@@ -349,7 +332,6 @@ public class ShippingFeeService implements ComponentReadiness {
             int dimensionSum = item.lengthCm() + item.widthCm() + item.heightCm();
             int longestSide = Math.max(item.lengthCm(), Math.max(item.widthCm(), item.heightCm()));
 
-            // 3. 材積總和檢查
             if (config.getMaxDimensionSumCm() > 0 && dimensionSum > config.getMaxDimensionSumCm()) {
                 allValid = false;
                 results.add(new ValidationResultItem(
@@ -360,7 +342,6 @@ public class ShippingFeeService implements ComponentReadiness {
                 continue;
             }
 
-            // 4. 單邊長度檢查
             if (config.getMaxSingleSideCm() > 0 && longestSide > config.getMaxSingleSideCm()) {
                 allValid = false;
                 results.add(new ValidationResultItem(
@@ -371,7 +352,6 @@ public class ShippingFeeService implements ComponentReadiness {
                 continue;
             }
 
-            // 5. 重量檢查
             if (config.getMaxWeightGrams() > 0 && item.weightGrams() > config.getMaxWeightGrams()) {
                 allValid = false;
                 results.add(new ValidationResultItem(
@@ -382,7 +362,6 @@ public class ShippingFeeService implements ComponentReadiness {
                 continue;
             }
 
-            // 全部通過
             results.add(new ValidationResultItem(
                     item.skuName(), method, temp, true,
                     "", "", 0, 0, 0L));
@@ -413,7 +392,6 @@ public class ShippingFeeService implements ComponentReadiness {
         }
     }
 
-    // ==================== Key 工具方法 ====================
 
     private static String configKey(String method, String temp) {
         return method + ":" + temp;
@@ -423,7 +401,6 @@ public class ShippingFeeService implements ComponentReadiness {
         return method + ":" + temp + ":" + zone;
     }
 
-    // ==================== 結果 DTO ====================
 
     public record CalculateResult(
             Map<ShippingTemperature, List<ShippingOptionItem>> temperatureGroups,
@@ -443,7 +420,6 @@ public class ShippingFeeService implements ComponentReadiness {
             long maxWeightGrams
     ) {}
 
-    // ==================== 驗證 DTO ====================
 
     public record ValidationItem(
             String skuName,

@@ -12,13 +12,10 @@ import (
 // 兩邊只在這裡對得上（Stripe 的 Search 是最終一致的，不用；列表是強一致的）。
 const MetaAttemptID = "attempt_id"
 
-// listPageLimit 是列表每頁的筆數。查回一律帶 created 下限（見 createdFilter）並翻到列表結束，沒有頁數上限：整份列表沒看完（ctx 的 deadline 到了、某一頁失敗）就回錯誤，不回「找不到」。
 const listPageLimit = 100
 
-// errNoLowerBound 標示查回沒有 created 下限：沒有下限的列表是整個平台的歷史，看不完也不能證明不存在。
 var errNoLowerBound = errors.New("stripe：查回需要 created 下限")
 
-// createdFilter 把 created 下限轉成列表的 created[gte]（Unix 秒，無條件捨去，只會讓範圍變大）；零值是呼叫端的錯。
 func createdFilter(after time.Time) (*sdk.RangeQueryParams, error) {
 	if after.IsZero() {
 		return nil, errNoLowerBound
@@ -378,8 +375,6 @@ func withAttempt(extra map[string]string, attemptID string) map[string]string {
 	return m
 }
 
-// listPages 逐頁（每頁各是一次有 deadline 的呼叫）列出項目，match 為真就停；翻完回 nil（沒有符合的）。沒有頁數上限：範圍由呼叫端的 created 下限界定，
-// 整份列表沒看完（某一頁失敗、ctx 到了 deadline）回錯誤，有更多卻沒有可接續的項目也回錯誤。
 func listPages[T any](ctx context.Context, c *Client, fetch func(ctx context.Context, after string) *sdk.V1List[T], id func(T) string, match func(T) bool) error {
 	after := ""
 	for {

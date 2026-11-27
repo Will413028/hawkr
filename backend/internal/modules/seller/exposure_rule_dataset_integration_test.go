@@ -16,8 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 )
 
-// exposureCase 是資料集的一家店：missing 是在建立時刻（base）人工標註的 PUBLIC_LISTING 缺項；exposableAt 是各評估時刻的人工標註
-// （沒有列的時刻與 base 相同）。
 type exposureCase struct {
 	name        string
 	storeID     int64
@@ -118,7 +116,6 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	exec("UPDATE seller.payout_capabilities SET transfers_active = false WHERE store_id = $1", id)
 	add("收款帳戶的轉帳能力未啟用", id, []Requirement{RequirementOnboardingComplete}, nil)
 
-	// 措施會記下帳號的身分快照，之後同一個身分就不能再通過 KYC：先建好所有要套措施的店，再建立措施。
 	measured := make([]int64, 5)
 	for i := range measured {
 		_, measured[i] = exposable()
@@ -135,7 +132,6 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 	add("開放式 RISK 停權", id, []Requirement{RequirementNotSuspended}, nil)
 
 	id = measured[2]
-	// 解除 RISK 停權是把結束時間設在下一刻（base+1µs）：base 那一刻仍生效，之後不生效。
 	_, err = f.lift(ctx, f.riskSuspend(t, id))
 	must(t, err)
 	f.now = base
@@ -190,7 +186,6 @@ func TestExposureRuleAgreesBetweenSQLAndGoOnADataset(t *testing.T) {
 		}
 	}
 
-	// 開通條件（SQL）等於「目前那一筆申請已核准而且收款帳戶的轉帳能力啟用」：Go 以申請狀態與閘門副本（payout_capabilities）各自重算一次。
 	applications, err := q.CurrentKYCStatuses(ctx, ids)
 	must(t, err)
 	approvedApplication := map[int64]bool{}

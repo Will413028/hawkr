@@ -84,7 +84,6 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
 }
 
-// exposableStore 為帳號開一家可以公開曝光的店（直接寫 seller 的表，最小的列；KYC 的約束先放寬，與 coupon、social 的 integration fixture 同一個做法）。
 func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -111,15 +110,12 @@ func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
 }
 
-// monolith 是單體的 Connect 入口加它的資料庫、identity、seller 與 catalog 模組：handler 與 production 一樣由 httpapi.NewHandler 組出，
-// 資料庫是 testdb 的真實 Postgres；media 是記憶體內的 Fake（圖片的 token 任意，不連儲存）。
 type monolith struct {
 	db       *db.DB
 	identity *identity.Module
 	buyers   *buyer.Module
 	sellers  *seller.Module
 	srv      *httptest.Server
-	// adminToken 是已授予 OWNER 的 dev 管理員 token。
 	adminToken string
 }
 
@@ -180,7 +176,6 @@ func startMonolith(t *testing.T) *monolith {
 	return &monolith{db: d, identity: id, buyers: buyers, sellers: sellers, srv: srv, adminToken: adminToken}
 }
 
-// newCustomer 建立一個 dev session 帳號；withStore 為真時再為它開一家可曝光的店。回傳 token 與店家 ID（沒有店是空字串）。
 func (m *monolith) newCustomer(t *testing.T, withStore bool) (token, storeID string) {
 	t.Helper()
 	ctx := t.Context()

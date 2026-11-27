@@ -74,7 +74,6 @@ class NotificationDeepLink {
         if (s.length == 3 && s[1] == 'inquiries') return _Inquiry(s[2]);
         return const _Inbox();
       case 'sellers':
-        // 店家論壇串：App 沒有單串頁面，到論壇所在的店家頁籤。
         if (s.length == 4 && s[2] == 'messages') return const _Forum();
         return const _Inbox();
       default:
@@ -125,7 +124,6 @@ class NotificationDeepLink {
     }
   }
 
-  // 先切 shell tab 保留底部導覽列，下一幀再疊子頁。
   static void _overShell(
     BuildContext ctx,
     String shell,

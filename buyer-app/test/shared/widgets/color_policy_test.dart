@@ -73,7 +73,6 @@ void main() {
           .toSet();
       const allowed = <String>{
         '000000',
-        // LINE 登入按鈕（LINE 的品牌色）。
         '06C755',
         '191C18',
         '1A1F71',
@@ -109,7 +108,6 @@ void main() {
         'FF3B4F',
         'FFFDF7',
         'FFFFFF',
-        // ink 色階（brandInk 與 brandInkOnDark 之間的中性藍灰）。
         '161C23',
         '28333F',
         '323F4B',

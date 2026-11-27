@@ -35,7 +35,6 @@ public record PayUniApiResponse(
         return decryptedData != null ? decryptedData.get(key) : null;
     }
 
-    // ===== 業務 getter（同時支援 v2.0 Result[0][...] 與 v1.x 頂層格式）=====
 
     /**
      * 取得 MerTradeNo（系統交易編號）
@@ -134,9 +133,6 @@ public record PayUniApiResponse(
         return (v == null || v.isEmpty()) ? null : v;
     }
 
-    // ===== 撥款查詢（grant_query）Result 陣列逐筆取值（§5.6 去重硬化 B）=====
-    // 解密後 decryptedData 的 key 形如 Result[0][TradeNo] / Result[1][Type] ...（PayUniHttpClient
-    // parseResponse 解 URL query string；欄位名依代理商專用 API 總覽 §6.4 實名，不臆造）。
 
     /**
      * grant_query 回傳的 Result 陣列筆數（以 Result[i][TradeNo] / Result[i][Type] 是否存在為界）。

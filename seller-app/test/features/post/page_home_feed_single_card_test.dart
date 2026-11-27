@@ -224,7 +224,6 @@ void main() {
             expect(tester.widget<Text>(caption).maxLines, 1);
             expect(tester.getSize(toggle).height, greaterThanOrEqualTo(48));
 
-            // Only the caption panel grows; the photo window and action bar stay put.
             await tester.ensureVisible(toggle);
             final toggleLabelRight = tester.getTopRight(find.text('查看說明')).dx;
             await tester.tap(toggle);

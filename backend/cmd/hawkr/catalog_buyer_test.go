@@ -14,7 +14,6 @@ import (
 type fakeRestockBuyers struct {
 	inputs []buyer.FanOutInput
 	more   []bool
-	// notified 是每次呼叫處理的筆數，沒給時每批都是 1 筆。
 	notified []int
 	err      error
 	purged   [][]uuid.UUID

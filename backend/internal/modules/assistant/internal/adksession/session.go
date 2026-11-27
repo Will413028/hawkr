@@ -11,9 +11,6 @@ import (
 	"google.golang.org/adk/v2/session"
 )
 
-// liveSession 是 Create、Get、List 回給呼叫端的 session，也是 AppendEvent 就地更新的對象：
-// runner 在同一輪 invocation 內一邊 AppendEvent、一邊從同一個 session 讀 events 與 state 組 prompt，
-// 所以 AppendEvent 成功後要讓這個物件反映新 event（行為同 ADK 的記憶體與資料庫實作）。
 type liveSession struct {
 	appName   string
 	userID    string
@@ -44,8 +41,6 @@ func (s *liveSession) LastUpdateTime() time.Time {
 	return s.updatedAt
 }
 
-// applyAppended 在 AppendEvent 的 transaction 提交之後呼叫：state 套完整的 delta（含 temp: key，
-// temp 只活在這一輪 invocation 的記憶體裡），events 只放已剝除 temp: key 的版本。
 func (s *liveSession) applyAppended(delta map[string]any, stored *session.Event, at time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -118,8 +113,6 @@ func (s *liveState) Set(key string, value any) error {
 	return nil
 }
 
-// splitDelta 把一份 state delta 依前綴分成 app、user、session 三層（前綴已去掉，app、user 層）；
-// temp: 前綴的 key 在這裡被丟掉，不會進任何一層。
 func splitDelta(delta map[string]any) (app, user, sess map[string]any) {
 	app, user, sess = map[string]any{}, map[string]any{}, map[string]any{}
 	for k, v := range delta {
@@ -134,7 +127,6 @@ func splitDelta(delta map[string]any) (app, user, sess map[string]any) {
 	return app, user, sess
 }
 
-// mergeStates 把三層 state 合成呼叫端看到的一份：app、user 層的 key 加回前綴。
 func mergeStates(app, user, sess map[string]any) map[string]any {
 	merged := make(map[string]any, len(app)+len(user)+len(sess))
 	maps.Copy(merged, sess)
@@ -147,8 +139,6 @@ func mergeStates(app, user, sess map[string]any) map[string]any {
 	return merged
 }
 
-// withoutTempKeys 回傳 StateDelta 不含 temp: key 的 event。沒有 temp: key 時回傳原物件；
-// 有的話複製一份，不改呼叫端手上的 event（agent 的後續 callback 在同一輪還會用到 temp: key）。
 func withoutTempKeys(ev *session.Event) *session.Event {
 	if len(ev.Actions.StateDelta) == 0 {
 		return ev

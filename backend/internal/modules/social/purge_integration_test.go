@@ -41,7 +41,6 @@ func TestBuyerDeletionEnqueuesAnIdempotentPurge(t *testing.T) {
 	if !slices.Equal(f.jobs.kinds(), []string{"social.purge_buyer_content"}) {
 		t.Fatalf("進入刪除中同 transaction 排清除 job：%v", f.jobs.kinds())
 	}
-	// job 跑之前，可見性已經改好：訂閱者在同一個 transaction 記下複本並讓旗標由真轉假，留言與討論區讀不到。
 	page := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, p.ID, nil, 10))
 	if len(page.Comments) != 1 || page.Comments[0].ID != cs.ID {
 		t.Fatalf("刪除中的買家的留言讀不到：%+v", page.Comments)
@@ -74,7 +73,6 @@ func TestBuyerDeletionEnqueuesAnIdempotentPurge(t *testing.T) {
 	}
 	f.assertStatsMatchTheDataset(t, "清除之後")
 	_ = cl
-	// 重跑、以及關閉（BuyerDeleted）再排一次：結果相同。
 	f.jobs.reset()
 	must(t, f.buyers.CloseForDeletion(ctx, leaving.BuyerID))
 	if n := strings.Count(strings.Join(f.jobs.kinds(), ","), "social.purge_buyer_content"); n != 1 {
@@ -107,7 +105,6 @@ func TestStoreRetirementEnqueuesAnIdempotentPurge(t *testing.T) {
 	c := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: keep.ID, Body: "別家貼文的留言"}))
 	reply := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, otherID), social.CommentInput{PostID: keep.ID, Body: "x", ParentID: &c.ID}))
 	_ = reply
-	// 店家身分的留言只存在於它自己的貼文與討論區（actor.ForWrite 只在資源屬於呼叫者的店時推導出 STORE）。
 	storeComment := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asStore(t, storeID), social.CommentInput{PostID: p.ID, Body: "自己貼文下的"}))
 	_ = storeComment
 	if got := mustV[[]social.HashtagCount](t)(f.module.SuggestHashtags(ctx, "水", false, 10)); len(got) != 1 || got[0].Posts != 2 {
@@ -120,7 +117,6 @@ func TestStoreRetirementEnqueuesAnIdempotentPurge(t *testing.T) {
 	if !slices.Equal(f.jobs.kinds(), []string{"social.purge_store_content"}) {
 		t.Fatalf("只排清除 job：%v", f.jobs.kinds())
 	}
-	// 店家不再可曝光（退場前 seller 已經擋住）：讀取時不算它的標籤。
 	f.setExposable(t, storeID, false)
 	if got := mustV[[]social.HashtagCount](t)(f.module.SuggestHashtags(ctx, "水", false, 10)); len(got) != 1 || got[0].Posts != 1 {
 		t.Fatalf("標籤數量在讀取時算，退場的店不算（SD16）：%+v", got)
@@ -181,7 +177,6 @@ func TestBuyerPurgeScrubsBodiesAndKeepsTombstones(t *testing.T) {
 		t.Fatal("作者自己刪除時內文仍然保留（一般刪除存的東西不變）")
 	}
 
-	// CHECK：內文 NULL 只能出現在已刪除的列（未刪除的留言與討論區留言不能清空內文）。
 	for _, q := range []string{
 		"UPDATE social.comments SET body = NULL WHERE id = $1",
 		"UPDATE social.forum_entries SET body = NULL WHERE id = $1",
@@ -197,9 +192,8 @@ func TestBuyerPurgeScrubsBodiesAndKeepsTombstones(t *testing.T) {
 
 	must(t, f.buyers.BeginDeletion(ctx, leaving.BuyerID))
 	must(t, f.module.PurgeBuyerContent(ctx, leaving.BuyerID))
-	must(t, f.module.PurgeBuyerContent(ctx, leaving.BuyerID)) // 重跑冪等
+	must(t, f.module.PurgeBuyerContent(ctx, leaving.BuyerID))
 
-	// social 的每一個文字欄位都找不到他寫過的字（內文，也包含留言事件、隱藏紀錄等別處）。
 	rows, err := f.db.Conn(ctx).Query(ctx, `SELECT table_name, column_name FROM information_schema.columns
 		WHERE table_schema = 'social' AND data_type IN ('text', 'character varying', 'jsonb', 'json') ORDER BY 1, 2`)
 	must(t, err)
@@ -219,7 +213,6 @@ func TestBuyerPurgeScrubsBodiesAndKeepsTombstones(t *testing.T) {
 			t.Errorf("social.%s.%s 還留著買家寫過的字：%d 列", c.table, c.column, n)
 		}
 	}
-	// 列還在，內文是 NULL、deleted_at 已設；別人的內容完整。
 	if n := f.scalar(t, "SELECT count(*) FROM social.comments WHERE actor_kind = 'BUYER' AND actor_id = $1 AND body IS NULL AND deleted_at IS NOT NULL", leaving.BuyerID); n != 2 {
 		t.Fatalf("買家的 2 則留言要留下 NULL 內文的墓碑：%d", n)
 	}
@@ -229,7 +222,6 @@ func TestBuyerPurgeScrubsBodiesAndKeepsTombstones(t *testing.T) {
 	if n := f.scalar(t, "SELECT count(*) FROM social.comments WHERE body IN ('店家的回覆', '留下的人的留言') ") + f.scalar(t, "SELECT count(*) FROM social.forum_entries WHERE body IN ('店家回討論', '留下的人的討論')"); n != 4 {
 		t.Fatalf("別人的內容不受影響：%d", n)
 	}
-	// 討論串的結構還在：有店家回覆的頂層留言與討論區留言仍以佔位項目出現，看不到內文與作者。
 	page := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, p.ID, nil, 10))
 	var placeholder *social.Comment
 	for i, c := range page.Comments {
@@ -356,7 +348,6 @@ func TestBuyerPurgeBustsTheStorePagesOfTheirForumEntries(t *testing.T) {
 	}
 }
 
-// sweptIDs 回傳排入的某一種 job 的目標 ID（buyer_id 或 store_id 欄位）。
 func (q *queue) sweptIDs(t *testing.T, kind, field string) []int64 {
 	t.Helper()
 	q.mu.Lock()

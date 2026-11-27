@@ -64,8 +64,6 @@ class AfterSaleLabelRetryLeaseIT {
         registry.add("hawkr.db.bootstrap.enabled", () -> "false");
         registry.add("spring.flyway.enabled", () -> "false");
         registry.add("hawkr.tsid.enabled", () -> "false");
-        // -1 關掉對外 gRPC server（本測試用不到）。0 是「先找空 port 再綁」，
-        // 中間可能被 testcontainers 的 port 映射搶走（CI 實測 Address already in use）。
         registry.add("grpc.server.port", () -> "-1");
         registry.add("spring.cloud.nacos.discovery.enabled", () -> "false");
         registry.add("spring.cloud.discovery.enabled", () -> "false");
@@ -95,7 +93,6 @@ class AfterSaleLabelRetryLeaseIT {
         jdbc.execute("TRUNCATE TABLE aftersale_cases RESTART IDENTITY CASCADE");
     }
 
-    // ==================== claimLabelRetry：跨副本互斥 ====================
 
     /**
      * <b>兩個 pod 同一 tick</b>：第一句拿到 1，第二句拿到 0。
@@ -129,7 +126,6 @@ class AfterSaleLabelRetryLeaseIT {
         insertRetryCandidate("L002");
         LocalDateTime now = LocalDateTime.now();
 
-        // 前一個持有者寫了一個「已經到期」的租約（＝它 claim 完就消失了）
         assertEquals(1, mapper.claimLabelRetry("L002", now, now.minusMinutes(1)));
 
         int reclaimed = mapper.claimLabelRetry("L002", now, now.plusMinutes(6));
@@ -150,7 +146,6 @@ class AfterSaleLabelRetryLeaseIT {
         assertEquals(0, mapper.claimLabelRetry("L003", now, now.plusMinutes(6)));
     }
 
-    // ==================== 候選述詞：租約條件真的有生效 ====================
 
     @Test
     @DisplayName("selectRetryCandidates：租約未到期的案件不在候選集合，到期後回來")
@@ -171,7 +166,6 @@ class AfterSaleLabelRetryLeaseIT {
                 "租約到期後必須自動回到候選集合");
     }
 
-    // ==================== releaseLabelRetryLease：守衛式還原 ====================
 
     @Test
     @DisplayName("releaseLabelRetryLease：租約值相符才釋放，不相符（已被他人重新 claim）回 0")
@@ -181,9 +175,7 @@ class AfterSaleLabelRetryLeaseIT {
         LocalDateTime mine = now.plusMinutes(6);
         assertEquals(1, mapper.claimLabelRetry("L005", now, mine));
 
-        // 別人的租約值 → 不得釋放（不能只用 case_no 當條件）
         assertEquals(0, mapper.releaseLabelRetryLease("L005", now.plusMinutes(99), now));
-        // 自己的租約值 → 釋放成一個過去的時間
         assertEquals(1, mapper.releaseLabelRetryLease("L005", mine, now));
 
         assertTrue(caseNos(mapper.selectRetryCandidates(50)).contains("L005"),
@@ -219,7 +211,6 @@ class AfterSaleLabelRetryLeaseIT {
         insertRetryCandidate("L009");
         agedTenMinutes("L009");
 
-        // 案件目前「從未成功觸發過」＝ label_retry_at IS NULL，這正是缺陷成立的前提
         AfterSaleCaseEntity before = loadCase("L009");
         assertTrue(before.getLabelRetryAt() == null, "前提：本案件從未被搶佔過");
 
@@ -229,7 +220,6 @@ class AfterSaleLabelRetryLeaseIT {
         AfterSaleLabelRetryService service =
                 new AfterSaleLabelRetryService(mapper, shipping, mock(AfterSaleAuditService.class));
 
-        // 完整失敗路徑：claim → gRPC 失敗 → release
         assertTrue(!service.retryAutomatic(before), "shipping 打不通必須回 false");
 
         AfterSaleCaseEntity after = loadCase("L009");
@@ -239,11 +229,9 @@ class AfterSaleLabelRetryLeaseIT {
                 "🚨 釋放後 label_retry_at 不得回到 NULL——NULL 的語意是「從未嘗試過」，"
                         + "會抹掉耗盡掃描唯一的「試過」證據");
 
-        // 恢復速度沒有被犧牲：下一 tick 仍立刻可重試（這是 release 存在的理由）
         assertTrue(caseNos(mapper.selectRetryCandidates(50)).contains("L009"),
                 "釋放後必須立刻回到候選集合，否則等於退回「等滿一個租約」");
 
-        // 偵測條件仍成立：耗盡掃描撈得到，且 CAS 標得動（兩支述詞逐字同步）
         assertTrue(caseNos(mapper.selectExhaustedCandidates(50)).contains("L009"),
                 "🚨 release 之後耗盡掃描必須仍撈得到——否則 shipping 長時間打不通時"
                         + "案件每 2 分鐘靜靜重試、只留 error log，LABEL_RETRY_EXHAUSTED 永遠不發，"
@@ -258,7 +246,6 @@ class AfterSaleLabelRetryLeaseIT {
                         .eq(AfterSaleCaseEntity::getCaseNo, caseNo));
     }
 
-    // ==================== 耗盡掃描：兩支述詞必須逐字同步 ====================
 
     /**
      * 「試過但沒能確認觸發」（count=0 且 {@code label_retry_at IS NOT NULL}）必須被告警撈到。
@@ -297,7 +284,6 @@ class AfterSaleLabelRetryLeaseIT {
         assertEquals(0, mapper.markLabelRetryExhausted("L007"));
     }
 
-    // ==================== ops 救濟：規範 §二 第 6 步 ====================
 
     @Test
     @DisplayName("resetLabelRetryCount：同時清掉租約，救濟立即生效而不是等租約到期")
@@ -318,7 +304,6 @@ class AfterSaleLabelRetryLeaseIT {
         assertTrue(caseNos(mapper.selectRetryCandidates(50)).contains("L008"));
     }
 
-    // ==================== helpers ====================
 
     private List<String> caseNos(List<AfterSaleCaseEntity> cases) {
         return cases.stream().map(AfterSaleCaseEntity::getCaseNo).toList();

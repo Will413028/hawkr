@@ -156,8 +156,6 @@ export default function AssistantWorkspace({
 	const [panelOpen, setPanelOpen] = React.useState(false);
 	const [resultInteractionLocked, setResultInteractionLocked] =
 		React.useState(false);
-	// ⛔ 掛載與可見性共用這一個值。原本掛載條件自己寫了一份（有吃 publication）、
-	// hasResults 又寫了一份（沒吃），於是重整後面板掛得起來卻永遠是 hidden。
 	const hasResults = hasProcurementResults(session);
 	const needsRequirementRefresh =
 		session.stage === "candidates" && !session.candidateSet;
@@ -466,9 +464,6 @@ export default function AssistantWorkspace({
 			value={draft}
 			onValueChange={handleDraftChange}
 			inputRef={composerInputRef}
-			// 停止鈕的三個 prop 都由 session 供給：run 身分與 CAS token 只有伺服器
-			// 的 runtime snapshot 給得出來，composer 自己打 API 會讓同一個畫面
-			// 出現第二套執行狀態。activeRun 為 null 時按鈕維持不可用。
 			canStop={Boolean(session.activeRun)}
 			stopState={session.cancelState}
 			onStop={() => void session.cancelActiveRun()}
@@ -539,7 +534,7 @@ export default function AssistantWorkspace({
 				>
 					<AppIcon name="arrow-left" size={20} aria-hidden="true" />
 				</Link>
-				{}
+
 				<div className="thread-page__head-meta">
 					<h1>Hawkr Agent</h1>
 					<span className="thread-page__head-status" data-state="assistant">
@@ -627,7 +622,7 @@ export default function AssistantWorkspace({
 						</li>
 					) : null}
 
-					{}
+
 					{session.stage === "ready" &&
 					!session.question &&
 					!isProcessing &&
@@ -645,7 +640,7 @@ export default function AssistantWorkspace({
 							<p>
 								找到 {candidateTotal} 筆可能符合的候選資料，已整理在工作台。
 							</p>
-							{}
+
 							{!resultsVisible ? (
 								<Button
 									variant="bordered"
@@ -664,14 +659,14 @@ export default function AssistantWorkspace({
 						</li>
 					) : null}
 
-					{}
+
 					{session.error ? (
 						<li
 							className="thread-page__bubble thread-page__bubble--card hawkr-agent-phase1__artifact-bubble assistant-invalidated"
 							role="alert"
 						>
 							<AppIcon name="warning" size={20} aria-hidden="true" />
-							{}
+
 							<div>
 								<strong>{session.error.code}</strong>
 								<p>{session.error.detail}</p>
@@ -714,7 +709,7 @@ export default function AssistantWorkspace({
 			data-panel={resultsVisible ? "open" : "closed"}
 		>
 			{thread}
-			{}
+
 			<div
 				className="sr-only"
 				role="status"

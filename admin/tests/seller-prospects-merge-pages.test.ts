@@ -712,7 +712,6 @@ test("修改撞到統編：持有者已入駐、沒有 reason 的 failed_precond
 		await click("儲存變更");
 		await until(() => bodyText().includes(texts[index]), `句子 ${index}`);
 		if (index === 0) {
-			// 只有第一個情境會去讀持有者；等到讀取發生，再讓畫面吃下結果（以輪詢的次數，不以時間）
 			await until(() => holderReads.n > 0, "持有者的 GetProspect 被呼叫");
 			let ticks = 0;
 			await until(() => ++ticks > 5, "持有者的結果渲染");
@@ -793,7 +792,6 @@ test("從編輯頁合併成功：目前這筆是敗方 → 導到勝方詳情；
 		{ "11": { displayName: "甲農場", contacts: [], region: "" } },
 	);
 
-	// 目前這筆（7）是敗方
 	let m = await openDetail(transport);
 	await type(byId("prospect-edit-display-name"), "新名稱");
 	await click("儲存變更");
@@ -811,7 +809,6 @@ test("從編輯頁合併成功：目前這筆是敗方 → 導到勝方詳情；
 	await m.unmount();
 	navigation.pushed = [];
 
-	// 目前這筆（7）是勝方
 	m = await openDetail(transport);
 	await type(byId("prospect-edit-display-name"), "新名稱");
 	await click("儲存變更");

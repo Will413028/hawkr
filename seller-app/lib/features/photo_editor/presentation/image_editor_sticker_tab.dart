@@ -41,13 +41,10 @@ class _ImageEditorStickerTabState extends State<ImageEditorStickerTab> {
     StickerBadge.limited,
   ];
 
-  // 認證標籤後面用 emoji 補滿
   static const List<String> _certEmojis = ['🏆', '✅', '🎖️'];
 
-  // 裝飾元素 - 使用 emoji
   final List<String> _decoStickers = ['🌸', '🌺', '🌼', '🌻', '🌷', '🪻'];
 
-  // 促銷標記 - 使用 emoji
   final List<String> _promoStickers = ['💰', '🎁', '🎊', '🏷️', '💝', '🎫'];
 
   @override
@@ -58,7 +55,6 @@ class _ImageEditorStickerTabState extends State<ImageEditorStickerTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 標題列
             Padding(
               padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
               child: Row(
@@ -74,16 +70,11 @@ class _ImageEditorStickerTabState extends State<ImageEditorStickerTab> {
                 ],
               ),
             ),
-            // 新鮮標籤 (徽章)
             _buildBadgeStickerSection('新鮮標籤', _freshStickers),
-            // 認證標籤 (混合: 徽章 + emoji)
             _buildMixedStickerSection('認證標籤', _qualityStickers, _certEmojis),
-            // 裝飾元素 (emoji)
             _buildEmojiStickerSection('裝飾元素', _decoStickers),
-            // 促銷標記 (emoji)
             _buildEmojiStickerSection('促銷標記', _promoStickers),
             SizedBox(height: 12.h),
-            // 底部提示
             Center(
               child: Text(
                 '選擇標籤貼圖來裝飾您的農產品圖片',

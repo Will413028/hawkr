@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// stubMedia 是 Media 的替身：tokens 是確認會成功的 token（對應資產的可見性），failures 是確認回的錯誤，files 是機敏檔的內容。
 type stubMedia struct {
 	tokens   map[string]media.Visibility
 	failures map[string]error

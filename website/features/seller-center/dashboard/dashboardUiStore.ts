@@ -17,9 +17,6 @@ type SellerDashboardUiPersistedState = {
 	onboardingCollapsedOverride: boolean | null;
 };
 
-// `resetOnboardingUi` 曾定義在此但全專案零呼叫端（死碼），且它想做的事——身份
-// 轉換時把 onboarding UI 還原成預設——現在由 createLocalPrivateStore 註冊的
-// reset 統一負責，留著只會讓人以為清除邏輯有兩個入口。
 type SellerDashboardUiState = SellerDashboardUiPersistedState & {
 	setOnboardingActiveTaskId: (taskId: SellerOnboardingTaskId | null) => void;
 	setOnboardingCollapsedOverride: (collapsed: boolean | null) => void;

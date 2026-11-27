@@ -141,7 +141,6 @@ class TestExpandedCountsAgainstRealTopology(unittest.TestCase):
         with _TOPOLOGY_YAML.open(encoding="utf-8") as fh:
             topo = yaml.safe_load(fh)
         out = expand(topo)
-        # 31 + 77 + 0 + 95 = 203
         self.assertEqual(len(out["exchanges"]), 31, "exchanges 數量與 pin 不符")
         self.assertEqual(len(out["queues"]), 77, "queues 數量與 pin 不符")
         self.assertEqual(

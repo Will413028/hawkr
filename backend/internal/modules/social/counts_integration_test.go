@@ -15,8 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// oracle 是計數的另一份獨立寫法（手寫 SQL，與 internal/visibility、reads 的重算語句和 trigger 都不同）：貼文的留言數含回覆，只算沒有刪除、沒有未還原的隱藏、
-// 作者不是已停用的買家的留言。
 func (f *fixture) expectedCommentCount(t *testing.T, postID uuidT) int64 {
 	t.Helper()
 	return f.scalar(t, `SELECT count(*) FROM social.comments c
@@ -26,7 +24,6 @@ func (f *fixture) expectedCommentCount(t *testing.T, postID uuidT) int64 {
 		  AND NOT (c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM buyer.buyers b WHERE b.buyer_id = c.actor_id AND b.status <> 'ACTIVE'))`, postID)
 }
 
-// assertStatsMatchTheDataset 對全部的 stats 列，檢查 trigger 維護的值等於從列算出的值（獨立的 SQL），而且重算沒有發現漂移。
 func (f *fixture) assertStatsMatchTheDataset(t *testing.T, label string) {
 	t.Helper()
 	ctx := context.Background()
@@ -189,7 +186,6 @@ func TestStatsMatchTheDatasetAfterRandomWrites(t *testing.T) {
 				step("討論區回覆", ignoreNotFound(err))
 			}
 		case op == 11 && i > 60 && len(purged) < 2:
-			// 買家刪帳：申請（進入刪除中，可見性由 pub 擋住）之後 job 清除並重算。
 			bi := pick()
 			if purged[bi] {
 				continue
@@ -210,7 +206,6 @@ func TestStatsMatchTheDatasetAfterRandomWrites(t *testing.T) {
 	}
 }
 
-// ignoreNotFound 吞掉資料集的隨機操作遇到的業務拒絕（目標已不可見、身分不符等）；其他錯誤照回。
 func ignoreNotFound(err error) error {
 	if slices.Contains([]apperr.Kind{apperr.KindNotFound, apperr.KindPermissionDenied, apperr.KindInvalidInput, apperr.KindFailedPrecondition}, kindOf(err)) {
 		return nil
@@ -307,7 +302,6 @@ func TestRecountAllIsBatchedAndOverwritesOnlyDriftedRows(t *testing.T) {
 	b := f.newBuyer(t)
 	mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"}))
 	mustV[bool](t)(f.module.LikePost(ctx, b.BuyerID, p.ID))
-	// 依 post_id 的順序（不含有留言的那篇），在第 1、501、1001、1200 列各改壞一列：落在三批的開頭、結尾與中間。
 	f.exec(t, `WITH ranked AS (SELECT post_id, row_number() OVER (ORDER BY post_id) AS rn FROM social.post_stats WHERE post_id <> $1)
 		UPDATE social.post_stats s SET like_count = 5, share_count = 2 FROM ranked r
 		WHERE r.post_id = s.post_id AND r.rn IN (1, 501, 1001, 1200)`, p.ID)
@@ -332,7 +326,6 @@ func TestRecountAllIsBatchedAndOverwritesOnlyDriftedRows(t *testing.T) {
 		}
 	}
 	f.assertStatsMatchTheDataset(t, "分批重算")
-	// 沒有漂移的列沒有被寫入。
 	var changed int
 	for id, x := range xminBefore {
 		var now string

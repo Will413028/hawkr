@@ -60,8 +60,6 @@ public class OrderOutboxPublisher {
             byte[] body = buildBody(event);
             rabbitPublisher.publish(event.getExchange(), event.getRoutingKey(), body, event.getEventType());
 
-            // issue #2294 H1：具名守衛 UPDATE（status <> SENT），取代 updateById 全欄覆寫——
-            // 後者會把另一個 pod 剛寫入的 claim 租約整列蓋掉。
             outboxMapper.markSent(event.getId(), DateTimeUtils.nowUtc());
 
             log.info("OrderOutboxPublisher.publish.success",
@@ -77,30 +75,22 @@ public class OrderOutboxPublisher {
     }
 
     private byte[] buildBody(OrderOutboxEntity event) throws Exception {
-        // order.paid：派送前補 seller/buyer meta（與原 afterCommit 等效）
         if (OrderEventType.ORDER_PAID.value().equals(event.getEventType())) {
             OrderPaidPayload core = MAPPER.readValue(event.getPayload(), OrderPaidPayload.class);
             return MAPPER.writeValueAsBytes(enrich(core));
         }
-        // order.cancelled：派送前補 seller/buyer 反解析與 sellerName/avatar（#1368，與原 TX 外直發等效）
         if (OrderEventType.ORDER_CANCELLED.value().equals(event.getEventType())) {
             OrderCancelledPayload core = MAPPER.readValue(event.getPayload(), OrderCancelledPayload.class);
             return MAPPER.writeValueAsBytes(enrichCancelled(core));
         }
-        // order.completed：派送前補 seller/buyer 的登入 account_id 反解析（issue #2294 B8，
-        // 與原 TX 外直發等效——反解析從完成事務內移到派送時，事務內零 gRPC）
         if (OrderEventType.ORDER_COMPLETED.value().equals(event.getEventType())) {
             OrderCompletedPayload core = MAPPER.readValue(event.getPayload(), OrderCompletedPayload.class);
             return MAPPER.writeValueAsBytes(enrichCompleted(core));
         }
-        // order.delivered：派送前補買家的登入 account_id 反解析（本次修復——狀態 CAS 與 outbox
-        // 同事務落地後，反解析從 consumer 執行緒移到派送時，事務內零 gRPC）
         if (OrderEventType.ORDER_DELIVERED.value().equals(event.getEventType())) {
             OrderDeliveredPayload core = MAPPER.readValue(event.getPayload(), OrderDeliveredPayload.class);
             return MAPPER.writeValueAsBytes(enrichDelivered(core));
         }
-        // order.receipt.confirmed：payload 只有 orderNo / confirmType，無需 enrich
-        // order.sales.accumulated：payload 只有 orderNo / occurredAt / items，無身分欄位，無需 enrich
         return event.getPayload().getBytes(StandardCharsets.UTF_8);
     }
 
@@ -121,7 +111,6 @@ public class OrderOutboxPublisher {
                 "OrderOutboxPublisher.enrichDelivered.resolveBuyerFailed",
                 "buyer_id -> account_id 解析失敗，買家通知將帶 0，buyerId=");
 
-        // 用完整建構子保留 core 的 eventId（跨重試冪等鍵穩定）
         return new OrderDeliveredPayload(
                 core.eventId(), core.orderNo(), core.buyerId(),
                 notifyBuyerAccountId, core.autoCompleteAt());
@@ -152,7 +141,6 @@ public class OrderOutboxPublisher {
                 "OrderOutboxPublisher.enrichCompleted.resolveBuyerFailed",
                 "buyer_id -> account_id 解析失敗，買家通知將帶 0，buyerId=");
 
-        // 用完整建構子保留 core 的 eventId（跨重試冪等鍵穩定）
         return new OrderCompletedPayload(
                 core.eventId(), core.orderNo(), core.buyerId(), notifyBuyerAccountId,
                 core.storeId(), notifySellerAccountId, core.totalActualAmount(),
@@ -184,7 +172,6 @@ public class OrderOutboxPublisher {
         Long storeId = core.storeId();
         Long buyerId = core.buyerId();
 
-        // 取賣家上下文（best-effort，失敗時 sellerName/sellerAvatarKey 留 null，不阻斷派送）
         String sellerName = null;
         String sellerAvatarKey = null;
         try {
@@ -192,14 +179,13 @@ public class OrderOutboxPublisher {
             sellerName = meta.getSellerName();
             String logoKey = meta.getLogoKey();
             if (logoKey != null && !logoKey.isBlank()) {
-                sellerAvatarKey = logoKey; // 49 §6.3/S3：MQ payload 只帶 objectKey，消費端 worker 組 URL
+                sellerAvatarKey = logoKey;
             }
         } catch (Exception e) {
             log.error("OrderOutboxPublisher.enrichCancelled.sellerFailed",
                     "取賣家資訊失敗，storeId=" + storeId, e);
         }
 
-        // buyer_id -> 登入 account_id（notification 買家路由，失敗帶 0 → notification-service 端 skip）
         Long notifyBuyerAccountId;
         try {
             notifyBuyerAccountId = buyerGrpcClient.resolvePrincipals(List.of(buyerId))
@@ -210,8 +196,6 @@ public class OrderOutboxPublisher {
             notifyBuyerAccountId = 0L;
         }
 
-        // store_id -> 登入 account_id（notification 商家路由；order.cancelled.merchant 模板
-        // target_user_field='notify_seller_account_id'）。失敗帶 0。
         Long notifySellerAccountId;
         try {
             notifySellerAccountId = sellerGrpcClient.resolvePrincipals(List.of(storeId))
@@ -222,7 +206,6 @@ public class OrderOutboxPublisher {
             notifySellerAccountId = 0L;
         }
 
-        // 用完整建構子保留 core 的 eventId（跨重試冪等鍵穩定）。
         return new OrderCancelledPayload(
                 core.eventId(), core.orderNo(), core.stockTxId(), core.items(), core.occurredAt(),
                 buyerId, notifyBuyerAccountId, storeId, notifySellerAccountId,
@@ -237,7 +220,7 @@ public class OrderOutboxPublisher {
             sellerName = meta.getSellerName();
             String logoKey = meta.getLogoKey();
             if (logoKey != null && !logoKey.isBlank()) {
-                sellerAvatar = logoKey; // 49 §6.3/S3：MQ payload 只帶 objectKey，消費端 worker 組 URL
+                sellerAvatar = logoKey;
             }
         } catch (Exception e) {
             log.error("OrderOutboxPublisher.enrich.sellerFailed",
@@ -251,15 +234,13 @@ public class OrderOutboxPublisher {
             BuyerDisplay bm = metas.get(core.buyerId());
             if (bm != null) {
                 buyerNickname = bm.getDisplayName();
-                buyerAvatarKey = bm.getAvatarKey(); // 49 §6.3/S3：MQ payload 只帶 objectKey，消費端 worker 組 URL
+                buyerAvatarKey = bm.getAvatarKey();
             }
         } catch (Exception e) {
             log.error("OrderOutboxPublisher.enrich.buyerFailed",
                     "取買家資訊失敗，buyerId=" + core.buyerId(), e);
         }
 
-        // buyer_id -> 登入 account_id 解析（notification routing 用，鏡像賣家側 notifySellerAccountId）。
-        // 失敗時帶 0（notification-service 端 skip），不阻斷本次 order.paid 派送主流程。
         Long notifyBuyerAccountId;
         try {
             notifyBuyerAccountId = buyerGrpcClient.resolvePrincipals(List.of(core.buyerId()))
@@ -271,9 +252,6 @@ public class OrderOutboxPublisher {
             notifyBuyerAccountId = 0L;
         }
 
-        // correlationId / invoiceSnapshotId 由 PaymentEventHandler 在 CAS 交易內寫進 core payload，
-        // enrich 只補 seller/buyer meta ⇒ 這兩欄原樣帶過。漏帶不會編譯錯也不會測試紅，
-        // 只會讓 invoice-service 的 correlation 欄恆空（58 §6.3.2.1 的失效模式）。
         return new OrderPaidPayload(core.orderNo(), core.shippingMethod(), core.occurredAt(),
                 core.buyerId(), notifyBuyerAccountId, core.storeId(), core.totalActualAmount(),
                 sellerName, sellerAvatar, buyerNickname, buyerAvatarKey,
@@ -289,7 +267,6 @@ public class OrderOutboxPublisher {
      */
     private void markFailed(OrderOutboxEntity event, String error) {
         int retry = (event.getRetryCount() == null ? 0 : event.getRetryCount()) + 1;
-        // 指數退避：5s, 15s, 45s, 135s, 405s（上限）
         long delaySec = (long) (5 * Math.pow(3, Math.min(retry - 1, 4)));
         outboxMapper.markFailedGuarded(event.getId(), retry,
                 DateTimeUtils.nowUtc().plusSeconds(delaySec));

@@ -60,8 +60,6 @@ export default function SellerSubscribeButton({
 
 	const runToggle = React.useCallback(async () => {
 		const next = !active;
-		// Bridge the shared set so sibling follow chips (home/market) agree
-		// immediately; `toggle()` owns the authoritative per-seller cache.
 		setFollowed(sellerId, next);
 		try {
 			const result = await toggle();
@@ -88,8 +86,6 @@ export default function SellerSubscribeButton({
 		lastClickAtRef.current = now;
 		if (pending) return;
 
-		// Role comes from the gate's post-hydration snapshot — the render-time
-		// value is stale when the click happened before the session resolved.
 		authGate(({ activeRole: resolvedRole }) => {
 			if (resolvedRole !== "buyer") {
 				setNotice("請切換到買家帳號後再訂閱商家。");
@@ -123,8 +119,6 @@ export default function SellerSubscribeButton({
 				<AppIcon
 					name="notification"
 					size={18}
-					/* Match the label colour per state: cream on the filled 訂閱
-					   pill, sage on the outlined 已訂閱 pill. */
 					style={{
 						color: active
 							? "var(--hkui-primary)"

@@ -41,7 +41,6 @@ public class CvsShipmentWebhookTest {
         String tradeNo = "TEST-WH-" + System.currentTimeMillis();
         String shipDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-        // ===== Step 1: 建立超商物流單 =====
         System.out.println("===== Step 1: 建立超商物流單 =====");
         System.out.println("MerID: " + MER_ID);
         System.out.println("MerTradeNo: " + tradeNo);
@@ -49,18 +48,18 @@ public class CvsShipmentWebhookTest {
 
         CreateCvsShipmentRequest createReq = new CreateCvsShipmentRequest(
                 tradeNo,
-                "1",        // ShipType: 7-ELEVEN
-                "C2C",      // LgsType
-                "1",        // GoodsType: 常溫
-                "3",        // ServiceType: 取貨不付款
+                "1",
+                "C2C",
+                "1",
+                "3",
                 "測試寄件人",
                 "0912345678",
                 "測試收件人",
                 "0987654321",
-                "131386",   // 7-ELEVEN 門市代碼（測試用）
-                "100",      // TradeAmt
+                "131386",
+                "100",
                 "測試商品",
-                null        // RefundStoreID
+                null
         );
 
         CreateCvsShipmentResponse createResp = shippingClient.createCvsShipment(MER_ID, createReq);
@@ -81,7 +80,6 @@ public class CvsShipmentWebhookTest {
         System.out.println("ShipTradeNo: " + shipTradeNo);
         System.out.println("建單成功！\n");
 
-        // ===== Step 2: 列印超商出貨單 =====
         System.out.println("===== Step 2: 列印超商出貨單 =====");
         System.out.println("ShipTradeNo: " + shipTradeNo);
         System.out.println("ShipDate: " + shipDate);

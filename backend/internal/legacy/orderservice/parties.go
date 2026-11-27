@@ -78,8 +78,6 @@ func (c *Client) HasOrderBetween(ctx context.Context, buyerID, storeID int64) (b
 	return true, resp.Msg.GetLatestOrderNo(), nil
 }
 
-// openOrderStatuses 是「進行中」的訂單狀態：訂單未完成。有活躍售後的訂單不會離開 40（自動完成反查售後、確認收貨被進行中的 case 擋下，
-// 50 不可再發起售後），所以售後不必另查。
 var openOrderStatuses = map[string]bool{"10": true, "20": true, "30": true, "32": true, "35": true, "40": true}
 
 // OpenOrderBetween 回報買家與店家之間最近一筆有關聯的訂單是否進行中（狀態 10、20、30、32、35、40）。

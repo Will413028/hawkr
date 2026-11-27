@@ -18,21 +18,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// 58 號《電子發票》§6.1.0(13) preserveData 業務碼的端到端斷言。
-//
-// 為什麼要走 bufconn ＋ 真 EnvelopeGuardInterceptor，而不是注入 mock proto client：
-// preserveData 這個概念**只存在於 interceptor 裡**（envelopeCodePreserveData 命中就
-// `return nil`，非零 envelope code 於是以「err == nil ＋ resp.Code != 0」的形狀抵達
-// handler）。注入 mock 的話**每個**非零碼都長這樣，preserveData 與非 preserveData
-// 的差別整個消失 —— 那種測試無論 handler 有沒有檢查 resp.GetCode() 都會綠，
-// 正是本檔要防的失效模式（同 testing.go 對 NewAccountClientForTest 的警語、#2050）。
-//
-// 覆蓋四件事：
-//
-//	① preserveData 碼（9331）不得被寫成 code=0    —— 已坐實缺陷的迴歸鎖
-//	② 非 preserveData 碼仍要走 error 路徑          —— 證明守門沒有把錯誤吞掉
-//	③ code=0 的成功形狀逐欄未變                    —— 證明「行為零改變」不是推理
-//	④ 分頁端點改寫後 data.{records,total,page,pageSize} 未變
 type fakeInvoiceServer struct {
 	pb.UnimplementedInvoiceServiceServer
 	code    int32
@@ -42,7 +27,6 @@ type fakeInvoiceServer struct {
 }
 
 func (s *fakeInvoiceServer) HealthCheckProviderAccountForAdmin(_ context.Context, _ *pb.HealthCheckProviderAccountForAdminRequest) (*pb.GetProviderAccountForAdminResponse, error) {
-	// 鏡射 invoice-service 的 provider_account.go：gRPC OK ＋ envelope 非零碼 ＋ data 仍在。
 	return &pb.GetProviderAccountForAdminResponse{Code: s.code, Message: s.message, Data: s.data}, nil
 }
 
@@ -54,9 +38,6 @@ func (s *fakeInvoiceServer) ListProviderAccountsForAdmin(_ context.Context, _ *p
 	return &pb.ListProviderAccountsForAdminResponse{Code: s.code, Message: s.message, Data: s.list}, nil
 }
 
-// newInvoiceAdminRouter 起 bufconn fake invoice server，掛上 production 的
-// EnvelopeGuardInterceptor，回傳一個把 accountId 預先塞好的 gin router
-// （授權由 requireAdmin 承擔，與本檔主張無關，故不掛）。
 func newInvoiceAdminRouter(t *testing.T, srv pb.InvoiceServiceServer) http.Handler {
 	t.Helper()
 	lis := bufconn.Listen(1024 * 1024)
@@ -83,13 +64,6 @@ func newInvoiceAdminRouter(t *testing.T, srv pb.InvoiceServiceServer) http.Handl
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	// bizcarrier.Middleware 是 production 全域鏈的一員（infrastructure/di.go 的
-	// newEngine），preserveData 業務碼的「不轉 error」特權由它承載：
-	// EnvelopeGuardInterceptor 只在 Arm 成功時 return nil，Arm 拿不到 carrier 就
-	// 撤銷特權、改走一般錯誤映射（碼還在、data 掉了）。
-	//
-	// ⚠️ 拿掉這一行，本檔的 9331 兩支會變成 HTTP 409 ＋ 無 data —— 那不是測試壞了，
-	// 那正是 fail-closed 契約本身：沒有 carrier 就沒有 preserveData。
 	r.Use(bizcarrier.Middleware())
 	r.Use(func(c *gin.Context) { c.Set("accountId", int64(4242)); c.Next() })
 	r.POST("/admin/invoices/provider_accounts/:store_id/health_checks", h.HealthCheckProviderAccountForAdmin)
@@ -100,9 +74,6 @@ func newInvoiceAdminRouter(t *testing.T, srv pb.InvoiceServiceServer) http.Handl
 
 func doInvoiceReq(t *testing.T, router http.Handler, method, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	// 帶一份合法 JSON body：端點 66 之類會先 ShouldBindJSON，空 body 會在打到
-	// invoice client 之前就 400，那樣測到的是 binding 不是 envelope（探權限要送
-	// 合法 payload 的同一條紀律）。
 	req := httptest.NewRequest(method, path, strings.NewReader(`{"reason":"e2e","confirmed":true,"expectedVersion":"1"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "e2e-preservedata-0001")
@@ -128,7 +99,6 @@ func TestHealthCheckProviderAccount_9331_NotSwallowedAsSuccess(t *testing.T) {
 	})
 	w := doInvoiceReq(t, router, http.MethodPost, "/admin/invoices/provider_accounts/2685914682/health_checks")
 
-	// preserveData 碼一律 HTTP 200（業務碼不走 HTTP status 分流）。
 	assertHTTPStatus(t, w, http.StatusOK)
 	body := parseJSON(t, w.Body)
 	assertCode(t, body, 9331)
@@ -139,7 +109,6 @@ func TestHealthCheckProviderAccount_9331_NotSwallowedAsSuccess(t *testing.T) {
 	if !ok {
 		t.Fatalf("data 必須原樣透傳，得到 %#v", body["data"])
 	}
-	// data.providerRequestId 是 ADM 去光貿對帳的唯一線索（§6.1.8）。
 	if data["lastRequestId"] != "req-abc-123" {
 		t.Errorf("data.lastRequestId = %v, want req-abc-123", data["lastRequestId"])
 	}

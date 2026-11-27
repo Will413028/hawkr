@@ -31,7 +31,6 @@ export function hydrateSiteBackgroundState() {
 			sessionStorage.getItem("hk:home-grainient-paused");
 		update({ ...state, paused: saved === "1" });
 	} catch {
-		/* Optional persistence must never block shopping. */
 	}
 }
 export function toggleSiteBackgroundPaused() {
@@ -40,6 +39,5 @@ export function toggleSiteBackgroundPaused() {
 	try {
 		sessionStorage.setItem(STORAGE_KEY, paused ? "1" : "0");
 	} catch {
-		/* The control still works when storage is unavailable. */
 	}
 }

@@ -42,7 +42,6 @@ class OrderServiceSellerStatusCountsTest {
 
         orderService.getSellerOrderStatusCounts(STORE_ID);
 
-        // 三桶各打一次 countBySellerStatusExcludingOrders；第三次才是「已結束」桶。
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> statuses = ArgumentCaptor.forClass(List.class);
         verify(orderRepository, times(3))

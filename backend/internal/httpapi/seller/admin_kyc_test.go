@@ -30,7 +30,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// adminKYCModule 是後台 KYC 方法的模組替身：記下輸入，回預先放好的結果。
 type adminKYCModule struct {
 	AdminModule
 	reads      int
@@ -82,7 +81,6 @@ const (
 	companyObjectKey = "secure/7111/secret-object-key"
 )
 
-// adminApplication 是一份帶公司補充文件（含 asset ID 與 object key）與審核紀錄的後台檢視。
 func adminApplication() model.KYCAdminApplication {
 	now := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	admin := int64(9)
@@ -127,7 +125,6 @@ func TestGetKYCApplicationReturnsDocumentViewURIsAndAssetIDs(t *testing.T) {
 	if len(a.GetReviews()) != 2 || a.GetReviews()[0].GetReviewerAdminId() != "9" || a.GetReviews()[0].GetAction() != adminpb.KYCReviewAction_KYC_REVIEW_ACTION_APPROVE || a.GetReviews()[1].GetReviewerAdminId() != "" {
 		t.Fatalf("reviews=%+v", a.GetReviews())
 	}
-	// view_uri 的格式與端點的路由一致：路由能把它解回同一個 (申請, 位置)。
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, wantSecond, nil)
 	mux := http.NewServeMux()
 	var parsed model.ReadKYCDocumentInput
@@ -136,7 +133,6 @@ func TestGetKYCApplicationReturnsDocumentViewURIsAndAssetIDs(t *testing.T) {
 	if parsed.ApplicationID != appID || parsed.Position != 1 {
 		t.Fatalf("parsed=%+v", parsed)
 	}
-	// 訊息的型別沒有身分證號、銀行帳號與個人姓名的欄位（D22、D37）。
 	for _, name := range []string{"id_card_no", "id_card_no_masked", "rep_id_card_no", "rep_id_card_no_masked", "bank_account", "bank_account_masked", "bank_code", "bank_name", "real_name", "birth_date", "english_name", "download_uri", "object_key", "shares_bank_account_with_sanctioned_account"} {
 		for _, d := range []protoreflect.MessageDescriptor{(&adminpb.KYCApplication{}).ProtoReflect().Descriptor(), (&adminpb.KYCDocument{}).ProtoReflect().Descriptor(), (&adminpb.KYCReview{}).ProtoReflect().Descriptor(), (&adminpb.IndividualKYC{}).ProtoReflect().Descriptor(), (&adminpb.BusinessKYC{}).ProtoReflect().Descriptor(), (&adminpb.KYCApplicationSummary{}).ProtoReflect().Descriptor()} {
 			if d.Fields().ByName(protoreflect.Name(name)) != nil {
@@ -159,7 +155,6 @@ func TestApproveKYCUsesTheCallingAdminTheETagAndTheComment(t *testing.T) {
 	if m.approve.AdminID != 42 || m.approve.ExpectedVersion != 3 || m.approve.Comment != "資料齊全" || m.approve.ApplicationID != m.got.ID {
 		t.Fatalf("approve=%+v", m.approve)
 	}
-	// 回應就是模組在同一個 transaction 內讀的檢視，handler 不另外再讀一次。
 	if m.reads != 0 {
 		t.Fatalf("handler 不該事後重讀：%d", m.reads)
 	}
@@ -180,7 +175,6 @@ func TestApproveKYCUsesTheCallingAdminTheETagAndTheComment(t *testing.T) {
 	if _, err := h.ApproveKYC(customer, connect.NewRequest(&adminpb.ApproveKYCRequest{Id: id, Etag: "3.0"})); err == nil || !strings.Contains(err.Error(), "需要管理員") {
 		t.Fatalf("customer: %v", err)
 	}
-	// 模組的欄位錯誤原樣交回（欄位路徑的對應由 interceptor 套用，integration 測試在線上確認）。
 	m.approveErr = apperr.InvalidInputOn([]string{"Comment"}, "說明太長")
 	_, err := h.ApproveKYC(adminCtx(42), connect.NewRequest(&adminpb.ApproveKYCRequest{Id: id, Etag: "3.0", Comment: "x"}))
 	var ae *apperr.Error
@@ -289,7 +283,6 @@ func TestAdminKYCEnumsMatchTheModule(t *testing.T) {
 	if got := rpc.EnumMismatches[adminpb.KYCSellerType](model.KYCSellerTypeValues()); len(got) != 0 {
 		t.Fatalf("KYCSellerType：%v", got)
 	}
-	// 後台契約沒有證件位置的列舉：文件類的欄位只有公司補充文件，而且是 KYCIssue 能指到文件的那個欄位。
 	if got := kycFieldPB(model.CompanyDocumentsField); got == pb.KYCField_KYC_FIELD_UNSPECIFIED || kycFieldNames[got] != model.CompanyDocumentsField {
 		t.Fatalf("文件類的欄位：%v", got)
 	}
@@ -418,7 +411,6 @@ func TestDocumentEndpointAuthorizesAdminsAndMapsErrorsWithoutLeaking(t *testing.
 			t.Fatalf("%s：code=%d body=%q", name, rec.Code, rec.Body.String())
 		}
 	}
-	// 位置格式不對：模組不被呼叫。
 	for _, bad := range []string{"/documents/x", "/documents/-1", "/documents/id_card_front/0"} {
 		m := &docModule{}
 		if rec := serveDocument(t, m, adminCtx(42), "/api/files/admin/seller/kyc_applications/"+app+bad); rec.Code != 404 || m.calls != 0 {
@@ -583,7 +575,6 @@ func TestGetKYCApplicationShowsTheRegistrationCheck(t *testing.T) {
 		a.GetReviews()[1].GetRegistrationCheckSeq() != 0 || a.GetReviews()[1].GetRegistrationCheckQueryTime() != nil {
 		t.Fatalf("reviews=%+v", a.GetReviews())
 	}
-	// 拆不開的地址只有原文；查無沒有 registration；沒有已完成的查詢時不設。
 	m.got.RegistrationCheck.Registration.TownCode, m.got.RegistrationCheck.Registration.AddressDetail = "", ""
 	resp, err = newTestAdmin(m).GetKYCApplication(adminCtx(1), connect.NewRequest(&adminpb.GetKYCApplicationRequest{Id: m.got.ID.String()}))
 	if err != nil {
@@ -617,7 +608,6 @@ func TestRequeryKYCRegistrationUsesTheCallingAdmin(t *testing.T) {
 	if m.requery.AdminID != 42 || m.requery.ApplicationID != m.got.ID {
 		t.Fatalf("requery=%+v", m.requery)
 	}
-	// 回應是這筆進行中的查詢（帶期限），不是空的。
 	if c := resp.Msg.GetRegistrationCheck(); c.GetSeq() != 4 || !c.GetRequestTime().AsTime().Equal(requested) || !c.GetDeadlineTime().AsTime().Equal(deadline) {
 		t.Fatalf("response=%+v", c)
 	}
@@ -634,7 +624,6 @@ func TestRequeryKYCRegistrationUsesTheCallingAdmin(t *testing.T) {
 
 // 登記資料的列舉與契約一一對應；現況與結果的值域各一份。
 func TestRegistrationEnumsMatchTheContract(t *testing.T) {
-	// 契約只有顯示得出來的結果：CANCELLED 是不顯示的終態，PENDING 不是結果（查詢中用 pending_registration_check）；顯示的查詢條件排除它們。
 	displayed := slices.DeleteFunc(model.RegistrationOutcomeValues(), func(o model.RegistrationOutcome) bool {
 		return o == model.RegistrationCancelled || o == model.RegistrationPending
 	})
@@ -717,7 +706,6 @@ func TestGetKYCApplicationCarriesTheActionAvailabilities(t *testing.T) {
 		a.GetRequeryRegistrationUnavailabilities()[1].GetMessage().GetMessage() != closed {
 		t.Fatalf("approve=%v reject=%v requery=%v", a.GetApproveUnavailabilities(), a.GetRejectUnavailabilities(), a.GetRequeryRegistrationUnavailabilities())
 	}
-	// 停權只擋核准（退回的清單是空的）。
 	m.got.ApproveUnavailable = []model.StoreActionUnavailableReason{model.StoreReasonAccountSuspended}
 	m.got.RejectUnavailable = nil
 	a = read()

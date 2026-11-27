@@ -376,8 +376,6 @@ function AfterSaleStatusTimeline({
 			{steps.map((step, i) => {
 				const isDone = i < currentIdx;
 				const isCurrent = i === currentIdx;
-				// 拒絕/取消時 afterSaleSteps 會把停住的那步標成 failed —— 比照
-				// CancelledOrderTimeline 的紅色樣式呈現「流程止於此」。
 				const isFailed = isCurrent && step.state === "failed";
 				const tone: Tone = isDone ? "done" : isCurrent ? "current" : "idle";
 				const dotStep: TimelineIconStep = {
@@ -394,9 +392,6 @@ function AfterSaleStatusTimeline({
 						aria-current={isCurrent ? "step" : undefined}
 					>
 						<span
-							// stepDot.current 是空字串（實色圓底由 stepDotClass 依 step
-							// 提供）—— 直接讀 stepDot 會讓進行中那步沒有圓底、而圖示又
-							// 塗成白色 = 在淺色面板上隱形（售後詳情「狀態不見」bug）。
 							className={`relative z-[1] grid size-[30px] place-items-center rounded-full text-[0.8125rem] font-bold ${isFailed ? cancelledCurrentDotClass : stepDotClass(tone, step.key)}`}
 							aria-hidden="true"
 						>
@@ -580,6 +575,5 @@ function formatTimelineStamp(value?: number | string): string | undefined {
 	return formatDate(d);
 }
 
-// 秒／毫秒判別與台北時區位移都在 `formatTaipeiMonthDayTime` 裡。
 const formatStamp = formatTaipeiMonthDayTime;
 const formatDate = formatTaipeiMonthDayTime;

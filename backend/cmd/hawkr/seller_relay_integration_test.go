@@ -27,7 +27,6 @@ type sellerRelayFixture struct {
 	sellers *seller.Module
 	account int64
 	store   seller.Store
-	// now 是測試的時鐘（改它就能讓關店滿保留期）。
 	now *time.Time
 }
 

@@ -50,7 +50,6 @@ func TestConnectStreamIsNotBuffered(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/connect+json")
 	req.Header.Set("Connect-Protocol-Version", "1")
-	// header 也要在第一筆送出時就到：緩衝的中介層連 header 都等到回應結束才送。
 	transport := srv.Client().Transport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = 3 * time.Second
 	resp, err := (&http.Client{Transport: transport}).Do(req)
@@ -73,10 +72,8 @@ func TestConnectStreamIsNotBuffered(t *testing.T) {
 	}
 }
 
-// connectEndStream 是 Connect 串流最後一筆（end-stream）的 envelope flag。
 const connectEndStream = 0x02
 
-// writeEnvelope 寫出一筆 Connect 串流的 envelope：1 byte 的 flags、4 bytes 的長度，接著是內容。
 func writeEnvelope(w io.Writer, flags byte, payload string) {
 	head := [5]byte{flags}
 	binary.BigEndian.PutUint32(head[1:], uint32(len(payload)))
@@ -84,7 +81,6 @@ func writeEnvelope(w io.Writer, flags byte, payload string) {
 	_, _ = io.WriteString(w, payload)
 }
 
-// readEnvelope 讀出一筆 envelope。
 func readEnvelope(t *testing.T, r io.Reader) (byte, string) {
 	t.Helper()
 	var head [5]byte

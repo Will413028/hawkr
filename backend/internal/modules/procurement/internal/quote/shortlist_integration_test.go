@@ -97,7 +97,6 @@ func TestDeleteShortlistIsIdempotentAndReportsAbsence(t *testing.T) {
 			t.Fatalf("刪除之後 = %+v %v", e, f.entries(r))
 		}
 	}
-	// 請求帶的版本與清單上掛的不同時，仍以回價為單位移除（唯一鍵是 (request, response)），回的是被移除那一列掛的版本。
 	_, err = f.service().PutShortlist(t.Context(), f.buyer, f.request, r, 2)
 	must(t, err)
 	e, err = f.service().DeleteShortlist(t.Context(), f.buyer, f.request, r, 1)

@@ -47,7 +47,6 @@ const (
 func newStore(id int64, status seller.Status, suspended bool) seller.Store {
 	var s seller.Store
 	s.StoreID, s.AccountID, s.StoreName, s.Status, s.Sanctions = id, id+7, "梨山盛花園", status, sanctionsOf(suspended)
-	// seller 讀店家時由 SQL 帶上的條件（Store.Conditions）：生命週期照 status，其餘都滿足。
 	s.Conditions = seller.Conditions{
 		Derived: true, Active: status != seller.Closed, NotPendingDeletion: status != seller.PendingDeletion, KYCApproved: true, TransfersActive: true,
 		StoreName: true, Logo: true, TownCode: true,
@@ -55,7 +54,6 @@ func newStore(id int64, status seller.Status, suspended bool) seller.Store {
 	return s
 }
 
-// fakeStores 是 seller 模組的替身：stores 以外的店家不存在，down 時讀不到。
 type fakeStores struct {
 	mu     sync.Mutex
 	stores map[int64]seller.Store
@@ -90,7 +88,6 @@ type fixture struct {
 	client   accountconnect.DelegationServiceClient
 }
 
-// setup 起 identity 與 legacy 的 DelegationService，client 以 gateway 的方式（gRPC、h2c）呼叫。
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
@@ -129,11 +126,9 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// admin 建立一位管理員；enabled 時開通代行。
 func (f *fixture) admin(t *testing.T, email string, enabled bool) string {
 	t.Helper()
 	ctx := context.Background()
-	// dev 的管理員的 email 是 <使用者>@dev.localhost：ops@hawkr.example 變成 dev_ops@dev.localhost。
 	local, _, _ := strings.Cut(email, "@")
 	tok, err := f.dev.AdminToken("dev_" + local)
 	if err != nil {
@@ -164,7 +159,6 @@ func TestPreflightCreateAndTheWorkspace(t *testing.T) {
 	admin := f.admin(t, "ops@hawkr.example", true)
 	store := formatID(storeID)
 
-	// 還沒開通：allowed=false 加業務碼，回應本身成功（code 0）；選項與能力仍然非空。
 	pre, err := f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: admin, TargetStoreId: store}))
 	if err != nil || pre.Msg.GetCode() != 0 || pre.Msg.GetData().GetAllowed() || pre.Msg.GetData().GetDeniedCode() != 9286 ||
 		len(pre.Msg.GetData().GetReasonOptions()) != 3 || len(pre.Msg.GetData().GetCapabilities()) != 10 {
@@ -178,7 +172,6 @@ func TestPreflightCreateAndTheWorkspace(t *testing.T) {
 		g.Msg.GetData().GetAuthorization().EffectiveUntil != nil || g.Msg.GetData().GetAuthorization().GetApprovedByAdminDisplayName() != "dev_ops@dev.localhost" {
 		t.Fatalf("開通 = %v, %v", g, err)
 	}
-	// 以假的店家狀態 preflight。
 	pre, err = f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: admin, TargetStoreId: store}))
 	d := pre.Msg.GetData()
 	if err != nil || !d.GetAllowed() || d.GetDeniedCode() != 0 || d.GetTtlSeconds() != 1800 || d.GetIdleSeconds() != 900 ||
@@ -197,14 +190,12 @@ func TestPreflightCreateAndTheWorkspace(t *testing.T) {
 	}
 	cd := created.Msg.GetData()
 	summary := cd.GetSession()
-	// session ID 是十進位字串：gateway 的 delegationSessionIDRE 與 admin 的 isDelegatedSessionId 都是 ^\d{1,19}$。
 	if !regexp.MustCompile(`^\d{1,19}$`).MatchString(summary.GetSessionId()) || summary.GetStatus() != "active" || summary.GetRevision() != 0 ||
 		summary.GetActor().GetDisplayName() != "營運 A" || summary.GetReason().GetLabel() != "賣家請求（管理員記錄）" ||
 		summary.GetCaseReference() != "HK-2026-0927" || len(cd.GetHandoffCode()) != 48 {
 		t.Fatalf("摘要 = %v", cd)
 	}
 
-	// 只有兌換 handoff 時才簽發 credential，反查回同一份摘要。
 	r, err := f.client.RedeemHandoff(ctx, connect.NewRequest(&pb.RedeemHandoffRequest{HandoffCode: cd.GetHandoffCode()}))
 	if err != nil || len(r.Msg.GetData().GetOperationCredential()) != 48 || r.Msg.GetData().GetSession().GetSessionId() != summary.GetSessionId() {
 		t.Fatalf("兌換 = %v, %v", r, err)
@@ -223,7 +214,6 @@ func TestPreflightCreateAndTheWorkspace(t *testing.T) {
 		t.Fatalf("對不到的 credential = %v", cur)
 	}
 
-	// 兩階段稽核：confirm 在同一個 transaction 內排入 delegation.operation.completed。
 	intent, err := f.client.RecordAuditIntent(ctx, connect.NewRequest(&pb.RecordAuditIntentRequest{
 		SessionId: summary.GetSessionId(), Capability: "products.write", Action: "PRODUCT_UPDATE", ResourceType: "product",
 		ResourceId: "2701445588392017", ResourceName: "梨山水蜜桃", OperationReason: "賣家請求修正商品說明",
@@ -258,7 +248,6 @@ func TestPreflightCreateAndTheWorkspace(t *testing.T) {
 		t.Fatalf("摘要 = %v, %v", sum, err)
 	}
 
-	// 撤銷（治理）；撤回授權的面板與清單。
 	rv, err := f.client.RevokeSession(ctx, connect.NewRequest(&pb.RevokeSessionRequest{
 		SessionId: summary.GetSessionId(), ActorAdminId: admin, RevokeReason: "賣家要求中止", IdempotencyKey: "rv-1",
 	}))
@@ -303,7 +292,6 @@ func TestErrorsKeepTheLegacyWireBehavior(t *testing.T) {
 	outsider := f.admin(t, "outsider@hawkr.example", false)
 	store := formatID(storeID)
 
-	// 不合法的 ID：放在回應的 code。
 	pre, err := f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: "abc", TargetStoreId: store}))
 	if err != nil || pre.Msg.GetCode() != 9260 {
 		t.Fatalf("= %v, %v", pre, err)
@@ -326,26 +314,21 @@ func TestErrorsKeepTheLegacyWireBehavior(t *testing.T) {
 	if list.Msg.GetCode() != 9288 {
 		t.Fatalf("沒有開通 = %v", list)
 	}
-	// 沒有開通的管理員：seller 模組讀不到也照樣回 9288（不需要店家的判斷先做）。
 	f.stores.setDown(true)
 	pre, err = f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: outsider, TargetStoreId: store}))
 	if err != nil || pre.Msg.GetData().GetDeniedCode() != 9288 || pre.Msg.GetData().GetTarget().GetStoreName() != "（查無此店家）" ||
 		pre.Msg.GetData().GetTarget().GetSellerAccountId() != "0" {
 		t.Fatalf("= %v, %v", pre, err)
 	}
-	// 讀不到店家不是拒絕：gRPC 的 internal（不是 unavailable，#3330），gateway 回 9280。
 	_, err = f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: admin, TargetStoreId: store}))
 	if connect.CodeOf(err) != connect.CodeInternal {
 		t.Fatalf("seller 模組掛了 = %v", err)
 	}
 	f.stores.setDown(false)
-	// 不存在的店家。
 	pre, _ = f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: admin, TargetStoreId: "99"}))
 	if pre.Msg.GetData().GetDeniedCode() != 9265 {
 		t.Fatalf("= %v", pre)
 	}
-	// 舊碼只在這一層對應：已關閉的店家模型裡是 DenialStoreClosed（店家存在），對外仍是 9265（舊版關店即軟刪除）；停權與等待刪除沒有店面寫入能力，是 9272。
-	// denied_label 是 seller 給的句子（StoreActionDelegate 的第一個原因），不是舊的固定句。
 	for _, tc := range []struct {
 		store string
 		want  int32
@@ -382,17 +365,14 @@ func TestErrorsKeepTheLegacyWireBehavior(t *testing.T) {
 	if g.Msg.GetCode() != 9260 {
 		t.Fatalf("期限的格式 = %v", g)
 	}
-	// 管理員從 session 解析出來卻不存在：不變量被打破，是 internal。
 	_, err = f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: "999999", TargetStoreId: store}))
 	if connect.CodeOf(err) != connect.CodeInternal {
 		t.Fatalf("= %v", err)
 	}
-	// 登出已經移到單體：這支沒有呼叫方了。
 	_, err = f.client.RevokeSessionsByActor(ctx, connect.NewRequest(&pb.RevokeSessionsByActorRequest{ActorAdminId: admin}))
 	if connect.CodeOf(err) != connect.CodeUnimplemented {
 		t.Fatalf("= %v", err)
 	}
-	// 批次：筆數超出範圍是整支 9260；逐項的錯誤只落在那一項。
 	b, err := f.client.RecordAuditIntentBatch(ctx, connect.NewRequest(&pb.RecordAuditIntentBatchRequest{}))
 	if err != nil || b.Msg.GetCode() != 9260 {
 		t.Fatalf("= %v, %v", b, err)
@@ -414,8 +394,6 @@ func sanctionsOf(suspended bool) *seller.Sanctions {
 	return seller.SanctionedBy(seller.EffectiveMeasure{Kind: seller.MeasureSuspension, MeasureID: uuid.NewV7(), Basis: seller.BasisRisk, RiskGround: &ground})
 }
 
-// noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這個測試不建排程，取消沒有東西可取消。
-// 內嵌的 *social.Module 是 nil：這些測試不寫代行貼文，只滿足 delegation.Social 的方法集合，被呼叫就 panic。
 type noSchedules struct{}
 
 func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {

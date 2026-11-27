@@ -54,8 +54,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// acting 以資料庫裡的店家（seller.stores 的 account_id）推導呼叫帳號的店，與 seller.ActingStore 的對應相同；
-// 能力與停權的判斷在 seller 的測試。
 type acting struct{ w *catalogtest.World }
 
 func (a acting) ActingStore(ctx context.Context, accountID int64, _ seller.Capability) (seller.Store, error) {
@@ -85,8 +83,6 @@ type env struct {
 	public catalogv1alpha1connect.CatalogPublicServiceClient
 }
 
-// setup 起 catalog 的 Connect handler（與正式組裝相同的 interceptor）；測試的呼叫者以 X-Test-Account 標示帳號，
-// 店家由 acting 從資料庫推導。
 func setup(t *testing.T) *env {
 	t.Helper()
 	w := catalogtest.New(t, pg)
@@ -203,7 +199,6 @@ func TestSellerCannotReadOrWriteAnotherStoresProduct(t *testing.T) {
 	if got.Title != "A 店的山藥" || got.Status != catalog.StatusActive || got.Version != a.Version || got.Skus[0].StockQty != 5 {
 		t.Fatalf("A 的商品被改了：%+v", got)
 	}
-	// A 自己照常讀得到、改得動。
 	own, err := e.seller(acctA).GetMyProduct(ctx, connect.NewRequest(&pb.GetMyProductRequest{ProductId: a.ID.String()}))
 	if err != nil || own.Msg.GetProduct().GetTitle() != "A 店的山藥" {
 		t.Fatalf("A 讀自己的商品 = %v, %v", own, err)
@@ -213,7 +208,6 @@ func TestSellerCannotReadOrWriteAnotherStoresProduct(t *testing.T) {
 	if err != nil || set.Msg.GetSku().GetStockQty() != 8 || set.Msg.GetSku().GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_AVAILABLE {
 		t.Fatalf("A 設定庫存 = %v, %v", set, err)
 	}
-	// 同一個 request_id 重送：現值已是 8，預期值 5 不符，只有冪等重放才回成功。
 	again, err := e.seller(acctA).SetStock(ctx, connect.NewRequest(setReq))
 	if err != nil || again.Msg.GetSku().GetStockQty() != 8 {
 		t.Fatalf("同一個 request_id 重送設定庫存 = %v, %v", again, err)
@@ -250,7 +244,6 @@ func TestSellerWritesCarryEtagAndRequestID(t *testing.T) {
 	wantCode(t, err, connect.CodeAborted)
 	adjust := &pb.AdjustStockRequest{SkuId: p.GetSkus()[0].GetId(), Delta: 2, RequestId: uuid.NewV4().String()}
 	for range 2 {
-		// 同一個 request_id 重送只生效一次：庫存 3 + 2 = 5，不是 7。
 		adjusted, err := s.AdjustStock(ctx, connect.NewRequest(adjust))
 		if err != nil || adjusted.Msg.GetSku().GetStockQty() != 5 {
 			t.Fatalf("調整庫存 = %v, %v", adjusted, err)
@@ -263,10 +256,8 @@ func TestSellerWritesCarryEtagAndRequestID(t *testing.T) {
 	if active.Msg.GetProduct().GetStatus() != pb.ProductStatus_PRODUCT_STATUS_ACTIVE || active.Msg.GetProduct().GetSkus()[0].GetStockQty() != 5 {
 		t.Fatalf("上架後 = %v", active.Msg.GetProduct())
 	}
-	// 預期庫存不符：failed_precondition，庫存不變。
 	_, err = s.SetStock(ctx, connect.NewRequest(&pb.SetStockRequest{SkuId: p.GetSkus()[0].GetId(), Quantity: 1, ExpectedQuantity: 3, RequestId: uuid.NewV4().String()}))
 	wantCode(t, err, connect.CodeFailedPrecondition)
-	// 低庫存計數：門檻預設 5，庫存 5 的 ACTIVE 商品算偏低。
 	count, err := s.CountMyProducts(ctx, connect.NewRequest(&pb.CountMyProductsRequest{Filter: &pb.MyProductFilter{Status: pb.ProductStatus_PRODUCT_STATUS_ACTIVE, StockStatus: pb.StockStatus_STOCK_STATUS_LOW}}))
 	if err != nil || count.Msg.GetCount() != 1 || count.Msg.GetDefaultLowStockThreshold() != catalog.DefaultLowStockThreshold {
 		t.Fatalf("低庫存計數 = %v, %v", count, err)
@@ -486,7 +477,6 @@ func TestPublicGetsVaryOnAcceptLanguage(t *testing.T) {
 			t.Fatalf("%q：第一個頂層分類不是 %q：%v %.200s", lang, want, err, body)
 		}
 	}
-	// 錯誤回應也帶 Vary: Accept-Language（內文的語言依它變化）。
 	resp, _ := get(catalogv1alpha1connect.CatalogPublicServiceGetProductProcedure, `{"productId":"`+uuid.NewV7().String()+`"}`, "en")
 	if resp.StatusCode != http.StatusNotFound || varyTokens(resp)["Accept-Language"] != 1 {
 		t.Fatalf("not_found：%d Vary = %q", resp.StatusCode, resp.Header.Values("Vary"))
@@ -515,7 +505,6 @@ func TestAppliedStockWriteStillSucceedsAfterTheSkuIsDeleted(t *testing.T) {
 	if err != nil || again.Msg.GetSku().GetStockQty() != 7 || again.Msg.GetSku().GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_UNAVAILABLE {
 		t.Fatalf("商品刪除後重送同一個 request_id 要回已生效的結果：%v, %v", again, err)
 	}
-	// 另一家店讀不到這個 SKU，仍是 not_found。
 	_, otherAcct := e.w.Store()
 	_, err = e.seller(otherAcct).AdjustStock(ctx, connect.NewRequest(&pb.AdjustStockRequest{SkuId: sku, Delta: 1, RequestId: uuid.NewV4().String()}))
 	wantCode(t, err, connect.CodeNotFound)

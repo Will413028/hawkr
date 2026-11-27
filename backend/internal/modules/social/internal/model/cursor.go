@@ -6,9 +6,6 @@ import (
 	"uuid"
 )
 
-// keyset 的第一頁用「方向的極值」當游標，讓每個清單 query 只有一個列比較（(a, id) < ($1, $2) 或 >）：它是 Index Cond，
-// 所有頁（含第一頁）走同一個 prepared statement 與同一種計畫；布林開關 `NOT has_cursor OR (…)` 在 generic plan 下是
-// Filter，成本隨游標深度成正比（step-1a-perf/README.md）。極值要落在 Postgres timestamptz 的範圍內（4713 BC 到 294276 AD）。
 var (
 	descStartTime = time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC)
 	descStartID   = uuid.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}

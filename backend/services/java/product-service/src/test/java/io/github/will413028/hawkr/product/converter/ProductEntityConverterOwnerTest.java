@@ -27,7 +27,6 @@ class ProductEntityConverterOwnerTest {
         try {
             TsidUtil.init(200, 0);
         } catch (IllegalStateException ignored) {
-            // 已初始化則忽略（node-id-base 200-299 為 product-service 範圍）
         }
     }
 
@@ -37,7 +36,6 @@ class ProductEntityConverterOwnerTest {
         ProductEntityConverter converter = new ProductEntityConverter(skuConverter, new ObjectMapper());
         CreateProductDTO dto = new CreateProductDTO();
         dto.setName("有機小白菜");
-        // 請求 storeId（resolver 上線後 = store surrogate）；owner 與 audit 應同值
         final long requestStoreId = 7412345678901234567L;
         dto.setStoreId(requestStoreId);
 

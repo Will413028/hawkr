@@ -36,7 +36,6 @@ class StoreMapServiceTest {
         ReflectionTestUtils.setField(service, "webFrontendUrl", WEB_BASE);
     }
 
-    // ==================== buildErrorDeepLink ====================
 
     @Test
     void buildErrorDeepLink_buyer_returnsBuyerScheme() {
@@ -73,7 +72,6 @@ class StoreMapServiceTest {
                 "未知 appType 兜底為 buyer scheme（與既有行為一致）, got: " + url);
     }
 
-    // ==================== decryptStoreMapResult (含 buildDeepLink private) ====================
 
     private static final String FAKE_ENC = "ENCRYPTED";
     private static final String FAKE_HASH = "HASH";
@@ -119,13 +117,11 @@ class StoreMapServiceTest {
 
         assertTrue(r.redirectUrl().startsWith(WEB_BASE + "/store-map/return?"),
                 "web 應走 {WEB_FRONTEND_URL}/store-map/return, got: " + r.redirectUrl());
-        // 三向 query naming 對齊既有 buyer/seller deep link（設計書 §5.14.2 註記）
         assertTrue(r.redirectUrl().contains("storeId=916712"), r.redirectUrl());
         assertTrue(r.redirectUrl().contains("storeName="), r.redirectUrl());
         assertTrue(r.redirectUrl().contains("address="), r.redirectUrl());
         assertTrue(r.redirectUrl().contains("insularArea=I"), r.redirectUrl());
         assertTrue(r.redirectUrl().contains("storeType=1"), r.redirectUrl());
-        // 中文必須 URL encoded
         assertTrue(r.redirectUrl().contains("%E6%95%A6%E5%AE%89"),
                 "StoreName 中文應 URL encoded, got: " + r.redirectUrl());
     }

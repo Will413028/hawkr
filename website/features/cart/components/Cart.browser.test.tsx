@@ -39,16 +39,13 @@ import { SellerGroupCard } from "./SellerGroupCard";
 import { ShippingMethodGroup } from "./ShippingMethodGroup";
 import { StorePickupPickerSheet } from "./StorePickupPickerSheet";
 
-// 商品列的連結（共用 <Link>）經 `@/lib/intl/use-router` 取 router；測試不掛 App Router，改用靜態 router。
 vi.mock("@/lib/intl/use-router", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@/lib/intl/use-router")>();
 	const { staticRouter } = await import("@/tests/browser/static-router");
 	return { ...actual, useRouter: () => staticRouter };
 });
-// 賣家購物車只覆寫身分，SellerGroupCard、query 設定與選取 helper 都是真的。
 vi.mock("@/lib/hooks/useQueryIdentity", { spy: true });
 
-// Local, deliberately labelled fixtures. No cart, account, checkout or map API.
 const products: CartItem[] = [
 	{
 		id: "preview-rice",
@@ -128,7 +125,6 @@ const sellerProducts: CartItem[] = [
 ];
 
 function guestSellerPreview() {
-	// signedIn=false disables shipping queries.
 	const identity = vi.mocked(useQueryIdentity);
 	identity.mockReturnValue({ accountId: null, activeRole: null });
 	return () => identity.mockRestore();
@@ -327,8 +323,6 @@ function fixedPreviewDate() {
 	};
 }
 
-// The production pickup sheet owns its map request. Keep even manually
-// clicking that control inside this preview's offline boundary.
 function offlinePickupBoundary() {
 	const originalFetch = window.fetch;
 	window.fetch = (input, init) => {
@@ -512,12 +506,10 @@ function ShippingAndAddressPreview() {
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
-	// 先卸載元件，再還原 spy 與全域：避免卸載時的 effect 讀到已還原的 fetch、Date.now。
 	cleanup();
 	while (cleanups.length > 0) cleanups.pop()?.();
 });
 beforeEach(() => {
-	// 抽屜與 provider 掛在 body：每個測試開始前確認沒有殘留的 dialog。
 	expect(screen.queryByRole("dialog")).toBeNull();
 });
 
@@ -556,7 +548,6 @@ async function playProducts(container: HTMLElement) {
 	for (const button of container.querySelectorAll(
 		".cart-tile__qty button, .cart-tile__actions button",
 	)) {
-		// Fractional transforms can report 43.9999px after a 44px control settles.
 		await waitFor(() => {
 			const rect = button.getBoundingClientRect();
 			expect(rect.height).toBeGreaterThanOrEqual(43.99);
@@ -696,7 +687,6 @@ async function playSellerSelection(container: HTMLElement) {
 		.toBeEnabled();
 	const saveLater = inactiveRow.getByRole("button", { name: "稍後買" });
 	await expect.element(saveLater).toBeEnabled();
-	// This also rejects pointer-events:none on an inactive seller card.
 	await userEvent.hover(saveLater);
 	const switchStore = second.getByRole("button", { name: "改選本店商品" });
 	switchStore.focus();

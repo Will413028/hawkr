@@ -10,29 +10,7 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// preview ↔ 實際開票 的等值斷言
-//
-// 🔴 這是本波最重要的一支測試。它守的不是某一個分支的正確性，而是一個**跨兩條路徑的
-// 不變式**：checkout preview 對買家承諾的 invoice_mode，必須就是 order.paid 真的開出來的
-// 那一個。
-//
-// 為什麼需要它：兩條路徑各有自己的入口（ResolveMode／Prepare）、各有自己的測試。
-// 任何人在其中一條裡「順手」把 domain.ResolveFulfillmentMode 換成一段 if，
-// **兩邊的既有測試都會繼續全綠** —— 症狀要到買家收到一張與結帳頁說法不同的發票
-// （或根本沒收到）才會出現，而那時發票已經開出去、不可回收。
-//
-// 判準刻意只比對 preview 對外承諾的那兩個欄位（fulfillment_mode／not_applicable_reason）：
-// document.status 與 manual_reason_code 不在 preview 的契約裡，把它們也拉進來比，
-// 只會讓 fail-closed 三格（preview 拿不到那三個輸入）永遠不相等而必須加例外，
-// 而例外一旦開始加，這支測試就會被稀釋成「比對我允許它比對的部分」。
-// ---------------------------------------------------------------------------
 
-// previewInputFrom 由 order.paid 的輸入推導出 preview 的輸入。
-//
-// 🔴 **推導而不是各寫一份**：兩邊各手寫一組金額時，改了其中一邊而忘了另一邊，
-// 這支測試會因為「輸入不同」而失敗或（更糟）因為輸入剛好還是同一葉而繼續綠。
-// 推導讓「同一組輸入」變成結構事實。
 func previewInputFrom(in OrderPaidInput) ResolveModeInput {
 	return ResolveModeInput{
 		StoreID:        in.StoreID,
@@ -44,7 +22,6 @@ func previewInputFrom(in OrderPaidInput) ResolveModeInput {
 	}
 }
 
-// assertPreviewMatchesPrepare 用同一組賣家事實與同一張訂單跑兩條路徑，斷言逐值相同。
 func assertPreviewMatchesPrepare(
 	t *testing.T,
 	profile domain.SellerTaxProfile,
@@ -58,17 +35,14 @@ func assertPreviewMatchesPrepare(
 		mutate(&paid)
 	}
 
-	// ① order.paid 那條路徑。
 	ph := newHarness(t, profile, account)
 	got, err := ph.uc.Prepare(context.Background(), paid)
 	if err != nil {
 		t.Fatalf("Prepare 失敗：%v", err)
 	}
 
-	// ② checkout preview 那條路徑。
 	ch := newCheckoutHarness(t, profile, account)
 	if domain.IsBusinessTaxID(paid.BuyerTaxID) {
-		// preview 沒有買家輸入可讀，B2B 的唯一來源是預設常用發票資料。
 		ch.prefs.def, ch.prefs.defFound = taxIDPreference(), true
 	}
 	preview, err := ch.uc.ResolveMode(context.Background(), previewInputFrom(paid))
@@ -198,9 +172,6 @@ func TestResolveMode_MatchesPrepare_AllLeaves(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 快照讀取小工具（給 checkout_test.go 用）
-// ---------------------------------------------------------------------------
 
 func snapshotMap(t *testing.T, out ValidateInvoiceOutput) map[string]any {
 	t.Helper()
@@ -223,8 +194,6 @@ func snapshotKeys(t *testing.T, out ValidateInvoiceOutput) map[string]bool {
 	return keys
 }
 
-// snapshotField 回傳欄位的字串化值。null 回空字串 —— 呼叫端要區分「沒有這個欄位」與
-// 「這個欄位是 null」時請用 snapshotKeys。
 func snapshotField(t *testing.T, out ValidateInvoiceOutput, key string) string {
 	t.Helper()
 	v, ok := snapshotMap(t, out)[key]

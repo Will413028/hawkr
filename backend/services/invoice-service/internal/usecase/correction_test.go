@@ -18,15 +18,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// Correction.Execute（§7.3.5 R02／R03）。
-//
-// 這支的價值全在**順序**與**失敗時停在哪**：每一個中間態都沒有人會發現。
-// 逐條對應本檔守的不變式：
-//   ① Hold 一定在跨服務呼叫之前 —— 反了就是「對方已用舊內容開票，我們才改快照」
-//   ② 跨服務呼叫在交易之外 —— 包進去等於把 DB 連線壽命綁在對方的 deadline 上
-//   ③ Hold 搶不到 ⇒ 改走 R04，**不是重試**
-//   ④ order-service 失敗時**不主動放掉 HELD**（讓租約做它的事）
-//   ⑤ 落地四件事同一交易，任一 rows=0 就整筆 rollback
 
 type corrOps struct {
 	domain.OperationRepository
@@ -48,14 +39,9 @@ type corrOps struct {
 	keyByType      map[string]string
 	gotOpKey       string
 	gotOpType      string
-	// order 記錄呼叫順序，用來斷言 Hold 在 gRPC 之前
 	order *[]string
 
-	// voidGateHeld 模擬 VOID operation 撞 uq_invop_open_adjustment_per_document
-	// （I5 序列閘門被別的調整佔用）：Create 回 inserted=false，且那把 key
-	// **不進 byKey** —— 真實 DB 上那一列根本沒插進去，所以之後也查不到。
 	voidGateHeld bool
-	// byKey 是 fake 的 uq_invop_operation_key，讓 GetByKey 分得出兩種 rows=0。
 	byKey map[string]domain.Operation
 }
 
@@ -88,10 +74,6 @@ func (f *corrOps) Create(_ context.Context, in domain.NewOperation) (domain.Oper
 	f.keyByType[in.OperationType] = in.OperationKey
 	f.gotOpType = in.OperationType
 	*f.order = append(*f.order, "create_operation")
-	// 🔴 fake 的鑑別力來自它**拒絕**什麼。照單全收的版本讓 MaxAttempts=0 一路過關，
-	// 而真的 DB 有 chk_invop_attempts（max_attempts >= 1）
-	// ⇒ 2026-08-31 dev 首次實打就 23514，單元測試全綠。
-	// 這裡把該約束搬進 fake：同一個錯誤不可能再溜過去。
 	if in.MaxAttempts < 1 {
 		return domain.Operation{}, false,
 			fmt.Errorf("fake: chk_invop_attempts violated: max_attempts=%d (must be >= 1)", in.MaxAttempts)
@@ -115,8 +97,6 @@ func (f *corrOps) Promote(_ context.Context, id int64, next string, _, _ time.Ti
 	f.gotPromoteID, f.gotPromoteTo = id, next
 	f.gotPromoteType = f.opTypeByID[id]
 	*f.order = append(*f.order, "promote_operation")
-	// 🔴 fake 拒絕錯的目標值：CREATED 之外的任何狀態都不在 worker 的候選集合裡，
-	// 推錯了那筆作廢一樣送不出去，而 DB 不會擋（Promote 的述詞只看來源狀態）。
 	if next != codemeta.InvoiceOperationStatusReady.Value {
 		return false, fmt.Errorf("fake: void operation must be promoted to READY, got %q", next)
 	}
@@ -140,11 +120,9 @@ type corrDocs struct {
 	gotRevise  domain.ReviseDocumentSnapshot
 	gotLines   []domain.NewDocumentLine
 	lockErr    error
-	// docSnapshotVersion 是 LockForCorrection 回的版本，用來測 stale 判定
 	docSnapshotVersion int32
 	order              *[]string
 
-	// 重開票（R04 ③）
 	orig             domain.Document
 	createdDoc       domain.NewDocument
 	createCalls      int
@@ -198,29 +176,23 @@ func (f *corrDocs) ReviseSnapshot(_ context.Context, in domain.ReviseDocumentSna
 	return f.reviseOK, f.reviseErr
 }
 
-// assertDocumentCheckConstraints 逐字鏡射 db/schema/schema.sql 的五條 CHECK。
 func assertDocumentCheckConstraints(in domain.ReviseDocumentSnapshot) error {
-	// chk_invdoc_taxid_shape：^([0-9]{8}|0000000000)$
 	if !reDocTaxIDShape.MatchString(in.RecipientTaxID) {
 		return fmt.Errorf("corrDocs: 違反 chk_invdoc_taxid_shape（真實 DB 回 23514）：recipient_tax_id=%q", in.RecipientTaxID)
 	}
-	// chk_invdoc_b2c：B2C ⇒ tax_amount = 0 AND recipient_tax_id = '0000000000'
 	if in.DocumentKind == codemeta.InvoiceDocumentKindB2c.Value &&
 		(in.TaxAmount != 0 || in.RecipientTaxID != domain.B2CBuyerIdentifier) {
 		return fmt.Errorf("corrDocs: 違反 chk_invdoc_b2c（真實 DB 回 23514）："+
 			"tax_amount=%d recipient_tax_id=%q", in.TaxAmount, in.RecipientTaxID)
 	}
-	// chk_invdoc_b2b：B2B ⇒ recipient_tax_id ~ ^[0-9]{8}$
 	if in.DocumentKind == codemeta.InvoiceDocumentKindB2b.Value && !reDocB2BTaxID.MatchString(in.RecipientTaxID) {
 		return fmt.Errorf("corrDocs: 違反 chk_invdoc_b2b（真實 DB 回 23514）：recipient_tax_id=%q", in.RecipientTaxID)
 	}
-	// chk_invdoc_total：total = sales + free + zero + tax
 	if in.TotalAmount != in.SalesAmount+in.FreeTaxSalesAmount+in.ZeroTaxSalesAmount+in.TaxAmount {
 		return fmt.Errorf("corrDocs: 違反 chk_invdoc_total（真實 DB 回 23514）："+
 			"total=%d sales=%d free=%d zero=%d tax=%d",
 			in.TotalAmount, in.SalesAmount, in.FreeTaxSalesAmount, in.ZeroTaxSalesAmount, in.TaxAmount)
 	}
-	// chk_invdoc_amounts_nonneg
 	if in.SalesAmount < 0 || in.FreeTaxSalesAmount < 0 || in.ZeroTaxSalesAmount < 0 ||
 		in.TaxAmount < 0 || in.TotalAmount < 0 {
 		return fmt.Errorf("corrDocs: 違反 chk_invdoc_amounts_nonneg（真實 DB 回 23514）：%+v", in)
@@ -302,8 +274,6 @@ type corrOrders struct {
 	err     error
 	calls   int
 	order   *[]string
-	// got 是最後一次送出的內容。舊版整包丟掉 ⇒ 「四個欄位從未賦值」這個缺陷
-	// （#3085，R03 從上線起 100% 失敗）在單元測試裡完全看不見。
 	got domain.ReviseSnapshotInput
 }
 
@@ -378,10 +348,6 @@ func execInput(f CorrectionFacts) ExecuteCorrectionInput {
 	return ExecuteCorrectionInput{
 		CorrectionID: 1001, DocumentID: 2002, DocumentVersion: 3, OperationID: 3003,
 		OrderNo: "O20260831001", ExpectedSnapshotVersion: 1, Facts: f,
-		// 🔴 OrderRevision 的兩個必填欄在 2026-09-04 之前**整包缺席**，而替身把輸入
-		// 丟掉 ⇒ 這三支測試對「R03 送出去必被 order-service 回 400」是綠的。
-		// 那正是 #3085 活到 dev 的原因（R03 從上線起 100% 失敗）。
-		// 規則見 corrOrders.ReviseOrderInvoiceSnapshot 的註解（讀自對端原始碼）。
 		OrderRevision: domain.ReviseSnapshotInput{
 			OrderNo:                 "O20260831001",
 			ExpectedSnapshotVersion: 1,
@@ -391,8 +357,6 @@ func execInput(f CorrectionFacts) ExecuteCorrectionInput {
 			BuyerTitle:              "整合測試股份有限公司",
 			IdempotencyKey:          "correction-1001",
 		},
-		// 修正後的買受人：個人 → 公司統編。R04 的重開票要依它重算 kind 與表頭；
-		// R03 就地更新也一樣（#3089 B 組 A-3：不重算就是 chk_invdoc_b2c 的 23514）。
 		Revised: domain.ReviseDocumentSnapshot{
 			RecipientType:  codemeta.InvoiceRecipientTypeBuyer.Value,
 			RecipientName:  "整合測試股份有限公司",
@@ -429,11 +393,9 @@ func TestCorrectionExecute_R03_OrderAndTransactionBoundary(t *testing.T) {
 		}
 	}
 
-	// 🔴 這兩條是本測試存在的理由，不是順帶：
 	if (*h.calls)[0] != "hold" || (*h.calls)[1] != "grpc_revise" {
 		t.Error("Hold 必須在跨服務呼叫之前——反了就是「對方已用舊內容開票，我們才改快照」")
 	}
-	// snapshot_version 只能來自 gRPC 回傳（I-50），不得自己算
 	if h.orders.calls != 1 {
 		t.Errorf("gRPC 呼叫 %d 次, want 1（版本號的唯一來源）", h.orders.calls)
 	}
@@ -462,8 +424,6 @@ func TestCorrectionExecute_OrderFailureLeavesHoldToLease(t *testing.T) {
 	if _, err := h.uc.Execute(context.Background(), execInput(pendingFacts())); err == nil {
 		t.Fatal("order-service 失敗必須往上拋")
 	}
-	// 🔴 刻意不主動 ReleaseHold：我們剛證明對外呼叫會失敗，此刻最不該做的是再賭一次
-	// DB 也還活著。租約 60 秒後由 ReleaseExpiredHolds 掃回。
 	if h.ops.releaseCall != 0 {
 		t.Errorf("不得主動放掉 HELD（實得 %d 次）——讓租約做它本來就要做的事", h.ops.releaseCall)
 	}
@@ -474,7 +434,7 @@ func TestCorrectionExecute_OrderFailureLeavesHoldToLease(t *testing.T) {
 
 func TestCorrectionExecute_DocumentDriftRollsBackEverything(t *testing.T) {
 	h := newCorrHarness(t)
-	h.docs.reviseOK = false // rows=0：版本被推進或已離開 PENDING
+	h.docs.reviseOK = false
 
 	if _, err := h.uc.Execute(context.Background(), execInput(pendingFacts())); err == nil {
 		t.Fatal("document CAS rows=0 必須整筆失敗——放行會留下「明細換了但快照沒換」")
@@ -517,9 +477,6 @@ func TestCorrectionExecute_R04CreatesVoidAdjustmentThenOperation(t *testing.T) {
 
 	want := []string{
 		"insert_adjustment", "create_operation", "promote_operation",
-		// R04 ③：重開票與它的 REISSUE operation 在**同一個交易**內就建好。
-		// 等作廢成功之後才建是行不通的——修正後的收件人明文只存在於這一刻
-		// （after_payload 已遮罩，而 email 可改）。
 		"create_reissue_document", "insert_lines", "create_operation",
 		"start_void_reissue",
 	}
@@ -534,10 +491,6 @@ func TestCorrectionExecute_R04CreatesVoidAdjustmentThenOperation(t *testing.T) {
 	if h.adjs.gotType != codemeta.InvoiceAdjustmentTypeVoid.Value {
 		t.Errorf("adjustment type = %q, want VOID", h.adjs.gotType)
 	}
-	// 🔴 operation_key 走 void:{adjustment_id}（實作版），不是設計圖的
-	// void:{document_id}:{correction_version}。
-	// 逐型別取：同一個交易裡建了兩筆 operation（VOID 與 REISSUE），
-	// 只看「最後一次」會取到 REISSUE，而那正是 2026-09-01 這支測試抓到的事。
 	if got := h.ops.keyByType[codemeta.InvoiceOperationTypeVoid.Value]; got != "void:9001" {
 		t.Errorf("VOID operation_key = %q, want void:9001（綁 adjustment 而非 document）", got)
 	}
@@ -547,7 +500,6 @@ func TestCorrectionExecute_R04CreatesVoidAdjustmentThenOperation(t *testing.T) {
 	if h.reqs.gotVoidAdjID != 9001 {
 		t.Errorf("correction 指向的 adjustment = %d, want 9001（fk_invcorr_void）", h.reqs.gotVoidAdjID)
 	}
-	// R04 全程不碰 operation 的 HELD，也不打 order-service
 	if h.ops.holdCalls != 0 || h.orders.calls != 0 {
 		t.Error("R04 不得 Hold、也不得打 order-service")
 	}
@@ -571,8 +523,6 @@ func TestCorrectionExecute_R04VoidSequenceGateHeldRollsBack(t *testing.T) {
 		t.Fatal("序列閘門被佔住卻回 nil —— correction 會進 VOID_REISSUE_IN_PROGRESS，" +
 			"而那筆作廢沒有任何執行者：買家看到「處理中」，永遠不會有事情發生")
 	}
-	// 沒建成就不得 promote，也不得往下建重開票（那會讓一張沒有作廢的發票旁邊
-	// 多出一張等著開的新票）。
 	if h.ops.promoteCalls != 0 {
 		t.Errorf("沒建成卻 promote 了 %d 次", h.ops.promoteCalls)
 	}
@@ -609,9 +559,6 @@ func submitInput(f CorrectionFacts) SubmitCorrectionInput {
 	return SubmitCorrectionInput{
 		DocumentID: 2002, BuyerID: 5005, ExpectedSnapshotVersion: 1,
 		OperationID: 3003, OrderNo: "O20260831001", Facts: f,
-		// 見 execInput 的紅線：這兩個欄位缺席就是 order-service 400（#3085）。
-		// 這裡刻意用 B2C ＋ USE_BUYER_DEFAULT（另一組合法值），讓兩支 builder
-		// 不會因為抄同一份而漏掉「值域檢查」那一半。
 		OrderRevision: domain.ReviseSnapshotInput{
 			OrderNo:                 "O20260831001",
 			ExpectedSnapshotVersion: 1,
@@ -622,9 +569,6 @@ func submitInput(f CorrectionFacts) SubmitCorrectionInput {
 		Revised: domain.ReviseDocumentSnapshot{
 			ExpectedVersion: 3,
 			DocumentKind:    codemeta.InvoiceDocumentKindB2c.Value,
-			// B2C 的 recipient_tax_id 恆為 '0000000000'（chk_invdoc_b2c 雙向守著），
-			// **不是空字串**——空字串違反 chk_invdoc_taxid_shape，而那正是
-			// #3089 B 組 A-3 的第三個變體（買家清掉統編 ⇒ 500）。
 			RecipientTaxID: domain.B2CBuyerIdentifier,
 			SalesAmount:    1050, TotalAmount: 1050,
 		},
@@ -654,7 +598,6 @@ func TestCorrectionSubmit_R01ImmediatelyRunsBranch(t *testing.T) {
 			t.Fatalf("呼叫序列 = %v, want %v", *h.calls, want)
 		}
 	}
-	// 鎖一定在建立之前——反了就是用過期的判定結果建 correction
 	if (*h.calls)[0] != "lock_document" {
 		t.Error("LockForCorrection 必須在 Insert 之前")
 	}
@@ -662,7 +605,7 @@ func TestCorrectionSubmit_R01ImmediatelyRunsBranch(t *testing.T) {
 
 func TestCorrectionSubmit_StaleSnapshotRejectedBeforeInsert(t *testing.T) {
 	h := newCorrHarness(t)
-	h.docs.docSnapshotVersion = 5 // 買家看到的是 1，實際已推進到 5
+	h.docs.docSnapshotVersion = 5
 
 	_, err := h.uc.Submit(context.Background(), submitInput(pendingFacts()))
 	if !errors.Is(err, ErrCorrectionSnapshotStale) {
@@ -675,7 +618,7 @@ func TestCorrectionSubmit_StaleSnapshotRejectedBeforeInsert(t *testing.T) {
 
 func TestCorrectionSubmit_SequenceGateBlocksSecondRequest(t *testing.T) {
 	h := newCorrHarness(t)
-	h.reqs.insertCreated = false // uq_invcorr_open_per_document 擋下
+	h.reqs.insertCreated = false
 
 	_, err := h.uc.Submit(context.Background(), submitInput(pendingFacts()))
 	if !errors.Is(err, ErrCorrectionAlreadyInProgress) {
@@ -788,7 +731,6 @@ func TestGatherCorrectionFacts_ExistingAllowanceBlocksVoid(t *testing.T) {
 	}
 }
 
-// ── CorrectionIntake：組裝層 ─────────────────────────────────────────────
 
 type intakeDocs struct {
 	corrDocs
@@ -855,8 +797,8 @@ func TestCorrectionIntake_OpenOperationUsesPositiveList(t *testing.T) {
 	}
 	docs.corrDocs = corrDocs{reviseOK: true, docSnapshotVersion: 1, order: h.calls, createInserted: true}
 	ops := &intakeOps{listed: []domain.Operation{
-		{ID: 9, Status: codemeta.InvoiceOperationStatusSucceeded.Value}, // 終態，不算
-		{ID: 3003, Status: codemeta.InvoiceOperationStatusReady.Value},  // 這個才算
+		{ID: 9, Status: codemeta.InvoiceOperationStatusSucceeded.Value},
+		{ID: 3003, Status: codemeta.InvoiceOperationStatusReady.Value},
 	}}
 	ops.corrOps = corrOps{holdOK: true, releaseOK: true, promoteOK: true, order: h.calls}
 
@@ -884,13 +826,9 @@ func TestCorrectionIntake_OpenOperationUsesPositiveList(t *testing.T) {
 	if out.Status != correctionStatusUpdatedBeforeIssue {
 		t.Errorf("Status = %q, want UPDATED_BEFORE_ISSUE", out.Status)
 	}
-	// handling_mode 與 status 的值域零交集——不得互相污染
 	if out.HandlingMode == out.Status {
 		t.Error("handling_mode 與 status 不得同值：前者是做法、後者是進度")
 	}
-	// 🔴 這一條才是「正面列舉 vs 排除法」的鑑別力所在：
-	// 排除法會選中 ID 9（SUCCEEDED，已完成），而對它下 Hold 必然 rows=0
-	// ⇒ 整筆退成 ErrCorrectionSendInFlight。只斷言 Route 的話兩者都是 R03，測不出來。
 	if h.ops.gotHoldID != 3003 {
 		t.Fatalf("Hold 對象 = %d, want 3003（READY 那一筆）——選中已完成的 operation 會讓 R03 恆失敗",
 			h.ops.gotHoldID)
@@ -927,8 +865,6 @@ func TestCorrectionIntake_RebuildsLinesFromExisting(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// ⚠️ 數的是 harness 的 docs 不是 intakeDocs：intake 用 deps **組裝**，
-	// 而執行走的是 Correction 自己的 repo（兩者刻意分開，見 CorrectionIntake 的註解）。
 	if h.docs.insertCall != 1 {
 		t.Fatalf("InsertLines 呼叫 %d 次, want 1", h.docs.insertCall)
 	}
@@ -946,7 +882,7 @@ func TestCorrectionIntake_RebuildsLinesFromExisting(t *testing.T) {
 // 2026-08-31 dev 首次實打就製造出一筆（VOID operation 漏填 MaxAttempts 觸發 23514）。
 func TestCorrectionSubmit_BranchFailureReleasesGate(t *testing.T) {
 	h := newCorrHarness(t)
-	h.orders.err = errors.New("order-service unavailable") // R03 中途失敗
+	h.orders.err = errors.New("order-service unavailable")
 
 	_, err := h.uc.Submit(context.Background(), submitInput(pendingFacts()))
 	if err == nil {
@@ -964,7 +900,7 @@ func TestCorrectionSubmit_BranchFailureReleasesGate(t *testing.T) {
 // 婉拒路徑本身失敗時不得再婉拒一次（那是無窮遞迴的形狀），也不得蓋掉原始錯誤。
 func TestCorrectionSubmit_RejectPathDoesNotDoubleReject(t *testing.T) {
 	f := issuedFacts()
-	f.AlreadyReported = true // 走 R02
+	f.AlreadyReported = true
 	h := newCorrHarness(t)
 
 	if _, err := h.uc.Submit(context.Background(), submitInput(f)); err != nil {
@@ -1118,10 +1054,6 @@ func TestCorrectionExecute_R04CreatesReissueDocumentInSameTx(t *testing.T) {
 	} else if *got.OriginalDocumentID != 2002 {
 		t.Errorf("original_document_id = %d, want 2002（原票）", *got.OriginalDocumentID)
 	}
-	// 🔴 金額**不是**從原票複製，是由 RevisedLines 經 domain.BuildHeader 重算。
-	// 2026-09-01 integration test 抓到的：買家把個人改成公司統編時，發票從二聯式
-	// 變三聯式，而 chk_invdoc_b2c 要求 B2C 的 tax_amount 恆 0、統編恆 '0000000000'
-	// ⇒ 複製原票的值會在建列當下 23514。
 	if got.DocumentKind != codemeta.InvoiceDocumentKindB2b.Value {
 		t.Errorf("document_kind = %q, want B2B —— 修正後的買受人有統編", got.DocumentKind)
 	}
@@ -1168,7 +1100,6 @@ func TestCorrectionExecute_R04LeavesReissueOperationUnpromoted(t *testing.T) {
 	if _, err := h.uc.Execute(context.Background(), execInput(issuedFacts())); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// 兩個 operation：VOID（要推）與 REISSUE（不推）⇒ promote 恰好一次。
 	if h.ops.promoteCalls != 1 {
 		t.Fatalf("Promote 呼叫 %d 次, want 1 —— 只有 VOID 該被推，REISSUE 要等作廢確認",
 			h.ops.promoteCalls)
@@ -1211,7 +1142,6 @@ func TestCorrectionIntake_PicksCurrentDocumentNotSupersededOriginal(t *testing.T
 	if got[0].Status == codemeta.InvoiceDocumentStatusSuperseded.Value {
 		t.Fatal("取到了 SUPERSEDED 的原票 —— 買家將再也無法更正重開後的發票")
 	}
-	// 陰性：確認替身**真的**有一列是 SUPERSEDED，否則上面兩個斷言恆真。
 	var sawSuperseded bool
 	for _, d := range got {
 		if d.Status == codemeta.InvoiceDocumentStatusSuperseded.Value {
@@ -1223,14 +1153,6 @@ func TestCorrectionIntake_PicksCurrentDocumentNotSupersededOriginal(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// #3085 ＋ #3089 B 組 A-3：R03「開立前直接改」的兩層失敗
-//
-// 這條路徑從上線起 100% 失敗，而且是**兩個獨立的原因疊在一起**：
-//   ① ReviseSnapshotInput 的四個必填欄位從未賦值 ⇒ order-service 回 400
-//   ② 就地 UPDATE 不重算 document_kind 與金額 ⇒ 就算過了 ① 也是 chk_invdoc_b2c 的 23514
-// 只修 ① 的話症狀只是從 400 換成 500。兩層各自要能單獨轉紅。
-// ---------------------------------------------------------------------------
 
 func intakeFixtureFor(t *testing.T, doc domain.Document, lines []domain.DocumentLine) (*corrHarness, *CorrectionIntake) {
 	t.Helper()
@@ -1274,8 +1196,6 @@ func TestCorrectionIntake_FillsOrderRevisionRequiredFields(t *testing.T) {
 	}
 
 	got := h.orders.got
-	// 🔴 四個一起驗：只補 invoice_kind 的話 carrier_selection_mode 會落空字串
-	// ⇒ 買家原本選的載具在更正後消失，而那不會報錯。
 	if got.InvoiceKind != codemeta.InvoiceDocumentKindB2b.Value {
 		t.Errorf("invoice_kind = %q，統編有值就該是 B2B", got.InvoiceKind)
 	}
@@ -1307,14 +1227,12 @@ func TestCorrectionIntake_RecomputesKindAndAmountsOnRevise(t *testing.T) {
 	if rev.RecipientTaxID != "12345678" {
 		t.Errorf("recipient_tax_id = %q", rev.RecipientTaxID)
 	}
-	// B2B 要把稅從含稅總額裡拆出來：1050 含稅 ⇒ 未稅 1000 ＋ 稅 50。
 	if rev.TaxAmount == 0 {
 		t.Error("B2B 的 tax_amount 不該是 0 —— 那是 B2C 的形狀，代表金額沒重算")
 	}
 	if rev.TotalAmount != rev.SalesAmount+rev.FreeTaxSalesAmount+rev.ZeroTaxSalesAmount+rev.TaxAmount {
 		t.Errorf("違反 chk_invdoc_total：%+v", rev)
 	}
-	// 期限跟著 kind 走：B2B 是 7 個自然日，B2C 是 2 個。
 	if rev.StatutoryDeadline == nil {
 		t.Fatal("statutory_deadline 沒重算 —— B2C 2 天與 B2B 7 天差 5 天，" +
 			"不重算不會有任何東西轉紅，只會讓這批發票在錯的時點被告警")
@@ -1340,7 +1258,6 @@ func TestCorrectionIntake_ClearingTaxIDFallsBackToB2C(t *testing.T) {
 	if rev.DocumentKind != codemeta.InvoiceDocumentKindB2c.Value {
 		t.Fatalf("document_kind = %q，沒有統編就該是 B2C", rev.DocumentKind)
 	}
-	// B2C 的落庫值恆為 '0000000000'，不是空字串（chk_invdoc_taxid_shape）。
 	if rev.RecipientTaxID != domain.B2CBuyerIdentifier {
 		t.Errorf("recipient_tax_id = %q，B2C 應為 %q", rev.RecipientTaxID, domain.B2CBuyerIdentifier)
 	}
@@ -1379,8 +1296,6 @@ func TestCorrectionIntake_RejectsOverlongBuyerName(t *testing.T) {
 		[]domain.DocumentLine{{LineSeq: 1, LineType: "PRODUCT", Quantity: 1, UnitPrice: 1050, NetAmount: 1050, TaxCategory: 1}})
 	_, err := intake.Submit(context.Background(), SubmitCorrectionRequest{
 		BuyerID: 5005, OrderNo: "O20260831001", ExpectedSnapshotVersion: 1,
-		// 🔴 刻意**不帶 carrierType**（無載具分支）——那正是 validateIdentityShape
-		// 不驗抬頭長度的那一格。
 		NewInvoice:     CheckoutInvoiceSpec{Present: true, BuyerName: strings.Repeat("字", 61)},
 		IdempotencyKey: "correction-long",
 	})
@@ -1410,7 +1325,6 @@ func TestCorrectionIntake_SequenceGateSeesTheOriginalNotTheReplacement(t *testin
 	docs := &intakeDocs{doc: replacement}
 	docs.corrDocs = corrDocs{reviseOK: true, docSnapshotVersion: 1, order: h.calls, createInserted: true}
 	corrs := &fakeCorrections{
-		// 原票上有一筆進行中的更正（R04 作廢重開正在飛）。
 		openByDoc: map[int64]domain.CorrectionRequest{
 			originalID: {ID: 6001, Status: codemeta.InvoiceCorrectionStatusVoidReissueInProgress.Value},
 		},
@@ -1459,7 +1373,6 @@ func TestCorrectionIntake_CompletedReissueStillAllowsNewCorrection(t *testing.T)
 		Documents:  docs,
 		Operations: ops,
 		Accounts:   &intakeAccounts{acct: domain.ProviderAccount{ID: 5, Status: codemeta.InvoiceProviderAccountStatusActive.Value}},
-		// 原票上**沒有**進行中的更正（上一次已經 COMPLETED）。
 		Corrections: &fakeCorrections{},
 		Tracks:      &corrTracks{},
 	}, h.uc)

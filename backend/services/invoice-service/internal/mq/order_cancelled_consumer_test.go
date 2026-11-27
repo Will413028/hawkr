@@ -11,11 +11,7 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// fakes
-// ---------------------------------------------------------------------------
 
-// fakeCancelled 是 invoice_cancelled_orders 的 fake。鍵是 order_no（＝真表的 PK）。
 type fakeCancelled struct {
 	rows      map[string]domain.CancelledOrder
 	inserts   int
@@ -43,14 +39,6 @@ func (f *fakeCancelled) IsCancelledForBuyer(_ context.Context, orderNo string, b
 	return ok && r.BuyerID == buyerID, nil
 }
 
-// rollbackTx 是**會真的還原**的 TxManager fake。
-//
-// 🔴 既有的 nopTx／xTx 只是 `return fn(ctx)`：它們證明不了本 handler 的核心不變式
-// （「失敗時去重列一起消失」）——用它們寫出來的測試，即使 handler 改成兩個獨立交易
-// 也照樣全綠。這裡以 snapshot/restore 重現 rollback 的**可觀察後果**。
-//
-// ⚠️ 它仍然是 fake。真正的原子性由 TestIntegration_OrderCancelled*（真 DB、真
-// TxManager）證明；這裡要的是「單元層跑得快、而且改壞了會紅」。
 type rollbackTx struct {
 	inbox     *fakeInbox
 	cancelled *fakeCancelled
@@ -97,13 +85,6 @@ func newCancelledFixture(t *testing.T) (*OrderCancelledConsumer, *fakeInbox, *fa
 	return c, inbox, cancelled, tx
 }
 
-// producerShapedCancelledBody 造一個**與 producer 形狀相同**的 body。
-//
-// 🔴 型別逐欄取自 order-service 的 `OrderCancelledPayload`：`buyer_id` /
-// `store_id` / `notify_*` 是 `Long` ⇒ **JSON 數字**；其餘是 `String` ⇒ 字串；
-// `items` 是巢狀 record 陣列。這與正上方的 refund fixture（全字串）**相反**，
-// 兩份都對——判別方式只有讀 producer。
-// 欄位集合本身由 TestCancelledFixtureCoversEveryProducerField 對 Java 原始碼守住。
 func producerShapedCancelledBody(t *testing.T, overrides map[string]any) []byte {
 	t.Helper()
 	body := map[string]any{
@@ -113,8 +94,6 @@ func producerShapedCancelledBody(t *testing.T, overrides map[string]any) []byte 
 		"items": []any{
 			map[string]any{"sku_id": "7381920374651238401", "quantity": "2"},
 		},
-		// 🔴 無 Z、無時區：producer 寫的是 DateTimeUtils.nowUtc().toString()
-		// （LocalDateTime.toString()），不是 formatIso8601。
 		"occurred_at":              "2026-08-30T11:58:03",
 		"buyer_id":                 2623900520,
 		"notify_buyer_account_id":  2623900520,
@@ -134,9 +113,6 @@ func producerShapedCancelledBody(t *testing.T, overrides map[string]any) []byte 
 	return b
 }
 
-// ---------------------------------------------------------------------------
-// happy path
-// ---------------------------------------------------------------------------
 
 // TestOrderCancelled_RealProducerPayloadIsConsumed 是 #2904 的主證明。
 //
@@ -163,7 +139,6 @@ func TestOrderCancelled_RealProducerPayloadIsConsumed(t *testing.T) {
 	if row.CancelReason != "PAYMENT_TIMEOUT" {
 		t.Errorf("cancel_reason = %q, want PAYMENT_TIMEOUT", row.CancelReason)
 	}
-	// occurred_at 必須是解析後的事件時間，不是 handler 的 now。
 	want := time.Date(2026, 8, 30, 11, 58, 3, 0, time.UTC)
 	if !row.OccurredAt.Equal(want) {
 		t.Errorf("occurred_at = %v, want %v（無時區的 LocalDateTime 一律以 UTC 解讀）", row.OccurredAt, want)
@@ -205,9 +180,6 @@ func TestOrderCancelled_StringBuyerIDIsRejected(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 失敗處置（skill checklist §B）
-// ---------------------------------------------------------------------------
 
 // TestOrderCancelled_MalformedBodyGoesToDLQ 釘住慣例①：反序列化失敗 return error。
 func TestOrderCancelled_MalformedBodyGoesToDLQ(t *testing.T) {
@@ -277,7 +249,7 @@ func TestOrderCancelled_AcceptsEveryProducerTimeLayout(t *testing.T) {
 	for _, raw := range []string{
 		"2026-08-30T11:58:03.123456789",
 		"2026-08-30T11:58:03",
-		"2026-08-30T11:58", // 秒與奈秒同為 0
+		"2026-08-30T11:58",
 		"2026-08-30T11:58:03Z",
 	} {
 		t.Run(raw, func(t *testing.T) {
@@ -312,9 +284,6 @@ func TestOrderCancelled_NullCancelReasonIsNormal(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 原子性：本 handler 與 C1／C2 的關鍵差別
-// ---------------------------------------------------------------------------
 
 // TestOrderCancelled_FailureRollsBackTheDedupKey 守住本設計唯一的理由。
 //
@@ -341,13 +310,11 @@ func TestOrderCancelled_FailureRollsBackTheDedupKey(t *testing.T) {
 			"訊息永遠進不了 DLQ", len(inbox.rows))
 	}
 
-	// 第二次投遞（pkg/mq 的 retry）必須真的重跑 —— 而不是被去重擋掉之後回 nil。
 	if err := c.Handle(ctx, pkgmq.RoutingKeyOrderCancelled, body); err == nil {
 		t.Fatal("重投時仍然失敗才對；回 nil 代表它被自己上一次留下的去重鍵擋掉了，" +
 			"那是「假裝成功」——打滿 MaxRetries 也不會進 DLQ")
 	}
 
-	// 修好之後同一則訊息必須能成功（證明 rollback 沒有留下任何殘留）。
 	cancelled.insertErr = nil
 	if err := c.Handle(ctx, pkgmq.RoutingKeyOrderCancelled, body); err != nil {
 		t.Fatalf("下游恢復之後重投應該成功：%v", err)
@@ -387,7 +354,7 @@ func TestOrderCancelled_DedupIsKeyedOnOrderNoNotEventID(t *testing.T) {
 
 	first := producerShapedCancelledBody(t, nil)
 	second := producerShapedCancelledBody(t, map[string]any{
-		"event_id": "00000000-0000-4000-8000-000000000002", // 換一個 UUID
+		"event_id": "00000000-0000-4000-8000-000000000002",
 	})
 	if err := c.Handle(ctx, pkgmq.RoutingKeyOrderCancelled, first); err != nil {
 		t.Fatal(err)
@@ -428,7 +395,6 @@ func TestCancelledFixtureCoversEveryProducerField(t *testing.T) {
 		if v == nil {
 			continue
 		}
-		// JSON 形狀必須與 Java 型別相符：String ⇒ 字串、Long ⇒ 數字。
 		switch c.Type {
 		case "String":
 			if _, ok := v.(string); !ok {

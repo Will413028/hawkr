@@ -30,7 +30,6 @@ func (m Measure) AppealUnavailabilities(l uitext.Locale) []AppealUnavailability 
 	return out
 }
 
-// appealUnavailableText 是原因給使用者看的一句話；不認得的原因回零值（Text 是空字串）。
 func appealUnavailableText(l uitext.Locale, r AppealUnavailableReason) uitext.Message {
 	switch r {
 	case AppealReasonRevoked:
@@ -78,7 +77,6 @@ func (m Measure) remediationUnavailableText(l uitext.Locale, r RemediationUnavai
 	return uitext.Message{}
 }
 
-// cooldownTime 是冷卻結束時間的顯示：台北時間、秒數進位到分鐘（顯示的時間不會早於真正可以再提出的時間）。
 func cooldownTime(l uitext.Locale, t time.Time) string {
 	return uitext.FormatDateTime(l, twtime.MinuteCeil(t))
 }

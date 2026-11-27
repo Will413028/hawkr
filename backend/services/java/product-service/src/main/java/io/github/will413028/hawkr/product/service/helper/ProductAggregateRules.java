@@ -57,14 +57,12 @@ public final class ProductAggregateRules {
         if (skus == null || skus.isEmpty()) {
             return new ArrayList<>();
         }
-        // 1. sku.id ASC 排序（穩定序，避免 fee_payer 因順序漂移）
         List<ProductSkuEntity> sorted = new ArrayList<>(skus);
         sorted.sort(Comparator.comparing(
             ProductSkuEntity::getId,
             Comparator.nullsLast(Comparator.naturalOrder())
         ));
 
-        // 2. 按 (type, temperature) 聚合
         Map<String, ShippingMethodItem> merged = new LinkedHashMap<>();
         for (ProductSkuEntity sku : sorted) {
             if (sku == null || sku.getShippingMethod() == null) continue;
@@ -73,15 +71,13 @@ public final class ProductAggregateRules {
                 String key = m.getType() + "|" + m.getTemperature();
                 ShippingMethodItem existing = merged.get(key);
                 if (existing == null) {
-                    merged.put(key, copy(m));  // 第一次出現的 fee_payer 勝出
+                    merged.put(key, copy(m));
                 } else {
                     mergeFreeThreshold(existing, m);
-                    // fee_payer 保持 existing（已是 sku.id 最小者）
                 }
             }
         }
 
-        // 3. 輸出排序 (type ASC, temperature ASC)
         List<ShippingMethodItem> result = new ArrayList<>(merged.values());
         result.sort(Comparator
             .comparing(ShippingMethodItem::getType, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -92,8 +88,8 @@ public final class ProductAggregateRules {
     private static void mergeFreeThreshold(ShippingMethodItem existing, ShippingMethodItem incoming) {
         Long curr = parseThreshold(existing.getFreeThreshold());
         Long inc  = parseThreshold(incoming.getFreeThreshold());
-        if (inc == null) return;                 // incoming 無門檻，不影響
-        if (curr == null || inc < curr) {        // existing 無門檻 → 採 inc；inc 較低 → 採 inc
+        if (inc == null) return;
+        if (curr == null || inc < curr) {
             existing.setFreeThreshold(incoming.getFreeThreshold());
         }
     }
@@ -102,7 +98,7 @@ public final class ProductAggregateRules {
         if (isBlank(s)) return null;
         try {
             long v = Long.parseLong(s);
-            return v > 0 ? v : null;       // <= 0 視為「無門檻」
+            return v > 0 ? v : null;
         } catch (NumberFormatException ignored) {
             return null;
         }

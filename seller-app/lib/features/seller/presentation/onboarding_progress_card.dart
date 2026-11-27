@@ -54,7 +54,6 @@ class OnboardingProgressCard extends HookConsumerWidget {
         required.isNotEmpty && completedRequired == required.length;
     final collapsedOverride = useState<bool?>(null);
     final collapsed = collapsedOverride.value ?? allRequiredComplete;
-    // 「公開前必須」沒有任務時：讀取中顯示「載入中…」，讀取失敗顯示預設錯誤句（不自己推導，也不顯示 0/0）。
     final requiredPlaceholder = required.isNotEmpty
         ? null
         : summaryLoading
@@ -63,8 +62,6 @@ class OnboardingProgressCard extends HookConsumerWidget {
         ? ref.watch(defaultErrorTextProvider)(Code.internal)
         : null;
 
-    // 進度卡常駐在主導航的分頁裡：去別的頁面辦事回來（成為可見）才重讀，離開時不讀。物流與商品數是辦事的結果，每次回來都重讀；
-    // 店家與認證流程 30 秒內讀過就不再讀。
     useOnBecameVisible(() {
       ref.invalidate(onboardingInputsProvider);
       unawaited(

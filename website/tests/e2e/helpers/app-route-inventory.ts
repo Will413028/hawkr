@@ -16,8 +16,6 @@ function walk(directory: string): string[] {
 }
 
 function routeSegment(segment: string): string | null {
-	// `[locale]` is the first URL segment of every localized page, and zh-TW (the
-	// default locale) has no prefix: the routes below are the zh-TW URLs.
 	if (segment === "[locale]") return null;
 	if (segment.startsWith("@")) return null;
 	if (/^\([^)]+\)$/.test(segment)) return null;
@@ -27,8 +25,6 @@ function routeSegment(segment: string): string | null {
 
 function routeForPage(file: string): string | null {
 	const rawSegments = relative(APP_ROOT, file).split(sep).slice(0, -1);
-	// Parallel/intercepted slots are alternate renderings of a canonical page,
-	// not independently addressable documents.
 	if (rawSegments.some((segment) => segment.startsWith("@"))) return null;
 	const segments = rawSegments
 		.map(routeSegment)
@@ -83,13 +79,6 @@ export function discoverPermanentRedirects(): PermanentRedirect[] {
  */
 export function isRedirectOnlyPageSource(src: string): boolean {
 	if (!/\bredirect\s*\(/.test(src)) return false;
-	// 函式主體必須「永遠不渲染」：最後一句是 redirect(...)，它前面只允許
-	// 單行守衛（notFound / forbidden / unauthorized / redirect）。有 return
-	// JSX 或多行分支的一律排除。
-	//
-	// 判準看行為而非行數：redirect 前面多一行 `if (...) notFound();` 守衛，
-	// 頁面照樣不渲染、照樣回 307，不該因此換類別（曾因此掉回「公開靜態頁」
-	// 類、被斷言成 200 而擋掉一次 main 部署）。
 	const body = src.match(
 		/export\s+default\s+(?:async\s+)?function\s+\w*\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/,
 	)?.[1];
@@ -99,8 +88,6 @@ export function isRedirectOnlyPageSource(src: string): boolean {
 		.map((line) => line.trim())
 		.filter((line) => line && !line.startsWith("//") && !line.startsWith("*"));
 	if (meaningful.length === 0) return false;
-	// 最後一句是 redirect(...)：可以跨多行（`redirect({ href, locale })`），
-	// 從它開頭的那一行起，括號配平的那一行必須是函式主體的最後一行。
 	const start = meaningful.findIndex((line) => /^redirect\s*\(/.test(line));
 	if (start === -1) return false;
 	let depth = 0;

@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// officialAppKey 是光貿公開文件的測試 App Key。
-const officialAppKey = "sHeq7t8G1wiQvhAuIM27" // gitleaks:allow（光貿公開文件的測試 App Key）
+const officialAppKey = "sHeq7t8G1wiQvhAuIM27"
 
 // TestSignatureOfficialGoldenFixtures 用光貿官方文件的三組 fixture 當 golden。
 // 其中兩組的統編已換成合成統編，期望簽章以文件規定的 MD5(data+time+AppKey) 另行重算；

@@ -5,45 +5,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// ---------------------------------------------------------------------------
-// 業務指標（§8.2.3）
-//
-// 🔴 **本檔的重點是「預先註冊」不是「用到才建」。** Go 的 counter/histogram 在第一次
-// 觀測之前不會出現在 /metrics，而 Prometheus 告警的 selector 對**不存在的序列**永遠
-// 不會 fire ⇒ `business-alerts.yml` 裡的 invoice 告警會是永久靜默的擺設。
-// 所以每個已知的 label 組合在啟動時就 `WithLabelValues(...)` 一次（counter 用
-// `.Add(0)`），讓序列存在且值為 0。
-//
-// **驗收判準是「序列存在」，不是「值為 0」**——值為 0 才是正確的初始狀態。
-//
-// label 基數紅線（§8.2.3 末）：禁止把 store_id／issuer_id／order_no／invoice_number／
-// buyer_id／carrier_id／AMEGO 原始錯誤碼當 label。「是哪一家、哪一張」是稽核問題與
-// ADM 工作台問題，不是 metric 問題。
-// ---------------------------------------------------------------------------
 
-// 本波實際會觸發的 worker 名（M25／M26 的 label 值域）。
-//
-// §8.2.3 M25 定義的封閉值域是八值（op/rc/pdf/ob/dl/gov/trk/hc），但現在只有三支
-// 排程器真的存在。**刻意只預先註冊這三個**：替不存在的 worker 造一條恆為 0 的序列，
-// 會讓告警 ⑲（tick 耗時 ÷ interval）對一支根本沒在跑的 worker 算出「健康」，
-// 而那正是「沒有這支 worker」與「這支 worker 壞了」唯一分得出來的地方。
-// 其餘五支隨各自的排程器落地時登記。
-//
-// 🔴 新增排程器時**這裡與 di.go 的 WorkerTickInterval 兩處都要加**：只加 di.go 那半，
-// M25 的 histogram 序列在第一次 tick 之前不存在（告警恆不觸發）；只加這裡那半，M26 的
-// 分母是 0（飽和度算出 +Inf 或 NaN）。兩處都不會編譯錯。
 const (
-	workerNameIssue    = "op"  // INV.op：開票送件
-	workerNameOutbox   = "ob"  // INV.ob：outbox 派送
-	workerNameDeadline = "dl"  // INV.dl：期限與 inbox 兜底掃描
-	workerNameTrack    = "trk" // INV.trk：字軌餘量巡檢
-	workerNameHealth   = "hc"  // INV.hc：provider 憑證與 provider 健康檢查
-	workerNameRecheck  = "rc"  // INV.rc：結果未明對帳 ＋ 上傳狀態覆查
-	workerNameGov      = "gov" // INV.gov：治理到期掃描 ＋ 跨期關帳窗口
-	workerNamePDF      = "pdf" // INV.pdf：發票 PDF 抓檔落自有儲存
+	workerNameIssue    = "op"
+	workerNameOutbox   = "ob"
+	workerNameDeadline = "dl"
+	workerNameTrack    = "trk"
+	workerNameHealth   = "hc"
+	workerNameRecheck  = "rc"
+	workerNameGov      = "gov"
+	workerNamePDF      = "pdf"
 )
 
-// invoiceIssueResults 是 M1 `invoice_issue_total` 的 result 值域（§8.2.3 M1，7 值）。
 var invoiceIssueResults = []string{
 	"succeeded",
 	"permanent_failed",
@@ -54,7 +27,6 @@ var invoiceIssueResults = []string{
 	"resolved_externally",
 }
 
-// invoiceFulfillmentModes 是 M1 的第二個 label 值域（CodeMeta InvoiceFulfillmentMode，4 值）。
 var invoiceFulfillmentModes = []string{
 	"AMEGO_AUTO",
 	"SELLER_SELF_ISSUE",
@@ -62,7 +34,6 @@ var invoiceFulfillmentModes = []string{
 	"LEGACY_MANUAL",
 }
 
-// invoiceDocumentKinds 是 M22 的 label 值域（封閉三值）。
 var invoiceDocumentKinds = []string{"B2C", "B2B", "RECEIPT"}
 
 // Metrics 持有 invoice-service 自己 export 的業務指標。
@@ -128,11 +99,6 @@ func NewMetrics() *Metrics {
 	return m
 }
 
-// preRegister 展開每個已知 label 組合，讓序列在第一次觀測之前就存在。
-//
-// counter 用 `.Add(0)`、histogram 用 `.WithLabelValues(...)`（取得 observer 即建立序列）。
-// 拿掉這個函式的任何一段，對應的告警就會從「未觸發」變成「永遠不會觸發」，而
-// /metrics 看起來只是少了幾行——沒有任何東西會轉紅。
 func (m *Metrics) preRegister() {
 	for _, result := range invoiceIssueResults {
 		for _, mode := range invoiceFulfillmentModes {
@@ -144,7 +110,6 @@ func (m *Metrics) preRegister() {
 	}
 	for _, w := range []string{workerNameIssue, workerNameOutbox, workerNameDeadline} {
 		m.WorkerTickDuration.WithLabelValues(w)
-		// interval 的實際值由 di.go 在啟動時設定；這裡先讓序列存在。
 		m.WorkerTickInterval.WithLabelValues(w).Set(0)
 	}
 }
@@ -152,8 +117,6 @@ func (m *Metrics) preRegister() {
 // ObserveIssueResult 記一次 M1。呼叫端必須保證「一個 operation 一輩子一次」。
 func (m *Metrics) ObserveIssueResult(result, fulfillmentMode string) {
 	if !containsString(invoiceIssueResults, result) {
-		// 值域外的 result 會造出一條沒有人會查的新序列 ⇒ 收斂到 not_applicable 之外
-		// 不做，直接不記並不阻斷業務。
 		return
 	}
 	if !containsString(invoiceFulfillmentModes, fulfillmentMode) {
@@ -165,7 +128,6 @@ func (m *Metrics) ObserveIssueResult(result, fulfillmentMode string) {
 // ObserveIssueE2E 記一次 M22。
 func (m *Metrics) ObserveIssueE2E(documentKind string, seconds float64) {
 	if !containsString(invoiceDocumentKinds, documentKind) || seconds < 0 {
-		// 負延遲代表時鐘偏移（§8.3.1 code 15），記進去只會污染 p99。
 		return
 	}
 	m.IssueE2EDuration.WithLabelValues(documentKind).Observe(seconds)

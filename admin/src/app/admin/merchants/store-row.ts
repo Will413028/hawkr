@@ -6,8 +6,6 @@ import {
 import { townByCode } from "@hawkr/twaddr/lookup";
 import { kycStatusText } from "@/lib/kyc-status";
 
-// 商家清單一列的顯示判斷。契約只給申請狀態（kyc_status，沒有申請時不設）、suspended 和店家的生命週期，
-// 徽章與代行入口的資格都由它們推出來，不另外存一份「綜合狀態」。
 
 export type BadgeVariant = "success" | "warning" | "danger" | "gray";
 

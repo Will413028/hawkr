@@ -70,7 +70,6 @@ class PageShopTabState extends ConsumerState<PageShopTab>
   void initState() {
     super.initState();
     Future.microtask(_loadOneProduct);
-    // 監聽背景上傳完成，刷新商品列表
     _uploadSub = ProductUploadService().taskStream.listen((tasks) {
       final ownSellerId = ref.read(sellerStoreIdProvider);
       final isOwn = widget.sellerId == ownSellerId;
@@ -248,7 +247,6 @@ class PageShopTabState extends ConsumerState<PageShopTab>
   }
 }
 
-// ── 商品卡片 ──────────────────────────────────────────────────────────────────
 
 @visibleForTesting
 Widget buildSellerProductManagementCardForTest({
@@ -278,13 +276,12 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
   int? _ratingCount;
   int? _minPrice;
   int? _maxPrice;
-  // PayUni #758: list price 用於 strikethrough；hasSale true 才顯示
   int? _listMin;
   int? _listMax;
   bool _hasSale = false;
   int? _stockQty;
 
-  String _status = ''; // 4001=draft, 4002=review, 4003=unlisted, 4004=listed
+  String _status = '';
   bool _isTogglingStatus = false;
 
   StreamSubscription<List<ProductUploadTask>>? _uploadSubscription;
@@ -296,7 +293,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
     super.initState();
     _minPrice = int.tryParse(widget.product['priceMin']?.toString() ?? '');
     _maxPrice = int.tryParse(widget.product['priceMax']?.toString() ?? '');
-    // 後端規則：salePriceMin/Max == "0" 表示全部無特價（不顯示刪除線）
     _hasSale = PriceDisplay.hasRangeSale(
       salePriceMin: widget.product['salePriceMin'],
       salePriceMax: widget.product['salePriceMax'],
@@ -347,14 +343,12 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
       setState(() => _imageUrls = urls);
     }
 
-    // sellerId
     final mRaw =
         widget.product['merchantId'] ??
         widget.product['merchant_id'] ??
         ref.read(sellerStoreIdProvider);
     final String? sellerId = mRaw?.toString();
 
-    // skuId
     final skuRaw =
         widget.product['skuId'] ??
         widget.product['sku_id'] ??
@@ -362,7 +356,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
     final Object? skuId = skuRaw;
     if (skuId == null || sellerId == null) return;
 
-    // 評分統計與 grades 各自隔離失敗，互不影響
     final results = await Future.wait<dynamic>([
       ref
           .read(reviewRepositoryProvider)
@@ -388,7 +381,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
     int stockTotal = 0;
     bool hasStockValue = false;
     for (final g in grades) {
-      // PayUni #758: main price = salePrice ?? price；list price 用於 strikethrough
       final priceVal = g['price'];
       final saleVal = g['salePrice'] ?? g['sale_price'];
       final effective = PriceDisplay.effectiveSkuPrice(
@@ -417,7 +409,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
     }
 
     setState(() {
-      // 評分與評價數只取自統計 RPC；讀取失敗時不更動，不顯示成 0 則評價。
       if (stats != null) {
         _avgRating = stats.average;
         _ratingCount = stats.count;
@@ -556,7 +547,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
     if (productId.isEmpty) return;
 
     if (_isListed) {
-      // 下架需要確認
       final confirmed = await _showDelistDialog();
       if (confirmed != true || !mounted) return;
     }
@@ -847,7 +837,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
   }
 
   Future<void> _editProduct() async {
-    // PayUni #758 編輯閘門：ACTIVE(4004) 需先下架；PENDING_REVIEW(4002) 禁編輯
     if (_status == '4002') {
       if (context.mounted) FloatingToast.error(context, '審核中不可編輯');
       return;
@@ -1054,9 +1043,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
         _ratingCount ?? (p['ratingCount'] is int ? p['ratingCount'] as int : 0);
     final bool isSoldOut = _isSoldOut;
 
-    // 判準走 PriceDisplay：後端契約以 `"0"` 表達「無價格」，
-    // `int.tryParse("0")` 拿到 0 會印成 `NT $0`。空字串＝不顯示價格列。
-    // PayUni #758: 區間缺席才退回 SKU 的 salePrice ?? price。
     final String priceDisplay = PriceDisplay.productCardPrice(
       priceMin: _minPrice,
       priceMax: _maxPrice,
@@ -1064,7 +1050,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
       skuSalePrice: p['salePrice'] ?? p['sale_price'],
       prefix: 'NT \$',
     );
-    // listPrice strikethrough：salePriceMin != "0" 或 per-SKU 偵測到 sale
     String? strikeListDisplay;
     if (_hasSale) {
       final strike = PriceDisplay.formatPriceRange(
@@ -1155,9 +1140,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
                   right: 0,
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      // 圓點寬度固定（含左右 margin），數量超過可視寬度容納上限時
-                      // 只畫前 N 顆，避免這個沒有 Expanded/Flexible 保護的 Row 被撐爆
-                      // （margin 未隨 ScreenUtil 縮放，圖片張數多或縮放比例偏低都會超版）。
                       const dotMargin = 4.0;
                       final perDot = 5.w + dotMargin * 2;
                       final maxFit = (constraints.maxWidth / perDot).floor();
@@ -1186,7 +1168,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
                     },
                   ),
                 ),
-              // hashtag 底部暗化漸層（增強對比）
               if (hashtags.isNotEmpty)
                 Positioned(
                   left: 0,
@@ -1208,7 +1189,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
                     ),
                   ),
                 ),
-              // hashtag chip overlay（左下，僅顯示第一個避免擠到）
               if (hashtags.isNotEmpty)
                 Positioned(
                   left: 4.w,
@@ -1325,7 +1305,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
                     children: [
                       buildImage(imageWidth),
                       SizedBox(width: 10.w),
-                      // 右側資訊
                       Expanded(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(minHeight: imageHeight),
@@ -1333,7 +1312,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // 標題 + 分享
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1358,7 +1336,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
                                   ),
                                 ],
                               ),
-                              // 評分
                               Row(
                                 children: [
                                   Icon(
@@ -1455,8 +1432,6 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
     double opacity = 1.0,
     VoidCallback? onTap,
   }) {
-    // 符合 Material 48dp / Apple HIG 44pt 最小可點擊範圍：
-    // 視覺高度 32h，外層額外 hit area 用 InkWell behavior
     return Opacity(
       opacity: opacity,
       child: Material(

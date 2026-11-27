@@ -145,7 +145,6 @@ func TestListPostsComposesPostsMeasureIDsAndOpenReportCounts(t *testing.T) {
 		t.Fatal("有下一頁要給 token")
 	}
 
-	// token 帶回後解成模組的游標；token 綁篩選，換篩選回 INVALID_ARGUMENT。
 	if _, err := c.ListPosts(t.Context(), connect.NewRequest(&adminpb.ListPostsRequest{TakenDownOnly: true, PageToken: res.Msg.GetNextPageToken()})); err != nil {
 		t.Fatal(err)
 	}

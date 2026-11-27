@@ -24,7 +24,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// 案件的詢問（step10e-3cb-design §7.4）。管理員 21 發詢問、22 記回覆、23 撤回。
 
 const (
 	inquiryCreator  = 21
@@ -32,7 +31,6 @@ const (
 	inquiryWithdraw = 23
 )
 
-// foodCase 在 storeID 上開一個進行中的食安案件（一筆通報）。
 func (f *fixture) foodCase(t *testing.T, storeID int64) AdminCase {
 	t.Helper()
 	c, _ := f.newCase(t, storeID, policy.FoodSafety, SeverityHigh, 1)
@@ -51,7 +49,6 @@ func (f *fixture) mustInquire(t *testing.T, caseID uuid.UUID) CreateCaseInquiryR
 	return r
 }
 
-// reply 記下回覆（管理員 22），收到的時間是 receivedAt；每個 name 放一份機敏附件（內容是 evidencePDF(name)，上傳者是管理員）。
 func (f *fixture) reply(t *testing.T, inquiryID uuid.UUID, receivedAt time.Time, names ...string) (RecordCaseInquiryReplyResult, error) {
 	t.Helper()
 	return f.module.RecordCaseInquiryReply(context.Background(), RecordCaseInquiryReplyInput{
@@ -104,14 +101,12 @@ func TestCreateInquiryStartsTheWaitAndAllowsOnlyOneOpenInquiry(t *testing.T) {
 		t.Fatalf("等賣家的案件沒有決定期限：%+v", got.DecideDeadline)
 	}
 
-	// 同時只能有一筆還沒結束的。
 	_, err = f.inquire(t, c.ID, InquiryKindRecords, "再問一次")
 	wantBlocked(t, err, "這個案件已有一筆詢問在等賣家回覆。")
 	if f.count(t, "SELECT count(*) FROM seller.case_inquiries WHERE case_id = $1", c.ID) != 1 {
 		t.Fatal("被擋下的詢問寫入了")
 	}
 
-	// 輸入不合法：指到欄位，什麼都不寫。
 	other := f.foodCase(t, f.anotherStore(t).StoreID)
 	due := func(d time.Duration) *time.Time { v := f.now.Add(d); return &v }
 	for name, tt := range map[string]struct {
@@ -138,7 +133,6 @@ func TestCreateInquiryStartsTheWaitAndAllowsOnlyOneOpenInquiry(t *testing.T) {
 	if f.count(t, "SELECT count(*) FROM seller.case_inquiries WHERE case_id = $1", other.ID) != 0 {
 		t.Fatal("不合法的輸入寫入了")
 	}
-	// 期限的邊界：剛好 1 天與剛好 14 天可以。
 	for _, d := range []time.Duration{24 * time.Hour, 14 * 24 * time.Hour} {
 		c2 := f.foodCase(t, f.anotherStore(t).StoreID)
 		in := CreateCaseInquiryInput{CaseID: c2.ID, AdminID: inquiryCreator, Kind: InquiryKindRecords, Message: "x", DueAt: due(d)}
@@ -148,7 +142,6 @@ func TestCreateInquiryStartsTheWaitAndAllowsOnlyOneOpenInquiry(t *testing.T) {
 			t.Errorf("期限 %v：%v", d, r.Inquiry.DueAt)
 		}
 	}
-	// 案件不存在。
 	_, err = f.inquire(t, uuid.NewV7(), InquiryKindRecords, "x")
 	wantKind(t, err, apperr.KindNotFound)
 	f.assertCaseInvariants(t)
@@ -201,7 +194,6 @@ func TestCreateInquiryIsBlockedOnlyOnceTheStoreWasPurged(t *testing.T) {
 	if got := f.caseOf(t, idle.ID); len(got.Availability.CreateInquiry) == 0 {
 		t.Fatal("已清理的店家，案件不能發詢問（can_create_inquiry 要是 false）")
 	}
-	// 已開著的詢問不動，照常逾期、可以記回覆或撤回。
 	still := f.inquiriesOf(t, waiting.ID)
 	if len(still) != 1 || still[0].State() != InquiryStateOpen || len(still[0].Availability.RecordReply) != 0 || len(still[0].Availability.Withdraw) != 0 {
 		t.Fatalf("清理之後仍開著的詢問：%+v", still)
@@ -232,7 +224,7 @@ func TestCreateInquiryRequestIDReplaysTheSameInquiry(t *testing.T) {
 	}
 	version := first.Case.Version
 
-	f.now = f.now.Add(2 * time.Hour) // 期限只剩 23 小時：重送不重新檢查範圍
+	f.now = f.now.Add(2 * time.Hour)
 	again, err := f.module.CreateCaseInquiry(ctx, in)
 	must(t, err)
 	if !again.Replayed || again.Inquiry.ID != first.Inquiry.ID || again.Case.Version != version || f.count(t, "SELECT count(*) FROM seller.case_inquiries") != 1 {
@@ -250,7 +242,6 @@ func TestCreateInquiryRequestIDReplaysTheSameInquiry(t *testing.T) {
 	if fields := invalidFields(t, err); !slices.Equal(fields, []string{"RequestID"}) {
 		t.Fatalf("同一個 request_id 帶別的案件：%v", err)
 	}
-	// 另一位管理員用同一個 request_id：另一個請求，不會讀回別人建立的詢問。
 	other := f.foodCase(t, f.anotherStore(t).StoreID)
 	mine := CreateCaseInquiryInput{CaseID: other.ID, AdminID: inquiryCreator + 1, Kind: InquiryKindRecords, Message: "另一位管理員", RequestID: &req}
 	got, err := f.module.CreateCaseInquiry(ctx, mine)
@@ -258,7 +249,6 @@ func TestCreateInquiryRequestIDReplaysTheSameInquiry(t *testing.T) {
 	if got.Replayed || got.Inquiry.ID == first.Inquiry.ID || got.Inquiry.CreatedByAdminID != inquiryCreator+1 {
 		t.Fatalf("範圍是 (管理員, request_id)：%+v", got.Inquiry)
 	}
-	// 原本那一筆已回覆、案件已結案：重送仍回原本那一筆（目前的狀態），不是「案件已結案」。
 	_, err = f.reply(t, first.Inquiry.ID, f.now.Add(-time.Hour))
 	must(t, err)
 	_, err = f.decide(t, c.ID, DecisionNoAction, "")
@@ -299,7 +289,6 @@ func TestConcurrentInquiriesOnOneCaseLeaveExactlyOneOpen(t *testing.T) {
 	if ok != 1 || f.count(t, "SELECT count(*) FROM seller.case_inquiries WHERE case_id = $1", c.ID) != 1 {
 		t.Fatalf("成功 %d 筆", ok)
 	}
-	// 同一個 request_id 的並行重送：只有一筆，其餘回同一筆。
 	other := f.foodCase(t, f.anotherStore(t).StoreID)
 	req := uuid.NewV4()
 	ids := make([]uuid.UUID, n)
@@ -385,7 +374,6 @@ func TestRecordInquiryReply(t *testing.T) {
 	}
 	_, err := f.reply(t, uuid.NewV7(), f.now)
 	wantKind(t, err, apperr.KindNotFound)
-	// 詢問不存在的句子是 Connect code NOT_FOUND 的預設文字，不是空字串。
 	if ae := new(apperr.Error); !errors.As(err, &ae) || strings.TrimSpace(ae.Message) == "" {
 		t.Fatalf("NotFound 要帶預設文字：%v", err)
 	}
@@ -393,7 +381,6 @@ func TestRecordInquiryReply(t *testing.T) {
 		t.Fatalf("被拒絕的回覆寫入了：%+v", got)
 	}
 
-	// 附件必須是機敏檔：公開的圖片在寫入的 transaction 內被拒絕，指到那一張，資產仍是暫存。
 	plainToken, plainAsset := f.stagePublic(t, media.Uploader{ID: inquiryRecorder, Admin: true})
 	_, err = f.module.RecordCaseInquiryReply(ctx, RecordCaseInquiryReplyInput{
 		InquiryID: i.ID, AdminID: inquiryRecorder, Channel: InquiryChannelPhone, ReceivedAt: f.now, Body: "x", EvidenceTokens: []string{plainToken},
@@ -418,7 +405,6 @@ func TestRecordInquiryReply(t *testing.T) {
 	if got.Case.Version != before.Version+1 || !got.Case.UpdatedAt.Equal(f.now) || got.Case.AwaitingSeller() || !got.Case.Open() {
 		t.Fatalf("case=%+v", got.Case.Case)
 	}
-	// 附件以管理員的身分確認（Admin: true；media 只讓上傳者本人確認），兩份都是有效的資產。
 	if n := f.activeEvidenceAssets(t, i.ID); n != 2 {
 		t.Fatalf("有效的附件資產=%d", n)
 	}
@@ -426,7 +412,6 @@ func TestRecordInquiryReply(t *testing.T) {
 		t.Fatalf("附件列=%d", n)
 	}
 
-	// 重送：回原本那一則，不寫入、不動版本、不比較內容。
 	f.now = f.now.Add(time.Hour)
 	again, err := f.module.RecordCaseInquiryReply(ctx, RecordCaseInquiryReplyInput{
 		InquiryID: i.ID, AdminID: inquiryRecorder + 1, Channel: InquiryChannelEmail, ReceivedAt: f.now, Body: "別的內容",
@@ -470,7 +455,6 @@ func TestWithdrawInquiry(t *testing.T) {
 	wantBlocked(t, err, "這筆詢問已撤回。")
 	_, err = f.module.WithdrawCaseInquiry(ctx, WithdrawCaseInquiryInput{InquiryID: uuid.NewV7(), AdminID: inquiryWithdraw})
 	wantKind(t, err, apperr.KindNotFound)
-	// 撤回之後可以再發一筆。
 	f.mustInquire(t, c.ID)
 	f.assertCaseInvariants(t)
 }
@@ -490,7 +474,6 @@ func TestALateRecordedReplyStartsTheDecisionClockAtTheReceiveTime(t *testing.T) 
 	if start := decisionStartOf(t, got.Case); !start.Equal(received) || start.Equal(f.now) {
 		t.Fatalf("待決定的開始=%v，預期收到的時間 %v（不是記下的 %v）", start, received, f.now)
 	}
-	// 兩筆詢問取最晚的重新起算時間：第二筆被管理員撤回，比第一筆的收到時間晚。
 	f.now = f.now.Add(time.Hour)
 	second := f.mustInquire(t, c.ID).Inquiry
 	f.now = f.now.Add(time.Hour)
@@ -499,7 +482,6 @@ func TestALateRecordedReplyStartsTheDecisionClockAtTheReceiveTime(t *testing.T) 
 	if start := decisionStartOf(t, w.Case); !start.Equal(f.now) {
 		t.Fatalf("待決定的開始=%v，預期最晚的撤回時間 %v", start, f.now)
 	}
-	// 清單與單筆的值相同（兩條 SQL 路徑）。
 	open := CaseStateOpen
 	page, err := f.module.AdminCases(context.Background(), CaseListInput{State: &open, StoreID: s.StoreID, PageSize: 10})
 	must(t, err)
@@ -528,7 +510,6 @@ func TestClosingTheCaseWithdrawsItsOpenInquiry(t *testing.T) {
 		t.Fatalf("已結案的案件沒有決定期限（系統撤回不重新起算）：%+v", closed.DecideDeadline)
 	}
 
-	// 已回覆的詢問不動。
 	replied := f.foodCase(t, f.anotherStore(t).StoreID)
 	r := f.mustInquire(t, replied.ID).Inquiry
 	_, err = f.reply(t, r.ID, f.now)
@@ -539,7 +520,6 @@ func TestClosingTheCaseWithdrawsItsOpenInquiry(t *testing.T) {
 		t.Fatalf("已回覆的詢問被動了：%+v", got)
 	}
 
-	// 通報都移走：原案件以 NO_REPORTS 關閉，詢問由系統撤回（作者是移動的管理員 9）。
 	other := f.anotherStore(t)
 	food, members := f.newCase(t, other.StoreID, policy.FoodSafety, SeverityHigh, 1)
 	moved := f.mustInquire(t, food.ID).Inquiry
@@ -581,7 +561,6 @@ func TestDecideAndAConcurrentReplyNeverLeaveAnOpenInquiryOnAClosedCase(t *testin
 			if replyErr != nil {
 				t.Fatalf("回覆成功了卻回錯誤：%v", replyErr)
 			}
-			// 回覆先寫入，決定在案件版本前進之後以舊 etag 失敗，或在回覆之前結案——後者不可能：結案會先撤回。
 			if decideErr == nil {
 				t.Fatalf("回覆之後案件的版本前進，帶舊 etag 的決定要失敗")
 			}
@@ -590,7 +569,6 @@ func TestDecideAndAConcurrentReplyNeverLeaveAnOpenInquiryOnAClosedCase(t *testin
 			must(t, decideErr)
 			wantBlocked(t, replyErr, "這筆詢問已撤回。")
 		}
-		// 使用過的案件收尾，讓同一家店可以再開同類別的案件。
 		if f.caseOf(t, c.ID).Open() {
 			_, err := f.decide(t, c.ID, DecisionNoAction, "")
 			must(t, err)
@@ -665,7 +643,6 @@ func TestInquiryEvidenceReadIsRecordedBeforeTheRead(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.evidence_accesses WHERE inquiry_id = $1 AND report_id IS NULL AND request_id IS NULL AND position = 1 AND admin_id = 9 AND accessed_at = $2", i.ID, f.now); n != 1 {
 		t.Fatalf("讀取紀錄=%d", n)
 	}
-	// 讀取紀錄寫不進去：不讀、不回傳。
 	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.evidence_accesses ADD CONSTRAINT test_no_writes CHECK (false) NOT VALID")
 	must(t, err)
 	calls := f.readSecureCalls()
@@ -770,8 +747,6 @@ func TestCaseListAwaitingSellerAgreesWithTheGoPredicates(t *testing.T) {
 	if fields := invalidFields(t, err); !slices.Equal(fields, []string{"AwaitingSeller"}) {
 		t.Fatalf("等賣家與已結案：%v", err)
 	}
-	// 待決定的開始時間（seller.review_case_decision，清單與單筆）等於由 fixture 的事實（開案、詢問回覆收到、管理員撤回）算出的 max；
-	// 等賣家的案件沒有期限。
 	for _, c := range all {
 		if !c.Open() || c.AwaitingSeller() {
 			if c.DecideDeadline != nil {
@@ -792,7 +767,6 @@ func TestCaseListAwaitingSellerAgreesWithTheGoPredicates(t *testing.T) {
 			t.Errorf("案件 %s 單筆：%v，預期 %v", c.ID, decisionStartOf(t, one), want)
 		}
 	}
-	// 已回覆的案件起算點是收到的時間（比開案晚的話）；已撤回（管理員）的是撤回時間；系統撤回（結案）的案件已不是待決定，沒有期限。
 	for _, id := range closed {
 		if f.caseOf(t, id).DecideDeadline != nil {
 			t.Errorf("已結案不該有決定期限：%s", id)
@@ -823,7 +797,7 @@ func TestListInquiriesIsOldestFirstAndPaged(t *testing.T) {
 		must(t, err)
 		_ = n
 	}
-	got := f.inquiriesOf(t, c.ID) // 每頁 2 筆
+	got := f.inquiriesOf(t, c.ID)
 	var ids []uuid.UUID
 	for _, i := range got {
 		ids = append(ids, i.ID)
@@ -850,7 +824,6 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 	_, err := f.reply(t, repliedInquiry.ID, f.now, "e0")
 	must(t, err)
 
-	// 一筆有效的詢問（案件 c，店家 s）；每個案例只換掉一部分。
 	insert := func(caseID uuid.UUID, storeID int64, admin int, due string, extraColumns, extraValues string) string {
 		return fmt.Sprintf("INSERT INTO seller.case_inquiries (id, case_id, store_id, kind, message, created_at, created_by_admin_id, due_at%s) VALUES (uuidv7(), '%s', %d, 'RECORDS', 'x', now(), %d, %s%s)",
 			extraColumns, caseID, storeID, admin, due, extraValues)
@@ -881,7 +854,6 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 		{"撤回原因不認得", "case_inquiries_withdraw_check", valid(withdrawColumns, ", now(), 1, 'OTHER'")},
 		{"撤回的管理員是 0", "case_inquiries_withdraw_check", valid(withdrawColumns, ", now(), 0, 'ADMIN'")},
 		{"撤回早於建立", "case_inquiries_withdraw_check", valid(withdrawColumns, ", now() - interval '1 day', 1, 'ADMIN'")},
-		// 回覆的作者二選一：管理員記下（管道是系統外的管道）或賣家在賣家中心回覆（管道是 SELLER_CENTER）。
 		{"賣家中心的回覆沒有帳號", "case_inquiries_reply_check", valid(replyColumns, ", 'x', 'SELLER_CENTER', now(), now(), 1")},
 		{"賣家中心的回覆同時有管理員與帳號", "case_inquiries_reply_check", valid(sellerReplyColumns, ", 'x', 'SELLER_CENTER', now(), now(), 1, 5")},
 		{"管理員記下的回覆同時有帳號", "case_inquiries_reply_check", valid(sellerReplyColumns, ", 'x', 'PHONE', now(), now(), 1, 5")},
@@ -890,24 +862,19 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 		{"只有回覆的帳號", "case_inquiries_reply_check", valid(", replied_by_account_id", ", 5")},
 		{"回覆與撤回同時存在", "case_inquiries_terminal_check", valid(replyColumns+withdrawColumns, ", 'x', 'PHONE', now(), now(), 1, now(), 1, 'ADMIN'")},
 		{"同一個案件第二筆還沒結束的詢問", "case_inquiries_one_open", insert(busy.ID, other.StoreID, 1, "now() + interval '1 day'", "", "")},
-		// 附件：位置、資產、外鍵與主鍵。
 		{"附件位置超過 4", "case_inquiry_reply_evidence_position_check", fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 5, '019c0000-0000-7000-8000-0000000000a1', 'k')", repliedInquiry.ID)},
 		{"附件的 object key 是空字串", "case_inquiry_reply_evidence_asset_check", fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 4, '019c0000-0000-7000-8000-0000000000a1', '')", repliedInquiry.ID)},
 		{"附件掛在不存在的詢問", "case_inquiry_reply_evidence_inquiry_id_fkey", "INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES (uuidv7(), 0, '019c0000-0000-7000-8000-0000000000a1', 'k')"},
-		// 讀取紀錄：擁有者剛好一個，附件要存在。
 		{"讀取紀錄沒有擁有者", "evidence_accesses_owner_check", "INSERT INTO seller.evidence_accesses (access_id, position, admin_id, accessed_at) VALUES (uuidv7(), 0, 1, now())"},
 		{"讀取紀錄指向不存在的附件", "evidence_accesses_inquiry_fkey", fmt.Sprintf("INSERT INTO seller.evidence_accesses (access_id, inquiry_id, position, admin_id, accessed_at) VALUES (uuidv7(), '%s', 4, 1, now())", repliedInquiry.ID)},
 	} {
 		f.wantViolates(t, v.name, v.constraint, v.sql)
 	}
-	// 附件的主鍵：同一筆詢問同一個位置不能重複（已有位置 0）。
 	_, err = f.db.Conn(ctx).Exec(ctx, fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 0, '019c0000-0000-7000-8000-0000000000a1', 'k')", repliedInquiry.ID))
 	var pg *pgconn.PgError
 	if !errors.As(err, &pg) || pg.ConstraintName != "case_inquiry_reply_evidence_pkey" {
 		t.Errorf("附件位置重複要被主鍵擋下：%v", err)
 	}
-	// 冪等鍵的範圍是 (管理員, request_id)：同一位管理員重複用同一個 request_id 被擋下，另一位管理員可以。
-	// 第一筆佔用案件 c 的名額；重複的放在已撤回的列（不佔名額），才只違反冪等鍵。
 	req := "'0199aaaa-0000-4000-8000-000000000002'"
 	_, err = f.db.Conn(ctx).Exec(ctx, valid(", request_id, request_hash", ", "+req+", '\\x01'"))
 	must(t, err)
@@ -919,7 +886,6 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 	must(t, err)
 }
 
-// decisionStartOf 是案件待決定的開始時間（決定期限的 Start，來源是 seller.review_case_decision）；案件沒有決定期限時記錯並回零值。
 func decisionStartOf(t *testing.T, c AdminCase) time.Time {
 	t.Helper()
 	if c.DecideDeadline == nil {

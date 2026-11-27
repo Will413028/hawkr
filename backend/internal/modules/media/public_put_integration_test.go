@@ -167,7 +167,6 @@ func holdSecureSlots(t *testing.T, f *fixture) (release func(), wait func()) {
 	return func() { close(rel) }, wg.Wait
 }
 
-// waitSignalCtx 在名額等待分支（upload.acquire）開始等 ctx.Done() 時發出訊號；資料庫呼叫也會讀 Done()，不算，所以只認呼叫堆疊裡有 acquire 的那次。
 type waitSignalCtx struct {
 	context.Context
 	waiting chan struct{}

@@ -28,13 +28,7 @@ import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 import { firstVisibleLabel } from "@/lib/unavailability";
 import { addressText } from "./store-detail";
 
-// 商家詳情的商家認證（KYC）審核的顯示判斷與文案（SellerAdminService.GetKYCApplication、
-// ApproveKYC、RejectKYC、RequeryKYCRegistration）。畫面只管呈現；哪個狀態
-// 可以核准、退回的逐項問題怎麼組成與驗證、GCIS 並列怎麼標記、背景工作怎麼輪詢都在這裡，才能不靠畫面測試
-// （決策簡報 K7、K8、K9、K15、K16、D4 第 4、5、6 點；2b 設計簡報題 1 (b′)、題 2）。
 
-// ---------------------------------------------------------------------------
-// D4 的文案（已核准，照原文；標註「實作者補」的是 D4 沒有原文的部分）
 
 export const GCIS_PENDING_TEXT = "登記資料查詢中…";
 /** 實作者補：查詢超過伺服器保證的期限仍沒有終態（伺服器的錯誤，或這台電腦的時鐘比伺服器快）時的說明。 */
@@ -57,8 +51,6 @@ export const REJECT_SUCCESS_TEXT =
 export const REQUERY_SUCCESS_TEXT =
 	"已排入重新查詢，結果出來後會更新在商業登記欄。";
 
-// ---------------------------------------------------------------------------
-// 申請的讀取狀態
 
 /** 申請內容的讀取狀態：沒有送出過的申請（GetStore 沒有 kyc 摘要）時是 none，畫面不顯示 KYC 區塊。 */
 export type KycApplicationState =
@@ -90,9 +82,6 @@ export function kycApplicationOf(
 	return { state: "ready", application: result.data.application };
 }
 
-// ---------------------------------------------------------------------------
-// 背景工作的輪詢（簡報題 1 (b′)）：進行中的查詢是有期限、伺服器保證終態的資源，client 以退避輪詢到終態或期限。
-// 頁籤隱藏時不輪詢（TanStack 的 refetchIntervalInBackground 預設為 false）。
 
 /** 退避的下限與上限（毫秒）：從要求的時間起，間隔隨已等待的時間成長（已等待時間的 1/4），上限 60 秒。 */
 export const POLL_MIN_MS = 3000;
@@ -135,8 +124,6 @@ export function registrationOverdue(
 	return now.getTime() >= timestampDate(pending.deadlineTime).getTime();
 }
 
-// ---------------------------------------------------------------------------
-// 核准、退回與重新查詢的可用性
 
 export interface ReviewActions {
 	/** 核准：伺服器說能核准（`can_approve`：審核中、店家營運中、帳號沒有停權），而且帶得出 id 與 etag（資料完整性，不是業務規則）。 */
@@ -177,8 +164,6 @@ export function reviewBlockedLabel(
 		: undefined;
 }
 
-// ---------------------------------------------------------------------------
-// 欄位
 
 /** 目錄認得的欄位（KYCField 的非 UNSPECIFIED 值）；新版伺服器才有的值不列。 */
 function isKnownKycField(field: KYCField): boolean {
@@ -204,8 +189,6 @@ export function isDocumentField(field: KYCField): boolean {
 	return DOCUMENT_FIELDS.has(field);
 }
 
-// ---------------------------------------------------------------------------
-// 退回的逐項問題（2b-0 契約：RejectKYCRequest.issues）
 
 /** 原因碼的呈現文字（封閉集合；UNSPECIFIED 不是有效值）。 */
 export const KYC_ISSUE_CODE_LABEL: Record<
@@ -367,7 +350,6 @@ export function validateIssueDraft(
 			return "找不到指定的文件，請重新選擇。";
 		}
 	}
-	// 文件類欄位依原因碼（與伺服器同一條規則）：問題出在某一張文件上的原因必須指定是哪一張，缺少則不可以指定。
 	if (option.document) {
 		if (issue.documentAssetId && issueAssetForbidden(issue.code)) {
 			return ISSUE_ASSET_FORBIDDEN_TEXT;
@@ -456,8 +438,6 @@ export function draftAfter(
 	return result.ok ? EMPTY_REVIEW_DRAFT : draft;
 }
 
-// ---------------------------------------------------------------------------
-// 審核紀錄
 
 /** 審核紀錄的動作文字。 */
 export function reviewActionLabel(action: KYCReviewAction): string {
@@ -526,8 +506,6 @@ export function documentsOf(
 		.sort((a, b) => a.position - b.position);
 }
 
-// ---------------------------------------------------------------------------
-// 申請內容的文字
 
 export function sellerTypeLabel(application: KYCApplication): string {
 	switch (application.subject.case) {
@@ -547,8 +525,6 @@ export function dateText(
 	return formatCalendarDate(date) || "-";
 }
 
-// ---------------------------------------------------------------------------
-// 商業登記（GCIS）並列（B4、D4 第 4 點）
 
 export type GcisMark = "mismatch" | "unverifiable";
 
@@ -761,7 +737,6 @@ export function gcisView(
 			mark: markOf(check, KYCField.KYC_FIELD_BUSINESS_COMPANY_REGISTER_DATE),
 		},
 		{
-			// K8：組織型態不是申請的欄位，只顯示登記資料的。
 			key: "organization_type",
 			label: "組織型態",
 			applicant: "-",
@@ -790,8 +765,6 @@ export function gcisMarkLabel(mark: GcisMark): string {
 	return mark === "mismatch" ? "不一致" : "無法比對";
 }
 
-// ---------------------------------------------------------------------------
-// 評分（公開的 StoreStats.rating_average）
 
 /**
  * 評分統計卡的值：只有讀到而且大於 0 的平均分才顯示（一位小數）；讀不到、還沒有評價、已關閉或未公開的店都是 undefined，

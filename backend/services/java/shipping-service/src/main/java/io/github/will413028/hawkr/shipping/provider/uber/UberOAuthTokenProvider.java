@@ -91,8 +91,6 @@ public class UberOAuthTokenProvider {
             return current.accessToken();
         }
         synchronized (refreshLock) {
-            // double-check：多執行緒同時發現要換新時，只有第一個真的去打 token 端點。
-            // 🔴 少了這一格，一次冷啟動的併發尖峰就會打出 N 次 token 請求，而上限是 100/hr。
             CachedToken again = cached;
             if (again != null && !again.needsRefresh(clock.instant())) {
                 return again.accessToken();
@@ -111,8 +109,6 @@ public class UberOAuthTokenProvider {
 
     private CachedToken requestToken() {
         if (!credentialsConfigured()) {
-            // 🔴 fail-closed（66 §8.5）：拿空字串去打 API 會變成一連串 401，
-            //    對外看起來像我們被停權，而真正的問題是 secret 沒掛上。
             throw new UberApiException(UberFailureKind.AUTH, 0, "UBER_CREDENTIALS_MISSING",
                     "Uber OAuth 憑證未設定（uber-direct-credentials 的 client-id／client-secret）");
         }
@@ -127,7 +123,6 @@ public class UberOAuthTokenProvider {
                             "Accept", "application/json"),
                     form, TOKEN_DEADLINE);
         } catch (IOException e) {
-            // 🔴 訊息裡不得出現 clientSecret，連長度都不記（66 §8.6 逐字）。
             throw new UberApiException(UberFailureKind.NON_DETERMINISTIC, 0, "UBER_TOKEN_IO",
                     "Uber token 端點連線失敗", e);
         }

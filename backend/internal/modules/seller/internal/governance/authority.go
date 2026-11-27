@@ -25,12 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 主管機關來函（step10e-reports-brief R5、設計 step10e-3cb-design §3.2）：登記、完成、延長保存與記下告知。
-//
-// 鎖順序：被指名帳號的店家列（stint.LockAccounts，account_id 升序、帳號內依 store_id）→ 來函列。登記、完成與延長都先鎖被指名帳號的店家列，讓寫入保存條件的一方
-// 和個資清理（RetireDueStores 鎖同一組店家列）在同一組列上競爭——這是 §2.4「鎖住之後再判斷一次」的證明所需要的前提。
-// 來函列只由完成、延長與記下告知鎖（FOR UPDATE）；建立措施只讀來函與對象（來函建立後對象不變），不鎖。
-// 登記與完成不檢查店家狀態：已關閉、已清理的店家也可以被指名，逐家的涵蓋狀態照實顯示。
 
 // Accounts 是登記來函時驗證被指名的帳號存在需要的 identity 公開 API（含已刪除的墓碑：帳號存在過，來函照樣要登記與回覆）。
 type Accounts interface {
@@ -44,7 +38,6 @@ func errAuthorityOrderVersion() error {
 	return apperr.VersionConflict("%s", text.AuthorityOrderVersionConflict().Text).WithMetadata(ConflictTargetKey, ConflictTargetAuthorityOrder)
 }
 
-// errAuthorityOrderNotFound 是來函不存在：文字是共用文案目錄 Connect code NOT_FOUND 的預設文字，固定取 zh-TW（同 errInquiryNotFound）。
 func errAuthorityOrderNotFound() error {
 	m, _ := uitext.For(uitext.ZhTW).CommonError("NOT_FOUND")
 	return apperr.NotFound("%s", m.Text)
@@ -57,14 +50,12 @@ func authorityBlocked(blocks []model.AuthorityOrderBlock) error {
 	return apperr.FailedPrecondition("%s", blocks[0].Text().Text)
 }
 
-// targetField 是第 i 個對象的欄位名（FieldPaths 把 "Targets[].AccountID" 對到 "targets[].account_id"）。
 func targetField(i int, name string) string {
 	return fmt.Sprintf("Targets[%d].%s", i, name)
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }
 
-// toAuthorityOrder 把來函列與它的對象列組成模型；店家範圍（Stores）與延長歷史由 readAuthorityOrders 另外載入。
 func toAuthorityOrder(row store.SellerAuthorityOrder) model.AuthorityOrder {
 	o := model.AuthorityOrder{
 		ID: row.ID, Agency: row.Agency, DocumentNo: row.DocumentNo, ReceivedAt: row.ReceivedAt, Kind: model.AuthorityOrderKind(row.Kind),
@@ -96,8 +87,6 @@ func toAuthorityTarget(row store.SellerAuthorityOrderTarget) model.AuthorityOrde
 	return t
 }
 
-// readAuthorityOrders 把一批來函列變成後台的檢視：每批固定幾支查詢（對象、對象範圍內的店家，要求時再加延長歷史），並附上此刻可以做的動作。
-// 對象依來函與位置；每個對象的店家逐家列出涵蓋狀態（以 now 推導），帳號在 seller 沒有店家時 NoSellerData 為 true。
 func readAuthorityOrders(ctx context.Context, q *store.Queries, rows []store.SellerAuthorityOrder, withExtensions bool, now time.Time) ([]model.AdminAuthorityOrder, error) {
 	out := make([]model.AdminAuthorityOrder, len(rows))
 	if len(rows) == 0 {
@@ -144,7 +133,6 @@ func readAuthorityOrders(ctx context.Context, q *store.Queries, rows []store.Sel
 			})
 		}
 	}
-	// 處理期限（Deadline）：成員、開始與期限只在 seller.review_authority_order(at)（db/objects.sql）；已完成或撤銷的來函不在結果裡。
 	deadlines, err := q.ReviewAuthorityOrderByIDs(ctx, store.ReviewAuthorityOrderByIDsParams{At: now, Ids: ids})
 	if err != nil {
 		return nil, err
@@ -163,7 +151,6 @@ func readAuthorityOrders(ctx context.Context, q *store.Queries, rows []store.Sel
 	return out, nil
 }
 
-// readAuthorityOrder 讀一份來函的後台檢視（含延長歷史）；在 q 的連線上執行，所以可以在指令的 transaction 裡讀自己寫的。
 func readAuthorityOrder(ctx context.Context, q *store.Queries, id uuid.UUID, now time.Time) (model.AdminAuthorityOrder, error) {
 	row, err := q.AuthorityOrderByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -179,8 +166,6 @@ func readAuthorityOrder(ctx context.Context, q *store.Queries, id uuid.UUID, now
 	return views[0], nil
 }
 
-// authorityRequestHash 是正規化後的登記輸入（不含 request_id；時間已截到微秒）以固定欄位順序編碼的 SHA-256：冪等重送比對「內容是否相同」的唯一定義，
-// 同 inquiryRequestHash。對象依輸入順序編碼（位置是對象的身分）；沒有指定期限時編碼 "-"。
 func authorityRequestHash(in model.CreateAuthorityOrderInput, agency, documentNo, summary string, targets []model.AuthorityTargetInput, due *time.Time) []byte {
 	h := sha256.New()
 	put := func(parts ...string) {
@@ -204,8 +189,6 @@ func authorityRequestHash(in model.CreateAuthorityOrderInput, agency, documentNo
 	return h.Sum(nil)
 }
 
-// validateTargets 檢查對象清單的形狀（個數、帳號、商品、重複與重疊），回傳正規化後的清單（商品去空白、略過空的、去重）。
-// 帳號是否存在與店家是否屬於帳號是有狀態的檢查，在後面。
 func validateTargets(in []model.AuthorityTargetInput) ([]model.AuthorityTargetInput, error) {
 	if n := len(in); n < 1 || n > model.MaxAuthorityTargets {
 		return nil, invalidOn("Targets", text.AuthorityOrderTargetsCount())
@@ -310,7 +293,6 @@ func (s *Service) CreateAuthorityOrder(ctx context.Context, in model.CreateAutho
 	if in.RequestID != nil {
 		hash = authorityRequestHash(in, agency, documentNo, summary, targets, due)
 	}
-	// 帳號是否存在：transaction 外問 identity（identity 有自己的連線），不存在的帳號不鎖也不寫。
 	for i, t := range targets {
 		if i > 0 && slices.ContainsFunc(targets[:i], func(p model.AuthorityTargetInput) bool { return p.AccountID == t.AccountID }) {
 			continue
@@ -332,7 +314,6 @@ func (s *Service) CreateAuthorityOrder(ctx context.Context, in model.CreateAutho
 		if err := stint.LockAccounts(ctx, q, distinctAccounts(targets)); err != nil {
 			return err
 		}
-		// 兩個同一個 request_id 的並行重送：後到的在店家列上等到先到的 commit，再查一次就找到它。
 		if replayed, ok, err := s.replayAuthorityOrder(ctx, q, in.AdminID, in.RequestID, hash); err != nil || ok {
 			result = replayed
 			return err
@@ -358,7 +339,6 @@ func (s *Service) CreateAuthorityOrder(ctx context.Context, in model.CreateAutho
 			HoldUntil: model.DefaultHoldUntil(receivedAt), Now: now, AdminID: in.AdminID, RequestID: in.RequestID, RequestHash: hash,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 同一個 (管理員, request_id) 在上面兩次查詢之後才出現：鎖住店家列之後不可能，除非它屬於別的對象（內容不同）。
 			replayed, ok, rerr := s.replayAuthorityOrder(ctx, q, in.AdminID, in.RequestID, hash)
 			if rerr != nil {
 				return rerr
@@ -379,7 +359,6 @@ func (s *Service) CreateAuthorityOrder(ctx context.Context, in model.CreateAutho
 				return err
 			}
 		}
-		// 鎖住店家列之後讀到的清理狀態是事實快照（不比較時鐘）：這時已清理的店家就是「登記之前已清除」。
 		if err := q.InsertAuthorityOrderPrepurgedStores(ctx, row.ID); err != nil {
 			return err
 		}
@@ -390,7 +369,6 @@ func (s *Service) CreateAuthorityOrder(ctx context.Context, in model.CreateAutho
 	return result, err
 }
 
-// replayAuthorityOrder 查 (管理員, request_id)：命中且內容相同回傳來函目前的狀態；內容不同回 InvalidInput；沒帶 request_id 或沒命中回 false。
 func (s *Service) replayAuthorityOrder(ctx context.Context, q *store.Queries, adminID int64, requestID *uuid.UUID, hash []byte) (model.CreateAuthorityOrderResult, bool, error) {
 	if requestID == nil {
 		return model.CreateAuthorityOrderResult{}, false, nil
@@ -409,8 +387,6 @@ func (s *Service) replayAuthorityOrder(ctx context.Context, q *store.Queries, ad
 	return model.CreateAuthorityOrderResult{Order: view, Replayed: true}, true, err
 }
 
-// lockedAuthorityOrder 是指令鎖住來函之後的狀態：先讀來函與對象（不鎖）找出被指名的帳號，依 account_id 升序鎖住它們的店家列（lockAccounts 為 false 的指令
-// 不鎖），再鎖來函列並比對版本。鎖住店家列之後才取 now（呼叫方自己取），讓個資清理與這個指令的時間先後和鎖的先後一致。
 func (s *Service) lockedAuthorityOrder(ctx context.Context, q *store.Queries, id uuid.UUID, expected int64, lockAccounts bool) (model.AuthorityOrder, error) {
 	if _, err := q.AuthorityOrderByID(ctx, id); errors.Is(err, pgx.ErrNoRows) {
 		return model.AuthorityOrder{}, errAuthorityOrderNotFound()
@@ -447,7 +423,6 @@ func (s *Service) lockedAuthorityOrder(ctx context.Context, q *store.Queries, id
 	return order, nil
 }
 
-// noticeValue 是驗證過的告知，要寫進對象列。
 type noticeValue struct {
 	kind       model.AuthorityNoticeKind
 	notifiedAt *time.Time
@@ -455,9 +430,6 @@ type noticeValue struct {
 	recheckOn  *time.Time
 }
 
-// validateNotice 檢查一個對象的告知輸入並正規化：Kind 之外的欄位只看對應的種類（已告知看告知的時間，暫不告知看確認日期），其餘忽略。
-// 已告知的時間必須在 [收文, now]；暫不告知必須有確認日期；由措施告知只限暫停帳號與限制或移除商品的來函，而且這個對象已有這份來函導出的措施（derived 是導出的措施所在的
-// 帳號與店家，與 ListMeasures(source_authority_order_id) 同一個定義）。allowed 是這次接受的種類。
 func validateNotice(order model.AuthorityOrder, target model.AuthorityOrderTarget, in model.AuthorityNoticeInput, allowed []model.AuthorityNoticeKind, now time.Time, derived []store.AuthorityOrderMeasureTargetsRow, field string) (noticeValue, error) {
 	if !slices.Contains(allowed, in.Kind) {
 		return noticeValue{}, invalidOn(field+".Kind", text.AuthorityOrderTargetNoticeRequired())
@@ -567,7 +539,6 @@ func (s *Service) CompleteAuthorityOrder(ctx context.Context, in model.CompleteA
 	return result, err
 }
 
-// targetNotices 檢查完成來函的每個對象的告知：剛好每個對象一筆（位置 0 到 n-1，不缺漏、不重複），並驗證每一筆；回傳依位置的清單。
 func (s *Service) targetNotices(ctx context.Context, q *store.Queries, order model.AuthorityOrder, in []model.TargetNoticeInput, now time.Time) ([]noticeValue, error) {
 	if len(in) != len(order.Targets) {
 		return nil, invalidOn("TargetNotices", text.AuthorityOrderTargetNoticeRequired())
@@ -803,7 +774,6 @@ func (s *Service) AuthorityOrders(ctx context.Context, in model.AuthorityOrderLi
 	return page, err
 }
 
-// civilDay 把 t 的年月日（t 所在時區的日曆日）取成 UTC 午夜的 time.Time；零值仍是零值。client 傳來的日期已經是這個形狀，這裡只是不信任呼叫端。
 func civilDay(t time.Time) time.Time {
 	if t.IsZero() {
 		return t

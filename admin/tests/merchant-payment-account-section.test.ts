@@ -363,9 +363,6 @@ test("重試建立（一般的建立失敗）：直接送出、不帶確認", as
 	assert.doesNotMatch(bodyText(), /確定金流商那邊沒有這家店/);
 });
 
-// create_unresolved 的意思是「超過金流商保存冪等鍵的期間」：建立失敗而且結果不明、已過 7 天但還在保存期內的帳戶，伺服器回 false，重試只是以同一把鍵重送，
-// 卡片顯示一般的建立失敗與「重試建立」，不出現確認框、不帶 acknowledge_no_provider_account。
-// mutation：卡片改成看建立失敗的時間（或任何不是 createUnresolved 的條件）決定開確認框 → 這裡出現確認框，失敗。
 test("重試建立（建立結果不明、已過 7 天但還在保存期內，create_unresolved 為 false）：不開確認框、直接送出、不帶確認", async () => {
 	const { calls, view, retryAcks } = setup({
 		get: () =>

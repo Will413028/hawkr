@@ -75,7 +75,6 @@ func TestStripePaymentConfig(t *testing.T) {
 	if c := p.Capabilities(); c.RequirementCollection != payment.CollectionPlatform {
 		t.Errorf("platform 新列要是平台收件：%+v", c)
 	}
-	// 公開金鑰與收件方式無關：既有的平台收件帳戶在行程改成金流商收件後仍會開內嵌 session。
 	for _, collection := range []string{"provider", "platform"} {
 		if _, err := readPaymentWith(with("STRIPE_REQUIREMENT_COLLECTION", collection, "STRIPE_PUBLISHABLE_KEY", "")); err == nil || !strings.Contains(err.Error(), "STRIPE_PUBLISHABLE_KEY") {
 			t.Errorf("收件方式 %s 沒有公開金鑰必須讓啟動失敗：%v", collection, err)

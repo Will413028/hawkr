@@ -1,36 +1,8 @@
--- identity 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（identity.<表>），不建跨 schema 的 FK；慣例見 PostgreSQL 設計規範。
--- 碼值欄位是 text 加 CHECK，值等於模組的 Go 常數（ADR 2026-09-25-codemeta-retirement D3）。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA identity;
 
--- 帳號：登入的 principal（`backend/docs/modules/identity.md`）。買家、賣家是同一個帳號的角色（account_roles）；業務身分
--- （buyer_id、store_id）屬於 buyer、seller 模組。
---
--- 登入由自建的聯合登入處理（ADR 2026-10-30-identity-self-hosted-federated-login）：帳號由 account_identities 的 provider 身分識別，
--- 第一次以某個身分登入時建立。刪除的帳號保留登入身分的墓碑（account_identities，同一個身分不得再建一個帳號），其他個資清掉，
--- 帳號只留墓碑，讓舊服務查得到「已刪除」。
---
--- id 過渡期是 IDENTITY：Java 服務仍把帳號 ID 存成 BIGINT，最後一個 Java 消費者改寫後以一個 migration
--- 換成 uuid（ADR 2026-09-25-row-identity-by-data-kind 的過渡規則、遷移計畫階段 C）。
---
--- 生命週期是 ACTIVE → PENDING_DELETION → DELETED：deletion_pending_at 是 accountdeletion 受理了刪除申請、等待未結訂單
--- 結束的時間（狀態由 identity 保存，流程由 accountdeletion 編排；ADR 2026-09-30-account-deletion-module 的修訂）。
--- 等待刪除的帳號不能再授予角色；刪除時清掉。
---
--- email 是 provider 回報的已驗證 email（LINE 可能沒有），登入時更新，是寄件地址，也給後台的清單顯示與搜尋。它不是識別：不唯一。
---
--- preferred_locale 是帳號最後一次生效的 UI 語系（多語系 ADR D1）：登入時與 notification 的 RegisterDeviceToken（App 每次啟動、回到前景都呼叫）
--- 以請求協商出的語系更新，伺服器非同步產生的文字（推播、email）依它組字；一人一個值，預設 zh-TW。
---
--- self_entered_email 是帳號自己填的聯絡信箱（D23 2026-11-03 修訂；賣家送審、收款帳戶的聯絡信箱要有）：未驗證，不是寄件地址
--- （通知只寄已驗證的 email，通知 ADR 決策 8），不是識別，也不寫進 account_identities、不成為自動連結的依據。只在帳號沒有已驗證的
--- email 時可設（應用層檢查；帳號之後才取得已驗證 email 時保留原值，讀取時已驗證的 email 優先）。格式與長度同收款帳戶的聯絡信箱。
 CREATE TABLE identity.accounts (
     id            BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email         TEXT,
@@ -41,23 +13,14 @@ CREATE TABLE identity.accounts (
     preferred_locale TEXT      NOT NULL DEFAULT 'zh-TW',
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    -- 非同步訊息（推播、email）的語系（多語系 ADR D1）：只准支援清單（zh-TW、en）內的值；清單與 platform/uitext 的 Locale 同步（TestCodeValueChecksMatchTheGoTypes）。
     CONSTRAINT accounts_preferred_locale_check CHECK (preferred_locale IN ('zh-TW', 'en')),
-    -- 刪除的帳號沒有個資，也不再是停權狀態。
     CONSTRAINT accounts_deleted_check CHECK (deleted_at IS NULL OR (email IS NULL AND self_entered_email IS NULL AND suspended_at IS NULL)),
-    -- 自填信箱已正規化：小寫、至多 254 字、恰好一個 @ 且兩側非空。
     CONSTRAINT accounts_self_entered_email_check CHECK (
         self_entered_email = lower(self_entered_email) AND char_length(self_entered_email) <= 254 AND self_entered_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'
     ),
-    -- 刪除的帳號不再是等待刪除。
     CONSTRAINT accounts_deletion_pending_check CHECK (deleted_at IS NULL OR deletion_pending_at IS NULL)
 );
 
--- 帳號連結的 provider 身分（D1、D4）：(provider, subject) 是識別，同一個身分只屬於一個帳號。登入時以 provider 回報的 subject 找帳號，
--- 找不到才依規則自動連結或建帳；email 與 email_verified 是 provider 最近一次回報的值，只用於自動連結的比對與更新帳號的寄件地址，
--- 不作識別或授權。auto_link_eligible 是這個身分最近一次登入（或建立）時是否符合自動連結資格（Google、email 已驗證、網域是 gmail.com 或帶 hd）：
--- 自動連結只拿符合資格的身分的 email 當目標，因為目標的 email 也要和進來的 Google 身分一樣可信（nOAuth：不可信的 email 不能成為連結的錨點）；
--- hd 不存，只存判斷的結果。LINE 沒有給 email 時兩者是 NULL 與 false。帳號刪除時這些列留作墓碑（保留 provider 與 subject，清掉 email 與 email_verified；同一個登入身分不會再建一個帳號），登入時遇到墓碑身分被拒。
 CREATE TABLE identity.account_identities (
     provider       TEXT         NOT NULL,
     subject        TEXT         NOT NULL,
@@ -70,19 +33,13 @@ CREATE TABLE identity.account_identities (
     PRIMARY KEY (provider, subject),
     CONSTRAINT account_identities_provider_check CHECK (provider::text IN ('GOOGLE', 'LINE')),
     CONSTRAINT account_identities_subject_check CHECK (char_length(subject) >= 1),
-    -- 已驗證一定有 email。
     CONSTRAINT account_identities_email_check CHECK (email IS NULL OR char_length(email) >= 1),
     CONSTRAINT account_identities_verified_check CHECK (NOT email_verified OR email IS NOT NULL),
-    -- 符合資格一定是 Google 且 email 已驗證。
     CONSTRAINT account_identities_auto_link_check CHECK (NOT auto_link_eligible OR (provider = 'GOOGLE' AND email_verified))
 );
 
 CREATE INDEX idx_account_identities_account_id ON identity.account_identities (account_id);
 
--- 登入 session（opaque-sessions ADR D1–D3、自建登入 ADR D1）：token 是 32 bytes 的 CSPRNG，只存 SHA-256；id 是對外的識別
--- （列出、終止 session 用），不是憑證。閒置逾時由 last_used_at 加上 client 的期限算出（web 7 天、App 14 天，常數在 Go），
--- 絕對逾時是 absolute_expires_at（建立後 90 天）；last_used_at 一天最多寫一次。auth_time 是最近一次以 provider 驗證的時間，
--- 登入時等於 created_at，之後重新驗證時更新（終止 session 前要求 15 分鐘內驗證過）。停權、刪帳在同一個 transaction 刪該帳號全部的列。
 CREATE TABLE identity.sessions (
     id                  UUID         PRIMARY KEY DEFAULT uuidv7(),
     token_hash          BYTEA        NOT NULL,
@@ -101,10 +58,6 @@ CREATE UNIQUE INDEX uidx_sessions_token_hash ON identity.sessions (token_hash);
 
 CREATE INDEX idx_sessions_account_id ON identity.sessions (account_id);
 
--- web 登入流程的暫存狀態（自建登入 ADR D3）：start 寫一列，callback 以 state 取出並同時刪除（單次使用，驗證失敗也已作廢），
--- 10 分鐘內有效。state 與登入前 cookie 只存 SHA-256；code_verifier 與 nonce 要在換 token 與驗 ID token 時原文使用，所以存原文，
--- 列的壽命只有 10 分鐘。provider 是預期的 provider（callback 的路徑必須相同，防 mix-up）；return_path 只收 / 開頭且不是 // 或 /\
--- 的相對路徑；link_account_id 不是 NULL 時這是已登入帳號發起的手動連結。
 CREATE TABLE identity.login_flows (
     state_hash       BYTEA        PRIMARY KEY,
     provider         TEXT         NOT NULL,
@@ -124,8 +77,6 @@ CREATE TABLE identity.login_flows (
 
 CREATE INDEX idx_login_flows_expires_at ON identity.login_flows (expires_at);
 
--- App 以原生 SDK 登入前向後端要的單次 nonce（自建登入 ADR D2）：ID token 的 nonce claim 必須等於它的原文，驗證時取出並刪除，
--- 5 分鐘內有效。只存 SHA-256。
 CREATE TABLE identity.app_login_nonces (
     nonce_hash  BYTEA        PRIMARY KEY,
     created_at  TIMESTAMPTZ  NOT NULL,
@@ -136,11 +87,6 @@ CREATE TABLE identity.app_login_nonces (
 
 CREATE INDEX idx_app_login_nonces_expires_at ON identity.app_login_nonces (expires_at);
 
--- 帳號的停權紀錄（A7-D9：處分紀錄歸執行效果的模組）：停權的理由、來源與解除在同一處，與 accounts.suspended_at 在同一個 transaction 寫入，
--- 入口只有 accountsuspension（internal/arch 的 TestSuspensionEntriesAreOnlyCalledByAccountsuspension）。解除留列不刪，之後可以再停權。
--- kind 只有 PERMANENT，沒有 ends_at（A7-D16：A7 只有永久停權與手動解除）。reason_category 是 platform/policy.Category 的全部值（模組的
--- TestCodeValueChecksMatchTheGoTypes）；source_ref 是來源（moderation 的案件）的不透明參照，identity 不讀它。同一帳號未解除的紀錄最多一筆，
--- 且若且唯若 accounts.suspended_at 不是 NULL。帳號刪除時未解除的紀錄以 release_reason = 'ACCOUNT_DELETED' 解除。
 CREATE TABLE identity.account_suspensions (
     id              UUID        PRIMARY KEY DEFAULT uuidv7(),
     account_id      BIGINT      NOT NULL REFERENCES identity.accounts (id),
@@ -166,7 +112,6 @@ CREATE UNIQUE INDEX uidx_account_suspensions_active ON identity.account_suspensi
 
 CREATE INDEX idx_account_suspensions_account_id_suspended_at ON identity.account_suspensions (account_id, suspended_at DESC);
 
--- 帳號另外申請的角色：seller 開店時授予。買家不是角色：帳號活著就是買家（ADR 2026-09-30-account-created-provisions-buyer）。
 CREATE TABLE identity.account_roles (
     account_id BIGINT       NOT NULL REFERENCES identity.accounts (id),
     role       TEXT         NOT NULL,
@@ -175,11 +120,6 @@ CREATE TABLE identity.account_roles (
     CONSTRAINT account_roles_role_check CHECK (role::text IN ('SELLER'))
 );
 
--- 管理員：與帳號是不同的 principal，由 Cloudflare Access 的白名單開通。access_subject 是 Access JWT 的 sub；
--- 第一次認證時建立。id 的過渡規則同
--- accounts（Java 以 BIGINT 記錄操作的管理員）。
---
--- email 是第一次認證時 Access JWT 回報的，只給後台顯示。
 CREATE TABLE identity.admins (
     id                 BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     access_subject     TEXT         NOT NULL,
@@ -190,8 +130,6 @@ CREATE TABLE identity.admins (
 
 CREATE UNIQUE INDEX uidx_admins_access_subject ON identity.admins (access_subject);
 
--- 管理員的角色（ADR 2026-10-04-admin-roles）：誰有哪個角色；角色對權限的對應寫在程式裡（platform/adminperm），這裡只存指派。
--- 零列的管理員沒有任何權限。撤銷刪除該列，變更的歷史在 admin_role_events。
 CREATE TABLE identity.admin_roles (
     admin_id   BIGINT       NOT NULL REFERENCES identity.admins (id),
     role       TEXT         NOT NULL,
@@ -200,9 +138,6 @@ CREATE TABLE identity.admin_roles (
     CONSTRAINT admin_roles_role_check CHECK (role::text IN ('OWNER'))
 );
 
--- 管理員角色的授予與撤銷歷史：只追加，與 admin_roles 的變更在同一個 transaction 內寫入，沒有 UPDATE、DELETE（queries 只有 INSERT 與 SELECT，TestAdminRoleEventsAreAppendOnly 檢查）。
--- 授予與撤銷只有 CLI 一條路，CLI 沒有經過驗證的操作者：source 記來源，db_user 是連線的 session_user、os_user 是執行者的作業系統
--- 使用者（取不到時是 NULL），兩者都未經驗證、只供參考，不提供自填操作者的參數。reason 必填，規則同 platform/auditreason。
 CREATE TABLE identity.admin_role_events (
     id          UUID         PRIMARY KEY DEFAULT uuidv7(),
     admin_id    BIGINT       NOT NULL REFERENCES identity.admins (id),

@@ -123,8 +123,6 @@ export async function POST(request: Request): Promise<Response> {
 		return body;
 	} catch (error) {
 		if (error instanceof DelegatedUpstreamUnavailableError) {
-			// 逾時＝結果不明：**不清 cookie**。清掉就等於宣稱已結束，而工作階段可能
-			// 還活著 —— 操作者會回到 ADM，代行卻仍在有效期內。
 			return delegatedJson(
 				{ code: UPSTREAM_FAILURE },
 				error.timedOut ? 504 : 502,

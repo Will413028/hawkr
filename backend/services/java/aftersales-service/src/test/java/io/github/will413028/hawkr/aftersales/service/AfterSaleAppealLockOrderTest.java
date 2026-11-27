@@ -91,7 +91,6 @@ class AfterSaleAppealLockOrderTest {
                         DateTimeUtils.nowUtc().minusHours(1)));
     }
 
-    // ==================== 資格判定必須採信「持鎖那一份」 ====================
 
     @Test
     @DisplayName("持鎖重讀顯示已申訴 ⇒ 拒絕（證明 A2 採信的是持鎖讀，不是擁有權那次讀）")
@@ -113,7 +112,7 @@ class AfterSaleAppealLockOrderTest {
         ownershipReadLooksEligible();
         when(caseMapper.selectByCaseNoForUpdate(CASE_NO))
                 .thenReturn(aCase(AfterSaleAppealState.NONE.value(),
-                        DateTimeUtils.nowUtc().minusHours(100)));   // QA 重現用的時序
+                        DateTimeUtils.nowUtc().minusHours(100)));
 
         AfterSalesBusinessException ex = assertThrows(AfterSalesBusinessException.class,
                 () -> service.submitAppeal(BUYER_ID, CASE_NO, "R", "D", List.of()));
@@ -133,7 +132,6 @@ class AfterSaleAppealLockOrderTest {
         assertEquals(GrpcResponseCode.AFTERSALE_NOT_FOUND.code(), ex.code());
     }
 
-    // ==================== 順序：鎖 → 判定 → 耗時工作 → CAS ====================
 
     @Test
     @DisplayName("順序不變式：持鎖 → （資格判定）→ media RPC → CAS，media 絕不得排在持鎖之前")
@@ -147,8 +145,6 @@ class AfterSaleAppealLockOrderTest {
         service.submitAppeal(BUYER_ID, CASE_NO, "R", "D", List.of("tok1"));
 
         InOrder order = inOrder(caseMapper, evidenceService);
-        // 鎖必須第一個發生：它之後的一切（含無界的 media RPC）都被這把鎖保護著，
-        // 撥款閘門在這段期間探測會取不到鎖 ⇒ fail-closed。
         order.verify(caseMapper).selectByCaseNoForUpdate(CASE_NO);
         order.verify(evidenceService).finalizeAndInsert(eq(CASE_NO), eq(BUYER_ID), any(), anyString());
         order.verify(caseMapper).markAppealed(eq(CASE_NO), any(), anyString(), anyString());
@@ -160,7 +156,7 @@ class AfterSaleAppealLockOrderTest {
         ownershipReadLooksEligible();
         when(caseMapper.selectByCaseNoForUpdate(CASE_NO))
                 .thenReturn(aCase(AfterSaleAppealState.NONE.value(),
-                        DateTimeUtils.nowUtc().minusHours(71).minusMinutes(59)));   // 剩約 1 分鐘
+                        DateTimeUtils.nowUtc().minusHours(71).minusMinutes(59)));
         when(caseMapper.markAppealed(eq(CASE_NO), any(), anyString(), anyString())).thenReturn(1);
 
         assertEquals(CASE_NO, service.submitAppeal(BUYER_ID, CASE_NO, "R", "D", List.of()));

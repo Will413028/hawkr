@@ -1,20 +1,10 @@
-/* Extracted from styles/globals.css.
- * Decorations, dialogs, lightbox, content responsive overrides.
- * Keep import order in styles/globals.css unless intentionally changing cascade.
- */
 
 .page-wrapper {
 	position: relative;
 	z-index: 1;
 }
 
-/* ===========================================
-   17. INITIAL PAGE LOADER
-   =========================================== */
 
-/* Deployment self-heal: keep the refreshed page visible and use one restrained
-   brand-colour rail as continuity feedback. It is removed as soon as the same
-   home-ready contract that owns the normal splash resolves. */
 .hk-stale-chunk-reload-pending body::after {
 	content: "";
 	position: fixed;
@@ -78,33 +68,17 @@
 		linear-gradient(135deg, #fbfaf3 0%, var(--color-ink-50) 54%, #f7f0dc 100%);
 	opacity: 1;
 	visibility: visible;
-	/* The splash is visual feedback, never an interaction lock. This makes a
-	   stuck animation unable to swallow mouse, touch or wheel input. */
 	pointer-events: none;
 	transition:
 		opacity 360ms ease,
 		visibility 360ms ease;
-	/* Last line of defence when JavaScript never hydrates. The bootstrap
-	   watchdog uses the same 6s deadline but cannot replace this CSS-only path
-	   when scripts are blocked altogether. */
 	animation: initial-loader-hard-timeout 1ms linear 6s forwards;
 }
 
-/* Authentication entry is an intentional full-document boundary. Its inline
-   bootstrap marks the document before this node is parsed, so login/register
-   never replay the branded first-visit splash or its fade after 登入 is tapped. */
 html.hk-skip-initial-loader .initial-loader {
 	display: none;
 }
 
-/*
- * Gate convergence (#338): the application tree stays visible and in normal
- * layout flow at all times. The opaque splash overlay above it is the only
- * gating surface, and that overlay can never lock content away — it carries
- * its own CSS-only 6s hard timeout (`initial-loader-hard-timeout`) and stays
- * pointer-transparent, so the server-rendered tree underneath is reachable
- * even if React never hydrates or a route marker never arrives.
- */
 
 @keyframes initial-loader-hard-timeout {
 	to {
@@ -130,9 +104,6 @@ html.hk-skip-initial-loader .initial-loader {
 	pointer-events: none;
 }
 
-/* Night-mode splash: the boot script paints data-theme before first paint, so
-   this kicks in with no light flash. Same composition, dark palette;
-   the wordmark's grey base layer is brightened so it reads on the dark canvas. */
 [data-theme="dark"] .initial-loader {
 	color: var(--color-brand-secondary);
 	background:
@@ -167,8 +138,6 @@ html.hk-skip-initial-loader .initial-loader {
 	animation: none;
 }
 
-/* Runs from a beforeInteractive document timer outside React's loader
-   mount/effect lifecycle. Pointer blocking ends immediately at the deadline. */
 .hk-initial-loader-timeout .initial-loader {
 	opacity: 0;
 	visibility: hidden;
@@ -186,7 +155,6 @@ html.hk-skip-initial-loader .initial-loader {
 	place-items: center;
 }
 
-/* Stacked logo layers: line-art outline + colour fill on top. */
 .il-logo {
 	position: relative;
 	width: 104px;
@@ -201,9 +169,6 @@ html.hk-skip-initial-loader .initial-loader {
 	overflow: visible;
 }
 
-/* Base line art — each blade outlined in its OWN block colour (set per-path
-   via the inline `stroke` attribute), no fill. Always visible underneath the
-   colour blocks as they bloom in. */
 .il-logo__line path {
 	fill: none;
 	stroke-width: 2.4;
@@ -212,10 +177,6 @@ html.hk-skip-initial-loader .initial-loader {
 	vector-effect: non-scaling-stroke;
 }
 
-/* Each colour block grows out of the logo's dead centre (shared origin 60,60 in
-   the view box) so the colour blooms from the middle into its outline — one
-   whole block at a time, never an angular slice across blocks. `opacity`
-   (not SVG fill-opacity) lets this continue on the compositor while JS runs. */
 .il-blade {
 	opacity: 0;
 	transform: scale(0.35);
@@ -223,9 +184,6 @@ html.hk-skip-initial-loader .initial-loader {
 	transform-origin: 60px 60px;
 }
 
-/* Awning first, then the counter. Each block blooms in its own window of one
-   shared 2.6s loop, both hold as the finished logo, then drain back to line
-   art so the loop restarts cleanly. */
 .il-blade--awning {
 	animation: ilBladeAwning 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
 }
@@ -233,10 +191,6 @@ html.hk-skip-initial-loader .initial-loader {
 	animation: ilBladeCounter 2.6s cubic-bezier(0.22, 0.8, 0.3, 1) infinite;
 }
 
-/* Wordmark: two overlaid copies of the same SVG. The base is desaturated to a
-   faint dark grey; the colour copy is masked so its real two-tone green wipes
-   in left → right like a loading bar, then holds and fades back to grey to
-   loop. */
 .il-word {
 	width: 188px;
 	aspect-ratio: 3129 / 764;
@@ -254,10 +208,6 @@ html.hk-skip-initial-loader .initial-loader {
 	filter: grayscale(1) brightness(0.55) opacity(0.4);
 }
 
-/* Move a fixed mask and counter-move the image by the same pixel distance.
-   The original wipe changes mask-position on every frame, forcing main-thread
-   paint exactly while hydration is busiest. These two transforms preserve the
-   same 250% mask, soft edge and stationary artwork on composited layers. */
 .il-word__reveal {
 	position: absolute;
 	inset: 0;
@@ -304,10 +254,6 @@ html.hk-skip-initial-loader .initial-loader {
 	}
 }
 
-/* Per-block bloom: hidden + shrunk to the centre, then a soft pop to full size
-   and opacity in the block's window, hold as part of the finished logo, then
-   all blocks drain back to the centre together to restart the loop. Staggered
-   start %s give the one-by-one sequence. */
 @keyframes ilBladeAwning {
 	0%,
 	6% {
@@ -380,13 +326,11 @@ html.hk-skip-initial-loader .initial-loader {
 		animation: none;
 		transition-duration: 120ms;
 	}
-	/* Skip the bloom sequence — show the finished colour logo straight away. */
 	.il-blade {
 		animation: none;
 		opacity: 1;
 		transform: none;
 	}
-	/* Skip the wipe — show the full-colour wordmark, hide the grey base. */
 	.il-word__reveal {
 		animation: none;
 		-webkit-mask-image: none;
@@ -403,8 +347,6 @@ html.hk-skip-initial-loader .initial-loader {
 	}
 }
 
-/* Keep this first-paint override after every normal splash/mobile/motion rule so
-   the technical reload can never reveal one frame of the branded overlay. */
 .hk-stale-chunk-reload .initial-loader {
 	display: none;
 }
@@ -421,18 +363,13 @@ html.hk-skip-initial-loader .initial-loader {
 	padding: 0 var(--content-padding-mobile);
 }
 
-/* ===========================================
-   18. RESPONSIVE OVERRIDES
-   =========================================== */
 
-/* --- Large desktop content centering --- */
 @media (min-width: 1441px) {
 	.content-container {
 		max-width: var(--content-width);
 	}
 }
 
-/* --- Below max-width responsive padding --- */
 @media (max-width: 1440px) {
 	.content-container {
 		padding-left: var(--content-padding-tablet);
@@ -440,18 +377,12 @@ html.hk-skip-initial-loader .initial-loader {
 	}
 }
 
-/* --- Small desktop: 1024-1280px --- */
 @media (max-width: 1280px) and (min-width: 769px) {
 	:root {
 		--site-nav-inner-height: 80px;
 	}
-	/* `.nav-item` + `.site-nav__inner` removed in the 子刀 4 PR-A detangle:
-	 * both were bare (0,1,0) and shadowed by navigation-final.css's base
-	 * `body .nav-item` and floating-navigation.css's base `body .site-nav__inner`
-	 * (0,1,1, no media) at this width — verified zero computed-style change. */
 }
 
-/* --- Mobile: below 768px --- */
 @media (max-width: 768px) {
 	html,
 	body {
@@ -477,9 +408,6 @@ html.hk-skip-initial-loader .initial-loader {
 		padding-top: 0;
 	}
 
-	/* `.site-nav` + `.site-nav__inner` removed in the 子刀 4 PR-A detangle:
-	 * shadowed by floating-navigation.css @768 `body .site-nav*` (0,1,1) —
-	 * verified zero computed-style change at ≤768. */
 
 	.mobile-nav {
 		display: block;

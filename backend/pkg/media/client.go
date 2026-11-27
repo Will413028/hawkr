@@ -15,19 +15,10 @@ type AssetInfo struct {
 }
 
 const (
-	// finalizeTimeout 是轉正呼叫的時間預算。
 	finalizeTimeout = 10 * time.Second
-	// linkTimeout 是「單次」建立引用的時間預算——與 finalize 分開計，避免 finalize 偏慢時
-	// 把 link 擠進 deadline 而靜默失敗。
 	linkTimeout = 5 * time.Second
-	// linkMaxAttempts 是建立引用的嘗試次數（含首次）。
 	linkMaxAttempts = 3
-	// linkRetryBackoff 是重試間隔的基數，第 n 次重試等待 n × 此值。
 	linkRetryBackoff = 200 * time.Millisecond
-	// releaseTimeout 是釋放引用的時間預算。原本這支完全沒有 timeout、直接用呼叫端的
-	// ctx——對同步呼叫端只是慢，但對 converge worker 是正確性問題：一次卡死的呼叫會讓
-	// 租約在它還在跑的時候過期，於是出現「兩個持有者同時處理同一列」，其中一個帶著
-	// 過期的 desired。
 	releaseTimeout = 5 * time.Second
 )
 

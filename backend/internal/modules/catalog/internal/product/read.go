@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// head 是商品列與它的子表（同一句 SQL 讀出）。欄位名稱與順序同 sqlc 的三個單筆讀取（Own、Public、Admin）的 Row 型別，用型別轉換接收。
 type head struct {
 	ID                uuid.UUID
 	StoreID           int64
@@ -43,7 +42,6 @@ type head struct {
 	Hashtags          []byte
 }
 
-// scope 是單筆讀取的範圍：賣家（限定店家）、公開（ACTIVE 或 ARCHIVED、店家在 at 可曝光）或後台（任何店家）。
 type scope struct {
 	storeID int64
 	public  *time.Time
@@ -111,8 +109,6 @@ func (s *Service) load(ctx context.Context, q *store.Queries, id uuid.UUID, stor
 	return s.loadScoped(ctx, q, id, scope{storeID: storeID, public: public})
 }
 
-// loadScoped 讀商品與它的選項、SKU、圖片與 hashtag。商品列與全部子表在同一句 SQL 讀出，所以是一份快照：並行的修改不會讓描述指到讀不到的圖片，也不會混到兩個版本。
-// 公開讀取會被別的模組呼叫，規則 3（backend/AGENTS.md）不讓它開 InReadSnapshot，單一語句是合規的做法。
 func (s *Service) loadScoped(ctx context.Context, q *store.Queries, id uuid.UUID, sc scope) (model.Product, error) {
 	var h head
 	var err error
@@ -195,7 +191,6 @@ func pageSize(size int32) int32 {
 	return size
 }
 
-// summaryRow 是五個列表查詢共同的一列（欄位名稱與順序同 sqlc 的 Row 型別，用型別轉換接收）。
 type summaryRow struct {
 	ID                uuid.UUID
 	StoreID           int64
@@ -225,7 +220,6 @@ func (r summaryRow) summary() model.ProductSummary {
 	}
 }
 
-// finishPage 把多取的一列轉成下一頁的游標。
 func finishPage(rows []summaryRow, size int32) model.ProductPage {
 	items := make([]model.ProductSummary, 0, len(rows))
 	for _, r := range rows {
@@ -248,7 +242,6 @@ func timeCursor(after *model.ListCursor) (*time.Time, *uuid.UUID) {
 	return &at, &after.ID
 }
 
-// likePattern 把關鍵字包成 ILIKE 的包含樣式（% _ \ 跳脫）；去頭尾空白後空的回空字串（不篩選）。
 func likePattern(q string) string {
 	q = trimtext.Trim(q)
 	if q == "" {
@@ -375,7 +368,6 @@ func (s *Service) SuggestNames(ctx context.Context, at time.Time, query string, 
 	return nonNil(out), err
 }
 
-// filterHashtags 把篩選的標籤以寫入同一套規則正規化並去重（#tea、Tea、tea 是同一個），否則 HashtagAll 的「全部命中」基數會被重複的輸入灌大而查無結果。
 func filterHashtags(raw []string) ([]string, error) {
 	tags, err := hashtag.RequireSet(raw)
 	if err != nil {
@@ -422,7 +414,6 @@ func (s *Service) TrendingHashtags(ctx context.Context, at time.Time, limit int3
 	return out, nil
 }
 
-// clamp：0 或負數是預設值，超過上限以上限計。
 func clamp(n, def, upper int32) int32 {
 	switch {
 	case n <= 0:

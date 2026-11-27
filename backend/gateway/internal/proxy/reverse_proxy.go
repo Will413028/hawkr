@@ -37,34 +37,11 @@ const (
 	FailClientFacing UpstreamFailureStatus = http.StatusFailedDependency // 424
 )
 
-// upstreamFailureMessage 是**唯一**會出現在使用者畫面上的那句話。
-//
-// ⚠️ 這裡絕對不能串接 err.Error()。原本是 `"service unavailable: " + err.Error()`，
-// 在 502 時代之所以沒事，是因為 Cloudflare 把整個 body 換掉了 —— 使用者看不到。
-// 改成 424 之後 envelope 是真的送達的，而 seller App 的 `AppException`
-// （`lib/core/exceptions/app_exception.dart:26-44`）直接把 `responseData['message']`
-// 當文案顯示 ⇒ 使用者會在畫面上看到 `dial tcp 10.x.x.x:9936: connect: connection refused`，
-// 內部 host:port 就這樣從「被 CF 藏著」變成「印在使用者手機上」。
-//
-// 真正的錯誤只進 log；排障靠 envelope 裡的 traceId 對回那筆 log。
 const upstreamFailureMessage = "服務暫時無法使用，請稍後再試"
 
-// writeUpstreamFailureEnvelope 在上游不可達時回統一 envelope，status 由呼叫端依
-// 消費者類別宣告（見 UpstreamFailureStatus）。
-//
-// 這裡拿不到 *gin.Context（httputil.ReverseProxy 的 ErrorHandler 只給 ResponseWriter），
-// 所以不能用 response 的 helper，但形狀必須一致：欄名是 message 不是 msg、錯誤回應要帶
-// traceId（10 檔 §2；response.Err 系列一律帶）。
-// 一律 json.Marshal，不用字串串接（歷史理由：err 裡只要有一個雙引號就會產出壞掉的
-// JSON；現在 message 是常數，這條仍保留，因為 traceId 來自請求 header、同樣不可信）。
-//
-// envelope 的 code 鏡射 HTTP status（424／502），沿用這條路徑原本的慣例：它不是
-// CodeMeta 登錄的業務碼，鏡射 status 至少是自我說明的，不會被誤認成某個業務語意。
 func writeUpstreamFailureEnvelope(w http.ResponseWriter, r *http.Request, status UpstreamFailureStatus, err error) {
 	traceID := proxyTraceID(w, r)
 
-	// 錯誤細節只進 log。ctx 帶著 trace/span，log 裡自然對得回 envelope 的 traceId；
-	// r 可能為 nil（測試路徑），此時退回 context.Background()。
 	ctx := context.Background()
 	method, path := "", ""
 	if r != nil {
@@ -92,10 +69,6 @@ func writeUpstreamFailureEnvelope(w http.ResponseWriter, r *http.Request, status
 	_, _ = w.Write(body)
 }
 
-// proxyTraceID 取這次請求的 trace id，順序與 pkg/envelope.ExtractTraceID 對齊。
-// 首選是 TracingMiddleware 已寫進**回應** header 的 x-trace-id（全域 r.Use，代理 handler
-// 之前就跑過，所以是 Gateway 本次請求真正的 traceId）；tracer 未啟用時退回上游 propagate
-// 進來的請求 header。取不到就留空，Envelope 的 omitempty 會把欄位省略。
 func proxyTraceID(w http.ResponseWriter, r *http.Request) string {
 	if tid := w.Header().Get("x-trace-id"); tid != "" {
 		return tid
@@ -142,12 +115,6 @@ var services = map[string]ServiceConfig{
 		Port:   getEnvOrDefault("SHIPPING_SERVICE_PORT", "9930"),
 		Prefix: "",
 	},
-	// invoice-service 的**檔案串流面**（10042），不是 gRPC 面（10041）。發票 PDF 的
-	// bytes 不該經 gRPC，而擁有者述詞（order_no × buyer_id × document_id）不在 media
-	// ⇒ 這是「微服務不暴露 HTTP」的第二個明列例外（58 號 §6.1.4）。
-	//
-	// ⚠️ 這一列漏了**不會編譯錯**：CreateProxy 查不到 service name 就回一個永遠
-	// response.NotFound 的 handler，症狀是「下載按鈕點了說找不到」。
 	"invoice": {
 		Name:   "invoice-service",
 		Host:   getEnvOrDefault("INVOICE_SERVICE_HOST", "127.0.0.1"),
@@ -160,33 +127,6 @@ func getEnvOrDefault(key, defaultVal string) string {
 	return pkgconfig.GetEnvOrDefault(key, defaultVal)
 }
 
-// mustParseTarget 解析上游位址，失敗即 panic（開機就炸，不帶病上線）。
-//
-// 為什麼是 panic 而不是「回一個會回錯誤的 handler」：這裡的輸入全部來自部署期注入的
-// env（`*_SERVICE_HOST` / `*_SERVICE_PORT`），解析失敗代表**這個環境的配置壞了**，
-// 不是某個請求壞了。原本寫成 `targetURL, _ := url.Parse(...)` 把 error 丟掉，一旦
-// 解析失敗 targetURL 就是 nil，而 nil 不會在啟動時被任何東西發現——它會在該路由的
-// **每一個請求**上，於 httputil.ReverseProxy 內部（rewriteRequestURL 首句取
-// target.RawQuery）nil dereference，被 gin Recovery() 接成 500 + 空 body。
-// 那個形狀沒有 envelope、沒有 traceId、連 ErrorHandler 都不會進，日誌裡不會出現
-// 任何指向配置的線索（#2813 為此花掉整輪才定位到這一行）。
-//
-// 觸發形狀（#2813）：k8s 對 Service 自動注入 `<NAME>_SERVICE_PORT=tcp://<ip>:<port>`
-// service-link 變數，與 gateway 讀的同名 env 撞名；config 沒定義該 env 時 service-link
-// 的值生效，拼出 `http://<host>:tcp://<ip>:<port>` —— Go 1.26 的 URL host/port
-// 驗證判它 `invalid port`，url.Parse 回 nil。同一個 pod 內 ACCOUNT_/BUYER_/SOCIAL_
-// SERVICE_PORT 也是這個形狀，目前沒有代理路由在用；哪天有人加了，這裡會在開機
-// 就炸並印出實際值，而不是再留一個沒有線索的 500。
-//
-// ⚠️ 要驗這類 parse 行為請在**本 module 內**寫測試：Go 1.26 收緊了 URL 驗證，而
-// go.mod 的 go directive 會透過 GODEBUG 決定套用新舊哪套語意 —— 同一個字串在
-// `go 1.24` 的 module 裡 parse 得過。另開小程式驗證會得到相反結論（#2813 踩過）。
-//
-// 額外檢查 targetURL == nil 而不是只看 err：成本是一個比較，換到的是「不明來源的
-// nil 也擋在開機」。
-//
-// panic 作為配置錯誤的處置方式與本包既有慣例一致（見 router.assertRouteCoverage 的
-// boot 斷言）：寧可部署即失敗，不要靜默帶病服務。
 func mustParseTarget(serviceName string, config ServiceConfig) *url.URL {
 	raw := "http://" + config.Host + ":" + config.Port
 	targetURL, err := url.Parse(raw)
@@ -210,8 +150,6 @@ func mustParseTarget(serviceName string, config ServiceConfig) *url.URL {
 func CreateProxy(serviceName string, onUpstreamFailure UpstreamFailureStatus) gin.HandlerFunc {
 	config, ok := services[serviceName]
 	if !ok {
-		// 未登記的 service name = wiring 錯誤（該路由的每個請求都會落到這裡）。
-		// 仍走統一 envelope，不自訂形狀（10 檔 §2）。
 		return func(c *gin.Context) {
 			response.NotFound(c, "service not found")
 		}
@@ -219,22 +157,11 @@ func CreateProxy(serviceName string, onUpstreamFailure UpstreamFailureStatus) gi
 
 	targetURL := mustParseTarget(serviceName, config)
 
-	// Rewrite（Go 1.26 起取代 deprecated 的 Director）。
-	//
-	// ⚠️ Rewrite 不像 Director 那樣自動補 X-Forwarded-*：ServeHTTP 在呼叫 Rewrite 之前
-	//    會把 client 送來的 Forwarded / X-Forwarded-For / -Host / -Proto 全部刪掉，補不補
-	//    由這個函式決定 ⇒ 必須顯式呼叫 SetXForwarded()。它的淨效果是**覆寫**而非附加
-	//    （client 自稱的值已被刪光，只留真實 RemoteAddr），比 Director 時代的
-	//    「client 值 + 真實 IP」更嚴格。2026-08-27 實查：全 services/ 無任何服務讀
-	//    X-Forwarded-For / X-Real-IP，這個差異目前沒有消費者。
-	//    **日後若有下游要看完整轉發鏈，這裡得改成手動接鏈**（自己從 r.In 讀出
-	//    X-Forwarded-For 再串上 RemoteAddr），SetXForwarded() 一句不夠。
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
-			r.SetURL(targetURL) // 等價於 NewSingleHostReverseProxy 的預設 director
+			r.SetURL(targetURL)
 			r.SetXForwarded()
 
-			// Strip /api/v1 prefix - backend services expect paths like /auth/login, not /api/v1/auth/login
 			path := r.Out.URL.Path
 			if strings.HasPrefix(path, "/api/v1/") {
 				path = strings.TrimPrefix(path, "/api/v1")
@@ -243,18 +170,15 @@ func CreateProxy(serviceName string, onUpstreamFailure UpstreamFailureStatus) gi
 			}
 			r.Out.URL.Path = path
 
-			// Set host header（SetURL 會把 Out.Host 清空以沿用 URL.Host，這裡顯式釘住）
 			r.Out.Host = targetURL.Host
 		},
 	}
 
-	// Error handler
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		writeUpstreamFailureEnvelope(w, r, onUpstreamFailure, err)
 	}
 
 	return func(c *gin.Context) {
-		// 注入身分 header（小寫，符合 API 設計規範 §6.2）
 		if accountId, exists := c.Get("accountId"); exists {
 			c.Request.Header.Set("x-account-id", fmt.Sprintf("%v", accountId))
 		}

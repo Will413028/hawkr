@@ -67,8 +67,6 @@ describe("CheckoutDraft 的逐欄重組", () => {
 	it("收件地址 id 撐得過去", () => {
 		writeCheckoutDraft(HOME_DRAFT);
 
-		// `recipient` 走 sessionStorage 這條分支（PII 不進 localStorage），
-		// 與 shipping 不同路 ⇒ 兩者要各自斷言。
 		expect(String(readCheckoutDraft()?.recipient?.id)).toBe(
 			"843856384063471760",
 		);

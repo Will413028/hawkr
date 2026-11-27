@@ -42,7 +42,6 @@ vi.mock("../connect/imageai", async () => {
 	};
 });
 
-// 縮圖用 canvas，jsdom／node 沒有；上限內的圖不會走到它。
 const defaults = (code: Code) => `default-${code}`;
 
 function failWith(code: Code, reason?: ErrorReason, message = "server text") {
@@ -114,7 +113,6 @@ describe("enhanceImage reason classification", () => {
 		server.transform = () => {
 			throw failWith(Code.InvalidArgument, ErrorReason.IMAGE_SAFETY_BLOCKED);
 		};
-		// ConnectError 的 message 不是 LocalizedMessage：沒有詳細資料時顯示目錄預設文字。
 		expect(((await run()) as Error).message).toBe(
 			`default-${Code.InvalidArgument}`,
 		);

@@ -10,17 +10,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// scenarios 是 Java coupon-service 要通過的情境，Driver 的實作各自跑同一份。資料庫可能已經有別
-// 的情境建的模板，所以每個情境只看帶自己 nonce 的那幾筆。期望值來自 CouponGrpcService、CouponTemplateService、
-// CouponClaimService 與 gateway 的 handler/coupon.go，鎖定的是現況，沒有驗證現況是否正確。
-//
-// 標 skipOnLegacy 的是計畫決定要改的行為（D2、BD）：舊的一端跳過並附編號，單體的一端照新行為斷言。
-//
-// 兩個 driver 都跑這一份。身分與 ID 經 Driver 取（StoreOf、BuyerAccount、BuyerID、Unknown、Malformed）：REST 是種子帳號，Connect 是情境各自建立的帳號。
-// 單體與舊實作不同的地方以 d.Legacy() 分支並附編號（D2：錢包模型沒有 claim_required；D5：結束活動冪等；防枚舉：別人的資源回 not_found）。
-// 固定的前提（REST）：買家的 token 是種子帳號 AccountBuyer、Buyer2 是 AccountBuyer2；賣家是兩家種子店家。ALL 型模板對買家的可見性
-// 依買家註冊時間，單體的 legacy account 回的是秒、Java 當毫秒讀（疑似缺陷，另案追），所以情境不驗「註冊在模板之後的
-// 買家看不到 ALL 型模板」。
 var scenarios = []ch.Scenario[Driver]{
 	{Name: "anonymous callers are rejected", Run: func(ctx context.Context, t ch.T, d Driver) {
 		_, err := d.ListMyCoupons(ctx, ch.Anonymous, ListQuery{})
@@ -35,7 +24,6 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 	}},
 	{Name: "my coupons list decodes used records", Run: func(ctx context.Context, t ch.T, d Driver) {
-		// 已使用的券只能由 order 內部的 gRPC 產生，REST 造不出來，所以只驗列表的形狀：每筆都有 ID 與模板 ID。
 		for _, status := range []string{"", "USED"} {
 			got := ch.Must(t, ch.Ret(d.ListMyCoupons(ctx, ch.Buyer, ListQuery{Status: status})))
 			if got.Used == nil {
@@ -49,7 +37,6 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 	}},
 	{Name: "buyers cannot use seller routes", Run: func(ctx context.Context, t ch.T, d Driver) {
-		// 舊的賣家路由對沒有賣家身分的帳號回 403；Connect 的賣家方法以呼叫者此刻的店推導，沒有店回 not_found。
 		want := ch.ErrPermission
 		if !d.Legacy() {
 			want = ch.ErrNotFound
@@ -195,7 +182,6 @@ var scenarios = []ch.Scenario[Driver]{
 	{Name: "seller revoke of someone else's or unknown template reports wrong status or not found", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
 		created := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetAll))))
-		// 舊的收回 UPDATE 同時比對店家與狀態，沒有命中一律是「狀態不允許」；單體依防枚舉回 not_found（別人的與不存在的完全相同）。
 		want := ErrWrongStatus
 		if !d.Legacy() {
 			want = ch.ErrNotFound
@@ -328,7 +314,6 @@ var scenarios = []ch.Scenario[Driver]{
 			"已經結束": {now.Add(-2 * time.Hour), now.Add(-time.Hour)},
 		} {
 			if !d.Legacy() && w[1].Before(now) {
-				// 單體建立活動時要求結束時間在未來（模組 TestClaimRejectsInactiveAndOutOfWindowCampaigns 以注入的時鐘涵蓋已結束的時間窗）。
 				continue
 			}
 			in := cashInput("coupon-"+ch.Nonce(), TargetAll)
@@ -408,7 +393,6 @@ var scenarios = []ch.Scenario[Driver]{
 			t.Errorf("issued/distributed = %d/%d，預期 1/0", res.Issued, res.Distributed)
 		}
 		got := mustFindIn(t, myCoupons(ctx, t, d, ch.Buyer2), tpl.ID)
-		// 舊的只指定名單、不代領；單體的指定發放就是建立買家的券（D2、D6），買家的錢包裡已經有這張券。
 		if got.Claimed == d.Legacy() {
 			t.Errorf("claimed = %v，預期 %v（舊的只指定不代領；單體發的是買家持有的券）", got.Claimed, !d.Legacy())
 		}
@@ -453,7 +437,6 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 		draft := ch.Must(t, ch.Ret(d.AdminCreate(ctx, ch.Admin, cashInput("coupon-"+ch.Nonce(), TargetDesignated))))
 		_, err := d.AdminIssue(ctx, ch.Admin, draft.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)
-		// 舊的只回「狀態不允許」；單體帶 COUPON_CAMPAIGN_NOT_ACTIVE。
 		want := ErrWrongStatus
 		if !d.Legacy() {
 			want = ErrNotActive
@@ -464,7 +447,6 @@ var scenarios = []ch.Scenario[Driver]{
 		if skipWithoutAdminRPC(t, d) {
 			return
 		}
-		// 舊的對不存在的券回「狀態不允許」；單體回 not_found。
 		want := ErrWrongStatus
 		if !d.Legacy() {
 			want = ch.ErrNotFound
@@ -550,13 +532,11 @@ func window() (start, end time.Time) {
 	return now.Add(-time.Hour), now.Add(30 * 24 * time.Hour)
 }
 
-// cashInput 是門檻 200、折抵 50 的現金券。
 func cashInput(title string, target Target) TemplateInput {
 	start, end := window()
 	return TemplateInput{Title: title, Type: TypeCash, Target: target, Threshold: 200, DiscountAmount: 50, StartAt: start, EndAt: end}
 }
 
-// skipOnLegacy 在舊的一端跳過情境：舊實作的行為與計畫的修正不同。回傳 true 時情境直接結束。
 func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	if !d.Legacy() {
 		return false
@@ -569,7 +549,6 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	return true
 }
 
-// sellerReady 把種子賣家的配額拉高：模板配額只算進行中的模板，各情境建立的模板不收回。
 func sellerReady(ctx context.Context, t ch.T, d Driver) {
 	t.Helper()
 	if err := d.AdminSetQuota(ctx, ch.Admin, d.StoreOf(ch.Seller), 100); err != nil {
@@ -613,7 +592,6 @@ func mustFindIn(t ch.T, list []Template, id string) Template {
 	return tpl
 }
 
-// myCoupons 翻完整份列表（到筆數達 Total 或遇到空頁），缺席檢查不會因為資料庫已有別的模板而落在第一頁之外。
 func myCoupons(ctx context.Context, t ch.T, d Driver, c ch.Caller) []Template {
 	t.Helper()
 	var all []Template
@@ -626,7 +604,6 @@ func myCoupons(ctx context.Context, t ch.T, d Driver, c ch.Caller) []Template {
 	}
 }
 
-// sellerTemplates 翻完整份賣家的模板列表，status 空字串不篩選。
 func sellerTemplates(ctx context.Context, t ch.T, d Driver, c ch.Caller, status Status) []Template {
 	t.Helper()
 	var all []Template
@@ -639,7 +616,6 @@ func sellerTemplates(ctx context.Context, t ch.T, d Driver, c ch.Caller, status 
 	}
 }
 
-// mustFind 在 Seller 的模板列表裡找模板。
 func mustFind(ctx context.Context, t ch.T, d Driver, id string) Template {
 	t.Helper()
 	return mustFindIn(t, sellerTemplates(ctx, t, d, ch.Seller, ""), id)
@@ -650,7 +626,6 @@ func mustDetail(ctx context.Context, t ch.T, d Driver, c ch.Caller, id string) S
 	return ch.Must(t, ch.Ret(d.SellerDetail(ctx, c, id)))
 }
 
-// skipOnMonolith 在單體（Connect）一端跳過情境：計畫刪掉了舊實作的這個能力，情境只驗舊的一端。回傳 true 時情境直接結束。
 func skipOnMonolith(t ch.T, d Driver, why string) bool {
 	if d.Legacy() {
 		return false
@@ -663,7 +638,6 @@ func skipOnMonolith(t ch.T, d Driver, why string) bool {
 	return true
 }
 
-// skipWithoutAdminRPC 在沒有 admin 對外 API 的 driver 跳過專門驗 admin RPC 行為的情境。回傳 true 時情境直接結束。
 func skipWithoutAdminRPC(t ch.T, d Driver) bool {
 	if d.AdminRPC() {
 		return false
@@ -676,7 +650,6 @@ func skipWithoutAdminRPC(t ch.T, d Driver) bool {
 	return true
 }
 
-// claimIfWallet 在錢包模型（單體）先領券：結帳可用的券只列買家持有的券，沒有領過的活動不在裡面（D2）；舊的賣家模板不需要領取。
 func claimIfWallet(ctx context.Context, t ch.T, d Driver, c ch.Caller, ids ...string) {
 	t.Helper()
 	if d.Legacy() {

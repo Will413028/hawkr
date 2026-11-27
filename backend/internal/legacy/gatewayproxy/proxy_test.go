@@ -28,7 +28,6 @@ func callerOf(ctx context.Context) (Caller, bool) {
 	return c, ok
 }
 
-// start 起一個假的 gateway 與代理；代理前面加一層把 caller 放進 ctx（入口的認證中介層做的事）。
 func start(t *testing.T, gateway http.Handler, caller *Caller) *httptest.Server {
 	t.Helper()
 	gw := httptest.NewServer(gateway)
@@ -84,7 +83,6 @@ func TestIdentityHeadersComeOnlyFromTheEntry(t *testing.T) {
 	}{
 		{"訪客：client 偽造的身分全部刪掉（#1859）", nil, "SELLER",
 			[]string{"X-Account-Id=\n", "X-Account-Type=\n", "X-Login-Role=\n", "X-Active-Role=\n"}},
-		// 買家位元由 legacy adapter 合成（W5）：identity 只有 SELLER，舊契約的 account_type 仍是買家 1 加賣家 2。
 		{"賣家（也是買家）、提示賣家 → 2", &Caller{Principal: seller}, "SELLER",
 			[]string{"X-Account-Id=7\n", "X-Account-Type=3\n", "X-Login-Role=2\n", "X-Active-Role=\n"}},
 		{"賣家（也是買家）、沒有提示 → 1", &Caller{Principal: seller}, "",

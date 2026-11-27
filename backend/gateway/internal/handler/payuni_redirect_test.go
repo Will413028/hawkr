@@ -16,16 +16,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-// #1394 反射 XSS 修復 — Gateway 端 regression。
-//
-// 舊實作把 client round-trip 的 base64 `?data=` 以 fmt.Sprintf 拼進 HTML（無 escape、
-// 無 host allowlist）→ 反射 XSS + open form-action。新實作改讀 opaque `?id=` → gRPC
-// 取回 canonical → html/template render + host allowlist。本檔以攻擊向量表格驅動驗證：
-//   1. 各欄位含 " / > / <script> / tag 分隔字元 → 輸出不形成新可執行 DOM node
-//   2. action host 非 allowlist（http/https-evil/javascript:）→ 受控 400、不 render 表單
-//   3. redirect_id 不存在（gRPC NOT_FOUND）→ 受控 404、不 render 表單
 
-// ---- mock clients（只覆寫本檔需要的 RPC；其餘靠內嵌 interface）----
 
 type mockStoreMapRedirectFormClient struct {
 	shippingpb.ShippingServiceClient
@@ -42,22 +33,18 @@ func setupPayUniRedirectRouter(h *Holder) *gin.Engine {
 	return r
 }
 
-// xssProbe 是塞進各欄位的攻擊字串，涵蓋 attribute 跳脫 + script 注入 + tag 分隔。
 const xssProbe = `"><script>alert(1)</script>`
 
-// assertNoActiveInjection 驗證 render 輸出未原樣帶入攻擊 payload（= 已被 escape）。
 func assertNoActiveInjection(t *testing.T, body string) {
 	t.Helper()
 	if strings.Contains(body, "<script>alert(1)</script>") {
 		t.Fatalf("output contains un-escaped <script>alert(1)</script>:\n%s", body)
 	}
-	// 屬性 context 的 " 必被 escape 成 &#34;，否則可跳出 value="..." 破框
 	if strings.Contains(body, `value="">`) {
 		t.Fatalf("output contains attribute-breaking un-escaped quote:\n%s", body)
 	}
 }
 
-// ==================== store map /store_map/redirect ====================
 
 func TestStoreMapRedirect_EscapesAllFields(t *testing.T) {
 	mock := &mockStoreMapRedirectFormClient{
@@ -168,9 +155,9 @@ func TestIsAllowedPayUniActionURL(t *testing.T) {
 	}{
 		{payuni.SandboxBaseURL + "/api/upp", true},
 		{payuni.ProdBaseURL + "/api/storemap", true},
-		{"http://api.payuni.com.tw/upp", false},   // 非 https
-		{"https://evil.com/upp", false},           // 非白名單 host
-		{"https://payuni.com.tw.evil.com", false}, // lookalike
+		{"http://api.payuni.com.tw/upp", false},
+		{"https://evil.com/upp", false},
+		{"https://payuni.com.tw.evil.com", false},
 		{"javascript:alert(1)", false},
 		{"", false},
 		{"://bad", false},

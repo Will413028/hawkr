@@ -18,7 +18,7 @@ func TestRedactSecrets_QueryStringNamedKeys(t *testing.T) {
 	}{
 		{
 			name:  "lowercase key param",
-			input: `Get "https://generativelanguage.googleapis.com/v1/models?key=AIzaSyABCDEF123456": dial tcp: i/o timeout`, // gitleaks:allow（遮罩測試的假 key）
+			input: `Get "https://generativelanguage.googleapis.com/v1/models?key=AIzaSyABCDEF123456": dial tcp: i/o timeout`,
 			want:  `Get "https://generativelanguage.googleapis.com/v1/models?key=REDACTED": dial tcp: i/o timeout`,
 		},
 		{
@@ -127,14 +127,6 @@ func TestRedactingCore_MessageItselfRedacted(t *testing.T) {
 	observedCore, logs := observer.New(zapcore.DebugLevel)
 	logger := zap.New(newRedactingCore(observedCore))
 
-	// 用 URL userinfo 帳密形狀驗證 entry.Message 本身也會走 redactSecrets——
-	// 這條路徑跟 zap.Error/zap.String 欄位是不同程式碼路徑（Write 裡直接改
-	// entry.Message，不經過 redactField）。原本這裡放的是 Discord webhook
-	// 範例，但 Discord 的 token 在 URL path 裡（/api/webhooks/{id}/{token}），
-	// 不是 query string 命名密鑰或 userinfo 帳密，不在本 task 宣告的兩種遮蔽
-	// 形狀內；Task 4 對 Discord webhook 是用完全不同的手法（丟棄整個 URL，見
-	// docs/superpowers/plans/2026-08-22-credential-leak-sweep.md 第 604 行），
-	// 不靠這裡的正則。換成本 task 實際涵蓋的形狀，語意不變。
 	logger.Warn(`mq publish failed: dial tcp: amqp://guest:REDACTED@rabbitmq.hawkr.svc:5672/: connection refused`)
 
 	entries := logs.All()

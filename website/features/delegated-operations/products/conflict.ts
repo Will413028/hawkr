@@ -50,8 +50,6 @@ export function draftFromDetail(
 		categoryId: detail.categoryId,
 		origin: detail.origin,
 		description: detail.description,
-		// 複製一份：表單會就地增刪，共用同一個陣列會讓「有沒有改過」的比較恆為 true
-		// （detail 那一份跟著一起變）⇒ 送出鍵永遠可按、送出去卻是一筆空變更。
 		skus,
 	};
 }

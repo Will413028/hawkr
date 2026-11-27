@@ -19,10 +19,6 @@ import AssistantWorkspace from "../AssistantWorkspace";
 import { hasProcurementResults } from "../session-logic";
 import { initialState, restoredStateFrom } from "../useProcurementSession";
 
-// session 的資料來源被換掉，Workspace 與 SidePanel 本身是真的。網路還原路徑由
-// useProcurementSession 自己的測試守；這裡要問的是「拿到那份還原狀態之後，
-// 使用者看不看得到成果」。⛔ restoredStateFrom 仍是真的（importOriginal），
-// 不自己拼 state，否則就測不到「candidateSet 恆為 null、stage 不會是 candidates」。
 const mocked = vi.hoisted(() => ({ session: null as unknown }));
 
 vi.mock("../useProcurementSession", async (importOriginal) => {
@@ -36,8 +32,6 @@ vi.mock("next/navigation", async (importOriginal) => ({
 	usePathname: () => "/account/messages/assistant/procurement",
 }));
 
-// 對話氣泡只拿暱稱來標大頭貼，與成果面板的可見性無關；沿用本 feature 既有的
-// auth mock 慣例（見 useProcurementSession.*.unit.test.ts），不為此拉起真 provider。
 vi.mock("@/lib/auth/context", () => ({
 	useAuth: () => ({
 		status: "signedIn",
@@ -46,8 +40,6 @@ vi.mock("@/lib/auth/context", () => ({
 	}),
 }));
 
-// jsdom 沒有 ResizeObserver。composer 的自動高度用得到它，但與成果面板無關，
-// 所以給一個 no-op，而不是把 composer 從這棵樹裡拿掉。
 class NoopResizeObserver {
 	observe() {}
 	unobserve() {}
@@ -205,8 +197,6 @@ describe("hasProcurementResults — 成果存在的唯一判準", () => {
 
 describe("重整後的真實還原狀態", () => {
 	it("restoredStateFrom 產出的 publication-only 狀態必須判定為有成果", () => {
-		// ⛔ 不自己拼一個 state：用 production 的還原函式，才測得到
-		// 「candidateSet 固定為 null、stage 永遠不是 candidates」這兩個真實約束。
 		const restored = restoredStateFrom(null, publicationOnlySnapshot());
 
 		expect(restored.candidateSet).toBeNull();
@@ -223,8 +213,6 @@ describe("重整後的真實還原狀態", () => {
 });
 
 function restoredPublicationOnly() {
-	// ⛔ 經過 production 的還原函式，不手捏 state：candidateSet 恆為 null、
-	// stage 永遠不是 "candidates"，這兩個約束正是 A8 踩中的東西。
 	return restoredStateFrom(null, publicationOnlySnapshot());
 }
 
@@ -237,7 +225,6 @@ function candidateOnlyState() {
 		failureReason: RunFailureReason.UNSPECIFIED,
 		candidates: [],
 	};
-	// session 內剛跑完搜尋的樣子：stage 是 "candidates"，還沒有任何 publication。
 	return {
 		requestId: "1234567890123456788",
 		revisionId: "1234567890123456791",
@@ -261,7 +248,6 @@ describe("真 render：重整後的成果面板看得見也打得開", () => {
 			expect(resultsPanel()).toBeNull();
 		});
 
-		// 關掉面板不等於成果消失：入口必須還在，而且按得動。
 		const opener = resultsOpener();
 		expect(opener).not.toBeNull();
 		expect((opener as HTMLButtonElement).disabled).toBe(false);
@@ -334,7 +320,6 @@ describe("真 render：重整後的成果面板看得見也打得開", () => {
 		await waitFor(() => {
 			expect(mountedPanel()).not.toBeNull();
 		});
-		// 這一組斷言同時證明上面的查詢真的分得出「掛載」與「看得見」。
 		expect(resultsPanel()).toBeNull();
 		expect((resultsOpener() as HTMLButtonElement).disabled).toBe(true);
 	});

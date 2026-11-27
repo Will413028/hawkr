@@ -3,11 +3,6 @@ import { readdirSync } from "node:fs";
 import test from "node:test";
 import ossImageLoader from "../lib/media/ossImageLoader";
 
-// Post OSS→R2 migration (design book 49 §4.4): per-width resizing is no longer
-// expressible — the loader ignores `width`/`quality` and returns the ORIGINAL
-// object through the configured media origin (tests/setup/hermetic.mjs pins
-// NEXT_PUBLIC_MEDIA_BASE_URL) with NO `x-oss-process` query. next/image dedupes
-// the identical URL across srcset widths so the browser fetches one image.
 const ORIGINAL = "https://test-media.example.com/i/original";
 
 test("returns the original object unchanged, ignoring width/quality", () => {
@@ -68,11 +63,6 @@ test("every subdirectory of public/ resolves as a local asset, including future 
 		.filter((item) => item.isDirectory())
 		.map((item) => item.name);
 
-	// The loader classifies by structure (rooted path minus the reserved backend
-	// namespaces), not by a hand-maintained directory list, so a brand-new folder
-	// under public/ needs no code edit. The only way this can fail is a folder
-	// named after a backend objectKey namespace (public / secure / tmp / i) —
-	// which really would be broken at runtime and must be renamed.
 	for (const dir of directories) {
 		const src = `/${dir}/test-asset.png`;
 		const resolved = ossImageLoader({ src, width: 200 });
@@ -83,9 +73,6 @@ test("every subdirectory of public/ resolves as a local asset, including future 
 		);
 	}
 
-	// Guard the rule itself: a directory that does not exist yet must already be
-	// treated as local, otherwise the classification silently degraded back into
-	// an allowlist and the next asset folder would 404 on the CDN.
 	assert.equal(
 		ossImageLoader({ src: "/folder-added-tomorrow/asset.png", width: 200 }),
 		"/folder-added-tomorrow/asset.png",
@@ -93,8 +80,6 @@ test("every subdirectory of public/ resolves as a local asset, including future 
 });
 
 test("keeps backend objectKey namespaces remote even with a stray leading slash", () => {
-	// Canonical backend keys are slash-less; a rooted variant must still resolve
-	// to the CDN, never to this app's origin.
 	assert.equal(
 		ossImageLoader({ src: "/public/p/a.jpg", width: 240 }),
 		`${ORIGINAL}/public/p/a.jpg`,
@@ -114,8 +99,6 @@ test("keeps backend objectKey namespaces remote even with a stray leading slash"
 });
 
 test("never treats a protocol-relative value as a local asset", () => {
-	// "//host/x" and "/\host/x" would take the browser off our origin; they must
-	// not be mistaken for a rooted public/ path.
 	assert.equal(
 		ossImageLoader({ src: "//evil.example/x.png", width: 200 }),
 		`${ORIGINAL}//evil.example/x.png`,

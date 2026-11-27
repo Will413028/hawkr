@@ -68,7 +68,6 @@ class UberDeliveryExposureContractTest {
                     "UberPodArtifactView." + f.getName() + " 外露了 POD 的 PIN——"
                             + "那是「持有即可領取包裹」的憑證，而判斷 POD 在不在不需要它。");
         }
-        // 存在性對照：本 message 仍然是「回報 POD 狀態」的那一個，禁令才有意義。
         assertNotNull(pod.findFieldByName("artifact_type"),
                 "UberPodArtifactView 不再回報 artifact_type——本測試已經指不到對的東西了");
         assertNotNull(pod.findFieldByName("object_key"),
@@ -77,8 +76,6 @@ class UberDeliveryExposureContractTest {
 
     @Test
     void summaryKeepsNormalizedAndRawProviderStatusAsSeparateFields() {
-        // W6-4 明列 normalized status 與 raw provider status 要能分開查；
-        // 合併成一欄會讓「未知 provider 值 fail-closed」（INV-U7）失去意義。
         Descriptors.Descriptor summary = UberDeliverySummary.getDescriptor();
         assertNotNull(summary.findFieldByName("status"), "normalized 狀態欄位不見了");
         assertNotNull(summary.findFieldByName("provider_status"), "raw provider 狀態欄位不見了");
@@ -86,8 +83,6 @@ class UberDeliveryExposureContractTest {
 
     @Test
     void summaryCarriesTheAddressableKeyForRowsWithoutProviderId() {
-        // delivery_id 在建單失敗／結果未知時為空；沒有 delivery_no 的話，Admin 點不開的
-        // 正好是他最需要點開的那幾筆。
         Descriptors.Descriptor summary = UberDeliverySummary.getDescriptor();
         assertNotNull(summary.findFieldByName("delivery_no"),
                 "少了可定址鍵 delivery_no——建單失敗的單將無法從列表打開");

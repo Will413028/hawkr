@@ -32,7 +32,7 @@ const Schema = "adminaudit"
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生
+		panic(err)
 	}
 	return sub
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// resultNote 驗證給檢舉人的結果說明（選填，最多 2000 字）並去掉前後空白；空字串是沒有說明（nil）。
 func resultNote(note string) (*string, error) {
 	trimmed := model.Text(note)
 	if trimmed != nil && utf8.RuneCountInString(*trimmed) > model.NoteBodyMaxRunes {

@@ -64,7 +64,6 @@ class BuyerHashtagExtractor {
           .toList(growable: false);
       if (list.isNotEmpty) return list;
     }
-    // fallback：從 description 抽
     final desc = product['description'];
     if (desc is Map) {
       final blocks = desc['blocks'];

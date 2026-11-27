@@ -16,7 +16,6 @@ func dateText(d *time.Time) *string {
 	return &s
 }
 
-// toApplication 把儲存的列轉成檢視：型別沒有欄位能放身分證號、銀行帳號與個人姓名（收款開通 ADR D22、D37），申請的列也沒有這些欄位。
 func toApplication(row store.SellerKycApplication, accountID int64) model.KYCApplication {
 	return model.KYCApplication{
 		ID: row.ApplicationID, StoreID: row.StoreID, AccountID: accountID, Status: model.KYCStatus(row.Status),
@@ -46,8 +45,6 @@ func toReview(row store.SellerKycReview, issues []model.KYCIssue) model.KYCRevie
 	}
 }
 
-// lastRejection 是賣家要處理的那次退回：最近一次審核紀錄（REBIND 不算）是 REJECT、之後賣家沒有重新送出，也沒有被核准或取消；
-// 其他時候沒有。總理由與逐項問題，沒有內部備註（給賣家看的）。
 func lastRejection(reviews []store.SellerKycReview, issues map[uuid.UUID][]model.KYCIssue) *model.KYCRejection {
 	r := pendingRejection(reviews)
 	if r == nil {
@@ -56,7 +53,6 @@ func lastRejection(reviews []store.SellerKycReview, issues map[uuid.UUID][]model
 	return &model.KYCRejection{Reason: *r.Reason, Issues: issues[r.ReviewID], DecidedAt: r.DecidedAt}
 }
 
-// insertParams 與 updateParams 把合併後的列轉成寫入的參數。
 func insertParams(r store.SellerKycApplication, now time.Time) store.InsertKYCApplicationParams {
 	return store.InsertKYCApplicationParams{
 		ApplicationID: r.ApplicationID, StoreID: r.StoreID, SellerType: r.SellerType,

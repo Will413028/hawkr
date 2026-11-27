@@ -77,9 +77,6 @@ class WebhookInboxDedupIntegrationTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // spring.flyway.url/user/password 在 application.yml 有獨立硬編碼預設值（指向本機真實
-        // hawkr_webhook DB），不覆寫會讓 Flyway 對本機真實 DB no-op（或密碼不符直接
-        // BeanCreationException）、testcontainers 內的測試 DB 卻從未跑過 migration。
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
@@ -214,8 +211,6 @@ class WebhookInboxDedupIntegrationTest {
     @Test
     @DisplayName("§2.5.2 修正驗證：外層 @Transactional rollback 時 FailedInboxRecorder 紀錄仍 commit（REQUIRES_NEW）")
     void failedInbox_persistsEvenWhenOuterTransactionRollsBack() {
-        // 模擬：外層 @Transactional 呼叫 FailedInboxRecorder.record() 後拋例外
-        // 預期：外層 rollback，但 FailedInboxRecorder 因 REQUIRES_NEW 已獨立 commit
         assertThrows(RuntimeException.class,
                 () -> outerCaller.callFailedInboxThenThrow("enc-x", "hash-x", "外層失敗測試"));
 
@@ -239,19 +234,16 @@ class WebhookInboxDedupIntegrationTest {
         String topic = "payuni.shipping.status";
         var now = DateTimeUtils.nowUtc();
 
-        // 第一次：應寫入
         int first = outboxMapper.insertIfAbsent(
                 WebhookProvider.PAYUNI.value(), eventKey, exchange, topic, eventKey,
                 "{\"v\":\"1\"}", OutboxEventStatus.PENDING.value(), 0, now);
         assertEquals(1, first, "第一次應 INSERT 成功（return 1）");
 
-        // 第二次：UNIQUE 命中應跳過（不拋例外、不污染 transaction）
         int second = outboxMapper.insertIfAbsent(
                 WebhookProvider.PAYUNI.value(), eventKey, exchange, topic, eventKey,
                 "{\"v\":\"2\"}", OutboxEventStatus.PENDING.value(), 0, now);
         assertEquals(0, second, "第二次應 UNIQUE 命中跳過（return 0）— 這是 §4.5.3 replay-safe 的核心保證");
 
-        // 不同 exchange 仍允許（雙通道前提）
         int agentNotify = outboxMapper.insertIfAbsent(
                 WebhookProvider.PAYUNI.value(), eventKey, "seller.events", "seller.review.result", eventKey,
                 "{\"v\":\"1\"}", OutboxEventStatus.PENDING.value(), 0, now);
@@ -351,8 +343,6 @@ class WebhookInboxDedupIntegrationTest {
         inbox.setWebhookType(PayUniEventType.AGENT_NOTIFY.value());
         inboxMapper.insert(inbox);
 
-        // #1757：AGENT_NOTIFY 已移除無 consumer 的 payuni.events/payuni.agent.notify 冗餘路由，
-        // 僅保留 seller.events/seller.review.result 單通道。
         outboxTxOps.enqueueAndMark(inbox.getId(),
                 java.util.List.of(
                         new WebhookOutboxTxOps.OutboxRoute(
@@ -378,10 +368,8 @@ class WebhookInboxDedupIntegrationTest {
                 "payuni.shipping.status",
                 "{\"e\":\"1\"}");
 
-        // 第一次（模擬前次 T2 commit 後在某處中斷）
         outboxTxOps.enqueueAndMark(inbox.getId(), java.util.List.of(route));
 
-        // 第二次（replay 重跑）— 不應拋例外、outbox 不應重複
         outboxTxOps.enqueueAndMark(inbox.getId(), java.util.List.of(route));
 
         Long outboxCount = outboxMapper.selectCount(null);

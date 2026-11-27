@@ -42,7 +42,6 @@ const HEALTHY = [
 	SellerCapability.ORDER_FULFILL,
 	SellerCapability.INVOICE_MANAGE,
 ];
-// 停權或等待刪除：沒有 INVOICE_MANAGE。
 const RESTRICTED = [
 	SellerCapability.ACCOUNT_SELF_READ,
 	SellerCapability.ORDER_FULFILL,
@@ -86,8 +85,6 @@ function unavailable() {
 }
 
 function mountOverview() {
-	// Exercise the real app retry policy, hook, repository and HTTP transport.
-	// Only shorten retry delays so the regression settles without real waiting.
 	const client = createAppQueryClient();
 	client.setDefaultOptions({
 		...client.getDefaultOptions(),

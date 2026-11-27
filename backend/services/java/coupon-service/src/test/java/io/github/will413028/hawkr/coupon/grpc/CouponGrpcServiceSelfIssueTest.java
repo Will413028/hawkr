@@ -42,12 +42,6 @@ class CouponGrpcServiceSelfIssueTest {
 
     @Test
     void diverged_sellerSideOnly_storeIdResolvesToOwnPrincipal_stillBlocked() {
-        // Guard-regression case: the acting seller's store_id (999, what
-        // sellerCreateTemplate reads off SellerCreateTemplateRequest.store_id
-        // after gateway resolution) resolves to principal 42, and the
-        // designated buyer_id 42 happens to already equal that principal
-        // (grandfathered buyer side, no divergence there) — same human,
-        // still blocked.
         SellerGrpcClient sellerGrpcClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerGrpcClient.resolvePrincipals(List.of(999L))).thenReturn(PrincipalResolution.allResolved(Map.of(999L, 42L)));
         BuyerGrpcClient buyerGrpcClient = Mockito.mock(BuyerGrpcClient.class);
@@ -83,9 +77,6 @@ class CouponGrpcServiceSelfIssueTest {
 
     @Test
     void diverged_bothSidesButDifferentAccounts_allowed() {
-        // Both sides diverge from their raw ids, but resolve to *different*
-        // underlying accounts — must not be blocked (proves the fix compares
-        // resolved principals, not raw ids naively).
         SellerGrpcClient sellerGrpcClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerGrpcClient.resolvePrincipals(List.of(999L))).thenReturn(PrincipalResolution.allResolved(Map.of(999L, 42L)));
         BuyerGrpcClient buyerGrpcClient = Mockito.mock(BuyerGrpcClient.class);
@@ -121,12 +112,6 @@ class CouponGrpcServiceSelfIssueTest {
                 .isInstanceOf(StatusRuntimeException.class);
     }
 
-    // ==================== 未解析 principal ⇒ fail-closed（issue #2789 階段 B1） ====================
-    //
-    // seller/buyer service 對查無在架列的 id 回 code=0 並把輸入原樣回吐。舊寫法
-    // getOrDefault(id, id) 讓「無法確認」變成「不是同一個人」⇒ 自發自用防護對這些 id
-    // 靜默失效。把產品碼的 requireResolved / requireAllResolved 換回 getOrDefault，
-    // 以下兩支會轉紅（回到「不拋例外」）。
 
     private static PrincipalResolution echoedBack(java.util.Map<Long, Long> principals, Long... unresolved) {
         return PrincipalResolution.of(principals, List.of(unresolved));
@@ -142,7 +127,6 @@ class CouponGrpcServiceSelfIssueTest {
         assertThatThrownBy(() -> CouponGrpcService.enforceNoSelfIssueForTest(
                 sellerGrpcClient, buyerGrpcClient, 200L, List.of(100L, 101L)))
                 .isInstanceOf(CouponBusinessException.class);
-        // 賣家側都還沒確認就擋掉，根本不該去問買家側
         Mockito.verifyNoInteractions(buyerGrpcClient);
     }
 
@@ -152,7 +136,6 @@ class CouponGrpcServiceSelfIssueTest {
         Mockito.when(sellerGrpcClient.resolvePrincipals(List.of(200L)))
                 .thenReturn(PrincipalResolution.allResolved(Map.of(200L, 200L)));
         BuyerGrpcClient buyerGrpcClient = Mockito.mock(BuyerGrpcClient.class);
-        // 101 查無在架買家：回吐 101，舊碼判 101 != 200 ⇒ 放行
         Mockito.when(buyerGrpcClient.resolvePrincipals(List.of(100L, 101L)))
                 .thenReturn(echoedBack(Map.of(100L, 100L, 101L, 101L), 101L));
 

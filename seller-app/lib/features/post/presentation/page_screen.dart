@@ -53,7 +53,7 @@ class _PageScreenState extends ConsumerState<PageScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   int _lastHandledTabIndex =
-      1; // tracks last processed tab to avoid re-firing during animation
+      1;
   final _shopTabKey = GlobalKey<PageShopTabState>();
   static const Color _pageBackgroundColor = AppColors.bgPrimary;
 
@@ -78,7 +78,6 @@ class _PageScreenState extends ConsumerState<PageScreen>
     final newIndex = _tabController.index;
     if (newIndex == _lastHandledTabIndex) return;
     _lastHandledTabIndex = newIndex;
-    // 切到 Shop tab 時重新載入認證 / 物流狀態
     if (newIndex == 1) {
       _shopTabKey.currentState?.reload();
     }
@@ -92,7 +91,7 @@ class _PageScreenState extends ConsumerState<PageScreen>
       length: 3,
       vsync: this,
       initialIndex: 1,
-    ); // Shop tab selected
+    );
     _tabController.addListener(_handleTabChanged);
     _refreshStore();
   }
@@ -121,7 +120,6 @@ class _PageScreenState extends ConsumerState<PageScreen>
     final storeId = mine?.storeId ?? '';
     final storeName = mine?.storeName;
 
-    // Tab 切換時刷新店家
     ref.listen<int>(pageTabRefreshProvider, (_, _) => _refreshStore());
 
     return AnnotatedRegion<SystemUiOverlayStyle>(

@@ -31,7 +31,7 @@ var migrationFiles embed.FS
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生，編譯後的 binary 不可能遇到
+		panic(err)
 	}
 	return sub
 }
@@ -168,7 +168,6 @@ func New(d Deps) *Module {
 	return m
 }
 
-// adminStores 把 seller 的兩個方法接成後台要的介面。
 type adminStores struct {
 	read  StoreReader
 	guard StoreGuard

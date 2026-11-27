@@ -44,7 +44,6 @@ func (c *CouponClient) Close() error {
 	return nil
 }
 
-// ==================== Buyer ====================
 
 // ListMyCoupons 查詢買家優惠券列表
 func (c *CouponClient) ListMyCoupons(ctx context.Context, req *pb.ListMyCouponsRequest) (*pb.ListMyCouponsResponse, error) {
@@ -67,7 +66,6 @@ func (c *CouponClient) ListAvailableCoupons(ctx context.Context, req *pb.ListAva
 	return c.client.ListAvailableCoupons(rpcCtx, req)
 }
 
-// ==================== Seller ====================
 
 // SellerCreateTemplate 賣家建立優惠券
 func (c *CouponClient) SellerCreateTemplate(ctx context.Context, req *pb.SellerCreateTemplateRequest) (*pb.SellerCreateTemplateResponse, error) {
@@ -104,7 +102,6 @@ func (c *CouponClient) ListBuyerCouponsForSeller(ctx context.Context, req *pb.Li
 	return c.client.ListBuyerCouponsForSeller(rpcCtx, req)
 }
 
-// ==================== Admin ====================
 
 // AdminCreateTemplate 管理員建立模板
 func (c *CouponClient) AdminCreateTemplate(ctx context.Context, req *pb.AdminCreateTemplateRequest) (*pb.AdminCreateTemplateResponse, error) {

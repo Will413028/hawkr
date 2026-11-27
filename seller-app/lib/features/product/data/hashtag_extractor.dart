@@ -22,15 +22,15 @@ class HashtagExtractor {
   static List<String> extractFromText(String text) {
     if (text.isEmpty) return const [];
     final result = <String>[];
-    final seen = <String>{}; // 已收進的 canonical key（小寫）
+    final seen = <String>{};
 
     for (final match in _pattern.allMatches(text)) {
       final raw = match.group(1);
       if (raw == null || raw.isEmpty) continue;
       final canonical = _canonical(raw);
       if (canonical.isEmpty) continue;
-      if (!seen.add(canonical)) continue; // dedup
-      result.add(raw); // 保留原樣（含中文 / 大小寫），server 端會 normalize
+      if (!seen.add(canonical)) continue;
+      result.add(raw);
       if (result.length >= maxCount) break;
     }
     return result;
@@ -64,7 +64,7 @@ class HashtagExtractor {
       final content = blockPlainText(b);
       if (content.isEmpty) continue;
       buf.write(content);
-      buf.write('\n'); // 區塊間插斷字元，避免「#hashtag」誤跟下一個 block 黏起來
+      buf.write('\n');
     }
     return extractFromText(buf.toString());
   }
@@ -108,24 +108,20 @@ class HashtagExtractor {
     int triggerAfterChars = 1,
   }) {
     if (textBeforeCaret.isEmpty) return null;
-    // 從右往左找 `#`，途中遇到不合法字元就退出
     final n = textBeforeCaret.length;
     for (int i = n - 1; i >= 0; i--) {
       final c = textBeforeCaret.codeUnitAt(i);
       final ch = textBeforeCaret[i];
       if (ch == '#') {
-        // 找到 `#`。檢查它前面是不是 word boundary（開頭 / 空白 / 非 hashtag char）。
         if (i > 0) {
           final prev = textBeforeCaret[i - 1];
           if (_isHashtagChar(prev) || prev == '#') return null;
         }
         final prefix = textBeforeCaret.substring(i + 1);
-        if (prefix.length < triggerAfterChars) return null; // 至少要 N 個字才觸發
+        if (prefix.length < triggerAfterChars) return null;
         return HashtagTaggingMode(hashAt: i, prefix: prefix);
       }
-      // 不是 `#` 也不是 hashtag char → 中途有空白/標點，不在 tagging mode
       if (!_isHashtagChar(ch)) return null;
-      // 避免 unused warning
       // ignore: unused_local_variable
       final _ = c;
     }
@@ -133,19 +129,16 @@ class HashtagExtractor {
   }
 
   static String _canonical(String s) {
-    // 英文小寫，其他語言（中文等）原樣保留作為 key
     return s.toLowerCase();
   }
 
   static bool _isHashtagChar(String ch) {
     if (ch.length != 1) return false;
-    // ASCII letter / digit / underscore 走快路徑
     final code = ch.codeUnitAt(0);
-    if (code == 0x5F) return true; // _
-    if (code >= 0x30 && code <= 0x39) return true; // 0-9
-    if (code >= 0x41 && code <= 0x5A) return true; // A-Z
-    if (code >= 0x61 && code <= 0x7A) return true; // a-z
-    // 其他用 regex 判斷一次（吃 unicode letter / digit）
+    if (code == 0x5F) return true;
+    if (code >= 0x30 && code <= 0x39) return true;
+    if (code >= 0x41 && code <= 0x5A) return true;
+    if (code >= 0x61 && code <= 0x7A) return true;
     return RegExp(r'[\p{L}\p{N}_]', unicode: true).hasMatch(ch);
   }
 }

@@ -30,8 +30,6 @@ import {
 import { policyCategoryText } from "@/lib/policy-category";
 import { reportOutcomeText } from "./report-text";
 
-// 商家通報與案件的對話框：輸入的驗證、請求組裝、失敗句。能不能做、有哪些選項都來自伺服器（Report.can_*、available_outcomes、
-// Case.decision_options 與各個 can_*），這裡不推導；時間一律由呼叫端傳入（now）。
 
 export const RESULT_NOTE_MAX_LENGTH = 2000;
 export const SEVERITY_NOTE_MAX_LENGTH = 2000;
@@ -87,8 +85,6 @@ function tooLong(value: string, max: number): boolean {
 	return goTrimmedRuneCount(value) > max;
 }
 
-// ---------------------------------------------------------------------------
-// 分案與移動：平台判定類別，以及這家店在那個類別的去處（伺服器隨 GetReport 的 triage_targets 給：加入進行中的案件，或開新案件）
 
 export interface AssessForm {
 	category: PolicyCategory;
@@ -193,8 +189,6 @@ export function buildMove(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 設定結果
 
 export interface ResolveForm {
 	outcome: ReportOutcome;
@@ -263,8 +257,6 @@ export function buildResolve(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 結案
 
 export interface DecideForm {
 	decision: CaseDecision;
@@ -322,8 +314,6 @@ export function bringInText(
 	return `${first}還沒有結果的 ${unresolvedReportCount} 筆通報會帶入「${reportOutcomeText(defaultOutcome)}」。`;
 }
 
-// ---------------------------------------------------------------------------
-// 改嚴重度
 
 export interface SeverityForm {
 	severity: ViolationSeverity;
@@ -362,8 +352,6 @@ export function buildChangeSeverity(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 案件的內部註記
 
 export function buildCreateCaseNote(
 	caseId: string,
@@ -372,8 +360,6 @@ export function buildCreateCaseNote(
 	return { caseId, note: { body: trimGoSpace(body) } };
 }
 
-// ---------------------------------------------------------------------------
-// 從案件建立措施：預先勾選的來源通報（伺服器篩出可以當來源的通報，見 use-case-reports）
 
 /** 預先勾選的來源通報超過一次能選的上限時，建立措施對話框的說明。 */
 export const SOURCE_OVERFLOW_TEXT = `這個案件超過 ${SOURCE_REPORTS_MAX} 筆可以當來源的通報，已預先勾選最早的 ${SOURCE_REPORTS_MAX} 筆。`;

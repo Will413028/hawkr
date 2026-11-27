@@ -27,8 +27,6 @@ import '../data/order_tab_mapper.dart';
 import '../data/seller_after_sale_lookup.dart';
 import 'order_card.dart';
 
-// tab 顯示名的單一來源在 order_tab_mapper.dart（與各 tab 的 status 集合同檔），
-// 不在這裡另寫字面值 —— 第三個是「已結束」不是「已完成」，理由見該處說明。
 const _kTabLabels = sellerOrderTabLabels;
 
 enum _OrderQuickFilter { all, pendingAction, afterSale }
@@ -68,8 +66,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
   int _page = 1;
   static const int _pageSize = 20;
 
-  // 直接訂閱 notifier 的 broadcast stream，獨立於 Riverpod StreamProvider 的
-  // build-cycle 綁定時序，確保 FCM silent push 事件不漏單。
   StreamSubscription<OrderStatusEvent>? _orderStatusSub;
   StreamSubscription<AfterSaleStatusEvent>? _afterSaleStatusSub;
 
@@ -306,7 +302,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
     return false;
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     ref.listen<int?>(ordersInitialTabProvider, (prev, next) {
@@ -321,8 +316,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
         if (prev != next) _requestReloadOrders();
       });
     }
-    // orderStatusStream / afterSaleStatusStream 已在 initState 直接訂閱 notifier，
-    // 不再經 Riverpod StreamProvider 橋接，避免 keepAlive/build-cycle 時序衝突。
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,

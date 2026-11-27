@@ -59,7 +59,7 @@ func appendContent(t *testing.T, svc session.Service, s session.Session, author 
 	if err := svc.AppendEvent(t.Context(), s, ev); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(2 * time.Millisecond) // 事件與 session 的時間戳要有先後
+	time.Sleep(2 * time.Millisecond)
 }
 
 // latest_session_empty：沒有任何對話時 session_id 空字串、沒有訊息。
@@ -141,7 +141,6 @@ func TestLatestReturnsOnlyTheMostRecent100Messages(t *testing.T) {
 	}
 }
 
-// recordingGet 記下 Get 的請求。
 type recordingGet struct {
 	session.Service
 	req *session.GetRequest
@@ -165,7 +164,6 @@ func TestLatestBoundsTheDatabaseRead(t *testing.T) {
 	}
 }
 
-// goneOnGet 模擬列出之後、讀取之前對話被刪除。
 type goneOnGet struct{ session.Service }
 
 func (goneOnGet) Get(context.Context, *session.GetRequest) (*session.GetResponse, error) {

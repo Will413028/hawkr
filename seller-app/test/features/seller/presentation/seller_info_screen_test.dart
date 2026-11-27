@@ -136,7 +136,6 @@ void main() {
         myStoreRepositoryProvider.overrideWithValue(server.repository),
         sellerAgreementsRepositoryProvider.overrideWithValue(agreements),
         sellerOnboardingProvider.overrideWithValue(onboarding),
-        // 措施提示卡讀 ListMyMeasures（帳號層級）；預設沒有措施。
         sellerClientProvider.overrideWithValue(
           SellerAppServiceClient(
             FakeTransportBuilder()
@@ -196,7 +195,6 @@ void main() {
       ],
     );
     addTearDown(router.dispose);
-    // 有措施提示卡時內容多一張卡，加高避免表單被擠出畫面。
     tester.view.physicalSize = Size(
       800,
       measures.isEmpty && openingReasons.isEmpty ? 1600 : 2000,
@@ -254,7 +252,6 @@ void main() {
         tester.getTopLeft(notice).dy,
         lessThan(tester.getTopLeft(find.text('品牌身份')).dy),
       );
-      // 共用的入口列（button semantics），整張卡都是點擊範圍。
       final row = find.ancestor(of: notice, matching: find.byType(OptionRow));
       expect(row, findsOneWidget);
       expect(tester.getSize(row).width, greaterThan(300));
@@ -322,7 +319,6 @@ void main() {
   });
 
   group('開店可用性（GetMyStoreOpening）', () {
-    // 伺服器對各個原因給的句子（設計 §7(a)）；畫面必須原樣顯示它，client 的程式碼沒有這張表。
     const reason = StoreOpeningUnavailableReason.values;
     final terminated = reason.firstWhere((r) => r.name.endsWith('_TERMINATED'));
     final suspended = reason.firstWhere((r) => r.name.endsWith('_SUSPENDED'));
@@ -573,7 +569,6 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    // 條款重讀還沒回來：勾選框停用、不能送出，不會拿舊版本去送。
     expect(find.text('條款已更新，請重新閱讀後再勾選。'), findsOneWidget);
     expect(
       tester

@@ -1,20 +1,8 @@
--- catalog 模組的 desired state（Atlas）。改完在 backend/ 執行 `make atlas-diff module=catalog name=<名稱>`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式與複合型別放 db/objects.sql
--- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（catalog.<表>），不建跨 schema 的 FK；實體（分類、商品、SKU）的主鍵是應用層產生的 UUIDv7、不設 DEFAULT
--- （ADR 2026-09-25-row-identity-by-data-kind）；值的集合（選項值、hashtag、圖片引用）沒有自己的 ID。
--- 時間一律 timestamptz（UTC）；店家用業務鍵 store_id（沒有 FK：它屬於 seller）。金額是新台幣元的整數。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA catalog;
 
--- 平台分類樹：兩層（頂層分組與葉節點），由 migration 的版本化種子定義，沒有執行期寫入。商品只能掛葉節點（寫入端以
--- 「沒有子節點」檢查；分類只在 migration 變動，所以沒有並行新增子節點的競爭）。名稱是 LocalizedText（多語 ADR D5）：
--- JSONB 物件，必有非空的 zh-TW，en 缺時顯示退回 zh-TW。shopify_taxonomy_id 是對外對照（Shopify Standard Product Taxonomy），
--- 葉節點必填、頂層為空；升版只更新對照欄，不動內部 ID。
 CREATE TABLE catalog.categories (
     id                  UUID    PRIMARY KEY,
     parent_id           UUID    REFERENCES catalog.categories (id),
@@ -34,17 +22,6 @@ CREATE UNIQUE INDEX categories_shopify_taxonomy_key ON catalog.categories (shopi
 CREATE UNIQUE INDEX categories_sibling_name_key ON catalog.categories (COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::uuid), (name ->> 'zh-TW'));
 CREATE INDEX categories_parent_idx ON catalog.categories (parent_id, position);
 
--- 商品：draft／active／archived 由賣家切換，不預審；刪除是另一個動作（deleted_at，列保留給訂單與評價引用）。
--- 可見性還要 AND 店家可曝光（join seller.pub_exposable_stores）與沒有有效限制措施，不寫進這裡。
--- min_price／max_price 是 SKU 價格區間的反正規化，在 SKU 寫入的同 transaction 重算。
--- 銷量、收藏數、評分與則數是反正規化的計數：由事實擁有者在同 transaction 更新或傳絕對值，不用 ±1。
--- description 是結構化區塊的 JSON 陣列，結構與長度由寫入端驗證。searchable_text 由寫入端組（名稱、描述文字、hashtag、
--- 分類英文名、選項軸與值），給 pg_trgm 搜尋（公開搜尋、賣家清單與後台的關鍵字共用）。
--- content_version 是樂觀鎖的版本，對外是 etag（ADR 2026-09-25-optimistic-concurrency-etag D4）：只在賣家可編輯的內容與狀態改變時加一
--- （整體修改、狀態切換）；庫存、銷量、收藏數、評分與價格區間的重算不改它，所以調整庫存或下單不會讓編輯中的表單衝突。
--- low_stock_threshold 是賣家設的低庫存提醒門檻（每個 SKU 庫存大於 0 且小於或等於它就偏低），空表示用平台預設值（程式常數 5）。
--- request_id 與 request_hash 是建立的冪等：同一家店以同一個 request_id 重送只建立一次，request_hash 是請求內容的雜湊，不同內容回錯；
--- 兩者永久保存（跟著商品列），一起有值或一起為空。
 CREATE TABLE catalog.products (
     id                 UUID             PRIMARY KEY,
     store_id           BIGINT           NOT NULL,
@@ -87,7 +64,6 @@ CREATE UNIQUE INDEX products_request_key ON catalog.products (store_id, request_
 CREATE INDEX products_search_idx ON catalog.products USING gin (searchable_text public.gin_trgm_ops) WHERE deleted_at IS NULL;
 CREATE INDEX products_public_sales_idx ON catalog.products (sales_count DESC, id DESC) WHERE deleted_at IS NULL AND status = 'ACTIVE';
 
--- 選項軸：每個商品 0–2 個，position 是軸的順序。軸的名稱與值都是賣家的字，不翻譯。
 CREATE TABLE catalog.product_option_axes (
     product_id UUID    NOT NULL REFERENCES catalog.products (id),
     position   INTEGER NOT NULL,
@@ -98,7 +74,6 @@ CREATE TABLE catalog.product_option_axes (
     UNIQUE (product_id, name)
 );
 
--- 軸上的有序值；同一軸內值不重複（主鍵），順序是 position。
 CREATE TABLE catalog.product_option_values (
     product_id    UUID    NOT NULL,
     axis_position INTEGER NOT NULL,
@@ -111,9 +86,6 @@ CREATE TABLE catalog.product_option_values (
     UNIQUE (product_id, axis_position, position) DEFERRABLE INITIALLY DEFERRED
 );
 
--- SKU：選項值的組合；沒有選項軸的商品只有一個 option1 與 option2 都為空的預設 SKU。價格是新台幣元；
--- compare_at_price 是原價，要大於售價。stock_qty 只由 stock 的條件式扣減與歸還改，不為負。刪除是 deleted_at（訂單的快照仍指向它）。
--- 組合是否落在商品的選項值內由寫入端在鎖住商品列的 transaction 內驗證。
 CREATE TABLE catalog.product_skus (
     id               UUID        PRIMARY KEY,
     product_id       UUID        NOT NULL REFERENCES catalog.products (id),
@@ -134,10 +106,6 @@ CREATE TABLE catalog.product_skus (
 CREATE UNIQUE INDEX skus_combination_key ON catalog.product_skus (product_id, COALESCE(option1_value, ''), COALESCE(option2_value, '')) WHERE deleted_at IS NULL;
 CREATE INDEX skus_product_idx ON catalog.product_skus (product_id) WHERE deleted_at IS NULL;
 
--- 庫存操作：一次扣減、歸還、賣家調整或賣家設定是一列。冪等鍵在各自的範圍內唯一：結帳的扣減與歸還沒有店家（store_id 為空），鍵全域唯一；
--- 賣家調整記下店家，鍵只在該店家內唯一，兩家店可以用同一個鍵，也探不到彼此的鍵。同一個範圍內併發或重送同一個鍵只生效一次。
--- 賣家的調整與設定（ADJUST、SET）記下請求內容的雜湊（request_hash），同一個鍵以不同內容重送時比對它；SET 的 movement 是設定當下的差額。
--- 歸還指向它歸還的那次扣減（deduct_operation_id），每個 SKU 的累計歸還量不得超過原扣減量（寫入端在鎖住原扣減列後檢查）。
 CREATE TABLE catalog.stock_operations (
     id                  UUID        PRIMARY KEY,
     idempotency_key     TEXT        NOT NULL,
@@ -157,7 +125,6 @@ CREATE UNIQUE INDEX stock_operations_global_key ON catalog.stock_operations (ide
 CREATE UNIQUE INDEX stock_operations_store_key ON catalog.stock_operations (store_id, idempotency_key) WHERE store_id IS NOT NULL;
 CREATE INDEX stock_operations_deduct_idx ON catalog.stock_operations (deduct_operation_id) WHERE deduct_operation_id IS NOT NULL;
 
--- 庫存異動明細：delta 是有號的變動量（扣減為負、歸還為正）；帳本只增不改，是庫存稽核的依據。
 CREATE TABLE catalog.stock_movements (
     operation_id UUID    NOT NULL REFERENCES catalog.stock_operations (id),
     sku_id       UUID    NOT NULL REFERENCES catalog.product_skus (id),
@@ -168,9 +135,6 @@ CREATE TABLE catalog.stock_movements (
 
 CREATE INDEX stock_movements_sku_idx ON catalog.stock_movements (sku_id);
 
--- 商品與描述的圖片引用：只存在擁有者的表（媒體 ADR 2026-10-03）；儲存時 Confirm、移除時同 transaction MarkDeleted。
--- kind 區分主圖庫（gallery）與描述裡的圖片區塊（description，描述 JSON 以 asset_id 指向這裡）。
--- DB 只存 key（API 回 Image，ADR 2026-09-25-api-image-uri-template）。
 CREATE TABLE catalog.product_images (
     product_id UUID    NOT NULL REFERENCES catalog.products (id),
     kind       TEXT    NOT NULL,
@@ -185,8 +149,6 @@ CREATE TABLE catalog.product_images (
     UNIQUE (product_id, asset_id)
 );
 
--- hashtag是商品上的值集合，沒有實體表：name 是正規化名稱（比對與去重），display_name 是顯示樣子。
--- 熱門與自動完成由查詢聚合；搜尋與自動完成的索引（pg_trgm）隨搜尋的查詢一起加。
 CREATE TABLE catalog.product_hashtags (
     product_id   UUID    NOT NULL REFERENCES catalog.products (id),
     name         TEXT    NOT NULL,
@@ -198,19 +160,12 @@ CREATE TABLE catalog.product_hashtags (
 );
 
 
--- 銷量累計的去重：訂單編號是 order.sales.accumulated 事件的自然鍵，同一筆訂單只累計一次。
--- 必要條件：Java order 以 MQ 送出事件，會重送，直到 ordering 搬進單體（B8）改成同 transaction 呼叫；那時這張表退場。
 CREATE TABLE catalog.sales_orders (
     order_no    TEXT        PRIMARY KEY,
     recorded_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT sales_orders_no_check CHECK (char_length(order_no) >= 1 AND char_length(order_no) <= 200)
 );
 
--- 補貨通知佇列（D26，transactional outbox 的 polling publisher）：一個 SKU 同時最多一列待通知的請求。
--- 必要條件：通知 port（buyer FanOut）不能在寫庫存的 transaction 內呼叫（單體規則 5），又不能因 crash 或下游失敗而漏掉；
--- 所以同 transaction 寫佇列列，由週期 worker 認領後在 transaction 外通知。due_at 是最早可處理的時間（合併短時間內反覆的轉換，也讓賣家來得及改正）；
--- requested_at 是最近一次請求的時間：列被認領處理中又來新轉換時只改 requested_at，worker 完成時比對它，變了就重新排而不是刪（轉換不會遺失）；
--- claimed_until 是認領的租約（crash 後租約到期即重新處理）；attempts、last_error 記失敗；failed_at 非空表示超過重試上限而停手（列保留供查，下一次新請求會重置）。
 CREATE TABLE catalog.restock_queue (
     sku_id        UUID        PRIMARY KEY,
     due_at        TIMESTAMPTZ NOT NULL,
@@ -224,8 +179,6 @@ CREATE TABLE catalog.restock_queue (
 
 CREATE INDEX restock_queue_due_idx ON catalog.restock_queue (due_at) WHERE failed_at IS NULL;
 
--- 商品或 SKU 刪除後清補貨訂閱的佇列：形狀與語意同 restock_queue，worker 呼叫 PurgeSKUSubscriptions。
--- 必要條件：訂閱在 buyer，刪除的 transaction 內不能呼叫它（單體規則 4、5），也不能因 crash 而漏清。
 CREATE TABLE catalog.restock_purge_queue (
     sku_id        UUID        PRIMARY KEY,
     due_at        TIMESTAMPTZ NOT NULL,

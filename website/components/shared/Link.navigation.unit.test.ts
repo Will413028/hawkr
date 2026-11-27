@@ -59,9 +59,6 @@ vi.mock("@/lib/seller/repo", () => ({
 	fetchMyStore: vi.fn(),
 }));
 
-// Keep both real Hawkr Link layers. The framework boundary implements
-// NextLink's ordered onClick -> cancelable onNavigate -> router dispatch;
-// document navigation is suppressed so no test can leave the jsdom document.
 vi.mock("next/link", async () => {
 	const ReactModule = await import("react");
 	return {
@@ -272,9 +269,6 @@ describe("shared Link navigation recovery integration", () => {
 
 	it("keeps one deferred data wave navigable after the same pending link is tapped again", async () => {
 		const settle = await startDeferredSellerLink();
-		// The shared recovery capture listener cancels the old intent before a
-		// trusted repeat click reaches React. Model that boundary explicitly;
-		// jsdom-generated events cannot be isTrusted.
 		mocks.cancelNavigationIntent();
 		fireEvent.click(screen.getByRole("link"));
 		expect(mocks.replace).not.toHaveBeenCalled();

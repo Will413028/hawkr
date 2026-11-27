@@ -58,7 +58,6 @@ class CanonicalActionRuleParityTest {
         resolver = new AllowedActionResolver(registry, new ShipmentStatusMapper());
     }
 
-    // ==================== 讀寫共用（parity） ====================
 
     @Test
     @DisplayName("超商單在 920＋標籤成功時：契約說 handover 可用，require 也放行")
@@ -68,21 +67,17 @@ class CanonicalActionRuleParityTest {
         assertThat(availability(ready, FulfillmentAction.HANDOVER).enabled())
                 .as("920 + 4103 是唯一該按確認出貨的狀態")
                 .isTrue();
-        resolver.require(FulfillmentAction.HANDOVER, ready);   // 不得拋
+        resolver.require(FulfillmentAction.HANDOVER, ready);
     }
 
     @Test
     @DisplayName("契約說不可用時，執行面用同一個碼 deterministic reject（不是 silent no-op）")
     void rejectsWhatTheContractSaysIsDisabled() {
-        // 標籤還沒成功 ⇒ 沒有交貨便代碼可交寄
         ShipmentEntity noLabel = cvsShipment(ShippingStatus.CVS_CODE_RECEIVED, LabelPrintStatus.NONE);
 
         ActionAvailability contract = availability(noLabel, FulfillmentAction.HANDOVER);
         assertThat(contract.enabled()).isFalse();
 
-        // 🔴 期望值**硬寫字面碼**，不是 contract.disabledReasonCode()。
-        //    resolve 與 require 共用同一支 evaluate ⇒ 拿 contract 的值當期望值恆真、零鑑別力
-        //    （那是「期望值來自被測物」的形狀）。硬寫字面值才抓得到「兩邊一起改錯」。
         assertThat(contract.disabledReasonCode())
                 .as("契約對『920 但標籤未成功』的碼")
                 .isEqualTo(GrpcResponseCode.SHIPMENT_HANDOVER_NOT_ALLOWED.code());
@@ -106,9 +101,6 @@ class CanonicalActionRuleParityTest {
     @Test
     @DisplayName("已取消（終態）的單不得再列印——契約與端點都要拒絕")
     void cancelledShipmentCannotPrintLabel() {
-        // 🔴 PRINT_LABEL 的 stateGate 原本**完全不看配送狀態**：
-        //    一張已取消、label_print_status=4104 的單，契約會算出 enabled=true，
-        //    而 printCvsLabel 也沒有任何 status 檢查 ⇒ CAS 4104→4102 成功、真的打到 provider。
         ShipmentEntity cancelled = cvsShipment(ShippingStatus.CANCELLED, LabelPrintStatus.FAILED);
 
         ActionAvailability contract = availability(cancelled, FulfillmentAction.PRINT_LABEL);
@@ -134,7 +126,6 @@ class CanonicalActionRuleParityTest {
         assertThat(availability(retryable, FulfillmentAction.PRINT_LABEL).enabled()).isTrue();
     }
 
-    // ==================== provider 維度（BLOCKER 2） ====================
 
     @Test
     @DisplayName("超商單不得有可按的 dispatch——它的 href 指向黑貓端點")
@@ -156,7 +147,6 @@ class CanonicalActionRuleParityTest {
         assertThat(availability(home, FulfillmentAction.DISPATCH).enabled()).isTrue();
     }
 
-    // ==================== actor 維度（BLOCKER 2） ====================
 
     @Test
     @DisplayName("每個動作都帶得出 actor，且賣家動作不得標成買家")
@@ -168,18 +158,13 @@ class CanonicalActionRuleParityTest {
         assertThat(actions).allSatisfy(a ->
                 assertThat(a.actorAccountTypes()).as("action=" + a.action()).isNotEmpty());
 
-        // 🔴 期望值一律硬寫字面值，不呼叫 FulfillmentActionPolicy——那會讓斷言跟著被測物一起變。
-        assertThat(actorOf(actions, FulfillmentAction.HANDOVER)).containsExactly("2");     // 僅賣家
-        assertThat(actorOf(actions, FulfillmentAction.PRINT_LABEL)).containsExactly("2");  // 僅賣家
-        assertThat(actorOf(actions, FulfillmentAction.DISPATCH)).containsExactly("2");     // 僅賣家
-        // 🔴 唯讀動作是**雙身分**：買賣家都能做，只是 gateway 依 viewer 給不同 href。
-        //    先前宣告成單一 BUYER，於是 gateway 只能拿自己的路由表 key 當資格判定
-        //    ⇒ 領域這份宣告是死的，形成兩份 SSOT（R4）。
+        assertThat(actorOf(actions, FulfillmentAction.HANDOVER)).containsExactly("2");
+        assertThat(actorOf(actions, FulfillmentAction.PRINT_LABEL)).containsExactly("2");
+        assertThat(actorOf(actions, FulfillmentAction.DISPATCH)).containsExactly("2");
         assertThat(actorOf(actions, FulfillmentAction.TRACK)).containsExactly("1", "2");
         assertThat(actorOf(actions, FulfillmentAction.VIEW_ONLY)).containsExactly("1", "2");
     }
 
-    // ==================== 真正的 write path（M4 的鑑別力來源） ====================
 
     /**
      * 🔴 <b>上面那些測試直接呼叫 {@code resolver.require(...)}，因此對
@@ -190,7 +175,6 @@ class CanonicalActionRuleParityTest {
     @Test
     @DisplayName("write path：契約說 handover 不可用時，confirmCvsShipment 必須用同一個碼拒絕")
     void confirmCvsShipmentRejectsIllegalHandover() {
-        // 921 已確認出貨 → 再按一次確認出貨（契約：920 才是唯一合法起點）
         ShipmentEntity alreadyConfirmed =
                 cvsShipment(ShippingStatus.IN_TRANSIT, LabelPrintStatus.SUCCEEDED);
         ShippingService service = serviceWith(alreadyConfirmed);
@@ -216,7 +200,6 @@ class CanonicalActionRuleParityTest {
                 .isInstanceOf(ShippingBusinessException.class);
     }
 
-    // ==================== helpers ====================
 
     /**
      * 組一個只餵得出指定配送單的 {@link ShippingService}。

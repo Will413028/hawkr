@@ -57,29 +57,24 @@ class CategoryScreen extends ConsumerStatefulWidget {
 
 class _CategoryScreenState extends ConsumerState<CategoryScreen>
     with TopBarProvider {
-  // Category tree
   List<Category> _l1Categories = [];
   Set<String> _selectedCategoryIds = <String>{};
   List<String> _popularHashtags = const [];
   List<MarketSellerPreview> _recommendedSellers = const [];
   _MarketStoryTab _storyTab = _MarketStoryTab.recommended;
 
-  // Products
   List<ProductItem> _products = [];
   int _total = 0;
   int _page = 1;
   bool _hasMore = true;
 
-  // Loading
   bool _loadingCategories = true;
   bool _loadingProducts = false;
 
-  // Web /public/products filter contract.
   String _keyword = '';
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _searchDebounce;
 
-  // Sort / price range.
   String _sortBy = '';
   Set<String> _selectedHashtags = <String>{};
   String _priceMin = '';
@@ -88,12 +83,10 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
   final TextEditingController _priceMinCtrl = TextEditingController();
   final TextEditingController _priceMaxCtrl = TextEditingController();
 
-  // Ignore stale responses when a user changes filters quickly.
   int _productRequestEpoch = 0;
 
   final ScrollController _productScrollCtrl = ScrollController();
 
-  // ─── Lifecycle ─────────────────────────────────────
 
   @override
   void initState() {
@@ -141,14 +134,12 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     super.dispose();
   }
 
-  // ─── Top bar (TopBarProvider) ──────────────────────
 
   @override
   PreferredSizeWidget buildTopBar(BuildContext context) {
     return buildMainTopBar(context);
   }
 
-  // ─── Data loading ─────────────────────────────────
 
   Future<void> _loadCategories() async {
     try {
@@ -175,8 +166,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
       if (!mounted) return;
       setState(() => _popularHashtags = values);
     } catch (error) {
-      // Hashtags are an optional enhancement. A transient failure must not
-      // block the product list or the rest of the filters.
       HKLog.logE('[CategoryScreen] _loadPopularHashtags error: $error', error);
     }
   }
@@ -189,8 +178,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
       if (!mounted) return;
       setState(() => _recommendedSellers = sellers);
     } catch (error) {
-      // The seller rail is independent. Keep product
-      // discovery usable when the recommendation call fails.
       HKLog.logE(
         '[CategoryScreen] _loadRecommendedSellers error: $error',
         error,
@@ -257,7 +244,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
         ),
       );
 
-      // GA4: view_item_list — fired once per loaded page, not on every rebuild
       if (result.records.isNotEmpty) {
         final listId =
             'category_${_selectedCategoryId ?? widget.initialType ?? 'all'}';
@@ -514,7 +500,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     if (selected.sort != null) _setSort(selected.sort!);
   }
 
-  // ─── Build ────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -1905,9 +1890,6 @@ class _MarketSortSheet extends StatelessWidget {
                     const SizedBox(height: HkSpace.sm),
                     Wrap(
                       key: const ValueKey('market-browse-options'),
-                      // 與同一張表單裡的其他選擇列一致（hashtag 都是 sm），
-                      // 也對齊網頁的 --hkui-filter-gap-sm。4px 在 32px 膠囊之間
-                      // 會讀成整排黏在一起。
                       spacing: HkSpace.sm,
                       runSpacing: HkSpace.sm,
                       children: [

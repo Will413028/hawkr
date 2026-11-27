@@ -91,8 +91,6 @@ export function setTextScale(scale: TextScale): void {
 	try {
 		localStorage.setItem(TEXT_SCALE_STORAGE_KEY, scale);
 	} catch {
-		// Private mode / storage disabled: the attribute still applies for this
-		// page view, it just will not survive a reload.
 	}
 	window.dispatchEvent(new CustomEvent(TEXT_SCALE_EVENT, { detail: scale }));
 }
@@ -106,7 +104,6 @@ export function nextTextScale(scale: TextScale): TextScale {
 
 function subscribe(onStoreChange: () => void): () => void {
 	window.addEventListener(TEXT_SCALE_EVENT, onStoreChange);
-	// Cross-tab: another tab wrote the key, so re-read (and re-apply) here.
 	window.addEventListener("storage", onStoreChange);
 	return () => {
 		window.removeEventListener(TEXT_SCALE_EVENT, onStoreChange);

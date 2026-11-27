@@ -47,10 +47,8 @@ func StoreExposable(at time.Time, storeID IntegerExpression) BoolExpression {
 	return pubsql.SellerExposableStoresHasStoreID(TimestampzT(at), storeID)
 }
 
-// anonymous 回報觀看者是不是未登入：未登入的語句不含封鎖子句。
 func (v Viewer) anonymous() bool { return v.BuyerID <= 0 }
 
-// and 把非 nil 的條件用 AND 串起來；全是 nil 時回 TRUE。nil 表示「這個觀看者沒有這條規則」（匿名沒有封鎖）。
 func and(parts ...BoolExpression) BoolExpression {
 	var out BoolExpression
 	for _, p := range parts {
@@ -68,19 +66,14 @@ func and(parts ...BoolExpression) BoolExpression {
 	return out
 }
 
-// storeBlocked 是 blocker 此刻封鎖了店 store：buyer.pub_blocked_stores() 的 EXISTS，走主鍵 (blocker_buyer_id, store_id)。
-// 子查詢內的 store_id 是 pub_blocked_stores() 的欄位；blocker 與 store 可以是常數或外層的列。
 func storeBlocked(blocker IntegerExpression, store IntegerExpression) BoolExpression {
 	return pubsql.BuyerBlockedStoresHasBlockerBuyerID(blocker, IntegerColumn("store_id").EQ(store))
 }
 
-// buyerBlocked 是 blocker 此刻封鎖了買家 blocked：buyer.pub_blocked_buyers() 的 EXISTS，走主鍵 (blocker_buyer_id, blocked_buyer_id)。
-// 子查詢內的 blocked_buyer_id 是 pub_blocked_buyers() 的欄位。
 func buyerBlocked(blocker IntegerExpression, blocked IntegerExpression) BoolExpression {
 	return pubsql.BuyerBlockedBuyersHasBlockerBuyerID(blocker, IntegerColumn("blocked_buyer_id").EQ(blocked))
 }
 
-// storeNotBlocked 是觀看者沒有封鎖這家店；匿名是 nil（沒有這條規則）。
 func storeNotBlocked(v Viewer, storeID IntegerExpression) BoolExpression {
 	if v.anonymous() || v.SkipOwnBlocks {
 		return nil
@@ -88,8 +81,6 @@ func storeNotBlocked(v Viewer, storeID IntegerExpression) BoolExpression {
 	return NOT(storeBlocked(Int64(v.BuyerID), storeID))
 }
 
-// authorAdmitted 是內容的作者沒被觀看者的封鎖排除：作者是買家時，觀看者與他之間任一方向都沒有個人封鎖；店家作者不在這裡排除
-// （觀看者封鎖該店時，容器條件已經擋下整家店）。匿名是 nil。
 func authorAdmitted(v Viewer, kind ColumnString, id ColumnInteger) BoolExpression {
 	if v.anonymous() {
 		return nil
@@ -112,8 +103,6 @@ func PostPublished(p *table.PostsTable) BoolExpression {
 	return p.Status.EQ(NewEnumValue("PUBLISHED")).AND(p.DeletedAt.IS_NULL())
 }
 
-// postNotTakenDown 是貼文沒有被內容下架：social.content_takedowns（seller 措施的複本，訂閱者同 transaction 維護）沒有這篇貼文的列。
-// 貼文沒有計入旗標，所以直接探測複本，走 content_takedowns_post。貼文底下的留言與討論區以外的內容跟著貼文：讀取留言要求貼文是 Posts 入口讀得到的。
 func postNotTakenDown(p *table.PostsTable) BoolExpression {
 	t := table.ContentTakedowns.AS("td")
 	return NOT(EXISTS(SELECT(t.PostID).FROM(t).WHERE(t.PostID.EQ(p.ID))))
@@ -144,15 +133,11 @@ func ReadableForum(at time.Time, v Viewer, storeID IntegerExpression) BoolExpres
 	return and(StoreExposable(at, storeID), storeNotBlocked(v, storeID))
 }
 
-// hidden 是「有未還原的隱藏」的子查詢；target 選 comment_id 或 forum_entry_id。只給 CommentIsHidden 這類要看隱藏本身的讀取；
-// 內容是否可見、是否計入看旗標，不重新求值隱藏。
 func hidden(target func(*table.HidesTable) ColumnString, id StringExpression) BoolExpression {
 	h := table.Hides.AS("h")
 	return EXISTS(SELECT(h.ID).FROM(h).WHERE(target(h).EQ(id).AND(h.RestoredAt.IS_NULL())))
 }
 
-// authorInactive：作者是買家而且在 inactive_authors（買家刪帳的事實的複本）。只用在佔位項目的 state（DELETED 或 HIDDEN），
-// 只對輸出的頁內的列求值。把「作者是買家」放進子查詢，外層才是 semi-join。
 func authorInactive(kind ColumnString, id ColumnInteger) BoolExpression {
 	ia := table.InactiveAuthors.AS("ia")
 	return EXISTS(SELECT(ia.BuyerID).FROM(ia).WHERE(ia.BuyerID.EQ(id).AND(kind.EQ(NewEnumValue("BUYER")))))

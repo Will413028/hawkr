@@ -20,17 +20,14 @@ public class SellerShipmentSettingEntity {
     private String shippingType;
     private String goodsType;
 
-    // 寄件人/退貨聯絡人資訊（宅配+超商共用）
     private String senderName;
     private String senderPhone;
 
-    // 宅配專用：寄件地址
     private String senderCity;
     private String senderDistrict;
     private String senderAddressDetail;
     private String senderPostalCode;
 
-    // 宅配專用：退貨地址（目前與寄件地址共同維護）
     private String returnName;
     private String returnPhone;
     private String returnCity;
@@ -38,7 +35,6 @@ public class SellerShipmentSettingEntity {
     private String returnAddressDetail;
     private String returnPostalCode;
 
-    // 超商專用：退貨門市
     private String returnStoreCode;
     private String returnStoreName;
     private String returnStoreAddress;
@@ -47,7 +43,6 @@ public class SellerShipmentSettingEntity {
     private String merId;
     private String partnerId;
     private String eshipId;
-    // PayUni 原始啟用狀態（欄位原名 setStatus，遵循 docs/開發規範/PayUni 錯誤回應收斂規範.md §4.1 改名）
     private String providerStatus;
     private String providerMessage;
     private String onboardingStatus;

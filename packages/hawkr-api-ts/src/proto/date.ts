@@ -8,7 +8,7 @@ export function parseDate(value: string): CalendarDate | undefined {
 	const match = ISO_DATE.exec(value);
 	if (!match) return undefined;
 	const year = Number(match[1]);
-	if (year < 1) return undefined; // google.type.Date 的 year 0 是「沒有年份」，不是 0000 年
+	if (year < 1) return undefined;
 	const month = Number(match[2]);
 	const day = Number(match[3]);
 	const check = new Date(0);

@@ -92,7 +92,6 @@ test("已等候天數：現在減提出時間的完整天數，剛好 24 小時�
 });
 
 test("已等候天數不用台北日期相減：23:59 提出、隔天早上仍是 0 天", () => {
-	// 台北 2026-10-10 23:59 = 15:59Z；隔天（台北 10-11）08:00 = 00:00Z+1。
 	const submit = new Date("2026-10-10T15:59:00Z");
 	const now = new Date("2026-10-11T00:00:00Z");
 	assert.equal(waitingDays(submit, now), 0);
@@ -167,7 +166,6 @@ test("請求種類與狀態的文字（共用目錄的後台員工受眾）；UN
 		text(MeasureRequestKind.APPEAL, 99 as MeasureRequestState),
 		"未知",
 	);
-	// 不認得的種類（新版伺服器才有的值）用目錄 other 的文字，不當成申覆或解除請求。
 	assert.equal(
 		text(99 as MeasureRequestKind, MeasureRequestState.PENDING),
 		"請求待裁定",

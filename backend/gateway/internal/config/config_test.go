@@ -26,8 +26,6 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestConfig_LoadDefaults(t *testing.T) {
-	// Load() calls Validate().
-	// We test defaults by constructing a Config directly and checking zero-value fields.
 	cfg := &Config{
 		Env:         "development",
 		Port:        "9900",

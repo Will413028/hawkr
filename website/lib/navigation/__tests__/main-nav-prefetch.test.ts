@@ -221,8 +221,6 @@ describe("main nav intent prefetch coordinator", () => {
 		await startIdle();
 		idleCallback?.();
 
-		// Focus owns the first destination; its pending idle timer must still
-		// advance to the remaining routes without issuing a duplicate request.
 		intent("/", "focus", "/feed");
 		await vi.advanceTimersByTimeAsync(1_000);
 

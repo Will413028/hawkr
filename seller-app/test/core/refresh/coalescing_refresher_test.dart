@@ -47,7 +47,6 @@ void main() {
 
     rounds[0].complete(true);
     expect(await base, isTrue);
-    // 前一輪結束的同一刻，後續一輪已經開始；中間插進來的非 fresh 呼叫共用它。
     await Future<void>.delayed(Duration.zero);
     expect(rounds, hasLength(2));
     expect(refresher.isRunning, isTrue);
@@ -78,7 +77,6 @@ void main() {
   });
 
   test('後續那輪只有等它的 fresh 呼叫全部要求 settledOnly 才縮小，有一個要完整重讀就完整重讀', () async {
-    // 全部 settledOnly：縮小。
     unawaited(refresher.refresh());
     unawaited(refresher.refresh(fresh: true, settledOnly: true));
     unawaited(refresher.refresh(fresh: true, settledOnly: true));
@@ -88,7 +86,6 @@ void main() {
     rounds[1].complete(true);
     await Future<void>.delayed(Duration.zero);
 
-    // 先要求 settledOnly、後來一個完整的：完整重讀。
     settledOnlyArgs.clear();
     rounds.clear();
     unawaited(refresher.refresh());
@@ -100,7 +97,6 @@ void main() {
     rounds[1].complete(true);
     await Future<void>.delayed(Duration.zero);
 
-    // 上一個後續輪的設定不會帶到下一次。
     settledOnlyArgs.clear();
     rounds.clear();
     unawaited(refresher.refresh());
@@ -117,7 +113,6 @@ void main() {
     final first = refresher.refresh(maxAge: maxAge);
     expect(rounds, hasLength(1));
     refresher.markSucceeded();
-    // 進行中：maxAge 不影響共用。
     final joined = refresher.refresh(maxAge: maxAge);
     expect(rounds, hasLength(1));
     rounds[0].complete(true);

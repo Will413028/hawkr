@@ -32,7 +32,6 @@ describe("Switch", () => {
 		const { container } = renderWithIntl(
 			<Controlled onCheckedChange={onCheckedChange} />,
 		);
-		// role=switch 的 input 視覺上隱藏（react-aria），使用者點的是可見的軌道。
 		const control = queryRequired<HTMLElement>(
 			container,
 			"[data-slot=switch-control]",

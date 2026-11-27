@@ -13,18 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔是 ADM 工作佇列與申訴裁決寫入面的 Layer 5（§6.1.14 端點 52／53／56、
-// §6.1.15 端點 57、§6.1.16 端點 60）。
-//
-// 三條規則（與 complaint.go 同源）：
-//
-//	① **業務錯誤走 envelope、故障走 gRPC error**。GetCode() 是 Gateway 的
-//	   EnvelopeGuardInterceptor 唯一的判定依據。
-//	② **帶 data 的非零碼必須真的帶 data**：9342（取消被回絕）與 9347（重複開票）
-//	   走 §6.1.0(13) 的 preserveData，HTTP 恆 200。少了 data，前端拿不到
-//	   lastProviderCheckAt／documentId，只能顯示一句紅字。
-//	③ **長度／必填／格式是契約違規不是業務結果** ⇒ 回 InvalidArgument（400），
-//	   不借業務碼：借一個近似的碼會讓前端把「號碼格式不對」顯示成別的意思。
 
 // RetryInvoiceJobForAdmin 是 ADM 安全重試（端點 52）。
 func (s *InvoiceServer) RetryInvoiceJobForAdmin(
@@ -150,10 +138,6 @@ func (s *InvoiceServer) ReportManualResultForAdmin(
 	})
 }
 
-// jobMutation 是三支 job 端點共用的錯誤分流與回應組裝。
-//
-// 🔴 Blocked（9342）走 **HTTP 200 ＋ preserveData**：那不是錯誤，是「現在還不能取消」，
-// 而 data 帶的三個欄位就是 ADM 的下一步。把它折成 error 會讓前端只看得到一句紅字。
 func (s *InvoiceServer) jobMutation(
 	ctx context.Context, event string, run func() (usecase.JobMutationResult, error),
 ) (*pb.InvoiceJobMutationResponse, error) {
@@ -171,8 +155,6 @@ func (s *InvoiceServer) jobMutation(
 		JobId:   fmtInt64(res.JobID),
 		Status:  res.Status,
 		Version: fmtInt64(res.Version),
-		// audit_log_id 目前是 InsertInvoiceAdminAuditLog 的 rows 值而不是新列的 id
-		// （該 query 是 :execrows）。缺口登記在交付回報；此處照實帶出，不自造一個假 id。
 		AuditLogId: fmtID(res.AuditLogID),
 	}
 	if res.Blocked {
@@ -207,8 +189,6 @@ func (s *InvoiceServer) CreateManualIssuanceForAdmin(
 			return nil, st
 		}
 		if errors.Is(err, usecase.ErrIssuanceOrderSnapshotUnavailable) {
-			// 能力缺口不是業務結果：回 Unimplemented 而不是一個看起來成功的空回應，
-			// 也不借 9346（那會告訴 ADM「這個組合不合法」，而它其實合法、只是還沒接線）。
 			return nil, status.Errorf(codes.Unimplemented, "%v", err)
 		}
 		if code, msg, ok := bizOf(err); ok {
@@ -224,7 +204,6 @@ func (s *InvoiceServer) CreateManualIssuanceForAdmin(
 		AuditLogId: fmtID(res.AuditLogID),
 	}
 	if res.Duplicate {
-		// 9347 ＋ 既有 documentId（preserveData）：前端導向那一份，不是再開一張。
 		return &pb.CreateManualIssuanceForAdminResponse{
 			Code: bizcode.InvoiceDuplicate, Message: bizcode.Message(bizcode.InvoiceDuplicate), Data: data,
 		}, nil
@@ -232,10 +211,6 @@ func (s *InvoiceServer) CreateManualIssuanceForAdmin(
 	return &pb.CreateManualIssuanceForAdminResponse{Code: 0, Message: msgSuccess, Data: data}, nil
 }
 
-// manualIssuanceInput 把 proto 的三段輸入攤成 usecase 的值。
-//
-// 🔴 每一個數字都 fail-loud：strconv 失敗回 InvalidArgument 而不是零值。金額吞成 0
-// 的後果是開出一張金額錯誤的發票，而那不可回收。
 func manualIssuanceInput(actor int64, req *pb.CreateManualIssuanceForAdminRequest) (usecase.ManualIssuanceInput, error) {
 	in := usecase.ManualIssuanceInput{
 		ActorAccountID: actor,
@@ -355,11 +330,6 @@ func (s *InvoiceServer) ActOnInvoiceComplaintForAdmin(
 	}, nil
 }
 
-// toSuspensionRecommendation 把建議物件折成 proto。
-//
-// nil ⇒ 回 nil：只有 DECIDE_VIOLATION 與 RECOMMEND_SUSPENSION 會有建議，
-// 給其他三個 action 回一個 should_suspend=false 的空物件會讓 A08 誤以為「系統評估過、
-// 認為不用停權」，而實際上根本沒評估。
 func toSuspensionRecommendation(r *usecase.SuspensionRecommendation) *pb.SuspensionRecommendation {
 	if r == nil {
 		return nil
@@ -374,10 +344,6 @@ func toSuspensionRecommendation(r *usecase.SuspensionRecommendation) *pb.Suspens
 	}
 }
 
-// adminInvalidArgument 把 usecase 的型別邊界錯誤映成 400。
-//
-// 它們刻意不是 DomainError（usecase 側註解逐字）：沒有任何業務碼描述「你的字太長」
-// 或「第 3 行金額對不起來」，而 bizOf 會把 DomainError 折成 envelope 的業務碼。
 func adminInvalidArgument(err error) (error, bool) {
 	switch {
 	case errors.Is(err, usecase.ErrJobReasonRequired),
@@ -414,9 +380,6 @@ func adminInvalidArgument(err error) (error, bool) {
 	return nil, false
 }
 
-// parseSignedAmount 解析可為負的元整數（DISCOUNT 行的 net_amount 恆為負）。
-//
-// 🔴 空字串不視同 0：明細金額是必填，把缺席折成 0 會靜默開出一張少算一行的發票。
 func parseSignedAmount(s string) (int64, error) {
 	if s == "" {
 		return 0, errMissingAmount

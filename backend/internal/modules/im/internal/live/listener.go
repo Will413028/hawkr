@@ -62,9 +62,6 @@ func (p *pgConn) Alive(ctx context.Context) (time.Time, error) {
 
 func (p *pgConn) Close(ctx context.Context) { _ = p.c.Close(ctx) }
 
-// listenLoop：連線 → LISTEN → 等通知並每 AliveEvery 確認存活；任何錯誤都關連線，以指數退避加 jitter 重連。
-// 連線成功後對所有訂閱發 epoch，帶前一條連線最後確認存活的資料庫時間；第一條連線帶的是啟動時（第一次撥號之前）讀到的資料庫時間，
-// 所以在第一次 LISTEN 成功之前就開的串流也會補洞。斷線區間內的通知不會補送，所以訂閱者依游標從資料庫補洞。
 func (h *Hub) listenLoop(ctx context.Context, dial Dial) {
 	bo := &Backoff{Base: h.cfg.BackoffBase, Max: h.cfg.BackoffMax, Rand: h.cfg.Rand}
 	lastOK, ok := h.startTime(ctx, bo)
@@ -145,7 +142,6 @@ func (h *Hub) serve(ctx context.Context, c Conn, lastOK *time.Time) error {
 	}
 }
 
-// startTime 讀一次資料庫時間當作第一個補洞起點；讀不到就以同一組退避重試，直到成功或 ctx 結束（回傳 false）。
 func (h *Hub) startTime(ctx context.Context, bo *Backoff) (time.Time, bool) {
 	for ctx.Err() == nil {
 		t, err := h.streams.DatabaseNow(ctx)

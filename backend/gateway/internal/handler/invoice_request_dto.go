@@ -1,10 +1,5 @@
 package handler
 
-// 58 號《電子發票服務》§6.1 的入站 body DTO。
-//
-// 規約（§6.1.0(17)）：Request DTO 一律各自獨立即使欄位相同——共用的那一份會被任一
-// 邊加欄污染（例：端點 3 不共用 CreateBuyerInvoiceProfileRequest，setDefault 語意不同
-// 且 carrierType 不可變更）。欄位語意與值域回查 §6.2.1，本檔不複寫第二份欄位表。
 
 // CreateBuyerInvoiceProfileRequest 是端點 2 的請求 body。名稱與 §6.2.1 該 RPC 的 Request message 同名（§6.1.0(17)）；
 // 身分（buyer_id／store_id／actor_account_id）、path param 與 Idempotency-Key 不在 body 內。

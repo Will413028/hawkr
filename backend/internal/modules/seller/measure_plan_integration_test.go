@@ -19,7 +19,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// recorder 記下最後一次送出的 SQL 與參數，讓測試對「程式實際送出的查詢」做 EXPLAIN，不在測試裡另寫一份查詢。
 type recorder struct {
 	inner store.DBTX
 	sql   string
@@ -55,9 +54,6 @@ func (f *fixture) explain(t *testing.T, r *recorder) string {
 	return strings.Join(lines, "\n")
 }
 
-// seedHistory 寫入大量已結束的停權（歷史）與少量此刻生效中的停權：historical 筆已結束的認定停權、timed 筆結束時間在未來的
-// 認定停權、open 筆沒有固定期間的 RISK，另有 expiredRisk 筆已結束但沒撤銷的 RISK（仍是 ENFORCED）、revokedRisk 筆沒有固定期間但
-// 已撤銷的 RISK；每個帳號各一家店。
 func (f *fixture) seedHistory(t *testing.T, accounts, historical, timed, open, expiredRisk, revokedRisk int) {
 	t.Helper()
 	ctx := context.Background()
@@ -141,8 +137,6 @@ func TestEffectiveMeasuresReadsScaleWithTheEffectiveSetNotTheHistory(t *testing.
 			t.Errorf("EffectiveMeasuresAll 的計畫不得出現 %s（目前值只讀 measures）：\n%s", gone, plan)
 		}
 	}
-	// 已結束與已撤銷由索引排除（部分索引的條件與 Index Cond），不是讀出來再丟掉：Filter 不得出現時間或狀態。BitmapOr 上 planner 會留下
-	// `kind = ANY(...)` 的 Filter，它被兩個部分索引的條件蘊含，不會丟掉任何列。
 	if m := regexp.MustCompile(`Filter: [^\n]*(ends_at|starts_at|status)`).FindString(plan); m != "" {
 		t.Errorf("EffectiveMeasuresAll 不得以 Filter 排除已結束或已撤銷的列（%s）：\n%s", m, plan)
 	}
@@ -195,7 +189,6 @@ func TestEffectiveMeasuresReadsScaleWithTheEffectiveSetNotTheHistory(t *testing.
 	t.Logf("AccountsWithOpenPeriod：\n%s", plan)
 }
 
-// shapedMeasure 是資料集裡的一筆措施：revisions 依序是各版本的結束時間（nil 為沒有固定期間），最後一版是目前版本。
 type shapedMeasure struct {
 	name      string
 	account   int
@@ -369,8 +362,6 @@ func labelled(cases []shapedMeasure, ids []string, set map[string]bool) []string
 	return out
 }
 
-// measures 的目前值（給賣家的理由、結束時間）與 measure_revisions 裡 current_revision 那一版的快照相同，而且版本連號：
-// 目前值與歷史由同一個寫入路徑維持一致（InsertMeasure、AdvanceMeasureRevision 的單一語句）。
 func (f *fixture) assertCurrentValuesMatchHistory(t *testing.T) {
 	t.Helper()
 	if n := f.count(t, `SELECT count(*) FROM seller.measures m LEFT JOIN seller.measure_revisions r ON r.measure_id = m.id AND r.revision = m.current_revision

@@ -134,7 +134,6 @@ func (m *Service) validate(in model.AdminRoleChangeInput) (string, error) {
 	return auditreason.Required(in.Reason, "Reason")
 }
 
-// resolve 回傳已存在的管理員的 ID；不會建立管理員。
 func (m *Service) resolve(ctx context.Context, in model.AdminRoleChangeInput) (int64, error) {
 	q := m.q(ctx)
 	if in.AdminID > 0 {

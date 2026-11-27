@@ -79,15 +79,7 @@ async function gotoSellerHeader(
 		identity: { accountId: "1", roles: ["seller"] },
 		session: "identity",
 	});
-	// SellerCenterShell treats a store without a completed onboarding as an
-	// incomplete shop and redirects to onboarding, so provide the one store
-	// fixture this header gate actually needs. Registering it after the
-	// catch-all gives this exact route precedence in Playwright.
 	await mockMyStore(page, { id: "1", storeName: "測試商店" });
-	// The /seller-center server layer reads the gateway session cookie and
-	// redirects to /login when it is absent. The cookie is HttpOnly (no JS
-	// set-cookie path), so seed it directly — the e2e suite gets it from the
-	// social-login mock's Set-Cookie instead.
 	await page
 		.context()
 		.addCookies([{ name: "hk_session", value: "opaque", url: baseURL }]);
@@ -96,10 +88,8 @@ async function gotoSellerHeader(
 			try {
 				localStorage.setItem(themeKey, themeVal);
 				localStorage.setItem(roleKey, roleVal);
-				// Skip the full-screen splash so the header paints immediately.
 				sessionStorage.setItem(loaderKey, "1");
 			} catch {
-				/* private mode — boot script falls back to light/guest */
 			}
 		},
 		[
@@ -114,17 +104,12 @@ async function gotoSellerHeader(
 		waitUntil: "domcontentloaded",
 	});
 	await page.locator(".seller-header").first().waitFor({ state: "attached" });
-	// `.seller-shell` only mounts once WorkspaceAlign resolves the seller role —
-	// it is the `:has()` anchor for the pill surface overrides, so the read must
-	// wait for it or it captures the un-overridden navigation-shell surface.
 	await page.locator(".seller-shell").first().waitFor({ state: "attached" });
 	await page.evaluate(() => document.fonts.ready);
 }
 
 const VIEWPORTS = [
 	{ label: "desktop-1440", width: 1440, height: 900 },
-	// ≤960: seller-center.css hides the pill (SellerCenterShell renders its own
-	// compact mobile bar). Locks the hide.
 	{ label: "tablet-900", width: 900, height: 900 },
 ] as const;
 
@@ -246,10 +231,6 @@ test(
 	"seller header computed styles unchanged by Tailwind migration",
 	{ tag: ["@ui"] },
 	async ({ page, baseURL }, testInfo) => {
-		// The gate asserts mouse-hover affordances (lift transform, highlight) that
-		// touch devices never apply — so it is meaningful on chromium only. One
-		// baseline file can't encode both the hovered and the no-hover state, and
-		// the mobile project would always diff on `transform: none`.
 		test.skip(
 			testInfo.project.name !== "chromium",
 			"hover-state gate is mouse-only; chromium covers it",
@@ -263,10 +244,6 @@ test(
 			for (const theme of THEMES) {
 				await gotoSellerHeader(page, theme, origin);
 				await page.addStyleTag({
-					// Keep the computed-style fixture independent from dashboard
-					// content height. A classic vertical scrollbar otherwise changes
-					// the 1440px viewport into a 1425px layout viewport even though
-					// the header CSS is unchanged.
 					content:
 						"html{overflow-y:hidden!important;scrollbar-gutter:auto!important}*{transition:none!important;animation:none!important}",
 				});
@@ -276,7 +253,6 @@ test(
 					inner: await readEl(page, ".seller-header__inner", INNER),
 					brand: await readEl(page, ".seller-header__brand", BRAND),
 					nav: await readEl(page, ".seller-header__nav", NAV),
-					// /seller-center/dashboard → 賣家總覽 is the active item.
 					navItemActive: await readEl(
 						page,
 						".seller-header__nav-item.is-active",
@@ -294,9 +270,6 @@ test(
 					avatar: await readEl(page, ".seller-header__avatar", AVATAR),
 				};
 
-				// hover carries the translateY(-1px) lift + bg/colour shift on the
-				// interactive children. nav-item hover read uses a plain (non-active)
-				// item so the hover vs is-active states do not overlap.
 				const hover: Record<string, unknown> = {};
 				for (const [name, sel] of [
 					["navItem", ".seller-header__nav-item:not(.is-active)"],
@@ -305,8 +278,6 @@ test(
 				] as const) {
 					const loc = page.locator(sel).first();
 					if ((await loc.count()) === 0) continue;
-					// Hidden at this viewport (≤960 hides the pill): hover would wait out the
-					// action timeout, and the read below records the unhovered state anyway.
 					if (await loc.isVisible()) await loc.hover().catch(() => {});
 					hover[name] = await loc.evaluate((el) => {
 						const s = getComputedStyle(el as Element);

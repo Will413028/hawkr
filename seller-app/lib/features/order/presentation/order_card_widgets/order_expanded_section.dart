@@ -20,7 +20,6 @@ import '../order_status_presentation.dart';
 import 'pill_button.dart';
 import '../../../../shared/time/taipei_display.dart';
 
-// ── 上傳出貨照片，回傳 stagedToken（失敗或未上傳回傳 null） ─────────────────
 Future<String?> uploadShipmentPhoto(
   WidgetRef ref,
   BuildContext context,
@@ -42,7 +41,6 @@ Future<String?> uploadShipmentPhoto(
   return token.isNotEmpty ? token : null;
 }
 
-// ── 計算 progressStage（0~3） ──────────────────────────────────────────────
 int calcProgressStage(OrderSummary order) {
   return DeliveryStatusPresentation.fromOrder(order).progressStep;
 }
@@ -260,8 +258,6 @@ class _StatusInfoBox extends StatelessWidget {
 
   List<Widget> _buildInfoContent(BuildContext context) {
     final ss = order.shipmentStatus;
-    // 🔴 依配送方式**明確分派**。原本是 `if (isTaqbin) 宅配段` ＋ `if (!isTaqbin) 超商段`，
-    // 於是未知 / 本版未支援的配送方式會走進超商段，顯示「出貨便代碼」與「取消出貨」。
     final shipping = shippingPresentationOf(order.shippingMethod);
     final firstPhoto = order.shipmentPhotoUrls.isNotEmpty
         ? order.shipmentPhotoUrls.first
@@ -271,7 +267,6 @@ class _StatusInfoBox extends StatelessWidget {
       color: AppColors.textSecondary,
     );
 
-    // ── 宅配 ──
     if (shipping == ShippingPresentation.homeDelivery) {
       if (ss == ShippingStatus.tcatCalled.value && order.labelUrl.isNotEmpty) {
         return [
@@ -324,7 +319,6 @@ class _StatusInfoBox extends StatelessWidget {
       }
     }
 
-    // ── 超商 ──
     if (shipping == ShippingPresentation.cvsStorePickup) {
       if (order.odno.isNotEmpty && (order.statusCode ?? 0) >= 30) {
         return [
@@ -369,8 +363,6 @@ class _StatusInfoBox extends StatelessWidget {
       }
     }
 
-    // 兩段都不中（含未知 / 本版未支援的配送方式）→ provider-neutral 文案，
-    // 不出現任何物流商專屬欄位或操作。
     return [Text('訂單處理中', style: infoStyle)];
   }
 

@@ -102,7 +102,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
   bool _loadingProducts = false;
   bool _prefetchApplied = false;
 
-  // ── 初始化 ────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -139,7 +138,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
     }
   }
 
-  // ── 資料載入 ──────────────────────────────────────────────────────────────
 
   Future<void> _loadFavorites() async {
     try {
@@ -213,7 +211,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
     }
   }
 
-  // ── 收藏工具 ──────────────────────────────────────────────────────────────
 
   bool _isFavorited(Map m) {
     final raw = m['isFavorited'];
@@ -238,7 +235,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -398,7 +394,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
     final isRestockSubscribed = m['isRestockSubscribed'] == true;
     return Consumer(
       builder: (_, favoriteRef, _) {
-        // 還沒讀到共用的收藏狀態時，先用商品資料帶的 isFavorited。
         final isFav =
             sku.isNotEmpty &&
             ((favoriteId == null
@@ -439,7 +434,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
 
   static List<String> _extractImageUrls(Map<String, dynamic> m) {
     final imageUrls = <String>[];
-    // 49 §6.1 成對契約：imageKeys（objectKey 陣列）優先，imageUrls 退路。
     final images = m['imageKeys'] ?? m['imageUrls'];
     if (images is List) {
       for (final e in images) {
@@ -515,7 +509,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
 
   /// List payload 有庫存時直接使用；沒有時保持未知，進入詳情頁再載入。
   static int? _extractInventory(Map<String, dynamic> m) {
-    // ProductItem 列表層吐的是 `stock`（字串）；skus[] 才有 stockQty。
     for (final key in ['stock']) {
       final raw = m[key];
       final parsed = raw is num
@@ -540,9 +533,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
   }
 }
 
-// ---------------------------------------------------------------------------
-// MerchantShopCard — 商城商品卡
-// ---------------------------------------------------------------------------
 
 /// 商城商品卡片（水平佈局）。
 ///
@@ -572,7 +562,6 @@ class MerchantShopCard extends StatefulWidget {
     required this.isFav,
     required this.onToggleFavorite,
     this.onFavoriteChanged,
-    // PayUni #758: hashtag + listPrice 區間（從 product map 推出）
     this.hashtags = const [],
     this.listPriceMin,
     this.listPriceMax,
@@ -625,7 +614,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
   int? _loadedReviewCount;
   num? _minPrice;
   num? _maxPrice;
-  // PayUni #758: 原價區間（刪除線）+ 是否有特價
   num? _listMin;
   num? _listMax;
   bool _hasSale = false;
@@ -645,9 +633,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.sku != widget.sku) _localRestockOverride = null;
     _hydrateFromListPayload();
-    // The seller-list payload can remain stale after a successful mutation.
-    // Keep the last confirmed local value in either direction until this card
-    // is remounted or begins representing a different product.
     final localOverride = _localRestockOverride;
     if (localOverride != null) _restockSubscribed = localOverride;
   }
@@ -693,7 +678,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
     _restockSubscribed = widget.isRestockSubscribed;
   }
 
-  // ── 加入購物車 / 導航 ─────────────────────────────────────────────────────
 
   Future<void> _addToCart() async {
     if (widget.sku.isEmpty) return;
@@ -717,7 +701,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
     final ref = widget.widgetRef;
     if (ref == null || !await requireLogin(context, ref)) return;
     if (!mounted) return;
-    // 補貨通知依規格（SKU）：卡片只在單一規格時知道要訂哪一個，多規格進詳情頁選（同 _buyNow）。
     if (_grades.length != 1) {
       _navigateToDetail();
       return;
@@ -827,7 +810,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
         .then(applyResult);
   }
 
-  // ── 價格顯示 ──────────────────────────────────────────────────────────────
 
   String get _priceDisplayText {
     if (_minPrice == null) {
@@ -852,7 +834,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
     return PriceDisplay.formatPriceRange(lpMin, lpMax, prefix: 'NT\$ ');
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -920,7 +901,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
                         : _buildImageSection(),
                     if (isSoldOut)
                       const Positioned(top: 6, left: 6, child: _SoldOutPill()),
-                    // PayUni #758: hashtag chip overlay（左下，僅顯示第一個）
                     if (widget.hashtags.isNotEmpty) ...[
                       Positioned(
                         left: 0,
@@ -988,7 +968,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
                   children: [
                     buildImage(),
                     const SizedBox(width: _shopCardColumnGap),
-                    // 文字區
                     Expanded(
                       child: KeyedSubtree(
                         key: const ValueKey('merchant-shop-content'),
@@ -996,7 +975,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 收藏按鈕不再撐高標題列；標題保留右側安全區。
                             SizedBox(
                               width: double.infinity,
                               child: Stack(
@@ -1041,7 +1019,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
                               ),
                             ),
                             const SizedBox(height: _shopCardSectionGap),
-                            // 評分
                             Row(
                               key: const ValueKey('merchant-shop-rating-row'),
                               mainAxisSize: MainAxisSize.min,
@@ -1335,9 +1312,6 @@ class _ShopFavoriteButtonState extends State<_ShopFavoriteButton> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// MerchantShopCardSkeleton — 商城骨架屏卡片
-// ---------------------------------------------------------------------------
 
 /// 商城商品載入期間的骨架屏佔位卡片。
 ///

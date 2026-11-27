@@ -41,8 +41,6 @@ class BuyerNavigationFrame extends ConsumerWidget {
     return AnimatedBuilder(
       animation: Listenable.merge([
         router.routeInformationProvider,
-        // The observer also notifies after imperative push/pop operations,
-        // whose top route is not reliably represented by RouteInformation.
         navigationObserver,
       ]),
       child: child,
@@ -62,7 +60,6 @@ class BuyerNavigationFrame extends ConsumerWidget {
         final showsNavigation =
             routeShowsNavigation && !navigationObserver.hasBlockingRoute;
 
-        // 停權的橫幅在每頁頂端（受限狀態頁本身不放）；橫幅吃掉狀態列的高度，頁面不再留一次。
         final showsBanner =
             restricted && uri.path != AccountRestrictedScreen.path;
         final layout = BuyerFloatingNavigationLayout(
@@ -81,12 +78,9 @@ class BuyerNavigationFrame extends ConsumerWidget {
         return Scaffold(
           key: const ValueKey('buyer-global-navigation-frame'),
           backgroundColor: AppColors.bgPrimary,
-          // 外層導覽 Scaffold 不參與鍵盤縮放，交給各頁自己的 Scaffold 處理一次，
-          // 避免與內層頁面 Scaffold 疊加造成鍵盤 inset 被算兩次（輸入框被頂高）。
           resizeToAvoidBottomInset: false,
           body: Column(
             children: [
-              // 第一格永遠是同一個 Visibility（不顯示時它自己收合成空），頁面子樹的位置不隨橫幅變動而重掛。
               Visibility(
                 visible: showsBanner,
                 child: SafeArea(
@@ -121,13 +115,8 @@ class BuyerNavigationFrame extends ConsumerWidget {
     final uri = _activeUri;
 
     if (uri.path == '/') {
-      // MainNavigationScreen owns the PageView transition. It commits
-      // currentTabProvider from onPageChanged only after the content moves, so
-      // the Navbar can never get ahead of the visible page.
       ref.read(tabSwitchRequestProvider.notifier).state = index;
     } else {
-      // 從貼文、商家或其他子頁回主分頁時，只替換 Navigator 內容；
-      // 本 Frame 與 Navbar 元件會原地保留。
       router.go('/?tab=$index');
     }
     return true;
@@ -137,8 +126,6 @@ class BuyerNavigationFrame extends ConsumerWidget {
     if (router.routerDelegate.currentConfiguration.isEmpty) {
       return router.routeInformationProvider.value.uri;
     }
-    // GoRouter's RouteMatchList.uri intentionally excludes imperative
-    // context.push() matches. Delegate.state resolves the top match instead.
     return router.routerDelegate.state.uri;
   }
 }

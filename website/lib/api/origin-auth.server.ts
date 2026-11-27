@@ -64,14 +64,9 @@ function resolveSigner(): { secret: string; ci: boolean } | null {
 	if (ci) return { secret: ci, ci: true };
 	const main = process.env.ORIGIN_AUTH_SECRET?.trim();
 	if (main) return { secret: main, ci: false };
-	// Unset ⇒ do not sign. The gateway falls back to the peer address, which is
-	// the behaviour this site had before #2264 — degraded, never broken.
 	return null;
 }
 
-// `crypto.subtle` rather than `node:crypto`: it exists in Node and
-// in the browser, so this module carries no platform-only import that a bundler
-// would have to resolve for a graph it is never executed in.
 const keyCache = new Map<string, Promise<CryptoKey>>();
 
 function hmacKey(secret: string): Promise<CryptoKey> {
@@ -148,8 +143,6 @@ export async function signOriginAuth(
 			m: input.method.toUpperCase(),
 			u: pathOf(input.url),
 		};
-		// Only meaningful for p=visitor, and the gateway rejects a p=visitor claim
-		// whose ip does not parse — so never send a placeholder.
 		if (!signer.ci && visitorIp) payload.ip = visitorIp;
 		const body = base64url(new TextEncoder().encode(JSON.stringify(payload)));
 		const mac = await crypto.subtle.sign(

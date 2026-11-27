@@ -40,45 +40,10 @@ import { ApiClientError } from "@/services/api-error";
 import ProviderDeactivateDialog from "./ProviderDeactivateDialog";
 import ProviderReactivateDialog from "./ProviderReactivateDialog";
 import ProviderRevokeDialog from "./ProviderRevokeDialog";
-// 對話框骨架（`.adm-operation-dialog*`）在共用 Dialog 自己的 Dialog.css；`.adm-operation-field*`／
-// `.adm-operation-error` 住在 `DelegatedOperations.css`（頁面級樣式表），少了這一行**不會報錯也不會轉紅**。
-// A10（audit-logs）與 A11（issuances/new）都是同樣兩份一起 import。
 import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A04（詳情）｜AMEGO 串接監控（58A §A04，端點 43 `GET .../provider_accounts/{store_id}`）。
-//
-// ## 五顆治理 CTA 都在（2026-08-31 補齊）
-//
-// 端點 44（重新測試）／45（停用）／66（恢復）／67（撤銷）在 invoice-service 都已實作
-// （`internal/grpc/provider_account.go` 的四支 `*ForAdmin` receiver 方法），Gateway 的
-// handler 與路由也齊了（`invoice_admin.go` ＋ `routes_invoice.go` 的
-// `AdminInvoiceProviderHealth`／`…Deactivate`／`…Reactivations`／`…Revocations`）
-// ⇒ 舊版那則「這一頁目前只能檢視」的告示已經過期，連同四顆缺席的按鈕一起補上。
-//
-// 58A 花了整整一節論證「恢復（66）與撤銷（67）非做不可」：`SUSPENDED` 在它們補上之前
-// **沒有任何出邊** —— 按下停用之後該賣家的 AMEGO 帳戶回不來也撤銷不了，之後每一筆訂單
-// 只能走人工開立；連帶讓 `REVOKED` 不可達，而 `uq_ipa_fingerprint` 的 partial 述詞正是
-// 靠「舊列已 REVOKED」讓賣家關店重開時綁回同一組憑證。
-//
-// ## 寫入一律走 `request()` 不走 `api.post`
-//
-// gateway 的 `middleware.RequireIdempotencyKey` 掛在整個 `/admin/invoices` 群組上，
-// POST 少了 `Idempotency-Key` header 一律 400，而 `api.post` 不收自訂 header。
-// BFF 的轉送白名單已含 `idempotency-key`（`bff-boundary.ts`）。
-//
-// ## 端點 44／66 的逾時是 130 秒不是 10 秒
-//
-// 兩支都在請求路徑上同步等 AMEGO（58A 陷阱 T10）。用預設的 10 秒，症狀是「按了說逾時，
-// 重新整理卻看到結果已經變了」——後端仍在跑而且結果會落庫。
-//
-// ## 與 58A 的欄位落差（三塊，全部是「規格有、DTO 沒有」）
-//
-// `recentHealthChecks[≤10]`／`trackBalance`／`storeName`＋`taxReviewStatus` 都不在端點 43
-// 的回應上（見 `features/invoices/types.ts` 的 `SellerProviderAccountData`）。
-// ⇒「最近檢查」與「字軌餘量」兩個 Section 本波不畫。**不是「查不到所以顯示 0」**：
-// 畫一張永遠空的卡等於告訴管理員「這個賣家沒有檢查紀錄」，而那是一句我們無從得知的話。
 
 type OpenDialog = "deactivate" | "reactivate" | "revoke" | null;
 
@@ -174,8 +139,6 @@ export default function ProviderAccountDetailPage() {
 		},
 	});
 
-	// 404 + 9330 ＝ 這個賣家尚未建立 AMEGO 串接。與列表的 `NOT_STARTED` 不衝突：
-	// 列表是全平台掃一遍所以需要一個「還沒開始」的值，單筆查一個不存在的資源就是 404。
 	const notFound =
 		isError && error instanceof ApiClientError && error.code === 9330;
 
@@ -191,8 +154,6 @@ export default function ProviderAccountDetailPage() {
 	 */
 	const routeBusinessError = (caught: unknown): boolean => {
 		if (!(caught instanceof ApiClientError)) return false;
-		// 收到回應 ⇒ 下一次按鍵是新的操作，換一把新的冪等鍵。
-		// （逾時／斷線走上面那個 return，鍵保持不變。）
 		setIdempotencyKey(createProviderIdempotencyKey());
 
 		const code = caught.code ?? 0;
@@ -207,8 +168,6 @@ export default function ProviderAccountDetailPage() {
 		}
 		if (PROVIDER_STATE_CONFLICT_CODES.has(code)) {
 			setOpenDialog(null);
-			// 🔴 **不透傳後端 message**：9336 的定版文案是申訴語境、9333 是「啟用或輪替」、
-			// 9322 是「稅務資格資料」，三句在這一頁上都是錯的（58A §A04）。
 			setBanner({ tone: "warning", text: providerConflictText(code) });
 			void refetch();
 			return true;
@@ -246,7 +205,6 @@ export default function ProviderAccountDetailPage() {
 			setCompletion(null);
 			if (routeBusinessError(caught)) return;
 			if (caught instanceof ApiClientError) {
-				// 9331／9332 是「檢查跑完了，結果是這個」，不是「檢查失敗」。
 				if (caught.code === PROVIDER_CREDENTIAL_INVALID_CODE) {
 					const requestId = (caught.data as SellerProviderAccountData | null)
 						?.lastRequestId;
@@ -345,8 +303,6 @@ export default function ProviderAccountDetailPage() {
 		onError: (caught) => {
 			if (routeBusinessError(caught)) return;
 			if (caught instanceof ApiClientError) {
-				// 恢復動作本身已經生效（狀態已推進），失敗的是重新驗證那一段
-				// ⇒ 關 dialog、把結果講清楚，而不是留在框裡叫人再送一次。
 				if (caught.code === PROVIDER_CREDENTIAL_INVALID_CODE) {
 					const requestId = (caught.data as SellerProviderAccountData | null)
 						?.lastRequestId;
@@ -407,7 +363,6 @@ export default function ProviderAccountDetailPage() {
 		reactivate.isPending ||
 		revoke.isPending;
 
-	// 治理 CTA 一律**不渲染**（不是 disabled）——58A §A04「四態．disabled」。
 	const canHealthCheck =
 		status !== "" && !HEALTH_CHECK_HIDDEN_STATUSES.has(status);
 	const canDeactivate = DEACTIVATABLE_STATUSES.has(status);
@@ -455,10 +410,7 @@ export default function ProviderAccountDetailPage() {
 					</div>
 				</div>
 				<div className="header-actions">
-					{/*
-					 * CTA 順序：撤銷**不放第一位**、停用用次要樣式、只有撤銷是 danger
-					 * （58A §A04：一顆可逆、一顆不可逆，不得並排成兩顆同權重的紅色鍵）。
-					 */}
+
 					{canHealthCheck ? (
 						<Button
 							variant="outline"
@@ -500,10 +452,7 @@ export default function ProviderAccountDetailPage() {
 							撤銷連線
 						</Button>
 					) : null}
-					{/*
-					 * A09 的唯一入口（58A §A09「進入點／導覽」）。獨立頁不是 Drawer：
-					 * 這一頁的內容是爭議時要指給人看的證據，獨立 URL 才貼得出去。
-					 */}
+
 					<Button
 						variant="outline"
 						size="sm"
@@ -535,12 +484,7 @@ export default function ProviderAccountDetailPage() {
 				</section>
 			) : (
 				<>
-					{/*
-					 * 「已完成」畫面（58A §A04：成功後不自動離開）。
-					 * `pendingOrderCount` 是**停用／撤銷之後**的計數，只在這裡出現；
-					 * dialog 內一律不顯示受影響訂單數（前端估算會與後端判定不同）。
-					 * 收到不含該欄的回應走「整列不畫」而不是印 undefined。
-					 */}
+
 					{completion ? (
 						<section className="invoice-scope-notice" role="status">
 							<MaterialSymbol name="check_circle" />
@@ -632,12 +576,7 @@ export default function ProviderAccountDetailPage() {
 										"—"
 									)}
 								</Field>
-								{/*
-								 * 這三欄標明時區（backend#3053）：切點決定哪些訂單走自動開票、
-								 * 驗證時間與憑證更新時間是賣家能不能開票的判斷依據 ——
-								 * 讀錯一小時就會把切點前後的訂單判錯。標了之後，就算未來有人
-								 * 把格式化改回本機時區也看得出來。
-								 */}
+
 								<Field label="憑證更新時間">
 									{formatTaipeiDateTime(account.credentialUpdatedAt)}
 								</Field>

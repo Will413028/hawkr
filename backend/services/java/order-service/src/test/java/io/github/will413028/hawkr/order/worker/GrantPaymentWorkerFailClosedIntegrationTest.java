@@ -81,7 +81,7 @@ class GrantPaymentWorkerFailClosedIntegrationTest {
         worker = new GrantPaymentWorker(repo, paymentGrpcClient,
                 mock(OrderRepository.class), mock(OrderEventPublisher.class),
                 mock(SellerGrpcClient.class),
-                new AfterSalesGrpcClient(factory),      // ← 真的 client，不是 mock
+                new AfterSalesGrpcClient(factory),
                 orderConfig, meterRegistry);
     }
 
@@ -105,19 +105,14 @@ class GrantPaymentWorkerFailClosedIntegrationTest {
      * next_retry_time 正確推遲，且下一次仍會重新查資格。
      */
     private void assertNoGrantAndProperlyDeferred(String situation) {
-        // (1) 一次 Payment Grant 都不能發出——這是資損防線本體
         verify(paymentGrpcClient, never()).grantPayment(anyString());
 
-        // (2) task 不得變成成功／終態
         verify(repo, never()).markGrantTaskDone(anyLong());
         verify(repo, never()).markGrantTaskManualIntervention(anyLong(), anyString());
 
-        // (3) 不得消耗業務重試額度（依賴故障不是撥款失敗；否則 aftersales 抖幾次就把
-        //     任務推進 MANUAL_INTERVENTION，變成要人工救的假故障）
         verify(repo, never()).markGrantTaskRetryScheduled(anyLong(), anyInt(), any(), anyString());
         verify(repo, never()).markGrantTaskMaxRetryReached(anyLong(), anyInt(), anyString());
 
-        // (4) next_retry_time 推遲到「無時間界 hold」的重問間隔（查不到 ⇒ 沒有可信時間界）
         ArgumentCaptor<LocalDateTime> next = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(repo).deferForPayoutHold(eq(TASK_ID), next.capture(), contains("LOOKUP_FAILED"));
         long secs = ChronoUnit.SECONDS.between(DateTimeUtils.nowUtc(), next.getValue());
@@ -125,7 +120,6 @@ class GrantPaymentWorkerFailClosedIntegrationTest {
                 situation + "：應推遲約 " + orderConfig.getPayoutHoldRecheckSeconds()
                         + " 秒（實際 " + secs + "）");
 
-        // (5) 觀測面：hold 有記帳，運維看得到卡在哪一類
         assertEquals(1.0, meterRegistry.find("hawkr_grant_payout_held")
                 .tag("reason", "LOOKUP_FAILED").counter().count());
     }

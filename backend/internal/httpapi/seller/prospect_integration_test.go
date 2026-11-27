@@ -49,7 +49,6 @@ func (f *adminFixture) getProspect(t *testing.T, id string) *adminsellerpb.Prosp
 	return resp.Msg.GetProspect()
 }
 
-// errorInfoOf 取出錯誤的 ErrorInfo；沒有時回 nil。
 func errorInfoOf(t *testing.T, err error) *errdetails.ErrorInfo {
 	t.Helper()
 	var ce *connect.Error
@@ -123,7 +122,6 @@ func TestProspectCreatePreviewMatchAndConfirmThroughTheWire(t *testing.T) {
 		t.Fatalf("preview=%v", preview.Msg)
 	}
 
-	// 撞到聯絡方式：failed_precondition、PROSPECT_MATCH_FOUND、metadata 帶相符的業者；什麼都沒寫。
 	b := newProspect("範例乙商行", email("hello@wang.example", true))
 	_, err = f.prospects.CreateProspect(ctx, connect.NewRequest(&adminsellerpb.CreateProspectRequest{Prospect: b}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "PROSPECT_MATCH_FOUND")
@@ -133,10 +131,8 @@ func TestProspectCreatePreviewMatchAndConfirmThroughTheWire(t *testing.T) {
 	if n := f.dbCountProspects(t); n != 1 {
 		t.Fatalf("撞到比對時不能寫入：%d 筆", n)
 	}
-	// 確認的 ID 沒涵蓋全部相符的業者：照樣被擋。
 	_, err = f.prospects.CreateProspect(ctx, connect.NewRequest(&adminsellerpb.CreateProspectRequest{Prospect: b, ConfirmedDistinctProspectIds: []string{"999999"}}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "PROSPECT_MATCH_FOUND")
-	// 格式不對的 ID。
 	_, err = f.prospects.CreateProspect(ctx, connect.NewRequest(&adminsellerpb.CreateProspectRequest{Prospect: b, ConfirmedDistinctProspectIds: []string{"abc"}}))
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "confirmed_distinct_prospect_ids[0]" {
 		t.Fatalf("field=%q", field)
@@ -145,15 +141,12 @@ func TestProspectCreatePreviewMatchAndConfirmThroughTheWire(t *testing.T) {
 	if confirmed.GetId() == a.GetId() || f.dbCountProspects(t) != 2 {
 		t.Fatalf("confirmed=%v", confirmed)
 	}
-	// 標記過的配對不再擋：同一個聯絡方式再建立第三家，只相符第二家以外的新業者；a 與 b 的配對已記下。
-	// 統編衝突：already_exists、PROSPECT_TAX_ID_HELD，metadata 的 prospectIds 是持有者。
 	dup := &adminsellerpb.Prospect{DisplayName: "另一家", VendorType: adminsellerpb.VendorType_VENDOR_TYPE_BUSINESS, TaxId: "22223223"}
 	_, err = f.prospects.CreateProspect(ctx, connect.NewRequest(&adminsellerpb.CreateProspectRequest{Prospect: dup}))
 	wantCode(t, err, connect.CodeAlreadyExists, "PROSPECT_TAX_ID_HELD")
 	if info := errorInfoOf(t, err); info.GetMetadata()["prospectIds"] != a.GetId() || len(info.GetMetadata()) != 1 || info.GetDomain() != "hawkr" {
 		t.Fatalf("info=%v", info)
 	}
-	// 修改撞到統編：failed_precondition，同一個 reason 與 metadata。
 	_, err = f.prospects.UpdateProspect(ctx, connect.NewRequest(&adminsellerpb.UpdateProspectRequest{
 		Prospect: &adminsellerpb.Prospect{Id: confirmed.GetId(), Etag: confirmed.GetEtag(), TaxId: "22223223"}, UpdateMask: mask("tax_id"),
 	}))
@@ -197,7 +190,6 @@ func TestUpdateProspectThroughTheWireWithImageUploads(t *testing.T) {
 		t.Fatalf("withLogo=%v", withLogo)
 	}
 
-	// 沒列進 mask：圖片沿用；etag 過期：aborted、VERSION_CONFLICT、什麼都不寫。
 	kept, err := update(&adminsellerpb.Prospect{Id: a.GetId(), Etag: withLogo.GetEtag(), DisplayName: "乙商行（再改）"}, nil, "display_name")
 	if err != nil || kept.GetLogoImage().GetUriTemplate() != wantLogo {
 		t.Fatalf("kept=%v err=%v", kept, err)
@@ -208,19 +200,16 @@ func TestUpdateProspectThroughTheWireWithImageUploads(t *testing.T) {
 		t.Fatal("過期的修改不能寫入")
 	}
 
-	// 來源網址只收 https：錯誤指到欄位；被拒絕的上傳沒有換圖。
 	_, err = update(&adminsellerpb.Prospect{Id: a.GetId(), Etag: kept.GetEtag(), CoverUpload: &adminsellerpb.ProspectImageUpload{StagedToken: "tok-cover", SourceUrl: "http://insecure.example.com"}}, nil, "cover_upload")
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "prospect.cover_upload.source_url" {
 		t.Fatalf("field=%q", field)
 	}
-	// 列了 mask 卻沒有上傳：自相矛盾。
 	_, err = update(&adminsellerpb.Prospect{Id: a.GetId(), Etag: kept.GetEtag()}, nil, "cover_upload")
 	wantCode(t, err, connect.CodeInvalidArgument, "")
 	if f.getProspect(t, a.GetId()).GetCoverImage() != nil {
 		t.Fatal("被拒絕的上傳不能換圖")
 	}
 
-	// 聯絡方式整批替換撞到其他業者：PROSPECT_MATCH_FOUND；確認不是同一家之後寫入，並且之後不再擋。
 	clash := &adminsellerpb.Prospect{Id: a.GetId(), Etag: kept.GetEtag(), Contacts: []*adminsellerpb.ProspectContact{email("jia@example.com", true), email("yi@example.com", false)}}
 	_, err = update(clash, nil, "contacts")
 	wantCode(t, err, connect.CodeFailedPrecondition, "PROSPECT_MATCH_FOUND")
@@ -231,17 +220,14 @@ func TestUpdateProspectThroughTheWireWithImageUploads(t *testing.T) {
 	if err != nil || len(replaced.GetContacts()) != 2 {
 		t.Fatalf("replaced=%v err=%v", replaced, err)
 	}
-	// 把聯絡方式清空（mask 列了、沒有值）。
 	cleared, err := update(&adminsellerpb.Prospect{Id: a.GetId(), Etag: replaced.GetEtag()}, nil, "contacts", "tax_id")
 	if err != nil || len(cleared.GetContacts()) != 0 {
 		t.Fatalf("cleared=%v err=%v", cleared, err)
 	}
-	// 沒有任何改變：etag 不變。
 	same, err := update(&adminsellerpb.Prospect{Id: a.GetId(), Etag: cleared.GetEtag(), DisplayName: cleared.GetDisplayName()}, nil, "display_name")
 	if err != nil || same.GetEtag() != cleared.GetEtag() {
 		t.Fatalf("same=%v err=%v", same, err)
 	}
-	// 輸入的值不合法：指到欄位、不當成有效值（招商進度列了 mask 卻沒有值）。
 	_, err = update(&adminsellerpb.Prospect{Id: a.GetId(), Etag: same.GetEtag()}, nil, "outreach_status")
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "prospect.outreach_status" {
 		t.Fatalf("field=%q", field)
@@ -258,7 +244,6 @@ func TestProspectArchiveRestoreMergeConvertThroughTheWire(t *testing.T) {
 	f := setupAdmin(t)
 	ctx := context.Background()
 
-	// 封存與還原：封存必帶 etag，還原不帶。
 	c := f.createProspect(t, newProspect("丙商行"))
 	_, err := f.prospects.ArchiveProspect(ctx, connect.NewRequest(&adminsellerpb.ArchiveProspectRequest{Id: c.GetId()}))
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "etag" {
@@ -270,10 +255,8 @@ func TestProspectArchiveRestoreMergeConvertThroughTheWire(t *testing.T) {
 	if err != nil || archived.Msg.GetProspect().GetStatus() != adminsellerpb.ProspectStatus_PROSPECT_STATUS_ARCHIVED {
 		t.Fatalf("archived=%v err=%v", archived, err)
 	}
-	// 封存生效後帶舊 etag 再送一次：aborted，不寫入（不推斷重送）。
 	_, err = f.prospects.ArchiveProspect(ctx, connect.NewRequest(&adminsellerpb.ArchiveProspectRequest{Id: c.GetId(), Etag: c.GetEtag()}))
 	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
-	// 帶目前的 etag 封存已封存的業者：回傳目前的業者。
 	again, err := f.prospects.ArchiveProspect(ctx, connect.NewRequest(&adminsellerpb.ArchiveProspectRequest{Id: c.GetId(), Etag: archived.Msg.GetProspect().GetEtag()}))
 	if err != nil || again.Msg.GetProspect().GetEtag() != archived.Msg.GetProspect().GetEtag() {
 		t.Fatalf("again=%v err=%v", again, err)
@@ -287,7 +270,6 @@ func TestProspectArchiveRestoreMergeConvertThroughTheWire(t *testing.T) {
 		t.Fatalf("restored=%v err=%v", restored, err)
 	}
 
-	// 合併：兩邊的 etag 都必填；過期的那一邊 aborted；成功後輸家封存、指向贏家，聯絡方式併入。
 	winner := f.createProspect(t, newProspect("贏家商行", email("win@example.com", true)))
 	loser := f.createProspect(t, &adminsellerpb.Prospect{
 		DisplayName: "輸家商行", VendorType: adminsellerpb.VendorType_VENDOR_TYPE_BUSINESS, TaxId: "22223223", Contacts: []*adminsellerpb.ProspectContact{email("lose@example.com", true)},
@@ -318,7 +300,6 @@ func TestProspectArchiveRestoreMergeConvertThroughTheWire(t *testing.T) {
 	if merged.GetId() != winner.GetId() || len(merged.GetContacts()) != 2 || merged.GetTaxId() != "22223223" || merged.GetEtag() == winner.GetEtag() {
 		t.Fatalf("merged=%v", merged)
 	}
-	// 合併生效後帶舊 etag 再送一次：aborted，不寫入。
 	_, err = merge(winner.GetEtag(), loser.GetEtag())
 	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
 	gone := f.getProspect(t, loser.GetId())
@@ -331,7 +312,6 @@ func TestProspectArchiveRestoreMergeConvertThroughTheWire(t *testing.T) {
 		t.Fatal("被合併的不能還原：沒有 reason")
 	}
 
-	// 轉成店家：etag 必填；成功後狀態與進度都是 CONVERTED；轉成之後帶舊 etag 再送是 aborted；店家被別的業者認領是 already_exists。
 	_, store := f.newSeller(t, "王記商店")
 	convert := func(id, etag string) (*adminsellerpb.Prospect, error) {
 		resp, err := f.prospects.ConvertProspect(ctx, connect.NewRequest(&adminsellerpb.ConvertProspectRequest{Id: id, StoreId: sid(store.StoreID), Etag: etag}))
@@ -406,7 +386,6 @@ func TestProspectDuplicatesPageWithoutGapsOrRepeats(t *testing.T) {
 			t.Fatalf("重複或自己對自己：%v", seen)
 		}
 	}
-	// 換了 token 的來源（別的清單的 token）不能用。
 	_, err := f.prospects.ListProspectDuplicates(ctx, connect.NewRequest(&adminsellerpb.ListProspectDuplicatesRequest{PageToken: "!!!"}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
 	taxes, err := f.prospects.ListProspectTaxIDMatches(ctx, connect.NewRequest(&adminsellerpb.ListProspectTaxIDMatchesRequest{}))
@@ -507,11 +486,9 @@ func TestProspectRequiredFieldsAreEnforced(t *testing.T) {
 		if method == nil {
 			t.Fatalf("service 沒有 %s", name)
 		}
-		// 每個 REQUIRED 的請求欄位與資源欄位（prospect.*）、聯絡方式與上傳的子欄位，各清掉一個、其餘照舊。
 		var targets []struct{ path []string }
 		walkRequired(method.Input(), nil, 0, func(path []string) { targets = append(targets, struct{ path []string }{path}) })
 		for _, target := range targets {
-			// display_name 與 vendor_type 是建立時必填（Prospect 的欄位註解）；修改只在 update_mask 選到時才用它們。
 			if name == "UpdateProspect" && slices.Contains([]string{"prospect.display_name", "prospect.vendor_type"}, joinPath(target.path)) {
 				continue
 			}
@@ -534,7 +511,6 @@ func TestProspectRequiredFieldsAreEnforced(t *testing.T) {
 	if checked < 15 {
 		t.Fatalf("只檢查了 %d 個 REQUIRED 欄位，descriptor 的走訪壞了", checked)
 	}
-	// 有效的請求照常成功（確認上面的失敗是清掉欄位造成的）。
 	if err := call(valid["GetProspect"]()); err != nil {
 		t.Fatal(err)
 	}
@@ -543,7 +519,6 @@ func TestProspectRequiredFieldsAreEnforced(t *testing.T) {
 	}
 }
 
-// walkRequired 走訪訊息的 REQUIRED 欄位（含 prospect、contacts、上傳等子訊息裡的 REQUIRED 欄位）。
 func walkRequired(md protoreflect.MessageDescriptor, prefix []string, depth int, visit func([]string)) {
 	fields := md.Fields()
 	for i := range fields.Len() {
@@ -564,7 +539,6 @@ func hasRequired(fd protoreflect.FieldDescriptor) bool {
 	return slices.Contains(behaviors, annotations.FieldBehavior_REQUIRED)
 }
 
-// clearAt 清掉路徑上的欄位；路徑經過 repeated 時清第一個元素；路徑上的訊息不存在時回 false（沒有東西可清）。
 func clearAt(m protoreflect.Message, path []string) bool {
 	fd := m.Descriptor().Fields().ByName(protoreflect.Name(path[0]))
 	if len(path) == 1 {
@@ -629,7 +603,6 @@ func TestMarkProspectsDistinctRemovesTheNameOnlyPairFromTheDuplicatesList(t *tes
 	if n != 1 || admin != f.adminID {
 		t.Fatalf("pairs=%d admin=%d", n, admin)
 	}
-	// 業者本身沒有被動到（沒有 etag 也不改版本）。
 	if got := f.getProspect(t, a.GetId()); got.GetEtag() != a.GetEtag() {
 		t.Fatalf("標記不能改業者的版本：%s → %s", a.GetEtag(), got.GetEtag())
 	}

@@ -100,8 +100,6 @@ func (c *Client) Send(ctx context.Context, e Email) error {
 	return classify(resp.StatusCode, apiErr.Name)
 }
 
-// Resend 對冪等鍵衝突回 409，以錯誤名稱區分：concurrent_idempotent_requests 是同鍵請求還在處理（暫時性）；
-// invalid_idempotent_request 是同鍵卻帶不同內容（永久，重試只會再被拒）。
 func classify(status int, name string) error {
 	detail := fmt.Sprintf("http %d %s", status, name)
 	switch {

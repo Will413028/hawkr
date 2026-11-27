@@ -29,7 +29,6 @@ void main() {
       find.byKey(const ValueKey('address-district-dropdown')),
       findsOneWidget,
     );
-    // D2：地址驗證步驟已移除，表單填完即可儲存，不再有驗證按鈕。
     expect(find.byKey(const ValueKey('address-verify-button')), findsNothing);
     expect(find.text('設為預設地址'), findsOneWidget);
     expect(find.text('取消'), findsOneWidget);
@@ -150,7 +149,6 @@ void main() {
       expect(city.selectedItem, countyByCode('63000'));
       expect(district.selectedItem, townByCode('63000040'));
       expect(district.items, contains(townByCode('63000040')));
-      // D2：欄位齊全就能儲存，不需要先經過地址驗證。
       final saveButton = tester.widget<FilledButton>(
         find.byKey(const ValueKey('address-save-button')),
       );

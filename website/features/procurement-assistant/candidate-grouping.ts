@@ -163,7 +163,6 @@ export function candidatesToToggleForSeller(group: CandidateSellerGroup): {
 	candidates: ProcurementCandidate[];
 	nextSelected: boolean;
 } {
-	// 部分勾選時往「全選」走：使用者點一個非空的框，預期是補齊而不是清空。
 	const nextSelected = sellerSelectionState(group) !== "all";
 	return {
 		candidates: group.candidates.filter((c) => c.selected !== nextSelected),

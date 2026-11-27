@@ -32,7 +32,6 @@ test.describe("footer data columns", { tag: ["@ui"] }, () => {
 			try {
 				sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 			} catch {
-				// ignore strict-mode browsers
 			}
 		});
 
@@ -52,8 +51,6 @@ test.describe("footer data columns", { tag: ["@ui"] }, () => {
 			.first();
 		await expect(categoryColumn).toBeVisible();
 
-		// Scrolling is what used to trigger the reads, so the assertion is only
-		// meaningful once the footer has actually been reached.
 		await page.evaluate(() =>
 			window.scrollTo(0, document.documentElement.scrollHeight),
 		);

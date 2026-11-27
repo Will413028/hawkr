@@ -18,8 +18,7 @@ export default async function Page(props: Props) {
 	const name = seller?.name ?? "商家";
 	return (
 		<>
-			{/* Keep exactly one semantic heading in the atomic route subtree.
-			    SellerProfileV2 renders the same visible name as a non-heading. */}
+
 			<h1 className="sr-only">{name}</h1>
 			<SellerPostsPage params={props.params} />
 		</>

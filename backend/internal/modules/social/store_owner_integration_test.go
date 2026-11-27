@@ -24,7 +24,6 @@ func storeCommentIDs(page social.CommentPage) []uuid.UUID {
 	return out
 }
 
-// listAll 走完店主留言列表的所有頁（每頁 size 筆），確認 keyset 沒有重複或漏掉。
 func (f *fixture) listAllStoreComments(t *testing.T, storeID int64, postID *uuid.UUID, unreplied bool, size int32) []uuid.UUID {
 	t.Helper()
 	var out []uuid.UUID
@@ -79,7 +78,6 @@ func TestStoreCommentsScopeAndUnreplied(t *testing.T) {
 	own := comment(post1, asStore, "店家自己的留言")
 	onPost2 := comment(post2, b(), "貼文二的留言")
 	fromForeign := comment(foreign, b(), "別家貼文的留言")
-	// 貼文下架後留言仍在店主的範圍內（店主讀自己的貼文不必公開）。
 	_, err = f.module.UnpublishPost(ctx, f.store(t, storeID), post2.ID, f.current(t, storeID, post2).Version, nil)
 	must(t, err)
 
@@ -120,7 +118,6 @@ func TestStoreCommentsScopeAndUnreplied(t *testing.T) {
 	if _, err := f.module.ListStoreComments(ctx, f.store(t, storeID), &foreignID, false, nil, 10); kindOf(err) != apperr.KindNotFound {
 		t.Errorf("別家的貼文：%v", err)
 	}
-	// 店主回覆之後，那則留言離開未回覆。
 	reply(post1, unreplied)
 	if slices.Contains(f.listAllStoreComments(t, storeID, nil, true, 50), unreplied.ID) {
 		t.Error("店主回覆後仍在未回覆")
@@ -200,7 +197,6 @@ func TestStoreSocialSummaryCountsPostsByStatus(t *testing.T) {
 	if got.Posts[social.StatusDraft] != 2 || got.Posts[social.StatusPublished] != 3 || got.Posts[social.StatusUnpublished] != 1 || got.Scheduled != 1 {
 		t.Fatalf("summary = %+v，預期 草稿 2、已發布 3、已下架 1、待發布排程 1", got)
 	}
-	// 排程被取消後不再算。
 	must(t, f.cancelSchedule(t, storeID, scheduledDraft))
 	if got = mustV[social.StoreSummary](t)(f.module.StoreSocialSummary(ctx, st)); got.Scheduled != 0 || got.Posts[social.StatusDraft] != 2 {
 		t.Fatalf("取消排程後：%+v", got)
@@ -252,7 +248,6 @@ func TestPostRequestIDReplayReturnsTheFirstResultWithoutDuplicating(t *testing.T
 		t.Fatal("沒帶 request_id 的重送各自建立")
 	}
 
-	// 貼文刪除後 request_id 仍占著：重送回原本那一篇，而它讀不到。
 	must(t, f.module.DeleteOwnPost(ctx, st, first.ID, 0))
 	if _, err := f.module.CreatePost(ctx, st, in, nil); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("刪除後重送：%v，預期 not_found", err)

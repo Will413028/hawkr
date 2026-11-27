@@ -42,11 +42,6 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-// #2744：DelegationContextValidator 自身的拒絕（S1a–S5）一律改發 9289
-// DELEGATION_INTERNAL_CONTRACT_MISMATCH，不再分散在 9260／9262。
-// DelegationContext 由 Gateway 組裝，操作者碰不到 —— 它們全是「我方組錯」，
-// 而 9260 說「你填錯了」、9262 說「你沒這個權限」，兩者都把人送去做一件
-// 不會改變任何事的工作；9262 還會讓稽核列指控一位沒做錯事的管理員。
 class ProductGrpcServiceDelegationTest {
 
     private static final long STORE_ID = 2685914682L;
@@ -148,7 +143,6 @@ class ProductGrpcServiceDelegationTest {
 
         @SuppressWarnings("unchecked")
         StreamObserver<BatchGetSellerProductsForDelegationResponse> observer = mock(StreamObserver.class);
-        // audit_log_id 刻意留空：這一跳在 RecordAuditIntentBatch 之前，S1b 對 .read 不驗
         buildService().batchGetSellerProductsForDelegation(
                 BatchGetSellerProductsForDelegationRequest.newBuilder()
                         .setStoreId(STORE_ID)
@@ -165,12 +159,6 @@ class ProductGrpcServiceDelegationTest {
         assertEquals("4", captor.getValue().getResults(0).getVersion());
         assertFalse(captor.getValue().getResults(1).getFound());
 
-        // withDetail 必須是 true，且 detail 必須真的被塞進回應。
-        //
-        // 這一跳是稽核 before_snapshot 的唯一素材來源：傳 false（或忘記 setDetail）時
-        // Gateway 會退回「只有 status」的舊形狀，於是批次下架的 before_snapshot 只有一個鍵，
-        // 而同一個操作的單筆版本存的是完整 12 欄（56 §7.2.8 讀法 8）。
-        // 那個退化**不會有任何錯誤訊號**：RPC 回 code 0、逐項結果齊全、批次照常執行成功。
         verify(productService).getProductSnapshotsForDelegation(eq(STORE_ID), any(), eq(true));
         assertTrue(captor.getValue().getResults(0).hasDetail(),
                 "found=true 的項必須帶 detail —— 它是 before_snapshot 的唯一素材來源");

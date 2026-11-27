@@ -5,19 +5,7 @@ import (
 	"testing"
 )
 
-// §4.5.8 環境 fail-closed 的鑑別力驗收。
-//
-// 這一支存在的理由：AMEGO 的**測試與正式共用同一個網域，回應也沒有任何環境標記**。
-// 設定填錯不會連不上、不會回錯誤碼、log 裡看不出來——只會靜默開出一張性質完全相反
-// 的真發票，而電子發票開出去就不可回收。⇒ 唯一擋得住它的是啟動時的斷言，而「斷言
-// 存在」本身也需要被證明，否則它就只是一段沒人執行過的 code。
-//
-// 五條驗收對應 §4.5.8 的表：#1 #2 #3 #5 在本層（啟動時），**#4 不在本層**——per-seller
-// 憑證是 runtime 從 DB 讀出來的，那是 guardEnvironment 的第二層，落點在
-// internal/client/amego。本檔不假裝涵蓋它。
 
-// baseValid 回傳一份「其餘欄位都合法」的 Config，讓每個 case 只變動它要測的那一格。
-// 不從環境變數走 Load()：那會讓測試依賴 process 級的 env 狀態，平行跑時互相污染。
 func baseValid() *Config {
 	c := &Config{Env: "dev"}
 	c.Server.HTTPPort = "10040"
@@ -56,7 +44,7 @@ func TestBaseValidConfigPasses(t *testing.T) {
 func TestValidate_RejectsRealTaxIDWhenRealInvoiceDisallowed(t *testing.T) {
 	c := baseValid()
 	c.Amego.AllowRealInvoice = false
-	c.Amego.PlatformInvoice = "45444444" // 非測試統編
+	c.Amego.PlatformInvoice = "45444444"
 	err := c.Validate()
 	if err == nil {
 		t.Fatal("ALLOW_REAL=false 配正式統編必須被擋下")
@@ -70,7 +58,7 @@ func TestValidate_RejectsRealTaxIDWhenRealInvoiceDisallowed(t *testing.T) {
 func TestValidate_RejectsTestTaxIDWhenRealInvoiceAllowed(t *testing.T) {
 	c := baseValid()
 	c.Amego.AllowRealInvoice = true
-	c.Amego.PlatformInvoice = "12345678" // ＝ TestInvoice
+	c.Amego.PlatformInvoice = "12345678"
 	err := c.Validate()
 	if err == nil {
 		t.Fatal("ALLOW_REAL=true 配測試統編必須被擋下")
@@ -114,9 +102,9 @@ func TestValidate_AllowRealIsTheGateNotEnvName(t *testing.T) {
 // 若換了基準四條全都不動，代表比較根本沒發生（例如兩邊都被當成空字串跳過）。
 func TestValidate_TestInvoiceIsActuallyTheBaseline(t *testing.T) {
 	c := baseValid()
-	c.Amego.TestInvoice = "99999999" // 換基準
+	c.Amego.TestInvoice = "99999999"
 	c.Amego.AllowRealInvoice = false
-	c.Amego.PlatformInvoice = "12345678" // 原本合法，現在不再等於基準
+	c.Amego.PlatformInvoice = "12345678"
 	if err := c.Validate(); err == nil {
 		t.Fatal("換掉 AMEGO_TEST_INVOICE 之後 #1 必須翻轉成紅；沒翻轉代表比較沒發生")
 	}
@@ -124,7 +112,7 @@ func TestValidate_TestInvoiceIsActuallyTheBaseline(t *testing.T) {
 	c2 := baseValid()
 	c2.Amego.TestInvoice = "99999999"
 	c2.Amego.AllowRealInvoice = false
-	c2.Amego.PlatformInvoice = "99999999" // 跟著新基準走 ⇒ 應該合法
+	c2.Amego.PlatformInvoice = "99999999"
 	if err := c2.Validate(); err != nil {
 		t.Fatalf("跟著新基準的設定應該合法，實際：%v", err)
 	}
@@ -139,10 +127,6 @@ func TestValidate_TaxIDsAreRequired(t *testing.T) {
 		want string
 	}{
 		{"缺 TEST_INVOICE", func(c *Config) { c.Amego.TestInvoice = "" }, "AMEGO_TEST_INVOICE"},
-		// AMEGO_PLATFORM_INVOICE 自 #3230 起是**選填**，不在本表。
-		// 它為空時必須通過 —— 由 TestValidate_PlatformInvoiceOptional_ProdCombination 守。
-		// ⚠️ AMEGO_TEST_INVOICE 仍是必填且**不可順手一起放寬**：它是下面兩條
-		// conflict 斷言的比對基準，拿掉它等於讓兩條的前提永遠不成立、守衛靜默失效。
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := baseValid()
@@ -173,7 +157,7 @@ func TestValidate_PlatformInvoiceOptional_ProdCombination(t *testing.T) {
 	c := baseValid()
 	c.Env = "prod"
 	c.Amego.AllowRealInvoice = true
-	c.Amego.PlatformInvoice = "" // 平台 issuer 尚未開通 —— 合法狀態
+	c.Amego.PlatformInvoice = ""
 
 	if err := c.Validate(); err != nil {
 		t.Fatalf("prod 的實際組合（ENV=prod ＋ AllowReal=true ＋ 平台統編為空）必須通過，實際被擋下：%v", err)
@@ -187,7 +171,6 @@ func TestValidate_PlatformInvoiceOptional_ProdCombination(t *testing.T) {
 // TestValidate_RejectsTestTaxIDWhenRealInvoiceAllowed；本測試驗的是「放寬必填之後
 // 那兩條仍然生效」，而不是重複它們。）
 func TestValidate_OptionalPlatformInvoiceDoesNotWeakenGuards(t *testing.T) {
-	// 空值 -> 通過（上一個測試已驗），但只要填了正式統編而未開放真發票，仍必須被擋
 	c := baseValid()
 	c.Amego.PlatformInvoice = "45444444"
 	c.Amego.AllowRealInvoice = false
@@ -195,10 +178,9 @@ func TestValidate_OptionalPlatformInvoiceDoesNotWeakenGuards(t *testing.T) {
 		t.Fatal("放寬必填後，方向 A（未開放真發票卻用正式統編）仍必須被擋下")
 	}
 
-	// 反向：開放真發票卻用測試統編，同樣必須被擋
 	c = baseValid()
 	c.Env = "prod"
-	c.Amego.PlatformInvoice = "12345678" // == TestInvoice
+	c.Amego.PlatformInvoice = "12345678"
 	c.Amego.AllowRealInvoice = true
 	if err := c.Validate(); err == nil {
 		t.Fatal("放寬必填後，方向 B（開放真發票卻用測試統編）仍必須被擋下")
@@ -217,7 +199,7 @@ func TestValidate_LookupKeyMustDifferFromMasterKey(t *testing.T) {
 // 就被另一個副本合法搶走 ⇒ 重複開票。編譯、測試、/metrics 全部正常。
 func TestValidate_LeaseMustExceedHTTPTimeout(t *testing.T) {
 	c := baseValid()
-	c.Schedule.IssueLeaseSeconds = 20 // 20s < 30000ms
+	c.Schedule.IssueLeaseSeconds = 20
 	err := c.Validate()
 	if err == nil {
 		t.Fatal("租約小於 issue timeout 必須被擋下")

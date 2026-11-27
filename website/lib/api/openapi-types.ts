@@ -7,7 +7,6 @@
  * snake_case survivors and are built at the call site, never typed here.
  */
 
-/* ---------- Account ---------- */
 export const ACCOUNT_TYPE = {
 	BUYER: 1,
 	SELLER: 2,
@@ -27,11 +26,8 @@ export function roleFromAccountType(t?: number | null): Role {
 	return "guest";
 }
 
-/* ---------- Post (Feed) ---------- */
 /** website view model mapped from the Connect post product message in `lib/posts/repo.ts` */
 export interface PostProductData {
-	// 64-bit TSID（> Number.MAX_SAFE_INTEGER）：api/json.ts 的 preserveBigInts 在
-	// parse 時保字串，故 canonical 型別一律 string，避免精度丟失。
 	id: string;
 	/** objectKey of the product image. */
 	imageKey: string;
@@ -58,7 +54,6 @@ export interface PostViewerState {
 export interface PostListItem {
 	/** 樂觀鎖版本；只有店主、代行讀自己的貼文時才有意義，寫入時帶回去。 */
 	etag?: string;
-	// 64-bit TSID，canonical string（見 PostProductData 註解）。
 	id: string;
 	sellerId: string;
 	/**
@@ -88,8 +83,8 @@ export interface PostListItem {
 	viewCount: number;
 	isLiked: boolean;
 	createdAt: number;
-	hiddenAt?: number; // unix；0/缺 = 未下架（僅店主讀自己的貼文時回傳）
-	hiddenReason?: string; // 平台下架原因（同上）
+	hiddenAt?: number;
+	hiddenReason?: string;
 	/** 下架這則貼文的措施 ID（只對店主；有值就是被平台下架，理由經措施讀）。 */
 	takedownMeasureId?: string;
 	/** 依觀看者的讀取才有（匿名讀取不設）：能不能留言與留言時的身分。 */
@@ -114,7 +109,6 @@ export interface PostListItem {
 
 /** website view model of post detail, mapped from the Connect post message in `lib/posts/repo.ts` */
 export interface PostDetail {
-	// 64-bit TSID，canonical string（見 PostProductData 註解）。
 	id: string;
 	sellerId: string;
 	sellerName: string;
@@ -148,7 +142,6 @@ export interface MyPostDetail extends PostDetail {
 	takedownMeasureId?: string;
 }
 
-/* ---------- Buyer profile ---------- */
 /** matches handler.BuyerLookupResponse */
 export interface BuyerInfo {
 	uid: string;
@@ -157,7 +150,6 @@ export interface BuyerInfo {
 	phone: string;
 }
 
-/* ---------- Pagination envelope ---------- */
 export interface ApiEnvelope<T> {
 	code: number;
 	data: T;

@@ -117,41 +117,27 @@ public class AfterSaleAppealService {
     @Transactional
     public String submitAppeal(Long buyerId, String caseNo, String reason,
                                 String description, List<String> evidencePhotoTokens) {
-        // 擁有權驗證（非持鎖讀；只決定「這張單是不是你的」，不決定資格）
         caseService.getCaseForBuyer(buyerId, caseNo);
 
-        // backend#3262 P0：<b>資格判定一律在持鎖之後</b>。
-        // 鎖從這一行取得、持有到 commit/rollback 為止，於是「通過 A3 的申訴」與「撥款閘門放行」
-        // 之間有了順序保證而非時間保證——閘門在放行前會探測這一列（tryLockCaseForPayoutRelease），
-        // 探不到就 fail-closed。理由與完整推導見 AfterSaleCaseMapper#selectByCaseNoForUpdate。
-        // 順序不可調換：先檢查再上鎖 ＝ 檢查通過到上鎖之間仍有窗口；
-        // 先做 media 再上鎖重檢 ＝ 交易自己跑得慢就把買家合法取得的申訴權利打掉（禁止）。
         AfterSaleCaseEntity caseEntity = caseMapper.selectByCaseNoForUpdate(caseNo);
         if (caseEntity == null) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_NOT_FOUND);
         }
 
-        // A1：前置狀態 = REJECTED 或 AUTO_COMPLETED_RETURN_PENDING_TIMEOUT(33)
-        // 2026-06-15 起 status=33 開放申訴（待寄回逾時自動關案後買家不服）
         if (!isAppealableStatus(caseEntity.getStatus())) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_APPEAL_NOT_APPEALABLE);
         }
 
-        // A2：appealState = NONE（一案一申訴）
         if (!AfterSaleAppealState.NONE.value().equals(nvl(caseEntity.getAppealState()))) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_APPEAL_ALREADY_SUBMITTED);
         }
 
-        // A3：申訴期限檢查（依前置 status 分流：60→last_rejected_at+72h；33→closed_at+72h）
-        // ⚠️ 這一刻起買家的申訴權利已確立：之後不論交易跑多久（media gRPC、DB、MQ、commit）
-        // 都不得再以「時間過了」為由拒絕它——那是把後端的慢轉嫁成買家的權利損失。
         LocalDateTime now = DateTimeUtils.nowUtc();
         LocalDateTime deadline = computeAppealDeadline(caseEntity);
         if (deadline == null || now.isAfter(deadline)) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_APPEAL_DEADLINE_EXCEEDED);
         }
 
-        // 證據照片數量上限
         int maxEvidence = properties.getAppeal().getMaxEvidenceCount();
         int tokenCount = evidencePhotoTokens == null ? 0 : evidencePhotoTokens.size();
         if (tokenCount > maxEvidence) {
@@ -159,20 +145,16 @@ public class AfterSaleAppealService {
                     String.format("申訴證據照片超過上限（最多 %d 張）", maxEvidence));
         }
 
-        // 證據先處理（TX 外呼叫 Media，但 linkImages 要進 DB 所以實際上在 TX 內；
-        // 實作上 evidenceService 會 finalize + insert 一次完成，與既有 supplementEvidence 一致）
         if (tokenCount > 0) {
             evidenceService.finalizeAndInsert(caseNo, buyerId, evidencePhotoTokens,
                     io.github.will413028.hawkr.common.utils.code.AfterSaleEvidenceType.PHOTO.value());
         }
 
-        // 樂觀鎖 CAS（同步寫入 appeal_reason / appeal_description，§10.6.6）
         int affected = caseMapper.markAppealed(caseNo, now, reason, description);
         if (affected != 1) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_CASE_UNDER_APPEAL);
         }
 
-        // INSERT appeal event
         AfterSaleAppealEventEntity event = new AfterSaleAppealEventEntity();
         event.setCaseNo(caseNo);
         event.setEventType(AfterSaleAppealEventType.APPEAL_SUBMITTED.value());
@@ -184,7 +166,6 @@ public class AfterSaleAppealService {
                 : "買家提交申訴：" + reason + "；" + description);
         appealEventMapper.insert(event);
 
-        // publish MQ（TX 內 publish，事件 best-effort）
         eventPublisher.publishAppealSubmitted(caseNo, caseEntity.getOrderNo(),
                 caseEntity.getBuyerId(), caseEntity.getStoreId(), reason);
 
@@ -299,9 +280,6 @@ public class AfterSaleAppealService {
      * </ul>
      */
     public LocalDateTime computeAppealDeadline(AfterSaleCaseEntity caseEntity) {
-        // backend#3262：規則本體移到 AppealDeadlineRules（純函式），與撥款閘門
-        // AfterSalePayoutHoldService 共用同一份——兩處各算一次的話，撥款會與買家實際
-        // 能申訴的時間錯開，而那正是本票要關的洞。
         return AppealDeadlineRules.computeDeadline(caseEntity, properties.getAppeal().getDeadlineHours());
     }
 
@@ -331,7 +309,6 @@ public class AfterSaleAppealService {
         AppealDetailForAdminResult result = new AppealDetailForAdminResult();
         result.setCaseEntity(caseEntity);
 
-        // arbitration（只有申訴過的 case 才有 events / decision）
         String appealState = caseEntity.getAppealState();
         if (appealState != null && !AfterSaleAppealState.NONE.value().equals(appealState)) {
             result.setAppealEvents(appealEventMapper.selectByCaseNoOrderByCreatedAt(caseNo));
@@ -340,7 +317,6 @@ public class AfterSaleAppealService {
             }
         }
 
-        // 最新一筆賣家 REJECT resolution（§10.6.6；reopen 已於 #1228 淘汰，單案至多一筆 REJECT）
         AfterSaleResolutionEntity latestReject = resolutionMapper.selectLatestRejectByCaseNo(
                 caseNo, AfterSaleResolutionType.REJECT.value());
         result.setLatestRejectResolution(latestReject);
@@ -348,7 +324,6 @@ public class AfterSaleAppealService {
         return result;
     }
 
-    // ==================== DTO ====================
 
     @Data
     public static class ArbitrationResult {
@@ -369,8 +344,8 @@ public class AfterSaleAppealService {
     @Data
     public static class AppealDetailForAdminResult {
         private AfterSaleCaseEntity caseEntity;
-        private List<AfterSaleAppealEventEntity> appealEvents;       // 未申訴則 null
-        private AfterSalePlatformDecisionEntity decision;             // 未裁決則 null
-        private AfterSaleResolutionEntity latestRejectResolution;     // 無 REJECT 則 null
+        private List<AfterSaleAppealEventEntity> appealEvents;
+        private AfterSalePlatformDecisionEntity decision;
+        private AfterSaleResolutionEntity latestRejectResolution;
     }
 }

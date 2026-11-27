@@ -13,7 +13,6 @@ import (
 
 const header = "西元日期,星期,是否放假,備註"
 
-// csvOf 組出 year 全年的 CSV：週六日放假，其餘上班；edit 可改單日的列（回傳新的整列文字，空字串表示整列省略）。
 func csvOf(year int, edit func(date string, line string) string) string {
 	lines := []string{header}
 	for d := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC); d.Year() == year; d = d.AddDate(0, 0, 1) {

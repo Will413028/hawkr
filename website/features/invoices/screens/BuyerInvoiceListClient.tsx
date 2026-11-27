@@ -115,8 +115,6 @@ function detailHref(documentId: string): string {
 }
 
 export default function BuyerInvoiceListClient() {
-	// 走 observed router 而不是裸 useRouter：`tests/navigation-route-contract.test.ts`
-	// 要求所有程式化導航都經過這一層（導航看門狗靠它辨識 stuck navigation）。
 	const router = useObservedRouter("buyer_invoice_documents");
 	const pathname = usePathname() ?? LIST_HREF;
 	const searchParams = useSearchParams();
@@ -136,7 +134,6 @@ export default function BuyerInvoiceListClient() {
 				if (value === null || value === "") next.delete(key);
 				else next.set(key, value);
 			}
-			// 改任一條件時 `page` 一律重設為 1，否則會停在一個不存在的頁碼。
 			if (!("page" in patch)) next.delete("page");
 			const qs = next.toString();
 			router.replace(qs ? `${pathname}?${qs}` : pathname);
@@ -163,14 +160,12 @@ export default function BuyerInvoiceListClient() {
 	} = useBuyerInvoiceDocuments(queryParams, { enabled: datesValid });
 
 	const records = result?.records ?? [];
-	// 🔴 `total` 是總筆數不是頁數：直接餵給 Pagination 會得到一個長度等於筆數的頁碼列。
 	const totalPages = result
 		? Math.max(1, Math.ceil(result.total / BUYER_DOCUMENTS_PAGE_SIZE))
 		: 1;
 	const hasFilters = Boolean(
 		dateFrom || dateTo || documentKind || documentStatus,
 	);
-	// 只有真的沒東西可顯示才換錯誤畫面；背景 refetch 失敗時保留最後一份好資料。
 	const failed = datesValid && !loading && !result;
 
 	return (
@@ -244,11 +239,7 @@ export default function BuyerInvoiceListClient() {
 							{T.loading}
 						</span>
 					) : null}
-					{/*
-					 * ≥768px 走表格、<768px 走卡片：同一份資料渲染兩份 DOM ＋ Tailwind
-					 * 斷點 `hidden`。`display:none` 讓被隱藏那份不進 accessibility tree，
-					 * 螢幕閱讀器只會讀到一組列表（§B09 Responsive）。
-					 */}
+
 					<div className="hidden overflow-x-auto md:block">
 						<table className="w-full border-collapse text-sm">
 							<caption className="sr-only">{T.tableCaption}</caption>
@@ -410,7 +401,7 @@ function DocumentRow({ item }: { item: BuyerInvoiceDocumentItem }) {
 				{dash(formatTaipeiDate(summary.issuedAt))}
 			</td>
 			<td className={TD_CLASS}>
-				{/* 🔴 完整顯示，不遮罩（58 §8.1.3(b) O 類與裁決 1）。 */}
+
 				<Link
 					className="font-semibold tabular-nums underline"
 					href={detailHref(summary.documentId)}

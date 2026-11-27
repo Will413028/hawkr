@@ -23,7 +23,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// gatedSub 逐筆交出事件：Next 阻塞到測試給下一筆，所以測試能確認「第 N 個 frame 在第 N+1 個事件產生之前就到達 client」。
 type gatedSub struct{ gate chan im.Event }
 
 func (s gatedSub) Next(ctx context.Context) (im.Event, error) {
@@ -63,7 +62,6 @@ func (chatAuth) Authenticate(context.Context, string) (identity.Authenticated, e
 	return identity.Authenticated{}, errors.New("unused")
 }
 
-// asAccount 以帳號 7 的身分執行 next（入口的 withSession 在正式環境做同一件事；assemble 的 Identity 是具體型別，測試從 service 這一層放身分）。
 func asAccount(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: 7})))
@@ -86,7 +84,6 @@ func TestChatStreamIsNotBufferedThroughTheFullMiddlewareChain(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
-	// header 要在第一個 frame 送出時就到：緩衝的中介層連 header 都等到回應結束才送。
 	transport := srv.Client().Transport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = 3 * time.Second
 	client := chatv1alpha1connect.NewChatAppServiceClient(&http.Client{Transport: transport}, srv.URL)
@@ -100,10 +97,9 @@ func TestChatStreamIsNotBufferedThroughTheFullMiddlewareChain(t *testing.T) {
 		t.Fatalf("第一個 frame 沒到：%v", st.Err())
 	}
 	for i := int64(1); i <= 3; i++ {
-		// 這個事件在上一個 frame 已被 client 收下之後才產生。
 		select {
 		case gate <- im.Event{Kind: im.EventUnread, Unread: 10 + i}:
-		case <-time.After(5 * time.Second): // 只防測試卡死
+		case <-time.After(5 * time.Second):
 			t.Fatal("來源的事件沒有被取走")
 		}
 		recvDone := make(chan bool, 1)
@@ -113,7 +109,7 @@ func TestChatStreamIsNotBufferedThroughTheFullMiddlewareChain(t *testing.T) {
 			if !ok || st.Msg().GetEvent().GetUnread().GetUnreadCount() != 10+i {
 				t.Fatalf("第 %d 個事件的 frame = %v（%v）", i, st.Msg(), st.Err())
 			}
-		case <-time.After(3 * time.Second): // 緩衝的中介層會讓 frame 一直不到
+		case <-time.After(3 * time.Second):
 			t.Fatalf("第 %d 個 frame 在下一個事件產生前沒有到達 client：中介層把串流緩衝了", i)
 		}
 	}
@@ -142,7 +138,6 @@ func TestStreamWriteDeadlineReachesTheConnectionThroughTheMiddlewareChain(t *tes
 		var res result
 		res.set = set(time.Now().Add(-time.Second))
 		w.Header().Set("Content-Type", "application/connect+json")
-		// 寫入超過 server 的緩衝，一定會碰到連線（Flush 經只有 Flush() 的 wrapper 會吞掉錯誤，所以看 Write 的結果）。
 		_, res.flush = w.Write(make([]byte, 256<<10))
 		got <- res
 	})

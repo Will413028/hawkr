@@ -83,9 +83,6 @@ import 'route_payload.dart';
 import 'session_listenable.dart';
 import 'tab_refresh_provider.dart';
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 路由路徑常量
-// ══════════════════════════════════════════════════════════════════════════════
 
 /// 認證相關路徑
 class AuthRoutes {
@@ -250,9 +247,6 @@ class ProcurementRoutes {
   static const sellerQuote = '/procurement/seller-quote';
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 導航鍵
-// ══════════════════════════════════════════════════════════════════════════════
 
 /// 根導航鍵 — 與 MyApp.navigatorKey 共用，保持 Toast Overlay 正常運作
 final rootNavigatorKey = MyApp.navigatorKey;
@@ -394,9 +388,6 @@ class _CouponDetailRoute extends ConsumerWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GoRouter Provider
-// ══════════════════════════════════════════════════════════════════════════════
 
 /// Navigator observers are injectable so hermetic app tests can exercise the
 /// production router without booting the Firebase native plugin.
@@ -424,9 +415,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = session.isLoggedIn;
       final location = redirectLocationOf(state);
 
-      // onboarding gating 的單一真相來源（純函式，見 redirect_logic.dart）。
-      // 認得 needsOnboarding：刪除帳號後重登停在 /auth 會被導去 /onboard，
-      // 不再被「已登入即進 dashboard」的舊規則蓋過。
       final needsForceUpdate = ref.read(forceUpdateGateProvider).updateRequired;
       final target = resolveAuthRedirect(
         isLoggedIn: isLoggedIn,
@@ -447,10 +435,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       return target;
     },
-    // GA4: 自動送 screen_view（root navigator）
     observers: ref.watch(appRouterObserversProvider),
     routes: [
-      // ── 啟動 / 認證 ──
       GoRoute(
         path: AuthRoutes.welcome,
         builder: (context, state) => const WelcomeScreen(),
@@ -464,14 +450,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SellerInformationScreen(),
       ),
 
-      // ── 主導航 (StatefulShellRoute) ──
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state, navigationShell) {
           return _MainShellScaffold(navigationShell: navigationShell);
         },
         branches: [
-          // Tab 0: Dashboard
           StatefulShellBranch(
             navigatorKey: _dashboardNavigatorKey,
             routes: [
@@ -481,7 +465,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 1: Category / Page
           StatefulShellBranch(
             navigatorKey: _categoryNavigatorKey,
             routes: [
@@ -492,7 +475,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 2: Wallet
           StatefulShellBranch(
             navigatorKey: _walletNavigatorKey,
             routes: [
@@ -502,7 +484,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 3: Orders
           StatefulShellBranch(
             navigatorKey: _ordersNavigatorKey,
             routes: [
@@ -515,7 +496,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 4: Settings / Profile
           StatefulShellBranch(
             navigatorKey: _settingsNavigatorKey,
             routes: [
@@ -529,9 +509,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // ── 子頁面 (parentNavigatorKey = root，覆蓋整個畫面) ──
 
-      // -- Dashboard 子頁面 --
       GoRoute(
         path: SettingsRoutes.profile,
         parentNavigatorKey: rootNavigatorKey,
@@ -557,7 +535,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: SettingsRoutes.shipping,
         parentNavigatorKey: rootNavigatorKey,
-        // builder: (context, state) => const ShippingSettingsScreen(),
         builder: (context, state) => const ShippingSettingsScreen(),
       ),
       GoRoute(
@@ -633,7 +610,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // -- Order 子頁面 --
       GoRoute(
         path: OrderRoutes.details,
         parentNavigatorKey: rootNavigatorKey,
@@ -671,8 +647,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: OrderRoutes.dispute,
         parentNavigatorKey: rootNavigatorKey,
-        // Retired static dispute mock. Seller after-sales cases and decisions
-        // must come from the server-backed after-sales workflow.
         redirect: (context, state) => ToolRoutes.afterSales,
       ),
       GoRoute(
@@ -680,8 +654,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
           final extra = _extractExtraMap(state);
-          // 🔴 原本 `?? 'HOME'`：沒帶 lgsType 的導航會把超商單當宅配去查 PayUni。
-          // 改成空字串，畫面走「未知物流類型」的 fail-safe 呈現。
           final lgsType =
               _extraMapValue<String>(extra, 'lgsType') ??
               state.uri.queryParameters['lgsType'] ??
@@ -721,7 +693,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // -- Product 子頁面 (wizard chain) --
       GoRoute(
         path: ProductRoutes.picker,
         parentNavigatorKey: rootNavigatorKey,
@@ -910,7 +881,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
-      // -- Post 子頁面 --
       GoRoute(
         path: PostRoutes.mediaPicker,
         parentNavigatorKey: rootNavigatorKey,
@@ -956,7 +926,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // -- Seller 子頁面 --
       GoRoute(
         path: SellerRoutes.certificationUpload,
         parentNavigatorKey: rootNavigatorKey,
@@ -998,8 +967,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const StoreUnavailableScreen(),
       ),
-      // parentNavigatorKey 是全螢幕攔截的關鍵：少了它會被 ShellRoute 的
-      // bottom nav 包住，強更畫面下方還留著可點的分頁（`packages/hawkr_app_update/docs/spec.md`）。
       GoRoute(
         path: SellerRoutes.forceUpdate,
         parentNavigatorKey: rootNavigatorKey,
@@ -1040,7 +1007,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // -- Wallet 子頁面 --
       GoRoute(
         path: CouponRoutes.editor,
         parentNavigatorKey: rootNavigatorKey,
@@ -1073,7 +1039,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // -- Settings 子頁面 --
       GoRoute(
         path: SettingsRoutes.notifications,
         parentNavigatorKey: rootNavigatorKey,
@@ -1095,21 +1060,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HelpCenterScreen(),
       ),
 
-      // -- 配送異常 dashboard --
       GoRoute(
         path: ShipmentAnomalyRoutes.dashboard,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const ShipmentAnomalyDashboardScreen(),
       ),
 
-      // -- Hawkr Agent 採購線：待回覆詢價清單（回價表單的入口）--
       GoRoute(
         path: ProcurementRoutes.sellerPublications,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const SellerPublicationListScreen(),
       ),
 
-      // -- Hawkr Agent 採購線：平台賣家回價表單 --
       GoRoute(
         path: ProcurementRoutes.sellerQuote,
         parentNavigatorKey: rootNavigatorKey,
@@ -1118,7 +1080,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // -- 共用工具頁面 --
       GoRoute(
         path: ToolRoutes.photoEditor,
         parentNavigatorKey: rootNavigatorKey,
@@ -1146,9 +1107,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 主導航 Shell Scaffold
-// ══════════════════════════════════════════════════════════════════════════════
 
 /// 主導航 Shell Scaffold — 取代原本的 MainNavigationScreen
 class _MainShellScaffold extends ConsumerStatefulWidget {
@@ -1193,7 +1151,6 @@ class _MainShellScaffoldState extends ConsumerState<_MainShellScaffold> {
   }
 
   void _onTap(int index) {
-    // 切換到不同 tab 時觸發刷新
     if (index != widget.navigationShell.currentIndex) {
       if (index == 1) {
         ref.read(pageTabRefreshProvider.notifier).increment();
@@ -1207,7 +1164,6 @@ class _MainShellScaffoldState extends ConsumerState<_MainShellScaffold> {
     }
     widget.navigationShell.goBranch(
       index,
-      // 點擊當前 tab 時 pop 到該 tab 的根頁面
       initialLocation: index == widget.navigationShell.currentIndex,
     );
   }

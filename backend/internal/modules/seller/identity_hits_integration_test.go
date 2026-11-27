@@ -14,10 +14,7 @@ import (
 	"uuid"
 )
 
-// 命中的定義涵蓋受處分帳號目前的雜湊（收款開通 ADR D46、D47）：措施在 at 生效而且帶身分效果時，身分來源是快照加上被處分帳號
-// 目前的 account_identity_hashes；處分頁的關聯帳號、待辦 SHARED_BANK_ACCOUNT 與申請送出、核准的比對讀同一份定義。
 
-// hitAccounts 是措施在 at 的命中帳號（不含被處分帳號本身），直接讀 SQL 函式 seller.measure_identity_hits。
 func (f *fixture) hitAccounts(t *testing.T, measureID uuid.UUID, exceptAccount int64, at time.Time) []int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -35,7 +32,6 @@ func (f *fixture) hitAccounts(t *testing.T, measureID uuid.UUID, exceptAccount i
 	return out
 }
 
-// linkedAccountIDs 是處分頁的關聯帳號（模組 API），排序後回傳。
 func (f *fixture) linkedAccountIDs(t *testing.T, measureID uuid.UUID) []int64 {
 	t.Helper()
 	var out []int64
@@ -46,7 +42,6 @@ func (f *fixture) linkedAccountIDs(t *testing.T, measureID uuid.UUID) []int64 {
 	return out
 }
 
-// firstFingerprintAfter 是店家在 after 之後最早寫入的 BANK_FINGERPRINT 時間。
 func (f *fixture) firstFingerprintAfter(t *testing.T, storeID int64, after time.Time) time.Time {
 	t.Helper()
 	var at time.Time
@@ -55,7 +50,6 @@ func (f *fixture) firstFingerprintAfter(t *testing.T, storeID int64, after time.
 	return at
 }
 
-// copyTaxHashes 讓 toStore 所屬的帳號「新增」fromStore 的統編 hash（寫入時間是現在）：寫入端被停權擋下時，以 SQL 直接給出 writeHashes 的結果，只驗讀取端。
 func (f *fixture) copyTaxHashes(t *testing.T, fromStore, toStore int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -68,7 +62,6 @@ func (f *fixture) copyTaxHashes(t *testing.T, fromStore, toStore int64) {
 	}
 }
 
-// identityBlocked 是新帳號以這個統編送出申請會不會被身分比對擋下。
 func (f *fixture) identityBlocked(t *testing.T, taxID string) bool {
 	t.Helper()
 	accountID, _ := f.open(t)
@@ -258,8 +251,6 @@ func TestEffectiveNoticeTerminationCarriesNoIdentityEffect(t *testing.T) {
 	}
 }
 
-// gainedIdentities 建立被處分的帳號 S（sanction 建立處分）、處分之後 S 同步新的 fingerprint 並新增 R 的統編 hash；O 有同一個 fingerprint、R 有同一個統編。
-// 回傳處分與命中的帳號。
 func (f *fixture) gainedIdentities(t *testing.T, sanction func(storeID int64) Measure) (m Measure, accountO, accountR int64) {
 	t.Helper()
 	_, storeS, subS := f.submittedCompany(t, taxIDOne)

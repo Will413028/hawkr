@@ -111,7 +111,6 @@ function carryForwardDegraded(
 ): HomeTabBootstrapV1 {
 	const merged: HomeTabBootstrapV1 = { ...payload };
 	const writable = merged as Record<RetainableDomain, unknown>;
-	// Same key on both sides, so every assignment keeps the field's declared type.
 	for (const domain of degraded) writable[domain] = previous[domain];
 	return merged;
 }
@@ -150,10 +149,6 @@ async function requestHomeTabBootstrap(): Promise<HomeTabBootstrapV1> {
 				? HOME_TAB_BOOTSTRAP_DEGRADED_FRESH_MS
 				: HOME_TAB_BOOTSTRAP_FRESH_MS),
 		expiresAt: now + HOME_TAB_BOOTSTRAP_TTL_MS,
-		// A degraded answer inherits the retention clock rather than restarting it:
-		// the content it carries forward was fetched at the last intact read, so its
-		// age is measured from there. Once that window closes the gap is served as
-		// it is — retaining forever would show content that may no longer exist.
 		retainableUntil: isDegraded
 			? (previous?.retainableUntil ?? 0)
 			: now + HOME_TAB_BOOTSTRAP_TTL_MS,
@@ -173,9 +168,6 @@ function sharedHomeTabBootstrap(options?: {
 			inFlight = undefined;
 		});
 	}
-	// Intent/idle preloading is stale-while-revalidate: keep the instant memory
-	// hit, but start one shared network refresh. The active Home query passes
-	// requireFresh and awaits that same flight before atomically replacing data.
 	if (memoryEntry && memoryEntry.expiresAt > now && !options?.requireFresh) {
 		void inFlight.catch(() => undefined);
 		return Promise.resolve(memoryEntry.payload);

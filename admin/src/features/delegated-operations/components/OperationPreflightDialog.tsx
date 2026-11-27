@@ -88,7 +88,6 @@ export default function OperationPreflightDialog({
 	const [chosenTtlSeconds, setChosenTtlSeconds] = useState<number | null>(null);
 	const [validationError, setValidationError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
-	// 申請內容改變就換一把 key：那是另一個請求，不該被上一個請求的冪等結果接住。
 	const [idempotencyKey, setIdempotencyKey] = useState(
 		() => resumedIdempotencyKey ?? safeIdempotencyKey(),
 	);
@@ -102,9 +101,6 @@ export default function OperationPreflightDialog({
 	const selectedReason = preflight?.reasonOptions.find(
 		(option) => option.code === reasonCode,
 	);
-	// preflight 頂層的 `caseReferenceRequired` 是「任一選項需要」的 OR，不是
-	// 「這一次要填」；本次是否必填只由被選中的那個原因決定，否則卡片上寫著
-	// 「案件編號可選填」的原因照樣會在送出時被擋。
 	const caseRequired = selectedReason?.caseReferenceRequired === true;
 	const readCapabilities =
 		preflight?.capabilities.filter((capability) =>
@@ -138,7 +134,6 @@ export default function OperationPreflightDialog({
 			reject("瀏覽器無法建立安全的操作識別碼，請更新瀏覽器後再試。");
 			return;
 		}
-		// 不呼叫 preventDefault：瀏覽器接手送出並跟著 303 走到工作區所在的 host。
 		setSubmitting(true);
 	};
 
@@ -228,9 +223,7 @@ export default function OperationPreflightDialog({
 					</div>
 
 					<fieldset className="adm-operation-reasons">
-						{/* 必填標示與下方案件欄同一種寫法。少了它，這一組的必填性要等到
-								    送出被擋、handleSubmit 吐「請選擇代行原因。」才第一次出現，而
-								    同一張表單的案件欄一進場就講明了。 */}
+
 						<legend>這次為什麼需要代行？（必選）</legend>
 						<p>請選擇伺服器核准的原因；原因會和後續操作一起寫入稽核紀錄。</p>
 						<div className="adm-operation-reason-grid">
@@ -265,9 +258,7 @@ export default function OperationPreflightDialog({
 					</fieldset>
 
 					<div className="adm-operation-field adm-operation-field--wide">
-						{/* 必填與否由被選中的原因決定（radio 小字說的就是這件事）。
-								    還沒選原因時兩個答案都還不成立，所以不加後綴 —— 先寫
-								    「（選填）」等於在資料出來之前先給一個宣稱。 */}
+
 						<label htmlFor="adm-operation-case">
 							案件或工單編號
 							{selectedReason ? (caseRequired ? "（必填）" : "（選填）") : ""}

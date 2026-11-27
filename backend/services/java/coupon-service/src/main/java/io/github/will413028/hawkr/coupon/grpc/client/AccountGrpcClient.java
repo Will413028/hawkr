@@ -57,8 +57,6 @@ public class AccountGrpcClient {
             AccountInfoResponse response = stub
                     .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                     .getAccountInfo(request);
-            // 失敗時 Account Service 會拋 StatusRuntimeException，由下方 catch 處理；
-            // 此處只需確認 data 存在
             if (!response.hasData()) {
                 return -1;
             }

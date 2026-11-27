@@ -53,17 +53,12 @@ var ErrProcessing = errors.New("image: processing failed")
 // ErrTooLarge 表示像素數超過 model 定義的上限；在解碼像素之前就回傳。
 var ErrTooLarge = errors.New("image: pixel count over limit")
 
-// jpegQuality 是靜態不透明圖輸出 JPEG 的品質。
 const jpegQuality = 90
 
-// webpQuality 是動態 WebP 輸出的品質。
 const webpQuality = 90
 
 var startOnce sync.Once
 
-// startVips 只初始化一次 libvips，可被並行的處理 job 同時呼叫。
-// libvips 內部執行緒設為 1：並行度來自同時跑的處理 job，不讓單一 job 再各自展開執行緒池；
-// 運算快取全關：每個上傳的內容都不同，快取不會命中，只會多佔記憶體。
 func startVips() {
 	startOnce.Do(func() {
 		vips.Startup(&vips.Config{ConcurrencyLevel: 1, MaxCacheFiles: 0, MaxCacheMem: 0, MaxCacheSize: 0})
@@ -125,7 +120,6 @@ func Sanitize(ctx context.Context, d []byte, lim Limits) (Result, error) {
 	return sanitize(ctx, d, lim, nil)
 }
 
-// sanitize 的 fail 只給測試用：在指定階段（stageColour、stageAutorot、stageAlpha、stageFlatten、stageEncode）注入失敗。
 func sanitize(ctx context.Context, d []byte, lim Limits, fail func(stage string) error) (Result, error) {
 	if err := lim.validate(); err != nil {
 		return Result{}, err
@@ -155,7 +149,6 @@ func sanitize(ctx context.Context, d []byte, lim Limits, fail func(stage string)
 	if err := live(ctx); err != nil {
 		return Result{}, err
 	}
-	// 標頭通過上限後才解碼全部像素；之後的失敗都不再是輸入的問題。
 	if _, err := img.Avg(); err != nil {
 		return Result{}, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
@@ -189,7 +182,6 @@ type stages struct {
 	fail func(stage string) error
 }
 
-// step 先檢查 ctx，再（測試注入時）回注入的失敗，否則執行 fn；失敗一律是一般錯誤。
 func (s stages) step(stage string, fn func() error) error {
 	if err := live(s.ctx); err != nil {
 		return err
@@ -207,7 +199,6 @@ func (s stages) step(stage string, fn func() error) error {
 	return nil
 }
 
-// isAPNG 在 IDAT 之前找 acTL 區段；libvips 只讀 APNG 的第一格，放行會靜默丟掉動畫。
 func isAPNG(d []byte) bool {
 	p := 8
 	for p+8 <= len(d) {
@@ -249,7 +240,6 @@ func pageHeight(img *vips.Image, pages int) int {
 	return img.Height()
 }
 
-// checkPixels 以標頭的尺寸檢查：每格像素與（動態時）影格數乘每格像素。尺寸是 int，先以 int64 相乘避免溢位。
 func checkPixels(w, h, pages int, f Format, lim Limits) error {
 	if w <= 0 || h <= 0 {
 		return fmt.Errorf("%w: empty dimensions", ErrMalformed)
@@ -270,7 +260,6 @@ func checkPixels(w, h, pages int, f Format, lim Limits) error {
 	return nil
 }
 
-// toSRGB 把像素轉成 sRGB：有內嵌 ICC 描述檔就依它轉換，之後（含沒有描述檔的灰階、CMYK、16 位元）統一轉成 sRGB 色彩空間。
 func (s stages) toSRGB(img *vips.Image) error {
 	return s.step(stageColour, func() error {
 		if img.HasICCProfile() {
@@ -282,7 +271,6 @@ func (s stages) toSRGB(img *vips.Image) error {
 	})
 }
 
-// hasTransparency 回報影像是否有任何不完全不透明的像素；有 alpha 通道但全部不透明不算。
 func hasTransparency(img *vips.Image) (bool, error) {
 	if !img.HasAlpha() {
 		return false, nil
@@ -306,8 +294,6 @@ func hasTransparency(img *vips.Image) (bool, error) {
 	return m < opaque, nil
 }
 
-// alphaOpaque 是影像格式下完全不透明的 alpha 值（8 位元 255、16 位元 65535）；其他格式回 ErrProcessing，不猜值。
-// 四個載入器只產生 8 或 16 位元，轉 sRGB 之後更只剩 8 位元，所以正常輸入到不了這個分支；萬一到了是永久拒絕，不讓它重試到用盡，也不說成使用者的圖片格式不對。
 func alphaOpaque(a *vips.Image) (float64, error) {
 	if f := a.BandFormat(); f == vips.BandFormatUchar {
 		return 255, nil
@@ -349,7 +335,6 @@ func (s stages) encodeStill(img *vips.Image) (Result, error) {
 	return Result{Data: out, Format: JPEG}, err
 }
 
-// encodeAnimated 保留影格與延遲；不套用方向（動態 GIF 與 WebP 的各影格疊成一張高圖，旋轉會打亂影格）。
 func (s stages) encodeAnimated(img *vips.Image, f Format) (Result, error) {
 	if err := s.toSRGB(img); err != nil {
 		return Result{}, err

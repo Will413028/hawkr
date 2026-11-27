@@ -76,7 +76,6 @@ export default function CreateMeasureDialog({
 	onConfirm,
 }: CreateMeasureDialogProps) {
 	const requestIdRef = useRef<RequestIdSlot | null>(null);
-	// 可引用的認定屬於店家的帳號，帳號從店家詳情讀；讀取中或失敗時「依據的認定」欄顯示那個狀態（失敗可重試），不是整欄消失。
 	const store = useStoreDetail(storeId);
 	const accountId = store.data?.store?.accountId ?? "";
 	const account: CitedFindingsAccount =

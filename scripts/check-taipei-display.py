@@ -21,8 +21,6 @@ def code_only(text: str) -> str:
     out = []
     i = 0
     n = len(text)
-    # Stack of string contexts; each entry is (quote, raw) for a string being read, or "{" for an interpolation
-    # or a code brace opened inside one.
     stack: list = []
 
     def blank(c: str) -> str:

@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// paidGroup 建立並讓一筆付款（買家 11）對兩張訂單入帳：PO-A 店 7 金額 100，PO-B 店 8 金額 250，付款總額 350。
 func (f *chargeFixture) paidGroup(t *testing.T) Payment {
 	t.Helper()
 	f.order("PO-A", 11, 7, 100)

@@ -63,7 +63,6 @@ function makeCase(overrides: Partial<AfterSaleCase> = {}): AfterSaleCase {
 	};
 }
 
-/* ===== labels ===== */
 
 test("afterSaleStatusLabel maps the return-logistics codes 26/27/28", () => {
 	assert.equal(afterSaleStatusLabel("26"), "超商待取");
@@ -96,7 +95,6 @@ test("afterSaleStatusLabel covers every AFTER_SALE_STATUS code and falls back on
 	assert.equal(afterSaleStatusLabel("999"), "售後處理中");
 });
 
-/* ===== tone ===== */
 
 test("afterSaleTone follows the status/tone matrix and defaults to muted", () => {
 	assert.equal(afterSaleTone(AFTER_SALE_STATUS.PENDING), "warning");
@@ -109,13 +107,12 @@ test("afterSaleTone follows the status/tone matrix and defaults to muted", () =>
 	assert.equal(afterSaleTone("999"), "muted");
 });
 
-/* ===== action gating ===== */
 
 test("afterSaleNeedsSeller gates seller action to 0/27/30 only", () => {
 	const needsSeller = [
-		AFTER_SALE_STATUS.PENDING, // 0 — resolve
-		AFTER_SALE_STATUS.RETURN_DELIVERED, // 27 — confirm receipt
-		AFTER_SALE_STATUS.RETURN_RECEIVED, // 30 — confirm refund amount
+		AFTER_SALE_STATUS.PENDING,
+		AFTER_SALE_STATUS.RETURN_DELIVERED,
+		AFTER_SALE_STATUS.RETURN_RECEIVED,
 	];
 	for (const status of needsSeller) {
 		assert.equal(
@@ -125,11 +122,11 @@ test("afterSaleNeedsSeller gates seller action to 0/27/30 only", () => {
 		);
 	}
 	const buyerOrIdle = [
-		AFTER_SALE_STATUS.RETURN_PENDING, // 20 — buyer ships back
-		AFTER_SALE_STATUS.RETURN_SHIPPING, // 25 — logistics
-		AFTER_SALE_STATUS.RETURN_AT_STORE, // 26 — logistics pickup
-		AFTER_SALE_STATUS.RETURN_FAILED, // 28 — support / buyer
-		AFTER_SALE_STATUS.REFUNDING, // 40 — payment worker
+		AFTER_SALE_STATUS.RETURN_PENDING,
+		AFTER_SALE_STATUS.RETURN_SHIPPING,
+		AFTER_SALE_STATUS.RETURN_AT_STORE,
+		AFTER_SALE_STATUS.RETURN_FAILED,
+		AFTER_SALE_STATUS.REFUNDING,
 		AFTER_SALE_STATUS.CLOSED,
 		AFTER_SALE_STATUS.REJECTED,
 		AFTER_SALE_STATUS.CANCELLED,
@@ -148,8 +145,6 @@ test("afterSaleNeedsSeller is false for a missing case", () => {
 });
 
 test("afterSaleNeedsSeller drops a case once it is under platform appeal", () => {
-	// Auto-escalate keeps status=0 but moves the case to arbitration — the
-	// seller can no longer act, so it must leave the 待辦 list.
 	assert.equal(
 		afterSaleNeedsSeller(makeCase({ status: "0", appealState: "10" })),
 		false,
@@ -158,26 +153,21 @@ test("afterSaleNeedsSeller drops a case once it is under platform appeal", () =>
 		afterSaleNeedsSeller(makeCase({ status: "30", appealState: "20" })),
 		false,
 	);
-	// NONE / resolved cases still follow the raw-status gate.
 	assert.equal(
 		afterSaleNeedsSeller(makeCase({ status: "0", appealState: "0" })),
 		true,
 	);
 });
 
-/* ===== appeal-aware list/card display ===== */
 
 test("afterSaleDisplayLabel folds 申訴仲裁中 over the raw status under appeal", () => {
-	// Buyer-appeal (60) and auto-escalate (0) both read 申訴仲裁中 in lists.
 	assert.equal(afterSaleDisplayLabel("60", "10"), AFTER_SALE_APPEAL_LABEL);
 	assert.equal(afterSaleDisplayLabel("20", "20"), AFTER_SALE_APPEAL_LABEL);
-	// NONE ("0") and undefined fall through to the plain status label.
 	assert.equal(afterSaleDisplayLabel("60", "0"), afterSaleStatusLabel("60"));
 	assert.equal(
 		afterSaleDisplayLabel("0", undefined),
 		afterSaleStatusLabel("0"),
 	);
-	// RESOLVED ("30") is no longer pending arbitration → raw status wins.
 	assert.equal(afterSaleDisplayLabel("60", "30"), afterSaleStatusLabel("60"));
 });
 
@@ -205,20 +195,16 @@ test("afterSaleIsTerminal is true only for 50/60/70", () => {
 });
 
 test("afterSaleIsTerminal is false for a rejected case that is under appeal", () => {
-	// 60 已拒絕 alone is terminal, but once appealed it re-enters arbitration —
-	// the seller default view must not hide it as 已結案.
 	assert.equal(
 		afterSaleIsTerminal(makeCase({ status: "60", appealState: "10" })),
 		false,
 	);
-	// A resolved appeal (30) follows the raw status again → terminal.
 	assert.equal(
 		afterSaleIsTerminal(makeCase({ status: "60", appealState: "30" })),
 		true,
 	);
 });
 
-/* ===== appeal lock & action predicates ===== */
 
 const ALL_STATUSES = [
 	"0",
@@ -241,15 +227,10 @@ test("afterSaleIsUnderAppeal treats undefined and empty appealState as no lock",
 });
 
 test("appeal predicates read codemeta Values only — Names are not accepted", () => {
-	// The wire carries the AfterSaleAppealState **Value** ("0"/"10"/"20"/"30").
-	// The Name never reaches the browser: gateway 400s `appeal_state=APPEALED`
-	// and aftersales-service persists Values. The old dual-track comparison
-	// (`=== "10" || === "APPEALED"`) is gone, so a Name must now match nothing.
 	assert.equal(afterSaleIsUnderAppeal("APPEALED"), false);
 	assert.equal(afterSaleIsUnderAppeal("INVESTIGATING"), false);
 	assert.equal(afterSaleIsAppealResolved("RESOLVED"), false);
 
-	// Values keep working — this is the only accepted spelling.
 	assert.equal(afterSaleIsUnderAppeal(AfterSaleAppealState.APPEALED), true);
 	assert.equal(
 		afterSaleIsUnderAppeal(AfterSaleAppealState.INVESTIGATING),
@@ -260,8 +241,6 @@ test("appeal predicates read codemeta Values only — Names are not accepted", (
 	assert.equal(afterSaleIsAppealResolved(AfterSaleAppealState.RESOLVED), true);
 	assert.equal(afterSaleIsAppealResolved(AfterSaleAppealState.APPEALED), false);
 
-	// The lock mirrors backend `assertNotUnderAppeal`, which compares against
-	// the Value "0" alone — so "NONE" is an unknown value and stays fail-closed.
 	assert.equal(afterSaleIsAppealLocked(AfterSaleAppealState.NONE), false);
 	assert.equal(afterSaleIsAppealLocked("NONE"), true);
 	assert.equal(afterSaleIsAppealLocked(AfterSaleAppealState.APPEALED), true);
@@ -271,14 +250,11 @@ test("appeal predicates read codemeta Values only — Names are not accepted", (
 });
 
 test("appeal lock disables seller resolve and confirm-receipt (backend 500/409 guard)", () => {
-	// Without the lock the seller may act on the actionable statuses…
 	assert.equal(afterSaleCanResolve(AFTER_SALE_STATUS.PENDING, undefined), true);
 	assert.equal(
 		afterSaleCanConfirmReceipt(AFTER_SALE_STATUS.RETURN_DELIVERED, undefined),
 		true,
 	);
-	// …but once appealState is set the gate closes regardless of status,
-	// because the backend rejects such calls with 500/409.
 	for (const status of ALL_STATUSES) {
 		assert.equal(
 			afterSaleCanResolve(status, "10"),
@@ -312,7 +288,6 @@ test("afterSaleCanConfirmReceipt allows only delivered/received returns, not in-
 			`status ${status}`,
 		);
 	}
-	// 25/26 are logistics-owned — explicitly excluded from seller confirm.
 	assert.equal(
 		afterSaleCanConfirmReceipt(AFTER_SALE_STATUS.RETURN_SHIPPING, undefined),
 		false,
@@ -324,12 +299,8 @@ test("afterSaleCanConfirmReceipt allows only delivered/received returns, not in-
 });
 
 test("buyer actions are all gated off once under appeal", () => {
-	// Appeal window open, no appeal filed yet → buyer may appeal.
 	assert.equal(afterSaleCanAppeal(true, undefined), true);
-	// Appeal filed → the second escalation path closes…
 	assert.equal(afterSaleCanAppeal(true, "10"), false);
-	// …and the appeal lock also hides the other buyer actions, so
-	// the case cannot be pushed back to a seller-actionable state.
 	assert.equal(afterSaleIsUnderAppeal("10"), true);
 	assert.equal(afterSaleCanCancel(AFTER_SALE_STATUS.PENDING, "10"), false);
 	assert.equal(afterSaleCanSupplement(AFTER_SALE_STATUS.PENDING, "10"), false);
@@ -338,7 +309,6 @@ test("buyer actions are all gated off once under appeal", () => {
 test("afterSaleCanAppeal requires the backend canAppeal flag", () => {
 	assert.equal(afterSaleCanAppeal(undefined, undefined), false);
 	assert.equal(afterSaleCanAppeal(false, undefined), false);
-	// An empty appealState is not a lock.
 	assert.equal(afterSaleCanAppeal(true, ""), true);
 });
 
@@ -372,7 +342,6 @@ test("empty status (drawer header before detail loads) enables nothing", () => {
 	assert.equal(afterSaleCanSupplement("", undefined), false);
 });
 
-/* ===== grouping ===== */
 
 test("afterSaleGroupOf buckets every status into the four filter groups", () => {
 	const expectations: Array<[string, string]> = [
@@ -397,7 +366,6 @@ test("afterSaleGroupOf buckets every status into the four filter groups", () => 
 	}
 });
 
-/* ===== narrative ===== */
 
 test("afterSaleNarrative tells the rejected buyer about the appeal path", () => {
 	const narrative = afterSaleNarrative(AFTER_SALE_STATUS.REJECTED);
@@ -418,7 +386,6 @@ test("afterSaleNarrative covers 26/27/28 with distinct copy and has a fallback",
 	assert.ok(!atStore.includes(fallback));
 });
 
-/* ===== 4-step progress ===== */
 
 test("afterSaleSteps marks 賣家審核 current while pending", () => {
 	for (const status of [AFTER_SALE_STATUS.PENDING]) {
@@ -468,7 +435,6 @@ test("afterSaleSteps treats an unknown status as freshly applied", () => {
 	);
 });
 
-/* ===== refund task / arbitration labels ===== */
 
 test("arbitrationOutcomeLabel accepts codemeta names, ordinals and passes unknowns through", () => {
 	assert.equal(arbitrationOutcomeLabel("FULL_REFUND"), "全額退款");
@@ -483,7 +449,6 @@ test("arbitrationEventLabel accepts names and ordinals", () => {
 	assert.equal(arbitrationEventLabel("UNKNOWN"), "UNKNOWN");
 });
 
-/* ===== seller order-list lookup ===== */
 
 test("buildAfterSaleLookup keeps the latest case per order", () => {
 	const older = makeCase({
@@ -496,7 +461,6 @@ test("buildAfterSaleLookup keeps the latest case per order", () => {
 		orderNo: "O001",
 		createdAt: "2026-06-05T00:00:00Z",
 	});
-	// Insert newest first to prove ordering does not matter.
 	const lookup = buildAfterSaleLookup([newer, older]);
 	assert.equal(lookup.size, 1);
 	assert.equal(lookup.get("O001")?.caseNo, "AS002");
@@ -525,13 +489,11 @@ test("buildAfterSaleLookup keeps a rejected case that is under appeal", () => {
 			appealState: "10",
 		}),
 	]);
-	// Plain rejected dropped; rejected-under-appeal kept (seller must see it).
 	assert.equal(lookup.has("O001"), false);
 	assert.equal(lookup.get("O002")?.caseNo, "AS002");
 });
 
 test("afterSaleGroupOf buckets an appealed case as active 待處理, not 已結案", () => {
-	// 60 已拒絕 normally groups closed; under appeal it is active arbitration.
 	assert.equal(
 		afterSaleGroupOf(makeCase({ status: "60", appealState: "10" })),
 		"pending",

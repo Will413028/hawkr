@@ -34,8 +34,6 @@ func principal(kind identity.PrincipalKind, id int64, roles ...adminperm.Role) i
 	return identity.Principal{Kind: kind, ID: id, AdminRoles: roles}
 }
 
-// declaredServices 是宣告表涵蓋的 service 的 descriptor（由 protoregistry 查，生成碼的 init 已註冊）。實際掛載的對照在
-// httpapi 的 connectServices；這裡只驗證 Check 本身的雙向比對。
 func declaredServices(t *testing.T) []protoreflect.ServiceDescriptor {
 	t.Helper()
 	seen := map[string]bool{}
@@ -157,7 +155,6 @@ func TestInterceptorDecisions(t *testing.T) {
 		}
 	}
 
-	// default deny：沒有宣告的 procedure 連 OWNER 也拒絕。
 	const undeclared = "/hawkr.admin.identity.v1alpha1.IdentityAdminService/NoSuchMethod"
 	logs.Reset()
 	if err := i.enter(rpc.WithPrincipal(context.Background(), owner), undeclared); apperr.KindOf(err) != apperr.KindPermissionDenied {
@@ -167,7 +164,6 @@ func TestInterceptorDecisions(t *testing.T) {
 		t.Errorf("拒絕沒有記下管理員與 procedure：%s", logs.String())
 	}
 
-	// 非 admin audience 的 procedure 不歸這支 interceptor 管：即使沒有 principal 也放行。
 	for _, procedure := range []string{
 		"/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners",
 		"/hawkr.seller.v1alpha1.SellerAppService/GetMyStore",
@@ -177,7 +173,6 @@ func TestInterceptorDecisions(t *testing.T) {
 		}
 	}
 
-	// 帳號與沒有呼叫者的請求不是管理員。
 	for name, ctx := range map[string]context.Context{
 		"帳號":    rpc.WithPrincipal(context.Background(), principal(identity.PrincipalAccount, 7)),
 		"沒有呼叫者": context.Background(),
@@ -390,10 +385,6 @@ func TestOnlyReadsAndNamedExceptionsAreReadOnly(t *testing.T) {
 	}
 }
 
-// frozenAuditPending 是現在允許宣告 auditPending 的 procedure 的完整清單（D62 延後項，遷入的觸發條件是上線前）。
-// 這份清單只能縮小：遷入平台紀錄的方法改成 auditAudited 並從這裡刪掉；新的後台寫入方法一律宣告 auditAudited，
-// 不得加進這份清單。
-// mutation：把任何一支不在清單內的方法（例如 payment 的 RetryPaymentAccountPurge）宣告成 auditPending → 下面的測試失敗。
 var frozenAuditPending = []string{
 	"/hawkr.admin.content.v1alpha1.ContentAdminService/CreateAppVersionGate",
 	"/hawkr.admin.content.v1alpha1.ContentAdminService/CreateBanner",

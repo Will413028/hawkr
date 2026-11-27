@@ -123,7 +123,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         try {
             io.github.will413028.hawkr.shipping.grpc.GetShipmentsByOrderNosResponse resp =
                     shippingGrpcClient.getShipmentsByOrderNos(orderNos);
-            // shipping-service 失敗時會拋 StatusRuntimeException，由下方 catch 降級為空 Map
             Map<String, ShipmentDetailView> map = new java.util.HashMap<>();
             for (ShipmentDetailView v : resp.getDataList()) {
                 map.put(v.getOrderNo(), v);
@@ -184,15 +183,12 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== Provider 狀態聚合（收斂規範 §6.2 / §6.3）====================
 
     /** Pair of provider status + message（避免多處重建） */
     private record ProviderPair(String status, String message) {
         static final ProviderPair EMPTY = new ProviderPair("", "");
     }
 
-    // §29 Provider 取源分組（收斂規範 §6.2）：依 order.status 決定向哪個 SoT 服務查。
-    // 使用 OrderStatus enum value 避免 magic string；switch-case 無法用 method call 故抽至 Set。
     private static final java.util.Set<String> STATUS_PAYMENT_SOURCE = java.util.Set.of(
             io.github.will413028.hawkr.common.utils.code.OrderStatus.PENDING_PAYMENT.value()
     );
@@ -232,7 +228,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             } else if (STATUS_SHIPPING_SOURCE.contains(s)) {
                 shippingOrderNos.add(o.getOrderNo());
             }
-            // 其他狀態不聚合
         }
 
         mergePaymentProvider(paymentOrderNos, out);
@@ -315,30 +310,25 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         return mediaUrlProperties.getBaseUrl();
     }
 
-    // ==================== 買家端 ====================
     @Override
     public void createOrder(CreateOrderRequest request, StreamObserver<CreateOrderResponse> responseObserver) {
         try {
-            // 授權：僅 BUYER 可建立訂單
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = request.getBuyerId();
 
             List<OrderService.CreateOrderItemParam> items = request.getItemsList().stream()
                     .map(i -> {
                         long unitPrice = ProtoConversionUtils.parseLongRequired(i.getUnitPrice(), "unitPrice");
-                        // listPrice 過渡期：proto 端若為空字串，視為「無特價」，listPrice = unitPrice
                         long listPrice = i.getListPrice().isEmpty()
                                 ? unitPrice
                                 : ProtoConversionUtils.parseLongRequired(i.getListPrice(), "listPrice");
-                        // catalog 建單：走 CreateOrderItemParam.catalog（工廠方法拒絕 null）
-                        // ⇒ sku_id 缺值或不是 UUID 在 parse 期擋下，不因 RFQ 放寬而鬆掉。
                         return OrderService.CreateOrderItemParam.catalog(
                             ProtoConversionUtils.parseUuidRequired(i.getSkuId(), "skuId"),
                             i.getSkuName(),
                             ProtoConversionUtils.parseIntRequired(i.getQuantity(), "quantity"),
                             unitPrice,
                             listPrice,
-                            0L,  // CreateOrder 走購物車外建單路徑：share_discount=0（無優惠券分攤）
+                            0L,
                             "",
                             i.getProductId().isEmpty() ? null : ProtoConversionUtils.parseUuidRequired(i.getProductId(), "productId"),
                             i.getProductName()
@@ -411,11 +401,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     ProtoConversionUtils.parseLongRequired(request.getAcceptanceId(), "acceptanceId"),
                     ProtoConversionUtils.parseLongRequired(request.getTotalAmount(), "totalAmount"),
                     ProtoConversionUtils.parseLongOrDefault(request.getShippingFee(), 0L),
-                    // RFQ 明細是 non-catalog line（64 號 §6.4.9）：wire 上 sku_id 缺值就是
-                    // proto3 string 的 ""，映成 null。
-                    // ⛔ 不用 parseUuidOrNull——它把格式不合法也吞成 null，那會讓「沒有 SKU」
-                    //    與「解析失敗」共用同一個值，而後者是 bug（§6.4.15 對哨兵的同一條立場）。
-                    //    慣例取自同一支呼叫裡的 deliveryTemp。
                     request.getSkuId().isEmpty()
                             ? null
                             : ProtoConversionUtils.parseUuidRequired(request.getSkuId(), "skuId"),
@@ -452,21 +437,13 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
 
     @Override
     public void cancelOrder(CancelOrderRequest request, StreamObserver<CancelOrderResponse> responseObserver) {
-        // #1871 OBS-09：order_no 進 MDC，讓這個方法內所有 log 行都能被 Loki structured
-        // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml），不只有明確帶 bzCol 的那幾行。
         MDC.put("order_no", request.getOrderNo());
         try {
-            // 授權：僅 BUYER 可取消訂單
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = request.getBuyerId();
 
-            // #1368：取消狀態變更 + 庫存歸還 order.cancelled outbox 同事務落地（cancelOrder 內），
-            // 由 outbox scheduler 保證至少一次投遞，取代原 TX 外 best-effort 直發
             orderService.cancelOrder(buyerId, request.getOrderNo());
-            // 關閉付款交易（best-effort）
             closePaymentForOrder(request.getOrderNo());
-            // 購物車已在建單時清理（建單即清策略），取消訂單無需解鎖
-            // 釋放優惠券（軟依賴）
             releaseCouponForOrder(request.getOrderNo());
 
             responseObserver.onNext(CancelOrderResponse.newBuilder()
@@ -508,7 +485,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     @Override
     public void getMyOrders(GetMyOrdersRequest request, StreamObserver<GetMyOrdersResponse> responseObserver) {
         try {
-            // 授權：僅 BUYER 可查詢自己的訂單
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = request.getBuyerId();
 
@@ -518,7 +494,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             List<OrderEntity> orders = orderService.getMyOrders(buyerId, request.getStatusFilter(), page, size);
             long total = orderService.countMyOrders(buyerId, request.getStatusFilter());
 
-            // 聚合賣家資訊
             List<Long> sellerIds = orders.stream().map(OrderEntity::getStoreId).distinct().toList();
             Map<Long, SellerMeta> sellerMetaMap = fetchSellerMetaQuietly(sellerIds);
             String cdnBaseUrl = getCdnBaseUrl();
@@ -556,7 +531,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     @Override
     public void getMyOrderStatusCounts(GetMyOrderStatusCountsRequest request, StreamObserver<GetMyOrderStatusCountsResponse> responseObserver) {
         try {
-            // 授權：僅 BUYER 可查詢自己的訂單筆數
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = request.getBuyerId();
 
@@ -592,18 +566,13 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
 
     @Override
     public void getOrder(GetOrderRequest request, StreamObserver<GetOrderResponse> responseObserver) {
-        // #1871 OBS-09：order_no 進 MDC，讓這個方法內所有 log 行都能被 Loki structured
-        // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml）。
         MDC.put("order_no", request.getOrderNo());
         try {
-            // 授權：僅 BUYER 可查詢訂單詳情
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = request.getBuyerId();
 
             OrderEntity order = orderService.getOrderByNo(request.getOrderNo());
-            // Ownership 檢查：訂單必須屬於該買家
             if (order.getBuyerId() != buyerId) {
-                // 越權防枚舉（API 設計規範 §14.1）：回應與「訂單不存在」完全一致，不洩漏訂單存在
                 throw new OrderNotFoundException(request.getOrderNo());
             }
 
@@ -611,7 +580,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             List<RefundRequestEntity> refunds = orderService.getRefundHistory(request.getOrderNo());
             ShipmentDetailView shipment = fetchShipmentQuietly(order.getOrderNo());
 
-            // 聚合賣家資訊
             Map<Long, SellerMeta> sellerMetaMap = fetchSellerMetaQuietly(List.of(order.getStoreId()));
             SellerMeta sellerMeta = sellerMetaMap.get(order.getStoreId());
             String cdnBaseUrl = getCdnBaseUrl();
@@ -650,11 +618,9 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     @Override
     public void confirmReceipt(ConfirmReceiptRequest request, StreamObserver<ConfirmReceiptResponse> responseObserver) {
         try {
-            // 授權：僅 BUYER 可確認收貨
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = request.getBuyerId();
 
-            // 階段 0：若有 stagedTokens 則先 finalize，失敗整個收貨失敗（嚴格模式，安全為主）
             java.util.List<String> stagedTokens = request.getStagedTokensList();
             java.util.List<String> assetIds = new java.util.ArrayList<>();
             String receiptPhotoKeysJson = null;
@@ -675,7 +641,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     responseObserver.onCompleted();
                     return;
                 }
-                // 存 objectKey（49 §5.3/§6.2）；顯示 URL 由 Gateway 組
                 java.util.List<String> keys = new java.util.ArrayList<>();
                 for (io.github.will413028.hawkr.media.grpc.FinalizedAsset a : assets) {
                     assetIds.add(a.getAssetId());
@@ -689,11 +654,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 }
             }
 
-            // 階段 1：linkImages 必須在把 objectKey 寫進 orders 之前成功（#2222）。
-            // 舊版排在確認收貨之後且吞掉錯誤：orders.receipt_photo_keys 指著這些資產、
-            // 卻沒有 asset_reference，7 天後被 media GC 連同 R2 物件實體刪除，爭議時無佐證可查。
-            // 失敗即回錯（與階段 0 的嚴格模式一致）：訂單未確認收貨，剛轉正的照片無人引用，
-            // 由 media GC 依孤兒規則回收，買家重試即可。
             if (!assetIds.isEmpty()) {
                 try {
                     mediaGrpcClient.linkImages(
@@ -713,7 +673,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 }
             }
 
-            // 階段 2：確認收貨（內含買家身分驗證 + 狀態檢查 + 完成 + MQ 事件發布）
             orderService.confirmReceipt(buyerId, request.getOrderNo(), receiptPhotoKeysJson);
 
             responseObserver.onNext(ConfirmReceiptResponse.newBuilder()
@@ -750,11 +709,9 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 賣家端 ====================
     @Override
     public void getSellerOrders(GetSellerOrdersRequest request, StreamObserver<GetSellerOrdersResponse> responseObserver) {
         try {
-            // 授權：賣家本人或代行（orders.read）。訂單面只有 orders.read，寫入全在禁區。
             DelegationContext delegation = delegationOrNull(request.hasDelegation(), request.getDelegation());
             GrpcAuthContext.requireSellerOrDelegated(delegation, request.getStoreId(),
                     DelegationCapability.ORDERS_READ);
@@ -763,28 +720,22 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             int page = ProtoConversionUtils.parseIntRequired(request.getPage().getPage(), "page");
             int size = ProtoConversionUtils.parseIntRequired(request.getPage().getSize(), "size");
 
-            // 解析可選的買家篩選條件
             long buyerId = ProtoConversionUtils.parseLongOrDefault(request.getBuyerId(), 0L);
 
-            // 列表與筆數共用同一個 query 實例，條件才不會分岔（total 對不上 records 不會報錯）
             SellerOrderQuery query = orderService.sellerOrderQuery(storeId, buyerId,
                     request.getStatusFilter(), request.getKeyword(),
                     request.getDateFrom(), request.getDateTo());
             List<OrderEntity> orders = orderService.getSellerOrders(query, page, size);
             long total = orderService.countSellerOrders(query);
 
-            // 聚合賣家資訊（賣家端：賣家查自己的訂單，只有一個 storeId）
             Map<Long, SellerMeta> sellerMetaMap = fetchSellerMetaQuietly(List.of(storeId));
-            // 聚合買家資訊（賣家視角需要顯示買家暱稱+頭像）
             List<Long> buyerIds = orders.stream().map(OrderEntity::getBuyerId).distinct().toList();
             Map<Long, BuyerDisplay> buyerDisplayMap = fetchBuyerDisplayQuietly(buyerIds);
             String cdnBaseUrl = getCdnBaseUrl();
 
-            // 賣家列表頁：批次取得即時 shipment（含最新出貨照片，避免賣家剛上傳的快照延遲）
             Map<String, ShipmentDetailView> shipmentMap = fetchShipmentsBatchQuietly(
                     orders.stream().map(OrderEntity::getOrderNo).toList());
 
-            // 收斂規範 §6.3：批次解析 providerStatus / providerMessage
             Map<String, ProviderPair> providerMap = resolveProviderStatusMap(orders);
 
             List<OrderSummaryView> summaries = orders.stream()
@@ -796,7 +747,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                                 shipmentMap.get(o.getOrderNo()));
                         return enrichProvider(base, providerMap.get(o.getOrderNo()));
                     })
-                    // 代行讀取：遮罩 ＋ 履約／金流欄位淨空（列表永遠不揭露，本 RPC 也不吐聯絡欄位）
                     .map(s -> delegation != null ? applyDelegatedProjection(s) : s)
                     .toList();
 
@@ -830,13 +780,10 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     @Override
     public void getSellerOrderDetail(GetSellerOrderDetailRequest request, StreamObserver<GetSellerOrderDetailResponse> responseObserver) {
         try {
-            // 授權：賣家本人或代行（orders.read）
             DelegationContext delegation = delegationOrNull(request.hasDelegation(), request.getDelegation());
             GrpcAuthContext.requireSellerOrDelegated(delegation, request.getStoreId(),
                     DelegationCapability.ORDERS_READ);
 
-            // PII 揭露的補充斷言（全案唯一一處呼叫端補的判定）：orders.read 落在 S1b 的「不驗」側，
-            // 而揭露完整收件資訊是必落稽核的，Validate 又看不到 reveal_recipient_contact ⇒ 只能在這裡補。
             boolean reveal = request.getRevealRecipientContact();
             if (reveal) {
                 if (delegation == null) {
@@ -848,10 +795,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     return;
                 }
                 if (delegation.getAuditLogId().isEmpty()) {
-                    // 9289 而不是 9260（#2744）：audit_log_id 由 Gateway 的 orchestrator 在
-                    // 呼叫本 RPC 之前寫入稽核意圖時填上，操作者碰不到它。缺了它代表 Gateway
-                    // 沒走完自己的兩階段流程 —— 與 DelegationContextValidator 的 S1b 同一個
-                    // 主體，重試與重填表單都無效。
                     throw new DelegationDeniedException(
                             GrpcResponseCode.DELEGATION_INTERNAL_CONTRACT_MISMATCH,
                             "PII 揭露必須帶稽核列 ID");
@@ -860,9 +803,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             long storeId = request.getStoreId();
 
             OrderEntity order = orderService.getOrderByNo(request.getOrderNo());
-            // Ownership 檢查：訂單必須屬於該賣家
             if (order.getStoreId() != storeId) {
-                // 越權防枚舉（API 設計規範 §14.1）：回應與「訂單不存在」完全一致，不洩漏訂單存在
                 throw new OrderNotFoundException(request.getOrderNo());
             }
 
@@ -870,17 +811,14 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             List<RefundRequestEntity> refunds = orderService.getRefundHistory(request.getOrderNo());
             ShipmentDetailView shipment = fetchShipmentQuietly(order.getOrderNo());
 
-            // 聚合賣家資訊
             Map<Long, SellerMeta> sellerMetaMap = fetchSellerMetaQuietly(List.of(order.getStoreId()));
             SellerMeta sellerMeta = sellerMetaMap.get(order.getStoreId());
-            // 聚合買家資訊（賣家視角需要顯示買家暱稱+頭像）
             Map<Long, BuyerDisplay> buyerDisplayMap = fetchBuyerDisplayQuietly(List.of(order.getBuyerId()));
             BuyerDisplay buyerDisplay = buyerDisplayMap.get(order.getBuyerId());
             String cdnBaseUrl = getCdnBaseUrl();
 
             OrderDetailView baseDetail = OrderProtoConverter.toDetailView(
                     order, items, refunds, shipment, sellerMeta, buyerDisplay, cdnBaseUrl, true);
-            // 收斂規範 §6.3：詳情端單筆聚合 provider 狀態
             OrderDetailView detail = enrichProvider(baseDetail, resolveProviderStatusFor(order));
             if (delegation != null) {
                 detail = applyDelegatedProjection(detail, reveal);
@@ -919,7 +857,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     }
 
 
-    // ==================== 代行讀取投影（56 §8.1.5 / §8.1.0） ====================
 
     /** proto3 message 欄位天生有 presence：未帶 = 賣家本人操作，帶了 = 代行操作。 */
     private static DelegationContext delegationOrNull(boolean present, DelegationContext delegation) {
@@ -935,7 +872,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     private static OrderSummaryView applyDelegatedProjection(OrderSummaryView summary) {
         return summary.toBuilder()
                 .setShippingAddress(nullToEmpty(MaskUtils.maskAddressToDistrict(summary.getShippingAddress())))
-                // 履約物件
                 .clearLabelKey()
                 .clearLabelExpireAt()
                 .clearPartnerId()
@@ -943,7 +879,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 .clearValidationNo()
                 .clearShipmentPhotoKeys()
                 .clearPickupStoreName()
-                // 金流與退款
                 .clearProviderStatus()
                 .clearProviderMessage()
                 .build();
@@ -958,7 +893,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
      */
     private static OrderDetailView applyDelegatedProjection(OrderDetailView detail, boolean reveal) {
         OrderDetailView.Builder builder = detail.toBuilder()
-                // 履約物件
                 .clearShipmentNo()
                 .clearLabelKey()
                 .clearLabelExpireAt()
@@ -969,11 +903,9 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 .clearReceiptPhotoKeys()
                 .clearPickupStoreName()
                 .clearCvsStoreId()
-                // 金流
                 .clearTransactionId()
                 .clearProviderStatus()
                 .clearProviderMessage()
-                // 退款與撥款
                 .clearRefundHistory();
         if (!reveal) {
             builder.setRecipientPhone(nullToEmpty(MaskUtils.maskPhone(detail.getRecipientPhone())))
@@ -1001,7 +933,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         return value != null ? value : "";
     }
 
-    // ==================== 服務間呼叫 ====================
 
     @Override
     public void getOrderForShipping(GetOrderForShippingRequest request, StreamObserver<GetOrderForShippingResponse> responseObserver) {
@@ -1011,10 +942,8 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             log.info("OrderGrpcService.getOrderForShipping.start", "取得物流建單資訊",
                     "order_no", orderNo);
 
-            // 純內部讀：授權由 HMAC internal-auth + netpol 保證，request.store_id 已不再用於歸屬校驗（#1366）
             OrderEntity order = orderService.getOrderForShipping(orderNo);
 
-            // 取第一筆明細的 skuName 作為 product_name
             OrderItemEntity firstItem = orderItemRepository.findFirstByOrderNo(orderNo);
             String productName = (firstItem != null) ? firstItem.getSkuName() : "";
 
@@ -1073,11 +1002,9 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 return;
             }
 
-            // 取第一筆明細的 skuName 作為 product_name
             OrderItemEntity firstItem = orderItemRepository.findFirstByOrderNo(orderNo);
             String productName = (firstItem != null) ? firstItem.getSkuName() : "";
 
-            // totalActualAmount 已包含運費，直接使用
             long amount = order.getTotalActualAmount();
 
             OrderPaymentInfo info = OrderPaymentInfo.newBuilder()
@@ -1087,7 +1014,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .setBuyerId(String.valueOf(order.getBuyerId()))
                     .setStatus(order.getStatus())
                     .setProductName(productName)
-                    // #2501 供 payment-service seller 付款歷程 store 歸屬驗證
                     .setStoreId(String.valueOf(order.getStoreId()))
                     .build();
 
@@ -1105,7 +1031,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 服務間呼叫（review-service）====================
     @Override
     public void getOrderForReview(GetOrderForReviewRequest request, StreamObserver<GetOrderForReviewResponse> responseObserver) {
         try {
@@ -1135,7 +1060,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 結帳模組 ====================
 
     @Override
     public void checkoutValidate(CheckoutValidateRequest request, StreamObserver<CheckoutValidateResponse> responseObserver) {
@@ -1194,10 +1118,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
-            // 🔴 只收 requireAccountType 自己丟的那兩個 status。
-            //    下游 gRPC（product / buyer / shipping）的 UNAVAILABLE、DEADLINE_EXCEEDED 也是
-            //    StatusRuntimeException——把它們一起收進來會變成「權限不足」，
-            //    而真正的成因是某個服務掛了。那種歸因錯誤要花一整輪才追得回來。
             Status.Code code = e.getStatus().getCode();
             if (code != Status.Code.UNAUTHENTICATED && code != Status.Code.PERMISSION_DENIED) {
                 GrpcErrorHandler.handleException(responseObserver, OrderUberQuoteResponse.newBuilder(), e, "OrderGrpcService", "getUberQuoteForCheckout", GrpcResponseCode.INTERNAL_ERROR);
@@ -1235,8 +1155,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (UnavailableItemsException e) {
-            // 20 §4.2：ShippingFee 不做 row 級攔截，但若 resolved 空（所有 SKU LOOKUP_FAILED / 全 inactive）
-            // 用 envelope code=4001 + 通用 message 回；前端引導買家返回購物車（已反灰）
             responseObserver.onNext(CheckoutShippingFeeResponse.newBuilder()
                     .setCode(GrpcResponseCode.INSUFFICIENT_STOCK.code())
                     .setMessage(e.getMessage())
@@ -1270,9 +1188,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     request.getCouponTemplateId(),
                     buyerId,
                     request.getConsolidated(),
-                    // 3003 專用（其餘配送方式為空字串）：結構化收件地址的來源鍵 ＋ 買家手上那筆報價。
-                    // 少了它們，preview 對 3003 會依 deny-by-default 回 9503，
-                    // 而買家在購物車是選得到 Uber 的 ⇒ 一條可達的死路。
                     request.getAddressId(),
                     request.getUberQuoteId()
             );
@@ -1284,7 +1199,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (UnavailableItemsException e) {
-            // 20 §3.4 + §4.14：row 級不可購買 → envelope code=4001 + data.unavailable_items[]
             CheckoutPreviewData.Builder dataBuilder = CheckoutPreviewData.newBuilder();
             for (var u : e.getItems()) {
                 dataBuilder.addUnavailableItems(UnavailableItem.newBuilder()
@@ -1342,7 +1256,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (CheckoutPriceChangedException e) {
-            // 金額變動：回傳變動明細供前端提示
             responseObserver.onNext(CheckoutConfirmResponse.newBuilder()
                     .setCode(GrpcResponseCode.CHECKOUT_PRICE_CHANGED.code())
                     .setMessage(e.getMessage())
@@ -1357,8 +1270,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (UnavailableItemsException e) {
-            // 20 §3.5 + §4.14：row 級不可購買 → envelope code=4001 + data.unavailable_items[]
-            // 由 CheckoutService.confirm 在 resolveItems 階段 throw
             CheckoutConfirmData.Builder dataBuilder = CheckoutConfirmData.newBuilder();
             for (var u : e.getItems()) {
                 dataBuilder.addUnavailableItems(UnavailableItem.newBuilder()
@@ -1376,8 +1287,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .build());
             responseObserver.onCompleted();
         } catch (InsufficientStockException e) {
-            // 後備：建單階段（OrderService.createOrderFromCheckout）DeductStock 失敗時可能仍 throw 舊例外。
-            // 20 §3.5 + §4.14：envelope code=4001 + data.unavailable_items[reason=INSUFFICIENT_STOCK]
             CheckoutConfirmData.Builder dataBuilder = CheckoutConfirmData.newBuilder();
             for (InsufficientStockException.Item item : e.getItems()) {
                 dataBuilder.addUnavailableItems(UnavailableItem.newBuilder()
@@ -1425,17 +1334,14 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 管理端 ====================
     @Override
     public void searchOrders(SearchOrdersRequest request, StreamObserver<SearchOrdersResponse> responseObserver) {
         try {
-            // 授權：僅 ADMIN 可搜尋所有訂單
             GrpcAuthContext.requireAccountType(AccountType.ADMIN);
 
             int page = ProtoConversionUtils.parseIntRequired(request.getPage().getPage(), "page");
             int size = ProtoConversionUtils.parseIntRequired(request.getPage().getSize(), "size");
 
-            // buyer_id / store_id 為管理端查詢參數（SearchOrdersRequest 欄位名），空字串表示不篩選
             long buyerIdFilter = ProtoConversionUtils.parseLongOrDefault(request.getBuyerId(), 0L);
             long storeIdFilter = ProtoConversionUtils.parseLongOrDefault(request.getStoreId(), 0L);
 
@@ -1444,10 +1350,8 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             long total = orderService.countSearchOrders(
                     request.getOrderNo(), buyerIdFilter, storeIdFilter, request.getStatus());
 
-            // 聚合賣家資訊
             List<Long> sellerIds = orders.stream().map(OrderEntity::getStoreId).distinct().toList();
             Map<Long, SellerMeta> sellerMetaMap = fetchSellerMetaQuietly(sellerIds);
-            // 聚合買家資訊（管理端需要顯示買家暱稱+頭像）
             List<Long> buyerIds = orders.stream().map(OrderEntity::getBuyerId).distinct().toList();
             Map<Long, BuyerDisplay> buyerDisplayMap = fetchBuyerDisplayQuietly(buyerIds);
             String cdnBaseUrl = getCdnBaseUrl();
@@ -1481,7 +1385,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     @Override
     public void getAdminOrderDetail(GetAdminOrderDetailRequest request, StreamObserver<GetAdminOrderDetailResponse> responseObserver) {
         try {
-            // 授權：僅 ADMIN 可查詢管理端訂單詳情
             GrpcAuthContext.requireAccountType(AccountType.ADMIN);
 
             OrderEntity order = orderService.getOrderByNo(request.getOrderNo());
@@ -1490,15 +1393,12 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             List<FinancialLogEntity> financialLogs = orderService.getFinancialLogs(request.getOrderNo());
             ShipmentDetailView shipment = fetchShipmentQuietly(order.getOrderNo());
 
-            // 聚合賣家資訊
             Map<Long, SellerMeta> sellerMetaMap = fetchSellerMetaQuietly(List.of(order.getStoreId()));
             SellerMeta sellerMeta = sellerMetaMap.get(order.getStoreId());
-            // 聚合買家資訊（管理端需要顯示買家暱稱+頭像）
             Map<Long, BuyerDisplay> buyerDisplayMap = fetchBuyerDisplayQuietly(List.of(order.getBuyerId()));
             BuyerDisplay buyerDisplay = buyerDisplayMap.get(order.getBuyerId());
             String cdnBaseUrl = getCdnBaseUrl();
 
-            // §29 Admin 對帳明細：依 order.status 聚合 provider_*
             ProviderPair providerPair = resolveProviderStatusFor(order);
             OrderDetailView baseDetailView = OrderProtoConverter.toDetailView(order, items, refunds, shipment, sellerMeta, buyerDisplay, cdnBaseUrl, true);
             OrderDetailView enrichedDetailView = enrichProvider(baseDetailView, providerPair);
@@ -1507,14 +1407,12 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .setOrderInfo(enrichedDetailView)
                     .addAllLogs(OrderProtoConverter.toFinancialLogViews(financialLogs));
 
-            // §29 providerContext 附加額外欄位（trade_no / refund_no / ship_trade_no 等對帳細節）
             String source = resolveProviderSource(order.getStatus());
             if (!source.isEmpty() && (!providerPair.status().isEmpty() || !providerPair.message().isEmpty())) {
                 AdminProviderContext.Builder pcBuilder = AdminProviderContext.newBuilder()
                         .setProviderSource(source)
                         .setProviderStatus(providerPair.status() == null ? "" : providerPair.status())
                         .setProviderMessage(providerPair.message() == null ? "" : providerPair.message());
-                // 補對帳細節
                 if (ProviderSource.SHIPPING.value().equals(source)) {
                     if (shipment != null) {
                         pcBuilder.setShipTradeNo(shipment.getShipTradeNo() == null ? "" : shipment.getShipTradeNo());
@@ -1564,7 +1462,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         return "";
     }
 
-    // ==================== §29 A1 Admin 異常訂單列表 ====================
 
     @Override
     public void listAbnormalOrdersForAdmin(ListAbnormalOrdersForAdminRequest request,
@@ -1577,8 +1474,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
 
             var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderEntity>();
 
-            // 預設異常 status filter。目前 OrderStatus enum 唯一的「異常」終態是 SHIPPING_ABNORMAL。
-            // 若 caller 未帶 status 則預設只列此狀態；caller 可顯式傳 status=... 覆寫。
             if (org.springframework.util.StringUtils.hasText(request.getStatus())) {
                 wrapper.in(OrderEntity::getStatus, java.util.Arrays.asList(request.getStatus().split(",")));
             } else {
@@ -1616,7 +1511,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
             var result = orderRepository.selectPage(page, wrapper);
 
-            // 批次聚合 provider_*
             Map<String, ProviderPair> providerMap = resolveProviderStatusMap(result.getRecords());
 
             ListAbnormalOrdersForAdminData.Builder dataBuilder = ListAbnormalOrdersForAdminData.newBuilder()
@@ -1656,7 +1550,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 服務間：買家消費彙總 ====================
 
     @Override
     public void getBuyerMerchantSummary(GetBuyerMerchantSummaryRequest request,
@@ -1710,7 +1603,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .setPageSize(String.valueOf(size));
 
             for (var o : orders) {
-                // 時間格式統一使用 ISO 8601（UTC）
                 String createTimeIso = o.getCreatedAt() != null
                         ? DateTimeUtils.formatIso8601(o.getCreatedAt())
                         : "";
@@ -1726,7 +1618,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                         .setShippingFee(ProtoConversionUtils.formatAmount(o.getShippingFee()))
                         .setRefundAmount(ProtoConversionUtils.formatAmount(o.getRefundTotalAmount()));
 
-                // 商品明細（復用 OrderItemDetail）
                 List<OrderItemEntity> items = orderService.getOrderItems(o.getOrderNo());
                 recordBuilder.addAllItems(OrderProtoConverter.toItemDetails(items, cdnBaseUrl));
 
@@ -1739,7 +1630,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 賣家儀表板 ====================
 
     @Override
     public void getSellerOrderStatusCounts(GetSellerOrderStatusCountsRequest request,
@@ -1753,8 +1643,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .setMessage(GrpcResponseCode.SUCCESS.message())
                     .setPendingShipmentCount(counts[0])
                     .setInProgressCount(counts[1])
-                    // counts[2] = 「已結束」桶（含 CANCELLED(80)/FULLY_REFUNDED(70)，非成交數）；
-                    // 欄名 completed_count 為既有 wire 契約保留，語意見 OrderService#getSellerOrderStatusCounts。
                     .setCompletedCount(counts[2])
                     .setAftersalesCount(counts[3])
                     .build());
@@ -1764,7 +1652,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 推薦商家：營收排名 ====================
 
     @Override
     public void getTopSellersByRevenue(GetTopSellersByRevenueRequest request,
@@ -1793,7 +1680,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 推薦商家：各店訂單統計 ====================
 
     private static final int STORE_ORDER_STATS_MAX_DAYS = 90;
     private static final int STORE_ORDER_STATS_DEFAULT_PAGE_SIZE = 500;
@@ -1852,7 +1738,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 單體賣家儀表板：單店分時間窗的訂單統計 ====================
 
     private static final int STORE_PERIOD_STATS_MAX_WINDOWS = 4;
     private static final long STORE_PERIOD_STATS_MAX_WINDOW_MS = 90L * 24 * 60 * 60 * 1000;
@@ -1916,7 +1801,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 服務間呼叫（aftersales-service）====================
 
     /**
      * 售後用：查詢訂單詳情（含買家地址、金額、送達時間）
@@ -1978,7 +1862,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             log.info("OrderGrpcService.cancelOrderInternal.start", "售後內部取消訂單",
                     "order_no", orderNo);
 
-            // 03 §5.3.2：寫入前 validator 強制檢查
             if (cancelReason != null && !cancelReason.isBlank()) {
                 io.github.will413028.hawkr.common.utils.code.CodeMetaValidator.requireValidValue(
                         io.github.will413028.hawkr.common.utils.code.OrderCancelReason.class, cancelReason, "cancelReason");
@@ -1986,9 +1869,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             io.github.will413028.hawkr.common.utils.code.CodeMetaValidator.requireValidValue(
                     io.github.will413028.hawkr.common.utils.code.OrderCancelByRole.class, cancelByRole, "cancelByRole");
 
-            // CAS 狀態更新：PENDING_PAYMENT(0)/PAID(10)/PENDING_SHIPMENT(20) → CANCELLED(80)
-            // #1368：狀態變更 + 庫存歸還 order.cancelled outbox 於 OrderService 同事務落地，
-            // 由 outbox scheduler 保證至少一次投遞，取代原 CAS auto-commit + TX 外 best-effort 直發
             int updated = orderService.cancelOrderInternalInTx(orderNo, cancelReason, cancelRemark, cancelByRole);
             if (updated == 0) {
                 responseObserver.onNext(CancelOrderInternalResponse.newBuilder()
@@ -1999,11 +1879,8 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 return;
             }
 
-            // TX 外：釋放優惠券（best-effort）
             releaseCouponForOrder(orderNo);
 
-            // [B-207] #1229：賣家工作區 realtime — 售後內部取消訂單 → CANCELLED(80)（eager，本 handler 非 @Transactional；03 §2.1 emit 矩陣 #10）
-            // previousStatus 傳 null：CAS WHERE status IN ('0','10','20') 多前置，與物流推進路徑一致不精確回填
             Long storeId = orderRepository.findStoreIdByOrderNo(orderNo);
             eventPublisher.emitSellerOrderUpdated(
                     storeId, orderNo, OrderEventPublisher.SRC_SYSTEM,
@@ -2048,7 +1925,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 服務間：發票快照（58 號 §7.1.2 步驟 5 ①）====================
 
     /**
      * invoice-service 的 {@code order.paid} consumer 專用：取開票所需的訂單不可變快照。
@@ -2073,8 +1949,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     public void getOrderInvoiceSnapshotInternal(GetOrderInvoiceSnapshotInternalRequest request,
                                                StreamObserver<GetOrderInvoiceSnapshotInternalResponse> responseObserver) {
         try {
-            // §5.2 internal-only：發票側服務間呼叫，無使用者情境。簽章由 server interceptor 驗
-            // （52 號 HMAC 四 header），這裡只讀 interceptor 的判定結果。
             if (!GrpcAuthContext.isInternalCall()) {
                 throw Status.PERMISSION_DENIED
                         .withDescription("GetOrderInvoiceSnapshotInternal 僅接受內部服務呼叫")
@@ -2097,8 +1971,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             OrderInvoiceSnapshotEntity snapshot =
                     orderInvoiceSnapshotRepository.findLatestByOrderNo(orderNo);
             if (snapshot == null) {
-                // V12 之前建立的訂單沒有快照。fail-loud 是刻意的：靜默補一個「無載具 B2C」
-                // 會讓 cutover 之前的舊訂單被自動開票，而那些訂單的買家從來沒有做過發票選擇。
                 log.warn("OrderGrpcService.getOrderInvoiceSnapshotInternal.snapshotNotFound",
                         "訂單無發票快照（V12 之前建立的訂單）", "order_no", orderNo);
                 responseObserver.onNext(GetOrderInvoiceSnapshotInternalResponse.newBuilder()
@@ -2126,7 +1998,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .setShippingFee(amountStr(order.getShippingFee()))
                     .setDiscountAmount(amountStr(order.getDiscountAmount()))
                     .setTotalActualAmount(amountStr(order.getTotalActualAmount()))
-                    // 見 javadoc：判不出來就送空字串，讓呼叫端 fail-closed
                     .setDiscountFunding("");
 
             for (OrderItemEntity item : items) {
@@ -2202,8 +2073,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 return;
             }
 
-            // 防線 1：這把鑰匙先前已經寫成功過 ⇒ 回同一個版本。
-            // 放在最前面：重送時連 order 都不必查，且不會因為期間有別人更正過而誤判版本衝突。
             OrderInvoiceSnapshotEntity replayed =
                     orderInvoiceSnapshotRepository.findByRevisionIdempotencyKey(orderNo, idempotencyKey);
             if (replayed != null) {
@@ -2221,8 +2090,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             OrderInvoiceSnapshotEntity latest =
                     orderInvoiceSnapshotRepository.findLatestByOrderNo(orderNo);
             if (latest == null) {
-                // 沒有 v1 就沒有可更正的對象。fail-loud 與 Get 那一支同理：靜默補一列
-                // 會讓從未做過發票選擇的舊訂單被自動開票。
                 log.warn("OrderGrpcService.reviseOrderInvoiceSnapshotInternal.snapshotNotFound",
                         "訂單無發票快照", "order_no", orderNo);
                 responseObserver.onNext(ReviseOrderInvoiceSnapshotInternalResponse.newBuilder()
@@ -2233,7 +2100,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 return;
             }
 
-            // 防線 2：樂觀鎖。沒有它，兩筆並行更正是後寫的靜默覆蓋前者，而兩筆都顯示成功。
             String expected = request.getExpectedSnapshotVersion();
             if (!String.valueOf(latest.getSnapshotVersion()).equals(expected)) {
                 log.warn("OrderGrpcService.reviseOrderInvoiceSnapshotInternal.versionConflict",
@@ -2247,9 +2113,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 return;
             }
 
-            // §8：對應 CodeMeta Enum 的輸入欄位，寫入 DB 前必須走共用 validator。
-            // （這與 §6.2.5 定版 4「不做發票業務驗證」不衝突：那條講的是三選一、金額這類
-            //   業務規則，交給 chk_ois_exclusive 等 DB 約束；碼值合法性是另一層，§8 強制。）
             CodeMetaValidator.requireValidValue(InvoiceDocumentKind.class,
                     request.getInvoiceKind(), "invoiceKind");
             CodeMetaValidator.requireValidValue(InvoiceCarrierSelectionMode.class,
@@ -2265,16 +2128,12 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             next.setBuyerTaxId(emptyToNull(request.getBuyerTaxId()));
             next.setBuyerTitle(emptyToNull(request.getBuyerTitle()));
             next.setDonationCode(emptyToNull(request.getDonationCode()));
-            // 見 javadoc：通知信箱不是內容軸，原樣沿用前一版。
             next.setNotifyEmail(latest.getNotifyEmail());
             next.setRevisionIdempotencyKey(idempotencyKey);
 
             try {
                 orderInvoiceSnapshotRepository.insert(next);
             } catch (DuplicateKeyException e) {
-                // 防線 3：並行的兩邊都通過了防線 2、都算出同一個 v(n+1)。
-                // uk_order_invoice_snapshots 擋下後者；回 9308 讓它重讀重試，
-                // 不要吞掉——吞掉就是「回報成功但什麼都沒寫」。
                 log.warn("OrderGrpcService.reviseOrderInvoiceSnapshotInternal.raced",
                         "並行更正撞唯一鍵 v" + next.getSnapshotVersion(), "order_no", orderNo);
                 responseObserver.onNext(ReviseOrderInvoiceSnapshotInternalResponse.newBuilder()
@@ -2305,7 +2164,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         return v == null ? "0" : String.valueOf(v);
     }
 
-    // ==================== Admin 撥款重發（收斂規範 §8.4）====================
 
     @Override
     public void retryGrant(io.github.will413028.hawkr.order.grpc.RetryGrantRequest request,

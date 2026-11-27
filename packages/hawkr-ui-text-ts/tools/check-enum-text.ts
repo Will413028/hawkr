@@ -233,7 +233,6 @@ export function exportedHanConsts(
 			}
 		}
 	}
-	// `export { U, V as W }`（沒有 from）：宣告在別處的常數。
 	for (const st of sf.statements) {
 		if (
 			ts.isExportDeclaration(st) &&
@@ -277,13 +276,10 @@ export function scanSource(
 		if (e.tsModule && e.tsName)
 			byModuleName.set(`${e.tsModule}#${e.tsName}`, e);
 	}
-	// 區域識別字 → enum；namespace import 的前綴 → 模組；import 進來的含漢字常數的區域名稱。
 	const locals = new Map<string, ManifestEnum>();
 	const namespaces = new Map<string, string>();
 	const importedConsts = new Set<string>();
-	// 從 next-intl 匯入的 translator 工廠的區域名稱（含 `as` 別名）；其他來源的同名函式不算。
 	const translatorFactories = new Set<string>();
-	// `import * as I from "next-intl"` 的命名空間名稱。
 	const translatorNamespaces = new Set<string>();
 	for (const stmt of sf.statements) {
 		if (
@@ -350,7 +346,6 @@ export function scanSource(
 		node: ts.Node;
 	}
 
-	// `E.M` 或 `ns.E.M`（可包在括號、`as`、`!`、`satisfies` 裡）；值號 0 的成員不是選擇子（K2）。
 	const select = (expr: ts.Expression): Sel | undefined => {
 		const x = stripWrappers(expr);
 		if (!ts.isPropertyAccessExpression(x)) return undefined;
@@ -374,8 +369,6 @@ export function scanSource(
 		return undefined;
 	};
 
-	// 作用域（K4、K5 共用）：從使用處往上找 Block／函式／SourceFile／case 子句；區塊裡只看使用處之前的宣告，
-	// SourceFile 看全部（函式本體在呼叫時才執行，頂層宣告的位置不影響）。參數、`let`／`var` 遮住同名的 const。
 	const lookupVar = (id: ts.Identifier): VarInfo | undefined => {
 		const name = id.text;
 		const pos = id.getStart(sf);
@@ -609,7 +602,6 @@ export function scanSource(
 						];
 			}
 			if (isEq(k) || isNe(k)) {
-				// `alias != null`（或 `alias == null` 為假）：別名 `cond ? x : null` 有值，等於它的 cond 為真。
 				const other = isNullish(c.right)
 					? c.left
 					: isNullish(c.left)
@@ -758,7 +750,6 @@ export function scanSource(
 			let pending: Sel[] = [];
 			for (const clause of n.clauses) {
 				if (ts.isDefaultClause(clause)) {
-					// default 可由任何值到達：不是確定相等；它的敘述也不屬於前面 fall-through 進來的成員。
 					pending = [];
 					continue;
 				}
@@ -1116,7 +1107,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 	try {
 		process.exit(main(process.argv.slice(2)));
 	} catch (error) {
-		// 未捕捉的例外 node 回 1，會和「有命中」混在一起；工具壞了一律回 2。
 		console.error(error);
 		process.exit(2);
 	}

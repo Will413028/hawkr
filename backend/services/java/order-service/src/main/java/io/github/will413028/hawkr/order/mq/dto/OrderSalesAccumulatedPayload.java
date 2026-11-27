@@ -24,7 +24,7 @@ import java.util.UUID;
 public record OrderSalesAccumulatedPayload(
         String eventId,
         String orderNo,
-        String occurredAt,                  // ISO 8601 UTC
+        String occurredAt,
         List<ProductSalesItem> items
 ) {
     public OrderSalesAccumulatedPayload(String orderNo, String occurredAt, List<ProductSalesItem> items) {

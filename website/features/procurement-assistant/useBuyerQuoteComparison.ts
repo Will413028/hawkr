@@ -68,8 +68,6 @@ export function useBuyerQuoteComparison(
 	const [list, setList] = React.useState<QuoteListState>({
 		status: "loading",
 	});
-	// 同一列的加入／移除必須序列化：兩個 request 交錯時伺服器的處理順序可以與
-	// 回應順序不同，畫面會停在伺服器已經不承認的狀態。不同列仍可並行。
 	const shortlistGuard = React.useMemo(createExclusiveMutationGuard, []);
 	const generationRef = React.useRef(0);
 
@@ -138,10 +136,7 @@ export function useBuyerQuoteComparison(
 			}
 			const key = `${target.sellerResponseId}:${target.sellerResponseVersion}`;
 			const lease = shortlistGuard.begin(key);
-			// 同一列還有 request 在途：直接當成沒有按過，不排隊也不覆寫。
 			if (!lease) return { ok: true, data: shortlisted };
-			// 樂觀更新：兩支方法都是目標狀態的方法（重送結果相同），失敗時把該列還原即可，
-			// 不必整張表重讀。
 			const apply = (value: boolean) =>
 				setList((current) =>
 					current.status === "success"

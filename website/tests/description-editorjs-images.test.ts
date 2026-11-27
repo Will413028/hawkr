@@ -42,7 +42,6 @@ const existingDescription = (): ProductDescription => ({
 });
 
 test("a saved image remains renderable through canonical history snapshots", () => {
-	// DescriptionEditor canonicalizes its initial history with this round trip.
 	const snapshot = fromEditorData(toEditorData(existingDescription()));
 	assert.equal(snapshot.blocks[1].imageUrl, undefined);
 	const restored = toEditorData(snapshot);
@@ -57,7 +56,6 @@ test("a saved image remains renderable through canonical history snapshots", () 
 });
 
 test("a newly uploaded image retains its staged token across save and reload", () => {
-	// The uploader returns a URL and staged token, with no imageKey yet.
 	const uploaded: OutputData = {
 		blocks: [
 			{
@@ -104,7 +102,6 @@ test("undo and redo snapshots preserve image order and identities after deletion
 		...added,
 		blocks: added.blocks.filter((block) => block.id !== "existing-image"),
 	};
-	// These are the saved data fed to applySnapshotToEditor on undo/redo.
 	for (const target of [added, deleted, added, baseline, added, deleted]) {
 		const restored = toEditorData(target);
 		assert.deepEqual(

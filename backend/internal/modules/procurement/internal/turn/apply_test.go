@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// spread 是 n 個命中，依序落在 roots 個大類（輪流）。
 func spread(n int, roots ...string) []resolver.Match {
 	var out []resolver.Match
 	for i := 0; i < n; i++ {
@@ -114,7 +113,7 @@ func groupPayload(t *testing.T) InterruptPayload {
 func groupOpt(name string) string { return "category-" + rootID(name).String() }
 
 func TestApplyGroupChoice(t *testing.T) {
-	all := spread(6, "水果", "加工品") // 水果：品0 品2 品4；加工品：品1 品3 品5
+	all := spread(6, "水果", "加工品")
 	t.Run("one match in the group confirms the leaf, never the group", func(t *testing.T) {
 		rs := &fakeResolver{res: resolver.Resolution{Matches: append([]resolver.Match{}, all[:2]...)}}
 		o := apply(t, rs, groupPayload(t), Answer{OptionID: groupOpt("水果")})
@@ -209,7 +208,6 @@ func TestApplyRejectsOptionsNotOnTheCard(t *testing.T) {
 }
 
 func TestItemChoiceDoesNotTrustTheCardAlone(t *testing.T) {
-	// 卡上有選項但 payload 的候選沒有它（payload 被改壞）：不確認。
 	p := itemPayload(t)
 	p.Candidates = nil
 	if o := apply(t, &fakeResolver{}, p, Answer{OptionID: optID(1)}); o.Kind != OutcomeInvalid {
@@ -298,7 +296,6 @@ func TestApplyInvalidAnswers(t *testing.T) {
 }
 
 func TestUnusableMatchesNeverConfirm(t *testing.T) {
-	// 標籤空白的命中 Apply 不會收下：不能成為確認，也不出現在卡上。
 	rs := &fakeResolver{byTerm: map[string][]resolver.Match{"梨": {match(1, "", "水果 > x")}}}
 	o := apply(t, rs, itemPayload(t), Answer{FreeText: "梨"})
 	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageDescribe {
@@ -357,7 +354,6 @@ func TestZeroMatchesAsksDescribeNotEmptyItemCard(t *testing.T) {
 func nonLeaf(m resolver.Match) resolver.Match { m.Leaf = false; return m }
 
 func TestNonLeafMatchesNeverConfirmOrCount(t *testing.T) {
-	// 6 個命中裡 2 個是非末層：只剩 4 個末層，不到 GROUP 門檻。
 	ms := spread(4, "水果", "加工品")
 	ms = append(ms, nonLeaf(match(900, "x", "水果")), nonLeaf(match(901, "y", "加工品")))
 	if p := cardFromMatches(ms); p.Stage != StageItem || len(p.Candidates) != 4 {
@@ -388,7 +384,6 @@ func TestChildlessRootGroupPickDoesNotConfirmTheGroup(t *testing.T) {
 }
 
 func TestItemPickRechecksCurrentTaxonomy(t *testing.T) {
-	// category-2 已不在現行分類樹：不確認，用現在的命中重新出卡。
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(3, "蘋果醋", "加工品 > 蘋果醋")}}}
 	o := apply(t, rs, itemPayload(t), Answer{OptionID: optID(2)})
 	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem || len(o.Next.Candidates) != 2 {
@@ -410,7 +405,6 @@ func TestOptionWithWhitespaceOnlyTextIsAnOptionAnswer(t *testing.T) {
 }
 
 func TestLeafListCardPickConfirms(t *testing.T) {
-	// 大類沒有與原詞相符的末層：列出該大類的末層，選其中一個要能確認（現行分類樹仍有它）。
 	l1, l2 := match(100, "品0", "水果 > 品0"), match(101, "品1", "水果 > 品1")
 	rs := &fakeResolver{res: resolver.Resolution{}, leaves: map[uuid.UUID][]resolver.Match{rootID("水果"): {l1, l2}}}
 	o := apply(t, rs, groupPayload(t), Answer{OptionID: groupOpt("水果")})
@@ -437,7 +431,6 @@ func TestChildlessRootNeverConfirmsOnTypedPath(t *testing.T) {
 }
 
 func TestStalePickRebuildsThroughDecideMatches(t *testing.T) {
-	// 只剩 1 個現行命中：直接確認；0 個：描述卡。
 	one := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果")}}}
 	o := apply(t, one, itemPayload(t), Answer{OptionID: optID(2)})
 	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != catID(1) {
@@ -459,7 +452,6 @@ func TestStalePickOnGroupNarrowedCardStaysInRoot(t *testing.T) {
 	if p.Stage != StageItem || p.Root == nil || *p.Root != rootID("水果") {
 		t.Fatalf("前置：ITEM 卡要記住大類：%+v", p)
 	}
-	// 選項 100 已消失；現行命中有 2 個水果、6 個別的大類：只在水果內出卡，不退回 GROUP 卡。
 	cur := []resolver.Match{ms[1], ms[2]}
 	for i, root := range []string{"加工品", "其他", "加工品", "其他", "加工品", "其他"} {
 		cur = append(cur, match(int64(800+i), fmt.Sprintf("他%d", i), root+" > 他"+fmt.Sprint(i)))

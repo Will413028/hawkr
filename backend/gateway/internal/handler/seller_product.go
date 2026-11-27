@@ -67,7 +67,6 @@ type HashtagItem struct {
 	ProductCount string `json:"productCount"`          // 引用數量（hashtag.product_count 即時值，字串型別）
 }
 
-// toHashtagItems 將 proto 的 hashtag list 轉為 gateway 的 HashtagItem slice。
 func toHashtagItems(protoItems []*pb.HashtagItem) []HashtagItem {
 	if len(protoItems) == 0 {
 		return nil
@@ -86,7 +85,6 @@ func toHashtagItems(protoItems []*pb.HashtagItem) []HashtagItem {
 	return out
 }
 
-// toCertificationItems converts proto Certification list to gateway DTO（商品卡 / 詳情共用）。
 func toCertificationItems(protoItems []*pb.Certification) []CertificationItem {
 	if len(protoItems) == 0 {
 		return nil
@@ -262,14 +260,6 @@ type UpdateProductRequest struct {
 	UpdateHashtags bool                       `json:"updateHashtags,omitempty"` // true=本次以 hashtags 全量取代；false/未設=不變更
 }
 
-// convertDescriptionInputToProto 將 ProductDescriptionInput 轉換為 pb.ProductDescription
-// Gateway body 使用 style 物件，轉換為 Proto 的 style_json 字串
-//
-// objectKey 走 resolveInputObjectKey 正規化（49 號 §25 / 10 檔 §25：前端可控輸入只收 objectKey）：
-// 剝殼本平台顯示 URL、拒絕外來域名與非 public/ 前綴。商品描述圖是公開資產，前綴一律 public/。
-// 不做這層會讓完整 URL 直接落進 products.description 的 objectKey——product-service 只在
-// stagedToken finalize 成功時覆寫該欄位（沒有 stagedToken 的 block 原樣落庫），髒值一旦
-// 落庫就會隨「載入→再送出」自我複製。
 func convertDescriptionInputToProto(mediaBase string, input *ProductDescriptionInput) (*pb.ProductDescription, error) {
 	if input == nil {
 		return nil, nil
@@ -296,7 +286,6 @@ func convertDescriptionInputToProto(mediaBase string, input *ProductDescriptionI
 			Alt:         b.Alt,
 		}
 
-		// 行內 runs（inline-run 模型）
 		if len(b.Runs) > 0 {
 			runs := make([]*pb.InlineRun, 0, len(b.Runs))
 			for _, r := range b.Runs {
@@ -312,7 +301,6 @@ func convertDescriptionInputToProto(mediaBase string, input *ProductDescriptionI
 			block.Runs = runs
 		}
 
-		// 將 style 物件序列化為 style_json 字串
 		if len(b.Style) > 0 {
 			styleBytes, err := json.Marshal(b.Style)
 			if err == nil {
@@ -375,7 +363,6 @@ func (h *Holder) ListSellerProducts(c *gin.Context) {
 	base := h.MediaBaseURL
 	products := make([]SellerProductItem, 0, len(resp.Products))
 	for _, p := range resp.Products {
-		// gallery objectKey 為 SSOT，顯示 URL 由 Gateway 組（49 §6.6）
 		gallery := make([]GalleryItem, 0, len(p.Gallery))
 		for _, g := range p.Gallery {
 			gallery = append(gallery, GalleryItem{
@@ -457,14 +444,12 @@ func (h *Holder) CreateSellerProduct(c *gin.Context) {
 		return
 	}
 
-	// 驗證冪等鍵必填
 	if req.IdempotencyKey == "" {
 		response.BadRequest(c, "idempotencyKey 為必填欄位")
 		return
 	}
 	idempotencyKey := req.IdempotencyKey
 
-	// 轉換圖片
 	images := make([]*pb.ProductImage, 0, len(req.Images))
 	for _, img := range req.Images {
 		images = append(images, &pb.ProductImage{
@@ -474,10 +459,8 @@ func (h *Holder) CreateSellerProduct(c *gin.Context) {
 		})
 	}
 
-	// 轉換 SKU（配送資訊在 SKU 層級）
 	skus := make([]*pb.ProductSku, 0, len(req.Skus))
 	for _, v := range req.Skus {
-		// 轉換 SKU 層級的運送方式
 		skuShippingMethods := make([]*pb.ShippingMethod, 0, len(v.ShippingMethods))
 		for _, sm := range v.ShippingMethods {
 			skuShippingMethods = append(skuShippingMethods, &pb.ShippingMethod{
@@ -488,7 +471,6 @@ func (h *Holder) CreateSellerProduct(c *gin.Context) {
 			})
 		}
 		skus = append(skus, &pb.ProductSku{
-			// 建立時不帶 Id：SKU 主鍵由 product-service 產生，前端送來的 id 一律無意義。
 			SkuName:         v.SkuName,
 			Weight:          v.Weight,
 			Unit:            v.Unit,
@@ -502,8 +484,6 @@ func (h *Holder) CreateSellerProduct(c *gin.Context) {
 		})
 	}
 
-	// 轉換認證，接著在送進 gRPC 之前剔除非法的那幾筆（19 §6.2.1 第 ① 層）。
-	// 剔除不回 4xx：非法值在舊版 App 的 AI 上架流程上可達，改成 400 會當場弄壞它。
 	certifications := make([]*pb.Certification, 0, len(req.Certifications))
 	for _, cert := range req.Certifications {
 		certifications = append(certifications, &pb.Certification{
@@ -572,7 +552,7 @@ func (h *Holder) UpdateSellerProduct(c *gin.Context) {
 
 	productID := c.Param("product_id")
 	if productID == "" {
-		productID = c.Param("id") // app 路由使用 :id
+		productID = c.Param("id")
 	}
 	if productID == "" {
 		response.BadRequest(c, "invalid product id")
@@ -585,14 +565,12 @@ func (h *Holder) UpdateSellerProduct(c *gin.Context) {
 		return
 	}
 
-	// 驗證冪等鍵必填
 	if req.IdempotencyKey == "" {
 		response.BadRequest(c, "idempotencyKey 為必填欄位")
 		return
 	}
 	idempotencyKey := req.IdempotencyKey
 
-	// 轉換圖片
 	images := make([]*pb.ProductImage, 0, len(req.Images))
 	for _, img := range req.Images {
 		images = append(images, &pb.ProductImage{
@@ -602,10 +580,8 @@ func (h *Holder) UpdateSellerProduct(c *gin.Context) {
 		})
 	}
 
-	// 轉換 SKU（配送資訊在 SKU 層級）
 	skus := make([]*pb.ProductSku, 0, len(req.Skus))
 	for _, v := range req.Skus {
-		// 轉換 SKU 層級的運送方式
 		skuShippingMethods := make([]*pb.ShippingMethod, 0, len(v.ShippingMethods))
 		for _, sm := range v.ShippingMethods {
 			skuShippingMethods = append(skuShippingMethods, &pb.ShippingMethod{
@@ -627,16 +603,10 @@ func (h *Holder) UpdateSellerProduct(c *gin.Context) {
 			WidthCm:         v.WidthCm,
 			HeightCm:        v.HeightCm,
 			ShippingMethods: skuShippingMethods,
-			// SKU 層樂觀鎖 token（#2545）。漏了透傳＝欄位在契約上存在但永遠是空字串，
-			// product-service 一律不比對，鎖形同不存在。
 			ExpectedVersion: v.ExpectedVersion,
 		})
 	}
 
-	// 轉換認證，接著剔除非法的那幾筆（19 §6.2.1 第 ① 層；理由同 CreateSellerProduct）。
-	// ⚠️ 剔除只影響送下去的內容，不影響 UpdateCertifications 旗標：一次「只送了一筆非法
-	// 認證」的更新仍然是「本次要全量取代」，全部剔光的結果就是清空——那是賣家送出的
-	// 內容如實反映，不是靜默失敗（warning 會告訴他那一筆沒被採用）。
 	certifications := make([]*pb.Certification, 0, len(req.Certifications))
 	for _, cert := range req.Certifications {
 		certifications = append(certifications, &pb.Certification{
@@ -663,9 +633,6 @@ func (h *Holder) UpdateSellerProduct(c *gin.Context) {
 		Skus:           skus,
 		Origin:         req.Origin,
 		Certifications: certifications,
-		// body 有帶 certifications（含明確帶空陣列）＝這次要全量取代。判斷用 req 而不是
-		// 上面那個 make 出來的 slice：後者恆非 nil，分不出「沒帶」與「帶空的」。
-		// 沒有這個旗標時賣家清不掉自己的認證標章——送出成功、畫面重整後標章又回來。
 		UpdateCertifications: req.Certifications != nil,
 		Status:               req.Status,
 		Hashtags:             req.Hashtags,
@@ -716,7 +683,7 @@ func (h *Holder) GetSellerProductDetail(c *gin.Context) {
 
 	productID := c.Param("product_id")
 	if productID == "" {
-		productID = c.Param("id") // app 路由使用 :id
+		productID = c.Param("id")
 	}
 	if productID == "" {
 		response.BadRequest(c, "invalid product id")

@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
-// rotatedMAC 是輪替之後的 HMAC 金鑰環：新的金鑰在前、舊的留著（舊的就是 sealtest.MAC 的那一把）。
 func rotatedMAC(t *testing.T) *seal.MAC {
 	t.Helper()
 	b64 := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }

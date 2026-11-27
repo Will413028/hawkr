@@ -153,7 +153,6 @@ type AdminUpdateCouponQuotaRequest struct {
 	MaxTemplateCount string `json:"maxTemplateCount" binding:"required"`
 }
 
-// ==================== 共用工具 ====================
 
 func getAccountType(c *gin.Context) int {
 	accountType, _ := c.Get("accountType")
@@ -216,8 +215,6 @@ func (h *Holder) validateBuyerIDs(c *gin.Context, raw []string) ([]string, bool)
 	return validated, true
 }
 
-// mergeBuyerIDs 合併兩個獨立來源的目標買家清單（resolveTargetBuyerIDs
-// 解析出來的、validateBuyerIDs 驗證過的），去重後回傳。
 func mergeBuyerIDs(resolved, alreadyResolved []string) []string {
 	seen := make(map[string]struct{}, len(resolved)+len(alreadyResolved))
 	merged := make([]string, 0, len(resolved)+len(alreadyResolved))
@@ -238,7 +235,6 @@ func mergeBuyerIDs(resolved, alreadyResolved []string) []string {
 	return merged
 }
 
-// ==================== Buyer API ====================
 
 // GetCoupons 取得優惠券列表（根據 view 參數分流）
 // @Summary      取得優惠券列表
@@ -264,13 +260,10 @@ func (h *Holder) GetCoupons(c *gin.Context) {
 		return
 	}
 
-	// §5.1 角色分離：買家/賣家使用獨立 RPC，Gateway 依 view 參數分發
 	view := c.Query("view")
 	accountType := getAccountType(c)
 
 	if view == "seller" {
-		// 賣家角色 + 停權能力檢查（CAP_ORDER_FULFILL）已由 sellerViewGuard 於路由層
-		// 完成（46 §3.3 rule 2；IsSeller 判斷收斂進 authz package）。
 		storeID, ok := h.resolveStoreIDFor(c, accountID)
 		if !ok {
 			return
@@ -279,7 +272,6 @@ func (h *Holder) GetCoupons(c *gin.Context) {
 		return
 	}
 
-	// 預設：買家查詢自己的券
 	if !middleware.IsBuyer(accountType) {
 		response.Forbidden(c, "需要買家權限")
 		return
@@ -310,12 +302,10 @@ func (h *Holder) handleListMyCoupons(c *gin.Context, accountID int64) {
 		return
 	}
 
-	// 可用券（Template 資格計算結果）
 	available := make([]gin.H, 0, len(resp.Records))
 	for _, tpl := range resp.Records {
 		available = append(available, templateInfoToMap(tpl, h.MediaBaseURL))
 	}
-	// 已使用券（Instance 紀錄）
 	used := make([]gin.H, 0, len(resp.UsedRecords))
 	for _, inst := range resp.UsedRecords {
 		used = append(used, instanceInfoToMap(inst, h.MediaBaseURL))
@@ -494,7 +484,6 @@ func (h *Holder) ClaimCoupon(c *gin.Context) {
 	})
 }
 
-// ==================== Seller API ====================
 
 // CreateCouponTemplate 賣家建立並發行優惠券
 // @Summary      建立並發行優惠券
@@ -726,7 +715,6 @@ func (h *Holder) RevokeCouponTemplate(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-// ==================== Admin API ====================
 
 // AdminCreateCouponTemplate 管理員建立優惠券模板
 // @Summary      管理員建立優惠券模板
@@ -748,7 +736,7 @@ func (h *Holder) AdminCreateCouponTemplate(c *gin.Context) {
 	}
 
 	var req struct {
-		ClaimRequired     *bool    `json:"claimRequired"` // 是否需要領券（預設 true）
+		ClaimRequired     *bool    `json:"claimRequired"`
 		Title             string   `json:"title" binding:"required"`
 		Type              string   `json:"type" binding:"required"`
 		TargetType        string   `json:"targetType" binding:"required"`
@@ -767,8 +755,6 @@ func (h *Holder) AdminCreateCouponTemplate(c *gin.Context) {
 		return
 	}
 
-	// proto3 bool 預設為 false，但業務預設為 true（需要領券）
-	// 使用指標判斷前端是否有傳值：nil=未傳（預設true）、false=明確免領券、true=需領券
 	claimRequired := true
 	if req.ClaimRequired != nil {
 		claimRequired = *req.ClaimRequired
@@ -900,7 +886,7 @@ func (h *Holder) AdminIssueCouponsHandler(c *gin.Context) {
 
 	var req struct {
 		BuyerAccountIds     []string `json:"buyerAccountIds" binding:"required"`
-		ImmediateDistribute bool     `json:"immediateDistribute"` // 是否立即代領（預設 false）
+		ImmediateDistribute bool     `json:"immediateDistribute"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "invalid request: "+err.Error())
@@ -995,7 +981,6 @@ func (h *Holder) AdminGrantCompensation(c *gin.Context) {
 		BuyerAccountId string `json:"buyerAccountId" binding:"required"`
 		Amount         string `json:"amount" binding:"required"`
 		RefOrderNo     string `json:"refOrderNo"`
-		// 必填，語意見 AdminGrantCompensationRequest。
 		ApplicableStoreId string `json:"applicableStoreId" binding:"required"`
 		Reason            string `json:"reason" binding:"required"`
 	}
@@ -1118,7 +1103,6 @@ func (h *Holder) AdminUpdateCouponQuota(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-// ==================== 轉換工具 ====================
 
 func templateInfoToMap(tpl *pb.TemplateInfo, mediaBase string) gin.H {
 	if tpl == nil {
@@ -1132,8 +1116,8 @@ func templateInfoToMap(tpl *pb.TemplateInfo, mediaBase string) gin.H {
 		"applicableStoreId":    tpl.ApplicableStoreId,
 		"sellerName":           tpl.SellerName,
 		"storeCode":            tpl.StoreCode,
-		"logoKey":              tpl.SellerAvatarKey,                      // 商家 logo objectKey（SSOT；49 §6.1）
-		"logoUrl":              buildURL(mediaBase, tpl.SellerAvatarKey), // 顯示 URL（Gateway 組）
+		"logoKey":              tpl.SellerAvatarKey,
+		"logoUrl":              buildURL(mediaBase, tpl.SellerAvatarKey),
 		"issuerType":           tpl.IssuerType,
 		"issuerAccountId":      tpl.IssuerAccountId,
 		"issuerStoreId":        tpl.IssuerStoreId,
@@ -1177,8 +1161,8 @@ func instanceInfoToMap(inst *pb.InstanceInfo, mediaBase string) gin.H {
 		"applicableStoreId": inst.ApplicableStoreId,
 		"sellerName":        inst.SellerName,
 		"storeCode":         inst.StoreCode,
-		"logoKey":           inst.SellerAvatarKey,                      // 商家 logo objectKey（SSOT；49 §6.1）
-		"logoUrl":           buildURL(mediaBase, inst.SellerAvatarKey), // 顯示 URL（Gateway 組）
+		"logoKey":           inst.SellerAvatarKey,
+		"logoUrl":           buildURL(mediaBase, inst.SellerAvatarKey),
 		"thresholdAmount":   inst.ThresholdAmount,
 		"discountAmount":    inst.DiscountAmount,
 		"discountPercent":   inst.DiscountPercent,

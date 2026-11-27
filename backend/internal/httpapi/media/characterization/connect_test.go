@@ -20,12 +20,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// connectDriver 以生成的 Connect client（MediaAppService）操作單體：JSON，與 web 相同；機敏段走單體的一般 HTTP 端點。
-// 身分由 auth 帶入（ch.Bearer）。錯誤用 ch.ConnectKind 分類。
-//
-// 與 REST 的對應：建立會話在公開時是 BeginUpload（檔名不送，B1-3 的 key 不含呼叫端檔名；md5 是 Connect 契約必填，情境不關心內容，
-// 送固定的合法值）、機敏時是 BeginSecureUpload（宣告的型別不送，第 0 段依 magic bytes 辨認，B1-D17）；session ID 就是 staged token
-// （B1-D2）；完成是 CompleteUpload，之後以 GetUpload 讀狀態。
 type connectDriver struct {
 	http    *http.Client
 	base    string
@@ -35,10 +29,8 @@ type connectDriver struct {
 
 var _ MonolithDriver = (*connectDriver)(nil)
 
-// anyMD5 是 16 位元組的標準 base64（BeginUpload 只驗形狀，內容比對在處理 job）。
 var anyMD5 = base64.StdEncoding.EncodeToString(make([]byte, 16))
 
-// newConnectDriver 建立 driver；每個呼叫者一組以 interceptor 帶入身分的 client。
 func newConnectDriver(httpClient *http.Client, base string, auth func(ch.Caller, http.Header)) *connectDriver {
 	d := &connectDriver{http: httpClient, base: base, auth: auth, clients: map[ch.Caller]mediav1alpha1connect.MediaAppServiceClient{}}
 	for _, c := range []ch.Caller{ch.Anonymous, ch.Buyer, ch.Buyer2, ch.Admin} {
@@ -85,7 +77,6 @@ func (d *connectDriver) CompleteUploadSession(ctx context.Context, c ch.Caller, 
 	if err != nil {
 		return CompletedSession{}, ch.ConnectKind(err)
 	}
-	// UPLOAD_STATE_UPLOADED → "UPLOADED"（與資料表的狀態字串同形）。
 	state := got.Msg.GetState().String()
 	return CompletedSession{StagedToken: sessionID, State: state[len("UPLOAD_STATE_"):]}, nil
 }

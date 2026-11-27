@@ -31,7 +31,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// clock 是注入的時間；測試不看 wall-clock。
 type clock struct {
 	mu sync.Mutex
 	t  time.Time
@@ -51,17 +50,14 @@ func (c *clock) Advance(d time.Duration) {
 	c.t = c.t.Add(d)
 }
 
-// spyStore 記錄呼叫儲存時 ctx 有沒有帶 transaction，並可以讓指定 key 的刪除失敗。
 type spyStore struct {
 	*storage.Fake
 	mu         sync.Mutex
 	inTx       []string
 	failDelete map[string]error
 	failPut    error
-	// puts 記錄每個 Put 收到的位元組（含失敗的），deleted 記錄每個 Delete 的 key。
 	puts    map[string][]byte
 	deleted []string
-	// afterPut 在 Put 成功之後、回傳之前呼叫（讓測試在「物件已寫、尚未推進」的空檔插入並行請求）。
 	afterPut func(key string)
 }
 
@@ -193,7 +189,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// module 建另一個共用同一個資料庫與儲存、但時鐘不同的 Module（並發測試用）。
 func (f *fixture) module(c *clock) *media.Module {
 	return media.New(media.Deps{
 		DB: f.d, Jobs: f.jobs, Store: f.store,
@@ -205,7 +200,6 @@ func (f *fixture) module(c *clock) *media.Module {
 	})
 }
 
-// copyProcess 是測試用的處理：把暫存物件原樣寫到正式 key。
 func (f *fixture) copyProcess(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {
 	rc, err := f.store.Get(ctx, in.TmpKey)
 	if errors.Is(err, storage.ErrNotFound) {
@@ -227,7 +221,6 @@ func (f *fixture) copyProcess(ctx context.Context, in media.ProcessInput) (media
 
 var payload = []byte("fake image bytes")
 
-// declaredMD5 是任意 16 位元組的 base64：fake 儲存與處理函式不驗 MD5（驗證在 storage 的 S3 測試）。
 var declaredMD5 = base64.StdEncoding.EncodeToString(make([]byte, 16))
 
 func begin(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
@@ -245,7 +238,6 @@ func tmpKeyOf(res media.BeginResult) string {
 	return strings.TrimPrefix(res.URL, "https://fake-storage.invalid/")
 }
 
-// clientUpload 模擬 client 直傳到預簽網址。
 func clientUpload(t *testing.T, f *fixture, res media.BeginResult) {
 	t.Helper()
 	if err := f.store.Fake.Put(t.Context(), storage.PutInput{Key: tmpKeyOf(res), Body: bytes.NewReader(payload), Size: int64(len(payload)), ContentType: "image/png"}); err != nil {
@@ -260,7 +252,6 @@ func complete(t *testing.T, f *fixture, who media.Uploader, res media.BeginResul
 	}
 }
 
-// uploaded 做到 UPLOADED（處理 job 還沒跑）。
 func uploaded(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
 	t.Helper()
 	res := begin(t, f, who)
@@ -269,7 +260,6 @@ func uploaded(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
 	return res
 }
 
-// ready 做到 READY：處理 job 成功。
 func ready(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
 	t.Helper()
 	res := uploaded(t, f, who)
@@ -310,7 +300,6 @@ func uploadKeys(t *testing.T, f *fixture, id uuid.UUID) (tmp string, final *stri
 	return tmp, final, asset
 }
 
-// assetState 是資產推導後的狀態（STAGED、ACTIVE、DELETING、DELETED），經 media.AssetState（GetAssetView 與 DeriveAssetState），不重寫謂詞。
 func assetState(t *testing.T, f *fixture, id uuid.UUID) string {
 	t.Helper()
 	st, err := f.m.AssetState(t.Context(), id)
@@ -320,7 +309,6 @@ func assetState(t *testing.T, f *fixture, id uuid.UUID) string {
 	return string(st)
 }
 
-// physicalAssetState 是資產列上記的物理 state（STAGED、DELETING、DELETED）。
 func physicalAssetState(t *testing.T, f *fixture, id uuid.UUID) string {
 	t.Helper()
 	var s string
@@ -330,7 +318,6 @@ func physicalAssetState(t *testing.T, f *fixture, id uuid.UUID) string {
 	return s
 }
 
-// claimKind 是暫存列的認領種類（CONFIRMED、RECLAIMED），沒有認領是空字串。
 func claimKind(t *testing.T, f *fixture, uploadID uuid.UUID) string {
 	t.Helper()
 	var kind string
@@ -362,7 +349,6 @@ func jobCount(t *testing.T, f *fixture, kind string) int {
 	return n
 }
 
-// assertNoDanglingAssets：沒有任何尚未開始刪除（STAGED，含已確認）的資產指著不存在的物件。
 func assertNoDanglingAssets(t *testing.T, f *fixture) {
 	t.Helper()
 	rows, err := f.d.Pool().Query(t.Context(), `SELECT object_key FROM media.assets WHERE state = 'STAGED'`)
@@ -400,7 +386,6 @@ func assetIDOf(t *testing.T, f *fixture, id uuid.UUID) uuid.UUID {
 	return *a
 }
 
-// ==================== BeginUpload、CompleteUpload ====================
 
 func TestBeginUpload_StoresOnlyTheTokenHashAndPresignsUnderTmp(t *testing.T) {
 	f := setup(t)
@@ -438,7 +423,7 @@ func TestCompleteUpload_EnqueuesTheProcessJobInTheSameTransaction(t *testing.T) 
 		t.Fatalf("回滾後 state=%s、job=%d，預期 PENDING 且沒有 job", got, jobCount(t, f, "media.process_upload"))
 	}
 	complete(t, f, owner, res)
-	complete(t, f, owner, res) // 重入成功，不重複排 job
+	complete(t, f, owner, res)
 	if got := uploadState(t, f, res.ID); got != "UPLOADED" {
 		t.Fatalf("state = %s，預期 UPLOADED", got)
 	}
@@ -478,7 +463,6 @@ func TestBeginUpload_RejectsInvalidDeclarations(t *testing.T) {
 	wantKind(t, err, apperr.KindInvalidInput)
 }
 
-// ==================== 處理 job ====================
 
 func TestProcess_SuccessCreatesTheAssetAndDeletesTheTmpObjectAfterCommit(t *testing.T) {
 	f := setup(t)
@@ -561,7 +545,7 @@ func TestProcess_ExpiredMidFlightLeavesNoOrphanObject(t *testing.T) {
 	_, final, _ := uploadKeys(t, f, res.ID)
 	f.process = func(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {
 		out, err := f.copyProcess(ctx, in)
-		f.clock.Advance(media.UploadTTL + time.Minute) // 處理的途中列過期
+		f.clock.Advance(media.UploadTTL + time.Minute)
 		return out, err
 	}
 	if err := f.m.ProcessUpload(t.Context(), res.ID, 1, media.ProcessMaxAttempts); err != nil {
@@ -577,7 +561,6 @@ func TestProcess_ExpiredMidFlightLeavesNoOrphanObject(t *testing.T) {
 	if err != nil || st.State != media.UploadRejected || st.RejectReason != media.RejectExpired {
 		t.Fatalf("GetUpload = %+v, %v", st, err)
 	}
-	// 之後 GC 回收 tmp。
 	if _, err := f.m.CollectGarbage(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +569,6 @@ func TestProcess_ExpiredMidFlightLeavesNoOrphanObject(t *testing.T) {
 	}
 }
 
-// ==================== Confirm ====================
 
 func TestConfirm_Success(t *testing.T) {
 	f := setup(t)
@@ -736,7 +718,7 @@ func TestConfirm_ReplayInLaterTransactionAfterMarkDeletedIsRejected(t *testing.T
 func TestConfirm_OnlyReturnsItsOwnAsset(t *testing.T) {
 	f := setup(t)
 	a := ready(t, f, owner)
-	b := ready(t, f, owner) // 同一個上傳者、較新的資產
+	b := ready(t, f, owner)
 	var gotA, gotB, again media.ConfirmedAsset
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 		var err error
@@ -816,9 +798,9 @@ func TestConfirm_RequiresTheOwnersTransaction(t *testing.T) {
 func TestConfirmAndGC_ConcurrentOnlyOneSucceeds(t *testing.T) {
 	f := setup(t)
 	before := newClock()
-	before.Advance(10 * time.Minute) // 還沒過期
+	before.Advance(10 * time.Minute)
 	after := newClock()
-	after.Advance(media.UploadTTL + time.Minute) // 已過期
+	after.Advance(media.UploadTTL + time.Minute)
 	confirmer, collector := f.module(before), f.module(after)
 	for i := range 12 {
 		res := ready(t, f, owner)
@@ -894,7 +876,6 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 			if _, err := confirmer.Confirm(ctx, owner, res.Token, media.VisibilityPublic); err != nil {
 				return err
 			}
-			// Confirm 的 transaction 還沒提交、持有認領列；GC 的認領等不到（lock_timeout）就跳過這一列。
 			_, err := collector.CollectGarbage(t.Context())
 			return err
 		})
@@ -924,7 +905,6 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 	})
 }
 
-// ==================== GetUpload ====================
 
 func TestGetUpload_ReportsStateAndReasonOnlyToTheUploader(t *testing.T) {
 	f := setup(t)
@@ -954,7 +934,6 @@ func TestGetUpload_ReportsStateAndReasonOnlyToTheUploader(t *testing.T) {
 	wantKind(t, err, apperr.KindNotFound)
 }
 
-// ==================== GC ====================
 
 func TestGC_NeverDeletesConfirmedAssets(t *testing.T) {
 	f := setup(t)
@@ -980,12 +959,12 @@ func TestGC_NeverDeletesConfirmedAssets(t *testing.T) {
 func TestGC_DeletesExpiredUnconfirmedRowsWithTheirObjects(t *testing.T) {
 	f := setup(t)
 	pending := begin(t, f, owner)
-	clientUpload(t, f, pending) // PENDING：只有 tmp 物件
+	clientUpload(t, f, pending)
 	rdy := ready(t, f, owner)
 	rdyAsset := assetIDOf(t, f, rdy.ID)
 	_, rdyFinal, _ := uploadKeys(t, f, rdy.ID)
 	f.process = func(ctx context.Context, in media.ProcessInput) (media.ProcessResult, error) {
-		_, err := f.copyProcess(ctx, in) // 處理中途寫出正式物件後才失敗
+		_, err := f.copyProcess(ctx, in)
 		if err != nil {
 			return media.ProcessResult{}, err
 		}
@@ -1132,7 +1111,6 @@ func TestConfirm_VisibilityMismatchIsRejectedBeforeAnyClaim(t *testing.T) {
 	}
 }
 
-// ==================== 實體刪除與三段式 ====================
 
 func confirmed(t *testing.T, f *fixture) (media.ConfirmedAsset, string) {
 	t.Helper()
@@ -1168,8 +1146,6 @@ func assertDeletionRequests(t *testing.T, f *fixture, want int) {
 	}
 }
 
-// orphanDeleting 是違反 B1-D25 不變量的列數：物理 DELETING 的已確認資產一定有刪除請求（只有擁有者的請求或 GC 的未確認回收能讓資產離開 STAGED；
-// 資產物理刪除完成時請求與認領才一併刪，所以不變量只能對 DELETING 檢查）。
 func orphanDeleting(t *testing.T, f *fixture) int {
 	t.Helper()
 	return count(t, f, `SELECT count(*) FROM media.assets a
@@ -1194,7 +1170,7 @@ func TestMarkDeleted_RequestsOnlyConfirmedAssetsAndEnqueuesNothing(t *testing.T)
 	a, _ := confirmed(t, f)
 	staged := ready(t, f, owner)
 	stagedAsset := assetIDOf(t, f, staged.ID)
-	if err := markDeletedInTx(f, a.ID, a.ID, stagedAsset, uuid.New()); err != nil { // 重複、未確認、不存在的 ID 都忽略
+	if err := markDeletedInTx(f, a.ID, a.ID, stagedAsset, uuid.New()); err != nil {
 		t.Fatal(err)
 	}
 	if got := assetState(t, f, a.ID); got != "DELETING" || physicalAssetState(t, f, a.ID) != "STAGED" {
@@ -1207,7 +1183,7 @@ func TestMarkDeleted_RequestsOnlyConfirmedAssetsAndEnqueuesNothing(t *testing.T)
 	if n := jobCount(t, f, "media.apply_deletions"); n != 0 {
 		t.Fatalf("擁有者的 transaction 不得排 job，現有 %d 個", n)
 	}
-	if err := markDeletedInTx(f, a.ID); err != nil { // 冪等
+	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := markDeletedInTx(f); err != nil {
@@ -1260,11 +1236,11 @@ func TestDeleteJob_ThreeStepsDeleteTheObjectAndMarkDeleted(t *testing.T) {
 	if f.store.has(final) || assetState(t, f, a.ID) != "DELETED" {
 		t.Fatal("物件應該已刪、資產應該是 DELETED")
 	}
-	assertDeletionRequests(t, f, 0) // 物理刪除完成時，請求與認領隨資產一起刪
+	assertDeletionRequests(t, f, 0)
 	if n := count(t, f, `SELECT count(*) FROM media.upload_claims`); n != 0 {
 		t.Fatalf("物理刪除完成後還有 %d 筆認領", n)
 	}
-	if n, err := f.m.DeleteAssets(t.Context()); err != nil || n != 0 { // 冪等
+	if n, err := f.m.DeleteAssets(t.Context()); err != nil || n != 0 {
 		t.Fatalf("第二次 DeleteAssets = %d, %v", n, err)
 	}
 }
@@ -1342,11 +1318,9 @@ func TestDeleteJob_FailureDoesNotBlockOtherRows(t *testing.T) {
 	}
 }
 
-// ==================== 儲存呼叫沒有 transaction ====================
 
 func TestStorageIsNeverCalledInsideATransaction(t *testing.T) {
 	f := setup(t)
-	// 走完整條路徑：上傳、處理、確認、擁有者刪除、GC 與實體刪除。
 	a, _ := confirmed(t, f)
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)

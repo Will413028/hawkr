@@ -135,7 +135,6 @@ void main() {
     expect(orderEvents, hasLength(1));
     expect(afterSaleEvents, hasLength(1));
 
-    // 伺服器正常結束也是重連。
     await h.streams.last.close();
     await pumpEventQueue();
     expect(h.waits, hasLength(2));
@@ -177,7 +176,6 @@ void main() {
     h.signals.start();
     await pumpEventQueue();
     expect(h.streams, hasLength(2));
-    // 停掉之前的串流不會再送訊號。
     h.streams.first.add(_inbox());
     await pumpEventQueue();
     expect(h.inboxSignals, isEmpty);

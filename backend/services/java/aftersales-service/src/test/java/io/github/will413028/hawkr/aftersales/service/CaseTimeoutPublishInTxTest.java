@@ -54,7 +54,7 @@ class CaseTimeoutPublishInTxTest {
 
     @BeforeAll
     static void initTsid() {
-        try { TsidUtil.init(700, 0); } catch (IllegalStateException ignored) { /* 已初始化 */ }
+        try { TsidUtil.init(700, 0); } catch (IllegalStateException ignored) {  }
     }
 
     @BeforeEach
@@ -67,7 +67,6 @@ class CaseTimeoutPublishInTxTest {
                 caseMapper, appealEventMapper, properties, eventPublisher);
     }
 
-    // ==================== B2 autoReject ====================
 
     @Test
     void autoReject_casAndPublishSucceed_returnsTrue() {
@@ -101,7 +100,6 @@ class CaseTimeoutPublishInTxTest {
                 anyString(), anyString(), any(), any(), anyInt(), any());
     }
 
-    // ==================== B3 escalate ====================
 
     @Test
     void escalate_casAndPublishSucceed_returnsTrue() {

@@ -30,7 +30,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 舊契約的業務碼（`GrpcResponseCode`）。
 const (
 	codeOK            = 0
 	codeInvalidParam  = 400
@@ -39,8 +38,6 @@ const (
 	codeReserveFailed = 7008
 )
 
-// compensationEndAt 是補償券的到期日：舊 coupon-service 的「無到期日」是 2099-12-31 23:59:59 UTC，轉接層沿用，
-// 因為舊契約沒有到期日欄位。
 var compensationEndAt = time.Date(2099, 12, 31, 23, 59, 59, 0, time.UTC)
 
 // Server 實作 legacy 的 CouponService 中 order 與 aftersales 呼叫的方法。

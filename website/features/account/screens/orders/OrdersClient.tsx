@@ -112,9 +112,6 @@ function hrefForStatusTab(
 	return query ? `/account/orders?${query}` : "/account/orders";
 }
 
-// Stable list of statusCsv keys to feed `useOrderStatusCounts`. Defined
-// at module scope so the hook's dep-key digest stays the same across
-// renders.
 const COUNT_KEYS: ReadonlyArray<string> = STATUS_TABS.map(
 	(tab) => tab.statusCsv ?? "",
 );

@@ -33,10 +33,6 @@ function columns(plan: { assignment: Map<string, number> }): number[] {
 	return [...plan.assignment.values()];
 }
 
-// hawkr-website#421: the SSR fallback is a plain CSS grid, so it paints
-// item `index` in column `index % columns`. If the first measured pass packs
-// by height instead, cards translate a whole column sideways on the handoff —
-// measured at 0.0771 CLS on /market/products against a 0.05 budget.
 test("the fallback-adopting pass keeps the CSS grid's column for every card", () => {
 	const heights = [436, 441, 436, 441, 441, 436, 436, 436, 436, 436];
 	const greedy = plan(heights);
@@ -53,8 +49,6 @@ test("the fallback-adopting pass keeps the CSS grid's column for every card", ()
 test("a card never changes column when its measured height moves", () => {
 	const heights = [436, 441, 436, 441, 441, 436];
 	const first = plan(heights, { adoptFallbackOrder: true });
-	// A title re-wraps and one card grows; every later card's shortest-column
-	// answer changes with it, which is exactly what used to re-deal the grid.
 	const grown = [436, 441, 640, 441, 441, 436];
 	const second = plan(grown, { previous: first.assignment });
 
@@ -74,7 +68,6 @@ test("appended items pack into the shortest column without moving the rest", () 
 		previous: initial.assignment,
 	});
 
-	// p0/p2 are the short columns (436), so the appended pair lands there.
 	assert.deepEqual(columns(next), [0, 1, 2, 0, 2]);
 	for (const [key, position] of initial.positions) {
 		assert.deepEqual(next.positions.get(key), position, `${key} moved`);
@@ -92,7 +85,6 @@ test("a column-count change re-deals the grid instead of stranding columns", () 
 		columns: 2,
 		colWidth: 450,
 		gap: GAP,
-		// Callers pass null on a column change; a stale map is also survivable.
 		previous: wide.assignment,
 		adoptFallbackOrder: false,
 	});
@@ -103,9 +95,6 @@ test("a column-count change re-deals the grid instead of stranding columns", () 
 });
 
 test("an item that has not been measured yet does not shift the others' columns", () => {
-	// The second card has no element on this pass, so it is skipped — the third
-	// card must still adopt the column the CSS fallback painted it in (2), not
-	// the one its position in the compacted array would suggest (1).
 	const { assignment } = planMasonryLayout({
 		entries: [
 			{ key: "p0", height: 436, index: 0 },

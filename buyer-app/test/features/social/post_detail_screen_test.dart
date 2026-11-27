@@ -94,7 +94,6 @@ void main() {
         ProviderScope(
           overrides: [
             socialPublicClientProvider.overrideWithValue(public.client()),
-            // 詳情端點沒有 storeCode：sellerId 7 經店家卡片換成 nanmu。
             sellerRepositoryProvider.overrideWithValue(
               fakeSellerRepository(
                 cards: [
@@ -156,7 +155,6 @@ void main() {
       'https://test-media.example.com/i/card/public/product/red-bean.webp',
     );
     expect(find.text('進入店舖'), findsOneWidget);
-    // 讀到貼文後記一次瀏覽（RecordPostView），只記一次。
     expect(public.recordViewCalls, 1);
     final surface = tester.widget<Scaffold>(
       find.byKey(const ValueKey('post-detail-surface')),

@@ -48,7 +48,6 @@ func (s *Service) TakedownRevoked(ctx context.Context, e seller.MeasureRevoked) 
 	return s.lockAndNotify(ctx, ids, 0)
 }
 
-// lockAndNotify 的 storeID 為 0 時不核對歸屬。
 func (s *Service) lockAndNotify(ctx context.Context, ids []uuid.UUID, storeID int64) error {
 	q := s.q(ctx)
 	rows, err := q.LockMessagesForTakedown(ctx, ids)

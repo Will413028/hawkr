@@ -54,8 +54,6 @@ func TestAdminComplaintEmitsNoEventsUntilProjectionCoversNotifications(t *testin
 		t.Fatalf("解析 %s：%v", path, err)
 	}
 
-	// 錨在**識別字**上而不是字面字串：outbox 的用法一律經由這些名字，
-	// 而字面字串會被註解與說明文字誤命中（本檔頭就寫了好幾次 outbox）。
 	forbidden := map[string]string{
 		"outbox":         "欄位或變數名為 outbox",
 		"Outbox":         "型別或方法名含 Outbox",

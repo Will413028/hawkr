@@ -38,7 +38,6 @@ class RateScreen extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Rating stars
             Container(
               padding: EdgeInsets.all(20.w),
               decoration: BoxDecoration(
@@ -96,7 +95,6 @@ class RateScreen extends HookConsumerWidget {
               ),
             ),
             SizedBox(height: 16.h),
-            // Review content
             Container(
               padding: EdgeInsets.all(20.w),
               decoration: BoxDecoration(
@@ -142,7 +140,6 @@ class RateScreen extends HookConsumerWidget {
               ),
             ),
             SizedBox(height: 32.h),
-            // Submit button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -185,7 +182,6 @@ class RateScreen extends HookConsumerWidget {
                               .read(orderListControllerProvider.notifier)
                               .refresh();
                           showFloatingToast(context, '評論提交成功');
-                          // pop 回訂單列表（不是跳出 app）
                           if (Navigator.of(context).canPop()) {
                             context.pop(true);
                           }

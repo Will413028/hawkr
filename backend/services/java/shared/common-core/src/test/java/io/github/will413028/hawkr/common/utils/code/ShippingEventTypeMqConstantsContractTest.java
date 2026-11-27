@@ -119,7 +119,6 @@ class ShippingEventTypeMqConstantsContractTest {
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 
-    // ==================== ① 掃描器自身的鑑別力（fail-closed） ====================
 
     /**
      * 觀測窗不得為空。反射掃不到東西時，底下每一支斷言都會「空集合 ⊆ 空集合」而全綠——
@@ -141,7 +140,6 @@ class ShippingEventTypeMqConstantsContractTest {
         assertFalse(enumValues().isEmpty(), "ShippingEventType 值域為空 ⇒ 生成檔異常");
     }
 
-    // ==================== ② 正向：常數 → enum 值域 ====================
 
     /**
      * CodeMeta「機械檢查」欄逐字要求的那一條。
@@ -164,7 +162,6 @@ class ShippingEventTypeMqConstantsContractTest {
                         + "禁止手改生成檔。若該 key 真的不屬物流領域，理由要寫進本檔 javadoc 的值域邊界。");
     }
 
-    // ==================== ③ 反向：enum 值域 → 常數（幽靈值） ====================
 
     @Test
     @DisplayName("ShippingEventType 沒有幽靈值：每個值都有對應的 MqConstants 常數")
@@ -177,7 +174,6 @@ class ShippingEventTypeMqConstantsContractTest {
                         + ghosts);
     }
 
-    // ==================== ④ Code 軸：event_type header 常數 ====================
 
     /**
      * {@code publish(exchange, routingKey, body, eventType)} 的第 4 個參數走
@@ -199,8 +195,6 @@ class ShippingEventTypeMqConstantsContractTest {
                 return;
             }
             if (!ShippingEventType.isValidValue(key)) {
-                // 「常數不在 enum 值域」由 everyShipmentRoutingKeyConstantIsInTheEnumValueDomain 負責，
-                // 這裡略過，免得同一個缺陷在兩支測試各報一次、還多一個 fromValue 的例外堆疊。
                 return;
             }
             String sibling = EVENT_TYPE_PREFIX + field.substring(ROUTING_KEY_PREFIX.length());
@@ -221,7 +215,6 @@ class ShippingEventTypeMqConstantsContractTest {
                 "Code 軸（event_type header）與 MqConstants 不一致：" + problems);
     }
 
-    // ==================== ⑤ 值域邊界：別的領域的 key 不得混進來 ====================
 
     /**
      * 這三條長得很像物流，但 producer 與 exchange 都屬別的領域（理由見類別 javadoc）。

@@ -135,7 +135,6 @@ String? normalizeCoveragePath(String rawPath, String workspacePath) {
   if (path.startsWith('$root/')) {
     path = path.substring(root.length + 1);
   } else if (path.startsWith('/')) {
-    // Never count package-cache or SDK sources that happen to contain /lib/.
     return null;
   }
   while (path.startsWith('./')) {
@@ -175,7 +174,6 @@ List<String> evaluateCoverage({
     return failures;
   }
 
-  // Compare fractions exactly; rounded percentages must never decide the gate.
   final currentScaled = current.coveredLines * baseline.instrumentedLines;
   final baselineScaled = baseline.coveredLines * current.instrumentedLines;
   if (currentScaled < baselineScaled) {

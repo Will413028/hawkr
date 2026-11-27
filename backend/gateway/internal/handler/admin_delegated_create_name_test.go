@@ -15,12 +15,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 建立類是唯一沒有 pre-image 的寫入形態，因此也是唯一「稽核列的 resource_name 只能
-// 由 Gateway 從請求本身填」的形態。漏填的症狀完全無聲：HTTP 200、稽核列在、
-// resource_id 由 confirm 補上——只有稽核主控台的「目標資源」欄恆為「—」，也就是
-// 建立這個動作最需要交代的那一格。
-//
-// 測的是「intent 送了什麼」而非回應：回應在漏填時一切正常。
 
 type createProductStub struct {
 	productpb.ProductServiceClient

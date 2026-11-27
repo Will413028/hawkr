@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-# 用消費端自己的 buf.gen.yaml 生成對外 API 的程式碼。在消費端的目錄執行：
-#   <相對路徑>/api/generate.sh <buf.gen.yaml>
-# 先確認 buf CLI 是 .buf-version 的版本（check-buf-version.sh）。
-#
-# buf.gen.yaml 的 clean: true 會在呼叫外掛「之前」清空 out 目錄；外掛失敗（指令不在 PATH、沒先
-# dart pub get 或 pnpm install）時生成物已經被刪光。所以先用 buf 的 --output 生成到目前目錄下的
-# 暫存目錄（同一個檔案系統，mv 是 rename），buf 成功後才把每個最上層的 out 目錄換成新的：
-# 失敗時原本的生成物不動，成功時刪掉的 proto 也不留孤兒檔。交換是「舊的改名成 .gen-old → 新的
-# 搬進來 → 刪 .gen-old」，中途失敗或被中斷時 EXIT trap 會把 .gen-old 搬回去，任何時間點不是舊的
-# 就是新的生成物在原位。
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
@@ -19,7 +9,6 @@ template="$1"
 
 "$(dirname "$0")/check-buf-version.sh"
 
-# 各外掛的 out 目錄（相對於目前目錄）。out 一律是單行純量，允許加引號。
 outs=()
 while IFS= read -r dir; do
   while [[ "$dir" == ./* ]]; do dir="${dir#./}"; done
@@ -42,7 +31,6 @@ for dir in "${outs[@]}"; do
   fi
 done
 
-# 巢狀的 out（lib/gen 與 lib/gen/connect）只交換最上層的那個。
 tops=()
 for dir in "${outs[@]}"; do
   nested=0
@@ -56,7 +44,6 @@ staging="$(mktemp -d ./.gen-staging.XXXXXX)"
 pending_dir=""
 pending_old=""
 cleanup() {
-  # 交換做到一半（舊的已改名、新的還沒到位）時把舊的搬回去。
   if [[ -n "$pending_old" && -e "$pending_old" && ! -e "$pending_dir" ]]; then
     mv "$pending_old" "$pending_dir" && echo "交換中斷；已還原 ${pending_dir}" >&2
   fi
@@ -71,7 +58,6 @@ if ! buf generate --template "$template" --output "$staging"; then
   exit 1
 fi
 
-# 每個生成的檔案都要落在某個 out 目錄底下；有漏掉的代表上面沒讀到某個 out，換進去會少東西。
 stray="$(cd "$staging" && find . -type f | sed 's|^\./||' | while IFS= read -r f; do
   ok=0
   for dir in "${tops[@]}"; do [[ "$f" == "$dir"/* ]] && { ok=1; break; }; done
@@ -82,7 +68,6 @@ if [[ -n "$stray" ]]; then
   exit 1
 fi
 
-# buf 沒在某個 out 寫出任何檔案時不換：換進去等於把真的目錄刪光。
 for dir in "${tops[@]}"; do
   if [[ -z "$(find "$staging/$dir" -type f 2>/dev/null | head -n 1)" ]]; then
     echo "buf 沒有在 ${dir} 生成任何檔案；未動生成物" >&2

@@ -48,14 +48,13 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   final flavor = _resolveFlavorFromEnv();
-  // API 主機是必要設定：stage 與 prod 缺少 GATEWAY_HOST 時在 runApp 前直接失敗。
   flavor.requireCoreConfig();
 
   SentryFlutter.init(
     (options) {
       options.dsn = flavor.sentryDsn;
       options.environment = flavor.name;
-      options.tracesSampleRate = 0; // error-only rollout；不開 performance tracing
+      options.tracesSampleRate = 0;
       options.sendDefaultPii = false;
       options.beforeSend = (event, hint) => scrubSentryEvent(event, hint);
     },
@@ -80,9 +79,6 @@ Future<void> _requestNotificationPermissionAndToken() async {
 }
 
 Future<Widget> _bootstrapApplication() async {
-  // ============ E2E auth inject（debug build only）============
-  // `--dart-define=E2E_AUTH_TOKEN=<token>` 以固定的 Bearer 取代 identity 的 session token（見
-  // auth_session_provider.dart），GetSession 讀取對應的帳號。release build 不讀它。
   if (kDebugMode && _e2eModeSeller) {
     PushNotificationManager.e2eDisabled = true;
   }
@@ -90,18 +86,13 @@ Future<Widget> _bootstrapApplication() async {
     HKLog.logI('[E2E] auth token injected → bypass OAuth');
   }
 
-  // bare semver 快取一次供同步讀取（Dio BaseOptions 的 header 與版本 gate
-  // 都要用，`packages/hawkr_app_update/docs/spec.md`）。必須早於任何 Dio instance 建立。
   await initAppVersionInfo();
 
-  // 從 --dart-define=FLUTTER_FLAVOR=xxx 讀取環境配置
   F.init(_resolveFlavorFromEnv());
   HKLog.logI('[Main] Flavor: ${F.appFlavor}');
   HKLog.logI('[Main] Current Flavor: ${F.appFlavor.name}');
   HKLog.logD(F.appFlavor.environmentInfo);
 
-  // Firebase 沒有設定（缺 FIREBASE_* define）時整體停用：不初始化、不註冊推播與分析，
-  // App 仍可啟動與登入。
   try {
     final firebaseReady = await initializeFirebase(
       options: F.appFlavor.firebaseOptions,
@@ -117,10 +108,6 @@ Future<Widget> _bootstrapApplication() async {
     rethrow;
   }
 
-  // GA4: prod + dev 啟用 analytics 收集（stage 不用）。各 flavor 連各自的
-  // Firebase 專案 → 各自的 GA property，dev 不會污染 prod 報表。複用單一
-  // predicate，與 analyticsServiceProvider 的 enabled gate 同步，避免 SDK
-  // master switch 與 app 層 gate 不一致。
   if (isFirebaseInitialized) {
     await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(
       analyticsEnabledForFlavor(F.appFlavor),
@@ -141,13 +128,6 @@ Future<Widget> _bootstrapApplication() async {
   await container.read(appTextSizeProvider.notifier).restore();
   PushNotificationManager.instance.injectContainer(container);
 
-  // App 版本 gate（`packages/hawkr_app_update/docs/spec.md`）：**await** 完成才進路由，否則會先進
-  // 首頁再彈更新畫面，出現可操作空窗。位置刻意早於下面的推播初始化——
-  // 通知導頁在 gate 攔截時還沒 arm，不需另建抑制機制。
-  //
-  // ⚠️ 例外必須在這裡自己吃掉：`BrandStartupGate._runBootstrap` 的 catch 只
-  // reportError、不 setState 也不解除 splash（`brand_startup_splash.dart:75-84`），
-  // 例外冒上去就是永遠卡在啟動畫面。fail-open 的具體落地點就是這個 try。
   try {
     await container.read(forceUpdateGateProvider.notifier).checkOnStartup();
   } catch (e, stackTrace) {
@@ -155,7 +135,6 @@ Future<Widget> _bootstrapApplication() async {
   }
 
   if (!_e2eModeSeller && isFirebaseInitialized) {
-    // 初始化 Firebase Messaging（推播是可見通知，由 OS 顯示，不需要背景 isolate 處理）
     await _initializeFirebaseMessaging();
   }
 
@@ -169,6 +148,5 @@ Future<void> _initializeFirebaseMessaging() async {
     HKLog.logI('Firebase Messaging 初始化成功');
   } catch (e, stackTrace) {
     HKLog.logE('Firebase Messaging 初始化失敗', e, stackTrace);
-    // Messaging 失敗不阻止 app 運行
   }
 }

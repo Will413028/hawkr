@@ -42,7 +42,6 @@ func id() uuid.UUID {
 
 func ptr[T any](v T) *T { return &v }
 
-// chain 是一位買家從需求到接受報價的整條資料，每一列都由 store 的查詢寫入，所以這個測試同時是每支寫入查詢的第一個執行者。
 type chain struct {
 	buyer                                               int64
 	request, revision, conversation, turn, candidateSet uuid.UUID
@@ -53,7 +52,6 @@ type chain struct {
 
 const storeID = int64(900)
 
-// seed 為買家寫入一整條資料。published 為 true 時走到發布、回價、接受；否則停在候選與預覽之前。
 func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, published bool) chain {
 	t.Helper()
 	c := chain{buyer: buyerID, request: id(), revision: id(), conversation: id(), turn: id(), candidateSet: id(), candidate: id(),
@@ -181,7 +179,6 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if revs, err := q.ListRevisions(ctx, store.ListRevisionsParams{RequestID: c.request, BuyerID: &c.buyer}); err != nil || len(revs) != 2 || revs[0].RevisionNo != 1 {
 		t.Fatalf("ListRevisions = %d, %v", len(revs), err)
 	}
-	// 一張需求同時只有一個現行版本：直接再寫一個 ACTIVE 會被 partial unique 擋下。
 	if _, err := q.InsertRevision(ctx, store.InsertRevisionParams{ID: id(), RequestID: c.request, BuyerID: &c.buyer, RevisionNo: 3, Now: epoch}); err == nil {
 		t.Fatal("同一張需求寫入第二個 ACTIVE 版本要失敗")
 	}
@@ -213,7 +210,6 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 		t.Fatal("刪對話不刪需求")
 	}
 
-	// 輪次的冪等鍵：同一個 client_request_id 重送回 0 列，改讀既有的。
 	turns, err := q.ListTurnsByRequest(ctx, store.ListTurnsByRequestParams{RequestID: c.request, BuyerID: c.buyer})
 	if err != nil || len(turns) != 1 {
 		t.Fatalf("ListTurnsByRequest = %d, %v", len(turns), err)
@@ -272,7 +268,6 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if got, err := q.GetApprovalByClientRequest(ctx, store.GetApprovalByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: appr.ClientRequestID}); err != nil || got.ID != c.approval {
 		t.Fatalf("GetApprovalByClientRequest = %+v, %v", got, err)
 	}
-	// 過期的 version 或已不是 PENDING 的核准，ClaimApprovalForExecute 沒命中任何列。
 	if _, err := q.ClaimApprovalForExecute(ctx, store.ClaimApprovalForExecuteParams{ID: c.approval, Version: 1, BuyerID: &c.buyer, Now: epoch}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("已執行過的核准不能再 claim：%v", err)
 	}
@@ -347,7 +342,6 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("GetSellerResponse = %+v, %v", got, err)
 	}
 
-	// 接受單：冪等鍵相同回 0 列並可讀回；usage 讀取。
 	if dup, err := q.InsertAcceptance(ctx, acceptanceParams(c, c.buyer, id(), c.acceptanceClientRequest)); err != nil || dup != 0 {
 		t.Fatalf("重送的 InsertAcceptance n=%d err=%v", dup, err)
 	}
@@ -405,7 +399,6 @@ func TestLiveLockOnlyBlocksActiveAcceptances(t *testing.T) {
 	if n, err := q.InsertAcceptance(ctx, acceptanceParams(c, c.buyer, second, id())); err != nil || n != 1 {
 		t.Fatalf("解除鎖後買家可以再接受：n=%d err=%v", n, err)
 	}
-	// 沒有寫入者的值不在 CHECK 內（S6）：直接寫會被擋下。
 	for _, bad := range []string{"CANCELLED", "EXPIRED", "PAYMENT_FINALIZED"} {
 		if _, err := d.Pool().Exec(ctx, `UPDATE procurement.buyer_quote_acceptances SET state = $1 WHERE id = $2`, bad, second); err == nil {
 			t.Errorf("state %s 沒有寫入者，CHECK 應該擋下", bad)

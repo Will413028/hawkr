@@ -12,8 +12,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Mock AfterSalesServiceClient（賣家 6 個 call site，Plan C Phase 3）====================
-// 介面 embed：未 stub 的方法呼叫即 nil-panic（沿用 aftersales_test.go 買家端慣例）。
 
 type mockAftersalesSellerServiceClient struct {
 	aftersalespb.AfterSalesServiceClient
@@ -205,7 +203,6 @@ func TestGetSellerArbitration_UsesResolvedSellerID(t *testing.T) {
 	}
 }
 
-// ==================== no current seller -> 403（全部 6 個 route）====================
 
 func TestAftersalesSellerHandlers_NoCurrentSeller_Forbidden(t *testing.T) {
 	cases := []struct {

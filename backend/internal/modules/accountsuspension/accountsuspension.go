@@ -101,8 +101,6 @@ func (m *Module) Unsuspend(ctx context.Context, accountID int64, reason string) 
 	return released, nil
 }
 
-// requireNoStore 擁有店家的帳號不能停權：停權對店家、未結訂單與撥款的效果由賣家條款決定，條款定出之前不停權。
-// 呼叫方已持有帳號列鎖，所以與開店（同一把鎖）序列化：不會停權之後才冒出店家。
 func (m *Module) requireNoStore(ctx context.Context, accountID int64) error {
 	_, err := m.d.Seller.CurrentStore(ctx, accountID)
 	switch {

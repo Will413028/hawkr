@@ -3,7 +3,6 @@ import { OnboardingTaskState } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller
 import type { MaterialSymbolName } from "@hawkr/icons/material-symbol";
 import type { BadgeVariant } from "@/components/UI";
 
-// 商家詳情開通摘要卡的純邏輯（讀取狀態、狀態的圖示與色調、總徽章）；元件在 OnboardingSummaryCard.tsx，查詢 hook 在 use-store-detail.ts。
 
 export type OnboardingSummaryState =
 	| { state: "loading" }

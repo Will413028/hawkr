@@ -23,40 +23,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 稽核列的 changed_fields 是爭議時的舉證。它記到一筆從未發生的變更，比少記一筆更糟：
-// 少記只是舉證不足，多記是**證據本身在說謊**——賣家看到「你把我的店名清空了」，而店名
-// 一個字都沒動。
-//
-// dev 實測（2026-08-16）：
-//   - 代行換一次店家 logo ⇒ changed_fields 記了 10 列，只有 logoKey 是真的，其餘 9 列
-//     （店名／地址／電話／封面…）全被記成「被清空」
-//   - 上／下架每次虛報一列「主題標籤被清空」，而 DB 的 product_hashtag 一列未動
-//
-// 成因是同一個：diff 的前提是「before 與 after 是同一個投影函式對同一資源的兩次完整
-// 取樣」，而狀態切換與媒體替換這類端點的寫入回應**本來就不是資源全貌**。它有兩種外殼，
-// 而且只有第一種會被「鍵集合是否相同」抓到：
-//
-//	① 鍵**缺席**（媒體端點手寫單鍵 after）⇒ 缺席側 render 成「—」
-//	② 鍵**在、值是零值**（上游回的 DTO 沒回填衍生集合）⇒ 看起來就是被清空
-//
-// ⇒ 本檔的不變式不是「兩側鍵集合相同」（那抓不到 ②），而是**每一個 action 的
-// changed_fields 必須恰好落在該 action 動得到的欄位集合內**。這個集合就是
-// delegation.Spec.SnapshotFields，由端點自己宣告。
-//
-// ⚠️ 下面的 stub 刻意讓寫入回應**殘缺**（狀態端點不回 hashtags、貼文狀態端點不回
-// content）。那正是 dev 上發生過的形狀，也是本測試的鑑別力來源：把 SnapshotFields
-// 拿掉，這幾支就會轉紅。Gateway 不得依賴領域服務回一份完整資源——十三支端點跨三個
-// 服務，「大家都會記得回全欄」不是一個守得住的前提。
 
 const (
 	scopeTestStoreID   = "2685914682"
 	scopeTestProductID = "7494590641851072512"
 )
 
-// ==================== stubs ====================
 
-// scopeAuditStub 收下三段序的四支 RPC 並保留送出的內容。稽核正確與否只看「Gateway 送
-// 了什麼」，回應長什麼樣在這個 bug 上完全正常，那正是它無聲的原因。
 type scopeAuditStub struct {
 	accountpb.DelegationServiceClient
 	intents  []*accountpb.RecordAuditIntentRequest
@@ -116,8 +89,6 @@ func fullProductDetail(name, status, version string) *productpb.ProductDetail {
 	}
 }
 
-// statusOnlyProductDetail 是**殘缺**的寫入回應：狀態變了，衍生集合（hashtags／
-// certifications）沒回填。這正是 dev 上 UpdateSellerProductStatus 回過的形狀。
 func statusOnlyProductDetail(status, version string) *productpb.ProductDetail {
 	d := fullProductDetail("無籽檸檬", status, version)
 	d.Hashtags = nil
@@ -150,9 +121,6 @@ func (s *scopeProductStub) UpdateSellerProductStatus(ctx context.Context, in *pr
 func (s *scopeProductStub) BatchGetSellerProductsForDelegation(ctx context.Context, in *productpb.BatchGetSellerProductsForDelegationRequest, opts ...grpc.CallOption) (*productpb.BatchGetSellerProductsForDelegationResponse, error) {
 	resp := &productpb.BatchGetSellerProductsForDelegationResponse{}
 	for _, id := range in.GetProductIds() {
-		// detail 是 before_snapshot 的素材，與單筆路徑的 GetProduct 回同一份形狀。
-		// product-service 這一跳刻意不填 seller／reviews（投影用不到，且填 seller 要
-		// 跨服務呼叫），所以這裡也不填 —— stub 要像真的那樣殘缺，不能比真的還完整。
 		detail := fullProductDetail("無籽檸檬", strconv.Itoa(4004), "12")
 		detail.Id = id
 		resp.Results = append(resp.Results, &productpb.BatchProductSnapshot{
@@ -173,7 +141,6 @@ func (s *scopeProductStub) BatchUpdateSellerProductStatus(ctx context.Context, i
 	return resp, nil
 }
 
-// ==================== router ====================
 
 func newDelegatedScopeRouter(t *testing.T) (*gin.Engine, *scopeAuditStub) {
 	t.Helper()
@@ -205,7 +172,6 @@ func newDelegatedScopeRouter(t *testing.T) (*gin.Engine, *scopeAuditStub) {
 	return r, audit
 }
 
-// ==================== 逐 action 的比較範圍 ====================
 
 // TestDelegatedAudit_ChangedFieldsStayInsideTheMutationScope 是本案的機械判準：
 // 對每一支寫入端點跑一次完整的 orchestrate，斷言 changed_fields 的欄位集合恰好等於
@@ -220,12 +186,9 @@ func TestDelegatedAudit_ChangedFieldsStayInsideTheMutationScope(t *testing.T) {
 		method string
 		path   string
 		body   string
-		// want 是這一次操作**應該**留下的 changed_fields 欄位集合。
 		want []string
 	}{
 		{
-			// 本案回歸點②：上架只能記 status 一列（56 號 §6.1.11 白紙黑字）。
-			// 修復前是兩列，多出來的那列是「主題標籤被清空」。
 			action: "PRODUCT_PUBLISH",
 			method: http.MethodPost, path: "/products/" + scopeTestProductID + "/publish",
 			body: `{"expectedVersion":"12","operationReason":"協助上架"}`,
@@ -235,8 +198,6 @@ func TestDelegatedAudit_ChangedFieldsStayInsideTheMutationScope(t *testing.T) {
 			action: "PRODUCT_UNPUBLISH",
 			method: http.MethodPost, path: "/products/" + scopeTestProductID + "/unpublish",
 			body: `{"expectedVersion":"12","operationReason":"協助下架"}`,
-			// before 已經是 4003（未上架），下架成同一個值 ⇒ 沒有任何欄位變更。
-			// 「什麼都沒變就一列都不記」與「只記 status」是同一條規則的兩端。
 			want: nil,
 		},
 		{
@@ -246,7 +207,6 @@ func TestDelegatedAudit_ChangedFieldsStayInsideTheMutationScope(t *testing.T) {
 			want: []string{"status"},
 		},
 		{
-			// 本案反向鑑別力：正常 PATCH 路徑不得被一起收窄掉。改 name 就要記 name。
 			action: "PRODUCT_UPDATE",
 			method: http.MethodPatch, path: "/products/" + scopeTestProductID,
 			body: `{"expectedVersion":"12","operationReason":"改名","name":"有機無籽檸檬"}`,
@@ -298,7 +258,6 @@ func TestDelegatedAudit_CreateActionsRecordTheWholeProjection(t *testing.T) {
 			action: "PRODUCT_CREATE", path: "/products",
 			body: `{"operationReason":"代客建立","name":"無籽檸檬","categoryId":"3001",` +
 				`"skus":[{"spec":"一箱","price":"120","stockQty":"36","unit":"3301"}]}`,
-			// 規則表 12 欄扣掉 description：建立回應沒有商品介紹，兩側都是「—」。
 			want: []string{
 				"name", "categoryName", "origin", "status", "priceMin", "priceMax",
 				"stockQty", "skus", "images", "hashtags", "certifications",
@@ -322,7 +281,6 @@ func TestDelegatedAudit_CreateActionsRecordTheWholeProjection(t *testing.T) {
 	}
 }
 
-// ==================== 機械閘門：新端點必須自己決定比較範圍 ====================
 
 // SnapshotFields 漏填 = 選了全表 = 稽核可能虛報，而它不編譯失敗、不轉紅、回應完全
 // 正常。上面那張表守的是「已知的 12 個 action」，這一支守的是**第 13 個之後**：任何
@@ -332,9 +290,6 @@ func TestDelegatedAudit_CreateActionsRecordTheWholeProjection(t *testing.T) {
 // 以 AST 而不是 grep 為錨：註解與字串裡出現 SnapshotFields 不算數，只有真的填在
 // composite literal 的 key 才算（§5「命中的是程式碼還是註解」）。
 func TestDelegatedOrchestrateCallSites_AllDeclareSnapshotFields(t *testing.T) {
-	// 掃整個 package 而不是 admin_delegated_*.go：第 14 支端點若落在不合那個命名的
-	// 檔案（例如既有的 admin_delegation.go），glob 版會靜默漏掉它，而 checked 門檻
-	// 只擋得住「全部錨點失效」，擋不住「新增一個沒被掃到的」。
 	all, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatalf("glob 失敗: %v", err)
@@ -384,9 +339,6 @@ func TestDelegatedOrchestrateCallSites_AllDeclareSnapshotFields(t *testing.T) {
 			return true
 		})
 	}
-	// 反向鑑別力：掃不到呼叫點時上面的迴圈一次都不會執行，整支測試會假綠。5 是
-	// 當下的實際數量（product 4、order 1；商品上下架兩支各自共用一個呼叫點）。新增端點時這個數字要跟著往上調——那正是提醒
-	// 你「有一支新的東西要決定比較範圍」的地方。
 	if checked < 5 {
 		t.Errorf("只掃到 %d 個 Orchestrate 呼叫點，少於已知的 5 個 —— AST 錨點可能失效了", checked)
 	}
@@ -405,7 +357,6 @@ func compositeLitHasKey(lit *ast.CompositeLit, key string) bool {
 	return false
 }
 
-// ==================== helpers ====================
 
 func doDelegatedScopeRequest(r *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, "/api/v1/admin/sellers/"+scopeTestStoreID+path, strings.NewReader(body))
@@ -439,7 +390,6 @@ func equalStringSets(got, want []string) bool {
 	return true
 }
 
-// ==================== before_snapshot 的舉證素材 ====================
 
 // TestDelegatedAudit_BatchBeforeSnapshotMatchesSinglePath 鎖住批次與單筆的 before
 // 快照對稱。
@@ -485,8 +435,6 @@ func TestDelegatedAudit_BatchBeforeSnapshotMatchesSinglePath(t *testing.T) {
 	batch := snapshotKeys(t, http.MethodPost, "/products/batch-unpublish",
 		`{"operationReason":"批次下架","items":[{"productId":"`+scopeTestProductID+`","expectedVersion":"12"}]}`)
 
-	// ① 先確認單筆這一側真的是完整白名單投影 —— 少了這一步，兩側一起退化成 {status}
-	//    時本測試仍會通過。
 	want := make([]string, 0, len(delegation.DelegationDiffRules["product"]))
 	for f := range delegation.DelegationDiffRules["product"] {
 		want = append(want, f)
@@ -495,7 +443,6 @@ func TestDelegatedAudit_BatchBeforeSnapshotMatchesSinglePath(t *testing.T) {
 		t.Fatalf("PRODUCT_UNPUBLISH 的 before_snapshot 鍵集合 = %v, want 完整規則表 %v", single, want)
 	}
 
-	// ② 批次必須與單筆逐鍵相同。
 	if !equalStringSets(batch, single) {
 		t.Errorf("PRODUCT_BATCH_UNPUBLISH 的 before_snapshot 鍵集合 = %v，單筆是 %v\n"+
 			"before_snapshot 是爭議時的舉證素材，批次正是「一次動很多件」的高風險操作，"+
@@ -503,9 +450,6 @@ func TestDelegatedAudit_BatchBeforeSnapshotMatchesSinglePath(t *testing.T) {
 			"由 productResource() 投影（不是在 Gateway 手寫第二份欄位清單）。", batch, single)
 	}
 
-	// ③ 反向鑑別力：before 補齊了，changed_fields 仍必須只有 status。收窄的是 Diff 的
-	//    比較範圍（SnapshotFields），不是 Project —— 兩者混為一談會讓這次修復把 §6.1.11
-	//    「PRODUCT_BATCH_UNPUBLISH 只記 status」一起改壞。
 	r, audit := newDelegatedScopeRouter(t)
 	w := doDelegatedScopeRequest(r, http.MethodPost, "/products/batch-unpublish",
 		`{"operationReason":"批次下架","items":[{"productId":"`+scopeTestProductID+`","expectedVersion":"12"}]}`)
@@ -527,7 +471,7 @@ func TestBatchProductResourceFallsBackWhenDetailMissing(t *testing.T) {
 	h := &Holder{}
 	res := batchProductResource(h, &productpb.BatchProductSnapshot{
 		ProductId: scopeTestProductID, Found: true, Version: "12",
-		Status: strconv.Itoa(4004), Name: "無籽檸檬", // Detail 刻意缺席
+		Status: strconv.Itoa(4004), Name: "無籽檸檬",
 	})
 	if !equalStringSets(mapKeys(res.Fields), []string{"status"}) {
 		t.Errorf("detail 缺席時的投影 = %v, want 只有 [status]；"+

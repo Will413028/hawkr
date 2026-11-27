@@ -17,13 +17,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔集中 ADM 代行營運（56 號）用到的 gRPC 呼叫。它們與各服務既有的賣家自助方法
-// 分開存在，理由是每一支都多帶兩樣東西：DelegationContext（授權語境）與 per-hop
-// deadline（§8.5.1 (B)，逾時預算是呼叫端的責任）。把 delegation 硬塞進既有簽章會讓
-// 每個賣家路徑的呼叫點都得傳一個 nil，而那個 nil 有一天會被填錯。
-//
-// deadlineMs <= 0 時不覆寫呼叫端的 deadline：測試 holder 沒有 config，
-// 而「沒有設定」不該被翻譯成「零秒逾時」。
 
 func withDeadline(ctx context.Context, deadlineMs int) (context.Context, context.CancelFunc) {
 	if deadlineMs <= 0 {
@@ -32,26 +25,6 @@ func withDeadline(ctx context.Context, deadlineMs int) (context.Context, context
 	return context.WithTimeout(ctx, time.Duration(deadlineMs)*time.Millisecond)
 }
 
-// requireCapability pins one call to the capability its domain service declares in
-// S3（§6.2.4）。每一支 wrapper 在自己第一行寫死那個字面常數，是 S3 的呼叫端鏡像。
-//
-// 沒有這道鏡像時，「這一跳送錯 capability」的唯一偵測器是實跑：領域服務回 9262、
-// 端點 100% 不可用，而所有把領域 client stub 掉的單元測試照樣全綠——stub 什麼都不驗。
-// storefront PATCH 就是以這個狀態出廠的：它在 Write 內取 before 快照時沿用了寫入跳的
-// context（storefront.write），而 GetSeller 宣告的是 storefront.read。
-//
-// 拒絕的形狀刻意做成領域拒絕的樣子（PermissionDenied ＋「[NNNN] 」前綴），讓它經
-// denialFromGrpcErr 還原成業務碼；請求不會送出去——一跳與自己的契約不符是 Gateway
-// 的 bug，不該讓被呼叫端去裁決。
-//
-// 碼是 9289 而不是 9262（#2744）。這裡的成因逐字就是上面那段講的 storefront PATCH：
-// **我方掛錯路由**。回 9262「此代行工作階段未取得該項操作權限」會把它講成操作者的
-// 授權問題 —— 而 requireCapability 的拒絕會以 Result=FAILED ＋ 該碼寫進
-// admin_operation_audit_logs，於是事後翻帳看到的是「這位管理員權限不足」。
-// **稽核說謊比回錯碼嚴重**，因為它在爭議發生時才被讀，而那時已經沒人記得真相。
-//
-// ⚠️ gRPC status 維持 PermissionDenied：denialFromGrpcErr 先解析前綴、只有沒有前綴
-// 時才看 status，而 codes.Internal 在它的傳輸失敗清單裡會短路成 9280。
 func requireCapability(d *commonpb.DelegationContext, rpc string, want pkgdelegation.Capability) error {
 	got := pkgdelegation.Capability(d.GetCapability())
 	if got == want {
@@ -63,7 +36,6 @@ func requireCapability(d *commonpb.DelegationContext, rpc string, want pkgdelega
 		bizcode.DelegationInternalContractMismatch, rpc, want, got))
 }
 
-// ==================== delegation 模組：兩階段稽核與查詢 ====================
 
 // RecordAuditIntent writes the PENDING audit row that every delegated mutation must
 // have before it touches any domain state. Failure is fail-closed (9279): the caller
@@ -132,16 +104,6 @@ func (c *AccountClient) ListAllDelegationAuditLogs(ctx context.Context, req *acc
 	return c.delegation.ListAllAuditLogs(ctx, req)
 }
 
-// ==================== delegation 模組：代行授權列治理（#2444） ====================
-//
-// 這六支與上面的稽核／工作階段呼叫不同層：它們是**治理設定**動作，發生在任何工作階段
-// 之前，因此不帶 DelegationContext、不驗 capability——requireCapability 那道鏡像對它們
-// 沒有意義（沒有一跳是「代行操作」）。授權者資格由 delegation 模組以
-// admin_accounts.delegation_enabled 判定並回 9288。
-//
-// deadline 沿用既有兩個參數：唯讀走 CurrentMs、寫入走 CreateMs。刻意不新增 config 欄位
-// ——多一個環境變數就多一處部署時可能漏設的地方，而這組端點的延遲特性與既有查詢／建立
-// 完全同級（單張表的一次 CAS，最多加一次 session 連帶撤銷）。
 
 // ListDelegationAuthorizations backs GET .../delegated-operations/authorizations.
 func (c *AccountClient) ListDelegationAuthorizations(ctx context.Context, req *accountpb.ListDelegationAuthorizationsRequest, deadlineMs int) (*accountpb.ListDelegationAuthorizationsResponse, error) {
@@ -189,7 +151,6 @@ func (c *AccountClient) ListDelegationAuthorizationHistory(ctx context.Context, 
 	return c.delegation.ListDelegationAuthorizationHistory(ctx, req)
 }
 
-// ==================== seller 模組 ====================
 
 // GetStoreStateForGuard reads the target store's lifecycle state for 授權鏈第 8 項
 // (§8.1.3 第 8 項) — "can this store still be operated on behalf of right now".
@@ -212,7 +173,6 @@ func (c *SellerClient) GetStoreStateForGuard(ctx context.Context, storeID int64,
 	return c.client.GetSeller(ctx, &sellerpb.GetSellerRequest{StoreId: storeID})
 }
 
-// ==================== product-service ====================
 
 func (c *ProductClient) GetProductListForDelegation(ctx context.Context, req *productpb.GetProductListRequest, deadlineMs int) (*productpb.GetProductListResponse, error) {
 	if err := requireCapability(req.GetDelegation(), "ProductService.GetProductList", pkgdelegation.CapProductsRead); err != nil {
@@ -282,7 +242,6 @@ func (c *ProductClient) BatchUpdateSellerProductStatusForDelegation(ctx context.
 	return c.client.BatchUpdateSellerProductStatus(ctx, req)
 }
 
-// ==================== order-service ====================
 
 func (c *OrderClient) GetSellerOrdersForDelegation(ctx context.Context, req *orderpb.GetSellerOrdersRequest, deadlineMs int) (*orderpb.GetSellerOrdersResponse, error) {
 	if err := requireCapability(req.GetDelegation(), "OrderService.GetSellerOrders", pkgdelegation.CapOrdersRead); err != nil {

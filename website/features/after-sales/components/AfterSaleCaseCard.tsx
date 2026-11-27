@@ -12,7 +12,6 @@ function reasonLabel(reason: string): string {
 }
 
 function formatDate(raw: string): string {
-	// 解不出來就把原字串照登（沿用原行為）。
 	return formatTaipeiDate(raw) || raw;
 }
 

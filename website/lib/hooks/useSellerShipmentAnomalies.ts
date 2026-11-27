@@ -41,8 +41,6 @@ export function useSellerShipmentAnomalies(
 	params: FetchShipmentAnomaliesParams = {},
 ): UseSellerShipmentAnomaliesResult {
 	const identity = useQueryIdentity();
-	// Stable params snapshot — JSON-stringify so the hook only refetches
-	// when filter inputs actually change (matches useSellerAfterSales).
 	const paramsKey = JSON.stringify(params);
 	const enabled = identity.activeRole === "seller";
 	const emptyResult = useMemo(
@@ -66,9 +64,7 @@ export function useSellerShipmentAnomalies(
 			});
 		},
 		enabled,
-		// placeholderData (not initialData): initialData writes the empty shape
 		// into the cache as fresh, so the global 30s staleTime suppresses the
-		// real mount fetch — sellers would see an empty list for up to 30s.
 		placeholderData: emptyResult,
 	});
 	const result = enabled ? (query.data ?? emptyResult) : emptyResult;
@@ -109,7 +105,6 @@ export function useSellerShipmentAnomalyStats(): UseSellerShipmentAnomalyStatsRe
 		queryKey: queryKeys.seller.shipmentAnomalyStats(identity),
 		queryFn: fetchSellerShipmentAnomalyStats,
 		enabled,
-		// See note above: placeholderData keeps the mount fetch alive.
 		placeholderData: emptyStats,
 	});
 

@@ -79,7 +79,6 @@ type fakeWrites struct {
 	name    string
 	names   []string
 	created crm.Tag
-	// customer 與 renamed 是寫入回傳的列（模組在寫入當下回傳）。
 	customer crm.Customer
 	renamed  crm.Tag
 }
@@ -130,7 +129,6 @@ func (f *fakeBuyers) BatchDisplay(_ context.Context, ids []int64) ([]buyer.Displ
 	return f.displays, nil
 }
 
-// fakeStores 是 seller.CurrentStore 的替身：own 為 nil 是沒有店。賣家能力不在 handler 檢查，所以它不回能力的拒絕。
 type fakeStores struct {
 	own *seller.Store
 }
@@ -229,7 +227,6 @@ func sampleCustomer(buyerID int64) crm.Customer {
 
 func mask(paths ...string) *fieldmaskpb.FieldMask { return &fieldmaskpb.FieldMask{Paths: paths} }
 
-// calls 是每個方法以 store_id 呼叫一次的入口，授權測試與宣告測試共用。
 func calls(e *env, storeID string) map[string]func(context.Context) error {
 	return map[string]func(context.Context) error{
 		crmv1alpha1connect.CrmAppServiceListCustomersProcedure: func(ctx context.Context) error {
@@ -956,7 +953,6 @@ func TestCustomerTypeAndSortEnumsMatchTheModule(t *testing.T) {
 	}
 }
 
-// CD8（A6-D8）：CRM 的回應永遠不含電話、Email、地址類欄位。檢查走 descriptor，遞迴每個回應訊息的欄位型別。
 var contactTokens = []string{"phone", "mobile", "tel", "telephone", "email", "mail", "address", "addr", "street", "postal", "zip", "contact"}
 
 func contactLike(name protoreflect.Name) bool {
@@ -976,8 +972,6 @@ func fieldNames(md protoreflect.MessageDescriptor) []string {
 	return out
 }
 
-// responseFields 是 CRM 回應走訪會碰到的每個訊息的欄位白名單（CD8）：新增欄位（任何名字）要先確認不是個資，再改這份白名單；
-// 名稱檢查（contactLike）只是第二道，抓不到 cellphone 這類不在詞表的名字，白名單抓得到。
 var responseFields = map[protoreflect.FullName][]string{
 	"hawkr.crm.v1alpha1.ListCustomersResponse":     {"customers", "next_page_token"},
 	"hawkr.crm.v1alpha1.GetCustomerResponse":       {"customer"},
@@ -995,7 +989,6 @@ var responseFields = map[protoreflect.FullName][]string{
 	"google.protobuf.Timestamp":                    {"seconds", "nanos"},
 }
 
-// walk 遞迴走訪 md 的每個欄位型別，回報：不在白名單的訊息、欄位與白名單不同的訊息、聯絡資料類的欄位名。
 func walk(md protoreflect.MessageDescriptor, path string, allowed map[protoreflect.FullName][]string, seen map[protoreflect.FullName]bool) []string {
 	if seen[md.FullName()] {
 		return nil

@@ -73,7 +73,7 @@ export interface GsiLoadOptions {
 }
 
 interface GsiCredentialResponse {
-	credential: string; // the Google ID token (JWT)
+	credential: string;
 }
 
 interface GoogleAccountsId {
@@ -208,9 +208,6 @@ export function loadGsi(options: GsiLoadOptions = {}): Promise<GsiLoadResult> {
 	}
 	if (loadState === "loading" && loadPromise) return loadPromise;
 
-	// A previously successful script lost its API (for example after an SDK
-	// bootstrap that fired load before exposing `google.accounts.id`). Never
-	// keep returning that fulfilled promise: discard the stale node and rebuild.
 	if (loadState === "ready") {
 		loadState = "idle";
 		loadPromise = null;
@@ -224,9 +221,6 @@ export function loadGsi(options: GsiLoadOptions = {}): Promise<GsiLoadResult> {
 	loadPromise = (async () => {
 		let firstFailureStage: GsiFailureStage | undefined;
 		for (let attempt = 1; attempt <= retryBackoffMs.length + 1; attempt += 1) {
-			// A timed-out/removed script can still finish evaluating, or another
-			// caller may have supplied GSI during the backoff. Reuse that API
-			// instead of appending a duplicate script or reporting a false failure.
 			if (firstFailureStage && hasGsiApi()) {
 				loadState = "ready";
 				return {
@@ -332,13 +326,6 @@ export async function renderGoogleButton(
 			cause: error,
 		});
 	}
-	// `width` is the only GSI knob that controls the click target's pixel
-	// width. The visible button on top is fluid (100% of container), so we
-	// pin the iframe width to the parent's measured width — falling back to
-	// 400 (GSI's max) when measurement is unavailable. shape/theme are
-	// invisible (the iframe sits at opacity:0 under our custom button), but
-	// "large" keeps the click target ~40px so it covers the 52px CTA's
-	// vertical centre comfortably.
 	const measured = Math.min(400, Math.round(el.getBoundingClientRect().width));
 	throwIfAborted(options.signal);
 	try {

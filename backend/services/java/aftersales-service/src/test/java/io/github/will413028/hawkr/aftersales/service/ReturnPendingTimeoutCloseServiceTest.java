@@ -67,7 +67,6 @@ class ReturnPendingTimeoutCloseServiceTest {
 
     @Test
     void casAffectedZero_returnsFalseWithoutSideEffects() {
-        // 競態：買家壓哨寄出 20→25 搶先 ⇒ 不得寫 audit、不得發事件（否則買家會收到「逾時未寄回」）
         when(caseMapper.markReturnPendingTimeoutAutoClosed(eq("A002"), any())).thenReturn(0);
 
         assertFalse(service.closeExpiredCase(expiredCase("A002"), now, principals));
@@ -79,7 +78,6 @@ class ReturnPendingTimeoutCloseServiceTest {
 
     @Test
     void publishFails_throwsSoTxRollsBack() {
-        // status='33' 是終態：不 rollback 的話該列永久離開候選集合、事件永久遺失
         when(caseMapper.markReturnPendingTimeoutAutoClosed(eq("A003"), any())).thenReturn(1);
         when(eventPublisher.tryPublishCaseTransitionWithContext(
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(), anyMap(), any()))

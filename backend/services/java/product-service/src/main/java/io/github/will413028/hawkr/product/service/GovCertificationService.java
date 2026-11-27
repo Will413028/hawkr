@@ -166,7 +166,6 @@ public class GovCertificationService {
                 .build();
     }
 
-    // ==================== 對外型別 ====================
 
     /**
      * 查驗結論（§8.5 推導規則三支各不相同）。
@@ -216,7 +215,6 @@ public class GovCertificationService {
         }
     }
 
-    // ==================== 入口 ====================
 
     /**
      * 認證編號字元白名單檢查。
@@ -318,7 +316,6 @@ public class GovCertificationService {
         }
     }
 
-    // ==================== 主流程 ====================
 
     /**
      * @param background          背景路徑：90 秒 read-timeout，且既不讀也不寫 circuit breaker
@@ -326,9 +323,6 @@ public class GovCertificationService {
      */
     private GovVerifyResult doVerify(String certNo, CertificationType certType,
                                      boolean background, boolean bypassResultCache) {
-        // 0. 字元白名單。這一關同時是安全邊界：certNo 之後會原字串接進政府 API 的查詢字串，
-        //    而該 URL 尾端帶 api_key。放行 URI 保留字元等同讓呼叫端隨手觸發 URI.create 失敗，
-        //    把整條含金鑰的 URL 推進例外訊息。擋在 try 之前也避免爛輸入誤觸 circuit breaker。
         if (!isValidCertNo(certNo)) {
             throw new IllegalArgumentException("認證編號格式不正確");
         }
@@ -336,12 +330,7 @@ public class GovCertificationService {
         String cacheKey = buildCacheKey(certType, certNo);
         String circuitKey = CIRCUIT_PREFIX + certType.code();
 
-        // 1+2. 查 Redis 結果快取 + circuit breaker
-        //   Redis 失聯時降級（02 §2.7.3）：略過快取與 circuit，直接呼叫政府 API。
         try {
-            // bypassResultCache（ADM 手動重新查驗，§9.3）：連 get 都不發。
-            // 🔴 這裡的判斷不能寫成「讀了但不用」——那樣一旦有人把 return 補回來就沒有任何
-            //    東西會轉紅；「沒有發出那次 get」本身才是測得到的不變式。
             if (!bypassResultCache) {
                 String cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
@@ -354,8 +343,6 @@ public class GovCertificationService {
                 }
             }
 
-            // circuit breaker（上游近期失敗 → 直接快回，避免每次卡 timeout）。
-            // 背景路徑刻意不讀：見 verifyDetailedForBackground 的說明。
             if (!background) {
                 String circuit = redisTemplate.opsForValue().get(circuitKey);
                 if (circuit != null) {
@@ -367,7 +354,6 @@ public class GovCertificationService {
             log.warn("cacheUnavailable", "Redis 失聯，認證查驗略過快取/circuit 直打政府 API: " + e.getMessage());
         }
 
-        // 3. 呼叫政府 API
         String url = buildGovApiUrl(certType, certNo);
         long readTimeout = background
                 ? govApiProperties.getBackgroundReadTimeout()
@@ -392,10 +378,8 @@ public class GovCertificationService {
                 throw new GovApiUnavailableException(GrpcResponseCode.GOV_CERT_API_UNAVAILABLE.message());
             }
 
-            // 4. 解析回應（防線 1 / 2 / 3 都在裡面）
             GovVerifyResult result = parseDetailed(certType, certNo, response.body());
 
-            // 5. 寫入快取（Redis 失聯時 log.warn 略過，不得讓快取寫入失敗誤判為政府 API 失敗，02 §2.7.3）
             writeCache(cacheKey, result);
 
             log.info("result", "認證查驗結果: type=" + certType.value() + ", certNo=" + certNo
@@ -414,8 +398,6 @@ public class GovCertificationService {
             openCircuit(circuitKey, background);
             throw new GovApiUnavailableException(GrpcResponseCode.GOV_CERT_API_UNAVAILABLE.message());
         } catch (Exception e) {
-            // 只記例外類別名稱，比照上面兩個分支：例外訊息可能內嵌整條含 api_key 的 URL
-            // （例如 URI.create 的 IllegalArgumentException），整個物件交給 logger 就是外洩。
             log.error("error", "政府 API 呼叫失敗: type=" + certType.value() + ", certNo=" + certNo + ", cause=" + e.getClass().getSimpleName());
             openCircuit(circuitKey, background);
             throw new GovApiUnavailableException(GrpcResponseCode.GOV_CERT_API_UNAVAILABLE.message());
@@ -439,7 +421,6 @@ public class GovCertificationService {
         }
     }
 
-    // ==================== 解析與三道防線 ====================
 
     /**
      * 解析政府 API 回應。
@@ -454,12 +435,8 @@ public class GovCertificationService {
             throw new GovApiResponseException(GrpcResponseCode.GOV_CERT_API_RESPONSE_INVALID.message());
         }
 
-        // ---- 防線 1：RS != "OK" 一律視為不可用，絕不得落成「查無此認證」 ----
-        // 實測：金鑰錯／失效／配額用盡 → {"RS":"ERROR","MSG":"API_ID&API_KEY不符,請檢查"}，
-        // HTTP 200 且完全沒有 Data 欄。舊版判「陣列非空」⇒ 回 false ⇒ 全站認證靜默變成假的。
         JsonNode rs = root == null ? null : root.get("RS");
         if (rs == null || !"OK".equals(rs.asText())) {
-            // 只記 RS 值，不記 MSG：MSG 由上游控制，不保證不回聲請求內容。
             log.error("govApiNotOk", "政府 API 回報非 OK，視為不可用（不得判為查無）: type="
                     + certType.value() + ", rs=" + (rs == null ? "<missing>" : rs.asText()));
             throw new GovApiUnavailableException(GrpcResponseCode.GOV_CERT_API_UNAVAILABLE.message());
@@ -477,9 +454,6 @@ public class GovCertificationService {
                     null, null, null, null, null, null, 0, objectMapper.createArrayNode());
         }
 
-        // ---- 防線 2：編號自我校驗 ----
-        // 實測：送未知參數名時伺服器忽略該參數並回傳整個資料集（1000 筆）
-        // ⇒ 參數名一旦打錯，任何編號都會「驗證通過」＝自動核准任意號碼。
         String echoField = echoFieldOf(certType);
         for (JsonNode row : data) {
             JsonNode echo = row == null ? null : row.get(echoField);
@@ -492,7 +466,6 @@ public class GovCertificationService {
             }
         }
 
-        // ---- 結論推導（§8.5，三支規則不同）＋ 防線 3（截斷）----
         JsonNode best = null;
         Validity bestValidity = null;
         for (JsonNode row : data) {
@@ -553,9 +526,6 @@ public class GovCertificationService {
             case TAP:
                 return notExpired(text(row, "ValidDate"));
             case CAS:
-                // 無狀態亦無效期 ⇒ found 即 VALID。
-                // ⚠️ 這只證明「該工廠具 CAS 資格」，不證明「這個商品是 CAS 產品」
-                // ⇒ 3703 一律人工審核（§8.5），不得自動核准。
                 return Validity.VALID;
             default:
                 return Validity.UNKNOWN;
@@ -589,7 +559,7 @@ public class GovCertificationService {
             case SUSPENDED: return 1;
             case EXPIRED: return 2;
             case TERMINATED: return 3;
-            default: return 4; // UNKNOWN / NOT_FOUND
+            default: return 4;
         }
     }
 
@@ -651,7 +621,6 @@ public class GovCertificationService {
                 : joined;
     }
 
-    // ==================== 欄位映射（§8.1）====================
 
     /** 防線 2 的編號回聲欄位。 */
     private static String echoFieldOf(CertificationType certType) {
@@ -667,7 +636,7 @@ public class GovCertificationService {
         switch (certType) {
             case ORGANIC: return "EffectiveDate";
             case TAP: return "ValidDate";
-            default: return "__none__"; // 3703 無效期欄位
+            default: return "__none__";
         }
     }
 
@@ -704,12 +673,10 @@ public class GovCertificationService {
         }
     }
 
-    // ==================== 快取序列化 ====================
 
     private void writeCache(String cacheKey, GovVerifyResult result) {
         long ttl = ttlSecondsFor(result.validity());
         if (ttl <= 0) {
-            // UNKNOWN：我方或上游故障，不是查驗結論。快取起來會把一次故障放大成一段時間的錯誤答案。
             log.warn("cacheSkipUnknown", "查驗結論為 UNKNOWN，不寫快取: certType=" + result.certType());
             return;
         }
@@ -728,7 +695,6 @@ public class GovCertificationService {
             case VALID:
                 return govApiProperties.getCacheTtlExists();
             case NOT_FOUND:
-                // 1 小時：避免賣家打錯字之後被自己的錯誤快取擋住一整天。
                 return govApiProperties.getCacheTtlNotExists();
             case EXPIRED:
             case TERMINATED:
@@ -785,7 +751,6 @@ public class GovCertificationService {
         }
     }
 
-    // ==================== 小工具 ====================
 
     private static String text(JsonNode node, String field) {
         if (node == null || field == null) {
@@ -807,7 +772,6 @@ public class GovCertificationService {
         try {
             return LocalDate.parse(s, GOV_DATE);
         } catch (Exception ignored) {
-            // fallthrough
         }
         try {
             return LocalDate.parse(s);
@@ -845,19 +809,12 @@ public class GovCertificationService {
             default:
                 throw new IllegalArgumentException("不支援的認證類型: " + certType.value());
         }
-        // 查詢參數名與防線 2 的回聲欄位<b>同一個常數</b>：兩者若各寫一份，參數名打錯時
-        // 校驗欄位也會跟著錯，防線 2 就白做了。
         String paramName = echoFieldOf(certType);
 
-        // certNo 已由 isValidCertNo 收斂到 RFC 3986 unreserved 字元，可直接串接；
-        // 若日後放寬白名單，這裡必須改成 percent-encoding。
         StringBuilder sb = new StringBuilder(baseUrl);
         sb.append("?").append(paramName).append("=").append(certNo);
-        // ⚠️ $top 實測被伺服器忽略（帶 $top=1 仍回 2 筆），保留只為省流量，
-        //    payload 大小的保證在防線 3，不在這裡。
         sb.append("&$top=1");
 
-        // 加入 API Key
         String apiKey = govApiProperties.getApiKey1();
         if (apiKey != null && !apiKey.isEmpty()) {
             sb.append("&api_key=").append(apiKey);
@@ -886,7 +843,6 @@ public class GovCertificationService {
             }
             return hex.substring(0, 16);
         } catch (Exception e) {
-            // SHA-256 是 JDK 必備演算法，理論上不會拋出 — 走到這裡代表 JVM 損毀
             throw new IllegalStateException("SHA-256 not supported by JVM", e);
         }
     }

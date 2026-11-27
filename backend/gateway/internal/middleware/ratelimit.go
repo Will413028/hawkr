@@ -13,19 +13,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// tier is a rate-limit sensitivity class. Endpoints map to a tier by their
-// matched route (c.FullPath), classified in one place (classifyTier) so the
-// exempt set — SSE/WS streams, the view beacon, health and the store-map callbacks —
-// lives in exactly one auditable location. Missing one exempt route would let a
-// reconnect storm on a long-lived stream trip the limiter and knock every
-// client off; scattering the rule across dozens of route files makes that
-// omission far easier. #1416.
 type tier int
 
 const (
-	tierExempt   tier = iota // not rate limited (long-lived streams / callbacks)
-	tierModerate             // anonymous public reads
-	tierDefault              // authenticated app + admin traffic
+	tierExempt   tier = iota
+	tierModerate
+	tierDefault
 )
 
 var tierNames = map[tier]string{
@@ -33,9 +26,6 @@ var tierNames = map[tier]string{
 	tierDefault:  "default",
 }
 
-// tierLabel names every tier including the exempt one, for metrics. tierNames
-// deliberately has no exempt entry — it builds quota keys, and exempt routes
-// never reach one.
 func tierLabel(t tier) string {
 	if t == tierExempt {
 		return "exempt"
@@ -65,14 +55,6 @@ type RateLimitPolicy struct {
 	FallbackCapacity     int
 }
 
-// limitFor resolves the quota for one (tier, kind) pair. Only tierModerate
-// distinguishes kinds; every other tier falls to its single value.
-//
-// A non-positive SSR/CI quota falls back to the visitor quota rather than
-// through to the limiter: pkg/ratelimit treats limit <= 0 as UNLIMITED, so a
-// field left unset in some RateLimitPolicy literal would not fail to compile,
-// would not fail a test, and would silently switch that axis off. Falling back
-// keeps the pre-#2264 behaviour; NewRateLimiter logs which field was missing.
 func (p RateLimitPolicy) limitFor(t tier, k SubjectKind) int {
 	switch t {
 	case tierModerate:
@@ -94,26 +76,17 @@ func (p RateLimitPolicy) limitFor(t tier, k SubjectKind) int {
 
 const publicNamespace = "/api/v1/public"
 
-// exemptExact are routes never rate limited, matched verbatim against gin's
-// FullPath (route params kept as ":id"). Long-lived SSE/WS connections and
-// low-JWT store-map callbacks would be wrongly throttled — reconnect storms or
-// same-source-IP callback bursts — under a per-IP request limit.
 var exemptExact = map[string]struct{}{
-	"/api/v1/health":      {}, // liveness probe
-	"/store_map/return":   {}, // PayUni CVS map return
-	"/store_map/redirect": {}, // WebView CVS-map opener
+	"/api/v1/health":      {},
+	"/store_map/return":   {},
+	"/store_map/redirect": {},
 	"/.well-known/apple-developer-merchantid-domain-association.txt": {},
 }
 
-// exemptPrefixes are route trees never rate limited.
 var exemptPrefixes = []string{
 	"/.well-known/",
 }
 
-// classifyTier maps a matched route (gin FullPath) to its rate-limit tier.
-// Order matters: the exempt rules win over the public namespace, and anything
-// unmatched — including 404s where FullPath is "" — falls to the default bucket
-// so it is still limited.
 func classifyTier(fullPath string) tier {
 	if _, ok := exemptExact[fullPath]; ok {
 		return tierExempt
@@ -129,54 +102,8 @@ func classifyTier(fullPath string) tier {
 	return tierDefault
 }
 
-// authFailureKey is the per-subject counter of 401 responses. One counter per
-// source rather than per route: the abuse being throttled is "this source
-// cannot authenticate and keeps trying", which is a property of the source, not
-// of any one endpoint. Its blast radius is bounded by authFailureAxisApplies,
-// not by the key.
 func authFailureKey(subject string) string { return "ratelimit:authfail:" + subject }
 
-// authFailureAxisApplies reports whether the auth-failure axis both observes
-// (counts 401s) and acts on (refuses) this tier.
-//
-// tierModerate — the anonymous public reads under /api/v1/public — is out of
-// scope in BOTH directions, and the two halves must stay in step so the axis
-// can only ever spend a budget it also feeds.
-//
-// Not acted on: the axis exists to stop a source that keeps failing to
-// authenticate. Refusing that source's anonymous reads prevents no further
-// authentication failure — it only escalates "cannot log in" into "cannot use
-// the site at all", for everyone sharing the address. Per-IP is the only
-// granularity available, so one broken client behind a NAT, a shared office
-// egress or a CI runner takes the whole address down with it. On 2026-07-29
-// exactly that happened: the website E2E suite (single runner IP, and by design
-// full of deliberate-401 assertions) tripped the threshold and was then refused
-// /public/marketplace, /public/products and /public/posts, failing every ISR
-// revalidate and blocking all web deploys. Abuse of the public reads themselves
-// is already covered by the moderate tier quota, which is what that quota is
-// for.
-//
-// Not counted: a route that requires no credentials cannot produce a failed
-// authentication attempt. A 401 surfacing there comes from downstream, so
-// counting it would let one misbehaving upstream silently spend an entire
-// address's authenticated budget.
-//
-// The OptionalJWT routes' app counterparts stay in scope: those requests do
-// attempt authentication. The OptionalJWT public routes themselves
-// (/public/carts, /public/products…) are deliberately out:
-// they never reject a caller for lacking an identity — the request proceeds as
-// anonymous — so there is no failed authentication to throttle and no
-// brute-force payoff to deny.
-//
-// 認證在單體之後，gateway 的 401 來自「單體沒有帶身分 header」：呼叫者沒有登入或 session 已失效。
-//
-// SubjectKind adds a second exclusion, on top of the tier one above.
-// SubjectSSR and SubjectCI are out: SSR is anonymous reading and produces no
-// failed authentication attempt, and CI asserts on deliberate 401s by design —
-// counting either only lets one shared axis take the blame for everyone.
-// SubjectVisitor stays IN, and must: it covers every human (browser direct, App
-// and worker-relayed alike), so excluding it would retire the whole defence
-// that the 2026-07-29 incident is the reason for.
 func authFailureAxisApplies(t tier, k SubjectKind) bool {
 	switch k {
 	case SubjectSSR, SubjectCI:
@@ -190,35 +117,12 @@ func authFailureAxisApplies(t tier, k SubjectKind) bool {
 	}
 }
 
-// blockLogWindow is the block-log sampling window: at most one line per
-// (reason, IP) within it. Deliberately its own constant rather than the tunable
-// quota window — log volume is a property of the log pipeline, not of a quota
-// operators may retune. It matches the default RATE_LIMIT_WINDOW_SECONDS=60.
 const blockLogWindow = time.Minute
 
-// blockLogMaxLinesPerWindow hard-caps the lines one window may emit no matter
-// how many distinct sources are blocked. A thousand samples already
-// characterises any incident, and past that a single "dropped" line carries the
-// true scale.
 const blockLogMaxLinesPerWindow = 1000
 
-// blockLogXFFMaxLen bounds the logged X-Forwarded-For. The header is entirely
-// caller-controlled and the origin-direct path sits outside Cloudflare's header
-// limits, so unbounded it lets one request write up to net/http's default 1MB
-// MaxHeaderBytes into a single log line. 256 holds a realistic proxy chain.
 const blockLogXFFMaxLen = 256
 
-// newBlockLogSampler builds the block log's own sampler (see logSampler), held
-// by the limiter alone so its budget is never spent by another call site.
-//
-// Why blocked requests need their own log line at all: Logger() is registered
-// AFTER the cheap gates, so a 429 abort never reaches it and leaves no
-// access-log entry. Prometheus counts the 429 but carries no client IP
-// (correctly — that would be unbounded cardinality). Without this, "who is
-// hammering us" is unanswerable for exactly the traffic that got blocked. On
-// 2026-07-29 the culprit was identifiable only because its loop sat 4% under the
-// tier ceiling and was therefore never blocked; once the auth-failure tier
-// catches that shape, the same investigation would have come up empty.
 func newBlockLogSampler() *logSampler {
 	return newLogSampler(blockLogWindow, blockLogMaxLinesPerWindow)
 }
@@ -239,8 +143,6 @@ func TieredRateLimiter(limiter *ratelimit.Limiter, policy RateLimitPolicy) gin.H
 	return tieredRateLimiter(limiter, policy, newBlockLogSampler())
 }
 
-// tieredRateLimiter takes the block-log sampler as a parameter so tests can
-// drive its clock instead of waiting out a real window.
 func tieredRateLimiter(limiter *ratelimit.Limiter, policy RateLimitPolicy, blockLog *logSampler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		t := classifyTier(c.FullPath())
@@ -251,9 +153,6 @@ func tieredRateLimiter(limiter *ratelimit.Limiter, policy RateLimitPolicy, block
 		subject, kind := RateLimitSubject(c)
 		authAxis := policy.AuthFailurePerWindow > 0 && authFailureAxisApplies(t, kind)
 
-		// Gate on the auth-failure counter before doing any work. Count (not
-		// Allow) because this counter is incremented only by 401 responses
-		// below — gating with Allow would make every request its own increment.
 		if authAxis &&
 			limiter.Count(c.Request.Context(), authFailureKey(subject), policy.Window) >= int64(policy.AuthFailurePerWindow) {
 			logBlocked(c, blockLog, "auth_failures", subject)
@@ -274,9 +173,6 @@ func tieredRateLimiter(limiter *ratelimit.Limiter, policy RateLimitPolicy, block
 		}
 		c.Next()
 
-		// Count the failure after the handler chain has resolved the status.
-		// Allow's return value is irrelevant here — it is being used purely as
-		// the atomic INCR+expire that backs the counter Count reads.
 		if authAxis && c.Writer.Status() == http.StatusUnauthorized {
 			_ = limiter.Allow(c.Request.Context(), authFailureKey(subject),
 				policy.AuthFailurePerWindow, policy.Window)
@@ -284,25 +180,6 @@ func tieredRateLimiter(limiter *ratelimit.Limiter, policy RateLimitPolicy, block
 	}
 }
 
-// throttleBizCode picks the envelope code a 429 carries. Everywhere it stays the
-// legacy 429-as-business-code; on a delegated route it becomes 9273
-// DELEGATION_RATE_LIMITED.
-//
-// 只在真的要回 429 的那兩個分支呼叫，不在每次請求開頭先算好：它查的是一張有鎖的
-// 登錄表，而限流中介層跑在**每一個**請求上，被節流的請求則是極少數。
-//
-// 56 號 §6.1.0 行 2317 定版：代行沿用既有的 tierDefault（300 次 / 60 秒），不新增層級、
-// 不新增 per-endpoint 額度，而「9273 即該既有 tier 觸發時回傳的業務碼」。實作原本一路
-// 送 429，於是 §6.5.1 登錄的 9273 在整個 repo 沒有任何 emitter，前端對它寫的處置分支
-// （倒數後安全重試、不得重複 mutation）永遠不會被觸發。這裡只換業務碼——HTTP 仍是
-// 429（bizhttp.go 對 9273 登錄的正是 429），限流行為、額度、key 一律不動。
-//
-// 兩條 429 分支共用同一個碼是刻意的。auth-failure 軸與 tier 額度是兩個不同的軸，但它
-// 們對呼叫端的意思完全相同：你被節流了，倒數後再來，不要重送 mutation。給其中一條裸
-// 429、另一條 9273，等於讓同一組端點的同一個 HTTP status 帶兩種業務碼，前端得為一個
-// 沒登錄的碼寫特例。要分辨兩者用的是 message 與 block log 的 reason 欄，那兩處都還在。
-// （另立一個新業務碼會是 CodeMeta 契約變更，且 §6.1.0 行 2337 明訂新增限流層級不在本期
-// 範圍。）
 func throttleBizCode(c *gin.Context) int32 {
 	if IsDelegatedRoute(c) {
 		return bizcode.DelegationRateLimited
@@ -310,20 +187,6 @@ func throttleBizCode(c *gin.Context) int32 {
 	return 429
 }
 
-// logBlocked records one line per (reason, subject) per window naming the source
-// that got throttled. Field names match Logger()'s access-log schema (ip,
-// method, path) so both are queryable the same way. path is the matched route,
-// not the raw URL — enough to see what was being hammered without logging IDs
-// or query strings.
-//
-// ip and subject are BOTH emitted and they are not the same question. ip is
-// forensic ("which machine sent this"); subject is attribution ("whose quota did
-// it spend"), and under SSR / CI / admin-relayed traffic the two differ. subject
-// must not be folded into the ip field: "s:ssr" is not an address, and a field
-// name that lies turns every existing log query silently wrong — the same reason
-// the OTP proto field was renamed off client_ip. Metrics cannot answer this
-// either; they deliberately carry no subject label (unbounded cardinality), so
-// this log line is the only place "which subject got blocked" exists.
 func logBlocked(c *gin.Context, sampler *logSampler, reason, subject string) {
 	if !sampler.admitWithNotice(c.Request.Context(), pkglogger.Warn,
 		reason+":"+subject, "[RateLimit] block log truncated") {
@@ -339,8 +202,6 @@ func logBlocked(c *gin.Context, sampler *logSampler, reason, subject string) {
 	)
 }
 
-// truncateForLog caps a caller-controlled value and marks that it was cut, so a
-// truncated chain is never read as the whole chain.
 func truncateForLog(v string, max int) string {
 	if len(v) <= max {
 		return v
@@ -358,13 +219,6 @@ func NewRateLimiter(policy RateLimitPolicy, logger *zap.Logger) gin.HandlerFunc 
 	return TieredRateLimiter(limiter, policy)
 }
 
-// publishQuotas exports the configured ceilings and shouts about any that would
-// leave an axis unguarded.
-//
-// Only the three moderate-tier kind quotas are checked, and deliberately not
-// "any non-positive limit": AuthFailurePerWindow = 0 is an existing, documented
-// contract meaning "the auth-failure axis is off", so a blanket rule would turn
-// that switch into "refuse everything".
 func (p RateLimitPolicy) publishQuotas(logger *zap.Logger) {
 	for _, q := range []struct {
 		kind  SubjectKind

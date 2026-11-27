@@ -40,13 +40,11 @@ type permanentError struct{ error }
 
 func invalid(format string, args ...any) error { return permanentError{fmt.Errorf(format, args...)} }
 
-// isPermanent 是兩個 handler 共用的分類：解碼失敗、必要欄位缺漏或格式不合都是 permanent（進 DLQ、不重試）。
 func isPermanent(err error) bool {
 	var p permanentError
 	return errors.As(err, &p)
 }
 
-// orderCompletedEvent 只列投影用到的欄位（Java 的 OrderCompletedPayload 其餘欄位忽略；ID 與金額是字串）。
 type orderCompletedEvent struct {
 	EventID           string `json:"event_id"`
 	OrderNo           string `json:"order_no"`
@@ -121,7 +119,6 @@ func (w *orderCompletedWorker) Work(ctx context.Context, job *river.Job[OrderCom
 	return cancelIfHopeless(err)
 }
 
-// cancelIfHopeless 把重試不會變好的錯誤轉成 River 的取消（不再重試）；其他錯誤（DB、網路）照常重試。
 func cancelIfHopeless(err error) error {
 	if errors.Is(err, crm.ErrInvalidEvent) || errors.Is(err, crm.ErrPartiesMismatch) {
 		return river.JobCancel(err)
@@ -129,7 +126,6 @@ func cancelIfHopeless(err error) error {
 	return err
 }
 
-// refundCompletedEvent 只列投影用到的欄位（Java 的 RefundCompletedPayload）。
 type refundCompletedEvent struct {
 	EventID       string `json:"event_id"`
 	CaseNo        string `json:"case_no"`
@@ -139,8 +135,6 @@ type refundCompletedEvent struct {
 	ExternalRefID string `json:"external_ref_id"`
 }
 
-// refundDedupKey 是退款事件的冪等鍵。event_id 不穩定：Java 的 RefundCompletedPayload 每次建構都產生新 UUID，RefundSyncWorker 每小時重發
-// 已完成的退款，所以用 external_ref_id，缺時 "AS_REFUND_"+case_no（同 order-service 自己消費這個事件的鍵）；兩者都缺或超過長度上限都是 permanent。
 func refundDedupKey(externalRefID, caseNo string) (string, error) {
 	key := externalRefID
 	if key == "" {
@@ -195,7 +189,6 @@ func (c Consumer) RefundCompleted(ctx context.Context, body []byte) error {
 			return invalid("crmconsumer：PARTIAL_REFUND 的 refund_amount 不是正整數")
 		}
 	case crm.RefundFull:
-		// 全額退款不信上游的 refund_amount：投影以自己記錄的淨額歸零，所以刻意不解析。
 	default:
 		return invalid("crmconsumer：未知的 refund_outcome %q", e.RefundOutcome)
 	}

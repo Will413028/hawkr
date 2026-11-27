@@ -122,7 +122,6 @@ class GrantPaymentPayoutHoldIT {
         return repo.findPendingTasks(20).stream().map(GrantPaymentTaskEntity::getTaskId).toList();
     }
 
-    // ==================== 核心保證：推遲之後撈不到，時間到又撈得到 ====================
 
     @Test
     @DisplayName("新建任務立即是候選（＝修復前 30 秒內撥款的那條路徑，本測試錨定它沒被改壞）")
@@ -152,7 +151,6 @@ class GrantPaymentPayoutHoldIT {
     void deferredTaskReturnsAfterHoldExpires() {
         freshTask();
         repo.claimTask(TASK_ID, DateTimeUtils.nowUtc().plusSeconds(120));
-        // 推到「1 秒前」＝模擬 hold 已到期（不 sleep，直接把時點放在過去）
         repo.deferForPayoutHold(TASK_ID, DateTimeUtils.nowUtc().minusSeconds(1), "payout hold: expired");
 
         assertThat(candidateIds())
@@ -172,7 +170,6 @@ class GrantPaymentPayoutHoldIT {
         assertThat(row().getRetryCount()).isEqualTo(7);
     }
 
-    // ==================== Case F：多副本競態 ====================
 
     @Test
     @DisplayName("Case F：兩個 replica 同時 claim ⇒ 只有一個拿到租約（既有 lease CAS，本修法未破壞）")
@@ -190,9 +187,7 @@ class GrantPaymentPayoutHoldIT {
     void lateDeferAfterClaimLostIsRejected() {
         freshTask();
         repo.claimTask(TASK_ID, DateTimeUtils.nowUtc().plusSeconds(120));
-        // pod A 推遲成功 → 列回到 PENDING
         assertThat(repo.deferForPayoutHold(TASK_ID, DateTimeUtils.nowUtc().plusHours(1), "A")).isEqualTo(1);
-        // pod B（同一輪的落後者）再推一次 → status 已非 PROCESSING ⇒ 0
         assertThat(repo.deferForPayoutHold(TASK_ID, DateTimeUtils.nowUtc().plusHours(9), "B")).isZero();
         assertThat(row().getLastError()).isEqualTo("A");
     }
@@ -209,13 +204,11 @@ class GrantPaymentPayoutHoldIT {
         assertThat(results.stream().filter(r -> r == 1).count()).isEqualTo(1);
     }
 
-    // ==================== Case G：crash / restart ====================
 
     @Test
     @DisplayName("Case G：pod 在閘門與撥款之間 crash（列停在 PROCESSING）⇒ 租約到期後可重新 claim，重新過閘")
     void crashedTaskIsReclaimableAfterLeaseExpiry() {
         freshTask();
-        // 模擬 crash：claim 過、租約已過期、狀態停在 PROCESSING
         jdbc.update("""
                 UPDATE grant_payment_tasks
                    SET status = ?, next_retry_time = NOW() - INTERVAL '1 second'
@@ -237,11 +230,9 @@ class GrantPaymentPayoutHoldIT {
         repo.claimTask(TASK_ID, DateTimeUtils.nowUtc().plusSeconds(120));
         repo.deferForPayoutHold(TASK_ID, DateTimeUtils.nowUtc().plusHours(72), "payout hold");
 
-        // 重啟＝重新掃候選，沒有任何記憶體狀態參與判定
         assertThat(candidateIds()).isEmpty();
     }
 
-    // ==================== admin 救濟與閘門的關係 ====================
 
     @Test
     @DisplayName("admin resetForRetry 收不到被 hold 住的 PENDING 任務（不會意外把 hold 解除）")
@@ -264,8 +255,6 @@ class GrantPaymentPayoutHoldIT {
 
         assertThat(repo.resetForRetry(ORDER_NO)).isEqualTo(1);
         assertThat(candidateIds()).containsExactly(TASK_ID);
-        // 回到候選只代表 worker 會處理它；worker 的第一件事是 claim → 反查資格
-        // （順序由 GrantPaymentWorkerPayoutHoldTest.gateSitsBetweenClaimAndPayment 守）
     }
 
     private List<Integer> runConcurrently(Callable<Integer> a, Callable<Integer> b) throws Exception {

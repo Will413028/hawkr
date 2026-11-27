@@ -63,9 +63,7 @@ public class FavoriteCountService {
                             + productId + " delta=" + delta);
             return false;
         }
-        // 反正規化欄位更新後 evict detail cache，避免讀路徑看到 stale favorite_count（02 §5.14）
         cacheService.evictProductDetail(productId.toString());
-        // favorite_count 亦出現在 ProductListItemDTO → 列表快取同步失效（owner bucket + 公開 bucket 0，#1426）。
         Long ownerId = productRepository.findProductSellerRefs(List.of(productId)).stream()
                 .findFirst().map(ProductSellerRef::sellerId).orElse(null);
         if (ownerId != null) {

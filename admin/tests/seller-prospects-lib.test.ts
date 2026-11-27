@@ -110,18 +110,15 @@ test("聯絡方式：改類型時兩個類型的主要都重算", () => {
 		row("p", ContactKind.PHONE, "02-1", true),
 		row("q", ContactKind.PHONE, "02-2"),
 	];
-	// 主要的 a 改成電話：原類型（電子郵件）由 b 遞補；電話已有主要 p，a 不是主要。
 	const moved = changeContactKind(start, "a", ContactKind.PHONE);
 	assert.deepEqual(primaries(moved), ["b", "p"]);
 	assert.equal(moved.find((r) => r.key === "a")?.primary, false);
-	// 新類型沒有其他列時，改過去的那一列成為主要；原類型沒有列了就沒有主要。
 	const alone = changeContactKind(
 		[row("a", ContactKind.EMAIL, "a@x.test", true)],
 		"a",
 		ContactKind.WEBSITE,
 	);
 	assert.deepEqual(primaries(alone), ["a"]);
-	// 非主要的列改類型：原類型的主要不變。
 	const nonPrimary = changeContactKind(start, "b", ContactKind.WEBSITE);
 	assert.deepEqual(primaries(nonPrimary), ["a", "b", "p"]);
 });
@@ -406,7 +403,6 @@ test("URL 篩選：只認白名單的小寫字串，不認得的回預設，UNSP
 		assert.equal(f.vendorType, undefined, bad);
 		assert.equal(f.status, ProspectStatus.ACTIVE, `status=${bad} 應回預設`);
 	}
-	// 招商進度的 CONVERTED 不在選項裡。
 	assert.equal(
 		readProspectFilters(params("outreachStatus=converted")).outreachStatus,
 		undefined,

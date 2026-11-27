@@ -65,21 +65,20 @@ class _HashtagSpecialText extends SpecialText {
   /// 空白、標點、emoji 都會結束 hashtag。
   @override
   bool isEnd(String value) {
-    if (value.length <= 1) return false; // 還沒收到 hashtag body
+    if (value.length <= 1) return false;
     final last = value.substring(value.length - 1);
     return !_bodyChar.hasMatch(last);
   }
 
   @override
   InlineSpan finishText() {
-    final raw = toString(); // 包含 # 加 body 加結束 char (若有)
+    final raw = toString();
     final m = RegExp(r'^#([\p{L}\p{N}_]+)', unicode: true).firstMatch(raw);
     if (m == null || m.group(1) == null || m.group(1)!.isEmpty) {
-      // 只有 `#` 沒有 body → 不上色，當普通文字
       return TextSpan(text: raw, style: textStyle);
     }
-    final tagPart = '#${m.group(1)}'; // 純 hashtag (含 #)
-    final rest = raw.substring(tagPart.length); // 結束字元（空白 / 標點等）
+    final tagPart = '#${m.group(1)}';
+    final rest = raw.substring(tagPart.length);
 
     final tagStyle = (textStyle ?? const TextStyle()).copyWith(
       color: tagColor,
@@ -89,7 +88,6 @@ class _HashtagSpecialText extends SpecialText {
     if (rest.isEmpty) {
       return TextSpan(text: tagPart, style: tagStyle);
     }
-    // tag 本體上色，結束字元維持原樣
     return TextSpan(
       children: [
         TextSpan(text: tagPart, style: tagStyle),

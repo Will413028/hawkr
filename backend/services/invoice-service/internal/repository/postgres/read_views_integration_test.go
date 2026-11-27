@@ -24,23 +24,14 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// seed helpers
-//
-// 每個 helper 只填「讓 CHECK 全部成立」的最小欄位集合。本表的 CHECK 有四條是
-// **雙向等式**（voided／na_reason／external_no／carrier_pair），少寫一半當場 23514
-// ——所以這些 helper 刻意不接受「隨便組一組欄位」的參數。
-// ---------------------------------------------------------------------------
 
-// seedWorld 是一組完整的、互不相干的測試資料：一個賣家 issuer ＋ 一個買家，
-// 底下有文件／operation／申訴／更正申請／稅務身分／provider 帳號各至少一筆。
 type seedWorld struct {
 	StoreID      int64
 	BuyerID      int64
 	IssuerID     int64
 	OrderNo      string
-	DocumentID   int64 // 銷項（賣家開給買家）
-	ReceivedID   int64 // 進項（平台開給賣家）
+	DocumentID   int64
+	ReceivedID   int64
 	JobID        int64
 	ComplaintID  int64
 	CorrectionID int64
@@ -50,7 +41,6 @@ type seedWorld struct {
 
 var seedSeq int64
 
-// nextID 產生單調遞增且不與其他測試碰撞的主鍵。
 func nextID() int64 {
 	seedSeq++
 	return time.Now().UnixNano() + seedSeq*1_000
@@ -63,7 +53,6 @@ func mustExec(ctx context.Context, t *testing.T, pool *pgxpool.Pool, sql string,
 	}
 }
 
-// seedIssuerFor 建一列 SELLER issuer，並回它的 id。
 func seedIssuerFor(ctx context.Context, t *testing.T, pool *pgxpool.Pool, storeID int64) int64 {
 	t.Helper()
 	id := nextID()
@@ -74,10 +63,6 @@ func seedIssuerFor(ctx context.Context, t *testing.T, pool *pgxpool.Pool, storeI
 	return id
 }
 
-// seedOrderDocument 建一份「賣家 → 買家」的 B2C 訂單發票。
-//
-// attemptSeq 進 uq_invdoc_order_identity 的最後一段：同一張訂單要建第二份文件
-// （作廢重開）時必須遞增它，否則 ON CONFLICT 之外的路徑會撞 23505。
 func seedOrderDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	issuerID, buyerID int64, orderNo, status string, attemptSeq int32, issuedAt time.Time) int64 {
 	t.Helper()
@@ -99,14 +84,10 @@ func seedOrderDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 		         'AMEGO', $7, $8,
 		         now(), now() + interval '2 days')`,
 		id, issuerID, orderNo, buyerID, status, attemptSeq,
-		// uq_invdoc_provider_invoice_no 是 (provider, provider_invoice_no) 的
-		// partial UNIQUE ⇒ 號碼必須逐份唯一，不能拿 attempt_seq 當種子。
 		fmt.Sprintf("A%09d", id%1_000_000_000), issuedAt)
 	return id
 }
 
-// seedReceivedDocument 建一份「平台 → 賣家」的 B2B 進項發票（端點 72 的資料形狀）。
-// source_type='MANUAL' ⇒ source_ref 必須是 NULL（chk_invdoc_source_ref 是雙向等式）。
 func seedReceivedDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	issuerID, storeID int64, description string, lineCount int) int64 {
 	t.Helper()
@@ -143,8 +124,6 @@ func seedReceivedDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	return id
 }
 
-// seedOperation 建一筆 ISSUE operation。
-// chk_invop_adjustment_pair：只有 VOID／ALLOWANCE／VOID_ALLOWANCE 需要 adjustment_id。
 func seedOperation(ctx context.Context, t *testing.T, pool *pgxpool.Pool, documentID int64, status string) int64 {
 	t.Helper()
 	id := nextID()
@@ -157,7 +136,6 @@ func seedOperation(ctx context.Context, t *testing.T, pool *pgxpool.Pool, docume
 	return id
 }
 
-// seedComplaint 建一件申訴。uq_invcomp_open_per_document ⇒ 一份文件只能有一件未結案。
 func seedComplaint(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	documentID, issuerID, buyerID int64, orderNo, status string, slaDueAt time.Time) int64 {
 	t.Helper()
@@ -186,9 +164,6 @@ func seedCorrection(ctx context.Context, t *testing.T, pool *pgxpool.Pool, docum
 func seedTaxProfile(ctx context.Context, t *testing.T, pool *pgxpool.Pool, issuerID int64, reviewStatus string) int64 {
 	t.Helper()
 	id := nextID()
-	// attestation_* 兩欄一律帶上：chk_stp_attested_when_committed 對 SUBMITTED／
-	// SELF_ISSUE_PENDING 要求非空（裁決 C 的不變式），而本 helper 的呼叫端就在用那兩個值。
-	// 對其他狀態多寫這兩欄無害（chk_stp_attestation_pair 只要求同進同出）。
 	mustExec(ctx, t, pool,
 		`INSERT INTO seller_tax_profiles (
 		   id, issuer_id, review_status, claimed_obligation, legal_name, tax_id,
@@ -210,8 +185,6 @@ func seedProviderAccountRow(ctx context.Context, t *testing.T, pool *pgxpool.Poo
 	return id
 }
 
-// buildWorld 建一整組互不相干的資料。兩個 world 之間**沒有任何共用主鍵**，
-// 所以任何一支查詢只要漏了擁有者述詞，就會在跨 world 的斷言上轉紅。
 func buildWorld(ctx context.Context, t *testing.T, pool *pgxpool.Pool, tag int64) seedWorld {
 	t.Helper()
 	w := seedWorld{
@@ -233,13 +206,6 @@ func buildWorld(ctx context.Context, t *testing.T, pool *pgxpool.Pool, tag int64
 
 func fullPage() domain.Page { return domain.Page{Limit: 50, Offset: 0} }
 
-// ---------------------------------------------------------------------------
-// ① Tier A：每一支 owner-scoped 查詢都必須「A 查不到 B 的」
-//
-// 🔴 這支測試的價值全在**陰性斷言**。陽性（自己讀得到自己的）人人記得寫，
-//    而 approved-only 型保證的實質內容是「非 X 不會 Y」——後者必須有獨立證據，
-//    不能由前者推論。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 	ctx := context.Background()
@@ -257,10 +223,8 @@ func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 
 	externalStatuses := []string{"MANUAL_PROCESS_ALLOWED", "RESOLVED_EXTERNALLY"}
 
-	// listCases：回 slice 的查詢——越權必須回**空集合**（不是回了再過濾）。
 	listCases := []struct {
 		name string
-		// own 用 A 自己的身分查 A 的資料，cross 用 B 的身分查 A 的資料。
 		own   func() (int, error)
 		cross func() (int, error)
 	}{
@@ -272,7 +236,6 @@ func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 			},
 			cross: func() (int, error) {
 				got, err := docRepo.ListForBuyer(ctx, domain.BuyerDocumentQuery{BuyerID: b.BuyerID, Page: fullPage()})
-				// B 只看得到自己的那一份；下面用「不含 A 的 id」再驗一次。
 				for _, d := range got {
 					if d.ID == a.DocumentID {
 						return 1, err
@@ -385,8 +348,6 @@ func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 		})
 	}
 
-	// singleCases：回單筆的查詢——越權必須與「不存在」不可區分，兩者都是
-	// pgx.ErrNoRows 被 notFound() 翻成同一個業務碼。
 	singleCases := []struct {
 		name  string
 		own   func() error
@@ -449,9 +410,6 @@ func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 		})
 	}
 
-	// CorrectionRequest 的第三段述詞（order_no）要單獨驗：申請人對、買受人也對，
-	// 但訂單號不匹配時仍必須走 not-found 出口。少驗這一段的話，只驗 buyer_id
-	// 的測試會全綠而述詞其實漏了一段。
 	t.Run("CorrectionRequestRepository.GetForBuyer/訂單號不匹配也走 not-found", func(t *testing.T) {
 		if _, err := correctionRepo.GetForBuyer(ctx, a.CorrectionID, a.BuyerID, b.OrderNo); err == nil {
 			t.Fatal("order_no 不匹配卻讀得到 ⇒ 三段述詞漏了訂單那一段")
@@ -459,12 +417,6 @@ func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// ② GetOrderInvoice 必須是 :many
-//
-// VOID_AND_REISSUE 之後同一張訂單有多份文件。:one 會**靜默取任意一列**
-// （沒有 LIMIT、順序未定義），症狀是買家看到作廢前的舊發票而畫面完全正常。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ListOrderDocumentsForBuyer_ReturnsEveryDocumentOfTheOrder(t *testing.T) {
 	ctx := context.Background()
@@ -474,7 +426,6 @@ func TestIntegration_ListOrderDocumentsForBuyer_ReturnsEveryDocumentOfTheOrder(t
 	const buyerID int64 = 810001
 	orderNo := "O-REISSUE-1"
 
-	// 作廢重開鏈：attempt 1 已 SUPERSEDED、attempt 2 是現行那一張。
 	first := seedOrderDocument(ctx, t, pool, issuerID, buyerID, orderNo, "SUPERSEDED", 1, time.Now().UTC().Add(-time.Hour))
 	second := seedOrderDocument(ctx, t, pool, issuerID, buyerID, orderNo, "ISSUED", 2, time.Now().UTC())
 
@@ -486,14 +437,11 @@ func TestIntegration_ListOrderDocumentsForBuyer_ReturnsEveryDocumentOfTheOrder(t
 	if len(got) != 2 {
 		t.Fatalf("回了 %d 份文件，want 2 —— 作廢重開之後的訂單有兩份，取一份等於讓買家看到舊發票", len(got))
 	}
-	// 排序：實體軸遞減 ⇒ 最新一次開立排最前。
 	if got[0].ID != second || got[1].ID != first {
 		t.Fatalf("順序不對：got [%d %d], want [%d %d]（issue_attempt_seq DESC）",
 			got[0].ID, got[1].ID, second, first)
 	}
 
-	// 既有的 :one 版本在同一組述詞下只會回一列——留這條斷言是為了讓「為什麼需要
-	// 一支新的 :many」寫在測試裡，而不是只寫在註解裡。
 	one, err := repo.GetForBuyer(ctx, orderNo, buyerID)
 	if err != nil {
 		t.Fatalf("GetForBuyer: %v", err)
@@ -503,19 +451,11 @@ func TestIntegration_ListOrderDocumentsForBuyer_ReturnsEveryDocumentOfTheOrder(t
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ③ count ↔ list 述詞一致性（**跨頁**）
-//
-// 只驗第一頁抓不到述詞漂移：漂移的症狀是「總數說有 N 筆、翻到第二頁是空的」。
-// 必須把每一頁的實際筆數加起來，與 Count 對帳。
-// ---------------------------------------------------------------------------
 
-// walkPages 逐頁取完，回實際取到的總筆數與看到的 id 集合（用來驗沒有重複列）。
 func walkPages(t *testing.T, total int64, pageSize int32, fetch func(page domain.Page) ([]int64, error)) int {
 	t.Helper()
 	seen := map[int64]bool{}
 	got := 0
-	// 多跑一頁：如果 count 少報，最後一頁會多出資料，這裡才抓得到。
 	pages := int(total/int64(pageSize)) + 2
 	for i := 0; i < pages; i++ {
 		ids, err := fetch(domain.Page{Limit: pageSize, Offset: int32(i) * pageSize})
@@ -540,8 +480,6 @@ func TestIntegration_ReadViews_CountMatchesPagedList(t *testing.T) {
 	issuerID := seedIssuerFor(ctx, t, pool, 720001)
 	const buyerID int64 = 820001
 
-	// 5 份文件：3 份 ISSUED、2 份 PENDING。同一張訂單只能有一份同 attempt_seq，
-	// 所以用五張不同的訂單號。
 	const seedCount = 5
 	issuedCount := 0
 	for i := 0; i < seedCount; i++ {
@@ -609,7 +547,7 @@ func TestIntegration_ReadViews_CountMatchesPagedList(t *testing.T) {
 		q := domain.SellerDocumentQuery{
 			StoreID:          720001,
 			AbnormalOnly:     true,
-			AbnormalStatuses: []string{"PENDING"}, // 用 PENDING 當「異常集合」以取得非空樣本
+			AbnormalStatuses: []string{"PENDING"},
 		}
 		total, err := docRepo.CountForSeller(ctx, q)
 		if err != nil {
@@ -634,13 +572,6 @@ func TestIntegration_ReadViews_CountMatchesPagedList(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// ④-b 「這件事還要不要人處理」在三個出口必須是同一份定義（#3045）
-//
-// A01 KPI 的 definition 字串逐字寫著「＝ A05 NEEDS_MANUAL 分頁的 job 數」，而 #3014
-// 的否決條件只加在 KPI ⇒ dev 實測同一時點 KPI=0、priorityJobs=11、A05 tab=8。
-// 三個數字互相矛盾，管理員無從判斷該不該動手。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *testing.T) {
 	ctx := context.Background()
@@ -651,15 +582,11 @@ func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *
 	resolved := []string{"VOIDED", "SUPERSEDED", "CANCELLED_BEFORE_ISSUE",
 		"NOT_APPLICABLE", "RESOLVED_EXTERNALLY"}
 
-	// ① 已收束：原票被作廢，它底下那筆 FAILED_PERMANENT 的 ISSUE 已經沒有下一步。
 	voidedDoc := seedOrderDocument(ctx, t, pool, issuerID, buyerID, "O-RESOLVED-1", "ISSUED", 1, time.Now().UTC())
-	// voided_at 與 status='VOIDED' 同進同出（chk_invdoc_voided_pair）。
 	mustExec(ctx, t, pool,
 		`UPDATE invoice_documents SET status = 'VOIDED', voided_at = now() WHERE id = $1`, voidedDoc)
 	voidedJob := seedOperation(ctx, t, pool, voidedDoc, "FAILED_PERMANENT")
 
-	// ② 陽性對照：同樣 FAILED_PERMANENT，但 document 停在 ISSUE_FAILED ＝ 還等著 ADM
-	//    安全重試 ⇒ **必須留下**。少了它，把整個清單關掉也會讓①那條斷言通過。
 	openDoc := seedOrderDocument(ctx, t, pool, issuerID, buyerID, "O-RESOLVED-2", "ISSUED", 1, time.Now().UTC())
 	mustExec(ctx, t, pool, `UPDATE invoice_documents SET status = 'ISSUE_FAILED' WHERE id = $1`, openDoc)
 	openJob := seedOperation(ctx, t, pool, openDoc, "FAILED_PERMANENT")
@@ -692,8 +619,6 @@ func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *
 			t.Fatal("ISSUE_FAILED 的 job 被一起排除了 ⇒ 這是把清單關掉，不是修好")
 		}
 
-		// 鑑別力：不傳否決集合 ⇒ 那一筆必須回來。沒有這一段，一個恆假的述詞也會
-		// 讓上面通過。
 		q.ResolvedDocumentStatuses = nil
 		rows, err = repo.ListPriorityViewsForAdmin(ctx, q)
 		if err != nil {
@@ -724,8 +649,6 @@ func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *
 			t.Fatal("ISSUE_FAILED 的 job 被一起排除了")
 		}
 
-		// Count 與 List 是兩支述詞逐字相同的查詢，改一支沒改另一支 ⇒ 分頁器與筆數
-		// 打架。這裡一起驗。
 		total, err := repo.CountViewsForAdmin(ctx, q)
 		if err != nil {
 			t.Fatalf("CountViewsForAdmin: %v", err)
@@ -734,7 +657,6 @@ func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *
 			t.Fatalf("Count = %d，List 回 %d 筆 ⇒ 兩支述詞漂移", total, len(rows))
 		}
 
-		// 其餘分頁不得被波及：SUCCEEDED 之類的分頁本來就該看得到已作廢的票。
 		q.ExcludeResolvedDocuments = false
 		q.IncludeManualDocuments = false
 		rows, err = repo.ListViewsForAdmin(ctx, q)
@@ -747,11 +669,6 @@ func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *
 	})
 }
 
-// ---------------------------------------------------------------------------
-// ④ 端點 50 的 NEEDS_MANUAL 是**聯集**：job 狀態 OR document.status='AWAITING_MANUAL'
-//
-// 只寫前半的症狀是 fail-closed 落點的案件在六個分頁裡都看不到（不是報錯，是消失）。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ListInvoiceOperationsForAdmin_NeedsManualIsUnionWithDocumentStatus(t *testing.T) {
 	ctx := context.Background()
@@ -760,8 +677,6 @@ func TestIntegration_ListInvoiceOperationsForAdmin_NeedsManualIsUnionWithDocumen
 	issuerID := seedIssuerFor(ctx, t, pool, 730001)
 	const buyerID int64 = 830001
 
-	// 這份文件落在 AWAITING_MANUAL，但它的 job 還停在 READY（不在 NEEDS_MANUAL 的
-	// job 狀態集合裡）⇒ 只有聯集述詞才看得到它。
 	doc := seedOrderDocument(ctx, t, pool, issuerID, buyerID, "O-MANUAL-1", "ISSUED", 1, time.Now().UTC())
 	mustExec(ctx, t, pool,
 		`UPDATE invoice_documents SET status = 'AWAITING_MANUAL', manual_reason_code = 'PLATFORM_FUNDED_DISCOUNT'
@@ -792,8 +707,6 @@ func TestIntegration_ListInvoiceOperationsForAdmin_NeedsManualIsUnionWithDocumen
 		t.Fatal("document.status='AWAITING_MANUAL' 的 job 沒有出現在 NEEDS_MANUAL 分頁 ⇒ 述詞不是聯集")
 	}
 
-	// 關掉聯集那一半 ⇒ 必須看不到它。這條是上一條的鑑別力證明：
-	// 沒有它的話，一個「恆真」的述詞也會讓上面那條通過。
 	q.IncludeManualDocuments = false
 	got, err = repo.ListViewsForAdmin(ctx, q)
 	if err != nil {
@@ -818,12 +731,6 @@ func TestIntegration_ListInvoiceOperationsForAdmin_NeedsManualIsUnionWithDocumen
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑤ 端點 58 的 OVERDUE 是**橫切視圖**：status='OVERDUE' OR（未結案且 sla_due_at 已過）
-//
-// 只寫前半會讓「掃描還沒跑到」「賣家逾期後才回覆」「已升級到 ADM」三類逾期件
-// 從 OVERDUE 分頁消失，而它們正是 ADM 最該看到的。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ListInvoiceComplaintsForAdmin_OverdueIsCrossCutting(t *testing.T) {
 	ctx := context.Background()
@@ -833,10 +740,8 @@ func TestIntegration_ListInvoiceComplaintsForAdmin_OverdueIsCrossCutting(t *test
 	const buyerID int64 = 840001
 	now := time.Now().UTC()
 
-	// 期限已過但狀態還是 OPEN（INV.dl 還沒掃到）——單純述詞看不到它。
 	docA := seedOrderDocument(ctx, t, pool, issuerID, buyerID, "O-OD-1", "ISSUED", 1, now)
 	lateOpen := seedComplaint(ctx, t, pool, docA, issuerID, buyerID, "O-OD-1", "OPEN", now.Add(-time.Hour))
-	// 期限未到的 OPEN——不論哪種述詞都不該出現在 OVERDUE 分頁。
 	docB := seedOrderDocument(ctx, t, pool, issuerID, buyerID, "O-OD-2", "ISSUED", 1, now)
 	onTime := seedComplaint(ctx, t, pool, docB, issuerID, buyerID, "O-OD-2", "OPEN", now.Add(48*time.Hour))
 
@@ -879,11 +784,6 @@ func TestIntegration_ListInvoiceComplaintsForAdmin_OverdueIsCrossCutting(t *test
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑥ 端點 42 的列表必須看得見「查無 provider account 列」的賣家（NOT_STARTED）
-//
-// 從 invoice_provider_accounts 起手（INNER JOIN）會讓上線當天的全體賣家整批消失。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ListProviderAccountsForAdmin_IncludesIssuersWithoutAccountRow(t *testing.T) {
 	ctx := context.Background()
@@ -928,9 +828,6 @@ func TestIntegration_ListProviderAccountsForAdmin_IncludesIssuersWithoutAccountR
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑦ 進項列表的 recipient_note 兩個輸入必須有值
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ListSellerReceivedInvoiceDocuments_ExposesNoteInputs(t *testing.T) {
 	ctx := context.Background()
@@ -956,9 +853,6 @@ func TestIntegration_ListSellerReceivedInvoiceDocuments_ExposesNoteInputs(t *tes
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑧ 總覽計數：口徑必須與列表一致
-// ---------------------------------------------------------------------------
 
 func TestIntegration_OverviewCounts(t *testing.T) {
 	ctx := context.Background()
@@ -991,7 +885,6 @@ func TestIntegration_OverviewCounts(t *testing.T) {
 	if got.OpenComplaintCount != 1 {
 		t.Fatalf("openComplaintCount = %d, want 1", got.OpenComplaintCount)
 	}
-	// 狀態還是 OPEN 但 sla_due_at 已過 ⇒ 必須被算成逾期（口徑是 OR）。
 	if got.OverdueComplaintCount != 1 {
 		t.Fatalf("overdueComplaintCount = %d, want 1 ⇒ 口徑寫成單純 status='OVERDUE'，"+
 			"賣家在最該行動的那幾小時會看到 0", got.OverdueComplaintCount)
@@ -1016,13 +909,6 @@ func TestIntegration_OverviewCounts(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑨ 其餘 ADM 查詢的執行證明 ＋ count ↔ list 對帳
-//
-// 這幾支不帶擁有者述詞（ADM 看全平台），所以 Tier A 的陰性斷言不適用；它們真正的
-// 風險是**執行期**：參數型別對不上、多型指標的 LEFT JOIN 誤配、cardinality(NULL)。
-// 這些在 `go build` 與 sqlc 生成都是綠的，只有真的送進 PostgreSQL 才會現形。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T) {
 	ctx := context.Background()
@@ -1038,8 +924,6 @@ func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T
 	job := seedOperation(ctx, t, pool, doc, "READY")
 	seedTaxProfile(ctx, t, pool, issuerID, "SUBMITTED")
 
-	// 稽核列：三種 resource_type 各一，用來驗五條 LEFT JOIN 的多型解析。
-	// resource_id 刻意用真實主鍵，誤配的話 store_id filter 會撈到不該撈的列。
 	for _, rt := range []struct {
 		kind string
 		id   int64
@@ -1080,7 +964,6 @@ func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T
 		if int(total) != len(rows) {
 			t.Fatalf("Count = %d，List 回 %d 筆 ⇒ 述詞漂移", total, len(rows))
 		}
-		// StoreID = nil ＝ 全平台，必須是前者的超集。
 		all, err := docRepo.CountForAdmin(ctx, domain.AdminDocumentQuery{})
 		if err != nil {
 			t.Fatalf("CountForAdmin(全平台): %v", err)
@@ -1150,9 +1033,8 @@ func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T
 		if int(total) != len(rows) {
 			t.Fatalf("Count = %d，List 回 %d 筆", total, len(rows))
 		}
-		// NEAR_DEADLINE 是**交集**視圖：加上旗標之後只會變少，不會變多。
 		q.NearDeadlineOnly = true
-		q.NearDeadlineBefore = now // 種子的 pending_valid_until 是 now+30d ⇒ 應該被濾掉
+		q.NearDeadlineBefore = now
 		narrowed, err := taxRepo.CountReviewsForAdmin(ctx, q)
 		if err != nil {
 			t.Fatalf("CountReviewsForAdmin(near_deadline): %v", err)
@@ -1180,8 +1062,6 @@ func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T
 			t.Fatalf("Count = %d，List 回 %d 筆 ⇒ 五條 LEFT JOIN 有一條只寫進了其中一支", total, len(rows))
 		}
 
-		// store_id filter 必須對三種 resource_type 都成立：DOCUMENT 直接解析、
-		// JOB 經 operation→document、PROVIDER_ACCOUNT 直接解析 issuer。
 		byStore := base
 		byStore.StoreID = &[]int64{storeID}[0]
 		storeRows, err := auditRepo.ListAdminAuditLogsForAdmin(ctx, byStore)
@@ -1192,8 +1072,6 @@ func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T
 			t.Fatalf("store_id filter 撈到 %d 列，want 3（三種 resource_type 各一）"+
 				" ⇒ 多型指標的解析漏了其中一條 join", len(storeRows))
 		}
-		// 鑑別力：換一個不存在的 store_id 必須回 0。少了這條，一個「恆真」的
-		// filter 也會讓上面那條通過（本測試的樣本剛好就是 3 列）。
 		otherStore := base
 		otherStore.StoreID = &[]int64{storeID + 999}[0]
 		otherRows, err := auditRepo.ListAdminAuditLogsForAdmin(ctx, otherStore)
@@ -1204,7 +1082,6 @@ func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T
 			t.Fatalf("不存在的 store_id 撈到 %d 列 ⇒ store_id filter 是 no-op", len(otherRows))
 		}
 
-		// order_no 只解析得到 DOCUMENT 與 JOB 兩條（provider account 不掛訂單）。
 		byOrder := base
 		byOrder.OrderNo = "O-ADM-1"
 		orderRows, err := auditRepo.ListAdminAuditLogsForAdmin(ctx, byOrder)
@@ -1215,7 +1092,6 @@ func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T
 			t.Fatalf("order_no filter 撈到 %d 列，want 2（DOCUMENT ＋ JOB）", len(orderRows))
 		}
 
-		// job_id 只解析得到 JOB 那一條。
 		byJob := base
 		byJob.JobID = &[]int64{job}[0]
 		jobRows, err := auditRepo.ListAdminAuditLogsForAdmin(ctx, byJob)

@@ -51,8 +51,6 @@ func TestDecideRecheck(t *testing.T) {
 			wantStatus: codemeta.InvoiceOperationStatusRetryScheduled.Value,
 		},
 		{
-			// 🔴 這一格是重複開票的分水嶺：超過 180 天時 AMEGO 對「開過的發票」
-			// 也回 71，把它當成「確定沒開」而補送 ⇒ 同一筆訂單開出第二張發票。
 			name:       "J25 邊界：code=71 但超過 180 天 → 不得補送，退回重查迴圈",
 			op:         domain.Operation{ID: 4, UnknownSince: ago(time.Hour)},
 			probe:      notIssuedStale,
@@ -81,8 +79,6 @@ func TestDecideRecheck(t *testing.T) {
 			wantStatus: codemeta.InvoiceOperationStatusWaitingConfirmation.Value,
 		},
 		{
-			// 已確認的取消不算「在途」——前置 ② 逐字用兩個時間戳判別，
-			// 只看 cancel_requested_at 會讓已結案的取消永遠把 job 卡在 J26。
 			name:       "取消已確認（confirmed 非空）不算在途 → 走無取消分支",
 			op:         domain.Operation{ID: 8, UnknownSince: ago(time.Hour), CancelRequestedAt: ago(time.Hour), CancelConfirmedAt: ago(time.Minute)},
 			probe:      notIssued,
@@ -125,7 +121,7 @@ func TestRecheckBackoff(t *testing.T) {
 		{15 * time.Minute, 5 * time.Minute},
 		{45 * time.Minute, 10 * time.Minute},
 		{2 * time.Hour, 30 * time.Minute},
-		{23 * time.Hour, 30 * time.Minute}, // 封頂，不會再拉長
+		{23 * time.Hour, 30 * time.Minute},
 	}
 	for _, c := range cases {
 		if got := recheckBackoff(c.elapsed); got != c.want {
@@ -137,8 +133,8 @@ func TestRecheckBackoff(t *testing.T) {
 // TestDecideRecheck_NextAttemptUsesLadder 確認排程時間真的用了階梯而不是固定值。
 func TestDecideRecheck_NextAttemptUsesLadder(t *testing.T) {
 	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
-	early := now.Add(-time.Minute)  // elapsed 1m ⇒ 30s
-	late := now.Add(-3 * time.Hour) // elapsed 3h ⇒ 30m
+	early := now.Add(-time.Minute)
+	late := now.Add(-3 * time.Hour)
 	got1 := decideRecheck(domain.Operation{ID: 1, UnknownSince: &early}, RecheckProbe{}, now)
 	got2 := decideRecheck(domain.Operation{ID: 2, UnknownSince: &late}, RecheckProbe{}, now)
 	if !got1.NextAttemptAt.Equal(now.Add(30 * time.Second)) {
@@ -165,7 +161,6 @@ func TestUploadNextAt(t *testing.T) {
 			t.Errorf("status=%d 是終態，應回 nil（離開候選集合），實得 %v", term, *got)
 		}
 	}
-	// 還在飛的值要排下一次；elapsed 3h ⇒ 階梯封頂 30 分鐘。
 	for _, flying := range []int16{1, 2, 3, 31, 32} {
 		got := uploadNextAt(doc, s(flying), nil, now)
 		if got == nil {
@@ -175,7 +170,6 @@ func TestUploadNextAt(t *testing.T) {
 			t.Errorf("status=%d 應排 +30m（elapsed 3h 封頂），實得 %v", flying, got.Sub(now))
 		}
 	}
-	// 查不到狀態（nil）且是**暫時性**失敗 ⇒ 仍要排下一次，不能因為這一輪沒問到就讓它離場。
 	if got := uploadNextAt(doc, nil, nil, now); got == nil {
 		t.Error("status 為 nil（本輪沒查到）時仍應排下一次，否則那份文件永遠不再被覆查")
 	}
@@ -226,7 +220,6 @@ func TestUploadNextAt_TerminationConditions(t *testing.T) {
 	t.Run("次數用盡 ⇒ 停（SQL 註解逐字的 48）", func(t *testing.T) {
 		atCap := domain.Document{ID: 1, ProviderIssuedAt: &issued,
 			UploadRecheckAttempts: uploadRecheckMaxAttempts - 1}
-		// -1 是因為本輪的 ClaimUploadRecheck 已經 +1 過，doc 是 claim 之前讀到的。
 		if got := uploadNextAt(atCap, nil, nil, now); got != nil {
 			t.Fatalf("attempts 已達上限仍排下一次（%v）", got)
 		}

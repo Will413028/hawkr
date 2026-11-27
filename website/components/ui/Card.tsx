@@ -52,12 +52,6 @@ export const Card = React.forwardRef(function Card(
 
 	const Component = Tag;
 
-	// `role="button"` + `tabIndex={0}` promises keyboard operation, but a <div>
-	// does not fire click on Enter/Space the way a native button does — the
-	// card announced itself as a button and then ignored the keyboard. Forward
-	// the key to a real click so the caller's own `onClick` runs unchanged.
-	// (No `use client` needed: the handler is only attached when the caller
-	// already opted into an interactive card.)
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
 		onKeyDown?.(event);
 		if (event.defaultPrevented) return;

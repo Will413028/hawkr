@@ -96,22 +96,12 @@ export default function CartClient() {
 	const [mounted, setMounted] = React.useState(false);
 	const [saved, setSaved] = React.useState<CartItem[]>([]);
 
-	// This client boundary can hydrate later than AuthProvider/Navbar under
-	// streamed SSR. By then the shared auth/cart query may already be settled,
-	// while the server HTML for this boundary still contains the loading state.
-	// Keep the first client render deterministic, then reveal the resolved cart
-	// only after the persisted UI + save-for-later state have been read.
-	//
-	// cartUiStore uses skipHydration for the same reason: localStorage must never
-	// influence the server render or the first client render (React #418).
 	React.useEffect(() => {
 		let active = true;
 		const hydrateBrowserState = async () => {
 			try {
 				await useCartUiStore.persist.rehydrate();
 			} catch {
-				// Storage can be unavailable in restricted/private browser contexts.
-				// The in-memory defaults still produce a fully usable cart.
 			}
 			if (!active) return;
 			setSaved(getSavedItems());
@@ -206,7 +196,6 @@ export default function CartClient() {
 		{},
 	);
 
-	/* ───── Save-for-later sync ───── */
 
 	React.useEffect(() => {
 		const onChange = () => setSaved(getSavedItems());
@@ -216,11 +205,8 @@ export default function CartClient() {
 		};
 	}, []);
 
-	/* Reconcile persisted choices once and preserve deliberate deselection. */
 	React.useEffect(() => {
 		if (!mounted || cart.loading) return;
-		// useCart can expose an empty placeholder before its first response.
-		// Do not consume the initial choice or erase persisted choices there.
 		if (!selectionInitializedRef.current && cart.items.length === 0) return;
 		const prev = useCartUiStore.getState().selected;
 		const next = reconcileCartSelection(
@@ -232,15 +218,7 @@ export default function CartClient() {
 		if (!sameSelection(prev, next)) setSelected(next);
 	}, [cart.items, cart.loading, mounted, setSelected]);
 
-	/* ───── 不可購買商品改由 CartProductTile 反灰呈現（後端 issue #1127）。 ─────
-	 * 舊版的「自動移除 + toast」邏輯已下線，避免：
-	 *  - 兩端（web / iOS）行為不一致
-	 *  - user agency 缺失：購物車莫名少一件造成困惑
-	 *  - 賣家補貨後無法救回
-	 * 反灰由 CartProductTile 讀 item.purchasable / item.unavailableReason 處理。
-	 */
 
-	/* ───── Active seller (single-seller checkout enforcement) ───── */
 
 	const activeSellerKey = React.useMemo<string | null>(() => {
 		for (const it of cart.items) {
@@ -249,7 +227,6 @@ export default function CartClient() {
 		return null;
 	}, [cart.items, selected]);
 
-	// 保留使用者目前勾選；不可購買商品不計入結帳，可從商品列逐項移除。
 	const selectedItems = React.useMemo(
 		() =>
 			cart.items.filter(
@@ -260,7 +237,6 @@ export default function CartClient() {
 		[cart.items, selected, activeSellerKey],
 	);
 
-	// 結帳用：從 selectedItems 排除不可購買 row（issue #1127）。
 	const selectedPurchasableItems = React.useMemo(
 		() => selectedItems.filter((it) => it.purchasable !== false),
 		[selectedItems],
@@ -279,7 +255,6 @@ export default function CartClient() {
 		0,
 	);
 
-	/* ───── Aggregate shipping options + auto-default ───── */
 
 	const checkoutItems = React.useMemo(
 		() =>
@@ -301,8 +276,6 @@ export default function CartClient() {
 		() => shippingState.options ?? [],
 		[shippingState.options],
 	);
-	// Stamp lastValidateAt only after a successful validate result. APP blocks
-	// checkout when the validate snapshot is older than 60 seconds.
 	React.useEffect(() => {
 		if (!shippingState.loading && shippingState.options !== null) {
 			setLastValidateAt(Date.now());
@@ -316,9 +289,6 @@ export default function CartClient() {
 			}
 			return;
 		}
-		// Drop the persisted selection when neither (method, temp) tuple
-		// nor the bare method exists in the latest options — default to
-		// the first option's full identity.
 		const exactMatch = shippingOptions.some(
 			(o) =>
 				o.shippingMethod === shippingMethod &&
@@ -358,14 +328,8 @@ export default function CartClient() {
 		itemsSubtotal,
 	);
 
-	/* ───── Default address / pickup auto-pick ───── */
 
 	React.useEffect(() => {
-		// Keep an existing selection only if it still points at a saved address.
-		// selectedAddressId is persisted to localStorage, so a stale id (an
-		// address that was deleted/recreated, or one from a previous account)
-		// must NOT block auto-pick — otherwise the cart shows "請選擇收件地址"
-		// even though a default exists.
 		if (
 			selectedAddressId != null &&
 			addresses.addresses.some((a) => a.id === selectedAddressId)
@@ -385,7 +349,6 @@ export default function CartClient() {
 	]);
 
 	React.useEffect(() => {
-		// Same stale-persisted-id guard as the address effect above.
 		if (
 			selectedPickupId != null &&
 			storePickups.pickups.some((p) => p.id === selectedPickupId)
@@ -413,7 +376,6 @@ export default function CartClient() {
 		[storePickups.pickups, selectedPickupId],
 	);
 
-	/* ───── Precise shipping fee (home delivery only) ───── */
 
 	const baseShippingFee = selectedShipping?.fee ?? 0;
 	const shippingFee = React.useMemo(() => {
@@ -429,12 +391,6 @@ export default function CartClient() {
 		baseShippingFee,
 	]);
 
-	// Serialized signature of everything the precise fee was computed FOR.
-	// Keyed by value (not array identity) so unrelated re-renders don't
-	// invalidate, but any address / method / temp / basket change does —
-	// the fetch effect below early-returns while `preciseShippingFee` is
-	// set, so without this reset the cart kept showing the fee quoted for
-	// the previous selection.
 	const preciseFeeKey = React.useMemo(
 		() =>
 			[
@@ -453,10 +409,6 @@ export default function CartClient() {
 	}, [preciseFeeKey, setPreciseShippingFee]);
 
 	React.useEffect(() => {
-		// Invariant: effect 不打 fetch 時 shippingFeeLoading 必為 false。任何
-		// 早期 return 都要先清掉 loading,否則前一輪 in-flight fetch 被
-		// cancelled 守衛攔下後,UI 會永卡「計算中」。新增 early-return 條件
-		// 時也必須沿用此 invariant。
 		if (
 			!isHomeDelivery ||
 			!selectedAddress ||
@@ -485,7 +437,6 @@ export default function CartClient() {
 				setPreciseShippingFee(r.shippingFee);
 			})
 			.catch(() => {
-				// Stick with estimate; surface only when checkout fails.
 			})
 			.finally(() => {
 				if (!cancelled) setShippingFeeLoading(false);
@@ -504,7 +455,6 @@ export default function CartClient() {
 		setShippingFeeLoading,
 	]);
 
-	/* ───── ErrorCode-specific reactions ───── */
 
 	const reportedErrorRef = React.useRef<string>("");
 	React.useEffect(() => {
@@ -531,17 +481,11 @@ export default function CartClient() {
 			actionLabel: "查看購物車",
 			actionHref: "/cart",
 		});
-		// Auto-reload cart for stock/off-shelf/self-purchase resolutions.
 		if (isStock || isOffShelf || isSelfPurchase) {
 			void cart.refresh();
 		}
 	}, [shippingState.validationErrors, cart.refresh]);
 
-	// 46 §7.2：賣家停權（9241）是硬擋整個 validate 呼叫的 thrown error，不會進
-	// 上面的 validationErrors[] 陣列，所以獨立一支 effect 處理。「已自結帳移除」
-	// 是既定文案；實際上目前僅擋下這次驗證（backend 尚無 cart 列表級即時反映機
-	// 制，見 CartProductTile 的 DELISTED fallback），refresh() 讓商品下架連動
-	// （若已跑完）在購物車立刻可見。
 	const reportedSuspensionRef = React.useRef(false);
 	React.useEffect(() => {
 		if (shippingState.errorCode !== 9241) {
@@ -559,7 +503,6 @@ export default function CartClient() {
 		void cart.refresh();
 	}, [shippingState.errorCode, cart.refresh]);
 
-	/* ───── Cart-context coupons ───── */
 
 	const cartCoupons = useCartCoupons({
 		storeId: activeSellerKey,
@@ -577,7 +520,6 @@ export default function CartClient() {
 		[cartCoupons.coupons, itemsSubtotal, shippingFee],
 	);
 
-	// Reconcile applied coupon when seller changes / threshold lost.
 	const activeCoupon = React.useMemo(() => {
 		if (!coupon) return null;
 		const match = cartCoupons.coupons.find(
@@ -610,7 +552,6 @@ export default function CartClient() {
 					? ntFormat(shippingFee)
 					: "免運";
 
-	/* ───── Handlers ───── */
 
 	const selectionIsBusy = () =>
 		clearCartPendingRef.current ||
@@ -630,10 +571,6 @@ export default function CartClient() {
 	};
 
 	const onChangeQty = (id: string, raw: string) => {
-		// Draft only — the mutation happens on commit (blur / Enter).
-		// Mutating per keystroke turned typing "15" into qty 1 then 15, and
-		// an emptied field into qty 0, which the cart API treats as REMOVE
-		// (the buyer just selected-all to retype the number).
 		setEditingQty((m) => ({ ...m, [id]: raw }));
 	};
 
@@ -648,9 +585,6 @@ export default function CartClient() {
 		const item = cart.items.find((it) => it.id === id);
 		if (!item) return;
 		const parsed = Math.floor(Number(raw));
-		// Empty/garbage/zero input reverts to the current quantity (the draft
-		// is cleared above, so the field snaps back). Removal stays on the
-		// explicit 移除/stepper paths, which confirm first.
 		if (raw.trim() === "" || !Number.isFinite(parsed) || parsed < 1) return;
 		const max = item.stockQty != null ? item.stockQty : 999;
 		if (max < 1) return;
@@ -669,8 +603,6 @@ export default function CartClient() {
 		const max = item.stockQty != null ? item.stockQty : 999;
 		const clamped = Math.max(0, Math.min(max, n));
 		if (clamped === 0) {
-			// Stepper "−" at qty 1: confirm like the explicit 移除 button —
-			// a silent delete here was inconsistent and easy to fat-finger.
 			if (!window.confirm(`確定要從購物車移除「${item.name}」？`)) return;
 			trackRemoveFromCart(item);
 			await cart.remove(item.id);
@@ -728,7 +660,6 @@ export default function CartClient() {
 				return next;
 			});
 		}
-		// useCart 已 surfaceError 處理失敗訊息
 	};
 
 	const runRowOperation = React.useCallback(
@@ -800,22 +731,12 @@ export default function CartClient() {
 
 	const handleClearCoupon = () => clearCoupon();
 
-	/* ───── Stale revalidate before checkout ───── */
 
 	const checkoutHref = signedIn ? "/checkout" : "/login?redirect=/checkout";
-	// 🔴 未知配送方式一律 fail-closed。舊寫法三元的最後一支是
-	// `: true` —— 語意等於「沒見過的配送方式就不用選收件地址也不用選門市」，
-	// 於是 3005 商家自送可以直接進結帳。
 	const addressReady = isShippingDestinationReady(shippingMethod, {
 		hasAddress: selectedAddress != null,
 		hasStorePickup: selectedPickup != null,
 	});
-	// `addressReady` 為 false 的三種原因各有自己的話術。未知配送方式**不能**
-	// 借用「請選擇收件地址」—— 那句話會叫使用者去做一件解決不了問題的事。
-	//
-	// 🔴 話術與開哪個選取器都錨在 `shippingDestinationKind`，**不再各自用
-	// `isHomeDelivery`／`isStorePickup` 推一次**：那兩個旗標是「是不是黑貓／7-11」，
-	// 而這裡問的是「要哪一種收件目標」。
 	const destinationKind = shippingDestinationKind(shippingMethod);
 	const addressPromptLabel =
 		destinationKind === "store-pickup"
@@ -836,8 +757,6 @@ export default function CartClient() {
 
 	const writeFrozenCheckoutDraft = React.useCallback(() => {
 		if (!activeSellerKey || !selectedShipping) return false;
-		// 收件／取貨目標齊備才寫草稿。`addressReady` 對未知配送方式回 false，
-		// 所以這裡不會再放行一張「既無地址也無門市」的草稿到結帳頁。
 		if (!addressReady) return false;
 		const firstItem = selectedPurchasableItems[0];
 		if (!firstItem) return false;
@@ -858,7 +777,6 @@ export default function CartClient() {
 				fee: shippingFee,
 			},
 			recipient:
-				// 判準是「這個配送方式要不要地址」，不是「它是不是黑貓」。
 				destinationKind === "address" && selectedAddress
 					? {
 							id: selectedAddress.id,
@@ -940,7 +858,6 @@ export default function CartClient() {
 					message: addressPromptLabel,
 					tone: "error",
 				});
-				// 未知配送方式沒有對應的選取器可開 —— 不猜一個開下去。
 				if (destinationKind === "store-pickup") {
 					setStorePickupPickerOpen(true);
 				} else if (destinationKind === "address") {
@@ -968,10 +885,7 @@ export default function CartClient() {
 		}
 	};
 
-	/* ───── Renders ───── */
 
-	// While auth is still hydrating from cookie/storage, hold the loader so we
-	// don't briefly render either the logged-in cart or the guest gate.
 	if (!mounted || authStatus === "unknown") {
 		return (
 			<section className="flex flex-col gap-7 mb-8">

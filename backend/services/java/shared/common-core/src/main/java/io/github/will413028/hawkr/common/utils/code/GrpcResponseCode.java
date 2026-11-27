@@ -20,7 +20,6 @@ import java.util.stream.Collectors;
  */
 public enum GrpcResponseCode {
 
-    // ===== 通用錯誤碼（所有服務共用） =====
     SUCCESS(0, "success"),
     INVALID_PARAM(400, "參數錯誤"),
     UNAUTHORIZED(401, "未登入"),
@@ -31,7 +30,6 @@ public enum GrpcResponseCode {
     NOT_IMPLEMENTED(501, "功能暫不支援"),
     SERVICE_UNAVAILABLE(503, "服務暫時不可用"),
 
-    // ===== Order 業務碼（4001~4099） =====
     INSUFFICIENT_STOCK(4001, "商品不可購買 — Checkout Preview / Confirm 時若 `data.unavailable_items` 非空，本碼為 envelope code；前端依 `unavailable_items[].reason`（`CartItemUnavailableReason`：DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）區分文案。Name 維持 `INSUFFICIENT_STOCK` 不重構，避免擴大改動範圍"),
     INVALID_STATUS(4002, "狀態不允許此操作"),
     CHECKOUT_EXPIRED(4006, "結帳已過期"),
@@ -48,7 +46,6 @@ public enum GrpcResponseCode {
     CHECKOUT_PRICE_CHANGED(4091, "訂單金額已變動"),
     ORDER_ALREADY_CREATED(4092, "您已有未付款訂單：%s，請先完成付款或取消後再下單"),
 
-    // ===== Shipping 業務碼（5001~5099） =====
     SHIPMENT_NOT_FOUND(5001, "物流單不存在"),
     SHIPMENT_NO_TRADE_NO(5002, "物流單尚未取得序號，無法操作"),
     SHIPMENT_ALREADY_LABELED(5003, "已取號，不可重複產生"),
@@ -98,7 +95,6 @@ public enum GrpcResponseCode {
     SHIPMENT_DATE_INVALID_FORMAT(5049, "%s 格式錯誤，需為 yyyy-MM-dd 或 yyyyMMdd：%s"),
     HOLIDAY_CSV_YEAR_MISMATCH(5050, "上傳的 CSV 不含指定年份 %s 的假日資料，請確認檔案與年份是否相符"),
 
-    // ===== Cart 業務碼（6001~6099） =====
     CART_ITEM_NOT_FOUND(6001, "找不到購物車項目"),
     INVALID_SKU(6002, "商品不存在或已下架"),
     CART_ITEM_LOCKED(6003, "商品處於結帳鎖定狀態"),
@@ -109,7 +105,6 @@ public enum GrpcResponseCode {
     CART_SKU_IDS_DUPLICATED(6009, "sku_ids 不可重複"),
     CART_QUANTITY_EXCEEDS_MAX_LIMIT(6010, "您已達該商品購買上限（上限 %d 件）"),
 
-    // ===== Coupon 業務碼（7001~7099） =====
     COUPON_NOT_FOUND(7001, "優惠券不存在"),
     COUPON_EXPIRED(7002, "優惠券已過期"),
     COUPON_ALREADY_USED(7003, "優惠券已使用"),
@@ -133,7 +128,6 @@ public enum GrpcResponseCode {
     COUPON_DISTRIBUTE_REQUIRES_ACTIVE(7022, "僅 ACTIVE 模板可執行代領"),
     COUPON_LOCKED_BY_OTHER_ORDER(7023, "此優惠券已被另一筆訂單鎖定，請取消後再試"),
 
-    // ===== Payment 業務碼（8001~8099） =====
     PAYMENT_ALREADY_EXISTS(8001, "重複付款"),
     INVALID_PAYMENT_TYPE(8002, "不支援的支付方式：%s"),
     PAYMENT_STATUS_INVALID(8003, "交易狀態不允許此操作：%s"),
@@ -150,7 +144,6 @@ public enum GrpcResponseCode {
     ORDER_AMOUNT_EXCEEDS_LIMIT(8026, "訂單金額過高（%d 元），超出系統支援上限（%d 元），請分批下單或聯繫客服"),
     PAYMENT_ZERO_AMOUNT_NOT_REFUNDABLE(8027, "零元訂單無退款流程，請改由訂單退貨/取消流程處理"),
 
-    // ===== Product 業務碼（3001~3099） =====
     CERT_NO_REQUIRED(3001, "認證編號不可為空"),
     CERT_TYPE_INVALID(3002, "不合法的認證類型"),
     CERT_TYPE_NOT_VERIFIABLE(3003, "此認證類型暫不支援線上驗證"),
@@ -182,25 +175,20 @@ public enum GrpcResponseCode {
     CERT_APPLICATION_DUPLICATE_PENDING(3029, "此商品的該認證類型已有待審申請"),
     CERT_REVERIFY_COOLDOWN(3030, "重新查驗冷卻中：%s。同一筆申請 %s 秒內只會實際查詢一次，避免重複消耗農業部每日配額"),
 
-    // ===== IM 業務碼（9201~9202） =====
     SELF_MESSAGE_NOT_ALLOWED(9201, "不能傳訊息給自己"),
     BLOCKED_MESSAGE_NOT_ALLOWED(9202, "雙向封鎖時無法傳訊"),
 
-    // ===== Account 自助刪除業務碼（9203~9209） =====
     BUYER_ACCOUNT_DELETING(9203, "帳戶刪除中，無法進行新交易"),
     ACCOUNT_ALREADY_IN_DELETION(9204, "帳號已在刪除流程中"),
     SELLER_HAS_ACTIVE_ORDERS(9205, "您有 %s 筆未完成訂單，請待結案後再申請刪除帳號"),
     RECEIVER_ACCOUNT_DELETED(9206, "IM：對方帳號已刪除，無法傳送訊息"),
     STORE_CLOSED_MESSAGE_NOT_ALLOWED(9207, "此商店已停業，無法傳送訊息"),
 
-    // ===== 內容審核業務碼（9210~9219） =====
     MODERATION_REJECTED(9210, "內容不符社群守則"),
     REPORT_RATE_LIMITED(9211, "檢舉過於頻繁，請稍後再試"),
 
-    // ===== Seller 媒體業務碼（9220~9229） =====
     MEDIA_OBJECT_KEY_REQUIRED(9220, "logo / cover_url 僅能透過頭像、封面圖片上傳流程設定，不可直接指定外部網址"),
 
-    // ===== Seller 業務碼（9230~9239） =====
     SELLER_NOT_ACTIVE(9230, "賣家未啟用，無法補登食品業者登錄字號"),
     FOOD_BUSINESS_REG_NO_INVALID(9231, "食品業者登錄字號格式不正確或未填"),
     SELLER_WEBSITE_URL_INVALID(9232, "網站網址格式不正確"),
@@ -209,18 +197,15 @@ public enum GrpcResponseCode {
     PAYUNI_MERCHANT_PROFILE_IDEMPOTENCY_KEY_REUSED(9235, "這個操作已經處理過，但內容不同，請重新操作"),
     PAYUNI_MERCHANT_PROFILE_NOT_ACTIVE(9236, "商家尚未完成 PayUni 綁定或審核中，暫不可修改聯絡資訊"),
 
-    // ===== 賣家停權業務碼（9240~9249） =====
     SELLER_SUSPENDED_OPERATION_BLOCKED(9240, "賣家帳號停權中，無法執行此操作"),
     SELLER_SUSPENDED_PRODUCT_UNAVAILABLE(9241, "賣家停權中，商品暫停販售"),
 
-    // ===== AI 修圖業務碼（9250~9259） =====
     AI_TRANSFORM_NO_IMAGE(9250, "這次沒有成功產生圖片，請再試一次"),
     AI_TRANSFORM_SAFETY_BLOCKED(9251, "這張照片或描述沒有通過內容審查，請換一張照片或修改描述"),
     AI_TRANSFORM_RECITATION(9252, "產生的圖片與版權內容過於相似，請換一張照片或修改描述"),
     AI_PROVIDER_UNAVAILABLE(9253, "AI 美化暫時無法使用，請稍後再試"),
     AI_QUOTA_EXCEEDED(4291, "本週 AI 美化次數已用完（%d/%d），下週一重置"),
 
-    // ===== 代行營運業務碼（9260~9299） =====
     DELEGATION_INVALID_COMMAND(9260, "代行請求參數不正確"),
     DELEGATION_ADMIN_SESSION_REQUIRED(9261, "管理員登入已失效，請重新登入"),
     DELEGATION_CAPABILITY_DENIED(9262, "此代行工作階段未取得該項操作權限"),
@@ -253,7 +238,6 @@ public enum GrpcResponseCode {
     DELEGATION_RESOURCE_ALREADY_IN_STATE(9290, "此資源已處於你要求的狀態"),
     DELEGATION_FEATURE_DISABLED(9291, "代行營運功能目前未啟用"),
 
-    // ===== Invoice 業務碼（9300~9399） =====
     INVOICE_DOCUMENT_NOT_FOUND(9301, "文件不存在"),
     INVOICE_PROFILE_NOT_FOUND(9302, "常用發票資料不存在"),
     INVOICE_PROFILE_LIMIT_EXCEEDED(9303, "常用發票資料已達 20 筆上限，請先刪除不需要的項目"),
@@ -300,13 +284,10 @@ public enum GrpcResponseCode {
     INVOICE_TAX_APPROVAL_IDENTITY_INCOMPLETE(9353, "賣家尚未填寫統一編號與法定名稱，無法核定為應開統一發票，請先要求補件"),
     INVOICE_TAX_APPROVAL_RECEIPT_AUTH_MISSING(9354, "賣家尚未完成平台代製收據授權，無法核定為免用統一發票"),
 
-    // ===== Buyer Membership 業務碼（9400~9409） =====
     INVALID_PLAN_CODE(9400, "無此方案代碼"),
 
-    // ===== Seller Membership 業務碼（9410~9419） =====
     SELLER_INVALID_PLAN_CODE(9410, "無此賣家方案代碼"),
 
-    // ===== AfterSales 業務碼（9001~9099） =====
     AFTERSALE_NOT_FOUND(9001, "售後單不存在"),
     AFTERSALE_DUPLICATE(9002, "該訂單已有進行中的售後申請"),
     AFTERSALE_EXPIRED(9003, "已超過售後申請時限"),
@@ -333,7 +314,6 @@ public enum GrpcResponseCode {
     AFTERSALE_COUPON_COMPENSATION_FAILED(9025, "補償券發放失敗：%s"),
     AFTERSALE_CONFIRM_RECEIPT_BLOCKED(9026, "訂單有進行中的退貨 / 退款 / 申訴售後案件，無法確認收貨"),
 
-    // ===== 物流履約業務碼（9500~9699） =====
     FULFILLMENT_COMMERCE_MODEL_LOCKED(9501, "訂單的履約模式已鎖定，無法變更"),
     FULFILLMENT_CONSIGNMENT_AGREEMENT_REQUIRED(9502, "尚未完成受託代銷附約，暫時無法以此方式結帳"),
     FULFILLMENT_PROVIDER_NOT_ENABLED(9503, "此配送服務尚未開放"),
@@ -387,7 +367,6 @@ public enum GrpcResponseCode {
     EXCEPTION_CASE_RESOLUTION_ALREADY_REVIEWED(9574, "本提案已完成覆核"),
     EXCEPTION_CASE_IMPACT_PREVIEW_STALE(9575, "影響預覽已過期，請重新產生後再覆核"),
 
-    // ===== 平台功能開通業務碼（9700~9709） =====
     FEATURE_ADDRESS_LOOKUP_DISABLED(9700, "地址查詢服務尚未開通，請手動輸入完整地址"),
     FEATURE_AI_ASSISTANT_DISABLED(9703, "AI 助理尚未開通，請稍後再試"),
     FEATURE_PAYUNI_MERCHANT_DISABLED(9704, "金流商家建檔服務尚未開通，請稍後再試"),

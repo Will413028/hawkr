@@ -31,7 +31,6 @@ func TestContentDispositionEncodesNonASCII(t *testing.T) {
 		want     string
 	}{
 		{
-			// 5 個中文字 = 15 bytes ⇒ 15 個底線（按「字數」算會寫成 9 個，那是錯的）
 			name:     "純中文檔名：filename 退化成底線，真正的名字在 filename*",
 			fileName: "作廢申請書.pdf",
 			want:     `attachment; filename="_______________.pdf"; filename*=UTF-8''%E4%BD%9C%E5%BB%A2%E7%94%B3%E8%AB%8B%E6%9B%B8.pdf`,
@@ -52,7 +51,6 @@ func TestContentDispositionEncodesNonASCII(t *testing.T) {
 			want:     `attachment; filename="abc.pdf"; filename*=UTF-8''abc.pdf`,
 		},
 		{
-			// 空格是 ASCII 0x20 ⇒ 不換底線；quoted-string 內的空格本來就合法
 			name:     "CR/LF 被剝掉，不構成 header injection",
 			fileName: "evil\r\nX-Injected: 1.pdf",
 			want:     `attachment; filename="evilX-Injected: 1.pdf"; filename*=UTF-8''evilX-Injected%3A%201.pdf`,

@@ -133,7 +133,7 @@ public record PrincipalResolution(Map<Long, Long> principals, Set<Long> unresolv
         }
         List<Long> unresolved = ids.stream()
                 .filter(this::isUnresolved)
-                .map(id -> id == null ? 0L : id) // null 也算未解析，但不能進 List.copyOf
+                .map(id -> id == null ? 0L : id)
                 .distinct()
                 .toList();
         if (!unresolved.isEmpty()) {

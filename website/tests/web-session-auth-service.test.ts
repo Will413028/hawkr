@@ -10,7 +10,6 @@ import {
 	sessionJson,
 } from "./mocks/connect-response";
 
-// The prod flavor requires the browser API base on the web origin; this file's base is http://127.0.0.1:9.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "http://127.0.0.1:9";
 
 interface Seen {
@@ -70,7 +69,6 @@ test("fetchSession returns the account from GetSession", async () => {
 	assert.equal(identity.accountId, "7");
 	assert.equal(seen[0]?.target, "IdentityAppService/GetSession");
 	assert.equal(seen[0]?.method, "GET");
-	// 憑證是同源的 HttpOnly session cookie，由瀏覽器附上；程式不碰 Authorization。
 	assert.equal(seen[0]?.headers.get("Authorization"), null);
 	assert.equal(seen[0]?.credentials, "include");
 });

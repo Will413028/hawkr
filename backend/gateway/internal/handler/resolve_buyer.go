@@ -19,9 +19,6 @@ func (h *Holder) resolveBuyerID(c *gin.Context) (identity.BuyerID, bool) {
 	return h.resolveBuyerIDFor(c, accountID)
 }
 
-// resolveBuyerIDFor 是 2-arg 變體：call site 已有自己驗過的
-// accountID（保留原有的 401 錯誤碼與訊息）時用。錯誤對映與
-// resolveBuyerID 相同，只少 401 分支。
 func (h *Holder) resolveBuyerIDFor(c *gin.Context, accountID int64) (identity.BuyerID, bool) {
 	buyerID, err := h.BuyerID.CurrentBuyerID(c.Request.Context(), identity.AccountID(accountID))
 	if err != nil {
@@ -47,7 +44,7 @@ func (h *Holder) resolveOptionalBuyerFilterQuery(c *gin.Context, rawIDStr string
 	buyerID, err := h.BuyerID.CurrentBuyerID(c.Request.Context(), identity.AccountID(rawID))
 	if err != nil {
 		if errors.Is(err, buyerid.ErrNoCurrentBuyer) {
-			return "-1", true // 哨兵值：保證查無結果，而非略過篩選（"0" 會被 Java 端當成未篩選，見上方註解）
+			return "-1", true
 		}
 		response.GrpcErr(c, "buyer", err)
 		return "", false
@@ -55,8 +52,6 @@ func (h *Holder) resolveOptionalBuyerFilterQuery(c *gin.Context, rawIDStr string
 	return strconv.FormatInt(int64(buyerID), 10), true
 }
 
-// parseSellerViewBuyerFilter 解析賣家視角訂單列表的 buyer_id：值是 CRM 回的買家代理鍵（Customer.buyer_id），不是帳號代碼，
-// 直接當篩選值，不經 CurrentBuyerID。必須是正整數（"0" 會被下游當成未篩選）；範圍永遠被呼叫者此刻的店限定，別店的買家查無結果。
 func parseSellerViewBuyerFilter(c *gin.Context, rawIDStr string) (string, bool) {
 	if rawIDStr == "" {
 		return "", true

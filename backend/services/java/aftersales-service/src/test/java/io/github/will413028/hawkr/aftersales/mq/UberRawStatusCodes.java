@@ -35,7 +35,6 @@ final class UberRawStatusCodes {
 
     static Path repoRoot() {
         Path p = Path.of("").toAbsolutePath();
-        // backend 根目錄以 go.work 為錨：monorepo 裡 .git 在上一層，不是 backend/。
         while (p != null && !Files.exists(p.resolve("go.work"))) {
             p = p.getParent();
         }
@@ -64,13 +63,10 @@ final class UberRawStatusCodes {
         }
 
         Set<String> out = new LinkedHashSet<>();
-        // ① FORWARD 表：`"pending", ShippingStatus.UNPROCESSED,` 這一類的 key
         out.addAll(literalsBetween(code,
                 "private static final Map<String, ShippingStatus> FORWARD = Map.of(", ");"));
-        // ② 逆向 leg 的「明確不處理」集合
         out.addAll(literalsBetween(code,
                 "RETURN_LEG_EXPLICIT_NO_OP = Set.of(", ");"));
-        // ③ 容忍值常數
         Matcher tolerated = Pattern.compile(
                 "TOLERATED_SHOPPING_COMPLETED\\s*=\\s*\"([a-z_]+)\"").matcher(code);
         if (tolerated.find()) {

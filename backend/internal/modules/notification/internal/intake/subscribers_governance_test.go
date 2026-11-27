@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// pureHelpers 是治理訂閱者在 Accept 之外允許呼叫的純函式（governance_intents.go，TestGovernanceIntentHelpersArePure 守住它們沒有 I/O）。
 var pureHelpers = []string{
 	"measureCreatedIntent", "requestDecidedIntent", "measureRevokedNotified", "measureEndedNotified", "moderationReportReceivedIntent", "socialAuthorBuyer", "messageAuthorBuyer", "string",
 }

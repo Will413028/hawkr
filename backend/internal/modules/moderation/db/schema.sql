@@ -1,26 +1,8 @@
--- moderation 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式與複合型別放 db/objects.sql
--- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（moderation.<表>），不建跨 schema 的 FK；實體的主鍵是應用層產生的 UUIDv7、不設 DEFAULT
--- （ADR 2026-09-25-row-identity-by-data-kind）；慣例見 PostgreSQL 設計規範。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA moderation;
 
--- 案件：一個對象同時至多一個進行中案件（partial UNIQUE，A7-D14），同對象的檢舉都掛進它；結案是終態，不重開也不改判，
--- 結案後對同一對象的新檢舉開新案件。對象是貼文、留言、討論區留言（content_id，social 的 UUID）或買家（buyer_id），恰好填一欄；
--- 兩種 ID 型別各有一個 partial UNIQUE（cases_one_open_content、cases_one_open_buyer）。
--- 決定只存在案件（A7-D14、A7-D20）：decision 是 VIOLATION（帶認定的政策分類 decision_category 與處置種類 decision_action）或 NO_VIOLATION，
--- decided_by_admin_id、closed_at 與 decision 同為 NULL 或同不為 NULL；這就是 moderation 的處置決定紀錄，處分本身的紀錄在 social（隱藏、警告）、
--- seller（內容下架措施）與 identity（帳號停權），不另建處置紀錄表。處置種類與對象種類的搭配由 cases_action_target_check 擋；作者是買家或店家由寫入端
--- 向 social 核對。version 是樂觀鎖：結案以 (id, version, closed_at IS NULL) 轉移，同時結案只有一個成功；新檢舉掛進既有案件也加一（同一個 transaction；開案的那筆不加，版本從 1 起），
--- 所以管理員讀到的檢舉集合不是結案時的集合就會版本衝突。
--- measure_id 是 TAKEDOWN 決定建立的 seller 措施 ID（跨 schema 不建 FK），結案時同一個 UPDATE 寫入；內容下架一定有、其他處置與進行中的案件一定是 NULL（cases_measure_check）。
--- reversed_at、reversed_by_admin_id、reverse_reason 是 HIDE 決定的撤銷（ReverseHide）：案件維持結案、決定不改，撤銷記在原決定旁；三欄同有同無，只允許處置是 HIDE 的案件（cases_reversed_*）。
--- decision_category 是 platform/policy.Assessable 的值（模組的 TestChecksMatchGo）；買家分支另外限於 CommunityAssessable，由寫入端檢查。
 CREATE TABLE moderation.cases (
     id                  UUID        PRIMARY KEY,
     target_kind         TEXT        NOT NULL,
@@ -71,21 +53,12 @@ CREATE TABLE moderation.cases (
     CONSTRAINT cases_reversed_hide_check CHECK (reversed_at IS NULL OR decision_action = 'HIDE'),
     CONSTRAINT cases_reverse_reason_check CHECK (reverse_reason IS NULL OR (char_length(reverse_reason) >= 1 AND char_length(reverse_reason) <= 500 AND reverse_reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
 );
--- 一個對象至多一個進行中案件。
 CREATE UNIQUE INDEX cases_one_open_content ON moderation.cases (target_kind, content_id) WHERE closed_at IS NULL AND content_id IS NOT NULL;
 CREATE UNIQUE INDEX cases_one_open_buyer ON moderation.cases (buyer_id) WHERE closed_at IS NULL AND buyer_id IS NOT NULL;
--- 待辦（A7-1e）與後台列進行中案件依開案時間讀進行中的案件。
 CREATE INDEX cases_open_by_time ON moderation.cases (opened_at, id) WHERE closed_at IS NULL;
--- 後台列案件不分狀態或只看已結案：全表索引，開案時間新的在前。
 CREATE INDEX cases_by_time ON moderation.cases (opened_at DESC, id DESC);
--- 快照的保留 job 依結案時間找可以清的案件。
 CREATE INDEX cases_closed_by_time ON moderation.cases (closed_at) WHERE closed_at IS NOT NULL;
 
--- 內容快照（A7-D20）：每案每份內容一列，UNIQUE (case_id, content_sha256)；content 是擁有者模組提供、經正規化的快照（canonical JSON 文字），
--- content_sha256 是它的 SHA-256（不用各表的 version：留言、討論區留言沒有 version，buyer.version 改任何欄位都加一）。30 筆檢舉同一份內容只存一份，
--- 內容改過才多一份。結案後 184 天由排程 job 刪除（reports.snapshot_id 是 ON DELETE SET NULL），案件與檢舉列留著、不含內容。
--- asset_ids 是快照自己擁有的圖片資產（B1-D20 證據保全）：建快照時把內容的圖片複製成 moderation 自己 Confirm 的新資產，內容裡的圖片參照就是這些複本；
--- 擁有者之後換圖、刪文或退場都不影響複本，複本只由結案後的保存期限清除（retention purge）MarkDeleted。
 CREATE TABLE moderation.case_snapshots (
     id             UUID        PRIMARY KEY,
     case_id        UUID        NOT NULL REFERENCES moderation.cases (id),
@@ -98,9 +71,6 @@ CREATE TABLE moderation.case_snapshots (
     CONSTRAINT case_snapshots_content_check CHECK (char_length(content) >= 2)
 );
 
--- 檢舉：一案一人一筆（買家 UNIQUE (case_id, reporter_buyer_id)、店家 UNIQUE (case_id, reporter_store_id)），結案後新案件自然可以再檢舉。檢舉不存結果，各檢舉的結果由所屬案件的決定推導（查詢時 join）。
--- 檢舉人是買家或店家，恰好填一欄（reports_reporter_kind_check；店家只能檢舉聊天訊息，由寫入端擋）：reporter_buyer_id、reporter_store_id 是各自擁有者的業務鍵，不建跨 schema 的 FK；category 是 platform/policy.CommunityReporterSelectable 的值
--- （模組的 TestChecksMatchGo）；snapshot_id 是送出時凍結的那一份，保留期後為 NULL。
 CREATE TABLE moderation.reports (
     id                UUID        PRIMARY KEY,
     case_id           UUID        NOT NULL REFERENCES moderation.cases (id),
@@ -123,8 +93,6 @@ CREATE INDEX reports_reporter_time ON moderation.reports (reporter_buyer_id, cre
 CREATE INDEX reports_store_reporter_time ON moderation.reports (reporter_store_id, created_at DESC, id DESC) WHERE reporter_store_id IS NOT NULL;
 CREATE INDEX reports_snapshot ON moderation.reports (snapshot_id) WHERE snapshot_id IS NOT NULL;
 
--- 檢舉的冪等紀錄（AIP-155，A7-D28 第 3 點）：檢舉人是買家或店家（恰好一欄），(檢舉人種類, 檢舉人, request_id) 對應第一次回傳的那一筆檢舉。檢舉可能是新建的，也可能是併入檢舉人在進行中案件裡已有的那一筆；
--- 兩條路徑都記，所以案件結案後同一個 request_id 重送仍回第一次的結果。request_hash 是送出輸入（對象、類別、說明；已正規化）的 SHA-256，重送時比對內容是否相同。
 CREATE TABLE moderation.report_requests (
     reporter_buyer_id BIGINT,
     reporter_store_id BIGINT,
@@ -140,8 +108,6 @@ CREATE TABLE moderation.report_requests (
 );
 CREATE INDEX report_requests_report ON moderation.report_requests (report_id);
 
--- 每位檢舉人每個台北日最多 20 筆，買家與店家各自計數（檢舉人恰好一欄）：一人一列，day 是台北日（platform/twtime.Day）。送出時單一 upsert 原子地「換日重算、未達上限才加一」，
--- 沒有先 count 再比較的空窗；upsert 鎖住這一列，同一檢舉人的並行送出自然序列化。
 CREATE TABLE moderation.reporter_daily_counts (
     reporter_buyer_id BIGINT,
     reporter_store_id BIGINT,

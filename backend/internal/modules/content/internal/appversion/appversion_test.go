@@ -7,7 +7,7 @@ func TestSemverComparesEachPartAsANumber(t *testing.T) {
 		a, b string
 		want int
 	}{
-		{"1.0.10", "1.0.9", 1}, // 字串比較會得到相反的結果
+		{"1.0.10", "1.0.9", 1},
 		{"1.2.3", "1.2.3", 0},
 		{"0.9.9", "1.0.0", -1},
 		{"2.0.0", "10.0.0", -1},
@@ -46,5 +46,3 @@ func TestStoreURLSchemes(t *testing.T) {
 		}
 	}
 }
-
-// 筆數照 Google AIP-158：0 用預設值、超過上限以上限計、負數是呼叫方的錯。

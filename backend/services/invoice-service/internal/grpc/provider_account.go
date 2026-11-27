@@ -11,20 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔是 M4「AMEGO 帳戶」寫入面的 Layer 5：賣家側 §6.1.8 的端點 24／25／26／27，
-// ADM 側 §6.1.13 的端點 44／45／66／67。讀取面（端點 23／42／43）在 query.go。
-//
-// 四條規則：
-//
-//	① **業務錯誤走 envelope、故障走 gRPC error**。GetCode() 是 Gateway 的
-//	   EnvelopeGuardInterceptor 唯一的判定依據，漏了會靜默當成功。
-//	② **9331 帶 data**（§6.1.8 端點 25：「200 ＋ preserveData」）：驗證失敗時前端要能
-//	   同時拿到「失敗了」與「現在的狀態是 INVALID_CREDENTIAL」，少了 data 就只剩一句紅字。
-//	   9332 走 envelopeCodeToGRPC 的 fallback ⇒ HTTP 409 ＋ 正確業務碼（**不是 503**：
-//	   codes.Unavailable 會把業務碼吃掉，而端點 25 的整個設計建立在 9331／9332 可區分之上）。
-//	③ **回應永遠不包含 AppKey，任何角色都不行**。這由 proto 的 reserved 90 保證（加回去
-//	   是 buf build 失敗，不是靜默外洩），本層不需要、也不得再做一次遮罩。
-//	④ **長度／必填／格式是契約違規不是業務結果** ⇒ InvalidArgument（400），不借業務碼。
 
 // PutSellerProviderCredentials 是端點 24（憑證寫入，write-only）。
 func (s *InvoiceServer) PutSellerProviderCredentials(
@@ -149,8 +135,6 @@ func (s *InvoiceServer) HealthCheckProviderAccountForAdmin(
 			return nil, st
 		}
 		if code, msg, ok := bizOf(err); ok {
-			// 9331／9332 帶 data：ADM 要同時看到「失敗了」與「現在的狀態」。
-			// view 在業務失敗時仍是有效的（usecase 先落地狀態才回碼）。
 			return &pb.GetProviderAccountForAdminResponse{
 				Code: code, Message: msg, Data: toProviderAccountData(view),
 			}, nil
@@ -260,11 +244,6 @@ func (s *InvoiceServer) RevokeProviderAccountForAdmin(
 	}, nil
 }
 
-// providerAccount 是四支賣家端點共用的錯誤分流與回應組裝。
-//
-// 🔴 業務失敗**仍然帶 data**：usecase 先把狀態落地才回碼（見 verifyFlow 的末段），
-// 所以 view 在這一格是有效的。少了 data，S03 顯示「驗證失敗」卻不知道現在是
-// INVALID_CREDENTIAL（要重打 AppKey）還是 PROVIDER_UNAVAILABLE（不要動 AppKey）。
 func (s *InvoiceServer) providerAccount(
 	ctx context.Context, event string, run func() (usecase.ProviderAccountView, error),
 ) (*pb.SellerProviderAccountResponse, error) {
@@ -285,10 +264,6 @@ func (s *InvoiceServer) providerAccount(
 	}, nil
 }
 
-// adminProviderActionInput 解析端點 45／66／67 的共通入參。
-//
-// confirmed／reason 的檢查在 usecase（那是業務守衛的一部分，必須與 CAS 在同一層被測到）；
-// 本函式只做型別邊界。
 func adminProviderActionInput(
 	actorAccountID int64, storeID, reason string, confirmed bool, expectedVersion, idempotencyKey string,
 ) (usecase.AdminProviderActionInput, error) {
@@ -314,10 +289,6 @@ func adminProviderActionInput(
 	}, nil
 }
 
-// providerInvalidArgument 把 usecase 的型別邊界錯誤映成 400。
-//
-// 它們刻意不是 DomainError：沒有任何業務碼描述「你的統編少一碼」，而 bizOf 會把
-// DomainError 折成 envelope 的業務碼。
 func providerInvalidArgument(err error) (error, bool) {
 	switch {
 	case errors.Is(err, usecase.ErrProviderUnsupported),
@@ -336,10 +307,6 @@ func providerInvalidArgument(err error) (error, bool) {
 	return nil, false
 }
 
-// parseISO8601 解析對外時間欄（§4：ISO 8601 UTC）。
-//
-// 🔴 只收帶時區的形式並一律轉 UTC：收一個沒有時區的字串等於讓「切點」的意義取決於
-// 送出者所在的時區，而切點決定的是哪些訂單走自動開票。
 func parseISO8601(s string) (time.Time, error) {
 	if s == "" {
 		return time.Time{}, errEmptyID

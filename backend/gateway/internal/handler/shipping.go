@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== DTO ====================
 
 // PrintCvsLabelReq 超商出貨單列印請求
 type PrintCvsLabelReq struct {
@@ -178,9 +177,7 @@ type ShippingOnboardingViewResp struct {
 	UpdatedAt           string `json:"updatedAt"`
 }
 
-// ==================== Helper ====================
 
-// ==================== Handler ====================
 
 // PrintCvsLabel 超商出貨單列印
 // @Summary      超商出貨單列印
@@ -442,7 +439,6 @@ func (h *Holder) CallTcat(c *gin.Context) {
 	}
 
 	var req CallTcatReq
-	// CallTcat 全部欄位選填，允許空 body
 	_ = c.ShouldBindJSON(&req)
 
 	resp, err := h.Shipping.CallTcat(c.Request.Context(), &pb.CallTcatRequest{
@@ -468,7 +464,6 @@ func (h *Holder) CallTcat(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, data)
 }
 
-// ==================== 建店 Handler ====================
 
 // OnboardCvsShipping 超商 C2C 建店
 // @Summary      超商 C2C 建店
@@ -691,7 +686,6 @@ func (h *Holder) ToggleShippingOnboarding(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-// ==================== 賣家配送方式 DTO ====================
 
 // SellerShippingMethodResp 賣家配送方式回應
 type SellerShippingMethodResp struct {
@@ -705,7 +699,6 @@ type SellerShippingMethodResp struct {
 	OnboardingRequired bool   `json:"onboardingRequired"`
 }
 
-// ==================== 賣家配送方式 Handler ====================
 
 // ListSellerShippingMethods 查詢賣家可用配送方式
 // @Summary      查詢賣家可用配送方式
@@ -764,7 +757,6 @@ func (h *Holder) ListSellerShippingMethods(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, items)
 }
 
-// ==================== 買家常用門市 DTO ====================
 
 // AddStorePickupReq 新增常用門市請求
 type AddStorePickupReq struct {
@@ -799,7 +791,6 @@ type BuyerStorePickupResp struct {
 	UpdatedAt     string `json:"updatedAt"`
 }
 
-// ==================== 買家常用門市 Handler ====================
 
 // AddBuyerStorePickup 新增常用門市
 // @Summary      新增常用門市
@@ -999,7 +990,6 @@ func (h *Holder) DeleteBuyerStorePickup(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-// convertPickupView 轉換 Proto 常用門市為回應 DTO
 func convertPickupView(v *pb.BuyerStorePickupView) BuyerStorePickupResp {
 	if v == nil {
 		return BuyerStorePickupResp{}
@@ -1017,7 +1007,6 @@ func convertPickupView(v *pb.BuyerStorePickupView) BuyerStorePickupResp {
 	}
 }
 
-// convertOnboardingView 轉換 Proto 建店設定為回應 DTO
 func convertOnboardingView(v *pb.ShippingOnboardingView) ShippingOnboardingViewResp {
 	if v == nil {
 		return ShippingOnboardingViewResp{}
@@ -1121,7 +1110,6 @@ func (h *Holder) ConfirmCvsShipment(c *gin.Context) {
 
 	var req ConfirmCvsShipmentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// body 選填，綁定失敗不阻擋
 		req = ConfirmCvsShipmentReq{}
 	}
 
@@ -1138,7 +1126,6 @@ func (h *Holder) ConfirmCvsShipment(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-// ==================== 買家物流追蹤 ====================
 
 // OrderLogisticsResp 買家物流追蹤回應（單點狀態，PayUni 無多筆軌跡）
 // 最小揭露：不含 recipientPhone / recipientAddress / labelUrl / sender 資訊
@@ -1163,16 +1150,6 @@ type OrderLogisticsResp struct {
 	AllowedActions []AllowedAction `json:"allowedActions"`
 }
 
-// allowedActionsOf 把 shipping-service 算好的可用性補上路由，成為對外契約。
-//
-// 🔴 **後端還沒開始送時回空陣列而不是 nil**：JSON 的 `null` 與 `[]` 在前端是兩種不同的處理
-// （`null` 常常讓 `.map()` 直接炸），而這個欄位在 provider capability 尚未全部搬移完成前
-// 本來就可能是空的。回 `[]` 讓前端一律走同一條路徑。
-//
-// ⚠️ 被丟棄的 action（未登錄路由、或不可用卻沒帶原因碼）目前只是不出現在回應裡。
-// 那是刻意的 fail-closed——猜一個路徑給前端打，症狀會出現在使用者面前而不是這裡。
-// 但**丟棄本身沒有告警**：若某個 action 一直被丟棄，沒有人會知道。
-// 要補的話是在這裡加一個 counter，而不是讓它通過。
 func allowedActionsOf(d interface {
 	GetAllowedActions() []*pb.ActionAvailability
 	GetOrderNo() string
@@ -1253,8 +1230,6 @@ func (h *Holder) GetOrderLogistics(c *gin.Context) {
 		RecipientName:   d.GetRecipientName(),
 		CreatedAt:       d.GetCreatedAt(),
 		CvsStoreCode:    d.GetCvsStoreCode(),
-		// 🔴 買家端：只放 actor=買家 的動作。修復前這裡回的是全部，
-		//    包含三條掛 seller capability 的 href，買家跟隨即 403。
 		AllowedActions: allowedActionsOf(d, ViewerBuyer),
 	}
 	response.GrpcResult(c, resp.Code, resp.Message, data)
@@ -1314,7 +1289,6 @@ func (h *Holder) GetSellerShipmentTracking(c *gin.Context) {
 		RecipientName:   d.GetRecipientName(),
 		CreatedAt:       d.GetCreatedAt(),
 		CvsStoreCode:    d.GetCvsStoreCode(),
-		// 🔴 賣家端：只放 actor=賣家 的動作（履約動作的實際歸屬端）。
 		AllowedActions: allowedActionsOf(d, ViewerSeller),
 	}
 	response.GrpcResult(c, resp.Code, resp.Message, data)

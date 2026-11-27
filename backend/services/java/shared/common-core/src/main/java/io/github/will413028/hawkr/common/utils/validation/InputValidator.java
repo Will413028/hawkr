@@ -26,7 +26,6 @@ public final class InputValidator {
 
     private InputValidator() {}
 
-    // ==================== 尺寸驗證（支援小數，四捨五入為整數 cm） ====================
 
     /**
      * 解析尺寸字串為正整數 cm（支援小數，四捨五入）
@@ -54,7 +53,6 @@ public final class InputValidator {
         return result;
     }
 
-    // ==================== 正整數驗證 ====================
 
     /**
      * 解析字串為正整數（必須 > 0）
@@ -98,7 +96,6 @@ public final class InputValidator {
         return parsed;
     }
 
-    // ==================== 金額驗證（Long，單位新台幣元） ====================
 
     /**
      * 解析金額字串為正整數 Long（必須 > 0）
@@ -142,7 +139,6 @@ public final class InputValidator {
         return parsed;
     }
 
-    // ==================== 手機號碼驗證 ====================
 
     private static final java.util.regex.Pattern MOBILE_PATTERN =
             java.util.regex.Pattern.compile("^09\\d{8}$");
@@ -162,7 +158,6 @@ public final class InputValidator {
         return value;
     }
 
-    // ==================== 地址驗證 ====================
 
     /**
      * 僅允許繁體中文 + 阿拉伯數字 + 地址常用符號（-/之）
@@ -191,14 +186,11 @@ public final class InputValidator {
      */
     public static String requireAddress(String value, String fieldName) {
         requireNotEmpty(value, fieldName);
-        // 僅允許繁體中文 + 阿拉伯數字 + 地址符號
         if (!ADDRESS_ALLOWED_CHARS.matcher(value).matches()) {
             throw new IllegalArgumentException(fieldName + " 僅能使用繁體中文及數字填寫，不可包含英文或特殊符號");
         }
-        // ICU4J 簡繁轉換偵測：轉成繁體後若不同，代表含簡體字
         String traditional = SIMPLIFIED_TO_TRADITIONAL.transliterate(value);
         if (!traditional.equals(value)) {
-            // 找出第一個簡體字，提示使用者
             for (int i = 0; i < value.length(); i++) {
                 if (value.charAt(i) != traditional.charAt(i)) {
                     throw new IllegalArgumentException(fieldName + " 包含簡體中文「"
@@ -207,14 +199,12 @@ public final class InputValidator {
                 }
             }
         }
-        // 必須包含「號」（最基本的地址結構）
         if (!value.contains("號")) {
             throw new IllegalArgumentException(fieldName + " 格式不完整，必須包含門牌號碼（號）");
         }
         return value;
     }
 
-    // ==================== 顯示長度（PayUni 計長：英文/半形 1、中文/全形 2） ====================
 
     /**
      * 計算字串的顯示長度，對齊 PayUni 物流欄位計長規則。
@@ -293,7 +283,6 @@ public final class InputValidator {
         return value;
     }
 
-    // ==================== 共用工具 ====================
 
     /**
      * 驗證字串非空（null 或空字串皆拒絕）

@@ -83,8 +83,6 @@ export function buildSellerShareCardData(
 		sellerId,
 		displayId: resolvedDisplayId,
 		name,
-		// ⚠️ 拿不到地點就是空字串，**不要**退回品牌名：名片上那一行的語意是「這家店
-		// 在哪裡」，填「Hawkr」會被讀成一個地名。呼叫端負責空值不渲染。
 		location,
 		description,
 		prize: pickText(seller?.prize),

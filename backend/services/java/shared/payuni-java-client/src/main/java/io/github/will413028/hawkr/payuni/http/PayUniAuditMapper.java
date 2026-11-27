@@ -50,7 +50,6 @@ public final class PayUniAuditMapper {
      */
     public static PayUniAuditRecord toAuditRecord(PayUniExchangeContext ctx) {
         Map<String, String> req = ctx.getRequestParams();
-        // mer_id 語意：業務參數內層 MerID 優先（代理商 API 外層是 AgentID 固定配置，內層才是子商家）
         String merId = req != null && req.get("MerID") != null && !req.get("MerID").isBlank()
                 ? req.get("MerID") : ctx.getMerId();
         return new PayUniAuditRecord(

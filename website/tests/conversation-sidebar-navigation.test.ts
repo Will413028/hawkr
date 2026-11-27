@@ -14,7 +14,6 @@ const source = readFileSync(
 );
 
 test("conversation rows use the native App Router link", () => {
-	// `lib/intl/native-link.tsx` is `next/link` with the page's language in the href and nothing else.
 	assert.match(source, /import Link from "@\/lib\/intl\/native-link";/);
 	assert.doesNotMatch(source, /import Link from "next\/link";/);
 	assert.doesNotMatch(

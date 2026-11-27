@@ -188,7 +188,6 @@ void main() {
       final result = validateSellerQuote(quote, now: _now);
       expect(result.amountIdentityHolds, isTrue);
       expect(result.isSubmittable, isTrue);
-      // 使用者填的字面值原封不動。
       expect(quote.totalAmount, '11025');
       expect(result.computedTotal, '11025');
     });

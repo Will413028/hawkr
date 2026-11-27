@@ -88,7 +88,6 @@ class ProductGrpcServiceCreateSkuGuardTest {
 
         ProductDetailDTO created = ProductDetailDTO.builder().id("7495464541774413824").name("蓮霧").build();
         when(protoConverter.toCreateDTO(any())).thenReturn(new CreateProductDTO());
-        // handler 改走 createProductWithWarnings()（19 §9.5 需要 certificationWarnings[]）
         when(productService.createProductWithWarnings(any()))
                 .thenReturn(io.github.will413028.hawkr.product.dto.response.ProductWriteOutcome.of(created, java.util.List.of()));
         when(protoConverter.toProductDetailProto(created)).thenReturn(ProductDetail.newBuilder().build());
@@ -139,8 +138,6 @@ class ProductGrpcServiceCreateSkuGuardTest {
     void zeroSkusIsRejectedBeforeAnyWrite() {
         CreateProductResponse response = call(validRequestWithoutSkus().build());
 
-        // 這一條先斷言：它才是不變式本身。若寫成「先建再擋」（建完商品才回 INVALID_PARAM），
-        // 下面的 code 斷言照樣會通過，但 DB 已經留下一筆零 SKU 的孤兒商品。
         verify(productService, never()).createProductWithWarnings(any());
 
         assertEquals(GrpcResponseCode.INVALID_PARAM.code(), response.getCode());

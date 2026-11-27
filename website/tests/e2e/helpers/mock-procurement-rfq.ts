@@ -46,9 +46,6 @@ const RFQ_SLOTS = {
 /** `PreviewRfqPriceResponse`。 */
 export function pricePreviewData(
 	overrides: {
-		// 重新試算時 command 帶的是買家剛編輯的區間，不再是預設的 30／42——
-		// 呼叫端要驗證「編輯後的區間原樣回送」就傳這個覆寫，不要在呼叫端另起一份
-		// preview 物件。
 		buyerRequestedRange?: {
 			lowerBoundAmount: string;
 			upperBoundAmount: string;
@@ -350,7 +347,6 @@ export async function setupRfqPriceReview(
 		page.getByRole("heading", { name: "預計邀請 1 筆候選" }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "取得價格範圍" }).click();
-	// 買家自己設定希望詢價區間後才取得試算（伺服器不再預填）。
 	await page.getByLabel("希望下限").fill("30");
 	await page.getByLabel("希望上限").fill("42");
 	await page.getByRole("button", { name: "取得無參考價試算" }).click();

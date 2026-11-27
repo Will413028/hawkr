@@ -23,7 +23,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-// failingDelete 在 MarkDeleted 時失敗，用來讓寫入的 transaction 在 Confirm 之後回滾。
 type failingDelete struct {
 	*media.Module
 	fail bool
@@ -66,7 +65,6 @@ func setupReal(t *testing.T) *realFixture {
 	return f
 }
 
-// stage 以後台管理員放一張公開 PNG，回傳可 Confirm 的 token 與資產 ID。
 func (f *realFixture) stage(t *testing.T) (string, uuid.UUID) {
 	t.Helper()
 	put, err := f.media.PutPublic(context.Background(), media.Uploader{ID: adminID, Admin: true}, bytes.NewReader(pngOf(t)))

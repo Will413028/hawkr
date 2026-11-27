@@ -12,16 +12,8 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// #3008：修好取檔而沒補歸屬判定，會從「都拿不到」變成「誰都拿得到」。
-//
-// 🔴 這一組測試的核心不是「拿得到」，而是**拿不到的那幾格長什麼樣**：
-// 越權與不存在必須逐字相同（同一個業務碼、同一段訊息），否則這條路由就是一台
-// 可枚舉的 oracle——攻擊者拿一串 document_id 打過去，兩種回應的差別就是
-// 「這張發票存在」。發票 PDF 上印著完整的買受人姓名、統編與金額。
 
 type fakeSecureReader struct {
-	// wantKey／wantRefID 是這個替身**唯一接受**的參數組合。
-	// 無條件回 bytes 的替身會讓「有沒有拿對 key」這件事零鑑別力。
 	wantKey   string
 	wantRefID string
 	data      []byte
@@ -73,17 +65,13 @@ func TestDocumentFile_OwnershipPredicates(t *testing.T) {
 		req     FileRequest
 		wantErr bool
 	}{
-		// ---- 陽性：三個合法讀者面各自拿得到 ----
 		{"買家本人", FileRequest{Actor: FileActorBuyer, DocumentID: docID, BuyerID: 2623900520}, false},
 		{"開票賣家", FileRequest{Actor: FileActorSeller, DocumentID: docID, StoreID: 2685914682}, false},
 		{"ADM（無 ownership 概念，授權在 gateway）", FileRequest{Actor: FileActorAdmin, DocumentID: docID}, false},
 
-		// ---- 陰性：越權 ----
 		{"別的買家", FileRequest{Actor: FileActorBuyer, DocumentID: docID, BuyerID: 2688637900}, true},
 		{"別的賣家", FileRequest{Actor: FileActorSeller, DocumentID: docID, StoreID: 2632049831}, true},
 
-		// ---- 陰性：fail-closed。gateway 的 header 注入失敗時這兩個值會是 0，
-		//      而「沒有述詞就不篩」在這裡等於把每一張發票開放給任何登入者。----
 		{"買家面缺 x-buyer-id", FileRequest{Actor: FileActorBuyer, DocumentID: docID}, true},
 		{"賣家面缺 x-store-id", FileRequest{Actor: FileActorSeller, DocumentID: docID}, true},
 
@@ -184,7 +172,6 @@ func TestDocumentFile_StyleWhitelist(t *testing.T) {
 			t.Errorf("style=%q 被放行（err=%v）—— AMEGO 不會幫你擋", s, err)
 		}
 	}
-	// 沒帶 style ⇒ 依統編推導（B2C 只有 0）。
 	got, err := u.Resolve(context.Background(), req)
 	if err != nil {
 		t.Fatalf("預設 style 解析失敗：%v", err)
@@ -208,7 +195,6 @@ func TestDocumentFile_ReadPassesOwnKeyAndRefID(t *testing.T) {
 	if media.calls != 1 {
 		t.Errorf("ReadSecure 呼叫 %d 次, want 1", media.calls)
 	}
-	// 被擋下的請求不得打到 media：那代表授權判定發生在取檔之後。
 	media.calls = 0
 	_, _, _, err = u.Read(context.Background(), FileRequest{
 		Actor: FileActorBuyer, DocumentID: 7500466617315229696, BuyerID: 2688637900})

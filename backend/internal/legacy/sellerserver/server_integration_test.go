@@ -49,7 +49,6 @@ type noOrders struct{}
 
 func (noOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return false, nil }
 
-// noRegistry 是登記資料來源的替身：這個測試不送公司型申請，來源不會被呼叫。
 type noRegistry struct{}
 
 func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
@@ -87,8 +86,6 @@ func (f fakeFollowers) SubscriberCounts(_ context.Context, ids []int64) (map[int
 	return out, nil
 }
 
-// slowRatings 永遠不回答，直到 ctx 結束；記下它收到的 ctx 有沒有期限、是不是因期限到了才結束。
-// 斷言看這兩個事實，不看牆鐘：「評分有自己的期限」是行為，經過幾毫秒取決於機器。
 type slowRatings struct{ seen *ratingCall }
 
 type ratingCall struct {
@@ -141,7 +138,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	events.Subscribe(bus, m.OnPayoutAccountChanged)
 	account := func() int64 {
 		var accountID int64
-		for range 3 { // account_id 與 store_id 不同值，互換 ID 的缺陷才藏不住
+		for range 3 {
 			if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts (self_entered_email) VALUES ('seller@example.com') RETURNING id").Scan(&accountID); err != nil {
 				t.Fatal(err)
 			}
@@ -215,7 +212,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// 處分記在舊 stint、帳號目前的 stint 繼承停權：Apply 在停權中會拒絕，直接寫一個新 stint。
 	inheritedAccount, inheritedOld := exposable("舊店")
 	riskSuspend(inheritedOld.StoreID, seller.RiskSecurity)
 	if _, err := m.CloseCurrent(ctx, inheritedAccount); err != nil {
@@ -238,7 +234,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	if _, err := m.CloseCurrent(ctx, closedAccount); err != nil {
 		t.Fatal(err)
 	}
-	// 同一個帳號關店後再開的新 stint：歷史與目前的 store_id 都要列出。
 	reopened, err := m.Apply(ctx, seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: closedAccount, StoreName: "重新入駐", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路二號"})
 	if err != nil {
 		t.Fatal(err)
@@ -258,29 +253,24 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if e != nil || byAccount.Msg.GetData().GetStoreId() != sid(exposed.StoreID) {
 			t.Fatalf("%v %v", byAccount, e)
 		}
-		// 風險停權（舊的管理員停權）：lifecycle 與原因碼
 		r, e = s.GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: suspended.StoreID}))
 		if e != nil || r.Msg.GetData().GetLifecycleStatus() != "suspended" || r.Msg.GetData().GetSuspensionReasonCode() != "9603" {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 已關閉：舊 server 的查詢濾掉 deleted_at，store_id 路徑是 404
 		r, e = s.GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: closed.StoreID}))
 		if e != nil || r.Msg.GetCode() != 404 || r.Msg.GetData() != nil {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 沒有目前店家的帳號，與不是正數的 account_id（舊 server 一樣是 9233）
 		for _, accountID := range []int64{999999, 0, -1} {
 			r, e = s.GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{AccountId: accountID}))
 			if e != nil || r.Msg.GetCode() != 9233 {
 				t.Fatalf("%d: %v %v", accountID, r, e)
 			}
 		}
-		// 等待刪除：不是 active，也不是已關閉
 		r, e = s.GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: deleting.StoreID}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetLifecycleStatus() != "pending_deletion" {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 繼承的停權：lifecycle 是 suspended 時原因碼一定有（措施記在舊 stint）
 		r, e = s.GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: inheritedNew}))
 		if e != nil || r.Msg.GetData().GetLifecycleStatus() != "suspended" || r.Msg.GetData().GetSuspensionReasonCode() != "9603" {
 			t.Fatalf("%v %v", r, e)
@@ -302,7 +292,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			r.Msg.GetData()[1].GetStoreId() != sid(exposed.StoreID) || r.Msg.GetData()[1].GetStoreCode() != sid(exposed.StoreCode) {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 批次不讀評價（呼叫方不讀 rating）：即使 review 有資料也不填，也不呼叫它。
 		if r.Msg.GetData()[1].GetRating() != 0 {
 			t.Fatalf("rating=%v", r.Msg.GetData()[1].GetRating())
 		}
@@ -310,7 +299,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if e != nil || len(failing.Msg.GetData()) != 1 {
 			t.Fatalf("%v %v", failing, e)
 		}
-		// 不是正數的 ID 當成不存在，不是輸入錯誤。
 		if r, e := s.GetSellerBatch(ctx, connect.NewRequest(&pb.GetSellerBatchRequest{StoreIds: []int64{0, -5, exposed.StoreID}})); e != nil || r.Msg.GetCode() != 0 || len(r.Msg.GetData()) != 1 {
 			t.Fatalf("%v %v", r, e)
 		}
@@ -339,14 +327,11 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if e != nil || r.Msg.GetPrincipals()[exposed.StoreID] != exposedAccount || len(r.Msg.GetPrincipals()) != 1 || !slices.Equal(r.Msg.GetUnresolvedIds(), []int64{closed.StoreID, 999999}) {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 已關閉的 stint 是 unresolved：舊契約的「沒有存活的店家列」，舊 server 關店等於軟刪除。unresolved 的 ID 只在 unresolved_ids，
-		// 不在 principals 裡（單體的 store_id 與 account_id 是兩個序列，原樣回吐一定是錯的 account_id）。
 		for _, id := range []int64{closed.StoreID, 999999} {
 			if v, ok := r.Msg.GetPrincipals()[id]; ok {
 				t.Fatalf("unresolved id %d 出現在 principals：%d", id, v)
 			}
 		}
-		// 隨帳號刪除而關閉的 stint 也一樣，media 的擁有權比對與通知都依這個前提。
 		r, e = s.ResolvePrincipals(ctx, connect.NewRequest(&pb.ResolvePrincipalsRequest{Ids: []int64{deleted.StoreID, 0}}))
 		if e != nil || !slices.Equal(r.Msg.GetUnresolvedIds(), []int64{deleted.StoreID, 0}) || len(r.Msg.GetPrincipals()) != 0 {
 			t.Fatalf("%v %v", r, e)
@@ -358,17 +343,14 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if e != nil || d.GetContactEmail() != "owner@example.com" || d.GetZipCode() != "100" || d.GetMerId() != "" || d.GetSenderPhone() != "0912345678" {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 已關閉的店找不到（舊 server 的 store_id 路徑濾掉 deleted_at）。
 		r, e = s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: closed.StoreID}))
 		if e != nil || r.Msg.GetCode() != 404 || r.Msg.GetData() != nil {
 			t.Fatalf("closed: %v %v", r, e)
 		}
-		// 沒有 KYC 申請的店也給店家的客服信箱（email 不經 KYC）。
 		r, e = s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: pending.StoreID}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetContactEmail() != "owner@example.com" {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 商店電話是選填：沒有填電話的店仍回資料，contact_email 照給，不回 428。
 		noPhone, err := m.Apply(ctx, seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: account(), StoreName: "沒填電話", TownCode: "63000050", AddressDetail: "測試路三號"})
 		must(err)
 		email := "nophone@example.com"
@@ -380,7 +362,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		}
 	})
 	t.Run("MatchCertificateHolder", func(t *testing.T) {
-		// 比對基準是核准的公司名稱（D37：平台不收本名）；個人賣家沒有基準，交人工判斷。
 		companyName, taxID, companyKind := "範例小農有限公司", "33330333", seller.KYCCompany
 		companyAccount, company := open("公司店")
 		companyDraft, err := m.SaveKYCDraft(ctx, seller.KYCDraftInput{AccountID: companyAccount, SellerType: &companyKind, CompanyName: &companyName, TaxID: &taxID})
@@ -397,7 +378,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if e != nil || r.Msg.GetMatched() || r.Msg.GetMatchedField() != "NONE" || !r.Msg.GetHasReference() {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 個人賣家與沒有核准的申請：沒有基準。
 		for name, id := range map[string]int64{"個人賣家": exposed.StoreID, "沒有申請": pending.StoreID} {
 			r, e = s.MatchCertificateHolder(ctx, connect.NewRequest(&pb.MatchCertificateHolderRequest{StoreId: id, HolderName: "王小明"}))
 			if e != nil || r.Msg.GetMatched() || r.Msg.GetHasReference() {
@@ -432,7 +412,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		}
 	})
 	t.Run("GetSeller 認定停權", func(t *testing.T) {
-		// 與舊 handler 一致：只依據認定的停權是 suspended_governance，沒有原因碼（9601 到 9603 只屬於管理員停權）。
 		r, e := s.GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: governance.StoreID}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetLifecycleStatus() != "suspended_governance" || r.Msg.GetData().GetSuspensionReasonCode() != "" {
 			t.Fatalf("%v %v", r, e)
@@ -450,13 +429,11 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if e != nil || d.GetStoreId() != sid(exposed.StoreID) || d.GetRating() != 4.77 || d.GetReviewCount() != 3 || d.GetFollowers() != 5 {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 逐欄降級：評價讀不到，粉絲數照填；粉絲數讀不到，評價照填。
 		noRatings := New(m, fakeRatings{err: errors.New("review down")}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, log)
 		r, e = noRatings.GetSellerStats(ctx, connect.NewRequest(&pb.GetSellerStatsRequest{StoreId: exposed.StoreID}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetFollowers() != 5 || r.Msg.GetData().GetRating() != 0 || r.Msg.GetData().GetReviewCount() != 0 {
 			t.Fatalf("評價失敗：%v %v", r, e)
 		}
-		// 評價逾時（slowRatings 不回答，只有期限能結束它）：粉絲數照填，評價欄位留 0。
 		slowSeen := &ratingCall{}
 		slow := New(m, slowRatings{seen: slowSeen}, fakeFollowers{counts: map[int64]int64{exposed.StoreID: 5}}, log)
 		r, e = slow.GetSellerStats(ctx, connect.NewRequest(&pb.GetSellerStatsRequest{StoreId: exposed.StoreID}))
@@ -497,7 +474,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		if e != nil || r.Msg.GetAccountId() != suspendedAccount {
 			t.Fatalf("%v %v", r, e)
 		}
-		// 隨帳號刪除的店照舊回帳號（發票通知要送給它）。
 		if r, e := s.ResolveSellerAccountID(ctx, connect.NewRequest(&pb.ResolveSellerAccountIDRequest{StoreId: deleted.StoreID})); e != nil || r.Msg.GetAccountId() != deletedAccount {
 			t.Fatalf("%v %v", r, e)
 		}
@@ -520,7 +496,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	})
 }
 
-// ownerFunc 是 payment 的擁有者查詢的函式版本。
 type ownerFunc func(ctx context.Context, storeID int64) (bool, error)
 
 func (f ownerFunc) OwnerActive(ctx context.Context, storeID int64) (bool, error) {

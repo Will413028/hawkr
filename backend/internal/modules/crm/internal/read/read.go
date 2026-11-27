@@ -39,8 +39,6 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// authorize 在讀店家的客戶與標籤之前檢查賣家能力（停權時被擋，與寫入同一個能力）。店家已關閉或不存在與寫入一致回 NotFound（notFound 決定原因：
-// 客戶層讀取是 CUSTOMER_NOT_FOUND，標籤是 TAG_NOT_FOUND）；其他拒絕（停權、前置條件）原樣回傳。
 func (s *Service) authorize(ctx context.Context, storeID int64, notFound func(context.Context) error) error {
 	st, err := s.d.Stores.Store(ctx, storeID)
 	if err == nil {
@@ -70,7 +68,6 @@ func pageSize(size int32) int32 {
 	return size
 }
 
-// row 是三個排序欄位的列表查詢共同的列形狀。
 type row struct {
 	StoreID      int64
 	BuyerID      int64
@@ -150,7 +147,6 @@ func (s *Service) ListCustomers(ctx context.Context, in model.CustomerListInput)
 	return page, nil
 }
 
-// list 依排序欄位與方向挑對應的查詢（六句各自吃自己的索引）。
 func (s *Service) list(ctx context.Context, in model.CustomerListInput, typ *string, limit int32) ([]row, error) {
 	q := s.q(ctx)
 	var afterBuyer *int64

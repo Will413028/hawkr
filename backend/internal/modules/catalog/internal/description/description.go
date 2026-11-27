@@ -124,7 +124,6 @@ func normalizeTable(field string, rows [][]string, budget *textBudget) ([][]stri
 	return out, nil
 }
 
-// textBudget 累計整份描述的文字量（rune），超過 model.MaxProductInputDescriptionTotalRunes 回 TooLong，欄位是整份描述的欄位路徑。
 type textBudget struct {
 	field string
 	used  int
@@ -138,7 +137,6 @@ func (b *textBudget) add(s string) error {
 	return nil
 }
 
-// checkText 檢查單一文字：max 大於 0 時是這段文字自己的上限，0 表示沒有單段上限。
 func checkText(field, s string, max int, allowEmpty bool) error {
 	if s == "" && !allowEmpty {
 		return model.Invalid(field, model.ReasonRequired)
@@ -178,7 +176,6 @@ func Text(blocks []model.Block) string {
 				}
 			}
 		case model.BlockImage:
-			// 圖片不貢獻文字。
 		}
 	}
 	return joinSpace(parts)

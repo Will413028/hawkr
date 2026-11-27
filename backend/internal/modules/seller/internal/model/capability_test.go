@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// adrWhitelist 與 businessCapabilities 是能力檢查 ADR 的結論，獨立寫死，用來核對表（needs）推導出來的結果。
 var (
 	adrWhitelist = []Capability{
 		CapAccountSelfRead, CapOrderFulfill, CapOrderContract, CapChatSend, CapChatRead,
@@ -17,8 +16,6 @@ var (
 	businessCapabilities = []Capability{CapStorefrontWrite, CapProductManage, CapMarketing, CapInvoiceManage, CapShippingSetup}
 )
 
-// conditionsOf 模擬讀店家時由 seller.store_requirement_flags 讀出的條件（SQL 的對應由 integration 的資料集測試鎖住）：生命週期由
-// status 決定，KYC 由 kyc 決定，店名、logo 與鄉鎮市區都有。
 func conditionsOf(status Status, kyc bool) Conditions {
 	return Conditions{
 		Derived: true, Active: status != Closed, NotPendingDeletion: status != PendingDeletion, KYCApproved: kyc, TransfersActive: kyc,
@@ -26,12 +23,10 @@ func conditionsOf(status Status, kyc bool) Conditions {
 	}
 }
 
-// fullStore 是公開曝光條件除了生命週期與停權之外都滿足（含開通閘門）的店家。
 func fullStore(status Status, suspended bool) Store {
 	return Store{Status: status, Sanctions: sanctionsOf(suspended), Conditions: conditionsOf(status, true)}
 }
 
-// withoutKYC 是同一個店家、收款帳戶的轉帳能力沒有啟用（開通閘門未通過）。
 func withoutKYC(s Store) Store {
 	s.Conditions.TransfersActive = false
 	return s
@@ -228,7 +223,6 @@ func TestAuthorizeDenialsCarryTheirReason(t *testing.T) {
 			t.Fatalf("%+v", ae)
 		}
 	}
-	// 停權又沒有 KYC：停權優先。
 	if ae := errorOf(t, Authorize(withoutKYC(fullStore(Active, true)), CapShippingSetup)); ae.Reason != apperr.ReasonSellerSuspended {
 		t.Fatalf("suspended shipping setup: %+v", ae)
 	}
@@ -338,7 +332,6 @@ func TestStoreWithoutDerivedSuspensionIsTreatedAsSuspended(t *testing.T) {
 	}
 }
 
-// sanctionsOf 是測試用的推導結果：suspended 時帶一筆生效中的措施。
 func sanctionsOf(suspended bool) *Sanctions {
 	if !suspended {
 		return NoSanctions()

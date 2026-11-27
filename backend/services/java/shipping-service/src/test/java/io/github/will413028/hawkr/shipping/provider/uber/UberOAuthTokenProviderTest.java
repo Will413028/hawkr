@@ -55,12 +55,10 @@ class UberOAuthTokenProviderTest {
         provider.bearerToken();
         assertThat(transport.tokenCallCount()).isEqualTo(1L);
 
-        // 還剩 25%（> 20% 門檻）⇒ 不換新
         now.set(T0.plus(Duration.ofSeconds((long) (THIRTY_DAYS_SECONDS * 0.75))));
         provider.bearerToken();
         assertThat(transport.tokenCallCount()).isEqualTo(1L);
 
-        // 剩 10%（< 20% 門檻）⇒ 換新
         now.set(T0.plus(Duration.ofSeconds((long) (THIRTY_DAYS_SECONDS * 0.90))));
         provider.bearerToken();
         assertThat(transport.tokenCallCount()).isEqualTo(2L);
@@ -69,8 +67,6 @@ class UberOAuthTokenProviderTest {
     @Test
     @DisplayName("🔴 刷新失敗不得 fail-open：拿不到新 token 就拋，絕不退回快取中的舊 token")
     void refreshFailureNeverFallsBackToTheCachedToken() {
-        // 66 §4.5.1 逐字：「『先用舊 token 試試看』會把一次認證失敗變成 N 次 401，
-        // 而 401 對外看起來像我們被停權。」
         FakeUberTransport transport = new FakeUberTransport(THIRTY_DAYS_SECONDS).tokenFailsAfter(1);
         AtomicReference<Instant> now = new AtomicReference<>(T0);
         UberOAuthTokenProvider provider = provider(transport, movingClock(now));

@@ -1,7 +1,6 @@
 import { createRequire } from "node:module";
 import type * as TS from "typescript-compiler-api";
 
-// TypeScript 7 沒有穩定的 JS compiler API；與 website、ui-text 一樣用 typescript-compiler-api（@typescript/typescript6 別名）。
 const ts = createRequire(import.meta.url)(
 	"typescript-compiler-api",
 ) as typeof TS;
@@ -59,7 +58,6 @@ function stringsOf(node: TS.Node): string[] {
 	if (ts.isIdentifier(node)) {
 		const init = constStrings.get(node.text);
 		if (!init) return [];
-		// 解開一次就好，避免 `const a = b; const b = a` 無限遞迴。
 		constStrings.delete(node.text);
 		try {
 			return stringsOf(init);
@@ -80,7 +78,6 @@ function stringsOf(node: TS.Node): string[] {
 		if (node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
 			const left = stringsOf(node.left);
 			const right = stringsOf(node.right);
-			// 常數相接："modal-" + "overlay"
 			if (left.length === 1 && right.length === 1) return [left[0] + right[0]];
 		}
 		return [...stringsOf(node.left), ...stringsOf(node.right)];
@@ -193,7 +190,6 @@ export function scanSource(fileName: string, text: string): Finding[] {
 			if (attr.includes("aria-modal")) add("aria-modal", "setAttribute", node);
 			if (attr.includes("role")) checkRole(node.arguments[1], node);
 		}
-		// 直接呼叫、經命名空間（`a11y.useFocusTrap(…)`）呼叫、或 import 時改名（`useFocusTrap as trap`）都算。
 		if (ts.isCallExpression(node)) {
 			const callee = node.expression;
 			if (ts.isIdentifier(callee) && HOOKS.has(callee.text)) {
@@ -253,7 +249,6 @@ export function scanSource(fileName: string, text: string): Finding[] {
 		ts.forEachChild(node, visit);
 	};
 	visit(source);
-	// 巢狀的字串表達式會重複看到同一個 token，同一行同一種只留一筆。
 	const seen = new Set<string>();
 	return findings.filter((f) => {
 		const key = `${f.kind}|${f.detail}|${f.line}`;

@@ -97,8 +97,6 @@ test("buyer-only seller intent keeps the buyer role while entering onboarding", 
 });
 
 test("without a requested workspace the default is client-side: stored seller workspace for a seller, else buyer", () => {
-	// The default rule lives in the client (lib/auth/active-role.ts); GetSession
-	// does not return a perspective (ADR 2026-10-07-connect-without-perspective).
 	assert.deepEqual(
 		resolvePostLoginTarget({
 			requestedRole: null,
@@ -109,7 +107,6 @@ test("without a requested workspace the default is client-side: stored seller wo
 		}),
 		{ activeRole: "seller", destination: "/seller-center/dashboard" },
 	);
-	// Stored seller workspace but the account no longer has the seller role.
 	assert.deepEqual(
 		resolvePostLoginTarget({
 			requestedRole: null,
@@ -120,7 +117,6 @@ test("without a requested workspace the default is client-side: stored seller wo
 		}),
 		{ activeRole: "buyer", destination: "/" },
 	);
-	// Nothing stored: buyer, even for a seller account.
 	assert.deepEqual(
 		resolvePostLoginTarget({
 			requestedRole: null,
@@ -139,7 +135,6 @@ test("an account page is the destination whatever the seller state or requested 
 		{ requestedRole: null, account: { isSeller: false }, storedRole: null },
 		{ requestedRole: "buyer", account: { isSeller: true }, storedRole: null },
 		{ requestedRole: "seller", account: { isSeller: true }, storedRole: null },
-		// 店家全關的帳號沒有賣家角色：選賣家分頁也不能被送去開店頁。
 		{ requestedRole: "seller", account: { isSeller: false }, storedRole: null },
 		{ requestedRole: null, account: { isSeller: true }, storedRole: "seller" },
 	] as const;

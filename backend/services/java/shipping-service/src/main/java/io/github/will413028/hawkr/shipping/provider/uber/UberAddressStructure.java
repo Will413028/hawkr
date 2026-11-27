@@ -129,15 +129,6 @@ public final class UberAddressStructure {
             throw new UberAddressUnparseableException("門牌為空");
         }
 
-        // 🔴 先過 AddressNormalizer，兩件事都不是可選的：
-        //  ① strip 掉前端誤塞進 detail 的重複「縣市＋鄉鎮市區」前綴 ——
-        //     不 strip 的話結構化地址會同時在 state／city 與 street 裡各帶一次城市名，
-        //     而重複的城市名正是地理編碼失敗的典型成因（症狀是 Uber 回 400 或定位到別處）。
-        //  ② strip 掉「里／村／鄰」token —— 那是 PayUni 明文不接受的（DEF01003），
-        //     而 Uber 這一側沒有官方說法 ⇒ 沿用同一個保守處置，理由見下。
-        //
-        // ⚠️ 本類別原本自己從 detail 切，**漏了這一層**（2026-09-12 施工時實查補上）。
-        //    它已經存在於本服務的 util 底下，是 10 檔 §15 的漏網。
         String normalizedDetail = AddressNormalizer.normalizeAddressDetail(county, district, detail);
         if (isBlank(normalizedDetail)) {
             throw new UberAddressUnparseableException("門牌在正規化後為空");
@@ -153,9 +144,6 @@ public final class UberAddressStructure {
                 notes = null;
             }
         } else {
-            // 沒有「號」，或「號」就是結尾 ⇒ 整串都是門牌，沒有樓層資訊。
-            // 🔴 不猜：切不出來就不切，而不是用長度或其他字元硬找一個切點。
-            //    ⚠️「之」尤其不能拿來當備用錨——它在門牌裡合法（「1之2號」）。
             street = trimmedDetail;
             notes = null;
         }

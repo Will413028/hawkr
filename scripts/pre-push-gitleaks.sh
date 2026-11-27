@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# pre-push：只掃這次要推的 commit 範圍（離線、通常不到一秒），與 CI 用同一份設定與基準。
-# pre-commit 在 pre-push 階段提供 PRE_COMMIT_FROM_REF／PRE_COMMIT_TO_REF；
-# 新分支沒有遠端基準時（FROM 是空的或全 0）改掃 origin/dev..TO。
-# 已在 origin 任一分支上的 commit 不算「要推的」：merge 進來的 dev commit 不是這次推送的內容。
 set -euo pipefail
 
 if ! command -v gitleaks >/dev/null 2>&1; then

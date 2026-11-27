@@ -22,7 +22,6 @@ class PayUniApiResponseDualFormatTest {
         return new PayUniApiResponse("SUCCESS", "ok", data);
     }
 
-    // ===== getTradeStatus =====
 
     @Test
     @DisplayName("v2.0 Result[0][TradeStatus] 應被讀到")
@@ -48,7 +47,6 @@ class PayUniApiResponseDualFormatTest {
         assertEquals("1", r.getTradeStatus());
     }
 
-    // ===== getTradeNo / getProviderTradeNo =====
 
     @Test
     @DisplayName("getTradeNo / getProviderTradeNo 雙格式")
@@ -65,7 +63,6 @@ class PayUniApiResponseDualFormatTest {
         assertEquals("UNI_001", v1.getProviderTradeNo());
     }
 
-    // ===== getTradeAmount =====
 
     @Test
     @DisplayName("getTradeAmount 雙格式 + Long parse")
@@ -80,7 +77,6 @@ class PayUniApiResponseDualFormatTest {
         assertNull(make(Map.of("TradeAmt", "abc")).getTradeAmount());
     }
 
-    // ===== getCloseStatus =====
 
     @Test
     @DisplayName("getCloseStatus v2.0 / v1.x 雙格式")
@@ -89,7 +85,6 @@ class PayUniApiResponseDualFormatTest {
         assertEquals("2", make(Map.of("CloseStatus", "2")).getCloseStatus());
     }
 
-    // ===== ATM 欄位 =====
 
     @Test
     @DisplayName("ATM 三欄位雙格式")
@@ -104,7 +99,6 @@ class PayUniApiResponseDualFormatTest {
         assertEquals("2026-04-09", v1.getAtmExpireDate());
     }
 
-    // ===== null safety / 空字串 =====
 
     @Test
     @DisplayName("decryptedData 為 null 時所有 getter 安全回 null")
@@ -130,7 +124,6 @@ class PayUniApiResponseDualFormatTest {
         assertNull(r.getTradeStatus());
     }
 
-    // ===== getErrorMessage =====
 
     @Test
     @DisplayName("getErrorMessage 優先讀解密 data Message")
@@ -148,15 +141,12 @@ class PayUniApiResponseDualFormatTest {
         assertEquals("外層訊息", r.getErrorMessage());
     }
 
-    // ===== getData 不做 fallback（明確語意）=====
 
     @Test
     @DisplayName("getData 是純取值，不做雙格式 fallback")
     void getData_noFallback() {
         var r = make(Map.of("Result[0][TradeStatus]", "1"));
-        // 直接讀頂層 key 應該回 null
         assertNull(r.getData("TradeStatus"));
-        // 讀 Result 陣列 key 才有值
         assertEquals("1", r.getData("Result[0][TradeStatus]"));
     }
 }

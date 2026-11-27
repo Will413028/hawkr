@@ -69,8 +69,6 @@ func base(a eventFields, eventType string) map[string]any {
 	}
 }
 
-// enqueuePublish 不在 transaction 內排入（relay 要呼叫 legacy 服務）；relay job 在排入後失敗而重試時，
-// PublishArgs 以 event_id 做的 unique 讓同一則事件只有一個送出的 job。
 func (w *Worker) enqueuePublish(ctx context.Context, a eventFields, exchange, key string, payload map[string]any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {

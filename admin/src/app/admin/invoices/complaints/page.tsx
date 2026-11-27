@@ -24,32 +24,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A07｜未收到發票申訴佇列（58A §A07，端點 58 `GET /api/v1/admin/invoices/complaints`）。
-//
-// 唯讀頁。**佇列頁不放停權按鈕**——不因單一申訴自動停權，停權是 A08 的明確操作，而且
-// 走的是 ADM 既有的違規模組。不做批次操作、不做表頭排序（排序走後端 query）、不輪詢。
-//
-// ⚠️ **五個分頁不互斥，筆數不可相加**（`AWAITING_SELLER` 含 `OVERDUE`、`OVERDUE` 是
-// 橫切視圖）。這與 A05 的六分頁**規則相反**，兩處不可互相套用。因此本頁：
-//   - tab 上不掛筆數 badge（也因為五支查詢會搶同一個限流桶）
-//   - 不顯示合計、不用減法算任何一頁
-//
-// ⚠️ 逾期橫幅的 N 來自**同一支端點的獨立查詢**（`tab=OVERDUE&page_size=1`，只讀 total），
-// 不是從當前分頁的 records 數出來的——人不會先切到「已逾期」才知道有逾期。這是本頁
-// 唯一一支額外請求；**不為此改打 A01 的總覽端點**（那是另一個口徑的聚合）。
-//
-// ## 與 58A 的欄位落差
-//
-// 58A 的 8 欄裡有兩欄畫不出來：`violationCountIn90Days`（90 天同類申訴）與由它推導的
-// 「是否達停權門檻」。端點 58／59 共用的 DTO（Gateway `InvoiceComplaintInfo`）沒有這個
-// 欄位——它只出現在**端點 60 的回應**（`SuspensionRecommendation`）。
-// ⇒ 本波 6 欄。這是**契約缺口不是取捨**：憑語意造欄名只會渲染 `undefined`（陷阱 T15）。
-//
-// ⚠️ 2026-09-02 更正：這裡原本寫「而端點 60 未實作」——**端點 60 一直都在**
-// （`internal/grpc/complaint.go` 的 `ActOnInvoiceComplaintForAdmin`，路徑
-// `POST /admin/invoices/complaints/{id}/actions`），A08 已接上五個處理動作。
-// 那兩欄仍然畫不出來，但理由是「它們只在寫入端點的回應裡」而不是「後端沒做」——
-// 兩者對讀的人的下一步完全不同：前者去 A08 送出動作就看得到，後者會讓人去等後端。
 
 const COMPLAINTS_ENDPOINT = "/api/v1/admin/invoices/complaints";
 const PAGE_SIZE = 20;
@@ -89,7 +63,6 @@ export default function InvoiceComplaintsPage() {
 		},
 	});
 
-	// 逾期件數：獨立查詢，只讀 total（page_size=1 是為了不把 20 筆資料也撈回來）。
 	const overdueCount = useQuery({
 		queryKey: ["invoice", "complaints", "overdueCount"],
 		queryFn: async () => {
@@ -219,8 +192,7 @@ export default function InvoiceComplaintsPage() {
 						}}
 					/>
 				</div>
-				{/* 排序走後端 query param，不做表頭排序：前端排序只排得動當前這一頁，
-				    而管理員會以為那是全域排序。 */}
+
 				<select
 					className="filter-select"
 					aria-label="排序方式"
@@ -288,7 +260,7 @@ export default function InvoiceComplaintsPage() {
 											<div className="cell-sub">
 												{formatDateTime(item.createdAt)}
 											</div>
-											{/* 重開案沒有獨立狀態：狀態回到 OPEN，靠 reopenCount 判別。 */}
+
 											{Number(item.reopenCount) > 0 ? (
 												<StatusBadge variant="info" size="sm">
 													重開第 {item.reopenCount} 次
@@ -296,14 +268,14 @@ export default function InvoiceComplaintsPage() {
 											) : null}
 										</td>
 										<td>
-											{/* buyerMaskedName 是後端遮好的，前端不還原。 */}
+
 											<div className="cell-main">
 												{item.buyerMaskedName || "—"}
 											</div>
 											<div className="cell-sub">{item.orderNo || "—"}</div>
 										</td>
 										<td>
-											{/* 這支端點的 DTO 沒有 storeName，只有 storeId。 */}
+
 											<div className="cell-main">{item.storeId}</div>
 										</td>
 										<td>
@@ -319,7 +291,7 @@ export default function InvoiceComplaintsPage() {
 											<div className="cell-main">
 												{formatDateTime(item.dueAt)}
 											</div>
-											{/* 工作天由後端給，前端零計算（只扣週末不扣國定假日會與後端分歧）。 */}
+
 											<SlaCountdown
 												remainingBusinessDays={item.remainingBusinessDays}
 												overdueBusinessDays={item.overdueBusinessDays}

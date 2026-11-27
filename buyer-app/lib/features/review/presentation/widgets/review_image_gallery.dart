@@ -41,7 +41,6 @@ Future<void> showReviewImageViewer(
     useRootNavigator: true,
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    // 只做輕量分層，避免把原頁面壓成深色。
     barrierColor: AppColors.textEmphasis.withValues(alpha: 0.18),
     transitionDuration: HkMotionTransitions.durationOf(
       context,

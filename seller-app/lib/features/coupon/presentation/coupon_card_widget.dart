@@ -75,7 +75,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // ── White card with selection border ──
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
@@ -99,7 +98,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
               ),
               child: Row(
                 children: [
-                  // ── Checkbox on far left center（删除模式时显示）──
                   if (widget.showCheckbox)
                     GestureDetector(
                       onTap: () {
@@ -134,7 +132,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
                       ),
                     ),
 
-                  // 右側內容區
                   Expanded(
                     child: Padding(
                       padding: EdgeInsets.only(
@@ -147,7 +144,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Row 1: avatar + title
                           Row(
                             children: [
                               _buildAvatar(),
@@ -170,7 +166,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
                           ),
                           SizedBox(height: 6.h),
 
-                          // Description
                           Text(
                             _description(coupon),
                             style: TextStyle(
@@ -185,7 +180,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
                           ),
                           SizedBox(height: 6.h),
 
-                          // Threshold
                           if (coupon.thresholdAmount != null &&
                               coupon.thresholdAmount!.isNotEmpty &&
                               coupon.thresholdAmount != '0') ...[
@@ -204,7 +198,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
                             SizedBox(height: 6.h),
                           ],
 
-                          // Expiry（使用 DateFormatter 格式化日期）
                           if (coupon.endAt != null && coupon.endAt!.isNotEmpty)
                             Row(
                               children: [
@@ -236,7 +229,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
               ),
             ),
 
-            // ── Top-right badge ──
             Positioned(left: 306.w, top: -5.h, child: _buildBadge(badge)),
           ],
         ),
@@ -263,7 +255,6 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
   }
 
   Widget _buildBadge(_BadgeConfig badge) {
-    // 使用通用的 CouponTypeBadge 组件
     return CouponTypeBadge(type: badge.type, label: badge.label);
   }
 

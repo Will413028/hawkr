@@ -30,8 +30,6 @@ export function retryInterceptor(opts: RetryOptions = {}): Interceptor {
 				return await next(req);
 			} catch (raw) {
 				if (retry >= maxRetries || req.signal.aborted) throw raw;
-				// fetch 的網路錯誤在 interceptor 這一層還是原本的 TypeError，connect-es 在最外層才包成
-				// ConnectError；先以同樣的規則轉換再分類。
 				const err = ConnectError.from(raw);
 				const d = classifyError(factsFromError(err, req.method, req.message));
 				if (d.action !== "retry") throw raw;

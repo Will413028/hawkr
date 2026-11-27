@@ -20,9 +20,7 @@ import (
 )
 
 const (
-	// busyRetryAfter 是同時修圖滿了時建議 client 等多久再試。
 	busyRetryAfter = 10 * time.Second
-	// providerBusyRetryAfter 是模型供應商回 429 時建議 client 等多久再試。
 	providerBusyRetryAfter = 30 * time.Second
 )
 
@@ -188,8 +186,6 @@ const (
 	refusalRecitation
 )
 
-// refusal 把沒有產出圖片的回覆分類：prompt 被擋（BlockReason 非空且不是 BLOCKED_REASON_UNSPECIFIED）與安全類結束原因是確定性的安全性擋下，著作權複誦同理；
-// 其餘（NO_IMAGE、IMAGE_OTHER、STOP、空字串）是模型的非決定性行為，視為沒有產出。
 func refusal(r llm.ImageResult) refusalKind {
 	if r.BlockReason != "" && r.BlockReason != blockReasonUnspecified {
 		return refusalSafety

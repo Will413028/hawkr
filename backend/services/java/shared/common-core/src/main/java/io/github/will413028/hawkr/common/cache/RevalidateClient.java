@@ -41,9 +41,6 @@ public class RevalidateClient {
 
     public RevalidateClient(WebRevalidateProperties properties) {
         this.properties = properties;
-        // 強制 HTTP/1.1：目標是 cleartext http:// 的 Next.js /api/revalidate，該 Node server
-        // 不支援 HTTP/2 cleartext，收到 h2 即重置而靜默失敗；Java 預設 HTTP_2，必須顯式降級。
-        // 不跟隨轉址：3xx 代表 base URL 設錯，由 non-2xx 分支以 WARN 浮現為失敗。
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .followRedirects(HttpClient.Redirect.NEVER)
@@ -90,7 +87,6 @@ public class RevalidateClient {
     public void bustAsync(List<String> tags) {
         if (tags == null || tags.isEmpty()) return;
         if (!properties.isEnabled()) {
-            // 配置未填（如 local dev 不對接 web）→ noop 不報錯，避免本地誤觸警告
             return;
         }
         HttpRequest request;
@@ -121,7 +117,6 @@ public class RevalidateClient {
                 .whenComplete((resp, err) -> {
                     if (err != null) {
                         if (shouldRetry(err) && attempt < MAX_ATTEMPTS) {
-                            // stale pooled connection：連線已從池移除，下次送出即開新連線
                             log.warn("RevalidateClient.send.retry tags={} attempt={} reason={}",
                                     tags, attempt, rootMessage(err));
                             sendWithRetry(tags, request, attempt + 1);
@@ -135,7 +130,6 @@ public class RevalidateClient {
                         log.info("RevalidateClient.send.success tags={} status={} attempt={}",
                                 tags, resp.statusCode(), attempt);
                     } else {
-                        // non-2xx（如 401 secret 不符）屬設定問題，不重試
                         log.warn("RevalidateClient.send.non2xx tags={} status={} body={}",
                                 tags, resp.statusCode(), truncate(resp.body()));
                     }

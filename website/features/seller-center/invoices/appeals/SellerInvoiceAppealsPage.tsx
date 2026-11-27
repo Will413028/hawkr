@@ -68,8 +68,6 @@ const EMPTY_COPY: Record<string, { title: string; description: string }> = {
 };
 
 export function SellerInvoiceAppealsPage() {
-	// 走 observed router 而不是裸 useRouter：`tests/navigation-route-contract.test.ts`
-	// 要求所有程式化導航都經過這一層。
 	const router = useObservedRouter("seller_invoice_appeals");
 	const pathname = usePathname() ?? "/seller-center/invoices/appeals";
 	const searchParams = useSearchParams();
@@ -84,7 +82,6 @@ export function SellerInvoiceAppealsPage() {
 				if (value === null || value === "") next.delete(key);
 				else next.set(key, value);
 			}
-			// 切分頁時 `page` 一律重設為 1，否則會停在一個不存在的頁碼。
 			if (!("page" in patch)) next.delete("page");
 			const qs = next.toString();
 			router.replace(qs ? `${pathname}?${qs}` : pathname);
@@ -105,7 +102,6 @@ export function SellerInvoiceAppealsPage() {
 	} = useSellerInvoiceComplaints(queryParams);
 
 	const records = result?.records ?? [];
-	// 🔴 `total` 是總筆數不是頁數（§B-2.0 T25）。
 	const totalPages = result
 		? Math.max(1, Math.ceil(result.total / PAGE_SIZE))
 		: 1;
@@ -235,7 +231,6 @@ function ComplaintListSkeleton() {
  */
 function ComplaintCard({ complaint }: { complaint: SellerInvoiceComplaint }) {
 	const display = invoiceComplaintDisplay(complaint.status);
-	// `reopenCount` 是**屬性不是狀態**：不為它做第四個分頁，也不拿它當 status 判斷。
 	const reopened =
 		complaint.reopenCount !== "" && Number(complaint.reopenCount) > 0;
 

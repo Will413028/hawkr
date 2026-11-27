@@ -22,12 +22,7 @@ const (
 
 func (e Effect) valid() bool { return e == EffectRead || e == EffectWrite || e == EffectSelfService }
 
-// customerEffects 宣告每個顧客 service（*AppService、*PublicService，不含 admin）的每個 procedure 的動作性質，
-// 由 withSession 執行；key 是 procedure（/<service 全名>/<方法>）。與賣家的能力宣告（店家的狀態）是不同的關注點，不合併。
-// 公開的 service 對停權的帳號一律以訪客執行，宣告仍要誠實標示方法的性質。
-// 新增 procedure 必須在這裡宣告，缺宣告、多宣告都不能啟動（checkCustomerEffects）。
 var customerEffects = map[string]Effect{
-	// BuyerAppService
 	"/hawkr.buyer.v1alpha1.BuyerAppService/GetProfile":                EffectRead,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/UpdateProfile":             EffectWrite,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/ListAddresses":             EffectRead,
@@ -54,49 +49,43 @@ var customerEffects = map[string]Effect{
 	"/hawkr.buyer.v1alpha1.BuyerAppService/ListRestockSubscriptions":  EffectRead,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/SubscribeRestock":          EffectWrite,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/UnsubscribeRestock":        EffectWrite,
-	// 個人封鎖是保護自己的動作（seller 模組的店家封鎖同理：停權時仍要能封鎖與解除），停權的帳號也能做；名單是讀取。
-	"/hawkr.buyer.v1alpha1.BuyerAppService/BlockAuthor":       EffectSelfService,
-	"/hawkr.buyer.v1alpha1.BuyerAppService/BlockStore":        EffectSelfService,
-	"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockBuyer":      EffectSelfService,
-	"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockStore":      EffectSelfService,
-	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers": EffectRead,
-	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores": EffectRead,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/BlockAuthor":               EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/BlockStore":                EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockBuyer":              EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/UnblockStore":              EffectSelfService,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers":         EffectRead,
+	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores":         EffectRead,
 
-	// PaymentAppService：建立付款寫入付款列並排補做 job，停權的帳號不能；讀付款（向金流商讀 client secret）只讀自己的資料。
 	"/hawkr.payment.v1alpha1.PaymentAppService/CreatePayment": EffectWrite,
 	"/hawkr.payment.v1alpha1.PaymentAppService/GetPayment":    EffectRead,
 
-	// AssistantAppService：送出會開一輪助理回覆（花 LLM 成本、寫對話），停權的帳號不能；訂閱與讀歷史只讀自己的資料。
-	"/hawkr.assistant.v1alpha1.AssistantAppService/SendAssistantMessage":      EffectWrite,
-	"/hawkr.assistant.v1alpha1.AssistantAppService/WatchAssistantTurn":        EffectRead,
-	"/hawkr.assistant.v1alpha1.AssistantAppService/GetLatestAssistantSession": EffectRead,
-	// ImageAiAppService：修圖會扣額度並花模型成本，停權的帳號不能；讀風格與用量可以。
-	"/hawkr.imageai.v1alpha1.ImageAiAppService/TransformImage": EffectWrite,
-	"/hawkr.imageai.v1alpha1.ImageAiAppService/ListAiStyles":   EffectRead,
-	// BuyerProcurementAppService：送出、搜尋、編修需求、發布詢價、入圍與接受報價都改變狀態（有些會花 LLM 成本），停權的帳號不能；讀取、串流與純計算的價格試算可以。
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/SubmitTurn":              EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/WatchRun":                EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/CancelRun":               EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ResumeRun":               EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/StartCandidateSearch":    EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetCandidateSearch":      EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ToggleSelection":         EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/SubmitAnswer":            EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/Rewind":                  EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PreviewRfqPrice":         EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PreviewRfqPublication":   EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ExecuteRfqPublication":   EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetSnapshot":             EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetRuntimeSnapshot":      EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ListConversations":       EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetConversationMessages": EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/RenameConversation":      EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/DeleteConversation":      EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ListSellerResponses":     EffectRead,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PutShortlistEntry":       EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/DeleteShortlistEntry":    EffectWrite,
-	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/AcceptSellerQuote":       EffectWrite,
-	// SellerProcurementAppService：草稿、送出、撤回與婉拒是店家的寫入，停權的帳號不能（店家的停權另由賣家能力宣告處理）；清單與詳情是讀取。
+	"/hawkr.assistant.v1alpha1.AssistantAppService/SendAssistantMessage":                EffectWrite,
+	"/hawkr.assistant.v1alpha1.AssistantAppService/WatchAssistantTurn":                  EffectRead,
+	"/hawkr.assistant.v1alpha1.AssistantAppService/GetLatestAssistantSession":           EffectRead,
+	"/hawkr.imageai.v1alpha1.ImageAiAppService/TransformImage":                          EffectWrite,
+	"/hawkr.imageai.v1alpha1.ImageAiAppService/ListAiStyles":                            EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/SubmitTurn":                 EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/WatchRun":                   EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/CancelRun":                  EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ResumeRun":                  EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/StartCandidateSearch":       EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetCandidateSearch":         EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ToggleSelection":            EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/SubmitAnswer":               EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/Rewind":                     EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PreviewRfqPrice":            EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PreviewRfqPublication":      EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ExecuteRfqPublication":      EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetSnapshot":                EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetRuntimeSnapshot":         EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ListConversations":          EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetConversationMessages":    EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/RenameConversation":         EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/DeleteConversation":         EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ListSellerResponses":        EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PutShortlistEntry":          EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/DeleteShortlistEntry":       EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/AcceptSellerQuote":          EffectWrite,
 	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/ListSellerPublications":    EffectRead,
 	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/GetSellerPublication":      EffectRead,
 	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/UpsertSellerResponseDraft": EffectWrite,
@@ -104,7 +93,6 @@ var customerEffects = map[string]Effect{
 	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/WithdrawSellerResponse":    EffectWrite,
 	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/DeclineRfqPublication":     EffectWrite,
 
-	// IdentityAppService
 	"/hawkr.identity.v1alpha1.IdentityAppService/GetSession":           EffectRead,
 	"/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount":        EffectSelfService,
 	"/hawkr.identity.v1alpha1.IdentityAppService/SignOut":              EffectSelfService,
@@ -115,14 +103,11 @@ var customerEffects = map[string]Effect{
 	"/hawkr.identity.v1alpha1.IdentityAppService/GetContactEmail":      EffectRead,
 	"/hawkr.identity.v1alpha1.IdentityAppService/SetContactEmail":      EffectWrite,
 
-	// IdentityPublicService
 	"/hawkr.identity.v1alpha1.IdentityPublicService/IssueAppLoginNonce": EffectWrite,
 	"/hawkr.identity.v1alpha1.IdentityPublicService/ExchangeIdToken":    EffectWrite,
 
-	// DiscoveryPublicService
 	"/hawkr.discovery.v1alpha1.DiscoveryPublicService/SuggestRecommendedSellers": EffectRead,
 
-	// SocialPublicService
 	"/hawkr.social.v1alpha1.SocialPublicService/GetPost":              EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/ListPosts":            EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/ListComments":         EffectRead,
@@ -133,23 +118,19 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialPublicService/GetForumThread":       EffectRead,
 	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       EffectWrite,
 
-	// ModerationAppService：檢舉是寫入（停權的帳號不能送出）；讀自己的檢舉停權的帳號也可以。
 	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":       EffectWrite,
 	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports":      EffectRead,
 	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyStoreReports": EffectRead,
 
-	// MediaAppService：上傳是寫入（停權的帳號不能開始新的上傳）；讀處理狀態停權的帳號也可以。
-	"/hawkr.media.v1alpha1.MediaAppService/BeginUpload":       EffectWrite,
-	"/hawkr.media.v1alpha1.MediaAppService/CompleteUpload":    EffectWrite,
-	"/hawkr.media.v1alpha1.MediaAppService/GetUpload":         EffectRead,
-	"/hawkr.media.v1alpha1.MediaAppService/BeginSecureUpload": EffectWrite,
-	// MediaDelegatedService：憑證是代行 session，不讀帳號；宣告仍要誠實標示方法的性質。
+	"/hawkr.media.v1alpha1.MediaAppService/BeginUpload":             EffectWrite,
+	"/hawkr.media.v1alpha1.MediaAppService/CompleteUpload":          EffectWrite,
+	"/hawkr.media.v1alpha1.MediaAppService/GetUpload":               EffectRead,
+	"/hawkr.media.v1alpha1.MediaAppService/BeginSecureUpload":       EffectWrite,
 	"/hawkr.media.v1alpha1.MediaDelegatedService/BeginSecureUpload": EffectWrite,
 	"/hawkr.media.v1alpha1.MediaDelegatedService/BeginUpload":       EffectWrite,
 	"/hawkr.media.v1alpha1.MediaDelegatedService/CompleteUpload":    EffectWrite,
 	"/hawkr.media.v1alpha1.MediaDelegatedService/GetUpload":         EffectRead,
 
-	// SocialAppService
 	"/hawkr.social.v1alpha1.SocialAppService/SharePost":             EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/LikePost":              EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/UnlikePost":            EffectWrite,
@@ -173,24 +154,20 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialAppService/CancelPostSchedule":    EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/ListStoreComments":     EffectRead,
 	"/hawkr.social.v1alpha1.SocialAppService/GetStoreSocialSummary": EffectRead,
-	// 作者讀自己的處分與被隱藏內容的理由（A7-D9）：只讀，停權的帳號也要讀得到。
-	"/hawkr.social.v1alpha1.SocialAppService/ListMySanctions":     EffectRead,
-	"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent": EffectRead,
+	"/hawkr.social.v1alpha1.SocialAppService/ListMySanctions":       EffectRead,
+	"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent":   EffectRead,
 
-	// ReviewPublicService：公開的 service 對停權的帳號一律以訪客執行，宣告仍標示方法的性質。
 	"/hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews":    EffectRead,
 	"/hawkr.review.v1alpha1.ReviewPublicService/ListStoreReviews":      EffectRead,
 	"/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats":   EffectRead,
 	"/hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats": EffectRead,
 
-	// ReviewAppService
 	"/hawkr.review.v1alpha1.ReviewAppService/GetReview":           EffectRead,
 	"/hawkr.review.v1alpha1.ReviewAppService/ReplyReview":         EffectWrite,
 	"/hawkr.review.v1alpha1.ReviewAppService/CreateReview":        EffectWrite,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListMyReviews":       EffectRead,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListOwnStoreReviews": EffectRead,
 
-	// CouponAppService：領券寫入；結束活動是店家的收縮型寫入，停權的帳號不在這裡放行（店家的停權由賣家能力宣告處理）。
 	"/hawkr.coupon.v1alpha1.CouponAppService/ListMyVouchers":         EffectRead,
 	"/hawkr.coupon.v1alpha1.CouponAppService/ListClaimableCampaigns": EffectRead,
 	"/hawkr.coupon.v1alpha1.CouponAppService/ClaimCoupon":            EffectWrite,
@@ -198,18 +175,16 @@ var customerEffects = map[string]Effect{
 	"/hawkr.coupon.v1alpha1.CouponAppService/ListCampaigns":          EffectRead,
 	"/hawkr.coupon.v1alpha1.CouponAppService/GetCampaign":            EffectRead,
 	"/hawkr.coupon.v1alpha1.CouponAppService/EndCampaign":            EffectWrite,
-	// CrmAppService
-	"/hawkr.crm.v1alpha1.CrmAppService/ListCustomers":     EffectRead,
-	"/hawkr.crm.v1alpha1.CrmAppService/GetCustomer":       EffectRead,
-	"/hawkr.crm.v1alpha1.CrmAppService/UpdateCustomer":    EffectWrite,
-	"/hawkr.crm.v1alpha1.CrmAppService/CreateTag":         EffectWrite,
-	"/hawkr.crm.v1alpha1.CrmAppService/ListTags":          EffectRead,
-	"/hawkr.crm.v1alpha1.CrmAppService/UpdateTag":         EffectWrite,
-	"/hawkr.crm.v1alpha1.CrmAppService/DeleteTag":         EffectWrite,
-	"/hawkr.crm.v1alpha1.CrmAppService/AddCustomerTags":   EffectWrite,
-	"/hawkr.crm.v1alpha1.CrmAppService/RemoveCustomerTag": EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/ListCustomers":                EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/GetCustomer":                  EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateCustomer":               EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/CreateTag":                    EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/ListTags":                     EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateTag":                    EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/DeleteTag":                    EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/AddCustomerTags":              EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/RemoveCustomerTag":            EffectWrite,
 
-	// ChatAppService
 	"/hawkr.chat.v1alpha1.ChatAppService/ListConversations":           EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/ListStoreConversations":      EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/GetStoreConversationByBuyer": EffectRead,
@@ -224,12 +199,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.chat.v1alpha1.ChatAppService/GetStoreUnreadCount":         EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/GetPresence":                 EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/GetStorePresence":            EffectRead,
-	// 串流只讀：停權的帳號可讀，停權不結束串流（A6-D16 W4）。
-	"/hawkr.chat.v1alpha1.ChatAppService/StreamEvents":      EffectRead,
-	"/hawkr.chat.v1alpha1.ChatAppService/StreamStoreEvents": EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamEvents":                EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamStoreEvents":           EffectRead,
 
-	// NotificationAppService：讀取停權的帳號也可以（要讀得到停權通知）；刪除、偏好與註冊 token 是寫入；已讀只改自己收件匣的已讀狀態，
-	// 註銷 token 是收斂動作（停權者登出與刪帳號時要能停止收到推播，同 SignOut），兩者停權時也必須能做。串流只讀。
 	"/hawkr.notification.v1alpha1.NotificationAppService/ListInboxItems":               EffectRead,
 	"/hawkr.notification.v1alpha1.NotificationAppService/GetUnreadCount":               EffectRead,
 	"/hawkr.notification.v1alpha1.NotificationAppService/MarkInboxItemRead":            EffectSelfService,
@@ -241,7 +213,6 @@ var customerEffects = map[string]Effect{
 	"/hawkr.notification.v1alpha1.NotificationAppService/DeleteDeviceToken":            EffectSelfService,
 	"/hawkr.notification.v1alpha1.NotificationAppService/WatchNotifications":           EffectRead,
 
-	// CatalogPublicService：公開讀取，停權的帳號以訪客執行；宣告仍如實標示性質。
 	"/hawkr.catalog.v1alpha1.CatalogPublicService/ListProducts":            EffectRead,
 	"/hawkr.catalog.v1alpha1.CatalogPublicService/SearchProducts":          EffectRead,
 	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestProductNames":     EffectRead,
@@ -250,7 +221,6 @@ var customerEffects = map[string]Effect{
 	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestHashtags":         EffectRead,
 	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestTrendingHashtags": EffectRead,
 
-	// SellerCatalogAppService：賣家的商品管理。寫入在帳號停權時被擋；店家自己的停權由 seller.ActingStore 依能力判斷。
 	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/ListMyProducts":   EffectRead,
 	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/GetMyProduct":     EffectRead,
 	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/CountMyProducts":  EffectRead,
@@ -261,12 +231,10 @@ var customerEffects = map[string]Effect{
 	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/AdjustStock":      EffectWrite,
 	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/SetStock":         EffectWrite,
 
-	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":        EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerReportAppService/GetMyReport":         EffectRead,
 	"/hawkr.seller.v1alpha1.SellerReportAppService/AddReportSupplement": EffectWrite,
 
-	// CatalogDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
 	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/ListStoreProducts":           EffectRead,
 	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/GetStoreProduct":             EffectRead,
 	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/CreateStoreProduct":          EffectWrite,
@@ -274,21 +242,18 @@ var customerEffects = map[string]Effect{
 	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/PublishStoreProduct":         EffectWrite,
 	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/UnpublishStoreProduct":       EffectWrite,
 	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/BatchUnpublishStoreProducts": EffectWrite,
-	// SocialDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
-	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStoreSocialSummary": EffectRead,
-	"/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts":        EffectRead,
-	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStorePost":          EffectRead,
-	"/hawkr.social.v1alpha1.SocialDelegatedService/CreateStorePost":       EffectWrite,
-	"/hawkr.social.v1alpha1.SocialDelegatedService/UpdateStorePost":       EffectWrite,
-	"/hawkr.social.v1alpha1.SocialDelegatedService/PublishStorePost":      EffectWrite,
-	"/hawkr.social.v1alpha1.SocialDelegatedService/UnpublishStorePost":    EffectWrite,
-	"/hawkr.social.v1alpha1.SocialDelegatedService/ScheduleStorePost":     EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStoreSocialSummary":         EffectRead,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts":                EffectRead,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStorePost":                  EffectRead,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/CreateStorePost":               EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/UpdateStorePost":               EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/PublishStorePost":              EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/UnpublishStorePost":            EffectWrite,
+	"/hawkr.social.v1alpha1.SocialDelegatedService/ScheduleStorePost":             EffectWrite,
 
-	// ContentPublicService
 	"/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners": EffectRead,
 	"/hawkr.content.v1alpha1.ContentPublicService/CheckAppVersion": EffectRead,
 
-	// SellerAppService
 	"/hawkr.seller.v1alpha1.SellerAppService/ApplyStore":                     EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyStoreOpening":              EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyStore":                     EffectRead,
@@ -315,12 +280,10 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerAppService/ListMyInquiries":                EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyInquiry":                   EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/ReplyToInquiry":                 EffectWrite,
-	// 店家封鎖是保護動作（同 BuyerAppService 的個人封鎖）；名單是讀取。
-	"/hawkr.seller.v1alpha1.SellerAppService/BlockBuyer":        EffectSelfService,
-	"/hawkr.seller.v1alpha1.SellerAppService/UnblockBuyer":      EffectSelfService,
-	"/hawkr.seller.v1alpha1.SellerAppService/ListBlockedBuyers": EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/BlockBuyer":                     EffectSelfService,
+	"/hawkr.seller.v1alpha1.SellerAppService/UnblockBuyer":                   EffectSelfService,
+	"/hawkr.seller.v1alpha1.SellerAppService/ListBlockedBuyers":              EffectRead,
 
-	// SellerPublicService
 	"/hawkr.seller.v1alpha1.SellerPublicService/GetStore":            EffectRead,
 	"/hawkr.seller.v1alpha1.SellerPublicService/ListStores":          EffectRead,
 	"/hawkr.seller.v1alpha1.SellerPublicService/BatchGetStores":      EffectRead,
@@ -328,7 +291,6 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerPublicService/RecordProductView":   EffectWrite,
 }
 
-// effectOf 回傳 procedure 宣告的動作性質；沒有宣告的當寫入（預設拒絕）。
 func effectOf(procedure string) Effect {
 	if e, ok := customerEffects[procedure]; ok {
 		return e
@@ -336,13 +298,10 @@ func effectOf(procedure string) Effect {
 	return EffectWrite
 }
 
-// customerServiceDescriptors 是掛載的 service 中 audience 不是 admin 的 descriptor，查法同 adminServiceDescriptors。
 func customerServiceDescriptors(services []service) ([]protoreflect.ServiceDescriptor, error) {
 	return serviceDescriptors(services, "顧客", func(a rpc.Audience) bool { return a != rpc.AudienceAdmin })
 }
 
-// checkCustomerEffects 對照 customerEffects 與實際掛載的顧客 service：掛了沒有宣告的方法、宣告了沒有掛載的方法、宣告的值不合法，
-// 都不能啟動。
 func checkCustomerEffects(services []service) error {
 	descriptors, err := customerServiceDescriptors(services)
 	if err != nil {

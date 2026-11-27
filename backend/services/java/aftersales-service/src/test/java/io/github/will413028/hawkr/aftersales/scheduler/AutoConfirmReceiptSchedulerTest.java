@@ -88,11 +88,9 @@ class AutoConfirmReceiptSchedulerTest {
         verify(returnReceiptService).autoConfirmReceipt("B003", OK);
     }
 
-    // ==================== issue #2294 B5：反解必須在 tx 之外、且走 strict ====================
 
     @Test
     void resolvesPrincipalsBeforeEnteringTx() {
-        // 防止反解被搬回 @Transactional 內（那會讓短 tx 在下游掛住時無限期持有 row lock）
         when(caseMapper.findAutoConfirmExpired(any(LocalDateTime.class), eq(200)))
                 .thenReturn(List.of("B001"));
         when(returnReceiptService.resolvePrincipalsForCaseStrict("B001")).thenReturn(OK);
@@ -107,8 +105,6 @@ class AutoConfirmReceiptSchedulerTest {
 
     @Test
     void principalResolutionFails_skipsCaseWithoutEnteringTx() {
-        // strict 語意：反解失敗 ⇒ 不進 tx ⇒ 沒有 CAS ⇒ status='27' 與 auto_confirm_at 未變
-        // ⇒ 下一 tick 必然重撈。降級成 best-effort（照發帶 0 的事件）會讓本測試轉綠 = 鑑別點。
         when(caseMapper.findAutoConfirmExpired(any(LocalDateTime.class), eq(200)))
                 .thenReturn(List.of("BAD", "B002"));
         when(returnReceiptService.resolvePrincipalsForCaseStrict("BAD"))
@@ -119,7 +115,6 @@ class AutoConfirmReceiptSchedulerTest {
         scheduler.checkAutoConfirm();
 
         verify(returnReceiptService, never()).autoConfirmReceipt(eq("BAD"), any());
-        // 單筆失敗不得中斷整批
         verify(returnReceiptService).autoConfirmReceipt("B002", OK);
     }
 }

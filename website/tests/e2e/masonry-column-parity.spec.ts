@@ -161,17 +161,6 @@ async function landOn(
 		`${route} @${width}: the navigation did not land on the route being graded (ended on ${page.url()}) — every number read after this would describe a different page`,
 	).toBe(route);
 	if (!rendered) return;
-	// A pathname match is NOT proof the page rendered. `notFound()` thrown from
-	// a layout keeps the URL and answers 200 (the shell is already flushed), so
-	// the only outward sign is an empty <main> — and the card wait downstream
-	// reports that as "the card count never settled", i.e. as a masonry defect.
-	// It is not one: it is the seller lookup having failed. Naming it here costs
-	// one selector and saves the next person the hour it cost this time.
-	//
-	// The failure this caught is real and lives in production: a gateway 429
-	// (anonymous public reads are capped per IP) made getCachedSeller return
-	// null, the storefront layout called notFound(), and ISR then served that
-	// 404 for the route's full 1800s window. See lib/api/prerender.ts.
 	await expect(
 		page.locator(rendered),
 		`${route} @${width}: the route answered, but its content subtree is absent (${rendered} never appeared) — this is a not-found/error shell, not the storefront this suite grades. Nothing below this line would be measuring the layout.`,
@@ -215,10 +204,6 @@ async function readFallbackGeometry(
 		).toBe(false);
 		return geometry;
 	} finally {
-		// The same `page` is reused for the settled read below. Leaving this
-		// route armed would block hydration there too, and the settled read
-		// would then time out waiting for a measured layout that can never
-		// happen — a false red that looks exactly like the bug.
 		await page.unroute(HYDRATION_BUNDLE, abortRoute);
 	}
 }
@@ -231,8 +216,6 @@ async function readSettledGeometry(
 ): Promise<GridGeometry | null> {
 	await page.setViewportSize({ width, height: 1080 });
 	await guestSession(page);
-	// Same blank slate as the fallback read, so the two passes differ ONLY by
-	// the blocked bundle — which is the entire premise of comparing them.
 	await blankSlate(page);
 	await landOn(page, route, width, rendered);
 	await waitForStableCardCount(page);
@@ -256,18 +239,6 @@ async function discoverStorefront(page: Page): Promise<string> {
 		timeout: 30_000,
 	});
 	await page.waitForSelector(CARD, { timeout: 20_000 });
-	// ⚠️ 只從**商品卡片內**取賣家連結，不要拿頁面上任何 `a[href^="/sellers/"]`。
-	//
-	// 市集頁除了商品卡，還有「推薦商家」欄，而推薦商家排行
-	// **不過濾商品數**：dev 上第一名 `2662192214` 的商品數是 0。原本的寫法掃
-	// 整份文件，於是挑中那家空店 —— 店面渲染正常（`ready=true`、頁面寫著
-	// 「沒有商品」），但 grid 與 card 都是 0，`waitForStableCardCount` 要求
-	// `count > 0` 就永遠不成立，20 秒後逾時。
-	//
-	// 失敗訊息會指向 `waitForStableCardCount`，看起來像 masonry 有 race，
-	// 實際上是這個 fixture 挑了一個**沒有欄可比**的頁面。
-	//
-	// 卡片內的賣家連結必然對應一個至少有一個商品的店家——那正是本測試要量的對象。
 	const href = await page.evaluate((cardSelector) => {
 		for (const card of document.querySelectorAll(cardSelector)) {
 			const link = Array.from(
@@ -353,15 +324,11 @@ function assertParity(
 
 	const context = `${route} @${width} (container ${settled.containerWidth}px)`;
 
-	// 0. Precondition, asserted rather than assumed: both reads saw the same
-	//    cards. A differing count is a real problem, but a DIFFERENT one, and
-	//    without this it surfaces as a bogus "column count changed".
 	expect(
 		settled.cardCount,
 		`${context}: SSR rendered ${fallback.cardCount} cards and the hydrated page shows ${settled.cardCount} — a card appearing or disappearing, not a column change`,
 	).toBe(fallback.cardCount);
 
-	// 1. The user-visible invariant: hydration must not re-deal the grid.
 	expect(
 		settled.columns,
 		`${context}: column count changed on hydration — fallback ${fallback.columns} (${fallback.cardWidth}px cards), settled ${settled.columns} (${settled.cardWidth}px cards). That is the #423 shift.`,
@@ -375,12 +342,6 @@ function assertParity(
 		`${context}: cards landed at different column offsets after hydration`,
 	).toEqual(fallback.offsets);
 
-	// 2. The structural invariant: the measured layout IS the CSS's own track
-	//    list, not a JS recomputation that merely happens to agree here.
-	//
-	//    A fixture can hold fewer products than there are columns (dev
-	//    storefronts routinely do), and then only the first N tracks get
-	//    occupied — that is correct, not a mismatch.
 	expect(
 		settled.columns,
 		`${context}: the CSS resolved ${settled.tracks.length} tracks and there are ${settled.cardCount} cards, but the cards occupy ${settled.columns} columns — something other than the grid declaration decided the layout`,
@@ -393,10 +354,6 @@ function assertParity(
 				.slice(0, index)
 				.reduce((sum, track) => sum + track + settled.gap, 0),
 	);
-	// 1px of slack, and no more: track edges land on fractional pixels
-	// (275.5px here) and `getBoundingClientRect().x` is rounded to report them.
-	// A reintroduced JS column formula moves offsets by ~100px, so this stays
-	// far from the noise it tolerates.
 	const drift = settled.offsets.map((offset, index) =>
 		Math.abs(offset - expectedOffsets[index]),
 	);

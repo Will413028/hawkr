@@ -126,7 +126,6 @@ export function delegatedAuditResourceDisplay(entry: {
 	resourceId: string;
 }): string {
 	if (entry.resourceName) return entry.resourceName;
-	// 加 `#` 是為了讓人一眼看出這是識別碼而不是一個叫這串數字的資源。
 	if (entry.resourceId) return `#${entry.resourceId}`;
 	return "—";
 }

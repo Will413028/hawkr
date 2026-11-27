@@ -35,9 +35,6 @@ func TestResolveFulfillmentMode(t *testing.T) {
 			codemeta.InvoiceDocumentKindB2c.Value,
 			codemeta.InvoiceDocumentStatusNotApplicable.Value,
 			codemeta.InvoiceNotApplicableReasonZeroAmount.Value, ""},
-		// #3026：收據產製已落地 ⇒ 已授權的免用發票賣家落 PENDING（進候選集合，
-		// 由 INV.op 走本地 PDF 產生）。這一格從 #3022 的 NOT_APPLICABLE 翻回來，
-		// 前提是 settleReceipt 真的會接手——否則會直接重現 #3022。
 		{"免用統一發票 ＋ 已授權 ⇒ 平台代製收據待產製", func(in *FulfillmentInput) {
 			in.SellerReviewStatus = codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value
 			in.SellerReceiptAuthorized = true
@@ -46,9 +43,6 @@ func TestResolveFulfillmentMode(t *testing.T) {
 			codemeta.InvoiceDocumentKindReceipt.Value,
 			codemeta.InvoiceDocumentStatusPending.Value,
 			"", ""},
-		// 🔴 陰性對照：**未授權**不得落 PENDING。收據的出據人是賣家（Q-B7），
-		// 平台沒有 S05 授權就不得以他的名義產出文件 ⇒ AWAITING_MANUAL ＋ 理由碼。
-		// 也**不得**落 NOT_APPLICABLE：那是終態，這筆訂單會再也沒有人回頭補收據。
 		{"免用統一發票 ＋ 未授權 ⇒ 轉人工催授權", func(in *FulfillmentInput) {
 			in.SellerReviewStatus = codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value
 			in.SellerReceiptAuthorized = false

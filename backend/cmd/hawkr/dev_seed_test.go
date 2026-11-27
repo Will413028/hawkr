@@ -24,7 +24,6 @@ func accountSeedSQL(t *testing.T) string {
 	return strings.Join(code, "\n")
 }
 
-// seedTable 回傳 01 的 INSERT INTO <table> (…) VALUES 之後每一列的欄位文字（以逗號切開、去空白），列以 "(" 開頭、"),"或");" 結尾。
 func seedTable(t *testing.T, sql, table string) [][]string {
 	t.Helper()
 	_, rest, ok := strings.Cut(sql, "INSERT INTO "+table+" ")

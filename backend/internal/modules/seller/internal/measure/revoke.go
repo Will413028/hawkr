@@ -71,10 +71,8 @@ func (s *Service) Revoke(ctx context.Context, in model.RevokeMeasureInput) (mode
 	return result, err
 }
 
-// errScopeChanged 是撤銷或賣家請求要鎖的帳號在不加鎖的預讀與鎖住之間變了（剛好有新的關聯終止或引用）：整個 transaction 回滾重來。
 var errScopeChanged = errors.New("seller/measure：要鎖的帳號範圍變了")
 
-// retryScope 在 errScopeChanged 時把整個 transaction 重跑（每次重新預讀、依升序鎖住），有限次數；仍然變動就回 Unavailable 請呼叫方重試。
 func (s *Service) retryScope(ctx context.Context, run func() error) error {
 	var err error
 	for range 5 {
@@ -85,8 +83,6 @@ func (s *Service) retryScope(ctx context.Context, run func() error) error {
 	return apperr.Unavailable("%s", text.MeasureRetryExhausted(uitext.LocaleFrom(ctx)))
 }
 
-// revokeScope 是撤銷一筆措施會碰到的帳號與鎖：措施自己的帳號、以它（與連帶撤銷的措施）為來源的關聯終止所在的帳號。涉及終止合作時帳號列也要先鎖
-// （恢復營業要授予 SELLER，identity 的帳號列鎖要在店家列之前）。
 type revokeScope struct {
 	accounts []int64
 	identity bool
@@ -94,9 +90,6 @@ type revokeScope struct {
 
 func (sc revokeScope) covers(accountID int64) bool { return slices.Contains(sc.accounts, accountID) }
 
-// lockForRevoke 依固定的順序鎖住撤銷要碰的帳號：identity 帳號列（涉及終止合作時）依 account_id 升序，再鎖這些帳號全部的 stint（升序），最後鎖措施列
-// （鎖順序：帳號列、店家列、措施列；跨帳號時一律升序，與關聯終止的建立不會互鎖）。要碰哪些帳號在鎖之前先不加鎖讀一次（措施、它的連帶對象和關聯終止），
-// 鎖住之後 planRevoke 重讀並確認沒有超出已鎖的範圍，超出（讀與鎖之間剛好有新的關聯終止或引用）回 Unavailable 請重試。
 func (s *Service) lockForRevoke(ctx context.Context, q *store.Queries, measureID uuid.UUID, revokeFindings bool) (revokeScope, store.SellerMeasure, error) {
 	current, err := q.MeasureByID(ctx, measureID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -144,7 +137,6 @@ func (s *Service) lockForRevoke(ctx context.Context, q *store.Queries, measureID
 	return scope, row, err
 }
 
-// citingMeasures 是撤銷 origin 並一併撤銷認定時會連帶撤銷的措施：引用 origin 自己建立、仍生效的認定的其他未撤銷措施（同一個帳號：認定屬於帳號）。
 func (s *Service) citingMeasures(ctx context.Context, q *store.Queries, origin store.SellerMeasure) ([]store.SellerMeasure, error) {
 	owned, err := q.OriginFindings(ctx, origin.ID)
 	if err != nil || len(owned) == 0 {
@@ -157,9 +149,6 @@ func (s *Service) citingMeasures(ctx context.Context, q *store.Queries, origin s
 	return q.MeasuresCitingFindings(ctx, store.MeasuresCitingFindingsParams{ViolationIds: findingIDs, ExceptID: origin.ID})
 }
 
-// revokePlan 是一次撤銷要做的全部事，在改動任何東西之前決定好（含恢復營業與否：恢復與否要看撤銷之前的資料，否則同一個 transaction 裡結案的待處理申覆
-// 會讓 legal hold 在裁定的那一刻消失）：自己建立的認定、連帶撤銷的措施（引用那些認定，FINDING_REVOKED）、關聯終止（以撤銷的終止為來源，
-// SOURCE_REVOKED），以及哪些措施要恢復它們關閉的店家。
 type revokePlan struct {
 	findings []uuid.UUID
 	cascaded []store.SellerMeasure
@@ -168,7 +157,6 @@ type revokePlan struct {
 	accounts []int64
 }
 
-// planRevoke 只讀（措施列與關聯終止的列在這裡鎖住）：措施與帳號都已由 lockForRevoke 鎖住。
 func (s *Service) planRevoke(ctx context.Context, q *store.Queries, scope revokeScope, row store.SellerMeasure, revokeFindings bool, now time.Time) (revokePlan, error) {
 	var plan revokePlan
 	if revokeFindings {
@@ -225,9 +213,6 @@ func (s *Service) planRevoke(ctx context.Context, q *store.Queries, scope revoke
 	return plan, nil
 }
 
-// revoke 是撤銷措施在同一個 transaction 要做的事（Revoke 與接受申覆共用）：撤銷措施、要求時撤銷自己建立的認定並連帶撤銷引用它們的其他措施
-// （FINDING_REVOKED）、連帶撤銷以撤銷的終止為來源的關聯終止（SOURCE_REVOKED，與來源同一個 transaction）、把它們待處理的請求結案、恢復它們在
-// 申覆期間內關閉的店家（plan.reopen）、重算每個受影響帳號的停權狀態（每個帳號只重算一次）。呼叫方已鎖住帳號與措施列，且已確認版本與狀態。
 func (s *Service) revoke(ctx context.Context, q *store.Queries, plan revokePlan, row store.SellerMeasure, adminID int64, reason model.RevokeReason, now time.Time) (store.SellerMeasure, error) {
 	revoked, err := q.RevokeMeasure(ctx, store.RevokeMeasureParams{ID: row.ID, ExpectedVersion: row.Version, Reason: string(reason), AdminID: adminID, Now: now})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -271,7 +256,6 @@ func (s *Service) revoke(ctx context.Context, q *store.Queries, plan revokePlan,
 	return revoked, nil
 }
 
-// cascadeRevoke 連帶撤銷這些措施（原因 reason，作者是動作的管理員），每個發 MeasureRevoked；回傳實際撤銷的。
 func (s *Service) cascadeRevoke(ctx context.Context, q *store.Queries, measures []store.SellerMeasure, reason model.RevokeReason, adminID int64, now time.Time) ([]store.SellerMeasure, error) {
 	if len(measures) == 0 {
 		return nil, nil
@@ -288,8 +272,6 @@ func (s *Service) cascadeRevoke(ctx context.Context, q *store.Queries, measures 
 	return cascaded, nil
 }
 
-// closePendingOfRevoked 把剛撤銷的這些措施上待處理的請求以 CLOSED（REVOKED，帶執行撤銷的管理員）結案，每筆在同一個 transaction 發
-// MeasureRequestClosed。
 func (s *Service) closePendingOfRevoked(ctx context.Context, q *store.Queries, measures []store.SellerMeasure, adminID int64, now time.Time) error {
 	closed, err := q.CloseRequests(ctx, store.CloseRequestsParams{MeasureIds: measureIDs(measures), AdminID: adminID, Now: now})
 	if err != nil {
@@ -298,8 +280,6 @@ func (s *Service) closePendingOfRevoked(ctx context.Context, q *store.Queries, m
 	return s.publishClosed(ctx, measures, closed, model.CloseCauseRevoked, now)
 }
 
-// closeEndedRemediations 把這些措施（已結束）上失去標的的待處理解除請求以 CLOSED（ENDED，系統結案沒有管理員）結案，結案時間是措施的結束時間
-// （model.Measure.EffectiveRequest 的輸出在結案前後相同），每筆在同一個 transaction 發 MeasureRequestClosed；回傳結案的請求。
 func (s *Service) closeEndedRemediations(ctx context.Context, q *store.Queries, measures []store.SellerMeasure, now time.Time) ([]store.SellerMeasureRequest, error) {
 	closed, err := q.CloseEndedRemediations(ctx, measureIDs(measures))
 	if err != nil {

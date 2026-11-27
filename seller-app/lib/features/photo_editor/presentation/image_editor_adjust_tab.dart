@@ -43,7 +43,6 @@ class ImageEditorAdjustTab extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 標題列
           Padding(
             padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
             child: Row(
@@ -59,7 +58,6 @@ class ImageEditorAdjustTab extends StatelessWidget {
               ],
             ),
           ),
-          // 滑桿列表
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.w),
             child: Column(
@@ -90,7 +88,6 @@ class ImageEditorAdjustTab extends StatelessWidget {
                   onChanged: onTemperatureChanged,
                 ),
                 SizedBox(height: 12.h),
-                // 調整小技巧
                 Container(
                   padding: EdgeInsets.all(12.w),
                   decoration: BoxDecoration(

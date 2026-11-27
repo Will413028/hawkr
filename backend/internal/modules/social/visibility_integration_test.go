@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// readable 是匿名讀者此刻看得到的：貼文、貼文底下的頂層留言數、討論區的頂層留言數、動態牆有沒有這篇。
 type readable struct {
 	post     bool
 	comments int
@@ -28,7 +27,6 @@ func (f *fixture) readable(t *testing.T, postID uuidT, storeID int64) readable {
 	} else if kindOf(err) != apperr.KindNotFound {
 		t.Fatal(err)
 	}
-	// 批次的公開可讀查詢與單篇讀取是同一條規則：每個情境都要一致，並且不存在的 ID 不在結果裡。
 	batch, err := f.module.PubliclyReadablePosts(ctx, []uuidT{postID, {}})
 	must(t, err)
 	if batch[postID] != r.post || batch[uuidT{}] {
@@ -39,7 +37,6 @@ func (f *fixture) readable(t *testing.T, postID uuidT, storeID int64) readable {
 	} else if kindOf(err) != apperr.KindNotFound {
 		t.Fatal(err)
 	}
-	// 模組隨資料回傳的旗標（viewer_can_* 的來源）與同一條規則一致：店主讀自己的貼文、店主的留言列表、討論區的列表。
 	if own, err := f.module.OwnPost(ctx, storeID, postID); err == nil && own.Readable != r.post {
 		t.Fatalf("OwnPost.Readable = %v，與 PublicPost 讀得到 = %v 不一致", own.Readable, r.post)
 	} else if err != nil && kindOf(err) != apperr.KindNotFound {
@@ -79,7 +76,7 @@ func TestSD1SD2PublicReadabilityPredicate(t *testing.T) {
 		name   string
 		apply  func(t *testing.T, f *fixture, st social.Post, c social.Comment, e social.ForumEntry, b buyerP)
 		revert func(t *testing.T, f *fixture, st social.Post, c social.Comment, e social.ForumEntry, b buyerP)
-		want   readable // 套用之後
+		want   readable
 	}
 	all := readable{post: true, comments: 1, forum: 1, feed: true}
 	scenarios := []scenario{
@@ -220,7 +217,6 @@ func TestSD7SD13HiddenContentIsVisibleToItsAuthorOnly(t *testing.T) {
 	if _, err := f.module.UpdateForumEntry(ctx, f.asBuyer(author), e.ID, 1, "想偷改"); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("被隱藏的討論區留言不能編輯：%v", err)
 	}
-	// 冪等：同一則再隱藏回既有的那一筆。
 	again, err := f.module.Hide(ctx, social.HideInput{Target: social.Target{Kind: social.TargetComment, ID: c.ID}, Category: "HATE", AdminID: 9})
 	must(t, err)
 	if again.Created || again.Category != "SPAM" {
@@ -230,7 +226,6 @@ func TestSD7SD13HiddenContentIsVisibleToItsAuthorOnly(t *testing.T) {
 		t.Fatalf("同一則內容未還原的隱藏最多一筆：%d", n)
 	}
 
-	// 管理員更正：還原後公開列表含該留言，作者可以編輯，隱藏紀錄留著；之後可以再隱藏。
 	_, err = f.module.Restore(ctx, social.RestoreInput{Target: social.Target{Kind: social.TargetComment, ID: c.ID}, AdminID: 9, Reason: "誤判"})
 	must(t, err)
 	page := mustV[social.CommentPage](t)(f.module.ListComments(ctx, social.Caller{}, p.ID, nil, 10))
@@ -320,12 +315,10 @@ func TestPlaceholderForTopLevelCommentWithVisibleReplies(t *testing.T) {
 			t.Fatalf("回覆照常顯示：%+v", replies)
 		}
 	}
-	// 回覆照常計入：3 則頂層（兩則回覆是計入的，被刪與被隱藏的頂層不計入）。
 	got := mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID))
 	if got.Stats.Comments != 2 {
 		t.Fatalf("留言數含回覆、不含不計入的頂層：%d", got.Stats.Comments)
 	}
-	// 回覆也被刪掉之後，整則（含佔位項目）不再出現。
 	for _, c := range page.Comments {
 		replies := mustV[social.CommentPage](t)(f.module.ListReplies(ctx, social.Caller{}, c.PostID, c.ID, nil, 10))
 		must(t, f.module.DeleteComment(ctx, store, replies.Comments[0].ID, 0))

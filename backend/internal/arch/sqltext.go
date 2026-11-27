@@ -74,7 +74,6 @@ var (
 	trimFrom    = regexp.MustCompile(`(?is)^\s*(?:(?:LEADING|TRAILING|BOTH)\s+)?(.*?)\s*\bFROM\b`)
 )
 
-// skipQuoted 回傳從 s[i]（' 或 "）開始的字串或引號識別字結束後的位置；重複的引號是跳脫。
 func skipQuoted(s string, i int) int {
 	q := s[i]
 	j := i + 1
@@ -91,8 +90,6 @@ func skipQuoted(s string, i int) int {
 	return len(s)
 }
 
-// normalizeSQLNames 去掉註解，把引號識別字換成裡面的名字、`a . b` 換成 `a.b`，讓名稱比對看得到 `"seller"."pub_x"` 與
-// `seller /* … */ . pub_x` 這類寫法。
 func normalizeSQLNames(s string) string {
 	s = StripSQLComments(s)
 	s = quotedIdent.ReplaceAllStringFunc(s, func(m string) string { return strings.ReplaceAll(m[1:len(m)-1], `""`, `"`) })
@@ -169,8 +166,6 @@ func CheckTrimmedText(module, file, content string) []string {
 	return out
 }
 
-// interiorSpaceFormats 是允許用正則空白類別的字面常數（值是理由）：要求整個值沒有空白的格式檢查，不是頭尾空白的定義，
-// 去掉頭尾空白後再比對的寫入端不受它影響。新增一項要寫明是哪個欄位、為什麼不是頭尾空白。
 var interiorSpaceFormats = map[string]string{
 	`^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$`: "seller.stores.support_email 的格式：整個 email 沒有空白",
 	`^[^@[:space:]]+@[^@[:space:]]+$`:                 "identity.accounts.self_entered_email 的格式：整個 email 沒有空白",
@@ -178,16 +173,12 @@ var interiorSpaceFormats = map[string]string{
 
 var (
 	regexSpaceClass = regexp.MustCompile(`\\[sS]|\[:(?:space|blank):\]`)
-	// regexpCall 是樣式在第二個參數的 regexp_* 函式。
 	regexpCall = regexp.MustCompile(`(?i)\bregexp_(?:replace|match|matches|like|count|instr|substr|split_to_array|split_to_table)\s*\(`)
-	// patternOp 是右邊是比對樣式的運算子：正則（~、~*、!~、!~*）、LIKE 系列（LIKE、ILIKE、~~、~~*、!~~、!~~*）與 SIMILAR TO。
 	patternOp  = regexp.MustCompile(`(?i)(?:!?~~?\*?|\b(?:I?LIKE|SIMILAR\s+TO)\b)\s*\(*\s*$`)
 	literalAt  = regexp.MustCompile(`(?i)^(?:E|U&)?'`)
 	castSuffix = regexp.MustCompile(`(?i)^(.*?)\s*(?:::\s*(?:text|character varying|varchar|bpchar))?$`)
 )
 
-// trimChars 回傳 trim 系列呼叫（name，參數 args 是字串已換成空白的版本、orig 是原文）指定的字元；沒有指定字元時 ok 是 false。
-// btrim/ltrim/rtrim 的字元是第二個參數；TRIM 是 `[LEADING|TRAILING|BOTH] 字元 FROM x`，或 FROM 之後（或整個參數）的第二個參數。
 func trimChars(name, args, orig string) (string, bool) {
 	if name == "trim" {
 		if m := trimFrom.FindStringSubmatchIndex(args); m != nil {
@@ -208,8 +199,6 @@ func trimChars(name, args, orig string) (string, bool) {
 	return strings.TrimSpace(restOrig), true
 }
 
-// literalValue 回傳 expr（可帶 ::text 這類轉型）是字串字面常數時的值：'…' 的重複引號、E'…' 的反斜線跳脫（\t、\n、\r、\f、\b、
-// \xHH、\ooo、\uXXXX、\UXXXXXXXX）都還原。U&'…' 與其他寫法回傳原文與 false。
 func literalValue(expr string) (string, bool) {
 	expr = castSuffix.FindStringSubmatch(strings.TrimSpace(expr))[1]
 	switch {
@@ -280,7 +269,6 @@ func unescapeE(s string) string {
 	return b.String()
 }
 
-// stringLiterals 回傳 body（已去掉註解）裡每個字串字面常數的原文（含引號與 E、U& 前綴）。E'…' 裡的 \' 不結束字串。
 func stringLiterals(body string) []string {
 	var out []string
 	for i := 0; i < len(body); {
@@ -310,7 +298,6 @@ func isIdentByte(c byte) bool {
 	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
-// skipEString 回傳從 s[i]（E'…' 的引號）開始的字串結束後的位置；反斜線跳脫下一個字元，重複的引號也是跳脫。
 func skipEString(s string, i int) int {
 	for j := i + 1; j < len(s); j++ {
 		switch {
@@ -325,8 +312,6 @@ func skipEString(s string, i int) int {
 	return len(s)
 }
 
-// patternLiterals 回傳 body 裡當成比對樣式的字面常數原文：regexp_* 函式的第二個參數，與比對運算子（patternOp）右邊緊接的字面常數。
-// calls 是 body 的字串換成空白的版本（blankStrings），結構的比對在它上面做，原文以同樣的位置取自 body。
 func patternLiterals(body, calls string) []string {
 	var out []string
 	for _, loc := range regexpCall.FindAllStringIndex(calls, -1) {
@@ -369,7 +354,6 @@ func patternLiterals(body, calls string) []string {
 	return out
 }
 
-// leadingLiteral 回傳 s 開頭（略過空白）的字串字面常數原文；開頭不是字面常數時回傳空字串。
 func leadingLiteral(s string) string {
 	t := strings.TrimLeft(s, " \t\n\r")
 	if !literalAt.MatchString(t) {
@@ -385,7 +369,6 @@ func leadingLiteral(s string) string {
 	return t[:end]
 }
 
-// blankStrings 把字串（'…'）的內容換成同長度的空白（引號保留），呼叫的比對才不會把字串裡的文字當成程式。
 func blankStrings(s string) string {
 	b := []byte(s)
 	for i := 0; i < len(b); {
@@ -402,7 +385,6 @@ func blankStrings(s string) string {
 	return string(b)
 }
 
-// parenBody 回傳 s[open] 這個左括號到對應右括號之間的內容（略過字串與引號識別字）。
 func parenBody(s string, open int) (string, bool) {
 	depth := 0
 	for i := open; i < len(s); {
@@ -423,7 +405,6 @@ func parenBody(s string, open int) (string, bool) {
 	return "", false
 }
 
-// topLevelComma 回傳 args 第一個不在括號、字串或引號識別字裡的逗號的位置，沒有時回傳 -1。
 func topLevelComma(args string) int {
 	depth := 0
 	for i := 0; i < len(args); {

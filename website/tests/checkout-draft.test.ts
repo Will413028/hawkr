@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
-// Minimal in-memory Web Storage stub.
 function makeStorage() {
 	const store: Record<string, string> = {};
 	return {
@@ -94,7 +93,6 @@ test("clearCheckoutDraft removes both the base and the PII", async () => {
 
 test("readCheckoutDraft falls back to inline PII from a pre-split draft", async () => {
 	const { readCheckoutDraft } = await import("../lib/checkout/draft");
-	// Old draft written before the split: PII still inline in localStorage.
 	ls.store[LS_KEY] = JSON.stringify({
 		...baseDraft(),
 		recipient: { name: "Old", phone: "0900111222", line: "高雄市…" },

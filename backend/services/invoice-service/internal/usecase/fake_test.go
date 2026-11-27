@@ -12,14 +12,7 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔的 fake 一律**嵌入介面**而不是逐方法實作空殼。
-//
-// 差別是行為：嵌入之後沒被覆寫的方法是 nil，呼叫時 panic 並指名方法。空殼則會回零值，
-// 而「回零值」與「這條路徑本來就不該被走到」在測試裡看起來一模一樣——那正是本波要防的
-// 那種靜默。
 
-// directTx 直接執行 callback：單元測試不驗交易語意（那是 integration_test.go 的職責，
-// 它有真的 PostgreSQL 可以 rollback）。
 type directTx struct{}
 
 func (directTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) error { return fn(ctx) }
@@ -67,13 +60,10 @@ type fakeDocRepo struct {
 	lines    []domain.NewDocumentLine
 	receipts []string
 
-	// notInserted 讓測試模擬冪等命中（uq_invdoc_order_identity 已有那一列）。
 	notInserted bool
 
-	// byID 覆寫 GetByID 的回傳（見該方法的註解）。未登記的 id 退回 stored。
 	byID map[int64]domain.Document
 
-	// superseded 記 MarkSuperseded 的 (原票 id, 新票 id)；supersedeFails 讓它回 rows=0。
 	superseded     [][2]int64
 	supersedeFails bool
 
@@ -85,7 +75,6 @@ type fakeDocRepo struct {
 	issueFailed        int
 	pendingRetry       int
 
-	// §5.2.1 逾期分類（#3261 延伸）的替身面。
 	deadlineRows      []domain.Document
 	deadlineCalls     int
 	deadlineThreshold time.Time
@@ -95,14 +84,12 @@ type fakeDocRepo struct {
 	secrets domain.RecipientSecrets
 	docLine []domain.DocumentLine
 
-	// ADM 寫入面
 	resumed            [][2]int64
 	resumeFails        bool
 	resolvedExternally []domain.MarkDocumentResolvedExternally
 	resolveDocFails    bool
 	byRequestNo        map[string]domain.Document
 
-	// ownerStoreID 是 GetForSeller 的歸屬述詞右運算元（SQL 裡是 invoice_issuers 的 join）。
 	ownerStoreID int64
 }
 
@@ -307,9 +294,7 @@ type fakeOpRepo struct {
 	exhaust  int
 	seller   int
 
-	// ADM 寫入面。casFails 讓測試模擬 rows=0（守衛不成立）。
 	casFails bool
-	// M4 P14／P16 的集合式副作用與端點 62 的 Tier A 讀取。
 	failOpen           []domain.FailOpenOperationsForIssuer
 	openCount          int64
 	sellerViews        [][2]int64
@@ -320,11 +305,9 @@ type fakeOpRepo struct {
 	resolvedExternally []adminRetryCall
 	allowManual        []adminRetryCall
 	confirmCancel      []confirmCancelCall
-	// gotProvider* 是 #3082 的斷言材料。
 	gotProviderCode    string
 	gotProviderMessage string
 
-	// byDocument 餵 ListByDocument（端點 73 的「零 operation」判準）。
 	byDocument map[int64][]domain.Operation
 }
 
@@ -404,7 +387,6 @@ func (f *fakeOpRepo) MarkSellerActionRequired(context.Context, domain.MarkOperat
 type fakeOutbox struct {
 	domain.OutboxRepository
 	inserted []domain.NewOutboxEvent
-	// err 讓 Insert 失敗，用來驗「事件寫不進去時整個交易要 rollback」。
 	err error
 }
 
@@ -445,11 +427,7 @@ func (f *fakeAudit) AppendStatusHistory(_ context.Context, in domain.NewStatusHi
 	return nil
 }
 
-// fakeProvider 記下每一次外呼。requests 的長度就是「我方到底送出去幾次」——
-// 「沒有任何請求送出去」這種宣稱只有數它才算數。
 type fakeProvider struct {
-	// allowanceCalls 數的是「真的打出去幾次」——折讓單號送出前先落庫，
-	// 重送會讓 AMEGO 端出現第二張同號憑證，所以次數本身就是不變式。
 	allowanceCalls   int
 	allowanceFn      func(amego.AllowanceRequest) (*amego.AllowanceResult, error)
 	allowanceQueryFn func(string) (*amego.AllowanceDetail, error)
@@ -457,15 +435,9 @@ type fakeProvider struct {
 	result           *amego.IssueResult
 	err              error
 	verify           fakeProviderVerify
-	// voidFn 讓作廢軸的測試複用同一個 fake；不設就是拒絕（見 VoidInvoice）。
 	voidFn          func(amego.VoidRequest) (*amego.VoidAccepted, error)
 	queryByNumberFn func(string) (*amego.InvoiceDetail, error)
 
-	// barcodeErr／barcodeCalls 是送出前載具驗證的替身面（§P12）。
-	//
-	// 🔴 預設 nil ＝ 驗證通過 ＝ 照常送 f0401：讓既有的每一支開票測試維持原行為，
-	// 否則「新增一道前置檢查」會把所有測試的意義悄悄換掉。要驗擋下來的路徑就把
-	// barcodeErr 設成帶 Code 的 *amego.APIError。
 	barcodeErr   error
 	barcodeCalls []string
 }
@@ -485,10 +457,6 @@ func (f *fakeProvider) IssueInvoice(_ context.Context, _ amego.Credential, req a
 	return f.result, nil
 }
 
-// 兩支驗證類唯讀端點（§7.3.4 P03 的 ① 與 ③）。
-//
-// banErr／tracks 分成兩組旗標而不是共用 err：P03 的三項各自對應不同的落點
-// （P04／P05／P06 vs 「沒有字軌」），共用一個錯誤就分不出測試在驗哪一格。
 type fakeProviderVerify struct {
 	banCalls  [][]string
 	banErr    error
@@ -528,7 +496,6 @@ func notFoundErr(code int32) error {
 	return pkgerrors.NewBusiness(code, bizcode.Message(code))
 }
 
-// amegoResult 是 f0401 成功回應的樣本。
 func amegoResult() amego.IssueResult {
 	return amego.IssueResult{
 		InvoiceNumber: "AB12345678",
@@ -540,12 +507,6 @@ func amegoResult() amego.IssueResult {
 var _ = errors.New
 var _ = notFoundErr
 
-// ---------------------------------------------------------------------------
-// ADM 寫入面（端點 52／53／56／57／60）的 fake 補充
-//
-// 每一支 CAS 都有一個 ok 旗標可以關掉：**rows=0 是本波最重要的陰性情境**，
-// 而它在真的 DB 上是靜默的（不拋例外、不告警）——測不到它就等於沒有測守衛。
-// ---------------------------------------------------------------------------
 
 func (f *fakeIssuerRepo) GetByID(context.Context, int64) (domain.Issuer, error) {
 	return f.issuer, f.err
@@ -690,16 +651,15 @@ func (f *fakeOpRepo) ConfirmCancel(_ context.Context, in domain.ConfirmOperation
 		return false, nil
 	}
 	if f.stored.CancelRequestedBy == nil {
-		return false, nil // cancel_requested_at IS NOT NULL（chk_invop_cancel_pair 綁定兩者）
+		return false, nil
 	}
 	if f.stored.CancelConfirmedAt != nil {
-		return false, nil // 重送同一個確認 ⇒ 冪等的 rows=0
+		return false, nil
 	}
 	if f.stored.Version != in.ExpectedVersion {
 		return false, nil
 	}
 	if *f.stored.CancelRequestedBy == in.ConfirmedBy {
-		// chk_invop_two_person：DB 回 23514，不是 rows=0。
 		return false, errFakeTwoPersonViolation
 	}
 	f.stored.Status = "CANCELLED_BY_ADMIN"
@@ -710,7 +670,6 @@ func (f *fakeOpRepo) ConfirmCancel(_ context.Context, in domain.ConfirmOperation
 	return true, nil
 }
 
-// errFakeTwoPersonViolation 代表 DB 的 chk_invop_two_person 被違反（SQLSTATE 23514）。
 var errFakeTwoPersonViolation = errors.New("fake: chk_invop_two_person violated")
 
 type confirmCancelCall struct {
@@ -749,7 +708,6 @@ type fakeComplaintRepo struct {
 	returned []adminRetryCall
 	events   []domain.NewComplaintEvent
 
-	// S10（端點 36）。
 	sellerErr   error
 	sellerReads [][2]int64
 	responded   []complaintSellerCall
@@ -791,7 +749,6 @@ func (f *fakeComplaintRepo) CountConfirmedViolationOrders(context.Context, int64
 	return f.violationCount, nil
 }
 
-// fakeBizDays 是一份空的工作天曆（沒有假日）。K10 只需要它算得出 sla_due_at。
 type fakeBizDays struct {
 	domain.BusinessDayRepository
 	synced *time.Time
@@ -808,14 +765,6 @@ func (f *fakeBizDays) Snapshot(context.Context, time.Time, time.Time) ([]time.Ti
 	return nil, &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
 }
 
-// ---------------------------------------------------------------------------
-// M4 provider 帳號寫入面（端點 24／25／26／27／44／45／66／67）的 fake 補充
-//
-// 每一支 CAS 都有一個獨立的 ok 旗標可以關掉：**rows=0 是本波最重要的陰性情境**，
-// 而它在真的 DB 上是靜默的（不拋例外、不告警）——測不到它就等於沒有測守衛。
-// 旗標刻意不共用一個 casFails：allowed-from 與樂觀鎖是兩個不同的守衛，共用一個旗標
-// 就分不出測試在驗哪一個。
-// ---------------------------------------------------------------------------
 
 type providerCall struct {
 	ID      int64
@@ -831,13 +780,10 @@ type fakeProviderAccountRepo struct {
 	account domain.ProviderAccount
 	getErr  error
 
-	// 解密後餵給 verifyCredential 的憑證。
 	taxID   string
 	appKey  string
 	openErr error
 
-	// 明文旁路偵測：任何一次寫入路徑收到的 AppKey 都記在這裡，
-	// 測試用它斷言「明文有到 repository、而且沒有到別的地方」。
 	seenAppKeys []string
 
 	created    []domain.NewProviderAccount
@@ -903,8 +849,6 @@ func (f *fakeProviderAccountRepo) Create(_ context.Context, in domain.NewProvide
 		ID: in.ID, IssuerID: in.IssuerID, Provider: in.Provider,
 		ProviderTaxID: in.ProviderTaxID, Status: in.Status, Version: 0,
 	}
-	// 建列成功之後那一列就存在了 ⇒ 後續的重讀（viewOf）不能再回 9330。
-	// 少了這一行，測試會在「已經建好卻讀不到」這個真實世界不存在的狀態上失敗。
 	f.getErr = nil
 	return nil
 }
@@ -1089,11 +1033,6 @@ type complaintSellerCall struct {
 	DueAt   time.Time
 }
 
-// fakeUnlockRepo 是 invoice_manual_unlocks 的替身（端點 54／55）。
-//
-// 它刻意**在記憶體裡重現兩條 SQL 守衛**（雙人與 24 小時窗口），因為那兩條正是本流程的
-// 全部價值：替身若無條件回 true，「不得同一人」與「逾期不可核准」的測試就會全綠而
-// 什麼都沒驗到。真 SQL 的鑑別力另由 integration 測試守。
 type fakeUnlockRepo struct {
 	domain.ManualUnlockRepository
 
@@ -1102,7 +1041,7 @@ type fakeUnlockRepo struct {
 	expired  int
 	created  []domain.NewManualUnlock
 	decided  []domain.DecideManualUnlock
-	takenNow bool // 下一次 Create 模擬撞 uq_invmu_open_per_operation
+	takenNow bool
 }
 
 func (f *fakeUnlockRepo) ExpireStale(_ context.Context, operationID int64, now time.Time) (int64, error) {
@@ -1133,9 +1072,6 @@ func (f *fakeUnlockRepo) Create(_ context.Context, in domain.NewManualUnlock) (d
 		ProviderCheckedAt:     in.ProviderCheckedAt,
 		RequestedAt:           in.Now,
 		ExpiresAt:             in.ExpiresAt,
-		// 🔴 這兩欄非帶不可：覆核（J28）從**這一列**讀證據種類。fake 不保存的話，
-		// 覆核端永遠讀到 nil ⇒「證據不合法」那條分支恆成立，J28 那支測試會用一個
-		// 假的理由失敗，而真正的連動一行都沒被驗到。
 		CancelEvidenceKind:      in.CancelEvidenceKind,
 		CancelEvidenceObjectKey: in.CancelEvidenceObjectKey,
 	}
@@ -1200,7 +1136,6 @@ func (f *fakeUnlockRepo) Decide(_ context.Context, in domain.DecideManualUnlock)
 	return false, nil
 }
 
-// fakeCutoverRepo 是 invoice_provider_cutovers 的替身（端點 26／46／67）。
 type fakeCutoverRepo struct {
 	domain.ProviderCutoverRepository
 
@@ -1297,22 +1232,9 @@ func (f *fakeProvider) QueryInvoiceByNumber(_ context.Context, _ amego.Credentia
 	return nil, fmt.Errorf("fakeProvider: unexpected QueryInvoiceByNumber(%s)", number)
 }
 
-// fakeCorrections 是 domain.CorrectionRequestRepository 的測試替身。
-//
-// 🔴 預設對每一個查詢都回「沒有 open correction」（業務碼），對每一個寫入都**失敗**：
-// 開票軸的既有測試沒有一支涉及更正請求，回成功會讓 R10 的漏接看不出來。
-// 要測 R10 的測試自己把 openByDoc 設進去。
 type fakeCorrections struct {
 	openByDoc   map[int64]domain.CorrectionRequest
 	failedByDoc map[int64]domain.CorrectionRequest
-	// latestByOrder 是第三份 map，理由同 failedByDoc 的說明：真實 SQL 是三支述詞
-	// 不同的查詢（進行中／REISSUE_FAILED／不分狀態取最新），共用一份 map 的替身
-	// 會讓「呼叫端查錯那一支」測不出來 —— 而端點 8 要的正是**被婉拒的那一筆**，
-	// 它不在前兩支的述詞裡。
-	//
-	// 🔴 鍵是 **order_no** 不是 document_id：更正請求掛在被作廢的那張 document 上，
-	// 作廢重開完成後訂單的最新 document 是重開的新那張、身上沒有 correction 列
-	// ⇒ 以 document 為鍵的替身複製不出那個缺陷（2026-09-05 修）。
 	latestByOrder map[string]domain.CorrectionRequest
 	completed     []int64
 	reissueFail   []int64
@@ -1385,15 +1307,7 @@ func (f *fakeCorrections) Complete(_ context.Context, id, _ int64, _ time.Time) 
 	return f.completeOK, f.failErr
 }
 
-// ---------------------------------------------------------------------------
-// 平台代製收據的兩個替身（#3026）
-// ---------------------------------------------------------------------------
 
-// fakeReceiptRenderer 產出一份**看起來像 PDF** 的 bytes 並記下收到的資料。
-//
-// 🔴 它的鑑別力來自「記下 in」而不是「回了 bytes」：settleReceipt 的正確性
-// 有一半在於**餵給渲染器的資料對不對**（出據人是誰、買受人有沒有個資、金額對不對），
-// 而那件事只能在這裡看到。回一個固定 blob 只驗得到「有呼叫」。
 type fakeReceiptRenderer struct {
 	in    domain.ReceiptData
 	calls int
@@ -1409,7 +1323,6 @@ func (f *fakeReceiptRenderer) Render(d domain.ReceiptData) ([]byte, error) {
 	return []byte("%PDF-1.3\nfake\n%%EOF"), nil
 }
 
-// fakeReceiptUploader 記下上傳內容並回一個固定 objectKey。
 type fakeReceiptUploader struct {
 	data        []byte
 	filename    string

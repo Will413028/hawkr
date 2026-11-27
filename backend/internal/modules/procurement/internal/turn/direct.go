@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// sourceRewind 是 turns.source 的 REWIND（與 schema 的 CHECK 相同）。
 const sourceRewind = "REWIND"
 
 // Direct 是不經 run 的 SubmitAnswer 與 Rewind（A9-D31）：同步、不建 run、不扣額度；同一個 transaction 先鎖買家的送出、現行版本、需求列，
@@ -29,24 +28,20 @@ type Direct struct {
 	Now      func() time.Time
 }
 
-// commandKey 是重送要對上的指令：同一個 client_request_id 必須來自同一個需求、同一種來源、同一個欄位、同一個買家回答與同一個讀到的版本。
 type commandKey struct {
 	request  uuid.UUID
 	source   string
 	message  string
 	expected uuid.UUID
-	// slot 是回答或倒回的欄位，存在 turns.command_slot（A9-D34）。
 	slot model.SlotKey
 }
 
-// directState 是鎖住之後讀到的現況。
 type directState struct {
 	prior     priorState
 	active    store.ProcurementRequestRevision
 	revisions []store.ProcurementRequestRevision
 }
 
-// command 是一個不經 run 的指令：compute 是純函式，由現況算出這一輪的 decision 與新版本的內容祖先。
 type command struct {
 	buyer           int64
 	request         uuid.UUID
@@ -90,7 +85,6 @@ func (d Direct) Answer(ctx context.Context, in AnswerSlotInput) ([]byte, error) 
 	return d.execute(ctx, c, sourceAnswer, plan.message)
 }
 
-// resolveItem 把 ITEM 回答的文字對到恰好一個末層分類（A9-D33(1)）：對到多個或零個回 INVALID_ARGUMENT（free_text），請改用 SubmitTurn；提問卡與中斷永遠由 run 擁有。
 func (d Direct) resolveItem(ctx context.Context, text string) (*slots.Resolution, error) {
 	if d.Resolver == nil {
 		return nil, errors.New("turn：ITEM 回答需要 Direct.Resolver")
@@ -128,8 +122,6 @@ func (d Direct) Rewind(ctx context.Context, in RewindInput) ([]byte, error) {
 	return d.execute(ctx, c, sourceRewind, "")
 }
 
-// replay 回第一次存下的 turn_result：輪次存在而且對得上指令（同需求、同來源、同回答、同讀到的版本）才回放，對不上回 INVALID_ARGUMENT；
-// 沒有輪次但這個 client_request_id 已被 run 用掉也算對不上（冪等鍵在買家之下只有一個命名空間）。
 func (d Direct) replay(ctx context.Context, q *store.Queries, c command) ([]byte, bool, error) {
 	t, err := q.GetTurnByClientRequest(ctx, store.GetTurnByClientRequestParams{BuyerID: c.buyer, ClientRequestID: c.clientRequestID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -172,7 +164,6 @@ func (d Direct) sameCommand(ctx context.Context, q *store.Queries, t store.Procu
 	if result == nil {
 		return false, fmt.Errorf("turn：輪次 %s 的結果版本不存在", t.ID)
 	}
-	// 新版本寫入時取代了讀到的現行版本，現行版本永遠是序號最大的，所以讀到的版本是結果版本的前一號。
 	if result.RevisionNo < 2 || !hasRevision(revs, result.RevisionNo-1, k.expected) {
 		return false, nil
 	}
@@ -188,7 +179,6 @@ func hasRevision(revs []store.ProcurementRequestRevision, no int32, id uuid.UUID
 	return false
 }
 
-// execute 在單一 transaction 內鎖、檢查守衛、算並寫這一輪。鎖的順序：買家的送出、現行版本、需求列（與搜尋與 TURN 的提交相同）。
 func (d Direct) execute(ctx context.Context, c command, source, message string) ([]byte, error) {
 	var out []byte
 	err := d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -237,7 +227,6 @@ func (d Direct) execute(ctx context.Context, c command, source, message string) 
 	return out, nil
 }
 
-// lockState 鎖住並讀現況，依序檢查：需求與對話屬於買家（NOT_FOUND）、沒有待回覆的中斷（APPROVAL_PENDING）、沒有進行中的 run、讀到的版本仍是現行版本。
 func (d Direct) lockState(ctx context.Context, q *store.Queries, c command) (directState, store.ProcurementRequest, store.ProcurementConversation, error) {
 	buyer := c.buyer
 	none := func(err error) (directState, store.ProcurementRequest, store.ProcurementConversation, error) {

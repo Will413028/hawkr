@@ -59,7 +59,6 @@ class OrderExpandedSection extends ConsumerWidget {
                 ],
               ),
               SizedBox(height: AppSpacing.sm),
-              // status=80 改用 cancelledSteps（已下單 ✓ → 已取消 ✗ → 配送中（灰）→ 已送達（灰））
               StepIndicator(
                 steps: order.status == '80'
                     ? StepIndicator.cancelledSteps

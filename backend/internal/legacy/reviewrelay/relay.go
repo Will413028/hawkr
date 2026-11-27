@@ -90,8 +90,6 @@ func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &typedWorker[ReviewCreatedArgs]{work: w.reviewCreated})
 }
 
-// baseEvent 是舊 pkg/mq 的 BaseEvent：timestamp 是 time.Time 的 JSON（RFC3339Nano、UTC），version 固定 "1.0"；
-// correlation_id 與 metadata 在舊 publisher 是空值，omitempty 之下不出現，這裡不帶。
 type baseEvent struct {
 	EventID   string    `json:"event_id"`
 	EventType string    `json:"event_type"`
@@ -104,7 +102,6 @@ func base(eventID string, at time.Time, eventType string) baseEvent {
 	return baseEvent{EventID: eventID, EventType: eventType, Version: "1.0", Timestamp: at.UTC(), Source: source}
 }
 
-// reviewCreated 是舊 ReviewCreatedEvent：id 與計數是 JSON 數字，review_id 是 0。
 type reviewCreated struct {
 	baseEvent
 	ReviewID           int64    `json:"review_id"`
@@ -123,8 +120,6 @@ type reviewCreated struct {
 	ProductReviewCount int64    `json:"product_review_count"`
 }
 
-// enqueuePublish 不在 transaction 內排入（relay 要讀 review、buyer、seller）；relay job 在排入後失敗而重試時，PublishArgs 以 event_id 做的
-// unique 讓同一則事件只有一個送出的 job。
 func (w *Worker) enqueuePublish(ctx context.Context, eventID, exchange, key string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -133,7 +128,6 @@ func (w *Worker) enqueuePublish(ctx context.Context, eventID, exchange, key stri
 	return w.Jobs.Enqueue(ctx, rabbitmq.PublishArgs{EventID: eventID, Exchange: exchange, RoutingKey: key, Body: body}, rabbitmq.InsertOpts())
 }
 
-// statsForCreated 在 job 執行當下重算 (店, 商品) 的聚合給 review.created payload。
 func (w *Worker) statsForCreated(ctx context.Context, storeID int64, productID uuid.UUID) (review.StoreStats, review.ProductStats, error) {
 	st, err := w.Reviews.StoreStats(ctx, storeID)
 	if err != nil {
@@ -153,13 +147,13 @@ func (w *Worker) reviewCreated(ctx context.Context, a ReviewCreatedArgs) error {
 	}
 	r, err := w.Reviews.ReviewForRelay(ctx, id)
 	if apperr.KindOf(err) == apperr.KindNotFound {
-		return nil // 評價已經清除（作者刪帳）：沒有東西可通知
+		return nil
 	}
 	if err != nil {
 		return err
 	}
 	if !r.Public {
-		return nil // 評價在 job 執行時已被隱藏或作者在刪帳中：不通知賣家，也不外送內容
+		return nil
 	}
 	st, pr, err := w.statsForCreated(ctx, r.StoreID, r.ProductID)
 	if err != nil {

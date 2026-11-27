@@ -133,7 +133,6 @@ class OrderPolicySnapshotChainContractTest {
         try {
             io.github.will413028.hawkr.common.utils.TsidUtil.init(300, 0);
         } catch (Exception ignored) {
-            // 同一個 JVM 內別的測試已經初始化過（surefire 不 fork per class）
         }
     }
 
@@ -178,11 +177,9 @@ class OrderPolicySnapshotChainContractTest {
                 .thenReturn(new FreeShippingResult(false, ShippingFeePayer.BUYER.value(), 0L));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        // 發票前置驗證預設放行（code=0）。要測「被擋下」的分支就在該支測試裡改 stub。
         when(invoiceGrpcClient.validateOrderInvoiceInput(any()))
                 .thenReturn(ValidateOrderInvoiceInputInternalResponse.newBuilder().setCode(0).build());
 
-        // 🔴 真 OrderCreationTxHandler ＋ 真 OrderService：本測試要驗的正是它們之間那條縫。
         OrderConfig orderConfig = mock(OrderConfig.class);
         when(orderConfig.getPaymentDeadlineSeconds()).thenReturn(259200L);
         OrderNoGenerator orderNoGenerator = mock(OrderNoGenerator.class);
@@ -219,8 +216,6 @@ class OrderPolicySnapshotChainContractTest {
     void policySurvivesTheWholeChainFromPreviewToInsert() {
         OrderEntity inserted = confirmAndCaptureInsertedOrder(METHOD);
 
-        // 🔴 五欄逐一硬寫字面值。任何一欄為 null ⇒ MyBatis insertStrategy=NOT_NULL 會把它
-        //    排除在 INSERT 之外 ⇒ DB DEFAULT 生效 ⇒ B1 原樣重演，而且完全無聲。
         assertThat(inserted.getCommerceModel())
                 .as("commerce_model 掉棒 ⇒ INSERT 省略該欄 ⇒ 吃 DB DEFAULT").isEqualTo("SELLER_DIRECT");
         assertThat(inserted.getCollectionModel())
@@ -262,16 +257,12 @@ class OrderPolicySnapshotChainContractTest {
             service.confirm(baseRequest(METHOD).build());
             org.junit.jupiter.api.Assertions.fail("快照缺政策卻建單成功——那正是 fail-closed 要擋的");
         } catch (io.github.will413028.hawkr.order.exception.OrderBusinessException expected) {
-            // 期望路徑
         }
         verify(orderRepository, org.mockito.Mockito.never()).insert(any());
     }
 
-    // ==================== harness ====================
 
     private OrderEntity confirmAndCaptureInsertedOrder(String shippingMethod) {
-        // setUp 的預設 stub 綁死 3002；陰性對照要換配送方式，這裡覆寫成當次的那一個。
-        // （賣家開通與可選方案都是 confirm 的前置檢查，不是本測試要驗的東西。）
         when(shippingGrpcClient.getSellerShippingConfig(anyLong()))
                 .thenReturn(GetSellerShippingConfigResponse.newBuilder()
                         .setCode(0)
@@ -279,7 +270,6 @@ class OrderPolicySnapshotChainContractTest {
                                 .setShippingMethod(shippingMethod)
                                 .setGoodsType(TEMP)
                                 .setAvailable(true)
-                                // 宅配／自送會回頭讀寄件郵遞區號（3002 走不到這條路徑）
                                 .setSenderPostalCode("100")
                                 .build())
                         .build());
@@ -289,10 +279,8 @@ class OrderPolicySnapshotChainContractTest {
                         "測試方案", 60L, 60L, ShippingFeePayer.BUYER.value(), 0L, false));
 
         OrderPolicySnapshot policy = new OrderPolicyResolver().resolve(shippingMethod);
-        // ②：產線的快照組裝，不手寫 JSON——欄名改了要在這裡就爆
         String snapshot = service.buildPriceSnapshot(
                 1000L, 60L, 0L, 1060L, false, false, policy);
-        // Redis 的往返就是字串往返
         when(valueOperations.getAndDelete(anyString())).thenReturn(snapshot);
 
         service.confirm(baseRequest(shippingMethod).build());
@@ -312,11 +300,9 @@ class OrderPolicySnapshotChainContractTest {
                 .setDeliveryTemp(TEMP)
                 .setRecipientName("王小明")
                 .setRecipientPhone("0912345678");
-        // 超商取貨要門市代號、宅配／自送要地址——兩者是不同的必填集合。
         if (ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value().equals(shippingMethod)) {
             b.setCvsStoreId("252698").setCvsStoreName("測試門市");
         } else {
-            // 位址驗證只收 CJK ＋ 半形數字 ＋ - ＋ 之（InputValidator.ADDRESS_ALLOWED_CHARS）
             b.setShippingAddress("台北市中正區忠孝東路一段1號");
         }
         return b;

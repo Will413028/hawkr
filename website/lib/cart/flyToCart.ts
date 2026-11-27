@@ -70,8 +70,6 @@ export function bumpCartBadge(): void {
 		],
 		{
 			duration: 420,
-			// Overshoot past 1 and settle — the badge lands like a physical object
-			// rather than easing politely into place.
 			easing: "cubic-bezier(0.34, 1.56, 0.64, 1)",
 		},
 	);
@@ -109,18 +107,6 @@ export function flyToCart(origin: Element | null, quantity: number): void {
 		y: targetRect.top + targetRect.height / 2,
 	};
 
-	// A single element can only ease one way. Splitting the axes across a
-	// wrapper (x) and a child (y) lets each carry its own easing, and an
-	// ease-out y against an ease-in x *is* the arc — no path keyframes, no
-	// per-frame JS. The chip leaps off the button and decelerates while the
-	// horizontal travel has barely started, so it reads as "up, then across
-	// into the cart".
-	//
-	// Both axes stay monotonic between the endpoints on purpose. An explicit
-	// apex past `min(0, dy)` was tried first and is wrong: the cart icon
-	// already sits near the top of the viewport, so arcing *above* it threw the
-	// chip off-screen — measured apex y = -72 on a 500px-wide product page.
-	// There is no room above the target to arc into.
 	const dy = to.y - from.y;
 
 	const carrier = document.createElement("div");
@@ -168,10 +154,6 @@ export function flyToCart(origin: Element | null, quantity: number): void {
 				{
 					transform: `translate3d(${from.x}px, ${from.y}px, 0)`,
 					offset: LIFTOFF_OFFSET,
-					// One smooth cubic for the whole sweep. The gap between this
-					// easing and the vertical one *is* the bow, so keeping the two
-					// close keeps the path shallow — and keeping each axis to a
-					// single cubic keeps it one continuous curve.
 					easing: "cubic-bezier(0.55, 0, 0.3, 1)",
 				},
 				{ transform: `translate3d(${to.x}px, ${from.y}px, 0)` },
@@ -181,8 +163,6 @@ export function flyToCart(origin: Element | null, quantity: number): void {
 
 		chip.animate(
 			[
-				// Born small on the button, so there is a frame where it is clearly
-				// *at* the button before it is anywhere else.
 				{
 					transform: "translate3d(0, 0, 0) scale(0.55)",
 					opacity: 0,
@@ -192,15 +172,6 @@ export function flyToCart(origin: Element | null, quantity: number): void {
 					transform: "translate3d(0, 0, 0) scale(1.12)",
 					opacity: 1,
 					offset: LIFTOFF_OFFSET,
-					// A single cubic from liftoff to landing. An intermediate
-					// keyframe at 62% used to sit here to hang at the arc's peak,
-					// but two easings meeting mid-path is a corner: the chip visibly
-					// stalled (59% → 63% of the vertical travel over 170ms) and then
-					// re-accelerated, which reads as a kink rather than as a throw.
-					//
-					// Not easeOutExpo either — expo put ~70% of the vertical travel
-					// into the first 80ms, so the flight was nominally 620ms and
-					// visually instant.
 					easing: "cubic-bezier(0.42, 0, 0.25, 1)",
 				},
 				{ transform: `translate3d(0, ${dy}px, 0) scale(0.42)`, opacity: 0 },
@@ -211,8 +182,6 @@ export function flyToCart(origin: Element | null, quantity: number): void {
 		window.setTimeout(bumpCartBadge, FLIGHT_MS - LANDING_LEAD_MS);
 		horizontal.finished.then(cleanup, cleanup);
 	} catch {
-		// No WAAPI (or an animation the engine refused): drop the chip rather
-		// than leaving it parked over the page.
 		cleanup();
 		bumpCartBadge();
 	}

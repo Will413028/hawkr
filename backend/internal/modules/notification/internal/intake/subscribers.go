@@ -8,8 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 )
 
-// 這個檔案只放同步訂閱者：它們在來源的 transaction 內執行，失敗會讓來源 rollback，所以只做 Accept（登記意圖並排 job），
-// 不讀別的模組、不組文字、不寫收件匣（subscribers_test.go 守住）。
 
 // OnSuspended 訂閱 accountsuspension.Suspended。
 func (s *Service) OnSuspended(ctx context.Context, e accountsuspension.Suspended) error {
@@ -25,8 +23,6 @@ func (s *Service) OnUnsuspended(ctx context.Context, e accountsuspension.Unsuspe
 	})
 }
 
-// 下面兩個是白名單內的訂閱者（subscribers_test.go 的 tokenPurgeSubscribers）：停權與刪帳號時在發布的同一個 transaction 刪掉帳號的全部裝置 token，
-// 之後不會再有推播送到這些裝置。只刪 token，不讀別的模組、不排 job。
 
 // PurgeTokensOnSuspended 訂閱 accountsuspension.Suspended。店家停權（store suspension）不是這個事件，token 不動。
 func (s *Service) PurgeTokensOnSuspended(ctx context.Context, e accountsuspension.Suspended) error {

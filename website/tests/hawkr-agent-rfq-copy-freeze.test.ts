@@ -66,17 +66,11 @@ test("draft copy never implies that a supplier received an unpublished RFQ", () 
 });
 
 test("published summary keeps its own delivery truth disclaimer", () => {
-	// 「幾筆邀請」的唯一伺服器來源換成 publication 的 recipientCount（legacy
-	// `batch.invites` 已下架）；界線句照舊，它是「已建立」與「已送達」之間
-	// 唯一的分界。
 	assert.match(
 		summary,
 		/已建立 1 組詢價・\$\{publication\.recipientCount\} 筆邀請/,
 	);
 	assert.match(summary, /通知已排入處理；不代表通知或聯絡已送達。/);
-	// ⛔ 三個 count 是發布當下的意圖分布，不是投遞結果：`queuedCount` 標的是
-	// 「已排入處理」，不得被寫成任何一種送出／送達的宣稱。「已送達」只准出現在
-	// 上面那句否定式界線句裡，所以這裡只擋肯定式的兩個詞。
 	assert.match(summary, /這三個數字是發布當下的收件人分布，不是投遞結果。/);
 	assert.doesNotMatch(summary, /已送出|已寄送/);
 });

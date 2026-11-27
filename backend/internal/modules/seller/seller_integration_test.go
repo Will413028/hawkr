@@ -41,7 +41,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// queue 記下排入的 job，並確認排入發生在 transaction 內。
 type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
@@ -73,8 +72,6 @@ func (q *queue) kinds() []string {
 	return out
 }
 
-// storeOrders 是店家未結訂單 port 的替身：open、err 決定回答，calls 記下被問的 store_id，onCall 在查詢時執行一次（鎖外），
-// 並確認查詢發生在 transaction 外（遠端呼叫不得在交易內）。
 type storeOrders struct {
 	mu     sync.Mutex
 	open   bool
@@ -99,7 +96,6 @@ func (o *storeOrders) HasOpenStoreOrders(ctx context.Context, storeID int64) (bo
 	return open, err
 }
 
-// logBuf 收集模組的 log，測試用來確認什麼情況下會記 error。
 type logBuf struct {
 	mu sync.Mutex
 	b  strings.Builder
@@ -126,7 +122,6 @@ type fixture struct {
 	jobs     *queue
 	media    *mediaProbe
 	payment  *payment.Fake
-	// payments 是 payment 模組（provider 是 payment 這個 fake）：核准經它寫收款帳戶列，同步發的 PayoutAccountChanged 由 f.module 訂閱。
 	payments *payment.Module
 	orders   *storeOrders
 	products *fakeProductStores
@@ -158,7 +153,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// fixtureOwners 是 payment 的擁有者查詢（組裝點的 sellerOwners 的測試版）：店家存在而且沒有關閉。
 type fixtureOwners struct{ f *fixture }
 
 func (o fixtureOwners) OwnerActive(ctx context.Context, storeID int64) (bool, error) {
@@ -185,20 +179,17 @@ func (o fixtureOwners) OwnerContactEmail(ctx context.Context, storeID int64) (st
 	return c.Address, true, nil
 }
 
-// newModule 在同一個 DB 上組一個 seller 模組：job 的排入可以換（真的 River）。
 func (f *fixture) newModule(t *testing.T, jc jobs.ReportingEnqueuer) *Module {
 	t.Helper()
 	kycMAC := sealtest.MAC(t)
 	return f.newModuleWithKeys(t, jc, kycMAC)
 }
 
-// newModuleWithKeys 同 newModule，KYC 的金鑰環由呼叫方給（測試金鑰輪替）。
 func (f *fixture) newModuleWithKeys(t *testing.T, jc jobs.ReportingEnqueuer, kycMAC *seal.MAC) *Module {
 	t.Helper()
 	return f.newModuleClock(t, jc, kycMAC, func() time.Time { return f.now })
 }
 
-// newModuleClock 同 newModuleWithKeys，時鐘由呼叫方給（測試多實例的時鐘差）。
 func (f *fixture) newModuleClock(t *testing.T, jc jobs.ReportingEnqueuer, kycMAC *seal.MAC, now func() time.Time) *Module {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
@@ -217,7 +208,6 @@ func (f *fixture) newModuleClock(t *testing.T, jc jobs.ReportingEnqueuer, kycMAC
 	})
 }
 
-// exposures 是和模組同一組依賴的可曝光公告，給直接呼叫內部套件的測試用。
 func (f *fixture) exposures() *exposure.Service {
 	return exposure.New(exposure.Deps{Events: f.bus})
 }
@@ -231,7 +221,6 @@ func must(t *testing.T, err error) {
 
 func ptr[T any](v T) *T { return &v }
 
-// account 建立一個帳號（有自填的聯絡信箱 seller@example.com，KYC 才送得出去）。先多建兩個，讓 account_id 與第一個 store_id 不同值：互換 ID 的缺陷才藏不住。
 func (f *fixture) account(t *testing.T) int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -274,7 +263,6 @@ func (f *fixture) open(t *testing.T) (int64, Store) {
 	return accountID, s
 }
 
-// setContact 直接寫入送出 KYC 需要的店家聯絡資料（開店不帶這三欄）；不經模組，店家的版本與事件不變，測試的版本與事件計數不受影響。
 func (f *fixture) setContact(t *testing.T, storeID int64) {
 	t.Helper()
 	_, err := f.db.Conn(context.Background()).Exec(context.Background(),
@@ -606,7 +594,6 @@ func TestProfileAndImagesAreWrittenInOneVersionedTransaction(t *testing.T) {
 	}
 	f.wantAsset(t, logo1, "ACTIVE")
 	f.wantAsset(t, cover, "ACTIVE")
-	// 沒有文字欄位改變時，換圖照樣寫入，被換掉的 logo 標為刪除，封面不動。
 	logo2Token, logo2 := f.stagePublic(t, up)
 	only, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: updated.Version, LogoToken: logo2Token, UploaderID: accountID})
 	must(t, err)
@@ -617,7 +604,6 @@ func TestProfileAndImagesAreWrittenInOneVersionedTransaction(t *testing.T) {
 	f.wantAsset(t, logo1, "DELETING")
 	f.wantAsset(t, cover, "ACTIVE")
 
-	// 讀取之後別人先改了：以舊版本換圖與文字衝突，整筆回滾。
 	bumped, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: only.Version, Prize: ptr("銅牌")})
 	must(t, err)
 	logo3Token, logo3 := f.stagePublic(t, up)
@@ -924,11 +910,9 @@ func TestChecksMatchGo(t *testing.T) {
 			t.Fatalf("%s: DB=%v Go=%v", tt.name, actual, values)
 		}
 	}
-	// 數字的界限：DB 的 CHECK 與 Go 的常數是同一個值。通報佐證的鍵是 (通報, 第幾次送出, 次內位置)：次內位置 0 到 MaxEvidence-1（每次送出最多 5 張）、
-	// 第幾次送出 0（原通報）到 MaxSupplements，補充的 seq 是 1 到 MaxSupplements。
 	for _, tt := range []struct {
 		table, name, column string
-		lower, upper        int // 欄位 >= lower AND 欄位 <= upper
+		lower, upper        int
 	}{
 		{"report_evidence", "report_evidence_position_check", "position", 0, model.MaxEvidence - 1},
 		{"report_evidence", "report_evidence_submission_check", "submission_seq", 0, model.MaxSupplements},

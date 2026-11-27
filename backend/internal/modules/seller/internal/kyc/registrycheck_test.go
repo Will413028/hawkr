@@ -19,7 +19,6 @@ func TestRegistryDeadlineIsAFixedWindow(t *testing.T) {
 	if got := registryCheckDeadline(requested); !got.Equal(requested.Add(15 * time.Minute)) {
 		t.Fatalf("deadline=%v", got)
 	}
-	// 掃描的間隔遠小於期限，閒置補排在期限內還有機會跑完。
 	if registrySweepInterval*3 > registryDeadline || registryResyncIdle >= registryDeadline {
 		t.Fatalf("sweep=%v idle=%v deadline=%v", registrySweepInterval, registryResyncIdle, registryDeadline)
 	}
@@ -50,7 +49,6 @@ func TestRegistrySweepIsPeriodicAndRegistered(t *testing.T) {
 	if len(periodic) != 1 {
 		t.Fatalf("periodic jobs=%d", len(periodic))
 	}
-	// River 不提供設定讀取 API；只讀 reflection 固定重啟與間隔，不修改其內部值。
 	configuration := reflect.ValueOf(periodic[0]).Elem()
 	options := configuration.FieldByName("opts").Elem()
 	if !options.FieldByName("RunOnStart").Bool() || options.FieldByName("ID").String() != "seller.kyc_registry_sweep" {

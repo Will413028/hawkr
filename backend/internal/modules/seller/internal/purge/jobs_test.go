@@ -14,7 +14,6 @@ func TestPeriodicConfiguration(t *testing.T) {
 	if len(periodicJobs) != 1 {
 		t.Fatalf("periodic jobs=%d", len(periodicJobs))
 	}
-	// River 不提供設定讀取 API；只讀 reflection 固定重啟與間隔，不修改其內部值。
 	configuration := reflect.ValueOf(periodicJobs[0]).Elem()
 	options := configuration.FieldByName("opts").Elem()
 	if !options.FieldByName("RunOnStart").Bool() || options.FieldByName("ID").String() != "seller.purge_pii" {

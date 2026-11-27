@@ -23,8 +23,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// providerRow 讀回本檔關心的四欄（domain.ProviderAccount 沒有 automation_cutover_at
-// 以外的全部，直接查表比較不受投影變動影響）。
 type providerRow struct {
 	Status     string
 	Version    int64
@@ -46,7 +44,6 @@ func readProviderRow(ctx context.Context, t *testing.T, pool *pgxpool.Pool, id i
 	return r
 }
 
-// seedProviderAccount 建一列並把它推到指定狀態（必要時補 verified_at）。
 func seedProviderAccount(ctx context.Context, t *testing.T, pool *pgxpool.Pool, repo *ProviderAccountRepository,
 	issuerID int64, taxID, appKey, status string, verified bool) int64 {
 	t.Helper()
@@ -68,9 +65,6 @@ func seedProviderAccount(ctx context.Context, t *testing.T, pool *pgxpool.Pool, 
 
 func uniqueAppKey() string { return fmt.Sprintf("AK%d", time.Now().UnixNano()) }
 
-// ---------------------------------------------------------------------------
-// 端點 26：I-61 ＋ chk_ipa_cutover_requires_verified
-// ---------------------------------------------------------------------------
 
 // TestIntegration_SetAutomationCutover_OnlyFromActive 驗 I-61 的 allowed-from。
 //
@@ -89,8 +83,6 @@ func TestIntegration_SetAutomationCutover_OnlyFromActive(t *testing.T) {
 		wantOK   bool
 	}{
 		{"ACTIVE", true, true},
-		// DEGRADED 是 §6.1.8 端點 26 散文允許、而 I-61 明令排除的那一格。
-		// 本測試釘死實作採用的是 I-61（衝突已登記在交付回報）。
 		{"DEGRADED", true, false},
 		{"CREDENTIAL_VERIFYING", false, false},
 		{"SUSPENDED", true, false},
@@ -113,7 +105,6 @@ func TestIntegration_SetAutomationCutover_OnlyFromActive(t *testing.T) {
 				if after.CutoverAt == nil {
 					t.Fatalf("切點未寫入")
 				}
-				// 🔴 端點 26 **不寫 status**：步驟 4 與 5 的分界是切點有沒有值。
 				if after.Status != before.Status {
 					t.Fatalf("端點 26 不得改動 status：%s → %s", before.Status, after.Status)
 				}
@@ -137,20 +128,17 @@ func TestIntegration_LandVerification_NilVerifiedAtBreaksCutoverCheck(t *testing
 	issuer := seedIssuer(ctx, t, pool, 9401)
 	id := seedProviderAccount(ctx, t, pool, repo, issuer, "12345678", uniqueAppKey(), "ACTIVE", true)
 
-	// 先設一個切點（走正式路徑，確保 CHECK 在這一步是滿足的）。
 	row := readProviderRow(ctx, t, pool, id)
 	ok, err := repo.SetAutomationCutover(ctx, id, row.Version, time.Now().UTC().Add(time.Hour), time.Now().UTC())
 	if err != nil || !ok {
 		t.Fatalf("設定切點失敗：ok=%v err=%v", ok, err)
 	}
-	// 推到 CREDENTIAL_VERIFYING（LandVerification 的 allowed-from）。
 	row = readProviderRow(ctx, t, pool, id)
 	if _, err := pool.Exec(ctx,
 		`UPDATE invoice_provider_accounts SET status='CREDENTIAL_VERIFYING' WHERE id=$1`, id); err != nil {
 		t.Fatal(err)
 	}
 
-	// ① 傳 nil ⇒ 23514（這是**錯誤示範**，用來證明 CHECK 真的在守）。
 	_, err = repo.LandVerification(ctx, domain.LandProviderVerification{
 		ID: id, NextStatus: "INVALID_CREDENTIAL", VerifiedAt: nil,
 		NextCheckAt:     time.Now().UTC().Add(15 * time.Minute),
@@ -160,7 +148,6 @@ func TestIntegration_LandVerification_NilVerifiedAtBreaksCutoverCheck(t *testing
 		t.Fatal("清空 verified_at 而該列已有切點，DB 應以 23514 擋下（chk_ipa_cutover_requires_verified 失效）")
 	}
 
-	// ② 沿用原值 ⇒ 成功。這是正式路徑實際採用的寫法。
 	row = readProviderRow(ctx, t, pool, id)
 	ok, err = repo.LandVerification(ctx, domain.LandProviderVerification{
 		ID: id, NextStatus: "INVALID_CREDENTIAL", VerifiedAt: row.VerifiedAt,
@@ -176,9 +163,6 @@ func TestIntegration_LandVerification_NilVerifiedAtBreaksCutoverCheck(t *testing
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 25／44／66：StartVerification 的 allowed-from
-// ---------------------------------------------------------------------------
 
 func TestIntegration_StartVerification_AllowedFrom(t *testing.T) {
 	ctx := context.Background()
@@ -195,10 +179,7 @@ func TestIntegration_StartVerification_AllowedFrom(t *testing.T) {
 		{"INVALID_CREDENTIAL", false, true},
 		{"PROVIDER_REJECTED", false, true},
 		{"PROVIDER_UNAVAILABLE", false, true},
-		// P15：端點 66 恢復連線的唯一入口。
 		{"SUSPENDED", true, true},
-		// 🔴 §7.3.4 沒有 ACTIVE → CREDENTIAL_VERIFYING 這條邊：ACTIVE／DEGRADED 的重測
-		// 走「不改 status」那條路，這正是 §6.1.13 端點 44 定版③ 的效果。
 		{"ACTIVE", true, false},
 		{"DEGRADED", true, false},
 		{"REVOKED", true, false},
@@ -219,9 +200,6 @@ func TestIntegration_StartVerification_AllowedFrom(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 45／67：Suspend／Revoke 的 allowed-from ＋ uq_ipa_fingerprint 第二向
-// ---------------------------------------------------------------------------
 
 func TestIntegration_SuspendAndRevoke_AllowedFrom(t *testing.T) {
 	ctx := context.Background()
@@ -235,9 +213,7 @@ func TestIntegration_SuspendAndRevoke_AllowedFrom(t *testing.T) {
 	}{
 		{"ACTIVE", true, true},
 		{"DEGRADED", true, true},
-		// 停用是可逆的、撤銷不是：SUSPENDED 只能被撤銷，不能被再停用一次。
 		{"SUSPENDED", false, true},
-		// 🔴 破壞性防護②：已 REVOKED 的列撤不了第二次，而且不會靜默成功。
 		{"REVOKED", false, false},
 		{"CREDENTIAL_VERIFYING", false, false},
 	} {
@@ -254,7 +230,6 @@ func TestIntegration_SuspendAndRevoke_AllowedFrom(t *testing.T) {
 				t.Fatalf("status=%s: Suspend ok = %v, want %v", tc.status, gotSuspend, tc.wantSuspend)
 			}
 
-			// 還原成原狀態再驗 Revoke（Suspend 成功時已把它改成 SUSPENDED）。
 			if _, err := pool.Exec(ctx,
 				`UPDATE invoice_provider_accounts SET status = $2 WHERE id = $1`, id, tc.status); err != nil {
 				t.Fatal(err)
@@ -296,7 +271,6 @@ func TestIntegration_Revoke_KeepsCutoverAndReleasesFingerprint(t *testing.T) {
 		t.Fatalf("設定切點失敗：ok=%v err=%v", ok, err)
 	}
 
-	// 撤銷之前，同一組（統編, AppKey）不得被新的 issuer 綁走。
 	newIssuer := seedIssuer(ctx, t, pool, 9502)
 	if err := repo.Create(ctx, newAccount(newIssuer+1, newIssuer, taxID, appKey)); err == nil {
 		t.Fatal("撤銷之前，第二個 issuer 不該綁得到同一組憑證")
@@ -311,19 +285,14 @@ func TestIntegration_Revoke_KeepsCutoverAndReleasesFingerprint(t *testing.T) {
 	if after.Status != "REVOKED" {
 		t.Fatalf("狀態應為 REVOKED，實得 %q", after.Status)
 	}
-	// ① 切點保留。
 	if after.CutoverAt == nil {
 		t.Fatal("撤銷不得清空 automation_cutover_at（歷史訂單的模式判定要用它）")
 	}
-	// ② 名額釋放（I-37 第二向）。
 	if err := repo.Create(ctx, newAccount(newIssuer+1, newIssuer, taxID, appKey)); err != nil {
 		t.Fatalf("撤銷之後同一組憑證應可被新 issuer 綁定（uq_ipa_fingerprint 的述詞不含 REVOKED）：%v", err)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 27：輪替三段的 chk_ipa_rotation 雙向等式
-// ---------------------------------------------------------------------------
 
 // TestIntegration_RotationLifecycle 驗 P11 → P12／P13 的三個落點都滿足
 // chk_ipa_rotation（(status='ROTATION_PENDING') = (pending_ciphertext IS NOT NULL)）
@@ -359,7 +328,6 @@ func TestIntegration_RotationLifecycle(t *testing.T) {
 		if after.Status != "ACTIVE" || after.Pending != nil {
 			t.Fatalf("P13 之後應回 ACTIVE 且 pending 三欄全清：%+v", after)
 		}
-		// 🔴 原 key 必須還解得開——這正是「先驗證再覆蓋」的全部意義。
 		if err := repo.WithDecryptedCredential(ctx, id, func(_, appKey string) error {
 			if appKey != oldKey {
 				t.Fatalf("P13 之後現行憑證被覆蓋了：got %q want %q", appKey, oldKey)
@@ -402,8 +370,6 @@ func TestIntegration_RotationLifecycle(t *testing.T) {
 		}
 	})
 
-	// 🔴 P11 的 allowed-from：ROTATION_PENDING 只能從 ACTIVE 進去。
-	// 少了它，一把還沒被收下的 key 可以直接覆蓋現役憑證。
 	t.Run("P11 只能從 ACTIVE", func(t *testing.T) {
 		issuer := seedIssuer(ctx, t, pool, 9603)
 		id := seedProviderAccount(ctx, t, pool, repo, issuer, "12345678", uniqueAppKey(), "INVALID_CREDENTIAL", true)

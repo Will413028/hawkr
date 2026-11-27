@@ -245,10 +245,6 @@ void main() {
     'settings keeps the locked shipping entry visible and explained',
     (tester) async {
       var tapped = false;
-      // 正式畫面把這張卡放在 profile_screen 的 CustomScrollView 裡
-      // （`HkPageSection('營運設定')`）。這裡不給捲動容器的話，營運入口每多
-      // 一列就會撞一次 RenderFlex overflow——那是測試少了正式畫面本來就有的
-      // 捲動，不是卡片壞了。
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

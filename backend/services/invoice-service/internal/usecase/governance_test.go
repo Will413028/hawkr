@@ -38,13 +38,9 @@ func TestCrossPeriodWindow(t *testing.T) {
 		{"單月 5 日 → closing", "2026-09-05T04:00:00Z", WindowClosing},
 		{"單月 6 日 → closed", "2026-09-06T04:00:00Z", WindowClosed},
 		{"單月 20 日 → closed", "2026-09-20T04:00:00Z", WindowClosed},
-		// 雙月一律 closed：上一期的關帳日早就過了。
 		{"雙月 1 日 → closed（不是 open）", "2026-10-01T04:00:00Z", WindowClosed},
 		{"雙月 4 日 → closed（不是 closing）", "2026-10-04T04:00:00Z", WindowClosed},
-		// 🔴 UTC 08-31 17:00 ＝ 台北 09-01 01:00 ⇒ 單月 1 日 ⇒ open。
-		// 用 UTC 判定會得到「8 月 31 日」＝雙月 ⇒ closed，**整個 open 窗口消失**。
 		{"UTC 08-31T17:00 ＝ 台北 09-01 → open", "2026-08-31T17:00:00Z", WindowOpen},
-		// 同理右邊界：UTC 09-05 17:00 ＝ 台北 09-06 01:00 ⇒ 已 closed。
 		{"UTC 09-05T17:00 ＝ 台北 09-06 → closed", "2026-09-05T17:00:00Z", WindowClosed},
 	}
 	for _, c := range cases {
@@ -75,10 +71,6 @@ type noopGovObserver struct{}
 func (noopGovObserver) ObserveCrossPeriodPending(CrossPeriodWindow, int64) {}
 func (noopGovObserver) ObserveApprovalRecheckDue(int64)                    {}
 
-// govRetentionFixture 是 §5.4.6 兩支清理的替身（#3261 ①②）。
-//
-// 🔴 **記下 cutoff 不只記次數**：保留期算錯（90d 寫成 90 分鐘、或正負號相反）
-// 只有 cutoff 抓得到，而算錯的後果是把還在保留期內的 PII／事件提前清掉。
 type govRetentionFixture struct {
 	purgeCalls   int
 	purgeCutoff  time.Time
@@ -121,8 +113,6 @@ func TestGovernanceRunOnce_RunsRetentionAndRecheckCount(t *testing.T) {
 	if ret.purgeCalls != 1 || ret.deleteCalls != 1 {
 		t.Fatalf("兩支清理都該跑到，實得 purge=%d delete=%d", ret.purgeCalls, ret.deleteCalls)
 	}
-	// 🔴 保留期硬寫，**不引用 inboxPayloadRetention／outboxDoneRetention**：
-	// 期望值取自被測物的常數等於「它改成多少都會過」。90／30 天的來源是設計書 §5.4.6。
 	if want := now.Add(-90 * 24 * time.Hour); !ret.purgeCutoff.Equal(want) {
 		t.Fatalf("inbox cutoff = %s，want %s（90 天）", ret.purgeCutoff, want)
 	}
@@ -162,7 +152,6 @@ func TestGovernanceRunOnce_NilRetentionIsSkipped(t *testing.T) {
 	}
 }
 
-// recordingGovObserver 記下屆期待複審有沒有被 Set。
 type recordingGovObserver struct {
 	recheckSet   bool
 	recheckCount int64

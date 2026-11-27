@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 舊的業務碼（go-pkg/errors）。
 const (
 	codeInvalidInput = 400
 	codeNotFound     = 404
@@ -40,7 +39,6 @@ func New(m *identity.Module, log *slog.Logger) *Server {
 	return &Server{m: m, log: log}
 }
 
-// businessCode 把模組的錯誤轉成舊的業務碼；沒有分類的錯誤回 error（gRPC 的 internal）。
 func businessCode(err error) (int32, string, error) {
 	switch apperr.KindOf(err) {
 	case apperr.KindNotFound:
@@ -56,9 +54,6 @@ func businessCode(err error) (int32, string, error) {
 	}
 }
 
-// accountInfo 是舊的 AccountInfo。刪除的帳號在舊的 account-service 查不到（404），這裡也一樣，所以 a 一定是存活的
-// 帳號：account_type 的買家位元由 accounttype 合成（帳號活著就是買家）。帳號沒有手機，
-// phone 一律是空字串。
 func accountInfo(a identity.Account) *pb.AccountInfo {
 	status := "active"
 	if a.Suspended {

@@ -16,9 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 賣家端的詢問：以帳號為範圍，擁有者是店家所屬的帳號。
 
-// sellerReply 以賣家的身分回覆詢問；每個 name 放一份機敏附件（內容是 evidencePDF(name)，上傳者是這個帳號）。
 func (f *fixture) sellerReply(t *testing.T, accountID int64, inquiryID uuid.UUID, body string, names ...string) (SellerInquiry, error) {
 	t.Helper()
 	return f.module.ReplyToInquiry(context.Background(), ReplyToInquiryInput{
@@ -132,7 +130,6 @@ func TestSellerReplyEndsTheInquiryAndIsVisibleToAdmin(t *testing.T) {
 		t.Fatalf("admin view=%+v", view.Reply)
 	}
 
-	// 已回覆：賣家再回覆被擋下、不寫入；管理員記回覆回賣家那一則。
 	f.now = f.now.Add(time.Hour)
 	_, err = f.sellerReply(t, owner, i.ID, "再回一次")
 	wantBlocked(t, err, "這筆詢問已經回覆過")

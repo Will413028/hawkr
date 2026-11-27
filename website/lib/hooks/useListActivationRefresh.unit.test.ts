@@ -247,7 +247,6 @@ describe("scoped feed activation", () => {
 	it("reconciles the loaded tail after five minutes without an extra head request or polling", async () => {
 		const { client, wrapper } = makeClient();
 		seedFeed(client, { hashtag: "當季" }, now - 301_000);
-		// page_token 鏈：第 1 頁無 token，第 N 頁的 token 是上一頁回的 `t<N>`。
 		vi.mocked(fetchPostsPage).mockImplementation(async ({ pageToken } = {}) => {
 			const page = pageToken ? Number(pageToken.slice(1)) : 1;
 			return feedPage([post(String(page), 9)], page);

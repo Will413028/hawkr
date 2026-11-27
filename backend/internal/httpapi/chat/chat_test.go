@@ -38,7 +38,6 @@ var (
 	reqID  = "0b1f1c2e-3d4a-4b5c-8d6e-7f8091a2b3c4"
 )
 
-// fakeReads 記下每個讀取收到的 Party 與參數；ConversationParties 回真實的雙方 ID，身分由 handler 的推導決定。
 type fakeReads struct {
 	parties      im.ConversationParties
 	partiesErr   error
@@ -128,7 +127,6 @@ func (f *fakeWrites) MarkAllRead(_ context.Context, p im.Party) error {
 type fakeBuyers struct {
 	displays []buyer.Display
 	batches  [][]int64
-	// swapped 非 0 時，同一個帳號對到這個買家，模擬換了身分。
 	swapped atomic.Int64
 }
 
@@ -197,7 +195,6 @@ func reasonOf(err error) string {
 	return ""
 }
 
-// badField 回傳錯誤指向的欄位路徑（沒有 BadRequest 時是空字串）。
 func badField(err error) string {
 	for _, d := range rpc.ConnectError(context.Background(), err).Details() {
 		if v, e := d.Value(); e == nil {
@@ -247,7 +244,6 @@ func newEnv(t *testing.T, store *seller.Store) *env {
 	return e
 }
 
-// asStoreSide 讓對話的店家方是呼叫者此刻的店（買家方是別人）。
 func (e *env) asStoreSide() {
 	e.reads.parties = im.ConversationParties{BuyerID: otherBuyerID, StoreID: callerStoreID}
 }
@@ -467,10 +463,8 @@ func TestStoreVersionsWithoutAStoreAreNotFoundAndNeverReachTheModule(t *testing.
 func TestOwnershipDerivationNeitherSideAndMissingConversationAreIndistinguishable(t *testing.T) {
 	cid := convID.String()
 	ctx := signedIn()
-	// 呼叫者有店，但兩邊都不是。
 	neither := newEnv(t, ownStore())
 	neither.reads.parties = im.ConversationParties{BuyerID: otherBuyerID, StoreID: otherStoreID}
-	// 對話不存在（模組回 NotFound，措辭與 handler 的不同）。
 	missing := newEnv(t, ownStore())
 	missing.reads.partiesErr = apperr.NotFound("模組自己的找不到句")
 	var msgs []string
@@ -855,7 +849,6 @@ func TestConversationPageTokenRoundTripsAndIsBoundToProcedureAndIdentity(t *test
 	if e.reads.after == nil || !e.reads.after.At.Equal(at) || e.reads.after.ID != next.ID {
 		t.Errorf("游標要傳進模組：%+v", e.reads.after)
 	}
-	// 同一個 token 不能用在店家版（procedure 不同），也不能在換了身分後使用（scope 含擁有者）。
 	if _, err := e.app.ListStoreConversations(signedIn(), connect.NewRequest(&pb.ListStoreConversationsRequest{PageToken: token})); codeOf(err) != connect.CodeInvalidArgument {
 		t.Errorf("買家版的 token 不能用在店家版：%v", err)
 	}
@@ -876,7 +869,6 @@ func TestConversationPageTokenRoundTripsAndIsBoundToProcedureAndIdentity(t *test
 	}
 }
 
-// otherBuyerStub 把同一個帳號對到另一個買家，模擬換了身分。
 type otherBuyerStub struct{}
 
 func (otherBuyerStub) CurrentBuyerID(context.Context, int64) (int64, error) { return 71, nil }
@@ -950,7 +942,6 @@ func TestMessageEnumsMapBothWaysAndNeverCarryUnspecifiedToTheModule(t *testing.T
 	if got := rpc.EnumMismatches[pb.ChatParty]([]im.PartyKind{im.PartyBuyer, im.PartyStore}); len(got) != 0 {
 		t.Errorf("ChatParty：%v", got)
 	}
-	// 內容只有 text 與 image_staged_token 兩種：沒有設定任何一個不會以空的 Type 送進模組。
 	if _, err := sendInput(reqID, &pb.MessageContent{}); badField(err) != "content" {
 		t.Errorf("沒有內容：%v", err)
 	}

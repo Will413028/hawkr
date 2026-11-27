@@ -37,7 +37,6 @@ final class DioWalletRemoteService implements WalletRemoteService {
 
   @override
   Future<Map<String, dynamic>> receiveCoupon(String templateId) async {
-    // Gateway 路由是 /claim（`routes_coupon.go` CouponsClaim = "/:template_id/claim"）
     final response = await _dio.post<Map<String, dynamic>>(
       '/app/coupons/$templateId/claim',
     );

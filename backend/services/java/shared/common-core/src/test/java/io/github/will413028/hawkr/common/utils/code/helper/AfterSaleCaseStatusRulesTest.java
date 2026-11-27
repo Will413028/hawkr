@@ -14,25 +14,23 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class AfterSaleCaseStatusRulesTest {
 
-    private static final String NONE = AfterSaleAppealState.NONE.value();       // "0"
-    private static final String APPEALED = AfterSaleAppealState.APPEALED.value(); // "10"
+    private static final String NONE = AfterSaleAppealState.NONE.value();
+    private static final String APPEALED = AfterSaleAppealState.APPEALED.value();
 
-    // ==================== isActive ====================
 
     @Test
     void activeStatusesWhenNoAppeal() {
-        // active = NOT IN {33,50,60,70,71}
         AfterSaleCaseStatus[] active = {
-                AfterSaleCaseStatus.PENDING,            // 0
-                AfterSaleCaseStatus.RETURN_PENDING,     // 20
-                AfterSaleCaseStatus.RETURN_SHIPPING,    // 25
-                AfterSaleCaseStatus.RETURN_AT_STORE,    // 26
-                AfterSaleCaseStatus.RETURN_DELIVERED,   // 27
-                AfterSaleCaseStatus.RETURN_FAILED,      // 28
-                AfterSaleCaseStatus.RETURN_RECEIVED,    // 30
-                AfterSaleCaseStatus.AUTO_COMPLETED_STORE_PICKUP_TIMEOUT,    // 31
-                AfterSaleCaseStatus.AUTO_COMPLETED_CONFIRM_RECEIPT_TIMEOUT, // 32
-                AfterSaleCaseStatus.REFUND_PROCESSING,  // 40
+                AfterSaleCaseStatus.PENDING,
+                AfterSaleCaseStatus.RETURN_PENDING,
+                AfterSaleCaseStatus.RETURN_SHIPPING,
+                AfterSaleCaseStatus.RETURN_AT_STORE,
+                AfterSaleCaseStatus.RETURN_DELIVERED,
+                AfterSaleCaseStatus.RETURN_FAILED,
+                AfterSaleCaseStatus.RETURN_RECEIVED,
+                AfterSaleCaseStatus.AUTO_COMPLETED_STORE_PICKUP_TIMEOUT,
+                AfterSaleCaseStatus.AUTO_COMPLETED_CONFIRM_RECEIPT_TIMEOUT,
+                AfterSaleCaseStatus.REFUND_PROCESSING,
         };
         for (AfterSaleCaseStatus s : active) {
             assertTrue(AfterSaleCaseStatusRules.isActive(s, NONE),
@@ -42,7 +40,6 @@ class AfterSaleCaseStatusRulesTest {
 
     @Test
     void terminalStatusesAreNotActiveWhenNoAppeal() {
-        // 33 / 50 / 60 / 70 無申訴時非 active
         assertFalse(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT, NONE));
         assertFalse(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.CLOSED, NONE));
         assertFalse(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.REJECTED, NONE));
@@ -51,17 +48,14 @@ class AfterSaleCaseStatusRulesTest {
 
     @Test
     void autoCompleteRefundIntermediateStatesAreActive() {
-        // ★ issue #1188 核心糾正：31/32 為退款中間態，必須 active（否則退款進行中誤恢復撥款倒數）
         assertTrue(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.AUTO_COMPLETED_STORE_PICKUP_TIMEOUT, NONE));
         assertTrue(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.AUTO_COMPLETED_CONFIRM_RECEIPT_TIMEOUT, NONE));
     }
 
     @Test
     void appealReactivatesRejectedAndReturnPendingTimeout() {
-        // 60 / 33 申訴中 → active（Admin 裁決前案件凍結）
         assertTrue(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.REJECTED, APPEALED));
         assertTrue(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT, APPEALED));
-        // 50 / 70 即使帶 appeal 仍非 active（無申訴重啟語意）
         assertFalse(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.CLOSED, APPEALED));
         assertFalse(AfterSaleCaseStatusRules.isActive(AfterSaleCaseStatus.CANCELLED, APPEALED));
     }
@@ -71,7 +65,6 @@ class AfterSaleCaseStatusRulesTest {
         assertFalse(AfterSaleCaseStatusRules.isActive(null, NONE));
     }
 
-    // ==================== isTerminalOverrideToCompleted ====================
 
     @Test
     void terminalOverrideIsClosedAndReturnPendingTimeoutNoAppeal() {
@@ -81,7 +74,6 @@ class AfterSaleCaseStatusRulesTest {
 
     @Test
     void returnPendingTimeoutUnderAppealIsNotOverride() {
-        // 33 申訴中屬 active，不是 terminal-override
         assertFalse(AfterSaleCaseStatusRules.isTerminalOverrideToCompleted(AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT, APPEALED));
     }
 
@@ -90,10 +82,9 @@ class AfterSaleCaseStatusRulesTest {
         assertFalse(AfterSaleCaseStatusRules.isTerminalOverrideToCompleted(AfterSaleCaseStatus.REJECTED, NONE));
         assertFalse(AfterSaleCaseStatusRules.isTerminalOverrideToCompleted(AfterSaleCaseStatus.CANCELLED, NONE));
         assertFalse(AfterSaleCaseStatusRules.isTerminalOverrideToCompleted(AfterSaleCaseStatus.PENDING, NONE));
-        assertFalse(AfterSaleCaseStatusRules.isTerminalOverrideToCompleted(AfterSaleCaseStatus.AUTO_COMPLETED_STORE_PICKUP_TIMEOUT, NONE)); // 31 active
+        assertFalse(AfterSaleCaseStatusRules.isTerminalOverrideToCompleted(AfterSaleCaseStatus.AUTO_COMPLETED_STORE_PICKUP_TIMEOUT, NONE));
     }
 
-    // ==================== overridesOrderLifecycle ====================
 
     @Test
     void rejectedAndCancelledDoNotOverrideLifecycle() {
@@ -109,7 +100,6 @@ class AfterSaleCaseStatusRulesTest {
         assertTrue(AfterSaleCaseStatusRules.overridesOrderLifecycle(AfterSaleCaseStatus.AUTO_COMPLETED_STORE_PICKUP_TIMEOUT));
     }
 
-    // ==================== active 與 terminal-override 互斥（驗收 #7：四桶不重疊基礎）====================
 
     @Test
     void activeAndTerminalOverrideAreMutuallyExclusiveAcrossAllStatuses() {

@@ -53,8 +53,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     final loading = useState(true);
     final error = useState<String?>(null);
 
-    // 監聽父層 lookup provider — 父層 invalidate / refresh 時
-    // lookupAsync 實例會變化，觸發下方 useEffect 重新 load()
     final lookupAsync = ref.watch(afterSaleOrderLookupProvider);
 
     Future<void> load() async {
@@ -81,8 +79,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       return null;
     }, [snapshot.caseNo, lookupAsync]);
 
-    // 售後狀態重讀提示由列表畫面處理（重撈 afterSaleOrderLookupProvider），上方 useEffect 隨之重讀；
-    // 卡片自己不監聽，避免每張展開卡片各打一次請求。
 
     return Column(
       children: [
@@ -134,7 +130,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 摘要區（不依賴詳情數據）────────────────────────
 
   Widget _buildHeader() {
     return Row(
@@ -150,7 +145,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // 步驟指示器
   Widget _buildStepIndicator() {
     return StepIndicator(
       steps: StepIndicator.afterSaleStepsFor(snapshot.status),
@@ -159,7 +153,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // 摘要卡片
   ///
   /// 文案優先級（B-114 動態文案 > status-based 靜態文案）：
   /// 1. detail.refundTaskStatus 非空 → 用 [RefundTaskStatus.buyerProgressLabel]
@@ -170,7 +163,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       return BlackcatAfterSaleStatusCard(caseData: detail);
     }
 
-    // 嘗試取動態文案（僅當後端回傳 refundTaskStatus 時）
     String? dynamicDesc;
     if (detail != null && detail.refundTaskStatus.isNotEmpty) {
       final label = RefundTaskStatus.buyerProgressLabel(
@@ -180,18 +172,15 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       if (label.isNotEmpty) dynamicDesc = label;
     }
 
-    // 申訴 / 平台仲裁中覆寫文案（與詳情頁仲裁 banner 一致），優先於 status 靜態文案。
     final appealDesc = snapshot.isUnderAppeal ? '申訴中，等待平台裁決' : null;
     final statusDesc =
         dynamicDesc ??
         appealDesc ??
         switch (snapshot.status) {
-          // 後端 #1241：REOPENED(65) 已淘汰（被拒後改走平台申訴），僅剩 0=待回覆
           '0' => '等待賣家回覆中，預計 1-3 個工作天',
           '20' => context.l10n.afterSaleReturnPendingSummary,
           '25' => '退貨商品運送中',
           '30' => '賣家已收到退貨，退款處理中',
-          // PR #983：待寄回逾時自動關案（status=33）
           '33' => '待寄回逾時自動關案，款項照常撥付',
           '40' => '平台正在處理退款，1-3 個工作天內入帳',
           '50' => '售後案件已完結',
@@ -263,7 +252,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 詳情區（異步載入完成後顯示）──────────────────
 
   Widget _buildDetailContent(
     BuildContext context,
@@ -283,10 +271,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     final showBlackcatReturn = BlackcatReturnLogisticsCard.shouldShowFor(c);
 
     if (showBlackcatReturn) {
-      // 黑貓宅配退貨：照舊渲染 BlackcatReturnLogisticsCard，但在它「上方」加上
-      // 跟一般物流進度同款的水平步驟條，讓 UI 一致（買家先看到 4 步進度，
-      // 再看到取件地址 / 預約出車 / 收件流程明細）。
-      // 黑貓宅配進入此 path 隱含 caseResolutionType=1，故步驟條無需額外條件。
       final steps = ['宅配取貨', '配送中', '已送達', '驗貨完成'];
       final currentStep = _returnLogisticsCurrentStep(c);
       return Column(
@@ -316,17 +300,13 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. 案件基本資訊（卡片化）
         _infoCard(_buildBasicInfo(context, c)),
-        // 2. B-93 7-11 三段碼（高優先級，條件渲染）
         if (c.shouldShow711ReturnCode) ...[
           SizedBox(height: AppSpacing.sm),
           _build711ReturnCodeBox(c),
         ],
-        // 3. 申請原因 + 說明 + 照片
         SizedBox(height: AppSpacing.sm),
         _infoCard(_buildReasonSection(c)),
-        // 4. 物流進度（條件渲染）
         if (hasLogistics) ...[
           SizedBox(height: AppSpacing.sm),
           _infoCard(_buildLogisticsSection(c)),
@@ -366,7 +346,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── B-93 7-11 三段碼展示區 ────────────────────
   ///
   /// 顯示條件：resolutionType=同意退貨 + returnShippingMethod=7-11 + status≥20
   /// （由 [AfterSale711CodeX.shouldShow711ReturnCode] 判斷）
@@ -398,7 +377,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
             ],
           ),
           SizedBox(height: AppSpacing.sm),
-          // 三段碼橫向展示
           Row(
             children: [
               Expanded(child: _segmentCode(c.partnerId, '母代碼')),
@@ -451,7 +429,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 1. 案件基本資訊 ──────────────────────────
 
   Widget _buildBasicInfo(BuildContext context, AfterSaleCase c) {
     final hasRefund =
@@ -460,7 +437,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 訂單編號行：icon + 單號（可複製）+ 右側可退金額 chip
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -499,7 +475,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
           ],
         ),
         SizedBox(height: AppSpacing.xs),
-        // 建立時間
         Row(
           children: [
             Icon(
@@ -549,17 +524,14 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 2. 退貨原因 + 說明 + 照片 ─────────────────
 
   Widget _buildReasonSection(AfterSaleCase c) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 標題：📝 申請資訊
         _sectionTitle(AppIcons.assignmentOutlined, '申請資訊'),
         SizedBox(height: AppSpacing.md),
 
-        // 退貨原因 — 橙色 outline pill
         Row(
           children: [
             Text(
@@ -574,7 +546,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         ),
         SizedBox(height: AppSpacing.sm),
 
-        // 詳細說明 — 浅灰底 box，长文更易读
         Text(
           '詳細說明',
           style: AppTypography.meta.copyWith(
@@ -585,7 +556,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         _descriptionBox(c.description.isNotEmpty ? c.description : '-'),
         SizedBox(height: AppSpacing.sm),
 
-        // 上傳的照片
         Text(
           '上傳的照片',
           style: AppTypography.meta.copyWith(
@@ -595,8 +565,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         SizedBox(height: AppSpacing.xs),
         Builder(
           builder: (_) {
-            // 優先使用 evidence（新契約）中買家舉證的 imageUrl，
-            // fallback 至舊欄位 shipmentPhotoUrls 保持向後相容
             final buyerPhotos = c.evidence
                 .where(
                   (e) =>
@@ -629,7 +597,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
           },
         ),
 
-        // 退貨代碼 — 高亮 box（和 7-11 三段碼視覺呼應）
         if (c.returnShipmentNo.isNotEmpty) ...[
           SizedBox(height: AppSpacing.md),
           _returnShipmentNoBox(c.returnShipmentNo),
@@ -704,7 +671,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 3. 物流進度 ───────────────────────────
 
   /// 物流進度 currentStep 對應（對齊賣家 退貨物流進度 `_returnLogisticsStatus`）：
   /// - status 50 已結案 → 3 驗貨完成
@@ -729,9 +695,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
   }
 
   Widget _buildLogisticsSection(AfterSaleCase c) {
-    // 第 4 步用「驗貨完成」對齊賣家 退貨物流進度（語意一致：物流結束於驗貨）。
-    // 第 1 步依退貨方式**明確分派**；未知 / 本版未支援者用 provider-neutral 的
-    // 「已寄出」，不得沿用宅配（到府取件）或超商（門市收件）的語意。
     final steps = switch (shippingPresentationOf(c.returnShippingMethod)) {
       ShippingPresentation.cvsStorePickup => const [
         '門市收件',
@@ -749,15 +712,12 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         c.status == AfterSaleStatus.returnInTransit ||
         c.status == '30';
 
-    // 退款進度區塊已併入上方 _buildProgressSteps 第 4 步「退款進度」+ 對應狀態
-    // 由訂單卡的售後流程列代為呈現；此處不再渲染冗餘的下方退款 timeline。
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle(AppIcons.localShipping, '物流進度'),
         SizedBox(height: AppSpacing.md),
         _buildProgressSteps(steps, currentStep),
-        // 退貨物流（買家寄回賣家）
         if (showReturnTimeline) ...[
           SizedBox(height: AppSpacing.md),
           ReturnLogisticsTimeline(caseData: c),
@@ -844,14 +804,12 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 4. 操作按鈕 ──────────────────────────
 
   Widget _buildActionButtons(
     BuildContext context,
     WidgetRef ref,
     AfterSaleCase c,
   ) {
-    // 待處理（'0'）允許取消售後
     final canCancel = c.status == AfterSaleStatus.pending;
 
     if (!canCancel) return const SizedBox.shrink();

@@ -151,9 +151,6 @@ class ShipmentReconcileClaimTest {
             shippingClient = mock(ShippingClient.class);
             shippingService = mock(ShippingService.class);
             anomalyPublisher = mock(ShipmentAnomalyEventPublisher.class);
-            // ⚠️ shippingClient 傳進 registry 而不是 scheduler：provider 呼叫已整段搬進 adapter，
-            //    scheduler 不再自己打 PayUni（連帶消滅它自己那份 deriveLgsType）。
-            //    下面的 verify(shippingClient) 仍然成立，因為 adapter 用的就是這一個 mock。
             scheduler = new ShipmentLabelReconcileScheduler(
                     shipmentMapper, shippingService, anomalyPublisher,
                     io.github.will413028.hawkr.shipping.provider.TestFulfillmentProviders.realRegistry(
@@ -218,8 +215,8 @@ class ShipmentReconcileClaimTest {
             long leaseSeconds = Duration.between(before, lease.getValue()).getSeconds();
 
             assertTrue(leaseSeconds > 0, "租約必須是未來時間（0 或負 ⇒ 等於沒有搶佔）");
-            long oneTickSeconds = 600L;   // label.interval-ms 預設 600000
-            long windowSeconds = 7L * 24 * 3600;  // label.max-age-days 預設 7
+            long oneTickSeconds = 600L;
+            long windowSeconds = 7L * 24 * 3600;
             assertTrue(leaseSeconds <= oneTickSeconds + 5,
                     "租約實測 " + leaseSeconds + " 秒 > 一個 tick(" + oneTickSeconds + " 秒)");
             assertTrue(leaseSeconds * 10 <= windowSeconds,

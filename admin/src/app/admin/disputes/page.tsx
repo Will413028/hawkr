@@ -11,8 +11,6 @@ import { AFTER_SALE_APPEAL_STATE_LABEL, codeLabel } from "@/lib/codemeta";
 import { formatDateTime as formatTaipeiDateTimeShared } from "@/lib/format";
 import { api } from "@/services/api";
 
-// appeal_state 篩選值：AfterSaleAppealState value（10=已申訴 / 30=已裁決）＋ all=不限。
-// 請求參數與回應欄位一律是 Value，前端不做 Name↔Value 轉換。
 type AppealStateFilter = "10" | "30" | "all";
 
 interface AppealSummary {
@@ -41,24 +39,12 @@ interface AppealListResponse {
 	};
 }
 
-// 標籤從 AFTER_SALE_APPEAL_STATE_LABEL 查，不在這裡另抄一份。
-//
-// 以前這裡把 10 這個碼硬寫成「待裁決」，而同一頁的列表欄位走 codeLabel 顯示同一個碼值時是
-// 「已申訴」——**同一個狀態在同一個畫面上有兩個名字**。那正是手抄鏡像會產生的病：
-// 兩處各自演化，而且沒有任何東西會發現它們不一致。
 const TAB_LABELS: Record<AppealStateFilter, string> = {
 	"10": codeLabel(AFTER_SALE_APPEAL_STATE_LABEL, "10"),
 	"30": codeLabel(AFTER_SALE_APPEAL_STATE_LABEL, "30"),
 	all: "全部",
 };
 
-// appealState（AfterSaleAppealState value）→ badge 樣式。
-// label 一律走集中常數 AFTER_SALE_APPEAL_STATE_LABEL，這裡只管顏色。
-//
-// 值域要收齊（`tests/codemeta-no-second-copy.test.ts` 會擋）：以碼值為鍵的呈現層對照
-// 少一個成員，那個成員就會靜靜落進 `|| "gray"`，沒有任何訊號。0（NONE＝未申訴）在這一頁
-// 理論上不會出現——這裡是申訴列表——但「不會出現」與「出現了長什麼樣」是兩件事，
-// 明寫成灰色比留給 fallback 決定誠實。
 const STATE_BADGE_VARIANT: Record<string, BadgeVariant> = {
 	"0": "gray",
 	"10": "danger",
@@ -66,8 +52,6 @@ const STATE_BADGE_VARIANT: Record<string, BadgeVariant> = {
 	"30": "gray",
 };
 
-// 時間一律走 lib/format 的台北釘死版（backend#3053 的稽查）：本地這份用
-// toLocaleString 會跟著看的人的瀏覽器時區跑，而管理員不一定在台灣。
 const formatDateTime = formatTaipeiDateTimeShared;
 
 /**
@@ -132,7 +116,6 @@ export default function DisputeList() {
 		);
 	}, [records, keyword]);
 
-	// 比對的是 AfterSaleAppealState value：10=已申訴 / 20=平台調查中 / 30=已裁決。
 	const stats = useMemo(() => {
 		const pending = records.filter((r) => r.appealState === "10").length;
 		const processing = records.filter((r) => r.appealState === "20").length;

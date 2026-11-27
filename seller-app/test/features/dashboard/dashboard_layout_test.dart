@@ -67,20 +67,17 @@ void main() {
 
     expect(find.text('今天有 7 件事待處理'), findsOneWidget);
 
-    // 兩個期間都是最近 7 個完整的臺北日曆日（伺服器固定），標籤與百分比都明說「近 7 日／較前 7 日」。
     expect(find.text('近 7 日營收'), findsOneWidget);
     expect(find.text(r'NT$ 128,400'), findsOneWidget);
-    // 五張 7 日數字卡（營收、訂單、顧客、商品瀏覽、新追蹤者）都帶同一段期間，同 website 的 buildStats。
     expect(find.text('9/30–10/6'), findsNWidgets(5));
     expect(find.text('關鍵數據與較前 7 日變化'), findsOneWidget);
     expect(find.text('累計營收'), findsNothing);
     expect(find.textContaining('週環比'), findsNothing);
 
-    // 營收卡的 pill 與三張期間 tile 各自帶正負號；新追蹤者沒有比較值，變化欄寫「近 7 日」。
-    expect(find.text('較前 7 日 +12%'), findsOneWidget); // revenue pill
-    expect(find.text('較前 7 日 +3%'), findsOneWidget); // orders
-    expect(find.text('較前 7 日 +6%'), findsOneWidget); // customers
-    expect(find.text('較前 7 日 -3%'), findsOneWidget); // product views
+    expect(find.text('較前 7 日 +12%'), findsOneWidget);
+    expect(find.text('較前 7 日 +3%'), findsOneWidget);
+    expect(find.text('較前 7 日 +6%'), findsOneWidget);
+    expect(find.text('較前 7 日 -3%'), findsOneWidget);
     expect(find.text('近 7 日訂單'), findsOneWidget);
     expect(find.text('近 7 日顧客'), findsOneWidget);
     expect(find.text('商品瀏覽'), findsOneWidget);
@@ -97,7 +94,6 @@ void main() {
       AppColors.brandPrimaryStrong,
     );
 
-    // 訂單進度四個桶：待出貨、進行中、已結束（含取消與全額退款，不是成交數）、售後。
     expect(find.text('23'), findsOneWidget);
     expect(find.text('8'), findsOneWidget);
 
@@ -153,7 +149,6 @@ void main() {
 
     expect(find.text(r'NT$ 128,400'), findsOneWidget);
     expect(find.text('較前 7 日 0%'), findsNothing);
-    // 營收與商品瀏覽兩處沒有基準。
     expect(find.text('—'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
@@ -167,11 +162,8 @@ void main() {
 
     expect(find.textContaining(r'NT$'), findsNothing);
     expect(find.text('0'), findsNothing);
-    // 營收（值＋變化）、訂單、顧客、商品瀏覽、新追蹤者各自的值與變化欄：2 + 2 + 2 + 2 + 2。
     expect(find.text('—'), findsNWidgets(10));
-    // 期間說明不因區塊沒設而消失（website 的 buildStats 一樣）。
     expect(find.text('9/30–10/6'), findsNWidgets(5));
-    // 訂單狀態沒受影響。
     expect(find.text('今天有 7 件事待處理'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -185,9 +177,7 @@ void main() {
     expect(find.text('今日待辦已清空'), findsNothing);
     expect(find.text('待出貨 —'), findsOneWidget);
     expect(find.text('售後 —'), findsOneWidget);
-    // 訂單進度四個桶（待出貨、進行中、已結束、售後）。
     expect(find.text('—'), findsNWidgets(4));
-    // 其他區塊不受影響。
     expect(find.text(r'NT$ 128,400'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -222,7 +212,6 @@ void main() {
     );
 
     expect(find.text('STATUS'), findsOneWidget);
-    // 還沒有儀表板：狀況由狀態區塊說明，今日待辦不說「暫時無法取得待辦」。
     expect(find.text('暫時無法取得待辦'), findsNothing);
     expect(find.text('今日待辦'), findsOneWidget);
     expect(find.text('待出貨 —'), findsOneWidget);
@@ -232,10 +221,8 @@ void main() {
       tester.getTopLeft(find.text('STATUS')).dy,
       lessThan(tester.getTopLeft(find.text('今日待辦')).dy),
     );
-    // 常用功能一直可用。
     expect(find.text('商品管理'), findsOneWidget);
     expect(find.text('新增商品'), findsOneWidget);
-    // 訂單進度的入口仍可點。
     await tester.tap(find.text('配送中'));
     expect(tapped, 1);
     expect(tester.takeException(), isNull);

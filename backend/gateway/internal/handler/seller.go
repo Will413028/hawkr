@@ -75,10 +75,6 @@ func (h *Holder) GetSellerProducts(c *gin.Context) {
 			Hashtags:        toHashtagItems(p.Hashtags),
 		}
 
-		// 與 /public/products 對稱（同一支 GetProductList RPC）。本處歷來只手抄
-		// name/logo/store_code，漏了 city/district/address——而前端商品卡的產地是
-		// `origin || seller.city`，缺 city 時店內商品卡產地就空白；改走共用 builder
-		// 一併補齊。攤平便利欄同理補上，與市集/搜尋的 ProductItem 保持同形。
 		if p.Seller != nil {
 			item.Seller = buildSellerInfoItem(base, p.Seller)
 			item.SellerName, item.SellerLogoKey, item.SellerLogoUrl = flatSellerFields(item.Seller)
@@ -87,9 +83,6 @@ func (h *Holder) GetSellerProducts(c *gin.Context) {
 		products = append(products, item)
 	}
 
-	// isRestockSubscribed aggregation (issue #1005 / B-203, 39 §5.5b)
-	// buyer_id-first：這裡沒有其他地方已解析過 buyerID，自己做一次 soft-fail 解析
-	// （同 product.go GetProductList 的理由）。
 	accountID := getOptionalAccountID(c)
 	if accountID != 0 && len(products) > 0 {
 		ids := make([]string, 0, len(products))

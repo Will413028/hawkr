@@ -60,7 +60,6 @@ func TestMissingExposureMapsEachConditionToItsRequirement(t *testing.T) {
 	if got := MissingExposure(all); !slices.Equal(got, Requirements()) {
 		t.Fatalf("every condition unmet: missing=%v want %v", got, Requirements())
 	}
-	// 生命週期欄位（Status）與店名等欄位不參與：只看 Conditions。
 	s := full
 	s.Status, s.StoreName = Closed, ""
 	if got := MissingExposure(s); len(got) != 0 {

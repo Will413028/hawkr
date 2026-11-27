@@ -3,7 +3,6 @@ import test, { after } from "node:test";
 import type { Canvas } from "fabric";
 import { JSDOM } from "jsdom";
 
-// fabric 的 "." 入口永遠是瀏覽器版，需要全域 DOM；jsdom 搭配 canvas 提供 2D context。
 const dom = new JSDOM("<!doctype html><body></body>", {
 	pretendToBeVisual: true,
 });
@@ -23,7 +22,6 @@ Object.defineProperty(globalThis, "navigator", {
 const doc = dom.window.document;
 after(() => dom.window.close());
 
-// CanvasEditor 的 import 會立刻讀全域 document，所以要等上面的 DOM 就位後才載入。
 async function makeEditor() {
 	const { CanvasEditor } = await import("../src/utils/CanvasEditor");
 	const el = doc.createElement("canvas");

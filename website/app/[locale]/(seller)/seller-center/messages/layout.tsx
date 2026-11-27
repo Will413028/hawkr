@@ -38,8 +38,6 @@ export default function SellerMessagesLayout({
 		return <>{children}</>;
 	}
 
-	// 這個 shell 只在對話路由渲染（上面已 early-return），所以 view 恆為
-	// thread。手機版收起清單的規則讀這個屬性，與買家收件匣同一份契約。
 	return (
 		<div
 			className="chat-page"

@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# watchdog-probe.sh 的自我測試。
-#
-# 為什麼需要：這道探測的價值全部來自「該紅的時候真的會紅」。它平常永遠綠
-# （監控棧正常時三道檢查都通過），所以「它已經失去鑑別力」跟「一切正常」
-# 在 CI 上長得一模一樣——正是這支腳本本身要擋的失效形狀。
-#
-# 做法：起一個假的 HTTP server，用環境變數控制它對三個路徑各自回什麼，
-# 逐個情境驗證 probe 的 exit code 與訊息。不連任何真實服務。
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,8 +71,6 @@ run_case "Prometheus 不健康 → 紅且指名 Prometheus" 1 "Prometheus /-/hea
 run_case "Alertmanager 不健康 → 紅且指名 Alertmanager" 1 "Alertmanager /-/healthy" FAKE_AM_HEALTH=503
 run_case "Alertmanager 活著但沒有 Watchdog → 紅（本檢查的核心）" 1 "查不到 Watchdog" FAKE_AM_ALERTS='[{"labels":{"alertname":"SomethingElse"}}]'
 run_case "alerts API 回 500 → 紅" 1 "讀不到 Alertmanager 的 alerts API" FAKE_AM_ALERTS_CODE=500
-# 空的 alert 清單與「有別的告警但沒有 Watchdog」是同一種失效，要分別驗到：
-# 監控棧靜默時 Alertmanager 常常是空的，那也必須紅。
 run_case "alerts 清單為空 → 紅" 1 "查不到 Watchdog" FAKE_AM_ALERTS='[]'
 
 echo "── $pass 通過／$fail 失敗 ──"

@@ -51,7 +51,6 @@ func newProductFixture(t *testing.T) *productFixture {
 	f.rn = &recordingNotifier{}
 	f.bus = events.NewBus()
 	f.m = New(f.deps(d, f.media))
-	// 測試只關心 catalog 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(`DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
 		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
@@ -59,7 +58,6 @@ func newProductFixture(t *testing.T) *productFixture {
 	return f
 }
 
-// deps 是這個 fixture 的模組依賴；換 database 連線或 media 的測試用它組出另一個 Module。
 func (f *productFixture) deps(d *db.DB, m Media) Deps {
 	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Events: f.bus, Restock: f.rn}
 }
@@ -101,7 +99,6 @@ func (f *productFixture) leaf() uuid.UUID {
 	return id
 }
 
-// store 建一家可以公開曝光的店（直接寫 seller 的表，最小的列），回傳 store_id 與帳號。
 func (f *productFixture) store() (storeID, accountID int64) {
 	f.t.Helper()
 	f.seq++
@@ -117,7 +114,6 @@ func (f *productFixture) store() (storeID, accountID int64) {
 	return storeID, accountID
 }
 
-// setExposable 讓店家回到可曝光（true）或不可曝光（false，KYC 退回）。
 func (f *productFixture) setExposable(storeID int64, ok bool) {
 	f.t.Helper()
 	status := "APPROVED"
@@ -127,7 +123,6 @@ func (f *productFixture) setExposable(storeID int64, ok bool) {
 	f.exec("UPDATE seller.kyc_applications SET status = $2 WHERE store_id = $1", storeID, status)
 }
 
-// input 是一份可以上架的輸入：帶一張主圖（token 每次不同）。
 func (f *productFixture) input(title string) ProductInput {
 	f.mu.Lock()
 	f.seq++
@@ -145,12 +140,10 @@ func (f *productFixture) create(storeID, accountID int64, in ProductInput) Produ
 	return p
 }
 
-// createP 以新的 request_id 建立商品。
 func createP(m *Module, ct context.Context, storeID int64, up media.Uploader, in ProductInput) (Product, error) {
 	return m.CreateProduct(ct, storeID, up, uuid.NewV7(), in, nil)
 }
 
-// updateP 讀目前的版本再整體取代；並行的修改造成版本衝突時重讀重試（測試關心的是寫入本身，不是版本競爭）。
 func updateP(m *Module, ct context.Context, storeID int64, up media.Uploader, id uuid.UUID, in ProductInput) (Product, error) {
 	for range 50 {
 		cur, err := m.Product(ct, storeID, id)
@@ -165,7 +158,6 @@ func updateP(m *Module, ct context.Context, storeID int64, up media.Uploader, id
 	return Product{}, ErrVersionConflict
 }
 
-// setStatusP 讀目前的版本再切換狀態。
 func setStatusP(m *Module, ct context.Context, storeID int64, id uuid.UUID, to ProductStatus) error {
 	for range 50 {
 		cur, err := m.Product(ct, storeID, id)
@@ -258,7 +250,6 @@ func TestActiveProductNeedsAGalleryImageOnEveryWrite(t *testing.T) {
 	if got, _ := f.m.Product(f.ct, storeID, p.ID); got.Status != StatusDraft || got.FirstPublishedAt != nil {
 		t.Fatalf("a rejected activation changes nothing: %+v", got)
 	}
-	// 描述圖不算主圖。
 	withDescImage := bare
 	withDescImage.Description = []Block{{Kind: BlockImage, Image: &Image{Token: "only-description"}}}
 	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, withDescImage); err != nil {
@@ -267,13 +258,11 @@ func TestActiveProductNeedsAGalleryImageOnEveryWrite(t *testing.T) {
 	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
 		t.Fatalf("a description image is not a gallery image: %v", err)
 	}
-	// 草稿與下架的商品可以存沒有主圖的內容；有主圖才能上架。
 	withImage := f.input("有圖")
 	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, withImage); err != nil {
 		t.Fatal(err)
 	}
 	f.activate(storeID, p.ID)
-	// ACTIVE 的商品整體取代時不給主圖：拒絕，內容不變，也不自動降回草稿。
 	bare.Title = "改名"
 	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, bare); !errors.Is(err, ErrActiveRequiresGalleryImage) {
 		t.Fatalf("updating an ACTIVE product without a gallery image: %v", err)
@@ -282,7 +271,6 @@ func TestActiveProductNeedsAGalleryImageOnEveryWrite(t *testing.T) {
 	if got.Status != StatusActive || got.Title != "有圖" || len(got.Gallery) != 1 {
 		t.Fatalf("a rejected update changes nothing and does not demote: %+v", got)
 	}
-	// 下架後可以把主圖清掉，再上架時被擋。
 	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusArchived); err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +333,6 @@ func TestSkuCombinationsMustBeUniqueAndWithinOptionValues(t *testing.T) {
 	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, dup); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a duplicate combination: %v", err)
 	}
-	// 沒有軸的商品只有一個預設 SKU。
 	flat := f.input("單一規格")
 	flat.Skus = []SkuInput{{Price: 1}, {Option1: "紅", Price: 1}}
 	if _, err := createP(f.m, f.ct, storeID, media.Uploader{ID: acct}, flat); !errors.Is(err, ErrInvalidInput) {
@@ -354,7 +341,6 @@ func TestSkuCombinationsMustBeUniqueAndWithinOptionValues(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM catalog.products WHERE title IN ('單一規格')`); n != 0 {
 		t.Fatalf("a rejected create leaves nothing behind: %d", n)
 	}
-	// 失敗的修改不改動商品。
 	if got, _ := f.m.Product(f.ct, storeID, p.ID); len(got.Skus) != 2 {
 		t.Fatalf("%+v", got.Skus)
 	}
@@ -428,7 +414,6 @@ func TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved(t *testing.T) {
 		t.Fatalf("image references: %d", n)
 	}
 
-	// 保留 g1 與描述圖（以資產 ID），移除 g2。
 	in.Gallery = []Image{{AssetID: g1, Alt: "正面"}}
 	in.Description = []Block{{Kind: BlockImage, Image: &Image{AssetID: d1, Alt: "細節"}}}
 	p, err := updateP(f.m, f.ct, storeID, up, p.ID, in)
@@ -445,12 +430,10 @@ func TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved(t *testing.T) {
 		t.Fatalf("%+v", p.Gallery)
 	}
 
-	// 不是這個商品的資產不能引用。
 	in.Gallery = []Image{{AssetID: uuid.NewV7()}}
 	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, in); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a foreign asset: %v", err)
 	}
-	// 移除全部圖片。
 	in.Gallery, in.Description = nil, nil
 	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, in); err != nil {
 		t.Fatal(err)
@@ -705,8 +688,6 @@ func TestOnlyLeafCategoriesAcceptedOnWrite(t *testing.T) {
 	}
 }
 
-// waitBlockedBy 等到有別的連線被 pid 這個 backend 持有的鎖擋住（pg_blocking_pids，不看 SQL 文字）；條件成立才往下，不假設時間。
-// done 先有結果代表那個呼叫沒有等鎖就結束了，直接讓測試失敗並帶出它的錯誤。
 func (f *productFixture) waitBlockedBy(pid int, done <-chan error) {
 	f.t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
@@ -724,7 +705,6 @@ func (f *productFixture) waitBlockedBy(pid int, done <-chan error) {
 	f.t.Fatalf("no session blocked on a lock held by backend %d", pid)
 }
 
-// lockedNow 回報這一刻 query（必須是 FOR UPDATE NOWAIT 的 SELECT）要鎖的列是不是已經被別的 transaction 持有。
 func (f *productFixture) lockedNow(query string, args ...any) bool {
 	f.t.Helper()
 	tx, err := f.d.Pool().Begin(f.ct)
@@ -842,8 +822,6 @@ func TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts(t *testing.T) {
 	in := f.input("快照")
 	in.Description = []Block{{Kind: BlockParagraph, Text: "說明"}, {Kind: BlockImage, Image: &Image{Token: "snap-d1"}}}
 	p := f.create(storeID, acct, in)
-	// 第二個連線池的 tracer 在 GetOwnProduct 這句讀完之後把讀取停住：單句實作到此已經讀完全部內容，
-	// 拆成兩句的實作還沒讀圖片。停住的期間提交修改，再放行。
 	gate := &readGate{reached: make(chan struct{}), release: make(chan struct{})}
 	defer gate.open()
 	d2, err := db.Open(f.ct, db.Config{URL: f.d.Pool().Config().ConnConfig.ConnString(), MaxConns: 2, ConnectRetryBudget: 10 * time.Second, Tracer: gate})
@@ -892,7 +870,6 @@ func TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts(t *testing.T) {
 	}
 }
 
-// readGate 在 GetOwnProduct 讀完時停住該連線，直到 open。
 type readGate struct {
 	reached chan struct{}
 	release chan struct{}
@@ -949,7 +926,6 @@ func TestDeleteProductMakesItsSkusUndeductibleButRestorable(t *testing.T) {
 	}
 }
 
-// confirmProbe 在 Confirm 被呼叫的那一刻檢查商品列是否已被這個寫入鎖住。
 type confirmProbe struct {
 	*media.Fake
 	f         *productFixture

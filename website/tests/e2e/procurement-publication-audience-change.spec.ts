@@ -40,8 +40,6 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 		let approvalCalls = 0;
 
 		await setupRfqPriceReview(page, {
-			// 第一筆刻意沿用 helper 預設的 id 與店名：setupRfqPriceReview
-			// 的收尾會點那一張把它選起來。另外兩筆才是這條測試加的。
 			candidateSearchPollHandler: () =>
 				candidateSearchJson("SUCCEEDED", [
 					candidateJson("seller-green", "範例鮮果合作社"),
@@ -51,7 +49,6 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 			publicationPreviewHandler: (request) => {
 				approvalCalls += 1;
 				previewBodies.push(request);
-				// 第二次核准是針對新受眾的另一份 approval。
 				return publicationApprovalJson({
 					approvalId:
 						approvalCalls === 1 ? RFQ_APPROVAL_ID : SECOND_APPROVAL_ID,
@@ -64,9 +61,6 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 			},
 		});
 
-		// —— 走到取得核准（受眾＝範例鮮果合作社）——
-		// setupRfqPriceReview 已經把畫面帶到價格確認那一步，序列照既有的
-		// procurement-assistant-rfq-draft.spec.ts。
 		await page
 			.getByRole("checkbox", { name: "我已核對這份需求版本與價格範圍" })
 			.check();
@@ -85,10 +79,7 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 		await expect(executeCta).toBeVisible();
 		expect(approvalCalls).toBe(1);
 
-		// —— 回到候選頁換掉受眾 ——
 		await page.getByRole("button", { name: "返回候選" }).click();
-		// 點 label 而不是 input：候選列在視窗底部時，頁尾會攔截對 input 的點擊。
-		// 這也是 setupRfqPriceReview 自己選第一張候選時用的方式。
 		for (const id of ["seller-green", "seller-south", "seller-east"]) {
 			await page.locator(`label[for="procurement-candidate-${id}"]`).click();
 		}
@@ -96,9 +87,6 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 			page.getByRole("checkbox", { name: "選取 範例鮮果合作社" }),
 		).not.toBeChecked();
 
-		// —— 舊核准必須失效 ——
-		// 改受眾會把畫面切回候選頁（CandidateCanvas 既有行為），所以先確認
-		// execute CTA 不在，再走一次「建立詢價草稿」回到草稿流程。
 		await expect(executeCta).toBeHidden();
 		expect(executeBodies).toHaveLength(0);
 
@@ -108,7 +96,6 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 			page.getByRole("button", { name: "確認並準備發布" }),
 		).toBeVisible();
 
-		// —— 重新核准之後才能送出，而且帶的是新核准 ——
 		await page
 			.getByRole("checkbox", {
 				name: "我已重新檢查需求、希望價格與發布受眾；確認後此快照不可變",
@@ -125,7 +112,6 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 			expectedRevisionId: RFQ_REVISION_ID,
 			payloadHash: RFQ_SELLER_PAYLOAD_HASH,
 		});
-		// 第二次核准送出的受眾就是畫面上那兩家。
 		expect(previewBodies[1]).toMatchObject({
 			selectedCandidateIds: ["seller-south", "seller-east"],
 		});

@@ -34,9 +34,6 @@ function decode(header: string) {
 }
 
 afterEach(() => {
-	// `delete`, not `= undefined`: assigning undefined stores the STRING
-	// "undefined", which is truthy and would make the next case sign with a key
-	// called "undefined" instead of not signing at all.
 	delete process.env.ORIGIN_AUTH_SECRET;
 	delete process.env.ORIGIN_AUTH_CI_SECRET;
 });
@@ -65,15 +62,12 @@ describe("signOriginAuth (backend#2264 wire contract)", () => {
 			v: 1,
 			p: "ssr",
 			m: "GET",
-			// Path only: the gateway compares `c.Request.URL.Path`, which carries no
-			// query string.
 			u: "/api/v1/public/products",
 		});
 		expect(payload.ip).toBeUndefined();
 		expect(Math.abs(payload.ts - Math.floor(Date.now() / 1000))).toBeLessThan(
 			5,
 		);
-		// Unpadded base64url on both halves — `base64.RawURLEncoding` rejects "=".
 		expect(body).toMatch(/^[A-Za-z0-9_-]+$/);
 		expect(mac).toMatch(/^[A-Za-z0-9_-]+$/);
 	});
@@ -97,12 +91,10 @@ describe("signOriginAuth (backend#2264 wire contract)", () => {
 		const header = await signOriginAuth({
 			method: "GET",
 			url: "https://test-api.example.com/api/v1/public/products",
-			// Even handed one — a runner has no real visitors, and the gateway would
-			// not accept a p=visitor claim under the CI key anyway.
 			visitorIp: "203.0.113.7",
 		});
 		const { macMatches, payload } = decode(header as string);
-		expect(macMatches).toBe(true); // i.e. signed with the CI key, not the other
+		expect(macMatches).toBe(true);
 		expect(payload.p).toBe("ci");
 		expect(payload.ip).toBeUndefined();
 	});

@@ -58,7 +58,6 @@ async function gotoWithTheme(
 			try {
 				localStorage.setItem(key, value);
 			} catch {
-				/* Safari private mode etc. — boot script falls back to light */
 			}
 		},
 		[THEME_STORAGE_KEY, theme] as const,
@@ -72,31 +71,25 @@ async function gotoWithTheme(
  *  正好 840px 不 skip 而直接失敗——那正是本檔原本的 bug）。 */
 const BOTTOM_NAV_BREAKPOINT = 840;
 
-// Expected resolved values per theme (Chromium rgb()/rgba() comma format).
 const EXPECT = {
 	light: {
-		navBg: "rgb(245, 241, 232)", // hk-surface-muted
-		navBorder: "rgba(51, 76, 15, 0.14)", // hk-border-soft
-		itemColor: "rgb(114, 121, 110)", // hk-muted (#72796e)
+		navBg: "rgb(245, 241, 232)",
+		navBorder: "rgba(51, 76, 15, 0.14)",
+		itemColor: "rgb(114, 121, 110)",
 		activeColor: "rgb(16, 16, 16)",
 		lensBg: "rgba(255, 255, 255, 0.72)",
 		lensBorder: "rgba(255, 255, 255, 0.82)",
 	},
 	dark: {
-		navBg: "rgba(38, 67, 52, 0.62)", // dark hk-surface-muted
-		navBorder: "rgba(245, 222, 165, 0.12)", // dark hk-border-soft
-		itemColor: "rgba(223, 233, 217, 0.56)", // hk-muted
+		navBg: "rgba(38, 67, 52, 0.62)",
+		navBorder: "rgba(245, 222, 165, 0.12)",
+		itemColor: "rgba(223, 233, 217, 0.56)",
 		activeColor: "rgb(245, 245, 245)",
 		lensBg: "rgba(255, 255, 255, 0.14)",
 		lensBorder: "rgba(255, 255, 255, 0.18)",
 	},
 } as const;
 
-// Theme-agnostic faithful values. The shadow is asserted via `toContain` because
-// Tailwind v4's box-shadow utility prepends four transparent placeholder layers
-// (ring / inset / drop / etc.) before the authored value — they render as
-// nothing but show up in the computed string. Pre-migration CSS sets only the
-// single layer, so this substring check stays accurate either way.
 const LIGHT_SHADOW = "rgba(255, 255, 255, 0.72) 0px 1px 0px 0px inset";
 
 test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
@@ -104,7 +97,6 @@ test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
 }, () => {
 	for (const theme of THEMES) {
 		test(`structure + tokens (${theme})`, async ({ page, viewport }) => {
-			// Bottom nav is display:none at ≥840px — only meaningful on a phone vp.
 			test.skip(
 				!viewport || viewport.width >= BOTTOM_NAV_BREAKPOINT,
 				`mobile-only：底部導覽列在 ≥${BOTTOM_NAV_BREAKPOINT}px 是 display:none`,
@@ -118,7 +110,6 @@ test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
 			const links = nav.getByRole("link");
 			await expect(links).toHaveCount(5);
 
-			// "/" route → "首頁" (href="/") is the active item.
 			const activeLink = nav.locator('a[aria-current="page"]');
 			await expect(activeLink).toHaveCount(1);
 			const inactiveLink = nav.locator('a:not([aria-current="page"])').first();
@@ -126,7 +117,6 @@ test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
 
 			const exp = EXPECT[theme];
 
-			// --- nav container: faithful sizes/glass + normalized border ---
 			const cont = await nav.evaluate((el) => {
 				const s = getComputedStyle(el);
 				return {
@@ -165,7 +155,6 @@ test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
 			expect(cont.backdrop).toBe("none");
 			if (theme === "light") expect(cont.shadow).toContain(LIGHT_SHADOW);
 
-			// --- inactive item: faithful sizes + normalized muted text ---
 			const item = await inactiveLink.evaluate((el) => {
 				const s = getComputedStyle(el);
 				return {
@@ -187,9 +176,6 @@ test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
 			expect(item.justifyItems).toBe("center");
 			expect(item.gap).toBe("3px");
 			expect(item.minH).toBe("48px");
-			// `MobileBottomNav.tsx` 的 item 是 `rounded-[16px]`（與 active indicator
-			// 的 lens 同值，見下方 `lens.borderRadius`）。本檔原本寫 12px，是遷移前的
-			// 舊值 —— 因為整支從沒在 CI 跑過，紅了兩個月沒人知道（web#386）。
 			expect(item.radius).toBe("16px");
 			expect(item.fs).toBe("11px");
 			expect(item.fw).toBe("800");
@@ -197,10 +183,6 @@ test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
 			expect(item.touch).toBe("manipulation");
 			expect(item.color).toBe(exp.itemColor);
 
-			// --- active item + sliding indicator: primary text + white glass lens ---
-			// The draggable-nav interaction paints the active background on one
-			// independently animated pill, not on the link itself. Keep the link
-			// semantic for aria-current/text and assert the actual painted layer.
 			const activeIndicator = nav.locator(
 				'[data-mobile-nav-active-indicator="true"]',
 			);
@@ -226,7 +208,6 @@ test.describe("MobileBottomNav CSS → Tailwind — computed-style gate", {
 			expect(lens.borderColor).toBe(exp.lensBorder);
 			expect(lens.borderRadius).toBe("16px");
 
-			// --- icon wrapper (first span in a link): faithful 30px box ---
 			const icon = await inactiveLink
 				.locator("span")
 				.first()

@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 )
 
-// 模組的狀態、角色、run 類型是 proto enum 值名去掉前綴的代碼；UNSPECIFIED 與不認得的代碼是不變量被破壞，回沒有分類的錯誤。
 
 func runStatusToProto(code string) (pb.RunStatus, error) {
 	v, ok := pb.RunStatus_value["RUN_STATUS_"+code]
@@ -65,7 +64,6 @@ func slotKeyToProto(k procurement.SlotKey) (pb.SlotKey, error) {
 	return pb.SlotKey(v), nil
 }
 
-// slotKeyFromProto 把請求的欄位代碼轉成模組的欄位代碼；沒給（UNSPECIFIED）是缺必填欄位。
 func slotKeyFromProto(k pb.SlotKey) (procurement.SlotKey, error) {
 	if k == pb.SlotKey_SLOT_KEY_UNSPECIFIED {
 		return "", rpc.RequiredField("slot_key", "slot_key 不能是空的")

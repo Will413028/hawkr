@@ -48,9 +48,6 @@ public class DataCleanupScheduler {
     public void cleanup() {
         log.info("DataCleanupScheduler.cleanup.start", "開始資料清理");
 
-        // 清理已處理的 inbox（保留 N 天）。
-        // terminal 狀態：ENQUEUED（已入隊）、DEDUPED（保留未用）、IGNORED（UNKNOWN 已稽核不投遞）。
-        // FAILED 不清 — 失敗 inbox 留作人工排查或 replay 路徑復原依據。
         var inboxCutoff = DateTimeUtils.nowUtc().minusDays(inboxRetentionDays);
         int inboxDeleted = inboxMapper.delete(
                 new LambdaQueryWrapper<WebhookInbox>()
@@ -62,7 +59,6 @@ public class DataCleanupScheduler {
         log.info("DataCleanupScheduler.inbox.cleaned",
                 "Inbox 清理完成", "count", String.valueOf(inboxDeleted));
 
-        // 清理已發送的 outbox（保留 N 天）
         var sentCutoff = DateTimeUtils.nowUtc().minusDays(outboxSentRetentionDays);
         int sentDeleted = outboxMapper.delete(
                 new LambdaQueryWrapper<OutboxEvent>()
@@ -71,7 +67,6 @@ public class DataCleanupScheduler {
         log.info("DataCleanupScheduler.outbox.sent.cleaned",
                 "已發送 Outbox 清理完成", "count", String.valueOf(sentDeleted));
 
-        // 清理死信 outbox（保留 N 天）
         var deadCutoff = DateTimeUtils.nowUtc().minusDays(outboxDeadRetentionDays);
         int deadDeleted = outboxMapper.delete(
                 new LambdaQueryWrapper<OutboxEvent>()

@@ -12,13 +12,9 @@ import (
 )
 
 const (
-	// batchSize 是一批處理的事件數，也是一次批次呼叫商品 port 的商品數上限。
 	batchSize int32 = 100
-	// maxBatches 是一次執行處理的批數上限：到了就停，下一次排程接著做（單次執行有界，積壓時不會一直占住 worker）。
 	maxBatches = 50
-	// portTimeout 是呼叫商品 port 的 deadline（port 的實作自己也可以更短）。
 	portTimeout = 10 * time.Second
-	// purgeBatch 是一個 transaction 刪除的事件數。
 	purgeBatch int32 = 1000
 )
 
@@ -45,7 +41,6 @@ func (s *Service) Rollup(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-// rollupBatch 處理一批，回傳讀到的事件數（沒讀滿代表取完了）與實際標記的事件數（別的 job 鎖住或已處理的不算）。
 func (s *Service) rollupBatch(ctx context.Context) (int, int, error) {
 	pending, err := store.New(s.d.DB.Conn(ctx)).PendingProductViewEvents(ctx, batchSize)
 	if err != nil || len(pending) == 0 {

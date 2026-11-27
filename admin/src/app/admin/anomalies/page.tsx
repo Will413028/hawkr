@@ -63,9 +63,6 @@ import {
 } from "./payment-lists";
 import ResolveAnomalyAction from "./ResolveAnomalyAction";
 
-// issue #1327：後端 6 群 admin 異常查詢 API 早已存在但前端零串接。本頁補上「異常監控」
-// 多 tab 面板：配送異常 / 異常訂單 / 付款異常 / 退款異常 / 轉帳異常。
-// 全走既有 BFF（api → /api/bff/[...path]），分頁 envelope {records,total,page,pageSize}（字串）。
 
 type TabKey = "shipping" | "orders" | "payments" | "refunds" | "grants";
 
@@ -79,7 +76,6 @@ const TABS: Array<{ key: TabKey; label: string; icon: MaterialSymbolName }> = [
 
 const PAGE_SIZE = 20;
 
-// ==================== 共用 UI ====================
 
 const thStyle: React.CSSProperties = {
 	padding: "12px 16px",
@@ -97,8 +93,6 @@ const tdStyle: React.CSSProperties = {
 	verticalAlign: "middle",
 };
 
-// 時間一律走 lib/format 的台北釘死版（backend#3053 的稽查）：本地這份用
-// toLocaleString 會跟著看的人的瀏覽器時區跑，而管理員不一定在台灣。
 const formatDT = formatTaipeiDateTimeShared;
 
 function formatAmount(raw: string | undefined): string {
@@ -232,7 +226,6 @@ const ignoreBtnStyle: React.CSSProperties = {
 	color: "#6b7280",
 };
 
-// ==================== 配送異常 ====================
 
 interface AdminShipmentAnomaly {
 	shipmentId: string;
@@ -244,9 +237,9 @@ interface AdminShipmentAnomaly {
 	shippingMethod: string;
 	shipmentStatus: string;
 	detectedAt: string;
-	ackAction: string; // admin 端處置
+	ackAction: string;
 	actedAt: string;
-	sellerAckAction: string; // #1327 賣家端處置（唯讀）
+	sellerAckAction: string;
 	sellerActedAt: string;
 }
 
@@ -285,12 +278,6 @@ function ShippingAnomaliesTab() {
 			});
 			if (anomalyType) params.set("anomaly_type", anomalyType);
 			if (severity) params.set("severity", severity);
-			// 後端 /admin/shipments/anomalies 讀的是 store_id（見
-			// shipment_anomaly.go resolveOptionalSellerFilterQuery，內部把此值當
-			// account_id 解析成現任 store_id 過濾——鍵名雖叫 store_id，值本身仍是
-			// 原始 account_id，gateway 負責解析）。2026-08 硬切自舊的
-			// seller_account_id，後端已移除舊鍵 fallback，改錯鍵名會讓篩選被後端
-			// DefaultQuery 忽略、靜默退化成「顯示全部」。
 			if (sellerIdApplied) params.set("store_id", sellerIdApplied);
 			const res = await api.get<ShipmentAnomalyListResp>(
 				`/api/v1/admin/shipments/anomalies?${params}`,
@@ -529,7 +516,6 @@ function ShippingAnomaliesTab() {
 	);
 }
 
-// ==================== 異常訂單 ====================
 
 interface AbnormalOrder {
 	orderNo: string;
@@ -556,19 +542,12 @@ interface AbnormalOrderListResp {
 	};
 }
 
-// 異常訂單 status 常見值（預設 35 物流異常）。
 const ABNORMAL_ORDER_STATUS_OPTS = ["35", "30", "32", "40", "60", "70", "80"];
 
 function AbnormalOrdersTab({ handoff }: { handoff: AnomalyHandoff }) {
 	const [page, setPage] = useState(1);
-	// 代行交接帶了狀態就用它：`GET /admin/orders/abnormal` 未帶 status 時後端預設
-	// 只回 35，從一筆付款異常的訂單點過來會落在一份查無此單的清單上。
 	const [status, setStatus] = useState(handoff.status ?? "35");
-	// providerSource 後端無 server 端過濾參數（僅 provider_status raw-code exact match），
-	// 故此處為本頁 client 端檢視過濾；筆數以伺服器 total 為準。
 	const [providerSource, setProviderSource] = useState("");
-	// 交接帶來的訂單編號同樣沒有 server 參數（該端點的 @Param 清單無 order_no），
-	// 所以它是**本頁**過濾；真正把範圍收窄的是 store_id，那個有 server 參數。
 	const [orderNo, setOrderNo] = useState(handoff.orderNo ?? "");
 	const storeId = handoff.storeId;
 
@@ -604,8 +583,6 @@ function AbnormalOrdersTab({ handoff }: { handoff: AnomalyHandoff }) {
 		return rows;
 	}, [records, providerSource, orderNo]);
 
-	// 交接帶來的 status 可能不在常見值清單裡（例如從一筆已付款訂單點過來），
-	// 補進選項才不會出現一個「選了卻不在選單裡」的下拉。
 	const statusOpts = useMemo(
 		() =>
 			status && !ABNORMAL_ORDER_STATUS_OPTS.includes(status)
@@ -680,8 +657,6 @@ function AbnormalOrdersTab({ handoff }: { handoff: AnomalyHandoff }) {
 							{visible.map((r) => (
 								<tr
 									key={r.orderNo}
-									// 交接帶來的那一筆標出來：清單裡同店同狀態可能有好幾筆，
-									// 「帶了訂單編號過來」卻要人自己一列一列對，等於沒帶。
 									style={
 										handoff.orderNo && r.orderNo === handoff.orderNo
 											? { background: "#fff7e6" }
@@ -736,7 +711,6 @@ function AbnormalOrdersTab({ handoff }: { handoff: AnomalyHandoff }) {
 	);
 }
 
-// ==================== 付款 / 退款 / 轉帳（PaymentAdminService） ====================
 
 const subTextStyle: React.CSSProperties = { fontSize: 12, color: "#9ca3af" };
 
@@ -1198,12 +1172,8 @@ function GrantAnomaliesTab() {
 	);
 }
 
-// ==================== 頁面 ====================
 
 export default function AnomaliesPage() {
-	// 代行工作區的訂單抽屜會帶著 tab／store_id／order_no／status 導到這裡（§6.7
-	// 「平台異常處置會離開代行工作區並重新驗治理權限」）。治理權限就是 /admin 的
-	// admin session，這些參數只決定落在哪個 tab、看哪一家店，不參與任何授權判定。
 	const searchParams = useSearchParams();
 	const handoff = useMemo(
 		() => parseAnomalyHandoff(searchParams),

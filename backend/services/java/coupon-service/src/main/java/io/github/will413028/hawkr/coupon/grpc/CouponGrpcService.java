@@ -80,7 +80,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
         this.buyerGrpcClient = buyerGrpcClient;
     }
 
-    // ==================== Buyer ====================
 
     @Override
     public void listMyCoupons(ListMyCouponsRequest request, StreamObserver<ListMyCouponsResponse> responseObserver) {
@@ -92,10 +91,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             int page = parseIntOrDefault(request.getPage(), 1);
             int pageSize = parseIntOrDefault(request.getPageSize(), 20);
 
-            // §6.8.1 status 解析：只認 CouponInstanceStatus.value()，禁止 code 字面比對
-            // - 不傳 / 空 → 兩者皆查
-            // - "0" → 僅 UNUSED；"2" → 僅 USED；"0,2" → 兩者
-            // - 其他值 → INVALID_PARAM（禁止靜默回空）
             String statusParam = request.getStatus();
             boolean wantUnused;
             boolean wantUsed;
@@ -112,7 +107,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     CouponInstanceStatus s = CouponInstanceStatus.fromValue(v);
                     if (s == CouponInstanceStatus.UNUSED) wantUnused = true;
                     else if (s == CouponInstanceStatus.USED) wantUsed = true;
-                    // 其他合法 value（RESERVED/EXPIRED/REVOKED/ANNUL）目前不對應任何分支，安全忽略
                 }
             }
 
@@ -120,17 +114,13 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage(GrpcResponseCode.SUCCESS.message());
 
-            // ========== 可用券（records）：可見性規則下放至 SQL，過濾先於分頁（§6.7） ==========
             if (wantUnused) {
-                // 預先載入跨服務資料（request scope 快取）
                 long buyerCreatedAt = accountGrpcClient.getAccountCreatedAt(rawAccountId);
                 Set<Long> memberSellerIds = orderGrpcClient.getBuyerMemberSellerIds(buyerId);
 
-                // §6.8：在 SQL 層套用 4 種 targetType 對稱可見性條件
                 Page<CouponTemplateEntity> templateResult = templateService.listAvailableForBuyer(
                         page, pageSize, null, buyerId, buyerCreatedAt, memberSellerIds);
 
-                // 查詢已有 USED/RESERVED Instance 的 template_id（排除已用）
                 Set<Long> usedTemplateIds = instanceService.listByOwner(buyerId, null, 1, 9999)
                         .getRecords().stream()
                         .filter(inst -> CouponInstanceStatus.USED.value().equals(inst.getStatus())
@@ -138,7 +128,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                         .map(CouponInstanceEntity::getTemplateId)
                         .collect(java.util.stream.Collectors.toSet());
 
-                // 批次查詢已領取的 template_id
                 Set<Long> claimedTemplateIds = claimService.getClaimedTemplateIds(buyerId);
 
                 List<CouponTemplateEntity> eligible = new ArrayList<>();
@@ -160,7 +149,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                 builder.setTotal(String.valueOf(eligible.size()));
             }
 
-            // ========== 已使用券（used_records）==========
             if (wantUsed) {
                 Page<CouponInstanceEntity> usedResult = instanceService.listByOwner(
                         buyerId, CouponInstanceStatus.USED.value(), page, pageSize);
@@ -199,15 +187,12 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             Long storeId = parseNullableLong(request.getStoreId());
             Long orderAmount = parseNullableLong(request.getOrderAmount());
 
-            // 跨服務資料
             long buyerCreatedAt = accountGrpcClient.getAccountCreatedAt(rawAccountId);
             Set<Long> memberSellerIds = orderGrpcClient.getBuyerMemberSellerIds(buyerId);
 
-            // §6.9：在 SQL 層套用 4 種 targetType 對稱可見性條件，過濾先於分頁
             Page<CouponTemplateEntity> result = templateService.listAvailableForBuyer(
                     page, pageSize, storeId, buyerId, buyerCreatedAt, memberSellerIds);
 
-            // 已用/鎖定的 template_id
             Set<Long> usedTemplateIds = instanceService.listByOwner(buyerId, null, 1, 9999)
                     .getRecords().stream()
                     .filter(inst -> CouponInstanceStatus.USED.value().equals(inst.getStatus())
@@ -215,15 +200,12 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     .map(CouponInstanceEntity::getTemplateId)
                     .collect(java.util.stream.Collectors.toSet());
 
-            // 已領取的 template_id（用於過濾 claim_required 但未領取的券）
             Set<Long> claimedTemplateIds = claimService.getClaimedTemplateIds(buyerId);
 
             List<CouponTemplateEntity> eligible = new ArrayList<>();
             for (CouponTemplateEntity tpl : result.getRecords()) {
                 if (usedTemplateIds.contains(tpl.getTemplateId())) continue;
-                // 門檻篩選
                 if (orderAmount != null && tpl.getThresholdAmount() != null && orderAmount < tpl.getThresholdAmount()) continue;
-                // 結帳頁排除「需領取但未領」的券（與可見性正交的維度）
                 if (Boolean.TRUE.equals(tpl.getClaimRequired())
                         && !claimedTemplateIds.contains(tpl.getTemplateId())) {
                     continue;
@@ -244,7 +226,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
 
             for (CouponTemplateEntity tpl : eligible) {
                 SellerMeta tplSellerMeta = sellerMetaOf(sellerMetaMap, tpl.getApplicableStoreId());
-                // 計算預算折扣
                 long discount = 0;
                 if (orderAmount != null) {
                     discount = instanceService.calculateDiscountForTemplate(tpl, orderAmount);
@@ -273,10 +254,8 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             long rawAccountId = request.getAccountId();
             Long templateId = parseLong(request.getTemplateId(), "template_id");
 
-            // 1. 取得模板，驗證存在
             CouponTemplateEntity template = templateService.getActiveTemplate(templateId);
 
-            // 2. 驗證 ACTIVE 狀態 + 時間有效
             if (!CouponTemplateStatus.ACTIVE.value().equals(template.getStatus())) {
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_CLAIM_REQUIRES_ACTIVE);
             }
@@ -285,13 +264,11 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_CLAIM_OUT_OF_WINDOW);
             }
 
-            // 3. 驗證 claim_required = TRUE
             if (!Boolean.TRUE.equals(template.getClaimRequired())) {
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_CLAIM_NOT_REQUIRED,
                         GrpcResponseCode.COUPON_CLAIM_NOT_REQUIRED.message());
             }
 
-            // 4. target_type 資格檢查（與 listMyCoupons 相同邏輯）
             long buyerCreatedAt = accountGrpcClient.getAccountCreatedAt(rawAccountId);
             Set<Long> memberSellerIds = orderGrpcClient.getBuyerMemberSellerIds(buyerId);
             List<Long> designatedTemplateIds = targetAccountMapper.selectTemplateIdsByBuyerId(buyerId);
@@ -300,17 +277,14 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                         "不符合此優惠券的領取資格");
             }
 
-            // 5. total_issue_limit 檢查
             if (template.getTotalIssueLimit() != -1
                     && template.getIssuedCount() >= template.getTotalIssueLimit()) {
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_ISSUE_LIMIT_REACHED,
                         GrpcResponseCode.COUPON_ISSUE_LIMIT_REACHED.message());
             }
 
-            // 6. 領取（冪等）
             LocalDateTime claimedAt = claimService.claimCoupon(templateId, buyerId);
 
-            // 7. 回傳
             BuyerClaimCouponResponse response = BuyerClaimCouponResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage(GrpcResponseCode.SUCCESS.message())
@@ -326,7 +300,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
         }
     }
 
-    // ==================== Order Internal ====================
 
     @Override
     public void validateCoupon(ValidateCouponRequest request, StreamObserver<ValidateCouponResponse> responseObserver) {
@@ -423,7 +396,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
         }
     }
 
-    // ==================== Seller ====================
 
     /**
      * 自發自用防護（resolve-to-principal，Plan 2b）：賣家側 id 解析出的 principal
@@ -441,10 +413,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
      */
     static void enforceNoSelfIssueForTest(SellerGrpcClient sellerGrpcClient, BuyerGrpcClient buyerGrpcClient,
                                            long storeId, List<Long> buyerIds) {
-        // fail-closed（issue #2789 階段 B1）：兩側都必須是<b>真正解析出來</b>的 account_id。
-        // seller/buyer service 對查無在架列的 id 會把輸入原樣回吐成合法非零值，舊寫法
-        // getOrDefault(id, id) 分辨不出來 ⇒「無法確認是不是同一個人」被當成「不是同一個人」
-        // ⇒ 自發自用防護靜默失效。未解析一律拒絕，不拿 echo-back 做身分比對。
         long sellerPrincipal;
         Map<Long, Long> buyerPrincipals;
         try {
@@ -465,8 +433,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     "指定的 buyer_id 查無在架買家，自發自用防護無法評估，fail-closed 拒絕發券："
                             + e.getMessage(),
                     "storeId", String.valueOf(storeId));
-            // 防枚舉（API 設計規範 §14.1）：不把「哪些 buyer_id 不存在」回給呼叫端，
-            // 否則這個錯誤就成了買家存在性的探測器。具體 id 只進 log。
             throw new CouponBusinessException(GrpcResponseCode.INVALID_PARAM,
                     "buyer_ids 含無法驗證的買家");
         }
@@ -485,10 +451,8 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             GrpcAuthContext.requireAccountType(AccountType.SELLER);
             long storeId = request.getStoreId();
 
-            // 配額檢查
             quotaService.checkQuota(storeId);
 
-            // 驗證 target_type
             String targetType = request.getTargetType();
             CodeMetaValidator.requireValidValue(CouponTargetType.class, targetType, "target_type");
             CouponTargetType targetTypeEnum = CouponTargetType.fromValue(targetType);
@@ -497,7 +461,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                         "賣家不允許的 target_type: " + targetType);
             }
 
-            // DESIGNATED 時必須提供買家列表
             List<Long> buyerIds = new ArrayList<>();
             if (CouponTargetType.DESIGNATED.value().equals(targetType)) {
                 for (String idStr : request.getBuyerIdsList()) {
@@ -507,13 +470,9 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     throw new CouponBusinessException(GrpcResponseCode.INVALID_PARAM,
                             "DESIGNATED 模式下 buyer_ids 不可為空");
                 }
-                // 自發自用防護（resolve-to-principal，Plan 2b）。RPC 失敗會拋
-                // StatusRuntimeException，直接交給本方法外層既有的 catch (Exception e)
-                // → onSystemError 處理（fail-closed：模板不會建立）。
                 enforceNoSelfIssueForTest(sellerGrpcClient, buyerGrpcClient, storeId, buyerIds);
             }
 
-            // 建立模板
             CouponTemplateEntity template = templateService.createSellerTemplate(
                     storeId,
                     request.getTitle(),
@@ -526,7 +485,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     parseDateTimeRequired(request.getStartAt(), "start_at"),
                     parseDateTimeRequired(request.getEndAt(), "end_at"));
 
-            // DESIGNATED 時寫入 coupon_target_accounts
             if (CouponTargetType.DESIGNATED.value().equals(targetType)) {
                 insertTargetAccounts(template.getTemplateId(), buyerIds);
             }
@@ -595,38 +553,21 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             Long templateId = parseLong(request.getTemplateId(), "template_id");
 
             CouponTemplateEntity template = templateService.getActiveTemplate(templateId);
-            // issuer_store_id 現為 SELLER-only 欄位（V6 migration 的寫入路徑保證：ADMIN 建立
-            // 路徑寫 issuer_account_id、SELLER 建立路徑寫 issuer_store_id，見
-            // CouponTemplateService）。但 V6 這次只做 expand（見該 migration 檔頭註解），DB 層
-            // 的 chk_tpl_issuer_identity CHECK constraint 依 expand-contract 規範延後到 contract
-            // release 才加，尚未真的存在 —— 這段 issuer_type=SELLER 判斷目前是唯一擋線，不是
-            // DB CHECK 之外的第二層防線。先確認 issuer_type=SELLER 才比對 issuer_store_id：一是
-            // 避免對 null 呼叫 .equals() 產生 NPE，二是維持越權防枚舉語意——非本店家（含 ADMIN
-            // 發的）模板一律當「不存在」。
             if (!IssuerType.SELLER.value().equals(template.getIssuerType())
                     || !template.getIssuerStoreId().equals(storeId)) {
-                // 越權防枚舉（API 設計規範 §14.1）：回應與「模板不存在」一致
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_NOT_FOUND);
             }
 
             int usedCount = instanceService.countByTemplateAndStatus(templateId, CouponInstanceStatus.USED.value());
             int reservedCount = instanceService.countByTemplateAndStatus(templateId, CouponInstanceStatus.RESERVED.value());
 
-            // 建立基本 TemplateInfo
             TemplateInfo.Builder templateInfoBuilder = toTemplateInfo(template).toBuilder();
 
-            // DESIGNATED / COMPENSATION 時查詢指定帳號並聚合暱稱 + 電話
             String targetType = template.getTargetType();
             if (CouponTargetType.DESIGNATED.value().equals(targetType)
                     || CouponTargetType.COMPENSATION.value().equals(targetType)) {
                 List<Long> buyerIds = targetAccountMapper.selectBuyerIdsByTemplateId(templateId);
                 if (!buyerIds.isEmpty()) {
-                    // buyer_id 是 stint-scoped 身分，AccountGrpcClient 是用 raw account_id
-                    // 當主鍵查 accounts 表 —— 分岔買家（buyer_id != 目前登入 account_id）
-                    // 若直接把 buyer_id 丟進去查會找不到人，nickname/phone 靜默回空字串
-                    // （buyer_id rekey Phase 5 既有缺口，見 coupon.proto TargetAccountInfo
-                    // 註解）。resolvePrincipals 失敗（RPC 例外）或某 buyer_id 沒有解析到存活的買家時，那位收券人
-                    // 不查帳號資訊（沒有電話），不拿 buyer_id 冒充 account_id 去查別人的電話；不阻斷本次查詢。
                     PrincipalResolution resolvedPrincipals;
                     try {
                         resolvedPrincipals = buyerGrpcClient.resolvePrincipals(buyerIds);
@@ -635,7 +576,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                                 "buyer_id -> account_id 批次反查失敗，收券人的電話欄位留空", e);
                         resolvedPrincipals = PrincipalResolution.empty();
                     }
-                    // 每位收券人只解析一次（未解析的只記一行 warn）；0 表示沒有解析到存活的買家。
                     PrincipalResolution principalsByBuyerId = resolvedPrincipals;
                     Map<Long, Long> accountIdByBuyerId = new java.util.LinkedHashMap<>();
                     for (Long buyerId : buyerIds) {
@@ -648,9 +588,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     var accountInfoMap = resolvedAccountIds.isEmpty()
                             ? Map.<Long, io.github.will413028.hawkr.account.grpc.AccountInfo>of()
                             : accountGrpcClient.batchGetAccountInfo(resolvedAccountIds);
-                    // 名字只有 buyer-service 有：accounts 表沒有 nickname 欄位，
-                    // AccountInfo.nickname 對每一位收券人都是空字串（不只已註銷者）。
-                    // 走 Display 版讓已註銷的收券人也顯示得出來（回墓碑字串）。#2830
                     Map<Long, io.github.will413028.hawkr.buyer.grpc.BuyerDisplay> buyerDisplayMap;
                     try {
                         buyerDisplayMap = buyerGrpcClient.batchGetBuyerDisplayByBuyerIds(buyerIds);
@@ -739,7 +676,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             Page<CouponInstanceEntity> result = instanceService.listBuyerCouponsForSeller(
                     storeId, buyerId, request.getStatus(), page, pageSize);
 
-            // 批量查詢賣家名稱
             Map<Long, SellerMeta> sellerMetaMap = batchGetSellerMeta(result.getRecords().stream()
                     .map(CouponInstanceEntity::getApplicableStoreId)
                     .filter(Objects::nonNull)
@@ -768,7 +704,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
         }
     }
 
-    // ==================== Admin ====================
 
     @Override
     public void adminCreateTemplate(AdminCreateTemplateRequest request,
@@ -786,8 +721,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                 buyerIds.add(Long.parseLong(id));
             }
 
-            // claim_required: proto3 預設 false，但 createTemplate 預設 true
-            // Gateway 應在 admin 未指定時傳 true
             Boolean claimRequired = request.getClaimRequired();
 
             CouponTemplateEntity template = templateService.createTemplate(
@@ -802,12 +735,11 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                     parseNullableLong(request.getMaxDiscountAmount()),
                     parseDateTimeRequired(request.getStartAt(), "start_at"),
                     parseDateTimeRequired(request.getEndAt(), "end_at"),
-                    null,  // usageLimitPerAccount (default 1)
+                    null,
                     parseNullableInt(request.getTotalIssueLimit()),
                     buyerIds,
                     claimRequired);
 
-            // DESIGNATED / COMPENSATION 時寫入 coupon_target_accounts
             if (CouponTargetTypeRules.requiresTargetAccounts(CouponTargetType.fromValue(targetType))
                     && !buyerIds.isEmpty()) {
                 insertTargetAccounts(template.getTemplateId(), buyerIds);
@@ -891,11 +823,9 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                 buyerIds.add(parseLong(idStr, "buyer_ids"));
             }
 
-            // 寫入 coupon_target_accounts
             insertTargetAccounts(templateId, buyerIds);
             cacheService.evictAvailableList();
 
-            // immediate_distribute: 立即代領
             int distributedCount = 0;
             if (request.getImmediateDistribute() && !buyerIds.isEmpty()) {
                 distributedCount = claimService.batchClaimForBuyers(templateId, buyerIds);
@@ -922,23 +852,19 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             GrpcAuthContext.requireAccountType(AccountType.ADMIN);
             Long templateId = parseLong(request.getTemplateId(), "template_id");
 
-            // 驗證模板存在且 ACTIVE
             CouponTemplateEntity template = templateService.getActiveTemplate(templateId);
             if (!CouponTemplateStatus.ACTIVE.value().equals(template.getStatus())) {
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_DISTRIBUTE_REQUIRES_ACTIVE);
             }
 
-            // 驗證 claim_required = TRUE
             if (!Boolean.TRUE.equals(template.getClaimRequired())) {
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_CLAIM_NOT_REQUIRED,
                         GrpcResponseCode.COUPON_CLAIM_NOT_REQUIRED.message());
             }
 
-            // 取得白名單帳號
             List<Long> targetAccountIds = targetAccountMapper.selectBuyerIdsByTemplateId(templateId);
             int totalTargetCount = targetAccountIds.size();
 
-            // 批量代領（INSERT IGNORE 冪等）
             int distributedCount = 0;
             if (!targetAccountIds.isEmpty()) {
                 distributedCount = claimService.batchClaimForBuyers(templateId, targetAccountIds);
@@ -971,21 +897,15 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
             if (amount <= 0) {
                 throw new IllegalArgumentException("補償金額 必須大於 0");
             }
-            // 適用商店必填。這裡刻意不用 parseNullableLong——它把空字串「和」格式
-            // 錯誤都吞成 null，而 null 在 Scope 檢查裡等同「全平台任何商店都能用」
-            // （設計書 07 §2.3），等於讓一個打錯的欄位名把限店補償券放大成全平台
-            // 券。缺值／格式錯一律 INVALID_PARAM。
             Long applicableStoreId = parseLong(request.getApplicableStoreId(), "applicable_store_id");
             if (applicableStoreId <= 0) {
                 throw new CouponBusinessException(GrpcResponseCode.INVALID_PARAM,
                         "applicable_store_id 必須為正整數");
             }
 
-            // 建立 COMPENSATION 模板
             CouponTemplateEntity template = templateService.createCompensationTemplate(
                     adminAccountId, amount, applicableStoreId);
 
-            // 寫入 coupon_target_accounts
             insertTargetAccounts(template.getTemplateId(), List.of(buyerId));
 
             responseObserver.onNext(AdminGrantCompensationCouponResponse.newBuilder()
@@ -1050,20 +970,16 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
         }
     }
 
-    // ==================== AfterSales Service 呼叫 ====================
 
     @Override
     public void grantSellerCompensationCoupon(GrantSellerCompensationCouponRequest request,
                                                StreamObserver<GrantSellerCompensationCouponResponse> responseObserver) {
         try {
-            // 內部服務呼叫，不檢查角色（由 x-internal-service 自動識別）
             Long storeId = parseLong(request.getStoreId(), "store_id");
             Long buyerId = parseLong(request.getBuyerId(), "buyer_id");
             Long amount = parseLong(request.getAmount(), "amount");
             Long minOrderAmount = parseLong(request.getMinOrderAmount(), "min_order_amount");
 
-            // 驗證集中化：補償券業務規則的唯一真實來源（依設計書 §5.12）
-            // 上游 service（aftersales 等）不再重複驗證，避免規則散落 + 內部直呼繞過。
             if (amount <= 0) {
                 throw new CouponBusinessException(GrpcResponseCode.INVALID_PARAM,
                         "補償金額必須大於 0");
@@ -1072,17 +988,14 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                 throw new CouponBusinessException(GrpcResponseCode.INVALID_PARAM,
                         "最低消費必須大於 0");
             }
-            // 業務規則：最低消費 >= 面額 * 5、最低消費 - 面額 >= 100
             if (minOrderAmount < amount * 5 || minOrderAmount - amount < 100) {
                 throw new CouponBusinessException(GrpcResponseCode.COUPON_RULE_VIOLATED);
             }
             String caseNo = request.getRefCaseNo();
 
-            // 建立賣家補償券模板（target_type=COMPENSATION）
             CouponTemplateEntity template = templateService.createSellerCompensationTemplate(
                     storeId, amount, minOrderAmount, caseNo);
 
-            // 寫入 coupon_target_accounts
             insertTargetAccounts(template.getTemplateId(), List.of(buyerId));
 
             SellerCompensationCouponData data = SellerCompensationCouponData.newBuilder()
@@ -1106,7 +1019,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
         }
     }
 
-    // ==================== 工具方法 ====================
 
     /**
      * 批次寫入 coupon_target_accounts
@@ -1124,7 +1036,7 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                                 long buyerCreatedAt, Set<Long> memberSellerIds,
                                 List<Long> designatedTemplateIds) {
         String targetType = tpl.getTargetType();
-        if (targetType == null) return true; // 舊資料相容
+        if (targetType == null) return true;
 
         String allValue = CouponTargetType.ALL.value();
         String memberValue = CouponTargetType.MEMBER.value();
@@ -1132,18 +1044,15 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
         String compensationValue = CouponTargetType.COMPENSATION.value();
 
         if (allValue.equals(targetType)) {
-            // 買家註冊時間 <= template.created_at
-            if (buyerCreatedAt < 0) return false; // Account Service 呼叫失敗
+            if (buyerCreatedAt < 0) return false;
             long templateCreatedAtMs = tpl.getCreatedAt() != null
                     ? tpl.getCreatedAt().toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
                     : Long.MAX_VALUE;
             return buyerCreatedAt <= templateCreatedAtMs;
         } else if (memberValue.equals(targetType)) {
-            // 買家在該賣家有完成交易紀錄
             Long sellerId = tpl.getApplicableStoreId();
             return sellerId != null && memberSellerIds.contains(sellerId);
         } else if (designatedValue.equals(targetType) || compensationValue.equals(targetType)) {
-            // 在 coupon_target_accounts 表
             return designatedTemplateIds.contains(tpl.getTemplateId());
         } else {
             return true;
@@ -1189,7 +1098,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                 .setCreatedAt(formatDateTime(tpl.getCreatedAt()))
                 .setSellerName(sellerMeta != null ? sellerMeta.getSellerName() : "")
                 .setSellerAvatarKey(sellerMeta != null ? sellerMeta.getLogoKey() : "")
-                // 賣家頁 canonical 網址走 store_code；值與店名同在這一份 SellerMeta 裡
                 .setStoreCode(sellerMeta != null ? sellerMeta.getStoreCode() : "")
                 .setTargetType(tpl.getTargetType() != null ? tpl.getTargetType() : "")
                 .setClaimRequired(claimRequired)
@@ -1228,7 +1136,6 @@ public class CouponGrpcService extends CouponServiceGrpc.CouponServiceImplBase {
                 .setCreatedAt(formatDateTime(inst.getCreatedAt()))
                 .setSellerName(sellerMeta != null ? sellerMeta.getSellerName() : "")
                 .setSellerAvatarKey(sellerMeta != null ? sellerMeta.getLogoKey() : "")
-                // 賣家頁 canonical 網址走 store_code；值與店名同在這一份 SellerMeta 裡
                 .setStoreCode(sellerMeta != null ? sellerMeta.getStoreCode() : "");
 
         if (inst.getApplicableStoreId() != null) {

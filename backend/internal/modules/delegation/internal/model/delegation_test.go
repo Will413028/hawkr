@@ -40,7 +40,6 @@ func TestAuditActionRules(t *testing.T) {
 		{AuditProductPublish, RiskHigh, "上架商品"},
 		{AuditOrderPIIReveal, RiskHigh, "查看訂單完整收件資訊"},
 		{AuditOrderRead, RiskLow, "查看訂單（被拒絕）"},
-		// 沒有登錄的動作：風險 fail closed 成 high，標籤回傳原值。
 		{"ORDER_REFUND_APPROVE", RiskHigh, "ORDER_REFUND_APPROVE"},
 	}
 	for _, c := range cases {
@@ -74,7 +73,6 @@ func TestReasons(t *testing.T) {
 			t.Errorf("%+v", o)
 		}
 	}
-	// 不認得的理由沒有標籤（不會被當成標籤存起來），而且要案件編號（fail closed）。
 	if r := DelegationReason("seller_request"); r.Label() != "" || !r.CaseReferenceRequired() {
 		t.Fatal("不認得的理由")
 	}

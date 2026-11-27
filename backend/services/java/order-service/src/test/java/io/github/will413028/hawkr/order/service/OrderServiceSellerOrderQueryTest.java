@@ -41,7 +41,6 @@ class OrderServiceSellerOrderQueryTest {
     void keywordWildcardsAreEscaped() {
         assertThat(query("100%", "", "").getKeywordPattern()).isEqualTo("%100\\%%");
         assertThat(query("a_b", "", "").getKeywordPattern()).isEqualTo("%a\\_b%");
-        // 跳脫字元本身要先處理，否則使用者輸入的 "\%" 會被還原成萬用字元
         assertThat(query("\\%", "", "").getKeywordPattern()).isEqualTo("%\\\\\\%%");
     }
 

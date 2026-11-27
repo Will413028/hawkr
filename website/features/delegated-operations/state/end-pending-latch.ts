@@ -61,8 +61,6 @@ export function writeEndPendingSessionId(
 	try {
 		store.setItem(DELEGATED_END_PENDING_STORAGE_KEY, sessionId);
 	} catch {
-		// 寫不進去只代表這一輪的封鎖無法跨 document 存活，記憶體那一半仍然成立；
-		// 為了寫 log 而讓工作區炸開沒有意義。
 	}
 }
 
@@ -73,7 +71,6 @@ export function clearEndPendingSessionId(
 	try {
 		store.removeItem(DELEGATED_END_PENDING_STORAGE_KEY);
 	} catch {
-		// 同上。
 	}
 }
 

@@ -133,7 +133,6 @@ export function buildContentSecurityPolicy(
 		"frame-src 'self' https://accounts.google.com https://apis.google.com https://connect-js.stripe.com https://js.stripe.com https://hooks.stripe.com",
 		"worker-src 'self' blob:",
 		"manifest-src 'self'",
-		// Collects violations at app/api/csp-report/route.ts → Sentry.
 		"report-uri /api/csp-report",
 	].join("; ");
 }

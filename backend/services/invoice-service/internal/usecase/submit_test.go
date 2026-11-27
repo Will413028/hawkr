@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// submitHarness 把一張已經 claim 到 SENDING 的 B2C 發票擺好。
 func submitHarness(t *testing.T, mutateDoc func(*domain.Document)) *harness {
 	t.Helper()
 	h := newHarness(t, approvedProfile(1), activeAccount())
@@ -49,9 +48,6 @@ func submitHarness(t *testing.T, mutateDoc func(*domain.Document)) *harness {
 	return h
 }
 
-// ---------------------------------------------------------------------------
-// happy path
-// ---------------------------------------------------------------------------
 
 func TestSubmit_SuccessIssuesAndEnqueuesOutbox(t *testing.T) {
 	h := submitHarness(t, nil)
@@ -83,11 +79,9 @@ func TestSubmit_SuccessIssuesAndEnqueuesOutbox(t *testing.T) {
 	if got.ProviderInvoiceNo != "AB12345678" || got.ProviderRandomCode != "4321" {
 		t.Errorf("號碼未回填：%+v", got)
 	}
-	// 註 5：invoice_date 是我方認定的應開立日，document 建立當下固定、不隨 provider 回傳值移動。
 	if got.InvoiceDateTaipei == nil || !got.InvoiceDateTaipei.Equal(time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("invoice_date_taipei 被 provider 回傳值覆蓋了：%v", got.InvoiceDateTaipei)
 	}
-	// 無載具 ⇒ 進 INV.pdf 候選集合；上傳輪詢一律進。
 	if got.PdfFetchNextAt == nil {
 		t.Error("無載具發票應進 PDF 抓取候選集合")
 	}
@@ -104,7 +98,6 @@ func TestSubmit_SuccessIssuesAndEnqueuesOutbox(t *testing.T) {
 	if ev.RoutingKey != pkgmq.RoutingKeyInvoiceIssued || ev.Exchange != pkgmq.ExchangeInvoice {
 		t.Errorf("routing key/exchange = %q/%q", ev.RoutingKey, ev.Exchange)
 	}
-	// §6.3.3.2 邊界②：random_code 是憑證不是資料（invoice_no + random_code 就查得到整張發票）。
 	if containsBytes(ev.Payload, "4321") {
 		t.Error("payload 帶了 random_code —— 它是憑證，不得進 MQ")
 	}
@@ -128,17 +121,14 @@ func TestSubmit_CarrierInvoiceSkipsPdfCandidateSet(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 四分類落點（§4.5.6 → §7.3.2）
-// ---------------------------------------------------------------------------
 
 func TestSubmit_ErrorClassRouting(t *testing.T) {
 	cases := []struct {
 		name string
 		err  *amego.APIError
 
-		wantSend     bool // 有沒有落 ISSUE_FAILED
-		wantUnknown  bool // 有沒有落 WAITING_CONFIRMATION
+		wantSend     bool
+		wantUnknown  bool
 		wantRetry    bool
 		wantSeller   bool
 		wantPermFail bool
@@ -226,7 +216,7 @@ func TestSubmit_NonProviderErrorGoesToReconcile(t *testing.T) {
 // J14：attempt_count 達 MaxAttempts ⇒ 先走完 J12 再走 J14（後者的 allowed-from 是 RETRY_SCHEDULED）。
 func TestSubmit_RetryExhaustedTakesBothEdges(t *testing.T) {
 	h := submitHarness(t, nil)
-	h.ops.stored.AttemptCount = 12 // 下一次 ＝ 13 ＝ MaxAttempts
+	h.ops.stored.AttemptCount = 12
 	h.provider.err = &amego.APIError{Code: "18", Class: amego.ClassRetryable, Msg: "DB 忙碌"}
 
 	if err := h.uc.Submit(context.Background(), 900002); err != nil {
@@ -403,13 +393,9 @@ func TestSubmit_ReissueEmitsBothIssuedAndReissued(t *testing.T) {
 		reissued.Exchange != pkgmq.ExchangeInvoice {
 		t.Errorf("event_type/exchange = %q/%q", reissued.EventType, reissued.Exchange)
 	}
-	// 冪等鍵：CodeMeta 逐字 `INV:{new_document_id}`。用原票 id 會與原票那則的鍵相同
-	// ⇒ notification 端的 UNIQUE(user_id,user_type,event_type,reference_id) 把它吞掉。
 	if !containsBytes(reissued.Payload, `"notification_ref_id":"INV:900001"`) {
 		t.Errorf("冪等鍵不是 INV:{新 document id}：%s", reissued.Payload)
 	}
-	// 🔴 兩個號碼必須取自不同來源。填反了買家會看到「原發票 X 已作廢並重新開立，
-	// 新發票號碼 X」——同一個號碼，而且不會有任何東西報錯。
 	if !containsBytes(reissued.Payload, `"voided_invoice_no":"AA10000437"`) {
 		t.Errorf("voided_invoice_no 不是原票號：%s", reissued.Payload)
 	}
@@ -427,11 +413,8 @@ func TestSubmit_ReissueWithoutCorrectionStillEmitsReissued(t *testing.T) {
 	origNo := "AA10000999"
 	h := submitHarness(t, func(d *domain.Document) { d.OriginalDocumentID = &origID })
 	h.docs.byID = map[int64]domain.Document{
-		// Status 必填：MarkSuperseded 的 allowed-from 是 ('VOIDED','ISSUED')，
-		// 空字串在真實 SQL 上是 rows=0（2026-09-08 fake 補上該述詞後才現形）。
 		origID: {ID: origID, Status: codemeta.InvoiceDocumentStatusVoided.Value, ProviderInvoiceNo: &origNo},
 	}
-	// 刻意不設 openByDoc ⇒ GetOpenByDocument 回 9307，completeReissueIfAny 提早 return。
 
 	if err := h.uc.Submit(context.Background(), 900002); err != nil {
 		t.Fatalf("Submit: %v", err)
@@ -447,11 +430,7 @@ func TestSubmit_ReissueWithoutCorrectionStillEmitsReissued(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §P12：手機條碼載具的送出前驗證（#3256）
-// ---------------------------------------------------------------------------
 
-// barcodeHarness 給一張帶手機條碼載具的 B2C 發票。
 func barcodeHarness(t *testing.T, barcode string) *harness {
 	t.Helper()
 	carrier := domain.AmegoCarrierMobileBarcode
@@ -460,7 +439,6 @@ func barcodeHarness(t *testing.T, barcode string) *harness {
 	return h
 }
 
-// amegoErr 造一個帶碼的 provider 錯誤（*amego.APIError 是分流的唯一依據）。
 func amegoErr(code string) error {
 	return &amego.APIError{Endpoint: "/json/barcode", Code: code, Msg: "x", Class: amego.ClassPermanent}
 }
@@ -534,7 +512,7 @@ func TestSubmit_BarcodeVerifyFailureIsFailOpen(t *testing.T) {
 
 // 非手機條碼一律不驗：/json/barcode 只驗手機條碼，拿別的載具去問是白費一次配額。
 func TestSubmit_NonMobileBarcodeSkipsVerification(t *testing.T) {
-	h := submitHarness(t, nil) // 預設無載具
+	h := submitHarness(t, nil)
 	if err := h.uc.Submit(context.Background(), 900002); err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
@@ -546,9 +524,6 @@ func TestSubmit_NonMobileBarcodeSkipsVerification(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §5.2.1：已逾法定上傳期限 → AWAITING_MANUAL ＋ DEADLINE_MISSED
-// ---------------------------------------------------------------------------
 
 // 🔴 這支掃描之前不存在，而 §5.2.1 逐字要求它。business-alerts.yml 的
 // InvoiceStatutoryDeadlineOverdue 註解 2026-09-05 已記載「那支掃描不存在」，
@@ -558,12 +533,9 @@ func TestSweepOverdueStatutoryDeadlines_MarksOnlyEligibleStatuses(t *testing.T) 
 	h.docs.deadlineRows = []domain.Document{
 		{ID: 1, Status: codemeta.InvoiceDocumentStatusPending.Value},
 		{ID: 2, Status: codemeta.InvoiceDocumentStatusIssueFailed.Value},
-		// 🔴 ISSUING 代表正在送 AMEGO，逾期了也該等它跑完
 		{ID: 3, Status: codemeta.InvoiceDocumentStatusIssuing.Value},
-		// AWAITING_MANUAL 已在目標狀態（查詢述詞含它，是為了「逼近告警」那個用途）
 		{ID: 4, Status: codemeta.InvoiceDocumentStatusAwaitingManual.Value},
 	}
-	// fake 的 MarkAwaitingManual 鏡射 allowed-from，需要 stored 處於可轉狀態
 	h.docs.stored = domain.Document{ID: 1, Status: codemeta.InvoiceDocumentStatusPending.Value}
 
 	now := time.Date(2026, 9, 9, 3, 0, 0, 0, time.UTC)
@@ -571,14 +543,9 @@ func TestSweepOverdueStatutoryDeadlines_MarksOnlyEligibleStatuses(t *testing.T) 
 	if err != nil {
 		t.Fatalf("SweepOverdueStatutoryDeadlines: %v", err)
 	}
-	// 🔴 threshold 必須是 now 本身，不是 now+6h ——傳錯會把「還沒逾期」的文件
-	// 提前標成 DEADLINE_MISSED，而那在買家面是「這張發票不會開了」。
 	if !h.docs.deadlineThreshold.Equal(now) {
 		t.Fatalf("threshold = %s，want %s（只取已逾期，不含逼近）", h.docs.deadlineThreshold, now)
 	}
-	// 🔴 這一格才是本測試的核心：4 列進來，只有 PENDING 與 ISSUE_FAILED 兩列被**嘗試**
-	// （fake 把記錄放在 allowed-from 檢查之前，所以它記的是嘗試數）。ISSUING 與
-	// AWAITING_MANUAL 連 UPDATE 都不該送出——前者正在打 AMEGO，後者已在目標狀態。
 	if got := h.docs.awaitingManual; len(got) != 2 {
 		t.Fatalf("應只嘗試 PENDING 與 ISSUE_FAILED 兩列，實得 %d 次（%v）", len(got), got)
 	}
@@ -587,8 +554,6 @@ func TestSweepOverdueStatutoryDeadlines_MarksOnlyEligibleStatuses(t *testing.T) 
 			t.Fatalf("第 %d 次的 reason = %q，want DEADLINE_MISSED", i, reason)
 		}
 	}
-	// 回報數是**真的轉成功**的筆數：fake 只有一個 stored，第一次轉完它就離開
-	// allowed-from ⇒ 第二次 rows=0（正常的併發結果，不是錯誤）。
 	if n != 1 {
 		t.Fatalf("回報標到 %d 筆，want 1（fake 的 stored 只有一列可轉）", n)
 	}
@@ -638,8 +603,6 @@ func TestSubmit_CompletesCorrectionStuckAtReissueFailed(t *testing.T) {
 			ProviderInvoiceNo: &origNo,
 		},
 	}
-	// 🔴 刻意**只**設 failedByDoc、不設 openByDoc：這正是 dev 上那 3 列的形狀。
-	// 用同一份 map 服務兩支查詢的替身會讓這個測試恆綠（見 fakeCorrections 的註解）。
 	h.corrs.failedByDoc = map[int64]domain.CorrectionRequest{
 		origID: {ID: 8002, Status: codemeta.InvoiceCorrectionStatusReissueFailed.Value},
 	}
@@ -686,7 +649,7 @@ func TestSubmit_FailureReasonCodesAreAlwaysCodeMeta(t *testing.T) {
 			}
 			for _, e := range h.audit.entries {
 				if e.ReasonCode == nil || *e.ReasonCode == "" {
-					continue // 沒填 reason_code 是另一件事，不在本測試範圍
+					continue
 				}
 				if _, ok := codemeta.InvoiceManualReasonFromValue(*e.ReasonCode); !ok {
 					t.Errorf("reason_code = %q 不在 InvoiceManualReason 值域內 —— "+

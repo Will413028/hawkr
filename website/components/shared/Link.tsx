@@ -103,7 +103,6 @@ function protectedRoleForTarget(
 	try {
 		const url = new URL(target, window.location.href);
 		if (url.origin !== window.location.origin) return null;
-		// `account` pages belong to no workspace, so there is no role to switch to.
 		return workspaceOfPath(url.pathname);
 	} catch {
 		return null;
@@ -127,9 +126,6 @@ let platformApprovedRule:
 	| typeof import("@/lib/seller/onboarding-summary").platformReviewCompleted
 	| undefined;
 
-// One user intent owns delayed atomic navigation across every Link instance.
-// A later click invalidates an earlier prefetch completion so the first link
-// cannot pull the user back after they have already chosen another page.
 let latestNavigationIntent = 0;
 
 const COMMIT_POLL_INTERVAL_MS = 120;
@@ -172,10 +168,6 @@ function endNavPendingWhenCommitted(
  */
 export default function Link(props: LinkProps) {
 	const { onNavigate: _onNavigate, ...forwardedProps } = props;
-	// Shared links are also rendered in isolated SSR/component contexts (email
-	// previews, tests, and future server-owned shells). Data warming is an
-	// enhancement, so absence of AppProviders must degrade to a plain link
-	// instead of making the anchor itself impossible to render.
 	const queryClient = React.useContext(QueryClientContext);
 	const router = useRouter();
 	const routedLocale = useRoutedLocale();
@@ -192,9 +184,7 @@ export default function Link(props: LinkProps) {
 	);
 	const navigationPendingRef = React.useRef(false);
 	const observedIntentRef = React.useRef<string | null>(null);
-	// The swallowed-click window (below) can last until COMMIT_POLL_MAX_MS. The
 	// global rail reports that a navigation is happening, but not that THIS link
-	// is the one waiting — so the anchor says so itself.
 	const [deferred, setDeferred] = React.useState(false);
 	const target = props.as ?? props.href;
 	const targetRole = protectedRoleForTarget(target);
@@ -389,9 +379,6 @@ export default function Link(props: LinkProps) {
 				navigationPendingRef.current &&
 				isNavigationIntentCurrent(observedIntentRef.current)
 			) {
-				// Only reuse a still-owned wait. A trusted new interaction cancels
-				// old recovery in capture phase; that click must create a new intent.
-				// QueryClient deduplicates any still-pending destination request.
 				event.preventDefault();
 				return;
 			}
@@ -406,8 +393,6 @@ export default function Link(props: LinkProps) {
 				new URL(renderedTarget, window.location.href).pathname,
 			);
 			const observedIntent = beginNavigationIntent({
-				// The rendered anchor is authoritative for UrlObject/as/basePath and
-				// same-origin absolute URLs.
 				target: renderedTarget,
 				trigger: "link",
 				mode: props.hardNavigation
@@ -421,8 +406,6 @@ export default function Link(props: LinkProps) {
 			});
 			observedIntentRef.current = observedIntent;
 
-			// The VT/deferred paths prevent NextLink's click before its onNavigate
-			// callback runs. Own that callback here once for every local soft link.
 			if (
 				!props.hardNavigation &&
 				new URL(renderedTarget).origin === window.location.origin
@@ -454,17 +437,9 @@ export default function Link(props: LinkProps) {
 			event.preventDefault();
 			navigationPendingRef.current = true;
 			setDeferred(true);
-			// The click is swallowed until the data wave settles — surface the
 			// wait on the global progress rail. PageTransition's own signal
-			// doesn't cover this window for same-shell/tab targets (its history
-			// patch skips startLoading for them), so the rail is the only
-			// acknowledgement the tap got through.
 			const endNavPending = beginNavPending();
 			void ensureDestination()
-				// A failed wave still navigates: the destination owns its own
-				// empty/error surface. No Link-level rescue — a hard reload
-				// here would trade a recoverable in-app state for a browser
-				// error page and lose all SPA state when offline.
 				.catch(() => undefined)
 				.then(() => {
 					if (
@@ -482,12 +457,6 @@ export default function Link(props: LinkProps) {
 					} else {
 						router.push(href, { scroll: props.scroll ?? true });
 					}
-					// Don't end the rail at data-settle: the RSC commit is still
-					// in flight and the screen hasn't changed — for tab/same-shell
-					// targets nothing else takes over, so ending here would play
-					// a completion sweep followed by seconds of silence. Poll the
-					// URL (App Router updates location at commit) and hand the
-					// >cap case to navigation-watchdog's recovery.
 					endNavPendingWhenCommitted(endNavPending, navigationSource);
 				})
 				.finally(() => {
@@ -528,11 +497,6 @@ export default function Link(props: LinkProps) {
 			onPointerDown={(event) => {
 				props.onPointerDown?.(event);
 				if (event.defaultPrevented) return;
-				// Touch: `pointerdown` fires on every tap, INCLUDING the tap that is
-				// about to navigate and the taps that are really scroll starts, so
-				// warming here fans out multi-query prefetches a phone never uses.
-				// `mouseenter`/`focus` above already cover the intent signals that
-				// exist on a pointer device.
 				if (event.pointerType === "touch") return;
 				warmDestination();
 			}}

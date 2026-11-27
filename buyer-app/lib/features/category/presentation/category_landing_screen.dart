@@ -65,9 +65,7 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
     )..addListener(() => setState(() {}));
     _categoryScrollController.addListener(_onCategoryScroll);
     _loadUserName();
-    // 載入優惠券
     _loadCouponCount();
-    // 首幀後再同步刷新一次，避免熱重載/初次渲染時未更新
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCouponCount();
     });
@@ -92,10 +90,8 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
     }
   }
 
-  // 處理滾動通知
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification is OverscrollNotification) {
-      // overscroll > 0 表示在底部往上滑（嘗試繼續向下滾動但已到底）
       if (notification.overscroll > 0) {
         if (_bodyDragExtent > 1) {
           final double next =
@@ -106,7 +102,6 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
         }
       }
     } else if (notification is ScrollEndNotification) {
-      // 滾動結束時，決定是否打開 marketplace
       if (_marketProgress.value > 0 && _marketProgress.value < 1) {
         _animateMarketplaceTo(_marketProgress.value >= 0.2 ? 1.0 : 0.0);
       }
@@ -125,7 +120,6 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
       name = activeSession.nickname ?? name;
     }
 
-    // 從 API 取得最新的用戶資料（名稱和頭像）
     if (userId.isNotEmpty) {
       try {
         final info = await ref.read(authRepositoryProvider).getProfile();
@@ -160,7 +154,6 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
         _couponCount = list is List ? list.length : 0;
       });
     } catch (_) {
-      // 靜默失敗，維持 0
     }
   }
 
@@ -179,7 +172,6 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Listen to session changes to reload user data
     ref.listen(sessionProvider, (_, __) => _loadUserName());
 
     final media = MediaQuery.of(context);
@@ -241,12 +233,9 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. 頂部地址欄（白色背景）
             const _AddressBar(),
-            // 2. Banner 輪播區域
             const _HeroBannerNew(),
             SizedBox(height: 12.h),
-            // 3. 會員優惠卡片 - 與 Banner 使用相同的 margin 16
             Container(
               height: 140.h,
               margin: EdgeInsets.symmetric(horizontal: 16.w),
@@ -255,7 +244,6 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
                 child: Stack(
                   children: [
                     const Positioned.fill(child: _MemberCardBackdrop()),
-                    // 內容
                     _MemberCardNew(
                       userName: _userName,
                       couponCount: _couponCount,
@@ -266,7 +254,6 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
               ),
             ),
             SizedBox(height: 20.h),
-            // 4. 商品推薦區域
             const CategoryMarketplaceProductSection(),
             SizedBox(height: 16.h),
           ],
@@ -295,9 +282,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ==================== 新設計組件 ====================
 
-// 1. 頂部地址欄
 class _AddressBar extends ConsumerStatefulWidget {
   const _AddressBar();
 
@@ -318,7 +303,6 @@ class _AddressBarState extends ConsumerState<_AddressBar> {
 
     addressesAsync.whenData((addresses) {
       if (addresses.isNotEmpty) {
-        // Find the default address or use the first one
         final defaultAddr =
             addresses.where((a) => a.isDefault).firstOrNull ?? addresses.first;
         final display = defaultAddr.fullAddress;
@@ -382,7 +366,6 @@ class _AddressBarState extends ConsumerState<_AddressBar> {
   }
 }
 
-// 2. 新版 Banner 輪播
 class _HeroBannerNew extends StatefulWidget {
   const _HeroBannerNew();
   @override
@@ -416,7 +399,6 @@ class _HeroBannerNewState extends State<_HeroBannerNew> {
           ),
         ),
         SizedBox(height: 8.h),
-        // 圓點指示器
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(3, (i) {
@@ -479,7 +461,6 @@ class _MemberCardBackdrop extends StatelessWidget {
   }
 }
 
-// 3. 新版會員卡片
 class _MemberCardNew extends ConsumerStatefulWidget {
   const _MemberCardNew({
     required this.userName,
@@ -511,7 +492,6 @@ class _MemberCardNewState extends ConsumerState<_MemberCardNew> {
 
   @override
   Widget build(BuildContext context) {
-    // 監聽 memberCardsController 更新會員卡數量與商家頭像
     ref.listen(memberCardsControllerProvider, (_, __) {
       if (mounted) setState(() => _syncMemberCards());
     });
@@ -523,17 +503,14 @@ class _MemberCardNewState extends ConsumerState<_MemberCardNew> {
         padding: EdgeInsets.symmetric(horizontal: 12.w),
         child: Column(
           children: [
-            // 上半部：頭像 + Hi, 名字 + 可用優惠券（深綠色區域，約佔 50%）
             Expanded(
               flex: 50,
               child: Padding(
                 padding: EdgeInsets.only(top: 16.h),
                 child: Row(
                   children: [
-                    // 頭像
                     _MemberAvatarNew(avatarUrl: widget.avatarUrl),
                     SizedBox(width: 8.w),
-                    // Hi, 名字 - 使用 Expanded 確保不超出
                     Expanded(
                       flex: 4,
                       child: Text(
@@ -548,7 +525,6 @@ class _MemberCardNewState extends ConsumerState<_MemberCardNew> {
                       ),
                     ),
                     SizedBox(width: 4.w),
-                    // 可用優惠券
                     Flexible(
                       flex: 5,
                       child: Text(
@@ -568,7 +544,6 @@ class _MemberCardNewState extends ConsumerState<_MemberCardNew> {
                 ),
               ),
             ),
-            // 下半部：商家頭像列表 + 會員卡數量（淺綠色區域，約佔 50%）
             Expanded(
               flex: 50,
               child: Align(
@@ -678,7 +653,6 @@ class CategoryMemberCardSummary extends StatelessWidget {
   }
 
   double _calculateAvatarsWidth(int count) {
-    // 第一個頭像佔 40px，之後每個重疊顯示佔 28px (40 - 12 重疊)
     return 40 + (count - 1) * 28.0;
   }
 
@@ -731,8 +705,6 @@ class CategoryMemberCardSummary extends StatelessWidget {
       }
     }
 
-    // objectKey 與完整 URL 一律直接交給 OssImage（內部走 buildImageUrl，
-    // 49 §4.1 唯一入口，兩種形式都認得）。
     return OssImage(
       imageSource: trimmed,
       scene: ImageScene.merchantAvatar,
@@ -789,7 +761,6 @@ class _MemberAvatarNew extends StatelessWidget {
       }
     }
 
-    // 網路圖片 - 使用 ClipOval + OssImage 以支援錯誤處理
     return ClipOval(
       child: SizedBox(
         width: 40.w,
@@ -816,7 +787,6 @@ class _MemberAvatarNew extends StatelessWidget {
   }
 }
 
-// 4. 商品推薦區域
 class CategoryMarketplaceProductSection extends ConsumerWidget {
   const CategoryMarketplaceProductSection({super.key});
 
@@ -826,7 +796,6 @@ class CategoryMarketplaceProductSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 標題列
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w),
           child: Row(
@@ -916,7 +885,6 @@ class CategoryMarketplaceProductSection extends ConsumerWidget {
   }
 }
 
-// 商品卡片
 class _ProductCard extends StatelessWidget {
   const _ProductCard({required this.product});
 
@@ -955,7 +923,6 @@ class _ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 商品圖片
             Stack(
               children: [
                 ClipRRect(
@@ -979,7 +946,6 @@ class _ProductCard extends StatelessWidget {
                           ),
                   ),
                 ),
-                // 右下角購物車圖標
                 Positioned(
                   bottom: 8,
                   right: 8,
@@ -1001,7 +967,6 @@ class _ProductCard extends StatelessWidget {
                 ),
               ],
             ),
-            // 商品資訊
             Padding(
               padding: EdgeInsets.all(12.w),
               child: Column(
@@ -1019,8 +984,6 @@ class _ProductCard extends StatelessWidget {
                   ),
                   SizedBox(height: 4.h),
                   Text(
-                    // `"0"` \u662f\u5f8c\u7aef\u300c\u7121\u50f9\u683c\u300d\u7684\u8868\u9054\u4e14\u975e\u7a7a\u5b57\u4e32\uff0c\u5224\u6e96\u8d70
-                    // PriceDisplay\uff0c\u4e0d\u7528 isNotEmpty\u3002
                     switch (PriceDisplay.formatPrice(
                       product.priceMin,
                       prefix: 'NT\$ ',
@@ -1043,9 +1006,7 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
-// ==================== 魚骨圖載入組件 ====================
 
-// 商品卡片魚骨圖
 class _ProductCardSkeleton extends StatelessWidget {
   const _ProductCardSkeleton();
 
@@ -1068,7 +1029,6 @@ class _ProductCardSkeleton extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 圖片骨架
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
@@ -1079,7 +1039,6 @@ class _ProductCardSkeleton extends StatelessWidget {
                 color: AppColors.dividerLight,
               ),
             ),
-            // 文字骨架
             Padding(
               padding: EdgeInsets.all(12.w),
               child: Column(
@@ -1111,5 +1070,3 @@ class _ProductCardSkeleton extends StatelessWidget {
     );
   }
 }
-
-// Shimmer 動畫效果

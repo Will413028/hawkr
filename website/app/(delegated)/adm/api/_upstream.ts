@@ -32,7 +32,6 @@ const TIMEOUT_MS: Record<DelegatedUpstreamTimeout, number> = {
 	session: 10_000,
 	mutation: 15_000,
 	batch: 60_000,
-	// 機敏檔的一段（單體端讀 body 的時限是 90 秒，這裡多留 10 秒給回應）。
 	file: 100_000,
 };
 
@@ -97,11 +96,7 @@ export async function callDelegatedUpstream(
 	request: DelegatedUpstreamRequest,
 ): Promise<DelegatedUpstreamResult> {
 	const url = `${getEnv().serverApiBase}${request.path}`;
-	// 恰五個名字（§4.5 L1040），下面四個條件式各補一個。多送一個都是在擴大
-	// 「瀏覽器能影響上游語境的面積」，即使那個 header 現在看起來無害。
 	const headers = new Headers({
-		// Gateway 的 CSRF guard 對所有 unsafe method 都要求它；GET 帶著也無害，
-		// 而少一個分支就少一個「這支忘了帶」的失敗形狀。
 		"X-Requested-With": "XMLHttpRequest",
 	});
 	if (request.credential) {
@@ -113,9 +108,6 @@ export async function callDelegatedUpstream(
 	if (request.json !== undefined) {
 		headers.set("Content-Type", "application/json");
 	}
-	// 簽章失敗回 null 是設計上的 fail-open（gateway 驗不過就退回 peer address）。
-	// 不得因為代行是敏感路徑就改成 throw：那會讓「沒設 ORIGIN_AUTH_SECRET 的環境」
-	// 整個工作區不能用，而它本來只是少了一層限流身分。
 	const { signOriginAuth, ORIGIN_AUTH_HEADER } = await import(
 		"@/lib/api/origin-auth.server"
 	);
@@ -134,9 +126,6 @@ export async function callDelegatedUpstream(
 			body:
 				request.json === undefined ? undefined : JSON.stringify(request.json),
 			cache: "no-store",
-			// §6.1.0 明令上游不得回 3xx。跟隨重導會讓一個設定錯誤（例：反代把
-			// /admin/* 導去登入頁）以 200 ＋ 一份不是 envelope 的 body 抵達，看起來
-			// 像「上游回了怪東西」；manual 讓它以 3xx 現形，由呼叫端判成上游失敗。
 			redirect: "manual",
 			signal: AbortSignal.timeout(TIMEOUT_MS[request.timeout]),
 		});
@@ -288,7 +277,6 @@ export async function callDelegatedConnect<
 	const client = createClient(
 		(request.service ?? SocialDelegatedService) as S,
 		publicTransport({
-			// 代行工作區只有 zh-TW（app/(delegated)）。
 			locale: "zh-TW",
 			visitorIp: request.visitorIp ?? undefined,
 		}),

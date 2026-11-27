@@ -16,40 +16,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// ---------------------------------------------------------------------------
-// Checkout：結帳鏈的兩支內部 RPC（§6.1.2、§6.2.4 的 order-service ②③）
-// ---------------------------------------------------------------------------
-//
-// 這一層回答結帳鏈的兩個問題，**兩個都不寫任何一列資料**：
-//
-//	preview  → ResolveMode      「這位賣家對這一筆會走哪個開票模式？金額怎麼拆？要不要告知？」
-//	confirm  → ValidateInput    「買家填的發票資料合不合法？賣家還接不接得了單？快照長什麼樣？」
-//
-// 🔴 **履約模式的判定只有一份**：ResolveMode 與 order.paid 的 Prepare 走同一支
-// domain.ResolveFulfillmentMode。兩份實作漂移的症狀是「preview 說會開 B2B、實際開出 B2C」，
-// 而**沒有任何測試會紅** —— 兩邊各自的測試都會通過自己那一份。守住這件事的是
-// checkout_consistency_test.go 的等值斷言，不是本註解。
 
-// checkoutPreviewTTL 是 preview 結果的有效期。
-//
-// 🔴 這個值的真正擁有者是**結帳鎖**（cart-service 的 `CartService.LOCK_TTL_MINUTES = 2`），
-// 不是本服務：§6.1.2 明文「前端自算 TTL 會與 checkout lock 過期時間漂移」，而同一個理由
-// 也適用於「invoice-service 自己挑一個不一樣的數字」。目前兩邊沒有共用的 SSOT，
-// 本常數刻意與 LOCK_TTL_MINUTES 同值並在此指名來源；那一邊改了、這一邊沒跟，
-// 症狀是買家看到「請重新計算」而金額其實還有效（或反過來，更糟）。
 const checkoutPreviewTTL = 2 * time.Minute
 
-// invoiceDisclosureTermsVersion 是法定告知的條款版本。
-//
-// confirm 會拿買家回填的 disclosureVersion 與本值比對（不符 ⇒ 9314），所以它是一個
-// **對外契約**：改動它會讓所有停在結帳頁、preview 已取得舊版本的買家在按下付款時被擋，
-// 必須當成一次前端可見的變更來安排，不是順手改字串。
 const invoiceDisclosureTermsVersion = "2026-08-30"
 
-// 法定告知的標題與內文。
-//
-// 兩段而不是一段：`PLATFORM_RECEIPT`（免用統一發票）與 `SELLER_SELF_ISSUE`／`LEGACY_MANUAL`
-// （賣家自行開立）要告知的是不同的事實，共用一段文案會讓其中一種買家讀到不成立的敘述。
 const (
 	disclosureReceiptTitle = "本筆交易由賣家開立收據"
 	disclosureReceiptBody  = "本賣家經國稅局核定免用統一發票，本筆交易將由平台代製收據，不會開立電子發票。" +
@@ -60,19 +31,12 @@ const (
 		"平台不會代為開立。如未收到發票，請直接與賣家聯繫。"
 )
 
-// 載具與買受人欄位的形狀規則（§6.1.1 逐欄驗證表）。
-//
-// ⚠️ 這一組是本 repo 內**唯一**的實作，不是第二份：全服務 grep 不到任何其他載具格式檢查
-// （profile CRUD 端點尚未落地）。CRUD 端點落地時必須共用這裡，不得各寫一份 —— 兩份規則
-// 漂移的症狀是「常用資料存得進去，結帳時被擋」。
 var (
 	reMobileBarcode = regexp.MustCompile(`^/[0-9A-Z+\-.]{7}$`)
 	reCitizenCert   = regexp.MustCompile(`^[A-Z]{2}[0-9]{14}$`)
 	reDonationCode  = regexp.MustCompile(`^[0-9]{3,7}$`)
 )
 
-// buyerNameMaxRunes 是 AMEGO BuyerName 的上限，同時是 order_invoice_snapshots.buyer_title
-// 的 varchar(60)。
 const buyerNameMaxRunes = 60
 
 // Checkout 承載結帳鏈的兩支內部 RPC 的全部業務判斷。
@@ -116,9 +80,6 @@ func (u *Checkout) WithClock(now func() time.Time) *Checkout {
 	return u
 }
 
-// ---------------------------------------------------------------------------
-// 值型別
-// ---------------------------------------------------------------------------
 
 // CheckoutAmount 是發票金額拆解（proto InvoiceAmountBreakdown）。
 type CheckoutAmount struct {
@@ -234,9 +195,6 @@ type ValidateInvoiceOutput struct {
 	IntakeLimit          CheckoutIntakeLimit
 }
 
-// ---------------------------------------------------------------------------
-// ResolveMode（checkout preview）
-// ---------------------------------------------------------------------------
 
 // ResolveMode 解析這一筆結帳的開票模式、金額拆解、法定告知與待審接單上限。
 //
@@ -278,9 +236,6 @@ func (u *Checkout) ResolveMode(ctx context.Context, in ResolveModeInput) (Resolv
 	}, nil
 }
 
-// ---------------------------------------------------------------------------
-// ValidateInput（checkout confirm）
-// ---------------------------------------------------------------------------
 
 // ValidateInput 驗證買家的發票輸入並回傳可持久化的快照。
 //
@@ -304,17 +259,11 @@ func (u *Checkout) ValidateInput(ctx context.Context, in ValidateInvoiceInput) (
 	}
 
 	amount := buildCheckoutAmount(in.Amount.ProductAmount, in.Amount.ShippingAmount, in.Amount.DiscountAmount, facts.profile)
-	// buyerHasTaxID 傳 false：它在 §7.1.3 只決定 document_kind（E 節點 B2B／B2C），
-	// **不影響 fulfillment_mode**，而本 RPC 只回 invoice_mode。決策必須在解析買家身分
-	// **之前**算出來，因為每一個拒絕分支都要帶著 mode 回去（前端據此決定顯不顯示法定告知）。
 	decision := domain.ResolveFulfillmentMode(fulfillmentInputFor(facts, amount.InvoiceAmount, now, false))
 	mode := decision.FulfillmentMode
 	limit := intakeLimitOf(facts.profile)
 
 	reject := func(r checkoutRejection) (ValidateInvoiceOutput, error) {
-		// 🔴 非 0 業務碼一律帶著 invoice_mode 與 intake_limit 回去：§6.1.2 對 9326 明文要求
-		// `data.intakeLimit` 帶現況（HTTP 200 ＋ preserveData），而其餘幾碼前端也要靠 mode
-		// 決定要不要顯示法定告知。回 code≠0 ＋ 空 data 會讓前端只剩下 parse message 一條路。
 		return ValidateInvoiceOutput{
 			Valid:       false,
 			BizCode:     r.Code,
@@ -324,20 +273,7 @@ func (u *Checkout) ValidateInput(ctx context.Context, in ValidateInvoiceInput) (
 		}, nil
 	}
 
-	// 1. 法定告知 —— **不再是擋門**（DEC-20260831-210934）。
-	//
-	// 原本這裡檢查「required 且已勾選且版本相符」，不過就回 9314。裁決把它改成
-	// 只顯示不強制：preview 仍回 disclosure.title／body 讓前端顯示，但 confirm
-	// 不檢查任何回填值（那兩個欄位已從 proto 移除、欄號 reserved）。
-	//
-	// 裁決依據：58 號 L1–L13 法規表查無「付款前必須告知」的法源，命名裡的「法定」
-	// 從未被證實；競品實查（蝦皮以「結帳頁有無電子發票欄位」為訊號、momo 寫在規則頁）
-	// 兩者皆無結帳時的強制確認。
-	//
-	// 🔴 disclosureFor 保留且仍被 preview 呼叫——**它決定要不要顯示、顯示哪一段文案**，
-	// 那個職責沒有消失。刪掉它會讓免用統一發票的買家完全不知道自己拿到的是收據。
 
-	// 2＋3. 解析買家發票身分（含歸屬驗證與逐欄格式）。
 	identity, rej, err := u.resolveIdentity(ctx, in.BuyerID, in.Invoice)
 	if err != nil {
 		return ValidateInvoiceOutput{}, err
@@ -346,13 +282,10 @@ func (u *Checkout) ValidateInput(ctx context.Context, in ValidateInvoiceInput) (
 		return reject(rej)
 	}
 
-	// 4. 三者互斥：走開立側的同一條斷言（A15），不另寫一套。
 	if code := u.assertBuyerIdentity(amount, identity); code != 0 {
 		return reject(rejectWith(code))
 	}
 
-	// 5. 待審接單上限。放在最後：它是賣家側的競態，越接近寫入越準；
-	//    前面幾格是買家自己改得掉的輸入錯誤，先告訴他那些比較有用。
 	if limit.Blocked {
 		return reject(rejectWith(bizcode.SellerInvoiceIntakeLimitReached))
 	}
@@ -374,26 +307,13 @@ func (u *Checkout) ValidateInput(ctx context.Context, in ValidateInvoiceInput) (
 	}, nil
 }
 
-// ---------------------------------------------------------------------------
-// 賣家事實
-// ---------------------------------------------------------------------------
 
-// checkoutSellerFacts 是決策樹需要的三份賣家事實。
 type checkoutSellerFacts struct {
 	issuer  domain.Issuer
 	profile domain.SellerTaxProfile
 	account domain.ProviderAccount
 }
 
-// sellerFacts 讀 issuer／稅務資格／provider 帳戶。
-//
-// 🔴 deny-by-default，與 Prepare 逐字相同：「查不到」不是錯誤，是決策樹的一個輸入值
-// （空字串 ⇒ default 分支 ⇒ LEGACY_MANUAL ＋ TAX_PROFILE_NOT_APPROVED）。
-// 把它當錯誤往上拋，結帳頁會在「這位賣家還沒送審」時直接 500 —— 而那是完全正常的狀態。
-//
-// ⚠️ issuer 查不到同樣不是錯誤：賣家從未進過發票流程時本來就沒有 invoice_issuers 列。
-// 這一格與 Prepare 不同（那裡 issuer 是必然存在的，因為 order.paid 之前賣家已經開過店），
-// 差異寫在這裡是刻意的：preview 會在賣家生命週期更早的時點被呼叫。
 func (u *Checkout) sellerFacts(ctx context.Context, storeID int64) (checkoutSellerFacts, error) {
 	var out checkoutSellerFacts
 	if storeID <= 0 {
@@ -402,10 +322,6 @@ func (u *Checkout) sellerFacts(ctx context.Context, storeID int64) (checkoutSell
 
 	issuer, err := u.issuers.GetByRef(ctx, codemeta.InvoiceIssuerTypeSeller.Value, storeID)
 	if err != nil {
-		// ⚠️ IssuerRepository.GetByRef 的「查無此列」回的是 `InvoiceProviderAccountNotFound`
-		// （9330）而不是一個 issuer 專屬的碼 —— 那是既有實作的現況（seller_repo.go 的
-		// GetByRef），不是這裡挑的。碼本身沒有 issuer 語意，所以這一格只能靠它，
-		// 而不能靠「碼名看起來對不對」。
 		if !isBizCode(err, bizcode.InvoiceProviderAccountNotFound) {
 			return out, err
 		}
@@ -428,11 +344,6 @@ func (u *Checkout) sellerFacts(ctx context.Context, storeID int64) (checkoutSell
 	return out, nil
 }
 
-// fulfillmentInputFor 把賣家事實與金額折成決策樹的輸入。
-//
-// 🔴 本函式是 ResolveMode 與 ValidateInput 共用的唯一一份組裝：兩支 RPC 若各自組
-// FulfillmentInput，preview 與 confirm 就會對同一筆訂單說出不同的 invoice_mode，
-// 而買家在 confirm 那一刻已經看不到 preview 的畫面了。
 func fulfillmentInputFor(f checkoutSellerFacts, invoiceAmount int64, now time.Time, buyerHasTaxID bool) domain.FulfillmentInput {
 	return domain.FulfillmentInput{
 		TotalActualAmount:   invoiceAmount,
@@ -441,19 +352,10 @@ func fulfillmentInputFor(f checkoutSellerFacts, invoiceAmount int64, now time.Ti
 		AutomationCutoverAt: f.account.AutomationCutoverAt,
 		InvoiceDate:         now,
 		BuyerHasTaxID:       buyerHasTaxID,
-		// 🔴 這一欄**必須跟 Prepare 傳同一個值**：preview 與實際落庫用同一棵樹，
-		// 兩邊輸入不同就會出現「結帳時說會代製收據、付款後卻落 AWAITING_MANUAL」，
-		// 而兩句話都是後端講的，買家無從判斷（同 buildCheckoutAmount 的 doc comment）。
 		SellerReceiptAuthorized: f.profile.ReceiptAuthorizedAt != nil,
-		// fail-closed 三格恆 false，理由見 ResolveMode 的 doc comment ②。
 	}
 }
 
-// buildCheckoutAmount 算出發票金額拆解。
-//
-// InvoiceAmount 夾在 0 以上，與 domain.OrderSnapshot.TotalActualAmount 的定義
-// （max(0, S + F − D)）一致 —— 兩邊用不同公式，preview 說「不開票」而實際開了（或反過來）
-// 就會發生，而兩者都不會報錯。
 func buildCheckoutAmount(product, shipping, discount int64, profile domain.SellerTaxProfile) CheckoutAmount {
 	total := product + shipping - discount
 	if total < 0 {
@@ -461,7 +363,6 @@ func buildCheckoutAmount(product, shipping, discount int64, profile domain.Selle
 	}
 	cat := profile.DefaultTaxCategory
 	if cat == 0 {
-		// DB DEFAULT 的語意是應稅，不是「未知」。與 taxResolverFor 的處理一致。
 		cat = int16(domain.TaxCategoryTaxable)
 	}
 	return CheckoutAmount{
@@ -498,20 +399,11 @@ func intakeLimitOf(p domain.SellerTaxProfile) CheckoutIntakeLimit {
 		OrderCountLimit: p.PendingOrderLimitCount,
 		AmountUsed:      p.PendingOrderAmount,
 		AmountLimit:     p.PendingOrderLimitAmount,
-		// 兩個上限是 OR，不是 AND（§6.1.2 C5 第 2 條）。
 		Blocked: p.PendingOrderCount >= p.PendingOrderLimitCount ||
 			p.PendingOrderAmount >= p.PendingOrderLimitAmount,
 	}
 }
 
-// disclosureFor 決定要不要顯示法定告知，以及顯示哪一段。
-//
-// 🔴 preview 與 confirm 共用本函式：confirm 拿買家回填的版本與 preview 給的版本比對，
-// 兩邊各算一次「要不要告知」就會出現「preview 沒要求、confirm 卻擋下來」。
-//
-// AMEGO_AUTO 以外的三種模式都要告知，理由不同但都是「平台不會代開這張發票」：
-// PLATFORM_RECEIPT 是免用統一發票的法定告知，另外兩種是自行開票提示（§6.1.2 B01 的
-// `invalid` 那一列明文「只有這一個觸發點」）。
 func disclosureFor(mode string) CheckoutDisclosure {
 	switch mode {
 	case codemeta.InvoiceFulfillmentModeAmegoAuto.Value:
@@ -524,7 +416,6 @@ func disclosureFor(mode string) CheckoutDisclosure {
 			Body:         disclosureReceiptBody,
 		}
 	default:
-		// SELLER_SELF_ISSUE / LEGACY_MANUAL。
 		return CheckoutDisclosure{
 			Required:     true,
 			TermsVersion: invoiceDisclosureTermsVersion,
@@ -534,53 +425,30 @@ func disclosureFor(mode string) CheckoutDisclosure {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 買家發票身分
-// ---------------------------------------------------------------------------
 
-// checkoutRejection 是一個業務層拒絕：碼 ＋ 給前端的訊息。
-//
-// Message 預設取 CodeMeta 的碼表訊息；只有在同一個碼承載了兩種不同處置時才覆寫
-// （目前唯一一處：一次性手動載具，見 identityFromManualInput）。覆寫是**例外不是慣例**——
-// 前端不解析 message（§6.1.2 對 9314／9305 分碼的理由），訊息只給人看。
 type checkoutRejection struct {
 	Code    int32
 	Message string
 }
 
-// ok 回報這是不是「沒有拒絕」。
 func (r checkoutRejection) ok() bool { return r.Code == 0 }
 
 func rejectWith(code int32) checkoutRejection {
 	return checkoutRejection{Code: code, Message: bizcode.Message(code)}
 }
 
-// checkoutIdentity 是解析後的買家發票身分。
 type checkoutIdentity struct {
-	// SelectionMode ＝ CodeMeta InvoiceCarrierSelectionMode 的 Value，
-	// 也是 order_invoice_snapshots.carrier_selection_mode 要落的值。
 	SelectionMode string
-	// PreferenceID 只在 EXPLICIT_PREFERENCE 時非 0。
 	PreferenceID int64
-	// CarrierType ＝ CodeMeta InvoiceCarrierType 的 Value（空字串 ＝ 無載具）。
 	CarrierType  string
 	CarrierValue string
-	// DisplayValue 恆為遮罩後的值。明碼只活在本 struct 內、不出服務邊界。
 	DisplayValue string
 	BuyerTaxID   string
 	BuyerName    string
 	DonationCode string
 
-	// HasCarrier ＝ 這個身分帶了一個載具（手機條碼／自然人憑證）。
-	//
-	// 🔴 它與 `CarrierValue != ""` **不等價**，這是本檔最容易寫錯的一處：
-	// 來自常用發票資料的載具，值是密文、本層刻意不解密（顯示用遮罩就夠了）⇒
-	// CarrierValue 是空的，而買家**確實選了載具**。A15 問的是「選了幾種」不是「值是什麼」，
-	// 拿空字串去數，統編＋載具的組合會被判成「只選了統編」而放行。
 	HasCarrier bool
 
-	// CarrierValueVisible ＝ CarrierValue 裡是明文（只有本次手動輸入才會是 true）。
-	// 逐欄格式驗證只能對看得見的值做；看不見的那些在寫入端點（§6.1.1 端點 2／3）驗過。
 	CarrierValueVisible bool
 }
 
@@ -588,10 +456,6 @@ func (p CheckoutProfile) hasTaxID() bool {
 	return p.Found && domain.IsBusinessTaxID(p.BuyerTaxID)
 }
 
-// defaultProfile 取買家的預設常用發票資料（preview 的 defaultProfile 欄）。
-//
-// 沒有預設是**正常分支**（§6.1.2(b) 第 ② 步：無載具發票），回 Found=false，
-// 對外是空 message 而不是錯誤。
 func (u *Checkout) defaultProfile(ctx context.Context, buyerID int64) (CheckoutProfile, error) {
 	if buyerID <= 0 {
 		return CheckoutProfile{}, nil
@@ -621,11 +485,6 @@ func toCheckoutProfile(p domain.BuyerPreference) CheckoutProfile {
 	}
 }
 
-// preferenceDisplayValue 取一列常用發票資料的遮罩顯示值。
-//
-// 🔴 載具型一律用已落庫的 carrier_value_mask，**不解密**：顯示不需要明碼，而每一次解密
-// 都是一次明碼可能外洩的機會（§6.1.1 遮罩段）。統編與捐贈碼本身不是 PII
-// （§5.4.3 表註解逐字：「公開營業登記資訊」「公告代碼」）⇒ 直接顯示。
 func preferenceDisplayValue(p domain.BuyerPreference) string {
 	switch p.PreferenceKind {
 	case codemeta.InvoiceCarrierTypeTaxId.Value:
@@ -637,28 +496,10 @@ func preferenceDisplayValue(p domain.BuyerPreference) string {
 	}
 }
 
-// resolveIdentity 解析買家這一次的發票身分，並做逐欄格式驗證。
-//
-// 第二個回傳值是業務碼：0 ＝ 通過。error 只留給真正的故障（DB 掛了），
-// 業務結果不走 error —— 兩者混在一起，呼叫端就分不出「該回 409」與「該重試」。
-//
-// **缺省鏈只有兩步**（§6.1.2(b) 的紅字方框、D6／D7／ADR-22）：
-// ① 買家有存活的 is_default profile → 用它 ② 否則 → 無載具發票。
-// 沒有第三步；`InvoiceCarrierType` 也沒有能承載光貿會員載具的第 5 個值。
 func (u *Checkout) resolveIdentity(ctx context.Context, buyerID int64, spec CheckoutInvoiceSpec) (checkoutIdentity, checkoutRejection, error) {
 	return resolveInvoiceIdentity(ctx, u.prefs, buyerID, spec)
 }
 
-// resolveInvoiceIdentity 是「買家的發票身分」的**唯一**一份推導。
-//
-// 🔴 它從 Checkout 的方法抽出來，是因為 R03（付款後修改、開立前直接改）也需要它
-// ——而在 2026-09-04 之前 correction_intake 根本沒做這件事：ReviseSnapshotInput
-// 的 7 個業務欄位只填了 3 個，invoice_kind／carrier_selection_mode／
-// buyer_invoice_preference_id／donation_code 四個從未賦值 ⇒ order-service 驗
-// invoice_kind 必填而回 400，R03 從上線起就沒有成功過一次（#3085）。
-//
-// ⚠️ **不要在 correction 那邊複製一份**：兩邊各自算同一件事必然漂移，而症狀是
-// 「更正之後買家原本選的載具消失了」——沒有任何東西會報錯。
 func resolveInvoiceIdentity(
 	ctx context.Context, prefs domain.BuyerPreferenceRepository, buyerID int64, spec CheckoutInvoiceSpec,
 ) (checkoutIdentity, checkoutRejection, error) {
@@ -669,29 +510,16 @@ func resolveInvoiceIdentity(
 		id, rej := identityFromManualInput(spec)
 		return id, rej, nil
 	default:
-		// 整包省略、或帶了一個什麼都沒填的 invoice ⇒ 缺省鏈。
-		//
-		// ⚠️ 這裡**不解析**買家的預設載具去填快照：§5.4.3 明文
-		// 「`USE_BUYER_DEFAULT` 由 invoice-service 在建立文件時解析，不在結帳同步呼叫」。
-		// 快照只記下模式，真正的解析在 order.paid（client/order/carrier.go）——
-		// 在這裡解析並落進快照，等於把「下單當下的預設」凍結成事實，而買家在付款前
-		// 改了預設時，兩邊會指向不同的載具且沒有任何東西會報錯。
 		return checkoutIdentity{
 			SelectionMode: codemeta.InvoiceCarrierSelectionModeUseBuyerDefault.Value,
 		}, checkoutRejection{}, nil
 	}
 }
 
-// identityFromPreference 走「指定既有常用發票資料」。
-//
-// 🔴 buyerID 是查詢述詞的一部分（寫進 SQL 的 WHERE，repository 保證），不是查回來再比對：
-// 「這筆不存在」與「這筆不屬於你」刻意不可分辨，同碼（9302）、同訊息、同一行程式碼
-// （§8.1.4(b)）。這裡若補一個 `if pref.BuyerID != buyerID` 分支，Tier A 當場失效。
 func identityFromPreference(
 	ctx context.Context, prefs domain.BuyerPreferenceRepository, buyerID, profileID int64,
 ) (checkoutIdentity, checkoutRejection, error) {
 	if buyerID <= 0 {
-		// 沒有買家鍵就驗不了歸屬。這裡**不得**退化成「不驗」（I-47）。
 		return checkoutIdentity{}, rejectWith(bizcode.InvoiceProfileNotFound), nil
 	}
 	if prefs == nil {
@@ -714,10 +542,6 @@ func identityFromPreference(
 		BuyerName:     derefString(pref.TaxTitle),
 		DonationCode:  derefString(pref.DonationCode),
 	}
-	// carrier_selection_mode 由 preference_kind 決定，不是「指定了 profile 就是
-	// EXPLICIT_PREFERENCE」：chk_ois_b2b 要求 B2B 恆為 NONE、chk_ois_donation_pair 是
-	// 雙向等式 ⇒ 統編型與捐贈型的 profile 各自落 NONE／DONATION，而
-	// buyer_invoice_preference_id 只跟著真正的載具走（chk_ois_exclusive 三選一）。
 	switch pref.PreferenceKind {
 	case codemeta.InvoiceCarrierTypeTaxId.Value:
 		id.SelectionMode = codemeta.InvoiceCarrierSelectionModeNone.Value
@@ -734,45 +558,13 @@ func identityFromPreference(
 	return id, checkoutRejection{}, nil
 }
 
-// errUnsavedOneOffCarrier 是「一次性手動載具無處可存」的訊息。
-//
-// 🔴 這不是格式錯，但只能借 9305 回報 —— 理由與代價寫在 identityFromManualInput。
 const errUnsavedOneOffCarrier = "請先將此載具儲存為常用發票資料後再結帳"
 
-// carrierPresentPlaceholder 是「有載具但本層看不到值」的佔位。
-//
-// 只出現在 forecastDraft 組出的預測草稿裡，**永遠不會被送去開票**（開票路徑的載具值
-// 來自 client/order/carrier.go 的解密）。刻意用一個明顯不像載具號碼的字串：
-// 萬一它真的漏進了哪個送出路徑，那是一眼看得出來的錯，而不是一張開錯載具的發票。
 const carrierPresentPlaceholder = "«carrier-present»"
 
-// identityFromManualInput 走「本次手動輸入」。
-//
-// 🔴 **只有統編與捐贈碼可以純手動**。手機條碼／自然人憑證條碼在 Phase 1 必須先存成
-// 常用發票資料（§6.1.1 端點 2）再以 `profileId` 帶進來，理由是快照存不下它：
-//
-//	§5.4.3 的 order_invoice_snapshots 是**零 PII** 表，載具值一律留在 invoice-service，
-//	它只有 buyer_invoice_preference_id 一個指標欄；而 carrier_selection_mode 的值域
-//	（chk_ois_mode）只有 USE_BUYER_DEFAULT / EXPLICIT_PREFERENCE / NONE / DONATION 四值，
-//	**沒有一個代表「這一單自己填的一次性載具」**。
-//
-// 於是純手動載具只有三條路，兩條是錯的：
-//   - 落 USE_BUYER_DEFAULT ⇒ 開票時解析成買家的預設（或無載具）⇒ **買家填的載具被靜默吞掉**，
-//     而發票不可回收、載具歸戶落空。
-//   - 落 EXPLICIT_PREFERENCE ＋ 空 id ⇒ chk_ois_pref_pair 是雙向等式 ⇒ order-service
-//     那一側 INSERT 直接被 DB 擋掉 ⇒ 結帳 500。
-//   - **擋在結帳**（本實作）：買家看得到、改得掉，而且還沒付錢。
-//
-// 這是設計書 §6.1.2(b)（允許手動輸入）與 §5.4.3（快照沒有欄位承載它）的矛盾，
-// 已列進交付回報；本波取 fail-closed 的那一邊。
 func identityFromManualInput(spec CheckoutInvoiceSpec) (checkoutIdentity, checkoutRejection) {
 	kind, ok := codemeta.InvoiceCarrierTypeFromValue(spec.CarrierType)
 	if !ok {
-		// 值域外的 carrierType（含「前端為『不使用載具』自造了一個 wire 值」這個
-		// §6.1.2(b) 明令禁止的形狀）⇒ 格式錯，不猜。
-		//
-		// ⚠️ 只帶 buyerTaxId 而不帶 carrierType 也走這裡：統編必須明說 carrierType=TAX_ID，
-		// 由欄位有沒有值去推語意，就是在憑證上猜買受人身分。
 		return checkoutIdentity{}, rejectWith(bizcode.InvoiceCarrierInvalid)
 	}
 
@@ -783,21 +575,18 @@ func identityFromManualInput(spec CheckoutInvoiceSpec) (checkoutIdentity, checko
 		id.BuyerTaxID = spec.BuyerTaxID
 		id.BuyerName = spec.BuyerName
 		id.DisplayValue = spec.BuyerTaxID
-		// TAX_ID 的 value 必須為空（§6.1.1）：帶了值代表前端把載具塞進了統編那一格。
 		id.CarrierValue = spec.Value
 	case codemeta.InvoiceCarrierTypeDonation.Value:
 		id.SelectionMode = codemeta.InvoiceCarrierSelectionModeDonation.Value
 		id.DonationCode = spec.Value
 		id.DisplayValue = spec.Value
-		// 捐贈同時帶統編 ⇒ 三選一違規，交給 A15 判（9306），不在這裡當成格式錯。
 		id.BuyerTaxID = spec.BuyerTaxID
 		id.BuyerName = spec.BuyerName
-	default: // MOBILE_BARCODE / CITIZEN_CERT
+	default:
 		id.CarrierValue = spec.Value
 		id.CarrierValueVisible = true
 		id.HasCarrier = true
 		id.DisplayValue = maskCarrierValue(spec.Value)
-		// 先驗形狀再擋：形狀本來就錯的值，回「請先存成常用資料」只會讓買家存一份錯的。
 		if code := validateIdentityShape(id); code != 0 {
 			return checkoutIdentity{}, rejectWith(code)
 		}
@@ -813,14 +602,10 @@ func identityFromManualInput(spec CheckoutInvoiceSpec) (checkoutIdentity, checko
 	return id, checkoutRejection{}
 }
 
-// validateIdentityShape 是 §6.1.1 逐欄驗證表的唯一實作。回 0 表示通過。
 func validateIdentityShape(id checkoutIdentity) int32 {
 	switch id.CarrierType {
 	case codemeta.InvoiceCarrierTypeMobileBarcode.Value:
 		if !id.CarrierValueVisible {
-			// 來自常用發票資料：值是密文、本層不解密 ⇒ 沒有東西可比對正則。
-			// 這裡**不是**放行一個沒驗過的值：寫入端點（§6.1.1 端點 2／3）驗過同一組正則，
-			// 而 chk_bip_shape 保證這種 kind 的密文非空。
 			return 0
 		}
 		if !reMobileBarcode.MatchString(id.CarrierValue) {
@@ -838,8 +623,6 @@ func validateIdentityShape(id checkoutIdentity) int32 {
 			return bizcode.InvoiceCarrierInvalid
 		}
 	case codemeta.InvoiceCarrierTypeTaxId.Value:
-		// value 必須為空；統編走 domain.IsBusinessTaxID（8 碼數字，**不驗檢查碼**）；
-		// 抬頭 1–60 字。
 		if id.CarrierValue != "" {
 			return bizcode.InvoiceCarrierInvalid
 		}
@@ -851,7 +634,6 @@ func validateIdentityShape(id checkoutIdentity) int32 {
 			return bizcode.InvoiceCarrierInvalid
 		}
 	case "":
-		// 無載具：不得夾帶任何載具值。
 		if id.CarrierValue != "" || id.DonationCode != "" || id.HasCarrier {
 			return bizcode.InvoiceCarrierInvalid
 		}
@@ -861,22 +643,9 @@ func validateIdentityShape(id checkoutIdentity) int32 {
 	return 0
 }
 
-// assertBuyerIdentity 用開立側的同一條斷言驗「統編／載具／捐贈碼三選一」。
-//
-// 🔴 **不另寫一套互斥判斷**：A15 已經在 domain.IssueDraft.Validate 內，而 AMEGO 三種違規
-// 組合實測全部通過（§6.1.1「9306 必須由我方強制」）⇒ 這是唯一的攔截點，兩份實作漂移
-// 等於漏掉其中一種組合，而憑證已經開出去了。
-//
-// **為什麼只有 A15 會擋下結帳，其餘斷言不會**：§7.1.3 對 A1–A14、A20–A23 失敗的處置是
-// `AWAITING_MANUAL`（轉人工），**不是拒絕成單**。把它們在這裡升級成結帳阻擋，會讓
-// 例如零稅率賣家（A10）的買家完全結不了帳，而設計書的 confirm 失敗清單裡沒有這一條、
-// CodeMeta 也沒有對應的碼。所以其餘斷言在這裡只留一行 WARN：它預告了這張單會落進
-// ADM 的人工佇列，而真正的 fail-closed 判定仍在 order.paid 那一次（不被本函式繞過）。
 func (u *Checkout) assertBuyerIdentity(amount CheckoutAmount, id checkoutIdentity) int32 {
 	draft := forecastDraft(amount, id)
 	if draft == nil {
-		// 零元結帳：沒有可送出的行，A15 沒有東西可斷言。零元訂單本來就不開票
-		// （§7.1.3 的 NA1），互斥與否不影響任何憑證。
 		return 0
 	}
 	err := draft.Validate()
@@ -886,7 +655,6 @@ func (u *Checkout) assertBuyerIdentity(amount CheckoutAmount, id checkoutIdentit
 
 	var ie *domain.InvariantError
 	if !errors.As(err, &ie) {
-		// Validate 只回 *InvariantError；真的出現別種，代表 domain 換了契約而這裡沒跟上。
 		u.logger().Error("invoice.checkout.validate.unexpected_error", zap.Error(err))
 		return 0
 	}
@@ -899,18 +667,6 @@ func (u *Checkout) assertBuyerIdentity(amount CheckoutAmount, id checkoutIdentit
 	return 0
 }
 
-// forecastDraft 組出「若現在就開票會長什麼樣」的草稿，供 A15 斷言。
-//
-// 🔴 它是**預測**不是事實，三個刻意的簡化都寫在這裡，不要當成開票路徑的替身：
-//
-//	① 品項合成一行（結帳 preview／confirm 的契約只帶金額拆解，沒有逐項明細）。
-//	   影響：A12／A13 恆過、A21 恆成立。真正的逐行斷言在 order.paid。
-//	② DiscountFunding 填 Seller。平台出資券的判定資料（券的 created_by）結帳當下拿不到，
-//	   而 §7.1.3 的 FC 三格是在 order.paid 判的 —— 在這裡填 Unknown 只會讓每一筆用了券的
-//	   結帳都印一行 WARN，不會多攔到任何東西。**那道 fail-closed 檢查沒有被繞過**。
-//	③ 稅別用賣家預設值（Phase 1 整張訂單同一個課稅別，與 taxResolverFor 同一個前提）。
-//
-// nil 回傳表示零元（domain.ErrZeroAmount），呼叫端當成「沒有東西可斷言」。
 func forecastDraft(amount CheckoutAmount, id checkoutIdentity) *domain.IssueDraft {
 	snap := domain.OrderSnapshot{
 		TotalOriginalAmount: amount.ProductAmount,
@@ -938,8 +694,6 @@ func forecastDraft(amount CheckoutAmount, id checkoutIdentity) *domain.IssueDraf
 
 	draft, err := domain.NewIssueDraft(snap, domain.SellerDefaultTaxResolver{Default: cat}, buyerIdentifier)
 	if err != nil {
-		// ErrZeroAmount 是正常分支；其餘（負數金額）同樣沒有可斷言的草稿，
-		// 金額本身的合法性由 order-service 的既有結帳驗證負責。
 		return nil
 	}
 
@@ -950,25 +704,13 @@ func forecastDraft(amount CheckoutAmount, id checkoutIdentity) *domain.IssueDraf
 	}
 	draft.CarrierValue = id.CarrierValue
 	if draft.CarrierValue == "" && id.HasCarrier {
-		// A15 只問「選了幾種買受人識別」，不看載具值本身。來自常用發票資料的載具是密文，
-		// 本層不解密 ⇒ 用一個非空佔位讓 A15 數得到它。少了這一行，「統編 ＋ 已存的載具」
-		// 會被判成只選了統編而放行，而 AMEGO 對那種組合實測照收。
 		draft.CarrierValue = carrierPresentPlaceholder
 	}
 	draft.DonationCode = id.DonationCode
 	return draft
 }
 
-// ---------------------------------------------------------------------------
-// 快照
-// ---------------------------------------------------------------------------
 
-// orderInvoiceSnapshot 是 order-service 要寫進 `order_invoice_snapshots` 的那一列
-// （§5.4.3 的 V12 DDL），逐欄對應。
-//
-// 🔴 **零 PII**：沒有載具值、沒有買家 email、沒有收件資訊。表註解逐字寫著
-// 「零 PII，密文一律留在 invoice-service」—— 多塞一欄進來，那句話就變成假的，
-// 而 order-service 那邊不會有任何東西擋住它。
 type orderInvoiceSnapshot struct {
 	OrderNo                  string  `json:"order_no"`
 	SnapshotVersion          int32   `json:"snapshot_version"`
@@ -980,11 +722,6 @@ type orderInvoiceSnapshot struct {
 	DonationCode             *string `json:"donation_code"`
 }
 
-// invoiceKindOf 由買受人統編有無決定 B2C／B2B。
-//
-// 🔴 判準是**買受人統編**不是別的：proto 的 invoice_kind 值域只有這兩個
-// （沒有 RECEIPT——收據是 document_kind 不是 invoice_kind）。
-// 這一份是唯一實作，結帳與 R03 兩條路共用（#3085：R03 原本一個字都沒填）。
 func invoiceKindOf(buyerTaxID string) string {
 	if domain.IsBusinessTaxID(buyerTaxID) {
 		return codemeta.InvoiceDocumentKindB2b.Value
@@ -997,8 +734,6 @@ func marshalOrderInvoiceSnapshot(in ValidateInvoiceInput, id checkoutIdentity) (
 
 	version := in.SnapshotVersion
 	if version < 1 {
-		// chk_ois_version 要求 >= 1。呼叫端沒帶時取 1（第一版），**不是**本服務在遞增
-		// snapshot_version —— I-50 明訂唯一寫入者是 order-service。
 		version = 1
 	}
 
@@ -1021,14 +756,7 @@ func marshalOrderInvoiceSnapshot(in ValidateInvoiceInput, id checkoutIdentity) (
 	return json.Marshal(snap)
 }
 
-// ---------------------------------------------------------------------------
-// 小工具
-// ---------------------------------------------------------------------------
 
-// maskCarrierValue 依 §5.1.4 carrier_value_mask 的形狀（例：`/ABC***9`）遮罩。
-//
-// 保留前 4 碼與末 1 碼，中間一律 `*`。太短的值只留末 1 碼 —— 遮罩的用途是讓買家認出
-// 「是不是我那一支」，不是讓人拼回原值。
 func maskCarrierValue(v string) string {
 	r := []rune(v)
 	switch {

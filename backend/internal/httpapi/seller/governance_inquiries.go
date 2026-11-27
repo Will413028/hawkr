@@ -16,20 +16,16 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 案件的詢問（step10e-reports-brief R4、設計 step10e-3cb-design §1.2、§4）。
 
-// 模組輸入的欄位對應到請求的路徑。
 var (
 	createInquiryPaths      = rpc.FieldPaths{"Kind": "kind", "Message": "message", "DueAt": "due_time", "RequestID": "request_id"}
 	recordInquiryReplyPaths = rpc.FieldPaths{"Channel": "channel", "ReceivedAt": "receive_time", "Body": "body", "EvidenceTokens[]": "evidence_tokens[]"}
 )
 
-// caseInquiryEvidenceURI 是詢問回覆附件的檢視網址（EvidenceInquiryRoute 的實例）。
 func caseInquiryEvidenceURI(inquiryID uuid.UUID, position int) string {
 	return "/api/files/admin/seller/case_inquiries/" + inquiryID.String() + "/evidence/" + strconv.Itoa(position)
 }
 
-// optionalID 是可能不存在的 ID（0 表示沒有）：沒有時是空字串，契約裡對應的欄位不設。
 func optionalID(id int64) string {
 	if id == 0 {
 		return ""
@@ -37,8 +33,6 @@ func optionalID(id int64) string {
 	return rpc.FormatID(id)
 }
 
-// toCaseInquiry 把後台看到的詢問轉成契約：期限只在還沒結束時輸出（義務還在時才輸出）；can_* 取自同一個 Availability（不輸出原因）；
-// 回覆附件的上限是模組的 MaxEvidence（RecordCaseInquiryReply 驗證的同一個值）。
 func toCaseInquiry(i model.AdminInquiry) *adminpb.CaseInquiry {
 	out := &adminpb.CaseInquiry{
 		Id: i.ID.String(), CaseId: i.CaseID.String(), StoreId: rpc.FormatID(i.StoreID),
@@ -49,7 +43,6 @@ func toCaseInquiry(i model.AdminInquiry) *adminpb.CaseInquiry {
 		ReplyEvidenceMax: model.MaxEvidence,
 	}
 	if i.Open() {
-		// 賣家的回覆期限：建立時存下的 due_at（不是營運的審閱政策），開始是建立時間。
 		out.ReplyDeadline = &commonpb.Deadline{StartTime: timestamppb.New(i.CreatedAt), DueTime: timestamppb.New(i.DueAt)}
 	}
 	if r := i.Reply; r != nil {

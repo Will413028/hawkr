@@ -87,7 +87,6 @@ function runTelemetrySafely(callback: () => void): void {
 	try {
 		callback();
 	} catch {
-		// Navigation must remain fail-open when analytics/Sentry is unavailable.
 	}
 }
 
@@ -112,7 +111,6 @@ export function navigationActionId(
 	if (!target) return `navigate_${method}`;
 	const url = resolveUrl(target);
 	if (!url) return `navigate_${method}`;
-	// the action id names the route, not the language it was reached in
 	const route = privacySafeRoutePathname(stripLocale(url.pathname));
 	const slug =
 		route === "/"
@@ -178,7 +176,6 @@ function clearPersistedHardNavigation(): void {
 	try {
 		window.sessionStorage.removeItem(HARD_NAVIGATION_STORAGE_KEY);
 	} catch {
-		// Storage can be blocked in private/partitioned contexts.
 	}
 }
 
@@ -205,7 +202,6 @@ function persistHardNavigation(transaction: NavigationTransaction): void {
 			}),
 		);
 	} catch {
-		// Hard navigation still works when storage is unavailable.
 	}
 }
 
@@ -321,8 +317,6 @@ function startIntentTimeout(transaction: NavigationTransaction): void {
 			activeTransaction?.id === transaction.id &&
 			transaction.transitionStartedAt === undefined
 		) {
-			// A slow callback/long task is not a failed navigation. Retain its ID
-			// so a late router start and the eventual result remain correlated.
 			addBreadcrumb(transaction, "navigation.start_pending");
 		}
 	}, INTENT_START_GRACE_MS);
@@ -340,8 +334,6 @@ function startIntentTimeout(transaction: NavigationTransaction): void {
 			}
 			if (!claimNavigationRecovery()) {
 				addBreadcrumb(transaction, "navigation.recovery_unavailable");
-				// Only automatic reload is unavailable. A deferred Link data promise
-				// may still complete and must retain permission to dispatch its route.
 				return;
 			}
 			finish(transaction, "not_started");
@@ -423,8 +415,6 @@ export function navigateDocument(
 		url.password
 	)
 		return false;
-	// Clear rescue ownership before doing any optional tracking. Even a failed
-	// Sentry/storage call must not allow an old soft intent to interrupt login.
 	markDocumentNavigationLeaving();
 	try {
 		beginNavigationIntent({
@@ -434,7 +424,6 @@ export function navigateDocument(
 			...options,
 		});
 	} catch {
-		/* The actual user-requested document navigation remains fail-open. */
 	}
 	try {
 		commitDocumentNavigation(url.href, options.replace);
@@ -451,7 +440,6 @@ export function beginNavigationIntent(
 ): string | null {
 	const target = resolveUrl(options.target);
 	observeNavigationLifecycle(onNavigationLifecycle);
-	// An invalid or external newer action still supersedes earlier recovery.
 	cancelNavigationRecovery();
 	if (activeTransaction) finish(activeTransaction, "superseded");
 	if (
@@ -514,8 +502,6 @@ export function declareRouterNavigationOwner(
 	componentId: string,
 	actionId: string,
 ): void {
-	// Back/Forward can be a no-op (no history entry), with no transition hook.
-	// Invalidate the previous target immediately rather than waiting for that hook.
 	cancelNavigationIntent();
 	pendingRouterOwner = { componentId, actionId, declaredAt: Date.now() };
 }
@@ -591,8 +577,6 @@ function finishWhenQuickViewReady(
 		childList: true,
 		subtree: true,
 	});
-	// Close the check→observe race: the Flight subtree can become visible after
-	// the first readiness read but before the observer is attached.
 	if (ready()) {
 		const outcome =
 			committedUrl === transaction.targetUrl ? "success" : "redirected";
@@ -617,7 +601,6 @@ export function markNavigationCommitted(committedUrl: string): void {
 			!(transaction.mode === "hard" && transaction.restoredFromDocument))
 	)
 		return;
-	// A commit can arrive even when the framework never emitted its start hook.
 	if (transaction.transitionStartedAt === undefined)
 		transaction.transitionStartedAt = now();
 	if (isProductQuickView(transaction)) {

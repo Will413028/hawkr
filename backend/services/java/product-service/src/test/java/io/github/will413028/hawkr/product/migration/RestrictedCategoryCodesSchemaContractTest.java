@@ -70,12 +70,9 @@ class RestrictedCategoryCodesSchemaContractTest {
                 throw new IllegalStateException("讀不到 " + MIGRATION_PATH, e);
             }
         }
-        // surefire 的工作目錄若不是 module basedir，退回 classpath（main/resources 在測試 classpath 上）。
         try (InputStream in = RestrictedCategoryCodesSchemaContractTest.class.getClassLoader()
                 .getResourceAsStream(MIGRATION_RESOURCE)) {
             if (in == null) {
-                // 🔴 對「目標不存在」必須 FAIL 而不是 SKIP：檔案被改名或搬走時，
-                //    SKIP 會讓這支測試靜默轉綠，而那正是它該叫的時候。
                 throw new IllegalStateException(
                         "找不到 migration（檔案系統 " + MIGRATION_PATH + " 與 classpath " + MIGRATION_RESOURCE
                                 + " 都沒有）。檔案被改名／搬走了嗎？本測試拒絕在看不到目標時通過。");
@@ -109,8 +106,6 @@ class RestrictedCategoryCodesSchemaContractTest {
     @Test
     @DisplayName("剝除器本身有效：只出現在註解裡的字串不得進入 CODE")
     void 註解剝除器本身有效() {
-        // jsonb_array_elements_text 只出現在「UP-4 定案後要怎麼改」那段 -- 註解裡。
-        // 它若出現在 CODE 裡，代表剝除器沒生效 ⇒ 底下所有否定斷言都會失去鑑別力。
         assertTrue(RAW.contains("jsonb_array_elements_text"),
                 "對照組失效：原始檔裡找不到那段註解，本測試無法判定剝除器是否有效——"
                         + "請改用另一個只出現在註解裡的字串當對照組。");
@@ -161,8 +156,6 @@ class RestrictedCategoryCodesSchemaContractTest {
     @Test
     @DisplayName("entity 側真的接上了：欄位存在且指名對應的 TypeHandler")
     void entity已接線() throws NoSuchFieldException {
-        // 🔴 這一格擋的是「migration 加了欄位但沒人把 entity 接上」——
-        //    那種情況 DDL 測試全綠、編譯全綠，而讀寫路徑永遠看不到這一欄。
         Field f = ProductSkuEntity.class.getDeclaredField("restrictedCategoryCodes");
         assertEquals(List.class, f.getType(), "欄位型別應為 List<String>（JSONB 字串陣列）。");
 

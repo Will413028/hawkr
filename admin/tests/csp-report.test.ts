@@ -8,9 +8,6 @@ import { POST } from "../src/app/api/csp-report/route";
 const testDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(testDir);
 
-// Rolled back to report-only: enforcement blocked the presigned-R2 upload PUT
-// on every image flow (connect-src only allows 'self'). Restore the `= false;`
-// expectation together with the connect-src fix.
 test("CSP ships as report-only while the R2 connect-src gap is open", () => {
 	const config = readFileSync(join(projectRoot, "next.config.ts"), "utf8");
 	assert.match(config, /const CSP_REPORT_ONLY = true;/);

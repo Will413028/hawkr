@@ -1,7 +1,3 @@
--- A7-1a §9.4 的 spike：hashtag 的「包含」搜尋（name LIKE '%q%'）在單體 Postgres 18 的 locale 下，對漢字的行為。
--- 在 seed.sql 灌好的 database 跑（沒有 pg_trgm 索引時是不用索引的基準；加上索引的版本見 README.md）：
---   psql -v ON_ERROR_STOP=1 -d perf -f spike-trgm.sql
--- 1) pg_trgm 對漢字的切分；2) 1 到 4 個漢字的 LIKE '%q%' 與 strpos 的結果相同（正確性）；3) 各長度的查詢耗時與計畫。
 
 \echo '== 1. 資料庫的 locale 與 pg_trgm 對漢字的切分（需要 pg_trgm；沒有裝時略過這一節）'
 SELECT datcollate, datctype, datlocprovider FROM pg_database WHERE datname = current_database();

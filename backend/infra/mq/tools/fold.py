@@ -14,7 +14,6 @@ def fold(flat):
     queues = {q["name"]: q for q in flat["queues"]}
     json_args = {q["name"]: q for q in flat.get("queues_json_args", [])}
 
-    # 衍生物辨識：.retry fanout exchange 對應的 base queue 即 Go retry queue
     retry_bases = {
         n[: -len(".retry")]
         for n, e in exchanges.items()
@@ -25,7 +24,6 @@ def fold(flat):
     for b in flat["bindings"]:
         bindings_by_dest.setdefault(b["destination"], []).append(b)
 
-    # 被 policy 展開吃掉、不該獨立出現在 YAML 的資源
     derived_exchanges = {f"{q}.retry" for q in retry_bases}
     derived_queues = set()
 
@@ -35,7 +33,7 @@ def fold(flat):
             base = name[: -len(".dlq")]
             if base in queues or base in retry_bases:
                 derived_queues.add(name)
-                continue  # 由 base queue 的 policy 展開產生
+                continue
 
         entry = {"name": name}
         args = dict(q["arguments"])
@@ -57,7 +55,6 @@ def fold(flat):
             if own_dlq in queues:
                 derived_queues.add(own_dlq)
             else:
-                # dead-letter 到共用 DLQ：需顯式指名目標
                 target = _shared_dlq_target(via, rk, bindings_by_dest)
                 dlq["queue"] = target
             if rk is not None:
@@ -89,8 +86,6 @@ def fold(flat):
 
 def _shared_dlq_target(via, routing_key, bindings_by_dest):
     if via == "":
-        # 空字串代表 RabbitMQ 的 default exchange：訊息直接依 routing key
-        # 送進同名 queue，不會有對應的 binding 條目可查。
         if routing_key:
             return routing_key
         raise ValueError("default exchange dead-letter 缺 routing_key，無法辨識目標 queue")

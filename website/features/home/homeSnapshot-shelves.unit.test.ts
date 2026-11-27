@@ -77,9 +77,7 @@ describe("home discovery shelves", () => {
 			),
 		);
 		expect(shelf(snapshot, "fruit")).toEqual(["「範例」東河文旦 禮盒裝"]);
-		// No seafood keyword in the name, filed under 海鮮 → on the seafood shelf.
 		expect(shelf(snapshot, "seafood")).toEqual(["北海道干貝"]);
-		// "鮮蝦" in the name, but the catalogue files it under 加工食品.
 		expect(shelf(snapshot, "pantry")).toEqual(["海味零嘴鮮蝦餅"]);
 		expect(shelf(snapshot, "vegetables")).toEqual([]);
 	});

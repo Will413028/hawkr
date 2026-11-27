@@ -63,7 +63,6 @@ export default function ConversationActionsMenu({
 	const reposition = React.useCallback((): boolean => {
 		const rect = triggerRef.current?.getBoundingClientRect();
 		if (!rect) return false;
-		// 觸發鈕已被捲出視窗 → 浮層留著只會飄在無關內容上。
 		if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
 		setPosition({
 			left: Math.max(VIEWPORT_EDGE, rect.right - MENU_WIDTH),
@@ -72,8 +71,6 @@ export default function ConversationActionsMenu({
 		return true;
 	}, []);
 
-	// 落地後量真實高度：撐出視窗底部就翻到觸發鈕上方。只在需要時修一次，
-	// 不進入「改了位置又重新判斷」的迴圈（判斷式只看會不會超出下緣）。
 	React.useLayoutEffect(() => {
 		if (!open || !position) return;
 		const menu = menuRef.current;
@@ -90,13 +87,10 @@ export default function ConversationActionsMenu({
 		if (reposition()) setOpen(true);
 	}, [reposition]);
 
-	// 點外面／Esc 關閉。捕捉階段掛在 document 上，Link 的兄弟節點也蓋得到。
 	React.useEffect(() => {
 		if (!open) return;
 		const onPointerDown = (event: PointerEvent) => {
 			const target = event.target as Node;
-			// 選單被 portal 到 body，不在 rootRef 底下——兩邊都要放行，否則
-			// 點選單項時會先被判成「點外面」而關閉，item 的 onClick 收不到。
 			if (rootRef.current?.contains(target)) return;
 			if (menuRef.current?.contains(target)) return;
 			close(false);
@@ -107,9 +101,6 @@ export default function ConversationActionsMenu({
 				close(true);
 			}
 		};
-		// fixed 座標會跟捲動脫鉤，所以捲動／改變大小時重算，讓選單跟著觸發鈕。
-		// 刻意不是「捲動就關掉」——開啟時把焦點送進第一個項目本身就會讓瀏覽器
-		// 捲動祖先來露出焦點元素，那種寫法會讓選單開了瞬間自己關掉（實測踩到）。
 		const onScrollOrResize = () => {
 			if (!reposition()) close(false);
 		};
@@ -125,7 +116,6 @@ export default function ConversationActionsMenu({
 		};
 	}, [open, close, reposition]);
 
-	// 開啟後把焦點送進第一個項目——鍵盤流程不停在觸發鈕上。
 	React.useEffect(() => {
 		if (open) firstItemRef.current?.focus();
 	}, [open]);
@@ -145,11 +135,6 @@ export default function ConversationActionsMenu({
 			</button>
 			{open && position
 				? createPortal(
-						// Portal 到 body：側欄祖先鏈上任何 transform／filter／
-						// contain 都會變成 fixed 的定位包含塊，讓 right/top 不再
-						// 相對視窗（實測算出來的座標被推到視窗外）。掛在 body 上
-						// 就只受初始包含塊影響，座標與 getBoundingClientRect 同一
-						// 個座標系。
 						<div
 							ref={menuRef}
 							className="chat-sidebar__agent-menu-list"

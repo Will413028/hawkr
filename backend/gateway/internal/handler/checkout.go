@@ -8,34 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== 超商取貨門市代號（cvsStoreCode） ====================
 
-// shippingMethodCvsPickup 是唯一會用到超商門市代號的配送方式
-// （`ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP`，7-11 店到店）。3001 黑貓宅配送到地址，
-// 沒有門市可指定。
 const shippingMethodCvsPickup = "3002"
 
-// cvsStoreCodePattern：7-11 門市店號固定 6 碼數字（例 `252698`）。目前 CVS 只有
-// 7-11 一家；若日後新增其他超商通路，這條規則要跟著 `ShippingMethod` 一起放寬。
 var cvsStoreCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
 
-// resolveCvsStore 收斂 checkout 三個端點對「超商取貨門市」的解析與驗證。
-//
-// 🔴 這組欄位的歷史包袱：對外 JSON key 一直叫 `storeId`／`storeName`，跟平台的
-// 賣家代理鍵 `store_id` **只有名字相同**——gateway 把它直接映進 proto 的
-// `CvsStoreId`，最後落進 `orders.cvs_store_id`。誰照字面理解都會填成賣家
-// store_id，而後端過去完全不驗：宅配單帶著賣家 store_id 也照收，靜靜寫進去。
-// dev 上 2026-07-18～08-30 就這樣累積了 79 列宅配污染訂單（43 個買家，全部出自
-// 驗證腳本；buyer app 與 website 兩個正式 client 都只在超商取貨時才帶，是對的）。
-//
-// 因此本函式做兩件事：
-//  1. 正名——優先讀新的 `cvsStoreCode`／`cvsStoreName`；舊的 `storeId`／`storeName`
-//     繼續接受（已上架的 App 直接呼叫這些端點，不能拔），只在文件上標 deprecated。
-//  2. 驗證——非超商取貨不得帶門市代號；超商取貨的代號必須是 6 碼數字。兩者都直接
-//     400，不做「靜默丟棄」：靜默丟棄會讓填錯的呼叫端永遠不知道自己填錯了，那正是
-//     這批髒資料累積 6 週沒人發現的原因。
-//
-// 回傳 ok=false 時已經寫過 HTTP 回應，呼叫端直接 return。
 func resolveCvsStore(c *gin.Context, shippingMethod, cvsStoreCode, cvsStoreName, legacyStoreID, legacyStoreName string) (code, name string, ok bool) {
 	code = cvsStoreCode
 	if code == "" {
@@ -51,13 +28,9 @@ func resolveCvsStore(c *gin.Context, shippingMethod, cvsStoreCode, cvsStoreName,
 			response.BadRequest(c, "非超商取貨不可指定門市代號（cvsStoreCode）")
 			return "", "", false
 		}
-		// 沒有門市代號時，門市名稱也一併丟掉：留著只會寫出一列「有店名沒店號」的訂單。
 		return "", "", true
 	}
 
-	// 超商取貨允許「還沒選門市」：買家在 App／網站上是先選 3002 看運費、再挑門市，
-	// preview 這一步門市代號本來就可能還是空的（`checkout_legacy_golden_test.go`
-	// 的 legacy fixture 就是這個形狀）。把它變成必填會直接打爛那一段流程。
 	if code == "" {
 		return "", name, true
 	}
@@ -68,7 +41,6 @@ func resolveCvsStore(c *gin.Context, shippingMethod, cvsStoreCode, cvsStoreName,
 	return code, name, true
 }
 
-// ==================== DTO ====================
 
 // CheckoutValidateDataResponse 結帳驗證回應
 type CheckoutValidateDataResponse struct {
@@ -182,7 +154,6 @@ type CheckoutInvoiceIntakeResponse struct {
 	Blocked         bool   `json:"blocked"`
 }
 
-// convertCheckoutInvoicePreview 把 proto 折成 DTO。回 nil ⇒ 上層不設 invoice 欄。
 func convertCheckoutInvoicePreview(in *pb.CheckoutInvoicePreview) *CheckoutInvoicePreviewResponse {
 	if in == nil {
 		return nil
@@ -209,7 +180,6 @@ func convertCheckoutInvoicePreview(in *pb.CheckoutInvoicePreview) *CheckoutInvoi
 			Body:         d.GetBody(),
 		}
 	}
-	// profileId 為空代表買家沒有預設 profile（proto 的空 message）⇒ 不帶這一欄。
 	if pf := in.GetDefaultProfile(); pf != nil && pf.GetProfileId() != "" {
 		out.DefaultProfile = &CheckoutInvoiceProfileResponse{
 			ProfileID:    pf.GetProfileId(),
@@ -365,10 +335,7 @@ type CheckoutItemRequest struct {
 	ProductID string `json:"productId" binding:"required"`
 }
 
-// ==================== 轉換函式 ====================
 
-// convertCheckoutInvoice 把選填的發票區塊轉成 proto。
-// nil-in / nil-out：proto3 的 message 欄位有 presence，不設就是「買家沒帶」。
 func convertCheckoutInvoice(in *CheckoutInvoiceRequest) *pb.CheckoutInvoiceRequest {
 	if in == nil {
 		return nil
@@ -416,7 +383,6 @@ func convertCheckoutValidateData(d *pb.CheckoutValidateData) *CheckoutValidateDa
 	return r
 }
 
-// convertUnavailableItems 將 proto UnavailableItem 列表轉成 Gateway DTO（Validate / Preview / Confirm 共用）
 func convertUnavailableItems(items []*pb.UnavailableItem) []UnavailableItemResponse {
 	out := make([]UnavailableItemResponse, 0, len(items))
 	for _, it := range items {
@@ -458,8 +424,6 @@ func convertCheckoutPreviewData(d *pb.CheckoutPreviewData) *CheckoutPreviewDataR
 		TotalShippingFee:    d.TotalShippingFee,
 		TotalDiscount:       d.TotalDiscount,
 		TotalActualAmount:   d.TotalActualAmount,
-		// 58 §6.2.4 order ②：發票區。order 拿不到時不設這一欄 ⇒ 這裡也是 nil ⇒
-		// JSON 沒有 `invoice` key，前端據此不渲染（而不是渲染一個空的）。
 		Invoice: convertCheckoutInvoicePreview(d.GetInvoice()),
 	}
 	r.OrderGroups = make([]OrderGroupPreviewResponse, 0, len(d.OrderGroups))
@@ -547,7 +511,6 @@ func convertCheckoutItems(items []CheckoutItemRequest) []*pb.CheckoutItem {
 	return result
 }
 
-// ==================== Handler ====================
 
 // CheckoutValidate 結帳即時驗證
 // @Summary      結帳即時驗證
@@ -623,7 +586,7 @@ func (h *Holder) CheckoutShippingFee(c *gin.Context) {
 		DeliveryTemp    string                `json:"deliveryTemp" binding:"required"`
 		ReceiverZipCode string                `json:"receiverZipCode"`
 		CvsStoreCode    string                `json:"cvsStoreCode"`
-		StoreID         string                `json:"storeId"` // Deprecated：cvsStoreCode 的舊名
+		StoreID         string                `json:"storeId"`
 		Items           []CheckoutItemRequest `json:"items" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -672,7 +635,6 @@ func (h *Holder) CheckoutPreview(c *gin.Context) {
 		response.Unauthorized(c)
 		return
 	}
-	// ② 買家身分 = 現任 buyer_id（resolver）。
 	buyerID, ok := h.resolveBuyerIDFor(c, accountID)
 	if !ok {
 		return
@@ -683,7 +645,7 @@ func (h *Holder) CheckoutPreview(c *gin.Context) {
 		DeliveryTemp     string                `json:"deliveryTemp" binding:"required"`
 		ReceiverZipCode  string                `json:"receiverZipCode"`
 		CvsStoreCode     string                `json:"cvsStoreCode"`
-		StoreID          string                `json:"storeId"` // Deprecated：cvsStoreCode 的舊名
+		StoreID          string                `json:"storeId"`
 		CouponTemplateID string                `json:"couponTemplateId"`
 		Items            []CheckoutItemRequest `json:"items" binding:"required"`
 		Consolidated     bool                  `json:"consolidated,omitempty"`
@@ -713,8 +675,6 @@ func (h *Holder) CheckoutPreview(c *gin.Context) {
 		return
 	}
 
-	// issue #1127：4001 商品不可購買時，envelope code=4001 + data.unavailableItems[] 透傳給前端 dialog。
-	// 走原始 c.JSON 而非 response.GrpcResult（後者對 code≠0 會丟 data）。
 	if resp.Code != 0 && resp.Data != nil && len(resp.Data.UnavailableItems) > 0 {
 		response.Biz(c, resp.Code, resp.Message, gin.H{
 			"unavailableItems": convertUnavailableItems(resp.Data.UnavailableItems),
@@ -769,11 +729,10 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 		OrderRemark      string                `json:"orderRemark"`
 		CvsStoreCode     string                `json:"cvsStoreCode"`
 		CvsStoreName     string                `json:"cvsStoreName"`
-		StoreID          string                `json:"storeId"`   // Deprecated：cvsStoreCode 的舊名
-		StoreName        string                `json:"storeName"` // Deprecated：cvsStoreName 的舊名
+		StoreID          string                `json:"storeId"`
+		StoreName        string                `json:"storeName"`
 		CouponTemplateID string                `json:"couponTemplateId"`
 		Items            []CheckoutItemRequest `json:"items" binding:"required"`
-		// 選填；nil ⇒ 不設 proto 的 invoice 欄位 ⇒ order-service 走 USE_BUYER_DEFAULT
 		Invoice *CheckoutInvoiceRequest `json:"invoice,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -801,9 +760,6 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 		CvsStoreId:       cvsStoreCode,
 		CvsStoreName:     cvsStoreName,
 		CouponTemplateId: req.CouponTemplateID,
-		// 🔴 nil 時**不設**這個欄位（proto3 message presence）：order-service 用
-		// hasInvoice() 區分「沒帶」與「帶了空值」，這裡若一律 new 一個空 message，
-		// 兩者就分不開了——而「沒帶」正是線上 App 的行為。
 		Invoice: convertCheckoutInvoice(req.Invoice),
 	})
 	if err != nil {
@@ -811,7 +767,6 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 		return
 	}
 
-	// 金額變動時回傳 code=4091 + data.priceChanged 明細
 	if resp.PriceChanged != nil && resp.PriceChanged.NewTotalAmount != "" {
 		response.Biz(c, resp.Code, resp.Message, gin.H{
 			"priceChanged": convertPriceChangedDetail(resp.PriceChanged),
@@ -819,7 +774,6 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 		return
 	}
 
-	// issue #1127：4001 商品不可購買時，envelope code=4001 + data.unavailableItems[] 透傳給前端 dialog。
 	if resp.Code != 0 && resp.Data != nil && len(resp.Data.UnavailableItems) > 0 {
 		response.Biz(c, resp.Code, resp.Message, gin.H{
 			"unavailableItems": convertUnavailableItems(resp.Data.UnavailableItems),

@@ -13,31 +13,10 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain/fsm"
 )
 
-// ---------------------------------------------------------------------------
-// P0-2：ADM 取消折讓 job 之後，operation 必須終結
-//
-// dev 實測（2026-09-05，evidence/A6/ALW-03/g15-experiment.txt）的症狀：
-// 端點 53 取消一筆 PENDING 的折讓 job ⇒ operation CANCEL_REQUESTED／adjustment CANCELLED
-// （兩者同一交易，正確）。24 小時後 INV.rc 把它 claim 進 PROVIDER_STATUS_RECHECK ⇒
-// ConfirmAllowance ⇒ allowance_query 回 71 ⇒ scheduleAllowanceRecheck 的 G15 ⇒
-// 第一句 MarkFailedUnknown 的 allowed-from 只有 WAITING_CONFIRMATION ⇒ rows=0 ⇒
-// **整個 WithTx rollback** ⇒ operation 停在 PROVIDER_STATUS_RECHECK、next_attempt_at
-// 只被 claim 的租約推兩分鐘 ⇒ 每 ~2 分鐘真的打一次 AMEGO，永遠。
-// 佐證：invoice_status_history 在該時點之後零列、invoice_provider_audit_logs 9 筆外呼。
-//
-// 這條軸的正解不是「讓 adjustment 也能被推」（CANCELLED → FAILED_UNKNOWN 在 M3 上是
-// 一條假的邊），而是走 operation 自己該走的那條終結邊 —— M2 的 J24。
-// ---------------------------------------------------------------------------
 
-// alwCancelUnknownSince 是「已經未明 25 小時」的事實時間戳（testNow = 2026-08-30 02:00Z）。
-// 硬寫字面值而不是 testNow.Add(-recheckGiveUpAfter-1h)：期望值引用被測物引用的常數時，
-// 把那個常數改掉測試照樣綠（§0.3 第二種形態）。
 var alwCancelUnknownSince = time.Date(2026, 8, 29, 1, 0, 0, 0, time.UTC)
 
-// alwAdminCancelSetup 把 harness 擺成「ADM 取消在途 ＋ INV.rc 已 claim」的真實時序，
-// 回傳要傳進 ConfirmAllowance 的**快照**（claim 之前那一份）。
 func alwAdminCancelSetup(h *alwHarness) domain.Operation {
-	// 端點 53 的結果：operation CANCEL_REQUESTED、adjustment CANCELLED（同一交易）。
 	h.adjs.adj.Status = codemeta.InvoiceAdjustmentStatusCancelled.Value
 
 	requestedAt := time.Date(2026, 8, 29, 0, 30, 0, 0, time.UTC)
@@ -51,7 +30,6 @@ func alwAdminCancelSetup(h *alwHarness) domain.Operation {
 
 	snapshot := h.ops.op
 	snapshot.Status = codemeta.InvoiceOperationStatusCancelRequested.Value
-	// ClaimInvoiceRecheck 已經把 DB 上那一列蓋成 PROVIDER_STATUS_RECHECK（J22）。
 	h.ops.op.Status = codemeta.InvoiceOperationStatusProviderStatusRecheck.Value
 	return snapshot
 }
@@ -103,8 +81,6 @@ func TestAllowance_AdminCancelWithProviderQuery71ReachesCancelledByAdmin(t *test
 		t.Errorf("completed_at 沒有寫入")
 	}
 
-	// adjustment 那一半刻意不動：它已經是 CANCELLED（M3 終態），硬推只會 rows=0，
-	// 而把那個 rows=0 當錯誤正是本缺陷的成因。
 	if s := h.adjs.adj.Status; s != codemeta.InvoiceAdjustmentStatusCancelled.Value {
 		t.Errorf("adjustment = %q，want 留在 CANCELLED", s)
 	}
@@ -142,7 +118,6 @@ func TestAllowance_AdminCancelStillUnknownGoesCancelBlockedUnknown(t *testing.T)
 	if h.ops.gotResolved != nil {
 		t.Errorf("不確定卻走了 MarkRecheckResolved（J24）—— 那會在折讓其實已成立時把它收掉")
 	}
-	// 25h 已過階梯頂（>= 2h ⇒ 30 分鐘），期望值硬寫。
 	want := time.Date(2026, 8, 30, 2, 30, 0, 0, time.UTC)
 	if !h.ops.gotUnresolvedNextAt.Equal(want) {
 		t.Errorf("next_attempt_at = %v，want %v（退避階梯觸頂 30m）",
@@ -205,12 +180,11 @@ func TestAllowance_GiveUpToleratesSettledAdjustment(t *testing.T) {
 			h.ops.op.Status = codemeta.InvoiceOperationStatusProviderStatusRecheck.Value
 
 			h.prov.allowanceQueryFn = func(string) (*amego.AllowanceDetail, error) {
-				return &amego.AllowanceDetail{}, nil // 查無
+				return &amego.AllowanceDetail{}, nil
 			}
 
 			err := h.uc.ConfirmAllowance(ctx, snapshot)
 			if adjStatus == "COMPLETED" {
-				// COMPLETED 在 ConfirmAllowance 開頭就走 finishOperation，不進 G15。
 				if err != nil {
 					t.Fatalf("ConfirmAllowance: %v", err)
 				}

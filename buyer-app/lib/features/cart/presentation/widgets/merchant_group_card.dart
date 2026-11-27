@@ -14,12 +14,6 @@ import '../../data/cart_model.dart';
 import 'cart_product_tile.dart';
 import 'merchant_group.dart';
 
-// ---------------------------------------------------------------------------
-// 商家分組卡片。
-//
-// 白色圓角卡片，頂部為商家頭（勾選框 + 頭像 + 名稱/地點），
-// 下方為該商家的所有商品行，每行支援左滑刪除。
-// ---------------------------------------------------------------------------
 
 /// 購物車中單個商家分組的卡片。
 ///
@@ -93,7 +87,6 @@ class MerchantGroupCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 商家標題列 ──
           _buildMerchantHeader(
             context,
             allChecked: allChecked,
@@ -102,12 +95,10 @@ class MerchantGroupCard extends StatelessWidget {
             selectedCount: selectedCount,
             selectableCount: selectableCount,
           ),
-          // ── 分隔線 ──
           const Padding(
             padding: EdgeInsets.symmetric(vertical: HkSpace.sm),
             child: Divider(height: 1, color: AppColors.dividerLight),
           ),
-          // ── 商品行列表 ──
           ...group.items.asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;

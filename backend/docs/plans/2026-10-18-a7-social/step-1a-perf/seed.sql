@@ -1,8 +1,3 @@
--- A7-1a §9.3 的播種腳本：把單體的 seller、buyer、social 三個 schema 灌到預估正式量（用法見 README.md）。
--- 前提：資料庫已套用單體的 migration（hawkr migrate），而且是用完即丟的 database，不是共用的開發 database。
--- 參數（psql -v 名稱=值，預設值是正式量的預估）：stores、buyers、posts、comments_per_post、likes_per_post。
--- 做法：session_replication_role = replica 關掉 FK 與 trigger（只有 CHECK 照常檢查，所以每一列仍然是合法的資料），
--- 最後由聚合算出 stats 表；分佈用 random()^k 做成偏斜（少數熱門店家、貼文、標籤）。
 
 \set ON_ERROR_STOP on
 \if :{?stores} \else \set stores 10000 \endif
@@ -11,13 +6,11 @@
 \if :{?comments_per_post} \else \set comments_per_post 5 \endif
 \if :{?likes_per_post} \else \set likes_per_post 10 \endif
 
--- 固定亂數種子：重跑得到相同的列數與分佈，量測前後才能比較（uuid 不受 setseed 影響，每次不同，不影響分佈）。
 SELECT setseed(0.42);
 SET session_replication_role = replica;
 SET maintenance_work_mem = '256MB';
 
 \echo '== seller：店家、KYC、PayUni、停權'
--- 3% 的店家沒有核准的 KYC（不可曝光）、2% 的帳號有生效中的停權、1% 正在隨帳號刪除。
 INSERT INTO seller.stores (store_id, store_code, account_id, status, store_name, logo_key, logo_asset_id, town_code, contact_phone, contact_name, contact_mobile, description, created_at, updated_at)
 OVERRIDING SYSTEM VALUE
 SELECT g, g, 1000000 + g, CASE WHEN g % 100 = 3 THEN 'PENDING_DELETION' ELSE 'ACTIVE' END,
@@ -50,7 +43,6 @@ SELECT g, 2000000 + g, CASE WHEN g % 50 = 11 THEN 'PENDING_DELETION' ELSE 'ACTIV
 FROM generate_series(1, :buyers) g;
 
 \echo '== social：貼文'
--- 店家偏斜：random()^2，前 1% 的店家各有上千篇。狀態：85% 已發布、8% 下架、2% 草稿、5% 已刪除（軟刪）。
 CREATE TEMP TABLE seed_posts AS
 SELECT g AS rn, uuidv7() AS id, 1 + floor(:stores * power(random(), 2))::bigint AS store_id,
        (CASE WHEN r < 0.85 THEN 'PUBLISHED' WHEN r < 0.93 THEN 'UNPUBLISHED' ELSE 'DRAFT' END)::text AS status,
@@ -64,8 +56,6 @@ SELECT id, store_id, '貼文內容 ' || rn || ' ' || repeat('好吃的水果與�
 FROM seed_posts;
 
 \echo '== social：標籤（5,000 個，60% 中文）'
--- 中文標籤由編號決定：兩到四個漢字，取自 1500 個漢字的字池，前兩個字的組合不重複（第一個字對 1500 取模時是雙射，第二個字的區段
--- 由編號除以 1500 決定），所以名稱保證不重複，又讓單一漢字在多個標籤裡出現；其餘是 6 到 10 個字母的偽隨機單字（md5 的前綴，數字換成 g–p）。
 CREATE TEMP TABLE seed_tags AS
 SELECT i, (CASE WHEN i % 5 < 3
            THEN chr(19968 + (i * 37) % 1500) || chr(19968 + (i / 1500) * 300 + (i * 13) % 300)
@@ -75,7 +65,6 @@ SELECT i, (CASE WHEN i % 5 < 3
 FROM generate_series(1, 5000) i;
 CREATE UNIQUE INDEX ON seed_tags (name);
 
--- 含 volatile 函式的子查詢不會被展平，所以每一列只抽一次；把 random() 直接寫在 JOIN 條件裡會對每個配對各抽一次。
 INSERT INTO social.post_hashtags (post_id, position, name, display_name)
 SELECT s.id, s.pos, t.name, t.name
 FROM (
@@ -85,7 +74,6 @@ FROM (
 ) s
 JOIN seed_tags t ON t.i = s.tag_i
 ON CONFLICT DO NOTHING;
--- 標籤列的 published_at 是貼文 published_at 的複本（trigger 在 replica 模式下不跑，這裡直接補）。
 UPDATE social.post_hashtags h SET published_at = p.published_at FROM social.posts p WHERE p.id = h.post_id AND p.published_at IS NOT NULL;
 
 \echo '== social：留言（80% 頂層，其餘是回覆；熱門貼文偏斜）'
@@ -116,17 +104,14 @@ SELECT uuidv7(), t.post_id, t.id, CASE WHEN random() < 0.3 THEN t.id END,
 FROM seed_top t
 CROSS JOIN LATERAL generate_series(1, 1 + (random() * 3)::int) r
 WHERE t.g % 4 = 0;
--- 旗標 counted 與 stats 同一個定義（沒有刪除、沒有未還原的隱藏、作者不在 inactive_authors）：回覆有 3% 已刪除，補成假。
 UPDATE social.comments SET counted = FALSE WHERE deleted_at IS NOT NULL AND counted;
 
--- 1% 的留言被隱藏，其中三成已還原。
 INSERT INTO social.hides (id, comment_id, reason_category, reason_text, admin_id, hidden_at, restored_at, restored_by, restore_reason)
 SELECT uuidv7(), c.id, 'SPAM', '測試', 1, c.created_at + interval '1 day',
        CASE WHEN r < 0.3 THEN c.created_at + interval '2 days' END, CASE WHEN r < 0.3 THEN 1 END, CASE WHEN r < 0.3 THEN '還原' END
 FROM (SELECT id, created_at, random() AS r FROM social.comments WHERE random() < 0.01) c;
 UPDATE social.comments c SET counted = FALSE FROM social.hides h WHERE h.comment_id = c.id AND h.restored_at IS NULL AND c.counted;
 
--- 買家刪帳的事實的複本（schema.sql 的 inactive_authors）：與 buyer.buyers 不營運中的列一致（2% 刪除中）；這些買家寫的留言旗標補成假。
 INSERT INTO social.inactive_authors (buyer_id, since) SELECT buyer_id, now() FROM buyer.buyers WHERE status <> 'ACTIVE';
 UPDATE social.comments c SET counted = FALSE
 WHERE c.counted AND c.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM social.inactive_authors ia WHERE ia.buyer_id = c.actor_id);
@@ -161,7 +146,6 @@ UPDATE social.forum_entries e SET counted = FALSE
 WHERE e.counted AND e.actor_kind = 'BUYER' AND EXISTS (SELECT 1 FROM social.inactive_authors ia WHERE ia.buyer_id = e.actor_id);
 
 \echo '== social：stats（由事實聚合，與 trigger 維護的結果一致）'
--- 先 ANALYZE：聚合與 join 的計畫要看得到剛灌進去的資料量。stats 是旗標的加總（stats = 旗標之和）。
 ANALYZE;
 INSERT INTO social.post_stats (post_id, like_count, comment_count, view_count, share_count)
 SELECT p.id, COALESCE(l.n, 0), COALESCE(c.n, 0), (random() * 5000)::bigint, 0
@@ -182,14 +166,12 @@ SELECT e.id, COALESCE(r.n, 0)
 FROM social.forum_entries e
 LEFT JOIN (SELECT parent_id, count(*) AS n FROM social.forum_entries WHERE counted AND parent_id IS NOT NULL GROUP BY parent_id) r ON r.parent_id = e.id;
 
--- 處分紀錄（ListSanctions 的 sanctions_buyer 索引要有資料才看得出計畫）：前 2,000 位買家各 10 筆。
 \echo '== social：處分'
 INSERT INTO social.sanctions (id, buyer_id, kind, reason_category, reason_text, source_ref, admin_id, created_at, ends_at)
 SELECT gen_random_uuid(), b.buyer_id, 'WARNING', 'SPAM', '', NULL, 1, now() - (g * interval '1 day') - (random() * interval '12 hours'), NULL
 FROM (SELECT buyer_id FROM buyer.buyers ORDER BY buyer_id LIMIT 2000) b, generate_series(1, 10) g;
 
 RESET session_replication_role;
--- VACUUM 設好 visibility map 與 hint bit（index-only scan 才不用回表），ANALYZE 更新統計；剛灌完不做的話，第一輪量測會被 autovacuum 與回表干擾。
 \echo '== VACUUM (ANALYZE)'
 VACUUM (ANALYZE);
 SELECT 'stores' AS what, count(*) FROM seller.stores

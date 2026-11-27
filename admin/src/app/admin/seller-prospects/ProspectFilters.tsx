@@ -49,7 +49,6 @@ export default function ProspectFilters() {
 	const [categoryInput, setCategoryInput] = useState(filters.category);
 	const [regionInput, setRegionInput] = useState(filters.region);
 
-	// 外部改變 URL（清除篩選鍵、瀏覽器上一頁）時同步輸入框，避免畫面停在舊值。
 	useEffect(() => setKeywordInput(filters.keyword), [filters.keyword]);
 	useEffect(() => setCategoryInput(filters.category), [filters.category]);
 	useEffect(() => setRegionInput(filters.region), [filters.region]);

@@ -50,7 +50,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
   int? _selectedBlockIndex;
 
-  // Undo/Redo 堆疊
   final List<List<TextBlockData>> _undoStack = [];
   final List<List<TextBlockData>> _redoStack = [];
 
@@ -58,7 +57,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
   void initState() {
     super.initState();
     if (widget.initialBlocks != null && widget.initialBlocks!.isNotEmpty) {
-      // 從結構化區塊回填（編輯模式）
       for (final block in widget.initialBlocks!) {
         final type = block['type']?.toString() ?? 'text';
         if (type == 'image') {
@@ -104,7 +102,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
           if (!hasRuns && content.isEmpty) continue;
           final styleMap = block['style'] as Map<String, dynamic>? ?? {};
           final style = _parseBlockStyle(styleMap);
-          // 新資料走 runs；legacy content 把整塊樣式降為單一 run（不遺失）
           final effectiveRuns = hasRuns
               ? runs
               : [
@@ -126,7 +123,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
           );
         }
       }
-      // 解析完畢後，為缺少 imageUrl 的圖片區塊取得簽名 URL
       _resolveImageUrls();
     } else if (widget.initialContent != null &&
         widget.initialContent!.isNotEmpty) {
@@ -153,8 +149,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
     return QuillController(
       document: Document.fromDelta(RunsDeltaAdapter.runsToDelta(runs)),
       selection: const TextSelection.collapsed(offset: 0),
-      // 強制走純文字貼上路徑（不讓外部 HTML 搶先攔截），並攔截貼上偵測表格。
-      // flutter_quill 11 的貼上 hook 仍標 @experimental，此為刻意使用。
       config: QuillControllerConfig(
         // ignore: experimental_member_use
         clipboardConfig: QuillClipboardConfig(
@@ -494,10 +488,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
   void _updateBlockText(int index, String text) {
     if (index < 0 || index >= _blocks.length) return;
-    // Mutate directly without setState — the child's TextEditingController
-    // is the source of truth during editing. Calling setState here would
-    // trigger a rebuild that re-syncs the controller in didUpdateWidget,
-    // causing setState-during-build errors.
     _blocks[index].text = text;
   }
 
@@ -588,8 +578,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    // 站內 design system 統一走 FloatingToast（原生 SnackBar 樣式不符，
-    // issue #1246 錯誤提示規範）
     FloatingToast.show(context, msg, isSuccess: false);
   }
 
@@ -598,7 +586,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
     setState(() {
       final block = _blocks.removeAt(oldIndex);
       _blocks.insert(newIndex, block);
-      // 更新選中索引
       if (_selectedBlockIndex == oldIndex) {
         _selectedBlockIndex = newIndex;
       } else if (_selectedBlockIndex != null) {
@@ -615,7 +602,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
   Future<void> _insertImage() async {
     final picker = ImagePicker();
-    // 描述圖不壓縮：保留原始解析度，避免商品故事圖 / 內嵌文字變糊（#1248）。
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
@@ -638,7 +624,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
     _scrollToBottom();
 
-    // 後台上傳
     try {
       final ts = DateTime.now().millisecondsSinceEpoch;
       final result = await ref
@@ -663,9 +648,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
       final idx = _blocks.indexWhere((b) => b.id == blockId);
       if (idx >= 0) {
         setState(() {
-          // 移除失敗的 block：本地 bytes 會讓圖「看起來已插入」，但無
-          // stagedToken/objectKey 存檔時會被靜默丟棄——假象比失敗更糟
-          //（issue #1246 錯誤提示規範）。
           _blocks.removeAt(idx);
           if (_selectedBlockIndex != null &&
               _selectedBlockIndex! >= _blocks.length) {
@@ -697,7 +679,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
   }
 
   RichTextEditorResult _exportResult() {
-    // 純文字預覽（用於摘要顯示）
     final content = _blocks
         .map((b) {
           if (b.type == BlockType.image) {
@@ -709,13 +690,10 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
         .where((s) => s.isNotEmpty)
         .join('\n\n');
 
-    // 結構化區塊（供 API description 欄位使用）
     final blocks = <Map<String, dynamic>>[];
     for (final b in _blocks) {
       if (b.type == BlockType.image) {
         if (b.stagedToken != null || b.objectKey != null) {
-          // 寫入契約：`DescriptionBlockInput`（gateway/internal/handler/seller_product.go）
-          // 的圖片鍵是 `imageKey`（原 `objectKey`）。
           blocks.add({
             'type': 'image',
             if (b.stagedToken != null) 'stagedToken': b.stagedToken,
@@ -733,14 +711,11 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
           blocks.add({'type': 'list', 'listJson': listJson});
         }
       } else {
-        // text block：inline runs 從 QuillController 讀取（deltaToRuns）
         final qc = b.quillController;
         if (qc == null) continue;
         final runs = RunsDeltaAdapter.deltaToRuns(qc.document.toDelta());
         if (runs.isEmpty) continue;
         final s = b.style;
-        // block-level style 只保留 fontSize(標題,px 字串) / fontWeight / alignment；
-        // bold/italic/color/連結為 run 級（已在 runs 內）
         final styleMap = <String, dynamic>{
           if (s.fontSize != 14.0) 'fontSize': '${s.fontSize.toInt()}px',
           if (s.fontWeight != FontWeight.w400) 'fontWeight': s.fontWeight.value,
@@ -754,7 +729,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
       }
     }
 
-    // 所有圖片的 stagedToken
     final stagedTokens = _blocks
         .where((b) => b.type == BlockType.image && b.stagedToken != null)
         .map((b) => b.stagedToken!)
@@ -808,7 +782,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
   }
 
   void _onSave() {
-    // ── Debug: 記錄每個 block 的完整資料 ──
     debugPrint('╔══════════════════════════════════════════════════');
     debugPrint('║ [RichTextEditor] 儲存 — 共 ${_blocks.length} 個區塊');
     debugPrint('╠══════════════════════════════════════════════════');
@@ -858,8 +831,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
 
-    // QuillEditor 需要 FlutterQuillLocalizations；用 Localizations.override 在
-    // 編輯器子樹局部注入（繼承 app 既有 delegates + 加 Quill），免動 MaterialApp。
     return Localizations.override(
       context: context,
       delegates: const [FlutterQuillLocalizations.delegate],
@@ -868,9 +839,7 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
         resizeToAvoidBottomInset: false,
         body: Column(
           children: [
-            // Status bar
             Container(height: topPadding, color: AppColors.primary),
-            // Top bar
             Container(
               height: 56.h,
               padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -898,7 +867,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
                         ),
                       ),
                       SizedBox(width: 12.w),
-                      // hashtag 計數器（# n/10）；達上限變橘
                       Builder(
                         builder: (_) {
                           final n = _totalHashtagCount;
@@ -942,7 +910,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
                 ],
               ),
             ),
-            // 文件區域
             Expanded(
               child: GestureDetector(
                 onTap: _onCanvasTap,
@@ -950,7 +917,6 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
                 child: _blocks.isEmpty ? _buildEmptyState() : _buildBlockList(),
               ),
             ),
-            // Toolbar
             EditorToolbar(
               onAddBlock: _addTextBlock,
               onBold: _focusedTextController != null

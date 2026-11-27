@@ -62,11 +62,8 @@ SQL_EXPORTERS = [
 ]
 GO_ROOTS = [REPO / "services", REPO / "pkg", REPO / "gateway"]
 
-# 被引用側只認這兩個形狀，理由見檔頭「觀測窗」。
 CONSUMED_RE = re.compile(r"\b(invoice_[a-z0-9_]+|invoice:[a-z0-9_:]+)")
-# PromQL 的字串字面值（label matcher 的值、annotation 片段）不是 series 名。
 STRING_RE = re.compile(r"\"[^\"]*\"|'[^']*'")
-# histogram／summary 自動衍生的後綴：底名存在就算有生產者。
 DERIVED_SUFFIXES = ("_count", "_sum", "_bucket")
 
 GO_NAME_RE = re.compile(r"""Name:\s*"(invoice_[a-z0-9_]+)"|Name:\s+"(invoice_[a-z0-9_]+)\"""")
@@ -92,9 +89,7 @@ def collect_consumed() -> dict[str, set[str]]:
     return out
 
 
-# 一次真正的觀測。`.Add(0)` 與裸 `WithLabelValues(...)` 是預先展開，刻意不算。
 OBSERVE_RE = re.compile(r"\.(Inc\(\)|Observe\(|Set\(|Add\(\s*(?!0\s*\))|Dec\(\))")
-# 綁定 metric 的識別字：package-level var、或 struct literal 的欄位名。
 BIND_RE = re.compile(
     r"^[ \t]*(?:var[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)[ \t]*[:=][ \t]*promauto\.New[A-Za-z]*\(",
     re.MULTILINE,
@@ -129,7 +124,6 @@ def go_metric_bindings() -> dict[str, tuple[str, Path]]:
 
 
 FUNC_RE = re.compile(r"^func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*[\(\[]", re.MULTILINE)
-# 觀測 helper 的命名慣例（本 repo 全部走這個字首）。它們多一層檢查：**要有呼叫端**。
 HELPER_RE = re.compile(r"^[Oo]bserve")
 
 
@@ -194,7 +188,6 @@ def unobserved_go_metrics() -> dict[str, str]:
         for _, text in sources:
             funcs = _funcs(text)
             for u in use_re.finditer(text):
-                # 識別字後面接一段鏈（可能有 WithLabelValues(...)），找真正的觀測動詞。
                 chain = text[u.end() : u.end() + 240].split(";")[0]
                 if not OBSERVE_RE.search(chain):
                     continue
@@ -202,7 +195,7 @@ def unobserved_go_metrics() -> dict[str, str]:
                 if enclosing and HELPER_RE.match(enclosing):
                     helpers_seen.add(enclosing)
                     if not helper_has_caller(enclosing, text):
-                        continue  # helper 沒有呼叫端 ⇒ 這一句永遠不會執行
+                        continue
                 observed = True
                 break
             if observed:
@@ -221,7 +214,6 @@ def unobserved_go_metrics() -> dict[str, str]:
 def collect_produced() -> set[str]:
     produced: set[str] = set(go_metric_bindings())
 
-    # ② sql_exporter 的 metric_name。
     for path in SQL_EXPORTERS:
         if not path.is_file():
             continue
@@ -230,7 +222,6 @@ def collect_produced() -> set[str]:
             if m:
                 produced.add(m.group(1))
 
-    # ③ recording rule 自己 record 出來的 series（它是下游告警的生產者）。
     for path in sorted(RULES_DIR.glob("*.yml")):
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         for group in doc.get("groups") or []:

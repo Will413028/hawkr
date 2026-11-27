@@ -50,8 +50,6 @@ export function createLocalPrivateStore<S extends object, P extends Partial<S>>(
 	config: LocalPrivateStoreConfig<S, P>,
 ) {
 	const spec = LOCAL_PRIVATE_KEYS[config.keyName];
-	// store 支撐的 key 一律只宣告一個 storage（橫跨兩者的只有結帳草稿，
-	// 而它不是 store）。tests/local-private-registry.test.ts 會守住這個前提。
 	const area = spec.in[0];
 	const store = create<S>()(
 		devtools(

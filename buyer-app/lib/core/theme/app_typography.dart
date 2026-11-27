@@ -26,7 +26,6 @@ import 'app_colors.dart';
 class AppTypography {
   AppTypography._();
 
-  // ── Colors ────────────────────────────────────────────────────────────────
   static const Color colorPrimary = AppColors.textPrimary;
   static const Color colorEmphasis = AppColors.textEmphasis;
   static const Color colorPrice = AppColors.primary;
@@ -36,7 +35,6 @@ class AppTypography {
   static const Color colorDanger = AppColors.danger;
   static const Color colorInverse = AppColors.white;
 
-  // ── Font family ───────────────────────────────────────────────────────────
   /// 不宣告未打包的 Roboto／Inter。iOS 會使用 San Francisco + PingFang TC，
   /// 取得穩定的繁中文字形與 fallback。
   static const String? family = null;
@@ -65,7 +63,6 @@ class AppTypography {
     ),
   );
 
-  // ── XL: Display (24px Bold) ──────────────────────────────────────────────
   /// 大數字、空狀態主標 — 例：合計「NT$ 9,999」
   static TextStyle get display => TextStyle(
     fontFamily: family,
@@ -75,7 +72,6 @@ class AppTypography {
     height: 32 / 24,
   );
 
-  // ── H1 (20px Bold) ───────────────────────────────────────────────────────
   /// 頁面主標題 — 例：「我的訂單」、「商家詳情」
   static TextStyle get h1 => TextStyle(
     fontFamily: family,
@@ -85,7 +81,6 @@ class AppTypography {
     height: 28 / 20,
   );
 
-  // ── L1: Section Title (18px Bold, emphasis) ──────────────────────────────
   /// 區塊標題 — 例：「選擇規格」
   static TextStyle get sectionTitle => TextStyle(
     fontFamily: family,
@@ -95,7 +90,6 @@ class AppTypography {
     height: 28 / 18,
   );
 
-  // ── L2: Product Name / Bold Body (16px Bold) ─────────────────────────────
   /// 商品名稱 · 主要按鈕文字 — 例：「小蕃茄」、「繼續購買」
   static TextStyle get productName => TextStyle(
     fontFamily: family,
@@ -108,7 +102,6 @@ class AppTypography {
   /// L2 別名（語意同 productName）— 用於一般 Bold 正文
   static TextStyle get bodyBold => productName;
 
-  // ── L3: Price Total Emphasis (18px Bold, accent) ─────────────────────────
   /// 合計金額強調 — 例：「NT$ 999」
   static TextStyle get priceTotal => TextStyle(
     fontFamily: family,
@@ -125,7 +118,6 @@ class AppTypography {
     color: colorPrice,
   );
 
-  // ── M: Body (16px Regular, primary) ──────────────────────────────────────
   /// 一般正文 · 標籤 — 例：「數量」、「庫存：50 件」、規格選項
   static TextStyle get body => TextStyle(
     fontFamily: family,
@@ -135,7 +127,6 @@ class AppTypography {
     height: 24 / 16,
   );
 
-  // ── S: Meta (14px Regular, primary) ──────────────────────────────────────
   /// 次要文字 — 例：「庫存」、「4.8 (326則評價)」
   static TextStyle get meta => TextStyle(
     fontFamily: family,
@@ -154,7 +145,6 @@ class AppTypography {
     height: 21 / 14,
   );
 
-  // ── XS: Tag (12px Regular) ───────────────────────────────────────────────
   /// 徽章類標籤 — 例：冷藏 / 冷凍 / 常溫。需搭配對應顏色（由呼叫方傳入）。
   static TextStyle tag(Color color) => TextStyle(
     fontFamily: family,
@@ -165,7 +155,6 @@ class AppTypography {
     letterSpacing: 1.55,
   );
 
-  // ── Caption (12 Regular) ──────────────────────────────────────────────────
   /// 極小說明文字 — 例：完整地址、7-11 門市名稱、付款期限提示
   /// 12px is the hard floor for compact supporting information.
   static TextStyle get caption => const TextStyle(
@@ -175,7 +164,6 @@ class AppTypography {
     color: colorMuted,
   );
 
-  // ── 按鈕文字 ─────────────────────────────────────────────────────────────
   /// 主 CTA 按鈕 — 例：「立即下單」、「結帳」
   static TextStyle get buttonLarge => TextStyle(
     fontFamily: family,

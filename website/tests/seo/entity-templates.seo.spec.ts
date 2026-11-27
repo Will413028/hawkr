@@ -62,14 +62,6 @@ test("seller template: self-canonical, ProfilePage + BreadcrumbList JSON-LD", as
 	);
 	if (id === null) return;
 
-	// Enter by the CANONICAL segment. `discoverLiveEntity` surfaces the store_id
-	// (the "recommended" listing carries no store_code), and a store_id URL is
-	// not where the storefront lives: middleware answers it with a real 308 to
-	// the store_code (#365). This gate is about the SEO template — canonical tag
-	// and JSON-LD — not about the redirect, so it must be pointed at the URL that
-	// actually renders the template. Asserting 200 on a store_id URL only passed
-	// while the first recommended seller happened to be a grandfathered one whose
-	// store_code equals its store_id; that was luck, not a contract.
 	const canonicalId = await resolveSellerCanonicalId(request, id);
 
 	const res = await request.get(`/sellers/${canonicalId}`, {

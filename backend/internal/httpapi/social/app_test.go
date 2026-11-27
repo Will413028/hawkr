@@ -134,13 +134,11 @@ type appEnv struct {
 	url    string
 }
 
-// newAppEnv 掛上真的 Connect handler 與 rpc 的 interceptor（授權、錯誤轉換）；header X-Test-Account 非空時以該帳號登入。
 func newAppEnv(t *testing.T, w *fakeWrites, s *fakeStores) *appEnv {
 	t.Helper()
 	return newAppEnvWith(t, w, &fakeOwner{}, s)
 }
 
-// newAppEnvWith 是 newAppEnv 加上店主方法的來源。
 func newAppEnvWith(t *testing.T, w *fakeWrites, owner Owner, s *fakeStores) *appEnv {
 	t.Helper()
 	images, err := rpc.NewImages("https://media.example.test")

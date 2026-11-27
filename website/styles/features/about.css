@@ -1,5 +1,3 @@
-/* About keeps the shared Hawkr postcard hero, but gives the brand IP a
- * real composition role instead of leaving the second half of the canvas idle. */
 .hkh-page .about-hero-grid {
 	grid-template-columns: minmax(0, 640px) minmax(340px, 1fr);
 	grid-template-areas: "content artwork";

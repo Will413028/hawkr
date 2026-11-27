@@ -34,7 +34,6 @@ func (f *fakeReader) count() int {
 	return f.calls
 }
 
-// testClock 是可以從測試推進、背景讀取也能安全讀取的時鐘；測試不依賴真實時間。
 type testClock struct {
 	mu sync.Mutex
 	t  time.Time
@@ -54,7 +53,6 @@ func (c *testClock) advance(d time.Duration) {
 
 func newClock() *testClock { return &testClock{t: time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)} }
 
-// waitIdle 等進行中的背景讀取結束（沒有就立即回）。
 func waitIdle(r *Resolver) {
 	r.mu.Lock()
 	l := r.loading
@@ -78,7 +76,7 @@ func newResolver(r TaxonomyReader, syn Synonyms) *Resolver {
 
 // AD3：買家的原詞有命中分類時，同義詞不被查閱，也不覆寫買家的詞。
 func TestSynonymNeverOverridesTheBuyersOwnTerm(t *testing.T) {
-	syn := Synonyms{"外套": {"夾克"}} // 同義詞把「外套」指向「夾克」
+	syn := Synonyms{"外套": {"夾克"}}
 	got, err := newResolver(&fakeReader{nodes: tree}, syn).Resolve(context.Background(), " 外套 ")
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +149,6 @@ func TestTreeIsCachedForTheTTL(t *testing.T) {
 	}
 }
 
-// gateReader 讓測試用 channel 控制讀取何時完成。
 type gateReader struct {
 	mu      sync.Mutex
 	calls   int
@@ -235,7 +232,7 @@ func TestStaleTreeIsServedImmediatelyWhileReloadingInTheBackground(t *testing.T)
 	g.mu.Unlock()
 	clk.advance(TreeTTL + time.Second)
 	for range 3 {
-		res, err := r.Resolve(context.Background(), "外套") // 重讀被擋住；這些呼叫不能等它
+		res, err := r.Resolve(context.Background(), "外套")
 		if err != nil || len(res.Matches) != 1 || res.Matches[0].CategoryID != categoryID(2) {
 			t.Fatalf("過期後重讀還沒完成，要立即回舊樹：%+v %v", res, err)
 		}

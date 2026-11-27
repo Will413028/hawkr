@@ -1,6 +1,4 @@
 #!/bin/bash
-# 建立 Tempo datasource（非 provisioned，讓 trace-to-logs 連結能正常顯示）
-# 詳見 TROUBLESHOOTING.md #14
 
 set -e
 
@@ -8,7 +6,6 @@ GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3000}"
 GRAFANA_USER="${GF_SECURITY_ADMIN_USER:-admin}"
 GRAFANA_PASS="${GF_SECURITY_ADMIN_PASSWORD:?請設定 GF_SECURITY_ADMIN_PASSWORD}"
 
-# 等待 Grafana 啟動
 echo "等待 Grafana 啟動..."
 for i in $(seq 1 30); do
   if curl -s -o /dev/null -w '%{http_code}' "$GRAFANA_URL/api/health" | grep -q 200; then
@@ -22,18 +19,15 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-# 取得 Loki datasource UID
 LOKI_UID=$(curl -s -u "$GRAFANA_USER:$GRAFANA_PASS" "$GRAFANA_URL/api/datasources/name/Loki" | python3 -c "import sys,json; print(json.load(sys.stdin)['uid'])")
 echo "Loki UID: $LOKI_UID"
 
-# 檢查 Tempo 是否已存在
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' -u "$GRAFANA_USER:$GRAFANA_PASS" "$GRAFANA_URL/api/datasources/name/Tempo")
 if [ "$HTTP_CODE" = "200" ]; then
   echo "Tempo datasource 已存在，跳過"
   exit 0
 fi
 
-# 建立 Tempo datasource
 python3 -c "
 import urllib.request, json, base64
 

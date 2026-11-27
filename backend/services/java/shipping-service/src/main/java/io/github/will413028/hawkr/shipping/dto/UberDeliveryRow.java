@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
  */
 public class UberDeliveryRow {
 
-    // ── shipments 側（歸屬、正規化狀態、失敗證據的 SSOT）────────────────
     private Long shipmentId;
     private String shipmentNo;
     private String orderNo;
@@ -30,7 +29,6 @@ public class UberDeliveryRow {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // ── uber_deliveries 側（provider 事實）；建單失敗／未知時整組為 null ──
     private String deliveryId;
     private String quoteId;
     private String providerStatus;

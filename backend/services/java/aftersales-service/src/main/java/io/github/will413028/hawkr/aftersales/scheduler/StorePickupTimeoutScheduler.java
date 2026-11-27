@@ -69,7 +69,6 @@ public class StorePickupTimeoutScheduler {
         int errors = 0;
         for (String caseNo : expiredCaseNos) {
             try {
-                // issue #2294 B6：反解必須先於 tx（見類別 javadoc）
                 EventPrincipals principals = returnReceiptService.resolvePrincipalsForCaseStrict(caseNo);
                 boolean ok = returnReceiptService.autoCompleteFromAtStore(caseNo, principals);
                 if (ok) {

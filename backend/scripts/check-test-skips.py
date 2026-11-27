@@ -35,7 +35,6 @@ def load_allowlist() -> dict[str, str]:
     if not ALLOWLIST.is_file():
         return {}
     raw = json.loads(ALLOWLIST.read_text(encoding="utf-8"))
-    # {"<package>::<Test>": "理由"}
     return {k: v for k, v in raw.items() if not k.startswith("//")}
 
 
@@ -55,15 +54,13 @@ def main() -> int:
 
     allow = load_allowlist()
     seen: set[str] = set()
-    # 也記錄「這一輪實際跑過哪些 package」。反向檢查只能在跑過的 package 上做——
-    # PR gate 只跑有變更的模組，否則沒被跑到的模組裡已登記的 skip 會被誤判成墳場。
     packages: set[str] = set()
     if STATE.exists():
         state = json.loads(STATE.read_text(encoding="utf-8"))
         if isinstance(state, dict):
             seen = set(state.get("seen", []))
             packages = set(state.get("packages", []))
-        else:  # 舊格式（純 list），相容讀取
+        else:
             seen = set(state)
 
     undeclared: list[tuple[str, str]] = []
@@ -76,14 +73,10 @@ def main() -> int:
                 ev = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            # 原樣透傳 go test 的輸出，讓這支腳本是 `go test` 的 drop-in 替代——
-            # 否則 CI 為了偵測 skip 就得放棄可讀的測試輸出，或是把測試跑兩次。
             if ev.get("Action") == "output":
                 sys.stdout.write(ev.get("Output", ""))
             if pkg := ev.get("Package"):
                 packages.add(pkg)
-            # package 層級的 skip（沒有 Test 欄位）＝「這個 package 沒有測試檔」，
-            # 不是測試被跳過，不能算進來。混在一起會讓數字虛胖 20 倍。
             if ev.get("Action") != "skip" or "Test" not in ev:
                 continue
             key = f"{ev.get('Package', '?')}::{ev['Test']}"
@@ -112,7 +105,6 @@ def main() -> int:
         )
 
     if args.final:
-        # 只檢查跑過的 package —— 沒跑到的模組不能拿來判斷條目是否過時。
         stale = sorted(
             k for k in set(allow) - seen if k.rsplit("::", 1)[0] in packages
         )

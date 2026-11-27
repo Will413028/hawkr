@@ -95,8 +95,6 @@ export function useAcceptSelfIssueAttestation(
 	const mutation = useMutation({
 		mutationFn: () => acceptSelfIssueAttestation({ currentTermsVersion }),
 		onSuccess: async () => {
-			// 條款 ＋ 稅務身分 ＋ 總覽三者都會變：補簽會把賣家推進 SELF_ISSUE_PENDING，
-			// 而 S01 卡 1 顯示的正是那個狀態。
 			await Promise.all([
 				queryClient.invalidateQueries({
 					queryKey: queryKeys.seller.invoiceAttestation(identity),

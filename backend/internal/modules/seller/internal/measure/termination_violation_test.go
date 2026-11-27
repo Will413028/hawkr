@@ -32,7 +32,6 @@ func TestTerminationViolationRequirementIsTheSameRuleAsCreateMeasure(t *testing.
 	if len(wantRequirement) != len(model.TerminationGroundValues()) {
 		t.Fatalf("預期表要涵蓋全部事由：%d 對 %d", len(wantRequirement), len(model.TerminationGroundValues()))
 	}
-	// 引用的認定須存在多久：需求是 REQUIRED 的事由是 MaterialBreachCure，其他沒有（錯誤句、說明句與有狀態的檢查共用 CitedFindingMinAge）。
 	for _, g := range model.TerminationGroundValues() {
 		want := time.Duration(0)
 		if wantRequirement[g] == model.ViolationRequired {
@@ -42,7 +41,6 @@ func TestTerminationViolationRequirementIsTheSameRuleAsCreateMeasure(t *testing.
 			t.Errorf("%s 的 CitedFindingMinAge = %s，期望 %s", g, got, want)
 		}
 	}
-	// 錯誤句的天數取自同一個來源：沒有引用認定的 REQUIRED 事由，句子含 MaterialBreachCure 的天數。
 	err := validateTermination(&model.CreateMeasureInput{Kind: model.MeasureTermination, Termination: &model.TerminationBasis{Ground: model.GroundMaterialBreach}})
 	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("已存在 %d 日以上", int(model.MaterialBreachCure/(24*time.Hour)))) {
 		t.Errorf("錯誤句要帶 MaterialBreachCure 的天數：%v", err)

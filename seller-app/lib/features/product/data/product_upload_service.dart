@@ -38,7 +38,7 @@ class ProductUploadTask {
   /// 而不是彈一個吐司讓使用者用同一份過期版本一再重試（那會永遠失敗）。
   /// 用訊息字串比對是不可靠的——訊息由後端 CodeMeta 決定、隨時可改。
   int? errorCode;
-  double progress; // 0.0 - 1.0
+  double progress;
 
   /// 給使用者看的錯誤訊息。
   ///
@@ -68,19 +68,18 @@ class ProductUploadTask {
 /// 商品上傳資料
 class ProductUploadData {
   final List<Uint8List> images;
-  final String? productId; // 新 API: 商品 TSID（編輯時使用）
-  final Object? skuId; // 舊 API: SKU ID（向後相容）
+  final String? productId;
+  final Object? skuId;
   final String productName;
-  final String category; // L1 名稱 (如「水果」)
-  final String subCategory; // L2 名稱 (如「柚子」) 或 L3 名稱
-  final int? catalogId; // L3 分類 ID（正式 cat_id 或 candidate_id）
+  final String category;
+  final String subCategory;
+  final int? catalogId;
   final bool isCandidateCategory;
-  // 完整分類資訊
   final int? l1Id;
   final String? l1Name;
   final int? l2Id;
   final String? l2Name;
-  final String? l3Name; // L3 分類名稱
+  final String? l3Name;
   final String? origin;
   final String? description;
   final List<Map<String, dynamic>>? descriptionBlocks;
@@ -132,19 +131,19 @@ class SpecData {
   /// 沒有 id 就走 INSERT ⇒ 單獨送 expectedVersion 會被**靜默丟棄**（HTTP 200、無 log）。
   final String? skuVersion;
 
-  final String grade; // → skuName
-  final int price; // → price (TWD 整數字串)
+  final String grade;
+  final int price;
   /// PayUni #758: SKU 特價（0 或 null = 無特價，編輯時不送 = 後端清空）
   final int? salePrice;
-  final int stock; // → stockQty
-  final double? weight; // → weight
+  final int stock;
+  final double? weight;
   final String
-  unit; // → unit (WeightUnit value: 3301=KG, 3302=CATTY, 3303=GRAM)
-  final double? lengthCm; // → lengthCm
-  final double? widthCm; // → widthCm
-  final double? heightCm; // → heightCm
+  unit;
+  final double? lengthCm;
+  final double? widthCm;
+  final double? heightCm;
   final List<Map<String, dynamic>>
-  shippingMethods; // → shippingMethods (SKU 層級)
+  shippingMethods;
 
   SpecData({
     this.skuId,
@@ -154,7 +153,7 @@ class SpecData {
     this.salePrice,
     required this.stock,
     this.weight,
-    this.unit = '3301', // WeightUnit.kg.value
+    this.unit = '3301',
     this.lengthCm,
     this.widthCm,
     this.heightCm,
@@ -333,8 +332,6 @@ class ProductUploadService {
           'skus': ?skus,
           'status': ?status,
           'hashtags': ?hashtags,
-          // updateHashtags 用 explicit boolean，false 也要傳，避免後端解讀為「不變更」
-          // 但 spec 預設 false=不變更，所以只在 true 時帶（true=全量取代）
           if (updateHashtags) 'updateHashtags': true,
         },
         options: Options(validateStatus: (s) => true),
@@ -471,10 +468,8 @@ class ProductUploadService {
     ProductUploadData data,
     AnalyticsEvents? analytics,
   ) async {
-    // 進度分配：圖片上傳 50% + API 呼叫 50%
     final hasImages = data.images.isNotEmpty;
 
-    // ── Step 1: 並行上傳圖片 → staged tokens ──
     List<Map<String, dynamic>> imageInputs = [];
 
     if (hasImages) {
@@ -498,7 +493,6 @@ class ProductUploadService {
         '[Upload] uploadBatch returned ${results.length} results (of ${data.images.length} files)',
       );
 
-      // 收集成功上傳的結果
       for (int i = 0; i < results.length; i++) {
         final r = results[i];
         debugPrint(
@@ -521,17 +515,13 @@ class ProductUploadService {
       _notifyListeners();
     }
 
-    // ── Step 2: 建立 SKU 列表 ──
     final skus = data.specs.map((s) => s.toSkuJson()).toList();
 
-    // ── Step 3: 決定分類 ID ──
-    // 優先使用 catalogId（L3 分類），否則嘗試 l2Id、l1Id
     final categoryId = data.catalogId ?? data.l2Id ?? data.l1Id ?? 0;
     if (categoryId == 0) {
       throw Exception('缺少商品分類 ID');
     }
 
-    // ── Step 4: 組裝並呼叫新 API ──
     final idempotencyKey = _uuid.v4();
     debugPrint(
       '[Upload] Creating product via new API (idempotency=$idempotencyKey)',
@@ -540,7 +530,6 @@ class ProductUploadService {
     task.progress = 0.6;
     _notifyListeners();
 
-    // 從 description（rich text）抽 hashtag；空 list 也送，讓後端知道是空 (對齊 issue #759)
     final hashtags = data.descriptionBlocks != null
         ? HashtagExtractor.extractFromBlocks(data.descriptionBlocks)
         : HashtagExtractor.extractFromText(data.description ?? '');
@@ -555,7 +544,7 @@ class ProductUploadService {
       descriptionBlocks: data.descriptionBlocks,
       images: imageInputs,
       skus: skus,
-      status: '4002', // PENDING_REVIEW — 提交審核
+      status: '4002',
       hashtags: hashtags,
     );
 
@@ -596,7 +585,6 @@ class ProductUploadService {
     ProductUploadData data,
     AnalyticsEvents? analytics,
   ) async {
-    // 從多個來源解析 productId
     final productId =
         data.productId ??
         data.existingProduct?['id']?.toString() ??
@@ -605,7 +593,6 @@ class ProductUploadService {
       throw Exception('缺少商品 ID，無法更新');
     }
 
-    // 1. 上傳新圖片
     List<Map<String, dynamic>> imageInputs = [];
     if (data.images.isNotEmpty) {
       final ts = DateTime.now().millisecondsSinceEpoch;
@@ -629,10 +616,6 @@ class ProductUploadService {
       _notifyListeners();
     }
 
-    // 2. 組裝更新請求
-    // 候選分類的 id 來自 category_candidate 表，與 category 表 id 空間衝突，
-    // 直接作為 category_id 傳送會導致後端映射到錯誤的正式分類。
-    // 候選分類未審核前，保留原商品的 category_id 不變。
     int? categoryId;
     if (data.isCandidateCategory) {
       final ep = data.existingProduct;
@@ -654,7 +637,6 @@ class ProductUploadService {
     task.progress = 0.6;
     _notifyListeners();
 
-    // 編輯模式：同樣從 description 抽 hashtag；updateHashtags=true 讓後端全量取代既有
     final hashtags = data.descriptionBlocks != null
         ? HashtagExtractor.extractFromBlocks(data.descriptionBlocks)
         : HashtagExtractor.extractFromText(data.description ?? '');
@@ -677,10 +659,8 @@ class ProductUploadService {
     );
 
     if (result['code'] != 0) {
-      // PayUni #758: code=3019 表示商品在 ACTIVE / PENDING_REVIEW，需先下架；保留後端 message
       final rawMsg = result['message'];
       final code = result['code'];
-      // 業務碼往上帶：呼叫端要靠它分辨「版本衝突」與其他失敗，兩者的下一步不同。
       task.errorCode = code is int
           ? code
           : int.tryParse(code?.toString() ?? '');

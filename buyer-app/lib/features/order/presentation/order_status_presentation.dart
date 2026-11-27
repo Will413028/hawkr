@@ -178,7 +178,6 @@ class DeliveryStatusPresentation {
     '81',
     '82',
     '990',
-    // 理賠受理中（遺失／毀損爭議）：已經出事，正在處理。
     '993',
   };
 
@@ -256,7 +255,6 @@ class DeliveryStatusPresentation {
     if (orderStatus == '30' || orderStatus == '32') return 2;
     if (shipping == ShippingStatus.inTransit ||
         shipping == ShippingStatus.waitingPickup ||
-        // 930 已離開賣家手上，與 31 同屬「配送中」那一格。
         shipping == ShippingStatus.handedOver) {
       return 2;
     }
@@ -320,8 +318,6 @@ class DeliveryStatusPresentation {
       ShippingStatus.cvsCodeReceived => '已取得超商寄件碼，等待賣家交寄。',
       ShippingStatus.sellerConfirmed => '賣家已確認交寄，等待物流更新。',
       ShippingStatus.handedOver => '包裹已交運，正在前往收件地址。',
-      // 991／992 不是異常（見 abnormalValues 的說明），但也不能沿用
-      // 「請留意後續物流通知」——那句話對「系統正在自己確認」沒有說明力。
       ShippingStatus.createUnknown => '物流單建立結果確認中，稍後會自動更新。',
       ShippingStatus.cancelPending => '取消申請已受理，等待物流商確認。',
       null => raw.isEmpty ? '物流資料尚未同步。' : '物流回傳狀態碼 $raw，資料同步中。',

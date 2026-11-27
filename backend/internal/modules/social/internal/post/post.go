@@ -81,8 +81,6 @@ func notFound(ctx context.Context) error {
 	return apperr.NotFound("%s", text.PostNotFound(uitext.LocaleFrom(ctx)))
 }
 
-// checkPublishable 是「公開中的貼文恰好一張圖、內文必填」唯一的檢查（舊 social 的 checkPublishable）：轉為 PUBLISHED 時與已發布的
-// 貼文被編輯時都要滿足；草稿可以不完整。
 func checkPublishable(ctx context.Context, body string, hasImage bool) error {
 	if !hasImage {
 		return apperr.InvalidInputOn([]string{"ImageToken"}, "%s", text.PostPublishImageRequired(uitext.LocaleFrom(ctx)))
@@ -93,8 +91,6 @@ func checkPublishable(ctx context.Context, body string, hasImage bool) error {
 	return nil
 }
 
-// requirePublishable 是 checkPublishable 的狀態版：貼文（不是這次請求的輸入）不符公開要件，發布與排程時回 FailedPrecondition；
-// 補齊內文或圖片之後才能成功。請求自己帶的輸入不符（建立並發布、編輯已發布的貼文）仍是 checkPublishable 的 InvalidInput。
 func requirePublishable(ctx context.Context, body string, hasImage bool) error {
 	err := checkPublishable(ctx, body, hasImage)
 	if err == nil {
@@ -123,7 +119,6 @@ func (s *Service) verifyProduct(ctx context.Context, productID *uuid.UUID, store
 	}
 }
 
-// confirmImage 在寫入貼文的 transaction 內確認新上傳的圖（上傳者是店家所屬的帳號）。沒有 token 回 nil。
 func (s *Service) confirmImage(ctx context.Context, st seller.Store, token string) (*media.ConfirmedAsset, error) {
 	if token == "" {
 		return nil, nil
@@ -135,7 +130,6 @@ func (s *Service) confirmImage(ctx context.Context, st seller.Store, token strin
 	return &a, nil
 }
 
-// errReplayed 讓重送（同一個 request_id 並行寫入、輸家）的 transaction 回滾：Confirm 已經做過，沒有貼文列指著那張圖，不能提交。
 var errReplayed = errors.New("social：貼文的重送沿用原本那一篇")
 
 func (s *Service) writeTags(ctx context.Context, q *store.Queries, postID uuid.UUID, tags []hashtag.Tag) error {
@@ -161,7 +155,6 @@ func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now ti
 	return delegatedactor.Publish(ctx, s.d.Events, e, actor)
 }
 
-// postWritten 是貼文寫入事件共用的欄位：寫入後貼文的內容（呼叫方手上已有，不再讀），店主的寫入 actor 是 nil。
 func (s *Service) postWritten(id uuid.UUID, storeID int64, body string, version int64, actor *delegatedactor.Actor) model.PostWritten {
 	return model.PostWritten{
 		EventID: uuid.NewV7(), OccurredAt: s.d.Now().UTC(), PostID: id, StoreID: storeID,
@@ -169,8 +162,6 @@ func (s *Service) postWritten(id uuid.UUID, storeID int64, body string, version 
 	}
 }
 
-// publishLocked 是貼文轉為 PUBLISHED 唯一的路徑（手動發布與排程到點共用）：貼文列已鎖，公開要件在這裡檢查，之後寫狀態、發 PostPublished、排快取失效。
-// 呼叫方負責先處理這篇貼文的待發布排程（手動發布取消它，到點發布把它轉 PUBLISHED）。
 func (s *Service) publishLocked(ctx context.Context, q *store.Queries, row store.SocialPost, now time.Time, origin model.PostOrigin, sc store.SocialPostSchedule, actor *delegatedactor.Actor) error {
 	if err := requirePublishable(ctx, row.Body, row.ImageKey != nil); err != nil {
 		return err
@@ -244,8 +235,6 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 		}
 		row, err := q.InsertPost(ctx, params)
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 同一家店的同一個 request_id 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它；不發事件，
-			// 圖片已 Confirm 過，所以以 errReplayed 回滾這個 transaction。
 			existing, ok, rerr := s.replay(ctx, q, st.StoreID, in.RequestID, hash)
 			if rerr != nil {
 				return rerr
@@ -278,7 +267,6 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 		return delegatedactor.Publish(ctx, s.d.Events, model.PostCreated{PostWritten: s.postWritten(out.ID, out.StoreID, out.Body, out.Version, actor)}, actor)
 	})
 	if err != nil && in.RequestID != nil && errors.Is(err, media.ErrUploadAlreadyConfirmed) {
-		// 並行的重送輸家：同一個圖片 token 已被贏家的 transaction 確認並提交（B1-D23），這時贏家的貼文讀得到；回滾後再 replay 一次，不加鎖。
 		row, ok, rerr := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash)
 		if rerr != nil {
 			return model.Post{}, rerr
@@ -301,7 +289,6 @@ func optionalUUID(id *uuid.UUID) string {
 	return id.String()
 }
 
-// tagsKey 是標籤集合進 RequestHash 的編碼：依輸入順序，名稱與顯示形式都算（顯示形式是使用者看得到的內容）。
 func tagsKey(tags []hashtag.Tag) string {
 	var b strings.Builder
 	for _, t := range tags {
@@ -310,7 +297,6 @@ func tagsKey(tags []hashtag.Tag) string {
 	return b.String()
 }
 
-// replay 查 (店家, request_id)：命中且內容相同回傳那一篇；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
 func (s *Service) replay(ctx context.Context, q *store.Queries, storeID int64, requestID *uuid.UUID, hash []byte) (store.SocialPost, bool, error) {
 	if requestID == nil {
 		return store.SocialPost{}, false, nil
@@ -328,8 +314,6 @@ func (s *Service) replay(ctx context.Context, q *store.Queries, storeID int64, r
 	return row, true, nil
 }
 
-// lockOwned 鎖住貼文並確認屬於這家店。不存在、已刪除與別家未公開（草稿、下架）的貼文回 NotFound，不讓店家藉回應差異探測它的存在；
-// 別家已公開可讀的貼文（存在本身公開）回 PermissionDenied（SD26）。
 func (s *Service) lockOwned(ctx context.Context, q *store.Queries, storeID int64, id uuid.UUID) (store.SocialPost, error) {
 	row, err := q.LockPost(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -344,8 +328,6 @@ func (s *Service) lockOwned(ctx context.Context, q *store.Queries, storeID int64
 	return row, nil
 }
 
-// rejectIfTakenDown 是貼文被內容下架措施下架（複本 content_takedowns）時回 FailedPrecondition(msg)；排程、修改與發布共用這一個檢查。
-// 呼叫端已在同一個 transaction 鎖住貼文。
 func rejectIfTakenDown(ctx context.Context, q *store.Queries, postID uuid.UUID, msg uitext.Message) error {
 	down, err := q.PostIsTakenDown(ctx, &postID)
 	if err != nil {
@@ -357,7 +339,6 @@ func rejectIfTakenDown(ctx context.Context, q *store.Queries, postID uuid.UUID, 
 	return nil
 }
 
-// foreignWriteError 是店家寫入別家貼文的錯誤：貼文對匿名觀看者公開可讀（同公開讀取的條件）回 PermissionDenied，否則 NotFound。
 func (s *Service) foreignWriteError(ctx context.Context, id uuid.UUID) error {
 	pub, err := reads.One[reads.BoolRow](ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(id, s.d.Now().UTC(), visibility.Viewer{}))
 	if err != nil {

@@ -142,7 +142,7 @@ func TestInReadSnapshotSeesOneSnapshot(t *testing.T) {
 		if err := d.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM items").Scan(&before); err != nil {
 			return err
 		}
-		if err := insert(context.Background(), d, 2); err != nil { // 另一條連線，立刻提交
+		if err := insert(context.Background(), d, 2); err != nil {
 			return err
 		}
 		return d.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM items").Scan(&after)

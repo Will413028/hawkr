@@ -92,7 +92,6 @@ func formatNodes(b *strings.Builder, nodes []Node, locale string, args map[strin
 	return nil
 }
 
-// branch 取 selector 的分支，沒有就取 other。
 func branch(bs []Branch, selector string) ([]Node, error) {
 	for _, b := range bs {
 		if b.Selector == selector {
