@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 )
@@ -159,7 +160,7 @@ func TestEncodeFreezesAuthoredTimeAndLinkTarget(t *testing.T) {
 
 func review() Content {
 	return Content{Kind: model.TargetReview, Review: &Review{
-		AuthorID: 9, SubjectStoreID: 4, ProductID: 5, Rating: 2, Body: "不好吃", MediaRefs: []string{"b", "a"}, ReplyBody: "抱歉",
+		AuthorID: 9, SubjectStoreID: 4, ProductID: uuid.UUID{15: 5}, Rating: 2, Body: "不好吃", MediaRefs: []string{"b", "a"}, ReplyBody: "抱歉",
 		AuthoredAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
 	}}
 }
@@ -179,7 +180,7 @@ func TestEveryReviewFieldIsHashed(t *testing.T) {
 	_, base := Encode(review())
 	for name, f := range map[string]func(*Review){
 		"評分":   func(r *Review) { r.Rating = 3 },
-		"商品":   func(r *Review) { r.ProductID = 6 },
+		"商品":   func(r *Review) { r.ProductID = uuid.UUID{15: 6} },
 		"店家":   func(r *Review) { r.SubjectStoreID = 5 },
 		"店家回覆": func(r *Review) { r.ReplyBody = "" },
 		"本文":   func(r *Review) { r.Body = "好吃" },

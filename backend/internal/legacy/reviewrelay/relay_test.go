@@ -56,7 +56,7 @@ type fakeReviews struct {
 	review  review.Review
 	hidden  bool
 	gone    bool
-	product map[int64]review.ProductStats
+	product map[uuid.UUID]review.ProductStats
 	store   map[int64]review.StoreStats
 }
 
@@ -67,7 +67,7 @@ func (f *fakeReviews) ReviewForRelay(context.Context, uuid.UUID) (review.RelayRe
 	return review.RelayReview{Review: f.review, Public: !f.hidden}, nil
 }
 
-func (f *fakeReviews) ProductStats(_ context.Context, id int64) (review.ProductStats, error) {
+func (f *fakeReviews) ProductStats(_ context.Context, id uuid.UUID) (review.ProductStats, error) {
 	return f.product[id], nil
 }
 
@@ -78,6 +78,7 @@ func (f *fakeReviews) StoreStats(_ context.Context, id int64) (review.StoreStats
 var (
 	eventID    = uuid.MustParse("01990000-0000-7000-8000-000000000001")
 	reviewID   = uuid.MustParse("01990000-0000-7000-8000-0000000000a1")
+	product700 = uuid.MustParse("01990000-0000-7000-8000-000000000700")
 	occurredAt = time.Date(2026, 11, 20, 9, 30, 15, 123456789, time.FixedZone("TST", 8*3600))
 	// timestamp 是 Go time.Time 的 JSON：UTC、RFC3339Nano。
 	wireTimestamp = "2026-11-20T01:30:15.123456789Z"
@@ -87,10 +88,10 @@ var (
 func newFixture() (*Worker, *fakeReviews) {
 	r := &fakeReviews{
 		review: review.Review{
-			ID: reviewID, OrderNo: "O1", OrderItemID: 11, BuyerID: 301, StoreID: 91, ProductID: 700, Rating: 5, Content: "很甜",
+			ID: reviewID, OrderNo: "O1", OrderItemID: 11, BuyerID: 301, StoreID: 91, ProductID: product700, Rating: 5, Content: "很甜",
 			Images: []review.Image{{AssetID: uuid.MustParse("01990000-0000-7000-8000-0000000000b1"), ObjectKey: "review/1.jpg"}, {AssetID: uuid.MustParse("01990000-0000-7000-8000-0000000000b2"), ObjectKey: "review/2.jpg"}}, CreatedAt: createdAt,
 		},
-		product: map[int64]review.ProductStats{700: {Count: 30, Average: 4.9}},
+		product: map[uuid.UUID]review.ProductStats{product700: {Count: 30, Average: 4.9}},
 		store:   map[int64]review.StoreStats{91: {Count: 120, Average: 4.8}},
 	}
 	return NewWorker(r, &recordingJobs{}, nil), r
@@ -146,7 +147,7 @@ func body(t *testing.T, a rabbitmq.PublishArgs) map[string]any {
 }
 
 func created() review.ReviewCreated {
-	return review.ReviewCreated{EventID: eventID, OccurredAt: occurredAt, ReviewID: reviewID, StoreID: 91, ProductID: 700}
+	return review.ReviewCreated{EventID: eventID, OccurredAt: occurredAt, ReviewID: reviewID, StoreID: 91, ProductID: product700}
 }
 
 func TestReviewCreatedPayload(t *testing.T) {
@@ -160,7 +161,7 @@ func TestReviewCreatedPayload(t *testing.T) {
 		"event_id": eventID.String(), "event_type": "REVIEW_CREATED", "version": "1.0", "timestamp": wireTimestamp, "source": "review-service",
 		"review_id": float64(0), "order_no": "O1", "order_item_id": float64(11), "store_id": float64(91),
 		"buyer_id": float64(301), "rating": float64(5), "content": "很甜", "image_keys": []any{"review/1.jpg", "review/2.jpg"},
-		"created_at": "2026-11-20T01:00:00Z", "avg_rating": 4.8, "total_count": float64(120), "product_id": float64(700),
+		"created_at": "2026-11-20T01:00:00Z", "avg_rating": 4.8, "total_count": float64(120), "product_id": product700.String(),
 		"product_avg_rating": 4.9, "product_review_count": float64(30),
 	}
 	if len(m) != len(want) {
@@ -201,10 +202,10 @@ func TestReviewCreatedSkipsAReviewThatIsNoLongerPublic(t *testing.T) {
 func TestStatsAreRecomputedWhenTheJobRuns(t *testing.T) {
 	w, r := newFixture()
 	relayed := &recordingJobs{}
-	if err := OnReviewAggregateChanged(relayed)(context.Background(), review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: 700}); err != nil {
+	if err := OnReviewAggregateChanged(relayed)(context.Background(), review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: product700}); err != nil {
 		t.Fatal(err)
 	}
-	r.product[700] = review.ProductStats{Count: 29, Average: 4.88}
+	r.product[product700] = review.ProductStats{Count: 29, Average: 4.88}
 	r.store[91] = review.StoreStats{Count: 119, Average: 4.79}
 	out := &recordingJobs{}
 	w.Jobs = out
@@ -215,7 +216,7 @@ func TestStatsAreRecomputedWhenTheJobRuns(t *testing.T) {
 	if out.published()[0].RoutingKey != "review.hidden" || m["product_avg_rating"] != 4.88 || m["product_review_count"] != float64(29) || m["avg_rating"] != 4.79 || m["total_count"] != float64(119) {
 		t.Fatalf("payload = %v", m)
 	}
-	if m["review_id"] != float64(0) || m["store_id"] != float64(91) || m["product_id"] != float64(700) || m["event_type"] != "REVIEW_HIDDEN" {
+	if m["review_id"] != float64(0) || m["store_id"] != float64(91) || m["product_id"] != product700.String() || m["event_type"] != "REVIEW_HIDDEN" {
 		t.Fatalf("payload = %v", m)
 	}
 }
@@ -223,9 +224,9 @@ func TestStatsAreRecomputedWhenTheJobRuns(t *testing.T) {
 // 沒有任何可見評價時，聚合是 0 而且仍然是 JSON 數字（Java 的 ReviewStatsConsumer 缺欄位或非數字會進 DLQ，不能省略）。
 func TestZeroAggregatesAreStillNumbers(t *testing.T) {
 	w, r := newFixture()
-	r.product = map[int64]review.ProductStats{}
+	r.product = map[uuid.UUID]review.ProductStats{}
 	r.store = map[int64]review.StoreStats{}
-	m := body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: 700})[0])
+	m := body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: product700})[0])
 	for _, k := range []string{"product_avg_rating", "product_review_count", "avg_rating", "total_count"} {
 		if v, ok := m[k].(float64); !ok || v != 0 {
 			t.Errorf("%s = %#v，預期數字 0", k, m[k])

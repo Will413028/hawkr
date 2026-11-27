@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -46,7 +47,13 @@ type fakeReads struct {
 	size   int32
 	gotID  uuid.UUID
 	hidden bool
+	// product 是最近一次商品讀取收到的商品 ID。
+	product uuid.UUID
 }
+
+func pidU(n int) uuid.UUID { return uuid.UUID{14: byte(n >> 8), 15: byte(n)} }
+
+func pid(n int) string { return pidU(n).String() }
 
 func (f *fakeReads) rec(op string, id, viewer int64, filter review.Filter, after *review.Cursor, size int32) (review.Page, error) {
 	f.calls = append(f.calls, op)
@@ -54,8 +61,9 @@ func (f *fakeReads) rec(op string, id, viewer int64, filter review.Filter, after
 	return f.page, f.err
 }
 
-func (f *fakeReads) ListProductReviews(_ context.Context, productID, viewer int64, flt review.Filter, after *review.Cursor, size int32) (review.Page, error) {
-	return f.rec("ListProductReviews", productID, viewer, flt, after, size)
+func (f *fakeReads) ListProductReviews(_ context.Context, productID uuid.UUID, viewer int64, flt review.Filter, after *review.Cursor, size int32) (review.Page, error) {
+	f.product = productID
+	return f.rec("ListProductReviews", 0, viewer, flt, after, size)
 }
 
 func (f *fakeReads) ListStoreReviews(_ context.Context, storeID, viewer int64, flt review.Filter, after *review.Cursor, size int32) (review.Page, error) {
@@ -93,9 +101,9 @@ func (f *fakeReads) StoreStats(_ context.Context, storeID int64) (review.StoreSt
 	return f.stats, f.err
 }
 
-func (f *fakeReads) ProductStats(_ context.Context, productID int64) (review.ProductStats, error) {
+func (f *fakeReads) ProductStats(_ context.Context, productID uuid.UUID) (review.ProductStats, error) {
 	f.calls = append(f.calls, "ProductStats")
-	f.id = productID
+	f.product = productID
 	return f.pstats, f.err
 }
 
@@ -241,7 +249,7 @@ func newEnv(t *testing.T, store *seller.Store) *env {
 func sampleReview(id byte) review.Review {
 	key := "items/sku.jpg"
 	return review.Review{
-		ID: uuid.UUID{id}, OrderNo: "ORD-1", OrderItemID: 501, BuyerID: 80, StoreID: 11, ProductID: 31, Rating: 4, Content: "好吃",
+		ID: uuid.UUID{id}, OrderNo: "ORD-1", OrderItemID: 501, BuyerID: 80, StoreID: 11, ProductID: pidU(31), Rating: 4, Content: "好吃",
 		Images:  []review.Image{{AssetID: uuid.UUID{0xa1}, ObjectKey: "reviews/a1.jpg"}, {AssetID: uuid.UUID{0xa2}, ObjectKey: "reviews/a2.jpg"}},
 		SkuName: "大份", ItemImageKey: &key, Price: 250, CreatedAt: at,
 		Reply: &review.Reply{Content: "謝謝", RepliedAt: at.Add(time.Hour)},
@@ -253,7 +261,7 @@ func TestListProductReviewsMapsEveryFieldAndHidesOrderDetailsInThePublicView(t *
 	name, avatar := "阿美", "avatars/80.jpg"
 	e.buyers.displays = []buyer.Display{{BuyerID: 80, DisplayName: &name, Avatar: &avatar}}
 	e.reads.page = review.Page{Reviews: []review.Review{sampleReview(1)}}
-	resp, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31"}))
+	resp, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: pid(31)}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +270,7 @@ func TestListProductReviewsMapsEveryFieldAndHidesOrderDetailsInThePublicView(t *
 		t.Fatalf("reviews = %d", len(got))
 	}
 	r := got[0]
-	if r.GetId() != (uuid.UUID{1}).String() || r.GetProductId() != "31" || r.GetStoreId() != "11" || r.GetRating() != 4 || r.GetContent() != "好吃" ||
+	if r.GetId() != (uuid.UUID{1}).String() || r.GetProductId() != pid(31) || r.GetStoreId() != "11" || r.GetRating() != 4 || r.GetContent() != "好吃" ||
 		r.GetSkuName() != "大份" || r.GetPrice() != 250 || !r.GetCreateTime().AsTime().Equal(at) {
 		t.Errorf("基本欄位：%v", r)
 	}
@@ -303,12 +311,12 @@ func TestReviewWithoutReplyAnItemImageOrAuthorDisplayLeavesThoseFieldsUnset(t *t
 func TestListProductReviewsReadsAsTheViewerAndPassesFilterAndPaging(t *testing.T) {
 	e := newEnv(t, nil)
 	rating := int32(5)
-	req := &pb.ListProductReviewsRequest{ProductId: "31", PageSize: 7, Rating: &rating, WithImages: true}
+	req := &pb.ListProductReviewsRequest{ProductId: pid(31), PageSize: 7, Rating: &rating, WithImages: true}
 	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(req)); err != nil {
 		t.Fatal(err)
 	}
-	if e.reads.viewer != 0 || e.reads.id != 31 || e.reads.size != 7 || e.reads.filter != (review.Filter{Rating: 5, WithImages: true}) || e.reads.after != nil {
-		t.Errorf("訪客：viewer=%d id=%d size=%d filter=%+v", e.reads.viewer, e.reads.id, e.reads.size, e.reads.filter)
+	if e.reads.viewer != 0 || e.reads.product != pidU(31) || e.reads.size != 7 || e.reads.filter != (review.Filter{Rating: 5, WithImages: true}) || e.reads.after != nil {
+		t.Errorf("訪客：viewer=%d product=%v size=%d filter=%+v", e.reads.viewer, e.reads.product, e.reads.size, e.reads.filter)
 	}
 	if _, err := e.public.ListProductReviews(signedIn(), connect.NewRequest(req)); err != nil {
 		t.Fatal(err)
@@ -356,12 +364,12 @@ func TestPageTokenRoundTripsAndIsBoundToTheSameQuery(t *testing.T) {
 	e := newEnv(t, nil)
 	next := review.Cursor{CreatedAt: at, ID: uuid.UUID{9}}
 	e.reads.page = review.Page{Reviews: []review.Review{sampleReview(1)}, Next: &next}
-	resp, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31"}))
+	resp, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: pid(31)}))
 	if err != nil || resp.Msg.GetNextPageToken() == "" {
 		t.Fatalf("有下一頁要帶 token：%v %v", resp, err)
 	}
 	token := resp.Msg.GetNextPageToken()
-	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31", PageToken: token})); err != nil {
+	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: pid(31), PageToken: token})); err != nil {
 		t.Fatal(err)
 	}
 	if e.reads.after == nil || !e.reads.after.CreatedAt.Equal(at) || e.reads.after.ID != next.ID {
@@ -369,10 +377,10 @@ func TestPageTokenRoundTripsAndIsBoundToTheSameQuery(t *testing.T) {
 	}
 	rating := int32(3)
 	for name, req := range map[string]*pb.ListProductReviewsRequest{
-		"換商品":     {ProductId: "32", PageToken: token},
-		"換篩選":     {ProductId: "31", PageToken: token, Rating: &rating},
-		"換附圖":     {ProductId: "31", PageToken: token, WithImages: true},
-		"壞 token": {ProductId: "31", PageToken: "garbage"},
+		"換商品":     {ProductId: pid(32), PageToken: token},
+		"換篩選":     {ProductId: pid(31), PageToken: token, Rating: &rating},
+		"換附圖":     {ProductId: pid(31), PageToken: token, WithImages: true},
+		"壞 token": {ProductId: pid(31), PageToken: "garbage"},
 	} {
 		if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(req)); codeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s 不能沿用 token：%v", name, err)
@@ -425,12 +433,12 @@ func TestGetStoreReviewStatsReturnsAllFiveStarBucketsAndDoesNotReadTheViewer(t *
 func TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer(t *testing.T) {
 	e := newEnv(t, nil)
 	e.reads.pstats = review.ProductStats{Count: 7, WithImagesCount: 3, Average: 4.14, Distribution: [5]int64{1, 0, 2, 1, 3}}
-	resp, err := e.public.GetProductReviewStats(signedIn(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "21"}))
+	resp, err := e.public.GetProductReviewStats(signedIn(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: pid(21)}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Msg.GetCount() != 7 || resp.Msg.GetWithImagesCount() != 3 || resp.Msg.GetAverage() != 4.14 || e.reads.id != 21 {
-		t.Fatalf("統計：%v id=%d", resp.Msg, e.reads.id)
+	if resp.Msg.GetCount() != 7 || resp.Msg.GetWithImagesCount() != 3 || resp.Msg.GetAverage() != 4.14 || e.reads.product != pidU(21) {
+		t.Fatalf("統計：%v product=%v", resp.Msg, e.reads.product)
 	}
 	if d := resp.Msg.GetDistribution(); len(d) != 5 {
 		t.Fatalf("要有 1 到 5 星各一項：%v", d)
@@ -448,7 +456,7 @@ func TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer(t *t
 
 func TestGetProductReviewStatsWithNoReviewsIsZeroNotAnError(t *testing.T) {
 	e := newEnv(t, nil)
-	resp, err := e.public.GetProductReviewStats(context.Background(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "999"}))
+	resp, err := e.public.GetProductReviewStats(context.Background(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: pid(999)}))
 	if err != nil || resp.Msg.GetCount() != 0 || resp.Msg.GetAverage() != 0 {
 		t.Fatalf("%v %v", resp, err)
 	}
@@ -465,7 +473,7 @@ func TestGetProductReviewStatsRejectsBadIDAndMapsModuleFailure(t *testing.T) {
 		t.Errorf("格式錯誤的 ID 不能到模組：%v", e.reads.calls)
 	}
 	e.reads.err = errors.New("db down")
-	if _, err := e.public.GetProductReviewStats(context.Background(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: "5"})); err == nil {
+	if _, err := e.public.GetProductReviewStats(context.Background(), connect.NewRequest(&pb.GetProductReviewStatsRequest{ProductId: pid(5)})); err == nil {
 		t.Fatal("模組失敗要回錯誤，不能回 0")
 	}
 }
@@ -475,7 +483,7 @@ func TestAuthorDisplayIsLookedUpOncePerUniqueBuyer(t *testing.T) {
 	a, b, c := sampleReview(1), sampleReview(2), sampleReview(3)
 	b.BuyerID, c.BuyerID = 81, 80
 	e.reads.page = review.Page{Reviews: []review.Review{a, b, c}}
-	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31"})); err != nil {
+	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: pid(31)})); err != nil {
 		t.Fatal(err)
 	}
 	if e.buyers.calls != 1 || !slices.Equal(e.buyers.batches[0], []int64{80, 81}) {
@@ -839,12 +847,12 @@ func TestPageTokenScopeUsesTheParsedIDSoEquivalentSpellingsShareIt(t *testing.T)
 	e := newEnv(t, nil)
 	next := review.Cursor{CreatedAt: at, ID: uuid.UUID{9}}
 	e.reads.page = review.Page{Reviews: []review.Review{sampleReview(1)}, Next: &next}
-	resp, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "7"}))
+	resp, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: pid(7)}))
 	if err != nil || resp.Msg.GetNextPageToken() == "" {
 		t.Fatalf("%v %v", resp, err)
 	}
-	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "007", PageToken: resp.Msg.GetNextPageToken()})); err != nil {
-		t.Fatalf("商品 '7' 的 token 用 '007' 續頁：%v", err)
+	if _, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: strings.ToUpper(pid(7)), PageToken: resp.Msg.GetNextPageToken()})); err != nil {
+		t.Fatalf("商品 UUID 的 token 用大寫寫法續頁：%v", err)
 	}
 	sresp, err := e.public.ListStoreReviews(context.Background(), connect.NewRequest(&pb.ListStoreReviewsRequest{StoreId: "7"}))
 	if err != nil || sresp.Msg.GetNextPageToken() == "" {
@@ -861,7 +869,7 @@ func TestExplicitRatingOutsideOneToFiveIsInvalidArgumentOnTheRatingField(t *test
 		rating := bad
 		calls := map[string]func() error{
 			"product": func() error {
-				_, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31", Rating: &rating}))
+				_, err := e.public.ListProductReviews(context.Background(), connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: pid(31), Rating: &rating}))
 				return err
 			},
 			"store": func() error {
@@ -899,7 +907,7 @@ func TestPublicReviewListsMarkOnlyTheSignedInAuthorsOwnReviewsAsMine(t *testing.
 	mine.BuyerID, other.BuyerID = callerBuyer, callerBuyer+1
 	e.reads.page = review.Page{Reviews: []review.Review{mine, other}}
 	flags := func(ctx context.Context) []bool {
-		p, err := e.public.ListProductReviews(ctx, connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: "31"}))
+		p, err := e.public.ListProductReviews(ctx, connect.NewRequest(&pb.ListProductReviewsRequest{ProductId: pid(31)}))
 		if err != nil {
 			t.Fatal(err)
 		}

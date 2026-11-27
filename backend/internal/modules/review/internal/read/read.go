@@ -89,7 +89,7 @@ func (s *Service) page(ctx context.Context, list []store.ReviewReview, size int3
 }
 
 // ListProductReviews 是商品的公開評價；viewerBuyerID 大於 0 時套用觀看者的封鎖（買家之間任一方向、觀看者封鎖店），在 keyset 之前過濾。
-func (s *Service) ListProductReviews(ctx context.Context, productID, viewerBuyerID int64, f model.Filter, after *model.Cursor, size int32) (model.Page, error) {
+func (s *Service) ListProductReviews(ctx context.Context, productID uuid.UUID, viewerBuyerID int64, f model.Filter, after *model.Cursor, size int32) (model.Page, error) {
 	rating, err := ratingArg(ctx, f)
 	if err != nil {
 		return model.Page{}, err
@@ -244,7 +244,7 @@ func (s *Service) ReviewStore(ctx context.Context, id uuid.UUID) (model.ReviewSt
 }
 
 // ProductStats 是商品的評價統計（公開可讀的評價，不套觀看者）。
-func (s *Service) ProductStats(ctx context.Context, productID int64) (model.ProductStats, error) {
+func (s *Service) ProductStats(ctx context.Context, productID uuid.UUID) (model.ProductStats, error) {
 	r, err := s.q(ctx).ProductStats(ctx, productID)
 	return model.ProductStats{
 		Count: r.TotalCount, Average: r.AvgRating, WithImagesCount: r.WithImagesCount,

@@ -264,19 +264,19 @@ type item struct {
 	itemID  int64
 }
 
-func (f *fixture) order(b buyer.Profile, storeID, productID int64) item {
+func (f *fixture) order(b buyer.Profile, storeID int64, productID int) item {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	n := f.ids.Add(1) + 1000
 	no := fmt.Sprintf("N%d", n)
 	f.orders.byNo[no] = review.OrderForReview{
 		OrderNo: no, BuyerID: b.BuyerID, StoreID: storeID, Status: review.OrderStatusCompleted, CompletedAt: f.now.Add(-24 * time.Hour),
-		Items: []review.OrderItem{{OrderItemID: n, ProductID: productID, SkuName: "紅茶 100g", Price: 120, ImageKey: "order/img.jpg"}},
+		Items: []review.OrderItem{{OrderItemID: n, ProductID: pid(productID), SkuName: "紅茶 100g", Price: 120, ImageKey: "order/img.jpg"}},
 	}
 	return item{no, n}
 }
 
-func (f *fixture) submit(t *testing.T, b buyer.Profile, storeID, productID int64, rating int, content string) review.Review {
+func (f *fixture) submit(t *testing.T, b buyer.Profile, storeID int64, productID int, rating int, content string) review.Review {
 	t.Helper()
 	it := f.order(b, storeID, productID)
 	r, err := f.module.Submit(context.Background(), review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: rating, Content: content})
@@ -320,3 +320,6 @@ func revalidations(q *queue) [][]string {
 	}
 	return out
 }
+
+// pid 把小整數編號轉成固定的商品 UUID（後 16 位元組為編號的大端表示），與 SQL 的 lpad(to_hex(n), 32, '0')::uuid 同值。
+func pid(n int) uuid.UUID { return uuid.UUID{14: byte(n >> 8), 15: byte(n)} }

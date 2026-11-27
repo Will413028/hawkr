@@ -119,7 +119,7 @@ type LockBuyerReviewBatchParams struct {
 type LockBuyerReviewBatchRow struct {
 	ID        uuid.UUID
 	StoreID   int64
-	ProductID int64
+	ProductID uuid.UUID
 }
 
 // 買家刪帳的清除與 relay 用的讀取。不是公開讀取：作者已不是營運中（pub_inactive_buyers），公開述詞必定排除他的評價。

@@ -40,7 +40,7 @@ func TestGoldenContentRendering(t *testing.T) {
 			"貼文收到讚", "有人對你的貼文按讚。", "Your post got a like", "Someone liked your post.", "/sellers/20260001/posts", "post_liked:post_like:" + contentPost},
 		{"store_followed", `{"event_id":"` + contentEvent + `",` + at + `,"store_id":7,"buyer_id":9}`,
 			"新的追蹤者", "有買家開始追蹤你的店家。", "New follower", "A buyer started following your store.", "", "store_followed:follow:7"},
-		{"review_created", `{"event_id":"` + contentEvent + `",` + at + `,"review_id":"` + contentObj + `","buyer_id":9,"store_id":7,"product_id":11}`,
+		{"review_created", `{"event_id":"` + contentEvent + `",` + at + `,"review_id":"` + contentObj + `","buyer_id":9,"store_id":7,"product_id":"` + contentObj + `"}`,
 			"收到新評價", "有買家評價了你的商品。", "New review", "A buyer reviewed your product.", "", ""},
 		{"post_published_item", `{"post_id":"` + contentPost + `","store_id":7,"buyer_id":9}`,
 			"追蹤的店家發佈了新貼文", "你追蹤的店家剛發佈了一則貼文。", "A store you follow posted", "A store you follow just published a new post.", "/sellers/20260001/posts", ""},

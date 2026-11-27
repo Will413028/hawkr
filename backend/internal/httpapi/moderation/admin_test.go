@@ -378,10 +378,10 @@ func TestGetCaseMapsEachSnapshotKindToTheOneof(t *testing.T) {
 			func(s *adminpb.CaseSnapshot) bool {
 				return s.GetBuyer().GetDisplayName() == "小明" && s.GetBuyer().GetAvatarAssetId() == "k"
 			}},
-		"評價": {&moderation.Snapshot{Kind: moderation.TargetReview, Review: &moderation.ReviewSnapshot{AuthorID: 9, SubjectStoreID: 4, ProductID: 5, Rating: 2, Body: "差", ReplyBody: "抱歉"}},
+		"評價": {&moderation.Snapshot{Kind: moderation.TargetReview, Review: &moderation.ReviewSnapshot{AuthorID: 9, SubjectStoreID: 4, ProductID: uuid.UUID{15: 5}, Rating: 2, Body: "差", ReplyBody: "抱歉"}},
 			func(s *adminpb.CaseSnapshot) bool {
 				x := s.GetReview()
-				return x.GetAuthorId() == "9" && x.GetStoreId() == "4" && x.GetProductId() == "5" && x.GetRating() == 2 && x.GetReplyBody() == "抱歉"
+				return x.GetAuthorId() == "9" && x.GetStoreId() == "4" && x.GetProductId() == "00000000-0000-0000-0000-000000000005" && x.GetRating() == 2 && x.GetReplyBody() == "抱歉"
 			}},
 		"聊天": {&moderation.Snapshot{Kind: moderation.TargetChatMessage, Chat: &moderation.ChatSnapshot{AuthorKind: "STORE", AuthorID: 4, ConversationID: "c", Seq: 6,
 			Context: []moderation.ChatContextMessage{{Seq: 5, SenderKind: "BUYER", SenderID: 9, Type: "TEXT", Hidden: true, SentAt: at}}}},

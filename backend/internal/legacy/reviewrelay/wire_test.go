@@ -102,6 +102,11 @@ func TestPayloadsMatchTheLegacyStructs(t *testing.T) {
 		// 舊 BaseEvent 的 correlation_id、metadata 是 omitempty 的空值，從不出現在 wire 上（下面的測試守住這個前提）。
 		delete(want, "correlation_id")
 		delete(want, "metadata")
+		// product_id 是 catalog 的 UUID 字串；舊的 int64 是 Java product 的數字 ID，Java product 在 B4-4d 被取代。
+		if f, ok := want["product_id"]; ok && f.typ == "int64" {
+			f.typ = "string"
+			want["product_id"] = f
+		}
 		if !reflect.DeepEqual(want, got) {
 			t.Errorf("%s: payload fields differ from %s\n old %v\n new %v", name, c.old, want, got)
 		}

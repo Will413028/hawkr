@@ -96,7 +96,7 @@ LIMIT $6
 `
 
 type ListProductReviewsAnonymousParams struct {
-	ProductID      int64
+	ProductID      uuid.UUID
 	Rating         int16
 	WithImages     bool
 	AfterCreatedAt *time.Time
@@ -171,7 +171,7 @@ LIMIT $7
 `
 
 type ListProductReviewsForViewerParams struct {
-	ProductID      int64
+	ProductID      uuid.UUID
 	ViewerBuyerID  int64
 	Rating         int16
 	WithImages     bool
@@ -385,7 +385,7 @@ type ProductStatsRow struct {
 	WithImagesCount int64
 }
 
-func (q *Queries) ProductStats(ctx context.Context, productID int64) (ProductStatsRow, error) {
+func (q *Queries) ProductStats(ctx context.Context, productID uuid.UUID) (ProductStatsRow, error) {
 	row := q.db.QueryRow(ctx, productStats, productID)
 	var i ProductStatsRow
 	err := row.Scan(

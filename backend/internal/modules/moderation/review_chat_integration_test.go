@@ -35,7 +35,7 @@ func (f *fixture) reviewBy(t *testing.T, b buyer.Profile, storeID int64, rating 
 	f.orders.mu.Lock()
 	f.orders.byNo[no] = review.OrderForReview{
 		OrderNo: no, BuyerID: b.BuyerID, StoreID: storeID, Status: review.OrderStatusCompleted, CompletedAt: f.clock().Add(-24 * time.Hour),
-		Items: []review.OrderItem{{OrderItemID: n, ProductID: 77, SkuName: "紅茶 100g", Price: 120, ImageKey: "order/img.jpg"}},
+		Items: []review.OrderItem{{OrderItemID: n, ProductID: uuid.UUID{15: 77}, SkuName: "紅茶 100g", Price: 120, ImageKey: "order/img.jpg"}},
 	}
 	f.orders.mu.Unlock()
 	r, err := f.review.Submit(context.Background(), review.SubmitInput{BuyerID: b.BuyerID, OrderNo: no, OrderItemID: n, Rating: rating, Content: content, StagedTokens: tokens})
@@ -160,7 +160,7 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 	if snap == nil || snap.Review == nil || snap.Kind != TargetReview {
 		t.Fatalf("評價案件的快照：%+v", snap)
 	}
-	if snap.Review.Rating != 2 || snap.Review.Body != "不好吃" || snap.Review.AuthorID != author.BuyerID || snap.Review.SubjectStoreID != storeID || snap.Review.ProductID != 77 ||
+	if snap.Review.Rating != 2 || snap.Review.Body != "不好吃" || snap.Review.AuthorID != author.BuyerID || snap.Review.SubjectStoreID != storeID || snap.Review.ProductID != (uuid.UUID{15: 77}) ||
 		len(snap.Review.MediaRefs) != 1 || snap.Review.MediaRefs[0] == r.Images[0].AssetID.String() {
 		t.Fatalf("快照欄位：%+v", snap.Review)
 	}

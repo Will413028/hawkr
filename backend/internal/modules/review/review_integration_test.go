@@ -47,15 +47,15 @@ func TestRD1ViewerBlocksFilterBeforeThePageIsCut(t *testing.T) {
 	must[bool](t)(f.buyers.BlockBuyer(ctx, viewer.BuyerID, buyersList[4]))
 	must[bool](t)(f.buyers.BlockBuyer(ctx, buyersList[3], viewer.BuyerID))
 
-	anon := must[review.Page](t)(f.module.ListProductReviews(ctx, product, 0, review.Filter{}, nil, 50))
+	anon := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), 0, review.Filter{}, nil, 50))
 	if !sameIDs(ids(anon), r5.ID, r4.ID, r3.ID, r2.ID, r1.ID) {
 		t.Fatalf("匿名看到全部：%v", ids(anon))
 	}
-	p1 := must[review.Page](t)(f.module.ListProductReviews(ctx, product, viewer.BuyerID, review.Filter{}, nil, 2))
+	p1 := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), viewer.BuyerID, review.Filter{}, nil, 2))
 	if !sameIDs(ids(p1), r3.ID, r2.ID) || p1.Next == nil {
 		t.Fatalf("第一頁要是 r3、r2（被擋的不佔頁）且有下一頁：%v next=%v", ids(p1), p1.Next)
 	}
-	p2 := must[review.Page](t)(f.module.ListProductReviews(ctx, product, viewer.BuyerID, review.Filter{}, p1.Next, 2))
+	p2 := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), viewer.BuyerID, review.Filter{}, p1.Next, 2))
 	if !sameIDs(ids(p2), r1.ID) || p2.Next != nil {
 		t.Fatalf("第二頁只有 r1 且沒有下一頁：%v next=%v", ids(p2), p2.Next)
 	}
@@ -70,18 +70,18 @@ func TestRD1ViewerBlocksFilterBeforeThePageIsCut(t *testing.T) {
 		t.Fatalf("店家後台看到全部：%d", len(own.Reviews))
 	}
 	// 統計不過濾觀看者。
-	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, product)); st.Count != 5 {
+	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(product))); st.Count != 5 {
 		t.Fatalf("統計不過濾：%+v", st)
 	}
 	// 店家封鎖買家只擋寫入，不影響這位買家（r1 的作者）對觀看者的可見性。
 	f.exec(t, "INSERT INTO seller.store_blocks (store_id, buyer_id, created_at) VALUES ($1, $2, $3)", storeID, buyersList[0], f.clock())
-	again := must[review.Page](t)(f.module.ListProductReviews(ctx, product, viewer.BuyerID, review.Filter{}, nil, 50))
+	again := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), viewer.BuyerID, review.Filter{}, nil, 50))
 	if !sameIDs(ids(again), r3.ID, r2.ID, r1.ID) {
 		t.Fatalf("店家封鎖買家不影響可見性：%v", ids(again))
 	}
 	// 觀看者封鎖店：整家店的評價都看不到，匿名照常。
 	must[bool](t)(f.buyers.BlockStore(ctx, viewer.BuyerID, storeID))
-	if got := must[review.Page](t)(f.module.ListProductReviews(ctx, product, viewer.BuyerID, review.Filter{}, nil, 50)); len(got.Reviews) != 0 {
+	if got := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), viewer.BuyerID, review.Filter{}, nil, 50)); len(got.Reviews) != 0 {
 		t.Fatalf("封鎖店之後看不到：%v", ids(got))
 	}
 	if got := must[review.Page](t)(f.module.ListStoreReviews(ctx, storeID, 0, review.Filter{}, nil, 50)); len(got.Reviews) != 5 {
@@ -103,7 +103,7 @@ func TestViewerBlockPredicateInlinesThePubFunctions(t *testing.T) {
 	}
 	clause := strings.ReplaceAll(regexp.MustCompile(`(?m)--.*$`).ReplaceAllString(m, ""), "sqlc.arg(viewer_buyer_id)::bigint", "1")
 	var plan []string
-	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "EXPLAIN SELECT r.id FROM review.reviews AS r WHERE r.product_id = 700 "+clause)
+	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "EXPLAIN SELECT r.id FROM review.reviews AS r WHERE r.product_id = '"+pid(700).String()+"' "+clause)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestInactiveBuyersPredicateInlinesThePubFunction(t *testing.T) {
 		t.Fatal("述詞沒有 join buyer.pub_inactive_buyers()")
 	}
 	var plan []string
-	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "EXPLAIN SELECT r.id FROM review.reviews AS r WHERE r.product_id = 700 AND "+string(raw))
+	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "EXPLAIN SELECT r.id FROM review.reviews AS r WHERE r.product_id = '"+pid(700).String()+"' AND "+string(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestRD3HideCanBeRestoredAndHiddenAgain(t *testing.T) {
 	f.jobs.reset()
 
 	h := hide(t, f, r.ID)
-	if !h.Created || len(f.changed) != 1 || f.changed[0].StoreID != storeID || f.changed[0].ProductID != 700 || f.jobs.count("revalidate") != 1 {
+	if !h.Created || len(f.changed) != 1 || f.changed[0].StoreID != storeID || f.changed[0].ProductID != pid(700) || f.jobs.count("revalidate") != 1 {
 		t.Fatalf("新隱藏：%+v events=%v jobs=%v", h, f.changed, f.jobs.kinds())
 	}
 	if _, err := f.module.GetReview(ctx, r.ID, 0); kindOf(err) != apperr.KindNotFound {
@@ -194,7 +194,7 @@ func TestRD3HideCanBeRestoredAndHiddenAgain(t *testing.T) {
 	if again := hide(t, f, r.ID); again.Created || again.ID != h.ID || len(f.changed) != 1 {
 		t.Fatalf("重複隱藏冪等、不重發事件：%+v events=%d", again, len(f.changed))
 	}
-	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 700)); st.Count != 0 {
+	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(700))); st.Count != 0 {
 		t.Fatalf("隱藏的不計分：%+v", st)
 	}
 
@@ -206,7 +206,7 @@ func TestRD3HideCanBeRestoredAndHiddenAgain(t *testing.T) {
 	if got := must[review.Review](t)(f.module.GetReview(ctx, r.ID, 0)); got.ID != r.ID {
 		t.Fatal("還原後可讀")
 	}
-	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 700)); st.Count != 1 {
+	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(700))); st.Count != 1 {
 		t.Fatalf("還原後計分：%+v", st)
 	}
 	if _, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "再還原"}); kindOf(err) != apperr.KindFailedPrecondition {
@@ -229,7 +229,7 @@ func TestRD6SnapshotComesFromTheOrderItem(t *testing.T) {
 	b := f.newBuyer(t)
 	it := f.order(b, storeID, 700)
 	r := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5}))
-	if r.ProductID != 700 || r.StoreID != storeID || r.SkuName != "紅茶 100g" || r.Price != 120 || r.ItemImageKey == nil || *r.ItemImageKey != "order/img.jpg" {
+	if r.ProductID != pid(700) || r.StoreID != storeID || r.SkuName != "紅茶 100g" || r.Price != 120 || r.ItemImageKey == nil || *r.ItemImageKey != "order/img.jpg" {
 		t.Fatalf("快照要等於訂單項目：%+v", r)
 	}
 	f.orders.mu.Lock()
@@ -239,6 +239,19 @@ func TestRD6SnapshotComesFromTheOrderItem(t *testing.T) {
 	got := must[review.Review](t)(f.module.GetReview(ctx, r.ID, 0))
 	if got.Price != 120 || got.SkuName != "紅茶 100g" {
 		t.Fatalf("快照建立後不變：%+v", got)
+	}
+}
+
+// 沒有商品的訂單項目（RFQ 成交，product_id 全零）不能評價，不能走到 reviews_product_check 才失敗。
+func TestSubmitRefusesAnOrderItemWithoutAProduct(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	b := f.newBuyer(t)
+	it := f.order(b, f.exposableStore(t), 0)
+	_, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5})
+	if kindOf(err) != apperr.KindFailedPrecondition || review.ReasonOf(err) != review.ReasonOrderNotReviewable {
+		t.Fatalf("沒有商品的項目要回 ORDER_NOT_REVIEWABLE：%v", err)
 	}
 }
 
@@ -346,7 +359,7 @@ func TestRD10SingleReadUsesThePublicPredicate(t *testing.T) {
 	if _, err := f.module.GetReview(ctx, r2.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("作者刪帳中：%v", err)
 	}
-	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 700)); st.Count != 0 {
+	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(700))); st.Count != 0 {
 		t.Fatalf("刪帳中的作者不計分：%+v", st)
 	}
 }
@@ -362,7 +375,7 @@ func TestSubmitRules(t *testing.T) {
 	in := review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, Content: "  好喝  "}
 	f.jobs.reset()
 	r := must[review.Review](t)(f.module.Submit(ctx, in))
-	if r.Content != "好喝" || len(f.created) != 1 || f.created[0].ReviewID != r.ID || f.created[0].ProductID != 700 || f.created[0].BuyerID != b.BuyerID || len(revalidations(f.jobs)) != 1 {
+	if r.Content != "好喝" || len(f.created) != 1 || f.created[0].ReviewID != r.ID || f.created[0].ProductID != pid(700) || f.created[0].BuyerID != b.BuyerID || len(revalidations(f.jobs)) != 1 {
 		t.Fatalf("提交：%+v events=%v jobs=%v", r, f.created, f.jobs.kinds())
 	}
 	if _, err := f.module.Submit(ctx, in); kindOf(err) != apperr.KindAlreadyExists || review.ReasonOf(err) != review.ReasonAlreadyExists {
@@ -448,7 +461,7 @@ func TestStatsAndStoreRatings(t *testing.T) {
 	f.submit(t, f.newBuyer(t), s2, 702, 3, "")
 	hide(t, f, hidden.ID)
 
-	if p := must[review.ProductStats](t)(f.module.ProductStats(ctx, 700)); p.Count != 2 || p.Average != 4.5 {
+	if p := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(700))); p.Count != 2 || p.Average != 4.5 {
 		t.Fatalf("商品：%+v", p)
 	}
 	st := must[review.StoreStats](t)(f.module.StoreStats(ctx, s1))
@@ -464,7 +477,7 @@ func TestStatsAndStoreRatings(t *testing.T) {
 			t.Fatalf("%v 要被擋：%v", bad, err)
 		}
 	}
-	empty := must[review.ProductStats](t)(f.module.ProductStats(ctx, 999))
+	empty := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(999)))
 	if empty.Count != 0 || empty.Average != 0 {
 		t.Fatalf("沒有評價是 0：%+v", empty)
 	}
@@ -482,16 +495,16 @@ func TestListFiltersAndKeysetAcrossTimestamps(t *testing.T) {
 	f.advance(time.Minute)
 	plain := f.submit(t, f.newBuyer(t), storeID, 700, 5, "")
 
-	if got := must[review.Page](t)(f.module.ListProductReviews(ctx, 700, 0, review.Filter{WithImages: true}, nil, 50)); !sameIDs(ids(got), withImg.ID) {
+	if got := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(700), 0, review.Filter{WithImages: true}, nil, 50)); !sameIDs(ids(got), withImg.ID) {
 		t.Fatalf("只看有圖：%v", ids(got))
 	}
-	if got := must[review.Page](t)(f.module.ListProductReviews(ctx, 700, 0, review.Filter{Rating: 5}, nil, 50)); !sameIDs(ids(got), plain.ID) {
+	if got := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(700), 0, review.Filter{Rating: 5}, nil, 50)); !sameIDs(ids(got), plain.ID) {
 		t.Fatalf("只看 5 星：%v", ids(got))
 	}
-	if _, err := f.module.ListProductReviews(ctx, 700, 0, review.Filter{Rating: 6}, nil, 50); kindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.ListProductReviews(ctx, pid(700), 0, review.Filter{Rating: 6}, nil, 50); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("評分篩選 6：%v", err)
 	}
-	all := must[review.Page](t)(f.module.ListProductReviews(ctx, 700, 0, review.Filter{}, nil, 0))
+	all := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(700), 0, review.Filter{}, nil, 0))
 	if len(all.Reviews) != 2 || len(all.Reviews[1].Images) != 1 || all.Reviews[0].Images == nil {
 		t.Fatalf("預設頁大小與附圖：%+v", all.Reviews)
 	}
@@ -667,15 +680,15 @@ func TestProductStatsExcludeWhatThePublicListExcludes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 710))
+	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(710)))
 	if st.Count != 2 || st.Average != 4.5 || st.Distribution != [5]int64{0, 0, 0, 1, 1} {
 		t.Fatalf("只計公開可讀的兩則（分佈同一個述詞）：%+v", st)
 	}
-	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 710, 0, review.Filter{}, nil, 50))
+	page := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(710), 0, review.Filter{}, nil, 50))
 	if int64(len(page.Reviews)) != st.Count {
 		t.Fatalf("統計與公開列表不一致：%d vs %d", len(page.Reviews), st.Count)
 	}
-	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 712)); none.Count != 0 || none.Average != 0 || none.Distribution != [5]int64{} {
+	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(712))); none.Count != 0 || none.Average != 0 || none.Distribution != [5]int64{} {
 		t.Fatalf("沒有評價是 0：%+v", none)
 	}
 }
@@ -686,7 +699,7 @@ func TestProductStatsWithImagesCountMatchesTheWithImagesFilter(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	store := f.exposableStore(t)
-	submitImg := func(product int64) review.Review {
+	submitImg := func(product int) review.Review {
 		b := f.newBuyer(t)
 		it := f.order(b, store, product)
 		tokens, _ := f.stage(t, b, 1)
@@ -704,15 +717,15 @@ func TestProductStatsWithImagesCountMatchesTheWithImagesFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 730))
+	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(730)))
 	if st.Count != 3 || st.WithImagesCount != 2 {
 		t.Fatalf("公開可讀 3 則、其中附圖 2 則：%+v", st)
 	}
-	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 730, 0, review.Filter{WithImages: true}, nil, 50))
+	page := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(730), 0, review.Filter{WithImages: true}, nil, 50))
 	if int64(len(page.Reviews)) != st.WithImagesCount {
 		t.Fatalf("附圖筆數與 with_images 列表不一致：%d vs %d", len(page.Reviews), st.WithImagesCount)
 	}
-	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 732)); none.Count != 1 || none.WithImagesCount != 0 {
+	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(732))); none.Count != 1 || none.WithImagesCount != 0 {
 		t.Fatalf("沒有附圖是 0：%+v", none)
 	}
 }

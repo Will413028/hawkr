@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -26,10 +27,10 @@ func (f reviewOrderRPC) OrderForReview(context.Context, string) (orderservice.Re
 func TestReviewOrdersMapsNotFoundAndKeepsOtherErrors(t *testing.T) {
 	ok := orderservice.ReviewOrder{
 		OrderNo: "N1", BuyerID: 11, StoreID: 22, Status: "50", CompletedAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
-		Items: []orderservice.ReviewOrderItem{{OrderItemID: 5, ProductID: 7, SkuName: "紅茶", Price: 120, ImageKey: "k/1.jpg"}},
+		Items: []orderservice.ReviewOrderItem{{OrderItemID: 5, ProductID: uuid.UUID{15: 7}, SkuName: "紅茶", Price: 120, ImageKey: "k/1.jpg"}},
 	}
 	got, err := reviewOrders{reviewOrderRPC{order: ok}}.OrderForReview(context.Background(), "N1")
-	if err != nil || got.StoreID != 22 || len(got.Items) != 1 || got.Items[0] != (review.OrderItem{OrderItemID: 5, ProductID: 7, SkuName: "紅茶", ImageKey: "k/1.jpg", Price: 120}) {
+	if err != nil || got.StoreID != 22 || len(got.Items) != 1 || got.Items[0] != (review.OrderItem{OrderItemID: 5, ProductID: uuid.UUID{15: 7}, SkuName: "紅茶", ImageKey: "k/1.jpg", Price: 120}) {
 		t.Fatalf("got %+v, %v", got, err)
 	}
 	_, err = reviewOrders{reviewOrderRPC{err: fmt.Errorf("包住：%w", orderservice.ErrOrderNotFound)}}.OrderForReview(context.Background(), "N1")

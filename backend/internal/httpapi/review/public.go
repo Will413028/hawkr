@@ -31,7 +31,7 @@ func NewPublic(reads Reads, buyers Buyers, images rpc.Images, log *slog.Logger) 
 
 func (h *Public) ListProductReviews(ctx context.Context, req *connect.Request[pb.ListProductReviewsRequest]) (*connect.Response[pb.ListProductReviewsResponse], error) {
 	msg := req.Msg
-	productID, err := rpc.ParseID("product_id", msg.GetProductId())
+	productID, err := rpc.ParseUUID("product_id", msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (h *Public) ListProductReviews(ctx context.Context, req *connect.Request[pb
 	if err != nil {
 		return nil, err
 	}
-	scope := filterScope(reviewv1alpha1connect.ReviewPublicServiceListProductReviewsProcedure, rpc.FormatID(productID), f)
+	scope := filterScope(reviewv1alpha1connect.ReviewPublicServiceListProductReviewsProcedure, productID.String(), f)
 	after, err := decodeCursor(scope, msg.GetPageToken())
 	if err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func ratingCounts(d [5]int64) []*pb.RatingCount {
 }
 
 func (h *Public) GetProductReviewStats(ctx context.Context, req *connect.Request[pb.GetProductReviewStatsRequest]) (*connect.Response[pb.GetProductReviewStatsResponse], error) {
-	productID, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	productID, err := rpc.ParseUUID("product_id", req.Msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}

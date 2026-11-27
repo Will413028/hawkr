@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -61,7 +62,7 @@ type Buyer struct {
 type Review struct {
 	AuthorID       int64     `json:"author_id"`
 	SubjectStoreID int64     `json:"subject_store_id"`
-	ProductID      int64     `json:"product_id"`
+	ProductID      uuid.UUID `json:"product_id"`
 	Rating         int       `json:"rating"`
 	Body           string    `json:"body"`
 	MediaRefs      []string  `json:"media_refs"`

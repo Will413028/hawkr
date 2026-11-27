@@ -41,8 +41,8 @@ func PostTag(postID uuid.UUID) string {
 }
 
 // ProductTag 是一個商品的 cache tag（"product:<id>"）：website 以商品 ID 為 key（lib/seo/tags.ts），評價數與評分在商品頁。
-func ProductTag(productID int64) string {
-	return "product:" + strconv.FormatInt(productID, 10)
+func ProductTag(productID uuid.UUID) string {
+	return "product:" + productID.String()
 }
 
 // StoreTags 是一家店的店家頁 cache tag：website 以網址上的 store_id 或 store_code 為 key（lib/seo/tags.ts 的 sellerTag），兩個都送。

@@ -166,7 +166,7 @@ func TestEachContentEventReachesItsRecipient(t *testing.T) {
 		{"comment_liked_store", w.ownerAccount, social.CommentLiked{EventID: uuid.NewV7(), OccurredAt: now, CommentID: comment, PostID: post, StoreID: w.storeID, Author: storeSide(w.storeID), Actor: buyerSide(w.buyerB)}},
 		{"post_liked", w.ownerAccount, social.PostLiked{EventID: uuid.NewV7(), OccurredAt: now, PostID: post, StoreID: w.storeID, BuyerID: w.buyerB}},
 		{"store_followed", w.ownerAccount, buyer.SellerFollowed{EventID: uuid.NewV7(), OccurredAt: now, StoreID: w.storeID, BuyerID: w.buyerB}},
-		{"review_created", w.ownerAccount, review.ReviewCreated{EventID: uuid.NewV7(), OccurredAt: now, ReviewID: uuid.NewV7(), BuyerID: w.buyerB, StoreID: w.storeID, ProductID: 11}},
+		{"review_created", w.ownerAccount, review.ReviewCreated{EventID: uuid.NewV7(), OccurredAt: now, ReviewID: uuid.NewV7(), BuyerID: w.buyerB, StoreID: w.storeID, ProductID: uuid.UUID{15: 11}}},
 		{"product_restocked", w.buyerAAccount, buyer.RestockTargeted{EventID: uuid.NewV7(), OccurredAt: now, BuyerID: w.buyerA, ProductID: 11, ProductName: "Apple", ImageKey: "public/apple"}},
 		{"post_published_item", followerAccount, social.PostPublished{EventID: uuid.NewV7(), OccurredAt: now.Add(time.Hour), PostID: post, StoreID: w.storeID}},
 	}
@@ -333,7 +333,7 @@ func TestReviewCreatedSkipsABuyerTheStoreBlocked(t *testing.T) {
 	w := newContentWorld(t, f)
 	publishReview := func(buyerID int64) {
 		f.publishEvent(t, func(ctx context.Context) error {
-			return events.Publish(ctx, f.bus, review.ReviewCreated{EventID: uuid.NewV7(), OccurredAt: contentBase, ReviewID: uuid.NewV7(), BuyerID: buyerID, StoreID: w.storeID, ProductID: 11})
+			return events.Publish(ctx, f.bus, review.ReviewCreated{EventID: uuid.NewV7(), OccurredAt: contentBase, ReviewID: uuid.NewV7(), BuyerID: buyerID, StoreID: w.storeID, ProductID: uuid.UUID{15: 11}})
 		})
 	}
 	publishReview(w.buyerB)

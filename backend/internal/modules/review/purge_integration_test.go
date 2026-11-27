@@ -44,7 +44,7 @@ func TestDeactivationHidesReviewsImmediatelyViaThePubJoin(t *testing.T) {
 	leaving, staying := f.newBuyer(t), f.newBuyer(t)
 	gone := f.submit(t, leaving, storeID, 700, 1, "要走的")
 	kept := f.submit(t, staying, storeID, 700, 5, "留下的")
-	if s := must[review.ProductStats](t)(f.module.ProductStats(ctx, 700)); s.Count != 2 {
+	if s := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(700))); s.Count != 2 {
 		t.Fatalf("申請前兩則都計：%+v", s)
 	}
 	f.jobs.reset()
@@ -53,11 +53,11 @@ func TestDeactivationHidesReviewsImmediatelyViaThePubJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 700, 0, review.Filter{}, nil, 20))
+	page := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(700), 0, review.Filter{}, nil, 20))
 	if !sameIDs(ids(page), kept.ID) {
 		t.Fatalf("申請後只剩留下的：%v", ids(page))
 	}
-	if s := must[review.ProductStats](t)(f.module.ProductStats(ctx, 700)); s.Count != 1 || s.Average != 5 {
+	if s := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(700))); s.Count != 1 || s.Average != 5 {
 		t.Fatalf("申請後商品統計不計他：%+v", s)
 	}
 	if s := must[review.StoreStats](t)(f.module.StoreStats(ctx, storeID)); s.Count != 1 || s.Average != 5 {
@@ -113,7 +113,7 @@ func TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable(t *
 	ctx := context.Background()
 	storeID := f.exposableStore(t)
 	leaving, staying := f.newBuyer(t), f.newBuyer(t)
-	submit := func(b buyer.Profile, product int64, tokens ...string) review.Review {
+	submit := func(b buyer.Profile, product int, tokens ...string) review.Review {
 		it := f.order(b, storeID, product)
 		return must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 4, StagedTokens: tokens}))
 	}
@@ -134,7 +134,7 @@ func TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable(t *
 	if n := f.scalar(t, "SELECT count(*) FROM review.review_images WHERE review_id IN ($1, $2)", withImages.ID, withoutImages.ID); n != 0 {
 		t.Fatalf("附圖列隨評價刪除：%d", n)
 	}
-	if n := f.reviewsOf(t, staying); n != 1 || !sameIDs(ids(must[review.Page](t)(f.module.ListProductReviews(ctx, 700, 0, review.Filter{}, nil, 20))), other.ID) {
+	if n := f.reviewsOf(t, staying); n != 1 || !sameIDs(ids(must[review.Page](t)(f.module.ListProductReviews(ctx, pid(700), 0, review.Filter{}, nil, 20))), other.ID) {
 		t.Fatalf("別人的評價不動：%d", n)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM review.review_images WHERE review_id = $1", other.ID); n != 1 {
@@ -149,7 +149,7 @@ func TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable(t *
 		t.Fatalf("別人的附圖 state=%s，預期 ACTIVE", got)
 	}
 	tags := revalidations(f.jobs)
-	if len(tags) != 1 || !slices.Contains(tags[0], revalidate.ProductTag(700)) || !slices.Contains(tags[0], revalidate.ProductTag(701)) {
+	if len(tags) != 1 || !slices.Contains(tags[0], revalidate.ProductTag(pid(700))) || !slices.Contains(tags[0], revalidate.ProductTag(pid(701))) {
 		t.Fatalf("快取失效帶兩個商品的 tag：%v", tags)
 	}
 
@@ -169,7 +169,7 @@ func TestPurgeLoopsOverBatches(t *testing.T) {
 	storeID := f.exposableStore(t)
 	b := f.newBuyer(t)
 	f.exec(t, `INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, sku_name, price, created_at)
-		SELECT gen_random_uuid(), 'N' || n, 100000 + n, $1, $2, 700 + n % 3, 5, 'sku', 1, $3
+		SELECT gen_random_uuid(), 'N' || n, 100000 + n, $1, $2, lpad(to_hex(700 + n % 3), 32, '0')::uuid, 5, 'sku', 1, $3
 		FROM generate_series(1, 405) AS n`, b.BuyerID, storeID, f.clock())
 	f.requestDeletion(t, b)
 	if err := f.module.PurgeAuthor(context.Background(), b.BuyerID); err != nil {
@@ -230,7 +230,7 @@ func TestSweepPurgeReachesBuyersBeyondOneBatch(t *testing.T) {
 	f.exec(t, `INSERT INTO buyer.buyers (buyer_id, account_id, status, display_name, created_at, updated_at, deleted_at)
 		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'CLOSED', 'b', now(), now(), now() FROM generate_series(100000, $1::bigint) AS g`, last)
 	f.exec(t, `INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, sku_name, price, created_at)
-		SELECT gen_random_uuid(), 'N' || g, g, g, $2, 700, 5, 'sku', 1, $3 FROM generate_series(100000, $1::bigint) AS g`, last, storeID, f.clock())
+		SELECT gen_random_uuid(), 'N' || g, g, g, $2, lpad(to_hex(700), 32, '0')::uuid, 5, 'sku', 1, $3 FROM generate_series(100000, $1::bigint) AS g`, last, storeID, f.clock())
 	f.jobs.reset()
 	n, err := f.module.SweepPurge(ctx)
 	if err != nil || n != buyers {
@@ -262,7 +262,7 @@ func TestPurgePublishesOneAggregateChangePerPairPerBatch(t *testing.T) {
 	s1, s2 := f.exposableStore(t), f.exposableStore(t)
 	b := f.newBuyer(t)
 	f.exec(t, `INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, sku_name, price, created_at)
-		SELECT gen_random_uuid(), 'N' || n, 100000 + n, $1, CASE WHEN n % 2 = 0 THEN $2::bigint ELSE $3::bigint END, 700 + n % 2, 5, 'sku', 1, $4
+		SELECT gen_random_uuid(), 'N' || n, 100000 + n, $1, CASE WHEN n % 2 = 0 THEN $2::bigint ELSE $3::bigint END, lpad(to_hex(700 + n % 2), 32, '0')::uuid, 5, 'sku', 1, $4
 		FROM generate_series(1, 250) AS n`, b.BuyerID, s1, s2, f.clock())
 	f.requestDeletion(t, b)
 	f.mu.Lock()
@@ -279,7 +279,7 @@ func TestPurgePublishesOneAggregateChangePerPairPerBatch(t *testing.T) {
 	for _, e := range got {
 		count[review.Target{StoreID: e.StoreID, ProductID: e.ProductID}]++
 	}
-	want := map[review.Target]int{{StoreID: s1, ProductID: 700}: 2, {StoreID: s2, ProductID: 701}: 2}
+	want := map[review.Target]int{{StoreID: s1, ProductID: pid(700)}: 2, {StoreID: s2, ProductID: pid(701)}: 2}
 	if len(got) != 4 || len(count) != len(want) {
 		t.Fatalf("2 批 x 2 組 = 4 個事件：%+v", got)
 	}

@@ -36,7 +36,7 @@ type GetReviewForDiagnosisRow struct {
 	OrderItemID  int64
 	BuyerID      int64
 	StoreID      int64
-	ProductID    int64
+	ProductID    uuid.UUID
 	Rating       int16
 	Content      *string
 	SkuName      string
@@ -107,7 +107,7 @@ type InsertReviewParams struct {
 	OrderItemID  int64
 	BuyerID      int64
 	StoreID      int64
-	ProductID    int64
+	ProductID    uuid.UUID
 	Rating       int16
 	Content      *string
 	SkuName      string

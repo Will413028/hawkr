@@ -197,7 +197,7 @@ func snapshotPB(c *moderation.Snapshot) *adminpb.CaseSnapshot {
 	case c.Review != nil:
 		x := c.Review
 		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Review{Review: &adminpb.ReviewSnapshot{
-			AuthorId: rpc.FormatID(x.AuthorID), StoreId: rpc.FormatID(x.SubjectStoreID), ProductId: rpc.FormatID(x.ProductID), Rating: int32(x.Rating), //nolint:gosec // 評價分數是 1 到 5
+			AuthorId: rpc.FormatID(x.AuthorID), StoreId: rpc.FormatID(x.SubjectStoreID), ProductId: x.ProductID.String(), Rating: int32(x.Rating), //nolint:gosec // 評價分數是 1 到 5
 			Body: x.Body, AssetIds: x.MediaRefs, AuthoredTime: optionalTime(x.AuthoredAt), ReplyBody: x.ReplyBody,
 		}}}
 	case c.ReviewReply != nil:

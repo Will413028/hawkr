@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	orderpb "github.com/Will413028/hawkr/backend/internal/legacy/gen/order"
@@ -25,12 +26,17 @@ func (f fakeReviewOrders) GetOrderForReview(context.Context, *connect.Request[or
 	return connect.NewResponse(f.resp), nil
 }
 
+var (
+	product7 = uuid.MustParse("0192f3a4-7b1c-7d2e-8f3a-000000000007")
+	product8 = uuid.MustParse("0192f3a4-7b1c-7d2e-8f3a-000000000008")
+)
+
 func validReviewResponse() *orderpb.GetOrderForReviewResponse {
 	return &orderpb.GetOrderForReviewResponse{
 		Data: &orderpb.OrderForReviewData{OrderNo: "N1", BuyerId: "11", StoreId: "22", Status: "50", CompletedAt: "2026-11-01T00:00:00Z"},
 		Items: []*orderpb.OrderItemForReview{
-			{OrderItemId: "5", SkuName: "紅茶", Price: "120", ProductId: "7", ImageObjectKey: "k/1.jpg", ImageUrl: "https://cdn/k/1.jpg"},
-			{OrderItemId: "6", SkuName: "綠茶", Price: "0", ProductId: "8"},
+			{OrderItemId: "5", SkuName: "紅茶", Price: "120", ProductId: product7.String(), ImageObjectKey: "k/1.jpg", ImageUrl: "https://cdn/k/1.jpg"},
+			{OrderItemId: "6", SkuName: "綠茶", Price: "0", ProductId: product8.String()},
 		},
 	}
 }
@@ -44,8 +50,10 @@ func TestOrderForReviewSeparatesNotFoundFromEveryOtherFailure(t *testing.T) {
 	badBuyer.Data.BuyerId = "x"
 	badTime := validReviewResponse()
 	badTime.Data.CompletedAt = "yesterday"
-	noProduct := validReviewResponse()
-	noProduct.Items[0].ProductId = ""
+	numericProduct := validReviewResponse()
+	numericProduct.Items[0].ProductId = "7"
+	nilProduct := validReviewResponse()
+	nilProduct.Items[0].ProductId = uuid.Nil().String()
 	wrongOrder := validReviewResponse()
 	wrongOrder.Data.OrderNo = "N2"
 	longSku := validReviewResponse()
@@ -67,7 +75,8 @@ func TestOrderForReviewSeparatesNotFoundFromEveryOtherFailure(t *testing.T) {
 		{"order number differs from request", fakeReviewOrders{resp: wrongOrder}, false},
 		{"sku name too long", fakeReviewOrders{resp: longSku}, false},
 		{"invalid utf8 image key", fakeReviewOrders{resp: badImage}, false},
-		{"item without product", fakeReviewOrders{resp: noProduct}, false},
+		{"item with numeric product id", fakeReviewOrders{resp: numericProduct}, false},
+		{"item with all-zero product id", fakeReviewOrders{resp: nilProduct}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -91,11 +100,23 @@ func TestOrderForReviewParsesSnapshot(t *testing.T) {
 		t.Fatalf("order = %+v", got)
 	}
 	want := []ReviewOrderItem{
-		{OrderItemID: 5, ProductID: 7, SkuName: "紅茶", ImageKey: "k/1.jpg", Price: 120},
-		{OrderItemID: 6, ProductID: 8, SkuName: "綠茶", ImageKey: "", Price: 0},
+		{OrderItemID: 5, ProductID: product7, SkuName: "紅茶", ImageKey: "k/1.jpg", Price: 120},
+		{OrderItemID: 6, ProductID: product8, SkuName: "綠茶", ImageKey: "", Price: 0},
 	}
 	if len(got.Items) != 2 || got.Items[0] != want[0] || got.Items[1] != want[1] {
 		t.Fatalf("items = %+v", got.Items)
+	}
+}
+
+func TestOrderForReviewTreatsAnEmptyProductIDAsNoProduct(t *testing.T) {
+	resp := validReviewResponse()
+	resp.Items[0].ProductId = ""
+	got, err := (&Client{rpc: fakeReviewOrders{resp: resp}}).OrderForReview(context.Background(), "N1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Items[0].ProductID != uuid.Nil() || got.Items[1].ProductID != product8 {
+		t.Fatalf("items = %+v，要第一項沒有商品、第二項保留", got.Items)
 	}
 }
 

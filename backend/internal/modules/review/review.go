@@ -162,7 +162,7 @@ func (m *Module) Restore(ctx context.Context, in RestoreInput) (Hide, error) {
 }
 
 // ListProductReviews 是商品的公開評價；viewerBuyerID 大於 0 時套用觀看者的封鎖。size 為 0 用預設，超過 MaxPageSize 以上限計。
-func (m *Module) ListProductReviews(ctx context.Context, productID, viewerBuyerID int64, f Filter, after *Cursor, size int32) (Page, error) {
+func (m *Module) ListProductReviews(ctx context.Context, productID uuid.UUID, viewerBuyerID int64, f Filter, after *Cursor, size int32) (Page, error) {
 	return m.read.ListProductReviews(ctx, productID, viewerBuyerID, f, after, size)
 }
 
@@ -193,7 +193,7 @@ func (m *Module) ReviewForReport(ctx context.Context, id uuid.UUID, viewerBuyerI
 }
 
 // ProductStats 是商品的評價統計。
-func (m *Module) ProductStats(ctx context.Context, productID int64) (ProductStats, error) {
+func (m *Module) ProductStats(ctx context.Context, productID uuid.UUID) (ProductStats, error) {
 	return m.read.ProductStats(ctx, productID)
 }
 

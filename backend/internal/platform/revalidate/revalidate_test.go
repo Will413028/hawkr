@@ -148,11 +148,10 @@ func TestPostTagIsAnEntityTagWebsiteAccepts(t *testing.T) {
 	}
 }
 
-// ProductTag 與舊 pkg/revalidate 的 ProductTag 同字串，website 的失效 key 不變。
-func TestProductTagIsTheLegacyString(t *testing.T) {
-	for id, want := range map[int64]string{1: "product:1", 700: "product:700", 9007199254740993: "product:9007199254740993"} {
-		if got := ProductTag(id); got != want {
-			t.Errorf("ProductTag(%d) = %q，預期 %q", id, got, want)
-		}
+// ProductTag 是 "product:" 加商品的 UUID 字串（website 以商品 ID 為 key）。
+func TestProductTagUsesTheCatalogUUID(t *testing.T) {
+	id := uuid.MustParse("0192f3a4-7b1c-7d2e-8f3a-000000000700")
+	if got, want := ProductTag(id), "product:0192f3a4-7b1c-7d2e-8f3a-000000000700"; got != want {
+		t.Errorf("ProductTag(%v) = %q，預期 %q", id, got, want)
 	}
 }
