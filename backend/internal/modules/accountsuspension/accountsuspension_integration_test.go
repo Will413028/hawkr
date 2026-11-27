@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/riverqueue/river"
 
@@ -49,7 +50,9 @@ func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, erro
 
 type noProducts struct{}
 
-func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
+func (noProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return nil, nil
+}
 
 type noOrders struct{}
 

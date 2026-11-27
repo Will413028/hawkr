@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -39,7 +40,7 @@ type fakePublic struct {
 	byCode   int64
 	cards    []model.StoreCard
 	cardIDs  []int64
-	viewed   []int64
+	viewed   []uuid.UUID
 	viewErr  error
 }
 
@@ -58,7 +59,7 @@ func (f *fakePublic) StoreCards(_ context.Context, ids []int64) ([]model.StoreCa
 	return f.cards, nil
 }
 
-func (f *fakePublic) RecordProductView(_ context.Context, id int64) error {
+func (f *fakePublic) RecordProductView(_ context.Context, id uuid.UUID) error {
 	f.viewed = append(f.viewed, id)
 	return f.viewErr
 }
@@ -272,10 +273,10 @@ func TestRecordProductViewCountsOnlyGuests(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := &fakePublic{}
 			h := newPublic(t, m, fakeFollowerCounts{}, fakeRatings{})
-			if _, err := h.RecordProductView(viewCtx(c.signedIn), connect.NewRequest(&pb.RecordProductViewRequest{ProductId: "42"})); err != nil {
+			if _, err := h.RecordProductView(viewCtx(c.signedIn), connect.NewRequest(&pb.RecordProductViewRequest{ProductId: "0190a000-0000-7000-8000-00000000002a"})); err != nil {
 				t.Fatal(err)
 			}
-			if len(m.viewed) != c.want || (c.want == 1 && m.viewed[0] != 42) {
+			if len(m.viewed) != c.want || (c.want == 1 && m.viewed[0] != uuid.MustParse("0190a000-0000-7000-8000-00000000002a")) {
 				t.Fatalf("viewed=%v, want %d", m.viewed, c.want)
 			}
 		})
@@ -285,7 +286,7 @@ func TestRecordProductViewCountsOnlyGuests(t *testing.T) {
 func TestRecordProductViewRejectsABadIDAndReportsWriteFailures(t *testing.T) {
 	m := &fakePublic{viewErr: errors.New("db down")}
 	h := newPublic(t, m, fakeFollowerCounts{}, fakeRatings{})
-	for _, bad := range []string{"", "x", "0", "-1"} {
+	for _, bad := range []string{"", "x", "0", "-1", "42", "00000000000000000000000000000001"} {
 		if _, err := h.RecordProductView(viewCtx(false), connect.NewRequest(&pb.RecordProductViewRequest{ProductId: bad})); !isInvalidArgument(err) && apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("product_id %q err=%v", bad, err)
 		}
@@ -293,7 +294,7 @@ func TestRecordProductViewRejectsABadIDAndReportsWriteFailures(t *testing.T) {
 	if len(m.viewed) != 0 {
 		t.Fatalf("不合法的 id 不該寫入：%v", m.viewed)
 	}
-	if _, err := h.RecordProductView(viewCtx(false), connect.NewRequest(&pb.RecordProductViewRequest{ProductId: "5"})); err == nil {
+	if _, err := h.RecordProductView(viewCtx(false), connect.NewRequest(&pb.RecordProductViewRequest{ProductId: "0190a000-0000-7000-8000-000000000005"})); err == nil {
 		t.Fatal("寫入失敗要回錯誤")
 	}
 }

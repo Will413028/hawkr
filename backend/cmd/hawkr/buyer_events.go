@@ -15,7 +15,5 @@ func subscribeBuyerLifecycle(bus *events.Bus, module *buyer.Module) {
 
 func subscribeBuyerEvents(bus *events.Bus, queue jobs.Enqueuer) {
 	enqueue := buyerrelay.NewEnqueue(queue)
-	events.Subscribe(bus, buyerrelay.OnFavoriteAdded(enqueue))
-	events.Subscribe(bus, buyerrelay.OnFavoriteRemoved(enqueue))
 	events.Subscribe(bus, buyerrelay.OnBuyerDeleted(enqueue))
 }

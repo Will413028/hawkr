@@ -65,7 +65,7 @@ func TestSuspendedAccountHasRestrictedAccess(t *testing.T) {
 	if _, err := public.GetSellerAgreements(ctx, connect.NewRequest(&sellerpb.GetSellerAgreementsRequest{})); err != nil {
 		t.Fatalf("停權的帳號呼叫公開方法 = %v", err)
 	}
-	_, err = f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: "11"}))
+	_, err = f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: "0190a000-0000-7000-8000-000000000011"}))
 	wantCode(t, err, connect.CodePermissionDenied, "ACCOUNT_SUSPENDED")
 	_, err = f.app.CreateAddress(ctx, connect.NewRequest(&pb.CreateAddressRequest{Address: address("王小明收件人")}))
 	wantCode(t, err, connect.CodePermissionDenied, "ACCOUNT_SUSPENDED")

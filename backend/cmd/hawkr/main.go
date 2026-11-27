@@ -194,7 +194,6 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	catalogModule := newCatalog(d, med)
 	products, err := productservice.New(productAddr, internalSecret)
 	if err != nil {
 		return err
@@ -220,9 +219,11 @@ func runServe(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
+	catalogModule := newCatalog(d, med, buyerModule)
+	subscribeCatalogFavorites(bus, catalogModule)
 	box := newInbox(d, jc, log)
 	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{catalog: catalogModule}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
 	// 資料庫參照的 HMAC 金鑰（防詐保存的 blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
@@ -316,7 +317,7 @@ func runServe(ctx context.Context) error {
 		Stats:                 stats,
 		DashboardOrders:       sellerDashboardOrders{orders},
 		SocialProducts:        socialCards{products},
-		BuyerPorts:            httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
+		BuyerPorts:            httpbuyer.Ports{Products: buyerProducts{catalogModule}, Skus: buyerSkus{catalogModule}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
 		Deletion:              deletion,
 		Delegation:            del,
 		Images:                images,
@@ -433,15 +434,16 @@ func runWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	catalogModule := newCatalog(d, med)
 	buyerModule := buyer.New(buyer.Deps{
 		DB: d, Events: bus,
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
+	catalogModule := newCatalog(d, med, buyerModule)
+	subscribeCatalogFavorites(bus, catalogModule)
 	box := newInbox(d, jc, log)
 	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
-	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
+	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{catalog: catalogModule}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
 	// 資料庫參照的 HMAC 金鑰（防詐保存的 blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
@@ -507,7 +509,7 @@ func runWorker(ctx context.Context) error {
 	crmConsumer.AddWorkers(workers)
 	publisher := rabbitmq.NewWorker(pub)
 	river.AddWorker(workers, publisher)
-	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
+	buyerrelay.NewWorker(jc).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
 	reviewrelay.NewWorker(reviewModule, jc, log).AddWorkers(workers)
 	bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)

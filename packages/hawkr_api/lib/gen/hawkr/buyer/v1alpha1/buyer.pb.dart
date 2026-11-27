@@ -561,7 +561,7 @@ class ProductCard extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearAvailable() => $_clearField(8);
 
-  /// 呼叫者已訂閱這個商品的補貨通知。
+  /// 呼叫者已訂閱這個商品任一規格（SKU）的補貨通知。
   @$pb.TagNumber(9)
   $core.bool get restockSubscribed => $_getBF(8);
   @$pb.TagNumber(9)
@@ -831,15 +831,17 @@ class Visit extends $pb.GeneratedMessage {
   $2.Timestamp ensureVisitTime() => $_ensure(1);
 }
 
-/// RestockSubscription 是等待補貨通知的商品。
+/// RestockSubscription 是等待補貨通知的商品規格（SKU）。
 class RestockSubscription extends $pb.GeneratedMessage {
   factory RestockSubscription({
     ProductCard? product,
     $2.Timestamp? createTime,
+    $core.String? skuId,
   }) {
     final result = RestockSubscription._();
     if (product != null) result.product = product;
     if (createTime != null) result.createTime = createTime;
+    if (skuId != null) result.skuId = skuId;
     return result;
   }
 
@@ -861,6 +863,7 @@ class RestockSubscription extends $pb.GeneratedMessage {
         subBuilder: ProductCard.$_createMessage)
     ..aOM<$2.Timestamp>(2, _omitFieldNames ? '' : 'createTime',
         subBuilder: $2.Timestamp.$_createMessage)
+    ..aOS(3, _omitFieldNames ? '' : 'skuId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -907,6 +910,16 @@ class RestockSubscription extends $pb.GeneratedMessage {
   void clearCreateTime() => $_clearField(2);
   @$pb.TagNumber(2)
   $2.Timestamp ensureCreateTime() => $_ensure(1);
+
+  /// 訂閱的規格；補貨通知依規格發送。
+  @$pb.TagNumber(3)
+  $core.String get skuId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set skuId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSkuId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSkuId() => $_clearField(3);
 }
 
 /// MemberCard 是買家在一個店家的會員卡。
@@ -4131,9 +4144,11 @@ class ListRestockSubscriptionsResponse extends $pb.GeneratedMessage {
 class SubscribeRestockRequest extends $pb.GeneratedMessage {
   factory SubscribeRestockRequest({
     $core.String? productId,
+    $core.String? skuId,
   }) {
     final result = SubscribeRestockRequest._();
     if (productId != null) result.productId = productId;
+    if (skuId != null) result.skuId = skuId;
     return result;
   }
 
@@ -4152,6 +4167,7 @@ class SubscribeRestockRequest extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
       createEmptyInstance: SubscribeRestockRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'productId')
+    ..aOS(2, _omitFieldNames ? '' : 'skuId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4186,6 +4202,16 @@ class SubscribeRestockRequest extends $pb.GeneratedMessage {
   $core.bool hasProductId() => $_has(0);
   @$pb.TagNumber(1)
   void clearProductId() => $_clearField(1);
+
+  /// 要等補貨的規格，必須屬於 product_id；規格目前有貨時拒絕（failed_precondition，reason RESTOCK_SKU_IN_STOCK），不存在或已刪除是 not_found。
+  @$pb.TagNumber(2)
+  $core.String get skuId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set skuId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSkuId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSkuId() => $_clearField(2);
 }
 
 class SubscribeRestockResponse extends $pb.GeneratedMessage {
@@ -4235,10 +4261,10 @@ class SubscribeRestockResponse extends $pb.GeneratedMessage {
 
 class UnsubscribeRestockRequest extends $pb.GeneratedMessage {
   factory UnsubscribeRestockRequest({
-    $core.String? productId,
+    $core.String? skuId,
   }) {
     final result = UnsubscribeRestockRequest._();
-    if (productId != null) result.productId = productId;
+    if (skuId != null) result.skuId = skuId;
     return result;
   }
 
@@ -4256,7 +4282,7 @@ class UnsubscribeRestockRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
       createEmptyInstance: UnsubscribeRestockRequest.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'productId')
+    ..aOS(1, _omitFieldNames ? '' : 'skuId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4286,13 +4312,13 @@ class UnsubscribeRestockRequest extends $pb.GeneratedMessage {
   static UnsubscribeRestockRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get productId => $_getSZ(0);
+  $core.String get skuId => $_getSZ(0);
   @$pb.TagNumber(1)
-  set productId($core.String value) => $_setString(0, value);
+  set skuId($core.String value) => $_setString(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasProductId() => $_has(0);
+  $core.bool hasSkuId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearProductId() => $_clearField(1);
+  void clearSkuId() => $_clearField(1);
 }
 
 class UnsubscribeRestockResponse extends $pb.GeneratedMessage {
@@ -5528,7 +5554,7 @@ class BuyerAppServiceApi {
       _client.invoke<ClearVisitsResponse>(ctx, 'BuyerAppService', 'ClearVisits',
           request, ClearVisitsResponse());
 
-  /// ListRestockSubscriptions 列出等待補貨通知的商品，新到舊。通知送出或取消之後就不在清單上。
+  /// ListRestockSubscriptions 列出等待補貨通知的商品規格（SKU），新到舊。通知送出或取消之後就不在清單上。
   $async.Future<ListRestockSubscriptionsResponse> listRestockSubscriptions(
           $pb.ClientContext? ctx, ListRestockSubscriptionsRequest request) =>
       _client.invoke<ListRestockSubscriptionsResponse>(
@@ -5538,13 +5564,14 @@ class BuyerAppServiceApi {
           request,
           ListRestockSubscriptionsResponse());
 
-  /// SubscribeRestock 訂閱商品的補貨通知；已訂閱時也成功。
+  /// SubscribeRestock 訂閱商品某個規格（SKU）的補貨通知：一次性，通知送出後訂閱就消失，不設到期；已訂閱時也成功。規格目前有貨時回 failed_precondition，
+  /// ErrorInfo.reason 是 RESTOCK_SKU_IN_STOCK；規格不存在、已刪除或不屬於 product_id 回 not_found。
   $async.Future<SubscribeRestockResponse> subscribeRestock(
           $pb.ClientContext? ctx, SubscribeRestockRequest request) =>
       _client.invoke<SubscribeRestockResponse>(ctx, 'BuyerAppService',
           'SubscribeRestock', request, SubscribeRestockResponse());
 
-  /// UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
+  /// UnsubscribeRestock 取消規格（SKU）的補貨通知；沒有訂閱時也成功。
   $async.Future<UnsubscribeRestockResponse> unsubscribeRestock(
           $pb.ClientContext? ctx, UnsubscribeRestockRequest request) =>
       _client.invoke<UnsubscribeRestockResponse>(ctx, 'BuyerAppService',

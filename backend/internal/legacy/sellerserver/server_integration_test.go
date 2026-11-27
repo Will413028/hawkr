@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
@@ -57,8 +58,8 @@ func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, erro
 
 type noProducts struct{}
 
-func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) {
-	return map[int64]int64{}, nil
+func (noProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return map[uuid.UUID]int64{}, nil
 }
 
 type fakeRatings struct {

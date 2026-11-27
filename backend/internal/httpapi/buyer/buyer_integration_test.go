@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -68,16 +69,28 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
+var (
+	product9  = uuid.MustParse("0190a000-0000-7000-8000-000000000009")
+	product10 = uuid.MustParse("0190a000-0000-7000-8000-000000000010")
+	product11 = uuid.MustParse("0190a000-0000-7000-8000-000000000011")
+)
+
 type source struct {
-	products  map[int64]httpbuyer.ProductInfo
+	products  map[uuid.UUID]httpbuyer.ProductInfo
+	skus      map[uuid.UUID]httpbuyer.RestockSku
 	stores    map[int64]seller.StoreCard
 	owners    map[int64]int64
 	summaries []httpbuyer.MerchantSummary
 	storesErr error
 }
 
-func (s *source) Cards(_ context.Context, _ []int64, _ bool) (map[int64]httpbuyer.ProductInfo, error) {
+func (s *source) Cards(_ context.Context, _ []uuid.UUID, _ bool) (map[uuid.UUID]httpbuyer.ProductInfo, error) {
 	return s.products, nil
+}
+
+func (s *source) RestockSku(_ context.Context, skuID uuid.UUID) (httpbuyer.RestockSku, bool, error) {
+	sku, ok := s.skus[skuID]
+	return sku, ok, nil
 }
 
 func openCard(id int64, name string) seller.StoreCard {
@@ -205,14 +218,14 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	stores := &switchStores{}
-	s := &source{products: map[int64]httpbuyer.ProductInfo{}, stores: map[int64]seller.StoreCard{}, owners: map[int64]int64{}}
+	s := &source{products: map[uuid.UUID]httpbuyer.ProductInfo{}, skus: map[uuid.UUID]httpbuyer.RestockSku{}, stores: map[int64]seller.StoreCard{}, owners: map[int64]int64{}}
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	kycMAC := sealtest.MAC(t)
 	sellerModule := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: media.NewFake(), Orders: s, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
-	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, Catalog: &catalogmod.Module{}, ImageAI: &imageai.Module{}, Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
+	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, Catalog: &catalogmod.Module{}, ImageAI: &imageai.Module{}, Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Skus: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +249,19 @@ func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, erro
 
 type noProducts struct{}
 
-func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
+func (noProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return nil, nil
+}
+
+// rows 回傳一句 count 查詢的結果。
+func (f *fixture) rows(t *testing.T, query string, args ...any) int64 {
+	t.Helper()
+	var n int64
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), query, args...).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
 
 func wantCode(t *testing.T, err error, code connect.Code, reason string) string {
 	t.Helper()
@@ -510,11 +535,11 @@ func TestConnectDeletedStoreCardsAndUnfollow(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.source.stores[3], f.source.owners[3] = openCard(3, "店家"), 999
-	f.source.products[9] = httpbuyer.ProductInfo{ID: 9, StoreID: 3, Name: "蘋果", Available: true}
+	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", Available: true}
 	if _, err := f.app.FollowStore(ctx, connect.NewRequest(&pb.FollowStoreRequest{StoreId: "3"})); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: "9"})); err != nil {
+	if _, err := f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: product9.String()})); err != nil {
 		t.Fatal(err)
 	}
 	f.source.summaries = []httpbuyer.MerchantSummary{{StoreID: 3, Spent: 100}}
@@ -554,16 +579,18 @@ func TestConnectPendingAndProductCards(t *testing.T) {
 	ctx := context.Background()
 	f.source.stores[3], f.source.owners[3] = openCard(3, "店家"), 999
 	f.source.stores[4], f.source.owners[4] = openCard(4, "自己"), f.accountID
-	f.source.products[9] = httpbuyer.ProductInfo{ID: 9, StoreID: 3, Name: "蘋果", MinPrice: 10, MaxPrice: 10, Available: true}
-	_, err := f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: "9"}))
+	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", MinPrice: 10, MaxPrice: 10, Available: true}
+	_, err := f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: product9.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: "10"}))
+	_, err = f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: product10.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.app.SubscribeRestock(ctx, connect.NewRequest(&pb.SubscribeRestockRequest{ProductId: "9"}))
+	sku9 := uuid.MustParse("0190a000-0000-7000-8000-0000000000a9")
+	f.source.skus[sku9] = httpbuyer.RestockSku{ProductID: product9}
+	_, err = f.app.SubscribeRestock(ctx, connect.NewRequest(&pb.SubscribeRestockRequest{ProductId: product9.String(), SkuId: sku9.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -576,12 +603,12 @@ func TestConnectPendingAndProductCards(t *testing.T) {
 	}
 	for _, item := range favorites.Msg.GetFavorites() {
 		switch item.GetProduct().GetId() {
-		case "9":
+		case product9.String():
 			if !item.GetProduct().GetRestockSubscribed() {
 				t.Fatal("restock missing")
 			}
-		case "10":
-			if !item.GetProduct().GetDeleted() || !proto.Equal(item.GetProduct(), &pb.ProductCard{Id: "10", Deleted: true}) {
+		case product10.String():
+			if !item.GetProduct().GetDeleted() || !proto.Equal(item.GetProduct(), &pb.ProductCard{Id: product10.String(), Deleted: true}) {
 				t.Fatalf("tombstone=%v", item.GetProduct())
 			}
 		default:
@@ -595,10 +622,54 @@ func TestConnectPendingAndProductCards(t *testing.T) {
 	if err := f.module.BeginDeletion(ctx, f.buyerID); err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: "11"}))
+	_, err = f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: product11.String()}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
 	_, err = f.app.FollowStore(ctx, connect.NewRequest(&pb.FollowStoreRequest{StoreId: "3"}))
 	wantCode(t, err, connect.CodeFailedPrecondition, "")
+}
+
+// 補貨訂閱以規格（SKU）為粒度（D26）：有貨的規格拒絕訂閱（failed_precondition，RESTOCK_SKU_IN_STOCK），不存在或不屬於該商品的規格是 not_found；
+// 缺貨的規格訂閱成功，清單帶 sku_id，取消只看 sku_id。
+func TestConnectRestockSubscriptionIsPerSKUAndRejectedWhenInStock(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.source.stores[3] = openCard(3, "店家")
+	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", MinPrice: 10, MaxPrice: 10}
+	soldOut := uuid.MustParse("0190a000-0000-7000-8000-0000000000b1")
+	inStock := uuid.MustParse("0190a000-0000-7000-8000-0000000000b2")
+	otherProduct := uuid.MustParse("0190a000-0000-7000-8000-0000000000b3")
+	f.source.skus[soldOut] = httpbuyer.RestockSku{ProductID: product9}
+	f.source.skus[inStock] = httpbuyer.RestockSku{ProductID: product9, InStock: true}
+	f.source.skus[otherProduct] = httpbuyer.RestockSku{ProductID: product10}
+	subscribe := func(productID, skuID uuid.UUID) error {
+		_, err := f.app.SubscribeRestock(ctx, connect.NewRequest(&pb.SubscribeRestockRequest{ProductId: productID.String(), SkuId: skuID.String()}))
+		return err
+	}
+	wantCode(t, subscribe(product9, inStock), connect.CodeFailedPrecondition, "RESTOCK_SKU_IN_STOCK")
+	wantCode(t, subscribe(product9, uuid.MustParse("0190a000-0000-7000-8000-0000000000ff")), connect.CodeNotFound, "")
+	wantCode(t, subscribe(product9, otherProduct), connect.CodeNotFound, "")
+	if n := f.rows(t, "SELECT count(*) FROM buyer.restock_subscriptions"); n != 0 {
+		t.Fatalf("rejected subscriptions wrote %d rows", n)
+	}
+	for range 2 {
+		if err := subscribe(product9, soldOut); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := f.rows(t, "SELECT count(*) FROM buyer.restock_subscriptions WHERE sku_id = $1 AND product_id = $2", soldOut, product9); n != 1 {
+		t.Fatalf("subscription rows=%d, want 1", n)
+	}
+	list, err := f.app.ListRestockSubscriptions(ctx, connect.NewRequest(&pb.ListRestockSubscriptionsRequest{}))
+	if err != nil || len(list.Msg.GetRestockSubscriptions()) != 1 || list.Msg.GetRestockSubscriptions()[0].GetSkuId() != soldOut.String() || list.Msg.GetRestockSubscriptions()[0].GetProduct().GetId() != product9.String() || !list.Msg.GetRestockSubscriptions()[0].GetProduct().GetRestockSubscribed() {
+		t.Fatalf("list=%v err=%v", list, err)
+	}
+	if _, err := f.app.UnsubscribeRestock(ctx, connect.NewRequest(&pb.UnsubscribeRestockRequest{SkuId: soldOut.String()})); err != nil {
+		t.Fatal(err)
+	}
+	if n := f.rows(t, "SELECT count(*) FROM buyer.restock_subscriptions"); n != 0 {
+		t.Fatalf("unsubscribe left %d rows", n)
+	}
 }
 
 func TestConnectDeleteAccount(t *testing.T) {

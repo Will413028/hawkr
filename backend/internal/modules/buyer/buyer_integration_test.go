@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	goimage "image"
 	"image/png"
@@ -242,11 +243,11 @@ func TestIdempotentEvents(t *testing.T) {
 		return check(ctx, event.EventID)
 	})
 	for range 2 {
-		must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, 11))
+		must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, pid(11)))
 		must(t, fixture.module.Follow(ctx, buyer.BuyerID, 21))
 	}
 	for range 2 {
-		must(t, fixture.module.RemoveFavorite(ctx, buyer.BuyerID, 11))
+		must(t, fixture.module.RemoveFavorite(ctx, buyer.BuyerID, pid(11)))
 	}
 	if added != 1 || removed != 1 || followed != 1 {
 		t.Fatalf("added=%d removed=%d followed=%d; duplicates must not publish", added, removed, followed)
@@ -261,12 +262,12 @@ func TestDeletionLifecycle(t *testing.T) {
 	_, err := fixture.module.AddAddress(ctx, addressInput(buyer.BuyerID))
 	must(t, err)
 	for _, id := range []int64{11, 12} {
-		must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, id))
+		must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, pid(id)))
 	}
 	must(t, fixture.module.Follow(ctx, buyer.BuyerID, 21))
-	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, 11))
-	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, 11))
-	removed := map[int64]bool{}
+	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, pid(11)))
+	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, pid(11), skuOf(11)))
+	removed := map[uuid.UUID]bool{}
 	deleted := 0
 	events.Subscribe(fixture.bus, func(_ context.Context, event FavoriteRemoved) error {
 		removed[event.ProductID] = true
@@ -283,14 +284,14 @@ func TestDeletionLifecycle(t *testing.T) {
 		t.Fatal("pending closed the stint")
 	}
 	must(t, fixture.module.BeginDeletion(ctx, buyer.BuyerID))
-	for _, fn := range []func() error{func() error { return fixture.module.AddFavorite(ctx, buyer.BuyerID, 13) }, func() error { return fixture.module.Follow(ctx, buyer.BuyerID, 22) }} {
+	for _, fn := range []func() error{func() error { return fixture.module.AddFavorite(ctx, buyer.BuyerID, pid(13)) }, func() error { return fixture.module.Follow(ctx, buyer.BuyerID, 22) }} {
 		if err = fn(); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 			t.Fatal(err)
 		}
 	}
 	must(t, fixture.module.CloseForDeletion(ctx, buyer.BuyerID))
 	must(t, fixture.module.CloseForDeletion(ctx, buyer.BuyerID))
-	if deleted != 1 || len(removed) != 2 || !removed[11] || !removed[12] {
+	if deleted != 1 || len(removed) != 2 || !removed[pid(11)] || !removed[pid(12)] {
 		t.Fatalf("deleted=%d favorite events=%v", deleted, removed)
 	}
 	for _, table := range []string{"shipping_addresses", "favorites", "seller_subscriptions", "visit_history"} {
@@ -458,22 +459,22 @@ func TestRestockFanOutNotifiesOnce(t *testing.T) {
 		return nil
 	})
 	for _, id := range []int64{first.BuyerID, first.BuyerID, second.BuyerID} {
-		must(t, fixture.module.SubscribeRestock(ctx, id, 11))
+		must(t, fixture.module.SubscribeRestock(ctx, id, pid(11), skuOf(11)))
 	}
 	{
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: 11, Limit: 100, OccurredAt: fixture.now})
+		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(11), Limit: 100, OccurredAt: fixture.now})
 		must(t, err)
 	}
 	{
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: 11, Limit: 100, OccurredAt: fixture.now})
+		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(11), Limit: 100, OccurredAt: fixture.now})
 		must(t, err)
 	}
 	if targeted[first.BuyerID] != 1 || targeted[second.BuyerID] != 1 {
 		t.Fatal(targeted)
 	}
-	checks, err := fixture.module.BatchCheckRestock(ctx, first.BuyerID, []int64{11})
+	checks, err := fixture.module.BatchCheckRestock(ctx, first.BuyerID, []uuid.UUID{pid(11)})
 	must(t, err)
-	if checks[11] {
+	if checks[pid(11)] {
 		t.Fatal("notified still active")
 	}
 }
@@ -502,7 +503,7 @@ func TestEventFailuresRollBack(t *testing.T) {
 	ctx := context.Background()
 	buyer := profile(t, fixture, 1)
 	events.Subscribe(fixture.bus, func(context.Context, FavoriteAdded) error { return errors.New("reject event") })
-	if err := fixture.module.AddFavorite(ctx, buyer.BuyerID, 1); err == nil {
+	if err := fixture.module.AddFavorite(ctx, buyer.BuyerID, pid(1)); err == nil {
 		t.Fatal("event rejection lost")
 	}
 	if count(t, fixture, "SELECT count(*) FROM buyer.favorites") != 0 {
@@ -519,6 +520,89 @@ func TestEventFailuresRollBack(t *testing.T) {
 	}
 }
 
+// 補貨訂閱以 SKU 為粒度（D26）：FanOut 只通知並刪除那個 SKU 的訂閱，同商品其他 SKU 的訂閱不被通知也不被刪；事件帶 SKU 與商品。
+func TestRestockFanOutIsPerSKU(t *testing.T) {
+	t.Parallel()
+	fixture := setup(t)
+	ctx := context.Background()
+	first := profile(t, fixture, 1)
+	second := profile(t, fixture, 2)
+	var got []RestockTargeted
+	events.Subscribe(fixture.bus, func(_ context.Context, event RestockTargeted) error {
+		got = append(got, event)
+		return nil
+	})
+	must(t, fixture.module.SubscribeRestock(ctx, first.BuyerID, pid(11), skuOf(1)))
+	must(t, fixture.module.SubscribeRestock(ctx, second.BuyerID, pid(11), skuOf(2)))
+	// 同一個商品的另一個 SKU 與同一個 SKU 重複訂閱都冪等。
+	must(t, fixture.module.SubscribeRestock(ctx, first.BuyerID, pid(11), skuOf(2)))
+	must(t, fixture.module.SubscribeRestock(ctx, first.BuyerID, pid(11), skuOf(1)))
+	if n := count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions"); n != 3 {
+		t.Fatalf("subscriptions=%d, want 3 (一個買家一個 SKU 一列)", n)
+	}
+	more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(1), Limit: 100, ProductName: "蘋果", ImageKey: "public/apple", OccurredAt: fixture.now})
+	must(t, err)
+	if more || len(got) != 1 || got[0].BuyerID != first.BuyerID || got[0].SKUID != skuOf(1) || got[0].ProductID != pid(11) || got[0].ProductName != "蘋果" {
+		t.Fatalf("more=%v events=%+v, want only the first buyer for SKU 1", more, got)
+	}
+	if n := count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE sku_id=$1", skuOf(2)); n != 2 {
+		t.Fatalf("other SKU subscriptions=%d, want 2 untouched", n)
+	}
+	if n := count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE sku_id=$1", skuOf(1)); n != 0 {
+		t.Fatalf("notified SKU subscriptions=%d, want 0 (一次性)", n)
+	}
+	checks, err := fixture.module.BatchCheckRestock(ctx, first.BuyerID, []uuid.UUID{pid(11), pid(12)})
+	must(t, err)
+	if !checks[pid(11)] || checks[pid(12)] {
+		t.Fatalf("product-level check=%v, want product 11 still subscribed via SKU 2", checks)
+	}
+}
+
+// PurgeRestockSKUs 只刪那些 SKU 的訂閱，沒有訂閱的 SKU 與空清單是 no-op，可重複呼叫。
+func TestPurgeRestockSKUs(t *testing.T) {
+	t.Parallel()
+	fixture := setup(t)
+	ctx := context.Background()
+	first := profile(t, fixture, 1)
+	second := profile(t, fixture, 2)
+	for _, buyer := range []int64{first.BuyerID, second.BuyerID} {
+		must(t, fixture.module.SubscribeRestock(ctx, buyer, pid(11), skuOf(1)))
+		must(t, fixture.module.SubscribeRestock(ctx, buyer, pid(11), skuOf(2)))
+		must(t, fixture.module.SubscribeRestock(ctx, buyer, pid(12), skuOf(3)))
+	}
+	for range 2 {
+		must(t, fixture.module.PurgeRestockSKUs(ctx, []uuid.UUID{skuOf(1), skuOf(3), skuOf(99)}))
+	}
+	must(t, fixture.module.PurgeRestockSKUs(ctx, nil))
+	if n := count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions"); n != 2 {
+		t.Fatalf("subscriptions=%d, want only SKU 2 of the two buyers", n)
+	}
+	if n := count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE sku_id=$1", skuOf(2)); n != 2 {
+		t.Fatalf("SKU 2 subscriptions=%d, want 2", n)
+	}
+}
+
+// 瀏覽紀錄以 UUID 商品 ID 寫入與讀出，同一商品只留最近一次。
+func TestVisitsRoundTripUUIDProductIDs(t *testing.T) {
+	t.Parallel()
+	fixture := setup(t)
+	ctx := context.Background()
+	buyer := profile(t, fixture, 1)
+	products := []uuid.UUID{uuid.NewV7(), uuid.NewV7()}
+	for _, id := range []uuid.UUID{products[0], products[1], products[0]} {
+		must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, id))
+	}
+	page, err := fixture.module.ListVisits(ctx, ProductListInput{BuyerID: buyer.BuyerID})
+	must(t, err)
+	seen := map[uuid.UUID]bool{}
+	for _, item := range page.Items {
+		seen[item.ID] = true
+	}
+	if len(page.Items) != 2 || !seen[products[0]] || !seen[products[1]] {
+		t.Fatalf("visits=%+v, want both products once", page.Items)
+	}
+}
+
 func TestSchemaConstraints(t *testing.T) {
 	t.Parallel()
 	fixture := setup(t)
@@ -531,7 +615,7 @@ func TestSchemaConstraints(t *testing.T) {
 			t.Fatal("DB accepted invalid enum/invariant", sql)
 		}
 	}
-	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, 11))
+	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, pid(11), skuOf(11)))
 	if _, err = fixture.database.Conn(ctx).Exec(ctx, "UPDATE buyer.restock_subscriptions SET status='bad' WHERE buyer_id=$1", buyer.BuyerID); err == nil {
 		t.Fatal("invalid restock status")
 	}
@@ -548,30 +632,41 @@ func TestKeysetPaginationAndVisits(t *testing.T) {
 		return nil
 	})
 	for _, id := range []int64{1, 2, 3} {
-		must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, id))
-		must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, id))
+		must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, pid(id)))
+		must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, pid(id)))
 	}
-	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, 1))
+	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, pid(1)))
 	if views != 4 {
 		t.Fatal(views)
 	}
-	page, err := fixture.module.ListFavorites(ctx, ListInput{BuyerID: buyer.BuyerID, PageSize: 2})
+	page, err := fixture.module.ListFavorites(ctx, ProductListInput{BuyerID: buyer.BuyerID, PageSize: 2})
 	must(t, err)
-	if len(page.Items) != 2 || page.Items[0].ID != 3 || page.Next == nil {
+	if len(page.Items) != 2 || page.Items[0].ID != pid(3) || page.Next == nil {
 		t.Fatal(page)
 	}
-	page, err = fixture.module.ListFavorites(ctx, ListInput{BuyerID: buyer.BuyerID, PageSize: 2, After: page.Next})
+	page, err = fixture.module.ListFavorites(ctx, ProductListInput{BuyerID: buyer.BuyerID, PageSize: 2, After: page.Next})
 	must(t, err)
-	if len(page.Items) != 1 || page.Items[0].ID != 1 || page.Next != nil {
+	if len(page.Items) != 1 || page.Items[0].ID != pid(1) || page.Next != nil {
 		t.Fatal(page)
 	}
 	must(t, fixture.module.ClearVisits(ctx, buyer.BuyerID))
-	visits, err := fixture.module.ListVisits(ctx, ListInput{BuyerID: buyer.BuyerID})
+	visits, err := fixture.module.ListVisits(ctx, ProductListInput{BuyerID: buyer.BuyerID})
 	must(t, err)
 	if len(visits.Items) != 0 {
 		t.Fatal(visits)
 	}
 }
+
+// pid 是測試用的確定性商品或 SKU ID（UUID）：n 放在最後 8 個位元組，大小順序與 n 相同。
+func pid(n int64) uuid.UUID {
+	var id uuid.UUID
+	binary.BigEndian.PutUint64(id[8:], uint64(n))
+	id[0] = 0x01
+	return id
+}
+
+// skuOf 是商品 pid(n) 的 SKU：與 n 同序，不與任何 pid 相撞。
+func skuOf(n int64) uuid.UUID { return pid(1000 + n) }
 
 func stringsOf[T ~string](values []T) []string {
 	out := make([]string, len(values))

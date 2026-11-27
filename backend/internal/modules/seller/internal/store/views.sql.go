@@ -79,7 +79,7 @@ ON CONFLICT (event_id) DO NOTHING
 
 type InsertProductViewEventParams struct {
 	EventID    uuid.UUID
-	ProductID  int64
+	ProductID  uuid.UUID
 	OccurredAt time.Time
 }
 
@@ -123,7 +123,7 @@ FOR UPDATE SKIP LOCKED
 
 type LockPendingProductViewEventsRow struct {
 	EventID   uuid.UUID
-	ProductID int64
+	ProductID uuid.UUID
 }
 
 // 鎖住這批裡仍然沒處理的事件；已被別的彙總 job 鎖住的跳過，已處理的不會再選中。
@@ -177,7 +177,7 @@ LIMIT $1
 
 type PendingProductViewEventsRow struct {
 	EventID   uuid.UUID
-	ProductID int64
+	ProductID uuid.UUID
 }
 
 // 還沒處理的事件，依發生順序取一批（不加鎖：解析在 transaction 之外，寫入時才鎖）。

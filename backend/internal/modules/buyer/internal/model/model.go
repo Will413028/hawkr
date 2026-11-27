@@ -109,6 +109,15 @@ type Cursor struct {
 // Valid 是 cursor 的內容合法（解自 client 回傳的 page token，不可信）。
 func (c Cursor) Valid() bool { return c.ID > 0 && !c.Time.IsZero() }
 
+// ProductCursor 時間與商品 ID 組成的降冪分頁位置（收藏、瀏覽）。
+type ProductCursor struct {
+	Time time.Time
+	ID   uuid.UUID
+}
+
+// Valid 是 cursor 的內容合法（解自 client 回傳的 page token，不可信）。
+func (c ProductCursor) Valid() bool { return c.ID != (uuid.UUID{}) && !c.Time.IsZero() }
+
 // AddressCursor 地址排序位置，預設地址在普通地址之前。
 type AddressCursor struct {
 	Default bool
@@ -148,11 +157,14 @@ type Page struct {
 	Next  *Cursor
 }
 
-// RestockCursor 補貨訂閱的時間與商品 ID 分頁位置。
+// RestockCursor 補貨訂閱的時間與 SKU ID 分頁位置。
 type RestockCursor struct {
 	Time time.Time
-	ID   int64
+	ID   uuid.UUID
 }
+
+// Valid 是 cursor 的內容合法（解自 client 回傳的 page token，不可信）。
+func (c RestockCursor) Valid() bool { return c.ID != (uuid.UUID{}) && !c.Time.IsZero() }
 
 // RestockListInput 待通知補貨訂閱的分頁輸入。
 type RestockListInput struct {
@@ -161,16 +173,37 @@ type RestockListInput struct {
 	After    *RestockCursor
 }
 
-// Restock 待通知的買家與商品關聯。
+// Restock 待通知的買家與 SKU 關聯；ProductID 是 SKU 所屬的商品。
 type Restock struct {
-	BuyerID, ProductID int64
-	CreatedAt          time.Time
+	BuyerID   int64
+	ProductID uuid.UUID
+	SKUID     uuid.UUID
+	CreatedAt time.Time
 }
 
 // RestockPage 一頁補貨訂閱及下一頁位置。
 type RestockPage struct {
 	Items []Restock
 	Next  *RestockCursor
+}
+
+// ProductListInput 買家商品清單（收藏、瀏覽）的 keyset 輸入，預設 20、最多 100 筆。
+type ProductListInput struct {
+	BuyerID  int64
+	PageSize int32
+	After    *ProductCursor
+}
+
+// ProductItem 商品的 ID 與業務時間。
+type ProductItem struct {
+	ID   uuid.UUID
+	Time time.Time
+}
+
+// ProductPage 一頁商品關聯資料及下一頁位置。
+type ProductPage struct {
+	Items []ProductItem
+	Next  *ProductCursor
 }
 
 // SubscribersInput 店家粉絲的 keyset 分頁輸入。
@@ -204,16 +237,18 @@ type Entitlement struct {
 
 // FavoriteAdded 帶 UUIDv7、OccurredAt 與業務 ID 的 FavoriteAdded 事件。
 type FavoriteAdded struct {
-	OccurredAt         time.Time
-	EventID            uuid.UUID
-	BuyerID, ProductID int64
+	OccurredAt time.Time
+	EventID    uuid.UUID
+	BuyerID    int64
+	ProductID  uuid.UUID
 }
 
 // FavoriteRemoved 帶 UUIDv7、OccurredAt 與業務 ID 的 FavoriteRemoved 事件。
 type FavoriteRemoved struct {
-	OccurredAt         time.Time
-	EventID            uuid.UUID
-	BuyerID, ProductID int64
+	OccurredAt time.Time
+	EventID    uuid.UUID
+	BuyerID    int64
+	ProductID  uuid.UUID
 }
 
 // SellerFollowed 帶 UUIDv7、OccurredAt 與業務 ID 的 SellerFollowed 事件。
@@ -225,24 +260,28 @@ type SellerFollowed struct {
 
 // ProductViewed 帶 UUIDv7、OccurredAt 與業務 ID 的 ProductViewed 事件。
 type ProductViewed struct {
-	OccurredAt         time.Time
-	EventID            uuid.UUID
-	BuyerID, ProductID int64
+	OccurredAt time.Time
+	EventID    uuid.UUID
+	BuyerID    int64
+	ProductID  uuid.UUID
 }
 
 // RestockTargeted 帶 UUIDv7、OccurredAt 與業務 ID 的 RestockTargeted 事件。
 type RestockTargeted struct {
-	OccurredAt         time.Time
-	EventID            uuid.UUID
-	BuyerID, ProductID int64
-	ProductName        string
-	ImageKey           string
+	OccurredAt  time.Time
+	EventID     uuid.UUID
+	BuyerID     int64
+	ProductID   uuid.UUID
+	SKUID       uuid.UUID
+	ProductName string
+	ImageKey    string
 }
 
-// FanOutInput 是一批補貨通知的輸入：上游補貨事件的商品與顯示快照，以及事件發生的時間。全部來自事件本身，
+// FanOutInput 是一批補貨通知的輸入：補貨的 SKU 與它所屬的商品、顯示快照，以及事件發生的時間。全部來自呼叫端（catalog 的補貨快照），
 // 分批與重試都沿用同一份（M4）；OccurredAt 必填，零值回 InvalidInput，不以處理當下的時間代替。
 type FanOutInput struct {
-	ProductID   int64
+	ProductID   uuid.UUID
+	SKUID       uuid.UUID
 	Limit       int32
 	ProductName string
 	ImageKey    string
@@ -282,6 +321,27 @@ func Positive(ids ...int64) error {
 	return nil
 }
 
+// NonNil 驗證每個 UUID 都不是零值。
+func NonNil(ids ...uuid.UUID) error {
+	for _, id := range ids {
+		if id == (uuid.UUID{}) {
+			return apperr.InvalidInput("ID 必填")
+		}
+	}
+	return nil
+}
+
+// ProductPageOf 截取指定頁面大小，從最後一筆建立下一頁 cursor。
+func ProductPageOf(items []ProductItem, size int32) ProductPage {
+	page := ProductPage{Items: items}
+	if len(items) > int(size) {
+		page.Items = items[:size]
+		last := page.Items[len(page.Items)-1]
+		page.Next = &ProductCursor{Time: last.Time, ID: last.ID}
+	}
+	return page
+}
+
 // PageOf 截取指定頁面大小，從最後一筆建立下一頁 cursor。
 func PageOf(items []Item, size int32) Page {
 	page := Page{Items: items}
@@ -298,6 +358,14 @@ const MaxBatchSize = 100
 
 // MaxAddresses 是每個買家的收貨地址上限（Will 2026-09-30 W4）；地址清單的預設頁大小等於它，一頁就是完整清單。
 const MaxAddresses = 20
+
+// BatchUUIDs 驗證批次大小及每個 ID，空清單是合法的空查詢。
+func BatchUUIDs(ids []uuid.UUID) error {
+	if len(ids) > MaxBatchSize {
+		return apperr.InvalidInput("批次最多接受 %d 個 ID", MaxBatchSize)
+	}
+	return NonNil(ids...)
+}
 
 // BatchIDs 驗證批次大小及每個 ID，空清單是合法的空查詢。
 func BatchIDs(ids []int64) error {

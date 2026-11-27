@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -46,13 +47,14 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := b.AddFavorite(ctx, p.BuyerID, 11); err != nil {
+	product := uuid.NewV7()
+	if err := b.AddFavorite(ctx, p.BuyerID, product); err != nil {
 		t.Fatal(err)
 	}
 	if err := b.Follow(ctx, p.BuyerID, 91); err != nil {
 		t.Fatal(err)
 	}
-	if err := b.SubscribeRestock(ctx, p.BuyerID, 11); err != nil {
+	if err := b.SubscribeRestock(ctx, p.BuyerID, product, uuid.NewV7()); err != nil {
 		t.Fatal(err)
 	}
 	s := New(b)
@@ -70,7 +72,7 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 	})
 	t.Run("ListFavoritedProductIds", func(t *testing.T) {
 		r, e := s.ListFavoritedProductIds(ctx, connect.NewRequest(&pb.ListFavoritedProductIdsRequest{BuyerId: p.BuyerID}))
-		if e != nil || len(r.Msg.GetProductIds()) != 1 || r.Msg.GetProductIds()[0] != 11 {
+		if e != nil || r.Msg.GetCode() != 0 || len(r.Msg.GetProductIds()) != 0 {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
@@ -109,21 +111,27 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
-	t.Run("CheckFavorite", func(t *testing.T) {
+	t.Run("CheckFavorite on an integer product ID of the old product service", func(t *testing.T) {
 		r, e := s.CheckFavorite(ctx, connect.NewRequest(&pb.CheckFavoriteRequest{BuyerId: p.BuyerID, ProductId: "11"}))
+		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetFavorited() {
+			t.Fatalf("%v %v", r, e)
+		}
+	})
+	t.Run("CheckFavorite", func(t *testing.T) {
+		r, e := s.CheckFavorite(ctx, connect.NewRequest(&pb.CheckFavoriteRequest{BuyerId: p.BuyerID, ProductId: product.String()}))
 		if e != nil || !r.Msg.GetFavorited() {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
 	t.Run("BatchCheckFavorites", func(t *testing.T) {
-		r, e := s.BatchCheckFavorites(ctx, connect.NewRequest(&pb.BatchCheckFavoritesRequest{BuyerId: p.BuyerID, ProductIds: []string{"11"}}))
-		if e != nil || len(r.Msg.GetFavoritedProductIds()) != 1 || r.Msg.GetFavoritedProductIds()[0] != "11" {
+		r, e := s.BatchCheckFavorites(ctx, connect.NewRequest(&pb.BatchCheckFavoritesRequest{BuyerId: p.BuyerID, ProductIds: []string{product.String(), "11"}}))
+		if e != nil || len(r.Msg.GetFavoritedProductIds()) != 1 || r.Msg.GetFavoritedProductIds()[0] != product.String() {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
 	t.Run("BatchCheckRestockSubscriptions", func(t *testing.T) {
-		r, e := s.BatchCheckRestockSubscriptions(ctx, connect.NewRequest(&pb.BatchCheckRestockSubscriptionsRequest{BuyerId: p.BuyerID, ProductIds: []string{"11"}}))
-		if e != nil || !r.Msg.GetSubscribed()["11"] {
+		r, e := s.BatchCheckRestockSubscriptions(ctx, connect.NewRequest(&pb.BatchCheckRestockSubscriptionsRequest{BuyerId: p.BuyerID, ProductIds: []string{product.String(), "11"}}))
+		if e != nil || !r.Msg.GetSubscribed()[product.String()] || r.Msg.GetSubscribed()["11"] || len(r.Msg.GetSubscribed()) != 2 {
 			t.Fatalf("%v %v", r, e)
 		}
 	})

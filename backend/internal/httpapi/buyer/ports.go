@@ -3,13 +3,14 @@ package buyer
 import (
 	"context"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
 // ProductInfo 是商品顯示所需的資料。
 type ProductInfo struct {
-	ID        int64
+	ID        uuid.UUID
 	StoreID   int64
 	Name      string
 	ImageKey  string
@@ -43,7 +44,18 @@ type SpendingPage struct {
 
 // Products 以一個批次取得商品顯示資料；缺少的 ID 表示已刪除。
 type Products interface {
-	Cards(context.Context, []int64, bool) (map[int64]ProductInfo, error)
+	Cards(context.Context, []uuid.UUID, bool) (map[uuid.UUID]ProductInfo, error)
+}
+
+// RestockSku 是補貨訂閱要確認的規格（SKU）現況：它所屬的商品，與現在有沒有貨（可購買：商品上架、沒刪除、庫存大於零）。
+type RestockSku struct {
+	ProductID uuid.UUID
+	InStock   bool
+}
+
+// Skus 讀補貨訂閱用的規格現況；規格不存在、已刪除或商品還是草稿時 found 為假（catalog 的商品與規格在 buyer 之上，由 cmd/hawkr 組裝）。
+type Skus interface {
+	RestockSku(ctx context.Context, skuID uuid.UUID) (sku RestockSku, found bool, err error)
 }
 
 // Stores 是 seller 模組給買家端的店家讀取（*seller.Module 直接滿足），ADR 2026-10-03-public-store-identity-and-visibility：

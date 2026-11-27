@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
-	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -46,7 +46,6 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	dbc := dbConfig(e)
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
-	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	log := newLogger()
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
@@ -74,15 +73,11 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 		d.Close()
 		return nil, err
 	}
-	products, err := productservice.New(productAddr, internalSecret)
-	if err != nil {
-		d.Close()
-		return nil, err
-	}
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
+	catalogModule := newCatalog(d, med, buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log}))
 	payments, owners := newPayment(d, bus, jc, newInbox(d, jc, log), paymentProvider, nil, nil, log)
-	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
+	module := newSeller(d, bus, jc, id, med, orders, sellerProducts{catalog: catalogModule}, kycMAC, payments, registry, log)
 	owners.bind(module)
 	subscribeSellerPayout(bus, module)
 	subscribeSellerRelay(bus, jc)

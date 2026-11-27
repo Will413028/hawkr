@@ -17,14 +17,14 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// ProductStores 是商品所屬店家的 port（舊服務期間由 internal/legacy/productservice 實作，catalog 搬進單體後改呼叫它的公開
-// API）。一次批次呼叫：回傳的 map 只含存在的商品，值是店家的 store_id；缺席的商品表示不存在，值 ≤ 0 表示商品沒有店家。
+// ProductStores 是商品所屬店家的 port（由組裝點以 catalog 的公開 API 實作）。一次批次呼叫：回傳的 map 只含存在的商品，值是店家的 store_id；缺席的商品表示不存在，值 ≤ 0 表示商品沒有店家。
 // 暫時性的錯誤（服務不通、逾時）回 error，彙總 job 不標記任何事件、交給 River 重試。已下架的商品照樣有店家（直接連結仍可瀏覽）。
 type ProductStores interface {
-	StoreIDs(ctx context.Context, productIDs []int64) (map[int64]int64, error)
+	StoreIDs(ctx context.Context, productIDs []uuid.UUID) (map[uuid.UUID]int64, error)
 }
 
 // Deps 外部依賴；clock 由組裝點注入。
@@ -42,15 +42,15 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 // Record 追加一筆原始瀏覽事件（匿名的打點；步驟 8 的 beacon 呼叫）。只有一句 insert：不解析商品、不碰彙總，可以在
 // transaction 內或外呼叫。
-func (s *Service) Record(ctx context.Context, productID int64) error {
+func (s *Service) Record(ctx context.Context, productID uuid.UUID) error {
 	return s.Ingest(ctx, uuid.NewV7(), productID, s.d.Now())
 }
 
 // Ingest 追加一筆已有 ID 與發生時間的原始瀏覽事件（登入買家的 ProductViewed，由組裝點轉進來）。event_id 重複的事件
 // 不會多一列，所以事件重送不會重複計數。
-func (s *Service) Ingest(ctx context.Context, eventID uuid.UUID, productID int64, occurredAt time.Time) error {
-	if err := model.Positive(productID); err != nil {
-		return err
+func (s *Service) Ingest(ctx context.Context, eventID uuid.UUID, productID uuid.UUID, occurredAt time.Time) error {
+	if productID == (uuid.UUID{}) {
+		return apperr.InvalidInput("商品 ID 必填")
 	}
 	return store.New(s.d.DB.Conn(ctx)).InsertProductViewEvent(ctx, store.InsertProductViewEventParams{
 		EventID: eventID, ProductID: productID, OccurredAt: occurredAt.UTC(),

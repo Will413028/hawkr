@@ -16,6 +16,6 @@ RETURNING product_id;
 -- 以瀏覽時間及商品 ID 分頁。
 SELECT *
 FROM buyer.visit_history
-WHERE buyer_id = @buyer_id AND (NOT @has_after::boolean OR (visited_at, product_id) < (@after_time::timestamptz, @after_id::bigint))
+WHERE buyer_id = @buyer_id AND (NOT @has_after::boolean OR (visited_at, product_id) < (@after_time::timestamptz, @after_id::uuid))
 ORDER BY visited_at DESC, product_id DESC
 LIMIT @page_limit;

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -21,7 +22,7 @@ import (
 type fakeModule struct {
 	Module
 	profile model.Profile
-	restock map[int64]bool
+	restock map[uuid.UUID]bool
 }
 
 func (f fakeModule) Profile(context.Context, int64) (model.Profile, error) { return f.profile, nil }
@@ -136,15 +137,15 @@ func TestCallerResolvesBuyerIDOnlyForAccounts(t *testing.T) {
 		})
 	}
 }
-func (f fakeModule) BatchCheckRestock(_ context.Context, _ int64, _ []int64) (map[int64]bool, error) {
+func (f fakeModule) BatchCheckRestock(_ context.Context, _ int64, _ []uuid.UUID) (map[uuid.UUID]bool, error) {
 	return f.restock, nil
 }
 
 type fakeProducts struct {
-	cards map[int64]ProductInfo
+	cards map[uuid.UUID]ProductInfo
 }
 
-func (f fakeProducts) Cards(context.Context, []int64, bool) (map[int64]ProductInfo, error) {
+func (f fakeProducts) Cards(context.Context, []uuid.UUID, bool) (map[uuid.UUID]ProductInfo, error) {
 	return f.cards, nil
 }
 
@@ -172,16 +173,16 @@ func TestProductCardsRestockSubscribed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := mustApp(t, fakeModule{restock: map[int64]bool{9: true}}, images, Ports{
-		Products: fakeProducts{cards: map[int64]ProductInfo{9: {ID: 9, Name: "蘋果", StoreID: 3, MinPrice: 20, MaxPrice: 30, Available: true, ImageKey: "products/apple"}}},
+	h := mustApp(t, fakeModule{restock: map[uuid.UUID]bool{product9: true}}, images, Ports{
+		Products: fakeProducts{cards: map[uuid.UUID]ProductInfo{product9: {ID: product9, Name: "蘋果", StoreID: 3, MinPrice: 20, MaxPrice: 30, Available: true, ImageKey: "products/apple"}}},
 		Stores:   fakeStores{cards: []seller.StoreCard{openStoreCard(3, "店家", "stores/logo")}},
 	}, testStats(&countedRatings{}))
-	cards, err := h.productCards(context.Background(), 1, []model.Item{{ID: 9, Time: time.Now()}}, true)
+	cards, err := h.productCards(context.Background(), 1, []model.ProductItem{{ID: product9, Time: time.Now()}}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cards[9].RestockSubscribed || !cards[9].Available || cards[9].Store == nil || cards[9].Image == nil {
-		t.Fatalf("card=%+v", cards[9])
+	if !cards[product9].RestockSubscribed || !cards[product9].Available || cards[product9].Store == nil || cards[product9].Image == nil {
+		t.Fatalf("card=%+v", cards[product9])
 	}
 }
 
@@ -350,23 +351,30 @@ func TestUpdateProfileGender(t *testing.T) {
 	})
 }
 
+var product9 = uuid.MustParse("0190a000-0000-7000-8000-000000000009")
+
+type visitCall struct {
+	buyerID   int64
+	productID uuid.UUID
+}
+
 // visitModule 記下 RecordVisit 收到的參數。
 type visitModule struct {
 	fakeModule
-	calls   *[][2]int64
+	calls   *[]visitCall
 	visitID int64
 }
 
 func (m visitModule) CurrentBuyerID(context.Context, int64) (int64, error) { return m.visitID, nil }
-func (m visitModule) RecordVisit(_ context.Context, buyerID, productID int64) error {
-	*m.calls = append(*m.calls, [2]int64{buyerID, productID})
+func (m visitModule) RecordVisit(_ context.Context, buyerID int64, productID uuid.UUID) error {
+	*m.calls = append(*m.calls, visitCall{buyerID, productID})
 	return nil
 }
 
 // forbiddenProducts 在被呼叫時讓測試失敗。
 type forbiddenProducts struct{ t *testing.T }
 
-func (f forbiddenProducts) Cards(context.Context, []int64, bool) (map[int64]ProductInfo, error) {
+func (f forbiddenProducts) Cards(context.Context, []uuid.UUID, bool) (map[uuid.UUID]ProductInfo, error) {
 	f.t.Error("RecordVisit must not call the product port")
 	return nil, errors.New("product service down")
 }
@@ -374,12 +382,12 @@ func (f forbiddenProducts) Cards(context.Context, []int64, bool) (map[int64]Prod
 // RecordVisit 不在請求的關鍵路徑上解析商品：商品服務不通也要記下瀏覽（店家由 seller 的背景 job 解析）。
 func TestRecordVisitDoesNotTouchTheProductPort(t *testing.T) {
 	ctx := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAccount, ID: 1})
-	var calls [][2]int64
+	var calls []visitCall
 	h := mustApp(t, visitModule{calls: &calls, visitID: 5007}, rpc.Images{}, Ports{Products: forbiddenProducts{t}})
-	if _, err := h.RecordVisit(ctx, connect.NewRequest(&pb.RecordVisitRequest{ProductId: "9"})); err != nil {
+	if _, err := h.RecordVisit(ctx, connect.NewRequest(&pb.RecordVisitRequest{ProductId: product9.String()})); err != nil {
 		t.Fatal(err)
 	}
-	if len(calls) != 1 || calls[0] != [2]int64{5007, 9} {
+	if len(calls) != 1 || calls[0] != (visitCall{5007, product9}) {
 		t.Fatalf("RecordVisit calls=%v", calls)
 	}
 }

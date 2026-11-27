@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/riverqueue/river"
 
@@ -41,7 +42,9 @@ func (dirNoRegistry) Lookup(context.Context, string) (gcis.Registration, bool, e
 
 type dirNoProducts struct{}
 
-func (dirNoProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
+func (dirNoProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return nil, nil
+}
 
 type dirNoOrders struct{}
 

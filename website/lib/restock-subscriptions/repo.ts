@@ -17,12 +17,12 @@ export async function subscribeRestock(
 
 /**
  * Unsubscribe (cancel) the current buyer's restock subscription for this
- * product. Idempotent — backend returns 200 even if no ACTIVE row exists.
+ * SKU. Idempotent — backend returns 200 even if no subscription exists.
  */
 export async function unsubscribeRestock(
-	productId: number | string,
+	skuId: number | string,
 ): Promise<void> {
-	await buyerAppClient().unsubscribeRestock({ productId: String(productId) });
+	await buyerAppClient().unsubscribeRestock({ skuId: String(skuId) });
 }
 
 export interface RestockSubscriptionItem {

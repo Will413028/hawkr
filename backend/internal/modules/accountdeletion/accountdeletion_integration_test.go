@@ -73,7 +73,9 @@ func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, erro
 
 type noProducts struct{}
 
-func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
+func (noProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return nil, nil
+}
 
 // testOrders 是訂單 port 的替身：買家側（open、err）與店家側（storeOpen、storeErr）各自設定。onStoreCall 在店家側的查詢
 // 時執行一次（鎖外），用來製造「查完訂單、進交易之前」的交錯。

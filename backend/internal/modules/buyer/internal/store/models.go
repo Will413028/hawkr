@@ -44,13 +44,14 @@ type BuyerBuyer struct {
 
 type BuyerFavorite struct {
 	BuyerID   int64
-	ProductID int64
+	ProductID uuid.UUID
 	CreatedAt time.Time
 }
 
 type BuyerRestockSubscription struct {
 	BuyerID   int64
-	ProductID int64
+	SkuID     uuid.UUID
+	ProductID uuid.UUID
 	CreatedAt time.Time
 }
 
@@ -75,6 +76,6 @@ type BuyerShippingAddress struct {
 
 type BuyerVisitHistory struct {
 	BuyerID   int64
-	ProductID int64
+	ProductID uuid.UUID
 	VisitedAt time.Time
 }

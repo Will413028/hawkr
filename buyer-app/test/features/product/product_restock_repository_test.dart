@@ -20,7 +20,7 @@ void main() {
               return buyer.SubscribeRestockResponse();
             })
             .unary(BuyerAppService.unsubscribeRestock, (request, _) {
-              ids.add(request.productId);
+              ids.add(request.skuId);
               if (fail) throw ConnectException(Code.unavailable, 'offline');
               return buyer.UnsubscribeRestockResponse();
             })

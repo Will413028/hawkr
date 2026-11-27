@@ -100,7 +100,7 @@ type ProductRestockedParams struct {
 	EventID     uuid.UUID `json:"event_id"`
 	OccurredAt  time.Time `json:"occurred_at"`
 	BuyerID     int64     `json:"buyer_id"`
-	ProductID   int64     `json:"product_id"`
+	ProductID   uuid.UUID `json:"product_id"`
 	ProductName string    `json:"product_name"`
 	ImageKey    string    `json:"image_key"`
 }
@@ -442,10 +442,10 @@ var productRestocked = Define(Definition[ProductRestockedParams]{
 	Text: func(l uitext.Locale, p ProductRestockedParams) (Content, error) {
 		return Content{Title: text.ProductRestockedTitle(l), Body: text.ProductRestockedBody(l, text.ProductRestockedBodyArgs{Product: p.ProductName})}, nil
 	},
-	DeepLink: func(p ProductRestockedParams) string { return "/products/" + strconv.FormatInt(p.ProductID, 10) },
+	DeepLink: func(p ProductRestockedParams) string { return "/products/" + p.ProductID.String() },
 	ImageKey: func(p ProductRestockedParams) string { return p.ImageKey },
 	Example: ProductRestockedParams{
-		EventID: exampleEventID, OccurredAt: exampleAt, BuyerID: exampleBuyerID, ProductID: 11, ProductName: "Apple", ImageKey: "public/apple",
+		EventID: exampleEventID, OccurredAt: exampleAt, BuyerID: exampleBuyerID, ProductID: exampleObject, ProductName: "Apple", ImageKey: "public/apple",
 	},
 })
 

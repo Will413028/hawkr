@@ -57,7 +57,7 @@ CREATE UNIQUE INDEX addresses_default ON buyer.shipping_addresses (buyer_id) WHE
 -- 收藏：買家與商品的關聯，以複合鍵保證重複新增冪等。
 CREATE TABLE buyer.favorites (
     buyer_id   BIGINT NOT NULL REFERENCES buyer.buyers (buyer_id),
-    product_id BIGINT NOT NULL,
+    product_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (buyer_id, product_id)
 );
@@ -65,7 +65,7 @@ CREATE TABLE buyer.favorites (
 -- 瀏覽紀錄：每組買家與商品只保留最近一次瀏覽時間。
 CREATE TABLE buyer.visit_history (
     buyer_id   BIGINT NOT NULL REFERENCES buyer.buyers (buyer_id),
-    product_id BIGINT NOT NULL,
+    product_id UUID NOT NULL,
     visited_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (buyer_id, product_id)
 );
@@ -100,12 +100,14 @@ CREATE TABLE buyer.blocked_stores (
 );
 CREATE INDEX blocked_stores_store ON buyer.blocked_stores (store_id, blocker_buyer_id);
 
--- 補貨訂閱：只保留待通知的買家與商品關聯，取消或通知後刪除。
+-- 補貨訂閱：SKU 粒度的一次性訂閱，只保留待通知的買家與 SKU 關聯，取消或通知後刪除，不設到期。product_id 是 SKU 所屬的商品（顯示與清單用），
+-- 商品與 SKU 在 catalog，不建 FK。
 CREATE TABLE buyer.restock_subscriptions (
     buyer_id   BIGINT NOT NULL REFERENCES buyer.buyers (buyer_id),
-    product_id BIGINT NOT NULL,
+    sku_id     UUID NOT NULL,
+    product_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (buyer_id, product_id)
+    PRIMARY KEY (buyer_id, sku_id)
 );
-CREATE INDEX restock_product ON buyer.restock_subscriptions (product_id, buyer_id);
+CREATE INDEX restock_sku ON buyer.restock_subscriptions (sku_id, buyer_id);
 

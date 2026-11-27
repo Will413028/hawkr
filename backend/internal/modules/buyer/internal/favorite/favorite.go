@@ -30,8 +30,11 @@ type Service struct {
 func New(deps Deps) *Service { return &Service{deps: deps} }
 
 // Add 新增收藏，pending 不允許；重複新增不發布事件。
-func (service *Service) Add(ctx context.Context, buyerID, id int64) error {
-	if err := model.Positive(buyerID, id); err != nil {
+func (service *Service) Add(ctx context.Context, buyerID int64, id uuid.UUID) error {
+	if err := model.Positive(buyerID); err != nil {
+		return err
+	}
+	if err := model.NonNil(id); err != nil {
 		return err
 	}
 	return service.deps.DB.InTx(ctx, func(ctx context.Context) error {
@@ -60,20 +63,20 @@ func (service *Service) Add(ctx context.Context, buyerID, id int64) error {
 }
 
 // List 以時間與商品 ID 分頁列出收藏。
-func (service *Service) List(ctx context.Context, input model.ListInput) (model.Page, error) {
+func (service *Service) List(ctx context.Context, input model.ProductListInput) (model.ProductPage, error) {
 	if input.After != nil {
-		if err := model.Positive(input.After.ID); err != nil {
-			return model.Page{}, err
+		if err := model.NonNil(input.After.ID); err != nil {
+			return model.ProductPage{}, err
 		}
 	}
 	if err := model.Positive(input.BuyerID); err != nil {
-		return model.Page{}, err
+		return model.ProductPage{}, err
 	}
 	count, err := pagination.PageSize(input.PageSize, 20, 100)
 	if err != nil {
-		return model.Page{}, err
+		return model.ProductPage{}, err
 	}
-	cursor := model.Cursor{}
+	cursor := model.ProductCursor{}
 	if input.After != nil {
 		cursor = *input.After
 	}
@@ -85,18 +88,21 @@ func (service *Service) List(ctx context.Context, input model.ListInput) (model.
 		PageLimit: count + 1,
 	})
 	if err != nil {
-		return model.Page{}, err
+		return model.ProductPage{}, err
 	}
-	items := make([]model.Item, 0, len(rows))
+	items := make([]model.ProductItem, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, model.Item{ID: row.ProductID, Time: row.CreatedAt})
+		items = append(items, model.ProductItem{ID: row.ProductID, Time: row.CreatedAt})
 	}
-	return model.PageOf(items, count), nil
+	return model.ProductPageOf(items, count), nil
 }
 
 // Remove 移除收藏，只有實際刪除才發布事件。
-func (service *Service) Remove(ctx context.Context, buyerID, id int64) error {
-	if err := model.Positive(buyerID, id); err != nil {
+func (service *Service) Remove(ctx context.Context, buyerID int64, id uuid.UUID) error {
+	if err := model.Positive(buyerID); err != nil {
+		return err
+	}
+	if err := model.NonNil(id); err != nil {
 		return err
 	}
 	return service.deps.DB.InTx(ctx, func(ctx context.Context) error {
@@ -121,15 +127,18 @@ func (service *Service) Remove(ctx context.Context, buyerID, id int64) error {
 }
 
 // Check 查詢商品是否已收藏。
-func (service *Service) Check(ctx context.Context, buyerID, id int64) (bool, error) {
-	if err := model.Positive(buyerID, id); err != nil {
+func (service *Service) Check(ctx context.Context, buyerID int64, id uuid.UUID) (bool, error) {
+	if err := model.Positive(buyerID); err != nil {
+		return false, err
+	}
+	if err := model.NonNil(id); err != nil {
 		return false, err
 	}
 	return store.New(service.deps.DB.Conn(ctx)).CheckFavorite(ctx, store.CheckFavoriteParams{BuyerID: buyerID, ProductID: id})
 }
 
 // IDs 列出全部收藏商品 ID。
-func (service *Service) IDs(ctx context.Context, buyerID int64) ([]int64, error) {
+func (service *Service) IDs(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	if err := model.Positive(buyerID); err != nil {
 		return nil, err
 	}
@@ -149,18 +158,18 @@ func (service *Service) Count(ctx context.Context, buyerID int64) (int64, error)
 }
 
 // BatchCheck 批次查詢收藏狀態，輸入最多 100 個 ID。
-func (service *Service) BatchCheck(ctx context.Context, buyerID int64, ids []int64) (map[int64]bool, error) {
+func (service *Service) BatchCheck(ctx context.Context, buyerID int64, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
 	if err := model.Positive(buyerID); err != nil {
 		return nil, err
 	}
-	if err := model.BatchIDs(ids); err != nil {
+	if err := model.BatchUUIDs(ids); err != nil {
 		return nil, err
 	}
 	rows, err := store.New(service.deps.DB.Conn(ctx)).BatchFavorite(ctx, store.BatchFavoriteParams{BuyerID: buyerID, Column2: ids})
 	if err != nil {
 		return nil, err
 	}
-	result := map[int64]bool{}
+	result := map[uuid.UUID]bool{}
 	for _, id := range ids {
 		result[id] = false
 	}

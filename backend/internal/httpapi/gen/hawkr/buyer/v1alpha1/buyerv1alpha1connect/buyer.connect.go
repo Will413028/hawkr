@@ -191,11 +191,12 @@ type BuyerAppServiceClient interface {
 	RecordVisit(context.Context, *connect.Request[v1alpha1.RecordVisitRequest]) (*connect.Response[v1alpha1.RecordVisitResponse], error)
 	// ClearVisits 清除全部瀏覽紀錄。
 	ClearVisits(context.Context, *connect.Request[v1alpha1.ClearVisitsRequest]) (*connect.Response[v1alpha1.ClearVisitsResponse], error)
-	// ListRestockSubscriptions 列出等待補貨通知的商品，新到舊。通知送出或取消之後就不在清單上。
+	// ListRestockSubscriptions 列出等待補貨通知的商品規格（SKU），新到舊。通知送出或取消之後就不在清單上。
 	ListRestockSubscriptions(context.Context, *connect.Request[v1alpha1.ListRestockSubscriptionsRequest]) (*connect.Response[v1alpha1.ListRestockSubscriptionsResponse], error)
-	// SubscribeRestock 訂閱商品的補貨通知；已訂閱時也成功。
+	// SubscribeRestock 訂閱商品某個規格（SKU）的補貨通知：一次性，通知送出後訂閱就消失，不設到期；已訂閱時也成功。規格目前有貨時回 failed_precondition，
+	// ErrorInfo.reason 是 RESTOCK_SKU_IN_STOCK；規格不存在、已刪除或不屬於 product_id 回 not_found。
 	SubscribeRestock(context.Context, *connect.Request[v1alpha1.SubscribeRestockRequest]) (*connect.Response[v1alpha1.SubscribeRestockResponse], error)
-	// UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
+	// UnsubscribeRestock 取消規格（SKU）的補貨通知；沒有訂閱時也成功。
 	UnsubscribeRestock(context.Context, *connect.Request[v1alpha1.UnsubscribeRestockRequest]) (*connect.Response[v1alpha1.UnsubscribeRestockResponse], error)
 	// BlockAuthor 封鎖一則留言或討論區留言的作者：作者是買家時封鎖那位買家（雙方互相看不到對方的留言，A7-1b），是店家時封鎖那家店
 	// （該店的貼文與討論區不再出現）。參照是呼叫者讀得到的內容；讀不到（不存在、已刪除、被隱藏、貼文不公開、已被雙方的封鎖排除）一律回
@@ -696,11 +697,12 @@ type BuyerAppServiceHandler interface {
 	RecordVisit(context.Context, *connect.Request[v1alpha1.RecordVisitRequest]) (*connect.Response[v1alpha1.RecordVisitResponse], error)
 	// ClearVisits 清除全部瀏覽紀錄。
 	ClearVisits(context.Context, *connect.Request[v1alpha1.ClearVisitsRequest]) (*connect.Response[v1alpha1.ClearVisitsResponse], error)
-	// ListRestockSubscriptions 列出等待補貨通知的商品，新到舊。通知送出或取消之後就不在清單上。
+	// ListRestockSubscriptions 列出等待補貨通知的商品規格（SKU），新到舊。通知送出或取消之後就不在清單上。
 	ListRestockSubscriptions(context.Context, *connect.Request[v1alpha1.ListRestockSubscriptionsRequest]) (*connect.Response[v1alpha1.ListRestockSubscriptionsResponse], error)
-	// SubscribeRestock 訂閱商品的補貨通知；已訂閱時也成功。
+	// SubscribeRestock 訂閱商品某個規格（SKU）的補貨通知：一次性，通知送出後訂閱就消失，不設到期；已訂閱時也成功。規格目前有貨時回 failed_precondition，
+	// ErrorInfo.reason 是 RESTOCK_SKU_IN_STOCK；規格不存在、已刪除或不屬於 product_id 回 not_found。
 	SubscribeRestock(context.Context, *connect.Request[v1alpha1.SubscribeRestockRequest]) (*connect.Response[v1alpha1.SubscribeRestockResponse], error)
-	// UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
+	// UnsubscribeRestock 取消規格（SKU）的補貨通知；沒有訂閱時也成功。
 	UnsubscribeRestock(context.Context, *connect.Request[v1alpha1.UnsubscribeRestockRequest]) (*connect.Response[v1alpha1.UnsubscribeRestockResponse], error)
 	// BlockAuthor 封鎖一則留言或討論區留言的作者：作者是買家時封鎖那位買家（雙方互相看不到對方的留言，A7-1b），是店家時封鎖那家店
 	// （該店的貼文與討論區不再出現）。參照是呼叫者讀得到的內容；讀不到（不存在、已刪除、被隱藏、貼文不公開、已被雙方的封鎖排除）一律回

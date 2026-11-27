@@ -5,10 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
-	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/riverqueue/river"
@@ -44,43 +42,6 @@ func (f *fakeBuyer) AccountIDByBuyerID(_ context.Context, id int64) (int64, erro
 	return f.accountID, nil
 }
 
-func (*fakeBuyer) FanOut(context.Context, buyer.FanOutInput) (bool, error) {
-	return false, nil
-}
-
-type snapshotBuyer struct {
-	calls     int
-	productID int64
-	details   buyer.FanOutInput
-}
-
-func (*snapshotBuyer) AccountIDByBuyerID(context.Context, int64) (int64, error) { return 0, nil }
-
-func (f *snapshotBuyer) FanOut(_ context.Context, input buyer.FanOutInput) (bool, error) {
-	f.calls++
-	f.productID = input.ProductID
-	f.details = input
-	return f.calls < 3, nil
-}
-
-func TestRestockWorkerKeepsUpstreamSnapshotAcrossBatches(t *testing.T) {
-	queue := &recordedJobs{}
-	c := Consumer{Jobs: queue}
-	const occurred = "2026-09-29T12:34:56Z"
-	if err := c.ProductRestock(t.Context(), []byte(`{"event_id":"restock-1","product_id":"9","product_name":"蘋果","image_key":"public/apple","occurred_at":"`+occurred+`"}`)); err != nil {
-		t.Fatal(err)
-	}
-	f := &snapshotBuyer{}
-	job := &river.Job[RestockArgs]{Args: queue.args[0].(RestockArgs)}
-	if err := (&restockWorker{buyer: f}).Work(t.Context(), job); err != nil {
-		t.Fatal(err)
-	}
-	want, _ := time.Parse(time.RFC3339Nano, occurred)
-	if f.calls != 3 || f.productID != 9 || f.details.ProductName != "蘋果" || f.details.ImageKey != "public/apple" || !f.details.OccurredAt.Equal(want) {
-		t.Fatalf("calls=%d product=%d details=%+v", f.calls, f.productID, f.details)
-	}
-}
-
 func TestOrderCompletedResolvesBuyerThenCompletesPending(t *testing.T) {
 	f := &fakeBuyer{accountID: 8}
 	jobs := &recordedJobs{}
@@ -110,10 +71,10 @@ func TestPoisonEventIsAcknowledgedAndFollowingEventIsEnqueued(t *testing.T) {
 	jobs := &recordedJobs{}
 	c := Consumer{Jobs: jobs}
 	acks := &recordedAcks{}
-	b := rabbitmq.Binding{Queue: "restock", Handle: c.ProductRestock}
+	b := rabbitmq.Binding{Queue: "order", Handle: c.OrderCompleted}
 	log := slog.New(slog.DiscardHandler)
 	rabbitmq.Process(t.Context(), amqp.Delivery{Acknowledger: acks, Body: []byte(`{"event_id":"bad"}`)}, b, isPermanent, log)
-	rabbitmq.Process(t.Context(), amqp.Delivery{Acknowledger: acks, Body: []byte(`{"event_id":"good","product_id":"9","occurred_at":"2026-09-30T00:00:00Z"}`)}, b, isPermanent, log)
+	rabbitmq.Process(t.Context(), amqp.Delivery{Acknowledger: acks, Body: []byte(`{"event_id":"good","buyer_id":"71"}`)}, b, isPermanent, log)
 	if acks.acks != 1 || acks.nacks != 1 || acks.requeue || len(jobs.args) != 1 {
 		t.Fatalf("acks=%d nacks=%d jobs=%d", acks.acks, acks.nacks, len(jobs.args))
 	}

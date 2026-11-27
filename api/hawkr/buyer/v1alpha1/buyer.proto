@@ -130,17 +130,18 @@ service BuyerAppService {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // ListRestockSubscriptions 列出等待補貨通知的商品，新到舊。通知送出或取消之後就不在清單上。
+  // ListRestockSubscriptions 列出等待補貨通知的商品規格（SKU），新到舊。通知送出或取消之後就不在清單上。
   rpc ListRestockSubscriptions(ListRestockSubscriptionsRequest) returns (ListRestockSubscriptionsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // SubscribeRestock 訂閱商品的補貨通知；已訂閱時也成功。
+  // SubscribeRestock 訂閱商品某個規格（SKU）的補貨通知：一次性，通知送出後訂閱就消失，不設到期；已訂閱時也成功。規格目前有貨時回 failed_precondition，
+  // ErrorInfo.reason 是 RESTOCK_SKU_IN_STOCK；規格不存在、已刪除或不屬於 product_id 回 not_found。
   rpc SubscribeRestock(SubscribeRestockRequest) returns (SubscribeRestockResponse) {
     option idempotency_level = IDEMPOTENT;
   }
 
-  // UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
+  // UnsubscribeRestock 取消規格（SKU）的補貨通知；沒有訂閱時也成功。
   rpc UnsubscribeRestock(UnsubscribeRestockRequest) returns (UnsubscribeRestockResponse) {
     option idempotency_level = IDEMPOTENT;
   }
@@ -245,7 +246,7 @@ message ProductCard {
   optional float rating = 7;
   // 現在可以購買；下架或售完時是 false。
   bool available = 8;
-  // 呼叫者已訂閱這個商品的補貨通知。
+  // 呼叫者已訂閱這個商品任一規格（SKU）的補貨通知。
   bool restock_subscribed = 9;
   string store_id = 10;
   // 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
@@ -272,10 +273,12 @@ message Visit {
   google.protobuf.Timestamp visit_time = 2;
 }
 
-// RestockSubscription 是等待補貨通知的商品。
+// RestockSubscription 是等待補貨通知的商品規格（SKU）。
 message RestockSubscription {
   ProductCard product = 1;
   google.protobuf.Timestamp create_time = 2;
+  // 訂閱的規格；補貨通知依規格發送。
+  string sku_id = 3;
 }
 
 // MemberCard 是買家在一個店家的會員卡。
@@ -517,12 +520,14 @@ message ListRestockSubscriptionsResponse {
 
 message SubscribeRestockRequest {
   string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 要等補貨的規格，必須屬於 product_id；規格目前有貨時拒絕（failed_precondition，reason RESTOCK_SKU_IN_STOCK），不存在或已刪除是 not_found。
+  string sku_id = 2 [(google.api.field_behavior) = REQUIRED];
 }
 
 message SubscribeRestockResponse {}
 
 message UnsubscribeRestockRequest {
-  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string sku_id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 message UnsubscribeRestockResponse {}

@@ -2,6 +2,7 @@ package buyer
 
 import (
 	"context"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -18,38 +19,40 @@ import (
 // Ports 是買家清單顯示資料的來源。
 type Ports struct {
 	Products Products
-	Stores   Stores
-	Orders   Orders
-	CRM      CRM
+	// Skus 是補貨訂閱確認規格現況的來源。
+	Skus   Skus
+	Stores Stores
+	Orders Orders
+	CRM    CRM
 	// Followed 是「追蹤中」動態的來源；httpapi.NewHandler 組裝，呼叫端不填。
 	Followed FollowedProducts
 }
 
 type listModule interface {
-	ListFavorites(context.Context, model.ListInput) (model.Page, error)
+	ListFavorites(context.Context, model.ProductListInput) (model.ProductPage, error)
 	FavoriteCount(context.Context, int64) (int64, error)
-	CheckFavorite(context.Context, int64, int64) (bool, error)
-	BatchCheckFavorites(context.Context, int64, []int64) (map[int64]bool, error)
-	AddFavorite(context.Context, int64, int64) error
-	RemoveFavorite(context.Context, int64, int64) error
+	CheckFavorite(context.Context, int64, uuid.UUID) (bool, error)
+	BatchCheckFavorites(context.Context, int64, []uuid.UUID) (map[uuid.UUID]bool, error)
+	AddFavorite(context.Context, int64, uuid.UUID) error
+	RemoveFavorite(context.Context, int64, uuid.UUID) error
 	ListFollows(context.Context, model.ListInput) (model.Page, error)
 	FollowCount(context.Context, int64) (int64, error)
 	CheckFollow(context.Context, int64, int64) (bool, error)
 	BatchCheckFollows(context.Context, int64, []int64) (map[int64]bool, error)
 	Follow(context.Context, int64, int64) error
 	Unfollow(context.Context, int64, int64) error
-	ListVisits(context.Context, model.ListInput) (model.Page, error)
-	RecordVisit(context.Context, int64, int64) error
+	ListVisits(context.Context, model.ProductListInput) (model.ProductPage, error)
+	RecordVisit(context.Context, int64, uuid.UUID) error
 	ClearVisits(context.Context, int64) error
 	ListRestock(context.Context, model.RestockListInput) (model.RestockPage, error)
-	SubscribeRestock(context.Context, int64, int64) error
-	UnsubscribeRestock(context.Context, int64, int64) error
-	BatchCheckRestock(context.Context, int64, []int64) (map[int64]bool, error)
+	SubscribeRestock(context.Context, int64, uuid.UUID, uuid.UUID) error
+	UnsubscribeRestock(context.Context, int64, uuid.UUID) error
+	BatchCheckRestock(context.Context, int64, []uuid.UUID) (map[uuid.UUID]bool, error)
 }
 
 func (h *App) lists() listModule { return h.m }
 
-func encodeCursor(scope string, c *model.Cursor) string {
+func encodeCursor[C any](scope string, c *C) string {
 	if c == nil {
 		return ""
 	}
@@ -84,8 +87,16 @@ func ids(items []model.Item) []int64 {
 	return out
 }
 
-func (h *App) productCards(ctx context.Context, buyerID int64, items []model.Item, includeInactive bool) (map[int64]*pb.ProductCard, error) {
-	productIDs := ids(items)
+func productIDs(items []model.ProductItem) []uuid.UUID {
+	out := make([]uuid.UUID, len(items))
+	for i, item := range items {
+		out[i] = item.ID
+	}
+	return out
+}
+
+func (h *App) productCards(ctx context.Context, buyerID int64, items []model.ProductItem, includeInactive bool) (map[uuid.UUID]*pb.ProductCard, error) {
+	productIDs := productIDs(items)
 	products, err := h.ports.Products.Cards(ctx, productIDs, includeInactive)
 	if err != nil {
 		return nil, apperr.Unavailable("暫時無法讀取商品")
@@ -109,9 +120,9 @@ func (h *App) productCards(ctx context.Context, buyerID int64, items []model.Ite
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[int64]*pb.ProductCard, len(productIDs))
+	out := make(map[uuid.UUID]*pb.ProductCard, len(productIDs))
 	for _, id := range productIDs {
-		card := &pb.ProductCard{Id: rpc.FormatID(id)}
+		card := &pb.ProductCard{Id: id.String()}
 		p, exists := products[id]
 		if !exists {
 			card.Deleted = true
@@ -144,11 +155,11 @@ func (h *App) ListFavorites(ctx context.Context, req *connect.Request[pb.ListFav
 		return nil, err
 	}
 	s := rpc.PageScope(buyerv1alpha1connect.BuyerAppServiceListFavoritesProcedure, buyerID)
-	after, err := rpc.ValidCursor[model.Cursor](s, req.Msg.GetPageToken())
+	after, err := rpc.ValidCursor[model.ProductCursor](s, req.Msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	page, err := h.lists().ListFavorites(ctx, model.ListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
+	page, err := h.lists().ListFavorites(ctx, model.ProductListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +187,7 @@ func (h *App) CheckFavorite(ctx context.Context, req *connect.Request[pb.CheckFa
 	if err != nil {
 		return nil, err
 	}
-	id, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	id, err := rpc.ParseUUID("product_id", req.Msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}
@@ -200,12 +211,25 @@ func batchIDs(values []string, field string) ([]int64, error) {
 	return ids, nil
 }
 
+// batchUUIDs 只把字串 ID 解析成 UUID；批次上限是模組的規則（model.BatchUUIDs），在這裡不重複檢查。
+func batchUUIDs(values []string, field string) ([]uuid.UUID, error) {
+	ids := make([]uuid.UUID, len(values))
+	for i, value := range values {
+		id, err := rpc.ParseUUID(field, value)
+		if err != nil {
+			return nil, err
+		}
+		ids[i] = id
+	}
+	return ids, nil
+}
+
 func (h *App) BatchCheckFavorites(ctx context.Context, req *connect.Request[pb.BatchCheckFavoritesRequest]) (*connect.Response[pb.BatchCheckFavoritesResponse], error) {
 	buyerID, err := h.caller(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ids, err := batchIDs(req.Msg.GetProductIds(), "product_ids")
+	ids, err := batchUUIDs(req.Msg.GetProductIds(), "product_ids")
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +251,7 @@ func (h *App) AddFavorite(ctx context.Context, req *connect.Request[pb.AddFavori
 	if err != nil {
 		return nil, err
 	}
-	id, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	id, err := rpc.ParseUUID("product_id", req.Msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +266,7 @@ func (h *App) RemoveFavorite(ctx context.Context, req *connect.Request[pb.Remove
 	if err != nil {
 		return nil, err
 	}
-	id, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	id, err := rpc.ParseUUID("product_id", req.Msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}
@@ -373,11 +397,11 @@ func (h *App) ListVisits(ctx context.Context, req *connect.Request[pb.ListVisits
 		return nil, err
 	}
 	s := rpc.PageScope(buyerv1alpha1connect.BuyerAppServiceListVisitsProcedure, buyerID)
-	after, err := rpc.ValidCursor[model.Cursor](s, req.Msg.GetPageToken())
+	after, err := rpc.ValidCursor[model.ProductCursor](s, req.Msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	page, err := h.lists().ListVisits(ctx, model.ListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
+	page, err := h.lists().ListVisits(ctx, model.ProductListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +421,7 @@ func (h *App) RecordVisit(ctx context.Context, req *connect.Request[pb.RecordVis
 	if err != nil {
 		return nil, err
 	}
-	id, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	id, err := rpc.ParseUUID("product_id", req.Msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}
@@ -424,43 +448,55 @@ func (h *App) ListRestockSubscriptions(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	s := rpc.PageScope(buyerv1alpha1connect.BuyerAppServiceListRestockSubscriptionsProcedure, buyerID)
-	after, err := rpc.ValidCursor[model.Cursor](s, req.Msg.GetPageToken())
+	after, err := rpc.ValidCursor[model.RestockCursor](s, req.Msg.GetPageToken())
 	if err != nil {
 		return nil, err
 	}
-	page, err := h.lists().ListRestock(ctx, model.RestockListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: (*model.RestockCursor)(after)})
+	page, err := h.lists().ListRestock(ctx, model.RestockListInput{BuyerID: buyerID, PageSize: req.Msg.GetPageSize(), After: after})
 	if err != nil {
 		return nil, err
 	}
-	items := make([]model.Item, len(page.Items))
+	items := make([]model.ProductItem, len(page.Items))
 	for i, item := range page.Items {
-		items[i] = model.Item{ID: item.ProductID, Time: item.CreatedAt}
+		items[i] = model.ProductItem{ID: item.ProductID, Time: item.CreatedAt}
 	}
 	cards, err := h.productCards(ctx, buyerID, items, true)
 	if err != nil {
 		return nil, err
 	}
-	var next *model.Cursor
-	if page.Next != nil {
-		next = &model.Cursor{Time: page.Next.Time, ID: page.Next.ID}
-	}
-	out := &pb.ListRestockSubscriptionsResponse{RestockSubscriptions: make([]*pb.RestockSubscription, len(items)), NextPageToken: encodeCursor(s, next)}
-	for i, item := range items {
-		out.RestockSubscriptions[i] = &pb.RestockSubscription{Product: cards[item.ID], CreateTime: timestamppb.New(item.Time)}
+	out := &pb.ListRestockSubscriptionsResponse{RestockSubscriptions: make([]*pb.RestockSubscription, len(items)), NextPageToken: encodeCursor(s, page.Next)}
+	for i, item := range page.Items {
+		out.RestockSubscriptions[i] = &pb.RestockSubscription{Product: cards[item.ProductID], CreateTime: timestamppb.New(item.CreatedAt), SkuId: item.SKUID.String()}
 	}
 	return connect.NewResponse(out), nil
 }
 
+// SubscribeRestock 訂閱規格的補貨通知。規格不存在、已刪除或不屬於 product_id 回 not_found（不區分原因）；規格目前有貨（D26）回
+// failed_precondition 與 RESTOCK_SKU_IN_STOCK。確認與寫入之間規格才變成有貨的競態不處理：訂閱留到下一次由缺貨變有貨時通知。
 func (h *App) SubscribeRestock(ctx context.Context, req *connect.Request[pb.SubscribeRestockRequest]) (*connect.Response[pb.SubscribeRestockResponse], error) {
 	buyerID, err := h.caller(ctx)
 	if err != nil {
 		return nil, err
 	}
-	id, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	productID, err := rpc.ParseUUID("product_id", req.Msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}
-	if err := h.lists().SubscribeRestock(ctx, buyerID, id); err != nil {
+	skuID, err := rpc.ParseUUID("sku_id", req.Msg.GetSkuId())
+	if err != nil {
+		return nil, err
+	}
+	sku, found, err := h.ports.Skus.RestockSku(ctx, skuID)
+	if err != nil {
+		return nil, apperr.Unavailable("暫時無法讀取商品")
+	}
+	if !found || sku.ProductID != productID {
+		return nil, apperr.NotFound("找不到商品規格")
+	}
+	if sku.InStock {
+		return nil, apperr.FailedPrecondition("這個規格目前有貨，不需要訂閱補貨通知").WithReason(apperr.ReasonRestockSKUInStock)
+	}
+	if err := h.lists().SubscribeRestock(ctx, buyerID, productID, skuID); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&pb.SubscribeRestockResponse{}), nil
@@ -471,11 +507,11 @@ func (h *App) UnsubscribeRestock(ctx context.Context, req *connect.Request[pb.Un
 	if err != nil {
 		return nil, err
 	}
-	id, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	skuID, err := rpc.ParseUUID("sku_id", req.Msg.GetSkuId())
 	if err != nil {
 		return nil, err
 	}
-	if err := h.lists().UnsubscribeRestock(ctx, buyerID, id); err != nil {
+	if err := h.lists().UnsubscribeRestock(ctx, buyerID, skuID); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&pb.UnsubscribeRestockResponse{}), nil

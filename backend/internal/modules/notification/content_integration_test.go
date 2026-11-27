@@ -167,7 +167,7 @@ func TestEachContentEventReachesItsRecipient(t *testing.T) {
 		{"post_liked", w.ownerAccount, social.PostLiked{EventID: uuid.NewV7(), OccurredAt: now, PostID: post, StoreID: w.storeID, BuyerID: w.buyerB}},
 		{"store_followed", w.ownerAccount, buyer.SellerFollowed{EventID: uuid.NewV7(), OccurredAt: now, StoreID: w.storeID, BuyerID: w.buyerB}},
 		{"review_created", w.ownerAccount, review.ReviewCreated{EventID: uuid.NewV7(), OccurredAt: now, ReviewID: uuid.NewV7(), BuyerID: w.buyerB, StoreID: w.storeID, ProductID: uuid.UUID{15: 11}}},
-		{"product_restocked", w.buyerAAccount, buyer.RestockTargeted{EventID: uuid.NewV7(), OccurredAt: now, BuyerID: w.buyerA, ProductID: 11, ProductName: "Apple", ImageKey: "public/apple"}},
+		{"product_restocked", w.buyerAAccount, buyer.RestockTargeted{EventID: uuid.NewV7(), OccurredAt: now, BuyerID: w.buyerA, ProductID: uuid.UUID{15: 11}, SKUID: uuid.UUID{15: 21}, ProductName: "Apple", ImageKey: "public/apple"}},
 		{"post_published_item", followerAccount, social.PostPublished{EventID: uuid.NewV7(), OccurredAt: now.Add(time.Hour), PostID: post, StoreID: w.storeID}},
 	}
 	for _, c := range cases {
@@ -352,13 +352,13 @@ func TestProductRestockedStoresTheNameSnapshotAndLinksToTheProduct(t *testing.T)
 	f := setupContent(t, nil)
 	w := newContentWorld(t, f)
 	f.publishEvent(t, func(ctx context.Context) error {
-		return events.Publish(ctx, f.bus, buyer.RestockTargeted{EventID: uuid.NewV7(), OccurredAt: contentBase, BuyerID: w.buyerA, ProductID: 11, ProductName: "Apple", ImageKey: "public/apple"})
+		return events.Publish(ctx, f.bus, buyer.RestockTargeted{EventID: uuid.NewV7(), OccurredAt: contentBase, BuyerID: w.buyerA, ProductID: uuid.UUID{15: 11}, SKUID: uuid.UUID{15: 21}, ProductName: "Apple", ImageKey: "public/apple"})
 	})
 	if n := f.count(t, `SELECT count(*) FROM notification.inbox_items WHERE account_id = $1 AND type = 'product_restocked' AND params->>'product_name' = 'Apple' AND params->>'image_key' = 'public/apple'`, w.buyerAAccount); n != 1 {
 		t.Fatalf("補貨收件匣 %d 列，預期 1", n)
 	}
 	page, err := f.module.ListInbox(context.Background(), Recipient{AccountID: w.buyerAAccount, Audience: AudienceBuyer}, nil, uitext.EN, nil, 10)
-	if err != nil || len(page.Items) != 1 || page.Items[0].DeepLink != "/en/products/11" {
+	if err != nil || len(page.Items) != 1 || page.Items[0].DeepLink != "/en/products/"+(uuid.UUID{15: 11}).String() {
 		t.Fatalf("%+v（%v）", page, err)
 	}
 }

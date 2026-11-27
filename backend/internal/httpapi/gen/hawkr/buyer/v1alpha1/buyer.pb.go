@@ -402,7 +402,7 @@ type ProductCard struct {
 	Rating *float32 `protobuf:"fixed32,7,opt,name=rating,proto3,oneof" json:"rating,omitempty"`
 	// 現在可以購買；下架或售完時是 false。
 	Available bool `protobuf:"varint,8,opt,name=available,proto3" json:"available,omitempty"`
-	// 呼叫者已訂閱這個商品的補貨通知。
+	// 呼叫者已訂閱這個商品任一規格（SKU）的補貨通知。
 	RestockSubscribed bool   `protobuf:"varint,9,opt,name=restock_subscribed,json=restockSubscribed,proto3" json:"restock_subscribed,omitempty"`
 	StoreId           string `protobuf:"bytes,10,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
@@ -686,11 +686,13 @@ func (x *Visit) GetVisitTime() *timestamppb.Timestamp {
 	return nil
 }
 
-// RestockSubscription 是等待補貨通知的商品。
+// RestockSubscription 是等待補貨通知的商品規格（SKU）。
 type RestockSubscription struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Product       *ProductCard           `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Product    *ProductCard           `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	CreateTime *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// 訂閱的規格；補貨通知依規格發送。
+	SkuId         string `protobuf:"bytes,3,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -737,6 +739,13 @@ func (x *RestockSubscription) GetCreateTime() *timestamppb.Timestamp {
 		return x.CreateTime
 	}
 	return nil
+}
+
+func (x *RestockSubscription) GetSkuId() string {
+	if x != nil {
+		return x.SkuId
+	}
+	return ""
 }
 
 // MemberCard 是買家在一個店家的會員卡。
@@ -3140,8 +3149,10 @@ func (x *ListRestockSubscriptionsResponse) GetNextPageToken() string {
 }
 
 type SubscribeRestockRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProductId string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	// 要等補貨的規格，必須屬於 product_id；規格目前有貨時拒絕（failed_precondition，reason RESTOCK_SKU_IN_STOCK），不存在或已刪除是 not_found。
+	SkuId         string `protobuf:"bytes,2,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3179,6 +3190,13 @@ func (*SubscribeRestockRequest) Descriptor() ([]byte, []int) {
 func (x *SubscribeRestockRequest) GetProductId() string {
 	if x != nil {
 		return x.ProductId
+	}
+	return ""
+}
+
+func (x *SubscribeRestockRequest) GetSkuId() string {
+	if x != nil {
+		return x.SkuId
 	}
 	return ""
 }
@@ -3221,7 +3239,7 @@ func (*SubscribeRestockResponse) Descriptor() ([]byte, []int) {
 
 type UnsubscribeRestockRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3256,9 +3274,9 @@ func (*UnsubscribeRestockRequest) Descriptor() ([]byte, []int) {
 	return file_hawkr_buyer_v1alpha1_buyer_proto_rawDescGZIP(), []int{59}
 }
 
-func (x *UnsubscribeRestockRequest) GetProductId() string {
+func (x *UnsubscribeRestockRequest) GetSkuId() string {
 	if x != nil {
-		return x.ProductId
+		return x.SkuId
 	}
 	return ""
 }
@@ -4142,11 +4160,12 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\x05Visit\x12;\n" +
 	"\aproduct\x18\x01 \x01(\v2!.hawkr.buyer.v1alpha1.ProductCardR\aproduct\x129\n" +
 	"\n" +
-	"visit_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tvisitTime\"\x8f\x01\n" +
+	"visit_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tvisitTime\"\xa6\x01\n" +
 	"\x13RestockSubscription\x12;\n" +
 	"\aproduct\x18\x01 \x01(\v2!.hawkr.buyer.v1alpha1.ProductCardR\aproduct\x12;\n" +
 	"\vcreate_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"createTime\"\x92\x01\n" +
+	"createTime\x12\x15\n" +
+	"\x06sku_id\x18\x03 \x01(\tR\x05skuId\"\x92\x01\n" +
 	"\n" +
 	"MemberCard\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x126\n" +
@@ -4289,14 +4308,14 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"\xaa\x01\n" +
 	" ListRestockSubscriptionsResponse\x12^\n" +
 	"\x15restock_subscriptions\x18\x01 \x03(\v2).hawkr.buyer.v1alpha1.RestockSubscriptionR\x14restockSubscriptions\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"=\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"Y\n" +
 	"\x17SubscribeRestockRequest\x12\"\n" +
 	"\n" +
-	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1a\n" +
-	"\x18SubscribeRestockResponse\"?\n" +
-	"\x19UnsubscribeRestockRequest\x12\"\n" +
-	"\n" +
-	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1c\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\x12\x1a\n" +
+	"\x06sku_id\x18\x02 \x01(\tB\x03\xe0A\x02R\x05skuId\"\x1a\n" +
+	"\x18SubscribeRestockResponse\"7\n" +
+	"\x19UnsubscribeRestockRequest\x12\x1a\n" +
+	"\x06sku_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x05skuId\"\x1c\n" +
 	"\x1aUnsubscribeRestockResponse\"\xa7\x01\n" +
 	"\x12BlockAuthorRequest\x12\x1f\n" +
 	"\n" +

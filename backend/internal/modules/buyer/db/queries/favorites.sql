@@ -21,7 +21,7 @@ RETURNING product_id;
 -- 以建立時間及商品 ID 進行收藏 keyset 分頁。
 SELECT *
 FROM buyer.favorites
-WHERE buyer_id = @buyer_id AND (NOT @has_after::boolean OR (created_at, product_id) < (@after_time::timestamptz, @after_id::bigint))
+WHERE buyer_id = @buyer_id AND (NOT @has_after::boolean OR (created_at, product_id) < (@after_time::timestamptz, @after_id::uuid))
 ORDER BY created_at DESC, product_id DESC
 LIMIT @page_limit;
 
@@ -42,7 +42,7 @@ WHERE buyer_id = $1 AND product_id = $2);
 -- 回傳輸入清單中已收藏的商品 ID。
 SELECT product_id
 FROM buyer.favorites
-WHERE buyer_id = $1 AND product_id = ANY($2::bigint[]);
+WHERE buyer_id = $1 AND product_id = ANY($2::uuid[]);
 
 -- name: CountFavorite :one
 -- 計算買家收藏數量。

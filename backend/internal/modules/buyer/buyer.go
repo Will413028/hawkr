@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/riverqueue/river"
 
@@ -133,6 +134,18 @@ type AddressCursor = model.AddressCursor
 // Cursor 時間與業務 ID 組成的降冪分頁位置。
 type Cursor = model.Cursor
 
+// ProductCursor 時間與商品 ID 組成的降冪分頁位置（收藏、瀏覽）。
+type ProductCursor = model.ProductCursor
+
+// ProductListInput 買家商品清單（收藏、瀏覽）的 keyset 輸入，預設 20、最多 100 筆。
+type ProductListInput = model.ProductListInput
+
+// ProductItem 商品的 ID 與業務時間。
+type ProductItem = model.ProductItem
+
+// ProductPage 一頁商品關聯資料及下一頁位置。
+type ProductPage = model.ProductPage
+
 // ListInput 買家關聯清單的 keyset 輸入，預設 20、最多 100 筆。
 type ListInput = model.ListInput
 
@@ -142,13 +155,13 @@ type Item = model.Item
 // Page 一頁關聯資料及下一頁位置。
 type Page = model.Page
 
-// RestockCursor 補貨訂閱的時間與商品 ID 分頁位置。
+// RestockCursor 補貨訂閱的時間與 SKU ID 分頁位置。
 type RestockCursor = model.RestockCursor
 
 // RestockListInput 待通知補貨訂閱的分頁輸入。
 type RestockListInput = model.RestockListInput
 
-// Restock 待通知的買家與商品關聯。
+// Restock 待通知的買家與 SKU 關聯。
 type Restock = model.Restock
 
 // RestockPage 一頁補貨訂閱及下一頁位置。
@@ -308,17 +321,17 @@ func (module *Module) DeleteAddress(ctx context.Context, buyerID, addressID, exp
 }
 
 // AddFavorite 新增收藏，pending 不允許；重複新增不發布事件。
-func (module *Module) AddFavorite(ctx context.Context, buyerID, id int64) error {
+func (module *Module) AddFavorite(ctx context.Context, buyerID int64, id uuid.UUID) error {
 	return module.favorite.Add(ctx, buyerID, id)
 }
 
 // RemoveFavorite 移除收藏，只有實際刪除才發布事件。
-func (module *Module) RemoveFavorite(ctx context.Context, buyerID, id int64) error {
+func (module *Module) RemoveFavorite(ctx context.Context, buyerID int64, id uuid.UUID) error {
 	return module.favorite.Remove(ctx, buyerID, id)
 }
 
 // CheckFavorite 查詢商品是否已收藏。
-func (module *Module) CheckFavorite(ctx context.Context, buyerID, id int64) (bool, error) {
+func (module *Module) CheckFavorite(ctx context.Context, buyerID int64, id uuid.UUID) (bool, error) {
 	return module.favorite.Check(ctx, buyerID, id)
 }
 
@@ -338,22 +351,27 @@ func (module *Module) CheckFollow(ctx context.Context, buyerID, id int64) (bool,
 }
 
 // RecordVisit 更新最近瀏覽時間並發布 ProductViewed。
-func (module *Module) RecordVisit(ctx context.Context, buyerID, id int64) error {
+func (module *Module) RecordVisit(ctx context.Context, buyerID int64, id uuid.UUID) error {
 	return module.visit.Add(ctx, buyerID, id)
 }
 
-// SubscribeRestock 建立 待通知訂閱，同組重複訂閱冪等。
-func (module *Module) SubscribeRestock(ctx context.Context, buyerID, id int64) error {
-	return module.restock.Subscribe(ctx, buyerID, id)
+// SubscribeRestock 建立 SKU 粒度的一次性待通知訂閱，同組（買家、SKU）重複訂閱冪等；productID 是 SKU 所屬的商品。SKU 是否存在、有沒有貨由呼叫端確認。
+func (module *Module) SubscribeRestock(ctx context.Context, buyerID int64, productID, skuID uuid.UUID) error {
+	return module.restock.Subscribe(ctx, buyerID, productID, skuID)
 }
 
-// UnsubscribeRestock 取消指定商品的 待通知訂閱。
-func (module *Module) UnsubscribeRestock(ctx context.Context, buyerID, id int64) error {
-	return module.restock.Unsubscribe(ctx, buyerID, id)
+// UnsubscribeRestock 取消指定 SKU 的待通知訂閱。
+func (module *Module) UnsubscribeRestock(ctx context.Context, buyerID int64, skuID uuid.UUID) error {
+	return module.restock.Unsubscribe(ctx, buyerID, skuID)
+}
+
+// PurgeRestockSKUs 刪除這些 SKU 的全部待通知訂閱（商品或 SKU 刪除後）；沒有訂閱的 SKU 是 no-op，可重複呼叫。
+func (module *Module) PurgeRestockSKUs(ctx context.Context, skuIDs []uuid.UUID) error {
+	return module.restock.PurgeSKUs(ctx, skuIDs)
 }
 
 // ListFavorites 以時間與商品 ID 分頁列出收藏。
-func (module *Module) ListFavorites(ctx context.Context, input ListInput) (Page, error) {
+func (module *Module) ListFavorites(ctx context.Context, input ProductListInput) (ProductPage, error) {
 	return module.favorite.List(ctx, input)
 }
 
@@ -363,7 +381,7 @@ func (module *Module) ListFollows(ctx context.Context, input ListInput) (Page, e
 }
 
 // ListVisits 以瀏覽時間與商品 ID 分頁。
-func (module *Module) ListVisits(ctx context.Context, input ListInput) (Page, error) {
+func (module *Module) ListVisits(ctx context.Context, input ProductListInput) (ProductPage, error) {
 	return module.visit.List(ctx, input)
 }
 
@@ -378,7 +396,7 @@ func (module *Module) FollowCount(ctx context.Context, buyerID int64) (int64, er
 }
 
 // FavoritedProductIDs 列出全部收藏商品 ID。
-func (module *Module) FavoritedProductIDs(ctx context.Context, buyerID int64) ([]int64, error) {
+func (module *Module) FavoritedProductIDs(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	return module.favorite.IDs(ctx, buyerID)
 }
 
@@ -393,7 +411,7 @@ func (module *Module) ClearVisits(ctx context.Context, buyerID int64) error {
 }
 
 // BatchCheckFavorites 批次查詢收藏狀態，輸入最多 100 個 ID。
-func (module *Module) BatchCheckFavorites(ctx context.Context, buyerID int64, ids []int64) (map[int64]bool, error) {
+func (module *Module) BatchCheckFavorites(ctx context.Context, buyerID int64, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
 	return module.favorite.BatchCheck(ctx, buyerID, ids)
 }
 
@@ -402,8 +420,8 @@ func (module *Module) BatchCheckFollows(ctx context.Context, buyerID int64, ids 
 	return module.follow.BatchCheck(ctx, buyerID, ids)
 }
 
-// BatchCheckRestock 批次查詢 待通知訂閱，輸入最多 100 個 ID。
-func (module *Module) BatchCheckRestock(ctx context.Context, buyerID int64, ids []int64) (map[int64]bool, error) {
+// BatchCheckRestock 批次查詢商品是否有 SKU 在待通知訂閱，輸入最多 100 個商品 ID。
+func (module *Module) BatchCheckRestock(ctx context.Context, buyerID int64, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
 	return module.restock.BatchCheck(ctx, buyerID, ids)
 }
 
@@ -429,7 +447,7 @@ func (module *Module) ListRestock(ctx context.Context, input RestockListInput) (
 	return module.restock.List(ctx, input)
 }
 
-// FanOut 在獨立 transaction 處理最多 Limit 筆（1..100），回傳是否仍有待通知訂閱。
+// FanOut 在獨立 transaction 處理某個 SKU 最多 Limit 筆（1..100）訂閱：發布 RestockTargeted 並刪除（一次性），回傳該 SKU 是否仍有待通知訂閱。
 func (module *Module) FanOut(ctx context.Context, input FanOutInput) (bool, error) {
 	return module.restock.FanOut(ctx, input)
 }

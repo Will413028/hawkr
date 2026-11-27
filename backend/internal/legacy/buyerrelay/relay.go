@@ -1,21 +1,16 @@
-// Package buyerrelay 將 buyer 模組事件轉成尚未搬遷的 RabbitMQ 消費者（Java product 的收藏數與買家刪除）所需訊息：只有 buyer.favorite.added、buyer.favorite.removed、buyer.deleted。
-// 追蹤、商品瀏覽與補貨的轉送已隨 A8-3d1 刪除，通知由 notification 模組訂閱 buyer 事件。
+// Package buyerrelay 將 buyer 模組事件轉成尚未搬遷的 RabbitMQ 消費者所需訊息：只有 buyer.deleted。
+// 追蹤、商品瀏覽與補貨的轉送已隨 A8-3d1 刪除，收藏數由 catalog 在收藏的同一個 transaction 內更新（B4-4c），通知由 notification 模組訂閱 buyer 事件。
 package buyerrelay
 
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
-	"strconv"
 	"time"
 
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
@@ -25,22 +20,12 @@ type eventFields struct {
 	BuyerID  int64     `json:"buyer_id"`
 }
 
-type FavoriteAddedArgs struct {
-	eventFields
-	ProductID int64 `json:"product_id"`
-}
-type FavoriteRemovedArgs struct {
-	eventFields
-	ProductID int64 `json:"product_id"`
-}
 type BuyerDeletedArgs struct {
 	eventFields
 	AccountID int64 `json:"account_id"`
 }
 
-func (FavoriteAddedArgs) Kind() string   { return "legacy.buyer_favorite_added" }
-func (FavoriteRemovedArgs) Kind() string { return "legacy.buyer_favorite_removed" }
-func (BuyerDeletedArgs) Kind() string    { return "legacy.buyer_deleted" }
+func (BuyerDeletedArgs) Kind() string { return "legacy.buyer_deleted" }
 
 type Enqueue func(context.Context, river.JobArgs) error
 
@@ -48,71 +33,18 @@ func NewEnqueue(j jobs.Enqueuer) Enqueue {
 	return func(ctx context.Context, args river.JobArgs) error { return j.Enqueue(ctx, args, nil) }
 }
 
-func OnFavoriteAdded(enqueue Enqueue) func(context.Context, buyer.FavoriteAdded) error {
-	return func(ctx context.Context, e buyer.FavoriteAdded) error {
-		return enqueue(ctx, FavoriteAddedArgs{eventFields: eventFields{e.EventID.String(), e.OccurredAt, e.BuyerID}, ProductID: e.ProductID})
-	}
-}
-func OnFavoriteRemoved(enqueue Enqueue) func(context.Context, buyer.FavoriteRemoved) error {
-	return func(ctx context.Context, e buyer.FavoriteRemoved) error {
-		return enqueue(ctx, FavoriteRemovedArgs{eventFields: eventFields{e.EventID.String(), e.OccurredAt, e.BuyerID}, ProductID: e.ProductID})
-	}
-}
 func OnBuyerDeleted(enqueue Enqueue) func(context.Context, buyer.BuyerDeleted) error {
 	return func(ctx context.Context, e buyer.BuyerDeleted) error {
 		return enqueue(ctx, BuyerDeletedArgs{eventFields: eventFields{e.EventID.String(), e.OccurredAt, e.BuyerID}, AccountID: e.AccountID})
 	}
 }
 
-type Buyers interface {
-	AccountIDByBuyerID(context.Context, int64) (int64, error)
-	ProfileByBuyerID(context.Context, int64) (buyer.Profile, error)
-}
-type Product = productservice.Card
-type Products interface {
-	Cards(context.Context, []int64, bool) (map[int64]Product, error)
-}
-
-// Stores 讀店家；seller 模組滿足它。已關閉的店家與不存在一樣當成找不到（舊 seller-service 關店就是軟刪除）。
-type Store = seller.Store
-type Stores interface {
-	Store(context.Context, int64) (Store, error)
-}
-
 type Worker struct {
-	Buyers   Buyers
-	Products Products
-	Stores   Stores
-	Jobs     jobs.Enqueuer
-	Log      *slog.Logger
+	Jobs jobs.Enqueuer
 }
 
-func NewWorker(b Buyers, p Products, s Stores, queue jobs.Enqueuer, log *slog.Logger) *Worker {
-	return &Worker{Buyers: b, Products: p, Stores: s, Jobs: queue, Log: log}
-}
-
-// store 在 relay 當下讀店家（計畫步驟 2：legacy payload 的店家欄位由 legacy 讀，不是事件當下的快照）。店家已不存在是
-// 永久狀態，重試不會改變：記 log 後回 ok=false，由呼叫方決定缺欄位照送或略過，不回錯誤讓 job 重試到上限。
-func (w *Worker) store(ctx context.Context, event string, storeID int64) (Store, bool, error) {
-	s, err := w.Stores.Store(ctx, storeID)
-	if apperr.KindOf(err) == apperr.KindNotFound || (err == nil && s.Status == seller.Closed) {
-		if w.Log != nil {
-			w.Log.WarnContext(ctx, "buyerrelay：店家不存在，店家欄位留空", "event", event, "store_id", storeID)
-		}
-		return Store{}, false, nil
-	}
-	if err != nil {
-		return Store{}, false, err
-	}
-	return s, true, nil
-}
-
-// accountRef 是舊 buyer-service 的帳號字串欄位：沒有帳號時送空字串，不送 "0"。
-func accountRef(id int64) string {
-	if id <= 0 {
-		return ""
-	}
-	return strconv.FormatInt(id, 10)
+func NewWorker(queue jobs.Enqueuer) *Worker {
+	return &Worker{Jobs: queue}
 }
 
 type typedWorker[T river.JobArgs] struct {
@@ -127,8 +59,6 @@ func (w *typedWorker[T]) Work(ctx context.Context, job *river.Job[T]) error {
 }
 
 func (w *Worker) AddWorkers(workers *river.Workers) {
-	river.AddWorker(workers, &typedWorker[FavoriteAddedArgs]{work: w.favoriteAdded})
-	river.AddWorker(workers, &typedWorker[FavoriteRemovedArgs]{work: w.favoriteRemoved})
 	river.AddWorker(workers, &typedWorker[BuyerDeletedArgs]{work: w.buyerDeleted})
 }
 
@@ -147,70 +77,6 @@ func (w *Worker) enqueuePublish(ctx context.Context, a eventFields, exchange, ke
 		return err
 	}
 	return w.Jobs.Enqueue(ctx, rabbitmq.PublishArgs{EventID: a.EventID, Exchange: exchange, RoutingKey: key, Body: body}, rabbitmq.InsertOpts())
-}
-
-func (w *Worker) accountID(ctx context.Context, buyerID int64) (int64, error) {
-	return w.Buyers.AccountIDByBuyerID(ctx, buyerID)
-}
-
-func (w *Worker) name(ctx context.Context, buyerID int64) (string, error) {
-	profile, err := w.Buyers.ProfileByBuyerID(ctx, buyerID)
-	if apperr.KindOf(err) == apperr.KindNotFound {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	return profile.DisplayName, nil
-}
-
-func (w *Worker) product(ctx context.Context, id int64) (Product, error) {
-	cards, err := w.Products.Cards(ctx, []int64{id}, true)
-	if err != nil {
-		return Product{}, err
-	}
-	return cards[id], nil
-}
-
-func (w *Worker) favoriteAdded(ctx context.Context, a FavoriteAddedArgs) error {
-	accountID, err := w.accountID(ctx, a.BuyerID)
-	if err != nil {
-		return err
-	}
-	product, err := w.product(ctx, a.ProductID)
-	if err != nil {
-		return err
-	}
-	name, err := w.name(ctx, a.BuyerID)
-	if err != nil {
-		return err
-	}
-	payload := base(a.eventFields, "BUYER_FAVORITE_ADDED")
-	payload["product_id"], payload["account_id"] = strconv.FormatInt(a.ProductID, 10), strconv.FormatInt(accountID, 10)
-	payload["occurred_at"], payload["buyer_name"], payload["product_name"] = a.Occurred.UTC().Format(time.RFC3339Nano), name, product.Name
-	payload["seller_account_id"], payload["store_id"] = "", ""
-	if product.StoreID > 0 {
-		// 店家不存在時仍送：product-service 的收藏數依 product_id 計，只缺賣家通知的欄位。
-		store, _, err := w.store(ctx, "buyer.favorite.added", product.StoreID)
-		if err != nil {
-			return err
-		}
-		payload["seller_account_id"], payload["store_id"] = accountRef(store.AccountID), strconv.FormatInt(product.StoreID, 10)
-	}
-	return w.enqueuePublish(ctx, a.eventFields, "hawkr.buyer", "buyer.favorite.added", payload)
-}
-
-func (w *Worker) favoriteRemoved(ctx context.Context, a FavoriteRemovedArgs) error {
-	accountID, err := w.accountID(ctx, a.BuyerID)
-	if err != nil {
-		return err
-	}
-	payload := base(a.eventFields, "BUYER_FAVORITE_REMOVED")
-	payload["product_id"], payload["account_id"] = strconv.FormatInt(a.ProductID, 10), strconv.FormatInt(accountID, 10)
-	payload["occurred_at"] = a.Occurred.UTC().Format(time.RFC3339Nano)
-	payload["seller_account_id"], payload["store_id"] = "", ""
-	payload["buyer_name"], payload["product_name"] = "", ""
-	return w.enqueuePublish(ctx, a.eventFields, "hawkr.buyer", "buyer.favorite.removed", payload)
 }
 
 func (w *Worker) buyerDeleted(ctx context.Context, a BuyerDeletedArgs) error {

@@ -51,17 +51,17 @@ func (noOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { retur
 
 // productStoresStub 是商品→店家 port 的替身；err 非 nil 時失敗，並記下被呼叫的次數。
 type productStoresStub struct {
-	stores map[int64]int64
+	stores map[uuid.UUID]int64
 	err    error
 	calls  int
 }
 
-func (p *productStoresStub) StoreIDs(_ context.Context, ids []int64) (map[int64]int64, error) {
+func (p *productStoresStub) StoreIDs(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]int64, error) {
 	p.calls++
 	if p.err != nil {
 		return nil, p.err
 	}
-	out := map[int64]int64{}
+	out := map[uuid.UUID]int64{}
 	for _, id := range ids {
 		if storeID, ok := p.stores[id]; ok {
 			out[id] = storeID
@@ -129,7 +129,8 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	}
 
 	// 商品服務不通：同一個商品看兩次、另一個商品看一次（總次數、不去重），瀏覽都成功，也沒有碰商品 port。
-	for _, productID := range []int64{10, 10, 11} {
+	productA, productB := uuid.NewV7(), uuid.NewV7()
+	for _, productID := range []uuid.UUID{productA, productA, productB} {
 		if err := buyers.RecordVisit(ctx, profile.BuyerID, productID); err != nil {
 			t.Fatalf("visit failed while the product service is down: %v", err)
 		}
@@ -149,7 +150,7 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	if views, err := sellers.ProductViewsBetween(ctx, store.StoreID, first, last); err != nil || views != 0 {
 		t.Fatalf("views=%d err=%v before the rollup succeeds", views, err)
 	}
-	products.err, products.stores = nil, map[int64]int64{10: store.StoreID, 11: store.StoreID}
+	products.err, products.stores = nil, map[uuid.UUID]int64{productA: store.StoreID, productB: store.StoreID}
 	if n, err := sellers.RollupProductViews(ctx); err != nil || n != 3 {
 		t.Fatalf("rollup n=%d err=%v", n, err)
 	}

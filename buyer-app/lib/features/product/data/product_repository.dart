@@ -264,14 +264,13 @@ class ProductRepository {
     }
   }
 
-  /// 取消補貨通知訂閱 — DELETE /app/products/{productId}/restock_subscriptions
-  /// 後端冪等：未訂閱也回 200。
-  Future<bool> unsubscribeRestock(String productId) async {
-    final pid = productId.trim();
+  /// 取消規格（SKU）的補貨通知訂閱。後端冪等：未訂閱也成功。
+  Future<bool> unsubscribeRestock(String skuId) async {
+    final pid = skuId.trim();
     if (pid.isEmpty || int.tryParse(pid) == null) return false;
     try {
       await _buyer.unsubscribeRestock(
-        buyer.UnsubscribeRestockRequest(productId: pid),
+        buyer.UnsubscribeRestockRequest(skuId: pid),
       );
       return true;
     } catch (_) {
