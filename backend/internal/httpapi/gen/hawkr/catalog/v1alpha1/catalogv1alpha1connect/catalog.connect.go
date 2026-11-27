@@ -2,7 +2,7 @@
 //
 // Source: hawkr/catalog/v1alpha1/catalog.proto
 
-// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），以及賣家管理自己店家的商品（SellerCatalogAppService）；
+// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），賣家管理自己店家的商品（SellerCatalogAppService），以及代行營運的平台管理員管理代行店家的商品（CatalogDelegatedService）；
 // 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
 // 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
@@ -34,6 +34,8 @@ const (
 	CatalogPublicServiceName = "hawkr.catalog.v1alpha1.CatalogPublicService"
 	// SellerCatalogAppServiceName is the fully-qualified name of the SellerCatalogAppService service.
 	SellerCatalogAppServiceName = "hawkr.catalog.v1alpha1.SellerCatalogAppService"
+	// CatalogDelegatedServiceName is the fully-qualified name of the CatalogDelegatedService service.
+	CatalogDelegatedServiceName = "hawkr.catalog.v1alpha1.CatalogDelegatedService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -92,6 +94,27 @@ const (
 	// SellerCatalogAppServiceSetStockProcedure is the fully-qualified name of the
 	// SellerCatalogAppService's SetStock RPC.
 	SellerCatalogAppServiceSetStockProcedure = "/hawkr.catalog.v1alpha1.SellerCatalogAppService/SetStock"
+	// CatalogDelegatedServiceListStoreProductsProcedure is the fully-qualified name of the
+	// CatalogDelegatedService's ListStoreProducts RPC.
+	CatalogDelegatedServiceListStoreProductsProcedure = "/hawkr.catalog.v1alpha1.CatalogDelegatedService/ListStoreProducts"
+	// CatalogDelegatedServiceGetStoreProductProcedure is the fully-qualified name of the
+	// CatalogDelegatedService's GetStoreProduct RPC.
+	CatalogDelegatedServiceGetStoreProductProcedure = "/hawkr.catalog.v1alpha1.CatalogDelegatedService/GetStoreProduct"
+	// CatalogDelegatedServiceCreateStoreProductProcedure is the fully-qualified name of the
+	// CatalogDelegatedService's CreateStoreProduct RPC.
+	CatalogDelegatedServiceCreateStoreProductProcedure = "/hawkr.catalog.v1alpha1.CatalogDelegatedService/CreateStoreProduct"
+	// CatalogDelegatedServiceUpdateStoreProductProcedure is the fully-qualified name of the
+	// CatalogDelegatedService's UpdateStoreProduct RPC.
+	CatalogDelegatedServiceUpdateStoreProductProcedure = "/hawkr.catalog.v1alpha1.CatalogDelegatedService/UpdateStoreProduct"
+	// CatalogDelegatedServicePublishStoreProductProcedure is the fully-qualified name of the
+	// CatalogDelegatedService's PublishStoreProduct RPC.
+	CatalogDelegatedServicePublishStoreProductProcedure = "/hawkr.catalog.v1alpha1.CatalogDelegatedService/PublishStoreProduct"
+	// CatalogDelegatedServiceUnpublishStoreProductProcedure is the fully-qualified name of the
+	// CatalogDelegatedService's UnpublishStoreProduct RPC.
+	CatalogDelegatedServiceUnpublishStoreProductProcedure = "/hawkr.catalog.v1alpha1.CatalogDelegatedService/UnpublishStoreProduct"
+	// CatalogDelegatedServiceBatchUnpublishStoreProductsProcedure is the fully-qualified name of the
+	// CatalogDelegatedService's BatchUnpublishStoreProducts RPC.
+	CatalogDelegatedServiceBatchUnpublishStoreProductsProcedure = "/hawkr.catalog.v1alpha1.CatalogDelegatedService/BatchUnpublishStoreProducts"
 )
 
 // CatalogPublicServiceClient is a client for the hawkr.catalog.v1alpha1.CatalogPublicService
@@ -681,4 +704,268 @@ func (UnimplementedSellerCatalogAppServiceHandler) AdjustStock(context.Context, 
 
 func (UnimplementedSellerCatalogAppServiceHandler) SetStock(context.Context, *connect.Request[v1alpha1.SetStockRequest]) (*connect.Response[v1alpha1.SetStockResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock is not implemented"))
+}
+
+// CatalogDelegatedServiceClient is a client for the hawkr.catalog.v1alpha1.CatalogDelegatedService
+// service.
+type CatalogDelegatedServiceClient interface {
+	// ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
+	ListStoreProducts(context.Context, *connect.Request[v1alpha1.ListStoreProductsRequest]) (*connect.Response[v1alpha1.ListStoreProductsResponse], error)
+	// GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
+	GetStoreProduct(context.Context, *connect.Request[v1alpha1.GetStoreProductRequest]) (*connect.Response[v1alpha1.GetStoreProductResponse], error)
+	// CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
+	// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
+	CreateStoreProduct(context.Context, *connect.Request[v1alpha1.CreateStoreProductRequest]) (*connect.Response[v1alpha1.CreateStoreProductResponse], error)
+	// UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
+	// VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
+	UpdateStoreProduct(context.Context, *connect.Request[v1alpha1.UpdateStoreProductRequest]) (*connect.Response[v1alpha1.UpdateStoreProductResponse], error)
+	// PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+	PublishStoreProduct(context.Context, *connect.Request[v1alpha1.PublishStoreProductRequest]) (*connect.Response[v1alpha1.PublishStoreProductResponse], error)
+	// UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+	UnpublishStoreProduct(context.Context, *connect.Request[v1alpha1.UnpublishStoreProductRequest]) (*connect.Response[v1alpha1.UnpublishStoreProductResponse], error)
+	// BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
+	// 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
+	// （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
+	BatchUnpublishStoreProducts(context.Context, *connect.Request[v1alpha1.BatchUnpublishStoreProductsRequest]) (*connect.Response[v1alpha1.BatchUnpublishStoreProductsResponse], error)
+}
+
+// NewCatalogDelegatedServiceClient constructs a client for the
+// hawkr.catalog.v1alpha1.CatalogDelegatedService service. By default, it uses the Connect protocol
+// with the binary Protobuf Codec, asks for gzipped responses, and sends uncompressed requests. To
+// use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or connect.WithGRPCWeb()
+// options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewCatalogDelegatedServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) CatalogDelegatedServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	catalogDelegatedServiceMethods := v1alpha1.File_hawkr_catalog_v1alpha1_catalog_proto.Services().ByName("CatalogDelegatedService").Methods()
+	return &catalogDelegatedServiceClient{
+		listStoreProducts: connect.NewClient[v1alpha1.ListStoreProductsRequest, v1alpha1.ListStoreProductsResponse](
+			httpClient,
+			baseURL+CatalogDelegatedServiceListStoreProductsProcedure,
+			connect.WithSchema(catalogDelegatedServiceMethods.ByName("ListStoreProducts")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getStoreProduct: connect.NewClient[v1alpha1.GetStoreProductRequest, v1alpha1.GetStoreProductResponse](
+			httpClient,
+			baseURL+CatalogDelegatedServiceGetStoreProductProcedure,
+			connect.WithSchema(catalogDelegatedServiceMethods.ByName("GetStoreProduct")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		createStoreProduct: connect.NewClient[v1alpha1.CreateStoreProductRequest, v1alpha1.CreateStoreProductResponse](
+			httpClient,
+			baseURL+CatalogDelegatedServiceCreateStoreProductProcedure,
+			connect.WithSchema(catalogDelegatedServiceMethods.ByName("CreateStoreProduct")),
+			connect.WithClientOptions(opts...),
+		),
+		updateStoreProduct: connect.NewClient[v1alpha1.UpdateStoreProductRequest, v1alpha1.UpdateStoreProductResponse](
+			httpClient,
+			baseURL+CatalogDelegatedServiceUpdateStoreProductProcedure,
+			connect.WithSchema(catalogDelegatedServiceMethods.ByName("UpdateStoreProduct")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		publishStoreProduct: connect.NewClient[v1alpha1.PublishStoreProductRequest, v1alpha1.PublishStoreProductResponse](
+			httpClient,
+			baseURL+CatalogDelegatedServicePublishStoreProductProcedure,
+			connect.WithSchema(catalogDelegatedServiceMethods.ByName("PublishStoreProduct")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		unpublishStoreProduct: connect.NewClient[v1alpha1.UnpublishStoreProductRequest, v1alpha1.UnpublishStoreProductResponse](
+			httpClient,
+			baseURL+CatalogDelegatedServiceUnpublishStoreProductProcedure,
+			connect.WithSchema(catalogDelegatedServiceMethods.ByName("UnpublishStoreProduct")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		batchUnpublishStoreProducts: connect.NewClient[v1alpha1.BatchUnpublishStoreProductsRequest, v1alpha1.BatchUnpublishStoreProductsResponse](
+			httpClient,
+			baseURL+CatalogDelegatedServiceBatchUnpublishStoreProductsProcedure,
+			connect.WithSchema(catalogDelegatedServiceMethods.ByName("BatchUnpublishStoreProducts")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// catalogDelegatedServiceClient implements CatalogDelegatedServiceClient.
+type catalogDelegatedServiceClient struct {
+	listStoreProducts           *connect.Client[v1alpha1.ListStoreProductsRequest, v1alpha1.ListStoreProductsResponse]
+	getStoreProduct             *connect.Client[v1alpha1.GetStoreProductRequest, v1alpha1.GetStoreProductResponse]
+	createStoreProduct          *connect.Client[v1alpha1.CreateStoreProductRequest, v1alpha1.CreateStoreProductResponse]
+	updateStoreProduct          *connect.Client[v1alpha1.UpdateStoreProductRequest, v1alpha1.UpdateStoreProductResponse]
+	publishStoreProduct         *connect.Client[v1alpha1.PublishStoreProductRequest, v1alpha1.PublishStoreProductResponse]
+	unpublishStoreProduct       *connect.Client[v1alpha1.UnpublishStoreProductRequest, v1alpha1.UnpublishStoreProductResponse]
+	batchUnpublishStoreProducts *connect.Client[v1alpha1.BatchUnpublishStoreProductsRequest, v1alpha1.BatchUnpublishStoreProductsResponse]
+}
+
+// ListStoreProducts calls hawkr.catalog.v1alpha1.CatalogDelegatedService.ListStoreProducts.
+func (c *catalogDelegatedServiceClient) ListStoreProducts(ctx context.Context, req *connect.Request[v1alpha1.ListStoreProductsRequest]) (*connect.Response[v1alpha1.ListStoreProductsResponse], error) {
+	return c.listStoreProducts.CallUnary(ctx, req)
+}
+
+// GetStoreProduct calls hawkr.catalog.v1alpha1.CatalogDelegatedService.GetStoreProduct.
+func (c *catalogDelegatedServiceClient) GetStoreProduct(ctx context.Context, req *connect.Request[v1alpha1.GetStoreProductRequest]) (*connect.Response[v1alpha1.GetStoreProductResponse], error) {
+	return c.getStoreProduct.CallUnary(ctx, req)
+}
+
+// CreateStoreProduct calls hawkr.catalog.v1alpha1.CatalogDelegatedService.CreateStoreProduct.
+func (c *catalogDelegatedServiceClient) CreateStoreProduct(ctx context.Context, req *connect.Request[v1alpha1.CreateStoreProductRequest]) (*connect.Response[v1alpha1.CreateStoreProductResponse], error) {
+	return c.createStoreProduct.CallUnary(ctx, req)
+}
+
+// UpdateStoreProduct calls hawkr.catalog.v1alpha1.CatalogDelegatedService.UpdateStoreProduct.
+func (c *catalogDelegatedServiceClient) UpdateStoreProduct(ctx context.Context, req *connect.Request[v1alpha1.UpdateStoreProductRequest]) (*connect.Response[v1alpha1.UpdateStoreProductResponse], error) {
+	return c.updateStoreProduct.CallUnary(ctx, req)
+}
+
+// PublishStoreProduct calls hawkr.catalog.v1alpha1.CatalogDelegatedService.PublishStoreProduct.
+func (c *catalogDelegatedServiceClient) PublishStoreProduct(ctx context.Context, req *connect.Request[v1alpha1.PublishStoreProductRequest]) (*connect.Response[v1alpha1.PublishStoreProductResponse], error) {
+	return c.publishStoreProduct.CallUnary(ctx, req)
+}
+
+// UnpublishStoreProduct calls hawkr.catalog.v1alpha1.CatalogDelegatedService.UnpublishStoreProduct.
+func (c *catalogDelegatedServiceClient) UnpublishStoreProduct(ctx context.Context, req *connect.Request[v1alpha1.UnpublishStoreProductRequest]) (*connect.Response[v1alpha1.UnpublishStoreProductResponse], error) {
+	return c.unpublishStoreProduct.CallUnary(ctx, req)
+}
+
+// BatchUnpublishStoreProducts calls
+// hawkr.catalog.v1alpha1.CatalogDelegatedService.BatchUnpublishStoreProducts.
+func (c *catalogDelegatedServiceClient) BatchUnpublishStoreProducts(ctx context.Context, req *connect.Request[v1alpha1.BatchUnpublishStoreProductsRequest]) (*connect.Response[v1alpha1.BatchUnpublishStoreProductsResponse], error) {
+	return c.batchUnpublishStoreProducts.CallUnary(ctx, req)
+}
+
+// CatalogDelegatedServiceHandler is an implementation of the
+// hawkr.catalog.v1alpha1.CatalogDelegatedService service.
+type CatalogDelegatedServiceHandler interface {
+	// ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
+	ListStoreProducts(context.Context, *connect.Request[v1alpha1.ListStoreProductsRequest]) (*connect.Response[v1alpha1.ListStoreProductsResponse], error)
+	// GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
+	GetStoreProduct(context.Context, *connect.Request[v1alpha1.GetStoreProductRequest]) (*connect.Response[v1alpha1.GetStoreProductResponse], error)
+	// CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
+	// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
+	CreateStoreProduct(context.Context, *connect.Request[v1alpha1.CreateStoreProductRequest]) (*connect.Response[v1alpha1.CreateStoreProductResponse], error)
+	// UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
+	// VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
+	UpdateStoreProduct(context.Context, *connect.Request[v1alpha1.UpdateStoreProductRequest]) (*connect.Response[v1alpha1.UpdateStoreProductResponse], error)
+	// PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+	PublishStoreProduct(context.Context, *connect.Request[v1alpha1.PublishStoreProductRequest]) (*connect.Response[v1alpha1.PublishStoreProductResponse], error)
+	// UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+	UnpublishStoreProduct(context.Context, *connect.Request[v1alpha1.UnpublishStoreProductRequest]) (*connect.Response[v1alpha1.UnpublishStoreProductResponse], error)
+	// BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
+	// 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
+	// （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
+	BatchUnpublishStoreProducts(context.Context, *connect.Request[v1alpha1.BatchUnpublishStoreProductsRequest]) (*connect.Response[v1alpha1.BatchUnpublishStoreProductsResponse], error)
+}
+
+// NewCatalogDelegatedServiceHandler builds an HTTP handler from the service implementation. It
+// returns the path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewCatalogDelegatedServiceHandler(svc CatalogDelegatedServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	catalogDelegatedServiceMethods := v1alpha1.File_hawkr_catalog_v1alpha1_catalog_proto.Services().ByName("CatalogDelegatedService").Methods()
+	catalogDelegatedServiceListStoreProductsHandler := connect.NewUnaryHandler(
+		CatalogDelegatedServiceListStoreProductsProcedure,
+		svc.ListStoreProducts,
+		connect.WithSchema(catalogDelegatedServiceMethods.ByName("ListStoreProducts")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	catalogDelegatedServiceGetStoreProductHandler := connect.NewUnaryHandler(
+		CatalogDelegatedServiceGetStoreProductProcedure,
+		svc.GetStoreProduct,
+		connect.WithSchema(catalogDelegatedServiceMethods.ByName("GetStoreProduct")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	catalogDelegatedServiceCreateStoreProductHandler := connect.NewUnaryHandler(
+		CatalogDelegatedServiceCreateStoreProductProcedure,
+		svc.CreateStoreProduct,
+		connect.WithSchema(catalogDelegatedServiceMethods.ByName("CreateStoreProduct")),
+		connect.WithHandlerOptions(opts...),
+	)
+	catalogDelegatedServiceUpdateStoreProductHandler := connect.NewUnaryHandler(
+		CatalogDelegatedServiceUpdateStoreProductProcedure,
+		svc.UpdateStoreProduct,
+		connect.WithSchema(catalogDelegatedServiceMethods.ByName("UpdateStoreProduct")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	catalogDelegatedServicePublishStoreProductHandler := connect.NewUnaryHandler(
+		CatalogDelegatedServicePublishStoreProductProcedure,
+		svc.PublishStoreProduct,
+		connect.WithSchema(catalogDelegatedServiceMethods.ByName("PublishStoreProduct")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	catalogDelegatedServiceUnpublishStoreProductHandler := connect.NewUnaryHandler(
+		CatalogDelegatedServiceUnpublishStoreProductProcedure,
+		svc.UnpublishStoreProduct,
+		connect.WithSchema(catalogDelegatedServiceMethods.ByName("UnpublishStoreProduct")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	catalogDelegatedServiceBatchUnpublishStoreProductsHandler := connect.NewUnaryHandler(
+		CatalogDelegatedServiceBatchUnpublishStoreProductsProcedure,
+		svc.BatchUnpublishStoreProducts,
+		connect.WithSchema(catalogDelegatedServiceMethods.ByName("BatchUnpublishStoreProducts")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/hawkr.catalog.v1alpha1.CatalogDelegatedService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case CatalogDelegatedServiceListStoreProductsProcedure:
+			catalogDelegatedServiceListStoreProductsHandler.ServeHTTP(w, r)
+		case CatalogDelegatedServiceGetStoreProductProcedure:
+			catalogDelegatedServiceGetStoreProductHandler.ServeHTTP(w, r)
+		case CatalogDelegatedServiceCreateStoreProductProcedure:
+			catalogDelegatedServiceCreateStoreProductHandler.ServeHTTP(w, r)
+		case CatalogDelegatedServiceUpdateStoreProductProcedure:
+			catalogDelegatedServiceUpdateStoreProductHandler.ServeHTTP(w, r)
+		case CatalogDelegatedServicePublishStoreProductProcedure:
+			catalogDelegatedServicePublishStoreProductHandler.ServeHTTP(w, r)
+		case CatalogDelegatedServiceUnpublishStoreProductProcedure:
+			catalogDelegatedServiceUnpublishStoreProductHandler.ServeHTTP(w, r)
+		case CatalogDelegatedServiceBatchUnpublishStoreProductsProcedure:
+			catalogDelegatedServiceBatchUnpublishStoreProductsHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedCatalogDelegatedServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedCatalogDelegatedServiceHandler struct{}
+
+func (UnimplementedCatalogDelegatedServiceHandler) ListStoreProducts(context.Context, *connect.Request[v1alpha1.ListStoreProductsRequest]) (*connect.Response[v1alpha1.ListStoreProductsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.CatalogDelegatedService.ListStoreProducts is not implemented"))
+}
+
+func (UnimplementedCatalogDelegatedServiceHandler) GetStoreProduct(context.Context, *connect.Request[v1alpha1.GetStoreProductRequest]) (*connect.Response[v1alpha1.GetStoreProductResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.CatalogDelegatedService.GetStoreProduct is not implemented"))
+}
+
+func (UnimplementedCatalogDelegatedServiceHandler) CreateStoreProduct(context.Context, *connect.Request[v1alpha1.CreateStoreProductRequest]) (*connect.Response[v1alpha1.CreateStoreProductResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.CatalogDelegatedService.CreateStoreProduct is not implemented"))
+}
+
+func (UnimplementedCatalogDelegatedServiceHandler) UpdateStoreProduct(context.Context, *connect.Request[v1alpha1.UpdateStoreProductRequest]) (*connect.Response[v1alpha1.UpdateStoreProductResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.CatalogDelegatedService.UpdateStoreProduct is not implemented"))
+}
+
+func (UnimplementedCatalogDelegatedServiceHandler) PublishStoreProduct(context.Context, *connect.Request[v1alpha1.PublishStoreProductRequest]) (*connect.Response[v1alpha1.PublishStoreProductResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.CatalogDelegatedService.PublishStoreProduct is not implemented"))
+}
+
+func (UnimplementedCatalogDelegatedServiceHandler) UnpublishStoreProduct(context.Context, *connect.Request[v1alpha1.UnpublishStoreProductRequest]) (*connect.Response[v1alpha1.UnpublishStoreProductResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.CatalogDelegatedService.UnpublishStoreProduct is not implemented"))
+}
+
+func (UnimplementedCatalogDelegatedServiceHandler) BatchUnpublishStoreProducts(context.Context, *connect.Request[v1alpha1.BatchUnpublishStoreProductsRequest]) (*connect.Response[v1alpha1.BatchUnpublishStoreProductsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.catalog.v1alpha1.CatalogDelegatedService.BatchUnpublishStoreProducts is not implemented"))
 }

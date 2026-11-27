@@ -20,6 +20,7 @@ import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $0;
 
+import '../../common/v1alpha1/delegated_operation.pbjson.dart' as $4;
 import '../../common/v1alpha1/image.pbjson.dart' as $2;
 import '../../common/v1alpha1/store_card.pbjson.dart' as $1;
 
@@ -2024,41 +2025,6 @@ final $typed_data.Uint8List postStatusCountDescriptor = $convert.base64Decode(
     'Cg9Qb3N0U3RhdHVzQ291bnQSOQoGc3RhdHVzGAEgASgOMiEuaGF3a3Iuc29jaWFsLnYxYWxwaG'
     'ExLlBvc3RTdGF0dXNSBnN0YXR1cxIUCgVjb3VudBgCIAEoA1IFY291bnQ=');
 
-@$core.Deprecated('Use delegatedOperationDescriptor instead')
-const DelegatedOperation$json = {
-  '1': 'DelegatedOperation',
-  '2': [
-    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'requestId'},
-    {
-      '1': 'operation_reason',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'operationReason'
-    },
-    {
-      '1': 'notify_seller',
-      '3': 3,
-      '4': 1,
-      '5': 8,
-      '9': 0,
-      '10': 'notifySeller',
-      '17': true
-    },
-  ],
-  '8': [
-    {'1': '_notify_seller'},
-  ],
-};
-
-/// Descriptor for `DelegatedOperation`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List delegatedOperationDescriptor = $convert.base64Decode(
-    'ChJEZWxlZ2F0ZWRPcGVyYXRpb24SKgoKcmVxdWVzdF9pZBgBIAEoCUIL4EEC4ozP1wgCCAFSCX'
-    'JlcXVlc3RJZBIuChBvcGVyYXRpb25fcmVhc29uGAIgASgJQgPgQQJSD29wZXJhdGlvblJlYXNv'
-    'bhIoCg1ub3RpZnlfc2VsbGVyGAMgASgISABSDG5vdGlmeVNlbGxlcogBAUIQCg5fbm90aWZ5X3'
-    'NlbGxlcg==');
-
 @$core.Deprecated('Use listStorePostsRequestDescriptor instead')
 const ListStorePostsRequest$json = {
   '1': 'ListStorePostsRequest',
@@ -2146,7 +2112,7 @@ const CreateStorePostRequest$json = {
       '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
       '8': {},
       '10': 'operation'
     },
@@ -2177,8 +2143,8 @@ const CreateStorePostRequest$json = {
 
 /// Descriptor for `CreateStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List createStorePostRequestDescriptor = $convert.base64Decode(
-    'ChZDcmVhdGVTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLnNvY2'
-    'lhbC52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEhIKBGJvZHkY'
+    'ChZDcmVhdGVTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLmNvbW'
+    '1vbi52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEhIKBGJvZHkY'
     'AiABKAlSBGJvZHkSMQoSaW1hZ2Vfc3RhZ2VkX3Rva2VuGAMgASgJQgPgQQRSEGltYWdlU3RhZ2'
     'VkVG9rZW4SIgoKcHJvZHVjdF9pZBgEIAEoCUgAUglwcm9kdWN0SWSIAQESJQoOaGFzaHRhZ19p'
     'bnB1dHMYBSADKAlSDWhhc2h0YWdJbnB1dHNCDQoLX3Byb2R1Y3RfaWQ=');
@@ -2213,7 +2179,7 @@ const UpdateStorePostRequest$json = {
       '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
       '8': {},
       '10': 'operation'
     },
@@ -2239,8 +2205,8 @@ const UpdateStorePostRequest$json = {
 
 /// Descriptor for `UpdateStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List updateStorePostRequestDescriptor = $convert.base64Decode(
-    'ChZVcGRhdGVTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLnNvY2'
-    'lhbC52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEjQKBHBvc3QY'
+    'ChZVcGRhdGVTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLmNvbW'
+    '1vbi52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEjQKBHBvc3QY'
     'AiABKAsyGy5oYXdrci5zb2NpYWwudjFhbHBoYTEuUG9zdEID4EECUgRwb3N0EjsKC3VwZGF0ZV'
     '9tYXNrGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza1IKdXBkYXRlTWFzaw==');
 
@@ -2274,7 +2240,7 @@ const PublishStorePostRequest$json = {
       '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
       '8': {},
       '10': 'operation'
     },
@@ -2285,8 +2251,8 @@ const PublishStorePostRequest$json = {
 
 /// Descriptor for `PublishStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List publishStorePostRequestDescriptor = $convert.base64Decode(
-    'ChdQdWJsaXNoU3RvcmVQb3N0UmVxdWVzdBJMCglvcGVyYXRpb24YASABKAsyKS5oYXdrci5zb2'
-    'NpYWwudjFhbHBoYTEuRGVsZWdhdGVkT3BlcmF0aW9uQgPgQQJSCW9wZXJhdGlvbhIcCgdwb3N0'
+    'ChdQdWJsaXNoU3RvcmVQb3N0UmVxdWVzdBJMCglvcGVyYXRpb24YASABKAsyKS5oYXdrci5jb2'
+    '1tb24udjFhbHBoYTEuRGVsZWdhdGVkT3BlcmF0aW9uQgPgQQJSCW9wZXJhdGlvbhIcCgdwb3N0'
     'X2lkGAIgASgJQgPgQQJSBnBvc3RJZBIXCgRldGFnGAMgASgJQgPgQQJSBGV0YWc=');
 
 @$core.Deprecated('Use publishStorePostResponseDescriptor instead')
@@ -2319,7 +2285,7 @@ const UnpublishStorePostRequest$json = {
       '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
       '8': {},
       '10': 'operation'
     },
@@ -2330,8 +2296,8 @@ const UnpublishStorePostRequest$json = {
 
 /// Descriptor for `UnpublishStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List unpublishStorePostRequestDescriptor = $convert.base64Decode(
-    'ChlVbnB1Ymxpc2hTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLn'
-    'NvY2lhbC52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEhwKB3Bv'
+    'ChlVbnB1Ymxpc2hTdG9yZVBvc3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLm'
+    'NvbW1vbi52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEhwKB3Bv'
     'c3RfaWQYAiABKAlCA+BBAlIGcG9zdElkEhcKBGV0YWcYAyABKAlCA+BBAlIEZXRhZw==');
 
 @$core.Deprecated('Use unpublishStorePostResponseDescriptor instead')
@@ -2365,7 +2331,7 @@ const ScheduleStorePostRequest$json = {
       '3': 1,
       '4': 1,
       '5': 11,
-      '6': '.hawkr.social.v1alpha1.DelegatedOperation',
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
       '8': {},
       '10': 'operation'
     },
@@ -2385,8 +2351,8 @@ const ScheduleStorePostRequest$json = {
 
 /// Descriptor for `ScheduleStorePostRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List scheduleStorePostRequestDescriptor = $convert.base64Decode(
-    'ChhTY2hlZHVsZVN0b3JlUG9zdFJlcXVlc3QSTAoJb3BlcmF0aW9uGAEgASgLMikuaGF3a3Iuc2'
-    '9jaWFsLnYxYWxwaGExLkRlbGVnYXRlZE9wZXJhdGlvbkID4EECUglvcGVyYXRpb24SHAoHcG9z'
+    'ChhTY2hlZHVsZVN0b3JlUG9zdFJlcXVlc3QSTAoJb3BlcmF0aW9uGAEgASgLMikuaGF3a3IuY2'
+    '9tbW9uLnYxYWxwaGExLkRlbGVnYXRlZE9wZXJhdGlvbkID4EECUglvcGVyYXRpb24SHAoHcG9z'
     'dF9pZBgCIAEoCUID4EECUgZwb3N0SWQSFwoEZXRhZxgDIAEoCUID4EECUgRldGFnEkIKDHB1Ym'
     'xpc2hfdGltZRgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAlILcHVibGlz'
     'aFRpbWU=');
@@ -3103,7 +3069,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.social.v1alpha1.GetStorePostRequest': GetStorePostRequest$json,
   '.hawkr.social.v1alpha1.GetStorePostResponse': GetStorePostResponse$json,
   '.hawkr.social.v1alpha1.CreateStorePostRequest': CreateStorePostRequest$json,
-  '.hawkr.social.v1alpha1.DelegatedOperation': DelegatedOperation$json,
+  '.hawkr.common.v1alpha1.DelegatedOperation': $4.DelegatedOperation$json,
   '.hawkr.social.v1alpha1.CreateStorePostResponse':
       CreateStorePostResponse$json,
   '.hawkr.social.v1alpha1.UpdateStorePostRequest': UpdateStorePostRequest$json,

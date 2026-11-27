@@ -15,43 +15,43 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'catalog.pb.dart' as $3;
+import 'catalog.pb.dart' as $5;
 import 'catalog.pbjson.dart';
 
 export 'catalog.pb.dart';
 
 abstract class CatalogPublicServiceBase extends $pb.GeneratedService {
-  $async.Future<$3.ListProductsResponse> listProducts(
-      $pb.ServerContext ctx, $3.ListProductsRequest request);
-  $async.Future<$3.SearchProductsResponse> searchProducts(
-      $pb.ServerContext ctx, $3.SearchProductsRequest request);
-  $async.Future<$3.SuggestProductNamesResponse> suggestProductNames(
-      $pb.ServerContext ctx, $3.SuggestProductNamesRequest request);
-  $async.Future<$3.GetProductResponse> getProduct(
-      $pb.ServerContext ctx, $3.GetProductRequest request);
-  $async.Future<$3.ListCategoriesResponse> listCategories(
-      $pb.ServerContext ctx, $3.ListCategoriesRequest request);
-  $async.Future<$3.SuggestHashtagsResponse> suggestHashtags(
-      $pb.ServerContext ctx, $3.SuggestHashtagsRequest request);
-  $async.Future<$3.SuggestTrendingHashtagsResponse> suggestTrendingHashtags(
-      $pb.ServerContext ctx, $3.SuggestTrendingHashtagsRequest request);
+  $async.Future<$5.ListProductsResponse> listProducts(
+      $pb.ServerContext ctx, $5.ListProductsRequest request);
+  $async.Future<$5.SearchProductsResponse> searchProducts(
+      $pb.ServerContext ctx, $5.SearchProductsRequest request);
+  $async.Future<$5.SuggestProductNamesResponse> suggestProductNames(
+      $pb.ServerContext ctx, $5.SuggestProductNamesRequest request);
+  $async.Future<$5.GetProductResponse> getProduct(
+      $pb.ServerContext ctx, $5.GetProductRequest request);
+  $async.Future<$5.ListCategoriesResponse> listCategories(
+      $pb.ServerContext ctx, $5.ListCategoriesRequest request);
+  $async.Future<$5.SuggestHashtagsResponse> suggestHashtags(
+      $pb.ServerContext ctx, $5.SuggestHashtagsRequest request);
+  $async.Future<$5.SuggestTrendingHashtagsResponse> suggestTrendingHashtags(
+      $pb.ServerContext ctx, $5.SuggestTrendingHashtagsRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'ListProducts':
-        return $3.ListProductsRequest();
+        return $5.ListProductsRequest();
       case 'SearchProducts':
-        return $3.SearchProductsRequest();
+        return $5.SearchProductsRequest();
       case 'SuggestProductNames':
-        return $3.SuggestProductNamesRequest();
+        return $5.SuggestProductNamesRequest();
       case 'GetProduct':
-        return $3.GetProductRequest();
+        return $5.GetProductRequest();
       case 'ListCategories':
-        return $3.ListCategoriesRequest();
+        return $5.ListCategoriesRequest();
       case 'SuggestHashtags':
-        return $3.SuggestHashtagsRequest();
+        return $5.SuggestHashtagsRequest();
       case 'SuggestTrendingHashtags':
-        return $3.SuggestTrendingHashtagsRequest();
+        return $5.SuggestTrendingHashtagsRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -61,21 +61,21 @@ abstract class CatalogPublicServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'ListProducts':
-        return listProducts(ctx, request as $3.ListProductsRequest);
+        return listProducts(ctx, request as $5.ListProductsRequest);
       case 'SearchProducts':
-        return searchProducts(ctx, request as $3.SearchProductsRequest);
+        return searchProducts(ctx, request as $5.SearchProductsRequest);
       case 'SuggestProductNames':
         return suggestProductNames(
-            ctx, request as $3.SuggestProductNamesRequest);
+            ctx, request as $5.SuggestProductNamesRequest);
       case 'GetProduct':
-        return getProduct(ctx, request as $3.GetProductRequest);
+        return getProduct(ctx, request as $5.GetProductRequest);
       case 'ListCategories':
-        return listCategories(ctx, request as $3.ListCategoriesRequest);
+        return listCategories(ctx, request as $5.ListCategoriesRequest);
       case 'SuggestHashtags':
-        return suggestHashtags(ctx, request as $3.SuggestHashtagsRequest);
+        return suggestHashtags(ctx, request as $5.SuggestHashtagsRequest);
       case 'SuggestTrendingHashtags':
         return suggestTrendingHashtags(
-            ctx, request as $3.SuggestTrendingHashtagsRequest);
+            ctx, request as $5.SuggestTrendingHashtagsRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -88,45 +88,45 @@ abstract class CatalogPublicServiceBase extends $pb.GeneratedService {
 }
 
 abstract class SellerCatalogAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$3.ListMyProductsResponse> listMyProducts(
-      $pb.ServerContext ctx, $3.ListMyProductsRequest request);
-  $async.Future<$3.GetMyProductResponse> getMyProduct(
-      $pb.ServerContext ctx, $3.GetMyProductRequest request);
-  $async.Future<$3.CountMyProductsResponse> countMyProducts(
-      $pb.ServerContext ctx, $3.CountMyProductsRequest request);
-  $async.Future<$3.CreateProductResponse> createProduct(
-      $pb.ServerContext ctx, $3.CreateProductRequest request);
-  $async.Future<$3.UpdateProductResponse> updateProduct(
-      $pb.ServerContext ctx, $3.UpdateProductRequest request);
-  $async.Future<$3.SetProductStatusResponse> setProductStatus(
-      $pb.ServerContext ctx, $3.SetProductStatusRequest request);
-  $async.Future<$3.DeleteProductResponse> deleteProduct(
-      $pb.ServerContext ctx, $3.DeleteProductRequest request);
-  $async.Future<$3.AdjustStockResponse> adjustStock(
-      $pb.ServerContext ctx, $3.AdjustStockRequest request);
-  $async.Future<$3.SetStockResponse> setStock(
-      $pb.ServerContext ctx, $3.SetStockRequest request);
+  $async.Future<$5.ListMyProductsResponse> listMyProducts(
+      $pb.ServerContext ctx, $5.ListMyProductsRequest request);
+  $async.Future<$5.GetMyProductResponse> getMyProduct(
+      $pb.ServerContext ctx, $5.GetMyProductRequest request);
+  $async.Future<$5.CountMyProductsResponse> countMyProducts(
+      $pb.ServerContext ctx, $5.CountMyProductsRequest request);
+  $async.Future<$5.CreateProductResponse> createProduct(
+      $pb.ServerContext ctx, $5.CreateProductRequest request);
+  $async.Future<$5.UpdateProductResponse> updateProduct(
+      $pb.ServerContext ctx, $5.UpdateProductRequest request);
+  $async.Future<$5.SetProductStatusResponse> setProductStatus(
+      $pb.ServerContext ctx, $5.SetProductStatusRequest request);
+  $async.Future<$5.DeleteProductResponse> deleteProduct(
+      $pb.ServerContext ctx, $5.DeleteProductRequest request);
+  $async.Future<$5.AdjustStockResponse> adjustStock(
+      $pb.ServerContext ctx, $5.AdjustStockRequest request);
+  $async.Future<$5.SetStockResponse> setStock(
+      $pb.ServerContext ctx, $5.SetStockRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'ListMyProducts':
-        return $3.ListMyProductsRequest();
+        return $5.ListMyProductsRequest();
       case 'GetMyProduct':
-        return $3.GetMyProductRequest();
+        return $5.GetMyProductRequest();
       case 'CountMyProducts':
-        return $3.CountMyProductsRequest();
+        return $5.CountMyProductsRequest();
       case 'CreateProduct':
-        return $3.CreateProductRequest();
+        return $5.CreateProductRequest();
       case 'UpdateProduct':
-        return $3.UpdateProductRequest();
+        return $5.UpdateProductRequest();
       case 'SetProductStatus':
-        return $3.SetProductStatusRequest();
+        return $5.SetProductStatusRequest();
       case 'DeleteProduct':
-        return $3.DeleteProductRequest();
+        return $5.DeleteProductRequest();
       case 'AdjustStock':
-        return $3.AdjustStockRequest();
+        return $5.AdjustStockRequest();
       case 'SetStock':
-        return $3.SetStockRequest();
+        return $5.SetStockRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -136,23 +136,23 @@ abstract class SellerCatalogAppServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'ListMyProducts':
-        return listMyProducts(ctx, request as $3.ListMyProductsRequest);
+        return listMyProducts(ctx, request as $5.ListMyProductsRequest);
       case 'GetMyProduct':
-        return getMyProduct(ctx, request as $3.GetMyProductRequest);
+        return getMyProduct(ctx, request as $5.GetMyProductRequest);
       case 'CountMyProducts':
-        return countMyProducts(ctx, request as $3.CountMyProductsRequest);
+        return countMyProducts(ctx, request as $5.CountMyProductsRequest);
       case 'CreateProduct':
-        return createProduct(ctx, request as $3.CreateProductRequest);
+        return createProduct(ctx, request as $5.CreateProductRequest);
       case 'UpdateProduct':
-        return updateProduct(ctx, request as $3.UpdateProductRequest);
+        return updateProduct(ctx, request as $5.UpdateProductRequest);
       case 'SetProductStatus':
-        return setProductStatus(ctx, request as $3.SetProductStatusRequest);
+        return setProductStatus(ctx, request as $5.SetProductStatusRequest);
       case 'DeleteProduct':
-        return deleteProduct(ctx, request as $3.DeleteProductRequest);
+        return deleteProduct(ctx, request as $5.DeleteProductRequest);
       case 'AdjustStock':
-        return adjustStock(ctx, request as $3.AdjustStockRequest);
+        return adjustStock(ctx, request as $5.AdjustStockRequest);
       case 'SetStock':
-        return setStock(ctx, request as $3.SetStockRequest);
+        return setStock(ctx, request as $5.SetStockRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -162,4 +162,73 @@ abstract class SellerCatalogAppServiceBase extends $pb.GeneratedService {
       SellerCatalogAppServiceBase$json;
   $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       get $messageJson => SellerCatalogAppServiceBase$messageJson;
+}
+
+abstract class CatalogDelegatedServiceBase extends $pb.GeneratedService {
+  $async.Future<$5.ListStoreProductsResponse> listStoreProducts(
+      $pb.ServerContext ctx, $5.ListStoreProductsRequest request);
+  $async.Future<$5.GetStoreProductResponse> getStoreProduct(
+      $pb.ServerContext ctx, $5.GetStoreProductRequest request);
+  $async.Future<$5.CreateStoreProductResponse> createStoreProduct(
+      $pb.ServerContext ctx, $5.CreateStoreProductRequest request);
+  $async.Future<$5.UpdateStoreProductResponse> updateStoreProduct(
+      $pb.ServerContext ctx, $5.UpdateStoreProductRequest request);
+  $async.Future<$5.PublishStoreProductResponse> publishStoreProduct(
+      $pb.ServerContext ctx, $5.PublishStoreProductRequest request);
+  $async.Future<$5.UnpublishStoreProductResponse> unpublishStoreProduct(
+      $pb.ServerContext ctx, $5.UnpublishStoreProductRequest request);
+  $async.Future<$5.BatchUnpublishStoreProductsResponse>
+      batchUnpublishStoreProducts(
+          $pb.ServerContext ctx, $5.BatchUnpublishStoreProductsRequest request);
+
+  $pb.GeneratedMessage createRequest($core.String methodName) {
+    switch (methodName) {
+      case 'ListStoreProducts':
+        return $5.ListStoreProductsRequest();
+      case 'GetStoreProduct':
+        return $5.GetStoreProductRequest();
+      case 'CreateStoreProduct':
+        return $5.CreateStoreProductRequest();
+      case 'UpdateStoreProduct':
+        return $5.UpdateStoreProductRequest();
+      case 'PublishStoreProduct':
+        return $5.PublishStoreProductRequest();
+      case 'UnpublishStoreProduct':
+        return $5.UnpublishStoreProductRequest();
+      case 'BatchUnpublishStoreProducts':
+        return $5.BatchUnpublishStoreProductsRequest();
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx,
+      $core.String methodName, $pb.GeneratedMessage request) {
+    switch (methodName) {
+      case 'ListStoreProducts':
+        return listStoreProducts(ctx, request as $5.ListStoreProductsRequest);
+      case 'GetStoreProduct':
+        return getStoreProduct(ctx, request as $5.GetStoreProductRequest);
+      case 'CreateStoreProduct':
+        return createStoreProduct(ctx, request as $5.CreateStoreProductRequest);
+      case 'UpdateStoreProduct':
+        return updateStoreProduct(ctx, request as $5.UpdateStoreProductRequest);
+      case 'PublishStoreProduct':
+        return publishStoreProduct(
+            ctx, request as $5.PublishStoreProductRequest);
+      case 'UnpublishStoreProduct':
+        return unpublishStoreProduct(
+            ctx, request as $5.UnpublishStoreProductRequest);
+      case 'BatchUnpublishStoreProducts':
+        return batchUnpublishStoreProducts(
+            ctx, request as $5.BatchUnpublishStoreProductsRequest);
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $core.Map<$core.String, $core.dynamic> get $json =>
+      CatalogDelegatedServiceBase$json;
+  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+      get $messageJson => CatalogDelegatedServiceBase$messageJson;
 }

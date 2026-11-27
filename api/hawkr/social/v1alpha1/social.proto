@@ -13,6 +13,7 @@ import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/delegated_operation.proto";
 import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/policy_category.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
@@ -855,19 +856,6 @@ service SocialDelegatedService {
   }
 }
 
-// DelegatedOperation 是每個代行寫入都要帶的稽核資料。
-message DelegatedOperation {
-  // UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
-  string request_id = 1 [
-    (google.api.field_behavior) = REQUIRED,
-    (google.api.field_info).format = UUID4
-  ];
-  // 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
-  string operation_reason = 2 [(google.api.field_behavior) = REQUIRED];
-  // 是否在完成後通知店主；不設是通知。
-  optional bool notify_seller = 3;
-}
-
 message ListStorePostsRequest {
   // 預設 20，上限 50。
   int32 page_size = 1;
@@ -891,7 +879,7 @@ message GetStorePostResponse {
 }
 
 message CreateStorePostRequest {
-  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
   // 內文，去除首尾空白後最多 2200 個字元；草稿可以是空的。
   string body = 2;
   // 圖片的 staged token（media 上傳完成後拿到的）。
@@ -909,7 +897,7 @@ message CreateStorePostResponse {
 }
 
 message UpdateStorePostRequest {
-  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
   // id 與 etag 必填。可以修改的欄位是 body、image_staged_token、product_id、hashtag_inputs，update_mask 要列至少一個；沒列的欄位保留目前的值。
   Post post = 2 [(google.api.field_behavior) = REQUIRED];
   google.protobuf.FieldMask update_mask = 3;
@@ -921,7 +909,7 @@ message UpdateStorePostResponse {
 }
 
 message PublishStorePostRequest {
-  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
   // 貼文 ID。
   string post_id = 2 [(google.api.field_behavior) = REQUIRED];
   // 讀取時拿到的 etag，必填。
@@ -934,7 +922,7 @@ message PublishStorePostResponse {
 }
 
 message UnpublishStorePostRequest {
-  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
   // 貼文 ID。
   string post_id = 2 [(google.api.field_behavior) = REQUIRED];
   // 讀取時拿到的 etag，必填。
@@ -947,7 +935,7 @@ message UnpublishStorePostResponse {
 }
 
 message ScheduleStorePostRequest {
-  DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
   // 貼文 ID。
   string post_id = 2 [(google.api.field_behavior) = REQUIRED];
   // 讀取時拿到的 etag，必填。

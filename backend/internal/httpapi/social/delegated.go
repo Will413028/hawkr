@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -90,23 +91,6 @@ func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, 
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log}, runner: runner, posts: posts}, nil
-}
-
-// delegatedOperation 解析每個寫入共同的稽核資料：request_id 必填（UUIDv4）；操作原因 1 到 100 字；notify_seller 不設是通知。
-func delegatedOperation(op *pb.DelegatedOperation) (moddelegation.DelegatedOperation, error) {
-	if !op.ProtoReflect().IsValid() {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation", "operation 必填")
-	}
-	id, err := rpc.ParseRequestID(op.GetRequestId())
-	if err != nil || id == nil {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.request_id", "operation.request_id 必填，而且必須是 UUIDv4")
-	}
-	reason, ok := moddelegation.LegalOperationReason(op.GetOperationReason())
-	if !ok {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.operation_reason",
-			fmt.Sprintf("operation.operation_reason 必填，去除首尾空白後 1 到 %d 個字元，不得含控制字元", moddelegation.OperationReasonMaxRunes))
-	}
-	return moddelegation.DelegatedOperation{RequestID: *id, Reason: reason, NotifySeller: op.NotifySeller == nil || op.GetNotifySeller()}, nil
 }
 
 // postPreview 是稽核列的資源名稱：內文去除首尾空白後的前 60 個字元。
@@ -246,7 +230,7 @@ func (h *Delegated) GetStorePost(ctx context.Context, req *connect.Request[pb.Ge
 
 func (h *Delegated) CreateStorePost(ctx context.Context, req *connect.Request[pb.CreateStorePostRequest]) (*connect.Response[pb.CreateStorePostResponse], error) {
 	msg := req.Msg
-	op, err := delegatedOperation(msg.GetOperation())
+	op, err := httpdelegation.ParseOperation(msg.GetOperation())
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +256,7 @@ func (h *Delegated) CreateStorePost(ctx context.Context, req *connect.Request[pb
 }
 
 func (h *Delegated) UpdateStorePost(ctx context.Context, req *connect.Request[pb.UpdateStorePostRequest]) (*connect.Response[pb.UpdateStorePostResponse], error) {
-	op, err := delegatedOperation(req.Msg.GetOperation())
+	op, err := httpdelegation.ParseOperation(req.Msg.GetOperation())
 	if err != nil {
 		return nil, err
 	}
@@ -310,9 +294,9 @@ func (h *Delegated) UpdateStorePost(ctx context.Context, req *connect.Request[pb
 }
 
 // transition 是發布與下架共同的流程：operation、貼文 ID 與必填的 etag，再由 do 呼叫模組。
-func (h *Delegated) transition(ctx context.Context, op *pb.DelegatedOperation, postID, etag string, action moddelegation.AuditAction,
+func (h *Delegated) transition(ctx context.Context, op *commonpb.DelegatedOperation, postID, etag string, action moddelegation.AuditAction,
 	do func(context.Context, seller.Store, uuid.UUID, int64, *delegatedactor.Actor) (social.Post, error)) (*pb.Post, string, error) {
-	o, err := delegatedOperation(op)
+	o, err := httpdelegation.ParseOperation(op)
 	if err != nil {
 		return nil, "", err
 	}
@@ -355,7 +339,7 @@ func (h *Delegated) UnpublishStorePost(ctx context.Context, req *connect.Request
 
 func (h *Delegated) ScheduleStorePost(ctx context.Context, req *connect.Request[pb.ScheduleStorePostRequest]) (*connect.Response[pb.ScheduleStorePostResponse], error) {
 	msg := req.Msg
-	op, err := delegatedOperation(msg.GetOperation())
+	op, err := httpdelegation.ParseOperation(msg.GetOperation())
 	if err != nil {
 		return nil, err
 	}

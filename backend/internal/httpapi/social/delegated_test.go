@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -276,8 +277,8 @@ func v4() string {
 	return id[:14] + "4" + id[15:19] + "8" + id[20:]
 }
 
-func delegatedOp() *pb.DelegatedOperation {
-	return &pb.DelegatedOperation{RequestId: v4(), OperationReason: "  店家請我們代發  "}
+func delegatedOp() *commonpb.DelegatedOperation {
+	return &commonpb.DelegatedOperation{RequestId: v4(), OperationReason: "  店家請我們代發  "}
 }
 
 func goodSessions() map[string]moddelegation.DelegationSession {
@@ -511,7 +512,7 @@ func TestOnlyReadsAreNoSideEffects(t *testing.T) {
 func TestWritesRequireAWellFormedOperation(t *testing.T) {
 	e := newDelegatedEnv(t, goodSessions())
 	id := uuid.New().String()
-	bad := map[string]*pb.DelegatedOperation{
+	bad := map[string]*commonpb.DelegatedOperation{
 		"沒有 operation":  nil,
 		"沒有 request_id": {OperationReason: "r"},
 		"不是 UUIDv4":     {RequestId: uuid.New().String()[:14] + "1" + uuid.New().String()[15:], OperationReason: "r"},

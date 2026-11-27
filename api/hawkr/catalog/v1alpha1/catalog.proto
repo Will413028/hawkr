@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），以及賣家管理自己店家的商品（SellerCatalogAppService）；
+// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），賣家管理自己店家的商品（SellerCatalogAppService），以及代行營運的平台管理員管理代行店家的商品（CatalogDelegatedService）；
 // 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
 // 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
@@ -13,7 +13,9 @@ package hawkr.catalog.v1alpha1;
 
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/delegated_operation.proto";
 import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/limits.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
@@ -112,6 +114,54 @@ service SellerCatalogAppService {
   // 現值不等於預期（期間有訂單扣減或別處調整）回 failed_precondition，不寫入，client 重讀後再決定。
   // 同一家店以同一個 request_id 重送且內容相同只生效一次；內容不同回 invalid_argument。不改商品的 etag。
   rpc SetStock(SetStockRequest) returns (SetStockResponse);
+}
+
+// CatalogDelegatedService 是代行營運中的平台管理員讀寫代行店家的商品：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
+// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。回應一律不可快取（private, no-store）。
+// 商品、狀態與內容的規則與 SellerCatalogAppService 相同（同一組模組方法），回應也用同一組賣家訊息（SellerProduct、SellerProductSummary）。
+//
+// 能力（products.read、products.write、products.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
+// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
+//
+// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
+// 成功的讀取不稽核。
+service CatalogDelegatedService {
+  // ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
+  rpc ListStoreProducts(ListStoreProductsRequest) returns (ListStoreProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
+  rpc GetStoreProduct(GetStoreProductRequest) returns (GetStoreProductResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
+  // 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
+  rpc CreateStoreProduct(CreateStoreProductRequest) returns (CreateStoreProductResponse);
+
+  // UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
+  // VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
+  rpc UpdateStoreProduct(UpdateStoreProductRequest) returns (UpdateStoreProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+  rpc PublishStoreProduct(PublishStoreProductRequest) returns (PublishStoreProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+  rpc UnpublishStoreProduct(UnpublishStoreProductRequest) returns (UnpublishStoreProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
+  // 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
+  // （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
+  rpc BatchUnpublishStoreProducts(BatchUnpublishStoreProductsRequest) returns (BatchUnpublishStoreProductsResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 }
 
 // ProductStatus 是商品的狀態（賣家與後台看得到，公開訊息不帶）。
@@ -674,4 +724,103 @@ message SkuInput {
   optional int64 compare_at_price = 4;
   // 新組合的初始庫存，不得為負。
   int32 initial_stock = 5;
+}
+
+// ===== 代行 =====
+
+message ListStoreProductsRequest {
+  MyProductFilter filter = 1;
+  // 預設 20，上限 50。
+  int32 page_size = 2;
+  // page_token 與 filter 綁定。
+  string page_token = 3;
+}
+
+message ListStoreProductsResponse {
+  repeated SellerProductSummary products = 1;
+  string next_page_token = 2;
+}
+
+message GetStoreProductRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStoreProductResponse {
+  SellerProduct product = 1;
+}
+
+message CreateStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 完整內容；建立一律是草稿。
+  ProductInput product = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateStoreProductResponse {
+  SellerProduct product = 1;
+  // 這次寫入的稽核列 ID（重送時是第一次的）。
+  string audit_log_id = 2;
+}
+
+message UpdateStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  string product_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+  // 要修改的欄位的新值；只讀 update_mask 列出的欄位。
+  ProductInput product = 4 [(google.api.field_behavior) = REQUIRED];
+  // ProductInput 最上層欄位的子集（title、category_id、hashtag_inputs、gallery、description、axes、skus、low_stock_threshold），至少一個；沒列的欄位保留目前的值。
+  // axes 與 skus 要一起列（SKU 的選項值要對得上選項軸）。
+  google.protobuf.FieldMask update_mask = 5 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateStoreProductResponse {
+  SellerProduct product = 1;
+  string audit_log_id = 2;
+}
+
+message PublishStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  string product_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PublishStoreProductResponse {
+  SellerProduct product = 1;
+  string audit_log_id = 2;
+}
+
+message UnpublishStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  string product_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnpublishStoreProductResponse {
+  SellerProduct product = 1;
+  string audit_log_id = 2;
+}
+
+message BatchUnpublishStoreProductsRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  // 要下架的商品，1 到 50 項，商品 ID 不得重複。
+  repeated BatchUnpublishItem items = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits).max_items = 50
+  ];
+}
+
+// BatchUnpublishItem 是批次下架的一項：商品與讀取時拿到的 etag。
+message BatchUnpublishItem {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message BatchUnpublishStoreProductsResponse {
+  // 下架後的商品，順序同請求的 items。
+  repeated SellerProductSummary products = 1;
+  // 這一批唯一的稽核列 ID（重送時是第一次的）。
+  string audit_log_id = 2;
 }

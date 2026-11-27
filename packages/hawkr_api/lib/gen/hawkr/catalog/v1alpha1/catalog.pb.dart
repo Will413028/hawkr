@@ -15,9 +15,12 @@ import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
+import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
+    as $4;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $2;
 
+import '../../common/v1alpha1/delegated_operation.pb.dart' as $3;
 import '../../common/v1alpha1/image.pb.dart' as $0;
 import '../../common/v1alpha1/store_card.pb.dart' as $1;
 import 'catalog.pbenum.dart';
@@ -4803,6 +4806,1213 @@ class SkuInput extends $pb.GeneratedMessage {
   void clearInitialStock() => $_clearField(5);
 }
 
+class ListStoreProductsRequest extends $pb.GeneratedMessage {
+  factory ListStoreProductsRequest({
+    MyProductFilter? filter,
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListStoreProductsRequest._();
+    if (filter != null) result.filter = filter;
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListStoreProductsRequest._();
+
+  factory ListStoreProductsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStoreProductsRequest()..mergeFromBuffer(data, registry);
+  factory ListStoreProductsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStoreProductsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListStoreProductsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: ListStoreProductsRequest.$_createMessage)
+    ..aOM<MyProductFilter>(1, _omitFieldNames ? '' : 'filter',
+        subBuilder: MyProductFilter.$_createMessage)
+    ..aI(2, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(3, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStoreProductsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStoreProductsRequest copyWith(
+          void Function(ListStoreProductsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListStoreProductsRequest))
+          as ListStoreProductsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListStoreProductsRequest() / ListStoreProductsRequest.new instead')
+  static ListStoreProductsRequest create() => ListStoreProductsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListStoreProductsRequest._();
+  @$core.override
+  ListStoreProductsRequest createEmptyInstance() =>
+      ListStoreProductsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListStoreProductsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListStoreProductsRequest>(
+          ListStoreProductsRequest.$_createMessage);
+  static ListStoreProductsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  MyProductFilter get filter => $_getN(0);
+  @$pb.TagNumber(1)
+  set filter(MyProductFilter value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasFilter() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFilter() => $_clearField(1);
+  @$pb.TagNumber(1)
+  MyProductFilter ensureFilter() => $_ensure(0);
+
+  /// 預設 20，上限 50。
+  @$pb.TagNumber(2)
+  $core.int get pageSize => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set pageSize($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageSize() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageSize() => $_clearField(2);
+
+  /// page_token 與 filter 綁定。
+  @$pb.TagNumber(3)
+  $core.String get pageToken => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set pageToken($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPageToken() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPageToken() => $_clearField(3);
+}
+
+class ListStoreProductsResponse extends $pb.GeneratedMessage {
+  factory ListStoreProductsResponse({
+    $core.Iterable<SellerProductSummary>? products,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListStoreProductsResponse._();
+    if (products != null) result.products.addAll(products);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListStoreProductsResponse._();
+
+  factory ListStoreProductsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStoreProductsResponse()..mergeFromBuffer(data, registry);
+  factory ListStoreProductsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListStoreProductsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListStoreProductsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: ListStoreProductsResponse.$_createMessage)
+    ..pPM<SellerProductSummary>(1, _omitFieldNames ? '' : 'products',
+        subBuilder: SellerProductSummary.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStoreProductsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListStoreProductsResponse copyWith(
+          void Function(ListStoreProductsResponse) updates) =>
+      super.copyWith((message) => updates(message as ListStoreProductsResponse))
+          as ListStoreProductsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListStoreProductsResponse() / ListStoreProductsResponse.new instead')
+  static ListStoreProductsResponse create() => ListStoreProductsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListStoreProductsResponse._();
+  @$core.override
+  ListStoreProductsResponse createEmptyInstance() =>
+      ListStoreProductsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListStoreProductsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListStoreProductsResponse>(
+          ListStoreProductsResponse.$_createMessage);
+  static ListStoreProductsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<SellerProductSummary> get products => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class GetStoreProductRequest extends $pb.GeneratedMessage {
+  factory GetStoreProductRequest({
+    $core.String? productId,
+  }) {
+    final result = GetStoreProductRequest._();
+    if (productId != null) result.productId = productId;
+    return result;
+  }
+
+  GetStoreProductRequest._();
+
+  factory GetStoreProductRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreProductRequest()..mergeFromBuffer(data, registry);
+  factory GetStoreProductRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreProductRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetStoreProductRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: GetStoreProductRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'productId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreProductRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreProductRequest copyWith(
+          void Function(GetStoreProductRequest) updates) =>
+      super.copyWith((message) => updates(message as GetStoreProductRequest))
+          as GetStoreProductRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetStoreProductRequest() / GetStoreProductRequest.new instead')
+  static GetStoreProductRequest create() => GetStoreProductRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetStoreProductRequest._();
+  @$core.override
+  GetStoreProductRequest createEmptyInstance() => GetStoreProductRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetStoreProductRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetStoreProductRequest>(
+          GetStoreProductRequest.$_createMessage);
+  static GetStoreProductRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get productId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set productId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProductId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProductId() => $_clearField(1);
+}
+
+class GetStoreProductResponse extends $pb.GeneratedMessage {
+  factory GetStoreProductResponse({
+    SellerProduct? product,
+  }) {
+    final result = GetStoreProductResponse._();
+    if (product != null) result.product = product;
+    return result;
+  }
+
+  GetStoreProductResponse._();
+
+  factory GetStoreProductResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreProductResponse()..mergeFromBuffer(data, registry);
+  factory GetStoreProductResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetStoreProductResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetStoreProductResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: GetStoreProductResponse.$_createMessage)
+    ..aOM<SellerProduct>(1, _omitFieldNames ? '' : 'product',
+        subBuilder: SellerProduct.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreProductResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetStoreProductResponse copyWith(
+          void Function(GetStoreProductResponse) updates) =>
+      super.copyWith((message) => updates(message as GetStoreProductResponse))
+          as GetStoreProductResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetStoreProductResponse() / GetStoreProductResponse.new instead')
+  static GetStoreProductResponse create() => GetStoreProductResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GetStoreProductResponse._();
+  @$core.override
+  GetStoreProductResponse createEmptyInstance() => GetStoreProductResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetStoreProductResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetStoreProductResponse>(
+          GetStoreProductResponse.$_createMessage);
+  static GetStoreProductResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SellerProduct get product => $_getN(0);
+  @$pb.TagNumber(1)
+  set product(SellerProduct value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProduct() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProduct() => $_clearField(1);
+  @$pb.TagNumber(1)
+  SellerProduct ensureProduct() => $_ensure(0);
+}
+
+class CreateStoreProductRequest extends $pb.GeneratedMessage {
+  factory CreateStoreProductRequest({
+    $3.DelegatedOperation? operation,
+    ProductInput? product,
+  }) {
+    final result = CreateStoreProductRequest._();
+    if (operation != null) result.operation = operation;
+    if (product != null) result.product = product;
+    return result;
+  }
+
+  CreateStoreProductRequest._();
+
+  factory CreateStoreProductRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStoreProductRequest()..mergeFromBuffer(data, registry);
+  factory CreateStoreProductRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStoreProductRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateStoreProductRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: CreateStoreProductRequest.$_createMessage)
+    ..aOM<$3.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $3.DelegatedOperation.$_createMessage)
+    ..aOM<ProductInput>(2, _omitFieldNames ? '' : 'product',
+        subBuilder: ProductInput.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStoreProductRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStoreProductRequest copyWith(
+          void Function(CreateStoreProductRequest) updates) =>
+      super.copyWith((message) => updates(message as CreateStoreProductRequest))
+          as CreateStoreProductRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateStoreProductRequest() / CreateStoreProductRequest.new instead')
+  static CreateStoreProductRequest create() => CreateStoreProductRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CreateStoreProductRequest._();
+  @$core.override
+  CreateStoreProductRequest createEmptyInstance() =>
+      CreateStoreProductRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreateStoreProductRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateStoreProductRequest>(
+          CreateStoreProductRequest.$_createMessage);
+  static CreateStoreProductRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation($3.DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation ensureOperation() => $_ensure(0);
+
+  /// 完整內容；建立一律是草稿。
+  @$pb.TagNumber(2)
+  ProductInput get product => $_getN(1);
+  @$pb.TagNumber(2)
+  set product(ProductInput value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProduct() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProduct() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ProductInput ensureProduct() => $_ensure(1);
+}
+
+class CreateStoreProductResponse extends $pb.GeneratedMessage {
+  factory CreateStoreProductResponse({
+    SellerProduct? product,
+    $core.String? auditLogId,
+  }) {
+    final result = CreateStoreProductResponse._();
+    if (product != null) result.product = product;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  CreateStoreProductResponse._();
+
+  factory CreateStoreProductResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStoreProductResponse()..mergeFromBuffer(data, registry);
+  factory CreateStoreProductResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateStoreProductResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateStoreProductResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: CreateStoreProductResponse.$_createMessage)
+    ..aOM<SellerProduct>(1, _omitFieldNames ? '' : 'product',
+        subBuilder: SellerProduct.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStoreProductResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateStoreProductResponse copyWith(
+          void Function(CreateStoreProductResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as CreateStoreProductResponse))
+          as CreateStoreProductResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateStoreProductResponse() / CreateStoreProductResponse.new instead')
+  static CreateStoreProductResponse create() => CreateStoreProductResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      CreateStoreProductResponse._();
+  @$core.override
+  CreateStoreProductResponse createEmptyInstance() =>
+      CreateStoreProductResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CreateStoreProductResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateStoreProductResponse>(
+          CreateStoreProductResponse.$_createMessage);
+  static CreateStoreProductResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SellerProduct get product => $_getN(0);
+  @$pb.TagNumber(1)
+  set product(SellerProduct value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProduct() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProduct() => $_clearField(1);
+  @$pb.TagNumber(1)
+  SellerProduct ensureProduct() => $_ensure(0);
+
+  /// 這次寫入的稽核列 ID（重送時是第一次的）。
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class UpdateStoreProductRequest extends $pb.GeneratedMessage {
+  factory UpdateStoreProductRequest({
+    $3.DelegatedOperation? operation,
+    $core.String? productId,
+    $core.String? etag,
+    ProductInput? product,
+    $4.FieldMask? updateMask,
+  }) {
+    final result = UpdateStoreProductRequest._();
+    if (operation != null) result.operation = operation;
+    if (productId != null) result.productId = productId;
+    if (etag != null) result.etag = etag;
+    if (product != null) result.product = product;
+    if (updateMask != null) result.updateMask = updateMask;
+    return result;
+  }
+
+  UpdateStoreProductRequest._();
+
+  factory UpdateStoreProductRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStoreProductRequest()..mergeFromBuffer(data, registry);
+  factory UpdateStoreProductRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStoreProductRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateStoreProductRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: UpdateStoreProductRequest.$_createMessage)
+    ..aOM<$3.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $3.DelegatedOperation.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'productId')
+    ..aOS(3, _omitFieldNames ? '' : 'etag')
+    ..aOM<ProductInput>(4, _omitFieldNames ? '' : 'product',
+        subBuilder: ProductInput.$_createMessage)
+    ..aOM<$4.FieldMask>(5, _omitFieldNames ? '' : 'updateMask',
+        subBuilder: $4.FieldMask.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStoreProductRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStoreProductRequest copyWith(
+          void Function(UpdateStoreProductRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateStoreProductRequest))
+          as UpdateStoreProductRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateStoreProductRequest() / UpdateStoreProductRequest.new instead')
+  static UpdateStoreProductRequest create() => UpdateStoreProductRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      UpdateStoreProductRequest._();
+  @$core.override
+  UpdateStoreProductRequest createEmptyInstance() =>
+      UpdateStoreProductRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateStoreProductRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateStoreProductRequest>(
+          UpdateStoreProductRequest.$_createMessage);
+  static UpdateStoreProductRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation($3.DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation ensureOperation() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get productId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set productId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProductId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProductId() => $_clearField(2);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(3)
+  $core.String get etag => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set etag($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEtag() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEtag() => $_clearField(3);
+
+  /// 要修改的欄位的新值；只讀 update_mask 列出的欄位。
+  @$pb.TagNumber(4)
+  ProductInput get product => $_getN(3);
+  @$pb.TagNumber(4)
+  set product(ProductInput value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProduct() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProduct() => $_clearField(4);
+  @$pb.TagNumber(4)
+  ProductInput ensureProduct() => $_ensure(3);
+
+  /// ProductInput 最上層欄位的子集（title、category_id、hashtag_inputs、gallery、description、axes、skus、low_stock_threshold），至少一個；沒列的欄位保留目前的值。
+  /// axes 與 skus 要一起列（SKU 的選項值要對得上選項軸）。
+  @$pb.TagNumber(5)
+  $4.FieldMask get updateMask => $_getN(4);
+  @$pb.TagNumber(5)
+  set updateMask($4.FieldMask value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasUpdateMask() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearUpdateMask() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $4.FieldMask ensureUpdateMask() => $_ensure(4);
+}
+
+class UpdateStoreProductResponse extends $pb.GeneratedMessage {
+  factory UpdateStoreProductResponse({
+    SellerProduct? product,
+    $core.String? auditLogId,
+  }) {
+    final result = UpdateStoreProductResponse._();
+    if (product != null) result.product = product;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  UpdateStoreProductResponse._();
+
+  factory UpdateStoreProductResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStoreProductResponse()..mergeFromBuffer(data, registry);
+  factory UpdateStoreProductResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateStoreProductResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateStoreProductResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: UpdateStoreProductResponse.$_createMessage)
+    ..aOM<SellerProduct>(1, _omitFieldNames ? '' : 'product',
+        subBuilder: SellerProduct.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStoreProductResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateStoreProductResponse copyWith(
+          void Function(UpdateStoreProductResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as UpdateStoreProductResponse))
+          as UpdateStoreProductResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateStoreProductResponse() / UpdateStoreProductResponse.new instead')
+  static UpdateStoreProductResponse create() => UpdateStoreProductResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      UpdateStoreProductResponse._();
+  @$core.override
+  UpdateStoreProductResponse createEmptyInstance() =>
+      UpdateStoreProductResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateStoreProductResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateStoreProductResponse>(
+          UpdateStoreProductResponse.$_createMessage);
+  static UpdateStoreProductResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SellerProduct get product => $_getN(0);
+  @$pb.TagNumber(1)
+  set product(SellerProduct value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProduct() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProduct() => $_clearField(1);
+  @$pb.TagNumber(1)
+  SellerProduct ensureProduct() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class PublishStoreProductRequest extends $pb.GeneratedMessage {
+  factory PublishStoreProductRequest({
+    $3.DelegatedOperation? operation,
+    $core.String? productId,
+    $core.String? etag,
+  }) {
+    final result = PublishStoreProductRequest._();
+    if (operation != null) result.operation = operation;
+    if (productId != null) result.productId = productId;
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  PublishStoreProductRequest._();
+
+  factory PublishStoreProductRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStoreProductRequest()..mergeFromBuffer(data, registry);
+  factory PublishStoreProductRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStoreProductRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PublishStoreProductRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: PublishStoreProductRequest.$_createMessage)
+    ..aOM<$3.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $3.DelegatedOperation.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'productId')
+    ..aOS(3, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStoreProductRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStoreProductRequest copyWith(
+          void Function(PublishStoreProductRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as PublishStoreProductRequest))
+          as PublishStoreProductRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PublishStoreProductRequest() / PublishStoreProductRequest.new instead')
+  static PublishStoreProductRequest create() => PublishStoreProductRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      PublishStoreProductRequest._();
+  @$core.override
+  PublishStoreProductRequest createEmptyInstance() =>
+      PublishStoreProductRequest._();
+  @$core.pragma('dart2js:noInline')
+  static PublishStoreProductRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PublishStoreProductRequest>(
+          PublishStoreProductRequest.$_createMessage);
+  static PublishStoreProductRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation($3.DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation ensureOperation() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get productId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set productId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProductId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProductId() => $_clearField(2);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(3)
+  $core.String get etag => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set etag($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEtag() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEtag() => $_clearField(3);
+}
+
+class PublishStoreProductResponse extends $pb.GeneratedMessage {
+  factory PublishStoreProductResponse({
+    SellerProduct? product,
+    $core.String? auditLogId,
+  }) {
+    final result = PublishStoreProductResponse._();
+    if (product != null) result.product = product;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  PublishStoreProductResponse._();
+
+  factory PublishStoreProductResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStoreProductResponse()..mergeFromBuffer(data, registry);
+  factory PublishStoreProductResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PublishStoreProductResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PublishStoreProductResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: PublishStoreProductResponse.$_createMessage)
+    ..aOM<SellerProduct>(1, _omitFieldNames ? '' : 'product',
+        subBuilder: SellerProduct.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStoreProductResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PublishStoreProductResponse copyWith(
+          void Function(PublishStoreProductResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as PublishStoreProductResponse))
+          as PublishStoreProductResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PublishStoreProductResponse() / PublishStoreProductResponse.new instead')
+  static PublishStoreProductResponse create() =>
+      PublishStoreProductResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      PublishStoreProductResponse._();
+  @$core.override
+  PublishStoreProductResponse createEmptyInstance() =>
+      PublishStoreProductResponse._();
+  @$core.pragma('dart2js:noInline')
+  static PublishStoreProductResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PublishStoreProductResponse>(
+          PublishStoreProductResponse.$_createMessage);
+  static PublishStoreProductResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SellerProduct get product => $_getN(0);
+  @$pb.TagNumber(1)
+  set product(SellerProduct value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProduct() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProduct() => $_clearField(1);
+  @$pb.TagNumber(1)
+  SellerProduct ensureProduct() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class UnpublishStoreProductRequest extends $pb.GeneratedMessage {
+  factory UnpublishStoreProductRequest({
+    $3.DelegatedOperation? operation,
+    $core.String? productId,
+    $core.String? etag,
+  }) {
+    final result = UnpublishStoreProductRequest._();
+    if (operation != null) result.operation = operation;
+    if (productId != null) result.productId = productId;
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  UnpublishStoreProductRequest._();
+
+  factory UnpublishStoreProductRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStoreProductRequest()..mergeFromBuffer(data, registry);
+  factory UnpublishStoreProductRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStoreProductRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnpublishStoreProductRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: UnpublishStoreProductRequest.$_createMessage)
+    ..aOM<$3.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $3.DelegatedOperation.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'productId')
+    ..aOS(3, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStoreProductRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStoreProductRequest copyWith(
+          void Function(UnpublishStoreProductRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as UnpublishStoreProductRequest))
+          as UnpublishStoreProductRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnpublishStoreProductRequest() / UnpublishStoreProductRequest.new instead')
+  static UnpublishStoreProductRequest create() =>
+      UnpublishStoreProductRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      UnpublishStoreProductRequest._();
+  @$core.override
+  UnpublishStoreProductRequest createEmptyInstance() =>
+      UnpublishStoreProductRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UnpublishStoreProductRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnpublishStoreProductRequest>(
+          UnpublishStoreProductRequest.$_createMessage);
+  static UnpublishStoreProductRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation($3.DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation ensureOperation() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get productId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set productId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProductId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProductId() => $_clearField(2);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(3)
+  $core.String get etag => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set etag($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEtag() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEtag() => $_clearField(3);
+}
+
+class UnpublishStoreProductResponse extends $pb.GeneratedMessage {
+  factory UnpublishStoreProductResponse({
+    SellerProduct? product,
+    $core.String? auditLogId,
+  }) {
+    final result = UnpublishStoreProductResponse._();
+    if (product != null) result.product = product;
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  UnpublishStoreProductResponse._();
+
+  factory UnpublishStoreProductResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStoreProductResponse()..mergeFromBuffer(data, registry);
+  factory UnpublishStoreProductResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishStoreProductResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnpublishStoreProductResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: UnpublishStoreProductResponse.$_createMessage)
+    ..aOM<SellerProduct>(1, _omitFieldNames ? '' : 'product',
+        subBuilder: SellerProduct.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStoreProductResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishStoreProductResponse copyWith(
+          void Function(UnpublishStoreProductResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as UnpublishStoreProductResponse))
+          as UnpublishStoreProductResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UnpublishStoreProductResponse() / UnpublishStoreProductResponse.new instead')
+  static UnpublishStoreProductResponse create() =>
+      UnpublishStoreProductResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      UnpublishStoreProductResponse._();
+  @$core.override
+  UnpublishStoreProductResponse createEmptyInstance() =>
+      UnpublishStoreProductResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UnpublishStoreProductResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnpublishStoreProductResponse>(
+          UnpublishStoreProductResponse.$_createMessage);
+  static UnpublishStoreProductResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SellerProduct get product => $_getN(0);
+  @$pb.TagNumber(1)
+  set product(SellerProduct value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProduct() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProduct() => $_clearField(1);
+  @$pb.TagNumber(1)
+  SellerProduct ensureProduct() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
+class BatchUnpublishStoreProductsRequest extends $pb.GeneratedMessage {
+  factory BatchUnpublishStoreProductsRequest({
+    $3.DelegatedOperation? operation,
+    $core.Iterable<BatchUnpublishItem>? items,
+  }) {
+    final result = BatchUnpublishStoreProductsRequest._();
+    if (operation != null) result.operation = operation;
+    if (items != null) result.items.addAll(items);
+    return result;
+  }
+
+  BatchUnpublishStoreProductsRequest._();
+
+  factory BatchUnpublishStoreProductsRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BatchUnpublishStoreProductsRequest()..mergeFromBuffer(data, registry);
+  factory BatchUnpublishStoreProductsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BatchUnpublishStoreProductsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BatchUnpublishStoreProductsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: BatchUnpublishStoreProductsRequest.$_createMessage)
+    ..aOM<$3.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $3.DelegatedOperation.$_createMessage)
+    ..pPM<BatchUnpublishItem>(2, _omitFieldNames ? '' : 'items',
+        subBuilder: BatchUnpublishItem.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BatchUnpublishStoreProductsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BatchUnpublishStoreProductsRequest copyWith(
+          void Function(BatchUnpublishStoreProductsRequest) updates) =>
+      super.copyWith((message) =>
+              updates(message as BatchUnpublishStoreProductsRequest))
+          as BatchUnpublishStoreProductsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BatchUnpublishStoreProductsRequest() / BatchUnpublishStoreProductsRequest.new instead')
+  static BatchUnpublishStoreProductsRequest create() =>
+      BatchUnpublishStoreProductsRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      BatchUnpublishStoreProductsRequest._();
+  @$core.override
+  BatchUnpublishStoreProductsRequest createEmptyInstance() =>
+      BatchUnpublishStoreProductsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static BatchUnpublishStoreProductsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BatchUnpublishStoreProductsRequest>(
+          BatchUnpublishStoreProductsRequest.$_createMessage);
+  static BatchUnpublishStoreProductsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation get operation => $_getN(0);
+  @$pb.TagNumber(1)
+  set operation($3.DelegatedOperation value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOperation() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  $3.DelegatedOperation ensureOperation() => $_ensure(0);
+
+  /// 要下架的商品，1 到 50 項，商品 ID 不得重複。
+  @$pb.TagNumber(2)
+  $pb.PbList<BatchUnpublishItem> get items => $_getList(1);
+}
+
+/// BatchUnpublishItem 是批次下架的一項：商品與讀取時拿到的 etag。
+class BatchUnpublishItem extends $pb.GeneratedMessage {
+  factory BatchUnpublishItem({
+    $core.String? productId,
+    $core.String? etag,
+  }) {
+    final result = BatchUnpublishItem._();
+    if (productId != null) result.productId = productId;
+    if (etag != null) result.etag = etag;
+    return result;
+  }
+
+  BatchUnpublishItem._();
+
+  factory BatchUnpublishItem.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BatchUnpublishItem()..mergeFromBuffer(data, registry);
+  factory BatchUnpublishItem.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BatchUnpublishItem()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BatchUnpublishItem',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: BatchUnpublishItem.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'productId')
+    ..aOS(2, _omitFieldNames ? '' : 'etag')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BatchUnpublishItem clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BatchUnpublishItem copyWith(void Function(BatchUnpublishItem) updates) =>
+      super.copyWith((message) => updates(message as BatchUnpublishItem))
+          as BatchUnpublishItem;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BatchUnpublishItem() / BatchUnpublishItem.new instead')
+  static BatchUnpublishItem create() => BatchUnpublishItem._();
+  static $pb.GeneratedMessage $_createMessage() => BatchUnpublishItem._();
+  @$core.override
+  BatchUnpublishItem createEmptyInstance() => BatchUnpublishItem._();
+  @$core.pragma('dart2js:noInline')
+  static BatchUnpublishItem getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BatchUnpublishItem>(
+          BatchUnpublishItem.$_createMessage);
+  static BatchUnpublishItem? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get productId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set productId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProductId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProductId() => $_clearField(1);
+
+  /// 讀取時拿到的 etag，必填。
+  @$pb.TagNumber(2)
+  $core.String get etag => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set etag($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEtag() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEtag() => $_clearField(2);
+}
+
+class BatchUnpublishStoreProductsResponse extends $pb.GeneratedMessage {
+  factory BatchUnpublishStoreProductsResponse({
+    $core.Iterable<SellerProductSummary>? products,
+    $core.String? auditLogId,
+  }) {
+    final result = BatchUnpublishStoreProductsResponse._();
+    if (products != null) result.products.addAll(products);
+    if (auditLogId != null) result.auditLogId = auditLogId;
+    return result;
+  }
+
+  BatchUnpublishStoreProductsResponse._();
+
+  factory BatchUnpublishStoreProductsResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BatchUnpublishStoreProductsResponse()..mergeFromBuffer(data, registry);
+  factory BatchUnpublishStoreProductsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BatchUnpublishStoreProductsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BatchUnpublishStoreProductsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: BatchUnpublishStoreProductsResponse.$_createMessage)
+    ..pPM<SellerProductSummary>(1, _omitFieldNames ? '' : 'products',
+        subBuilder: SellerProductSummary.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BatchUnpublishStoreProductsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BatchUnpublishStoreProductsResponse copyWith(
+          void Function(BatchUnpublishStoreProductsResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as BatchUnpublishStoreProductsResponse))
+          as BatchUnpublishStoreProductsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BatchUnpublishStoreProductsResponse() / BatchUnpublishStoreProductsResponse.new instead')
+  static BatchUnpublishStoreProductsResponse create() =>
+      BatchUnpublishStoreProductsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      BatchUnpublishStoreProductsResponse._();
+  @$core.override
+  BatchUnpublishStoreProductsResponse createEmptyInstance() =>
+      BatchUnpublishStoreProductsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static BatchUnpublishStoreProductsResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              BatchUnpublishStoreProductsResponse>(
+          BatchUnpublishStoreProductsResponse.$_createMessage);
+  static BatchUnpublishStoreProductsResponse? _defaultInstance;
+
+  /// 下架後的商品，順序同請求的 items。
+  @$pb.TagNumber(1)
+  $pb.PbList<SellerProductSummary> get products => $_getList(0);
+
+  /// 這一批唯一的稽核列 ID（重送時是第一次的）。
+  @$pb.TagNumber(2)
+  $core.String get auditLogId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set auditLogId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAuditLogId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAuditLogId() => $_clearField(2);
+}
+
 /// CatalogPublicService 是任何人都能讀的商品、搜尋與分類，不需要登入，回應不依觀看者（可共享快取）。
 /// 公開可讀的商品：沒刪除、店家此刻可曝光（seller.pub_exposable_stores，時間用請求的 clock）、狀態是 ACTIVE 或 ARCHIVED；
 /// 只有 ACTIVE 的出現在列表與搜尋，ARCHIVED 的商品頁讀得到但 availability 是不可購買。其他一律與不存在相同（not_found）。
@@ -4931,6 +6141,80 @@ class SellerCatalogAppServiceApi {
           $pb.ClientContext? ctx, SetStockRequest request) =>
       _client.invoke<SetStockResponse>(ctx, 'SellerCatalogAppService',
           'SetStock', request, SetStockResponse());
+}
+
+/// CatalogDelegatedService 是代行營運中的平台管理員讀寫代行店家的商品：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
+/// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。回應一律不可快取（private, no-store）。
+/// 商品、狀態與內容的規則與 SellerCatalogAppService 相同（同一組模組方法），回應也用同一組賣家訊息（SellerProduct、SellerProductSummary）。
+///
+/// 能力（products.read、products.write、products.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
+/// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
+///
+/// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
+/// 成功的讀取不稽核。
+class CatalogDelegatedServiceApi {
+  final $pb.RpcClient _client;
+
+  CatalogDelegatedServiceApi(this._client);
+
+  /// ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
+  $async.Future<ListStoreProductsResponse> listStoreProducts(
+          $pb.ClientContext? ctx, ListStoreProductsRequest request) =>
+      _client.invoke<ListStoreProductsResponse>(ctx, 'CatalogDelegatedService',
+          'ListStoreProducts', request, ListStoreProductsResponse());
+
+  /// GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
+  $async.Future<GetStoreProductResponse> getStoreProduct(
+          $pb.ClientContext? ctx, GetStoreProductRequest request) =>
+      _client.invoke<GetStoreProductResponse>(ctx, 'CatalogDelegatedService',
+          'GetStoreProduct', request, GetStoreProductResponse());
+
+  /// CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
+  /// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
+  $async.Future<CreateStoreProductResponse> createStoreProduct(
+          $pb.ClientContext? ctx, CreateStoreProductRequest request) =>
+      _client.invoke<CreateStoreProductResponse>(ctx, 'CatalogDelegatedService',
+          'CreateStoreProduct', request, CreateStoreProductResponse());
+
+  /// UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
+  /// VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
+  $async.Future<UpdateStoreProductResponse> updateStoreProduct(
+          $pb.ClientContext? ctx, UpdateStoreProductRequest request) =>
+      _client.invoke<UpdateStoreProductResponse>(ctx, 'CatalogDelegatedService',
+          'UpdateStoreProduct', request, UpdateStoreProductResponse());
+
+  /// PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+  $async.Future<PublishStoreProductResponse> publishStoreProduct(
+          $pb.ClientContext? ctx, PublishStoreProductRequest request) =>
+      _client.invoke<PublishStoreProductResponse>(
+          ctx,
+          'CatalogDelegatedService',
+          'PublishStoreProduct',
+          request,
+          PublishStoreProductResponse());
+
+  /// UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
+  $async.Future<UnpublishStoreProductResponse> unpublishStoreProduct(
+          $pb.ClientContext? ctx, UnpublishStoreProductRequest request) =>
+      _client.invoke<UnpublishStoreProductResponse>(
+          ctx,
+          'CatalogDelegatedService',
+          'UnpublishStoreProduct',
+          request,
+          UnpublishStoreProductResponse());
+
+  /// BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
+  /// 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
+  /// （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
+  $async.Future<BatchUnpublishStoreProductsResponse>
+      batchUnpublishStoreProducts($pb.ClientContext? ctx,
+              BatchUnpublishStoreProductsRequest request) =>
+          _client.invoke<BatchUnpublishStoreProductsResponse>(
+              ctx,
+              'CatalogDelegatedService',
+              'BatchUnpublishStoreProducts',
+              request,
+              BatchUnpublishStoreProductsResponse());
 }
 
 const $core.bool _omitFieldNames =
