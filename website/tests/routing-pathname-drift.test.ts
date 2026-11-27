@@ -52,7 +52,7 @@ test("routingPathname is the path next-intl rewrites: unprefixed (default locale
 		"/en/products/1",
 		"/account/orders/%44F-1",
 	]) {
-		const expected = new URL(expectedTarget(path), "http://localhost").pathname;
+		const expected = expectedTarget(path);
 		assert.equal(rewriteTarget(path), expected, path);
 	}
 });
