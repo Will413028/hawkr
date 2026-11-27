@@ -20,7 +20,7 @@ function rewriteTarget(path: string): string {
 		headers: { host: "localhost:3000" },
 	});
 	const rewrite = intl(request).headers.get("x-middleware-rewrite");
-	return new URL(rewrite ?? request.url).pathname;
+	return decodeURI(new URL(rewrite ?? request.url).pathname);
 }
 
 /** What next-intl should route the request to, from `routingPathname`: the default locale is rewritten to /zh-TW. */

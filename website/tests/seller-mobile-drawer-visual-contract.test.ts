@@ -95,8 +95,10 @@ test("打開手機側欄時使用主題遮罩並保留可辨識的關閉控制",
 });
 
 test("手機側欄關閉鍵與導覽列右側數字使用同一條靠右軸線", () => {
-	const mobileAt = css.indexOf("@media (max-width: 960px)");
-	const closeAt = css.indexOf(".seller-sidebar__close {", mobileAt);
+	const mobileChromeDefaults = css.indexOf(".seller-shell__mobile-bar,");
+	const mobileDrawerAt = css.indexOf(".seller-sidebar {", mobileChromeDefaults);
+	const closeAt = css.indexOf(".seller-sidebar__close {", mobileDrawerAt);
+	assert.ok(mobileChromeDefaults >= 0 && mobileDrawerAt > mobileChromeDefaults);
 	const close = blockAt(css, closeAt, "mobile seller drawer close button");
 
 	assert.match(close, /margin-left:\s*auto/);

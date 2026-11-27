@@ -28,12 +28,21 @@ test("order records use dedicated phone work cards and explicit selection mode",
 	assert.match(afterSales, /seller-orders__mobile-view--aftersale/);
 	assert.match(afterSales, /seller-orders__mobile-card--aftersale/);
 
-	const phoneStyles = css.slice(
-		css.indexOf("@media (max-width: 767px) {\n\t.seller-orders__desktop-view,"),
-		css.indexOf(
-			"@media (max-width: 767px) {\n\t.seller-products__card .seller-orders__table-wrap,",
-		),
+	const orderMobileMarker = css.indexOf(".seller-orders__desktop-view,");
+	const phoneStylesStart = css.lastIndexOf(
+		"@media (max-width: 767px) {",
+		orderMobileMarker,
 	);
+	const listTableMobileMarker = css.indexOf(
+		".seller-products__card .seller-orders__table-wrap,",
+		orderMobileMarker,
+	);
+	const listTableMobileStart = css.lastIndexOf(
+		"@media (max-width: 767px) {",
+		listTableMobileMarker,
+	);
+	assert.ok(phoneStylesStart >= 0 && listTableMobileStart > phoneStylesStart);
+	const phoneStyles = css.slice(phoneStylesStart, listTableMobileStart);
 	assert.match(phoneStyles, /@media \(max-width: 767px\)/);
 	assert.match(
 		phoneStyles,
