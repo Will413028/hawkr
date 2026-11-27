@@ -39,7 +39,7 @@ func (f *fixture) queueRow(t *testing.T, productID uuid.UUID) (queueRow, bool) {
 	t.Helper()
 	var r queueRow
 	err := f.db.Conn(context.Background()).QueryRow(context.Background(),
-		`SELECT seq, attempts, claimed_until IS NOT NULL, failed_at IS NOT NULL, due_at, priority, COALESCE(claim_token, uuid_nil()) FROM review.rating_recompute_queue WHERE product_id = $1`, productID,
+		`SELECT seq, attempts, claimed_until IS NOT NULL, failed_at IS NOT NULL, due_at, priority, COALESCE(claim_token, '00000000-0000-0000-0000-000000000000'::uuid) FROM review.rating_recompute_queue WHERE product_id = $1`, productID,
 	).Scan(&r.seq, &r.attempts, &r.claimed, &r.failed, &r.dueAt, &r.priority, &r.token)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return queueRow{}, false
@@ -96,8 +96,9 @@ func TestReviewSucceedsWhenProductIsMissingAndWorkerDropsTheRow(t *testing.T) {
 	}
 }
 
-// 處理中到的新請求不遺失：SetRating 執行當下另一個 transaction 提交了新評價（序號加一），worker 完成時序號已變，不刪列而重排；
-// 下一輪才寫入含新評價的值。
+// 處理中到的新請求不遺失：SetRating 執行當下另一個 transaction 提交了新評價（序號加一），worker 完成時序號已變，不刪列而重排（立即到期）；
+// 一輪 Run 會反覆認領到沒有到期列為止，所以同一輪內重排的列被再處理一次，寫入含新評價的值。
+// 若完成時不比對序號（刪列），第一次寫入後列就消失，第二次寫入 (3,2) 不會發生。
 func TestRequestArrivingWhileProcessingIsNotLost(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -107,18 +108,9 @@ func TestRequestArrivingWhileProcessingIsNotLost(t *testing.T) {
 	f.ratings.onSet = func() { f.submit(t, b2, storeID, 700, 1, "處理中到的") }
 
 	f.runRatings(t)
-	first := f.ratings.snapshot()
-	if len(first) != 1 || first[0].count != 1 || first[0].average != 5 {
-		t.Fatalf("第一輪寫的是認領當下讀到的統計：%+v", first)
-	}
-	row, ok := f.queueRow(t, pid(700))
-	if !ok || row.seq != 2 || row.claimed {
-		t.Fatalf("序號已變：列要保留並放掉租約：%+v ok=%v", row, ok)
-	}
-
-	f.runRatings(t)
-	if got := f.ratings.snapshot(); len(got) != 2 || got[1].count != 2 || got[1].average != 3 {
-		t.Fatalf("第二輪寫入含新評價的值：%+v", got)
+	got := f.ratings.snapshot()
+	if len(got) != 2 || got[0].count != 1 || got[0].average != 5 || got[1].count != 2 || got[1].average != 3 {
+		t.Fatalf("先寫認領當下讀到的統計 (5,1)，同一輪重排後再寫含新評價的值 (3,2)：%+v", got)
 	}
 	if _, ok := f.queueRow(t, pid(700)); ok {
 		t.Fatal("序號沒變才刪列")
