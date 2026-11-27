@@ -5,7 +5,7 @@
 ## 1. 範圍與公開介面
 
 - 實作在 `internal/modules/catalog`，自己的 `catalog` schema 與 migration，登記在 `cmd/hawkr/modules.go` 的 `modules()`。不依賴 fulfillment（D10：運費與配送方式歸 seller 的運費設定，B3）。
-- 根套件的方法：`DeductStock`、`RestoreStock`、`AdjustStock`、`SetStock`、`SetRating`、`RecordSales`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`AdminProduct`、`ListSellerProducts`、`CountSellerProducts`、`ListPublicProducts`、`ListPublicProductsOfStores`、`ListAdminProducts`、`SuggestProductNames`、`SuggestHashtags`、`TrendingHashtags`、`Etag`／`ParseEtag`、`SuggestedSafetyStock`。
+- 根套件的方法：`DeductStock`、`RestoreStock`、`AdjustStock`、`SetStock`、`SetRating`、`RecordSales`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`AdminProduct`、`ListSellerProducts`、`CountSellerProducts`、`ListPublicProducts`、`ListPublicProductsOfStores`、`ListAdminProducts`、`SuggestProductNames`、`SuggestHashtags`、`TrendingHashtags`、`ProductCards`、`ProductStoreIDs`、`StoresWithPublicProducts`、`CheckoutSnapshot`、`SkuCartInfo`、`AddFavorite`／`RemoveFavorite`、`Etag`／`ParseEtag`、`SuggestedSafetyStock`。
 - 模組內依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 2. 資料
@@ -77,3 +77,13 @@
 - 失敗：同一列 `attempts` 加一、`due_at` 退避（1 分鐘起倍增，上限 1 小時）、記 `last_error`；累計 5 次設 `failed_at` 停手，列保留，新請求會重置。
 - 清訂閱：商品或 SKU 刪除的 transaction 內寫 `restock_purge_queue`（立即到期），worker 把一輪認領的 SKU 合併成一次 `PurgeSKUSubscriptions`，語意同上。
 - 不以店家恢復曝光觸發通知（Will 2026-11-27）。
+
+## 8. 給別的模組與轉接層的批次讀取與收藏數（B4-4a）
+
+- `ProductCards(at, ids, includeInactive)`：沒刪除的商品的卡片（`ProductSummary`）；`includeInactive` 為假只回 ACTIVE 且店家在 `at` 可曝光的，為真任何狀態（含草稿、下架、店家不可曝光）都回，直接連結仍可瀏覽。缺席的 ID 是不存在或已刪除。
+- `ProductStoreIDs(ids)`：沒刪除的商品所屬店家，任何狀態、不看曝光。
+- `StoresWithPublicProducts(at)`：至少有一件 ACTIVE 且沒刪除的商品、店家在 `at` 可曝光的店家 ID，升序（沒有時是空切片）。
+- `CheckoutSnapshot(skuIDs)`、`SkuCartInfo(skuIDs)`（D20，不版本化）：同一句查詢回 `SkuSnapshot`：SKU 與商品此刻的標題、選項值（以 ` / ` 串接，預設 SKU 為空）、主圖 key、售價、原價（有才有值）、庫存、商品狀態。不過濾狀態與刪除（訂單與購物車仍指向已下架、已刪除的 SKU），`Active` 是商品 ACTIVE 且商品與 SKU 都沒刪除；不看店家曝光與庫存（庫存由呼叫端看 `StockQty`）。缺席的 SKU 是不存在。配送方式、重量與尺寸不在 catalog（D10），快照不帶。
+- 批次輸入最多 `MaxBatchIDs`（200）個，超過或含零值回 `*InvalidInputError`；空輸入回空 map。
+- `AddFavorite(productID)`／`RemoveFavorite(productID)`（D3）：buyer 在收藏列同一個 transaction 內加減收藏數，ctx 沒有 transaction 時是單句寫入；不改 etag。`AddFavorite` 對已刪除的商品回 `ErrProductNotFound`；`RemoveFavorite` 下限 0、已刪除的商品照減（計數跟著收藏列走）。重複與去重是呼叫方的事（收藏列的唯一鍵），這裡不去重。
+- 轉接：`internal/legacy/catalogserver` 以舊的 product gRPC 契約服務 Java cart 的 `GetProductSimple`、`BatchGetSkuCartInfo` 與 order 的 `DeductStock`、`RestoreStock`、`BatchGetProductForCheckout`；`internal/legacy/catalogconsumer` 消費 `order.cancelled`（歸還）與 `order.sales.accumulated`（銷量）。兩者的歸還鍵是 `catalogserver.RestoreKey(stock_tx_id)`，指向原扣減 `stock_tx_id`。組裝在 B4-6。

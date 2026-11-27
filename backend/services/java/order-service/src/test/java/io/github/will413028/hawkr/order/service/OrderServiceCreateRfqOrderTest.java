@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.service;
 
 import io.github.will413028.hawkr.common.utils.TsidUtil;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.OrderPolicySnapshot;
 import io.github.will413028.hawkr.order.config.OrderConfig;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
@@ -194,9 +195,9 @@ class OrderServiceCreateRfqOrderTest {
     @DisplayName("wire 上真的帶了 sku_id 就照帶：放寬不等於忽略")
     void honoursSkuIdWhenCallerProvidesOne() {
         orderService.createRfqOrder(100L, SETTLEMENT_STORE_ID, ACCEPTANCE_ID,
-                30800L, 800L, 5150L, "文旦柚 200 公斤", 30000L, "3201", "EXTERNAL");
+                30800L, 800L, TestIds.id(5150L), "文旦柚 200 公斤", 30000L, "3201", "EXTERNAL");
 
-        assertThat(capturedItems().get(0).skuId()).isEqualTo(5150L);
+        assertThat(capturedItems().get(0).skuId()).isEqualTo(TestIds.id(5150L));
     }
 
     @Test

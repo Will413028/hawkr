@@ -34,3 +34,27 @@ type RestockNotifier interface {
 	// PurgeSKUSubscriptions 清掉這些 SKU 的訂閱（商品或 SKU 刪除後）。
 	PurgeSKUSubscriptions(ctx context.Context, skuIDs []uuid.UUID) error
 }
+
+// MaxBatchIDs 是一次批次讀取的 ID 數上限（檢查輸入的合理範圍，不是業務限制）；超過回 *InvalidInputError。
+const MaxBatchIDs = 200
+
+// SkuSnapshot 是一個 SKU 與它的商品此刻的內容（結帳與購物車用，D20：不版本化，訂單自己保存當時的快照）。
+// 已刪除與下架的 SKU 也讀得到（訂單與購物車仍指向它），Active 是呼叫端判斷可不可以買的依據：商品 ACTIVE、商品與 SKU 都沒刪除；庫存另看 StockQty。
+// 配送方式、重量與尺寸不在 catalog（D10），所以不在快照裡。
+type SkuSnapshot struct {
+	SkuID, ProductID uuid.UUID
+	StoreID          int64
+	ProductTitle     string
+	// SkuName 是選項值以 " / " 串接（沒有選項軸的預設 SKU 為空字串）。
+	SkuName string
+	// CoverKey 是主圖庫第一張的 object key，沒有圖是空字串。
+	CoverKey string
+	// Price 是實際成交單價；CompareAtPrice 是原價（有特價才有值，大於 Price）。
+	Price          int64
+	CompareAtPrice *int64
+	StockQty       int32
+	Status         ProductStatus
+	// Deleted 為真表示商品或 SKU 已刪除。
+	Deleted bool
+	Active  bool
+}

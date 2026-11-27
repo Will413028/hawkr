@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.ResolvedItem;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.SkuShippingOption;
@@ -34,8 +35,8 @@ class CheckoutServiceSelfPurchaseTest {
     // (verify against the record before reusing this helper elsewhere).
     private ResolvedItem item(long skuId, long storeId) {
         return new ResolvedItem(
-                skuId, "sku-" + skuId, 1, 100L, 100L, 999L,
-                10, 10, 10, 1000L, storeId, "p-" + skuId, "product-" + skuId,
+                TestIds.id(skuId), "sku-" + skuId, 1, 100L, 100L, 999L,
+                10, 10, 10, 1000L, storeId, TestIds.id(skuId + 1000), "product-" + skuId,
                 List.of(new SkuShippingOption("3001", "3201", 0L, "3102")),
                 "img", true);
     }

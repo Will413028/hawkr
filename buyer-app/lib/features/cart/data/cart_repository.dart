@@ -156,12 +156,12 @@ class CartRepository {
   }
 
   /// POST /public/carts/items.
-  Future<CartData> addToCart(int skuId, int count, {String? guestId}) async {
+  Future<CartData> addToCart(String skuId, int count, {String? guestId}) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/public/carts/items',
         data: {
-          'skuId': skuId.toString(),
+          'skuId': skuId,
           'quantity': count.toString(),
           if (guestId != null) 'guestId': guestId,
         },

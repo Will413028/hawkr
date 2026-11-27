@@ -11,7 +11,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 CREATE SCHEMA review;
 
 -- 買家對一個訂單項目的評價（一個 order_item_id 至多一則，UNIQUE 是「已評價過」的最終保證）。評價不可編輯、沒有作者自刪的入口，所以沒有 deleted_at；
--- 買家刪帳時評價被實刪（purge job 隨刪帳訂閱者另外接）。ID 是 UUIDv7；buyer_id、store_id、product_id、order_item_id 是外部的業務鍵。
+-- 買家刪帳時評價被實刪（purge job 隨刪帳訂閱者另外接）。ID 是 UUIDv7；buyer_id、store_id、order_item_id 是外部的業務鍵，product_id 是 catalog 的商品 UUID。
 -- order_no、sku_name、item_image_key、price 是建立當下取自訂單項目的快照（不收 client 的值），之後不變。content 空就是 NULL。
 CREATE TABLE review.reviews (
     id             UUID        PRIMARY KEY,
@@ -19,7 +19,7 @@ CREATE TABLE review.reviews (
     order_item_id  BIGINT      NOT NULL,
     buyer_id       BIGINT      NOT NULL,
     store_id       BIGINT      NOT NULL,
-    product_id     BIGINT      NOT NULL,
+    product_id     UUID        NOT NULL,
     rating         SMALLINT    NOT NULL,
     content        TEXT,
     sku_name       TEXT        NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE review.reviews (
     CONSTRAINT reviews_order_item_check CHECK (order_item_id > 0),
     CONSTRAINT reviews_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT reviews_store_check CHECK (store_id > 0),
-    CONSTRAINT reviews_product_check CHECK (product_id > 0),
+    CONSTRAINT reviews_product_check CHECK (product_id <> '00000000-0000-0000-0000-000000000000'),
     CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5),
     CONSTRAINT reviews_content_check CHECK (content IS NULL OR (char_length(content) >= 1 AND char_length(content) <= 1000 AND content !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')),
     CONSTRAINT reviews_sku_name_check CHECK (char_length(sku_name) <= 255),

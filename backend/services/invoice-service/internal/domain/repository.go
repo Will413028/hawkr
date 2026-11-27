@@ -223,7 +223,7 @@ type DocumentLine struct {
 	LineSeq           int32
 	LineType          string
 	OrderItemID       *int64
-	SkuID             *int64
+	SkuID             *string
 	Description       string
 	Unit              *string
 	Quantity          int32
@@ -904,12 +904,12 @@ type NewDocument struct {
 //	chk_invline_sign            DISCOUNT 行 net_amount < 0，其餘 >= 0
 //	chk_invline_allowance_shape DISCOUNT 行三個 allowance 欄恆 0；其餘 base = net − allocated
 //
-// OrderItemID／SkuID 為 0 表示 NULL（SHIPPING／DISCOUNT 行）。
+// OrderItemID 為 0、SkuID 為空字串表示 NULL（SHIPPING／DISCOUNT 行）。
 type NewDocumentLine struct {
 	LineSeq           int32
 	LineType          string
 	OrderItemID       int64
-	SkuID             int64
+	SkuID             string
 	Description       string
 	Unit              string
 	Quantity          int32

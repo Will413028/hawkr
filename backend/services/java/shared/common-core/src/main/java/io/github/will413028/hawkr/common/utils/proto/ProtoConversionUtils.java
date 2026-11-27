@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.UUID;
 
 /**
  * gRPC 邊界型別轉換工具。
@@ -84,6 +85,46 @@ public final class ProtoConversionUtils {
      */
     public static String formatLong(Long value) {
         return value == null ? "" : String.valueOf(value);
+    }
+
+    // ==================== UUID 轉換 ====================
+
+    /**
+     * Proto string → UUID（必填欄位；商品與 SKU 的 ID 是 catalog 的 UUIDv7）。
+     * 空值或格式不合法時拋出 IllegalArgumentException。
+     */
+    public static UUID parseUuidRequired(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " 不可為空");
+        }
+        UUID id = parseUuidOrNull(value);
+        if (id == null) {
+            throw new IllegalArgumentException(fieldName + " 格式不合法: " + value);
+        }
+        return id;
+    }
+
+    /**
+     * Proto string → UUID（可選欄位）。空值或格式不合法（含縮寫寫法）返回 null。
+     */
+    public static UUID parseUuidOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            UUID id = UUID.fromString(value);
+            // UUID.fromString 接受 "1-1-1-1-1" 這類縮寫；只收標準的 8-4-4-4-12 寫法。
+            return id.toString().equalsIgnoreCase(value) ? id : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * UUID → Proto string（ID 欄位）。null 返回空字串（沒有指向任何商品或 SKU）。
+     */
+    public static String formatUuid(UUID value) {
+        return value == null ? "" : value.toString();
     }
 
     // ==================== Integer 轉換 ====================

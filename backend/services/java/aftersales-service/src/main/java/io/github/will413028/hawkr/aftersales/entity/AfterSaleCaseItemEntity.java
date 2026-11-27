@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.aftersales.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import java.util.UUID;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -16,7 +17,8 @@ public class AfterSaleCaseItemEntity {
 
     private Long orderItemId;
 
-    private Long skuId;
+    /** catalog 的 SKU UUID；NULL ＝ non-catalog line（RFQ 成交） */
+    private UUID skuId;
 
     private String skuName;
 

@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceCarrierSelectionMode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceDocumentKind;
@@ -70,7 +71,7 @@ class CheckoutConfirmInvoiceIntakeTest {
 
     private static final long STORE_ID = 2685914682L;
     private static final long BUYER_ID = 2623900520L;
-    private static final String SKU_ID = "5001";
+    private static final String SKU_ID = TestIds.id(5001L).toString();
     private static final String CHECKOUT_ID = "CHK-INVOICE-1";
     private static final String METHOD = ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value();
     private static final String TEMP = ShippingTemperature.CHILLED.value();
@@ -92,6 +93,7 @@ class CheckoutConfirmInvoiceIntakeTest {
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
+                                .setProductId(TestIds.id(9001L).toString())
                                 .setSkuName("大")
                                 .setProductName("蘋果禮盒")
                                 .setStoreId(String.valueOf(STORE_ID))
@@ -149,7 +151,7 @@ class CheckoutConfirmInvoiceIntakeTest {
                 .setBuyerId(BUYER_ID)
                 .setCheckoutId(CHECKOUT_ID)
                 .addItems(CheckoutItem.newBuilder()
-                        .setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build())
+                        .setSkuId(SKU_ID).setProductId(TestIds.id(9001L).toString()).setQuantity("2").build())
                 .setShippingMethod(METHOD)
                 .setDeliveryTemp(TEMP)
                 .setRecipientName("王小明")
@@ -209,6 +211,31 @@ class CheckoutConfirmInvoiceIntakeTest {
         assertThat(params.invoiceSnapshot().invoiceKind()).isEqualTo(InvoiceDocumentKind.B2C.value());
         assertThat(params.invoiceSnapshot().carrierSelectionMode())
                 .isEqualTo(InvoiceCarrierSelectionMode.USE_BUYER_DEFAULT.value());
+    }
+
+    @Test
+    @DisplayName("訂單明細的 product_id 取自 catalog 的回應，client 送錯的 product_id 不影響")
+    void storedProductIdComesFromCatalogNotFromRequest() {
+        CheckoutConfirmRequest request = baseRequest().clearItems()
+                .addItems(CheckoutItem.newBuilder()
+                        .setSkuId(SKU_ID).setProductId(TestIds.id(1234L).toString()).setQuantity("2").build())
+                .build();
+
+        OrderService.CreateOrderParams params = confirmAndCaptureParams(request);
+
+        assertThat(params.items().get(0).productId()).isEqualTo(TestIds.id(9001L));
+    }
+
+    @Test
+    @DisplayName("client 沒送 product_id 時，訂單明細的 product_id 仍取自 catalog 的回應")
+    void storedProductIdComesFromCatalogWhenRequestOmitsIt() {
+        CheckoutConfirmRequest request = baseRequest().clearItems()
+                .addItems(CheckoutItem.newBuilder().setSkuId(SKU_ID).setQuantity("2").build())
+                .build();
+
+        OrderService.CreateOrderParams params = confirmAndCaptureParams(request);
+
+        assertThat(params.items().get(0).productId()).isEqualTo(TestIds.id(9001L));
     }
 
     @Test

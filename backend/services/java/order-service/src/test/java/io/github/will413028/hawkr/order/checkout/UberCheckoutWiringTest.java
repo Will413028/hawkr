@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.utils.code.ShippingRoute;
 import io.github.will413028.hawkr.common.utils.code.ShippingTemperature;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.AvailableOption;
@@ -71,8 +72,8 @@ class UberCheckoutWiringTest {
                 .map(m -> new SkuShippingOption(m, AMBIENT, 0L, "3101")) // BUYER 付運費，避開免運分支
                 .toList();
         return new ResolvedItem(
-                1L, "sku-1", 1, 500L, 500L, 99L,
-                10, 10, 10, 1000L, 2683382637L, "p-1", "product-1",
+                TestIds.id(1L), "sku-1", 1, 500L, 500L, 99L,
+                10, 10, 10, 1000L, 2683382637L, TestIds.id(1001L), "product-1",
                 options, "img", true);
     }
 
@@ -221,7 +222,7 @@ class UberCheckoutWiringTest {
                 1L, 2683382637L, AMBIENT, "王小明", "0912345678",
                 "臺北市", "大安區", "測試路1號",
                 List.of(new UberOrderEligibilityGuard.Item(
-                        1L, "sku-1", 1, 10, 10, 10, 1000L, 500L)),
+                        TestIds.id(1L), "sku-1", 1, 10, 10, 10, 1000L, 500L)),
                 quoteId);
     }
 }

@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.common.utils.code.ShippingTemperature;
@@ -108,7 +109,7 @@ class OrderPolicySnapshotChainContractTest {
 
     private static final long STORE_ID = 2685914682L;
     private static final long BUYER_ID = 2623900520L;
-    private static final String SKU_ID = "5001";
+    private static final String SKU_ID = TestIds.id(5001L).toString();
     private static final String CHECKOUT_ID = "CHK-POLICY-CHAIN";
     private static final String METHOD = ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value();
     private static final String TEMP = ShippingTemperature.CHILLED.value();
@@ -141,6 +142,7 @@ class OrderPolicySnapshotChainContractTest {
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
+                                .setProductId(TestIds.id(9001L).toString())
                                 .setSkuName("大")
                                 .setProductName("蘋果禮盒")
                                 .setStoreId(String.valueOf(STORE_ID))
@@ -305,7 +307,7 @@ class OrderPolicySnapshotChainContractTest {
                 .setBuyerId(BUYER_ID)
                 .setCheckoutId(CHECKOUT_ID)
                 .addItems(CheckoutItem.newBuilder()
-                        .setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build())
+                        .setSkuId(SKU_ID).setProductId(TestIds.id(9001L).toString()).setQuantity("2").build())
                 .setShippingMethod(shippingMethod)
                 .setDeliveryTemp(TEMP)
                 .setRecipientName("王小明")

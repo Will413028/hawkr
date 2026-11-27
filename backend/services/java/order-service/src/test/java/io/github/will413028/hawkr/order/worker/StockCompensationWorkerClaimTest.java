@@ -39,7 +39,7 @@ class StockCompensationWorkerClaimTest {
         r.setOrderNo("ORD1");
         r.setPhase(phase);
         r.setRetryCount(0);
-        r.setPayloadSnapshot("[{\"skuId\":1,\"quantity\":2}]");
+        r.setPayloadSnapshot("[{\"skuId\":\"0192f3a4-7b1c-7d2e-8f3a-000000000001\",\"quantity\":2}]");
         return r;
     }
 
@@ -153,5 +153,39 @@ class StockCompensationWorkerClaimTest {
                 "第二筆的租約必須明顯晚於第一筆（實測差 " + deltaMs + " ms）。"
                         + "兩者相等 ⇒ 租約基準在迴圈外只算一次 ⇒ 40 筆 × 10 秒 = 400 秒的批次上界"
                         + "已超過 300 秒租約，後段項目在 claim 當下租約就已過期。");
+    }
+
+    @Test
+    @DisplayName("payload 解析不出 UUID 的 skuId（舊的數字 ID）→ 轉人工處理，不打 gRPC，不留在掃描範圍")
+    void unparsablePayload_marksManualIntervention() {
+        StockTxRecordRepository repo = mock(StockTxRecordRepository.class);
+        ProductGrpcClient product = mock(ProductGrpcClient.class);
+        StockTxRecordEntity legacy = record("TX_OLD", OrderConstants.STOCK_TX_PHASE_DEDUCT);
+        legacy.setPayloadSnapshot("[{\"skuId\":\"5150\",\"quantity\":2}]");
+        when(repo.findPendingCompensation(anyInt())).thenReturn(List.of(legacy));
+        when(repo.findFailedRestores(anyInt())).thenReturn(List.of());
+        when(repo.claimForCompensation(anyString(), anyString(), any())).thenReturn(1);
+
+        new StockCompensationWorker(repo, product).compensate();
+
+        verify(repo).markManualIntervention("TX_OLD", OrderConstants.STOCK_TX_PHASE_DEDUCT);
+        verifyNoInteractions(product);
+    }
+
+    @Test
+    @DisplayName("payload 為空陣列 → 同樣轉人工處理")
+    void emptyPayload_marksManualIntervention() {
+        StockTxRecordRepository repo = mock(StockTxRecordRepository.class);
+        ProductGrpcClient product = mock(ProductGrpcClient.class);
+        StockTxRecordEntity empty = record("TX_EMPTY", OrderConstants.STOCK_TX_PHASE_DEDUCT);
+        empty.setPayloadSnapshot("[]");
+        when(repo.findPendingCompensation(anyInt())).thenReturn(List.of(empty));
+        when(repo.findFailedRestores(anyInt())).thenReturn(List.of());
+        when(repo.claimForCompensation(anyString(), anyString(), any())).thenReturn(1);
+
+        new StockCompensationWorker(repo, product).compensate();
+
+        verify(repo).markManualIntervention("TX_EMPTY", OrderConstants.STOCK_TX_PHASE_DEDUCT);
+        verifyNoInteractions(product);
     }
 }

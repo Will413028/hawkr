@@ -77,7 +77,7 @@ type ReviewCreatedParams struct {
 	ReviewID   uuid.UUID `json:"review_id"`
 	BuyerID    int64     `json:"buyer_id"`
 	StoreID    int64     `json:"store_id"`
-	ProductID  int64     `json:"product_id"`
+	ProductID  uuid.UUID `json:"product_id"`
 }
 
 // PostPublishedParams 是 post_published 母意圖的參數快照，欄位取自 social.PostPublished。
@@ -339,7 +339,7 @@ var reviewCreated = Define(Definition[ReviewCreatedParams]{
 	Text: func(l uitext.Locale, _ ReviewCreatedParams) (Content, error) {
 		return Content{Title: text.ReviewCreatedTitle(l), Body: text.ReviewCreatedBody(l)}, nil
 	},
-	Example: ReviewCreatedParams{EventID: exampleEventID, OccurredAt: exampleAt, ReviewID: exampleObject, BuyerID: exampleBuyerID, StoreID: exampleStoreID, ProductID: 11},
+	Example: ReviewCreatedParams{EventID: exampleEventID, OccurredAt: exampleAt, ReviewID: exampleObject, BuyerID: exampleBuyerID, StoreID: exampleStoreID, ProductID: exampleObject},
 })
 
 var postPublished = Define(Definition[PostPublishedParams]{

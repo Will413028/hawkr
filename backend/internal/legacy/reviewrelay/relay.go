@@ -51,8 +51,8 @@ type ReviewCreatedArgs struct {
 // ReviewAggregateChangedArgs 轉成一則 review.hidden。
 type ReviewAggregateChangedArgs struct {
 	eventFields
-	StoreID   int64 `json:"store_id"`
-	ProductID int64 `json:"product_id"`
+	StoreID   int64     `json:"store_id"`
+	ProductID uuid.UUID `json:"product_id"`
 }
 
 func (ReviewCreatedArgs) Kind() string          { return "legacy.review_created" }
@@ -83,7 +83,7 @@ func OnReviewAggregateChanged(q jobs.Enqueuer) func(context.Context, review.Revi
 // Reviews 是 relay 讀評價的 port；*review.Module 實作它。
 type Reviews interface {
 	ReviewForRelay(ctx context.Context, id uuid.UUID) (review.RelayReview, error)
-	ProductStats(ctx context.Context, productID int64) (review.ProductStats, error)
+	ProductStats(ctx context.Context, productID uuid.UUID) (review.ProductStats, error)
 	StoreStats(ctx context.Context, storeID int64) (review.StoreStats, error)
 }
 
@@ -144,7 +144,7 @@ type reviewCreated struct {
 	CreatedAt          string   `json:"created_at,omitempty"`
 	AvgRating          float64  `json:"avg_rating"`
 	TotalCount         int64    `json:"total_count"`
-	ProductID          int64    `json:"product_id"`
+	ProductID          string   `json:"product_id"`
 	ProductAvgRating   float64  `json:"product_avg_rating"`
 	ProductReviewCount int64    `json:"product_review_count"`
 }
@@ -154,7 +154,7 @@ type reviewHidden struct {
 	baseEvent
 	ReviewID           int64   `json:"review_id"`
 	StoreID            int64   `json:"store_id"`
-	ProductID          int64   `json:"product_id"`
+	ProductID          string  `json:"product_id"`
 	AvgRating          float64 `json:"avg_rating"`
 	TotalCount         int64   `json:"total_count"`
 	ProductAvgRating   float64 `json:"product_avg_rating"`
@@ -172,7 +172,7 @@ func (w *Worker) enqueuePublish(ctx context.Context, eventID, exchange, key stri
 }
 
 // hidden 在 job 執行當下重算 (店, 商品) 的聚合，組成一則 review.hidden。
-func (w *Worker) hidden(ctx context.Context, eventID string, at time.Time, storeID, productID int64) (reviewHidden, error) {
+func (w *Worker) hidden(ctx context.Context, eventID string, at time.Time, storeID int64, productID uuid.UUID) (reviewHidden, error) {
 	store, err := w.Reviews.StoreStats(ctx, storeID)
 	if err != nil {
 		return reviewHidden{}, err
@@ -182,7 +182,7 @@ func (w *Worker) hidden(ctx context.Context, eventID string, at time.Time, store
 		return reviewHidden{}, err
 	}
 	return reviewHidden{
-		baseEvent: base(eventID, at, "REVIEW_HIDDEN"), StoreID: storeID, ProductID: productID,
+		baseEvent: base(eventID, at, "REVIEW_HIDDEN"), StoreID: storeID, ProductID: productID.String(),
 		AvgRating: store.Average, TotalCount: store.Count, ProductAvgRating: product.Average, ProductReviewCount: product.Count,
 	}, nil
 }
@@ -222,7 +222,7 @@ func (w *Worker) reviewCreated(ctx context.Context, a ReviewCreatedArgs) error {
 		baseEvent: base(a.EventID, a.Occurred, "REVIEW_CREATED"), OrderNo: r.OrderNo, OrderItemID: r.OrderItemID, StoreID: r.StoreID,
 		BuyerID: r.BuyerID, Rating: int32(r.Rating), //nolint:gosec // rating 由 reviews_rating_check 保證 1 到 5
 		Content: r.Content, ImageKeys: keys,
-		CreatedAt: r.CreatedAt.UTC().Format(time.RFC3339), AvgRating: h.AvgRating, TotalCount: h.TotalCount, ProductID: r.ProductID,
+		CreatedAt: r.CreatedAt.UTC().Format(time.RFC3339), AvgRating: h.AvgRating, TotalCount: h.TotalCount, ProductID: r.ProductID.String(),
 		ProductAvgRating: h.ProductAvgRating, ProductReviewCount: h.ProductReviewCount,
 	})
 }

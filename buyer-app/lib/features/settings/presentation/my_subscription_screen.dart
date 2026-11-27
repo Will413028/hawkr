@@ -985,7 +985,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
               : await AuthStorage.guestCartId();
           await ref
               .read(cartRepositoryProvider)
-              .addToCart(skuId, 1, guestId: guestId);
+              .addToCart(skuId.toString(), 1, guestId: guestId);
           ref.invalidate(cartCountProvider);
           selectedSkuId = skuId;
           success = true;

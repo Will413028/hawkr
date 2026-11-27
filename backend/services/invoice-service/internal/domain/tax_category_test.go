@@ -79,9 +79,9 @@ func TestTaxCategoryLevels(t *testing.T) {
 
 func TestSellerDefaultTaxResolver(t *testing.T) {
 	r := SellerDefaultTaxResolver{Default: TaxCategoryExempt}
-	for _, sku := range []int64{0, 1, 999} {
+	for _, sku := range []string{"", "0192a3b4-0000-7000-8000-000000000001", "0192a3b4-0000-7000-8000-000000000002"} {
 		if got := r.ResolveProduct(sku); got != TaxCategoryExempt {
-			t.Fatalf("ResolveProduct(%d) = %d, want 3", sku, int16(got))
+			t.Fatalf("ResolveProduct(%q) = %d, want 3", sku, int16(got))
 		}
 	}
 	var _ TaxCategoryResolver = r

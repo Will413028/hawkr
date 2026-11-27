@@ -81,7 +81,7 @@ type OrderForReview struct {
 // OrderItem 是訂單項目。ImageKey 為空表示沒有商品圖。
 type OrderItem struct {
 	OrderItemID int64
-	ProductID   int64
+	ProductID   uuid.UUID // 全零 ＝ 沒有商品（RFQ 成交），不能評價
 	SkuName     string
 	ImageKey    string
 	Price       int64
@@ -112,7 +112,7 @@ type Review struct {
 	OrderItemID  int64
 	BuyerID      int64
 	StoreID      int64
-	ProductID    int64
+	ProductID    uuid.UUID
 	Rating       int
 	Content      string
 	Images       []Image
@@ -129,7 +129,7 @@ type ReportedReview struct {
 	ID        uuid.UUID
 	BuyerID   int64
 	StoreID   int64
-	ProductID int64
+	ProductID uuid.UUID
 	Rating    int
 	Content   string
 	// AssetIDs 是評價附圖的 asset ID，依位置排序。
@@ -245,7 +245,7 @@ type ReviewCreated struct {
 	ReviewID   uuid.UUID
 	BuyerID    int64
 	StoreID    int64
-	ProductID  int64
+	ProductID  uuid.UUID
 }
 
 // ReviewAggregateChanged 在隱藏或還原改變一組 (店, 商品) 的公開評價集合時、同一個 transaction 內發布；
@@ -254,7 +254,7 @@ type ReviewAggregateChanged struct {
 	EventID    uuid.UUID
 	OccurredAt time.Time
 	StoreID    int64
-	ProductID  int64
+	ProductID  uuid.UUID
 }
 
 // ReviewHidden 一則評價被隱藏（只在真的新增一筆隱藏時發，冪等的重複隱藏不發），在隱藏的同一個 transaction 內發布。只帶參照與列舉，不帶管理員說明文字；
@@ -285,5 +285,5 @@ type ReviewRestored struct {
 // Target 是一組 (店, 商品)：評價聚合的單位。
 type Target struct {
 	StoreID   int64
-	ProductID int64
+	ProductID uuid.UUID
 }

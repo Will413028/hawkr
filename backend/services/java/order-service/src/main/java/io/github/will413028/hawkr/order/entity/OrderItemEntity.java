@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import java.util.UUID;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -17,13 +18,14 @@ public class OrderItemEntity {
 
     private String orderNo;
 
-    /** 商品 ID 快照（下單時從 Product Service 複製） */
-    private Long productId;
+    /** 商品 ID 快照（catalog 的 UUID；下單時從 catalog 複製） */
+    private UUID productId;
 
     /** 商品名稱快照（下單時從 Product Service 複製） */
     private String productName;
 
-    private Long skuId;
+    /** SKU ID（catalog 的 UUID）；NULL ＝ non-catalog line（RFQ 成交） */
+    private UUID skuId;
 
     private String skuName;
 

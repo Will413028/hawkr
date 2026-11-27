@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.mq;
 
 import io.github.will413028.hawkr.common.mq.MqConstants;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
 import io.github.will413028.hawkr.common.utils.code.OrderEventType;
 import io.github.will413028.hawkr.common.utils.code.OrderStatus;
@@ -110,7 +111,7 @@ class PaymentEventHandlerSalesOutboxTest {
     private OrderItemEntity item(long productId, int qty) {
         OrderItemEntity it = new OrderItemEntity();
         it.setOrderNo("O1");
-        it.setProductId(productId);
+        it.setProductId(TestIds.id(productId));
         it.setQuantity(qty);
         return it;
     }
@@ -173,8 +174,41 @@ class PaymentEventHandlerSalesOutboxTest {
                 .extracting(OrderSalesAccumulatedPayload.ProductSalesItem::productId,
                         OrderSalesAccumulatedPayload.ProductSalesItem::quantity)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple(9001L, 3),
-                        org.assertj.core.groups.Tuple.tuple(9002L, 5));
+                        org.assertj.core.groups.Tuple.tuple(TestIds.id(9001L), 3),
+                        org.assertj.core.groups.Tuple.tuple(TestIds.id(9002L), 5));
+    }
+
+    @Test
+    @DisplayName("RFQ 明細（product_id 為 NULL）不進銷量累計，也不讓 groupingBy 拋 NPE")
+    void rfqItemWithoutProductIdIsSkippedFromSalesAccumulation() throws Exception {
+        stubPaidOrder();
+        OrderItemEntity rfq = item(0L, 200);
+        rfq.setProductId(null);
+        when(orderItemRepository.findByOrderNo("O1")).thenReturn(List.of(item(9001L, 2), rfq));
+
+        handler.handlePaymentSuccess(payload(), "{}", "hash-rfq");
+
+        ArgumentCaptor<OrderOutboxEntity> captor = ArgumentCaptor.forClass(OrderOutboxEntity.class);
+        verify(outboxMapper, org.mockito.Mockito.times(2)).insert(captor.capture());
+        OrderSalesAccumulatedPayload parsed =
+                MAPPER.readValue(captor.getAllValues().get(1).getPayload(), OrderSalesAccumulatedPayload.class);
+        assertThat(parsed.items())
+                .extracting(OrderSalesAccumulatedPayload.ProductSalesItem::productId,
+                        OrderSalesAccumulatedPayload.ProductSalesItem::quantity)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(TestIds.id(9001L), 2));
+    }
+
+    @Test
+    @DisplayName("訂單明細全是 RFQ（product_id 皆 NULL）→ 只落 order.paid")
+    void allRfqItems_writesOnlyPaidOutbox() throws Exception {
+        stubPaidOrder();
+        OrderItemEntity rfq = item(0L, 200);
+        rfq.setProductId(null);
+        when(orderItemRepository.findByOrderNo("O1")).thenReturn(List.of(rfq));
+
+        handler.handlePaymentSuccess(payload(), "{}", "hash-rfq2");
+
+        verify(outboxMapper).insert(any());
     }
 
     @Test

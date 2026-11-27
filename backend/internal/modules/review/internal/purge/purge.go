@@ -147,7 +147,7 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 			return nil
 		}
 		ids := make([]uuid.UUID, len(batch))
-		stores, products := make([]int64, 0, len(batch)), make([]int64, 0, len(batch))
+		stores, products := make([]int64, 0, len(batch)), make([]uuid.UUID, 0, len(batch))
 		for i, r := range batch {
 			ids[i] = r.ID
 			stores, products = append(stores, r.StoreID), append(products, r.ProductID)
@@ -185,7 +185,7 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 }
 
 // distinctTargets 把一批評價的店與商品配成不重複、由小到大的 (店, 商品)。
-func distinctTargets(storeIDs, productIDs []int64) []model.Target {
+func distinctTargets(storeIDs []int64, productIDs []uuid.UUID) []model.Target {
 	out := make([]model.Target, len(storeIDs))
 	for i := range storeIDs {
 		out[i] = model.Target{StoreID: storeIDs[i], ProductID: productIDs[i]}
@@ -194,15 +194,15 @@ func distinctTargets(storeIDs, productIDs []int64) []model.Target {
 		if a.StoreID != b.StoreID {
 			return cmp.Compare(a.StoreID, b.StoreID)
 		}
-		return cmp.Compare(a.ProductID, b.ProductID)
+		return a.ProductID.Compare(b.ProductID)
 	})
 	return slices.Compact(out)
 }
 
 // bust 排入這一批評價所在的商品頁與店面頁的快取失效（一個 job、去重、由小到大）。
-func (s *Service) bust(ctx context.Context, storeIDs, productIDs []int64) error {
+func (s *Service) bust(ctx context.Context, storeIDs []int64, productIDs []uuid.UUID) error {
 	slices.Sort(storeIDs)
-	slices.Sort(productIDs)
+	slices.SortFunc(productIDs, uuid.UUID.Compare)
 	var tags []string
 	for _, id := range slices.Compact(productIDs) {
 		tags = append(tags, revalidate.ProductTag(id))

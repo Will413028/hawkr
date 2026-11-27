@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.service;
 
 import io.github.will413028.hawkr.common.utils.TsidUtil;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.OrderPolicyResolver;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
@@ -112,7 +113,7 @@ class UberOrderCreationGuardWiringTest {
 
     private List<OrderService.CreateOrderItemParam> items() {
         return List.of(new OrderService.CreateOrderItemParam(
-                1L, "sku-1", 1, 500L, 500L, 0L, "img", 1L, "product-1"));
+                TestIds.id(1L), "sku-1", 1, 500L, 500L, 0L, "img", TestIds.id(1001L), "product-1"));
     }
 
     // ===== 入口 1／2：gRPC CreateOrder（購物車外建單）=====

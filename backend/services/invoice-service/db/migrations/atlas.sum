@@ -1,4 +1,4 @@
-h1:Wj0XX+e/ezIsYX3HPDKfGHE3+g1y6yOi6ahnIVnrSVQ=
+h1:QUsrr5B31lodBzZheKXG0Y0yCv1a5U1Nnrnhz7ZXMMM=
 20260829093437_init_invoice_schema.sql h1:RpaWnhLsLBVBLS34Ujc5ALWrNfZ7fwrNbryDzn6qjQ0=
 20260829152318_add_invoice_number_sequences.sql h1:XLlM5LPbOnjtSZ2q7+7nPXAf+trzG05atI9fWlEkdMs=
 20260829155115_add_cancel_evidence_kind.sql h1:iqH1rXgdhWC7OX2WNp8IaLJJRvWkC7z1cnsqLfLxmto=
@@ -20,3 +20,4 @@ h1:Wj0XX+e/ezIsYX3HPDKfGHE3+g1y6yOi6ahnIVnrSVQ=
 20260904045411_add_manual_unlock_cancel_evidence.sql h1:JZjgrc9h+0X4m/lIhBNQpyhJdvB3dmOFO6+PNTz0pMQ=
 20260904172018_fix_admin_cancel_evidence_check.sql h1:JHrEUm7UmiNvNi5nR+60S0vpEOU9v1sLN1fThyaMz5Y=
 20261122120000_add_business_day_coverage.sql h1:UJgGFMgiHXG/LY1rF1ij5rPnThgsFyiJUVAc7Vc1U9U=
+20261127120000_sku_id_uuid.sql h1:spam2VXM/GQwLkZLKBMCQGC/WCLG9SrSg1CvvdCk6io=

@@ -100,9 +100,9 @@ func fullSnapshot() *pb.OrderInvoiceSnapshotData {
 		DiscountFunding:      "SELLER",
 		IsConsolidatedOrder:  false,
 		Items: []*pb.OrderInvoiceSnapshotItem{
-			{OrderItemId: "2685914682000001", SkuId: "2685914682000011", ProductName: "有機高麗菜",
+			{OrderItemId: "2685914682000001", SkuId: "0192a3b4-0000-7000-8000-000000000011", ProductName: "有機高麗菜",
 				SkuName: "大顆", Quantity: "2", UnitPrice: "300"},
-			{OrderItemId: "2685914682000002", SkuId: "2685914682000012", ProductName: "有機番茄",
+			{OrderItemId: "2685914682000002", SkuId: "0192a3b4-0000-7000-8000-000000000012", ProductName: "有機番茄",
 				SkuName: "", Quantity: "1", UnitPrice: "400"},
 		},
 	}
@@ -143,7 +143,7 @@ func TestGetOrderInvoiceSnapshot_FieldMapping(t *testing.T) {
 		t.Fatalf("items 數 = %d", len(s.Items))
 	}
 	// 順序即 line_seq（§5A.3）：本層原樣保留 proto 的順序，不重排。
-	if s.Items[0].OrderItemID != 2685914682000001 || s.Items[0].SkuID != 2685914682000011 ||
+	if s.Items[0].OrderItemID != 2685914682000001 || s.Items[0].SkuID != "0192a3b4-0000-7000-8000-000000000011" ||
 		s.Items[0].ProductName != "有機高麗菜" || s.Items[0].SkuName != "大顆" ||
 		s.Items[0].Quantity != 2 || s.Items[0].UnitPrice != 300 {
 		t.Fatalf("items[0] 對映錯：%+v", s.Items[0])

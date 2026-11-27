@@ -9,6 +9,7 @@ import io.github.will413028.hawkr.cart.grpc.client.ProductGrpcClient;
 import io.github.will413028.hawkr.cart.repository.CartItemRepository;
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
+import io.github.will413028.hawkr.common.utils.proto.ProtoConversionUtils;
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.common.grpc.UnresolvedPrincipalException;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
@@ -113,11 +114,11 @@ public class CartService {
      *
      * @return AddItemResult 包含 code, message, totalItems
      */
-    public AddItemResult addItem(Long buyerId, String guestId, Long skuId, int quantity) {
+    public AddItemResult addItem(Long buyerId, String guestId, UUID skuId, int quantity) {
         // 1. SKU 驗證（同步呼叫 Product Service）
         GetProductSimpleResponse productResp;
         try {
-            productResp = productGrpcClient.getProductSimple(String.valueOf(skuId));
+            productResp = productGrpcClient.getProductSimple(skuId.toString());
         } catch (StatusRuntimeException e) {
             log.error("CartService.addItem.productRpcFail",
                     "Product Service 呼叫失敗 " + ownerTag(buyerId, guestId) + " skuId=" + skuId, e);
@@ -144,15 +145,15 @@ public class CartService {
         Long unitPrice;     // 實際成交單價（無特價=list_price，有特價=當時 sale_price）
         Long listPrice;     // 原價快照
         int maxLimit;
-        Long productId;
+        UUID productId;
         try {
             storeId = Long.parseLong(info.getStoreId());
             unitPrice = Long.parseLong(info.getPrice());
             // list_price 若為空字串（過渡期或舊版 Product Service）→ 退化為 unit_price，視為「無特價」
             listPrice = info.getListPrice().isEmpty() ? unitPrice : Long.parseLong(info.getListPrice());
             maxLimit = info.getMaxLimit().isEmpty() ? Integer.MAX_VALUE : Integer.parseInt(info.getMaxLimit());
-            productId = info.getProductId().isEmpty() ? 0L : Long.parseLong(info.getProductId());
-        } catch (NumberFormatException e) {
+            productId = ProtoConversionUtils.parseUuidRequired(info.getProductId(), "product_id");
+        } catch (IllegalArgumentException e) {
             log.error("CartService.addItem.parseError",
                     "商品資訊格式異常 " + ownerTag(buyerId, guestId),
                     "skuId", String.valueOf(skuId));
@@ -425,7 +426,7 @@ public class CartService {
 
     // ==================== SetItemQuantity（設計書 §5.7） ====================
 
-    public SetItemResult setItemQuantity(Long buyerId, String guestId, Long skuId, int quantity) {
+    public SetItemResult setItemQuantity(Long buyerId, String guestId, UUID skuId, int quantity) {
         CartItemEntity item = (buyerId != null)
                 ? cartItemRepository.findByBuyerIdAndSkuId(buyerId, skuId)
                 : cartItemRepository.findByGuestIdAndSkuId(guestId, skuId);
@@ -472,12 +473,12 @@ public class CartService {
 
     // ==================== CheckoutLock（設計書 §5.4） ====================
 
-    public int checkoutLock(Long buyerId, String checkoutId, List<Long> skuIds) {
+    public int checkoutLock(Long buyerId, String checkoutId, List<UUID> skuIds) {
         if (skuIds == null || skuIds.isEmpty()) {
             throw new CartBusinessException(GrpcResponseCode.CART_SKU_IDS_REQUIRED);
         }
 
-        List<Long> distinctSkuIds = skuIds.stream().distinct().toList();
+        List<UUID> distinctSkuIds = skuIds.stream().distinct().toList();
         if (distinctSkuIds.size() != skuIds.size()) {
             throw new CartBusinessException(GrpcResponseCode.CART_SKU_IDS_DUPLICATED);
         }
@@ -501,7 +502,7 @@ public class CartService {
 
     // ==================== CheckoutUnlock（設計書 §5.5） ====================
 
-    public int checkoutUnlock(Long buyerId, String checkoutId, List<Long> skuIds) {
+    public int checkoutUnlock(Long buyerId, String checkoutId, List<UUID> skuIds) {
         if (skuIds != null && !skuIds.isEmpty()) {
             long distinct = skuIds.stream().distinct().count();
             if (distinct != skuIds.size()) {
@@ -520,7 +521,7 @@ public class CartService {
 
     // ==================== RemoveItemsByCheckoutId（設計書 §5.6） ====================
 
-    public int removeItemsByCheckoutId(Long buyerId, String checkoutId, List<Long> skuIds) {
+    public int removeItemsByCheckoutId(Long buyerId, String checkoutId, List<UUID> skuIds) {
         if (skuIds != null && !skuIds.isEmpty()) {
             long distinct = skuIds.stream().distinct().count();
             if (distinct != skuIds.size()) {

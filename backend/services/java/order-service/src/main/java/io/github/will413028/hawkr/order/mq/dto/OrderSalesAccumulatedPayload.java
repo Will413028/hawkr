@@ -33,7 +33,7 @@ public record OrderSalesAccumulatedPayload(
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record ProductSalesItem(
-            Long productId,
+            UUID productId,
             Integer quantity
     ) {}
 }

@@ -67,7 +67,7 @@ func TestRequestSnapshotHash_ChangesWithEveryFieldThatReachesAmego(t *testing.T)
 	snap := OrderSnapshot{
 		TotalOriginalAmount: 100, TotalActualAmount: 100,
 		DiscountFunding: DiscountFundingSeller,
-		Items:           []OrderItem{{OrderItemID: 1, SkuID: 1, ProductName: "菜", Quantity: 1, UnitPrice: 100}},
+		Items:           []OrderItem{{OrderItemID: 1, SkuID: "0192a3b4-0000-7000-8000-000000000001", ProductName: "菜", Quantity: 1, UnitPrice: 100}},
 	}
 	base, err := NewIssueDraft(snap, SellerDefaultTaxResolver{Default: TaxCategoryTaxable}, B2CBuyerIdentifier)
 	if err != nil {

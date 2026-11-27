@@ -63,7 +63,7 @@ mybatis-plus:
       id-type: INPUT
   configuration:
     map-underscore-to-camel-case: true
-  type-handlers-package: io.github.will413028.hawkr.order.config.typehandler
+  type-handlers-package: io.github.will413028.hawkr.common.mybatis,io.github.will413028.hawkr.order.config.typehandler
 
 # Hawkr Observability 配置
 hawkr:

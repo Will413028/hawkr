@@ -1,14 +1,17 @@
 package domain
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 // mapResolver 讓測試表達 Phase 2 的逐 SKU 稅別（例 2 需要）。
 type mapResolver struct {
-	byS map[int64]TaxCategory
+	byS map[string]TaxCategory
 	def TaxCategory
 }
 
-func (r mapResolver) ResolveProduct(skuID int64) TaxCategory {
+func (r mapResolver) ResolveProduct(skuID string) TaxCategory {
 	if c, ok := r.byS[skuID]; ok {
 		return c
 	}
@@ -39,14 +42,15 @@ func newExampleDraft(t *testing.T, items []exItem, shippingFee, discount int64, 
 		DiscountAmount:  discount,
 		DiscountFunding: DiscountFundingSeller,
 	}
-	byS := map[int64]TaxCategory{}
+	byS := map[string]TaxCategory{}
 	for i, it := range items {
 		id := int64(i + 1)
+		sku := fmt.Sprintf("0192a3b4-0000-7000-8000-%012d", id)
 		snap.Items = append(snap.Items, OrderItem{
-			OrderItemID: id, SkuID: id, ProductName: it.name, Quantity: it.qty, UnitPrice: it.price,
+			OrderItemID: id, SkuID: sku, ProductName: it.name, Quantity: it.qty, UnitPrice: it.price,
 		})
 		snap.TotalOriginalAmount += int64(it.qty) * it.price
-		byS[id] = it.cat
+		byS[sku] = it.cat
 	}
 	snap.TotalActualAmount = snap.TotalOriginalAmount + shippingFee - discount
 	if snap.TotalActualAmount < 0 {

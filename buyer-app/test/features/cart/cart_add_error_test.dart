@@ -30,7 +30,7 @@ void main() {
     );
 
     await expectLater(
-      CartRepository(dio).addToCart(123, 1),
+      CartRepository(dio).addToCart('123', 1),
       throwsA(
         isA<ServerException>().having(
           (error) => error.message,

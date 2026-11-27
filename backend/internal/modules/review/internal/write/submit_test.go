@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -99,7 +100,7 @@ func TestSubmitSeparatesOrderNotFoundFromUnavailable(t *testing.T) {
 // A6-D10：擁有者先於狀態檢查，別人的訂單（不論狀態）與不存在的訂單回應一致。
 func TestSubmitForeignOrderIsIndistinguishableFromAbsent(t *testing.T) {
 	completed := now.Add(-time.Hour)
-	order := model.OrderForReview{OrderNo: "N1", BuyerID: 99, StoreID: 22, Status: "50", CompletedAt: completed, Items: []model.OrderItem{{OrderItemID: 5, ProductID: 7, SkuName: "紅茶", Price: 100}}}
+	order := model.OrderForReview{OrderNo: "N1", BuyerID: 99, StoreID: 22, Status: "50", CompletedAt: completed, Items: []model.OrderItem{{OrderItemID: 5, ProductID: uuid.UUID{15: 7}, SkuName: "紅茶", Price: 100}}}
 
 	_, absent := service(&orders{err: model.ErrOrderNotFound}).Submit(context.Background(), valid())
 

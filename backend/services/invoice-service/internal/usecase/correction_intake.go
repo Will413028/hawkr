@@ -209,7 +209,7 @@ func (u *CorrectionIntake) Submit(ctx context.Context, req SubmitCorrectionReque
 	for _, l := range existing {
 		revisedLines = append(revisedLines, domain.NewDocumentLine{
 			LineSeq: l.LineSeq, LineType: l.LineType,
-			OrderItemID: int64OrZero(l.OrderItemID), SkuID: int64OrZero(l.SkuID),
+			OrderItemID: int64OrZero(l.OrderItemID), SkuID: derefString(l.SkuID),
 			Description: l.Description, Unit: derefString(l.Unit),
 			Quantity: l.Quantity, UnitPrice: l.UnitPrice, NetAmount: l.NetAmount,
 			TaxCategory: l.TaxCategory, TaxRateBps: l.TaxRateBps,

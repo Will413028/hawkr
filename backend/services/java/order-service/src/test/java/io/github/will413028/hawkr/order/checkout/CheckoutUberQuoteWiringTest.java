@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.buyer.grpc.AddressInfo;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.ValidationResult;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Assessment;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Check;
@@ -55,7 +56,7 @@ class CheckoutUberQuoteWiringTest {
 
     private static final long BUYER_ID = 2623900520L;
     private static final long STORE_ID = 2685914682L;
-    private static final String SKU_ID = "5001";
+    private static final String SKU_ID = TestIds.id(5001L).toString();
     private static final String ADDRESS_ID = "7788";
     /** 商品沒有任何 shipping option ⇒ inferredTemperature 落在最冷的 3203。硬寫字面值。 */
     private static final String FROZEN = "3203";
@@ -76,6 +77,7 @@ class CheckoutUberQuoteWiringTest {
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
+                                .setProductId(TestIds.id(9001L).toString())
                                 .setSkuName("蘋果")
                                 .setProductName("蘋果禮盒")
                                 .setStoreId(String.valueOf(STORE_ID))
@@ -114,7 +116,7 @@ class CheckoutUberQuoteWiringTest {
 
     private static List<CheckoutItem> items() {
         return List.of(CheckoutItem.newBuilder()
-                .setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build());
+                .setSkuId(SKU_ID).setProductId(TestIds.id(9001L).toString()).setQuantity("2").build());
     }
 
     private static Decision decisionOf(boolean allowed, Status status, Assessment assessment) {
@@ -167,7 +169,7 @@ class CheckoutUberQuoteWiringTest {
         assertThat(probe.district()).isEqualTo("中正區");
         assertThat(probe.detailAddress()).isEqualTo("測試路1號3樓");
         assertThat(probe.items()).hasSize(1);
-        assertThat(probe.items().get(0).skuId()).isEqualTo(5001L);
+        assertThat(probe.items().get(0).skuId()).isEqualTo(TestIds.id(5001L));
         assertThat(probe.items().get(0).quantity()).isEqualTo(2);
         assertThat(probe.items().get(0).unitPrice()).isEqualTo(500L);
         // 報價階段不落任何狀態

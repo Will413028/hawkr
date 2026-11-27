@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.utils.code.CollectionModel;
+import java.util.UUID;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.order.exception.OrderBusinessException;
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
@@ -10,6 +11,7 @@ import io.github.will413028.hawkr.common.utils.code.ShippingTemperature;
 import io.github.will413028.hawkr.common.utils.code.WeightUnit;
 import io.github.will413028.hawkr.common.utils.code.CartItemUnavailableReason;
 import io.github.will413028.hawkr.common.utils.code.helper.ProductPurchasabilityRules;
+import io.github.will413028.hawkr.common.utils.proto.ProtoConversionUtils;
 import io.github.will413028.hawkr.common.utils.shipping.SellerShippingFilter;
 import io.github.will413028.hawkr.common.utils.shipping.ShippingAreaResolver;
 import io.github.will413028.hawkr.common.utils.shipping.WeightConverter;
@@ -698,7 +700,7 @@ public class CheckoutService {
         String checkoutId = UUID.randomUUID().toString();
 
         // 折扣分攤：依 unit_price × qty 比例分攤 discountAmount，尾差歸最後一筆（20 設計書 §4.10）
-        Map<Long, Long> shareDiscountBySku = allocateShareDiscount(resolved, discountAmount);
+        Map<UUID, Long> shareDiscountBySku = allocateShareDiscount(resolved, discountAmount);
 
         // 最終免運判定（折扣後）：以 unit_price × qty − share_discount 對門檻判定（20 設計書 §4.7.2）
         var finalFsr = checkoutValidator.checkFreeShipping(
@@ -715,7 +717,7 @@ public class CheckoutService {
                             ? String.valueOf(r.unitPrice()) : "";
                     return CheckoutItemPreview.newBuilder()
                             .setSkuId(String.valueOf(r.skuId()))
-                            .setProductId(r.productId())
+                            .setProductId(r.productId().toString())
                             .setSkuName(r.skuName())
                             .setQuantity(String.valueOf(r.quantity()))
                             .setPrice(String.valueOf(r.unitPrice()))
@@ -931,7 +933,7 @@ public class CheckoutService {
         }
 
         // 折扣分攤 + 最終免運判定（與 preview 一致，§4.7.2 折扣後判定）
-        Map<Long, Long> shareDiscountBySku = allocateShareDiscount(resolved, discountAmount);
+        Map<UUID, Long> shareDiscountBySku = allocateShareDiscount(resolved, discountAmount);
         var finalFsr = checkoutValidator.checkFreeShipping(
                 resolved, shippingMethodCode, deliveryTempCode, shareDiscountBySku);
         // 同 preview：折扣後失去免運必須用 rawFee
@@ -981,7 +983,7 @@ public class CheckoutService {
                         r.skuId(), r.skuName(), r.quantity(), r.unitPrice(), r.listPrice(),
                         shareDiscountBySku.getOrDefault(r.skuId(), 0L),  // 03 §3.2.1：建單時寫入分攤折扣
                         r.imageObjectKey(),
-                        Long.parseLong(r.productId()), r.productName()))
+                        r.productId(), r.productName()))
                 .toList();
 
         // 收款模式 fail-closed：與 preview 同一份政策快照，不在 confirm 重新決策。
@@ -1100,7 +1102,9 @@ public class CheckoutService {
         List<UnavailableItemInfo> unavailable = new ArrayList<>();
 
         for (CheckoutItem item : checkoutItems) {
-            ProductForCheckoutInfo info = infoMap.get(item.getSkuId());
+            // 伺服器回的 key 是小寫的標準 UUID；請求的寫法不同（大寫）或不是 UUID 時查不到，走 LOOKUP_FAILED。
+            UUID skuId = ProtoConversionUtils.parseUuidOrNull(item.getSkuId());
+            ProductForCheckoutInfo info = skuId == null ? null : infoMap.get(skuId.toString());
 
             // quantity 防護式解析（code-reviewer #7）：若 quantity 不合法（"0" / 負數 / 非數字）
             // 不 throw，視為 INVALID_ITEM 進 unavailable 並 continue。
@@ -1176,7 +1180,7 @@ public class CheckoutService {
                     : InputValidator.requirePositiveAmount(info.getSalePrice(), "商品特價");
 
             resolved.add(new ResolvedItem(
-                    Long.parseLong(item.getSkuId()),
+                    skuId,
                     info.getSkuName() != null ? info.getSkuName() : "",
                     requestedQty,
                     unitPrice,
@@ -1187,7 +1191,7 @@ public class CheckoutService {
                     parseIntSafe(info.getHeightCm()),
                     weightGram,
                     Long.parseLong(info.getStoreId()),
-                    item.getProductId(),
+                    ProtoConversionUtils.parseUuidRequired(info.getProductId(), "product_id"),
                     info.getProductName() != null ? info.getProductName() : "",
                     options,
                     info.getImageObjectKey() != null ? info.getImageObjectKey() : "",
@@ -1614,8 +1618,8 @@ public class CheckoutService {
         return b.build();
     }
 
-    private Map<Long, Long> allocateShareDiscount(List<ResolvedItem> items, long discountAmount) {
-        Map<Long, Long> result = new LinkedHashMap<>();
+    private Map<UUID, Long> allocateShareDiscount(List<ResolvedItem> items, long discountAmount) {
+        Map<UUID, Long> result = new LinkedHashMap<>();
         if (discountAmount <= 0 || items.isEmpty()) {
             for (ResolvedItem r : items) result.put(r.skuId(), 0L);
             return result;

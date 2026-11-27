@@ -22,6 +22,7 @@ import (
 	pb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 	invoicemq "github.com/Will413028/hawkr/invoice-service/internal/mq"
+	"github.com/google/uuid"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -302,9 +303,9 @@ func mapItems(in []*pb.OrderInvoiceSnapshotItem) ([]domain.OrderItem, error) {
 			return nil, err
 		}
 		// non-catalog line（RFQ 成交）沒有平台 SKU ⇒ order-service 輸出空字串。
-		// 用 0 承載「無此值」與 Line.SkuID 的既有慣例一致，最終由 inp() 寫成 NULL。
+		// 空字串承載「無此值」，最終由 repository 寫成 NULL。
 		// ⚠️ 只有 sku_id 可缺：其餘數值欄位仍走 parseRequiredInt。
-		skuID, err := parseOptionalInt(it.GetSkuId(), fmt.Sprintf("items[%d].sku_id", i))
+		skuID, err := parseOptionalUUID(it.GetSkuId(), fmt.Sprintf("items[%d].sku_id", i))
 		if err != nil {
 			return nil, err
 		}
@@ -359,18 +360,17 @@ func parseRequiredInt(s, field string) (int64, error) {
 	return v, nil
 }
 
-// parseOptionalInt 解析**允許缺值**的數值欄位：空字串回 0，交由 domain 的
-// 「0 表示 NULL」慣例承載（Line.SkuID 的註解、repository 的 inp() 都照這條走）。
-// ⚠️ 只對確實可缺的欄位使用。非空但非數字仍然是錯誤——那是上游壞了，不是缺值。
-func parseOptionalInt(s, field string) (int64, error) {
+// parseOptionalUUID 解析**允許缺值**的 UUID 欄位：空字串原樣回傳（代表 NULL），
+// 非空必須是合法 UUID，回傳正規化（小寫）字串。非空但格式錯是上游壞了，不是缺值。
+func parseOptionalUUID(s, field string) (string, error) {
 	if s == "" {
-		return 0, nil
+		return "", nil
 	}
-	v, err := strconv.ParseInt(s, 10, 64)
+	v, err := uuid.Parse(s)
 	if err != nil {
-		return 0, fmt.Errorf("%s=%q is not an integer: %w", field, s, err)
+		return "", fmt.Errorf("%s=%q is not a UUID: %w", field, s, err)
 	}
-	return v, nil
+	return v.String(), nil
 }
 
 // parseOptionalID 解析「"" ＝ NULL」的 id 欄位。空字串回 0，其餘必須是正整數。

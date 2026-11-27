@@ -435,7 +435,7 @@ CREATE TABLE "invoice_document_lines" (
   "line_seq"        integer NOT NULL,                    -- 1-based，決定送 AMEGO 的 ProductItem 順序
   "line_type"       varchar(20) NOT NULL,                -- CodeMeta InvoiceLineType：PRODUCT / SHIPPING / DISCOUNT
   "order_item_id"   bigint,                              -- order_items.id（TSID），SHIPPING/DISCOUNT 為 NULL
-  "sku_id"          bigint,
+  "sku_id"          uuid,                                -- catalog SKU 的 UUID；non-catalog 行為 NULL
   "description"     varchar(256) NOT NULL,               -- AMEGO ProductItem.Description 上限 256 字（257 → 3040139）
   "unit"            varchar(6),                          -- AMEGO ProductItem.Unit 上限 6 字。Phase 1 恆為 NULL（U-2）
   "quantity"        integer NOT NULL,

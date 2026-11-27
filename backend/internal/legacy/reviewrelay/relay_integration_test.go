@@ -29,7 +29,7 @@ func TestRelayRetryEnqueuesOnePublishJobPerEvent(t *testing.T) {
 	w.Jobs = queue
 
 	createdArgs := ReviewCreatedArgs{eventFields: eventFields{EventID: "event-created", Occurred: occurredAt}, ReviewID: reviewID.String()}
-	changedArgs := ReviewAggregateChangedArgs{eventFields: eventFields{EventID: "event-changed", Occurred: occurredAt}, StoreID: 91, ProductID: 700}
+	changedArgs := ReviewAggregateChangedArgs{eventFields: eventFields{EventID: "event-changed", Occurred: occurredAt}, StoreID: 91, ProductID: product700}
 	for range 2 {
 		if err := w.reviewCreated(ctx, createdArgs); err != nil {
 			t.Fatal(err)
@@ -37,7 +37,7 @@ func TestRelayRetryEnqueuesOnePublishJobPerEvent(t *testing.T) {
 		if err := w.reviewAggregateChanged(ctx, changedArgs); err != nil {
 			t.Fatal(err)
 		}
-		reviews.product[700] = review.ProductStats{Count: 31, Average: 4.5}
+		reviews.product[product700] = review.ProductStats{Count: 31, Average: 4.5}
 	}
 
 	rows, err := d.Pool().Query(ctx, `SELECT args->>'event_id', args->>'routing_key' FROM river.river_job WHERE kind = 'legacy.rabbitmq_publish' ORDER BY id`)

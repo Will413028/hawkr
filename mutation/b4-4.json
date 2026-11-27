@@ -1,0 +1,49 @@
+{
+ "mutants": [
+  {
+   "id": "server-deduct-drops-idempotency-key",
+   "stack": "go",
+   "file": "backend/internal/legacy/catalogserver/server.go",
+   "old": "err := s.catalog.DeductStock(ctx, m.GetStockTxId(), items)",
+   "new": "err := s.catalog.DeductStock(ctx, \"\", items)",
+   "test": "internal/legacy/catalogserver ^TestDeductIsIdempotentOnStockTxID$",
+   "why": "DeductStock 不傳 stock_tx_id 當冪等鍵：同一個 stock_tx_id 重送沒有被擋下（catalog 收到空鍵就拒絕），冪等測試要紅。"
+  },
+  {
+   "id": "server-restore-shares-the-deduct-key",
+   "stack": "go",
+   "file": "backend/internal/legacy/catalogserver/server.go",
+   "old": "err := s.catalog.RestoreStock(ctx, RestoreKey(m.GetStockTxId()), m.GetStockTxId(), items)",
+   "new": "err := s.catalog.RestoreStock(ctx, m.GetStockTxId(), m.GetStockTxId(), items)",
+   "test": "internal/legacy/catalogserver ^TestRestoreIsIdempotentOnStockTxID$",
+   "why": "歸還的冪等鍵與扣減同一個 stock_tx_id：鍵空間撞上原扣減（冪等鍵全域唯一），歸還被當成鍵重用而失敗，歸還冪等測試要紅。"
+  },
+  {
+   "id": "consumer-drops-the-restore-call",
+   "stack": "go",
+   "file": "backend/internal/legacy/catalogconsumer/consumer.go",
+   "old": "\terr := c.Catalog.RestoreStock(ctx, catalogserver.RestoreKey(e.StockTxID), e.StockTxID, items)\n",
+   "new": "\t_ = catalogserver.RestoreKey(e.StockTxID)\n\tvar err error\n",
+   "test": "internal/legacy/catalogconsumer ^TestCancelledOrderRestoresStockOnceWhenResent$",
+   "why": "order.cancelled 的 consumer 不呼叫歸還：取消的訂單庫存沒有還回去，取消訂單還庫存測試要紅。"
+  },
+  {
+   "id": "snapshot-skips-the-archived-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/export.go",
+   "old": "Active: status == model.StatusActive && !deleted,",
+   "new": "Active: !deleted,",
+   "test": "internal/modules/catalog ^TestCheckoutSnapshotReportsArchivedAndDeletedSkuAsInactive$",
+   "why": "結帳快照不看商品狀態：下架與草稿商品的 SKU 被判成可購買，快照測試要紅。"
+  },
+  {
+   "id": "snapshot-ignores-deleted-flag",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/export.go",
+   "old": "deleted := r.ProductDeleted || r.SkuDeleted",
+   "new": "deleted := false",
+   "test": "internal/modules/catalog ^TestCheckoutSnapshotReportsArchivedAndDeletedSkuAsInactive$",
+   "why": "結帳快照不看已刪除：已刪除的商品或 SKU 被判成可購買，快照測試要紅。"
+  }
+ ]
+}

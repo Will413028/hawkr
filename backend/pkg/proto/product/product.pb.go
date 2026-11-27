@@ -1003,7 +1003,7 @@ func (x *CreateProductResponse) GetCertificationWarnings() []*CertificationWarni
 type UpdateProductRequest struct {
 	state                protoimpl.MessageState    `protogen:"open.v1"`
 	IdempotencyKey       string                    `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`                     // 冪等鍵
-	ProductId            string                    `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                                    // 商品 ID (TSID 數字字串)
+	ProductId            string                    `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                                    // 商品 ID (UUID 字串，catalog 的商品 ID)
 	StoreId              int64                     `protobuf:"varint,3,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`                                         // 用於權限驗證（Gateway JWT 注入，resolver 解析後的 store surrogate）
 	Name                 string                    `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`                                                               // 商品名稱
 	CategoryId           string                    `protobuf:"bytes,5,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`                                 // 分類 ID（數字字串）
@@ -1235,7 +1235,7 @@ func (x *UpdateProductResponse) GetCertificationWarnings() []*CertificationWarni
 
 type GetProductForAdminRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (TSID 數字字串)
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (UUID 字串，catalog 的商品 ID)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1279,7 +1279,7 @@ func (x *GetProductForAdminRequest) GetProductId() string {
 
 type UpdateProductStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (TSID 數字字串)
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (UUID 字串，catalog 的商品 ID)
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                        // 目標狀態（CodeMeta ProductStatus：4003=未上架, 4004=已上架）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1331,7 +1331,7 @@ func (x *UpdateProductStatusRequest) GetStatus() string {
 
 type UpdateSellerProductStatusRequest struct {
 	state           protoimpl.MessageState    `protogen:"open.v1"`
-	ProductId       string                    `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (TSID 數字字串)
+	ProductId       string                    `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (UUID 字串，catalog 的商品 ID)
 	StoreId         int64                     `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`      // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
 	Status          string                    `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`                        // 目標狀態碼（CodeMeta ProductStatus：4003=未上架, 4004=已上架）
 	ExpectedVersion string                    `protobuf:"bytes,4,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
@@ -1945,7 +1945,7 @@ func (x *BatchUpdateSellerProductStatusResponse) GetFailed() string {
 
 type GetProductRequest struct {
 	state         protoimpl.MessageState    `protogen:"open.v1"`
-	ProductId     string                    `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (TSID 數字字串)
+	ProductId     string                    `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (UUID 字串，catalog 的商品 ID)
 	StoreId       int64                     `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`      // 店家 ID（用於權限判斷，0 表示匿名）（Gateway JWT 注入，resolver 解析後的 store surrogate）
 	Delegation    *common.DelegationContext `protobuf:"bytes,100,opt,name=delegation,proto3" json:"delegation,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2065,7 +2065,7 @@ func (x *GetProductResponse) GetData() *ProductDetail {
 
 type GetPublicProductRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (TSID 數字字串)
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID (UUID 字串，catalog 的商品 ID)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2395,7 +2395,7 @@ func (x *GetProductListResponse) GetPageSize() string {
 // 商品詳情（完整資料）
 type ProductDetail struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                          // 商品 ID (TSID 數字字串)
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                          // 商品 ID (UUID 字串，catalog 的商品 ID)
 	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                                      // 商品名稱
 	Rating         string                 `protobuf:"bytes,3,opt,name=rating,proto3" json:"rating,omitempty"`                                  // 評分（數字字串）
 	Status         string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                                  // 狀態
@@ -2949,7 +2949,7 @@ func (x *ReviewPreview) GetCreatedAt() string {
 // 商品列表項目（簡化資料，不含 skus）
 type ProductListItem struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                                     // 商品 ID (TSID 數字字串)
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                                     // 商品 ID (UUID 字串，catalog 的商品 ID)
 	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                                                 // 商品名稱
 	Rating          string                 `protobuf:"bytes,3,opt,name=rating,proto3" json:"rating,omitempty"`                                             // 評分（數字字串）
 	Status          string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                                             // 狀態
@@ -3242,7 +3242,7 @@ func (x *ProductListItem) GetVersion() string {
 // 詳見 02 §5.5.1
 type GetProductsByIDsRequest struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
-	ProductIds []string               `protobuf:"bytes,1,rep,name=product_ids,json=productIds,proto3" json:"product_ids,omitempty"` // 商品 ID 列表（TSID 數字字串）
+	ProductIds []string               `protobuf:"bytes,1,rep,name=product_ids,json=productIds,proto3" json:"product_ids,omitempty"` // 商品 ID 列表（UUID 字串，catalog 的商品 ID）
 	// 是否回傳非 ACTIVE 商品。
 	// false（預設）= 僅回 ACTIVE 且未軟刪除（瀏覽紀錄路徑使用）
 	// true = 回所有未軟刪除商品（含 DRAFT/PENDING_REVIEW/INACTIVE，收藏列表 enrichment 使用）
@@ -3495,7 +3495,7 @@ func (x *ProductResponse) GetData() *ProductInfo {
 
 type DeleteProductRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID（TSID 數字字串）
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID（UUID 字串，catalog 的商品 ID）
 	StoreId       int64                  `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`      // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3703,7 +3703,7 @@ func (x *RestoreStockRequest) GetItems() []*StockItem {
 
 type StockItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"` // 對應 product_sku.id（數字字串）
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"` // 對應 catalog 的 SKU ID（UUID 字串）
 	Quantity      string                 `protobuf:"bytes,2,opt,name=quantity,proto3" json:"quantity,omitempty"`        // 數量（數字字串）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3815,7 +3815,7 @@ func (x *StockOperationResponse) GetInsufficientItems() []*InsufficientItem {
 
 type InsufficientItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                      // 庫存不足的 SKU ID（數字字串）
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                      // 庫存不足的 SKU ID（UUID 字串）
 	RequestedQty  string                 `protobuf:"bytes,2,opt,name=requested_qty,json=requestedQty,proto3" json:"requested_qty,omitempty"` // 請求數量（數字字串）
 	AvailableQty  string                 `protobuf:"bytes,3,opt,name=available_qty,json=availableQty,proto3" json:"available_qty,omitempty"` // 實際可用庫存（數字字串）
 	unknownFields protoimpl.UnknownFields
@@ -3875,7 +3875,7 @@ func (x *InsufficientItem) GetAvailableQty() string {
 
 type GetStockRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuIds        []string               `protobuf:"bytes,1,rep,name=sku_ids,json=skuIds,proto3" json:"sku_ids,omitempty"` // 要查詢的 product_sku.id 列表（數字字串）
+	SkuIds        []string               `protobuf:"bytes,1,rep,name=sku_ids,json=skuIds,proto3" json:"sku_ids,omitempty"` // 要查詢的 catalog 的 SKU ID 列表（UUID 字串）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3979,7 +3979,7 @@ func (x *GetStockResponse) GetItems() []*StockInfo {
 
 type StockInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`          // 對應 product_sku.id（數字字串）
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`          // 對應 catalog 的 SKU ID（UUID 字串）
 	StockQty      string                 `protobuf:"bytes,2,opt,name=stock_qty,json=stockQty,proto3" json:"stock_qty,omitempty"` // 當前庫存數量（數字字串）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4211,7 +4211,7 @@ func (x *PurgeCacheResult) GetDescription() string {
 
 type GetProductSimpleRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"` // product_sku.id（數字字串）
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"` // catalog 的 SKU ID（UUID 字串）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4316,13 +4316,13 @@ func (x *GetProductSimpleResponse) GetData() *ProductSimpleInfo {
 // 商品簡化資訊（供 Cart AddItem 驗證與快照使用）
 type ProductSimpleInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	SkuId          string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                              // product_sku.id（數字字串）
+	SkuId          string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                              // catalog 的 SKU ID（UUID 字串）
 	StoreId        string                 `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`                        // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
 	IsActive       bool                   `protobuf:"varint,3,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`                    // 是否上架可售（product.status == '4004' 且未軟刪除）
 	Name           string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`                                             // 商品名稱（product.name）
 	Price          string                 `protobuf:"bytes,5,opt,name=price,proto3" json:"price,omitempty"`                                           // **實際成交單價**（有特價=sale_price，否則=list price，新台幣元，數字字串）。Cart AddItem 寫入 added_unit_price
 	MaxLimit       string                 `protobuf:"bytes,6,opt,name=max_limit,json=maxLimit,proto3" json:"max_limit,omitempty"`                     // 限購上限（= product_sku.stock_qty，當前庫存，數字字串）
-	ProductId      string                 `protobuf:"bytes,7,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                  // 商品 ID（product.id，數字字串）
+	ProductId      string                 `protobuf:"bytes,7,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                  // 商品 ID（UUID 字串）
 	SkuName        string                 `protobuf:"bytes,8,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`                        // SKU 規格名稱（product_sku.sku_name）
 	ImageObjectKey string                 `protobuf:"bytes,9,opt,name=image_object_key,json=imageObjectKey,proto3" json:"image_object_key,omitempty"` // 商品主圖 objectKey（product.gallery[0].objectKey）
 	DeliveryTemps  []string               `protobuf:"bytes,10,rep,name=delivery_temps,json=deliveryTemps,proto3" json:"delivery_temps,omitempty"`     // SKU 支援的配送溫層 value（如 ["3201","3202"]）
@@ -4440,7 +4440,7 @@ func (x *ProductSimpleInfo) GetListPrice() string {
 
 type BatchGetSkuCartInfoRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuIds        []string               `protobuf:"bytes,1,rep,name=sku_ids,json=skuIds,proto3" json:"sku_ids,omitempty"` // SKU ID 列表（數字字串）
+	SkuIds        []string               `protobuf:"bytes,1,rep,name=sku_ids,json=skuIds,proto3" json:"sku_ids,omitempty"` // SKU ID 列表（UUID 字串）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4486,7 +4486,7 @@ type BatchGetSkuCartInfoResponse struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	Code          int32                   `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Message       string                  `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Skus          map[string]*SkuCartInfo `protobuf:"bytes,3,rep,name=skus,proto3" json:"skus,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // key = sku_id（數字字串）
+	Skus          map[string]*SkuCartInfo `protobuf:"bytes,3,rep,name=skus,proto3" json:"skus,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // key = sku_id（UUID 字串）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4621,7 +4621,7 @@ func (x *SkuCartInfo) GetListPrice() string {
 
 type BatchGetProductForCheckoutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuIds        []string               `protobuf:"bytes,1,rep,name=sku_ids,json=skuIds,proto3" json:"sku_ids,omitempty"` // 批次查詢的 SKU ID（數字字串，長度 ≤ 100）
+	SkuIds        []string               `protobuf:"bytes,1,rep,name=sku_ids,json=skuIds,proto3" json:"sku_ids,omitempty"` // 批次查詢的 SKU ID（UUID 字串，長度 ≤ 100）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4718,8 +4718,8 @@ func (x *BatchGetProductForCheckoutResponse) GetData() map[string]*ProductForChe
 // 結帳鏈路用的商品完整資訊（接受 inactive，含 status / weight / dimension / shipping_methods）
 type ProductForCheckoutInfo struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	SkuId           string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                               // SKU ID（數字字串）
-	ProductId       string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                   // 商品 ID（TSID 數字字串）
+	SkuId           string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                               // SKU ID（UUID 字串）
+	ProductId       string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                   // 商品 ID（UUID 字串，catalog 的商品 ID）
 	StoreId         string                 `protobuf:"bytes,3,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`                         // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
 	IsActive        bool                   `protobuf:"varint,4,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`                     // product.status == ACTIVE 且 deleted_at IS NULL
 	Price           string                 `protobuf:"bytes,5,opt,name=price,proto3" json:"price,omitempty"`                                            // 實際成交單價（有特價=sale_price，否則=list price，數字字串）
@@ -5344,7 +5344,7 @@ func (x *ShippingLimitsProto) GetMaxWeightGrams() string {
 
 type GetRelatedProductsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID（TSID 數字字串）
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID（UUID 字串，catalog 的商品 ID）
 	Limit         string                 `protobuf:"bytes,2,opt,name=limit,proto3" json:"limit,omitempty"`                          // 回傳上限（數字字串，預設 "8"）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

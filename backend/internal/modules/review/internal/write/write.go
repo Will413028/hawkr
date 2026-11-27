@@ -104,6 +104,9 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 	if !ok {
 		return model.Review{}, apperr.InvalidInputOn([]string{"OrderItemID"}, "%s", text.ReviewItemNotInOrder(l))
 	}
+	if item.ProductID == uuid.Nil() {
+		return model.Review{}, model.WithReason(apperr.FailedPrecondition("%s", text.ReviewOrderNotReviewable(l)), model.ReasonOrderNotReviewable)
+	}
 
 	var uploader media.Uploader
 	if len(in.StagedTokens) > 0 {
@@ -213,7 +216,7 @@ func findItem(items []model.OrderItem, id int64) (model.OrderItem, bool) {
 }
 
 // bust 排入店面頁與商品頁的快取失效（評價數與評分在這兩頁）；必須在 transaction 內呼叫。
-func (s *Service) bust(ctx context.Context, storeID, productID int64) error {
+func (s *Service) bust(ctx context.Context, storeID int64, productID uuid.UUID) error {
 	tags := []string{revalidate.ProductTag(productID)}
 	st, err := s.d.Stores.Store(ctx, storeID)
 	switch {
@@ -369,7 +372,7 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 	return out, err
 }
 
-func (s *Service) aggregateChanged(ctx context.Context, storeID, productID int64, now time.Time) error {
+func (s *Service) aggregateChanged(ctx context.Context, storeID int64, productID uuid.UUID, now time.Time) error {
 	if err := s.bust(ctx, storeID, productID); err != nil {
 		return err
 	}

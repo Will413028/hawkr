@@ -664,7 +664,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             String imageKey = item.getImageObjectKey() != null ? item.getImageObjectKey() : "";
             detailBuilder.addItems(AfterSaleCaseItemView.newBuilder()
                     .setOrderItemId(ProtoConversionUtils.formatLong(item.getOrderItemId()))
-                    .setSkuId(ProtoConversionUtils.formatLong(item.getSkuId()))
+                    .setSkuId(ProtoConversionUtils.formatUuid(item.getSkuId()))
                     .setSkuName(nullToEmpty(item.getSkuName()))
                     .setQuantity(ProtoConversionUtils.formatInt(item.getQuantity()))
                     .setOriginalPrice(ProtoConversionUtils.formatLong(item.getOriginalPrice()))

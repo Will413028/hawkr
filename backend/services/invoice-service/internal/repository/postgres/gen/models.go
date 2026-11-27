@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -252,7 +253,7 @@ type InvoiceDocumentLine struct {
 	LineSeq           int32              `db:"line_seq" json:"line_seq"`
 	LineType          string             `db:"line_type" json:"line_type"`
 	OrderItemID       *int64             `db:"order_item_id" json:"order_item_id"`
-	SkuID             *int64             `db:"sku_id" json:"sku_id"`
+	SkuID             *uuid.UUID         `db:"sku_id" json:"sku_id"`
 	Description       string             `db:"description" json:"description"`
 	Unit              *string            `db:"unit" json:"unit"`
 	Quantity          int32              `db:"quantity" json:"quantity"`

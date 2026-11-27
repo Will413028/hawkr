@@ -1,5 +1,6 @@
-h1:Oiifs0056REBiF0doFMGEQzEEqFf9VLl8iIdXpHERAg=
+h1:hjRLJqxKeG5UoAACj1xcj3Ipjd8e6gDva27Vrb8S6XY=
 20261119141818_review_baseline.sql h1:l7uX7Xtoim/QOPh+UNmNQ1Wkbg9SNo+4NFxRfw9wzM4=
 20261119151923_review_image_unique.sql h1:fVWvmcxxZCZwO+Z5eSigiUenjdGqS61M8MOnvBwg5tI=
 20261121023254_review_drop_inactive_authors.sql h1:3AtC7oz9p40OXFpvXpcqO6vG+vCC4ptDqT5paGhvMHM=
 20261123041947_review_media_port.sql h1:npYo2WYwdjmoxKJQQsiuZRolY9rdaAARS+eoGvDKoUc=
+20261127015613_review_product_id_uuid.sql h1:v3Z/p20uPVGXm6fGBuHwoqguLHOYHzIeeBu7bTblGV4=

@@ -38,6 +38,11 @@ sql:
               import: "time"
               type: "Time"
               pointer: true
+          - column: "invoice_document_lines.sku_id"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
           - column: "seller_tax_profiles.evidence_object_keys"
             go_type: "encoding/json.RawMessage"
           - column: "invoice_documents.source_snapshot"

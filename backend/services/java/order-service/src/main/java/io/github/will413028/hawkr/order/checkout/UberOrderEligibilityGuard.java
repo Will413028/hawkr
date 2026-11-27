@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
+import java.util.UUID;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.order.exception.OrderBusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -288,7 +289,7 @@ public class UberOrderEligibilityGuard {
     public static final String UNWIRED_EVIDENCE = "本檢查沒有接線，fail-closed 視為未通過";
 
     /** 一件待報價的商品。欄位逐一對齊 {@code shipping.proto} 的 {@code UberQuoteItem}。 */
-    public record Item(long skuId,
+    public record Item(UUID skuId,
                        String name,
                        int quantity,
                        int lengthCm,

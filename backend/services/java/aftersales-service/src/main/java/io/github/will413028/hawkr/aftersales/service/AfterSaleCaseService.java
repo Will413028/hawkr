@@ -160,9 +160,9 @@ public class AfterSaleCaseService {
             itemEntity.setCaseNo(caseNo);
             itemEntity.setOrderItemId(ProtoConversionUtils.parseLongRequired(item.getId(), "orderItemId"));
             // non-catalog line（RFQ 成交）沒有平台 SKU ⇒ order-service 對 NULL 輸出空字串
-            // （ProtoConversionUtils.formatLong 是 null-safe 的），這裡必須容忍並寫回 NULL。
-            // ⚠️ 只有 sku_id 可缺：同段其餘數值欄位缺值代表上游壞了，一律維持 parseLongRequired。
-            itemEntity.setSkuId(ProtoConversionUtils.parseLongOrNull(item.getSkuId()));
+            // （ProtoConversionUtils.formatUuid 是 null-safe 的），這裡必須容忍並寫回 NULL。
+            // ⚠️ 只有 sku_id 可缺（空字串）；有值卻不是 UUID 是上游壞了，不吞成 NULL（不用 parseUuidOrNull）。
+            itemEntity.setSkuId(item.getSkuId().isEmpty() ? null : ProtoConversionUtils.parseUuidRequired(item.getSkuId(), "skuId"));
             itemEntity.setSkuName(item.getSkuName());
             itemEntity.setQuantity(ProtoConversionUtils.parseIntRequired(item.getQuantity(), "quantity"));
             // 從 OrderItemForAfterSales.unit_price（重命名自 original_price）讀取，aftersales 內部 entity 仍稱為 originalPrice

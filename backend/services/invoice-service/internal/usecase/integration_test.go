@@ -218,7 +218,7 @@ func itInput(env *itEnv) OrderPaidInput {
 		Snapshot: domain.OrderSnapshot{
 			TotalOriginalAmount: 100, TotalActualAmount: 100,
 			DiscountFunding: domain.DiscountFundingSeller,
-			Items:           []domain.OrderItem{{OrderItemID: 1, SkuID: 11, ProductName: "有機高麗菜", Quantity: 1, UnitPrice: 100}},
+			Items:           []domain.OrderItem{{OrderItemID: 1, SkuID: "0192a3b4-0000-7000-8000-000000000011", ProductName: "有機高麗菜", Quantity: 1, UnitPrice: 100}},
 		},
 	}
 }

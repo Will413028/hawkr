@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.repository;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import java.util.UUID;
 import io.github.will413028.hawkr.common.utils.code.OrderStatus;
 import io.github.will413028.hawkr.common.utils.code.ReceiptStatus;
 import io.github.will413028.hawkr.order.constant.OrderConstants;
@@ -406,7 +407,7 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
         """)
     OrderEntity findLatestPendingPaymentByBuyerAndSkus(
             @Param("buyerId") long buyerId,
-            @Param("skuIds") List<Long> skuIds
+            @Param("skuIds") List<UUID> skuIds
     );
 
     /**

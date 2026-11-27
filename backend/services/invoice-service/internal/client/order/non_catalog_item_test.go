@@ -14,6 +14,8 @@ import (
 // parseRequiredInt，空字串直接 error ⇒ RFQ 訂單根本組不出發票行。而 non-catalog
 // 的 ADR 原本判定 invoice 是「假相依」，理由是 SellerDefaultTaxResolver.ResolveProduct
 // 忽略 skuID —— 那個判定只看到 domain 層，沒看到 parse 擋在更前面，根本走不到它。
+const testSkuUUID = "0192a3b4-0000-7000-8000-000000000011"
+
 func nonCatalogItem(skuID string) *pb.OrderInvoiceSnapshotItem {
 	return &pb.OrderInvoiceSnapshotItem{
 		OrderItemId: "7001",
@@ -33,10 +35,10 @@ func TestMapItems_NonCatalogLine_EmptySkuIDAccepted(t *testing.T) {
 	if len(out) != 1 {
 		t.Fatalf("len(out) = %d, want 1", len(out))
 	}
-	// 0 是 domain 層「無此值」的既有慣例（Line.SkuID 的註解、repository 的 inp()），
+	// 空字串是 domain 層「無此值」的慣例（Line.SkuID 的註解），
 	// 最終寫進 invoice_document_lines.sku_id 會是 NULL。
-	if out[0].SkuID != 0 {
-		t.Errorf("SkuID = %d, want 0（無 SKU）", out[0].SkuID)
+	if out[0].SkuID != "" {
+		t.Errorf("SkuID = %q, want 空字串（無 SKU）", out[0].SkuID)
 	}
 	// ⚠️ 品名不受影響：sku_name 是 NOT NULL 且禁止 sentinel（doc 64 §6.4.9），
 	//    那條禁令只約束品名、不約束 sku_id 指向誰。
@@ -46,19 +48,19 @@ func TestMapItems_NonCatalogLine_EmptySkuIDAccepted(t *testing.T) {
 }
 
 func TestMapItems_CatalogLine_SkuIDStillParsed(t *testing.T) {
-	out, err := mapItems([]*pb.OrderInvoiceSnapshotItem{nonCatalogItem("5150")})
+	out, err := mapItems([]*pb.OrderInvoiceSnapshotItem{nonCatalogItem(testSkuUUID)})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out[0].SkuID != 5150 {
-		t.Errorf("SkuID = %d, want 5150", out[0].SkuID)
+	if out[0].SkuID != testSkuUUID {
+		t.Errorf("SkuID = %q, want %q", out[0].SkuID, testSkuUUID)
 	}
 }
 
-// 放寬的只有「缺值」，不是「亂值」：非空但非數字代表上游壞了，仍然要擋。
+// 放寬的只有「缺值」，不是「亂值」：非空但非 UUID 代表上游壞了，仍然要擋。
 func TestMapItems_MalformedSkuIDStillRejected(t *testing.T) {
-	if _, err := mapItems([]*pb.OrderInvoiceSnapshotItem{nonCatalogItem("abc")}); err == nil {
-		t.Fatal("非數字的 sku_id 應該仍然被擋下")
+	if _, err := mapItems([]*pb.OrderInvoiceSnapshotItem{nonCatalogItem("5150")}); err == nil {
+		t.Fatal("非 UUID 的 sku_id 應該仍然被擋下")
 	}
 }
 
@@ -73,7 +75,7 @@ func TestMapItems_OtherNumericFieldsStillRequired(t *testing.T) {
 		{"unit_price", func(i *pb.OrderInvoiceSnapshotItem) { i.UnitPrice = "" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			it := nonCatalogItem("5150")
+			it := nonCatalogItem(testSkuUUID)
 			tc.mut(it)
 			if _, err := mapItems([]*pb.OrderInvoiceSnapshotItem{it}); err == nil {
 				t.Fatalf("%s 缺值應該仍然被擋下", tc.name)

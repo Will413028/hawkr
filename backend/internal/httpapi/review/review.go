@@ -26,14 +26,14 @@ import (
 
 // Reads 是評價的讀取來源（*review.Module）。viewerBuyerID 大於 0 時模組套用觀看者的封鎖。
 type Reads interface {
-	ListProductReviews(ctx context.Context, productID, viewerBuyerID int64, f review.Filter, after *review.Cursor, size int32) (review.Page, error)
+	ListProductReviews(ctx context.Context, productID uuid.UUID, viewerBuyerID int64, f review.Filter, after *review.Cursor, size int32) (review.Page, error)
 	ListStoreReviews(ctx context.Context, storeID, viewerBuyerID int64, f review.Filter, after *review.Cursor, size int32) (review.Page, error)
 	ListOwnStoreReviews(ctx context.Context, storeID int64, f review.Filter, after *review.Cursor, size int32) (review.Page, error)
 	ListMyReviews(ctx context.Context, buyerID, orderItemID int64, after *review.Cursor, size int32) (review.Page, error)
 	GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (review.Review, error)
 	ReviewStore(ctx context.Context, id uuid.UUID) (review.ReviewStore, error)
 	StoreStats(ctx context.Context, storeID int64) (review.StoreStats, error)
-	ProductStats(ctx context.Context, productID int64) (review.ProductStats, error)
+	ProductStats(ctx context.Context, productID uuid.UUID) (review.ProductStats, error)
 }
 
 // Writes 是評價的寫入來源（*review.Module）。
@@ -205,7 +205,7 @@ func (p *presenter) toReviews(ctx context.Context, in []review.Review, withOrder
 func (p *presenter) toReview(r review.Review, d buyer.Display, withOrder bool, viewer int64) (*pb.Review, error) {
 	out := &pb.Review{
 		Id:         r.ID.String(),
-		ProductId:  rpc.FormatID(r.ProductID),
+		ProductId:  r.ProductID.String(),
 		StoreId:    rpc.FormatID(r.StoreID),
 		Rating:     int32(r.Rating), //nolint:gosec // 評價分數由 reviews_rating_check 保證 1 到 5
 		Content:    r.Content,

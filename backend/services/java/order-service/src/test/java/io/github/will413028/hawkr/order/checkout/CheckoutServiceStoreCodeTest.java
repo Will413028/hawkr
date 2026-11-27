@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.AvailableOption;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.FreeShippingResult;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.ValidationResult;
@@ -59,7 +60,7 @@ class CheckoutServiceStoreCodeTest {
     private static final long STORE_ID = 2636840881L;
     private static final String STORE_CODE = "2649605557";
     private static final long BUYER_ID = 100L;
-    private static final String SKU_ID = "5001";
+    private static final String SKU_ID = TestIds.id(5001L).toString();
 
     private static final String METHOD = ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value();
     private static final String TEMP = ShippingTemperature.CHILLED.value();
@@ -106,7 +107,7 @@ class CheckoutServiceStoreCodeTest {
         CheckoutPreviewData data = service.preview(
                 List.of(CheckoutItem.newBuilder()
                         .setSkuId(SKU_ID)
-                        .setProductId("9001")
+                        .setProductId(TestIds.id(9001L).toString())
                         .setQuantity("1")
                         .build()),
                 METHOD, TEMP, "", "", "", BUYER_ID, false, "", "");
@@ -120,6 +121,7 @@ class CheckoutServiceStoreCodeTest {
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
+                                .setProductId(TestIds.id(9001L).toString())
                                 .setSkuName("Apple")
                                 .setProductName("Apple Box")
                                 .setStoreId(String.valueOf(STORE_ID))

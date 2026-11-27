@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -193,7 +194,7 @@ type ReviewOrder struct {
 // ReviewOrderItem 是訂單項目的已解析投影；ImageKey 為空表示沒有商品圖。
 type ReviewOrderItem struct {
 	OrderItemID int64
-	ProductID   int64
+	ProductID   uuid.UUID // 全零 ＝ 沒有商品（RFQ 成交）
 	SkuName     string
 	ImageKey    string
 	Price       int64
@@ -245,7 +246,7 @@ func (c *Client) OrderForReview(ctx context.Context, orderNo string) (ReviewOrde
 		if err != nil {
 			return ReviewOrder{}, fmt.Errorf("orderservice：訂單項目 ID 不合法: %q", item.GetOrderItemId())
 		}
-		productID, err := positiveID(item.GetProductId())
+		productID, err := optionalUUID(item.GetProductId())
 		if err != nil {
 			return ReviewOrder{}, fmt.Errorf("orderservice：商品 ID 不合法: %q", item.GetProductId())
 		}
@@ -262,6 +263,18 @@ func (c *Client) OrderForReview(ctx context.Context, orderNo string) (ReviewOrde
 		out.Items = append(out.Items, ReviewOrderItem{OrderItemID: itemID, ProductID: productID, SkuName: item.GetSkuName(), ImageKey: item.GetImageObjectKey(), Price: price})
 	}
 	return out, nil
+}
+
+// optionalUUID 解析 UUID 字串；空字串是沒有（全零），其他不合法的值是錯誤。
+func optionalUUID(raw string) (uuid.UUID, error) {
+	if raw == "" {
+		return uuid.Nil(), nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil || id == uuid.Nil() {
+		return uuid.Nil(), fmt.Errorf("orderservice：不是合法的 UUID: %q", raw)
+	}
+	return id, nil
 }
 
 func positiveID(raw string) (int64, error) {

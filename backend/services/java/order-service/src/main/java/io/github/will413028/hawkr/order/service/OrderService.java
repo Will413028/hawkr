@@ -175,7 +175,7 @@ public class OrderService {
 
         // 1. 依 skuId 升冪排序（避免 Product 端 deadlock）
         items = new ArrayList<>(items);
-        items.sort(Comparator.comparingLong(CreateOrderItemParam::skuId));
+        items.sort(Comparator.comparing(CreateOrderItemParam::skuId));
 
         // ★ 購物車結帳鎖定
         boolean cartLocked = false;
@@ -319,7 +319,7 @@ public class OrderService {
     public RfqOrderResult createRfqOrder(
             long buyerId, long storeId, long acceptanceId,
             long totalAmount, long shippingFee,
-            Long skuId, String skuName, long unitPrice,
+            UUID skuId, String skuName, long unitPrice,
             String deliveryTemp, String lane
     ) {
         // 冪等回查排在所有守門之前：worker 的重試是常態，不是例外。
@@ -549,7 +549,7 @@ public class OrderService {
 
         List<StockItem> stockItems = parsePayloadToStockItems(deductRecord.getPayloadSnapshot());
         List<OrderCancelledPayload.StockItemPayload> items = stockItems.stream()
-                .map(si -> new OrderCancelledPayload.StockItemPayload(si.getSkuId(), si.getQuantity()))
+                .map(si -> new OrderCancelledPayload.StockItemPayload(UUID.fromString(si.getSkuId()), si.getQuantity()))
                 .toList();
 
         OrderCancelledPayload core = new OrderCancelledPayload(
@@ -1019,7 +1019,7 @@ public class OrderService {
      * <p>嚴禁將 lock 失敗一律壓成通用 CONFLICT(409)。
      */
     private void throwLockFailureWithOrderAlreadyCreatedCheck(long buyerId, List<CreateOrderItemParam> items) {
-        List<Long> skuIds = items.stream()
+        List<UUID> skuIds = items.stream()
                 .map(CreateOrderItemParam::skuId)
                 .toList();
         OrderEntity existing = orderRepository.findLatestPendingPaymentByBuyerAndSkus(buyerId, skuIds);
@@ -1135,7 +1135,7 @@ public class OrderService {
         // 與原始 createOrder 相同流程，新增欄位傳遞至 createOrderInTx
         // 注意：couponInstanceId 不在此處寫入，由 CheckoutService 在 reserveCoupon 成功後透過 updateCouponInstanceId 回寫
         items = new ArrayList<>(items);
-        items.sort(Comparator.comparingLong(CreateOrderItemParam::skuId));
+        items.sort(Comparator.comparing(CreateOrderItemParam::skuId));
 
         boolean cartLocked = false;
         if (checkoutId != null && !checkoutId.isEmpty()) {
@@ -1244,32 +1244,31 @@ public class OrderService {
      * 建單明細參數。{@code skuId} 為 {@code null} 代表 <b>non-catalog line</b>——
      * RFQ 成交的明細不指向任何 {@code product_sku}（64 號 §6.4.9、§6.4.15）。
      *
-     * <p>🔴 <b>{@code skuId} 從 primitive {@code long} 放寬成 {@code Long} 之後，
-     * 「忘記帶 sku_id」不再是編譯錯誤</b>。Wave A 期間 catalog 路徑之所以結構上不可能
-     * 寫入 NULL，靠的正是 primitive 傳不進 null；本波放寬後那道防線消失，於是改由
-     * {@link #catalog} 承接：catalog 的兩個呼叫端一律走它，參數仍是 primitive
-     * {@code long} ⇒ 編譯器照舊擋住 null。canonical constructor 只保留給 RFQ 這條
+     * <p>🔴 <b>{@code skuId} 放寬成可為 {@code null} 之後，「忘記帶 sku_id」不再是編譯錯誤</b>。
+     * 改由 {@link #catalog} 承接：catalog 的兩個呼叫端一律走它，工廠方法在執行時拒絕
+     * {@code null}。canonical constructor 只保留給 RFQ 這條
      * non-catalog 路徑（Java 不允許 record 的 canonical constructor 比 record 本身更
      * 封閉，所以擋不住，但 catalog 呼叫端沒有理由繞過工廠方法）。
      */
     public record CreateOrderItemParam(
-            Long skuId,            // NULL ＝ non-catalog line（RFQ 成交）；catalog 明細恆非空
+            UUID skuId,            // NULL ＝ non-catalog line（RFQ 成交）；catalog 明細恆非空（catalog 的 UUID）
             String skuName,
             int quantity,
             long unitPrice,        // 實際成交單價（無特價=listPrice，有特價=當時 sale_price）。原欄位 originalPrice 已重命名
             long listPrice,        // 原價快照（永遠 = SKU.price）
             long shareDiscount,    // 該品項分攤的優惠券折扣（CheckoutService.allocateShareDiscount 結果）
             String imageObjectKey,
-            Long productId,
+            UUID productId,
             String productName
     ) {
         /**
-         * catalog 明細：{@code skuId} 是 primitive {@code long}，型別層保證非空。
+         * catalog 明細：{@code skuId} 必填，這裡拒絕 null（UUID 是物件型別，編譯器不再擋，改在工廠方法擋）。
          * ⛔ catalog 的呼叫端不得改走 canonical constructor——那等於自己拆掉這道守門。
          */
         public static CreateOrderItemParam catalog(
-                long skuId, String skuName, int quantity, long unitPrice, long listPrice,
-                long shareDiscount, String imageObjectKey, Long productId, String productName) {
+                UUID skuId, String skuName, int quantity, long unitPrice, long listPrice,
+                long shareDiscount, String imageObjectKey, UUID productId, String productName) {
+            java.util.Objects.requireNonNull(skuId, "catalog 明細的 skuId 不可為空");
             return new CreateOrderItemParam(skuId, skuName, quantity, unitPrice, listPrice,
                     shareDiscount, imageObjectKey, productId, productName);
         }
@@ -1314,5 +1313,5 @@ public class OrderService {
             io.github.will413028.hawkr.order.checkout.OrderPolicySnapshot policySnapshot
     ) {}
 
-    private record PayloadItem(long skuId, int quantity) {}
+    private record PayloadItem(UUID skuId, int quantity) {}
 }
