@@ -82,29 +82,33 @@ func (service *Service) PurgeSKUs(ctx context.Context, skuIDs []uuid.UUID) error
 	return store.New(service.deps.DB.Conn(ctx)).PurgeRestockSKUs(ctx, skuIDs)
 }
 
-// FanOut 在獨立 transaction 內處理某個 SKU 最多 Limit 筆（1..100）訂閱：通知並刪除（一次性），回傳該 SKU 是否仍有待通知訂閱。
+// FanOut 在獨立 transaction 內處理某個 SKU 最多 Limit 筆（1..100）訂閱：通知並刪除（一次性），回傳這一批通知了幾筆與該 SKU 是否仍有待通知訂閱。
 // 事件的發生時間與顯示快照一律來自輸入，不在這裡補當下時間。其他 SKU 的訂閱（含同商品的）不被通知也不被刪除。
-func (service *Service) FanOut(ctx context.Context, input model.FanOutInput) (bool, error) {
+func (service *Service) FanOut(ctx context.Context, input model.FanOutInput) (int, bool, error) {
 	if err := model.NonNil(input.ProductID, input.SKUID); err != nil {
-		return false, err
+		return 0, false, err
 	}
 	if input.Limit < 1 || input.Limit > model.MaxBatchSize {
-		return false, apperr.InvalidInput("補貨批次大小必須為 1 到 100")
+		return 0, false, apperr.InvalidInput("補貨批次大小必須為 1 到 100")
 	}
 	if input.OccurredAt.IsZero() {
-		return false, apperr.InvalidInput("補貨事件的發生時間必填")
+		return 0, false, apperr.InvalidInput("補貨事件的發生時間必填")
 	}
 	if _, ok := db.TxFrom(ctx); ok {
-		return false, apperr.FailedPrecondition("補貨分批必須在 transaction 外開始")
+		return 0, false, apperr.FailedPrecondition("補貨分批必須在 transaction 外開始")
 	}
 	skuID, limit := input.SKUID, input.Limit
-	var more bool
+	var (
+		notified int
+		more     bool
+	)
 	err := service.deps.DB.InTx(ctx, func(ctx context.Context) error {
 		queries := store.New(service.deps.DB.Conn(ctx))
 		buyerIDs, err := queries.FanOut(ctx, store.FanOutParams{SkuID: skuID, BatchLimit: limit})
 		if err != nil {
 			return err
 		}
+		notified = len(buyerIDs)
 		for _, buyerID := range buyerIDs {
 			if err := events.Publish(ctx, service.deps.Events, model.RestockTargeted{
 				OccurredAt:  input.OccurredAt.UTC(),
@@ -122,9 +126,9 @@ func (service *Service) FanOut(ctx context.Context, input model.FanOutInput) (bo
 		return err
 	})
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
-	return more, nil
+	return notified, more, nil
 }
 
 // BatchCheck 批次查詢商品是否有 SKU 在待通知訂閱，輸入最多 100 個商品 ID。
@@ -180,6 +184,7 @@ func (service *Service) List(ctx context.Context, input model.RestockListInput) 
 		result.Items = append(result.Items, model.Restock{
 			BuyerID:   row.BuyerID,
 			ProductID: row.ProductID,
+			SKUID:     row.SkuID,
 			CreatedAt: row.CreatedAt,
 		})
 	}

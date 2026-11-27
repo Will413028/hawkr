@@ -21,9 +21,12 @@ func newCatalog(d *db.DB, med catalog.Media, buyers *buyer.Module) *catalog.Modu
 
 // restockBuyers 是補貨通知用到的 buyer 方法（*buyer.Module 滿足它）。
 type restockBuyers interface {
-	FanOut(ctx context.Context, input buyer.FanOutInput) (bool, error)
+	FanOut(ctx context.Context, input buyer.FanOutInput) (int, bool, error)
 	PurgeRestockSKUs(ctx context.Context, skuIDs []uuid.UUID) error
 }
+
+// errNoRestockProgress 表示補貨分批還有待通知的訂閱，這一批卻一筆也沒處理到。
+var errNoRestockProgress = errors.New("補貨通知這一批沒有進展")
 
 // catalogRestock 以 buyer 模組實作 catalog 的補貨通知 port（catalog 在 buyer 之上，buyer 不能 import catalog，接線在這裡）。
 type catalogRestock struct{ buyer restockBuyers }
@@ -32,12 +35,16 @@ type catalogRestock struct{ buyer restockBuyers }
 // 同商品其他 SKU 的訂閱不受影響。
 func (r catalogRestock) NotifyRestocked(ctx context.Context, sku catalog.RestockedSKU) error {
 	for {
-		more, err := r.buyer.FanOut(ctx, buyer.FanOutInput{
+		notified, more, err := r.buyer.FanOut(ctx, buyer.FanOutInput{
 			ProductID: sku.ProductID, SKUID: sku.SKUID, Limit: buyer.MaxBatchSize,
 			ProductName: sku.Name, ImageKey: sku.ImageKey, OccurredAt: sku.OccurredAt,
 		})
 		if err != nil || !more {
 			return err
+		}
+		if notified == 0 {
+			// 剩下的訂閱被別的 transaction 鎖著（SKIP LOCKED）而這一批一筆也沒處理：回錯誤讓 catalog worker 退避重試，不空轉。
+			return errNoRestockProgress
 		}
 	}
 }

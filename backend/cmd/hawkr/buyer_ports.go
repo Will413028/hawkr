@@ -39,8 +39,8 @@ func productInfo(card catalog.ProductSummary) httpbuyer.ProductInfo {
 	}
 }
 
-// buyerSkus 以 catalog 的結帳快照實作補貨訂閱確認規格現況的 port。有貨是「現在可以購買」：商品上架、商品與規格沒刪除、庫存大於零（快照的 Active 加 StockQty）；
-// 已刪除與還是草稿的規格視為不存在。
+// buyerSkus 以 catalog 實作補貨訂閱確認規格現況的 port。有貨是 catalog 的「可買」（D26）：庫存大於零、商品上架、商品與規格沒刪除、店家可曝光；
+// 已刪除與還是草稿的規格視為不存在（結帳快照判斷），不可曝光的店家仍可訂閱但算沒貨。
 type buyerSkus struct{ catalog *catalog.Module }
 
 func (a buyerSkus) RestockSku(ctx context.Context, skuID uuid.UUID) (httpbuyer.RestockSku, bool, error) {
@@ -52,7 +52,11 @@ func (a buyerSkus) RestockSku(ctx context.Context, skuID uuid.UUID) (httpbuyer.R
 	if !ok || snapshot.Deleted || snapshot.Status == catalog.StatusDraft {
 		return httpbuyer.RestockSku{}, false, nil
 	}
-	return httpbuyer.RestockSku{ProductID: snapshot.ProductID, InStock: snapshot.Active && snapshot.StockQty > 0}, true, nil
+	purchasable, err := a.catalog.SkuPurchasable(ctx, skuID)
+	if err != nil {
+		return httpbuyer.RestockSku{}, false, err
+	}
+	return httpbuyer.RestockSku{ProductID: snapshot.ProductID, InStock: purchasable}, true, nil
 }
 
 type buyerOrders struct{ client *orderservice.Client }

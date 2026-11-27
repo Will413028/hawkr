@@ -109,20 +109,20 @@ func TestRestockBatchesAndRollback(t *testing.T) {
 		targeted++
 		return nil
 	})
-	more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
+	_, more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
 	if err == nil || more || count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE sku_id=$1", skuOf(10)) != 5 {
 		t.Fatal("failed event did not roll back subscriptions", more, err)
 	}
 	reject = false
 	for index, expectedMore := range []bool{true, true, false} {
 		before := targeted
-		more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
+		_, more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
 		must(t, err)
 		if more != expectedMore || targeted-before > 2 || targeted != min((index+1)*2, 5) {
 			t.Fatalf("batch %d: more=%v targeted=%d", index, more, targeted)
 		}
 	}
-	more, err = fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
+	_, more, err = fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
 	must(t, err)
 	if more || targeted != 5 || count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions") != 0 {
 		t.Fatal("fanout retained history or repeated events")
@@ -133,7 +133,7 @@ func TestRestockBatchesAndRollback(t *testing.T) {
 		t.Fatal("unsubscribe retained history")
 	}
 	err = fixture.database.InTx(ctx, func(ctx context.Context) error {
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
+		_, _, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
 		return err
 	})
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition {

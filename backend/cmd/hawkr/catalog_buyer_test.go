@@ -14,16 +14,22 @@ import (
 type fakeRestockBuyers struct {
 	inputs []buyer.FanOutInput
 	more   []bool
-	err    error
-	purged [][]uuid.UUID
+	// notified 是每次呼叫處理的筆數，沒給時每批都是 1 筆。
+	notified []int
+	err      error
+	purged   [][]uuid.UUID
 }
 
-func (f *fakeRestockBuyers) FanOut(_ context.Context, input buyer.FanOutInput) (bool, error) {
+func (f *fakeRestockBuyers) FanOut(_ context.Context, input buyer.FanOutInput) (int, bool, error) {
 	f.inputs = append(f.inputs, input)
 	if f.err != nil {
-		return false, f.err
+		return 0, false, f.err
 	}
-	return f.more[len(f.inputs)-1], nil
+	n := 1
+	if f.notified != nil {
+		n = f.notified[len(f.inputs)-1]
+	}
+	return n, f.more[len(f.inputs)-1], nil
 }
 
 func (f *fakeRestockBuyers) PurgeRestockSKUs(_ context.Context, skuIDs []uuid.UUID) error {
@@ -56,6 +62,15 @@ func TestNotifyRestockedStopsOnAnError(t *testing.T) {
 	err := (catalogRestock{buyer: buyers}).NotifyRestocked(t.Context(), catalog.RestockedSKU{ProductID: uuid.NewV7(), SKUID: uuid.NewV7(), OccurredAt: time.Now()})
 	if !errors.Is(err, failure) || len(buyers.inputs) != 1 {
 		t.Fatalf("err=%v calls=%d, want the error after one call", err, len(buyers.inputs))
+	}
+}
+
+// 剩下的訂閱被別的 transaction 鎖著時 FanOut 一筆也處理不到卻仍回 more：回錯誤交給 worker 退避，不空轉。
+func TestNotifyRestockedFailsWhenABatchMakesNoProgress(t *testing.T) {
+	buyers := &fakeRestockBuyers{more: []bool{true, true, true}, notified: []int{1, 0, 1}}
+	err := (catalogRestock{buyer: buyers}).NotifyRestocked(t.Context(), catalog.RestockedSKU{ProductID: uuid.NewV7(), SKUID: uuid.NewV7(), OccurredAt: time.Now()})
+	if !errors.Is(err, errNoRestockProgress) || len(buyers.inputs) != 2 {
+		t.Fatalf("err=%v calls=%d, want errNoRestockProgress after the empty second batch", err, len(buyers.inputs))
 	}
 }
 

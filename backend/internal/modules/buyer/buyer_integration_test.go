@@ -462,11 +462,11 @@ func TestRestockFanOutNotifiesOnce(t *testing.T) {
 		must(t, fixture.module.SubscribeRestock(ctx, id, pid(11), skuOf(11)))
 	}
 	{
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(11), Limit: 100, OccurredAt: fixture.now})
+		_, _, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(11), Limit: 100, OccurredAt: fixture.now})
 		must(t, err)
 	}
 	{
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(11), Limit: 100, OccurredAt: fixture.now})
+		_, _, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(11), Limit: 100, OccurredAt: fixture.now})
 		must(t, err)
 	}
 	if targeted[first.BuyerID] != 1 || targeted[second.BuyerID] != 1 {
@@ -540,7 +540,7 @@ func TestRestockFanOutIsPerSKU(t *testing.T) {
 	if n := count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions"); n != 3 {
 		t.Fatalf("subscriptions=%d, want 3 (一個買家一個 SKU 一列)", n)
 	}
-	more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(1), Limit: 100, ProductName: "蘋果", ImageKey: "public/apple", OccurredAt: fixture.now})
+	_, more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(11), SKUID: skuOf(1), Limit: 100, ProductName: "蘋果", ImageKey: "public/apple", OccurredAt: fixture.now})
 	must(t, err)
 	if more || len(got) != 1 || got[0].BuyerID != first.BuyerID || got[0].SKUID != skuOf(1) || got[0].ProductID != pid(11) || got[0].ProductName != "蘋果" {
 		t.Fatalf("more=%v events=%+v, want only the first buyer for SKU 1", more, got)

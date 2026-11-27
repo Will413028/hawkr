@@ -264,7 +264,7 @@ func TestEventsUseInjectedOccurrenceTime(t *testing.T) {
 	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, pid(10)))
 	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, pid(10), skuOf(10)))
 	{
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 100, OccurredAt: fixture.now})
+		_, _, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 100, OccurredAt: fixture.now})
 		must(t, err)
 	}
 	must(t, fixture.module.CloseForDeletion(ctx, buyer.BuyerID))

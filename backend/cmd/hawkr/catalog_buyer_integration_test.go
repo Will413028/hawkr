@@ -23,10 +23,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-const (
-	testStoreID   = int64(7001)
-	testAccountID = int64(1001)
-)
+const testAccountID = int64(1001)
 
 // catalogBuyerFixture 是 buyer 與 catalog 的真實接線（subscribeCatalogFavorites、catalogRestock、buyerSkus），資料庫是真的。
 type catalogBuyerFixture struct {
@@ -35,6 +32,7 @@ type catalogBuyerFixture struct {
 	bus     *events.Bus
 	buyers  *buyer.Module
 	catalog *catalog.Module
+	storeID int64
 	accts   *identity.Module
 	seq     int
 	logins  int
@@ -58,7 +56,36 @@ func newCatalogBuyerFixture(t *testing.T) *catalogBuyerFixture {
 	subscribeBuyerLifecycle(bus, f.buyers)
 	f.catalog = newCatalog(d, media.NewFake(), f.buyers)
 	subscribeCatalogFavorites(bus, f.catalog)
+	f.storeID = f.seedExposableStore()
 	return f
+}
+
+// seedExposableStore 直接寫 seller 的最小列，建一家可以公開曝光的店（只關心 catalog 讀的 seller.pub_exposable_stores；它自己的規則在 seller 的測試）。
+func (f *catalogBuyerFixture) seedExposableStore() int64 {
+	f.t.Helper()
+	ctx := context.Background()
+	now := time.Now()
+	f.exec(ctx, `DO $$ DECLARE r record; BEGIN
+		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
+		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
+		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
+	f.exec(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
+		VALUES ($1, $1, '測試店', 'logo/k', $3, '63000010', $2, $2)`, testAccountID, now, uuid.NewV7())
+	var storeID int64
+	if err := f.d.Pool().QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", testAccountID).Scan(&storeID); err != nil {
+		f.t.Fatal(err)
+	}
+	f.exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
+		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, now, uuid.NewV7())
+	f.exec(ctx, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
+	return storeID
+}
+
+func (f *catalogBuyerFixture) exec(ctx context.Context, sql string, args ...any) {
+	f.t.Helper()
+	if _, err := f.d.Pool().Exec(ctx, sql, args...); err != nil {
+		f.t.Fatal(err)
+	}
 }
 
 // newBuyer 建一個買家（建帳時同 transaction 建立）。
@@ -110,11 +137,11 @@ func (f *catalogBuyerFixture) product(ctx context.Context, stocks ...int32) cata
 			skus[i].Option1 = values[i]
 		}
 	}
-	p, err := f.catalog.CreateProduct(ctx, testStoreID, media.Uploader{ID: testAccountID}, uuid.NewV7(), input)
+	p, err := f.catalog.CreateProduct(ctx, f.storeID, media.Uploader{ID: testAccountID}, uuid.NewV7(), input)
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if err := f.catalog.SetProductStatus(ctx, testStoreID, p.ID, p.Version, catalog.StatusActive); err != nil {
+	if err := f.catalog.SetProductStatus(ctx, f.storeID, p.ID, p.Version, catalog.StatusActive); err != nil {
 		f.t.Fatal(err)
 	}
 	return p
@@ -222,7 +249,7 @@ func TestCatalogRestockNotifiesOnlyTheSKUAndPurgesSubscriptions(t *testing.T) {
 	notifier := catalogRestock{buyer: f.buyers}
 	occurred := time.Date(2026, 12, 1, 9, 5, 0, 0, time.UTC)
 	for range 2 { // 重送是 no-op：一次性訂閱通知過就沒有了
-		if err := notifier.NotifyRestocked(ctx, catalog.RestockedSKU{ProductID: product.ID, SKUID: skuA, StoreID: testStoreID, Name: "蘋果", ImageKey: "public/apple", OccurredAt: occurred}); err != nil {
+		if err := notifier.NotifyRestocked(ctx, catalog.RestockedSKU{ProductID: product.ID, SKUID: skuA, StoreID: f.storeID, Name: "蘋果", ImageKey: "public/apple", OccurredAt: occurred}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -259,10 +286,26 @@ func TestBuyerSkusReportsStockFromTheCatalogSnapshot(t *testing.T) {
 			t.Fatalf("%s: sku=%+v found=%v err=%v", name, got, found, err)
 		}
 	}
-	if err := f.catalog.DeleteProduct(ctx, testStoreID, product.ID, 0); err != nil {
+	if err := f.catalog.DeleteProduct(ctx, f.storeID, product.ID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, found, err := skus.RestockSku(ctx, soldOut); err != nil || found {
 		t.Fatalf("deleted product's SKU found=%v err=%v, want not found", found, err)
+	}
+}
+
+// 店家不可曝光時，有庫存的規格也不算有貨（D26 的「可買」），但規格仍存在，買家可以訂閱。
+func TestBuyerSkusTreatsAStockedSKUOfAnUnexposableStoreAsOutOfStock(t *testing.T) {
+	ctx := context.Background()
+	f := newCatalogBuyerFixture(t)
+	product := f.product(ctx, 3)
+	sku := product.Skus[0].ID
+	skus := buyerSkus{catalog: f.catalog}
+	if got, found, err := skus.RestockSku(ctx, sku); err != nil || !found || !got.InStock {
+		t.Fatalf("exposable store: sku=%+v found=%v err=%v, want in stock", got, found, err)
+	}
+	f.exec(ctx, "UPDATE seller.kyc_applications SET status = 'REJECTED' WHERE store_id = $1", f.storeID)
+	if got, found, err := skus.RestockSku(ctx, sku); err != nil || !found || got.InStock || got.ProductID != product.ID {
+		t.Fatalf("unexposable store: sku=%+v found=%v err=%v, want found and not in stock", got, found, err)
 	}
 }

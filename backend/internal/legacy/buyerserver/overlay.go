@@ -18,24 +18,43 @@ func positiveID(raw string) (int64, bool) {
 	return id, true
 }
 
+// parsedID 是呼叫者送來的一個商品 ID：raw 是原字串（回應以它為 key，大寫輸入也對得上），id 是解析後的 UUID。
+type parsedID struct {
+	raw string
+	id  uuid.UUID
+}
+
 // 商品 ID 已是 UUID（catalog）。舊的 Java 商品服務在切換前仍用整數商品 ID：它們不可能是任何收藏或補貨訂閱的主鍵，所以
 // 不是 UUID 的 ID 一律當作沒有收藏、沒有訂閱，不當成格式錯誤（否則舊 gateway 的商品疊加會整批失敗）。
-func parseUUIDs(raw []string) []uuid.UUID {
-	ids := make([]uuid.UUID, 0, len(raw))
+func parseUUIDs(raw []string) []parsedID {
+	parsed := make([]parsedID, 0, len(raw))
 	for _, value := range raw {
 		if id, err := uuid.Parse(value); err == nil && len(value) == 36 {
-			ids = append(ids, id)
+			parsed = append(parsed, parsedID{raw: value, id: id})
+		}
+	}
+	return parsed
+}
+
+// distinct 回傳解析後不重複的 UUID（大小寫不同的同一個 ID 只問一次）。
+func distinct(parsed []parsedID) []uuid.UUID {
+	seen := make(map[uuid.UUID]bool, len(parsed))
+	ids := make([]uuid.UUID, 0, len(parsed))
+	for _, p := range parsed {
+		if !seen[p.id] {
+			seen[p.id] = true
+			ids = append(ids, p.id)
 		}
 	}
 	return ids
 }
 
 func (s *Server) CheckFavorite(ctx context.Context, req *connect.Request[pb.CheckFavoriteRequest]) (*connect.Response[pb.CheckFavoriteResponse], error) {
-	ids := parseUUIDs([]string{req.Msg.GetProductId()})
-	if len(ids) == 0 {
+	parsed := parseUUIDs([]string{req.Msg.GetProductId()})
+	if len(parsed) == 0 {
 		return connect.NewResponse(&pb.CheckFavoriteResponse{}), nil
 	}
-	yes, err := s.buyer.CheckFavorite(ctx, req.Msg.GetBuyerId(), ids[0])
+	yes, err := s.buyer.CheckFavorite(ctx, req.Msg.GetBuyerId(), parsed[0].id)
 	if err != nil {
 		code, msg, fatal := failure(err)
 		if fatal != nil {
@@ -47,8 +66,8 @@ func (s *Server) CheckFavorite(ctx context.Context, req *connect.Request[pb.Chec
 }
 
 func (s *Server) BatchCheckFavorites(ctx context.Context, req *connect.Request[pb.BatchCheckFavoritesRequest]) (*connect.Response[pb.BatchCheckFavoritesResponse], error) {
-	ids := parseUUIDs(req.Msg.GetProductIds())
-	flags, err := s.buyer.BatchCheckFavorites(ctx, req.Msg.GetBuyerId(), ids)
+	parsed := parseUUIDs(req.Msg.GetProductIds())
+	flags, err := s.buyer.BatchCheckFavorites(ctx, req.Msg.GetBuyerId(), distinct(parsed))
 	if err != nil {
 		code, msg, fatal := failure(err)
 		if fatal != nil {
@@ -56,10 +75,10 @@ func (s *Server) BatchCheckFavorites(ctx context.Context, req *connect.Request[p
 		}
 		return connect.NewResponse(&pb.BatchCheckFavoritesResponse{Code: code, Message: msg}), nil
 	}
-	out := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if flags[id] {
-			out = append(out, id.String())
+	out := make([]string, 0, len(parsed))
+	for _, p := range parsed {
+		if flags[p.id] {
+			out = append(out, p.raw)
 		}
 	}
 	return connect.NewResponse(&pb.BatchCheckFavoritesResponse{FavoritedProductIds: out}), nil
@@ -67,8 +86,8 @@ func (s *Server) BatchCheckFavorites(ctx context.Context, req *connect.Request[p
 
 func (s *Server) BatchCheckRestockSubscriptions(ctx context.Context, req *connect.Request[pb.BatchCheckRestockSubscriptionsRequest]) (*connect.Response[pb.BatchCheckRestockSubscriptionsResponse], error) {
 	raw := req.Msg.GetProductIds()
-	ids := parseUUIDs(raw)
-	flags, err := s.buyer.BatchCheckRestock(ctx, req.Msg.GetBuyerId(), ids)
+	parsed := parseUUIDs(raw)
+	flags, err := s.buyer.BatchCheckRestock(ctx, req.Msg.GetBuyerId(), distinct(parsed))
 	if err != nil {
 		code, msg, fatal := failure(err)
 		if fatal != nil {
@@ -80,8 +99,8 @@ func (s *Server) BatchCheckRestockSubscriptions(ctx context.Context, req *connec
 	for _, value := range raw {
 		out[value] = false
 	}
-	for _, id := range ids {
-		out[id.String()] = flags[id]
+	for _, p := range parsed {
+		out[p.raw] = flags[p.id]
 	}
 	return connect.NewResponse(&pb.BatchCheckRestockSubscriptionsResponse{Subscribed: out}), nil
 }

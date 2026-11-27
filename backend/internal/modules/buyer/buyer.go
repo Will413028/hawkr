@@ -447,8 +447,8 @@ func (module *Module) ListRestock(ctx context.Context, input RestockListInput) (
 	return module.restock.List(ctx, input)
 }
 
-// FanOut 在獨立 transaction 處理某個 SKU 最多 Limit 筆（1..100）訂閱：發布 RestockTargeted 並刪除（一次性），回傳該 SKU 是否仍有待通知訂閱。
-func (module *Module) FanOut(ctx context.Context, input FanOutInput) (bool, error) {
+// FanOut 在獨立 transaction 處理某個 SKU 最多 Limit 筆（1..100）訂閱：發布 RestockTargeted 並刪除（一次性），回傳這一批通知了幾筆與該 SKU 是否仍有待通知訂閱。
+func (module *Module) FanOut(ctx context.Context, input FanOutInput) (int, bool, error) {
 	return module.restock.FanOut(ctx, input)
 }
 

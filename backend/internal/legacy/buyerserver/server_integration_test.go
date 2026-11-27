@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -129,9 +130,23 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
+	t.Run("BatchCheckFavorites with an upper-case product ID", func(t *testing.T) {
+		upper := strings.ToUpper(product.String())
+		r, e := s.BatchCheckFavorites(ctx, connect.NewRequest(&pb.BatchCheckFavoritesRequest{BuyerId: p.BuyerID, ProductIds: []string{upper}}))
+		if e != nil || len(r.Msg.GetFavoritedProductIds()) != 1 || r.Msg.GetFavoritedProductIds()[0] != upper {
+			t.Fatalf("%v %v", r, e)
+		}
+	})
 	t.Run("BatchCheckRestockSubscriptions", func(t *testing.T) {
 		r, e := s.BatchCheckRestockSubscriptions(ctx, connect.NewRequest(&pb.BatchCheckRestockSubscriptionsRequest{BuyerId: p.BuyerID, ProductIds: []string{product.String(), "11"}}))
 		if e != nil || !r.Msg.GetSubscribed()[product.String()] || r.Msg.GetSubscribed()["11"] || len(r.Msg.GetSubscribed()) != 2 {
+			t.Fatalf("%v %v", r, e)
+		}
+	})
+	t.Run("BatchCheckRestockSubscriptions with an upper-case product ID", func(t *testing.T) {
+		upper := strings.ToUpper(product.String())
+		r, e := s.BatchCheckRestockSubscriptions(ctx, connect.NewRequest(&pb.BatchCheckRestockSubscriptionsRequest{BuyerId: p.BuyerID, ProductIds: []string{upper}}))
+		if e != nil || !r.Msg.GetSubscribed()[upper] || len(r.Msg.GetSubscribed()) != 1 {
 			t.Fatalf("%v %v", r, e)
 		}
 	})

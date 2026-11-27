@@ -27,11 +27,11 @@ func TestNilUUIDsRejectedBeforeDatabaseAccess(t *testing.T) {
 		"unsubscribe":       func() error { return module.UnsubscribeRestock(ctx, 1, nilID) },
 		"purge":             func() error { return module.PurgeRestockSKUs(ctx, []uuid.UUID{validUUID, nilID}) },
 		"fanout product": func() error {
-			_, err := module.FanOut(ctx, FanOutInput{SKUID: validUUID, Limit: 100, OccurredAt: time.Now()})
+			_, _, err := module.FanOut(ctx, FanOutInput{SKUID: validUUID, Limit: 100, OccurredAt: time.Now()})
 			return err
 		},
 		"fanout sku": func() error {
-			_, err := module.FanOut(ctx, FanOutInput{ProductID: validUUID, Limit: 100, OccurredAt: time.Now()})
+			_, _, err := module.FanOut(ctx, FanOutInput{ProductID: validUUID, Limit: 100, OccurredAt: time.Now()})
 			return err
 		},
 		"favorite list": func() error {
@@ -158,7 +158,7 @@ func TestUUIDBatchBoundariesRejectedBeforeDatabaseAccess(t *testing.T) {
 func TestFanOutLimitRejectedBeforeDatabaseAccess(t *testing.T) {
 	module := New(Deps{Now: time.Now})
 	for _, limit := range []int32{-1, 0, MaxBatchSize + 1} {
-		more, err := module.FanOut(context.Background(), FanOutInput{ProductID: validUUID, SKUID: validUUID, Limit: limit, OccurredAt: time.Now()})
+		_, more, err := module.FanOut(context.Background(), FanOutInput{ProductID: validUUID, SKUID: validUUID, Limit: limit, OccurredAt: time.Now()})
 		if more || apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Fatalf("limit %d: more=%v err=%v", limit, more, err)
 		}
@@ -168,7 +168,7 @@ func TestFanOutLimitRejectedBeforeDatabaseAccess(t *testing.T) {
 // 補貨事件的發生時間必填：零值不能悄悄退回處理當下的時間（M4 的缺陷）。
 func TestFanOutRejectsZeroOccurrenceTime(t *testing.T) {
 	module := New(Deps{Now: time.Now})
-	more, err := module.FanOut(context.Background(), FanOutInput{ProductID: validUUID, SKUID: validUUID, Limit: 100, ProductName: "蘋果"})
+	_, more, err := module.FanOut(context.Background(), FanOutInput{ProductID: validUUID, SKUID: validUUID, Limit: 100, ProductName: "蘋果"})
 	if more || apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("zero occurred_at: more=%v err=%v", more, err)
 	}

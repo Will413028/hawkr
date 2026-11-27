@@ -157,10 +157,46 @@
    "id": "buyer-skus-reports-sold-out-as-in-stock",
    "stack": "go-integration",
    "file": "backend/cmd/hawkr/buyer_ports.go",
-   "old": "InStock: snapshot.Active && snapshot.StockQty > 0",
+   "old": "InStock: purchasable",
    "new": "InStock: snapshot.Active",
    "test": "cmd/hawkr ^TestBuyerSkusReportsStockFromTheCatalogSnapshot$",
-   "why": "規格有貨的判斷不看庫存：缺貨的規格被當成有貨，缺貨規格的測試要紅。"
+   "why": "規格有貨的判斷不看 catalog 的可買（庫存與店家可曝光）：缺貨的規格被當成有貨，缺貨規格的測試要紅。"
+  },
+  {
+   "id": "buyer-skus-ignores-store-exposure",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/buyer_ports.go",
+   "old": "InStock: purchasable",
+   "new": "InStock: snapshot.Active && snapshot.StockQty > 0",
+   "test": "cmd/hawkr ^TestBuyerSkusTreatsAStockedSKUOfAnUnexposableStoreAsOutOfStock$",
+   "why": "有貨只看快照的庫存、不看店家可曝光：不可曝光店家的有庫存規格被當成有貨，該測試要紅。"
+  },
+  {
+   "id": "restock-list-drops-sku-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/restock/restock.go",
+   "old": "\t\t\tSKUID:     row.SkuID,\n",
+   "new": "",
+   "test": "internal/modules/buyer ^TestRestockBatchesAndRollback$",
+   "why": "補貨訂閱清單漏帶 sku_id：回應的 sku_id 為零值、下一頁游標無效，游標翻頁測試要紅。"
+  },
+  {
+   "id": "notify-restocked-spins-on-an-empty-batch",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/catalog.go",
+   "old": "\t\tif notified == 0 {",
+   "new": "\t\tif false {",
+   "test": "cmd/hawkr ^TestNotifyRestockedFailsWhenABatchMakesNoProgress$",
+   "why": "一批處理 0 筆而 more 仍為真時不回錯誤：會空轉到鎖釋放，測試要紅。"
+  },
+  {
+   "id": "legacy-batch-check-keys-by-normalized-uuid",
+   "stack": "go",
+   "file": "backend/internal/legacy/buyerserver/overlay.go",
+   "old": "parsed = append(parsed, parsedID{raw: value, id: id})",
+   "new": "parsed = append(parsed, parsedID{raw: id.String(), id: id})",
+   "test": "internal/legacy/buyerserver ^TestParseUUIDsKeepsTheCallersRawString$",
+   "why": "批次查詢的回應以解析後的小寫 UUID 為 key：大寫輸入對不上，原字串保留的測試要紅。"
   }
  ]
 }
