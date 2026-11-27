@@ -192,7 +192,7 @@ func TestDiff_OrderRuleTableIsEmpty(t *testing.T) {
 	}
 }
 
-// ==================== 比較範圍（SnapshotFields） ====================
+// ==================== 比較範圍（SnapshotFields / Scope*） ====================
 
 // 這是本 bug 的最小重現：before 是完整投影、after 只有一個鍵（媒體端點的寫入回應就
 // 是這個形狀），於是缺席的每一欄都被記成「被清空」。dev 實測換一次 logo 得到 10 列，
@@ -232,9 +232,9 @@ func TestDiff_ScopeAlsoContainsZeroValuedPresentKeys(t *testing.T) {
 		t.Fatalf("未收窄時 changed_fields 長度 = %d, want 2（status 真 + hashtags 假）", got)
 	}
 
-	scoped := Diff("product", before, after, []string{"status"})
+	scoped := Diff("product", before, after, ScopeProductStatus())
 	if len(scoped) != 1 || scoped[0].GetField() != "status" {
-		t.Fatalf("收窄後 changed_fields = %v, want 只有 status 一列", scoped)
+		t.Fatalf("收窄後 changed_fields = %v, want 只有 status 一列（56 號 §6.1.11）", scoped)
 	}
 }
 
@@ -249,6 +249,45 @@ func TestDiff_NilScopeStillComparesTheWholeRuleTable(t *testing.T) {
 	}
 	if len(got) != 2 || !got["name"] || !got["images"] {
 		t.Errorf("changed_fields = %v, want {name, images}", got)
+	}
+}
+
+// scope 內不在規則表的欄名會被靜默略過，所以**打錯一個字就等於什麼都不比較**：
+// 端點照樣回 200、稽核列照樣寫入、changed_fields 恆為空，沒有任何訊號。
+// 這支測試就是那個 typo 的偵測器。
+func TestDiffScopes_OnlyReferenceRegisteredFields(t *testing.T) {
+	scopes := map[string]struct {
+		resourceType string
+		fields       []string
+	}{
+		"ScopeProductStatus": {"product", ScopeProductStatus()},
+	}
+	for name, sc := range scopes {
+		if len(sc.fields) == 0 {
+			t.Errorf("%s 回了空集合 —— 空 scope 等於「什麼都不比較」，要全表請用 nil", name)
+		}
+		seen := map[string]bool{}
+		for _, f := range sc.fields {
+			if seen[f] {
+				t.Errorf("%s 有重複欄位 %q —— 會產出兩列相同的 changed_field", name, f)
+			}
+			seen[f] = true
+			if _, registered := DelegationDiffRules[sc.resourceType][f]; !registered {
+				t.Errorf("%s 含未登記欄位 %q（resourceType=%s）—— 它會被 Diff 靜默略過",
+					name, f, sc.resourceType)
+			}
+		}
+	}
+}
+
+// Scope* 必須每次回新的 slice。回同一個套件層變數的話，任一呼叫端 append 一次就改掉
+// 其他所有呼叫端的比較範圍，而那個錯誤不編譯失敗、不轉紅。
+func TestDiffScopes_ReturnFreshSlices(t *testing.T) {
+	a := ScopeProductStatus()
+	a = append(a, "name")
+	_ = a
+	if b := ScopeProductStatus(); len(b) != 1 || b[0] != "status" {
+		t.Errorf("ScopeProductStatus() 被呼叫端污染：%v", b)
 	}
 }
 

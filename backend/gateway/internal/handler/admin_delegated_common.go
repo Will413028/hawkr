@@ -41,6 +41,15 @@ var delegatedIdempotencyKeyRE = middleware.IdempotencyKeyPattern
 // delegatedVersionRE matches expectedVersion / any numeric id string.
 var delegatedVersionRE = regexp.MustCompile(`^\d{1,19}$`)
 
+// delegatedMutationData is the one response shape every delegated mutation returns.
+// version is the NEW version after the write — the front end feeds it straight back
+// as the next expectedVersion.
+type delegatedMutationData struct {
+	AuditLogID string `json:"auditLogId"`
+	Version    string `json:"version"`
+	Resource   any    `json:"resource"`
+}
+
 // delegatedRequest is everything the orchestrator needs about the caller that does not
 // come from the request body.
 type delegatedRequest struct {
@@ -184,6 +193,29 @@ func validateOperationReason(c *gin.Context, reason string) (string, bool) {
 	return trimmed, true
 }
 
+// validateExpectedVersion checks the optimistic-lock token's shape only; whether it
+// still matches is the domain service's call (9266).
+func validateExpectedVersion(c *gin.Context, version string) bool {
+	if !delegatedVersionRE.MatchString(version) {
+		response.BizStatus(c, bizcode.DelegationInvalidCommand, "expectedVersion 格式不正確")
+		return false
+	}
+	return true
+}
+
+// notifySellerOrDefault resolves the tri-state body flag into the explicit boolean the
+// audit intent must carry.
+//
+// The default is true, and it has to be materialised HERE. Leaving the field at its
+// proto3 zero value means false, which builds no outbox row, sends the seller nothing,
+// and leaves an audit table where every row is present and nothing looks wrong.
+func notifySellerOrDefault(v *bool) bool {
+	if v == nil {
+		return true
+	}
+	return *v
+}
+
 // delegatedPaging parses the shared page / page_size query pair.
 //
 // Out-of-range is 9260, never a silent clamp: after clamping, the echoed pageSize
@@ -296,6 +328,42 @@ func denyDelegated(c *gin.Context, d *delegation.Denial) {
 	response.BizStatus(c, d.Code, d.Message)
 }
 
+// respondDelegatedMutation renders the unified mutation envelope.
+func respondDelegatedMutation(c *gin.Context, result *delegation.Result) {
+	response.OK(c, delegatedMutationData{
+		AuditLogID: result.AuditLogID,
+		Version:    result.Version,
+		Resource:   result.Resource,
+	})
+}
+
+// delegatedProductMutationData 是代行商品建立／更新專屬的回應 data：共用三欄之外多一個
+// certificationWarnings（19 §9.5 的適用端點含代行建立／更新）。
+//
+// 不把欄位加進共用的 delegatedMutationData：那份形狀是每一種代行變更都吐的（訂單、貼文、
+// 店面、商品狀態…），加上去等於對每一支端點宣告一個它永遠不會有的欄位。
+type delegatedProductMutationData struct {
+	AuditLogID string `json:"auditLogId"`
+	Version    string `json:"version"`
+	Resource   any    `json:"resource"`
+	// 本次未被採用的認證輸入；無警告時是空陣列不是省略（19 §9.5）。
+	CertificationWarnings []CertificationWarningOutput `json:"certificationWarnings"`
+}
+
+// respondDelegatedProductMutation 是 respondDelegatedMutation 的商品版：多帶
+// certificationWarnings，其餘三欄逐位元相同（前端既有解析不受影響）。
+func respondDelegatedProductMutation(c *gin.Context, result *delegation.Result, warnings []CertificationWarningOutput) {
+	if warnings == nil {
+		warnings = []CertificationWarningOutput{}
+	}
+	response.OK(c, delegatedProductMutationData{
+		AuditLogID:            result.AuditLogID,
+		Version:               result.Version,
+		Resource:              result.Resource,
+		CertificationWarnings: warnings,
+	})
+}
+
 // delegationDenialFromCode turns a domain-service business code into a Denial. Codes
 // the delegated contract owns pass through unchanged; anything else is surfaced as
 // itself so the §6.5.2 mapping keeps working (an unregistered code collapses to 409,
@@ -358,4 +426,30 @@ func denialFromGrpcErr(err error) *delegation.Denial {
 	zap.L().Warn("Delegation.upstream.unmapped",
 		zap.String("grpcCode", st.Code().String()), zap.String("grpcMessage", st.Message()))
 	return upstreamDenial()
+}
+
+// mapDomainItemCode normalises a per-element business code from a batch response.
+//
+// 批次的逐項 code 不經 gRPC status（整支 RPC 是成功的），所以領域服務的 HTTP 鏡射碼
+// （400／403／404）會原樣浮到前端。它們不在 §6.5.1 的封閉碼表內，前端也不透傳
+// message ⇒ 操作者拿到一個對應不到任何恢復動作的數字。單筆路徑已由 denialFromGrpcErr
+// 收斂，逐項這一半必須做同一件事，否則同一個失敗在兩條路徑上是兩個碼。
+func mapDomainItemCode(code int32) int32 {
+	switch code {
+	case 0:
+		return 0
+	case 400:
+		return bizcode.DelegationInvalidCommand
+	case 403, 404:
+		return bizcode.DelegationResourceNotOwned
+	default:
+		return code
+	}
+}
+
+// joinForDisplay renders a string slice into the projection's scalar form. The
+// projection layer is what makes seven formatters enough: everything reaching a
+// formatter is already a scalar.
+func joinForDisplay(values []string) string {
+	return strings.Join(values, "、")
 }

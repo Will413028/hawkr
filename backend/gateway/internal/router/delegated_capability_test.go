@@ -101,6 +101,14 @@ func (s *stubAudit) ConfirmAuditResult(_ context.Context, req *accountpb.Confirm
 	return &accountpb.ConfirmAuditResultResponse{Code: 0}, nil
 }
 
+func (s *stubAudit) RecordAuditIntentBatch(_ context.Context, _ *accountpb.RecordAuditIntentBatchRequest, _ int) (*accountpb.RecordAuditIntentBatchResponse, error) {
+	return &accountpb.RecordAuditIntentBatchResponse{Code: 0}, nil
+}
+
+func (s *stubAudit) ConfirmAuditResultBatch(_ context.Context, _ *accountpb.ConfirmAuditResultBatchRequest, _ int) (*accountpb.ConfirmAuditResultBatchResponse, error) {
+	return &accountpb.ConfirmAuditResultBatchResponse{Code: 0}, nil
+}
+
 func newGuardEngine(stub *stubSessionResolver) *gin.Engine {
 	return newGuardEngineWith(stub, &stubStoreState{resp: operableStore("active")}, &stubRevoker{})
 }

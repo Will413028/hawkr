@@ -9,14 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// registerDelegatedOperationRoutes mounts the 25 endpoints of 56 號 ADM 代行營運
+// registerDelegatedOperationRoutes mounts the 32 endpoints of 56 號 ADM 代行營運
 // (§6.1.1 ＋ #2444 的授權列治理 ＋ §11.3 P1 的跨工作階段查詢), split across two
 // groups that share the /api/v1/admin prefix:
 //
 //	admin        — 14 支 ADM host 端點，身分＝ADM session（既有 JWTAuth + requireAdmin）
-//	adminNoAuth  — 11 支，身分＝operation credential（A31 起前綴不再蘊含 admin 身分）
+//	adminNoAuth  — 18 支，身分＝operation credential（A31 起前綴不再蘊含 admin 身分）
 //
-// 那 11 支就是 §8.1.2 boot 斷言第 4 條的具名白名單。掛錯 group 的症狀是不對稱的：
+// 那 18 支就是 §8.1.2 boot 斷言第 4 條的具名白名單。掛錯 group 的症狀是不對稱的：
 // 把 www host 組掛回 requireAdmin ⇒ 工作區每一次輪詢 9261（吵，看得見）；反過來把一支
 // 治理端點掛到 credential-only 群組上 ⇒ 一支**沒有任何身分要求**的治理端點，而 review
 // 時它與其他 /admin/ 路由長得一模一樣，差別只在註冊時用了哪一個 group 變數。
@@ -81,7 +81,7 @@ func registerDelegatedOperationRoutes(admin, adminNoAuth *gin.RouterGroup, h *ha
 	// ── S6 交接兌換（1 支）：四個 helper 一個都不掛 ──────────────────────────
 	handoffHandle(adminNoAuth, http.MethodPost, "/delegated-operations/handoff/redeem", h.RedeemDelegationHandoff)
 
-	// ── 7 支代行資源端點：capability 為必填參數，宣告＝掛載合一 ──────────────
+	// ── 14 支代行資源端點：capability 為必填參數，宣告＝掛載合一 ──────────────
 	sellers := "/sellers/:store_id"
 
 	// storefront（4）
@@ -89,6 +89,16 @@ func registerDelegatedOperationRoutes(admin, adminNoAuth *gin.RouterGroup, h *ha
 	delegatedHandle(adminNoAuth, http.MethodPatch, sellers+"/storefront", authz.AdminCapStorefrontWrite, deps, h.DelegatedStorefrontUnavailable)
 	delegatedHandle(adminNoAuth, http.MethodPost, sellers+"/storefront/logo", authz.AdminCapStorefrontWrite, deps, h.DelegatedStorefrontUnavailable)
 	delegatedHandle(adminNoAuth, http.MethodPost, sellers+"/storefront/cover", authz.AdminCapStorefrontWrite, deps, h.DelegatedStorefrontUnavailable)
+
+	// products（7）。batch-unpublish 的 capability 是 products.publish，不是任何
+	// 「批次」專用值——批次與逐筆做的是同一件事，只有跳數不同。
+	delegatedHandle(adminNoAuth, http.MethodGet, sellers+"/products", authz.AdminCapProductsRead, deps, h.ListDelegatedProducts)
+	delegatedHandle(adminNoAuth, http.MethodPost, sellers+"/products", authz.AdminCapProductsWrite, deps, h.CreateDelegatedProduct)
+	delegatedHandle(adminNoAuth, http.MethodPost, sellers+"/products/batch-unpublish", authz.AdminCapProductsPublish, deps, h.BatchUnpublishDelegatedProducts)
+	delegatedHandle(adminNoAuth, http.MethodGet, sellers+"/products/:product_id", authz.AdminCapProductsRead, deps, h.GetDelegatedProduct)
+	delegatedHandle(adminNoAuth, http.MethodPatch, sellers+"/products/:product_id", authz.AdminCapProductsWrite, deps, h.UpdateDelegatedProduct)
+	delegatedHandle(adminNoAuth, http.MethodPost, sellers+"/products/:product_id/publish", authz.AdminCapProductsPublish, deps, h.PublishDelegatedProduct)
+	delegatedHandle(adminNoAuth, http.MethodPost, sellers+"/products/:product_id/unpublish", authz.AdminCapProductsPublish, deps, h.UnpublishDelegatedProduct)
 
 	// orders（3，全部唯讀）。recipient-contact 是獨立的 PII 揭露動作，仍然只吃
 	// orders.read——它必落稽核的性質由 order-service 斷言 audit_log_id 非空承擔，

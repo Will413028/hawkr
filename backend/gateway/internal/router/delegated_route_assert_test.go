@@ -12,10 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// The three counts are the arithmetic §6.1.1 / §13.1 G5 states: 25 endpoints total,
-// of which 7 enter the delegated registry and 11 are named exceptions (six S
+// The three counts are the arithmetic §6.1.1 / §13.1 G5 states: 32 endpoints total,
+// of which 14 enter the delegated registry and 18 are named exceptions (six S
 // endpoints, three summary/audit queries, the seven
-// #2444 授權列治理端點, and the two §11.3 P1 跨工作階段查詢). 11 of the 25 skip
+// #2444 授權列治理端點, and the two §11.3 P1 跨工作階段查詢). 18 of the 32 skip
 // requireAdmin(). Writing it as "registry 沒有的就略過" instead would let any future
 // resource endpoint that forgot to register slip through with it.
 func TestDelegatedRouteInventory(t *testing.T) {
@@ -28,16 +28,16 @@ func TestDelegatedRouteInventory(t *testing.T) {
 		mounted[ri.Method+" "+ri.Path] = struct{}{}
 	}
 
-	if got := len(authz.RegisteredAdmin()); got != 7 {
-		t.Errorf("delegatedHandle registry = %d 支，應為 7", got)
+	if got := len(authz.RegisteredAdmin()); got != 14 {
+		t.Errorf("delegatedHandle registry = %d 支，應為 14", got)
 	}
 
 	noAuth := registeredAdminNoAuth()
-	if len(noAuth) != 11 {
-		t.Errorf("credential-only 路由 = %d 支，A31 白名單恰為 11", len(noAuth))
+	if len(noAuth) != 18 {
+		t.Errorf("credential-only 路由 = %d 支，A31 白名單恰為 18", len(noAuth))
 	}
-	if len(adminNoAuthWhitelist) != 11 {
-		t.Errorf("adminNoAuthWhitelist = %d 條，恰為 11", len(adminNoAuthWhitelist))
+	if len(adminNoAuthWhitelist) != 18 {
+		t.Errorf("adminNoAuthWhitelist = %d 條，恰為 18", len(adminNoAuthWhitelist))
 	}
 	if p := checkAdminNoAuthWhitelist(mounted, noAuth, adminNoAuthWhitelist); len(p) != 0 {
 		t.Errorf("白名單雙向比對不通過：%v", p)
@@ -62,8 +62,8 @@ func TestDelegatedRouteInventory(t *testing.T) {
 		}
 	}
 
-	if total := len(admOnly) + len(noAuth); total != 25 {
-		t.Errorf("代行端點合計 %d 支，總表為 25", total)
+	if total := len(admOnly) + len(noAuth); total != 32 {
+		t.Errorf("代行端點合計 %d 支，總表為 32", total)
 	}
 }
 
@@ -105,7 +105,7 @@ func delegatedAdmHostRoutes() []string {
 // 「登錄 ≡ 掛載」——漏登錄的症狀是那一支端點被節流時回裸 429，前端拿到一個沒登錄的碼，
 // 不會有任何東西轉紅。
 //
-// 前綴式判斷之所以不行也在這裡看得見：7 支資源端點掛在 /sellers/:store_id/ 這一段，
+// 前綴式判斷之所以不行也在這裡看得見：14 支資源端點掛在 /sellers/:store_id/ 這一段，
 // 而同一段也可以掛非代行的端點，前綴規則分不出兩者，所以這裡逐條對照登錄與掛載。
 func TestDelegatedRoutesAreAllRateLimitRegistered(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -124,8 +124,8 @@ func TestDelegatedRoutesAreAllRateLimitRegistered(t *testing.T) {
 	for _, k := range registeredAdminNoAuth() {
 		want[k] = struct{}{}
 	}
-	if len(want) != 25 {
-		t.Fatalf("代行端點合計 %d 支，總表為 25 —— 先修 TestDelegatedRouteInventory", len(want))
+	if len(want) != 32 {
+		t.Fatalf("代行端點合計 %d 支，總表為 32 —— 先修 TestDelegatedRouteInventory", len(want))
 	}
 
 	got := map[string]struct{}{}

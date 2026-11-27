@@ -212,3 +212,16 @@ func TestSellerProductUpdate_ShippingMethodsCarryAmbientTemperature(t *testing.T
 		t.Errorf("Temperature = %q, want 3201", temp)
 	}
 }
+
+func TestDelegated_ShippingMethodsCarryAmbientTemperature(t *testing.T) {
+	for _, m := range toShippingMethodProtosFromInput([]DelegatedShippingMethodInput{{Type: "3101"}}) {
+		if m.Temperature != "3201" {
+			t.Errorf("delegated input Temperature = %q, want 3201", m.Temperature)
+		}
+	}
+	for _, m := range toShippingMethodProtos([]ShippingMethodResponse{{Type: "3101", Temperature: "3202"}}) {
+		if m.Temperature != "3201" {
+			t.Errorf("delegated before Temperature = %q, want 3201", m.Temperature)
+		}
+	}
+}

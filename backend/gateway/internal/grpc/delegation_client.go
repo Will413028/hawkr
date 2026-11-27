@@ -10,6 +10,7 @@ import (
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 	commonpb "github.com/Will413028/hawkr/go-pkg/proto/common"
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
+	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -80,6 +81,23 @@ func (c *AccountClient) ConfirmAuditResult(ctx context.Context, req *accountpb.C
 	ctx, cancel := withDeadline(ctx, deadlineMs)
 	defer cancel()
 	return c.delegation.ConfirmAuditResult(ctx, req)
+}
+
+// RecordAuditIntentBatch is the O(1)-hop form for batch operations (§7.2.8): one
+// transaction with a SAVEPOINT per item, so one failing item does not abort the rest.
+func (c *AccountClient) RecordAuditIntentBatch(ctx context.Context, req *accountpb.RecordAuditIntentBatchRequest, deadlineMs int) (*accountpb.RecordAuditIntentBatchResponse, error) {
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.delegation.RecordAuditIntentBatch(ctx, req)
+}
+
+// ConfirmAuditResultBatch is all-or-nothing by design: a failure leaves N rows in
+// PENDING rather than an unknown mixture, which is the one regression this shape
+// accepts and must never be reported as success.
+func (c *AccountClient) ConfirmAuditResultBatch(ctx context.Context, req *accountpb.ConfirmAuditResultBatchRequest, deadlineMs int) (*accountpb.ConfirmAuditResultBatchResponse, error) {
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.delegation.ConfirmAuditResultBatch(ctx, req)
 }
 
 // ListDelegationAuditLogs backs GET .../{sessionId}/audit-logs.
@@ -192,6 +210,76 @@ func (c *SellerClient) GetStoreStateForGuard(ctx context.Context, storeID int64,
 	ctx, cancel := withDeadline(ctx, deadlineMs)
 	defer cancel()
 	return c.client.GetSeller(ctx, &sellerpb.GetSellerRequest{StoreId: storeID})
+}
+
+// ==================== product-service ====================
+
+func (c *ProductClient) GetProductListForDelegation(ctx context.Context, req *productpb.GetProductListRequest, deadlineMs int) (*productpb.GetProductListResponse, error) {
+	if err := requireCapability(req.GetDelegation(), "ProductService.GetProductList", pkgdelegation.CapProductsRead); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.client.GetProductList(ctx, req)
+}
+
+func (c *ProductClient) GetProductForDelegation(ctx context.Context, req *productpb.GetProductRequest, deadlineMs int) (*productpb.GetProductResponse, error) {
+	if err := requireCapability(req.GetDelegation(), "ProductService.GetProduct", pkgdelegation.CapProductsRead); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.client.GetProduct(ctx, req)
+}
+
+func (c *ProductClient) CreateProductForDelegation(ctx context.Context, req *productpb.CreateProductRequest, deadlineMs int) (*productpb.CreateProductResponse, error) {
+	if err := requireCapability(req.GetDelegation(), "ProductService.CreateProduct", pkgdelegation.CapProductsWrite); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.client.CreateProduct(ctx, req)
+}
+
+func (c *ProductClient) UpdateProductForDelegation(ctx context.Context, req *productpb.UpdateProductRequest, deadlineMs int) (*productpb.UpdateProductResponse, error) {
+	if err := requireCapability(req.GetDelegation(), "ProductService.UpdateProduct", pkgdelegation.CapProductsWrite); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.client.UpdateProduct(ctx, req)
+}
+
+func (c *ProductClient) UpdateSellerProductStatusForDelegation(ctx context.Context, req *productpb.UpdateSellerProductStatusRequest, deadlineMs int) (*productpb.UpdateProductResponse, error) {
+	if err := requireCapability(req.GetDelegation(), "ProductService.UpdateSellerProductStatus", pkgdelegation.CapProductsPublish); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.client.UpdateSellerProductStatus(ctx, req)
+}
+
+// BatchGetSellerProductsForDelegation is hop ② of the batch shape and runs BEFORE the
+// audit intent exists, so its DelegationContext carries an empty audit_log_id and the
+// read capability (products.read). Declaring products.publish here would make S1b
+// reject every batch unpublish with 9260 — the operation would be entirely unusable
+// while every unit test that only feeds write fixtures stayed green.
+func (c *ProductClient) BatchGetSellerProductsForDelegation(ctx context.Context, req *productpb.BatchGetSellerProductsForDelegationRequest, deadlineMs int) (*productpb.BatchGetSellerProductsForDelegationResponse, error) {
+	if err := requireCapability(req.GetDelegation(), "ProductService.BatchGetSellerProductsForDelegation", pkgdelegation.CapProductsRead); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.client.BatchGetSellerProductsForDelegation(ctx, req)
+}
+
+func (c *ProductClient) BatchUpdateSellerProductStatusForDelegation(ctx context.Context, req *productpb.BatchUpdateSellerProductStatusRequest, deadlineMs int) (*productpb.BatchUpdateSellerProductStatusResponse, error) {
+	if err := requireCapability(req.GetDelegation(), "ProductService.BatchUpdateSellerProductStatus", pkgdelegation.CapProductsPublish); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDeadline(ctx, deadlineMs)
+	defer cancel()
+	return c.client.BatchUpdateSellerProductStatus(ctx, req)
 }
 
 // ==================== order-service ====================

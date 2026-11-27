@@ -30,6 +30,9 @@ type closureAuditStub struct {
 	// confirmCtxErr 記錄 confirm 當下 ctx 的狀態。detached 之後它必須是 nil，即使
 	// 呼叫端的 ctx 早就被取消。
 	confirmCtxErr error
+
+	batchIntentResults []*accountpb.RecordAuditIntentItemResult
+	batchConfirms      []*accountpb.ConfirmAuditResultRequest
 }
 
 func (s *closureAuditStub) RecordAuditIntent(_ context.Context, in *accountpb.RecordAuditIntentRequest, _ int) (*accountpb.RecordAuditIntentResponse, error) {
@@ -48,6 +51,28 @@ func (s *closureAuditStub) ConfirmAuditResult(ctx context.Context, in *accountpb
 	s.confirmCtxErr = ctx.Err()
 	return &accountpb.ConfirmAuditResultResponse{}, nil
 }
+
+func (s *closureAuditStub) RecordAuditIntentBatch(_ context.Context, in *accountpb.RecordAuditIntentBatchRequest, _ int) (*accountpb.RecordAuditIntentBatchResponse, error) {
+	if s.batchIntentResults != nil {
+		return &accountpb.RecordAuditIntentBatchResponse{Results: s.batchIntentResults}, nil
+	}
+	results := make([]*accountpb.RecordAuditIntentItemResult, 0, len(in.GetItems()))
+	for i, item := range in.GetItems() {
+		results = append(results, &accountpb.RecordAuditIntentItemResult{
+			ResourceId: item.GetResourceId(),
+			Ok:         true,
+			Data:       &accountpb.RecordAuditIntentData{AuditLogId: itemAuditLogID(i)},
+		})
+	}
+	return &accountpb.RecordAuditIntentBatchResponse{Results: results}, nil
+}
+
+func (s *closureAuditStub) ConfirmAuditResultBatch(_ context.Context, in *accountpb.ConfirmAuditResultBatchRequest, _ int) (*accountpb.ConfirmAuditResultBatchResponse, error) {
+	s.batchConfirms = append(s.batchConfirms, in.GetItems()...)
+	return &accountpb.ConfirmAuditResultBatchResponse{}, nil
+}
+
+func itemAuditLogID(i int) string { return []string{"9101", "9102", "9103"}[i] }
 
 func closureOrchestrator(stub *closureAuditStub) *Orchestrator {
 	return &Orchestrator{Audit: stub, Cfg: config.DelegationConfig{}}
@@ -176,5 +201,78 @@ func TestOrchestrate_ConfirmSurvivesCallerCancellation(t *testing.T) {
 	}
 	if stub.confirmCtxErr != nil {
 		t.Fatalf("confirm 的 ctx 必須與呼叫端解耦；實際帶著 %v", stub.confirmCtxErr)
+	}
+}
+
+// TestOrchestrateBatch_MissingWriteResultStillCloses：領域服務沒回報的元素也必須關。
+//
+// 收 confirm 的迴圈跑的是 writeResults 而不是 writeItems，所以「有 intent 但沒出現在
+// 結果裡」的元素會整個掉出去 —— 沒有 confirm、沒有 log、回應裡那一格還是初始的
+// OK=false/Code=0，看起來就像一個普通的失敗元素。今天 Java 端是逐 request item 迴圈、
+// 保證 1:1，但這一側沒有任何東西在守那個假設。
+func TestOrchestrateBatch_MissingWriteResultStillCloses(t *testing.T) {
+	stub := &closureAuditStub{}
+	o := closureOrchestrator(stub)
+
+	results, denial := o.OrchestrateBatch(context.Background(), BatchSpec{
+		Session:      closureSession(),
+		Action:       "PRODUCT_BATCH_UNPUBLISH",
+		ResourceType: "product",
+		Items: []BatchItem{
+			{ResourceID: "7001"},
+			{ResourceID: "7002"},
+			{ResourceID: "7003"},
+		},
+		ReadBatch: func(context.Context, *commonpb.DelegationContext) (map[string]*Resource, *Denial) {
+			return map[string]*Resource{
+				"7001": {ID: "7001", Version: "1", Fields: map[string]any{"name": "a"}},
+				"7002": {ID: "7002", Version: "1", Fields: map[string]any{"name": "b"}},
+				"7003": {ID: "7003", Version: "1", Fields: map[string]any{"name": "c"}},
+			}, nil
+		},
+		WriteBatch: func(_ context.Context, _ *commonpb.DelegationContext, items []BatchWriteItem) ([]BatchWriteResult, *Denial) {
+			// 上游只回報了第一與第三個元素。7002 憑空消失。
+			out := make([]BatchWriteResult, 0, 2)
+			for _, it := range items {
+				if it.ResourceID == "7002" {
+					continue
+				}
+				out = append(out, BatchWriteResult{ResourceID: it.ResourceID, OK: true, Version: "2"})
+			}
+			return out, nil
+		},
+		AfterFields:    func(before map[string]any) map[string]any { return before },
+		SnapshotFields: []string{"name"},
+	})
+	if denial != nil {
+		t.Fatalf("部分失敗不該讓整批被拒: %+v", denial)
+	}
+	if len(stub.batchConfirms) != 3 {
+		t.Fatalf("三列 intent 就要三列 confirm；實際 %d 列", len(stub.batchConfirms))
+	}
+	byID := map[string]*accountpb.ConfirmAuditResultRequest{}
+	for _, c := range stub.batchConfirms {
+		byID[c.GetResourceId()] = c
+	}
+	missing, ok := byID["7002"]
+	if !ok {
+		t.Fatal("上游沒回報的那一列完全沒被 confirm —— 它會永遠停在 PENDING")
+	}
+	if missing.GetResult() != "FAILED" {
+		t.Fatalf("「問了但沒得到答案」對稽核來說就是 FAILED；實際 %q", missing.GetResult())
+	}
+	if missing.GetBizCode() == 0 {
+		t.Fatal("FAILED 必須帶得出原因碼，否則稽核列說不出為什麼失敗")
+	}
+	for _, id := range []string{"7001", "7003"} {
+		if byID[id].GetResult() != "SUCCEEDED" {
+			t.Fatalf("%s 有回報且成功，必須是 SUCCEEDED；實際 %q", id, byID[id].GetResult())
+		}
+	}
+	// 回應那一側也不能說謊：那個元素不是「成功」。
+	for _, r := range results {
+		if r.ResourceID == "7002" && r.OK {
+			t.Fatal("上游沒回報的元素不得回報成 OK")
+		}
 	}
 }
