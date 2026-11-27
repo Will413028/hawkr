@@ -7,6 +7,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -19,7 +20,7 @@ func TestBannerActionMustBeComplete(t *testing.T) {
 		{model.BannerAction{Type: model.BannerActionPopup}, true},
 		{model.BannerAction{Type: model.BannerActionURL, Target: "https://example.com/promo"}, true},
 		{model.BannerAction{Type: model.BannerActionURL, Target: "http://example.com"}, true},
-		{model.BannerAction{Type: model.BannerActionProduct, Target: "123"}, true},
+		{model.BannerAction{Type: model.BannerActionProduct, Target: "018f0000-0000-7000-8000-0000000000a1"}, true},
 		{model.BannerAction{Type: model.BannerActionPost, Target: "018f0000-0000-7000-8000-000000000001"}, true},
 		{model.BannerAction{}, false},                            // 被洗成 {} 的那種
 		{model.BannerAction{Type: model.BannerActionURL}, false}, // 選了 url 沒填網址
@@ -135,7 +136,7 @@ func TestCreateBannerDoesNotSwallowASocialFailure(t *testing.T) {
 func TestPublicReadHidesBannersWhosePostIsNoLongerReadable(t *testing.T) {
 	soc := &fakeSocial{readable: map[uuid.UUID]bool{postPublic: true}}
 	svc := New(Deps{Social: soc})
-	product := model.Banner{Action: model.BannerAction{Type: model.BannerActionProduct, Target: "42"}}
+	product := model.Banner{Action: model.BannerAction{Type: model.BannerActionProduct, Target: productPublic.String()}}
 	got, err := svc.dropUnreadablePostTargets(context.Background(), []model.Banner{postBanner(postPublic), postBanner(postGone), product})
 	if err != nil {
 		t.Fatal(err)
@@ -145,6 +146,66 @@ func TestPublicReadHidesBannersWhosePostIsNoLongerReadable(t *testing.T) {
 	}
 	if soc.calls != 1 {
 		t.Errorf("問了 social %d 次，預期一次（批次）", soc.calls)
+	}
+}
+
+var (
+	productPublic = uuid.UUID{0x01, 0x8f, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, 0xa1}
+	productGone   = uuid.UUID{0x01, 0x8f, 0, 0, 0, 0, 0x70, 0, 0x80, 0, 0, 0, 0, 0, 0, 0xa2}
+)
+
+// fakeProducts 以固定的集合回答「商品公開可見」：不在集合裡的回 catalog.ErrProductNotFound，並記下被問的次數。
+type fakeProducts struct {
+	public map[uuid.UUID]bool
+	err    error
+	calls  int
+}
+
+func (f *fakeProducts) PublicProduct(_ context.Context, id uuid.UUID, _ time.Time) (catalog.Product, error) {
+	f.calls++
+	if f.err != nil {
+		return catalog.Product{}, f.err
+	}
+	if !f.public[id] {
+		return catalog.Product{}, catalog.ErrProductNotFound
+	}
+	return catalog.Product{ID: id}, nil
+}
+
+func productInput(target string) model.BannerInput {
+	return model.BannerInput{Title: "t", PreviewImageToken: "p", PopupImageToken: "q",
+		Action: model.BannerAction{Type: model.BannerActionProduct, Target: target}}
+}
+
+// 商品目標的檢查在碰 DB 之前：Service 沒有 DB 時，被拒的建立仍回得出錯誤。
+// 不存在的商品用合法的 UUID，被拒的原因只能是 catalog 回找不到；不是 UUID 的目標則在問 catalog 之前被拒。
+func TestCreateBannerRejectsAProductTargetThatIsNotPubliclyVisible(t *testing.T) {
+	products := &fakeProducts{public: map[uuid.UUID]bool{productPublic: true}}
+	svc := New(Deps{Products: products, Now: time.Now})
+	for name, c := range map[string]struct {
+		target string
+		asked  int
+	}{
+		"不存在或不公開（草稿、已刪除、店家不可曝光都在 catalog 回找不到）": {productGone.String(), 1},
+		"不是 UUID（舊的數字 ID）": {"123", 0},
+	} {
+		products.calls = 0
+		_, err := svc.CreateBanner(context.Background(), 1, productInput(c.target))
+		if apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：err = %v，預期 InvalidInput", name, err)
+		}
+		if products.calls != c.asked {
+			t.Errorf("%s：問了 catalog %d 次，預期 %d", name, products.calls, c.asked)
+		}
+	}
+}
+
+func TestCreateBannerDoesNotSwallowACatalogFailure(t *testing.T) {
+	boom := errors.New("boom")
+	svc := New(Deps{Products: &fakeProducts{err: boom}, Now: time.Now})
+	_, err := svc.CreateBanner(context.Background(), 1, productInput(productPublic.String()))
+	if !errors.Is(err, boom) || apperr.KindOf(err) == apperr.KindInvalidInput {
+		t.Errorf("err = %v，預期原樣包著 catalog 的錯誤、不是 InvalidInput", err)
 	}
 }
 

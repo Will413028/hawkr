@@ -4,12 +4,14 @@ package buyerprocurement
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"iter"
 	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/riverqueue/river"
@@ -61,18 +63,28 @@ func (l *stubLLM) GenerateContent(ctx context.Context, _ *adkmodel.LLMRequest, _
 
 type taxonomy struct{}
 
+// catID 是測試用的確定性分類 ID：同一個數字永遠得到同一個 UUID，且不是零值。
+func catID(n int) uuid.UUID {
+	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
+}
+
+func parentOf(n int) *uuid.UUID {
+	id := catID(n)
+	return &id
+}
+
 func (taxonomy) CategoryTree(context.Context) ([]procurement.TaxonomyNode, error) {
 	return []procurement.TaxonomyNode{
-		{ID: 1, Name: "葉菜"}, {ID: 2, Name: "水果"}, {ID: 3, Name: "加工品"},
-		{ID: 18, ParentID: 1, Name: "小白菜"},
-		{ID: 21, ParentID: 2, Name: "蘋果"}, {ID: 22, ParentID: 3, Name: "蘋果"},
+		{ID: catID(1), Name: "葉菜"}, {ID: catID(2), Name: "水果"}, {ID: catID(3), Name: "加工品"},
+		{ID: catID(18), ParentID: parentOf(1), Name: "小白菜"},
+		{ID: catID(21), ParentID: parentOf(2), Name: "蘋果"}, {ID: catID(22), ParentID: parentOf(3), Name: "蘋果"},
 	}, nil
 }
 
 type products struct{}
 
-func (products) Page(context.Context, procurement.SearchQuery, int) (procurement.SearchPage, error) {
-	return procurement.SearchPage{Hits: []procurement.SearchHit{{ProductID: 501, StoreID: 900}}, Last: true}, nil
+func (products) Page(context.Context, procurement.SearchQuery, procurement.SearchCursor) (procurement.SearchPage, error) {
+	return procurement.SearchPage{Hits: []procurement.SearchHit{{ProductID: catID(501), StoreID: 900}}}, nil
 }
 
 type stores struct{}

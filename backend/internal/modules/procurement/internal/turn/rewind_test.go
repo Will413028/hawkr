@@ -108,7 +108,7 @@ func TestRewindTargetItemIgnoresTheServerFilledResolution(t *testing.T) {
 	a := store.ProcurementRequestRevision{ID: uuid.NewV7(), RevisionNo: 1, Item: sp("梨")}
 	b := store.ProcurementRequestRevision{ID: uuid.NewV7(), RevisionNo: 2, ParentRevisionID: &a.ID, Item: sp("蘋果")}
 	c := b
-	kind, label, cat := "CATEGORY_CONFIRMED", "蘋果", int64(21)
+	kind, label, cat := "CATEGORY_CONFIRMED", "蘋果", catID(21)
 	c.ID, c.RevisionNo, c.ParentRevisionID, c.ItemResolutionKind, c.ItemResolutionLabel, c.ItemResolutionCategoryID = uuid.NewV7(), 3, &b.ID, &kind, &label, &cat
 	got, err := rewindTarget([]store.ProcurementRequestRevision{a, b, c}, c, slots.Item)
 	if err != nil || got.ID != a.ID {

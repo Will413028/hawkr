@@ -61,9 +61,9 @@
 | payment | payment-service：收款、退款、撥款 API（B2 改為 Stripe separate charges and transfers，經 provider port；會員訂閱計費已隨 scope cut 刪除） | — |
 | buyer | buyer-service | identity, media |
 | seller | seller-service（推薦賣家排行、vendor portal 除外） | identity, media |
-| content | content-service | media, social（banner 的貼文目標：建立時確認公開可讀，讀取時隱藏失效的；social 不得依賴 content，A7-D28、A7-D23 O5） |
+| content | content-service | media, social, catalog（banner 的貼文目標：建立時確認公開可讀，讀取時隱藏失效的；social 不得依賴 content，A7-D28、A7-D23 O5；商品目標：建立與換掉時經 catalog 確認公開可見） |
 | fulfillment | shipping-service（含 Uber、假日） | buyer, seller, media |
-| catalog | product-service（含 category） | seller, buyer, media, fulfillment |
+| catalog | product-service（含 category） | seller, buyer, media |
 | productimport | product-import-service | catalog, media, fulfillment |
 | pricebook | pricebook-service | catalog |
 | invoice | invoice-service，並接手 order 的發票快照 | payment, fulfillment, buyer, seller, media |
@@ -422,3 +422,9 @@
 理由：端點只會從設定進來，設定項刪除或不給預設值後，沒有路徑能在沒有人明確填入時連到舊公司；為此再維護一份 denylist 與 baseline，成本高於它防住的風險。
 
 物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。
+
+## 修訂：content 依賴 catalog、catalog 不依賴 fulfillment（2026-11-27，Will；計畫 `backend/docs/plans/2026-11-24-b4-catalog.md` B4-4b）
+
+- `content` 的依賴加 `catalog`：banner 的商品目標在建立與換掉時經 catalog 的 `PublicProduct` 確認公開可見，目標是 UUID；方向與貼文目標相同（content 依賴被指向的模組，catalog 不得依賴 content）。
+- `catalog` 的依賴拿掉 `fulfillment`：配送方式與運費不在 catalog（B4 計畫 D10），單體沒有 `fulfillment` 模組（`2026-11-15-fulfillment-seller-managed-shipping.md`），catalog 也沒有 import 它。
+- 上表兩列已照改；`internal/arch/modules.go` 是機械檢查的唯一來源。

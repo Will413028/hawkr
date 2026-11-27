@@ -3,7 +3,7 @@
 package planner
 
 import (
-	"strconv"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
@@ -211,13 +211,13 @@ const MaxItemOptions = 5
 // ItemCandidate 是品項消歧要買家選的一個末層分類。Label 是分類名稱（確認後存成 resolution label）；Path 是從大類到它的路徑，
 // 非空時是選項顯示的文字（買家靠大類分辨同名品項）。
 type ItemCandidate struct {
-	CategoryID int64
+	CategoryID uuid.UUID
 	Label      string
 	Path       string
 }
 
 // ItemOptionID 是候選的選項 ID；回答時用同一個規則比對買家送回來的 ID。
-func ItemOptionID(c ItemCandidate) string { return "category-" + strconv.FormatInt(c.CategoryID, 10) }
+func ItemOptionID(c ItemCandidate) string { return "category-" + c.CategoryID.String() }
 
 // BuildItemDisambiguation 把候選分類（呼叫端依 resolver 的排序給）組成品項消歧問題卡：最多 MaxItemOptions 個，加固定的「其他，自行描述」；
 // 開放自由輸入（打字是用新字詞重新解析，不是選擇結果）；不可跳過，品項身份未定時無法計價也無法詢價。沒有候選時只剩「自行描述品項」。

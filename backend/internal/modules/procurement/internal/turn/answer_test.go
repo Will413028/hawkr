@@ -20,16 +20,16 @@ func TestCheckAnswerShape(t *testing.T) {
 		a    Answer
 		want InvalidReason
 	}{
-		"option on the card":            {item, Answer{OptionID: "category-2"}, ""},
+		"option on the card":            {item, Answer{OptionID: optID(2)}, ""},
 		"free text":                     {item, Answer{FreeText: "蘋果乾"}, ""},
 		"free text on a describe card":  {describe, Answer{FreeText: "自家種的"}, ""},
-		"both":                          {item, Answer{OptionID: "category-2", FreeText: "x"}, InvalidNeedExactlyOne},
+		"both":                          {item, Answer{OptionID: optID(2), FreeText: "x"}, InvalidNeedExactlyOne},
 		"neither":                       {item, Answer{}, InvalidNeedExactlyOne},
 		"blank text":                    {item, Answer{FreeText: " \t　"}, InvalidBlankText},
-		"option not on the card":        {item, Answer{OptionID: "category-999"}, InvalidOptionNotOnCard},
-		"option on a describe card":     {describe, Answer{OptionID: "category-2"}, InvalidOptionNotOnCard},
+		"option not on the card":        {item, Answer{OptionID: optID(999)}, InvalidOptionNotOnCard},
+		"option on a describe card":     {describe, Answer{OptionID: optID(2)}, InvalidOptionNotOnCard},
 		"unknown stage":                 {InterruptPayload{Stage: "OTHER"}, Answer{FreeText: "x"}, InvalidUnknownStage},
-		"whitespace text beside option": {item, Answer{OptionID: "category-2", FreeText: " "}, ""},
+		"whitespace text beside option": {item, Answer{OptionID: optID(2), FreeText: " "}, ""},
 	} {
 		if got := CheckAnswer(tc.p, tc.a); got != tc.want {
 			t.Errorf("%s：CheckAnswer = %q，要 %q", name, got, tc.want)
@@ -44,10 +44,10 @@ func TestCheckShapeReportsFieldViolationsWithoutAReason(t *testing.T) {
 		in     ResumeInput
 		fields []string
 	}{
-		"both set":         {ResumeInput{OptionID: "category-2", FreeText: "x"}, []string{"OptionID", "FreeText"}},
+		"both set":         {ResumeInput{OptionID: optID(2), FreeText: "x"}, []string{"OptionID", "FreeText"}},
 		"neither set":      {ResumeInput{}, []string{"OptionID", "FreeText"}},
 		"blank text":       {ResumeInput{FreeText: "  "}, []string{"FreeText"}},
-		"option not on it": {ResumeInput{OptionID: "category-999"}, []string{"OptionID"}},
+		"option not on it": {ResumeInput{OptionID: optID(999)}, []string{"OptionID"}},
 		"text too long":    {ResumeInput{FreeText: long}, []string{"FreeText"}},
 	} {
 		err := checkShape(item, tc.in)
@@ -68,8 +68,8 @@ func TestCheckShapeReportsFieldViolationsWithoutAReason(t *testing.T) {
 		}
 	}
 	for name, in := range map[string]ResumeInput{
-		"option":            {OptionID: "category-2"},
-		"option and blank":  {OptionID: "category-2", FreeText: " "},
+		"option":            {OptionID: optID(2)},
+		"option and blank":  {OptionID: optID(2), FreeText: " "},
 		"text":              {FreeText: "蘋果乾"},
 		"text at the limit": {FreeText: strings.Repeat("字", MaxFreeTextRunes)},
 	} {
@@ -82,12 +82,12 @@ func TestCheckShapeReportsFieldViolationsWithoutAReason(t *testing.T) {
 func TestDecideAnswerResolvedRecordsTheResolutionAndMovesTheStatus(t *testing.T) {
 	item := "蘋果"
 	prior := priorState{current: slots.Set{Item: &item}, requestOf: statusClarifying}
-	out := Outcome{Kind: OutcomeResolved, Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 2, Label: "蘋果乾"}}
+	out := Outcome{Kind: OutcomeResolved, Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: catID(2), Label: "蘋果乾"}}
 	d, err := decideAnswer(uitext.ZhTW, now, prior, out)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.next.Resolution == nil || d.next.Resolution.CategoryID != 2 || d.interrupt != nil {
+	if d.next.Resolution == nil || d.next.Resolution.CategoryID != catID(2) || d.interrupt != nil {
 		t.Fatalf("解析要進新版本、不再問：%+v", d)
 	}
 	if len(d.recorded) != 1 {
@@ -143,14 +143,14 @@ func TestAnswerTextShowsTheOptionLabelOrTheTrimmedText(t *testing.T) {
 	p := itemPayload(t)
 	label := ""
 	for _, o := range p.Question.Options {
-		if o.OptionID == "category-2" {
+		if o.OptionID == optID(2) {
 			label = o.Label
 		}
 	}
 	if label == "" {
 		t.Fatal("前置：卡上要有 category-2")
 	}
-	if got := answerText(p, "category-2", ""); got != label {
+	if got := answerText(p, optID(2), ""); got != label {
 		t.Errorf("選項：%q，要 %q", got, label)
 	}
 	if got := answerText(p, "", "  自家種的 "); got != "自家種的" {

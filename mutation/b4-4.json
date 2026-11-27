@@ -44,6 +44,33 @@
    "new": "deleted := false",
    "test": "internal/modules/catalog ^TestCheckoutSnapshotReportsArchivedAndDeletedSkuAsInactive$",
    "why": "結帳快照不看已刪除：已刪除的商品或 SKU 被判成可購買，快照測試要紅。"
+  },
+  {
+   "id": "content-drops-the-product-existence-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/content/internal/banner/banner.go",
+   "old": "\tif a.Type == model.BannerActionProduct {\n\t\treturn m.checkProductTarget(ctx, id)\n\t}\n",
+   "new": "\tif a.Type == model.BannerActionProduct {\n\t\treturn nil\n\t}\n",
+   "test": "internal/modules/content ^TestCreateBannerRequiresTheProductToBePubliclyVisible$",
+   "why": "banner 的商品目標不經 catalog 確認：合法 UUID 但不存在的商品被收下，不存在商品的 banner 被拒測試要紅。"
+  },
+  {
+   "id": "procurement-search-ignores-the-cursor",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "\tpg, err := p.catalog.ListPublicProducts(ctx, p.now(), f, catalog.SortSales, cursor, searchPageSize)\n",
+   "new": "\t_ = cursor\n\tpg, err := p.catalog.ListPublicProducts(ctx, p.now(), f, catalog.SortSales, nil, searchPageSize)\n",
+   "test": "cmd/hawkr ^TestProductSearchKeysetPagesNeitherRepeatNorSkip$",
+   "why": "採購的商品搜尋 adapter 忽略游標、永遠回第一頁：翻頁重複同一批商品，keyset 翻頁不重不漏測試要紅。"
+  },
+  {
+   "id": "candidate-search-never-advances-the-cursor",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
+   "old": "\t\tafter = pg.Next\n",
+   "new": "\t\t_ = pg.Next\n",
+   "test": "internal/modules/procurement/internal/candidate ^TestSearchStopsAfterMaxPages$",
+   "why": "候選搜尋的翻頁迴圈不帶上一頁的游標：每頁都要第一頁，翻頁游標測試要紅。"
   }
  ]
 }

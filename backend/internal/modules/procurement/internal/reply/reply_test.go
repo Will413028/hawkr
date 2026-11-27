@@ -16,7 +16,7 @@ const zh, en = uitext.ZhTW, uitext.EN
 func b(k BlockKind, text string) Block { return Block{k, text} }
 
 func TestRenderParity(t *testing.T) {
-	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: 1, Label: "小白菜"}})
+	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: categoryID(1), Label: "小白菜"}})
 	packaging := planner.BuildFor(slots.Packaging, slots.Set{})
 	cases := []struct {
 		name string
@@ -196,7 +196,7 @@ func TestQuestionTextParity(t *testing.T) {
 		t.Errorf("city options = %+v", city.Options)
 	}
 
-	choices := Question(zh, planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: 18, Label: "有機小白菜"}}))
+	choices := Question(zh, planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: categoryID(18), Label: "有機小白菜"}}))
 	if choices.Prompt != "找到幾個相符的品項，麻煩選一下你要的是哪一個：" || choices.Options[0].Label != "有機小白菜" || choices.Options[1].Label != "其他（自己輸入）" {
 		t.Errorf("choices = %+v", choices)
 	}
@@ -231,7 +231,7 @@ func TestAdjustedValueWarnsInsideTheNormalAct(t *testing.T) {
 
 func TestCorrectionCarriesTheNextStep(t *testing.T) {
 	salient := []slots.Recorded{{Key: slots.Item, Value: "富士蘋果"}}
-	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: 1, Label: "蘋果"}})
+	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: categoryID(1), Label: "蘋果"}})
 	got := Render(zh, planner.Plan{Act: planner.CorrectionApplied, Salient: salient, Question: disamb}, Args{})
 	if len(got) != 2 || got[1].Kind != NextStep || got[1].Text != "找到幾個相符的品項，麻煩選一下你要的是哪一個：" {
 		t.Errorf("disambiguation: %v", got)
@@ -251,7 +251,7 @@ func TestCorrectionCarriesTheNextStep(t *testing.T) {
 }
 
 func TestRejectedAndCorrectionRepliesEndWithThePendingQuestion(t *testing.T) {
-	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: 1, Label: "蘋果"}})
+	disamb := planner.BuildItemDisambiguation([]planner.ItemCandidate{{CategoryID: categoryID(1), Label: "蘋果"}})
 	rej := Args{Rejected: []slots.Rejection{{Key: slots.DeliveryCity, Reason: slots.ReasonCityUnrecognized}}}
 	got := Render(zh, planner.Plan{Act: planner.InputRejected, Question: disamb}, rej)
 	want := []Block{b(Warning, "有幾個內容我沒辦法直接採用：配送城市：不是可辨識的縣市名稱"), b(NextStep, "找到幾個相符的品項，麻煩選一下你要的是哪一個：")}

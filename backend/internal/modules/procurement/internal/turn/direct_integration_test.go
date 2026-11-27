@@ -33,7 +33,7 @@ func (f *fixture) seed(city, status string) uuid.UUID {
 	ctx := context.Background()
 	q := store.New(f.d.Conn(ctx))
 	id := uuid.NewV7()
-	item, kind, label, cat, unit := "小白菜", "CATEGORY_CONFIRMED", "小白菜", int64(18), "KG"
+	item, kind, label, cat, unit := "小白菜", "CATEGORY_CONFIRMED", "小白菜", catID(18), "KG"
 	p := store.InsertRevisionParams{
 		ID: id, RevisionNo: 1, Item: &item, ItemResolutionKind: &kind, ItemResolutionLabel: &label, ItemResolutionCategoryID: &cat, Unit: &unit,
 		Now: now, RequestID: f.request, BuyerID: ptr(buyer),
@@ -529,7 +529,7 @@ func TestRewindItemFromMatchingGoesBackToReadyButRewindingTheCityStaysMatching(t
 	rev1 := f.seed("臺北市", "MATCHING")
 	// 第二版把品項換成另一個分類：結果與第一版的解析不同（用資料列直接寫，模擬較早的 TURN 結果）。
 	q := store.New(f.d.Conn(context.Background()))
-	item, kind, label, cat, unit, city := "梨", "CATEGORY_CONFIRMED", "梨", int64(30), "KG", "臺北市"
+	item, kind, label, cat, unit, city := "梨", "CATEGORY_CONFIRMED", "梨", catID(30), "KG", "臺北市"
 	if _, err := q.SupersedeActiveRevision(context.Background(), store.SupersedeActiveRevisionParams{RequestID: f.request, BuyerID: ptr(buyer)}); err != nil {
 		t.Fatal(err)
 	}
@@ -544,7 +544,7 @@ func TestRewindItemFromMatchingGoesBackToReadyButRewindingTheCityStaysMatching(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a := f.active(); *a.Item != "小白菜" || *a.ItemResolutionCategoryID != 18 || f.status() != "REQUIREMENT_READY" {
+	if a := f.active(); *a.Item != "小白菜" || *a.ItemResolutionCategoryID != catID(18) || f.status() != "REQUIREMENT_READY" {
 		t.Fatalf("品項解析變了要退回：active = %+v status = %s", a, f.status())
 	}
 	if view(t, raw).Question.SlotKey != "SLOT_KEY_ITEM" {
@@ -686,7 +686,7 @@ func TestResumeRunAnswerTurnHasNoCommandSlotAndIsNeverReplayedBySubmitAnswer(t *
 	ctx := context.Background()
 	f := newFixture(t)
 	_, irq := f.ask(ctx)
-	answer := f.resume(irq, "category-21", "")
+	answer := f.resume(irq, optID(21), "")
 	if err := f.runAnswer(ctx, answer); err != nil {
 		t.Fatal(err)
 	}

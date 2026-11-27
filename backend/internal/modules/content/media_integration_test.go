@@ -60,7 +60,7 @@ func setupReal(t *testing.T) *realFixture {
 		Now: func() time.Time { return now }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})}
 	f.m = content.New(content.Deps{
-		DB: d, Social: &fakeSocial{readable: map[uuid.UUID]bool{}}, Media: f.media, NewID: uuid.NewV7,
+		DB: d, Social: &fakeSocial{readable: map[uuid.UUID]bool{}}, Products: &fakeProducts{public: map[uuid.UUID]bool{}}, Media: f.media, NewID: uuid.NewV7,
 		Now: func() time.Time { return now }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return f

@@ -65,11 +65,11 @@ func waitIdle(r *Resolver) {
 }
 
 var tree = []Node{
-	{ID: 1, Name: "服飾"},
-	{ID: 2, ParentID: 1, Name: "外套"},
-	{ID: 3, ParentID: 1, Name: "夾克"},
-	{ID: 4, Name: "3C"},
-	{ID: 5, ParentID: 4, Name: "耳機"},
+	{ID: categoryID(1), Name: "服飾"},
+	{ID: categoryID(2), ParentID: parentOf(1), Name: "外套"},
+	{ID: categoryID(3), ParentID: parentOf(1), Name: "夾克"},
+	{ID: categoryID(4), Name: "3C"},
+	{ID: categoryID(5), ParentID: parentOf(4), Name: "耳機"},
 }
 
 func newResolver(r TaxonomyReader, syn Synonyms) *Resolver {
@@ -86,7 +86,7 @@ func TestSynonymNeverOverridesTheBuyersOwnTerm(t *testing.T) {
 	if got.BuyerTerm != "外套" {
 		t.Fatalf("BuyerTerm = %q，買家的原詞不能被覆寫", got.BuyerTerm)
 	}
-	if len(got.Matches) != 1 || got.Matches[0].CategoryID != 2 || got.Matches[0].Via != ViaExact {
+	if len(got.Matches) != 1 || got.Matches[0].CategoryID != categoryID(2) || got.Matches[0].Via != ViaExact {
 		t.Fatalf("原詞「外套」有命中分類 2，同義詞不該被用：%+v", got.Matches)
 	}
 }
@@ -101,19 +101,19 @@ func TestSynonymIsUsedOnlyWhenTheBuyersTermMatchesNothing(t *testing.T) {
 	if got.BuyerTerm != "耳麥" {
 		t.Fatalf("BuyerTerm = %q", got.BuyerTerm)
 	}
-	if len(got.Matches) != 1 || got.Matches[0].CategoryID != 5 || got.Matches[0].Via != ViaSynonym || got.Matches[0].Path != "3C > 耳機" {
+	if len(got.Matches) != 1 || got.Matches[0].CategoryID != categoryID(5) || got.Matches[0].Via != ViaSynonym || got.Matches[0].Path != "3C > 耳機" {
 		t.Fatalf("matches = %+v", got.Matches)
 	}
 }
 
 func TestNoMatchIsNotAnErrorAndSpaceCaseAreNormalized(t *testing.T) {
-	r := newResolver(&fakeReader{nodes: []Node{{ID: 9, Name: "USB 線"}}}, Synonyms{})
+	r := newResolver(&fakeReader{nodes: []Node{{ID: categoryID(9), Name: "USB 線"}}}, Synonyms{})
 	got, err := r.Resolve(context.Background(), "沒有的東西")
 	if err != nil || len(got.Matches) != 0 || got.BuyerTerm != "沒有的東西" {
 		t.Fatalf("got=%+v err=%v", got, err)
 	}
 	got, err = r.Resolve(context.Background(), "usb線")
-	if err != nil || len(got.Matches) != 1 || got.Matches[0].CategoryID != 9 {
+	if err != nil || len(got.Matches) != 1 || got.Matches[0].CategoryID != categoryID(9) {
 		t.Fatalf("正規化（大小寫、空白）後應命中：%+v err=%v", got, err)
 	}
 }
@@ -231,12 +231,12 @@ func TestStaleTreeIsServedImmediatelyWhileReloadingInTheBackground(t *testing.T)
 	<-g.started
 
 	g.mu.Lock()
-	g.nodes = []Node{{ID: 7, Name: "外套"}}
+	g.nodes = []Node{{ID: categoryID(7), Name: "外套"}}
 	g.mu.Unlock()
 	clk.advance(TreeTTL + time.Second)
 	for range 3 {
 		res, err := r.Resolve(context.Background(), "外套") // 重讀被擋住；這些呼叫不能等它
-		if err != nil || len(res.Matches) != 1 || res.Matches[0].CategoryID != 2 {
+		if err != nil || len(res.Matches) != 1 || res.Matches[0].CategoryID != categoryID(2) {
 			t.Fatalf("過期後重讀還沒完成，要立即回舊樹：%+v %v", res, err)
 		}
 	}
@@ -247,7 +247,7 @@ func TestStaleTreeIsServedImmediatelyWhileReloadingInTheBackground(t *testing.T)
 		t.Fatalf("過期後的多個呼叫讀了 %d 次分類樹（含第一次），要 2 次", c)
 	}
 	res, err := r.Resolve(context.Background(), "外套")
-	if err != nil || len(res.Matches) != 1 || res.Matches[0].CategoryID != 7 {
+	if err != nil || len(res.Matches) != 1 || res.Matches[0].CategoryID != categoryID(7) {
 		t.Fatalf("背景重讀完成後要換成新樹：%+v %v", res, err)
 	}
 }
@@ -373,18 +373,18 @@ func (s *switchReader) CategoryTree(ctx context.Context) ([]Node, error) {
 }
 
 func TestLeafLooksUpByCategoryIDAndOnlyLeavesQualify(t *testing.T) {
-	nodes := []Node{{ID: 1, Name: "水果"}, {ID: 2, ParentID: 1, Name: "蘋果"}, {ID: 3, Name: "孤兒"}}
+	nodes := []Node{{ID: categoryID(1), Name: "水果"}, {ID: categoryID(2), ParentID: parentOf(1), Name: "蘋果"}, {ID: categoryID(3), Name: "孤兒"}}
 	r := newResolver(&fakeReader{nodes: nodes}, nil)
 	for _, tc := range []struct {
-		id   int64
+		id   int
 		want bool
 	}{{2, true}, {1, false}, {99, false}, {3, true}} {
-		m, ok, err := r.Leaf(context.Background(), tc.id)
+		m, ok, err := r.Leaf(context.Background(), categoryID(tc.id))
 		if err != nil || ok != tc.want {
 			t.Fatalf("Leaf(%d) = %+v %v %v，要 ok=%v", tc.id, m, ok, err, tc.want)
 		}
 	}
-	if m, _, _ := r.Leaf(context.Background(), 2); m.RootID != 1 || m.Name != "蘋果" {
+	if m, _, _ := r.Leaf(context.Background(), categoryID(2)); m.RootID != categoryID(1) || m.Name != "蘋果" {
 		t.Fatalf("%+v", m)
 	}
 }
@@ -394,12 +394,12 @@ func TestLeafAsOfReloadsATreeLoadedBeforeNotBeforeAndSeesTheNewLeaf(t *testing.T
 	clk := newClock()
 	r := New(reader, nil, clk.now)
 	ctx := context.Background()
-	if _, ok, err := r.LeafAsOf(ctx, 9, clk.now()); err != nil || ok {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(9), clk.now()); err != nil || ok {
 		t.Fatalf("分類 9 還不存在：%v %v", ok, err)
 	}
-	reader.set(append(append([]Node{}, tree...), Node{ID: 9, ParentID: 1, Name: "背心"}), nil)
+	reader.set(append(append([]Node{}, tree...), Node{ID: categoryID(9), ParentID: parentOf(1), Name: "背心"}), nil)
 	clk.advance(time.Second)
-	if _, ok, err := r.LeafAsOf(ctx, 9, clk.now()); err != nil || !ok || reader.count() != 2 {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(9), clk.now()); err != nil || !ok || reader.count() != 2 {
 		t.Fatalf("樹早於 notBefore 要在 TTL 之內重讀並看到新末層：ok=%v err=%v calls=%d", ok, err, reader.count())
 	}
 }
@@ -410,14 +410,14 @@ func TestLeafAsOfAnswersFromACacheLoadedAtOrAfterNotBeforeWithoutReloading(t *te
 	r := New(reader, nil, clk.now)
 	ctx := context.Background()
 	loaded := clk.now()
-	if _, ok, err := r.LeafAsOf(ctx, 2, loaded); err != nil || !ok {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(2), loaded); err != nil || !ok {
 		t.Fatalf("%v %v", ok, err)
 	}
 	clk.advance(time.Second)
-	if _, ok, err := r.LeafAsOf(ctx, 2, loaded); err != nil || !ok || reader.count() != 1 {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(2), loaded); err != nil || !ok || reader.count() != 1 {
 		t.Fatalf("夠新的樹不重讀：ok=%v err=%v calls=%d", ok, err, reader.count())
 	}
-	if _, ok, err := r.LeafAsOf(ctx, 1, loaded); err != nil || ok || reader.count() != 1 {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(1), loaded); err != nil || ok || reader.count() != 1 {
 		t.Fatalf("夠新的樹確定不是末層：ok=%v err=%v calls=%d", ok, err, reader.count())
 	}
 }
@@ -428,12 +428,12 @@ func TestLeafAsOfReloadsAnExpiredTreeEvenWhenTheCachedAnswerIsPositive(t *testin
 	r := New(reader, nil, clk.now)
 	ctx := context.Background()
 	notBefore := clk.now()
-	if _, ok, err := r.LeafAsOf(ctx, 2, notBefore); err != nil || !ok {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(2), notBefore); err != nil || !ok {
 		t.Fatalf("%v %v", ok, err)
 	}
-	reader.set([]Node{{ID: 1, Name: "服飾"}, {ID: 2, ParentID: 1, Name: "外套"}, {ID: 9, ParentID: 2, Name: "羽絨外套"}}, nil)
+	reader.set([]Node{{ID: categoryID(1), Name: "服飾"}, {ID: categoryID(2), ParentID: parentOf(1), Name: "外套"}, {ID: categoryID(9), ParentID: parentOf(2), Name: "羽絨外套"}}, nil)
 	clk.advance(TreeTTL + time.Second)
-	if _, ok, err := r.LeafAsOf(ctx, 2, notBefore); err != nil || ok || reader.count() != 2 {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(2), notBefore); err != nil || ok || reader.count() != 2 {
 		t.Fatalf("過期的樹要重讀，2 已有子節點：ok=%v err=%v calls=%d", ok, err, reader.count())
 	}
 }
@@ -443,20 +443,20 @@ func TestLeafAsOfWithAStaleTreeAndFailedReloadReturnsAnErrorNotTheOldAnswer(t *t
 	clk := newClock()
 	r := New(reader, nil, clk.now)
 	ctx := context.Background()
-	if _, _, err := r.LeafAsOf(ctx, 2, clk.now()); err != nil {
+	if _, _, err := r.LeafAsOf(ctx, categoryID(2), clk.now()); err != nil {
 		t.Fatal(err)
 	}
 	clk.advance(time.Second)
 	notBefore := clk.now()
 	boom := errors.New("catalog down")
 	reader.set(nil, boom)
-	if _, ok, err := r.LeafAsOf(ctx, 2, notBefore); !errors.Is(err, boom) || ok {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(2), notBefore); !errors.Is(err, boom) || ok {
 		t.Fatalf("讀取失敗要回錯誤：%v %v", ok, err)
 	}
-	if _, ok, err := r.LeafAsOf(ctx, 2, notBefore); err == nil || ok {
+	if _, ok, err := r.LeafAsOf(ctx, categoryID(2), notBefore); err == nil || ok {
 		t.Fatalf("退避期間仍要回錯誤，不用舊樹：%v %v", ok, err)
 	}
-	if _, ok, err := r.Leaf(ctx, 2); err != nil || !ok {
+	if _, ok, err := r.Leaf(ctx, categoryID(2)); err != nil || !ok {
 		t.Fatalf("Leaf 仍回舊樹：%v %v", ok, err)
 	}
 }

@@ -29,8 +29,8 @@ func Migrations() fs.FS {
 	return sub
 }
 
-// Deps 是模組需要的外部依賴，全部必填；clock 由組裝點注入。Orders、Products、Reviews 在上游搬進單體之前由
-// cmd/hawkr 以 internal/legacy 的 client 實作，Stores 是 seller 模組。
+// Deps 是模組需要的外部依賴，全部必填；clock 由組裝點注入。Orders 在上游搬進單體之前由
+// cmd/hawkr 以 internal/legacy 的 client 實作，Products 是 catalog 模組、Reviews 是 review 模組、Stores 是 seller 模組。
 type Deps struct {
 	DB       *db.DB
 	Orders   Orders

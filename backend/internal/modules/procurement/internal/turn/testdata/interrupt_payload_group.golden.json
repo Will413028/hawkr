@@ -3,12 +3,12 @@
   "query": "蘋果",
   "candidates": [
     {
-      "categoryId": "48468",
+      "categoryId": "00000000-0000-7000-9000-000000048468",
       "label": "水果",
       "path": "水果"
     },
     {
-      "categoryId": "28405",
+      "categoryId": "00000000-0000-7000-9000-000000028405",
       "label": "加工品",
       "path": "加工品"
     }
@@ -18,11 +18,11 @@
     "prompt": "相符的品項分散在幾個大類，請先選你要的是哪一類：",
     "options": [
       {
-        "optionId": "category-48468",
+        "optionId": "category-00000000-0000-7000-9000-000000048468",
         "label": "水果"
       },
       {
-        "optionId": "category-28405",
+        "optionId": "category-00000000-0000-7000-9000-000000028405",
         "label": "加工品"
       },
       {

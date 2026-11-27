@@ -95,7 +95,7 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 	))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m := content.New(content.Deps{DB: d, Social: noPosts{}, Media: &fakeMedia{}, NewID: uuid.NewV7, Now: time.Now, Logger: log})
+	m := content.New(content.Deps{DB: d, Social: noPosts{}, Products: noProducts{}, Media: &fakeMedia{}, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -641,6 +641,13 @@ func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWi
 
 func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderStatusCounts, error) {
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
+}
+
+// noProducts 是沒有任何公開商品的 catalog 替身（這裡的 banner 不指向商品）。
+type noProducts struct{}
+
+func (noProducts) PublicProduct(context.Context, uuid.UUID, time.Time) (catalogmod.Product, error) {
+	return catalogmod.Product{}, catalogmod.ErrProductNotFound
 }
 
 // noPosts 是沒有任何公開貼文的 social 替身（這裡的 banner 不指向貼文）。

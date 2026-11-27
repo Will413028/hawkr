@@ -32,6 +32,8 @@ type Deps struct {
 	DB *db.DB
 	// Social 回答貼文是不是公開可讀：banner 的貼文目標建立時要公開可讀、讀取時隱藏失效的。組裝點給 *social.Module。
 	Social Social
+	// Products 回答商品是不是公開可見：banner 的商品目標建立與換掉時要存在。組裝點給 *catalog.Module。
+	Products Products
 	// Media 是 media 模組（*media.Module）：banner 的圖在寫入的 transaction 內 Confirm，被換掉或終態的資產 MarkDeleted。
 	Media model.Media
 	// NewID 產生實體的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
@@ -43,6 +45,9 @@ type Deps struct {
 
 // Social 是 content 對 social 的需求（banner 的貼文目標）。
 type Social = banner.Social
+
+// Products 是 content 對 catalog 的需求（banner 的商品目標）。
+type Products = banner.Products
 
 type BannerActionType = model.BannerActionType
 type BannerAction = model.BannerAction
@@ -78,9 +83,12 @@ func New(d Deps) *Module {
 	if d.Social == nil {
 		panic("content：缺 Social")
 	}
+	if d.Products == nil {
+		panic("content：缺 Products")
+	}
 	return &Module{
 		banner: banner.New(banner.Deps{
-			DB: d.DB, Social: d.Social, Media: d.Media, NewID: d.NewID, Now: d.Now,
+			DB: d.DB, Social: d.Social, Products: d.Products, Media: d.Media, NewID: d.NewID, Now: d.Now,
 		}),
 		appversion: appversion.New(appversion.Deps{DB: d.DB, Logger: d.Logger}),
 	}

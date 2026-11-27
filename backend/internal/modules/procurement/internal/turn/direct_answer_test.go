@@ -53,7 +53,7 @@ func TestPlanAnswerChecksTheShapeAndNamesTheFields(t *testing.T) {
 		"quantity not a number":         {AnswerSlotInput{Slot: slots.Quantity, FreeText: "二十"}, []string{"FreeText"}},
 		"quantity bad unit":             {AnswerSlotInput{Slot: slots.Quantity, FreeText: "2", UnitOptionID: "unit-ton"}, []string{"UnitOptionID"}},
 		"budget not a number":           {AnswerSlotInput{Slot: slots.BudgetPerUnit, FreeText: "很多"}, []string{"FreeText"}},
-		"item by option":                {AnswerSlotInput{Slot: slots.Item, OptionID: "category-1"}, []string{"OptionID"}},
+		"item by option":                {AnswerSlotInput{Slot: slots.Item, OptionID: optID(1)}, []string{"OptionID"}},
 		"item text":                     {AnswerSlotInput{Slot: slots.Item, FreeText: "蘋果"}, nil},
 		"item skip":                     {AnswerSlotInput{Slot: slots.Item, Skip: true}, []string{"Skip"}},
 		"unit slot folds into quantity": {AnswerSlotInput{Slot: slots.Unit, OptionID: "unit-kg"}, []string{"SlotKey"}},
@@ -172,13 +172,13 @@ func TestAnswerDecisionSkipCarriesTheSkippedSlotAndAsksSomethingElse(t *testing.
 func TestAnswerDecisionItemTakesTheResolutionAndRegressesMatching(t *testing.T) {
 	prior := readyPrior()
 	prior.requestOf = statusMatching
-	res := &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 9, Label: "梨"}
+	res := &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: catID(9), Label: "梨"}
 	p, _ := planAnswer(AnswerSlotInput{Slot: slots.Item, FreeText: "梨"})
 	d, err := answerDecision(uitext.ZhTW, now, prior, p, res)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if *d.next.Item != "梨" || d.next.Resolution == nil || d.next.Resolution.CategoryID != 9 || d.interrupt != nil {
+	if *d.next.Item != "梨" || d.next.Resolution == nil || d.next.Resolution.CategoryID != catID(9) || d.interrupt != nil {
 		t.Fatalf("next = %+v", d.next)
 	}
 	if d.status != statusRequirementReady {

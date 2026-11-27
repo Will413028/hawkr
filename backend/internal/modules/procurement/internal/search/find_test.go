@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/candidate"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
@@ -18,7 +19,7 @@ type stubLeaf struct {
 	notBefores []time.Time
 }
 
-func (s *stubLeaf) LeafAsOf(_ context.Context, _ int64, notBefore time.Time) (resolver.Match, bool, error) {
+func (s *stubLeaf) LeafAsOf(_ context.Context, _ uuid.UUID, notBefore time.Time) (resolver.Match, bool, error) {
 	s.calls++
 	s.notBefores = append(s.notBefores, notBefore)
 	if s.onLeaf != nil {
@@ -33,12 +34,12 @@ type stubSearch struct {
 	onGet func()
 }
 
-func (s *stubSearch) Page(context.Context, candidate.Query, int) (candidate.Page, error) {
+func (s *stubSearch) Page(context.Context, candidate.Query, candidate.Cursor) (candidate.Page, error) {
 	s.calls++
 	if s.onGet != nil {
 		s.onGet()
 	}
-	return candidate.Page{Hits: []candidate.Hit{{ProductID: 1, StoreID: 7}}, Last: true}, s.err
+	return candidate.Page{Hits: []candidate.Hit{{ProductID: categoryID(1), StoreID: 7}}}, s.err
 }
 
 type allOpen struct{}
@@ -61,7 +62,7 @@ func executorOf(l *stubLeaf, s *stubSearch) Executor {
 	return Executor{Searcher: s, Open: allOpen{}, Blocks: noBlocks{}, Resolver: l}
 }
 
-var byCategory = candidate.Query{CategoryID: 18}
+var byCategory = candidate.Query{CategoryID: categoryID(18)}
 
 var asOf = time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
 

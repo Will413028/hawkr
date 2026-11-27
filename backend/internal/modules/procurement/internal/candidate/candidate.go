@@ -5,6 +5,7 @@ package candidate
 import (
 	"context"
 	"fmt"
+	"uuid"
 )
 
 // OpenStores 回傳 storeIDs 之中此刻是 OPEN 的店（不存在、暫停、關閉的略過）；讀取失敗回錯誤（fail-closed）。
@@ -19,28 +20,31 @@ const (
 	MaxPages  = 5
 )
 
-// Query 是搜尋的輸入：分類 ID 與關鍵字二擇一。
+// Query 是搜尋的輸入：分類 ID 與關鍵字二擇一；CategoryID 是 uuid.Nil() 表示用關鍵字。
 type Query struct {
-	CategoryID int64
+	CategoryID uuid.UUID
 	Keyword    string
 }
 
 // Hit 是搜尋命中的一件上架商品：SourceID 是商品 ID。
 type Hit struct {
-	ProductID int64
+	ProductID uuid.UUID
 	StoreID   int64
 }
 
-// Page 是搜尋的一頁命中（依搜尋的順序）；Last 表示後面沒有更多頁。
+// Cursor 是搜尋翻頁的不透明游標，由 Searcher 編碼與解讀；空字串是第一頁（請求）或沒有下一頁（回應）。
+type Cursor string
+
+// Page 是搜尋的一頁命中（依搜尋的順序）；Next 是下一頁的游標，空字串表示後面沒有更多頁。
 type Page struct {
 	Hits []Hit
-	Last bool
+	Next Cursor
 }
 
-// Searcher 依序取商品搜尋的一頁，page 從 1 起；任一頁失敗回錯誤。
-// 由根套件以 internal/legacy 的商品搜尋實作（catalog 搬進單體前）。
+// Searcher 依序取商品搜尋的一頁（keyset 翻頁，翻頁不重不漏）：after 是上一頁的 Next，第一頁給空字串；任一頁失敗回錯誤。
+// 由根套件以 catalog 的公開商品列表實作。
 type Searcher interface {
-	Page(ctx context.Context, q Query, page int) (Page, error)
+	Page(ctx context.Context, q Query, after Cursor) (Page, error)
 }
 
 // BlockedStores 回傳 storeIDs 之中封鎖了這位買家的店；讀取失敗回錯誤（fail-closed）。
@@ -54,8 +58,9 @@ type BlockedStores interface {
 func Search(ctx context.Context, s Searcher, open OpenStores, blocks BlockedStores, buyerID int64, q Query) ([]Hit, error) {
 	seen := make(map[int64]struct{})
 	var out []Hit
+	var after Cursor
 	for page := 1; page <= MaxPages; page++ {
-		pg, err := s.Page(ctx, q, page)
+		pg, err := s.Page(ctx, q, after)
 		if err != nil {
 			return nil, fmt.Errorf("candidate：搜尋第 %d 頁：%w", page, err)
 		}
@@ -78,9 +83,10 @@ func Search(ctx context.Context, s Searcher, open OpenStores, blocks BlockedStor
 		if len(out) >= MaxStores {
 			return out[:MaxStores], nil
 		}
-		if pg.Last {
+		if pg.Next == "" {
 			break
 		}
+		after = pg.Next
 	}
 	return out, nil
 }

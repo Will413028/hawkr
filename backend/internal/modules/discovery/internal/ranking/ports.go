@@ -2,6 +2,7 @@ package ranking
 
 import (
 	"context"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -19,9 +20,9 @@ type Orders interface {
 
 // Products 是商品的 port。
 type Products interface {
-	// StoresWithPublicProducts 回傳至少有一個公開上架商品的店家 ID 全集。失敗必須回 error，不可降級成空集合
+	// StoresWithPublicProducts 回傳在 at 至少有一個公開上架商品的店家 ID 全集（at 是這次重算的開始時間）。失敗必須回 error，不可降級成空集合
 	// （空集合代表全平台沒有公開商品）。
-	StoresWithPublicProducts(ctx context.Context) ([]int64, error)
+	StoresWithPublicProducts(ctx context.Context, at time.Time) ([]int64, error)
 }
 
 // MaxRatingBatch 是 Reviews.StoreRatingStats 一次最多接受的店家數（review-service ListStoreRatingStats 的上限）；

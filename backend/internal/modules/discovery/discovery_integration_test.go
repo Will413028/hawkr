@@ -42,9 +42,11 @@ type fakes struct {
 	orders     map[int64]OrderStats  // order port
 	ratings    map[int64]RatingStats // review port：只有放進來的店有評價
 	productErr error
-	orderErr   error
-	sellerErr  error
-	ratingErr  map[int64]error // 針對單一店家：批次裡含有它就失敗
+	// productAt 是 product port 每次被問的時間。
+	productAt []time.Time
+	orderErr  error
+	sellerErr error
+	ratingErr map[int64]error // 針對單一店家：批次裡含有它就失敗
 	// ratingExtra 是 review port 額外回傳的（沒被詢問的）店家，用來模擬違反契約。
 	ratingExtra map[int64]RatingStats
 
@@ -92,9 +94,10 @@ func (f *fakes) StoreOrderStats(_ context.Context, days int) ([]OrderStats, erro
 	return out, nil
 }
 
-func (f *fakes) StoresWithPublicProducts(context.Context) ([]int64, error) {
+func (f *fakes) StoresWithPublicProducts(_ context.Context, at time.Time) ([]int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.productAt = append(f.productAt, at)
 	if f.productErr != nil {
 		return nil, f.productErr
 	}
@@ -278,6 +281,9 @@ func TestRecomputeWritesTheSnapshotAndReadFollowsScoreOrder(t *testing.T) {
 
 	if n := x.recompute(t); n != 4 {
 		t.Fatalf("candidates = %d", n)
+	}
+	if len(x.f.productAt) != 1 || !x.f.productAt[0].Equal(x.clock()) {
+		t.Fatalf("product port 要用重算開始時的模組時鐘 %v 詢問：%v", x.clock(), x.f.productAt)
 	}
 	if !slices.Equal(x.f.orderDays, []int{30}) {
 		t.Fatalf("order stats must be asked once for 30 days: %v", x.f.orderDays)

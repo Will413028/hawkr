@@ -3,8 +3,10 @@ package candidate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
+	"uuid"
 )
 
 type fakeOpen struct {
@@ -18,10 +20,15 @@ func (f *fakeOpen) OpenStoreIDs(_ context.Context, ids []int64) (map[int64]struc
 	return f.open, f.err
 }
 
+// productID 是測試用的確定性商品 ID：同一個數字永遠得到同一個 UUID，且不是零值。
+func productID(n int64) uuid.UUID {
+	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
+}
+
 func found(ids ...int64) []Hit {
 	out := make([]Hit, 0, len(ids))
 	for _, id := range ids {
-		out = append(out, Hit{ProductID: id * 100, StoreID: id})
+		out = append(out, Hit{ProductID: productID(id * 100), StoreID: id})
 	}
 	return out
 }
@@ -70,7 +77,7 @@ func TestKeepOpenWithNothingFoundSkipsTheLookup(t *testing.T) {
 func TestKeepOpenDeduplicatesStoresKeepingTheFirst(t *testing.T) {
 	gate := &fakeOpen{open: map[int64]struct{}{10: {}, 20: {}}}
 	in := found(10, 20, 10)
-	in[2].ProductID = 7
+	in[2].ProductID = productID(7)
 	got, err := KeepOpen(context.Background(), gate, in)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +85,7 @@ func TestKeepOpenDeduplicatesStoresKeepingTheFirst(t *testing.T) {
 	if want := []int64{10, 20}; !reflect.DeepEqual(ids(got), want) {
 		t.Fatalf("候選 = %v，要 %v", ids(got), want)
 	}
-	if got[0].ProductID == 7 {
+	if got[0].ProductID == productID(7) {
 		t.Fatal("重複時要留第一筆")
 	}
 	if want := []int64{10, 20}; !reflect.DeepEqual(gate.got, want) {
@@ -86,23 +93,39 @@ func TestKeepOpenDeduplicatesStoresKeepingTheFirst(t *testing.T) {
 	}
 }
 
+// endCursor 標記 fakeSearcher 的一頁是最後一頁；其他頁的 Next 由 fake 依位置產生（"p<下一頁的索引>"）。
+const endCursor Cursor = "end"
+
 type fakeSearcher struct {
 	pages []Page
+	// err 以頁的索引（0 起）指定那一頁失敗。
 	err   map[int]error
-	calls []int
+	calls []Cursor
 	query []Query
 }
 
-func (f *fakeSearcher) Page(_ context.Context, q Query, page int) (Page, error) {
-	f.calls = append(f.calls, page)
+func (f *fakeSearcher) Page(_ context.Context, q Query, after Cursor) (Page, error) {
+	f.calls = append(f.calls, after)
 	f.query = append(f.query, q)
-	if err := f.err[page]; err != nil {
+	i := 0
+	if after != "" {
+		if _, err := fmt.Sscanf(string(after), "p%d", &i); err != nil {
+			return Page{}, fmt.Errorf("游標 %q 不是 fake 產生的", after)
+		}
+	}
+	if err := f.err[i]; err != nil {
 		return Page{}, err
 	}
-	if page > len(f.pages) {
-		return Page{Last: true}, nil
+	if i >= len(f.pages) {
+		return Page{}, nil
 	}
-	return f.pages[page-1], nil
+	pg := f.pages[i]
+	if pg.Next == endCursor {
+		pg.Next = ""
+	} else {
+		pg.Next = Cursor(fmt.Sprintf("p%d", i+1))
+	}
+	return pg, nil
 }
 
 type fakeBlocks struct {
@@ -129,14 +152,14 @@ func (allOpen) OpenStoreIDs(_ context.Context, ids []int64) (map[int64]struct{},
 func seq(from, to int64) []Hit {
 	var out []Hit
 	for i := from; i <= to; i++ {
-		out = append(out, Hit{ProductID: i * 100, StoreID: i})
+		out = append(out, Hit{ProductID: productID(i * 100), StoreID: i})
 	}
 	return out
 }
 
 func search(t *testing.T, s Searcher, open OpenStores, b BlockedStores) ([]Hit, error) {
 	t.Helper()
-	return Search(context.Background(), s, open, b, 5, Query{CategoryID: 9})
+	return Search(context.Background(), s, open, b, 5, Query{CategoryID: productID(9)})
 }
 
 func TestSearchStopsOnceTwentyStoresAreKept(t *testing.T) {
@@ -148,15 +171,15 @@ func TestSearchStopsOnceTwentyStoresAreKept(t *testing.T) {
 	if len(got) != MaxStores || got[0].StoreID != 1 || got[MaxStores-1].StoreID != 20 {
 		t.Fatalf("stores = %v", ids(got))
 	}
-	if !reflect.DeepEqual(s.calls, []int{1, 2}) {
+	if !reflect.DeepEqual(s.calls, []Cursor{"", "p1"}) {
 		t.Fatalf("pages = %v，滿 20 家就不再翻頁", s.calls)
 	}
 }
 
 func TestSearchStopsAtAShortLastPage(t *testing.T) {
-	s := &fakeSearcher{pages: []Page{{Hits: seq(1, 3), Last: true}, {Hits: seq(4, 6)}}}
+	s := &fakeSearcher{pages: []Page{{Hits: seq(1, 3), Next: endCursor}, {Hits: seq(4, 6)}}}
 	got, err := search(t, s, allOpen{}, &fakeBlocks{})
-	if err != nil || len(got) != 3 || !reflect.DeepEqual(s.calls, []int{1}) {
+	if err != nil || len(got) != 3 || !reflect.DeepEqual(s.calls, []Cursor{""}) {
 		t.Fatalf("got=%v err=%v pages=%v", ids(got), err, s.calls)
 	}
 }
@@ -168,28 +191,28 @@ func TestSearchStopsAfterMaxPages(t *testing.T) {
 	}
 	s := &fakeSearcher{pages: pages}
 	got, err := search(t, s, allOpen{}, &fakeBlocks{})
-	if err != nil || len(got) != 2*MaxPages || !reflect.DeepEqual(s.calls, []int{1, 2, 3, 4, 5}) {
+	if err != nil || len(got) != 2*MaxPages || !reflect.DeepEqual(s.calls, []Cursor{"", "p1", "p2", "p3", "p4"}) {
 		t.Fatalf("got=%d err=%v pages=%v", len(got), err, s.calls)
 	}
 }
 
 func TestSearchKeepsTheFirstProductOfEachStore(t *testing.T) {
 	s := &fakeSearcher{pages: []Page{
-		{Hits: []Hit{{ProductID: 1, StoreID: 10}, {ProductID: 2, StoreID: 10}, {ProductID: 3, StoreID: 20}}},
-		{Hits: []Hit{{ProductID: 4, StoreID: 20}, {ProductID: 5, StoreID: 30}}, Last: true},
+		{Hits: []Hit{{ProductID: productID(1), StoreID: 10}, {ProductID: productID(2), StoreID: 10}, {ProductID: productID(3), StoreID: 20}}},
+		{Hits: []Hit{{ProductID: productID(4), StoreID: 20}, {ProductID: productID(5), StoreID: 30}}, Next: endCursor},
 	}}
 	got, err := search(t, s, allOpen{}, &fakeBlocks{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Hit{{ProductID: 1, StoreID: 10}, {ProductID: 3, StoreID: 20}, {ProductID: 5, StoreID: 30}}
+	want := []Hit{{ProductID: productID(1), StoreID: 10}, {ProductID: productID(3), StoreID: 20}, {ProductID: productID(5), StoreID: 30}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got = %v，要 %v", got, want)
 	}
 }
 
 func TestSearchDropsClosedAndBlockingStoresBeforeCounting(t *testing.T) {
-	s := &fakeSearcher{pages: []Page{{Hits: seq(1, 6), Last: true}}}
+	s := &fakeSearcher{pages: []Page{{Hits: seq(1, 6), Next: endCursor}}}
 	open := &fakeOpen{open: map[int64]struct{}{1: {}, 2: {}, 3: {}, 4: {}, 5: {}}}
 	blocks := &fakeBlocks{blocked: map[int64]struct{}{2: {}}}
 	got, err := search(t, s, open, blocks)
@@ -211,14 +234,14 @@ func TestSearchCountsOnlyFilteredStoresTowardTheCap(t *testing.T) {
 	}
 	s := &fakeSearcher{pages: []Page{{Hits: seq(1, 15)}, {Hits: seq(16, 40)}}}
 	got, err := search(t, s, allOpen{}, &fakeBlocks{blocked: blocked})
-	if err != nil || len(got) != MaxStores || got[0].StoreID != 11 || !reflect.DeepEqual(s.calls, []int{1, 2}) {
+	if err != nil || len(got) != MaxStores || got[0].StoreID != 11 || !reflect.DeepEqual(s.calls, []Cursor{"", "p1"}) {
 		t.Fatalf("got=%v err=%v pages=%v", ids(got), err, s.calls)
 	}
 }
 
 func TestSearchFailsWhenAFilterOrAPageFails(t *testing.T) {
 	boom := errors.New("boom")
-	pages := []Page{{Hits: seq(1, 2)}, {Hits: seq(3, 4), Last: true}}
+	pages := []Page{{Hits: seq(1, 2)}, {Hits: seq(3, 4), Next: endCursor}}
 	for name, c := range map[string]struct {
 		s *fakeSearcher
 		o OpenStores
@@ -226,8 +249,8 @@ func TestSearchFailsWhenAFilterOrAPageFails(t *testing.T) {
 	}{
 		"blocks":     {&fakeSearcher{pages: pages}, allOpen{}, &fakeBlocks{err: boom}},
 		"open":       {&fakeSearcher{pages: pages}, &fakeOpen{err: boom}, &fakeBlocks{}},
-		"first page": {&fakeSearcher{pages: pages, err: map[int]error{1: boom}}, allOpen{}, &fakeBlocks{}},
-		"later page": {&fakeSearcher{pages: pages, err: map[int]error{2: boom}}, allOpen{}, &fakeBlocks{}},
+		"first page": {&fakeSearcher{pages: pages, err: map[int]error{0: boom}}, allOpen{}, &fakeBlocks{}},
+		"later page": {&fakeSearcher{pages: pages, err: map[int]error{1: boom}}, allOpen{}, &fakeBlocks{}},
 	} {
 		got, err := search(t, c.s, c.o, c.b)
 		if !errors.Is(err, boom) || got != nil {
@@ -237,7 +260,7 @@ func TestSearchFailsWhenAFilterOrAPageFails(t *testing.T) {
 }
 
 func TestSearchPassesTheQueryThrough(t *testing.T) {
-	s := &fakeSearcher{pages: []Page{{Last: true}}}
+	s := &fakeSearcher{pages: []Page{{Next: endCursor}}}
 	if _, err := Search(context.Background(), s, allOpen{}, &fakeBlocks{}, 5, Query{Keyword: "高麗菜"}); err != nil {
 		t.Fatal(err)
 	}

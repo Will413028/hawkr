@@ -1,0 +1,2 @@
+-- Modify "request_revisions" table
+ALTER TABLE "procurement"."request_revisions" DROP CONSTRAINT "request_revisions_resolution_category_check", DROP COLUMN "item_resolution_category_id", ADD COLUMN "item_resolution_category_id" uuid NULL, ADD CONSTRAINT "request_revisions_resolution_category_check" CHECK (((item_resolution_category_id IS NOT NULL) = (NOT (item_resolution_kind IS DISTINCT FROM 'CATEGORY_CONFIRMED'::text))) AND ((item_resolution_category_id IS NULL) OR (item_resolution_category_id <> '00000000-0000-0000-0000-000000000000'::uuid)));

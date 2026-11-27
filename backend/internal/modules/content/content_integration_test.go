@@ -15,6 +15,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -99,13 +100,46 @@ func (s *fakeSocial) PubliclyReadablePosts(_ context.Context, ids []uuid.UUID) (
 	return out, nil
 }
 
+// fakeProducts 以測試設定的集合回答「商品公開可見」（規則本身由 catalog 的整合測試守）：不在集合裡的回 catalog.ErrProductNotFound。
+type fakeProducts struct {
+	mu     sync.Mutex
+	public map[uuid.UUID]bool
+	err    error
+	calls  int
+	at     []time.Time
+}
+
+func (p *fakeProducts) set(id uuid.UUID, ok bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.public[id] = ok
+}
+
+func (p *fakeProducts) PublicProduct(_ context.Context, id uuid.UUID, at time.Time) (catalog.Product, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls++
+	p.at = append(p.at, at)
+	if p.err != nil {
+		return catalog.Product{}, p.err
+	}
+	if !p.public[id] {
+		return catalog.Product{}, catalog.ErrProductNotFound
+	}
+	return catalog.Product{ID: id}, nil
+}
+
+// publicProduct 是每個 fixture 預設就公開可見的商品，bannerInput 指向它。
+var publicProduct = uuid.MustParse("018f0000-0000-7000-8000-0000000000a1")
+
 type fixture struct {
-	m      *content.Module
-	social *fakeSocial
-	db     *db.DB
-	media  *fakeMedia
-	now    time.Time
-	newID  func() uuid.UUID
+	m        *content.Module
+	social   *fakeSocial
+	products *fakeProducts
+	db       *db.DB
+	media    *fakeMedia
+	now      time.Time
+	newID    func() uuid.UUID
 }
 
 const adminID = 9001
@@ -114,14 +148,15 @@ const activeBannerLimit = 20
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "content", Dir: content.Migrations()}))
-	f := &fixture{social: &fakeSocial{readable: map[uuid.UUID]bool{}}, db: d, media: &fakeMedia{}, now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC), newID: uuid.NewV7}
+	f := &fixture{social: &fakeSocial{readable: map[uuid.UUID]bool{}}, products: &fakeProducts{public: map[uuid.UUID]bool{publicProduct: true}}, db: d, media: &fakeMedia{}, now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC), newID: uuid.NewV7}
 	f.m = content.New(content.Deps{
-		DB:     d,
-		Social: f.social,
-		Media:  f.media,
-		NewID:  func() uuid.UUID { return f.newID() },
-		Now:    func() time.Time { return f.now },
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		DB:       d,
+		Social:   f.social,
+		Products: f.products,
+		Media:    f.media,
+		NewID:    func() uuid.UUID { return f.newID() },
+		Now:      func() time.Time { return f.now },
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return f
 }
@@ -141,7 +176,7 @@ func bannerInput() content.BannerInput {
 		ButtonText:        "看看",
 		PreviewImageToken: "p1",
 		PopupImageToken:   "q1",
-		Action:            content.BannerAction{Type: content.BannerActionProduct, Target: "42"},
+		Action:            content.BannerAction{Type: content.BannerActionProduct, Target: publicProduct.String()},
 		DisplayOrder:      1,
 		IsActive:          true,
 	}
@@ -172,7 +207,7 @@ func TestCreateBannerConfirmsBothImages(t *testing.T) {
 	if got.PreviewImageKey != "public/7109/p1.jpg" || got.PopupImageKey != "public/7109/q1.jpg" {
 		t.Errorf("圖片 = %q、%q", got.PreviewImageKey, got.PopupImageKey)
 	}
-	if got.Action != (content.BannerAction{Type: content.BannerActionProduct, Target: "42"}) {
+	if got.Action != (content.BannerAction{Type: content.BannerActionProduct, Target: publicProduct.String()}) {
 		t.Errorf("點擊行為 = %+v", got.Action)
 	}
 }
@@ -736,6 +771,106 @@ func TestAppTargetChecksMatchTheGoTypes(t *testing.T) {
 		if !slices.Equal(got, c.want) {
 			t.Errorf("%s 允許 %v，Go 的值域是 %v（%s）", c.constraint, got, c.want, def)
 		}
+	}
+}
+
+func productBannerInput(target string) content.BannerInput {
+	in := bannerInput()
+	in.Action = content.BannerAction{Type: content.BannerActionProduct, Target: target}
+	return in
+}
+
+// 商品目標建立時要經 catalog 確認公開可見。不存在的商品用合法的 UUID：被拒的原因只能是 catalog 回找不到，不是格式。
+func TestCreateBannerRequiresTheProductToBePubliclyVisible(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	missing := uuid.New()
+	_, err := f.m.CreateBanner(ctx, adminID, productBannerInput(missing.String()))
+	wantKind(t, err, apperr.KindInvalidInput)
+	if f.products.calls != 1 {
+		t.Fatalf("問了 catalog %d 次，預期 1 次（格式合法，被拒是因為商品不存在）", f.products.calls)
+	}
+	if len(f.media.confirmed) != 0 {
+		t.Errorf("被拒的建立轉正了 %d 張圖", len(f.media.confirmed))
+	}
+	page, err := f.m.ListBanners(ctx, nil, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Banners) != 0 {
+		t.Errorf("被拒的建立留下 %d 則 banner", len(page.Banners))
+	}
+
+	exists := uuid.New()
+	f.products.set(exists, true)
+	b, err := f.m.CreateBanner(ctx, adminID, productBannerInput(exists.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Action.Target != exists.String() {
+		t.Errorf("目標 = %q", b.Action.Target)
+	}
+	if got := f.products.at[len(f.products.at)-1]; !got.Equal(f.now) {
+		t.Errorf("問 catalog 的時間 = %v，要用模組的時鐘 %v", got, f.now)
+	}
+}
+
+// 商品目標不是 UUID（舊的數字 ID）在問 catalog 之前就被拒；空白與大寫寫入前轉成小寫的標準形。
+func TestCreateBannerRejectsAProductTargetThatIsNotAUUIDAndStoresTheCanonicalForm(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, err := f.m.CreateBanner(ctx, adminID, productBannerInput("42"))
+	wantKind(t, err, apperr.KindInvalidInput)
+	if f.products.calls != 0 {
+		t.Fatalf("格式不對不該問 catalog：%d 次", f.products.calls)
+	}
+	b, err := f.m.CreateBanner(ctx, adminID, productBannerInput("  "+strings.ToUpper(publicProduct.String())+"\t"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Action.Target != publicProduct.String() {
+		t.Fatalf("存的目標 = %q，預期 %q", b.Action.Target, publicProduct.String())
+	}
+}
+
+func TestCreateBannerDoesNotSwallowACatalogFailure(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	boom := errors.New("boom")
+	f.products.err = boom
+	_, err := f.m.CreateBanner(context.Background(), adminID, bannerInput())
+	if !errors.Is(err, boom) || apperr.KindOf(err) == apperr.KindInvalidInput {
+		t.Fatalf("err = %v，預期原樣包著 catalog 的錯誤、不是 InvalidInput", err)
+	}
+}
+
+// 修改時只有換掉目標才檢查商品：目標沒變的 banner（例如商品後來下架）仍可修改其他欄位。
+func TestUpdateBannerChecksTheProductOnlyWhenTheTargetChanges(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	b, err := f.m.CreateBanner(ctx, adminID, bannerInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := bannerInput()
+	in.PreviewImageToken, in.PopupImageToken = "", ""
+	in.Action = content.BannerAction{Type: content.BannerActionProduct, Target: uuid.New().String()}
+	_, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
+	wantKind(t, err, apperr.KindInvalidInput)
+
+	f.products.set(publicProduct, false)
+	callsBefore := f.products.calls
+	in.Action = b.Action
+	in.Title = "改標題"
+	b, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
+	if err != nil {
+		t.Fatalf("目標沒變時不再檢查商品：%v", err)
+	}
+	if b.Title != "改標題" || f.products.calls != callsBefore {
+		t.Fatalf("title=%q，問 catalog %d 次（原本 %d）", b.Title, f.products.calls, callsBefore)
 	}
 }
 

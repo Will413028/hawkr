@@ -135,11 +135,11 @@ func TestCanSkip(t *testing.T) {
 
 func TestItemDisambiguation(t *testing.T) {
 	t.Run("candidates plus the other option", func(t *testing.T) {
-		q := BuildItemDisambiguation([]ItemCandidate{{CategoryID: 18, Label: "有機小白菜"}})
+		q := BuildItemDisambiguation([]ItemCandidate{{CategoryID: categoryID(18), Label: "有機小白菜"}})
 		if q.Slot != slots.ItemDisambiguation || !q.AllowFreeText || q.CanSkip || q.Prompt != PromptItemChoices || len(q.Options) != 2 {
 			t.Fatalf("got %+v", q)
 		}
-		if q.Options[0].ID != "category-18" || q.Options[0].Value != "有機小白菜" || q.Options[0].Kind != OptionValue {
+		if q.Options[0].ID != "category-"+categoryID(18).String() || q.Options[0].Value != "有機小白菜" || q.Options[0].Kind != OptionValue {
 			t.Errorf("candidate option = %+v", q.Options[0])
 		}
 		if last := q.Options[1]; last.ID != ItemOtherOptionID || last.Value != "OTHER" || last.Kind != OptionOther {
@@ -159,14 +159,14 @@ func TestItemDisambiguation(t *testing.T) {
 
 func TestItemDisambiguationCapsAtFiveAndLabelsWithThePath(t *testing.T) {
 	var cands []ItemCandidate
-	for i := int64(1); i <= 8; i++ {
-		cands = append(cands, ItemCandidate{CategoryID: i, Label: "品項", Path: "大類 > 品項"})
+	for i := 1; i <= 8; i++ {
+		cands = append(cands, ItemCandidate{CategoryID: categoryID(i), Label: "品項", Path: "大類 > 品項"})
 	}
 	q := BuildItemDisambiguation(cands)
 	if len(q.Options) != MaxItemOptions+1 {
 		t.Fatalf("options = %d，要 %d 個品項加「其他」", len(q.Options), MaxItemOptions+1)
 	}
-	if q.Options[0].Value != "大類 > 品項" || q.Options[0].ID != "category-1" || q.Options[MaxItemOptions-1].ID != "category-5" {
+	if q.Options[0].Value != "大類 > 品項" || q.Options[0].ID != "category-"+categoryID(1).String() || q.Options[MaxItemOptions-1].ID != "category-"+categoryID(5).String() {
 		t.Errorf("options = %+v：要帶路徑、依給定順序截前 5 個", q.Options)
 	}
 	if last := q.Options[MaxItemOptions]; last.ID != ItemOtherOptionID || last.Kind != OptionOther {
@@ -206,7 +206,7 @@ func TestNextOptionalStreakParity(t *testing.T) {
 func rec(key model.SlotKey, v string) []slots.Recorded { return []slots.Recorded{{Key: key, Value: v}} }
 
 func TestDecideParity(t *testing.T) {
-	disamb := BuildItemDisambiguation([]ItemCandidate{{CategoryID: 1, Label: "小白菜"}})
+	disamb := BuildItemDisambiguation([]ItemCandidate{{CategoryID: categoryID(1), Label: "小白菜"}})
 	opt := &Question{Slot: slots.Quantity}
 	apple, fuji := "蘋果", "富士蘋果"
 	cases := []struct {

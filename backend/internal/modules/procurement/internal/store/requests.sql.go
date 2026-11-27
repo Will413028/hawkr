@@ -311,7 +311,7 @@ type InsertRevisionParams struct {
 	Item                     *string
 	ItemResolutionKind       *string
 	ItemResolutionLabel      *string
-	ItemResolutionCategoryID *int64
+	ItemResolutionCategoryID *uuid.UUID
 	Quantity                 *int32
 	Unit                     *string
 	Packaging                *string
