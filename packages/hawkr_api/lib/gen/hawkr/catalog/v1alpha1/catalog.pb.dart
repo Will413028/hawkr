@@ -5940,7 +5940,7 @@ class BatchUnpublishItem extends $pb.GeneratedMessage {
 
 class BatchUnpublishStoreProductsResponse extends $pb.GeneratedMessage {
   factory BatchUnpublishStoreProductsResponse({
-    $core.Iterable<SellerProductSummary>? products,
+    $core.Iterable<UnpublishedProduct>? products,
     $core.String? auditLogId,
   }) {
     final result = BatchUnpublishStoreProductsResponse._();
@@ -5964,8 +5964,8 @@ class BatchUnpublishStoreProductsResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
       createEmptyInstance: BatchUnpublishStoreProductsResponse.$_createMessage)
-    ..pPM<SellerProductSummary>(1, _omitFieldNames ? '' : 'products',
-        subBuilder: SellerProductSummary.$_createMessage)
+    ..pPM<UnpublishedProduct>(1, _omitFieldNames ? '' : 'products',
+        subBuilder: UnpublishedProduct.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'auditLogId')
     ..hasRequiredFields = false;
 
@@ -5998,9 +5998,9 @@ class BatchUnpublishStoreProductsResponse extends $pb.GeneratedMessage {
           BatchUnpublishStoreProductsResponse.$_createMessage);
   static BatchUnpublishStoreProductsResponse? _defaultInstance;
 
-  /// 下架後的商品，順序同請求的 items。
+  /// 下架後的商品（已經下架的項目也在其中），順序同請求的 items；重送時是它們目前的狀態。
   @$pb.TagNumber(1)
-  $pb.PbList<SellerProductSummary> get products => $_getList(0);
+  $pb.PbList<UnpublishedProduct> get products => $_getList(0);
 
   /// 這一批唯一的稽核列 ID（重送時是第一次的）。
   @$pb.TagNumber(2)
@@ -6011,6 +6011,91 @@ class BatchUnpublishStoreProductsResponse extends $pb.GeneratedMessage {
   $core.bool hasAuditLogId() => $_has(1);
   @$pb.TagNumber(2)
   void clearAuditLogId() => $_clearField(2);
+}
+
+/// UnpublishedProduct 是批次下架後一個商品的狀態：client 以它更新列表上的狀態與 etag，不必重讀整份。
+class UnpublishedProduct extends $pb.GeneratedMessage {
+  factory UnpublishedProduct({
+    $core.String? productId,
+    $core.String? etag,
+    ProductStatus? status,
+  }) {
+    final result = UnpublishedProduct._();
+    if (productId != null) result.productId = productId;
+    if (etag != null) result.etag = etag;
+    if (status != null) result.status = status;
+    return result;
+  }
+
+  UnpublishedProduct._();
+
+  factory UnpublishedProduct.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishedProduct()..mergeFromBuffer(data, registry);
+  factory UnpublishedProduct.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnpublishedProduct()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnpublishedProduct',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.catalog.v1alpha1'),
+      createEmptyInstance: UnpublishedProduct.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'productId')
+    ..aOS(2, _omitFieldNames ? '' : 'etag')
+    ..aE<ProductStatus>(3, _omitFieldNames ? '' : 'status',
+        enumValues: ProductStatus.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishedProduct clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnpublishedProduct copyWith(void Function(UnpublishedProduct) updates) =>
+      super.copyWith((message) => updates(message as UnpublishedProduct))
+          as UnpublishedProduct;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UnpublishedProduct() / UnpublishedProduct.new instead')
+  static UnpublishedProduct create() => UnpublishedProduct._();
+  static $pb.GeneratedMessage $_createMessage() => UnpublishedProduct._();
+  @$core.override
+  UnpublishedProduct createEmptyInstance() => UnpublishedProduct._();
+  @$core.pragma('dart2js:noInline')
+  static UnpublishedProduct getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnpublishedProduct>(
+          UnpublishedProduct.$_createMessage);
+  static UnpublishedProduct? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get productId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set productId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProductId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProductId() => $_clearField(1);
+
+  /// 下架後的 etag（已經下架的項目是它目前的 etag，沒有改動）。
+  @$pb.TagNumber(2)
+  $core.String get etag => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set etag($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEtag() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEtag() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  ProductStatus get status => $_getN(2);
+  @$pb.TagNumber(3)
+  set status(ProductStatus value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStatus() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStatus() => $_clearField(3);
 }
 
 /// CatalogPublicService 是任何人都能讀的商品、搜尋與分類，不需要登入，回應不依觀看者（可共享快取）。

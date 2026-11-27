@@ -2077,7 +2077,7 @@ const BatchUnpublishStoreProductsResponse$json = {
       '3': 1,
       '4': 3,
       '5': 11,
-      '6': '.hawkr.catalog.v1alpha1.SellerProductSummary',
+      '6': '.hawkr.catalog.v1alpha1.UnpublishedProduct',
       '10': 'products'
     },
     {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
@@ -2087,9 +2087,33 @@ const BatchUnpublishStoreProductsResponse$json = {
 /// Descriptor for `BatchUnpublishStoreProductsResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List batchUnpublishStoreProductsResponseDescriptor =
     $convert.base64Decode(
-        'CiNCYXRjaFVucHVibGlzaFN0b3JlUHJvZHVjdHNSZXNwb25zZRJICghwcm9kdWN0cxgBIAMoCz'
-        'IsLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2VsbGVyUHJvZHVjdFN1bW1hcnlSCHByb2R1Y3Rz'
-        'EiAKDGF1ZGl0X2xvZ19pZBgCIAEoCVIKYXVkaXRMb2dJZA==');
+        'CiNCYXRjaFVucHVibGlzaFN0b3JlUHJvZHVjdHNSZXNwb25zZRJGCghwcm9kdWN0cxgBIAMoCz'
+        'IqLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVW5wdWJsaXNoZWRQcm9kdWN0Ughwcm9kdWN0cxIg'
+        'CgxhdWRpdF9sb2dfaWQYAiABKAlSCmF1ZGl0TG9nSWQ=');
+
+@$core.Deprecated('Use unpublishedProductDescriptor instead')
+const UnpublishedProduct$json = {
+  '1': 'UnpublishedProduct',
+  '2': [
+    {'1': 'product_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+    {
+      '1': 'status',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.catalog.v1alpha1.ProductStatus',
+      '8': {},
+      '10': 'status'
+    },
+  ],
+};
+
+/// Descriptor for `UnpublishedProduct`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishedProductDescriptor = $convert.base64Decode(
+    'ChJVbnB1Ymxpc2hlZFByb2R1Y3QSIgoKcHJvZHVjdF9pZBgBIAEoCUID4EEDUglwcm9kdWN0SW'
+    'QSFwoEZXRhZxgCIAEoCUID4EEDUgRldGFnEkIKBnN0YXR1cxgDIAEoDjIlLmhhd2tyLmNhdGFs'
+    'b2cudjFhbHBoYTEuUHJvZHVjdFN0YXR1c0ID4EEDUgZzdGF0dXM=');
 
 const $core.Map<$core.String, $core.dynamic> CatalogPublicServiceBase$json = {
   '1': 'CatalogPublicService',
@@ -2424,6 +2448,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.catalog.v1alpha1.BatchUnpublishItem': BatchUnpublishItem$json,
   '.hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse':
       BatchUnpublishStoreProductsResponse$json,
+  '.hawkr.catalog.v1alpha1.UnpublishedProduct': UnpublishedProduct$json,
 };
 
 /// Descriptor for `CatalogDelegatedService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

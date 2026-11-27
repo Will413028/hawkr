@@ -4687,8 +4687,8 @@ func (x *BatchUnpublishItem) GetEtag() string {
 
 type BatchUnpublishStoreProductsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 下架後的商品，順序同請求的 items。
-	Products []*SellerProductSummary `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	// 下架後的商品（已經下架的項目也在其中），順序同請求的 items；重送時是它們目前的狀態。
+	Products []*UnpublishedProduct `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
 	// 這一批唯一的稽核列 ID（重送時是第一次的）。
 	AuditLogId    string `protobuf:"bytes,2,opt,name=audit_log_id,json=auditLogId,proto3" json:"audit_log_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -4725,7 +4725,7 @@ func (*BatchUnpublishStoreProductsResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{67}
 }
 
-func (x *BatchUnpublishStoreProductsResponse) GetProducts() []*SellerProductSummary {
+func (x *BatchUnpublishStoreProductsResponse) GetProducts() []*UnpublishedProduct {
 	if x != nil {
 		return x.Products
 	}
@@ -4737,6 +4737,68 @@ func (x *BatchUnpublishStoreProductsResponse) GetAuditLogId() string {
 		return x.AuditLogId
 	}
 	return ""
+}
+
+// UnpublishedProduct 是批次下架後一個商品的狀態：client 以它更新列表上的狀態與 etag，不必重讀整份。
+type UnpublishedProduct struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProductId string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	// 下架後的 etag（已經下架的項目是它目前的 etag，沒有改動）。
+	Etag          string        `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	Status        ProductStatus `protobuf:"varint,3,opt,name=status,proto3,enum=hawkr.catalog.v1alpha1.ProductStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnpublishedProduct) Reset() {
+	*x = UnpublishedProduct{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnpublishedProduct) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnpublishedProduct) ProtoMessage() {}
+
+func (x *UnpublishedProduct) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnpublishedProduct.ProtoReflect.Descriptor instead.
+func (*UnpublishedProduct) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *UnpublishedProduct) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *UnpublishedProduct) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+func (x *UnpublishedProduct) GetStatus() ProductStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ProductStatus_PRODUCT_STATUS_UNSPECIFIED
 }
 
 var File_hawkr_catalog_v1alpha1_catalog_proto protoreflect.FileDescriptor
@@ -5092,11 +5154,16 @@ const file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc = "" +
 	"\x12BatchUnpublishItem\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\x12\x17\n" +
-	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x02R\x04etag\"\x91\x01\n" +
-	"#BatchUnpublishStoreProductsResponse\x12H\n" +
-	"\bproducts\x18\x01 \x03(\v2,.hawkr.catalog.v1alpha1.SellerProductSummaryR\bproducts\x12 \n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x02R\x04etag\"\x8f\x01\n" +
+	"#BatchUnpublishStoreProductsResponse\x12F\n" +
+	"\bproducts\x18\x01 \x03(\v2*.hawkr.catalog.v1alpha1.UnpublishedProductR\bproducts\x12 \n" +
 	"\faudit_log_id\x18\x02 \x01(\tR\n" +
-	"auditLogId*\x81\x01\n" +
+	"auditLogId\"\x95\x01\n" +
+	"\x12UnpublishedProduct\x12\"\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x03R\tproductId\x12\x17\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x03R\x04etag\x12B\n" +
+	"\x06status\x18\x03 \x01(\x0e2%.hawkr.catalog.v1alpha1.ProductStatusB\x03\xe0A\x03R\x06status*\x81\x01\n" +
 	"\rProductStatus\x12\x1e\n" +
 	"\x1aPRODUCT_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14PRODUCT_STATUS_DRAFT\x10\x01\x12\x19\n" +
@@ -5164,7 +5231,7 @@ func file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 68)
+var file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 69)
 var file_hawkr_catalog_v1alpha1_catalog_proto_goTypes = []any{
 	(ProductStatus)(0),                          // 0: hawkr.catalog.v1alpha1.ProductStatus
 	(ProductAvailability)(0),                    // 1: hawkr.catalog.v1alpha1.ProductAvailability
@@ -5239,11 +5306,12 @@ var file_hawkr_catalog_v1alpha1_catalog_proto_goTypes = []any{
 	(*BatchUnpublishStoreProductsRequest)(nil),  // 70: hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest
 	(*BatchUnpublishItem)(nil),                  // 71: hawkr.catalog.v1alpha1.BatchUnpublishItem
 	(*BatchUnpublishStoreProductsResponse)(nil), // 72: hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse
-	(*v1alpha1.Image)(nil),                      // 73: hawkr.common.v1alpha1.Image
-	(*v1alpha1.StoreCard)(nil),                  // 74: hawkr.common.v1alpha1.StoreCard
-	(*timestamppb.Timestamp)(nil),               // 75: google.protobuf.Timestamp
-	(*v1alpha1.DelegatedOperation)(nil),         // 76: hawkr.common.v1alpha1.DelegatedOperation
-	(*fieldmaskpb.FieldMask)(nil),               // 77: google.protobuf.FieldMask
+	(*UnpublishedProduct)(nil),                  // 73: hawkr.catalog.v1alpha1.UnpublishedProduct
+	(*v1alpha1.Image)(nil),                      // 74: hawkr.common.v1alpha1.Image
+	(*v1alpha1.StoreCard)(nil),                  // 75: hawkr.common.v1alpha1.StoreCard
+	(*timestamppb.Timestamp)(nil),               // 76: google.protobuf.Timestamp
+	(*v1alpha1.DelegatedOperation)(nil),         // 77: hawkr.common.v1alpha1.DelegatedOperation
+	(*fieldmaskpb.FieldMask)(nil),               // 78: google.protobuf.FieldMask
 }
 var file_hawkr_catalog_v1alpha1_catalog_proto_depIdxs = []int32{
 	4,   // 0: hawkr.catalog.v1alpha1.ProductFilter.hashtag_match:type_name -> hawkr.catalog.v1alpha1.HashtagMatch
@@ -5272,36 +5340,36 @@ var file_hawkr_catalog_v1alpha1_catalog_proto_depIdxs = []int32{
 	48,  // 23: hawkr.catalog.v1alpha1.SetProductStatusResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
 	44,  // 24: hawkr.catalog.v1alpha1.AdjustStockResponse.sku:type_name -> hawkr.catalog.v1alpha1.Sku
 	44,  // 25: hawkr.catalog.v1alpha1.SetStockResponse.sku:type_name -> hawkr.catalog.v1alpha1.Sku
-	73,  // 26: hawkr.catalog.v1alpha1.ProductImage.image:type_name -> hawkr.common.v1alpha1.Image
+	74,  // 26: hawkr.catalog.v1alpha1.ProductImage.image:type_name -> hawkr.common.v1alpha1.Image
 	41,  // 27: hawkr.catalog.v1alpha1.ProductDescriptionBlock.image:type_name -> hawkr.catalog.v1alpha1.ProductImage
 	53,  // 28: hawkr.catalog.v1alpha1.ProductDescriptionBlock.bullet_list:type_name -> hawkr.catalog.v1alpha1.BulletList
 	54,  // 29: hawkr.catalog.v1alpha1.ProductDescriptionBlock.table:type_name -> hawkr.catalog.v1alpha1.Table
 	1,   // 30: hawkr.catalog.v1alpha1.Sku.availability:type_name -> hawkr.catalog.v1alpha1.ProductAvailability
-	74,  // 31: hawkr.catalog.v1alpha1.Product.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	75,  // 31: hawkr.catalog.v1alpha1.Product.store:type_name -> hawkr.common.v1alpha1.StoreCard
 	1,   // 32: hawkr.catalog.v1alpha1.Product.availability:type_name -> hawkr.catalog.v1alpha1.ProductAvailability
-	75,  // 33: hawkr.catalog.v1alpha1.Product.first_publish_time:type_name -> google.protobuf.Timestamp
+	76,  // 33: hawkr.catalog.v1alpha1.Product.first_publish_time:type_name -> google.protobuf.Timestamp
 	41,  // 34: hawkr.catalog.v1alpha1.Product.gallery:type_name -> hawkr.catalog.v1alpha1.ProductImage
 	42,  // 35: hawkr.catalog.v1alpha1.Product.description:type_name -> hawkr.catalog.v1alpha1.ProductDescriptionBlock
 	43,  // 36: hawkr.catalog.v1alpha1.Product.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxis
 	44,  // 37: hawkr.catalog.v1alpha1.Product.skus:type_name -> hawkr.catalog.v1alpha1.Sku
 	45,  // 38: hawkr.catalog.v1alpha1.Product.hashtags:type_name -> hawkr.catalog.v1alpha1.ProductHashtag
-	74,  // 39: hawkr.catalog.v1alpha1.ProductSummary.store:type_name -> hawkr.common.v1alpha1.StoreCard
-	73,  // 40: hawkr.catalog.v1alpha1.ProductSummary.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	75,  // 39: hawkr.catalog.v1alpha1.ProductSummary.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	74,  // 40: hawkr.catalog.v1alpha1.ProductSummary.cover_image:type_name -> hawkr.common.v1alpha1.Image
 	1,   // 41: hawkr.catalog.v1alpha1.ProductSummary.availability:type_name -> hawkr.catalog.v1alpha1.ProductAvailability
-	75,  // 42: hawkr.catalog.v1alpha1.ProductSummary.first_publish_time:type_name -> google.protobuf.Timestamp
+	76,  // 42: hawkr.catalog.v1alpha1.ProductSummary.first_publish_time:type_name -> google.protobuf.Timestamp
 	0,   // 43: hawkr.catalog.v1alpha1.SellerProduct.status:type_name -> hawkr.catalog.v1alpha1.ProductStatus
-	75,  // 44: hawkr.catalog.v1alpha1.SellerProduct.first_publish_time:type_name -> google.protobuf.Timestamp
+	76,  // 44: hawkr.catalog.v1alpha1.SellerProduct.first_publish_time:type_name -> google.protobuf.Timestamp
 	41,  // 45: hawkr.catalog.v1alpha1.SellerProduct.gallery:type_name -> hawkr.catalog.v1alpha1.ProductImage
 	42,  // 46: hawkr.catalog.v1alpha1.SellerProduct.description:type_name -> hawkr.catalog.v1alpha1.ProductDescriptionBlock
 	43,  // 47: hawkr.catalog.v1alpha1.SellerProduct.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxis
 	44,  // 48: hawkr.catalog.v1alpha1.SellerProduct.skus:type_name -> hawkr.catalog.v1alpha1.Sku
 	45,  // 49: hawkr.catalog.v1alpha1.SellerProduct.hashtags:type_name -> hawkr.catalog.v1alpha1.ProductHashtag
-	75,  // 50: hawkr.catalog.v1alpha1.SellerProduct.create_time:type_name -> google.protobuf.Timestamp
-	75,  // 51: hawkr.catalog.v1alpha1.SellerProduct.update_time:type_name -> google.protobuf.Timestamp
-	73,  // 52: hawkr.catalog.v1alpha1.SellerProductSummary.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	76,  // 50: hawkr.catalog.v1alpha1.SellerProduct.create_time:type_name -> google.protobuf.Timestamp
+	76,  // 51: hawkr.catalog.v1alpha1.SellerProduct.update_time:type_name -> google.protobuf.Timestamp
+	74,  // 52: hawkr.catalog.v1alpha1.SellerProductSummary.cover_image:type_name -> hawkr.common.v1alpha1.Image
 	0,   // 53: hawkr.catalog.v1alpha1.SellerProductSummary.status:type_name -> hawkr.catalog.v1alpha1.ProductStatus
-	75,  // 54: hawkr.catalog.v1alpha1.SellerProductSummary.first_publish_time:type_name -> google.protobuf.Timestamp
-	75,  // 55: hawkr.catalog.v1alpha1.SellerProductSummary.create_time:type_name -> google.protobuf.Timestamp
+	76,  // 54: hawkr.catalog.v1alpha1.SellerProductSummary.first_publish_time:type_name -> google.protobuf.Timestamp
+	76,  // 55: hawkr.catalog.v1alpha1.SellerProductSummary.create_time:type_name -> google.protobuf.Timestamp
 	51,  // 56: hawkr.catalog.v1alpha1.ProductInput.gallery:type_name -> hawkr.catalog.v1alpha1.ImageInput
 	52,  // 57: hawkr.catalog.v1alpha1.ProductInput.description:type_name -> hawkr.catalog.v1alpha1.DescriptionBlock
 	56,  // 58: hawkr.catalog.v1alpha1.ProductInput.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxisInput
@@ -5313,71 +5381,72 @@ var file_hawkr_catalog_v1alpha1_catalog_proto_depIdxs = []int32{
 	22,  // 64: hawkr.catalog.v1alpha1.ListStoreProductsRequest.filter:type_name -> hawkr.catalog.v1alpha1.MyProductFilter
 	49,  // 65: hawkr.catalog.v1alpha1.ListStoreProductsResponse.products:type_name -> hawkr.catalog.v1alpha1.SellerProductSummary
 	48,  // 66: hawkr.catalog.v1alpha1.GetStoreProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
-	76,  // 67: hawkr.catalog.v1alpha1.CreateStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
+	77,  // 67: hawkr.catalog.v1alpha1.CreateStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
 	50,  // 68: hawkr.catalog.v1alpha1.CreateStoreProductRequest.product:type_name -> hawkr.catalog.v1alpha1.ProductInput
 	48,  // 69: hawkr.catalog.v1alpha1.CreateStoreProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
-	76,  // 70: hawkr.catalog.v1alpha1.UpdateStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
+	77,  // 70: hawkr.catalog.v1alpha1.UpdateStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
 	50,  // 71: hawkr.catalog.v1alpha1.UpdateStoreProductRequest.product:type_name -> hawkr.catalog.v1alpha1.ProductInput
-	77,  // 72: hawkr.catalog.v1alpha1.UpdateStoreProductRequest.update_mask:type_name -> google.protobuf.FieldMask
+	78,  // 72: hawkr.catalog.v1alpha1.UpdateStoreProductRequest.update_mask:type_name -> google.protobuf.FieldMask
 	48,  // 73: hawkr.catalog.v1alpha1.UpdateStoreProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
-	76,  // 74: hawkr.catalog.v1alpha1.PublishStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
+	77,  // 74: hawkr.catalog.v1alpha1.PublishStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
 	48,  // 75: hawkr.catalog.v1alpha1.PublishStoreProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
-	76,  // 76: hawkr.catalog.v1alpha1.UnpublishStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
+	77,  // 76: hawkr.catalog.v1alpha1.UnpublishStoreProductRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
 	48,  // 77: hawkr.catalog.v1alpha1.UnpublishStoreProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
-	76,  // 78: hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
+	77,  // 78: hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest.operation:type_name -> hawkr.common.v1alpha1.DelegatedOperation
 	71,  // 79: hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest.items:type_name -> hawkr.catalog.v1alpha1.BatchUnpublishItem
-	49,  // 80: hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse.products:type_name -> hawkr.catalog.v1alpha1.SellerProductSummary
-	6,   // 81: hawkr.catalog.v1alpha1.CatalogPublicService.ListProducts:input_type -> hawkr.catalog.v1alpha1.ListProductsRequest
-	8,   // 82: hawkr.catalog.v1alpha1.CatalogPublicService.SearchProducts:input_type -> hawkr.catalog.v1alpha1.SearchProductsRequest
-	10,  // 83: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestProductNames:input_type -> hawkr.catalog.v1alpha1.SuggestProductNamesRequest
-	12,  // 84: hawkr.catalog.v1alpha1.CatalogPublicService.GetProduct:input_type -> hawkr.catalog.v1alpha1.GetProductRequest
-	14,  // 85: hawkr.catalog.v1alpha1.CatalogPublicService.ListCategories:input_type -> hawkr.catalog.v1alpha1.ListCategoriesRequest
-	17,  // 86: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestHashtags:input_type -> hawkr.catalog.v1alpha1.SuggestHashtagsRequest
-	19,  // 87: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestTrendingHashtags:input_type -> hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest
-	23,  // 88: hawkr.catalog.v1alpha1.SellerCatalogAppService.ListMyProducts:input_type -> hawkr.catalog.v1alpha1.ListMyProductsRequest
-	25,  // 89: hawkr.catalog.v1alpha1.SellerCatalogAppService.GetMyProduct:input_type -> hawkr.catalog.v1alpha1.GetMyProductRequest
-	27,  // 90: hawkr.catalog.v1alpha1.SellerCatalogAppService.CountMyProducts:input_type -> hawkr.catalog.v1alpha1.CountMyProductsRequest
-	29,  // 91: hawkr.catalog.v1alpha1.SellerCatalogAppService.CreateProduct:input_type -> hawkr.catalog.v1alpha1.CreateProductRequest
-	31,  // 92: hawkr.catalog.v1alpha1.SellerCatalogAppService.UpdateProduct:input_type -> hawkr.catalog.v1alpha1.UpdateProductRequest
-	33,  // 93: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetProductStatus:input_type -> hawkr.catalog.v1alpha1.SetProductStatusRequest
-	35,  // 94: hawkr.catalog.v1alpha1.SellerCatalogAppService.DeleteProduct:input_type -> hawkr.catalog.v1alpha1.DeleteProductRequest
-	37,  // 95: hawkr.catalog.v1alpha1.SellerCatalogAppService.AdjustStock:input_type -> hawkr.catalog.v1alpha1.AdjustStockRequest
-	39,  // 96: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock:input_type -> hawkr.catalog.v1alpha1.SetStockRequest
-	58,  // 97: hawkr.catalog.v1alpha1.CatalogDelegatedService.ListStoreProducts:input_type -> hawkr.catalog.v1alpha1.ListStoreProductsRequest
-	60,  // 98: hawkr.catalog.v1alpha1.CatalogDelegatedService.GetStoreProduct:input_type -> hawkr.catalog.v1alpha1.GetStoreProductRequest
-	62,  // 99: hawkr.catalog.v1alpha1.CatalogDelegatedService.CreateStoreProduct:input_type -> hawkr.catalog.v1alpha1.CreateStoreProductRequest
-	64,  // 100: hawkr.catalog.v1alpha1.CatalogDelegatedService.UpdateStoreProduct:input_type -> hawkr.catalog.v1alpha1.UpdateStoreProductRequest
-	66,  // 101: hawkr.catalog.v1alpha1.CatalogDelegatedService.PublishStoreProduct:input_type -> hawkr.catalog.v1alpha1.PublishStoreProductRequest
-	68,  // 102: hawkr.catalog.v1alpha1.CatalogDelegatedService.UnpublishStoreProduct:input_type -> hawkr.catalog.v1alpha1.UnpublishStoreProductRequest
-	70,  // 103: hawkr.catalog.v1alpha1.CatalogDelegatedService.BatchUnpublishStoreProducts:input_type -> hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest
-	7,   // 104: hawkr.catalog.v1alpha1.CatalogPublicService.ListProducts:output_type -> hawkr.catalog.v1alpha1.ListProductsResponse
-	9,   // 105: hawkr.catalog.v1alpha1.CatalogPublicService.SearchProducts:output_type -> hawkr.catalog.v1alpha1.SearchProductsResponse
-	11,  // 106: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestProductNames:output_type -> hawkr.catalog.v1alpha1.SuggestProductNamesResponse
-	13,  // 107: hawkr.catalog.v1alpha1.CatalogPublicService.GetProduct:output_type -> hawkr.catalog.v1alpha1.GetProductResponse
-	15,  // 108: hawkr.catalog.v1alpha1.CatalogPublicService.ListCategories:output_type -> hawkr.catalog.v1alpha1.ListCategoriesResponse
-	18,  // 109: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestHashtags:output_type -> hawkr.catalog.v1alpha1.SuggestHashtagsResponse
-	20,  // 110: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestTrendingHashtags:output_type -> hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse
-	24,  // 111: hawkr.catalog.v1alpha1.SellerCatalogAppService.ListMyProducts:output_type -> hawkr.catalog.v1alpha1.ListMyProductsResponse
-	26,  // 112: hawkr.catalog.v1alpha1.SellerCatalogAppService.GetMyProduct:output_type -> hawkr.catalog.v1alpha1.GetMyProductResponse
-	28,  // 113: hawkr.catalog.v1alpha1.SellerCatalogAppService.CountMyProducts:output_type -> hawkr.catalog.v1alpha1.CountMyProductsResponse
-	30,  // 114: hawkr.catalog.v1alpha1.SellerCatalogAppService.CreateProduct:output_type -> hawkr.catalog.v1alpha1.CreateProductResponse
-	32,  // 115: hawkr.catalog.v1alpha1.SellerCatalogAppService.UpdateProduct:output_type -> hawkr.catalog.v1alpha1.UpdateProductResponse
-	34,  // 116: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetProductStatus:output_type -> hawkr.catalog.v1alpha1.SetProductStatusResponse
-	36,  // 117: hawkr.catalog.v1alpha1.SellerCatalogAppService.DeleteProduct:output_type -> hawkr.catalog.v1alpha1.DeleteProductResponse
-	38,  // 118: hawkr.catalog.v1alpha1.SellerCatalogAppService.AdjustStock:output_type -> hawkr.catalog.v1alpha1.AdjustStockResponse
-	40,  // 119: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock:output_type -> hawkr.catalog.v1alpha1.SetStockResponse
-	59,  // 120: hawkr.catalog.v1alpha1.CatalogDelegatedService.ListStoreProducts:output_type -> hawkr.catalog.v1alpha1.ListStoreProductsResponse
-	61,  // 121: hawkr.catalog.v1alpha1.CatalogDelegatedService.GetStoreProduct:output_type -> hawkr.catalog.v1alpha1.GetStoreProductResponse
-	63,  // 122: hawkr.catalog.v1alpha1.CatalogDelegatedService.CreateStoreProduct:output_type -> hawkr.catalog.v1alpha1.CreateStoreProductResponse
-	65,  // 123: hawkr.catalog.v1alpha1.CatalogDelegatedService.UpdateStoreProduct:output_type -> hawkr.catalog.v1alpha1.UpdateStoreProductResponse
-	67,  // 124: hawkr.catalog.v1alpha1.CatalogDelegatedService.PublishStoreProduct:output_type -> hawkr.catalog.v1alpha1.PublishStoreProductResponse
-	69,  // 125: hawkr.catalog.v1alpha1.CatalogDelegatedService.UnpublishStoreProduct:output_type -> hawkr.catalog.v1alpha1.UnpublishStoreProductResponse
-	72,  // 126: hawkr.catalog.v1alpha1.CatalogDelegatedService.BatchUnpublishStoreProducts:output_type -> hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse
-	104, // [104:127] is the sub-list for method output_type
-	81,  // [81:104] is the sub-list for method input_type
-	81,  // [81:81] is the sub-list for extension type_name
-	81,  // [81:81] is the sub-list for extension extendee
-	0,   // [0:81] is the sub-list for field type_name
+	73,  // 80: hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse.products:type_name -> hawkr.catalog.v1alpha1.UnpublishedProduct
+	0,   // 81: hawkr.catalog.v1alpha1.UnpublishedProduct.status:type_name -> hawkr.catalog.v1alpha1.ProductStatus
+	6,   // 82: hawkr.catalog.v1alpha1.CatalogPublicService.ListProducts:input_type -> hawkr.catalog.v1alpha1.ListProductsRequest
+	8,   // 83: hawkr.catalog.v1alpha1.CatalogPublicService.SearchProducts:input_type -> hawkr.catalog.v1alpha1.SearchProductsRequest
+	10,  // 84: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestProductNames:input_type -> hawkr.catalog.v1alpha1.SuggestProductNamesRequest
+	12,  // 85: hawkr.catalog.v1alpha1.CatalogPublicService.GetProduct:input_type -> hawkr.catalog.v1alpha1.GetProductRequest
+	14,  // 86: hawkr.catalog.v1alpha1.CatalogPublicService.ListCategories:input_type -> hawkr.catalog.v1alpha1.ListCategoriesRequest
+	17,  // 87: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestHashtags:input_type -> hawkr.catalog.v1alpha1.SuggestHashtagsRequest
+	19,  // 88: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestTrendingHashtags:input_type -> hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest
+	23,  // 89: hawkr.catalog.v1alpha1.SellerCatalogAppService.ListMyProducts:input_type -> hawkr.catalog.v1alpha1.ListMyProductsRequest
+	25,  // 90: hawkr.catalog.v1alpha1.SellerCatalogAppService.GetMyProduct:input_type -> hawkr.catalog.v1alpha1.GetMyProductRequest
+	27,  // 91: hawkr.catalog.v1alpha1.SellerCatalogAppService.CountMyProducts:input_type -> hawkr.catalog.v1alpha1.CountMyProductsRequest
+	29,  // 92: hawkr.catalog.v1alpha1.SellerCatalogAppService.CreateProduct:input_type -> hawkr.catalog.v1alpha1.CreateProductRequest
+	31,  // 93: hawkr.catalog.v1alpha1.SellerCatalogAppService.UpdateProduct:input_type -> hawkr.catalog.v1alpha1.UpdateProductRequest
+	33,  // 94: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetProductStatus:input_type -> hawkr.catalog.v1alpha1.SetProductStatusRequest
+	35,  // 95: hawkr.catalog.v1alpha1.SellerCatalogAppService.DeleteProduct:input_type -> hawkr.catalog.v1alpha1.DeleteProductRequest
+	37,  // 96: hawkr.catalog.v1alpha1.SellerCatalogAppService.AdjustStock:input_type -> hawkr.catalog.v1alpha1.AdjustStockRequest
+	39,  // 97: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock:input_type -> hawkr.catalog.v1alpha1.SetStockRequest
+	58,  // 98: hawkr.catalog.v1alpha1.CatalogDelegatedService.ListStoreProducts:input_type -> hawkr.catalog.v1alpha1.ListStoreProductsRequest
+	60,  // 99: hawkr.catalog.v1alpha1.CatalogDelegatedService.GetStoreProduct:input_type -> hawkr.catalog.v1alpha1.GetStoreProductRequest
+	62,  // 100: hawkr.catalog.v1alpha1.CatalogDelegatedService.CreateStoreProduct:input_type -> hawkr.catalog.v1alpha1.CreateStoreProductRequest
+	64,  // 101: hawkr.catalog.v1alpha1.CatalogDelegatedService.UpdateStoreProduct:input_type -> hawkr.catalog.v1alpha1.UpdateStoreProductRequest
+	66,  // 102: hawkr.catalog.v1alpha1.CatalogDelegatedService.PublishStoreProduct:input_type -> hawkr.catalog.v1alpha1.PublishStoreProductRequest
+	68,  // 103: hawkr.catalog.v1alpha1.CatalogDelegatedService.UnpublishStoreProduct:input_type -> hawkr.catalog.v1alpha1.UnpublishStoreProductRequest
+	70,  // 104: hawkr.catalog.v1alpha1.CatalogDelegatedService.BatchUnpublishStoreProducts:input_type -> hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest
+	7,   // 105: hawkr.catalog.v1alpha1.CatalogPublicService.ListProducts:output_type -> hawkr.catalog.v1alpha1.ListProductsResponse
+	9,   // 106: hawkr.catalog.v1alpha1.CatalogPublicService.SearchProducts:output_type -> hawkr.catalog.v1alpha1.SearchProductsResponse
+	11,  // 107: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestProductNames:output_type -> hawkr.catalog.v1alpha1.SuggestProductNamesResponse
+	13,  // 108: hawkr.catalog.v1alpha1.CatalogPublicService.GetProduct:output_type -> hawkr.catalog.v1alpha1.GetProductResponse
+	15,  // 109: hawkr.catalog.v1alpha1.CatalogPublicService.ListCategories:output_type -> hawkr.catalog.v1alpha1.ListCategoriesResponse
+	18,  // 110: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestHashtags:output_type -> hawkr.catalog.v1alpha1.SuggestHashtagsResponse
+	20,  // 111: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestTrendingHashtags:output_type -> hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse
+	24,  // 112: hawkr.catalog.v1alpha1.SellerCatalogAppService.ListMyProducts:output_type -> hawkr.catalog.v1alpha1.ListMyProductsResponse
+	26,  // 113: hawkr.catalog.v1alpha1.SellerCatalogAppService.GetMyProduct:output_type -> hawkr.catalog.v1alpha1.GetMyProductResponse
+	28,  // 114: hawkr.catalog.v1alpha1.SellerCatalogAppService.CountMyProducts:output_type -> hawkr.catalog.v1alpha1.CountMyProductsResponse
+	30,  // 115: hawkr.catalog.v1alpha1.SellerCatalogAppService.CreateProduct:output_type -> hawkr.catalog.v1alpha1.CreateProductResponse
+	32,  // 116: hawkr.catalog.v1alpha1.SellerCatalogAppService.UpdateProduct:output_type -> hawkr.catalog.v1alpha1.UpdateProductResponse
+	34,  // 117: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetProductStatus:output_type -> hawkr.catalog.v1alpha1.SetProductStatusResponse
+	36,  // 118: hawkr.catalog.v1alpha1.SellerCatalogAppService.DeleteProduct:output_type -> hawkr.catalog.v1alpha1.DeleteProductResponse
+	38,  // 119: hawkr.catalog.v1alpha1.SellerCatalogAppService.AdjustStock:output_type -> hawkr.catalog.v1alpha1.AdjustStockResponse
+	40,  // 120: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock:output_type -> hawkr.catalog.v1alpha1.SetStockResponse
+	59,  // 121: hawkr.catalog.v1alpha1.CatalogDelegatedService.ListStoreProducts:output_type -> hawkr.catalog.v1alpha1.ListStoreProductsResponse
+	61,  // 122: hawkr.catalog.v1alpha1.CatalogDelegatedService.GetStoreProduct:output_type -> hawkr.catalog.v1alpha1.GetStoreProductResponse
+	63,  // 123: hawkr.catalog.v1alpha1.CatalogDelegatedService.CreateStoreProduct:output_type -> hawkr.catalog.v1alpha1.CreateStoreProductResponse
+	65,  // 124: hawkr.catalog.v1alpha1.CatalogDelegatedService.UpdateStoreProduct:output_type -> hawkr.catalog.v1alpha1.UpdateStoreProductResponse
+	67,  // 125: hawkr.catalog.v1alpha1.CatalogDelegatedService.PublishStoreProduct:output_type -> hawkr.catalog.v1alpha1.PublishStoreProductResponse
+	69,  // 126: hawkr.catalog.v1alpha1.CatalogDelegatedService.UnpublishStoreProduct:output_type -> hawkr.catalog.v1alpha1.UnpublishStoreProductResponse
+	72,  // 127: hawkr.catalog.v1alpha1.CatalogDelegatedService.BatchUnpublishStoreProducts:output_type -> hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse
+	105, // [105:128] is the sub-list for method output_type
+	82,  // [82:105] is the sub-list for method input_type
+	82,  // [82:82] is the sub-list for extension type_name
+	82,  // [82:82] is the sub-list for extension extendee
+	0,   // [0:82] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_catalog_v1alpha1_catalog_proto_init() }
@@ -5415,7 +5484,7 @@ func file_hawkr_catalog_v1alpha1_catalog_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc), len(file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   68,
+			NumMessages:   69,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

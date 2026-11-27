@@ -819,8 +819,16 @@ message BatchUnpublishItem {
 }
 
 message BatchUnpublishStoreProductsResponse {
-  // 下架後的商品，順序同請求的 items。
-  repeated SellerProductSummary products = 1;
+  // 下架後的商品（已經下架的項目也在其中），順序同請求的 items；重送時是它們目前的狀態。
+  repeated UnpublishedProduct products = 1;
   // 這一批唯一的稽核列 ID（重送時是第一次的）。
   string audit_log_id = 2;
+}
+
+// UnpublishedProduct 是批次下架後一個商品的狀態：client 以它更新列表上的狀態與 etag，不必重讀整份。
+message UnpublishedProduct {
+  string product_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 下架後的 etag（已經下架的項目是它目前的 etag，沒有改動）。
+  string etag = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ProductStatus status = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
