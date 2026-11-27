@@ -285,12 +285,13 @@ class _MerchantItemDetailScreenState
     return grades.every((g) => qtyOf(g) <= 0);
   }
 
-  /// 訂閱 / 取消補貨通知 — POST / DELETE /app/products/{productId}/restock_subscriptions（#942）
+  /// 訂閱 / 取消補貨通知：依目前選取的規格（SKU）。
   Future<void> _toggleRestockSubscription() async {
     if (!await requireLogin(context, ref)) return;
     if (!mounted) return;
     final pid = (widget.skuId ?? '').trim();
-    if (pid.isEmpty) return;
+    final sku = (_selectedGradeId ?? '').trim();
+    if (pid.isEmpty || sku.isEmpty) return;
     if (_restockLoading) return;
     final bool target = !_isRestockSubscribed;
     setState(() {
@@ -300,8 +301,8 @@ class _MerchantItemDetailScreenState
     try {
       final repo = ref.read(productRepositoryProvider);
       final ok = target
-          ? await repo.subscribeRestock(pid)
-          : await repo.unsubscribeRestock(pid);
+          ? await repo.subscribeRestock(pid, sku)
+          : await repo.unsubscribeRestock(sku);
       if (!mounted) return;
       if (!ok) {
         setState(() => _isRestockSubscribed = !target);

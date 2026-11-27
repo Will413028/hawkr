@@ -1,7 +1,9 @@
 package buyerserver
 
 import (
+	"strings"
 	"testing"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -53,5 +55,18 @@ func TestAddressConversionAndUnknownCode(t *testing.T) {
 	})
 	if err == nil || connect.CodeOf(err) != connect.CodeInternal {
 		t.Fatalf("expected CodeInternal for unknown code, got: %v", err)
+	}
+}
+
+// 回應以呼叫者送來的原字串為 key：大寫的 UUID 解析後同一個 ID，key 仍是原樣；非 UUID（舊服務的整數 ID）略過，同一個 ID 的不同寫法只問一次。
+func TestParseUUIDsKeepsTheCallersRawString(t *testing.T) {
+	id := uuid.NewV7()
+	lower, upper := id.String(), strings.ToUpper(id.String())
+	parsed := parseUUIDs([]string{upper, "11", lower})
+	if len(parsed) != 2 || parsed[0].raw != upper || parsed[0].id != id || parsed[1].raw != lower || parsed[1].id != id {
+		t.Fatalf("parsed = %+v", parsed)
+	}
+	if ids := distinct(parsed); len(ids) != 1 || ids[0] != id {
+		t.Fatalf("distinct = %v", ids)
 	}
 }

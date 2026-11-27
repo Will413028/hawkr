@@ -24,13 +24,13 @@ func TestRelayRetryEnqueuesOnePublishJobPerEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := NewWorker(relayBuyers{}, &relayProducts{}, relayStores{}, queue, nil)
+	w := NewWorker(queue)
 	for _, account := range []int64{99, 100} {
 		if err := w.buyerDeleted(ctx, BuyerDeletedArgs{eventFields: fields("event-1"), AccountID: account}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := w.favoriteAdded(ctx, FavoriteAddedArgs{eventFields: fields("event-2"), ProductID: 11}); err != nil {
+	if err := w.buyerDeleted(ctx, BuyerDeletedArgs{eventFields: fields("event-2"), AccountID: 99}); err != nil {
 		t.Fatal(err)
 	}
 	rows, err := d.Pool().Query(ctx, `SELECT args->>'event_id' FROM river.river_job WHERE kind = 'legacy.rabbitmq_publish' ORDER BY id`)

@@ -10,17 +10,18 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   for (final fail in [false, true]) {
     test(
-      'restock mutations ${fail ? 'fail closed' : 'send the exact product ID'}',
+      'restock mutations ${fail ? 'fail closed' : 'send the exact product and SKU IDs'}',
       () async {
         final ids = <String>[];
         final transport = FakeTransportBuilder()
             .unary(BuyerAppService.subscribeRestock, (request, _) {
               ids.add(request.productId);
+              ids.add(request.skuId);
               if (fail) throw ConnectException(Code.unavailable, 'offline');
               return buyer.SubscribeRestockResponse();
             })
             .unary(BuyerAppService.unsubscribeRestock, (request, _) {
-              ids.add(request.productId);
+              ids.add(request.skuId);
               if (fail) throw ConnectException(Code.unavailable, 'offline');
               return buyer.UnsubscribeRestockResponse();
             })
@@ -29,11 +30,18 @@ void main() {
         addTearDown(dio.close);
         final repo = ProductRepository(dio, BuyerAppServiceClient(transport));
 
-        expect(await repo.subscribeRestock('bad-id'), isFalse);
+        const product = '0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b';
+        const sku = '0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c';
+        expect(await repo.subscribeRestock('bad-id', sku), isFalse);
+        expect(
+          await repo.subscribeRestock(product, '871936508549696815'),
+          isFalse,
+        );
         expect(await repo.unsubscribeRestock('bad-id'), isFalse);
-        expect(await repo.subscribeRestock('871936508549696815'), !fail);
-        expect(await repo.unsubscribeRestock('871936508549696815'), !fail);
-        expect(ids, ['871936508549696815', '871936508549696815']);
+        expect(await repo.unsubscribeRestock(''), isFalse);
+        expect(await repo.subscribeRestock(product, sku), !fail);
+        expect(await repo.unsubscribeRestock(sku), !fail);
+        expect(ids, [product, sku, sku]);
       },
     );
   }

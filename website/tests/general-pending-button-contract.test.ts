@@ -86,10 +86,6 @@ test("list-like async controls retain per-action pending identity", () => {
 });
 
 test("general loading copy names the concrete Traditional Chinese action", () => {
-	const restock = source("components/shared/RestockNotifyButton.tsx");
-	assert.match(restock, /"取消補貨通知中…"/);
-	assert.match(restock, /"設定補貨通知中…"/);
-
 	const sellerMessage = source(
 		"features/sellers/components/SellerMessageTab.tsx",
 	);

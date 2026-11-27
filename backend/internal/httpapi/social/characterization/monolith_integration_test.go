@@ -58,7 +58,9 @@ func (noOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { retur
 
 type noProducts struct{}
 
-func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
+func (noProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return nil, nil
+}
 
 type noRegistry struct{}
 

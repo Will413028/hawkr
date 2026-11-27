@@ -717,11 +717,22 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
     final ref = widget.widgetRef;
     if (ref == null || !await requireLogin(context, ref)) return;
     if (!mounted) return;
+    // 補貨通知依規格（SKU）：卡片只在單一規格時知道要訂哪一個，多規格進詳情頁選（同 _buyNow）。
+    if (_grades.length != 1) {
+      _navigateToDetail();
+      return;
+    }
+    final skuId =
+        (_grades.first['id'] ??
+                _grades.first['gradeId'] ??
+                _grades.first['skuId'] ??
+                '')
+            .toString();
     setState(() => _restockLoading = true);
     try {
       final subscribed = await ref
           .read(productRepositoryProvider)
-          .subscribeRestock(widget.sku);
+          .subscribeRestock(widget.sku, skuId);
       if (!mounted) return;
       if (subscribed) {
         setState(() {

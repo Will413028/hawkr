@@ -8,20 +8,19 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/views"
 )
 
-// ProductStores 是商品所屬店家的 port（見 views.ProductStores）：彙總 job 在 transaction 之外一次批次解析；舊服務期間由
-// internal/legacy/productservice 實作，由組裝點接上。
+// ProductStores 是商品所屬店家的 port（見 views.ProductStores）：彙總 job 在 transaction 之外一次批次解析，由組裝點以 catalog 的 ProductStoreIDs 實作。
 type ProductStores = views.ProductStores
 
 // ProductView 是登入買家的一次商品瀏覽（buyer 的 ProductViewed，由 cmd/hawkr 轉進來）。
 type ProductView struct {
 	EventID    uuid.UUID
-	ProductID  int64
+	ProductID  uuid.UUID
 	OccurredAt time.Time
 }
 
 // RecordProductView 追加一筆原始瀏覽事件（匿名的打點入口用，步驟 8；總次數、不去重，`backend/docs/modules/seller.md` §16）。只有一句 insert，不解析
 // 商品所屬的店家（由彙總 job 在背景做），可以在 transaction 內或外呼叫。
-func (m *Module) RecordProductView(ctx context.Context, productID int64) error {
+func (m *Module) RecordProductView(ctx context.Context, productID uuid.UUID) error {
 	return m.views.Record(ctx, productID)
 }
 

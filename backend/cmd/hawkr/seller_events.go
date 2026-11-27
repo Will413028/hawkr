@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -14,7 +15,7 @@ import (
 
 // subscribeSellerViews 讓登入買家的商品瀏覽進 seller 的原始事件：訂閱 buyer 的 ProductViewed，各插一列（只有 insert，
 // 以事件的 EventID 與 OccurredAt 為準，重送不會多一列）。事件在 RecordVisit 的 transaction 內同步發布，但這裡不解析商品
-// 所屬的店家、不碰彙總：解析與彙總由 seller 的 River job 在背景做（sellerProducts 是它的 port），所以商品服務不通不會讓
+// 所屬的店家、不碰彙總：解析與彙總由 seller 的 River job 在背景做（sellerProducts 是它的 port），所以商品查詢失敗不會讓
 // 瀏覽失敗。seller 與 buyer 互不依賴，兩者的接線只在這裡。匿名的打點不經過 buyer，由入口直接呼叫 seller 的 RecordProductView。
 func subscribeSellerViews(bus *events.Bus, module *seller.Module) {
 	events.Subscribe(bus, func(ctx context.Context, e buyer.ProductViewed) error {
@@ -33,18 +34,13 @@ func subscribeSellerRelay(bus *events.Bus, queue jobs.Enqueuer) {
 	events.Subscribe(bus, sellerrelay.OnStoreExposureChanged(queue))
 }
 
-// sellerProducts 以舊的 product-service 實作 seller 的商品所屬店家 port（一次批次呼叫，含已下架的商品：直接連結仍可瀏覽）。
-// 商品搬進單體之後改呼叫 catalog 的公開 API。
-type sellerProducts struct{ client *productservice.Client }
+// sellerProducts 以 catalog 實作 seller 的商品所屬店家 port（一次批次呼叫，含已下架的商品：直接連結仍可瀏覽）。
+type sellerProducts struct{ catalog *catalog.Module }
 
-func (p sellerProducts) StoreIDs(ctx context.Context, productIDs []int64) (map[int64]int64, error) {
-	cards, err := p.client.Cards(ctx, productIDs, true)
+func (p sellerProducts) StoreIDs(ctx context.Context, productIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	stores, err := p.catalog.ProductStoreIDs(ctx, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("商品：%w", err)
 	}
-	out := make(map[int64]int64, len(cards))
-	for id, card := range cards {
-		out[id] = card.StoreID
-	}
-	return out, nil
+	return stores, nil
 }

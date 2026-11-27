@@ -8,6 +8,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"uuid"
 )
 
 const addFavorite = `-- name: AddFavorite :execrows
@@ -18,7 +20,7 @@ ON CONFLICT (buyer_id, product_id) DO NOTHING
 
 type AddFavoriteParams struct {
 	BuyerID   int64
-	ProductID int64
+	ProductID uuid.UUID
 	CreatedAt time.Time
 }
 
@@ -34,24 +36,24 @@ func (q *Queries) AddFavorite(ctx context.Context, arg AddFavoriteParams) (int64
 const batchFavorite = `-- name: BatchFavorite :many
 SELECT product_id
 FROM buyer.favorites
-WHERE buyer_id = $1 AND product_id = ANY($2::bigint[])
+WHERE buyer_id = $1 AND product_id = ANY($2::uuid[])
 `
 
 type BatchFavoriteParams struct {
 	BuyerID int64
-	Column2 []int64
+	Column2 []uuid.UUID
 }
 
 // 回傳輸入清單中已收藏的商品 ID。
-func (q *Queries) BatchFavorite(ctx context.Context, arg BatchFavoriteParams) ([]int64, error) {
+func (q *Queries) BatchFavorite(ctx context.Context, arg BatchFavoriteParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, batchFavorite, arg.BuyerID, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var product_id int64
+		var product_id uuid.UUID
 		if err := rows.Scan(&product_id); err != nil {
 			return nil, err
 		}
@@ -71,7 +73,7 @@ WHERE buyer_id = $1 AND product_id = $2)
 
 type CheckFavoriteParams struct {
 	BuyerID   int64
-	ProductID int64
+	ProductID uuid.UUID
 }
 
 // 查詢單一商品的收藏狀態。
@@ -90,15 +92,15 @@ RETURNING product_id
 `
 
 // 刪除全部收藏並回傳商品 ID 供事件發布。
-func (q *Queries) ClearFavorite(ctx context.Context, buyerID int64) ([]int64, error) {
+func (q *Queries) ClearFavorite(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, clearFavorite, buyerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var product_id int64
+		var product_id uuid.UUID
 		if err := rows.Scan(&product_id); err != nil {
 			return nil, err
 		}
@@ -132,15 +134,15 @@ ORDER BY product_id
 `
 
 // 列出買家的全部收藏商品 ID。
-func (q *Queries) FavoriteIDs(ctx context.Context, buyerID int64) ([]int64, error) {
+func (q *Queries) FavoriteIDs(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, favoriteIDs, buyerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var product_id int64
+		var product_id uuid.UUID
 		if err := rows.Scan(&product_id); err != nil {
 			return nil, err
 		}
@@ -155,7 +157,7 @@ func (q *Queries) FavoriteIDs(ctx context.Context, buyerID int64) ([]int64, erro
 const listFavorite = `-- name: ListFavorite :many
 SELECT buyer_id, product_id, created_at
 FROM buyer.favorites
-WHERE buyer_id = $1 AND (NOT $2::boolean OR (created_at, product_id) < ($3::timestamptz, $4::bigint))
+WHERE buyer_id = $1 AND (NOT $2::boolean OR (created_at, product_id) < ($3::timestamptz, $4::uuid))
 ORDER BY created_at DESC, product_id DESC
 LIMIT $5
 `
@@ -164,7 +166,7 @@ type ListFavoriteParams struct {
 	BuyerID   int64
 	HasAfter  bool
 	AfterTime time.Time
-	AfterID   int64
+	AfterID   uuid.UUID
 	PageLimit int32
 }
 
@@ -203,7 +205,7 @@ WHERE buyer_id = $1 AND product_id = $2
 
 type RemoveFavoriteParams struct {
 	BuyerID   int64
-	ProductID int64
+	ProductID uuid.UUID
 }
 
 // 僅實際刪除收藏時回傳一列。

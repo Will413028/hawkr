@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -74,21 +75,21 @@ func TestRestockBatchesAndRollback(t *testing.T) {
 	for accountID := int64(1); accountID <= 5; accountID++ {
 		buyer := profile(t, fixture, accountID)
 		buyerIDs = append(buyerIDs, buyer.BuyerID)
-		must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, 10))
+		must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, pid(10), skuOf(10)))
 	}
 	firstPage, err := fixture.module.ListRestock(ctx, RestockListInput{BuyerID: buyerIDs[0]})
 	must(t, err)
-	if len(firstPage.Items) != 1 || firstPage.Items[0].ProductID != 10 {
+	if len(firstPage.Items) != 1 || firstPage.Items[0].ProductID != pid(10) || firstPage.Items[0].SKUID != skuOf(10) {
 		t.Fatal(firstPage)
 	}
 	for _, productID := range []int64{11, 12} {
-		must(t, fixture.module.SubscribeRestock(ctx, buyerIDs[0], productID))
+		must(t, fixture.module.SubscribeRestock(ctx, buyerIDs[0], pid(productID), skuOf(productID)))
 	}
 	var cursor *RestockCursor
 	for _, expected := range []int64{12, 11, 10} {
 		page, err := fixture.module.ListRestock(ctx, RestockListInput{BuyerID: buyerIDs[0], PageSize: 1, After: cursor})
 		must(t, err)
-		if len(page.Items) != 1 || page.Items[0].ProductID != expected {
+		if len(page.Items) != 1 || page.Items[0].ProductID != pid(expected) || page.Items[0].SKUID != skuOf(expected) {
 			t.Fatalf("restock cursor skipped a product: %+v", page)
 		}
 		cursor = page.Next
@@ -97,7 +98,7 @@ func TestRestockBatchesAndRollback(t *testing.T) {
 		t.Fatal("restock cursor should end")
 	}
 	for _, productID := range []int64{11, 12} {
-		must(t, fixture.module.UnsubscribeRestock(ctx, buyerIDs[0], productID))
+		must(t, fixture.module.UnsubscribeRestock(ctx, buyerIDs[0], skuOf(productID)))
 	}
 	targeted := 0
 	reject := true
@@ -108,31 +109,31 @@ func TestRestockBatchesAndRollback(t *testing.T) {
 		targeted++
 		return nil
 	})
-	more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: 10, Limit: 2, OccurredAt: fixture.now})
-	if err == nil || more || count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE product_id=10") != 5 {
+	_, more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
+	if err == nil || more || count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE sku_id=$1", skuOf(10)) != 5 {
 		t.Fatal("failed event did not roll back subscriptions", more, err)
 	}
 	reject = false
 	for index, expectedMore := range []bool{true, true, false} {
 		before := targeted
-		more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: 10, Limit: 2, OccurredAt: fixture.now})
+		_, more, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
 		must(t, err)
 		if more != expectedMore || targeted-before > 2 || targeted != min((index+1)*2, 5) {
 			t.Fatalf("batch %d: more=%v targeted=%d", index, more, targeted)
 		}
 	}
-	more, err = fixture.module.FanOut(ctx, FanOutInput{ProductID: 10, Limit: 2, OccurredAt: fixture.now})
+	_, more, err = fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
 	must(t, err)
 	if more || targeted != 5 || count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions") != 0 {
 		t.Fatal("fanout retained history or repeated events")
 	}
-	must(t, fixture.module.SubscribeRestock(ctx, buyerIDs[0], 10))
-	must(t, fixture.module.UnsubscribeRestock(ctx, buyerIDs[0], 10))
+	must(t, fixture.module.SubscribeRestock(ctx, buyerIDs[0], pid(10), skuOf(10)))
+	must(t, fixture.module.UnsubscribeRestock(ctx, buyerIDs[0], skuOf(10)))
 	if count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions") != 0 {
 		t.Fatal("unsubscribe retained history")
 	}
 	err = fixture.database.InTx(ctx, func(ctx context.Context) error {
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: 10, Limit: 2, OccurredAt: fixture.now})
+		_, _, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 2, OccurredAt: fixture.now})
 		return err
 	})
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
@@ -216,9 +217,9 @@ func TestReadErrorsReturnNilCollections(t *testing.T) {
 	assertNil(principals, err)
 	addresses, err := fixture.module.ListAddresses(ctx, buyer.BuyerID)
 	assertNil(addresses, err)
-	favorites, err := fixture.module.BatchCheckFavorites(ctx, buyer.BuyerID, []int64{10})
+	favorites, err := fixture.module.BatchCheckFavorites(ctx, buyer.BuyerID, []uuid.UUID{pid(10)})
 	assertNil(favorites, err)
-	restock, err := fixture.module.BatchCheckRestock(ctx, buyer.BuyerID, []int64{10})
+	restock, err := fixture.module.BatchCheckRestock(ctx, buyer.BuyerID, []uuid.UUID{pid(10)})
 	assertNil(restock, err)
 	counts, err := fixture.module.SubscriberCounts(ctx, []int64{20})
 	assertNil(counts, err)

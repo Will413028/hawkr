@@ -219,7 +219,7 @@ abstract final class BuyerAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
-  /// ListRestockSubscriptions 列出等待補貨通知的商品，新到舊。通知送出或取消之後就不在清單上。
+  /// ListRestockSubscriptions 列出等待補貨通知的商品規格（SKU），新到舊。通知送出或取消之後就不在清單上。
   static const listRestockSubscriptions = connect.Spec(
     '/$name/ListRestockSubscriptions',
     connect.StreamType.unary,
@@ -228,7 +228,8 @@ abstract final class BuyerAppService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
-  /// SubscribeRestock 訂閱商品的補貨通知；已訂閱時也成功。
+  /// SubscribeRestock 訂閱商品某個規格（SKU）的補貨通知：一次性，通知送出後訂閱就消失，不設到期；已訂閱時也成功。規格目前有貨時回 failed_precondition，
+  /// ErrorInfo.reason 是 RESTOCK_SKU_IN_STOCK；規格不存在、已刪除或不屬於 product_id 回 not_found。
   static const subscribeRestock = connect.Spec(
     '/$name/SubscribeRestock',
     connect.StreamType.unary,
@@ -237,7 +238,7 @@ abstract final class BuyerAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
-  /// UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
+  /// UnsubscribeRestock 取消規格（SKU）的補貨通知；沒有訂閱時也成功。
   static const unsubscribeRestock = connect.Spec(
     '/$name/UnsubscribeRestock',
     connect.StreamType.unary,

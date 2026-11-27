@@ -98,6 +98,105 @@
    "new": "\t\t_ = targetID\n",
    "test": "internal/modules/content ^TestUpdateBannerChecksTheProductOnlyWhenTheTargetChanges$",
    "why": "更新 banner 換目標時不確認商品：改成合法 UUID 但不存在的商品被收下，更新路徑的拒絕測試要紅。"
+  },
+  {
+   "id": "favorite-count-subscriber-leaves-the-transaction",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/catalog.go",
+   "old": "err := module.AddFavorite(ctx, e.ProductID)",
+   "new": "err := module.AddFavorite(context.Background(), e.ProductID)",
+   "test": "cmd/hawkr ^TestFavoriteCountFollowsTheFavoriteRowInTheSameTransaction$",
+   "why": "收藏數訂閱改用不帶 transaction 的 context：之後的訂閱者讓收藏回滾時收藏數仍然加一，同 transaction 的測試要紅。"
+  },
+  {
+   "id": "favorite-count-subscription-removed",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/catalog.go",
+   "old": "err := module.AddFavorite(ctx, e.ProductID)",
+   "new": "var err error",
+   "test": "cmd/hawkr ^TestFavoriteCountFollowsTheFavoriteRowInTheSameTransaction$",
+   "why": "收藏事件不更新 catalog 的收藏數：收藏後計數仍是 0，收藏數測試要紅。"
+  },
+  {
+   "id": "restock-fanout-notifies-by-product",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/store/restock_subscriptions.sql.go",
+   "old": "    WHERE pending.sku_id = $1\n",
+   "new": "    WHERE pending.product_id = (SELECT any_sub.product_id FROM buyer.restock_subscriptions AS any_sub WHERE any_sub.sku_id = $1 LIMIT 1)\n",
+   "test": "internal/modules/buyer ^TestRestockFanOutIsPerSKU$",
+   "why": "補貨通知依商品而不是 SKU 找訂閱（生成碼的 SQL）：同商品其他 SKU 的訂閱者也被通知並刪除，SKU 粒度測試要紅。"
+  },
+  {
+   "id": "restock-fanout-by-product-through-the-catalog-adapter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/store/restock_subscriptions.sql.go",
+   "old": "    WHERE pending.sku_id = $1\n",
+   "new": "    WHERE pending.product_id = (SELECT any_sub.product_id FROM buyer.restock_subscriptions AS any_sub WHERE any_sub.sku_id = $1 LIMIT 1)\n",
+   "test": "cmd/hawkr ^TestCatalogRestockNotifiesOnlyTheSKUAndPurgesSubscriptions$",
+   "why": "同上，經 catalog 的 NotifyRestocked 接線：同商品另一個 SKU 的訂閱被通知或被刪，接線的 SKU 測試要紅。"
+  },
+  {
+   "id": "restock-purge-deletes-every-subscription",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/store/restock_subscriptions.sql.go",
+   "old": "DELETE FROM buyer.restock_subscriptions WHERE sku_id = ANY($1::uuid[])",
+   "new": "DELETE FROM buyer.restock_subscriptions WHERE sku_id = ANY($1::uuid[]) OR true",
+   "test": "internal/modules/buyer ^TestPurgeRestockSKUs$",
+   "why": "清訂閱刪掉全部 SKU 的訂閱而不只是指定的 SKU：留下的 SKU 訂閱數測試要紅。"
+  },
+  {
+   "id": "restock-subscribe-accepted-while-in-stock",
+   "stack": "go-integration",
+   "file": "backend/internal/httpapi/buyer/lists.go",
+   "old": "\tif sku.InStock {\n",
+   "new": "\tif false && sku.InStock {\n",
+   "test": "internal/httpapi/buyer ^TestConnectRestockSubscriptionIsPerSKUAndRejectedWhenInStock$",
+   "why": "有貨的規格仍接受補貨訂閱：RESTOCK_SKU_IN_STOCK 的拒絕測試要紅。"
+  },
+  {
+   "id": "buyer-skus-reports-sold-out-as-in-stock",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/buyer_ports.go",
+   "old": "InStock: purchasable",
+   "new": "InStock: purchasable && false || snapshot.Active",
+   "test": "cmd/hawkr ^TestBuyerSkusReportsStockFromTheCatalogSnapshot$",
+   "why": "規格有貨的判斷不看 catalog 的可買（庫存與店家可曝光）：缺貨的規格被當成有貨，缺貨規格的測試要紅。"
+  },
+  {
+   "id": "buyer-skus-ignores-store-exposure",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/buyer_ports.go",
+   "old": "InStock: purchasable",
+   "new": "InStock: purchasable && false || snapshot.Active && snapshot.StockQty > 0",
+   "test": "cmd/hawkr ^TestBuyerSkusTreatsAStockedSKUOfAnUnexposableStoreAsOutOfStock$",
+   "why": "有貨只看快照的庫存、不看店家可曝光：不可曝光店家的有庫存規格被當成有貨，該測試要紅。"
+  },
+  {
+   "id": "restock-list-drops-sku-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/restock/restock.go",
+   "old": "\t\t\tSKUID:     row.SkuID,\n",
+   "new": "",
+   "test": "internal/modules/buyer ^TestRestockBatchesAndRollback$",
+   "why": "補貨訂閱清單漏帶 sku_id：回應的 sku_id 為零值、下一頁游標無效，游標翻頁測試要紅。"
+  },
+  {
+   "id": "notify-restocked-spins-on-an-empty-batch",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/catalog.go",
+   "old": "\t\tif notified == 0 {",
+   "new": "\t\tif notified < 0 {",
+   "test": "cmd/hawkr ^TestNotifyRestockedFailsWhenABatchMakesNoProgress$",
+   "why": "一批處理 0 筆而 more 仍為真時不回錯誤：會空轉到鎖釋放，測試要紅。"
+  },
+  {
+   "id": "legacy-batch-check-keys-by-normalized-uuid",
+   "stack": "go",
+   "file": "backend/internal/legacy/buyerserver/overlay.go",
+   "old": "parsed = append(parsed, parsedID{raw: value, id: id})",
+   "new": "parsed = append(parsed, parsedID{raw: id.String(), id: id})",
+   "test": "internal/legacy/buyerserver ^TestParseUUIDsKeepsTheCallersRawString$",
+   "why": "批次查詢的回應以解析後的小寫 UUID 為 key：大寫輸入對不上，原字串保留的測試要紅。"
   }
  ]
 }

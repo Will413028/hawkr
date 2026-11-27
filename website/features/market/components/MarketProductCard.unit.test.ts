@@ -17,9 +17,6 @@ vi.mock("@/components/shared/Avatar", () => ({ default: () => null }));
 vi.mock("@/components/shared/FavoriteButton", () => ({
 	default: () => React.createElement("button", { type: "button" }, "收藏"),
 }));
-vi.mock("@/components/shared/RestockNotifyButton", () => ({
-	default: () => React.createElement("button", { type: "button" }, "通知補貨"),
-}));
 vi.mock("@/components/shared/AddToCartButton", () => ({
 	default: (props: {
 		children: React.ReactNode;
@@ -111,10 +108,10 @@ describe("MarketProductCard", () => {
 				product: { ...product, stock: 0 },
 			}),
 		);
-		expect(screen.getByRole("button", { name: "通知補貨" })).toBeDefined();
-		expect(
-			view.container.querySelector(".market-product-card__cart-btn-icon"),
-		).toBeNull();
+		const restock = screen.getByRole("link", { name: /補貨通知/ });
+		expect(restock.getAttribute("href")).toBe(product.href);
+		expect(restock.textContent).toContain("補貨通知");
+		expect(screen.queryByRole("button", { name: /加入購物車/ })).toBeNull();
 		view.rerender(
 			React.createElement(MarketProductCard, { product, previewMode: true }),
 		);

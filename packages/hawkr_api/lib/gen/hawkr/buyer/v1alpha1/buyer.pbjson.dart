@@ -372,6 +372,7 @@ const RestockSubscription$json = {
       '6': '.google.protobuf.Timestamp',
       '10': 'createTime'
     },
+    {'1': 'sku_id', '3': 3, '4': 1, '5': 9, '10': 'skuId'},
   ],
 };
 
@@ -379,7 +380,8 @@ const RestockSubscription$json = {
 final $typed_data.Uint8List restockSubscriptionDescriptor = $convert.base64Decode(
     'ChNSZXN0b2NrU3Vic2NyaXB0aW9uEjsKB3Byb2R1Y3QYASABKAsyIS5oYXdrci5idXllci52MW'
     'FscGhhMS5Qcm9kdWN0Q2FyZFIHcHJvZHVjdBI7CgtjcmVhdGVfdGltZRgCIAEoCzIaLmdvb2ds'
-    'ZS5wcm90b2J1Zi5UaW1lc3RhbXBSCmNyZWF0ZVRpbWU=');
+    'ZS5wcm90b2J1Zi5UaW1lc3RhbXBSCmNyZWF0ZVRpbWUSFQoGc2t1X2lkGAMgASgJUgVza3VJZA'
+    '==');
 
 @$core.Deprecated('Use memberCardDescriptor instead')
 const MemberCard$json = {
@@ -1207,6 +1209,7 @@ const SubscribeRestockRequest$json = {
   '1': 'SubscribeRestockRequest',
   '2': [
     {'1': 'product_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'sku_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'skuId'},
   ],
 };
 
@@ -1214,7 +1217,7 @@ const SubscribeRestockRequest$json = {
 final $typed_data.Uint8List subscribeRestockRequestDescriptor =
     $convert.base64Decode(
         'ChdTdWJzY3JpYmVSZXN0b2NrUmVxdWVzdBIiCgpwcm9kdWN0X2lkGAEgASgJQgPgQQJSCXByb2'
-        'R1Y3RJZA==');
+        'R1Y3RJZBIaCgZza3VfaWQYAiABKAlCA+BBAlIFc2t1SWQ=');
 
 @$core.Deprecated('Use subscribeRestockResponseDescriptor instead')
 const SubscribeRestockResponse$json = {
@@ -1229,15 +1232,15 @@ final $typed_data.Uint8List subscribeRestockResponseDescriptor =
 const UnsubscribeRestockRequest$json = {
   '1': 'UnsubscribeRestockRequest',
   '2': [
-    {'1': 'product_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'sku_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'skuId'},
   ],
 };
 
 /// Descriptor for `UnsubscribeRestockRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List unsubscribeRestockRequestDescriptor =
     $convert.base64Decode(
-        'ChlVbnN1YnNjcmliZVJlc3RvY2tSZXF1ZXN0EiIKCnByb2R1Y3RfaWQYASABKAlCA+BBAlIJcH'
-        'JvZHVjdElk');
+        'ChlVbnN1YnNjcmliZVJlc3RvY2tSZXF1ZXN0EhoKBnNrdV9pZBgBIAEoCUID4EECUgVza3VJZA'
+        '==');
 
 @$core.Deprecated('Use unsubscribeRestockResponseDescriptor instead')
 const UnsubscribeRestockResponse$json = {

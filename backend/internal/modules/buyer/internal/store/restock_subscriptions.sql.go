@@ -8,28 +8,30 @@ package store
 import (
 	"context"
 	"time"
+
+	"uuid"
 )
 
 const batchRestock = `-- name: BatchRestock :many
-SELECT product_id FROM buyer.restock_subscriptions
-WHERE buyer_id = $1 AND product_id = ANY($2::bigint[])
+SELECT DISTINCT product_id FROM buyer.restock_subscriptions
+WHERE buyer_id = $1 AND product_id = ANY($2::uuid[])
 `
 
 type BatchRestockParams struct {
 	BuyerID int64
-	Column2 []int64
+	Column2 []uuid.UUID
 }
 
-// 回傳輸入清單中已訂閱補貨的商品 ID。
-func (q *Queries) BatchRestock(ctx context.Context, arg BatchRestockParams) ([]int64, error) {
+// 回傳輸入清單中至少有一個 SKU 已訂閱補貨的商品 ID。
+func (q *Queries) BatchRestock(ctx context.Context, arg BatchRestockParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, batchRestock, arg.BuyerID, arg.Column2)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var product_id int64
+		var product_id uuid.UUID
 		if err := rows.Scan(&product_id); err != nil {
 			return nil, err
 		}
@@ -53,26 +55,26 @@ func (q *Queries) CancelRestock(ctx context.Context, buyerID int64) error {
 
 const fanOut = `-- name: FanOut :many
 WITH targets AS (
-    SELECT pending.buyer_id, pending.product_id FROM buyer.restock_subscriptions AS pending
-    WHERE pending.product_id = $1
+    SELECT pending.buyer_id, pending.sku_id FROM buyer.restock_subscriptions AS pending
+    WHERE pending.sku_id = $1
     ORDER BY pending.buyer_id
     LIMIT $2
     FOR UPDATE SKIP LOCKED
 )
 DELETE FROM buyer.restock_subscriptions AS subscriptions
 USING targets
-WHERE subscriptions.buyer_id = targets.buyer_id AND subscriptions.product_id = targets.product_id
+WHERE subscriptions.buyer_id = targets.buyer_id AND subscriptions.sku_id = targets.sku_id
 RETURNING subscriptions.buyer_id
 `
 
 type FanOutParams struct {
-	ProductID  int64
+	SkuID      uuid.UUID
 	BatchLimit int32
 }
 
-// 有界鎖定並刪除待通知關聯；事件與刪除同 transaction。
+// 有界鎖定並刪除某個 SKU 的待通知關聯，回傳買家與 SKU 所屬商品；事件與刪除同 transaction。
 func (q *Queries) FanOut(ctx context.Context, arg FanOutParams) ([]int64, error) {
-	rows, err := q.db.Query(ctx, fanOut, arg.ProductID, arg.BatchLimit)
+	rows, err := q.db.Query(ctx, fanOut, arg.SkuID, arg.BatchLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -92,21 +94,21 @@ func (q *Queries) FanOut(ctx context.Context, arg FanOutParams) ([]int64, error)
 }
 
 const hasRestock = `-- name: HasRestock :one
-SELECT EXISTS (SELECT 1 FROM buyer.restock_subscriptions WHERE product_id = $1)
+SELECT EXISTS (SELECT 1 FROM buyer.restock_subscriptions WHERE sku_id = $1)
 `
 
-// 檢查商品是否仍有待通知關聯。
-func (q *Queries) HasRestock(ctx context.Context, productID int64) (bool, error) {
-	row := q.db.QueryRow(ctx, hasRestock, productID)
+// 檢查 SKU 是否仍有待通知關聯。
+func (q *Queries) HasRestock(ctx context.Context, skuID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRestock, skuID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
 const listRestock = `-- name: ListRestock :many
-SELECT buyer_id, product_id, created_at FROM buyer.restock_subscriptions
-WHERE buyer_id = $1 AND (NOT $2::boolean OR (created_at, product_id) < ($3::timestamptz, $4::bigint))
-ORDER BY created_at DESC, product_id DESC
+SELECT buyer_id, sku_id, product_id, created_at FROM buyer.restock_subscriptions
+WHERE buyer_id = $1 AND (NOT $2::boolean OR (created_at, sku_id) < ($3::timestamptz, $4::uuid))
+ORDER BY created_at DESC, sku_id DESC
 LIMIT $5
 `
 
@@ -114,11 +116,11 @@ type ListRestockParams struct {
 	BuyerID   int64
 	HasAfter  bool
 	AfterTime time.Time
-	AfterID   int64
+	AfterID   uuid.UUID
 	PageLimit int32
 }
 
-// 以時間與商品 ID 分頁列出待通知關聯。
+// 以時間與 SKU ID 分頁列出待通知關聯。
 func (q *Queries) ListRestock(ctx context.Context, arg ListRestockParams) ([]BuyerRestockSubscription, error) {
 	rows, err := q.db.Query(ctx, listRestock,
 		arg.BuyerID,
@@ -134,7 +136,12 @@ func (q *Queries) ListRestock(ctx context.Context, arg ListRestockParams) ([]Buy
 	items := []BuyerRestockSubscription{}
 	for rows.Next() {
 		var i BuyerRestockSubscription
-		if err := rows.Scan(&i.BuyerID, &i.ProductID, &i.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&i.BuyerID,
+			&i.SkuID,
+			&i.ProductID,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -145,36 +152,52 @@ func (q *Queries) ListRestock(ctx context.Context, arg ListRestockParams) ([]Buy
 	return items, nil
 }
 
+const purgeRestockSKUs = `-- name: PurgeRestockSKUs :exec
+DELETE FROM buyer.restock_subscriptions WHERE sku_id = ANY($1::uuid[])
+`
+
+// 刪除這些 SKU 的全部訂閱（商品或 SKU 刪除後）；沒有訂閱的 SKU 是 no-op，可重複呼叫。
+func (q *Queries) PurgeRestockSKUs(ctx context.Context, skuIds []uuid.UUID) error {
+	_, err := q.db.Exec(ctx, purgeRestockSKUs, skuIds)
+	return err
+}
+
 const subscribeRestock = `-- name: SubscribeRestock :exec
-INSERT INTO buyer.restock_subscriptions (buyer_id, product_id, created_at)
-VALUES ($1, $2, $3)
-ON CONFLICT (buyer_id, product_id) DO NOTHING
+INSERT INTO buyer.restock_subscriptions (buyer_id, sku_id, product_id, created_at)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (buyer_id, sku_id) DO NOTHING
 `
 
 type SubscribeRestockParams struct {
 	BuyerID   int64
-	ProductID int64
+	SkuID     uuid.UUID
+	ProductID uuid.UUID
 	CreatedAt time.Time
 }
 
-// 建立待通知關聯，同組訂閱冪等。
+// 建立待通知關聯，同組（買家、SKU）訂閱冪等。
 func (q *Queries) SubscribeRestock(ctx context.Context, arg SubscribeRestockParams) error {
-	_, err := q.db.Exec(ctx, subscribeRestock, arg.BuyerID, arg.ProductID, arg.CreatedAt)
+	_, err := q.db.Exec(ctx, subscribeRestock,
+		arg.BuyerID,
+		arg.SkuID,
+		arg.ProductID,
+		arg.CreatedAt,
+	)
 	return err
 }
 
 const unsubscribeRestock = `-- name: UnsubscribeRestock :exec
 DELETE FROM buyer.restock_subscriptions
-WHERE buyer_id = $1 AND product_id = $2
+WHERE buyer_id = $1 AND sku_id = $2
 `
 
 type UnsubscribeRestockParams struct {
-	BuyerID   int64
-	ProductID int64
+	BuyerID int64
+	SkuID   uuid.UUID
 }
 
-// 刪除指定商品的訂閱。
+// 刪除指定 SKU 的訂閱。
 func (q *Queries) UnsubscribeRestock(ctx context.Context, arg UnsubscribeRestockParams) error {
-	_, err := q.db.Exec(ctx, unsubscribeRestock, arg.BuyerID, arg.ProductID)
+	_, err := q.db.Exec(ctx, unsubscribeRestock, arg.BuyerID, arg.SkuID)
 	return err
 }

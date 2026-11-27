@@ -1,4 +1,4 @@
-// Package buyerconsumer bridges order and product events to the buyer module.
+// Package buyerconsumer bridges order events to the buyer module.
 package buyerconsumer
 
 import (
@@ -7,18 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 type Profiles interface {
 	AccountIDByBuyerID(context.Context, int64) (int64, error)
-	FanOut(context.Context, buyer.FanOutInput) (bool, error)
 }
 
 // CompletePending 隔離 accountdeletion 的結果型別。
@@ -126,70 +123,7 @@ func (w *orderCompletedWorker) completeAccountOf(ctx context.Context, resolve fu
 	}
 }
 
-type restockEvent struct {
-	EventID   string `json:"event_id"`
-	ProductID string `json:"product_id"`
-	Name      string `json:"product_name"`
-	ImageKey  string `json:"image_key"`
-	Occurred  string `json:"occurred_at"`
-}
-
-// RestockArgs 的唯一鍵只包含上游 event_id，重送的 payload 其他欄位不會另排工作。
-type RestockArgs struct {
-	EventID   string `json:"event_id" river:"unique"`
-	ProductID int64  `json:"product_id"`
-	Name      string `json:"product_name"`
-	ImageKey  string `json:"image_key"`
-	Occurred  string `json:"occurred_at"`
-}
-
-func (RestockArgs) Kind() string { return "legacy.buyer_restock" }
-
-func (RestockArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}
-}
-
-// ProductRestock 先排持久、以 event_id 去重的 River 工作，再確認 RabbitMQ 訊息。
-func (c Consumer) ProductRestock(ctx context.Context, body []byte) error {
-	var event restockEvent
-	if err := json.Unmarshal(body, &event); err != nil {
-		return permanentError{fmt.Errorf("buyerconsumer：product.restock payload：%w", err)}
-	}
-	id, err := strconv.ParseInt(event.ProductID, 10, 64)
-	if event.EventID == "" || err != nil || id <= 0 {
-		return invalidEvent("buyerconsumer：product.restock event_id/product_id 不合法")
-	}
-	if _, err := time.Parse(time.RFC3339Nano, event.Occurred); err != nil {
-		return invalidEvent("buyerconsumer：product.restock occurred_at 不合法：%v", err)
-	}
-	args := RestockArgs{EventID: event.EventID, ProductID: id, Name: event.Name, ImageKey: event.ImageKey, Occurred: event.Occurred}
-	opts := args.InsertOpts()
-	return c.Jobs.Enqueue(ctx, args, &opts)
-}
-
-type restockWorker struct {
-	river.WorkerDefaults[RestockArgs]
-	buyer Profiles
-}
-
-func (w *restockWorker) Work(ctx context.Context, job *river.Job[RestockArgs]) error {
-	occurred, err := time.Parse(time.RFC3339Nano, job.Args.Occurred)
-	if err != nil {
-		return err
-	}
-	for {
-		more, err := w.buyer.FanOut(ctx, buyer.FanOutInput{
-			ProductID: job.Args.ProductID, Limit: 100,
-			ProductName: job.Args.Name, ImageKey: job.Args.ImageKey, OccurredAt: occurred,
-		})
-		if err != nil || !more {
-			return err
-		}
-	}
-}
-
 func (c Consumer) AddWorkers(workers *river.Workers) {
-	river.AddWorker(workers, &restockWorker{buyer: c.Buyer})
 	river.AddWorker(workers, &orderCompletedWorker{buyer: c.Buyer, complete: c.Complete, storeAccount: c.StoreAccount, advanceStore: c.AdvanceStore})
 }
 

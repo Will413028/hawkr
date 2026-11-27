@@ -21,9 +21,10 @@ test("the card exposes one full-card product link without nesting controls", asy
 
 	assert.equal(
 		source.match(/href=\{product\.href\}/g)?.length,
-		1,
-		"each card should have exactly one primary product anchor",
+		2,
+		"each card has one primary product anchor plus the sold-out restock entry that routes to the same page",
 	);
+	assert.match(source, /<RestockNotifyButton[^>]*href=\{product\.href\}/);
 	assert.match(source, /data-market-product-primary-link=""/);
 	assert.match(source, /className="absolute inset-0 z-10/);
 	assert.match(source, /aria-label=\{`查看商品：\$\{product\.name\}`\}/);

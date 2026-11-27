@@ -30,8 +30,11 @@ type Service struct {
 func New(deps Deps) *Service { return &Service{deps: deps} }
 
 // Add 更新最近瀏覽時間並發布 ProductViewed。
-func (service *Service) Add(ctx context.Context, buyerID, id int64) error {
-	if err := model.Positive(buyerID, id); err != nil {
+func (service *Service) Add(ctx context.Context, buyerID int64, id uuid.UUID) error {
+	if err := model.Positive(buyerID); err != nil {
+		return err
+	}
+	if err := model.NonNil(id); err != nil {
 		return err
 	}
 	return service.deps.DB.InTx(ctx, func(ctx context.Context) error {
@@ -57,20 +60,20 @@ func (service *Service) Add(ctx context.Context, buyerID, id int64) error {
 }
 
 // List 以瀏覽時間與商品 ID 分頁。
-func (service *Service) List(ctx context.Context, input model.ListInput) (model.Page, error) {
+func (service *Service) List(ctx context.Context, input model.ProductListInput) (model.ProductPage, error) {
 	if input.After != nil {
-		if err := model.Positive(input.After.ID); err != nil {
-			return model.Page{}, err
+		if err := model.NonNil(input.After.ID); err != nil {
+			return model.ProductPage{}, err
 		}
 	}
 	if err := model.Positive(input.BuyerID); err != nil {
-		return model.Page{}, err
+		return model.ProductPage{}, err
 	}
 	count, err := pagination.PageSize(input.PageSize, 20, 100)
 	if err != nil {
-		return model.Page{}, err
+		return model.ProductPage{}, err
 	}
-	cursor := model.Cursor{}
+	cursor := model.ProductCursor{}
 	if input.After != nil {
 		cursor = *input.After
 	}
@@ -82,13 +85,13 @@ func (service *Service) List(ctx context.Context, input model.ListInput) (model.
 		PageLimit: count + 1,
 	})
 	if err != nil {
-		return model.Page{}, err
+		return model.ProductPage{}, err
 	}
-	items := make([]model.Item, 0, len(rows))
+	items := make([]model.ProductItem, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, model.Item{ID: row.ProductID, Time: row.VisitedAt})
+		items = append(items, model.ProductItem{ID: row.ProductID, Time: row.VisitedAt})
 	}
-	return model.PageOf(items, count), nil
+	return model.ProductPageOf(items, count), nil
 }
 
 // Clear 清空買家的瀏覽紀錄。

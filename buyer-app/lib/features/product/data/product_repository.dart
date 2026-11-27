@@ -249,14 +249,14 @@ class ProductRepository {
   // Restock Subscriptions (#942)
   // ---------------------------------------------------------------------------
 
-  /// 訂閱補貨通知 — POST /app/products/{productId}/restock_subscriptions
-  /// 後端冪等：已訂閱再呼叫直接回 200，不重複建立。
-  Future<bool> subscribeRestock(String productId) async {
+  /// 訂閱規格（SKU）的補貨通知。後端冪等：已訂閱再呼叫直接回成功；規格目前有貨時後端拒絕。
+  Future<bool> subscribeRestock(String productId, String skuId) async {
     final pid = productId.trim();
-    if (pid.isEmpty || int.tryParse(pid) == null) return false;
+    final sid = skuId.trim();
+    if (!_isUuid(pid) || !_isUuid(sid)) return false;
     try {
       await _buyer.subscribeRestock(
-        buyer.SubscribeRestockRequest(productId: pid),
+        buyer.SubscribeRestockRequest(productId: pid, skuId: sid),
       );
       return true;
     } catch (_) {
@@ -264,20 +264,25 @@ class ProductRepository {
     }
   }
 
-  /// 取消補貨通知訂閱 — DELETE /app/products/{productId}/restock_subscriptions
-  /// 後端冪等：未訂閱也回 200。
-  Future<bool> unsubscribeRestock(String productId) async {
-    final pid = productId.trim();
-    if (pid.isEmpty || int.tryParse(pid) == null) return false;
+  /// 取消規格（SKU）的補貨通知訂閱。後端冪等：未訂閱也成功。
+  Future<bool> unsubscribeRestock(String skuId) async {
+    final sid = skuId.trim();
+    if (!_isUuid(sid)) return false;
     try {
       await _buyer.unsubscribeRestock(
-        buyer.UnsubscribeRestockRequest(productId: pid),
+        buyer.UnsubscribeRestockRequest(skuId: sid),
       );
       return true;
     } catch (_) {
       return false;
     }
   }
+
+  static final RegExp _uuidShape = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  static bool _isUuid(String value) => _uuidShape.hasMatch(value);
 
   /// 取得分享連結 — GET /app/share_url?type={type}&id={id}
   Future<Map<String, dynamic>?> getShareUrl({

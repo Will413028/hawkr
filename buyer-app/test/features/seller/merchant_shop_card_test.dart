@@ -508,7 +508,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(adapter.restockProductIds, ['1001']);
+    expect(adapter.restockProductIds, [_restockProductId, _restockSkuId]);
     expect(find.text('已開啟補貨通知，補貨時會通知你'), findsOneWidget);
     expect(find.text('已開啟補貨通知'), findsOneWidget);
 
@@ -524,7 +524,7 @@ void main() {
       find.descendant(of: restock, matching: find.byType(GestureDetector)),
     );
     expect(detector.onTap, isNull);
-    expect(adapter.restockProductIds, ['1001']);
+    expect(adapter.restockProductIds, [_restockProductId, _restockSkuId]);
     expect(tester.takeException(), isNull);
     await tester.pump(const Duration(milliseconds: 2100));
   });
@@ -706,7 +706,9 @@ Future<_RecordingAdapter> _pumpCard(
           (_) => FakeTransportBuilder().unary(
             BuyerAppService.subscribeRestock,
             (request, _) {
-              adapter.restockProductIds.add(request.productId);
+              adapter.restockProductIds
+                ..add(request.productId)
+                ..add(request.skuId);
               return buyer.SubscribeRestockResponse();
             },
           ).build(),
@@ -738,7 +740,10 @@ Future<_RecordingAdapter> _pumpCard(
                           widgetRef: interactiveFavorite ? null : ref,
                           merchantId: '2683382637',
                           merchantName: '金湖水產',
-                          sku: '1001',
+                          sku: _restockProductId,
+                          grades: const [
+                            {'id': _restockSkuId},
+                          ],
                           title: '澎湖現流急凍小花枝切片家庭號',
                           imageUrls: const [],
                           fallbackPrice: 299,
@@ -771,6 +776,9 @@ Future<_RecordingAdapter> _pumpCard(
   await tester.pump(const Duration(milliseconds: 10));
   return adapter;
 }
+
+const _restockProductId = '0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b';
+const _restockSkuId = '0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c';
 
 class _SignedInSession extends Session {
   @override

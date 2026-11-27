@@ -375,7 +375,7 @@ type SellerPayoutCapability struct {
 
 type SellerProductViewEvent struct {
 	EventID     uuid.UUID
-	ProductID   int64
+	ProductID   uuid.UUID
 	OccurredAt  time.Time
 	StoreID     *int64
 	ProcessedAt *time.Time

@@ -1,4 +1,4 @@
-h1:9Xn54trAc7rkn8gD/MfizVl37gCyDaNyK5dABLkjS4o=
+h1:vXV/FIDGjaradJFaTgmirYlkVEYzd4d7E1fN5xTVQTg=
 20260928215932_buyer_schema.sql h1:cPW6PVSv32fI3+pFmfKVVcWNWACyQcjRl+8UtDQrOqI=
 20260928230627_buyer_tables.sql h1:du5isn4Kz8zoySdcLZY08aTCpSIPqVj1jPIb7vjL07o=
 20260928230628_buyer_membership_plan_seeds.sql h1:Mvn1TBmcjETjXk3mPrudT+jNOLCjOwJwTIwpsrG+dS8=
@@ -16,3 +16,4 @@ h1:9Xn54trAc7rkn8gD/MfizVl37gCyDaNyK5dABLkjS4o=
 20261123075138_drop_buyer_memberships.sql h1:EAsDRhSmmm4yT3vzln2SX1HwNCC+lHib2Byl5D63XQc=
 20261123120000_drop_buyer_membership_plans.sql h1:iLYbzQn0Ow/tt/afVbHN0Xypzd9HtOlUEsLny7vFTHc=
 20261124101721_buyer_followers_store_buyer_index.sql h1:GniE33zuyTRpMd4nxRYwC13s3G9YdidiJJjSNLtarWw=
+20261127114124_buyer_product_uuid_restock_sku.sql h1:LksycS+A8PsKlf3ia8LxQRdValE4ve0IeLu1e3523u8=

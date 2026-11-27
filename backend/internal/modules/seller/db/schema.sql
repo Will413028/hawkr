@@ -1327,12 +1327,12 @@ CREATE INDEX prospect_categories_category ON seller.prospect_categories (categor
 -- （商品在 catalog）。
 CREATE TABLE seller.product_view_events (
     event_id     UUID PRIMARY KEY,
-    product_id   BIGINT NOT NULL,
+    product_id   UUID NOT NULL,
     occurred_at  TIMESTAMPTZ NOT NULL,
     store_id     BIGINT,
     processed_at TIMESTAMPTZ,
     outcome      TEXT,
-    CONSTRAINT product_view_events_product_check CHECK (product_id > 0),
+    CONSTRAINT product_view_events_product_check CHECK (product_id <> '00000000-0000-0000-0000-000000000000'::uuid),
     CONSTRAINT product_view_events_outcome_check CHECK (outcome IN ('COUNTED', 'UNRESOLVED')),
     CONSTRAINT product_view_events_processed_check CHECK (
         (processed_at IS NULL AND outcome IS NULL AND store_id IS NULL)

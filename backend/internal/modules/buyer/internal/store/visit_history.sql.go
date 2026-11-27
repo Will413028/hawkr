@@ -8,6 +8,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"uuid"
 )
 
 const addVisit = `-- name: AddVisit :execrows
@@ -19,7 +21,7 @@ SET visited_at = excluded.visited_at
 
 type AddVisitParams struct {
 	BuyerID   int64
-	ProductID int64
+	ProductID uuid.UUID
 	VisitedAt time.Time
 }
 
@@ -40,15 +42,15 @@ RETURNING product_id
 `
 
 // 清空指定買家的瀏覽紀錄。
-func (q *Queries) ClearVisit(ctx context.Context, buyerID int64) ([]int64, error) {
+func (q *Queries) ClearVisit(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, clearVisit, buyerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var product_id int64
+		var product_id uuid.UUID
 		if err := rows.Scan(&product_id); err != nil {
 			return nil, err
 		}
@@ -63,7 +65,7 @@ func (q *Queries) ClearVisit(ctx context.Context, buyerID int64) ([]int64, error
 const listVisit = `-- name: ListVisit :many
 SELECT buyer_id, product_id, visited_at
 FROM buyer.visit_history
-WHERE buyer_id = $1 AND (NOT $2::boolean OR (visited_at, product_id) < ($3::timestamptz, $4::bigint))
+WHERE buyer_id = $1 AND (NOT $2::boolean OR (visited_at, product_id) < ($3::timestamptz, $4::uuid))
 ORDER BY visited_at DESC, product_id DESC
 LIMIT $5
 `
@@ -72,7 +74,7 @@ type ListVisitParams struct {
 	BuyerID   int64
 	HasAfter  bool
 	AfterTime time.Time
-	AfterID   int64
+	AfterID   uuid.UUID
 	PageLimit int32
 }
 

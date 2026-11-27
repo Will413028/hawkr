@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
@@ -45,7 +46,7 @@ func (publicModule) StoreCards(_ context.Context, ids []int64) ([]seller.StoreCa
 	return out, nil
 }
 
-func (publicModule) RecordProductView(context.Context, int64) error { return nil }
+func (publicModule) RecordProductView(context.Context, uuid.UUID) error { return nil }
 
 type publicFollowers struct{}
 
@@ -130,10 +131,10 @@ func TestPublicReadsAreServedAsCacheableGETs(t *testing.T) {
 func TestRecordProductViewIsAnUncachedPOST(t *testing.T) {
 	h := publicEntry(t)
 	procedure := sellerv1alpha1connect.SellerPublicServiceRecordProductViewProcedure
-	if rec := do(h, connectGET(t, procedure, `{"productId":"1"}`)); rec.Code == http.StatusOK {
+	if rec := do(h, connectGET(t, procedure, `{"productId":"0190a000-0000-7000-8000-000000000001"}`)); rec.Code == http.StatusOK {
 		t.Fatalf("GET 呼叫了寫入的方法：%d", rec.Code)
 	}
-	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, procedure, strings.NewReader(`{"productId":"1"}`))
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, procedure, strings.NewReader(`{"productId":"0190a000-0000-7000-8000-000000000001"}`))
 	r.Header.Set("Content-Type", "application/json")
 	rec := do(h, r)
 	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "private, no-store" {
@@ -147,7 +148,7 @@ func TestRecordProductViewIsLimitedPerSourceIP(t *testing.T) {
 	h := publicEntry(t)
 	procedure := sellerv1alpha1connect.SellerPublicServiceRecordProductViewProcedure
 	post := func(ip string) *httptest.ResponseRecorder {
-		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, procedure, strings.NewReader(`{"productId":"1"}`))
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, procedure, strings.NewReader(`{"productId":"0190a000-0000-7000-8000-000000000001"}`))
 		r.Header.Set("Content-Type", "application/json")
 		r.RemoteAddr = ip + ":4000"
 		return do(h, r)

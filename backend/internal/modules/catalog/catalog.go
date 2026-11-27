@@ -274,6 +274,11 @@ func (m *Module) SkuCartInfo(ctx context.Context, skuIDs []uuid.UUID) (map[uuid.
 	return m.product.SkuSnapshots(ctx, skuIDs)
 }
 
+// SkuPurchasable 回報 SKU 此刻是否可買（D26）：有庫存、SKU 與商品未刪、商品 ACTIVE、店家可曝光（與補貨通知同一個判斷）；SKU 不存在回 false。
+func (m *Module) SkuPurchasable(ctx context.Context, skuID uuid.UUID) (bool, error) {
+	return m.restock.Purchasable(ctx, skuID)
+}
+
 // AddFavorite 把商品的收藏數加一，由 buyer 在收藏列同一個 transaction 內呼叫（D3）：與呼叫方的 transaction 同進退（ctx 沒有時單句寫入）。商品不存在或已刪除回 ErrProductNotFound。
 func (m *Module) AddFavorite(ctx context.Context, productID uuid.UUID) error {
 	return m.product.AddFavorite(ctx, productID)

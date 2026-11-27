@@ -125,16 +125,9 @@ func (s *Server) ValidateAddress(context.Context, *connect.Request[pb.ValidateAd
 	return connect.NewResponse(&pb.ValidateAddressResponse{Code: 9700, Message: "地址查詢已停用"}), nil
 }
 
-func (s *Server) ListFavoritedProductIds(ctx context.Context, req *connect.Request[pb.ListFavoritedProductIdsRequest]) (*connect.Response[pb.ListFavoritedProductIdsResponse], error) {
-	ids, err := s.buyer.FavoritedProductIDs(ctx, req.Msg.GetBuyerId())
-	if err != nil {
-		code, msg, fatal := failure(err)
-		if fatal != nil {
-			return nil, fatal
-		}
-		return connect.NewResponse(&pb.ListFavoritedProductIdsResponse{Code: code, Message: msg}), nil
-	}
-	return connect.NewResponse(&pb.ListFavoritedProductIdsResponse{ProductIds: ids}), nil
+// ListFavoritedProductIds 回空清單：回應的商品 ID 是整數（舊 proto），收藏的商品 ID 已是 UUID，沒有收藏對得上舊的整數商品。
+func (s *Server) ListFavoritedProductIds(context.Context, *connect.Request[pb.ListFavoritedProductIdsRequest]) (*connect.Response[pb.ListFavoritedProductIdsResponse], error) {
+	return connect.NewResponse(&pb.ListFavoritedProductIdsResponse{ProductIds: []int64{}}), nil
 }
 
 func (s *Server) ListSubscribedSellerIds(ctx context.Context, req *connect.Request[pb.ListSubscribedSellerIdsRequest]) (*connect.Response[pb.ListSubscribedSellerIdsResponse], error) {

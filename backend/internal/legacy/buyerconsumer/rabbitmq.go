@@ -11,6 +11,5 @@ import (
 func (c Consumer) Run(ctx context.Context, url string, log *slog.Logger) {
 	rabbitmq.Run(ctx, url, []rabbitmq.Binding{
 		{Queue: "hawkr.monolith.buyer.order.completed", Exchange: "hawkr.order", Key: "order.completed", Handle: c.OrderCompleted},
-		{Queue: "hawkr.monolith.buyer.product.restock", Exchange: "hawkr.product", Key: "product.restock", Handle: c.ProductRestock},
 	}, isPermanent, log)
 }

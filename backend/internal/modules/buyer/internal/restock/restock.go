@@ -30,9 +30,13 @@ type Service struct {
 // New 建立服務，外部依賴由組裝點提供。
 func New(deps Deps) *Service { return &Service{deps: deps} }
 
-// Subscribe 建立 待通知訂閱，同組重複訂閱冪等。
-func (service *Service) Subscribe(ctx context.Context, buyerID, productID int64) error {
-	if err := model.Positive(buyerID, productID); err != nil {
+// Subscribe 建立 SKU 粒度的待通知訂閱（一次性，不設到期），同組重複訂閱冪等。productID 是 SKU 所屬的商品，供清單顯示；
+// SKU 存在與否、是否有貨由呼叫端（httpapi）經 catalog 確認，這裡不看 catalog。
+func (service *Service) Subscribe(ctx context.Context, buyerID int64, productID, skuID uuid.UUID) error {
+	if err := model.Positive(buyerID); err != nil {
+		return err
+	}
+	if err := model.NonNil(productID, skuID); err != nil {
 		return err
 	}
 	return service.deps.DB.InTx(ctx, func(ctx context.Context) error {
@@ -42,15 +46,19 @@ func (service *Service) Subscribe(ctx context.Context, buyerID, productID int64)
 		}
 		return queries.SubscribeRestock(ctx, store.SubscribeRestockParams{
 			BuyerID:   buyerID,
+			SkuID:     skuID,
 			ProductID: productID,
 			CreatedAt: service.deps.Now().UTC(),
 		})
 	})
 }
 
-// Unsubscribe 取消指定商品的 待通知訂閱。
-func (service *Service) Unsubscribe(ctx context.Context, buyerID, productID int64) error {
-	if err := model.Positive(buyerID, productID); err != nil {
+// Unsubscribe 取消指定 SKU 的待通知訂閱。
+func (service *Service) Unsubscribe(ctx context.Context, buyerID int64, skuID uuid.UUID) error {
+	if err := model.Positive(buyerID); err != nil {
+		return err
+	}
+	if err := model.NonNil(skuID); err != nil {
 		return err
 	}
 	return service.deps.DB.InTx(ctx, func(ctx context.Context) error {
@@ -58,67 +66,84 @@ func (service *Service) Unsubscribe(ctx context.Context, buyerID, productID int6
 		if _, err := stint.Require(ctx, queries, buyerID, false); err != nil {
 			return err
 		}
-		return queries.UnsubscribeRestock(ctx, store.UnsubscribeRestockParams{BuyerID: buyerID, ProductID: productID})
+		return queries.UnsubscribeRestock(ctx, store.UnsubscribeRestockParams{BuyerID: buyerID, SkuID: skuID})
 	})
 }
 
-// FanOut 在獨立 transaction 內處理最多 Limit 筆（1..100），回傳是否仍有待通知訂閱。事件的發生時間與顯示快照
-// 一律來自輸入（上游事件），不在這裡補當下時間。
-func (service *Service) FanOut(ctx context.Context, input model.FanOutInput) (bool, error) {
-	if err := model.Positive(input.ProductID); err != nil {
-		return false, err
+// PurgeSKUs 刪除這些 SKU 的全部待通知訂閱（商品或 SKU 刪除後，由 catalog 的清理 job 在 transaction 外呼叫）；沒有訂閱的 SKU 是 no-op，
+// 可重複呼叫，空清單回 nil。
+func (service *Service) PurgeSKUs(ctx context.Context, skuIDs []uuid.UUID) error {
+	if len(skuIDs) == 0 {
+		return nil
+	}
+	if err := model.NonNil(skuIDs...); err != nil {
+		return err
+	}
+	return store.New(service.deps.DB.Conn(ctx)).PurgeRestockSKUs(ctx, skuIDs)
+}
+
+// FanOut 在獨立 transaction 內處理某個 SKU 最多 Limit 筆（1..100）訂閱：通知並刪除（一次性），回傳這一批通知了幾筆與該 SKU 是否仍有待通知訂閱。
+// 事件的發生時間與顯示快照一律來自輸入，不在這裡補當下時間。其他 SKU 的訂閱（含同商品的）不被通知也不被刪除。
+func (service *Service) FanOut(ctx context.Context, input model.FanOutInput) (int, bool, error) {
+	if err := model.NonNil(input.ProductID, input.SKUID); err != nil {
+		return 0, false, err
 	}
 	if input.Limit < 1 || input.Limit > model.MaxBatchSize {
-		return false, apperr.InvalidInput("補貨批次大小必須為 1 到 100")
+		return 0, false, apperr.InvalidInput("補貨批次大小必須為 1 到 100")
 	}
 	if input.OccurredAt.IsZero() {
-		return false, apperr.InvalidInput("補貨事件的發生時間必填")
+		return 0, false, apperr.InvalidInput("補貨事件的發生時間必填")
 	}
 	if _, ok := db.TxFrom(ctx); ok {
-		return false, apperr.FailedPrecondition("補貨分批必須在 transaction 外開始")
+		return 0, false, apperr.FailedPrecondition("補貨分批必須在 transaction 外開始")
 	}
-	productID, limit := input.ProductID, input.Limit
-	var more bool
+	skuID, limit := input.SKUID, input.Limit
+	var (
+		notified int
+		more     bool
+	)
 	err := service.deps.DB.InTx(ctx, func(ctx context.Context) error {
 		queries := store.New(service.deps.DB.Conn(ctx))
-		buyerIDs, err := queries.FanOut(ctx, store.FanOutParams{ProductID: productID, BatchLimit: limit})
+		buyerIDs, err := queries.FanOut(ctx, store.FanOutParams{SkuID: skuID, BatchLimit: limit})
 		if err != nil {
 			return err
 		}
+		notified = len(buyerIDs)
 		for _, buyerID := range buyerIDs {
 			if err := events.Publish(ctx, service.deps.Events, model.RestockTargeted{
 				OccurredAt:  input.OccurredAt.UTC(),
 				EventID:     uuid.NewV7(),
 				BuyerID:     buyerID,
-				ProductID:   productID,
+				ProductID:   input.ProductID,
+				SKUID:       skuID,
 				ProductName: input.ProductName,
 				ImageKey:    input.ImageKey,
 			}); err != nil {
 				return err
 			}
 		}
-		more, err = queries.HasRestock(ctx, productID)
+		more, err = queries.HasRestock(ctx, skuID)
 		return err
 	})
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
-	return more, nil
+	return notified, more, nil
 }
 
-// BatchCheck 批次查詢 待通知訂閱，輸入最多 100 個 ID。
-func (service *Service) BatchCheck(ctx context.Context, buyerID int64, ids []int64) (map[int64]bool, error) {
+// BatchCheck 批次查詢商品是否有 SKU 在待通知訂閱，輸入最多 100 個商品 ID。
+func (service *Service) BatchCheck(ctx context.Context, buyerID int64, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
 	if err := model.Positive(buyerID); err != nil {
 		return nil, err
 	}
-	if err := model.BatchIDs(ids); err != nil {
+	if err := model.BatchUUIDs(ids); err != nil {
 		return nil, err
 	}
 	rows, err := store.New(service.deps.DB.Conn(ctx)).BatchRestock(ctx, store.BatchRestockParams{BuyerID: buyerID, Column2: ids})
 	if err != nil {
 		return nil, err
 	}
-	result := map[int64]bool{}
+	result := map[uuid.UUID]bool{}
 	for _, id := range ids {
 		result[id] = false
 	}
@@ -139,7 +164,7 @@ func (service *Service) List(ctx context.Context, input model.RestockListInput) 
 	}
 	cursor := model.RestockCursor{}
 	if input.After != nil {
-		if err := model.Positive(input.After.ID); err != nil {
+		if err := model.NonNil(input.After.ID); err != nil {
 			return model.RestockPage{}, err
 		}
 		cursor = *input.After
@@ -159,13 +184,14 @@ func (service *Service) List(ctx context.Context, input model.RestockListInput) 
 		result.Items = append(result.Items, model.Restock{
 			BuyerID:   row.BuyerID,
 			ProductID: row.ProductID,
+			SKUID:     row.SkuID,
 			CreatedAt: row.CreatedAt,
 		})
 	}
 	if len(result.Items) > int(count) {
 		result.Items = result.Items[:count]
 		last := result.Items[len(result.Items)-1]
-		result.Next = &model.RestockCursor{Time: last.CreatedAt, ID: last.ProductID}
+		result.Next = &model.RestockCursor{Time: last.CreatedAt, ID: last.SKUID}
 	}
 	return result, nil
 }

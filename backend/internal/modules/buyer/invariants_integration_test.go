@@ -74,10 +74,10 @@ func TestProfilePartialUpdateAndPendingWrites(t *testing.T) {
 	_, err = fixture.module.UpdateAddress(ctx, input)
 	must(t, err)
 	must(t, fixture.module.DeleteAddress(ctx, buyer.BuyerID, address.AddressID, 0))
-	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, 10))
+	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, pid(10)))
 	must(t, fixture.module.ClearVisits(ctx, buyer.BuyerID))
-	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, 10))
-	must(t, fixture.module.UnsubscribeRestock(ctx, buyer.BuyerID, 10))
+	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, pid(10), skuOf(10)))
+	must(t, fixture.module.UnsubscribeRestock(ctx, buyer.BuyerID, skuOf(10)))
 	current, err := fixture.module.Profile(ctx, buyer.AccountID)
 	must(t, err)
 	token, _ := stageAvatar(t, fixture, buyer.AccountID)
@@ -91,7 +91,7 @@ func TestProfilePartialUpdateAndPendingWrites(t *testing.T) {
 		t.Fatal(updatedAvatar)
 	}
 	for _, write := range []func() error{
-		func() error { return fixture.module.AddFavorite(ctx, buyer.BuyerID, 10) },
+		func() error { return fixture.module.AddFavorite(ctx, buyer.BuyerID, pid(10)) },
 		func() error { return fixture.module.Follow(ctx, buyer.BuyerID, 10) },
 	} {
 		if err := write(); apperr.KindOf(err) != apperr.KindFailedPrecondition {
@@ -212,7 +212,7 @@ func TestCloseForDeletionEffects(t *testing.T) {
 	fixture := setup(t)
 	ctx := context.Background()
 	buyer := profile(t, fixture, 1)
-	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, 10))
+	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, pid(10), skuOf(10)))
 	var deleted []BuyerDeleted
 	events.Subscribe(fixture.bus, func(_ context.Context, event BuyerDeleted) error {
 		deleted = append(deleted, event)
@@ -259,12 +259,12 @@ func TestEventsUseInjectedOccurrenceTime(t *testing.T) {
 		timestamps["buyer.deleted"] = event.OccurredAt
 		return nil
 	})
-	must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, 10))
+	must(t, fixture.module.AddFavorite(ctx, buyer.BuyerID, pid(10)))
 	must(t, fixture.module.Follow(ctx, buyer.BuyerID, 20))
-	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, 10))
-	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, 10))
+	must(t, fixture.module.RecordVisit(ctx, buyer.BuyerID, pid(10)))
+	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, pid(10), skuOf(10)))
 	{
-		_, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: 10, Limit: 100, OccurredAt: fixture.now})
+		_, _, err := fixture.module.FanOut(ctx, FanOutInput{ProductID: pid(10), SKUID: skuOf(10), Limit: 100, OccurredAt: fixture.now})
 		must(t, err)
 	}
 	must(t, fixture.module.CloseForDeletion(ctx, buyer.BuyerID))

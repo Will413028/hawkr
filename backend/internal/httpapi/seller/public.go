@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,7 +21,7 @@ type PublicModule interface {
 	PublicStoreByCode(ctx context.Context, storeCode int64) (model.PublicStore, error)
 	ListPublicStores(ctx context.Context, in model.ListPublicStoresInput) (model.PublicStorePage, error)
 	StoreCards(ctx context.Context, storeIDs []int64) ([]model.StoreCard, error)
-	RecordProductView(ctx context.Context, productID int64) error
+	RecordProductView(ctx context.Context, productID uuid.UUID) error
 }
 
 // FollowerCounts 是店家粉絲數的來源（buyer 模組擁有追蹤）：沒有粉絲的店家是 0。
@@ -178,7 +179,7 @@ func (h *Public) BatchGetStores(ctx context.Context, req *connect.Request[pb.Bat
 // RecordProductView 只計訪客：有呼叫者（登入的帳號或管理員）時回成功但不計數，登入買家的瀏覽由 buyer 的 ProductViewed 計入。
 // 每個來源 IP 的額度在入口（httpapi 的 tierProductView）。
 func (h *Public) RecordProductView(ctx context.Context, req *connect.Request[pb.RecordProductViewRequest]) (*connect.Response[pb.RecordProductViewResponse], error) {
-	productID, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	productID, err := rpc.ParseUUID("product_id", req.Msg.GetProductId())
 	if err != nil {
 		return nil, err
 	}

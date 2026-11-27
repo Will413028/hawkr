@@ -89,6 +89,18 @@ func (s *Service) StockIncreased(ctx context.Context, skuID uuid.UUID, added int
 	})
 }
 
+// Purchasable 回報 SKU 此刻是否可買（D26）：有庫存、SKU 與商品未刪、商品 ACTIVE、店家在 now 可曝光；SKU 不存在回 false。
+func (s *Service) Purchasable(ctx context.Context, skuID uuid.UUID) (bool, error) {
+	st, err := s.q(ctx).GetSkuRestockState(ctx, store.GetSkuRestockStateParams{ID: skuID, At: s.d.Now()})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return st.Purchasable, nil
+}
+
 // ProductActivated 在商品由 DRAFT 或 ARCHIVED 切成 ACTIVE 的 transaction 內呼叫：商品每個沒刪除的 SKU 都排，不看庫存。
 // 不讀庫存就不會與並行的 0 到正庫存變更互相看不到而漏通知；庫存是 0 的 SKU 由 worker 執行時重新確認而不通知。
 func (s *Service) ProductActivated(ctx context.Context, productID uuid.UUID) error {

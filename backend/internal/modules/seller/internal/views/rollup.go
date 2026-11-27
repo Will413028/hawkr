@@ -51,11 +51,11 @@ func (s *Service) rollupBatch(ctx context.Context) (int, int, error) {
 	if err != nil || len(pending) == 0 {
 		return 0, 0, err
 	}
-	productIDs := make([]int64, 0, len(pending))
+	productIDs := make([]uuid.UUID, 0, len(pending))
 	for _, e := range pending {
 		productIDs = append(productIDs, e.ProductID)
 	}
-	slices.Sort(productIDs)
+	slices.SortFunc(productIDs, uuid.UUID.Compare)
 	productIDs = slices.Compact(productIDs)
 	portCtx, cancel := context.WithTimeout(ctx, portTimeout)
 	stores, err := s.d.ProductStores.StoreIDs(portCtx, productIDs)

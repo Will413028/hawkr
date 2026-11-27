@@ -4,6 +4,7 @@ package seller_test
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"slices"
@@ -20,19 +21,27 @@ import (
 // fakeProductStores 是商品→店家 port 的替身：stores 沒有的商品視為不存在，err 非 nil 時整批失敗；記下每次呼叫的商品 ID。
 type fakeProductStores struct {
 	mu     sync.Mutex
-	stores map[int64]int64
+	stores map[uuid.UUID]int64
 	err    error
-	calls  [][]int64
+	calls  [][]uuid.UUID
 }
 
-func (p *fakeProductStores) StoreIDs(_ context.Context, ids []int64) (map[int64]int64, error) {
+// pid 是測試用的確定性商品 ID（UUID）：n 放在最後 8 個位元組。
+func pid(n int64) uuid.UUID {
+	var id uuid.UUID
+	binary.BigEndian.PutUint64(id[8:], uint64(n))
+	id[0] = 0x01
+	return id
+}
+
+func (p *fakeProductStores) StoreIDs(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]int64, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.calls = append(p.calls, slices.Clone(ids))
 	if p.err != nil {
 		return nil, p.err
 	}
-	out := map[int64]int64{}
+	out := map[uuid.UUID]int64{}
 	for _, id := range ids {
 		if storeID, ok := p.stores[id]; ok {
 			out[id] = storeID
@@ -41,11 +50,11 @@ func (p *fakeProductStores) StoreIDs(_ context.Context, ids []int64) (map[int64]
 	return out, nil
 }
 
-func (p *fakeProductStores) set(productID, storeID int64) {
+func (p *fakeProductStores) set(productID uuid.UUID, storeID int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.stores == nil {
-		p.stores = map[int64]int64{}
+		p.stores = map[uuid.UUID]int64{}
 	}
 	p.stores[productID] = storeID
 }
@@ -72,8 +81,8 @@ func (f *fixture) pendingEvents(t *testing.T) int64 {
 func (f *fixture) view(t *testing.T, storeID int64, at time.Time) {
 	t.Helper()
 	f.now = at
-	f.products.set(900000+storeID, storeID)
-	must(t, f.module.RecordProductView(context.Background(), 900000+storeID))
+	f.products.set(pid(900000+storeID), storeID)
+	must(t, f.module.RecordProductView(context.Background(), pid(900000+storeID)))
 	n, err := f.module.RollupProductViews(context.Background())
 	must(t, err)
 	if n != 1 {
@@ -104,8 +113,8 @@ func TestRecordProductViewOnlyAppendsAnEvent(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	must(t, f.module.RecordProductView(ctx, 10))
-	must(t, f.module.RecordProductView(ctx, 10))
+	must(t, f.module.RecordProductView(ctx, pid(10)))
+	must(t, f.module.RecordProductView(ctx, pid(10)))
 	if got := f.pendingEvents(t); got != 2 {
 		t.Fatalf("pending events=%d, want 2 (總次數、不去重)", got)
 	}
@@ -115,15 +124,16 @@ func TestRecordProductViewOnlyAppendsAnEvent(t *testing.T) {
 	// 事件重送（同一個 event_id）不會多一列。
 	id := uuid.NewV7()
 	for range 2 {
-		must(t, f.module.IngestProductView(ctx, ProductView{EventID: id, ProductID: 11, OccurredAt: f.now}))
+		must(t, f.module.IngestProductView(ctx, ProductView{EventID: id, ProductID: pid(11), OccurredAt: f.now}))
 	}
 	if got := f.count(t, "SELECT count(*) FROM seller.product_view_events WHERE event_id = $1", id); got != 1 {
 		t.Fatalf("redelivered event rows=%d, want 1", got)
 	}
-	for _, productID := range []int64{0, -5} {
-		if err := f.module.RecordProductView(ctx, productID); apperr.KindOf(err) != apperr.KindInvalidInput {
-			t.Fatalf("productID %d: %v", productID, err)
-		}
+	if err := f.module.RecordProductView(ctx, uuid.UUID{}); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("nil productID: %v", err)
+	}
+	if err := f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), OccurredAt: f.now}); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("nil productID ingest: %v", err)
 	}
 }
 
@@ -137,14 +147,14 @@ func TestRollupBucketsByStoreAndTaipeiDayOfOccurrence(t *testing.T) {
 	if s.StoreID == accountID {
 		t.Fatal("fixture must keep store_id and account_id apart")
 	}
-	f.products.set(10, s.StoreID)
-	f.products.set(11, s.StoreID)
+	f.products.set(pid(10), s.StoreID)
+	f.products.set(pid(11), s.StoreID)
 	// UTC 的 10/3 15:59:59 還是台北的 10/3，16:00:00 已經是台北的 10/4。
 	for i, at := range []time.Time{
 		time.Date(2026, 10, 3, 15, 59, 59, 0, time.UTC), time.Date(2026, 10, 3, 15, 59, 59, 0, time.UTC),
 		time.Date(2026, 10, 3, 16, 0, 0, 0, time.UTC),
 	} {
-		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: 10 + int64(i%2), OccurredAt: at}))
+		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(10 + int64(i%2)), OccurredAt: at}))
 	}
 	// 處理發生在台北的 10/4 中午，晚了半天。
 	f.now = time.Date(2026, 10, 4, 12, 0, 0, 0, twtime.Taipei)
@@ -167,7 +177,7 @@ func TestRollupBucketsByStoreAndTaipeiDayOfOccurrence(t *testing.T) {
 	}
 	// 沒有去重：同一天一直加。
 	for range 3 {
-		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: 10, OccurredAt: time.Date(2026, 10, 4, 3, 0, 0, 0, twtime.Taipei)}))
+		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(10), OccurredAt: time.Date(2026, 10, 4, 3, 0, 0, 0, twtime.Taipei)}))
 	}
 	_, err = f.module.RollupProductViews(ctx)
 	must(t, err)
@@ -183,10 +193,10 @@ func TestRollupResolvesDistinctProductsInOneCall(t *testing.T) {
 	ctx := context.Background()
 	_, a := f.open(t)
 	_, b := f.open(t)
-	f.products.set(10, a.StoreID)
-	f.products.set(20, b.StoreID)
+	f.products.set(pid(10), a.StoreID)
+	f.products.set(pid(20), b.StoreID)
 	for _, productID := range []int64{10, 20, 10, 10} {
-		must(t, f.module.RecordProductView(ctx, productID))
+		must(t, f.module.RecordProductView(ctx, pid(productID)))
 	}
 	if _, err := f.module.RollupProductViews(ctx); err != nil {
 		t.Fatal(err)
@@ -195,7 +205,7 @@ func TestRollupResolvesDistinctProductsInOneCall(t *testing.T) {
 	if f.viewRow(t, a.StoreID, day) != 3 || f.viewRow(t, b.StoreID, day) != 1 {
 		t.Fatalf("buckets=%v", f.buckets(t))
 	}
-	if f.products.callCount() != 1 || !slices.Equal(f.products.calls[0], []int64{10, 20}) {
+	if f.products.callCount() != 1 || !slices.Equal(f.products.calls[0], []uuid.UUID{pid(10), pid(20)}) {
 		t.Fatalf("port calls=%v, want one call with [10 20]", f.products.calls)
 	}
 }
@@ -206,9 +216,9 @@ func TestRollupTransientPortErrorMarksNothingAndRetryCountsOnce(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, s := f.open(t)
-	f.products.set(10, s.StoreID)
-	must(t, f.module.RecordProductView(ctx, 10))
-	must(t, f.module.RecordProductView(ctx, 10))
+	f.products.set(pid(10), s.StoreID)
+	must(t, f.module.RecordProductView(ctx, pid(10)))
+	must(t, f.module.RecordProductView(ctx, pid(10)))
 	f.products.err = errors.New("product service down")
 	if _, err := f.module.RollupProductViews(ctx); err == nil {
 		t.Fatal("rollup swallowed the port error")
@@ -230,9 +240,9 @@ func TestRollupMarksUnresolvedProductsAndDoesNotRetryThem(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.products.set(30, 0) // 商品存在但沒有店家
-	must(t, f.module.RecordProductView(ctx, 404))
-	must(t, f.module.RecordProductView(ctx, 30))
+	f.products.set(pid(30), 0) // 商品存在但沒有店家
+	must(t, f.module.RecordProductView(ctx, pid(404)))
+	must(t, f.module.RecordProductView(ctx, pid(30)))
 	n, err := f.module.RollupProductViews(ctx)
 	must(t, err)
 	if n != 2 || len(f.buckets(t)) != 0 {
@@ -255,11 +265,11 @@ func TestRollupMarksEventsOfUnknownStoresUnresolvedAndTheBatchContinues(t *testi
 	ctx := context.Background()
 	_, s := f.open(t)
 	const unknownStore = int64(987654321)
-	f.products.set(40, s.StoreID)
-	f.products.set(41, unknownStore)
-	f.products.set(42, s.StoreID)
+	f.products.set(pid(40), s.StoreID)
+	f.products.set(pid(41), unknownStore)
+	f.products.set(pid(42), s.StoreID)
 	for _, productID := range []int64{40, 41, 42} {
-		must(t, f.module.RecordProductView(ctx, productID))
+		must(t, f.module.RecordProductView(ctx, pid(productID)))
 	}
 	n, err := f.module.RollupProductViews(ctx)
 	must(t, err)
@@ -272,7 +282,7 @@ func TestRollupMarksEventsOfUnknownStoresUnresolvedAndTheBatchContinues(t *testi
 	if got := f.count(t, "SELECT count(*) FROM seller.product_views_daily WHERE store_id = $1", unknownStore); got != 0 {
 		t.Fatalf("unknown store has %d daily rows, want 0", got)
 	}
-	if got := f.count(t, "SELECT count(*) FROM seller.product_view_events WHERE product_id = 41 AND outcome = 'UNRESOLVED' AND store_id IS NULL AND processed_at IS NOT NULL"); got != 1 {
+	if got := f.count(t, "SELECT count(*) FROM seller.product_view_events WHERE product_id = $1 AND outcome = 'UNRESOLVED' AND store_id IS NULL AND processed_at IS NOT NULL", pid(41)); got != 1 {
 		t.Fatalf("unknown-store event must be UNRESOLVED, got %d", got)
 	}
 	if got := f.count(t, "SELECT count(*) FROM seller.product_view_events WHERE outcome = 'COUNTED'"); got != 2 {
@@ -289,10 +299,10 @@ func TestRollupRerunDoesNotDoubleCountAndDrainsBacklog(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, s := f.open(t)
-	f.products.set(10, s.StoreID)
+	f.products.set(pid(10), s.StoreID)
 	const n = 250 // 超過一批（100）
 	for range n {
-		must(t, f.module.RecordProductView(ctx, 10))
+		must(t, f.module.RecordProductView(ctx, pid(10)))
 	}
 	for range 3 {
 		if _, err := f.module.RollupProductViews(ctx); err != nil {
@@ -310,10 +320,10 @@ func TestRollupConcurrentRunsCountEachEventOnce(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, s := f.open(t)
-	f.products.set(10, s.StoreID)
+	f.products.set(pid(10), s.StoreID)
 	const events, runners = 300, 4
 	for range events {
-		must(t, f.module.RecordProductView(ctx, 10))
+		must(t, f.module.RecordProductView(ctx, pid(10)))
 	}
 	errs := make(chan error, runners)
 	for range runners {
@@ -336,8 +346,8 @@ func TestRebuildMatchesIncrementalRollup(t *testing.T) {
 	ctx := context.Background()
 	_, a := f.open(t)
 	_, b := f.open(t)
-	f.products.set(10, a.StoreID)
-	f.products.set(20, b.StoreID)
+	f.products.set(pid(10), a.StoreID)
+	f.products.set(pid(20), b.StoreID)
 	f.now = time.Date(2026, 10, 7, 12, 0, 0, 0, twtime.Taipei)
 	for _, ev := range []struct {
 		product int64
@@ -348,13 +358,13 @@ func TestRebuildMatchesIncrementalRollup(t *testing.T) {
 		{20, time.Date(2026, 10, 5, 10, 0, 0, 0, twtime.Taipei)}, {20, time.Date(2026, 10, 5, 11, 0, 0, 0, twtime.Taipei)},
 		{404, time.Date(2026, 10, 5, 12, 0, 0, 0, twtime.Taipei)},
 	} {
-		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: ev.product, OccurredAt: ev.at}))
+		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(ev.product), OccurredAt: ev.at}))
 	}
 	if _, err := f.module.RollupProductViews(ctx); err != nil {
 		t.Fatal(err)
 	}
 	// 還沒處理的事件：重算不能把它算進去。
-	must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: 10, OccurredAt: time.Date(2026, 10, 6, 9, 0, 0, 0, twtime.Taipei)}))
+	must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(10), OccurredAt: time.Date(2026, 10, 6, 9, 0, 0, 0, twtime.Taipei)}))
 	incremental := f.buckets(t)
 	if len(incremental) != 5 {
 		t.Fatalf("incremental buckets=%v", incremental)
@@ -394,16 +404,16 @@ func TestRebuildSkipsCountedEventsOfStoresThatDoNotExist(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, s := f.open(t)
-	f.products.set(10, s.StoreID)
+	f.products.set(pid(10), s.StoreID)
 	f.now = time.Date(2026, 10, 7, 12, 0, 0, 0, twtime.Taipei)
 	at := time.Date(2026, 10, 6, 9, 0, 0, 0, twtime.Taipei)
-	must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: 10, OccurredAt: at}))
+	must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(10), OccurredAt: at}))
 	if _, err := f.module.RollupProductViews(ctx); err != nil {
 		t.Fatal(err)
 	}
 	const legacyStore = int64(9)
 	if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.product_view_events (event_id, product_id, occurred_at, store_id, processed_at, outcome)
-		VALUES ($1, 11, $2, $3, $2, 'COUNTED')`, uuid.NewV7(), at, legacyStore); err != nil {
+		VALUES ($1, $4, $2, $3, $2, 'COUNTED')`, uuid.NewV7(), at, legacyStore, pid(11)); err != nil {
 		t.Fatal(err)
 	}
 	must(t, f.module.RebuildProductViews(ctx, time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC)))
@@ -442,12 +452,12 @@ func TestPurgeOnlyDeletesProcessedEventsOlderThanRetention(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, s := f.open(t)
-	f.products.set(10, s.StoreID)
+	f.products.set(pid(10), s.StoreID)
 	now := time.Date(2026, 10, 20, 12, 0, 0, 0, twtime.Taipei)
 	f.now = now
 	add := func(at time.Time) uuid.UUID {
 		id := uuid.NewV7()
-		must(t, f.module.IngestProductView(ctx, ProductView{EventID: id, ProductID: 10, OccurredAt: at}))
+		must(t, f.module.IngestProductView(ctx, ProductView{EventID: id, ProductID: pid(10), OccurredAt: at}))
 		return id
 	}
 	oldProcessed := add(now.Add(-7*24*time.Hour - time.Second))

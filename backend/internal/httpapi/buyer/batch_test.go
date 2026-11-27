@@ -13,20 +13,21 @@ import (
 func TestBatchIDsParsesAndModuleOwnsTheLimit(t *testing.T) {
 	ids := make([]string, buyer.MaxBatchSize+1)
 	for i := range ids {
-		ids[i] = "1"
+		ids[i] = "0190a000-0000-7000-8000-000000000001"
 	}
-	parsed, err := batchIDs(ids, "product_ids")
+	parsed, err := batchUUIDs(ids, "product_ids")
 	if err != nil || len(parsed) != buyer.MaxBatchSize+1 {
 		t.Fatalf("parse %d ids: len=%d err=%v", len(ids), len(parsed), err)
 	}
 	if _, err := buyer.New(buyer.Deps{Now: time.Now}).BatchCheckFavorites(context.Background(), 1, parsed); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("module limit err=%v", err)
 	}
-	if _, err := batchIDs([]string{"1", "0"}, "product_ids"); err == nil {
-		t.Fatal("nonpositive ID must fail")
+	for _, bad := range []string{"0", "1", "00000000000000000000000000000001", "urn:uuid:0190a000-0000-7000-8000-000000000001"} {
+		if _, err := batchUUIDs([]string{"0190a000-0000-7000-8000-000000000001", bad}, "product_ids"); err == nil {
+			t.Fatalf("%q must fail", bad)
+		}
 	}
-	parsed, err = batchIDs([]string{"9007199254740993"}, "product_ids")
-	if err != nil || len(parsed) != 1 || parsed[0] != 9007199254740993 {
-		t.Fatalf("ids=%v err=%v", parsed, err)
+	if storeIDs, err := batchIDs([]string{"9007199254740993"}, "store_ids"); err != nil || len(storeIDs) != 1 || storeIDs[0] != 9007199254740993 {
+		t.Fatalf("ids=%v err=%v", storeIDs, err)
 	}
 }

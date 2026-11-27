@@ -429,7 +429,7 @@ extension type BuyerAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// ListRestockSubscriptions 列出等待補貨通知的商品，新到舊。通知送出或取消之後就不在清單上。
+  /// ListRestockSubscriptions 列出等待補貨通知的商品規格（SKU），新到舊。通知送出或取消之後就不在清單上。
   Future<hawkrbuyerv1alpha1buyer.ListRestockSubscriptionsResponse> listRestockSubscriptions(
     hawkrbuyerv1alpha1buyer.ListRestockSubscriptionsRequest input, {
     connect.Headers? headers,
@@ -447,7 +447,8 @@ extension type BuyerAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// SubscribeRestock 訂閱商品的補貨通知；已訂閱時也成功。
+  /// SubscribeRestock 訂閱商品某個規格（SKU）的補貨通知：一次性，通知送出後訂閱就消失，不設到期；已訂閱時也成功。規格目前有貨時回 failed_precondition，
+  /// ErrorInfo.reason 是 RESTOCK_SKU_IN_STOCK；規格不存在、已刪除或不屬於 product_id 回 not_found。
   Future<hawkrbuyerv1alpha1buyer.SubscribeRestockResponse> subscribeRestock(
     hawkrbuyerv1alpha1buyer.SubscribeRestockRequest input, {
     connect.Headers? headers,
@@ -465,7 +466,7 @@ extension type BuyerAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UnsubscribeRestock 取消補貨通知；沒有訂閱時也成功。
+  /// UnsubscribeRestock 取消規格（SKU）的補貨通知；沒有訂閱時也成功。
   Future<hawkrbuyerv1alpha1buyer.UnsubscribeRestockResponse> unsubscribeRestock(
     hawkrbuyerv1alpha1buyer.UnsubscribeRestockRequest input, {
     connect.Headers? headers,

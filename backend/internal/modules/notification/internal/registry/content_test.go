@@ -48,8 +48,8 @@ func TestGoldenContentRendering(t *testing.T) {
 			"新訊息", "店家傳了一則訊息給你。", "New message", "A store sent you a message.", "/account/messages/7", ""},
 		{"chat_message_store", `{"event_id":"` + contentEvent + `",` + at + `,"conversation_id":"` + contentObj + `","buyer_id":9,"store_id":7}`,
 			"新訊息", "買家傳了一則訊息給你。", "New message", "A buyer sent you a message.", "/seller-center/messages/9", ""},
-		{"product_restocked", `{"event_id":"` + contentEvent + `",` + at + `,"buyer_id":9,"product_id":11,"product_name":"Apple","image_key":"public/apple"}`,
-			"商品補貨通知", "你關注的「Apple」已補貨。", "Back in stock", "\"Apple\", which you were watching, is back in stock.", "/products/11", ""},
+		{"product_restocked", `{"event_id":"` + contentEvent + `",` + at + `,"buyer_id":9,"product_id":"` + contentObj + `","product_name":"Apple","image_key":"public/apple"}`,
+			"商品補貨通知", "你關注的「Apple」已補貨。", "Back in stock", "\"Apple\", which you were watching, is back in stock.", "/products/" + contentObj, ""},
 	}
 	ld := Loaded{StoreCode: 20260001}
 	for _, c := range cases {
