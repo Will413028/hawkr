@@ -397,6 +397,31 @@ func (q *Queries) InsertDelegationAuditLog(ctx context.Context, arg InsertDelega
 	return i, err
 }
 
+const insertDelegationAuditLogItem = `-- name: InsertDelegationAuditLogItem :exec
+INSERT INTO delegation.admin_operation_audit_log_items (audit_log_id, resource_id, resource_name, resource_version_before, resource_version_after)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertDelegationAuditLogItemParams struct {
+	AuditLogID            uuid.UUID
+	ResourceID            string
+	ResourceName          *string
+	ResourceVersionBefore *int64
+	ResourceVersionAfter  *int64
+}
+
+// 批次稽核列的一個商品；與父列同 transaction（RecordOperation）寫入。
+func (q *Queries) InsertDelegationAuditLogItem(ctx context.Context, arg InsertDelegationAuditLogItemParams) error {
+	_, err := q.db.Exec(ctx, insertDelegationAuditLogItem,
+		arg.AuditLogID,
+		arg.ResourceID,
+		arg.ResourceName,
+		arg.ResourceVersionBefore,
+		arg.ResourceVersionAfter,
+	)
+	return err
+}
+
 const insertFailedAuditLog = `-- name: InsertFailedAuditLog :one
 INSERT INTO delegation.admin_operation_audit_logs (
     id, session_id, actor_admin_id, actor_display_name,
@@ -751,6 +776,39 @@ func (q *Queries) LatestDelegationAuditReason(ctx context.Context, arg LatestDel
 	var i LatestDelegationAuditReasonRow
 	err := row.Scan(&i.OperationReason, &i.NotifySeller)
 	return i, err
+}
+
+const listDelegationAuditLogItems = `-- name: ListDelegationAuditLogItems :many
+SELECT audit_log_id, resource_id, resource_name, resource_version_before, resource_version_after FROM delegation.admin_operation_audit_log_items
+WHERE audit_log_id = $1
+ORDER BY resource_id
+`
+
+// 批次稽核列的商品清單，依資源 ID 由小到大。
+func (q *Queries) ListDelegationAuditLogItems(ctx context.Context, auditLogID uuid.UUID) ([]DelegationAdminOperationAuditLogItem, error) {
+	rows, err := q.db.Query(ctx, listDelegationAuditLogItems, auditLogID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DelegationAdminOperationAuditLogItem{}
+	for rows.Next() {
+		var i DelegationAdminOperationAuditLogItem
+		if err := rows.Scan(
+			&i.AuditLogID,
+			&i.ResourceID,
+			&i.ResourceName,
+			&i.ResourceVersionBefore,
+			&i.ResourceVersionAfter,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDelegationAuditLogs = `-- name: ListDelegationAuditLogs :many

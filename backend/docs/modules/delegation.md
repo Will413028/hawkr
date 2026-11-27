@@ -92,3 +92,9 @@ TTL、閒置、handoff、分頁與保留天數是 `internal/model` 的常數，�
 ## 8. 分頁
 
 - 列表以 OFFSET 分頁並回總數；分頁參數經驗證，不截斷。
+
+## 9. 商品的代行寫入與批次下架（B4-5d）
+
+- 商品寫入事件（catalog 的 `ProductCreated`、`ProductUpdated`、`ProductPublished`、`ProductUnpublished`、`*Repeated`、`ProductsUnpublished`）由 `OnProduct*` 訂閱者以 `delegatedactor.AuditHandler` 具名訂閱，同 transaction 寫一列 SUCCEEDED（動作與能力由 `ProductWriteFor` 決定：建立與修改 `products.write`，上下架與批次下架 `products.publish`）。
+- 批次下架（D29）：一個 `request_id` 一列 `PRODUCT_BATCH_UNPUBLISH`（`resource_id` 為 NULL、`resource_name` 是商品數）與一則賣家通知；商品逐項記在 `admin_operation_audit_log_items`（`resource_id`、名稱、請求版本、寫入後版本；已下架的項目兩個版本相同）。`DelegatedWriteResult.Items` 在重送時帶回第一次的清單。
+

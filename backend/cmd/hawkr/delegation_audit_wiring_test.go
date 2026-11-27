@@ -9,6 +9,7 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -22,10 +23,10 @@ func (noSeller) Store(context.Context, int64) (seller.Store, error) { return sel
 
 type noSocial struct{ delegation.Social }
 
-// newDelegation 以 delegatedactor.AuditHandler 這個名字訂閱 social 每一種貼文寫入事件（代行寫入的稽核靠它們，A7-D27）。保證在發布時的
+// newDelegation 以 delegatedactor.AuditHandler 這個名字訂閱 social 每一種貼文寫入事件與 catalog 每一種商品寫入事件（代行寫入的稽核靠它們，A7-D27）。保證在發布時的
 // events.PublishRequired（指名的 handler 不在就失敗關閉），不在這裡；serve、worker 與 CLI 的組裝（newDelegation、newDelegationOffline）都經過它，
 // 所以這個測試確認正式組裝真的接了這些事件，兩條路徑各一次。
-func TestNewDelegationSubscribesEveryPostWriteEvent(t *testing.T) {
+func TestNewDelegationSubscribesEveryPostAndProductWriteEvent(t *testing.T) {
 	bus := events.NewBus()
 	newDelegation(bus, delegation.Deps{Seller: noSeller{}, Social: noSocial{}, NewID: uuid.NewV7})
 	assertAuditHandlers(t, bus)
@@ -63,13 +64,20 @@ func TestEveryEntrypointThatBuildsSocialAssemblesDelegation(t *testing.T) {
 func assertAuditHandlers(t *testing.T, bus *events.Bus) {
 	t.Helper()
 	for name, ok := range map[string]bool{
-		"PostCreated":           events.HasNamed[social.PostCreated](bus, delegatedactor.AuditHandler),
-		"PostUpdated":           events.HasNamed[social.PostUpdated](bus, delegatedactor.AuditHandler),
-		"PostPublished":         events.HasNamed[social.PostPublished](bus, delegatedactor.AuditHandler),
-		"PostUnpublished":       events.HasNamed[social.PostUnpublished](bus, delegatedactor.AuditHandler),
-		"PostScheduled":         events.HasNamed[social.PostScheduled](bus, delegatedactor.AuditHandler),
-		"PostPublishRepeated":   events.HasNamed[social.PostPublishRepeated](bus, delegatedactor.AuditHandler),
-		"PostUnpublishRepeated": events.HasNamed[social.PostUnpublishRepeated](bus, delegatedactor.AuditHandler),
+		"PostCreated":              events.HasNamed[social.PostCreated](bus, delegatedactor.AuditHandler),
+		"PostUpdated":              events.HasNamed[social.PostUpdated](bus, delegatedactor.AuditHandler),
+		"PostPublished":            events.HasNamed[social.PostPublished](bus, delegatedactor.AuditHandler),
+		"PostUnpublished":          events.HasNamed[social.PostUnpublished](bus, delegatedactor.AuditHandler),
+		"PostScheduled":            events.HasNamed[social.PostScheduled](bus, delegatedactor.AuditHandler),
+		"PostPublishRepeated":      events.HasNamed[social.PostPublishRepeated](bus, delegatedactor.AuditHandler),
+		"PostUnpublishRepeated":    events.HasNamed[social.PostUnpublishRepeated](bus, delegatedactor.AuditHandler),
+		"ProductCreated":           events.HasNamed[catalog.ProductCreated](bus, delegatedactor.AuditHandler),
+		"ProductUpdated":           events.HasNamed[catalog.ProductUpdated](bus, delegatedactor.AuditHandler),
+		"ProductPublished":         events.HasNamed[catalog.ProductPublished](bus, delegatedactor.AuditHandler),
+		"ProductUnpublished":       events.HasNamed[catalog.ProductUnpublished](bus, delegatedactor.AuditHandler),
+		"ProductPublishRepeated":   events.HasNamed[catalog.ProductPublishRepeated](bus, delegatedactor.AuditHandler),
+		"ProductUnpublishRepeated": events.HasNamed[catalog.ProductUnpublishRepeated](bus, delegatedactor.AuditHandler),
+		"ProductsUnpublished":      events.HasNamed[catalog.ProductsUnpublished](bus, delegatedactor.AuditHandler),
 	} {
 		if !ok {
 			t.Errorf("%s 沒有訂閱者", name)

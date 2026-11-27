@@ -305,6 +305,17 @@ CREATE INDEX idx_admin_operation_audit_logs_store_created_at
 CREATE INDEX idx_admin_operation_audit_logs_actor_created_at
     ON delegation.admin_operation_audit_logs (actor_admin_id, created_at DESC);
 
+-- 批次稽核列（PRODUCT_BATCH_UNPUBLISH，D29）記錄的商品清單：一個批次是一列稽核與一則賣家通知（父列），商品逐項記在這裡。與父列同 transaction 寫入、只追加。
+-- resource_version_before 是請求帶的版本，resource_version_after 是寫入後的版本（已經下架的項目兩者相同、沒有寫入）。
+CREATE TABLE delegation.admin_operation_audit_log_items (
+    audit_log_id            UUID   NOT NULL REFERENCES delegation.admin_operation_audit_logs (id),
+    resource_id             TEXT   NOT NULL,
+    resource_name           TEXT,
+    resource_version_before BIGINT,
+    resource_version_after  BIGINT,
+    PRIMARY KEY (audit_log_id, resource_id)
+);
+
 -- 授權列的治理歷史：誰、何時、依據什麼、把範圍從什麼改成什麼。只追加，沒有 UPDATE、DELETE，也沒有
 -- updated_at。與授權列在同一個 transaction 內寫入；同時是三個寫入動作的冪等紀錄（同一列授權上，同一把鍵
 -- 只能成功一次）。capabilities_before 為 NULL 表示這列授權之前不存在（只有 GRANT）。before、after 刻意不加

@@ -12,6 +12,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -64,7 +65,9 @@ type DelegatedWriteResult struct {
 	Store      seller.Store
 	AuditLogID uuid.UUID
 	ResourceID string
-	Replayed   bool
+	// Items 是批次寫入（PRODUCT_BATCH_UNPUBLISH）第一次寫入的商品清單，只有重送（Replayed）時填；批次的稽核列沒有單一資源，ResourceID 是空的。
+	Items    []model.AuditItem
+	Replayed bool
 }
 
 // DelegatedPayloadHash 是請求內容的雜湊：parts 依序編成 JSON，動作與所有影響結果的欄位都要放進去。
@@ -213,11 +216,11 @@ func (m *Module) replayResult(ctx context.Context, c DelegatedCaller, log model.
 	if !state.Found {
 		return DelegatedWriteResult{}, replayReadError{fmt.Errorf("delegation：重送的稽核列 %s 的店家 %d 不存在", log.ID, c.Session.Target.StoreID)}
 	}
-	out := DelegatedWriteResult{Store: st, AuditLogID: log.ID, Replayed: true}
+	out := DelegatedWriteResult{Store: st, AuditLogID: log.ID, Replayed: true, Items: log.Items}
 	if log.ResourceID != nil {
 		out.ResourceID = *log.ResourceID
 	}
-	if out.ResourceID == "" {
+	if out.ResourceID == "" && len(out.Items) == 0 {
 		return DelegatedWriteResult{}, replayReadError{fmt.Errorf("delegation：重送的稽核列 %s 沒有資源 ID", log.ID)}
 	}
 	return out, nil
@@ -248,11 +251,14 @@ var (
 	postScheduleWrite  = postWrite{CapabilityPostsPublish, AuditPostSchedule}
 )
 
-// PostWriteAudit 是一種貼文寫入事件在稽核上的能力與動作。
-type PostWriteAudit struct {
+// WriteAudit 是一種資源寫入事件在稽核上的能力與動作。
+type WriteAudit struct {
 	Capability Capability
 	Action     AuditAction
 }
+
+// PostWriteAudit 是貼文寫入事件的 WriteAudit。
+type PostWriteAudit = WriteAudit
 
 // PostWriteFor 回傳 social 貼文寫入事件 e（值，不是指標）對應的能力與動作，不是代行會寫入的事件回 false。這是代行寫入宣告的唯一來源：
 // 訂閱者寫稽核列用它，httpapi 的 DelegatedDeclaration 也由它衍生每個寫入方法的能力與動作，兩邊不會各寫一份而不一致。
@@ -312,22 +318,130 @@ func (m *Module) recordPostWrite(ctx context.Context, w postWrite, e social.Post
 }
 
 func (m *Module) recordPostWriteBy(ctx context.Context, w postWrite, a *delegatedactor.Actor, postID uuid.UUID, storeID int64, preview string, version int64) error {
-	if storeID != a.StoreID {
-		return fmt.Errorf("delegation：貼文寫入事件的店家 %d 與代行者的店家 %d 不一致", storeID, a.StoreID)
-	}
-	if _, err := m.operableStore(ctx, a.StoreID); err != nil {
+	if err := m.checkWriteStore(ctx, "貼文", storeID, a); err != nil {
 		return err
 	}
+	name := AuditName(preview)
+	return m.audit.RecordOperation(ctx, m.writeAuditInput(w, ResourcePost, a, postID.String(), name),
+		model.OperationOutcome{ResourceID: postID.String(), ResourceName: name, VersionAfter: version})
+}
+
+var (
+	productCreateWrite         = postWrite{CapabilityProductsWrite, AuditProductCreate}
+	productUpdateWrite         = postWrite{CapabilityProductsWrite, AuditProductUpdate}
+	productPublishWrite        = postWrite{CapabilityProductsPublish, AuditProductPublish}
+	productUnpublishWrite      = postWrite{CapabilityProductsPublish, AuditProductUnpublish}
+	productBatchUnpublishWrite = postWrite{CapabilityProductsPublish, AuditProductBatchUnpublish}
+)
+
+// ProductWriteFor 回傳 catalog 商品寫入事件 e（值，不是指標）對應的能力與動作，不是代行會寫入的事件回 false。與 PostWriteFor 同理：訂閱者寫稽核列用它，
+// catalog httpapi 的 DelegatedDeclaration 也由它衍生每個寫入方法的能力與動作。
+func ProductWriteFor(e any) (WriteAudit, bool) {
+	var w postWrite
+	switch e.(type) {
+	case catalog.ProductCreated:
+		w = productCreateWrite
+	case catalog.ProductUpdated:
+		w = productUpdateWrite
+	case catalog.ProductPublished, catalog.ProductPublishRepeated:
+		w = productPublishWrite
+	case catalog.ProductUnpublished, catalog.ProductUnpublishRepeated:
+		w = productUnpublishWrite
+	case catalog.ProductsUnpublished:
+		w = productBatchUnpublishWrite
+	default:
+		return WriteAudit{}, false
+	}
+	return WriteAudit{Capability: w.capability, Action: w.action}, true
+}
+
+// OnProductCreated、OnProductUpdated、OnProductPublished、OnProductUnpublished、OnProductPublishRepeated、OnProductUnpublishRepeated、OnProductsUnpublished 訂閱 catalog 的同名事件
+// （組裝點以 events.SubscribeNamed 與 delegatedactor.AuditHandler 訂閱）：事件帶代行者時，代行寫入在 catalog 的 transaction 內，依事件種類決定稽核動作，再寫一列 SUCCEEDED；
+// 沒有代行者（店主自己的寫入）略過。批次下架是一個事件、一列稽核（商品清單記在 admin_operation_audit_log_items）、一則賣家通知（D29）。
+func (m *Module) OnProductCreated(ctx context.Context, e catalog.ProductCreated) error {
+	return m.recordProductWrite(ctx, productCreateWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductUpdated(ctx context.Context, e catalog.ProductUpdated) error {
+	return m.recordProductWrite(ctx, productUpdateWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductPublished(ctx context.Context, e catalog.ProductPublished) error {
+	return m.recordProductWrite(ctx, productPublishWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductUnpublished(ctx context.Context, e catalog.ProductUnpublished) error {
+	return m.recordProductWrite(ctx, productUnpublishWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductPublishRepeated(ctx context.Context, e catalog.ProductPublishRepeated) error {
+	return m.recordProductWrite(ctx, productPublishWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductUnpublishRepeated(ctx context.Context, e catalog.ProductUnpublishRepeated) error {
+	return m.recordProductWrite(ctx, productUnpublishWrite, e.ProductWritten)
+}
+
+// recordProductWrite 同 recordPostWrite：核對店家、確認店家此刻可代行，再寫一列 SUCCEEDED；任何一步失敗 catalog 的 transaction 整個 rollback。
+func (m *Module) recordProductWrite(ctx context.Context, w postWrite, e catalog.ProductWritten) error {
+	a := e.Actor
+	if a == nil {
+		return nil
+	}
+	if err := m.checkWriteStore(ctx, "商品", e.StoreID, a); err != nil {
+		return err
+	}
+	name := AuditName(e.Title)
+	return m.audit.RecordOperation(ctx, m.writeAuditInput(w, ResourceProduct, a, e.ProductID.String(), name),
+		model.OperationOutcome{ResourceID: e.ProductID.String(), ResourceName: name, VersionAfter: e.Version})
+}
+
+// OnProductsUnpublished 為一次批次下架寫一列 SUCCEEDED（PRODUCT_BATCH_UNPUBLISH）：父列的資源是整批（沒有單一資源 ID，名稱是商品數），商品清單逐項記下。
+func (m *Module) OnProductsUnpublished(ctx context.Context, e catalog.ProductsUnpublished) error {
+	a := e.Actor
+	if a == nil {
+		return nil
+	}
+	if err := m.checkWriteStore(ctx, "商品", e.StoreID, a); err != nil {
+		return err
+	}
+	items := make([]model.AuditItem, len(e.Items))
+	for i, it := range e.Items {
+		items[i] = model.AuditItem{ResourceID: it.ProductID.String(), ResourceName: AuditName(it.Title), VersionBefore: it.VersionBefore, VersionAfter: it.VersionAfter}
+	}
+	name := BatchResourceName(len(e.Items))
+	return m.audit.RecordOperation(ctx, m.writeAuditInput(productBatchUnpublishWrite, ResourceProduct, a, "", name),
+		model.OperationOutcome{ResourceName: name, Items: items})
+}
+
+// BatchResourceName 是批次稽核列的資源名稱（商品數）；handler 寫 FAILED 列時用同一個。
+func BatchResourceName(n int) string { return fmt.Sprintf("%d 項商品", n) }
+
+// checkWriteStore 核對事件的店家與代行者的店家一致、店家此刻可代行（第一次寫入；重送在呼叫資源模組之前就回了）。
+func (m *Module) checkWriteStore(ctx context.Context, what string, storeID int64, a *delegatedactor.Actor) error {
+	if storeID != a.StoreID {
+		return fmt.Errorf("delegation：%s寫入事件的店家 %d 與代行者的店家 %d 不一致", what, storeID, a.StoreID)
+	}
+	_, err := m.operableStore(ctx, a.StoreID)
+	return err
+}
+
+// AuditName 是稽核列的資源名稱：預覽文字去除首尾空白後的前 auditNameRunes 個字元（事件訂閱者寫成功列與 handler 寫失敗列用同一個）。
+func AuditName(preview string) string {
 	name := strings.TrimSpace(preview)
 	if r := []rune(name); len(r) > auditNameRunes {
 		name = string(r[:auditNameRunes])
 	}
-	return m.audit.RecordOperation(ctx, model.OperationAuditInput{
-		SessionID: a.SessionID, Capability: w.capability, Action: w.action, ResourceType: ResourcePost,
-		ResourceID: postID.String(), ResourceName: name, ResourceVersionBefore: a.ResourceVersionBefore,
+	return name
+}
+
+func (m *Module) writeAuditInput(w postWrite, rt AuditResourceType, a *delegatedactor.Actor, resourceID, name string) model.OperationAuditInput {
+	return model.OperationAuditInput{
+		SessionID: a.SessionID, Capability: w.capability, Action: w.action, ResourceType: rt,
+		ResourceID: resourceID, ResourceName: name, ResourceVersionBefore: a.ResourceVersionBefore,
 		OperationReason: a.Reason, NotifySeller: a.NotifySeller,
 		RequestID: a.RequestID, CorrelationID: a.CorrelationID, UserAgent: a.UserAgent, PayloadHash: a.PayloadHash,
-	}, model.OperationOutcome{ResourceID: postID.String(), ResourceName: name, VersionAfter: version})
+	}
 }
 
 // failureTimeout 是寫 FAILED 稽核的期限：請求的 ctx 已取消或逾時時仍要留下一列。

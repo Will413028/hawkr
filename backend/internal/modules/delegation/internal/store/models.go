@@ -50,6 +50,14 @@ type DelegationAdminOperationAuditLog struct {
 	ConfirmedAt           *time.Time
 }
 
+type DelegationAdminOperationAuditLogItem struct {
+	AuditLogID            uuid.UUID
+	ResourceID            string
+	ResourceName          *string
+	ResourceVersionBefore *int64
+	ResourceVersionAfter  *int64
+}
+
 type DelegationDelegatedOperationSession struct {
 	ID                    int64
 	DisplayCode           string

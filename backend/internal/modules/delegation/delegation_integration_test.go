@@ -15,6 +15,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -45,9 +46,11 @@ type fixture struct {
 	social Social
 	// realSocial 只在 setupWithSocial 有值。
 	realSocial *social.Module
-	media      *media.Fake
-	sellers    *seller.Reader
-	nextID     int64
+	// catalog 只在 setupWithSocial 有值（商品的代行寫入）。
+	catalog *catalog.Module
+	media   *media.Fake
+	sellers *seller.Reader
+	nextID  int64
 }
 
 // noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這些測試不建排程，取消沒有東西可取消。
@@ -80,6 +83,7 @@ func build(t *testing.T, withSocial bool) *fixture {
 			migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 			migrate.Module{Name: "seller", Dir: seller.Migrations()},
 			migrate.Module{Name: "social", Dir: social.Migrations()},
+			migrate.Module{Name: "catalog", Dir: catalog.Migrations()},
 		)
 	}
 	steps := []testdb.Step{testdb.Migrations(modules...)}
@@ -107,6 +111,7 @@ func build(t *testing.T, withSocial bool) *fixture {
 			NewID:               uuid.NewV7, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		})
 		f.social = f.realSocial
+		f.catalog = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return f.now }, Media: f.media, Events: f.bus, Restock: noRestock{}})
 		// 測試只關心 social 讀 seller 的店家：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 		if _, err := d.Conn(context.Background()).Exec(context.Background(), `DO $$ DECLARE r record; BEGIN
 			FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
@@ -124,6 +129,13 @@ func build(t *testing.T, withSocial bool) *fixture {
 	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostScheduled)
 	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostPublishRepeated)
 	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnPostUnpublishRepeated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnProductCreated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnProductUpdated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnProductPublished)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnProductUnpublished)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnProductPublishRepeated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnProductUnpublishRepeated)
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, f.m.OnProductsUnpublished)
 	events.Subscribe(f.bus, f.m.OnStoreSuspended)
 	events.Subscribe(f.bus, f.m.OnStoreClosed)
 	return f
@@ -202,3 +214,10 @@ func (noStoreBlocks) StoreBlocksBuyer(context.Context, int64, int64) (bool, erro
 func (noSchedules) PendingSchedulerRefs(context.Context, social.ScheduleKind) ([]string, error) {
 	return nil, nil
 }
+
+// noRestock 是補貨通知的替身：代行測試不跑補貨 job。
+type noRestock struct{}
+
+func (noRestock) NotifyRestocked(context.Context, catalog.RestockedSKU) error { return nil }
+
+func (noRestock) PurgeSKUSubscriptions(context.Context, []uuid.UUID) error { return nil }
