@@ -144,7 +144,7 @@ func (w *World) SetStatus(storeID int64, id uuid.UUID, to catalog.ProductStatus)
 	if err != nil {
 		w.T.Fatal(err)
 	}
-	if err := w.Module.SetProductStatus(context.Background(), storeID, id, cur.Version, to, nil); err != nil {
+	if _, err := w.Module.SetProductStatus(context.Background(), storeID, id, cur.Version, to, nil); err != nil {
 		w.T.Fatal(err)
 	}
 }

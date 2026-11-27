@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"testing"
 	"uuid"
 
@@ -51,6 +52,8 @@ func handlerErr(err error) error {
 		return apperr.VersionConflict("商品已經被修改")
 	case errors.Is(err, catalog.ErrProductNotFound):
 		return apperr.NotFound("找不到這個商品")
+	case errors.Is(err, catalog.ErrCreateReplayed), errors.Is(err, catalog.ErrNotPublished):
+		return apperr.FailedPrecondition("%v", err)
 	}
 	return err
 }
@@ -114,7 +117,7 @@ func (f *fixture) updateProduct(c DelegatedCaller, op DelegatedOperation, id uui
 func (f *fixture) setProductStatus(c DelegatedCaller, op DelegatedOperation, id uuid.UUID, version int64, to catalog.ProductStatus) (wroteProduct, error) {
 	return f.writeProduct(c, DelegatedWrite{Op: op, ResourceID: id.String(), Version: &version, PayloadHash: DelegatedPayloadHash(c.Method.Action, id, version)}, id,
 		func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) (catalog.Product, error) {
-			return catalog.Product{}, f.catalog.SetProductStatus(ctx, st.StoreID, id, version, to, actor)
+			return f.catalog.SetProductStatus(ctx, st.StoreID, id, version, to, actor)
 		})
 }
 
@@ -123,7 +126,8 @@ func (f *fixture) batchUnpublish(c DelegatedCaller, op DelegatedOperation, items
 	slices.SortFunc(sorted, func(a, b catalog.VersionedProduct) int { return a.ProductID.Compare(b.ProductID) })
 	return f.m.DelegatedWrite(context.Background(), c, DelegatedWrite{Op: op, ResourceName: BatchResourceName(len(items)), PayloadHash: DelegatedPayloadHash(AuditProductBatchUnpublish, sorted)},
 		func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error {
-			return handlerErr(f.catalog.UnpublishProducts(ctx, st.StoreID, items, actor))
+			_, err := f.catalog.UnpublishProducts(ctx, st.StoreID, items, actor)
+			return handlerErr(err)
 		})
 }
 
@@ -533,14 +537,117 @@ func TestOwnerProductWritesLeaveNoAuditRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.catalog.SetProductStatus(ctx, o.storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
+	if _, err := f.catalog.SetProductStatus(ctx, o.storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
 		t.Fatal(err)
 	}
 	cur, _ := f.catalog.Product(ctx, o.storeID, p.ID)
-	if err := f.catalog.UnpublishProducts(ctx, o.storeID, versioned(cur), nil); err != nil {
+	if _, err := f.catalog.UnpublishProducts(ctx, o.storeID, versioned(cur), nil); err != nil {
 		t.Fatal(err)
 	}
 	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE target_store_id = $1`, o.storeID); n != 0 {
 		t.Fatalf("店主的寫入留下 %d 列代行稽核", n)
+	}
+}
+
+// 並行的同 request_id（同 session、同內容）：輸家的寫入可能因贏家已提交而版本衝突，不能寫 FAILED、不能回 ABORTED，兩個呼叫都回第一次的結果，稽核只有一列。
+func TestConcurrentWritesWithTheSameRequestIDAllReturnTheFirstResultAndRecordOneRow(t *testing.T) {
+	f := build(t, true)
+	o := f.newOperator(t, "prod-concurrent", productCaps...)
+	sid := o.session.Session.ID
+	p := f.mustCreateProduct(t, o, "山藥")
+	call := f.caller(t, o, methodProductUpdate)
+	op := f.op("並行修改標題")
+	const n = 4
+	inputs := make([]catalog.ProductInput, n)
+	for i := range inputs {
+		inputs[i] = f.productInput(t, "山藥二號")
+		inputs[i].Gallery = []catalog.Image{{AssetID: p.Gallery[0].AssetID}}
+	}
+	type outcome struct {
+		res wroteProduct
+		err error
+	}
+	got := make([]outcome, n)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			got[i].res, got[i].err = f.updateProduct(call, op, p.ID, p.Version, inputs[i])
+		}()
+	}
+	close(start)
+	wg.Wait()
+	var first uuid.UUID
+	for i, g := range got {
+		if g.err != nil {
+			t.Fatalf("呼叫 %d = %v，並行的同 request_id 都要成功", i, g.err)
+		}
+		if i == 0 {
+			first = g.res.Res.AuditLogID
+		}
+		if g.res.Res.AuditLogID != first || g.res.Product.ID != p.ID {
+			t.Fatalf("呼叫 %d 的稽核列 %s、商品 %s，預期同一列 %s、商品 %s", i, g.res.Res.AuditLogID, g.res.Product.ID, first, p.ID)
+		}
+	}
+	if n := f.auditRowsOfKey(t, sid, op.RequestID.String()); n != 1 {
+		t.Fatalf("冪等鍵 %d 列，預期 1", n)
+	}
+	if r := f.failedRow(t, sid, "PRODUCT_UPDATE"); r.n != 0 {
+		t.Fatalf("並行的重送留下 %d 列 FAILED（%v）", r.n, r.failureReason)
+	}
+	if _, v := f.productStatus(t, o.storeID, p.ID); v != p.Version+1 {
+		t.Fatalf("商品版本 %d，預期只改一次的 %d", v, p.Version+1)
+	}
+}
+
+// 代行建立的 request_id 已被這家店的另一次建立用過（不是這個 session 的重送）：FAILED_PRECONDITION，不是 INTERNAL；沒有 SUCCEEDED 的建立列、沒有第二個商品。
+func TestDelegatedCreateWithARequestIDTheStoreAlreadyUsedFailsAPreconditionNotInternal(t *testing.T) {
+	f := build(t, true)
+	ctx := context.Background()
+	o := f.newOperator(t, "prod-used-rid", productCaps...)
+	sid := o.session.Session.ID
+	op := f.op("建立")
+	in := f.productInput(t, "店主先建的")
+	if _, err := f.catalog.CreateProduct(ctx, o.storeID, f.uploader(o.storeID), op.RequestID, in, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, err := f.createProduct(t, f.caller(t, o, methodProductCreate), op, in)
+	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("建立 = %v，預期 FAILED_PRECONDITION", err)
+	}
+	row := f.failedRow(t, sid, "PRODUCT_CREATE")
+	if row.n != 1 || row.failureReason == nil || *row.failureReason != "FAILED_PRECONDITION" {
+		t.Fatalf("FAILED 列 = %+v，預期原因 FAILED_PRECONDITION", row)
+	}
+	if f.auditRows(t, sid, "PRODUCT_CREATE") != 1 || f.resultRows(t, sid, "SUCCEEDED") != 0 {
+		t.Fatal("被拒絕的建立不該留下 SUCCEEDED 列")
+	}
+	if n := f.count(t, `SELECT count(*) FROM catalog.products WHERE store_id = $1`, o.storeID); n != 1 {
+		t.Fatalf("商品 %d 個，預期 1", n)
+	}
+}
+
+// 批次裡有草稿：整批 FAILED_PRECONDITION、沒有任何商品被動、沒有 SUCCEEDED 的批次列。
+func TestBatchUnpublishWithADraftWritesNothing(t *testing.T) {
+	f := build(t, true)
+	o := f.newOperator(t, "batch-draft", productCaps...)
+	sid := o.session.Session.ID
+	active := f.activeProduct(t, o, "上架中")
+	draft := f.mustCreateProduct(t, o, "草稿")
+	_, err := f.batchUnpublish(f.caller(t, o, methodProductBatch), f.op("含草稿"), versioned(active, draft))
+	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("含草稿的批次 = %v，預期 FAILED_PRECONDITION", err)
+	}
+	if st, _ := f.productStatus(t, o.storeID, active.ID); st != catalog.StatusActive {
+		t.Fatalf("上架中的商品 = %s，整批沒寫入", st)
+	}
+	if st, _ := f.productStatus(t, o.storeID, draft.ID); st != catalog.StatusDraft {
+		t.Fatalf("草稿 = %s，預期仍是 DRAFT", st)
+	}
+	if f.batchRows(t, sid) != 1 || f.failedRow(t, sid, "PRODUCT_BATCH_UNPUBLISH").n != 1 {
+		t.Fatal("預期只有一列 FAILED 的批次稽核")
 	}
 }

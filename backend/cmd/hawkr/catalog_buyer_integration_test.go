@@ -141,7 +141,7 @@ func (f *catalogBuyerFixture) product(ctx context.Context, stocks ...int32) cata
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if err := f.catalog.SetProductStatus(ctx, f.storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
+	if _, err := f.catalog.SetProductStatus(ctx, f.storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
 		f.t.Fatal(err)
 	}
 	return p

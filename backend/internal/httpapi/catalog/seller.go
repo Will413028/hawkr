@@ -225,12 +225,9 @@ func (h *App) SetProductStatus(ctx context.Context, req *connect.Request[pb.SetP
 	if to == "" {
 		return nil, fieldError("status", "status 必填")
 	}
-	if err := h.m.SetProductStatus(ctx, c.storeID, id, version, to, nil); err != nil {
-		return nil, failure(err, statusPaths)
-	}
-	p, err := h.m.Product(ctx, c.storeID, id)
+	p, err := h.m.SetProductStatus(ctx, c.storeID, id, version, to, nil)
 	if err != nil {
-		return nil, failure(err, noPaths)
+		return nil, failure(err, statusPaths)
 	}
 	out, err := sellerProduct(h.images, p)
 	if err != nil {

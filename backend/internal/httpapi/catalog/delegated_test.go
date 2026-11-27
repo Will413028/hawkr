@@ -145,16 +145,20 @@ func (f *fakeDelegatedModule) UpdateProduct(_ context.Context, storeID int64, up
 	return f.product, f.err
 }
 
-func (f *fakeDelegatedModule) SetProductStatus(_ context.Context, storeID int64, _ uuid.UUID, version int64, to catalog.ProductStatus, a *delegatedactor.Actor) error {
+func (f *fakeDelegatedModule) SetProductStatus(_ context.Context, storeID int64, _ uuid.UUID, version int64, to catalog.ProductStatus, a *delegatedactor.Actor) (catalog.Product, error) {
 	f.rec("SetStatus", storeID, a)
 	f.versions, f.statuses = append(f.versions, version), append(f.statuses, to)
-	return f.err
+	return f.product, f.err
 }
 
-func (f *fakeDelegatedModule) UnpublishProducts(_ context.Context, storeID int64, items []catalog.VersionedProduct, a *delegatedactor.Actor) error {
+func (f *fakeDelegatedModule) UnpublishProducts(_ context.Context, storeID int64, items []catalog.VersionedProduct, a *delegatedactor.Actor) ([]catalog.UnpublishedItem, error) {
 	f.rec("UnpublishMany", storeID, a)
 	f.batch = items
-	return f.err
+	out := make([]catalog.UnpublishedItem, len(items))
+	for i, it := range items {
+		out[i] = catalog.UnpublishedItem{ProductID: it.ProductID, VersionBefore: it.Version, VersionAfter: it.Version + 1, Changed: true}
+	}
+	return out, f.err
 }
 
 type delegatedRig struct {
@@ -612,5 +616,93 @@ func TestWriteDeclarationsAgreeWithTheAuditSubscriberMapping(t *testing.T) {
 	}
 	if _, ok := moddelegation.ProductWriteFor(catalog.ProductWritten{}); ok {
 		t.Fatal("共用欄位型別不是事件")
+	}
+}
+
+// 批次下架的回應來自寫入的結果（重送時是稽核列記下的清單），不再讀商品：重送時商品已被刪除也回第一次的結果。
+func TestBatchUnpublishReplayAnswersFromTheRecordedItemsWithoutReadingProducts(t *testing.T) {
+	t.Parallel()
+	r := newDelegatedRig(t, allProductCaps...)
+	a, b := uuid.UUID{1}, uuid.UUID{2}
+	r.m.err = catalog.ErrProductNotFound
+	r.runner.replayed = true
+	r.runner.items = []moddelegation.AuditItem{{ResourceID: a.String(), VersionBefore: 4, VersionAfter: 5}, {ResourceID: b.String(), VersionBefore: 7, VersionAfter: 7}}
+	res, err := r.client.BatchUnpublishStoreProducts(t.Context(), asSession(batchRequest(item(2, catalog.Etag(7)), item(1, catalog.Etag(4)))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps := res.Msg.GetProducts()
+	if len(ps) != 2 || ps[0].GetProductId() != b.String() || ps[0].GetEtag() != catalog.Etag(7) || ps[1].GetProductId() != a.String() || ps[1].GetEtag() != catalog.Etag(5) {
+		t.Fatalf("回應 = %v，預期依請求順序、版本取自稽核列", ps)
+	}
+	for _, p := range ps {
+		if p.GetStatus() != pb.ProductStatus_PRODUCT_STATUS_ARCHIVED {
+			t.Fatalf("商品 %s 狀態 %v，預期 ARCHIVED", p.GetProductId(), p.GetStatus())
+		}
+	}
+	if len(r.m.calls) != 0 {
+		t.Fatalf("重送不該呼叫模組：%v", r.m.calls)
+	}
+}
+
+// 第一次的批次下架也不讀商品：回應用模組回傳的寫入結果。
+func TestBatchUnpublishFirstCallAnswersFromTheWriteOutcome(t *testing.T) {
+	t.Parallel()
+	r := newDelegatedRig(t, allProductCaps...)
+	if _, err := r.client.BatchUnpublishStoreProducts(t.Context(), asSession(batchRequest(item(1, catalog.Etag(4))))); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(r.m.calls, []string{"UnpublishMany"}) {
+		t.Fatalf("模組呼叫 = %v，預期只有 UnpublishMany", r.m.calls)
+	}
+}
+
+// 單一上架與下架回應用寫入的 transaction 內回傳的商品，不在提交後再讀一次。
+func TestPublishAndUnpublishAnswerFromTheWrittenProductWithoutReReading(t *testing.T) {
+	t.Parallel()
+	r := newDelegatedRig(t, allProductCaps...)
+	p := sampleProduct()
+	p.ID, p.Version = uuid.UUID{1}, 8
+	r.m.product = p
+	res, err := r.client.PublishStoreProduct(t.Context(), asSession(&pb.PublishStoreProductRequest{Operation: operation(), ProductId: p.ID.String(), Etag: catalog.Etag(7)}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Msg.GetProduct().GetId() != p.ID.String() || res.Msg.GetProduct().GetEtag() != catalog.Etag(8) {
+		t.Fatalf("回應 = %v，預期寫入後的商品", res.Msg.GetProduct())
+	}
+	if !slices.Equal(r.m.calls, []string{"SetStatus"}) {
+		t.Fatalf("模組呼叫 = %v，預期只有 SetStatus（不再讀商品）", r.m.calls)
+	}
+}
+
+// 代行不能下架草稿：單一與批次都是 failed_precondition，批次在訊息裡列出全部草稿商品的 ID（沒有 ErrorReason，metadata 帶不出去）。
+func TestDelegatedUnpublishOfDraftsIsFailedPrecondition(t *testing.T) {
+	t.Parallel()
+	r := newDelegatedRig(t, allProductCaps...)
+	r.m.err = catalog.ErrNotPublished
+	_, err := r.client.UnpublishStoreProduct(t.Context(), asSession(&pb.UnpublishStoreProductRequest{Operation: operation(), ProductId: uuid.UUID{1}.String(), Etag: "3"}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("單一下架草稿 code = %v，預期 failed_precondition：%v", connect.CodeOf(err), err)
+	}
+	r.m.err = &catalog.BatchNotPublishedError{ProductIDs: []uuid.UUID{{3}, {9}}}
+	_, err = r.client.BatchUnpublishStoreProducts(t.Context(), asSession(batchRequest(item(3, "3"), item(9, "3"), item(5, "3"))))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("批次含草稿 code = %v，預期 failed_precondition：%v", connect.CodeOf(err), err)
+	}
+	want := uuid.UUID{3}.String() + "," + uuid.UUID{9}.String()
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("錯誤訊息 %q，預期列出全部草稿商品 %q", err.Error(), want)
+	}
+}
+
+// 代行建立的 request_id 這家店已用過（不是這個 session 的重送）：failed_precondition，不是 internal。
+func TestDelegatedCreateWithAUsedRequestIDIsFailedPrecondition(t *testing.T) {
+	t.Parallel()
+	r := newDelegatedRig(t, allProductCaps...)
+	r.m.err = catalog.ErrCreateReplayed
+	_, err := r.client.CreateStoreProduct(t.Context(), asSession(&pb.CreateStoreProductRequest{Operation: operation(), Product: sampleInput()}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("code = %v，預期 failed_precondition：%v", connect.CodeOf(err), err)
 	}
 }

@@ -245,7 +245,7 @@ func (f *catalogSocialReviewFixture) createProduct(ctx context.Context, storeID,
 		f.t.Fatal(err)
 	}
 	if status != catalog.StatusDraft {
-		if err := f.catalog.SetProductStatus(ctx, storeID, p.ID, p.Version, status, nil); err != nil {
+		if _, err := f.catalog.SetProductStatus(ctx, storeID, p.ID, p.Version, status, nil); err != nil {
 			f.t.Fatal(err)
 		}
 		p, err = f.catalog.Product(ctx, storeID, p.ID)

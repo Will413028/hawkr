@@ -58,8 +58,8 @@ type DelegatedModule interface {
 	Product(ctx context.Context, storeID int64, productID uuid.UUID) (catalog.Product, error)
 	CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in catalog.ProductInput, actor *delegatedactor.Actor) (catalog.Product, error)
 	UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in catalog.ProductInput, actor *delegatedactor.Actor) (catalog.Product, error)
-	SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to catalog.ProductStatus, actor *delegatedactor.Actor) error
-	UnpublishProducts(ctx context.Context, storeID int64, items []catalog.VersionedProduct, actor *delegatedactor.Actor) error
+	SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to catalog.ProductStatus, actor *delegatedactor.Actor) (catalog.Product, error)
+	UnpublishProducts(ctx context.Context, storeID int64, items []catalog.VersionedProduct, actor *delegatedactor.Actor) ([]catalog.UnpublishedItem, error)
 }
 
 // maxDelegatedPageSize 是代行列表一頁的上限（proto 註解寫的 50）。
@@ -160,7 +160,8 @@ func (h *Delegated) GetStoreProduct(ctx context.Context, req *connect.Request[pb
 }
 
 // delegatedWrite 是每個單一商品的代行寫入共同的流程：交給 delegation 檢查重送與店家，帶著代行者（明確的參數，A7-D27）執行 do（catalog 在自己的 transaction 內發帶代行者的事件，稽核同 transaction 寫入）；
-// 商品由 do 回傳（建立、修改），或在 do 之後讀回（切換狀態；重送時 do 沒被呼叫，也讀回第一次寫入的商品目前的樣子）。回傳商品與稽核列 ID。
+// 第一次寫入的商品由 do 在寫入的 transaction 內回傳（建立、修改、切換狀態），不再讀一次；重送時 do 沒被呼叫（或輸給並行的第一次寫入），稽核列只記資源 ID 與版本，
+// 回應讀回第一次寫入的商品目前的樣子。回傳商品與稽核列 ID。
 // do 內的模組錯誤先轉成對外的錯誤（failure）：delegation 以錯誤鏈上的原因寫 FAILED 列（NOT_FOUND、VERSION_CONFLICT…），而不是 INTERNAL。
 func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.DelegatedWrite, productID uuid.UUID,
 	do func(ctx context.Context, c moddelegation.DelegatedCaller, st seller.Store, actor *delegatedactor.Actor) (catalog.Product, error)) (*pb.SellerProduct, string, error) {
@@ -174,21 +175,16 @@ func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.Delegate
 		if err != nil {
 			return err
 		}
-		if p.ID != (uuid.UUID{}) {
-			written = &p
-		}
+		written = &p
 		return nil
 	})
 	if err != nil {
 		return nil, "", err
 	}
 	var p catalog.Product
-	switch {
-	case written != nil && !res.Replayed:
-		p = *written
-	default:
+	if res.Replayed {
 		id := productID
-		if res.Replayed && res.ResourceID != "" {
+		if res.ResourceID != "" {
 			if id, err = uuid.Parse(res.ResourceID); err != nil {
 				return nil, "", fmt.Errorf("httpapi/catalog：稽核列 %s 的資源 ID %q：%w", res.AuditLogID, res.ResourceID, err)
 			}
@@ -196,6 +192,11 @@ func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.Delegate
 		if p, err = h.m.Product(ctx, res.Store.StoreID, id); err != nil {
 			return nil, "", failure(err, noPaths)
 		}
+	} else {
+		if written == nil {
+			return nil, "", fmt.Errorf("httpapi/catalog：代行寫入 %s 成功卻沒有商品", res.AuditLogID)
+		}
+		p = *written
 	}
 	out, err := sellerProduct(h.images, p)
 	return out, res.AuditLogID.String(), err
@@ -401,7 +402,8 @@ func (h *Delegated) transition(ctx context.Context, op *commonpb.DelegatedOperat
 	return h.delegatedWrite(ctx, moddelegation.DelegatedWrite{
 		Op: o, ResourceID: id.String(), Version: &version, PayloadHash: moddelegation.DelegatedPayloadHash(action, id, version),
 	}, id, func(ctx context.Context, _ moddelegation.DelegatedCaller, st seller.Store, actor *delegatedactor.Actor) (catalog.Product, error) {
-		return catalog.Product{}, failure(h.m.SetProductStatus(ctx, st.StoreID, id, version, to, actor), statusPaths)
+		p, err := h.m.SetProductStatus(ctx, st.StoreID, id, version, to, actor)
+		return p, failure(err, statusPaths)
 	})
 }
 
@@ -462,23 +464,41 @@ func (h *Delegated) BatchUnpublishStoreProducts(ctx context.Context, req *connec
 	// 請求內容雜湊與項目順序無關（依商品 ID 排序）：同一批商品與版本是同一個請求。
 	sorted := slices.Clone(items)
 	slices.SortFunc(sorted, func(a, b catalog.VersionedProduct) int { return a.ProductID.Compare(b.ProductID) })
+	var written []catalog.UnpublishedItem
 	res, err := h.runner.DelegatedWrite(ctx, c, moddelegation.DelegatedWrite{
 		Op: op, ResourceName: moddelegation.BatchResourceName(len(items)),
 		PayloadHash: moddelegation.DelegatedPayloadHash(moddelegation.AuditProductBatchUnpublish, sorted),
 	}, func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error {
-		return failure(h.m.UnpublishProducts(ctx, st.StoreID, items, actor), batchPaths)
+		var err error
+		written, err = h.m.UnpublishProducts(ctx, st.StoreID, items, actor)
+		return failure(err, batchPaths)
 	})
 	if err != nil {
 		return nil, err
 	}
+	// 回應來自寫入的結果（第一次）或稽核列記下的商品清單（重送），不再讀商品：商品之後被修改、刪除不影響同一個請求的回覆。
+	after := make(map[uuid.UUID]int64, len(items))
+	if res.Replayed {
+		for _, it := range res.Items {
+			id, err := uuid.Parse(it.ResourceID)
+			if err != nil {
+				return nil, fmt.Errorf("httpapi/catalog：稽核列 %s 的商品 ID %q：%w", res.AuditLogID, it.ResourceID, err)
+			}
+			after[id] = it.VersionAfter
+		}
+	} else {
+		for _, it := range written {
+			after[it.ProductID] = it.VersionAfter
+		}
+	}
 	out := &pb.BatchUnpublishStoreProductsResponse{AuditLogId: res.AuditLogID.String(), Products: make([]*pb.UnpublishedProduct, len(items))}
 	for i, it := range items {
-		p, err := h.m.Product(ctx, res.Store.StoreID, it.ProductID)
-		if err != nil {
-			return nil, failure(err, noPaths)
+		v, ok := after[it.ProductID]
+		if !ok {
+			return nil, fmt.Errorf("httpapi/catalog：批次下架 %s 的結果沒有商品 %s", res.AuditLogID, it.ProductID)
 		}
 		out.Products[i] = &pb.UnpublishedProduct{
-			ProductId: p.ID.String(), Etag: catalog.Etag(p.Version), Status: rpc.EnumToProto[pb.ProductStatus](p.Status),
+			ProductId: it.ProductID.String(), Etag: catalog.Etag(v), Status: rpc.EnumToProto[pb.ProductStatus](catalog.StatusArchived),
 		}
 	}
 	return connect.NewResponse(out), nil

@@ -54,7 +54,7 @@ func TestProductWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.m.SetProductStatus(f.ct, storeID, p.ID, cur.Version, to, nil); err != nil {
+		if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, cur.Version, to, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -73,7 +73,7 @@ func TestProductWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(
 	}
 	// 代行者只能上架與下架：切成草稿被拒絕。
 	cur, _ := f.m.Product(f.ct, storeID, p.ID)
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, cur.Version, StatusDraft, testActor()); !errors.Is(err, ErrInvalidInput) {
+	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, cur.Version, StatusDraft, testActor()); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("delegated set to draft = %v, want ErrInvalidInput", err)
 	}
 }
@@ -152,7 +152,7 @@ func TestUnpublishProductsIsAllOrNothing(t *testing.T) {
 	}
 
 	// 兩項版本過時：整批回衝突、列出兩個商品，沒有任何商品被下架、沒有事件。
-	err := f.m.UnpublishProducts(f.ct, storeID, items(0, 2), testActor())
+	_, err := f.m.UnpublishProducts(f.ct, storeID, items(0, 2), testActor())
 	var conflict *BatchVersionConflictError
 	if !errors.As(err, &conflict) || !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("stale batch = %v, want *BatchVersionConflictError", err)
@@ -172,12 +172,12 @@ func TestUnpublishProductsIsAllOrNothing(t *testing.T) {
 	// 別家的商品：整批 ErrProductNotFound，同樣不動。
 	other, otherAcct := f.store()
 	foreign := f.create(other, otherAcct, f.input("別家"))
-	if err := f.m.UnpublishProducts(f.ct, storeID, append(items(), VersionedProduct{ProductID: foreign.ID, Version: foreign.Version}), testActor()); !errors.Is(err, ErrProductNotFound) {
+	if _, err := f.m.UnpublishProducts(f.ct, storeID, append(items(), VersionedProduct{ProductID: foreign.ID, Version: foreign.Version}), testActor()); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("batch with a foreign product = %v, want ErrProductNotFound", err)
 	}
 
 	// 全部版本正確（含已下架的一項）：全部下架、一個事件，已下架的項目是成功且不改版本。
-	if err := f.m.UnpublishProducts(f.ct, storeID, items(), testActor()); err != nil {
+	if _, err := f.m.UnpublishProducts(f.ct, storeID, items(), testActor()); err != nil {
 		t.Fatal(err)
 	}
 	if len(batches) != 1 || len(batches[0].Items) != 4 {
@@ -209,8 +209,119 @@ func TestUnpublishProductsIsAllOrNothing(t *testing.T) {
 		"duplicate": {{ProductID: ps[0].ID, Version: 1}, {ProductID: ps[0].ID, Version: 1}},
 		"no etag":   {{ProductID: ps[0].ID}},
 	} {
-		if err := f.m.UnpublishProducts(f.ct, storeID, in, nil); !errors.Is(err, ErrInvalidInput) {
+		if _, err := f.m.UnpublishProducts(f.ct, storeID, in, nil); !errors.Is(err, ErrInvalidInput) {
 			t.Fatalf("%s batch = %v, want ErrInvalidInput", name, err)
 		}
+	}
+}
+
+// 代行建立遇到這家店已用過的 request_id：不寫入、不發事件，回 ErrCreateReplayed（代行自己的重送由 delegation 的稽核列處理）；店主自己的重送仍回第一次的商品。
+func TestDelegatedCreateWithAUsedRequestIDReportsAReplayWithoutAnEvent(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	up := media.Uploader{ID: acct}
+	var created int
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, func(_ context.Context, e ProductCreated) error {
+		if e.Actor != nil {
+			created++
+		}
+		return nil
+	})
+	rid, in := uuid.NewV7(), f.input("原本")
+	first, err := f.m.CreateProduct(f.ct, storeID, up, rid, in, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.CreateProduct(f.ct, storeID, up, rid, in, testActor()); !errors.Is(err, ErrCreateReplayed) {
+		t.Fatalf("delegated create with a used request_id = %v, want ErrCreateReplayed", err)
+	}
+	if created != 0 {
+		t.Fatalf("a replayed delegated create published %d delegated events", created)
+	}
+	again, err := f.m.CreateProduct(f.ct, storeID, up, rid, in, nil)
+	if err != nil || again.ID != first.ID {
+		t.Fatalf("the owner's replay = %v, %v; want the first product %s", again.ID, err, first.ID)
+	}
+	if n := f.count(`SELECT count(*) FROM catalog.products WHERE store_id = $1`, storeID); n != 1 {
+		t.Fatalf("products = %d, want 1", n)
+	}
+}
+
+// 代行者不能下架草稿（單一與批次，批次整批拒絕並列出全部草稿），店主自己可以；已經下架的批次項目記目前的版本（before == after），不照請求的 etag。
+func TestDelegatedUnpublishRejectsDraftsAndRecordsTheCurrentVersionOfUnchangedItems(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	var batches []ProductsUnpublished
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, func(_ context.Context, e ProductsUnpublished) error { batches = append(batches, e); return nil })
+	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, func(context.Context, ProductUnpublished) error { return nil })
+	active := f.activeProducts(storeID, acct, 1)[0]
+	draft := f.create(storeID, acct, f.input("草稿"))
+	draft2 := f.create(storeID, acct, f.input("草稿二"))
+
+	if _, err := f.m.SetProductStatus(f.ct, storeID, draft.ID, draft.Version, StatusArchived, testActor()); !errors.Is(err, ErrNotPublished) {
+		t.Fatalf("delegated unpublish of a draft = %v, want ErrNotPublished", err)
+	}
+	var drafts *BatchNotPublishedError
+	_, err := f.m.UnpublishProducts(f.ct, storeID, []VersionedProduct{{ProductID: active.ID, Version: active.Version}, {ProductID: draft.ID, Version: draft.Version}, {ProductID: draft2.ID, Version: draft2.Version}}, testActor())
+	if !errors.As(err, &drafts) || !errors.Is(err, ErrNotPublished) {
+		t.Fatalf("batch with drafts = %v, want *BatchNotPublishedError", err)
+	}
+	if want := sortedIDs(draft.ID, draft2.ID); !slices.Equal(drafts.ProductIDs, want) {
+		t.Fatalf("draft ids = %v, want %v", drafts.ProductIDs, want)
+	}
+	if got, _ := f.m.Product(f.ct, storeID, active.ID); got.Status != StatusActive || got.Version != active.Version {
+		t.Fatalf("the active product changed by a rejected batch: %s v%d", got.Status, got.Version)
+	}
+	if got, _ := f.m.Product(f.ct, storeID, draft.ID); got.Status != StatusDraft {
+		t.Fatalf("the draft = %s, want DRAFT", got.Status)
+	}
+	if len(batches) != 0 {
+		t.Fatalf("a rejected batch published %d events", len(batches))
+	}
+	// 店主自己（沒有代行者）仍可以把草稿切成下架。
+	if got, err := f.m.SetProductStatus(f.ct, storeID, draft.ID, draft.Version, StatusArchived, nil); err != nil || got.Status != StatusArchived || got.Version != draft.Version+1 {
+		t.Fatalf("owner archives a draft = %s v%d, %v", got.Status, got.Version, err)
+	}
+
+	archived := f.activeProducts(storeID, acct, 1)[0]
+	if err := setStatusP(f.m, f.ct, storeID, archived.ID, StatusArchived); err != nil {
+		t.Fatal(err)
+	}
+	archived, _ = f.m.Product(f.ct, storeID, archived.ID)
+	out, err := f.m.UnpublishProducts(f.ct, storeID, []VersionedProduct{{ProductID: active.ID, Version: active.Version}, {ProductID: archived.ID, Version: archived.Version + 1}}, testActor())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(batches) != 1 || !slices.Equal(out, batches[0].Items) {
+		t.Fatalf("returned items %v must be the event's items %v", out, batches)
+	}
+	for _, it := range out {
+		if it.ProductID == archived.ID {
+			if it.Changed || it.VersionBefore != archived.Version || it.VersionAfter != archived.Version {
+				t.Fatalf("already-archived item = %+v, want unchanged with both versions %d", it, archived.Version)
+			}
+			continue
+		}
+		if !it.Changed || it.VersionBefore != active.Version || it.VersionAfter != active.Version+1 {
+			t.Fatalf("unpublished item = %+v, want v%d -> v%d", it, active.Version, active.Version+1)
+		}
+	}
+}
+
+// SetProductStatus 回傳寫入後在同一個 transaction 內讀出的商品。
+func TestSetProductStatusReturnsTheWrittenProduct(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	p := f.create(storeID, acct, f.input("狀態"))
+	got, err := f.m.SetProductStatus(f.ct, storeID, p.ID, p.Version, StatusActive, nil)
+	if err != nil || got.ID != p.ID || got.Status != StatusActive || got.Version != p.Version+1 {
+		t.Fatalf("publish returned %s v%d, %v; want ACTIVE v%d", got.Status, got.Version, err, p.Version+1)
+	}
+	same, err := f.m.SetProductStatus(f.ct, storeID, p.ID, got.Version, StatusActive, nil)
+	if err != nil || same.Status != StatusActive || same.Version != got.Version {
+		t.Fatalf("no-op publish returned %s v%d, %v; want ACTIVE v%d", same.Status, same.Version, err, got.Version)
 	}
 }

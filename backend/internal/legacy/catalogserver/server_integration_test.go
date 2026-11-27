@@ -79,7 +79,7 @@ func (f *fixture) product(ctx context.Context, title string, stock int32, compar
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if err := f.m.SetProductStatus(ctx, storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
+	if _, err := f.m.SetProductStatus(ctx, storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
 		f.t.Fatal(err)
 	}
 	return p
@@ -176,7 +176,7 @@ func TestSnapshotRpcsAgainstTheRealCatalog(t *testing.T) {
 		t.Fatalf("checkout info = %v", x)
 	}
 
-	if err := f.m.SetProductStatus(ctx, storeID, p.ID, mustVersion(t, f, ctx, p.ID), catalog.StatusArchived, nil); err != nil {
+	if _, err := f.m.SetProductStatus(ctx, storeID, p.ID, mustVersion(t, f, ctx, p.ID), catalog.StatusArchived, nil); err != nil {
 		t.Fatal(err)
 	}
 	checkout, _ = f.srv.BatchGetProductForCheckout(ctx, connect.NewRequest(&pb.BatchGetProductForCheckoutRequest{SkuIds: []string{sku.String()}}))

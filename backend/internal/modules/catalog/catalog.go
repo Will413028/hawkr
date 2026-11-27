@@ -113,6 +113,8 @@ type (
 	VersionedProduct = model.VersionedProduct
 	// BatchVersionConflictError 是批次下架有版本衝突時的錯誤，列出全部衝突的商品；errors.Is(err, ErrVersionConflict) 成立。
 	BatchVersionConflictError = model.BatchVersionConflictError
+	// BatchNotPublishedError 是代行批次下架含草稿時的錯誤，列出全部草稿商品；errors.Is(err, ErrNotPublished) 成立。
+	BatchNotPublishedError = model.BatchNotPublishedError
 	// RestockNotifier 是 catalog 宣告、補貨通知下游（buyer，B4-4 接線）實作的 port。
 	RestockNotifier = model.RestockNotifier
 )
@@ -163,6 +165,10 @@ var (
 	ErrInvalidInput               = model.ErrInvalidInput
 	// ErrVersionConflict 表示依據的版本（etag）已過時，沒有寫入。
 	ErrVersionConflict = model.ErrVersionConflict
+	// ErrCreateReplayed 見 model.ErrCreateReplayed：代行建立的 request_id 在這家店已用過。
+	ErrCreateReplayed = model.ErrCreateReplayed
+	// ErrNotPublished 見 model.ErrNotPublished：代行不能下架草稿。
+	ErrNotPublished = model.ErrNotPublished
 )
 
 // InvalidInputError.Reason 的值：欄位為什麼不合法。
@@ -343,14 +349,15 @@ func (m *Module) UpdateProduct(ctx context.Context, storeID int64, uploader medi
 }
 
 // SetProductStatus 切換商品狀態（actor 同 CreateProduct；事件依目標狀態是 ProductPublished 或 ProductUnpublished，已經在目標狀態時是 *Repeated，目標 DRAFT 沒有事件也不接受 actor）：DRAFT、ACTIVE、ARCHIVED 任兩個都能互切，切成目前狀態是 no-op（不改版本）。切成 ACTIVE 時商品沒有主圖回 ErrActiveRequiresGalleryImage；
-// first_published_at 只在第一次 ACTIVE 時填，之後不清除。version 必填，不符回 ErrVersionConflict。
-func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to ProductStatus, actor *delegatedactor.Actor) error {
+// first_published_at 只在第一次 ACTIVE 時填，之後不清除。version 必填，不符回 ErrVersionConflict。代行者不能下架草稿（回 ErrNotPublished）。回傳寫入後（no-op 時是目前）的商品，在寫入的 transaction 內讀出。
+func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to ProductStatus, actor *delegatedactor.Actor) (Product, error) {
 	return m.product.SetStatus(ctx, storeID, productID, version, to, actor)
 }
 
 // UnpublishProducts 原子地下架多個商品（D29）：一個 transaction、一個事件，全部下架或全部不動；任一項版本不符整批回 *BatchVersionConflictError（列出全部衝突的商品），
-// 已經下架的項目視為成功。商品不是這家店的回 ErrProductNotFound。actor 同 SetProductStatus。
-func (m *Module) UnpublishProducts(ctx context.Context, storeID int64, items []VersionedProduct, actor *delegatedactor.Actor) error {
+// 已經下架的項目視為成功（兩個版本都是目前版本）。商品不是這家店的回 ErrProductNotFound。actor 同 SetProductStatus；代行者的批次裡有草稿，整批回 *BatchNotPublishedError（ErrNotPublished）。
+// 回傳每一項寫入後的結果（依商品 ID 由小到大），與事件同一份，呼叫方據它組回應、不必再讀商品。
+func (m *Module) UnpublishProducts(ctx context.Context, storeID int64, items []VersionedProduct, actor *delegatedactor.Actor) ([]UnpublishedItem, error) {
 	return m.product.UnpublishMany(ctx, storeID, items, actor)
 }
 

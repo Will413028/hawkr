@@ -76,8 +76,8 @@
    "id": "batch-commits-per-item",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
-   "new": "\tfor _, it := range sorted {\n\t\t_ = s.SetStatus(ctx, storeID, it.ProductID, it.Version, model.StatusArchived, nil)\n\t}\n\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
+   "old": "\tvar out []model.UnpublishedItem\n\terr := s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts, drafts []uuid.UUID",
+   "new": "\tfor _, it := range sorted {\n\t\t_, _ = s.SetStatus(ctx, storeID, it.ProductID, it.Version, model.StatusArchived, nil)\n\t}\n\tvar out []model.UnpublishedItem\n\terr := s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts, drafts []uuid.UUID",
    "test": "internal/modules/catalog ^TestUnpublishProductsIsAllOrNothing$",
    "why": "批次改成逐項提交：版本衝突的批次仍把沒衝突的商品下架，原子性消失"
   },
@@ -85,8 +85,8 @@
    "id": "batch-commits-per-item-delegated",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
-   "new": "\tfor _, it := range sorted {\n\t\t_ = s.SetStatus(ctx, storeID, it.ProductID, it.Version, model.StatusArchived, nil)\n\t}\n\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
+   "old": "\tvar out []model.UnpublishedItem\n\terr := s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts, drafts []uuid.UUID",
+   "new": "\tfor _, it := range sorted {\n\t\t_, _ = s.SetStatus(ctx, storeID, it.ProductID, it.Version, model.StatusArchived, nil)\n\t}\n\tvar out []model.UnpublishedItem\n\terr := s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts, drafts []uuid.UUID",
    "test": "internal/modules/delegation ^TestBatchUnpublishConflictWritesNothingAndTheRetryRecordsOneRow$",
    "why": "批次改成逐項提交：被拒絕的批次留下已下架的商品（整合到 delegation 的批次稽核測試）"
   },
@@ -98,6 +98,60 @@
    "new": "model.OperationOutcome{ResourceName: name, Items: items[:0]})",
    "test": "internal/modules/delegation ^TestBatchUnpublishWritesOneAuditRowWithItsItemsAndOneNotification$",
    "why": "批次稽核不再記錄本批的商品清單（只剩一列父列）：稽核看不出批次動了哪些商品"
+  },
+  {
+   "id": "delegated-unpublish-allows-draft",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if actor != nil && from == model.StatusDraft && to == model.StatusArchived {",
+   "new": "if false && actor != nil && from == model.StatusDraft && to == model.StatusArchived {",
+   "test": "internal/modules/catalog ^TestDelegatedUnpublishRejectsDraftsAndRecordsTheCurrentVersionOfUnchangedItems$",
+   "why": "代行單一下架不再拒絕草稿：草稿被代行者切成 ARCHIVED"
+  },
+  {
+   "id": "delegated-batch-unpublish-allows-draft",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "case actor != nil && model.ProductStatus(cur.Status) == model.StatusDraft:",
+   "new": "case false && actor != nil && model.ProductStatus(cur.Status) == model.StatusDraft:",
+   "test": "internal/modules/catalog ^TestDelegatedUnpublishRejectsDraftsAndRecordsTheCurrentVersionOfUnchangedItems$",
+   "why": "代行批次下架不再拒絕草稿：整批含草稿時草稿被下架"
+  },
+  {
+   "id": "batch-unchanged-item-records-request-etag",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "VersionBefore: cur.ContentVersion, VersionAfter: cur.ContentVersion})",
+   "new": "VersionBefore: it.Version, VersionAfter: cur.ContentVersion})",
+   "test": "internal/modules/catalog ^TestDelegatedUnpublishRejectsDraftsAndRecordsTheCurrentVersionOfUnchangedItems$",
+   "why": "已經下架的批次項目 VersionBefore 記請求帶的 etag，不是目前版本"
+  },
+  {
+   "id": "concurrent-loser-not-converted-to-replay",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/delegation/delegated.go",
+   "old": "if log, found, lerr := m.audit.LookupOperation(ctx, in); lerr == nil && found {",
+   "new": "if log, found, lerr := m.audit.LookupOperation(ctx, in); false && lerr == nil && found {",
+   "test": "internal/modules/delegation ^TestConcurrentWritesWithTheSameRequestIDAllReturnTheFirstResultAndRecordOneRow$",
+   "why": "do 失敗後不再重查同 request_id：並行的輸家回版本衝突並寫 FAILED，不是第一次的結果"
+  },
+  {
+   "id": "delegated-create-replay-reports-the-product",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\t\tif actor != nil {\n\t\t\treturn model.Product{}, model.ErrCreateReplayed\n\t\t}\n\t\treturn s.Get(ctx, storeID, rep.id)",
+   "new": "\t\treturn s.Get(ctx, storeID, rep.id)",
+   "test": "internal/modules/catalog ^TestDelegatedCreateWithAUsedRequestIDReportsAReplayWithoutAnEvent$",
+   "why": "代行建立遇到已用過的 request_id 回既有商品、不報重送：delegation 找不到稽核列而回 INTERNAL"
+  },
+  {
+   "id": "batch-replay-rereads-products",
+   "stack": "go",
+   "file": "backend/internal/httpapi/catalog/delegated.go",
+   "old": "\t\t\tafter[id] = it.VersionAfter",
+   "new": "\t\t\tafter[id] = it.VersionAfter + 1",
+   "test": "internal/httpapi/catalog ^TestBatchUnpublishReplayAnswersFromTheRecordedItemsWithoutReadingProducts$",
+   "why": "重送的批次回應版本不是稽核列記下的 VersionAfter"
   }
  ]
 }

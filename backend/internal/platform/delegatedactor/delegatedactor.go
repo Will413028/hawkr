@@ -8,7 +8,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// AuditHandler 是代行寫入的稽核 handler 在 events.Bus 上的註冊名稱：delegation 以它訂閱 social 的貼文寫入事件，social 帶代行者發布事件時用
+// AuditHandler 是代行寫入的稽核 handler 在 events.Bus 上的註冊名稱：delegation 以它訂閱資源模組（social、catalog）的寫入事件，資源模組帶代行者發布事件時用
 // events.PublishRequired 指名要求它存在，沒有就失敗關閉（A7-D27）。
 const AuditHandler = "delegation.audit"
 

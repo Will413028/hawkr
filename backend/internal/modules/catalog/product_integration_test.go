@@ -172,7 +172,7 @@ func setStatusP(m *Module, ct context.Context, storeID int64, id uuid.UUID, to P
 		if err != nil {
 			return err
 		}
-		err = m.SetProductStatus(ct, storeID, id, cur.Version, to, nil)
+		_, err = m.SetProductStatus(ct, storeID, id, cur.Version, to, nil)
 		if !errors.Is(err, ErrVersionConflict) {
 			return err
 		}

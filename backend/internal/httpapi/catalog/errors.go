@@ -105,6 +105,7 @@ func failure(err error, paths rpc.FieldPaths) error {
 	var shortage *catalog.InsufficientStockError
 	var mismatch *catalog.StockMismatchError
 	var batchConflict *catalog.BatchVersionConflictError
+	var batchDrafts *catalog.BatchNotPublishedError
 	switch {
 	case errors.As(err, &invalid):
 		field := invalid.Field
@@ -127,6 +128,17 @@ func failure(err error, paths rpc.FieldPaths) error {
 			text[i] = id.String()
 		}
 		return apperr.VersionConflict("有 %d 個商品已經被修改，請重新讀取後再送出", len(ids)).WithMetadata("conflictingProductIds", strings.Join(text, ","))
+	case errors.As(err, &batchDrafts):
+		text := make([]string, len(batchDrafts.ProductIDs))
+		for i, id := range batchDrafts.ProductIDs {
+			text[i] = id.String()
+		}
+		// 沒有對應的 ErrorReason（ErrorInfo 只在有 reason 時才送出，metadata 帶不出去），草稿商品的 ID 寫在訊息裡。
+		return apperr.FailedPrecondition("有 %d 個商品是草稿，草稿沒有上架過、不能下架：%s", len(text), strings.Join(text, ","))
+	case errors.Is(err, catalog.ErrNotPublished):
+		return apperr.FailedPrecondition("草稿沒有上架過，不能下架")
+	case errors.Is(err, catalog.ErrCreateReplayed):
+		return apperr.FailedPrecondition("這個 request_id 已經用來建立過這家店的商品，請改用新的 request_id")
 	case errors.Is(err, catalog.ErrVersionConflict):
 		return apperr.VersionConflict("商品已經被修改，請重新讀取後再送出")
 	case errors.Is(err, catalog.ErrActiveRequiresGalleryImage):

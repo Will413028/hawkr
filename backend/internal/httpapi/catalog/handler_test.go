@@ -126,10 +126,10 @@ func (f *fakeModule) UpdateProduct(_ context.Context, storeID int64, up media.Up
 	return f.product, f.err
 }
 
-func (f *fakeModule) SetProductStatus(_ context.Context, storeID int64, _ uuid.UUID, version int64, _ catalog.ProductStatus, _ *delegatedactor.Actor) error {
+func (f *fakeModule) SetProductStatus(_ context.Context, storeID int64, _ uuid.UUID, version int64, _ catalog.ProductStatus, _ *delegatedactor.Actor) (catalog.Product, error) {
 	f.rec("SetProductStatus")
 	f.stores, f.versions = append(f.stores, storeID), append(f.versions, version)
-	return f.err
+	return f.product, f.err
 }
 
 func (f *fakeModule) DeleteProduct(_ context.Context, storeID int64, _ uuid.UUID, version int64) error {

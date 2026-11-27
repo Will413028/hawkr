@@ -51,7 +51,7 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, p.Version+1, f.input("改名"), nil); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag on update must be rejected: %v", err)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, p.Version+1, StatusActive, nil); !errors.Is(err, ErrVersionConflict) {
+	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, p.Version+1, StatusActive, nil); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag on status change must be rejected: %v", err)
 	}
 	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, p.Version+1); !errors.Is(err, ErrVersionConflict) {
@@ -86,21 +86,21 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 	}
 
 	// 狀態切換加一，同狀態 no-op 不加。
-	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
 	active := f.mustProduct(storeID, p.ID)
 	if active.Version != updated.Version+1 {
 		t.Fatalf("a status change bumps the version: %d -> %d", updated.Version, active.Version)
 	}
-	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, active.Version, StatusActive, nil))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, active.Version, StatusActive, nil))
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a no-op status change must not bump the version: %d -> %d", active.Version, got.Version)
 	}
 	// 重送：用切換前的舊 etag 再送同一個目標狀態仍成功（冪等），etag 不變。
-	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a retried status change must leave the etag alone: %d -> %d", active.Version, got.Version)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusArchived, nil); !errors.Is(err, ErrVersionConflict) {
+	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusArchived, nil); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag with a different target is still a conflict: %v", err)
 	}
 }
@@ -737,6 +737,11 @@ func TestHashtagSuggestionsCountOnlyVisibleProducts(t *testing.T) {
 	if err != nil || len(trend) != 2 || trend[0].Name != "yam" || trend[0].ProductCount != 2 {
 		t.Fatalf("trending is ordered by visible product count: %+v %v", trend, err)
 	}
+}
+
+func (f *productFixture) mustStatus(_ Product, err error) {
+	f.t.Helper()
+	f.must(err)
 }
 
 func (f *productFixture) must(err error) {

@@ -32,7 +32,7 @@ type SellerModule interface {
 	OwnSku(ctx context.Context, storeID int64, skuID uuid.UUID) (catalog.SkuState, error)
 	CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in catalog.ProductInput, actor *delegatedactor.Actor) (catalog.Product, error)
 	UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in catalog.ProductInput, actor *delegatedactor.Actor) (catalog.Product, error)
-	SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to catalog.ProductStatus, actor *delegatedactor.Actor) error
+	SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to catalog.ProductStatus, actor *delegatedactor.Actor) (catalog.Product, error)
 	DeleteProduct(ctx context.Context, storeID int64, productID uuid.UUID, version int64) error
 	AdjustStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, delta int32) error
 	SetStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, quantity, expected int32) error

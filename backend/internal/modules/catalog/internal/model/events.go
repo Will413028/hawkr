@@ -73,6 +73,14 @@ func (e *BatchVersionConflictError) Error() string { return "catalog: batch prod
 // Is 讓 errors.Is(err, ErrVersionConflict) 成立。
 func (e *BatchVersionConflictError) Is(target error) bool { return target == ErrVersionConflict }
 
+// BatchNotPublishedError 表示批次裡有商品是草稿（代行下架不接受草稿），整批沒有寫入；errors.Is(err, ErrNotPublished) 成立。ProductIDs 是全部草稿商品，由小到大。
+type BatchNotPublishedError struct{ ProductIDs []uuid.UUID }
+
+func (e *BatchNotPublishedError) Error() string { return "catalog: batch contains draft products" }
+
+// Is 讓 errors.Is(err, ErrNotPublished) 成立。
+func (e *BatchNotPublishedError) Is(target error) bool { return target == ErrNotPublished }
+
 // SortedIDs 回傳由小到大的衝突商品 ID（UUID 的位元組序）。
 func (e *BatchVersionConflictError) SortedIDs() []uuid.UUID {
 	out := slices.Clone(e.ProductIDs)
