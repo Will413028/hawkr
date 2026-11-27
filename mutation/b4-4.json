@@ -158,7 +158,7 @@
    "stack": "go-integration",
    "file": "backend/cmd/hawkr/buyer_ports.go",
    "old": "InStock: purchasable",
-   "new": "InStock: snapshot.Active",
+   "new": "InStock: purchasable && false || snapshot.Active",
    "test": "cmd/hawkr ^TestBuyerSkusReportsStockFromTheCatalogSnapshot$",
    "why": "規格有貨的判斷不看 catalog 的可買（庫存與店家可曝光）：缺貨的規格被當成有貨，缺貨規格的測試要紅。"
   },
@@ -167,7 +167,7 @@
    "stack": "go-integration",
    "file": "backend/cmd/hawkr/buyer_ports.go",
    "old": "InStock: purchasable",
-   "new": "InStock: snapshot.Active && snapshot.StockQty > 0",
+   "new": "InStock: purchasable && false || snapshot.Active && snapshot.StockQty > 0",
    "test": "cmd/hawkr ^TestBuyerSkusTreatsAStockedSKUOfAnUnexposableStoreAsOutOfStock$",
    "why": "有貨只看快照的庫存、不看店家可曝光：不可曝光店家的有庫存規格被當成有貨，該測試要紅。"
   },
@@ -185,7 +185,7 @@
    "stack": "go",
    "file": "backend/cmd/hawkr/catalog.go",
    "old": "\t\tif notified == 0 {",
-   "new": "\t\tif false {",
+   "new": "\t\tif notified < 0 {",
    "test": "cmd/hawkr ^TestNotifyRestockedFailsWhenABatchMakesNoProgress$",
    "why": "一批處理 0 筆而 more 仍為真時不回錯誤：會空轉到鎖釋放，測試要紅。"
   },
