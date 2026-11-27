@@ -142,6 +142,7 @@ class OrderPolicySnapshotChainContractTest {
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
+                                .setProductId(TestIds.id(9001L).toString())
                                 .setSkuName("大")
                                 .setProductName("蘋果禮盒")
                                 .setStoreId(String.valueOf(STORE_ID))

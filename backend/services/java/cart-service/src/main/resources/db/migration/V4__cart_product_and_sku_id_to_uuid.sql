@@ -1,4 +1,4 @@
--- B4-4a（D27）：商品與 SKU 的 ID 改成 catalog 的 UUID（UUIDv7），不保留數字舊 ID 的對照。
+-- 商品與 SKU 的 ID 改成 catalog 的 UUID（UUIDv7），不保留數字舊 ID 的對照。
 -- 數字的 sku_id、product_id 指向即將刪除的 product-service，沒有可轉換的對應，也沒有上線的資料，所以先清掉既有的明細再換欄位型別。
 -- sku_id 是兩個 partial unique index 的成員，換欄位時隨欄位一起被刪，這裡重建（名稱同 V1、V3）。
 DELETE FROM cart_items;

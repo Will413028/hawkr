@@ -137,8 +137,10 @@ public class StockCompensationWorker {
 
         List<StockItem> items = parsePayload(record.getPayloadSnapshot());
         if (items.isEmpty()) {
-            log.error("StockCompensationWorker.process.emptyPayload", "payload 為空",
+            log.error("StockCompensationWorker.process.emptyPayload", "payload 為空或無法解析，轉人工處理",
                     "stockTxId", record.getStockTxId());
+            stockTxRecordRepository.markManualIntervention(
+                    record.getStockTxId(), record.getPhase());
             return;
         }
 
@@ -202,6 +204,13 @@ public class StockCompensationWorker {
         }
 
         List<StockItem> items = parsePayload(deductRecord.getPayloadSnapshot());
+        if (items.isEmpty()) {
+            log.error("StockCompensationWorker.retryRestore.emptyPayload", "原始扣減記錄的 payload 為空或無法解析，轉人工處理",
+                    "stockTxId", record.getStockTxId());
+            stockTxRecordRepository.markManualIntervention(
+                    record.getStockTxId(), record.getPhase());
+            return;
+        }
         try {
             StockOperationResponse response = productGrpcClient.restoreStock(record.getStockTxId(), items);
             if (StockOperationStatus.SUCCESS.value().equals(response.getStatus())

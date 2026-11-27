@@ -146,4 +146,23 @@ class NonCatalogCaseItemConstraintIT {
                 "SELECT sku_id FROM aftersale_case_items WHERE id = 9104").get("sku_id"))
                 .isEqualTo(CATALOG_SKU);
     }
+
+    @Test
+    @DisplayName("UUID sku_id 經 MyBatis 寫入後能讀回同一個值，且不是 null")
+    void uuidSkuIdRoundTripsThroughMapper() {
+        AfterSaleCaseItemEntity item = new AfterSaleCaseItemEntity();
+        item.setId(9105L);
+        item.setCaseNo("AS_NC_005");
+        item.setOrderItemId(7001L);
+        item.setSkuId(CATALOG_SKU);
+        item.setSkuName("文旦柚 200 公斤");
+        item.setQuantity(1);
+        item.setOriginalPrice(30000L);
+        item.setActualPayAmount(30000L);
+
+        itemMapper.insert(item);
+
+        AfterSaleCaseItemEntity read = itemMapper.selectById(9105L);
+        assertThat(read.getSkuId()).isEqualTo(CATALOG_SKU);
+    }
 }

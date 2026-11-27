@@ -112,8 +112,8 @@ class NonCatalogOrderItemConstraintIT {
     @Test
     @DisplayName("A-7 後半：catalog 訂單的 uk_order_items_order_sku 原樣成立，沒被放寬波及")
     void sameSkuIdInSameOrderStillCollides() {
-        jdbc.update(INSERT, 9005L, "O_NC_004", 5150L, "文旦柚 200 公斤");
-        assertThatThrownBy(() -> jdbc.update(INSERT, 9006L, "O_NC_004", 5150L, "文旦柚 200 公斤"))
+        jdbc.update(INSERT, 9005L, "O_NC_004", io.github.will413028.hawkr.order.TestIds.id(5150L), "文旦柚 200 公斤");
+        assertThatThrownBy(() -> jdbc.update(INSERT, 9006L, "O_NC_004", io.github.will413028.hawkr.order.TestIds.id(5150L), "文旦柚 200 公斤"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

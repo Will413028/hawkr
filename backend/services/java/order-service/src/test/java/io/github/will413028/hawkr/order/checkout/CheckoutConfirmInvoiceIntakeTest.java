@@ -93,6 +93,7 @@ class CheckoutConfirmInvoiceIntakeTest {
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
+                                .setProductId(TestIds.id(9001L).toString())
                                 .setSkuName("大")
                                 .setProductName("蘋果禮盒")
                                 .setStoreId(String.valueOf(STORE_ID))
@@ -210,6 +211,31 @@ class CheckoutConfirmInvoiceIntakeTest {
         assertThat(params.invoiceSnapshot().invoiceKind()).isEqualTo(InvoiceDocumentKind.B2C.value());
         assertThat(params.invoiceSnapshot().carrierSelectionMode())
                 .isEqualTo(InvoiceCarrierSelectionMode.USE_BUYER_DEFAULT.value());
+    }
+
+    @Test
+    @DisplayName("訂單明細的 product_id 取自 catalog 的回應，client 送錯的 product_id 不影響")
+    void storedProductIdComesFromCatalogNotFromRequest() {
+        CheckoutConfirmRequest request = baseRequest().clearItems()
+                .addItems(CheckoutItem.newBuilder()
+                        .setSkuId(SKU_ID).setProductId(TestIds.id(1234L).toString()).setQuantity("2").build())
+                .build();
+
+        OrderService.CreateOrderParams params = confirmAndCaptureParams(request);
+
+        assertThat(params.items().get(0).productId()).isEqualTo(TestIds.id(9001L));
+    }
+
+    @Test
+    @DisplayName("client 沒送 product_id 時，訂單明細的 product_id 仍取自 catalog 的回應")
+    void storedProductIdComesFromCatalogWhenRequestOmitsIt() {
+        CheckoutConfirmRequest request = baseRequest().clearItems()
+                .addItems(CheckoutItem.newBuilder().setSkuId(SKU_ID).setQuantity("2").build())
+                .build();
+
+        OrderService.CreateOrderParams params = confirmAndCaptureParams(request);
+
+        assertThat(params.items().get(0).productId()).isEqualTo(TestIds.id(9001L));
     }
 
     @Test

@@ -2,7 +2,7 @@ package io.github.will413028.hawkr.order;
 
 import java.util.UUID;
 
-/** 測試用的固定 UUID：商品與 SKU 的 ID 是 catalog 的 UUID（D27），測試以小整數編號產生可讀、可重現的值。 */
+/** 測試用的固定 UUID：商品與 SKU 的 ID 是 catalog 的 UUID，測試以小整數編號產生可讀、可重現的值。 */
 public final class TestIds {
 
     private TestIds() {

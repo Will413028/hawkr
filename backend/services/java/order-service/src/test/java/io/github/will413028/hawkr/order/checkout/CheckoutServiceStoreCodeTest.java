@@ -121,6 +121,7 @@ class CheckoutServiceStoreCodeTest {
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
+                                .setProductId(TestIds.id(9001L).toString())
                                 .setSkuName("Apple")
                                 .setProductName("Apple Box")
                                 .setStoreId(String.valueOf(STORE_ID))

@@ -284,6 +284,7 @@ public class PaymentEventHandler {
         // 而 docs/開發規範/後端服務責任邊界規範.md 禁止寫 reconciliation job ⇒ 無任何救濟路徑。
         // ⇒ 改走**例外 A（同 tx outbox）**，與正上方 order.paid 同一個做法與同一個事務。
         Map<UUID, Integer> productQtyMap = orderItemRepository.findByOrderNo(orderId).stream()
+                .filter(item -> item.getProductId() != null)
                 .collect(Collectors.groupingBy(
                         item -> item.getProductId(),
                         Collectors.summingInt(item -> item.getQuantity())));

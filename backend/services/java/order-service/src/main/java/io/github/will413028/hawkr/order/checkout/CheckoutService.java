@@ -1191,7 +1191,7 @@ public class CheckoutService {
                     parseIntSafe(info.getHeightCm()),
                     weightGram,
                     Long.parseLong(info.getStoreId()),
-                    ProtoConversionUtils.parseUuidRequired(item.getProductId(), "product_id"),
+                    ProtoConversionUtils.parseUuidRequired(info.getProductId(), "product_id"),
                     info.getProductName() != null ? info.getProductName() : "",
                     options,
                     info.getImageObjectKey() != null ? info.getImageObjectKey() : "",

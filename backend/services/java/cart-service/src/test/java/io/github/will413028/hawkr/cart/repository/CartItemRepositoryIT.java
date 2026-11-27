@@ -1,5 +1,6 @@
 package io.github.will413028.hawkr.cart.repository;
 
+import io.github.will413028.hawkr.cart.entity.CartItemEntity;
 import io.github.will413028.hawkr.common.config.MyBatisPlusAutoConfiguration;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -149,7 +150,66 @@ class CartItemRepositoryIT {
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM cart_items", Integer.class));
     }
 
+    @Test
+    @DisplayName("UUID sku_id / product_id: entity insert and select round-trip through the mapper")
+    void uuidIdsRoundTripThroughMapper() {
+        java.util.UUID skuId = new java.util.UUID(3L, 1L);
+        java.util.UUID productId = new java.util.UUID(4L, 1L);
+        CartItemEntity entity = new CartItemEntity();
+        entity.setId(3001L);
+        entity.setGuestId("guest-U");
+        entity.setStoreId(9001L);
+        entity.setSkuId(skuId);
+        entity.setProductId(productId);
+        entity.setQuantity(1);
+        entity.setAddedUnitPrice(100L);
+        entity.setAddedListPrice(100L);
+        entity.setMaxLimitSnapshot(10);
+        entity.setSkuNameSnapshot("test sku");
+        entity.setStatus("0");
+
+        repository.insert(entity);
+
+        CartItemEntity read = repository.findByGuestIdAndSkuId("guest-U", skuId);
+        assertNotNull(read);
+        assertEquals(skuId, read.getSkuId());
+        assertEquals(productId, read.getProductId());
+    }
+
+    @Test
+    @DisplayName("UUID sku_id: <foreach> over List<UUID> expands and matches in lock / unlock / remove")
+    void uuidForeachLockUnlockRemove() {
+        java.util.UUID sku1 = new java.util.UUID(5L, 1L);
+        java.util.UUID sku2 = new java.util.UUID(5L, 2L);
+        java.util.UUID sku3 = new java.util.UUID(5L, 3L);
+        insertBuyerItem(4001L, 55L, sku1);
+        insertBuyerItem(4002L, 55L, sku2);
+        insertBuyerItem(4003L, 55L, sku3);
+
+        int locked = repository.lockItemsByBuyerAndSkus(55L, "CK1",
+                java.time.LocalDateTime.now().plusMinutes(10), List.of(sku1, sku2));
+        assertEquals(2, locked);
+
+        int unlocked = repository.unlockItemsByCheckoutId(55L, "CK1", List.of(sku1));
+        assertEquals(1, unlocked);
+
+        int removed = repository.removeByCheckoutId(55L, "CK1", List.of(sku2));
+        assertEquals(1, removed);
+        assertEquals(0, countById(4002L));
+        assertEquals(1, countById(4001L));
+        assertEquals(1, countById(4003L));
+    }
+
     // ==================== helpers ====================
+
+    private void insertBuyerItem(long id, long buyerId, java.util.UUID skuId) {
+        jdbc.update("""
+                INSERT INTO cart_items
+                    (id, buyer_id, store_id, sku_id, product_id, quantity,
+                     added_unit_price, added_list_price, max_limit_snapshot, sku_name_snapshot, status)
+                VALUES (?, ?, 9001, ?, ?, 1, 100, 100, 10, 'test sku', '0')
+                """, id, buyerId, skuId, new java.util.UUID(6L, id));
+    }
 
     /**
      * 直接 SQL insert（避免走 MyBatis-Plus auto-fill，方便精確控制 status / store_id）。
