@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -310,12 +311,20 @@ func (r *DocumentRepository) InsertLines(ctx context.Context, documentID int64, 
 	}
 	params := make([]gen.BulkInsertInvoiceDocumentLinesParams, 0, len(lines))
 	for _, l := range lines {
+		var skuID *uuid.UUID
+		if l.SkuID != "" {
+			u, err := uuid.Parse(l.SkuID)
+			if err != nil {
+				return fmt.Errorf("invoice line %d: sku_id %q is not a UUID: %w", l.LineSeq, l.SkuID, err)
+			}
+			skuID = &u
+		}
 		params = append(params, gen.BulkInsertInvoiceDocumentLinesParams{
 			DocumentID:        documentID,
 			LineSeq:           l.LineSeq,
 			LineType:          l.LineType,
 			OrderItemID:       inp(l.OrderItemID),
-			SkuID:             inp(l.SkuID),
+			SkuID:             skuID,
 			Description:       l.Description,
 			Unit:              snp(l.Unit),
 			Quantity:          l.Quantity,

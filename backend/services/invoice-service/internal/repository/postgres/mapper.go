@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/Will413028/hawkr/go-pkg/crypto"
@@ -387,7 +388,7 @@ func toDocumentLine(row gen.InvoiceDocumentLine) (domain.DocumentLine, error) {
 		LineSeq:           row.LineSeq,
 		LineType:          row.LineType,
 		OrderItemID:       row.OrderItemID,
-		SkuID:             row.SkuID,
+		SkuID:             uuidPtrString(row.SkuID),
 		Description:       row.Description,
 		Unit:              row.Unit,
 		Quantity:          row.Quantity,
@@ -863,7 +864,16 @@ func snp(s string) *string {
 	return &s
 }
 
-// inp 是 int64 的 nullable 版：0 回 nil。用於 order_item_id／sku_id／adjustment_id
+// uuidPtrString 把 nullable UUID 欄位轉成 domain 的 *string（NULL 回 nil）。
+func uuidPtrString(u *uuid.UUID) *string {
+	if u == nil {
+		return nil
+	}
+	s := u.String()
+	return &s
+}
+
+// inp 是 int64 的 nullable 版：0 回 nil。用於 order_item_id／adjustment_id
 // 這類「0 不是合法業務值」的 FK 欄。
 func inp(v int64) *int64 {
 	if v == 0 {

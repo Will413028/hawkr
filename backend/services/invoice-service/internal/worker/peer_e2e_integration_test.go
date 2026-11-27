@@ -151,7 +151,7 @@ func peerSnapshot(orderNo string, prefID int64) *orderpb.OrderInvoiceSnapshotDat
 		TotalActualAmount:        "300",
 		DiscountFunding:          "SELLER",
 		Items: []*orderpb.OrderInvoiceSnapshotItem{
-			{OrderItemId: "9007199254740993", SkuId: "9007199254740994",
+			{OrderItemId: "9007199254740993", SkuId: "0192a3b4-0000-7000-8000-000000000094",
 				ProductName: "有機高麗菜", SkuName: "大顆", Quantity: "3", UnitPrice: "100"},
 		},
 	}

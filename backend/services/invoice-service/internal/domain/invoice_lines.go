@@ -51,7 +51,7 @@ const (
 // 四捨五入、尾差歸最後一筆、負值夾成 0，三者都會讓加總不變式失效；收了那兩個欄位就會有人拿去算金額。
 type OrderItem struct {
 	OrderItemID int64
-	SkuID       int64
+	SkuID       string // catalog SKU UUID；空字串表示 non-catalog 行
 	ProductName string
 	SkuName     string
 	Quantity    int32
@@ -79,7 +79,7 @@ type Line struct {
 	LineSeq     int32
 	LineType    string // codemeta InvoiceLineType 的 Value
 	OrderItemID int64  // 0 表示 NULL（SHIPPING／DISCOUNT）
-	SkuID       int64  // 同上
+	SkuID       string // 空字串表示 NULL
 	Description string
 	Quantity    int32
 	UnitPrice   int64

@@ -79,7 +79,7 @@ func TaxCategoryToAmego(tc TaxCategory) (string, error) {
 type TaxCategoryResolver interface {
 	// ResolveProduct 必須是純函式：所有外部資料在建構 resolver 時就已快照完畢，
 	// Resolve 期間不得再查 DB／gRPC。
-	ResolveProduct(skuID int64) TaxCategory
+	ResolveProduct(skuID string) TaxCategory
 }
 
 // SellerDefaultTaxResolver 是 Phase 1 唯一實作：整張訂單同一個課稅別。
@@ -90,4 +90,4 @@ type TaxCategoryResolver interface {
 type SellerDefaultTaxResolver struct{ Default TaxCategory }
 
 // ResolveProduct 回傳賣家層級的預設課稅別，與 skuID 無關。
-func (r SellerDefaultTaxResolver) ResolveProduct(int64) TaxCategory { return r.Default }
+func (r SellerDefaultTaxResolver) ResolveProduct(string) TaxCategory { return r.Default }
