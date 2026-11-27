@@ -418,7 +418,7 @@ func guardResourceID(c *gin.Context, face string) string {
 	}
 }
 
-// requireDelegated is the guard on the 14 delegated resource routes. capability is a
+// requireDelegated is the guard on the 7 delegated resource routes. capability is a
 // REQUIRED parameter, so a new delegated route cannot compile without declaring one
 // — the compile-time half of deny-by-default, with the boot assertion as the backstop.
 //
@@ -493,7 +493,7 @@ func requireDelegated(cap authz.AdminCapability, deps delegationDeps) gin.Handle
 
 // 四個 helper 一律呼叫 middleware.RegisterDelegatedRoute：限流命中時要回代行專用的
 // 9273（§6.1.0 行 2317）而不是裸 429，而限流跑在所有 handler 之前，唯一問得到的問題是
-// 「c.FullPath() 是不是代行路由」。登錄制與 capability 登錄同理由——14 支資源端點掛在
+// 「c.FullPath() 是不是代行路由」。登錄制與 capability 登錄同理由——7 支資源端點掛在
 // /sellers/:store_id/ 這一段，而同一段也可以掛非代行的端點；任何前綴規則都分不出兩者，
 // 會多吃非代行的、或漏吃形狀不符前綴的代行端點，而兩種錯法都靜默（照樣回 429，
 // 只是業務碼不對）。
@@ -527,7 +527,7 @@ func credentialHandle(g *gin.RouterGroup, method, relPath string, h gin.HandlerF
 	g.Handle(method, relPath, h)
 }
 
-// delegatedHandle mounts one of the 14 delegated resource routes: it registers
+// delegatedHandle mounts one of the 7 delegated resource routes: it registers
 // (method, fullPath, cap) in the admin authz registry — declaration and mounting are
 // one act — and prepends requireDelegated(cap).
 func delegatedHandle(g *gin.RouterGroup, method, relPath string, cap authz.AdminCapability, deps delegationDeps, h gin.HandlerFunc) {

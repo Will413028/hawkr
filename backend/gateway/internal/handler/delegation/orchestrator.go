@@ -24,8 +24,6 @@ const auditResultPending = "PENDING"
 type AuditClient interface {
 	RecordAuditIntent(ctx context.Context, req *accountpb.RecordAuditIntentRequest, deadlineMs int) (*accountpb.RecordAuditIntentResponse, error)
 	ConfirmAuditResult(ctx context.Context, req *accountpb.ConfirmAuditResultRequest, deadlineMs int) (*accountpb.ConfirmAuditResultResponse, error)
-	RecordAuditIntentBatch(ctx context.Context, req *accountpb.RecordAuditIntentBatchRequest, deadlineMs int) (*accountpb.RecordAuditIntentBatchResponse, error)
-	ConfirmAuditResultBatch(ctx context.Context, req *accountpb.ConfirmAuditResultBatchRequest, deadlineMs int) (*accountpb.ConfirmAuditResultBatchResponse, error)
 }
 
 // Orchestrator owns the only implementation of the three-step sequence

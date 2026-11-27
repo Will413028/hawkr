@@ -318,10 +318,10 @@ func TestDelegatedHandlers_UpstreamErrorBranchesRestoreBizCode(t *testing.T) {
 	// 這個下界是 ratchet，也是本閘門的第二個自我量測：比對器一旦失準（Holder 欄位改名、
 	// 呼叫形狀改了、標記判定壞了）最可能的症狀是「一個都沒掃到而全綠」。
 	//
-	// 28 ＝ 本次盤點的實際命中數。下界訂在 23 而不是 28：刪掉幾支代行端點是正常的維護，
+	// 19 ＝ 本次盤點的實際命中數。下界訂在 14 而不是 19：刪掉幾支代行端點是正常的維護，
 	// 不該連帶把這支測試弄紅；但一次掉超過 5 個就不是「刪了幾支端點」的量級，那是比對器
 	// 整組失準。
-	const minSites = 23
+	const minSites = 14
 	if len(sites) < minSites {
 		t.Fatalf("只掃到 %d 個上游呼叫點（< %d）——比對器八成失準了，此時的綠燈是假的", len(sites), minSites)
 	}

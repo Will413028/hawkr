@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
-	"github.com/Will413028/hawkr/gateway/internal/middleware"
-	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -258,49 +256,6 @@ func TestCreateSellerProduct_CertificationCountLimitStillRejects(t *testing.T) {
 	}
 	if stub.lastCreate != nil {
 		t.Error("超量請求不得送到 product-service")
-	}
-}
-
-// ==================== 代行路徑（W3／W4）====================
-
-func newDelegatedCertRouter(stub *certCapturingProductStub) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	h := &Holder{
-		Account: grpcclient.NewAccountDelegationClientForTest(&delegationStub{}),
-		Product: grpcclient.NewProductClientForTest(stub),
-	}
-	r := gin.New()
-	g := r.Group("/api/v1/admin")
-	g.Use(func(c *gin.Context) {
-		middleware.SetDelegationSession(c, &accountpb.OperationSessionSummary{
-			SessionId: "2701445580000002",
-			Actor:     &accountpb.DelegationActor{AdminId: "2701338845", DisplayName: "Cora Chen"},
-			Target:    &accountpb.DelegationTarget{StoreId: "2685914682"},
-			Status:    "active",
-		})
-		c.Next()
-	})
-	g.POST("/sellers/:store_id/products", h.CreateDelegatedProduct)
-	return r
-}
-
-func TestDelegatedProductCreate_IllegalCertificationIsDroppedNotRejected(t *testing.T) {
-	stub := &certCapturingProductStub{}
-	r := newDelegatedCertRouter(stub)
-
-	// 代行走另一個 DTO（DelegatedProductCertification），而 validateProductArrays 只擋
-	// 筆數——值域這一層是本次新加的，漏了它非法值會直接落進申請表與 ADM 佇列。
-	postDelegated(t, r, "/api/v1/admin/sellers/2685914682/products", "ik-cert-delegated-0001",
-		`{"operationReason":"協助新品上架","name":"嘉義布袋鮮蚵","categoryId":"10001",`+
-			`"skus":[{"spec":"600g","price":"350","stockQty":"20","unit":"3301"}],`+
-			`"certifications":[{"name":"3701","certNo":"1-008-131005"},{"name":"9999","certNo":"x"}]}`)
-
-	if stub.lastCreate == nil {
-		t.Fatal("CreateProduct 沒有被呼叫，下面的斷言會空過")
-	}
-	got := stub.lastCreate.GetCertifications()
-	if len(got) != 1 || got[0].GetName() != "3701" {
-		t.Fatalf("送往 gRPC 的 certifications = %+v, want 只留 3701 那一筆", got)
 	}
 }
 

@@ -55,22 +55,12 @@ var delegatedForbiddenFieldExceptions = map[string]struct{}{}
 // 新增一個代行 DTO 卻忘了列進來，這支測試就守不到它——所以清單本身也是契約的一部分。
 func delegatedResponseDTOs() map[string]any {
 	return map[string]any{
-		"DelegatedProductListItem":        DelegatedProductListItem{},
-		"DelegatedProductDetail":          DelegatedProductDetail{},
 		"DelegatedOrderListItem":          DelegatedOrderListItem{},
 		"DelegatedOrderDetail":            DelegatedOrderDetail{},
 		"DelegatedAuditLogEntry":          DelegatedAuditLogEntry{},
 		"DelegatedSessionSummary":         DelegatedSessionSummary{},
 		"DelegatedOperationSessionRecord": DelegatedOperationSessionRecord{},
-		"DelegatedBatchUnpublishData":     DelegatedBatchUnpublishData{},
 		"DelegatedRecipientContactData":   DelegatedRecipientContactData{},
-		// 每一支寫入端點的統一出口。它一度不在清單內，而它正是所有代行寫入
-		// 回應的形狀 —— 漏掉它等於整條寫入路徑沒有被這支契約守到。
-		"delegatedMutationData": delegatedMutationData{},
-		// 代行商品建立／更新的專屬出口（共用三欄 ＋ certificationWarnings，19 §9.5）。
-		// 它是 delegatedMutationData 的旁支而不是取代品，所以兩個都要在清單裡——
-		// 少列這一個，商品寫入路徑就從禁用欄位契約裡整條掉出去。
-		"delegatedProductMutationData": delegatedProductMutationData{},
 	}
 }
 
@@ -275,7 +265,7 @@ func collectJSONFieldNames(t reflect.Type, seen map[reflect.Type]bool) []string 
 //
 // 原本的設計是「新增代行 DTO 卻忘了列進來，這支測試就守不到它——所以清單本身也是
 // 契約的一部分」。但那句話當時沒有任何東西在執行：清單漏了三個實際出口
-// （delegatedMutationData／DelegatedMediaCompleteData／DelegatedRecipientContactData），
+// （三個實際出口），
 // 其中第一個是每一支寫入端點的統一回應形狀，而所有測試照樣全綠。
 //
 // 這裡直接解析四支 admin_delegated_*.go 的 AST，把每一個 `response.OK(c, X{...})`

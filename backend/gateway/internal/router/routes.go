@@ -32,7 +32,7 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	// A31（56 號）：/api/v1/admin 前綴不再蘊含 admin 身分。這個 sibling group 不掛
 	// JWTAuth／requireAdmin，身分改由 operation credential 承擔——工作區在
 	// hawkr-website 上，那裡沒有 ADM session（host-only cookie 送不到）。
-	// 誰能掛在這上面由 boot 斷言第 4 條的 18 支具名白名單機械守住。
+	// 誰能掛在這上面由 boot 斷言第 4 條的 11 支具名白名單機械守住。
 	adminNoAuth := v1.Group(AdminPath)
 
 	// 五個保留 header 一律在群組入口刪掉。目前沒有任何 handler 讀它們，這正是要現在
@@ -61,7 +61,7 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerShareRoutes(app, h)
 	registerDevRoutes(public, h)
 
-	// ADM 代行營運（56 號）：14 支走 ADM session、18 支走 operation credential。
+	// ADM 代行營運（56 號）：14 支走 ADM session、11 支走 operation credential。
 	registerDelegatedOperationRoutes(admin, adminNoAuth, h)
 
 	// 文件檢視器（僅 local/dev 環境）

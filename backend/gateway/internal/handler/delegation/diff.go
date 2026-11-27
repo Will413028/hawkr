@@ -123,15 +123,6 @@ func Project(resourceType string, resource map[string]any) map[string]any {
 	return out
 }
 
-// ScopeProductStatus is the comparison scope of PRODUCT_PUBLISH / PRODUCT_UNPUBLISH /
-// PRODUCT_BATCH_UNPUBLISH. 56 號 §6.1.11 明訂「PRODUCT_PUBLISH 這一列的 changedFields
-// 只會有 status」——本函式就是那句話的實作，不是效能優化。
-//
-// 這四個函式回的是**新的 slice** 而不是套件層變數：套件層的 []string 是可寫的，任何
-// 一個呼叫端 append 一次就改掉了其他所有呼叫端的比較範圍，而那個錯誤不會編譯失敗、
-// 不會有測試轉紅，只會讓稽核從那天起少記或多記欄位。
-func ScopeProductStatus() []string { return []string{"status"} }
-
 // Diff produces changed_fields from two projections.
 //
 // scope restricts the comparison to a subset of the rule table; nil means the whole
@@ -149,8 +140,8 @@ func ScopeProductStatus() []string { return []string{"status"} }
 // 影，「上架當下這件商品長什麼樣」才舉證得出來。
 //
 // scope 內不在規則表的欄名一律略過（與規則表本身的 fail-safe 同向）。⚠️ 這代表**打錯
-// 一個字的 scope 會靜默退化成「什麼都不比較」**，所以每個 Scope* 函式的內容都由
-// TestDiffScopes_OnlyReferenceRegisteredFields 逐項對規則表核對。
+// 一個字的 scope 會靜默退化成「什麼都不比較」**，所以呼叫端宣告的 SnapshotFields
+// 必須是規則表內已登記的欄位。
 //
 // Comparison uses the RAW values and formatting happens afterwards. The reverse order
 // silently drops changes: truncate(60) makes two long texts that differ only at
