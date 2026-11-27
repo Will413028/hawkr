@@ -56,7 +56,6 @@ type CountSellerProductsParams struct {
 	QueryPattern     string
 }
 
-// 條件同 ListSellerProducts（沒有游標）。
 func (q *Queries) CountSellerProducts(ctx context.Context, arg CountSellerProductsParams) (int32, error) {
 	row := q.db.QueryRow(ctx, countSellerProducts,
 		arg.StoreID,
@@ -145,7 +144,6 @@ type GetAdminProductRow struct {
 	Hashtags          []byte
 }
 
-// 後台讀任何店家的商品（任何狀態，沒刪除）；唯讀。圖片、選項、SKU 與 hashtag 以 JSON 欄位在同一句 SQL 內讀出：一句就是一份快照，不會讀到並行寫入的一半。
 func (q *Queries) GetAdminProduct(ctx context.Context, id uuid.UUID) (GetAdminProductRow, error) {
 	row := q.db.QueryRow(ctx, getAdminProduct, id)
 	var i GetAdminProductRow
@@ -219,7 +217,6 @@ type GetOwnProductRow struct {
 	Hashtags          []byte
 }
 
-// 店家自己的商品（任何狀態，沒刪除）。圖片、選項、SKU 與 hashtag 以 JSON 欄位在同一句 SQL 內讀出：一句就是一份快照，不會讀到並行寫入的一半。
 func (q *Queries) GetOwnProduct(ctx context.Context, arg GetOwnProductParams) (GetOwnProductRow, error) {
 	row := q.db.QueryRow(ctx, getOwnProduct, arg.ID, arg.StoreID)
 	var i GetOwnProductRow
@@ -264,7 +261,6 @@ type GetProductByRequestRow struct {
 	DeletedAt   *time.Time
 }
 
-// 同一家店以同一個 request_id 建立過的商品（含已刪除）；重送時用它讀回並比對 request_hash。
 func (q *Queries) GetProductByRequest(ctx context.Context, arg GetProductByRequestParams) (GetProductByRequestRow, error) {
 	row := q.db.QueryRow(ctx, getProductByRequest, arg.StoreID, arg.RequestID)
 	var i GetProductByRequestRow
@@ -319,7 +315,6 @@ type GetPublicProductRow struct {
 	Hashtags          []byte
 }
 
-// 公開可讀：ACTIVE 或 ARCHIVED（下架的商品頁保留、不可購買）、沒刪除、店家在 at 這一刻可曝光；草稿不可讀。子表的 JSON 欄位同 GetOwnProduct：公開讀取會被別的模組呼叫，不開快照 transaction（backend/AGENTS.md 規則 3），靠單一語句取得一致的讀取。
 func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductParams) (GetPublicProductRow, error) {
 	row := q.db.QueryRow(ctx, getPublicProduct, arg.ID, arg.At)
 	var i GetPublicProductRow
@@ -386,7 +381,6 @@ func (q *Queries) InsertOptionValue(ctx context.Context, arg InsertOptionValuePa
 }
 
 const insertProduct = `-- name: InsertProduct :execrows
-
 INSERT INTO catalog.products (id, store_id, category_id, title, description, status, first_published_at, min_price, max_price, searchable_text, low_stock_threshold, request_id, request_hash, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10, $11, $12, $13, $14, $14)
@@ -410,9 +404,6 @@ type InsertProductParams struct {
 	Now               time.Time
 }
 
-// 商品、選項、SKU、圖片引用與 hashtag 的寫入與讀取。
-// 建立的冪等：(store_id, request_id) 唯一索引是判重點。同鍵併發時後到的交易在這裡等到先到的提交，然後 ON CONFLICT DO NOTHING 回 0 列
-// （呼叫端改讀回先到的那筆、比對 request_hash）；先到的回滾時後到的插入成功。
 func (q *Queries) InsertProduct(ctx context.Context, arg InsertProductParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertProduct,
 		arg.ID,
@@ -559,7 +550,6 @@ type ListAdminProductsRow struct {
 	SortKey           int64
 }
 
-// 後台列表：全站沒刪除的商品（任何狀態），最新建立的在前；store_id 與 query_pattern 選填。
 func (q *Queries) ListAdminProducts(ctx context.Context, arg ListAdminProductsParams) ([]ListAdminProductsRow, error) {
 	rows, err := q.db.Query(ctx, listAdminProducts,
 		arg.StoreID,
@@ -705,10 +695,6 @@ type ListPublicProductsRow struct {
 	SortKey           int64
 }
 
-// 公開列表與搜尋：只含 ACTIVE、沒刪除、店家在 at 這一刻可曝光（seller.pub_exposable_stores）的商品。排序鍵 sort_key 依 sort 決定、一律由大到小
-// （價格低到高取負值），同鍵依 id 遞減；游標是 (sort_key, id)。sort 是 LATEST、PRICE_ASC、PRICE_DESC、SALES、RATING 或 RELEVANCE（RELEVANCE 要有 query）。
-// query_pattern 是已跳脫的 ILIKE 樣式（空字串不篩選），query 是原字串（相關度用 word_similarity）。category_ids 可給頂層（含底下的葉節點）或葉節點。
-// 空的陣列是不篩選；hashtags 是正規化名稱，hashtag_all 為真時要全部都有。
 func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProductsParams) ([]ListPublicProductsRow, error) {
 	rows, err := q.db.Query(ctx, listPublicProducts,
 		arg.Sort,
@@ -819,9 +805,6 @@ type ListSellerProductsRow struct {
 	SortKey           int64
 }
 
-// 賣家清單：店家自己的所有沒刪除的商品，不看狀態也不看曝光；最新建立的在前。status 空字串是全部；stock_status 空字串是不篩選，LOW 與 OUT_OF_STOCK
-// 只比對 ACTIVE 的商品（LOW：有 SKU 庫存大於 0 且小於或等於商品的門檻，沒設用 default_threshold；OUT_OF_STOCK：有 SKU 庫存是 0）。
-// query_pattern 是已跳脫的 ILIKE 樣式（空字串不篩選），比對 searchable_text。游標是 (created_at, id)；sort_key 是 created_at 的微秒數，給呼叫端組游標。
 func (q *Queries) ListSellerProducts(ctx context.Context, arg ListSellerProductsParams) ([]ListSellerProductsRow, error) {
 	rows, err := q.db.Query(ctx, listSellerProducts,
 		arg.StoreID,
@@ -887,7 +870,6 @@ type LockLiveSkusRow struct {
 	StockQty       int32
 }
 
-// 商品的未刪除 SKU，依 ID 升序鎖列（FOR UPDATE 在排序之後逐列取鎖）：與 DeductStock 的 SKU 鎖順序一致，商品寫入之後再改這些列不會再等別人。
 func (q *Queries) LockLiveSkus(ctx context.Context, productID uuid.UUID) ([]LockLiveSkusRow, error) {
 	rows, err := q.db.Query(ctx, lockLiveSkus, productID)
 	if err != nil {
@@ -934,7 +916,6 @@ type LockOwnProductRow struct {
 	ContentVersion   int64
 }
 
-// 店家自己的、沒刪除的商品，鎖列；同一個商品的寫入都從這裡開始，所以 SKU、選項與價格區間的重算不會並行交錯。
 func (q *Queries) LockOwnProduct(ctx context.Context, arg LockOwnProductParams) (LockOwnProductRow, error) {
 	row := q.db.QueryRow(ctx, lockOwnProduct, arg.ID, arg.StoreID)
 	var i LockOwnProductRow
@@ -956,7 +937,6 @@ type OwnProductDeletedParams struct {
 	StoreID int64
 }
 
-// 店家自己的商品是否已刪除（Delete 重送冪等：已刪除回成功；別家的或不存在的查不到，仍是找不到）。
 func (q *Queries) OwnProductDeleted(ctx context.Context, arg OwnProductDeletedParams) (bool, error) {
 	row := q.db.QueryRow(ctx, ownProductDeleted, arg.ID, arg.StoreID)
 	var exists bool
@@ -976,7 +956,6 @@ type RecomputePriceRangeParams struct {
 	ID  uuid.UUID
 }
 
-// 商品的價格區間是沒刪除 SKU 價格的最小與最大；每次 SKU 寫入的同 transaction 呼叫。沒有 SKU 時不改（影響 0 列）。
 func (q *Queries) RecomputePriceRange(ctx context.Context, arg RecomputePriceRangeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, recomputePriceRange, arg.Now, arg.ID)
 	if err != nil {
@@ -999,7 +978,6 @@ type SetProductStatusParams struct {
 	ID     uuid.UUID
 }
 
-// 設成 ACTIVE 時 first_published_at 只在還是空的時候填（之後的下架再上架不改它）。狀態是 etag 涵蓋的範圍，content_version 加一。
 func (q *Queries) SetProductStatus(ctx context.Context, arg SetProductStatusParams) error {
 	_, err := q.db.Exec(ctx, setProductStatus, arg.Status, arg.Now, arg.ID)
 	return err
@@ -1014,7 +992,6 @@ type SoftDeleteLiveSkusParams struct {
 	ProductID uuid.UUID
 }
 
-// 商品刪除時，它還在的 SKU 一併標刪除，讓所有庫存路徑對「已刪除的商品」一致（扣減與調整都找不到）；呼叫前先 LockLiveSkus。
 func (q *Queries) SoftDeleteLiveSkus(ctx context.Context, arg SoftDeleteLiveSkusParams) error {
 	_, err := q.db.Exec(ctx, softDeleteLiveSkus, arg.Now, arg.ProductID)
 	return err
@@ -1072,7 +1049,6 @@ type SuggestHashtagsRow struct {
 	ProductCount int64
 }
 
-// 標籤建議：名稱符合 name_pattern（已跳脫的 ILIKE 樣式）的標籤與它的可見商品數（ACTIVE、店家可曝光），商品數多的在前。display 是最常用的輸入樣子。
 func (q *Queries) SuggestHashtags(ctx context.Context, arg SuggestHashtagsParams) ([]SuggestHashtagsRow, error) {
 	rows, err := q.db.Query(ctx, suggestHashtags, arg.At, arg.NamePattern, arg.RowLimit)
 	if err != nil {
@@ -1114,7 +1090,6 @@ type SuggestProductNamesParams struct {
 	RowLimit     int32
 }
 
-// 搜尋框的建議：可見商品（ACTIVE、店家可曝光）的標題含 query_pattern，相關度高的在前，已去重。
 func (q *Queries) SuggestProductNames(ctx context.Context, arg SuggestProductNamesParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, suggestProductNames,
 		arg.Query,
@@ -1162,7 +1137,6 @@ type TrendingHashtagsRow struct {
 	ProductCount int64
 }
 
-// 熱門標籤：各標籤的可見商品數，多的在前。
 func (q *Queries) TrendingHashtags(ctx context.Context, arg TrendingHashtagsParams) ([]TrendingHashtagsRow, error) {
 	rows, err := q.db.Query(ctx, trendingHashtags, arg.At, arg.RowLimit)
 	if err != nil {
@@ -1202,7 +1176,6 @@ type UpdateProductContentParams struct {
 	ID                uuid.UUID
 }
 
-// 賣家可編輯的內容；content_version 加 version_bump（etag 的來源；修改是 1，建立時補寫內容是 0，建立的版本是 1）。呼叫前已用 LockOwnProduct 鎖列並比對過版本（同一把列鎖之下，版本不會在比對與寫入之間改變）。
 func (q *Queries) UpdateProductContent(ctx context.Context, arg UpdateProductContentParams) error {
 	_, err := q.db.Exec(ctx, updateProductContent,
 		arg.CategoryID,
@@ -1228,7 +1201,6 @@ type UpdateSkuPricesParams struct {
 	ID             uuid.UUID
 }
 
-// 庫存不在這裡改（只由 stock 改）。
 func (q *Queries) UpdateSkuPrices(ctx context.Context, arg UpdateSkuPricesParams) error {
 	_, err := q.db.Exec(ctx, updateSkuPrices,
 		arg.Price,

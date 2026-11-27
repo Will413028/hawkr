@@ -171,8 +171,7 @@ export default function NotificationToastBridge() {
 							groupKey: `notif:${n.title}`,
 						});
 					}
-				} catch {
-				}
+				} catch {}
 			})();
 		};
 		window.addEventListener(NOTIFICATION_SIGNAL_EVENT, onSignal);

@@ -66,7 +66,7 @@ type delegationDeps struct {
 	deadlineMs           int
 	storeStateDeadlineMs int
 	revokeDeadlineMs     int
-	audit *delegation.Orchestrator
+	audit                *delegation.Orchestrator
 }
 
 func newDelegationDeps(h *handler.Holder) delegationDeps {
@@ -215,7 +215,7 @@ func revokeForStoreNotOperable(c *gin.Context, deps delegationDeps, session *acc
 	}
 	sessionID := session.GetSessionId()
 	resp, err := deps.revoker.RevokeDelegationSession(c.Request.Context(), &accountpb.RevokeSessionRequest{
-		SessionId: sessionID,
+		SessionId:      sessionID,
 		ActorAdminId:   session.GetActor().GetAdminId(),
 		RevokeReason:   revokeReasonStoreNotOperable,
 		IdempotencyKey: revokeReasonStoreNotOperable + ":" + sessionID,
@@ -244,9 +244,9 @@ func recordGuardDenial(c *gin.Context, deps delegationDeps, session *accountpb.O
 		return
 	}
 	deps.audit.RecordReadDenial(c.Request.Context(), delegation.ReadDenial{
-		Session:      session,
-		ResourceType: face,
-		ResourceID:   guardResourceID(c, face),
+		Session:       session,
+		ResourceType:  face,
+		ResourceID:    guardResourceID(c, face),
 		Capability:    cap,
 		BizCode:       denied,
 		RequestID:     c.GetString("request_id"),
@@ -314,8 +314,6 @@ func requireDelegated(cap authz.AdminCapability, deps delegationDeps) gin.Handle
 		c.Next()
 	}
 }
-
-
 
 func adminHandle(g *gin.RouterGroup, method, relPath string, h gin.HandlerFunc) {
 	middleware.RegisterDelegatedRoute(method, ginJoinPath(g.BasePath(), relPath))

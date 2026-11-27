@@ -76,7 +76,7 @@ type orders struct {
 	open  bool
 	err   error
 	calls int
-	inTx bool
+	inTx  bool
 }
 
 func (o *orders) OpenOrderBetween(ctx context.Context, _, _ int64) (bool, error) {
@@ -94,7 +94,7 @@ type buyers struct {
 	accounts map[int64]int64
 	blocking bool
 	blockErr error
-	owner *buyer.Module
+	owner    *buyer.Module
 }
 
 func seedParties(t *testing.T, d *db.DB, buyerIDs, storeIDs []int64) {
@@ -157,12 +157,12 @@ func (b *buyers) IsBlockingStore(context.Context, int64, int64) (bool, error) {
 }
 
 type stores struct {
-	mu    sync.Mutex
-	owner *seller.Module
-	byID  map[int64]seller.Store
-	err   error
-	block bool
-	blockErr error
+	mu        sync.Mutex
+	owner     *seller.Module
+	byID      map[int64]seller.Store
+	err       error
+	block     bool
+	blockErr  error
 	afterLock func()
 }
 

@@ -84,7 +84,6 @@ type DeleteTagParams struct {
 	ID      uuid.UUID
 }
 
-// 關聯由 customer_tags 的 FK cascade 刪除。
 func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteTag, arg.StoreID, arg.ID)
 	if err != nil {
@@ -132,7 +131,6 @@ type InsertTagParams struct {
 	Now     time.Time
 }
 
-// 撞 UNIQUE (store_id, name) 回 0 列（名稱已被用）。
 func (q *Queries) InsertTag(ctx context.Context, arg InsertTagParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertTag,
 		arg.ID,
@@ -164,7 +162,6 @@ type ListCustomerTagsRow struct {
 	Name    string
 }
 
-// 一頁客戶的標籤（名稱升序）。
 func (q *Queries) ListCustomerTags(ctx context.Context, arg ListCustomerTagsParams) ([]ListCustomerTagsRow, error) {
 	rows, err := q.db.Query(ctx, listCustomerTags, arg.StoreID, arg.BuyerIds)
 	if err != nil {
@@ -231,7 +228,6 @@ type ListTagsRow struct {
 	Name string
 }
 
-// 已退場的店家沒有標籤（可見性在清除 job 跑之前就已經改好）。
 func (q *Queries) ListTags(ctx context.Context, storeID int64) ([]ListTagsRow, error) {
 	rows, err := q.db.Query(ctx, listTags, storeID)
 	if err != nil {
@@ -265,8 +261,6 @@ type LockCustomerParams struct {
 	BuyerID int64
 }
 
-// 鎖住客戶列（沒有列回 ErrNoRows）：同一位客戶的標籤上限檢查與插入串行，並讓只有客戶才能貼標在 FK 之前就得到 NotFound。
-// inactive 的買家或店家也回 ErrNoRows。
 func (q *Queries) LockCustomer(ctx context.Context, arg LockCustomerParams) (int64, error) {
 	row := q.db.QueryRow(ctx, lockCustomer, arg.StoreID, arg.BuyerID)
 	var buyer_id int64
@@ -275,14 +269,9 @@ func (q *Queries) LockCustomer(ctx context.Context, arg LockCustomerParams) (int
 }
 
 const lockStoreTags = `-- name: LockStoreTags :exec
-
 SELECT pg_advisory_xact_lock(hashtextextended('crm.tags:' || $1::bigint::text, 0))
 `
 
-// 標籤與客戶的標籤。
-// 同一家店的標籤變更（CreateTag、AddCustomerTags、RenameTag、DeleteTag）串行：每店標籤數上限的檢查與插入之間不能有人插入，
-// AddCustomerTags 以名稱查到的標籤 ID 在它寫入客戶之前也不能被改名或刪除。選 advisory lock 而不是對查到的列 FOR SHARE：
-// AddCustomerTags 要先判斷「名稱不存在」再建立，列鎖鎖不住不存在的名稱，仍需要這把店家層級的鎖。crm 自己的命名空間，不進鎖序。
 func (q *Queries) LockStoreTags(ctx context.Context, storeID int64) error {
 	_, err := q.db.Exec(ctx, lockStoreTags, storeID)
 	return err
@@ -306,7 +295,6 @@ type RenameTagRow struct {
 	Name string
 }
 
-// 撞名會是 UNIQUE 違反（呼叫者轉成 AlreadyExists，transaction 隨即結束）；ErrNoRows 表示標籤不存在（或屬於別家店）；回傳寫入當下的列。
 func (q *Queries) RenameTag(ctx context.Context, arg RenameTagParams) (RenameTagRow, error) {
 	row := q.db.QueryRow(ctx, renameTag,
 		arg.Name,

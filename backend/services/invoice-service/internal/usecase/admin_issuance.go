@@ -18,10 +18,9 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
-	manualIssuanceMaxLines = 50
-	manualIssuanceNameMax = 60
+	manualIssuanceMaxLines   = 50
+	manualIssuanceNameMax    = 60
 	manualLineDescriptionMax = 200
 
 	issuanceSourceOrderSnapshot = "ORDER_SNAPSHOT"
@@ -441,18 +440,18 @@ func (u *AdminIssuance) buildDocument(
 		IssuerID:            issuer.ID,
 		IssuerNameSnapshot:  issuerName,
 		IssuerTaxIDSnapshot: issuerTaxID,
-		SourceType:      sourceTypeManual,
-		TriggerType:     triggerTypeManual,
-		RecipientType:   in.Recipient.Kind,
-		RecipientRefID:  recipientRefID,
-		RecipientName:   recipientName,
-		RecipientTaxID:  recipientTaxID,
-		RecipientEmail:  in.Recipient.Email,
-		DocumentKind:    in.DocumentKind,
-		FulfillmentMode: mode,
-		Status:          codemeta.InvoiceDocumentStatusPending.Value,
-		SnapshotVersion: 1,
-		IssueAttemptSeq: 1,
+		SourceType:          sourceTypeManual,
+		TriggerType:         triggerTypeManual,
+		RecipientType:       in.Recipient.Kind,
+		RecipientRefID:      recipientRefID,
+		RecipientName:       recipientName,
+		RecipientTaxID:      recipientTaxID,
+		RecipientEmail:      in.Recipient.Email,
+		DocumentKind:        in.DocumentKind,
+		FulfillmentMode:     mode,
+		Status:              codemeta.InvoiceDocumentStatusPending.Value,
+		SnapshotVersion:     1,
+		IssueAttemptSeq:     1,
 
 		SalesAmount:        header.SalesAmount,
 		FreeTaxSalesAmount: header.FreeTaxSalesAmount,
@@ -467,7 +466,7 @@ func (u *AdminIssuance) buildDocument(
 		ReceiptNo:                   receiptNo,
 		ReceiptAuthorizationVersion: receiptAuthNoneV1,
 
-		InvoiceDateTaipei: &invoiceDate,
+		InvoiceDateTaipei:   &invoiceDate,
 		TaxPeriodCode:       taxPeriodFor(in.DocumentKind, invoiceDate),
 		IssueNotBefore:      now,
 		StatutoryDeadlineAt: deadline,
@@ -480,10 +479,10 @@ func (u *AdminIssuance) createOperation(
 	ctx context.Context, doc domain.Document, now time.Time, in ManualIssuanceInput,
 ) (int64, string, error) {
 	opID, status, _, err := createAndPromoteIssueOperation(ctx, u.ops, issueOperationSpec{
-		OperationID:       u.newID(),
-		DocumentID:        doc.ID,
-		IssueAttemptSeq:   1,
-		ProviderRequestNo: derefString(doc.ProviderRequestNo),
+		OperationID:         u.newID(),
+		DocumentID:          doc.ID,
+		IssueAttemptSeq:     1,
+		ProviderRequestNo:   derefString(doc.ProviderRequestNo),
 		RequestSnapshotHash: "manual:" + strconv.FormatInt(doc.ID, 10),
 		MaxAttempts:         u.issueCfg.MaxAttempts,
 		NextAttemptAt:       now,
@@ -515,7 +514,6 @@ func (u *AdminIssuance) appendHistory(
 		Now:            now,
 	})
 }
-
 
 func isAllowedIssuanceCombo(in ManualIssuanceInput) bool {
 	for _, c := range allowedIssuanceCombos {

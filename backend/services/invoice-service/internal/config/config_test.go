@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-
 func baseValid() *Config {
 	c := &Config{Env: "dev"}
 	c.Server.HTTPPort = "10040"

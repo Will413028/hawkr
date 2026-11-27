@@ -70,7 +70,6 @@ function measure(
 	});
 }
 
-
 test("原因的文字直接取自伺服器的 message，不查原因對照表", () => {
 	assert.deepEqual(
 		unavailableLabels([
@@ -124,7 +123,6 @@ test("沒有 message 的原因（含 UNSPECIFIED）顯示通用文字，只列�
 	);
 	assert.deepEqual(unavailableLabels([]), [GENERIC_UNAVAILABLE_LABEL]);
 });
-
 
 test("操作列：全部 can_* 都是 true 時所有動作可用、沒有原因文字", () => {
 	const bar = actionBar(
@@ -261,7 +259,6 @@ test("操作列：can_revoke 是 true 時不看原因欄（伺服器說可以就
 	);
 	assert.deepEqual(bar.revoke, { visible: true, enabled: true, reasons: [] });
 });
-
 
 test("理由欄：can_update_statement 為 false 時不能編輯，旁邊列出伺服器的原因", () => {
 	assert.deepEqual(
@@ -459,7 +456,6 @@ test("修改的驗證：只能縮短時不能晚於目前的結束時間；只�
 	);
 });
 
-
 test("裁定的標題與選項文字", () => {
 	assert.equal(decideTitle("appeal"), "裁定申覆");
 	assert.equal(decideTitle("remediation"), "裁定解除請求");
@@ -630,7 +626,6 @@ test("重讀後把沒動過的欄位對到新措施，動過的欄位保留輸�
 	assert.deepEqual(editedFields(next.baseline, next.form), ["statement"]);
 });
 
-
 test("撤銷原因的選項取自契約的 AdminRevokeReason（不含 UNSPECIFIED）；系統寫入的原因在契約裡表示不出來", () => {
 	assert.deepEqual(REVOKE_REASON_OPTIONS, [
 		AdminRevokeReason.ADMIN_CORRECTION,
@@ -754,7 +749,6 @@ test("註記請求只帶 body（去掉前後空白），不帶 etag", () => {
 		note: { body: "調查經過" },
 	});
 });
-
 
 test("提出時的版本文字與差異對照", () => {
 	assert.equal(

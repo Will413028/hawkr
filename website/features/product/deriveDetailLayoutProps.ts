@@ -62,7 +62,6 @@ export interface DerivedLayoutProps {
 	descriptionBlocks: Array<Record<string, unknown>>;
 }
 
-
 export function textOrEmpty(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
 }
@@ -223,7 +222,6 @@ export function mapLiveReviews(
 	}));
 	return { reviews, total };
 }
-
 
 export function deriveDetailLayoutProps(
 	input: DeriveInput,

@@ -109,7 +109,7 @@ func TestDocumentFileUnavailableReason_NotApplicableBeatsCarrier(t *testing.T) {
 func TestIntakeLimitApplies_PredicateIsReviewStatusNotFieldPresence(t *testing.T) {
 	for _, st := range codemeta.AllSellerTaxReviewStatuss {
 		p := domain.SellerTaxProfile{
-			ReviewStatus: st.Value,
+			ReviewStatus:           st.Value,
 			PendingOrderLimitCount: 50, PendingOrderLimitAmount: 100000,
 		}
 		want := st.Value == codemeta.SellerTaxReviewStatusSelfIssuePending.Value ||

@@ -44,7 +44,6 @@ type InsertAppVersionGateParams struct {
 	NoticeBody     string
 }
 
-// 只建立：那一組已經存在時不寫入、沒有回傳列（pgx.ErrNoRows）。
 func (q *Queries) InsertAppVersionGate(ctx context.Context, arg InsertAppVersionGateParams) (ContentAppVersionGate, error) {
 	row := q.db.QueryRow(ctx, insertAppVersionGate,
 		arg.AppType,
@@ -120,7 +119,6 @@ type UpdateAppVersionGateParams struct {
 	ExpectedVersion int64
 }
 
-// 條件式 UPDATE：不存在或版本不符時沒有回傳列（pgx.ErrNoRows），由呼叫方分辨。
 func (q *Queries) UpdateAppVersionGate(ctx context.Context, arg UpdateAppVersionGateParams) (ContentAppVersionGate, error) {
 	row := q.db.QueryRow(ctx, updateAppVersionGate,
 		arg.AppType,

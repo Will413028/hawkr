@@ -35,8 +35,8 @@ var _ domain.CancelledOrderRepository = (*CancelledOrderRepository)(nil)
 // 它**不是**錯誤，回 error 會讓 consumer 走 retry/DLQ，而那則訊息本來就該被 ACK。
 func (r *CancelledOrderRepository) Insert(ctx context.Context, in domain.CancelledOrder) (bool, error) {
 	rows, err := r.q(ctx).InsertCancelledOrder(ctx, gen.InsertCancelledOrderParams{
-		OrderNo: in.OrderNo,
-		BuyerID: in.BuyerID,
+		OrderNo:      in.OrderNo,
+		BuyerID:      in.BuyerID,
 		CancelReason: nilIfBlank(in.CancelReason),
 		OccurredAt:   ts(in.OccurredAt),
 		Now:          ts(in.Now),

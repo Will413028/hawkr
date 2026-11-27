@@ -38,7 +38,7 @@ const (
 	AppNonceTTL = 5 * time.Minute
 
 	tokenBytes = 32
-	tokenLen = 43
+	tokenLen   = 43
 )
 
 // Invalid 是認證失敗時給使用者的錯誤：沒有 token、token 無效或過期，或帳號已刪除。這幾種情況刻意不區分，client 一律回到登入。

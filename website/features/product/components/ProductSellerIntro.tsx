@@ -225,7 +225,6 @@ export default function ProductSellerIntro({
 			className="flex flex-col items-end gap-3 justify-self-end w-full max-w-[230px] text-right max-md:max-w-none max-md:pt-3.5 max-md:border-t max-md:border-hk-brand-secondary/30"
 			aria-label="商家資訊"
 		>
-
 			{previewMode || !storefrontHref ? (
 				<div className="flex w-full items-center justify-end gap-3 rounded-[14px] text-inherit">
 					<SellerIdentity

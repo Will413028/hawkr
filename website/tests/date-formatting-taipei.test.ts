@@ -121,7 +121,6 @@ function stripCommentsAndStringBodies(src: string): string {
 			continue;
 		}
 
-
 		if (c === "/" && next === "/") {
 			while (i < n && src[i] !== "\n") {
 				out += " ";
@@ -533,7 +532,6 @@ test("helper 提供的具名輸出涵蓋全站四種日期呈現", () => {
 		);
 	}
 });
-
 
 /** 橫跨 UTC+8 兩側的代表性時區（含最東的 +14 與美西 -7）。 */
 const TZ_MATRIX = [

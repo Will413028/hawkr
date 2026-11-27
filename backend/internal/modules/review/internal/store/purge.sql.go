@@ -15,7 +15,6 @@ const deleteReviewsByID = `-- name: DeleteReviewsByID :execrows
 DELETE FROM review.reviews WHERE id = ANY($1::uuid[])
 `
 
-// 附圖列由 review_images 的 ON DELETE CASCADE 一起刪。
 func (q *Queries) DeleteReviewsByID(ctx context.Context, ids []uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteReviewsByID, ids)
 	if err != nil {
@@ -28,7 +27,6 @@ const getReviewByID = `-- name: GetReviewByID :one
 SELECT id, order_no, order_item_id, buyer_id, store_id, product_id, rating, content, sku_name, item_image_key, price, created_at, reply_content, replied_at FROM review.reviews WHERE id = $1
 `
 
-// relay 讀單則評價（建立事件的 payload）：不過濾可見性，不存在才是沒有列。
 func (q *Queries) GetReviewByID(ctx context.Context, id uuid.UUID) (ReviewReview, error) {
 	row := q.db.QueryRow(ctx, getReviewByID, id)
 	var i ReviewReview
@@ -60,7 +58,6 @@ SELECT EXISTS (
 )
 `
 
-// relay 在 job 執行當下判斷這則評價現在是否公開可讀（沒有未還原的隱藏、作者不在 buyer.pub_inactive_buyers()，與 testdata/public_predicate.sql 同一段述詞）。
 func (q *Queries) IsReviewPublic(ctx context.Context, id uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, isReviewPublic, id)
 	var exists bool
@@ -81,7 +78,6 @@ type ListInactiveBuyersWithReviewsParams struct {
 	MaxRows int32
 }
 
-// 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但仍有評價列，依 buyer_id 的 keyset 由小到大，最多 max_rows 位；第一頁的游標是 0。
 func (q *Queries) ListInactiveBuyersWithReviews(ctx context.Context, arg ListInactiveBuyersWithReviewsParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, listInactiveBuyersWithReviews, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -103,7 +99,6 @@ func (q *Queries) ListInactiveBuyersWithReviews(ctx context.Context, arg ListIna
 }
 
 const lockBuyerReviewBatch = `-- name: LockBuyerReviewBatch :many
-
 SELECT id, store_id, product_id FROM review.reviews
 WHERE buyer_id = $1
 ORDER BY id
@@ -122,9 +117,6 @@ type LockBuyerReviewBatchRow struct {
 	ProductID uuid.UUID
 }
 
-// 買家刪帳的清除與 relay 用的讀取。不是公開讀取：作者已不是營運中（pub_inactive_buyers），公開述詞必定排除他的評價。
-// 這個檔的查詢都列在 readpolicy_test.go 的 nonPublicReads。
-// 清除的一批：依 id 升序鎖住買家還在的評價（重跑時只剩沒刪的）。
 func (q *Queries) LockBuyerReviewBatch(ctx context.Context, arg LockBuyerReviewBatchParams) ([]LockBuyerReviewBatchRow, error) {
 	rows, err := q.db.Query(ctx, lockBuyerReviewBatch, arg.BuyerID, arg.MaxRows)
 	if err != nil {

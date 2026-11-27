@@ -16,7 +16,6 @@ import (
 	pkgmq "github.com/Will413028/hawkr/go-pkg/mq"
 )
 
-
 type javaComponent struct {
 	Type string
 	Name string

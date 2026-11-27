@@ -243,7 +243,6 @@ export default function MarketProductsList({
 
 	return (
 		<>
-
 			<span data-hk-market-products-hydrated={hydrated} hidden />
 			{hydrated && !followPending && !initialPending ? (
 				<span data-hk-tab-content-ready="market" hidden />

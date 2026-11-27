@@ -62,7 +62,6 @@ class F {
   static bool get showFcmDebugOverlay => _appFlavor == Flavor.dev;
 }
 
-
 extension FlavorExtension on Flavor {
   /// 環境顯示名稱
   String get displayName {

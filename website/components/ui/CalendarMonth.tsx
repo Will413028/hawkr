@@ -428,7 +428,6 @@ export const CalendarMonth = React.forwardRef<
 				</button>
 			</div>
 
-
 			{/* biome-ignore lint/a11y/useSemanticElements: 見上方註解 */}
 			<div
 				ref={gridRef}

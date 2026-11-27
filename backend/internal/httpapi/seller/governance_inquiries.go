@@ -16,7 +16,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 var (
 	createInquiryPaths      = rpc.FieldPaths{"Kind": "kind", "Message": "message", "DueAt": "due_time", "RequestID": "request_id"}
 	recordInquiryReplyPaths = rpc.FieldPaths{"Channel": "channel", "ReceivedAt": "receive_time", "Body": "body", "EvidenceTokens[]": "evidence_tokens[]"}

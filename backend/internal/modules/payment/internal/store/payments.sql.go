@@ -27,7 +27,6 @@ type AnomalyPaymentParams struct {
 	ID     uuid.UUID
 }
 
-// provider 與本地紀錄不符或查回連續失敗：還在建立中、沒有外部 ID 的列進 ANOMALY（佔住這張訂單，補掃不再重試），原因記在 failure_reason。
 func (q *Queries) AnomalyPayment(ctx context.Context, arg AnomalyPaymentParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, anomalyPayment, arg.Reason, arg.Now, arg.ID)
 	var i PaymentPayment
@@ -69,7 +68,6 @@ type ApplyAttemptSnapshotParams struct {
 	ID                uuid.UUID
 }
 
-// 把讀到的狀態記進嘗試列（外部 ID 只在還沒有時寫；入帳的狀態不倒退）。只在這次讀取的開始時間不早於已存的 fetched_at 時寫入；沒有寫入時回 no rows。
 func (q *Queries) ApplyAttemptSnapshot(ctx context.Context, arg ApplyAttemptSnapshotParams) (PaymentPaymentAttempt, error) {
 	row := q.db.QueryRow(ctx, applyAttemptSnapshot,
 		arg.ExternalPaymentID,
@@ -124,8 +122,6 @@ type ApplyPaymentIntentSnapshotParams struct {
 	ID                   uuid.UUID
 }
 
-// 把有效嘗試的快照寫進付款列：外部 ID、冪等鍵、呼叫時刻與 provider 取自這次的嘗試（有效嘗試時與列上相同；舊嘗試晚到成功而換成有效時，列改成它的）。
-// 呼叫方已在同 transaction 鎖住列、以嘗試列的 fetched_at 擋下過期的讀取並算好下一個狀態。
 func (q *Queries) ApplyPaymentIntentSnapshot(ctx context.Context, arg ApplyPaymentIntentSnapshotParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, applyPaymentIntentSnapshot,
 		arg.Status,
@@ -230,7 +226,6 @@ type AttemptsOfPaymentParams struct {
 	Provider  string
 }
 
-// 付款的嘗試，依建立順序；同步要重讀的 PaymentIntent 都在這裡。
 func (q *Queries) AttemptsOfPayment(ctx context.Context, arg AttemptsOfPaymentParams) ([]PaymentPaymentAttempt, error) {
 	rows, err := q.db.Query(ctx, attemptsOfPayment, arg.PaymentID, arg.Provider)
 	if err != nil {
@@ -308,7 +303,6 @@ type CreatingPaymentIDsParams struct {
 	Batch      int32
 }
 
-// 週期掃描：還在建立中、閒置超過門檻的列（job 掉了的保底；呼叫過的從第一次呼叫起算）。
 func (q *Queries) CreatingPaymentIDs(ctx context.Context, arg CreatingPaymentIDsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, creatingPaymentIDs, arg.IdleBefore, arg.AfterID, arg.Batch)
 	if err != nil {
@@ -368,7 +362,6 @@ type EnsureEffectiveAttemptParams struct {
 	PaymentID uuid.UUID
 }
 
-// 建立中的列沒有有效嘗試時寫一列（provider 與冪等鍵取自付款列）；已有就不寫（唯一索引 payment_attempts_effective）。
 func (q *Queries) EnsureEffectiveAttempt(ctx context.Context, arg EnsureEffectiveAttemptParams) error {
 	_, err := q.db.Exec(ctx, ensureEffectiveAttempt, arg.ID, arg.Now, arg.PaymentID)
 	return err
@@ -387,7 +380,6 @@ type ExcessPaidAttemptsParams struct {
 	Batch   int32
 }
 
-// 後台查詢：重複入帳的嘗試（同一張訂單兩個 PaymentIntent 都扣到款）。
 func (q *Queries) ExcessPaidAttempts(ctx context.Context, arg ExcessPaidAttemptsParams) ([]PaymentPaymentAttempt, error) {
 	rows, err := q.db.Query(ctx, excessPaidAttempts, arg.AfterID, arg.Batch)
 	if err != nil {
@@ -435,7 +427,6 @@ type FailPaymentCreateParams struct {
 	ID            uuid.UUID
 }
 
-// 建立的終局：只有還在建立中、沒有外部 ID 的列能進 CREATE_FAILED。
 func (q *Queries) FailPaymentCreate(ctx context.Context, arg FailPaymentCreateParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, failPaymentCreate, arg.FailureReason, arg.Now, arg.ID)
 	var i PaymentPayment
@@ -475,7 +466,6 @@ type InsertPaymentParams struct {
 	Now         time.Time
 }
 
-// 建立付款的 transaction 寫「建立中」的付款群組列（沒有外部 ID；amount 是各訂單應收的總額）。訂單應收由 InsertPaymentOrder 在同一個 transaction 寫入。
 func (q *Queries) InsertPayment(ctx context.Context, arg InsertPaymentParams) error {
 	_, err := q.db.Exec(ctx, insertPayment,
 		arg.ID,
@@ -503,7 +493,6 @@ type InsertPaymentOrderParams struct {
 	Now       time.Time
 }
 
-// 付款底下寫一張訂單應收。order_no 唯一（一張訂單只屬於一筆付款）：已屬於別的付款時不寫（ON CONFLICT DO NOTHING，回 0 列），呼叫端回滾整個 transaction 再讀既有的列決定怎麼處理。
 func (q *Queries) InsertPaymentOrder(ctx context.Context, arg InsertPaymentOrderParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertPaymentOrder,
 		arg.ID,
@@ -533,7 +522,6 @@ type LinkEffectiveAttemptParams struct {
 	PaymentID         uuid.UUID
 }
 
-// 後台人工結案：有效嘗試連上 provider 的 PaymentIntent（還沒有外部 ID 的才連）。
 func (q *Queries) LinkEffectiveAttempt(ctx context.Context, arg LinkEffectiveAttemptParams) (PaymentPaymentAttempt, error) {
 	row := q.db.QueryRow(ctx, linkEffectiveAttempt, arg.ExternalPaymentID, arg.Now, arg.PaymentID)
 	var i PaymentPaymentAttempt
@@ -560,7 +548,6 @@ WHERE id = $1
 FOR UPDATE
 `
 
-// 鎖定付款列序列化它的寫入（付款列先於退款列與轉帳列）。
 func (q *Queries) LockPayment(ctx context.Context, id uuid.UUID) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, lockPayment, id)
 	var i PaymentPayment
@@ -599,7 +586,6 @@ type MarkAttemptCalledParams struct {
 	IdempotencyKey uuid.UUID
 }
 
-// 呼叫 provider 之前記下有效嘗試的呼叫時刻（保留最早的）。
 func (q *Queries) MarkAttemptCalled(ctx context.Context, arg MarkAttemptCalledParams) (PaymentPaymentAttempt, error) {
 	row := q.db.QueryRow(ctx, markAttemptCalled, arg.Now, arg.PaymentID, arg.IdempotencyKey)
 	var i PaymentPaymentAttempt
@@ -630,7 +616,6 @@ type MarkAttemptExcessPaidParams struct {
 	ID  uuid.UUID
 }
 
-// 付款列已經以另一個 PaymentIntent 入帳，這個舊嘗試也入帳了：記下重複入帳（保留最早的時刻），給後台查。
 func (q *Queries) MarkAttemptExcessPaid(ctx context.Context, arg MarkAttemptExcessPaidParams) error {
 	_, err := q.db.Exec(ctx, markAttemptExcessPaid, arg.Now, arg.ID)
 	return err
@@ -649,7 +634,6 @@ type MarkPaymentCreateCalledParams struct {
 	ID  uuid.UUID
 }
 
-// 呼叫 provider 之前先記「已呼叫」的時刻（已記過的保留最早的）：之後列上就分得出「從沒呼叫」與「呼叫過、結果不明」。只有還在建立中的列寫。
 func (q *Queries) MarkPaymentCreateCalled(ctx context.Context, arg MarkPaymentCreateCalledParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, markPaymentCreateCalled, arg.Now, arg.ID)
 	var i PaymentPayment
@@ -687,7 +671,6 @@ type PaymentByExternalParams struct {
 	ExternalPaymentID *string
 }
 
-// PaymentIntent 的外部 ID 經歷程表對回付款列：舊嘗試（付款列已換新 ID）的 ID 也對得到。
 func (q *Queries) PaymentByExternal(ctx context.Context, arg PaymentByExternalParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, paymentByExternal, arg.Provider, arg.ExternalPaymentID)
 	var i PaymentPayment
@@ -751,7 +734,6 @@ JOIN payment.payment_orders o ON o.payment_id = p.id
 WHERE o.order_no = $1
 `
 
-// 訂單應收所屬的付款（群組）。
 func (q *Queries) PaymentByOrderNo(ctx context.Context, orderNo string) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, paymentByOrderNo, orderNo)
 	var i PaymentPayment
@@ -821,7 +803,6 @@ type PaymentsByOrderNosRow struct {
 	PaymentPaymentOrder PaymentPaymentOrder
 }
 
-// 舊服務（legacy paymentserver）的批次讀取：每張找得到的訂單應收回一列（付款群組與那張訂單應收），找不到的不出現。
 func (q *Queries) PaymentsByOrderNos(ctx context.Context, orderNos []string) ([]PaymentsByOrderNosRow, error) {
 	rows, err := q.db.Query(ctx, paymentsByOrderNos, orderNos)
 	if err != nil {
@@ -880,7 +861,6 @@ type PollablePaymentIDsParams struct {
 	Batch      int32
 }
 
-// 週期掃描：已建立、還沒結案的列，超過門檻沒有讀過就補排同步（漏掉 webhook 的保底）。
 func (q *Queries) PollablePaymentIDs(ctx context.Context, arg PollablePaymentIDsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, pollablePaymentIDs, arg.ReadBefore, arg.AfterID, arg.Batch)
 	if err != nil {
@@ -919,8 +899,6 @@ type RebindCreatingPaymentParams struct {
 	ID       uuid.UUID
 }
 
-// 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空）時改成目前的 provider，換新冪等鍵。
-// 呼叫過的列不改綁：舊 provider 已無法查回，無從證明它沒有建出 PaymentIntent，改綁會讓買家拿到兩個；那樣的列由呼叫方進 ANOMALY。
 func (q *Queries) RebindCreatingPayment(ctx context.Context, arg RebindCreatingPaymentParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, rebindCreatingPayment, arg.Provider, arg.Now, arg.ID)
 	var i PaymentPayment
@@ -976,8 +954,6 @@ type ResetPaymentParams struct {
 	ID          uuid.UUID
 }
 
-// 買家對「不會再成功」的付款再次付款（建立失敗的終局，或已取消而訂單仍可付）：同一列換新冪等鍵、清掉舊的外部 ID 與讀取結果、重設回建立中、provider 與說明以目前的為準
-// （一張訂單仍只有一列、一次只有一個有效 PaymentIntent）；訂單資料以這次讀到的為準。
 func (q *Queries) ResetPayment(ctx context.Context, arg ResetPaymentParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, resetPayment,
 		arg.Provider,
@@ -1025,7 +1001,6 @@ type ResolvePaymentFailedParams struct {
 	ID            uuid.UUID
 }
 
-// 後台人工結案：確認 provider 沒有這筆付款，ANOMALY 進 CREATE_FAILED（買家可以再付，換新鍵）。
 func (q *Queries) ResolvePaymentFailed(ctx context.Context, arg ResolvePaymentFailedParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, resolvePaymentFailed, arg.FailureReason, arg.Now, arg.ID)
 	var i PaymentPayment
@@ -1069,7 +1044,6 @@ type ResolvePaymentLinkedParams struct {
 	ID                uuid.UUID
 }
 
-// 後台人工結案：ANOMALY 的付款在 provider 確實有 PaymentIntent（external_payment_id 是證據）：連上它、暫記 AWAITING_PAYMENT，真正的狀態由隨後的同步重讀推導。
 func (q *Queries) ResolvePaymentLinked(ctx context.Context, arg ResolvePaymentLinkedParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, resolvePaymentLinked, arg.ExternalPaymentID, arg.Now, arg.ID)
 	var i PaymentPayment
@@ -1102,7 +1076,6 @@ WHERE id = $1 AND superseded_at IS NOT NULL
 RETURNING id, payment_id, provider, external_payment_id, idempotency_key, called_at, state, fetched_at, superseded_at, excess_paid_at, created_at
 `
 
-// 舊嘗試晚到成功、付款列改以它入帳：它成為有效的嘗試（呼叫方先取代現有的有效嘗試）。
 func (q *Queries) ReviveAttempt(ctx context.Context, id uuid.UUID) (PaymentPaymentAttempt, error) {
 	row := q.db.QueryRow(ctx, reviveAttempt, id)
 	var i PaymentPaymentAttempt
@@ -1138,8 +1111,6 @@ type RotateCreateKeyParams struct {
 	OldKey uuid.UUID
 }
 
-// provider 已知拒絕（可重試、沒有執行）：付款列換新的冪等鍵、清掉呼叫時刻與查回失敗次數，不計任何期限；呼叫方同 transaction 取代有效嘗試並寫新的一列。
-// 只有仍用 old_key 的建立中列換（並行的呼叫不重複換）。
 func (q *Queries) RotateCreateKey(ctx context.Context, arg RotateCreateKeyParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, rotateCreateKey, arg.Now, arg.ID, arg.OldKey)
 	var i PaymentPayment
@@ -1180,7 +1151,6 @@ type StaleAttemptPaymentIDsParams struct {
 	Batch      int32
 }
 
-// 週期掃描：被取代、沒有結案（狀態不是入帳或取消）又超過門檻沒讀過的嘗試所屬的付款，補排同步（舊嘗試的成功或取消沒有留在本地時的保底）。
 func (q *Queries) StaleAttemptPaymentIDs(ctx context.Context, arg StaleAttemptPaymentIDsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, staleAttemptPaymentIDs, arg.ReadBefore, arg.AfterID, arg.Batch)
 	if err != nil {
@@ -1213,7 +1183,6 @@ type SupersedeEffectiveAttemptParams struct {
 	PaymentID uuid.UUID
 }
 
-// 把有效的嘗試標成已被取代（買家重付、改綁 provider、或舊嘗試晚到成功而換成它）；沒有有效嘗試時回 no rows。
 func (q *Queries) SupersedeEffectiveAttempt(ctx context.Context, arg SupersedeEffectiveAttemptParams) (PaymentPaymentAttempt, error) {
 	row := q.db.QueryRow(ctx, supersedeEffectiveAttempt, arg.Now, arg.PaymentID)
 	var i PaymentPaymentAttempt
@@ -1247,7 +1216,6 @@ type UpdatePaymentOrderTermsParams struct {
 	ID      uuid.UUID
 }
 
-// 買家對還沒入帳的付款重付：訂單應收的店家與金額以重讀的訂單為準（付款已重設回建立中，沒有轉帳與退款）。
 func (q *Queries) UpdatePaymentOrderTerms(ctx context.Context, arg UpdatePaymentOrderTermsParams) (PaymentPaymentOrder, error) {
 	row := q.db.QueryRow(ctx, updatePaymentOrderTerms, arg.StoreID, arg.Amount, arg.ID)
 	var i PaymentPaymentOrder

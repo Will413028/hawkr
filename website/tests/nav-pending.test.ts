@@ -5,7 +5,6 @@ import {
 	beginNavPending,
 } from "../lib/loading/nav-pending";
 
-
 const realSetTimeout = globalThis.setTimeout;
 const realClearTimeout = globalThis.clearTimeout;
 const realDateNow = Date.now;

@@ -559,7 +559,6 @@ func (r *CorrectionRequestRepository) Complete(ctx context.Context, id, reissued
 	return rows > 0, nil
 }
 
-
 // InsertLines 建折讓明細（G01 的一部分，與 adjustment 同交易）。
 func (r *AdjustmentRepository) InsertLines(
 	ctx context.Context, adjustmentID int64, lines []domain.NewAdjustmentLine, now time.Time,
@@ -650,7 +649,6 @@ func (r *AdjustmentRepository) MarkFailedUnknown(ctx context.Context, id int64, 
 		gen.MarkInvoiceAdjustmentFailedUnknownParams{ID: id, Now: ts(now)})
 	return rows > 0, err
 }
-
 
 // GetByRefund 是 uq_invadj_allowance_refund 的反查（I-11）。
 //

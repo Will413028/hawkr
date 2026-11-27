@@ -82,7 +82,6 @@ const labelStyle: React.CSSProperties = {
 	color: "#374151",
 };
 
-
 const AppVersionGateManagement: React.FC = () => {
 	const queryClient = useQueryClient();
 	const transport = useTransport();
@@ -205,7 +204,6 @@ const AppVersionGateManagement: React.FC = () => {
 
 	return (
 		<div>
-
 			<div className="page-header">
 				<div>
 					<div className="page-title">App 版本管理</div>
@@ -215,7 +213,6 @@ const AppVersionGateManagement: React.FC = () => {
 					</div>
 				</div>
 			</div>
-
 
 			<div
 				style={{
@@ -252,7 +249,6 @@ const AppVersionGateManagement: React.FC = () => {
 					載入失敗：{errorMessage(listError)}
 				</div>
 			)}
-
 
 			<div className="table-container">
 				<table className="data-table">
@@ -340,7 +336,6 @@ const AppVersionGateManagement: React.FC = () => {
 					</tbody>
 				</table>
 			</div>
-
 
 			{editing && !confirming && (
 				<Dialog
@@ -489,7 +484,6 @@ const AppVersionGateManagement: React.FC = () => {
 					)}
 				</Dialog>
 			)}
-
 
 			{editing && confirming && (
 				<Dialog

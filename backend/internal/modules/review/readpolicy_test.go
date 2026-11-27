@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-
 type query struct{ name, file, body string }
 
 var queryHeader = regexp.MustCompile(`(?m)^-- name: (\w+) :\w+\s*$`)
@@ -92,7 +91,7 @@ func TestEveryPublicQueryCarriesThePublicPredicate(t *testing.T) {
 var nonPublicReads = map[string]bool{
 	"InsertReview": true, "ListMyReviews": true, "ReplyToReview": true, "GetReviewForDiagnosis": true, "GetReviewStore": true, "LockReview": true,
 	"LockReviewsForTakedown": true,
-	"InsertReviewImage": true, "ListReviewImages": true,
+	"InsertReviewImage":      true, "ListReviewImages": true,
 	"LockBuyerReviewBatch": true, "DeleteReviewsByID": true, "ListInactiveBuyersWithReviews": true, "GetReviewByID": true, "IsReviewPublic": true,
 	"RequestRatingReconcileBatch": true,
 }

@@ -1,6 +1,5 @@
 package handler
 
-
 // CreateBuyerInvoiceProfileRequest 是端點 2 的請求 body。名稱與 §6.2.1 該 RPC 的 Request message 同名（§6.1.0(17)）；
 // 身分（buyer_id／store_id／actor_account_id）、path param 與 Idempotency-Key 不在 body 內。
 type CreateBuyerInvoiceProfileRequest struct {

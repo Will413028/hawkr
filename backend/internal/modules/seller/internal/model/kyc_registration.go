@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-
 // RegistrationOutcome 是一次登記資料查詢的結果，與 DB 的 kyc_registration_checks_outcome_check 一致。
 type RegistrationOutcome string
 

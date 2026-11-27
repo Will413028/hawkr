@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 // InquiryKind 是平台要賣家做的事；值與 DB 的 case_inquiries_kind_check、契約的 CaseInquiryKind 一致。
 type InquiryKind string
 

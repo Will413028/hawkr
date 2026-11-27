@@ -6,7 +6,6 @@ import (
 	"unicode"
 )
 
-
 // CertHolderField 是業者名稱相符的欄位；值是 legacy 的 `MatchCertificateHolderResponse.matched_field`，稽核只記欄位名稱。
 type CertHolderField string
 

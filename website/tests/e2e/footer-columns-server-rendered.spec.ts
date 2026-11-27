@@ -31,8 +31,7 @@ test.describe("footer data columns", { tag: ["@ui"] }, () => {
 		await page.addInitScript(() => {
 			try {
 				sessionStorage.setItem("hawkr:initial-loader-seen", "1");
-			} catch {
-			}
+			} catch {}
 		});
 
 		const browserReads: string[] = [];

@@ -64,7 +64,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
   bool _viewCartSent = false;
 
-
   @override
   void initState() {
     super.initState();
@@ -139,7 +138,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Future<void> _loadCartItems() =>
       ref.read(cartControllerProvider.notifier).refresh();
 
-
   Future<void> _deleteCartItem(CartItem item) async {
     final itemName = item.title ?? '商品';
     final success = await ref
@@ -174,7 +172,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final effect = resolveCouponEffect(coupon, baseAmount);
     return effect?.deduction ?? 0;
   }
-
 
   double get _productTotal {
     return _cartItems
@@ -222,7 +219,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     if (checkedSellerIds.length != 1) return null;
     return checkedSellerIds.first;
   }
-
 
   /// 取得目前已勾選商品所屬的 storeId（單選模式下所有勾選都是同一個）。
   /// 沒有勾選則回 null。
@@ -277,7 +273,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
   }
 
-
   Future<List<Map<String, dynamic>>> _loadCoupons() {
     final storeId = _checkedStoreId ?? '';
     if (_couponFuture != null && _couponCachedSellerId == storeId) {
@@ -321,7 +316,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     showCommonSnackBar(context, '已套用優惠券：$title');
     return selected;
   }
-
 
   void _openPaymentSheet() {
     if (_isOpeningSheet) return;
@@ -432,7 +426,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     });
   }
 
-
   ImageProvider? _resolveImageProvider(String? source) {
     if (source == null) return null;
     final raw = source.trim();
@@ -489,7 +482,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
     return url;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -780,5 +772,4 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ref.read(cartControllerProvider.notifier).selectAddress(selected);
     }
   }
-
 }

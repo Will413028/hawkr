@@ -158,7 +158,6 @@ func (r *SellerTaxProfileRepository) ConfirmReceiptAuthorization(
 	return rows > 0, err
 }
 
-
 // Create 建 DRAFT（T01 的 `[*]` 形態）。
 func (r *SellerTaxProfileRepository) Create(
 	ctx context.Context, id, issuerID int64, now time.Time,
@@ -466,14 +465,14 @@ func (r *BuyerPreferenceRepository) Create(
 		PreferenceKind:         in.PreferenceKind,
 		CarrierType:            snp(in.CarrierType),
 		CarrierValueCiphertext: ciphertext,
-		CarrierValueHash: r.keys.hashOptional(in.CarrierValue),
-		CarrierValueMask: snp(in.CarrierMask),
-		TaxID:            snp(in.TaxID),
-		TaxTitle:         snp(in.TaxTitle),
-		DonationCode:     snp(in.DonationCode),
-		Label:            snp(in.Label),
-		IsDefault:        in.IsDefault,
-		Now:              ts(now),
+		CarrierValueHash:       r.keys.hashOptional(in.CarrierValue),
+		CarrierValueMask:       snp(in.CarrierMask),
+		TaxID:                  snp(in.TaxID),
+		TaxTitle:               snp(in.TaxTitle),
+		DonationCode:           snp(in.DonationCode),
+		Label:                  snp(in.Label),
+		IsDefault:              in.IsDefault,
+		Now:                    ts(now),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

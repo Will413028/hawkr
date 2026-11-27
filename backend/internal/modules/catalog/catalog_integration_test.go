@@ -31,10 +31,10 @@ func setup(t *testing.T) *db.DB {
 }
 
 type recordingNotifier struct {
-	mu       sync.Mutex
-	notified []RestockedSKU
-	purged   [][]uuid.UUID
-	onNotify func()
+	mu                    sync.Mutex
+	notified              []RestockedSKU
+	purged                [][]uuid.UUID
+	onNotify              func()
 	failNotify, failPurge error
 }
 

@@ -178,7 +178,6 @@ export function SellerOrderInvoiceCard({ orderNo }: Props) {
 						</p>
 					) : null}
 
-
 					<p
 						role="status"
 						className="m-0 text-[0.8125rem] text-[var(--hkui-foreground-soft)]"

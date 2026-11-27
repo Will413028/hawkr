@@ -581,7 +581,6 @@ class CustomerDetailScreen extends HookConsumerWidget {
   }
 }
 
-
 /// 標籤管理底部彈窗的標題列。
 ///
 /// 關閉按鈕的視覺維持右側錨點，外層仍提供至少 48dp 的點擊區。

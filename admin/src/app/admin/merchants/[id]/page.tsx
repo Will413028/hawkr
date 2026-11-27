@@ -630,7 +630,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 
 	return (
 		<div className="certification-detail-page">
-
 			<div className="detail-header">
 				<div className="header-left">
 					<button
@@ -773,7 +772,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					</div>
 				</div>
 				<div className="header-actions">
-
 					<MerchantOperationEntry
 						storeId={store.id}
 						enabled
@@ -865,11 +863,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			</div>
 
-
 			{!anyDialogOpen && (
 				<GovernanceNoticeBanner notice={notice} ref={noticeRef} />
 			)}
-
 
 			<ScheduledTerminationNotice accountId={store.accountId} />
 			<ActiveMeasureCards
@@ -878,10 +874,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				onEnd={(measure) => openDialog(() => setEndTargetId(measure.id))}
 			/>
 
-
 			{isApproved && (
 				<>
-
 					{(orderTotal !== null ||
 						activeProductTotal !== null ||
 						rating !== undefined) && (
@@ -963,7 +957,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</>
 			)}
 
-
 			{(!isApproved || activeTab === "basic") && reviewable.canReject && (
 				<div className="audit-notice">
 					<div className="audit-notice-icon">
@@ -982,14 +975,12 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				<KycRejectionNotice application={application} />
 			)}
 
-
 			{(!isApproved || activeTab === "basic") && (
 				<OnboardingSummaryCard
 					state={onboarding.value}
 					onReload={() => void onboarding.query.refetch()}
 				/>
 			)}
-
 
 			{(!isApproved || activeTab === "basic") && (
 				<PaymentAccountSection
@@ -999,10 +990,8 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-
 			{(!isApproved || activeTab === "basic") && (
 				<div id="kyc" className="detail-content-grid">
-
 					<div className="detail-left-column">
 						{application ? (
 							<KycBasicInfoCard
@@ -1051,7 +1040,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 						)}
 					</div>
 
-
 					{application && (
 						<div className="detail-right-column">
 							<KycDocumentsCard
@@ -1065,11 +1053,9 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-
 			{(!isApproved || activeTab === "basic") && (
 				<MeasureHistoryCard accountId={store.accountId} />
 			)}
-
 
 			{isApproved && activeTab === "products" && (
 				<div className="tab-content-card">
@@ -1124,7 +1110,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 											</td>
 											<td>
 												<div className="tab-table-actions">
-
 													<button
 														type="button"
 														className="btn-force-unpublish"
@@ -1159,7 +1144,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					)}
 				</div>
 			)}
-
 
 			{isApproved && activeTab === "orders" && (
 				<div className="tab-content-card">
@@ -1256,7 +1240,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-
 			{isApproved && activeTab === "delegation" && (
 				<div className="tab-content-card">
 					<MerchantDelegationAuthorizationPanel
@@ -1266,7 +1249,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				</div>
 			)}
 
-
 			{isApproved && activeTab === "finance" && (
 				<div className="tab-content-card">
 					<div className="tab-empty-state">
@@ -1275,7 +1257,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					</div>
 				</div>
 			)}
-
 
 			{showRejectModal && application && (
 				<RejectKycDialog
@@ -1293,7 +1274,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-
 			{showCreateMeasureModal && (
 				<CreateRiskMeasureDialog
 					storeId={store.id}
@@ -1301,7 +1281,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					onConfirm={handleCreateMeasure}
 				/>
 			)}
-
 
 			{showCreateViolationMeasure && (
 				<CreateMeasureDialog
@@ -1311,7 +1290,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-
 			{endTarget && (
 				<EndMeasureDialog
 					measure={endTarget}
@@ -1319,7 +1297,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					onConfirm={() => handleEndMeasure(endTarget)}
 				/>
 			)}
-
 
 			{unpublishTarget && (
 				<ProductForceUnpublishDialog
@@ -1330,7 +1307,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					onConfirm={handleForceUnpublish}
 				/>
 			)}
-
 
 			{showDeleteAccountDialog && (
 				<SellerAccountDeleteDialog
@@ -1343,7 +1319,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 				/>
 			)}
 
-
 			{showTerminationDialog && (
 				<CreateTerminationDialog
 					storeId={store.id}
@@ -1353,7 +1328,6 @@ function MerchantDetail({ storeId }: { storeId: string }) {
 					onConfirm={handleCreateTermination}
 				/>
 			)}
-
 
 			{previewImage && (
 				<button

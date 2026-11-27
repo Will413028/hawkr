@@ -169,7 +169,6 @@ export default function MarketClientShell({
 							: undefined
 					}
 				>
-
 					<input
 						type="checkbox"
 						id="market-filter-toggle"

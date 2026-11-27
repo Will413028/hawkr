@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	codeSuccess            = 0
-	codeInvalidInput       = 400
-	codeNotFound           = 404
-	codeFailedPrecondition = 428
+	codeSuccess             = 0
+	codeInvalidInput        = 400
+	codeNotFound            = 404
+	codeFailedPrecondition  = 428
 	codeTransactionNotFound = 8015
 )
 

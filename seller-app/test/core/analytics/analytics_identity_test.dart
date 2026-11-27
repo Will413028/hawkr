@@ -39,10 +39,7 @@ void main() {
   );
 
   test('applyIdentity clears user_id when logged out', () async {
-    await applyIdentity(
-      svc,
-      const SessionModel(),
-    );
+    await applyIdentity(svc, const SessionModel());
     verify(() => fa.setUserId(id: null)).called(1);
     verifyNever(
       () => fa.setUserProperty(

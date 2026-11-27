@@ -39,11 +39,7 @@ export default function DelegatedAreaUnauthorized({
 			<h1 className="adm-panel__title">不在本次代行授權範圍</h1>
 			<p className="adm-panel__hint">{reason}</p>
 			{backHref ? (
-				<Link
-					href={backHref}
-					data-hkui-button=""
-					className="adm-blocked__link"
-				>
+				<Link href={backHref} data-hkui-button="" className="adm-blocked__link">
 					{backLabel ?? "返回"}
 				</Link>
 			) : null}

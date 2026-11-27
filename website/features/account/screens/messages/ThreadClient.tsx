@@ -404,7 +404,6 @@ export default function ThreadClient({
 				) : null}
 
 				<form className="thread-page__compose" onSubmit={handleSend}>
-
 					<div className="thread-page__field">
 						<Button
 							type="button"
@@ -488,7 +487,6 @@ function ChatImage({ url }: { url: string }) {
 				role="img"
 				aria-label="圖片無法載入"
 			>
-
 				<AppIcon
 					name="image"
 					className="thread-page__bubble-attachment__icon"

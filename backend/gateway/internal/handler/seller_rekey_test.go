@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 func setupSellerRekeyRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	app := r.Group("/api/v1/app", fakeJWTAuth())
@@ -70,7 +69,7 @@ func TestGetSellerProductDetail_RawAccountIDDoesNotMatchOwner(t *testing.T) {
 			return &productpb.GetProductResponse{
 				Code: 0,
 				Data: &productpb.ProductDetail{
-					Id: in.ProductId,
+					Id:        in.ProductId,
 					CreatedBy: strconv.FormatInt(rekeyTestSurrogate+1, 10),
 				},
 			}, nil

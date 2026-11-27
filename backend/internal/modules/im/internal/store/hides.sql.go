@@ -16,7 +16,6 @@ const hasActiveHide = `-- name: HasActiveHide :one
 SELECT EXISTS (SELECT 1 FROM im.hides WHERE message_id = $1 AND restored_at IS NULL)
 `
 
-// 訊息或評價目前有沒有未還原的隱藏；還原沒有列時用來分辨「沒有隱藏」與「隱藏來源不符」。
 func (q *Queries) HasActiveHide(ctx context.Context, messageID uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasActiveHide, messageID)
 	var exists bool
@@ -42,7 +41,6 @@ type InsertHideParams struct {
 	Now            time.Time
 }
 
-// 同一則訊息已經有未還原的隱藏時回既有的那一列（冪等）；回傳的 id 等於傳入的 id 才是新增。
 func (q *Queries) InsertHide(ctx context.Context, arg InsertHideParams) (ImHide, error) {
 	row := q.db.QueryRow(ctx, insertHide,
 		arg.ID,
@@ -70,7 +68,6 @@ func (q *Queries) InsertHide(ctx context.Context, arg InsertHideParams) (ImHide,
 }
 
 const lockMessage = `-- name: LockMessage :one
-
 SELECT m.id, m.conversation_id, c.buyer_id, c.store_id, m.seq, m.sender_kind FROM im.messages AS m
 JOIN im.conversations AS c ON c.id = m.conversation_id
 WHERE m.id = $1 FOR NO KEY UPDATE OF m
@@ -85,7 +82,6 @@ type LockMessageRow struct {
 	SenderKind     string
 }
 
-// 訊息的隱藏紀錄（可多次隱藏與還原）。可見性只由 im 寫；呼叫者是 moderation 的 transaction，先鎖訊息列（LockMessage）。
 func (q *Queries) LockMessage(ctx context.Context, id uuid.UUID) (LockMessageRow, error) {
 	row := q.db.QueryRow(ctx, lockMessage, id)
 	var i LockMessageRow
@@ -115,7 +111,6 @@ type RestoreHideParams struct {
 	SourceRef *string
 }
 
-// 還原訊息目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
 func (q *Queries) RestoreHide(ctx context.Context, arg RestoreHideParams) (ImHide, error) {
 	row := q.db.QueryRow(ctx, restoreHide,
 		arg.Now,

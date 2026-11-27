@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // AdminAbnormalOrderSummaryResp 異常訂單列表單筆
 type AdminAbnormalOrderSummaryResp struct {
 	OrderNo           string `json:"orderNo"`
@@ -109,7 +108,6 @@ func (h *Holder) ListAbnormalOrdersForAdmin(c *gin.Context) {
 		PageSize: d.GetPageSize(),
 	})
 }
-
 
 // RetryGrantRequest Admin 重發撥款請求
 type RetryGrantRequest struct {

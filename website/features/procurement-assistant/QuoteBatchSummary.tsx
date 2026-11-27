@@ -183,7 +183,6 @@ export default function QuoteBatchSummary({
 					>
 						<h3 id="quote-summary-snapshot">詢價快照</h3>
 						<dl className={styles.facts}>
-
 							{publication ? (
 								<div>
 									<dt>結果版本</dt>
@@ -197,7 +196,6 @@ export default function QuoteBatchSummary({
 							<Fact label="數量" value={quantityText} />
 							<Fact label="配送" value={deliveryText} />
 							<Fact label="希望詢價" value={rangeText} />
-
 						</dl>
 						<p className={styles.note}>
 							<AppIcon name="info" size={17} aria-hidden="true" />
@@ -208,7 +206,6 @@ export default function QuoteBatchSummary({
 							</span>
 						</p>
 					</section>
-
 
 					{publication ? (
 						<section

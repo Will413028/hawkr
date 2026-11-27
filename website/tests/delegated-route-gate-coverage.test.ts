@@ -50,7 +50,6 @@ const ORDERS_GATE = [
 ];
 
 const COVERAGE: Record<string, Coverage> = {
-
 	"[...area]": {
 		kind: "exempt",
 		why: "catch-all 本身就是「本期未開放」的空狀態頁",

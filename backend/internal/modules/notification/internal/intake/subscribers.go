@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 )
 
-
 // OnSuspended 訂閱 accountsuspension.Suspended。
 func (s *Service) OnSuspended(ctx context.Context, e accountsuspension.Suspended) error {
 	return s.Accept(ctx, "account_suspended", registry.AccountSuspendedParams{
@@ -22,7 +21,6 @@ func (s *Service) OnUnsuspended(ctx context.Context, e accountsuspension.Unsuspe
 		AccountID: e.AccountID, SuspensionID: e.SuspensionID, ReleasedAt: e.ReleasedAt,
 	})
 }
-
 
 // PurgeTokensOnSuspended 訂閱 accountsuspension.Suspended。店家停權（store suspension）不是這個事件，token 不動。
 func (s *Service) PurgeTokensOnSuspended(ctx context.Context, e accountsuspension.Suspended) error {

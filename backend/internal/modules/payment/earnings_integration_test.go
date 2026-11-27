@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 func (f *chargeFixture) paidTransferred(t *testing.T, orderNo string, storeID, amount int64) PaymentTransfer {
 	t.Helper()
 	f.order(orderNo, 11, storeID, amount)

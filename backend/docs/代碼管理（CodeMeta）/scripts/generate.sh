@@ -246,8 +246,6 @@ generate_java_error_code() {
         local total_rows=0
         total_rows=$(grep -c '^ROW:' "$parsed_file" || true)
         local row_index=0
-        local last_was_section=0
-
         while IFS= read -r line; do
             if [[ "$line" == SECTION:* ]]; then
                 local section="${line#SECTION:}"
@@ -255,8 +253,6 @@ generate_java_error_code() {
                     if [[ $row_index -gt 0 ]]; then
                         echo ""
                     fi
-                    echo "    // ===== ${section} ====="
-                    last_was_section=1
                 fi
                 continue
             fi
@@ -273,7 +269,6 @@ generate_java_error_code() {
                 fi
 
                 echo "    ${name}(${code}, \"$(java_escape "$message")\")${suffix}"
-                last_was_section=0
             fi
         done < "$parsed_file"
 

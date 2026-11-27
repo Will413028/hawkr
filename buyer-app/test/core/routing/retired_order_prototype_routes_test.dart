@@ -15,8 +15,11 @@ void main() {
     expect(router, isNot(contains('const OrderPaymentDetailsScreen()')));
     expect(router, isNot(contains('const PaymentDetailScreen()')));
     expect(
-      router,
-      contains("path: '/orders/matched',\n        // Retired prototype"),
+      RegExp(
+        r"path: '/orders/matched',[\s\S]{0,160}"
+        r"redirect: \(_, __\) => '/\?tab=3'",
+      ).hasMatch(router),
+      isTrue,
     );
     expect(router, contains("redirect: (_, __) => '/?tab=3'"));
     expect(

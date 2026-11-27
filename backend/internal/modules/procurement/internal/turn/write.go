@@ -14,16 +14,16 @@ import (
 )
 
 type turnWrite struct {
-	ids ids
-	buyerID int64
+	ids             ids
+	buyerID         int64
 	parent          *uuid.UUID
 	d               decision
 	source, message string
 	clientRequestID uuid.UUID
-	fromStatus string
-	result []byte
-	commandSlot model.SlotKey
-	now         time.Time
+	fromStatus      string
+	result          []byte
+	commandSlot     model.SlotKey
+	now             time.Time
 }
 
 func writeTurn(ctx context.Context, q *store.Queries, w turnWrite) error {

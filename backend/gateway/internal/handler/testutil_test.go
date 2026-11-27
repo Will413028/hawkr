@@ -16,7 +16,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-
 func init() {
 	gin.SetMode(gin.TestMode)
 }
@@ -50,7 +49,6 @@ func fakeJWTAuth() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
 
 func parseJSON(t *testing.T, body io.Reader) map[string]interface{} {
 	t.Helper()
@@ -108,9 +106,8 @@ func pageRecords(t *testing.T, body map[string]interface{}) []interface{} {
 	return rows
 }
 
-
 type mockSellerServiceClient struct {
-	MatchCertificateHolderFn func(context.Context, *sellerpb.MatchCertificateHolderRequest, ...grpc.CallOption) (*sellerpb.MatchCertificateHolderResponse, error)
+	MatchCertificateHolderFn   func(context.Context, *sellerpb.MatchCertificateHolderRequest, ...grpc.CallOption) (*sellerpb.MatchCertificateHolderResponse, error)
 	SearchSellerProspectsFn    func(context.Context, *sellerpb.SearchSellerProspectsRequest, ...grpc.CallOption) (*sellerpb.SearchSellerProspectsResponse, error)
 	GetSellerFn                func(ctx context.Context, in *sellerpb.GetSellerRequest, opts ...grpc.CallOption) (*sellerpb.SellerResponse, error)
 	GetSellerStatsFn           func(ctx context.Context, in *sellerpb.GetSellerStatsRequest, opts ...grpc.CallOption) (*sellerpb.SellerStatsResponse, error)
@@ -173,7 +170,6 @@ func (m *mockSellerServiceClient) GetSellerShippingProfile(ctx context.Context, 
 	return nil, nil
 }
 
-
 func (m *mockSellerServiceClient) ResolveSellerAccountID(ctx context.Context, in *sellerpb.ResolveSellerAccountIDRequest, opts ...grpc.CallOption) (*sellerpb.ResolveSellerAccountIDResponse, error) {
 	return nil, grpcstatus.Error(grpccodes.Unimplemented, "ResolveSellerAccountID not wired in test")
 }
@@ -200,7 +196,6 @@ func (m *mockSellerServiceClient) SearchSellerProspects(ctx context.Context, in 
 	}
 	return nil, grpcstatus.Error(grpccodes.Unimplemented, "SearchSellerProspectsFn not wired in test")
 }
-
 
 type mockBuyerServiceClient struct {
 	GetBuyerProfileFn                func(ctx context.Context, in *buyerpb.GetBuyerProfileRequest, opts ...grpc.CallOption) (*buyerpb.BuyerProfileResponse, error)
@@ -258,7 +253,6 @@ func (m *mockBuyerServiceClient) BatchCheckFavorites(ctx context.Context, in *bu
 	return nil, nil
 }
 
-
 func (m *mockBuyerServiceClient) BatchCheckRestockSubscriptions(ctx context.Context, in *buyerpb.BatchCheckRestockSubscriptionsRequest, opts ...grpc.CallOption) (*buyerpb.BatchCheckRestockSubscriptionsResponse, error) {
 	if m.BatchCheckRestockSubscriptionsFn != nil {
 		return m.BatchCheckRestockSubscriptionsFn(ctx, in, opts...)
@@ -288,7 +282,6 @@ func (m *mockBuyerServiceClient) GetBuyerEntitlement(ctx context.Context, in *bu
 	}
 	return nil, nil
 }
-
 
 type mockOrderServiceClient struct {
 	orderpb.OrderServiceClient

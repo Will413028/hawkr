@@ -45,7 +45,6 @@ export function normalizeWebHref(
 		if (options.allowInsecureHttp && url.protocol === "http:") {
 			return url.toString();
 		}
-	} catch {
-	}
+	} catch {}
 	return undefined;
 }

@@ -48,8 +48,6 @@ func (r iteratorForBulkInsertInvoiceAdjustmentLines) Err() error {
 	return nil
 }
 
-// 整批折讓明細（COPY 協定）。欄位與 CHECK 同上——COPY 不繞過 CHECK／UNIQUE／FK。
-// 沒有 ON CONFLICT（copyfrom 不支援）：重跑會撞 uq_invadjline_seq，這是刻意的。
 func (q *Queries) BulkInsertInvoiceAdjustmentLines(ctx context.Context, arg []BulkInsertInvoiceAdjustmentLinesParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"invoice_adjustment_lines"}, []string{"adjustment_id", "line_seq", "source_line_id", "original_invoice_no", "original_invoice_date", "original_description", "quantity", "unit_price_ex_tax", "net_amount_ex_tax", "tax_amount", "tax_category", "created_at"}, &iteratorForBulkInsertInvoiceAdjustmentLines{rows: arg})
 }
@@ -97,16 +95,6 @@ func (r iteratorForBulkInsertInvoiceDocumentLines) Err() error {
 	return nil
 }
 
-// 同一份文件的整批明細行（COPY 協定，一次來回）。與上面那一支是同一組欄位、同一組 CHECK：
-// COPY **不繞過** CHECK／UNIQUE／FK，所以「批次寫入時約束比較鬆」這個常見誤解在這裡不成立。
-// ⚠️ 沒有 ON CONFLICT：copyfrom 不支援。重跑同一份文件的行組裝會撞 uq_invline_doc_seq，
-//
-//	這是刻意的——重建明細行的正確做法是同交易內先刪後建（fk_invline_document 是
-//	ON DELETE CASCADE，但刪 document 不是選項），不是靠衝突靜默跳過。
-//
-// ⚠️ 本句要求 database.DBTX 具備 CopyFrom（pkg/database 的 DBTX 已含），
-//
-//	交易感知照舊由 baseRepo.q(ctx) 提供。
 func (q *Queries) BulkInsertInvoiceDocumentLines(ctx context.Context, arg []BulkInsertInvoiceDocumentLinesParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"invoice_document_lines"}, []string{"document_id", "line_seq", "line_type", "order_item_id", "sku_id", "description", "unit", "quantity", "unit_price", "net_amount", "tax_category", "tax_rate_bps", "remark", "allocated_discount", "allowanceable_base", "created_at"}, &iteratorForBulkInsertInvoiceDocumentLines{rows: arg})
 }

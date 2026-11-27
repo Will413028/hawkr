@@ -580,8 +580,8 @@
    "id": "no-getbody-body-consumed",
    "stack": "go",
    "file": "backend/internal/platform/stripe/client.go",
-   "old": "\treturn nil\n}\n\n// call",
-   "new": "\tb, _ := io.ReadAll(req.Body)\n\treq.Body = io.NopCloser(strings.NewReader(\"\"))\n\treturn b\n}\n\n// call",
+   "old": "\treturn nil\n}\n\nfunc (c *Client) call",
+   "new": "\tb, _ := io.ReadAll(req.Body)\n\treq.Body = io.NopCloser(strings.NewReader(\"\"))\n\treturn b\n}\n\nfunc (c *Client) call",
    "test": "internal/platform/stripe ^TestRequestWithoutGetBodyIsSentIntactAndBodyIsNotLogged$",
    "why": "沒有 GetBody 時仍讀走 req.Body，送出的請求本文被改動。"
   },

@@ -56,9 +56,9 @@ type spyStore struct {
 	inTx       []string
 	failDelete map[string]error
 	failPut    error
-	puts    map[string][]byte
-	deleted []string
-	afterPut func(key string)
+	puts       map[string][]byte
+	deleted    []string
+	afterPut   func(key string)
 }
 
 func newSpyStore() *spyStore {
@@ -386,7 +386,6 @@ func assetIDOf(t *testing.T, f *fixture, id uuid.UUID) uuid.UUID {
 	return *a
 }
 
-
 func TestBeginUpload_StoresOnlyTheTokenHashAndPresignsUnderTmp(t *testing.T) {
 	f := setup(t)
 	res := begin(t, f, owner)
@@ -462,7 +461,6 @@ func TestBeginUpload_RejectsInvalidDeclarations(t *testing.T) {
 	_, err = f.m.BeginUpload(t.Context(), media.Uploader{}, media.BeginInput{})
 	wantKind(t, err, apperr.KindInvalidInput)
 }
-
 
 func TestProcess_SuccessCreatesTheAssetAndDeletesTheTmpObjectAfterCommit(t *testing.T) {
 	f := setup(t)
@@ -568,7 +566,6 @@ func TestProcess_ExpiredMidFlightLeavesNoOrphanObject(t *testing.T) {
 		t.Fatal("GC 之後 tmp 物件還在")
 	}
 }
-
 
 func TestConfirm_Success(t *testing.T) {
 	f := setup(t)
@@ -905,7 +902,6 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 	})
 }
 
-
 func TestGetUpload_ReportsStateAndReasonOnlyToTheUploader(t *testing.T) {
 	f := setup(t)
 	res := begin(t, f, owner)
@@ -933,7 +929,6 @@ func TestGetUpload_ReportsStateAndReasonOnlyToTheUploader(t *testing.T) {
 	_, err = f.m.GetUpload(t.Context(), other, res.Token)
 	wantKind(t, err, apperr.KindNotFound)
 }
-
 
 func TestGC_NeverDeletesConfirmedAssets(t *testing.T) {
 	f := setup(t)
@@ -1110,7 +1105,6 @@ func TestConfirm_VisibilityMismatchIsRejectedBeforeAnyClaim(t *testing.T) {
 		t.Fatalf("以正確的可見性確認機敏：%v", err)
 	}
 }
-
 
 func confirmed(t *testing.T, f *fixture) (media.ConfirmedAsset, string) {
 	t.Helper()
@@ -1317,7 +1311,6 @@ func TestDeleteJob_FailureDoesNotBlockOtherRows(t *testing.T) {
 		t.Fatal("a 重試後應該是 DELETED")
 	}
 }
-
 
 func TestStorageIsNeverCalledInsideATransaction(t *testing.T) {
 	f := setup(t)

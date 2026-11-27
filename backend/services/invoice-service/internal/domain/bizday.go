@@ -6,7 +6,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/timeutil"
 )
 
-
 const (
 	// ComplaintSlaBusinessDays 是賣家回覆申訴的 SLA（§0.1 關鍵參數：3 工作天）。
 	ComplaintSlaBusinessDays = 3
@@ -25,7 +24,7 @@ const (
 // 零值是**零涵蓋**的行事曆（每一天都不是工作天），不是「每一天都是工作天」——
 // 呼叫端忘了載入鏡像時，得到的是偏晚的硬上限而不是偏早的自然日。
 type BusinessCalendar struct {
-	holidays map[string]struct{}
+	holidays    map[string]struct{}
 	coveredFrom time.Time
 	coveredTo   time.Time
 	covered     bool

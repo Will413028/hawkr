@@ -71,8 +71,7 @@ class SocialContentRepository {
       await _public.recordPostView(
         pb.RecordPostViewRequest(postId: postId.toString()),
       );
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   Future<void> setPostLiked(int postId, {required bool liked}) async {

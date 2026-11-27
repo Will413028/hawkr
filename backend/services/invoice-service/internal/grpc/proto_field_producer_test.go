@@ -12,15 +12,12 @@ import (
 	"testing"
 )
 
-
 var knownEmptyFields = map[string]string{
 	"InvoiceAuditLogItem.actor_display_name": "設計上恆為空：accounts 表沒有任何名字欄，GetAccountInfoBatch 的 nickname 在批次路徑上結構性恆空；不得用 email 頂替",
 	"InvoiceAuditLogItem.result":             "設計上恆為空：invoice_admin_audit_logs 無此欄；填 SUCCESS 會讓失敗的操作看起來都成功",
 	"InvoiceAuditLogItem.terms_version":      "設計上恆為空：invoice_admin_audit_logs 無此欄；只對條款相關 action 有意義，猜當期版本會讓每一列都像簽過同一版",
-	"SelfIssueAttestationInfo.terms_key": "設計上恆為空：條款全文尚未發布成 media 資產；猜一個 key 會產生 404 的下載連結",
+	"SelfIssueAttestationInfo.terms_key":     "設計上恆為空：條款全文尚未發布成 media 資產；猜一個 key 會產生 404 的下載連結",
 	"SellerInvoiceDocumentDetail.created_by": "設計上恆為空：來源是 coupon 的 created_by，本服務無 coupon client；同 message 的 funded_by 已用 UNDETERMINED 承擔 fail-closed（§3.7 D9a）",
-
-
 
 	"TaxDocumentInfo.kind": "設計上恆為空：上傳端只收 objectKey 純字串陣列，DB 與 media metadata 皆無分類欄；填 OTHER 會讓 ADM 以為賣家分過類",
 }
@@ -183,7 +180,7 @@ func goFieldName(snake string) string {
 }
 
 type producerIndex struct {
-	produced map[string]bool
+	produced         map[string]bool
 	unresolvedAssign map[string]bool
 }
 

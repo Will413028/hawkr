@@ -21,7 +21,6 @@ type BannerAssetsRow struct {
 	PopupImageAssetID   uuid.UUID
 }
 
-// 同步 job 讀的：banner 目前的兩張圖（沒有列時 pgx.ErrNoRows，也就是終態）。
 func (q *Queries) BannerAssets(ctx context.Context, id uuid.UUID) (BannerAssetsRow, error) {
 	row := q.db.QueryRow(ctx, bannerAssets, id)
 	var i BannerAssetsRow
@@ -33,7 +32,6 @@ const countActiveBanners = `-- name: CountActiveBanners :one
 SELECT count(*) FROM content.banners WHERE is_active AND id <> $1::uuid
 `
 
-// 啟用中的 banner 數量，不含 except_id（新增時傳 uuid 的零值）。
 func (q *Queries) CountActiveBanners(ctx context.Context, exceptID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countActiveBanners, exceptID)
 	var count int64
@@ -51,7 +49,6 @@ type DeleteBannerParams struct {
 	ExpectedVersion int64
 }
 
-// expected_version 為 0 表示不檢查版本。
 func (q *Queries) DeleteBanner(ctx context.Context, arg DeleteBannerParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBanner, arg.ID, arg.ExpectedVersion)
 	if err != nil {
@@ -171,7 +168,6 @@ type ListBannersParams struct {
 	MaxRows      int32
 }
 
-// 後台的清單，依顯示順序。keyset 分頁：has_cursor 時從 (after_order, after_created, after_id) 之後開始。
 func (q *Queries) ListBanners(ctx context.Context, arg ListBannersParams) ([]ContentBanner, error) {
 	rows, err := q.db.Query(ctx, listBanners,
 		arg.HasCursor,
@@ -236,8 +232,6 @@ type ListLiveBannersParams struct {
 	MaxRows      int32
 }
 
-// 前台顯示的 banner：啟用中，而且 now 落在排程區間 [start_date, end_date) 內（沒設的一端不設限）。
-// 分頁同 ListBanners。
 func (q *Queries) ListLiveBanners(ctx context.Context, arg ListLiveBannersParams) ([]ContentBanner, error) {
 	rows, err := q.db.Query(ctx, listLiveBanners,
 		arg.Now,
@@ -292,7 +286,6 @@ type LockBannerAssetsRow struct {
 	PopupImageAssetID   uuid.UUID
 }
 
-// 鎖住 banner 並回傳它目前的兩張圖的 asset ID（換圖與刪除要把被換掉的記成退場）。
 func (q *Queries) LockBannerAssets(ctx context.Context, id uuid.UUID) (LockBannerAssetsRow, error) {
 	row := q.db.QueryRow(ctx, lockBannerAssets, id)
 	var i LockBannerAssetsRow
@@ -339,7 +332,6 @@ type UpdateBannerParams struct {
 	ExpectedVersion     int64
 }
 
-// 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows），由呼叫方分辨不存在還是版本衝突。
 func (q *Queries) UpdateBanner(ctx context.Context, arg UpdateBannerParams) (ContentBanner, error) {
 	row := q.db.QueryRow(ctx, updateBanner,
 		arg.ID,

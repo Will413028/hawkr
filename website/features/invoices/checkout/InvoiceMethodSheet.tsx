@@ -107,7 +107,6 @@ export function InvoiceMethodSheet({
 				</p>
 			) : null}
 
-
 			{profiles.length > 0 ? (
 				<section className="mb-4">
 					<h3 className="text-[0.6875rem] font-extrabold text-foreground/70 mb-2">
@@ -169,7 +168,6 @@ export function InvoiceMethodSheet({
 				</p>
 			) : null}
 
-
 			<section>
 				<h3 className="text-[0.6875rem] font-extrabold text-foreground/70 mb-2">
 					使用其他方式
@@ -228,7 +226,6 @@ export function InvoiceMethodSheet({
 						</div>
 					</OtherOption>
 				</div>
-
 
 				<p className="mt-3 text-[0.625rem] leading-relaxed text-foreground/55">
 					要使用手機條碼或自然人憑證，請先到

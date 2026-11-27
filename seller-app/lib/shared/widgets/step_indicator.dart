@@ -54,7 +54,6 @@ class StepIndicator extends StatelessWidget {
   static const double _stepW = 60;
   static const double _lineH = 3;
 
-
   /// 售後流程 4 步
   static const afterSaleSteps = [
     StepDef(label: '售後申請', icon: HkIconName.document),
@@ -116,7 +115,6 @@ class StepIndicator extends StatelessWidget {
     StepDef(label: '驗貨完成', icon: HkIconName.location),
   ];
 
-
   static int afterSaleStepFromStatus(String status) => switch (status) {
     '0' => 1,
     '20' || '25' => 2,
@@ -153,7 +151,6 @@ class StepIndicator extends StatelessWidget {
     '50' => 4,
     _ => 0,
   };
-
 
   @override
   Widget build(BuildContext context) {

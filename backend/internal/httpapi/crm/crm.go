@@ -54,12 +54,12 @@ type Stores interface {
 
 // App 實作 CrmAppService。
 type App struct {
-	reads  Reads
-	writes Writes
-	buyers Buyers
-	stores Stores
-	images rpc.Images
-	log    *slog.Logger
+	reads    Reads
+	writes   Writes
+	buyers   Buyers
+	stores   Stores
+	images   rpc.Images
+	log      *slog.Logger
 	reasonOf func(error) crm.Reason
 }
 
@@ -172,7 +172,6 @@ func pageSize(n int32) (int32, error) {
 func lists(mask *fieldmaskpb.FieldMask, field string) bool {
 	return slices.ContainsFunc(mask.GetPaths(), func(p string) bool { return p == field || p == "*" })
 }
-
 
 func (h *App) ListCustomers(ctx context.Context, req *connect.Request[pb.ListCustomersRequest]) (*connect.Response[pb.ListCustomersResponse], error) {
 	msg := req.Msg

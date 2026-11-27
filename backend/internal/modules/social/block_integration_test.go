@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 func (f *fixture) blockBuyer(t *testing.T, blocker, target buyerP) {
 	t.Helper()
 	changed, err := f.buyers.BlockBuyer(context.Background(), blocker.BuyerID, target.BuyerID)

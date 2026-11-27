@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/notifyrouting"
 )
 
-
 const (
 	fxIssuerPK      int64 = 7304857280000000001
 	fxStoreID       int64 = 2685914682
@@ -207,7 +206,7 @@ func TestBuyerIDNeverCarriesAStoreIDAcrossEveryProducer(t *testing.T) {
 		name          string
 		recipientType string
 		recipientRef  *int64
-		wantDocBuyer string
+		wantDocBuyer  string
 	}{
 		{"方向一 BUYER", codemeta.InvoiceRecipientTypeBuyer.Value, ptrInt64(fxBuyerID), "2623900520"},
 		{"方向二 SELLER（recipient_ref_id 是另一個賣家的 store_id）",
@@ -246,7 +245,6 @@ func TestBuyerIDNeverCarriesAStoreIDAcrossEveryProducer(t *testing.T) {
 		})
 	}
 }
-
 
 func assertProducersCoverEveryPayloadType(t *testing.T, producers []producer) {
 	t.Helper()

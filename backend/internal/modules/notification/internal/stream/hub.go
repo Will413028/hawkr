@@ -71,10 +71,10 @@ type Hub struct {
 
 	backoffBase, backoffMax time.Duration
 	jitter                  func() float64
-	now        func() time.Time
-	sleep      func(ctx context.Context, d time.Duration)
-	listening  chan struct{}
-	listenOnce sync.Once
+	now                     func() time.Time
+	sleep                   func(ctx context.Context, d time.Duration)
+	listening               chan struct{}
+	listenOnce              sync.Once
 
 	mu        sync.Mutex
 	down      bool

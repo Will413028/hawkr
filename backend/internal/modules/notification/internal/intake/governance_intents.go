@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-
 func measureCreatedIntent(e seller.MeasureCreated) (name string, params any, ok bool) {
 	switch e.Kind {
 	case seller.MeasureSuspension:

@@ -38,9 +38,6 @@ type AdminStoreStatsRow struct {
 	NewThisMonth      int32
 }
 
-// 後台的店家統計，一句查詢、同一個 snapshot：目前的店家（營運中與等待刪除）的總數、依目前那一筆還沒取消的 KYC 申請狀態的核准與退回家數、
-// 商家認證申請在後台待辦裡的家數（kyc_awaiting_review：與待辦、商家清單的「待審核」分頁同一個成員 seller.review_kyc_application），
-// 以及台北本月（[month_start, month_end)）新開的家數。
 func (q *Queries) AdminStoreStats(ctx context.Context, arg AdminStoreStatsParams) (AdminStoreStatsRow, error) {
 	row := q.db.QueryRow(ctx, adminStoreStats, arg.Now, arg.MonthStart, arg.MonthEnd)
 	var i AdminStoreStatsRow
@@ -103,10 +100,6 @@ type AdminStoresParams struct {
 	PageSize          int32
 }
 
-// 後台的店家清單：生命週期（呼叫方一定給至少一個）、名稱或電話（ILIKE，呼叫方已跳脫 % _ \）或 store_code 相同、帳號、
-// 目前那一筆還沒取消的 KYC 申請的狀態，新到舊的 keyset。停權不在這裡判斷：它的定義
-// 只有 EffectiveMeasures 一處，呼叫方先以它取得生效中停權措施的帳號（suspended_accounts），suspended 為 true 只列這些帳號的
-// 店家、false 只列不在其中的。
 func (q *Queries) AdminStores(ctx context.Context, arg AdminStoresParams) ([]SellerStore, error) {
 	rows, err := q.db.Query(ctx, adminStores,
 		arg.Statuses,
@@ -181,8 +174,6 @@ type CloseStoreParams struct {
 	StoreID int64
 }
 
-// 關閉 stint：釋放「目前」的位置。關店可逆，logo 與封面留著（連同 media 的引用），到個資清理才釋放（PurgeStores）。關店的紀錄由呼叫方同一個
-// transaction 以 OpenStoreClosure 寫入 store_closures（關店紀錄只有那一處），now 與它相同：current_closed_at 指向那一列。
 func (q *Queries) CloseStore(ctx context.Context, arg CloseStoreParams) error {
 	_, err := q.db.Exec(ctx, closeStore, arg.Now, arg.StoreID)
 	return err
@@ -213,8 +204,6 @@ type CreateStoreParams struct {
 	Now           time.Time
 }
 
-// 建立新的 stint；store_code 撞號時不寫入、回 0 列，由呼叫方換一個代碼重試。帳號已有目前的 stint 時違反
-// stores_current_account（呼叫方先鎖帳號再檢查，所以只在不變量被破壞時發生）。
 func (q *Queries) CreateStore(ctx context.Context, arg CreateStoreParams) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, createStore,
 		arg.StoreCode,
@@ -265,7 +254,6 @@ FROM seller.stores
 WHERE account_id = $1 AND status <> 'CLOSED'
 `
 
-// 讀取帳號目前的 stint（status 不是 CLOSED）。
 func (q *Queries) CurrentStore(ctx context.Context, accountID int64) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, currentStore, accountID)
 	var i SellerStore
@@ -306,7 +294,6 @@ FROM seller.store_closures
 WHERE store_id = ANY($1::bigint[]) AND reopened_at IS NULL
 `
 
-// 這些 stint 目前的關店紀錄（已關閉的才有）。
 func (q *Queries) CurrentStoreClosures(ctx context.Context, storeIds []int64) ([]SellerStoreClosure, error) {
 	rows, err := q.db.Query(ctx, currentStoreClosures, storeIds)
 	if err != nil {
@@ -345,7 +332,6 @@ type EndStoreClosureParams struct {
 	StoreID int64
 }
 
-// 結束目前的關店紀錄（恢復營業）；沒有目前的紀錄時 0 列。
 func (q *Queries) EndStoreClosure(ctx context.Context, arg EndStoreClosureParams) (int64, error) {
 	result, err := q.db.Exec(ctx, endStoreClosure, arg.Now, arg.StoreID)
 	if err != nil {
@@ -373,8 +359,6 @@ type ExposedStoresAfterRow struct {
 	ExposureChangedAt *time.Time
 }
 
-// 最後公告為可曝光的 stint，依 store_id 取 after 之後的一批，連同公告時間（exposure_changed_at，公開資料的更新時間之一）。
-// 只是候選：公告落後現況時，呼叫方仍以 exposure.Classify（seller.pub_exposable_stores）的判定為準，這裡不套規則。給公開清單（ListPublicStores）。
 func (q *Queries) ExposedStoresAfter(ctx context.Context, arg ExposedStoresAfterParams) ([]ExposedStoresAfterRow, error) {
 	rows, err := q.db.Query(ctx, exposedStoresAfter, arg.AfterStoreID, arg.BatchSize)
 	if err != nil {
@@ -431,7 +415,6 @@ ORDER BY store_id DESC
 LIMIT 1
 `
 
-// 帳號最近的 stint（store_id 最大的；含已關閉的）。
 func (q *Queries) LatestStoreOfAccount(ctx context.Context, accountID int64) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, latestStoreOfAccount, accountID)
 	var i SellerStore
@@ -484,7 +467,6 @@ type ListLiveStoreAccountsRow struct {
 	AccountID int64
 }
 
-// 尚未退場（retired_at 為空；營運中、關店、等待刪除都算）的店家 (store_id, account_id)，依 store_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知公告）。
 func (q *Queries) ListLiveStoreAccounts(ctx context.Context, arg ListLiveStoreAccountsParams) ([]ListLiveStoreAccountsRow, error) {
 	rows, err := q.db.Query(ctx, listLiveStoreAccounts, arg.AfterStoreID, arg.PageSize)
 	if err != nil {
@@ -513,8 +495,6 @@ ORDER BY store_id
 FOR UPDATE
 `
 
-// 鎖住帳號全部的 stint（含已關閉的），固定依 store_id 的順序，避免兩個重算互鎖。停權的推導與期間的寫入都在這個鎖
-// 之後才讀處分。
 func (q *Queries) LockAccountStores(ctx context.Context, accountID int64) ([]SellerStore, error) {
 	rows, err := q.db.Query(ctx, lockAccountStores, accountID)
 	if err != nil {
@@ -569,9 +549,6 @@ WHERE store_id = $1
 FOR NO KEY UPDATE
 `
 
-// 鎖定指定 stint，序列化它的業務寫入（FOR NO KEY UPDATE）：與其他模組守門用的 FOR KEY SHARE 不互斥。
-// 只搭配不改 stores 唯一鍵欄位（store_id、store_code、account_id、current_closed_at）的更新；關店與恢復營業改 current_closed_at，
-// 走 LockAccountStores（FOR UPDATE）。
 func (q *Queries) LockStore(ctx context.Context, storeID int64) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, lockStore, storeID)
 	var i SellerStore
@@ -613,8 +590,6 @@ WHERE store_id = $1
 FOR KEY SHARE
 `
 
-// 以 KEY SHARE 讀取指定 stint：只與 FOR UPDATE（RetireDueStores、LockAccountStores）互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
-// 其他模組的店家寫入用它與退場序列化。
 func (q *Queries) LockStoreKeyShare(ctx context.Context, storeID int64) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, lockStoreKeyShare, storeID)
 	var i SellerStore
@@ -661,7 +636,6 @@ type MarkPendingDeletionParams struct {
 	StoreID int64
 }
 
-// 店家隨帳號刪除進入等待；只從 ACTIVE 轉移。
 func (q *Queries) MarkPendingDeletion(ctx context.Context, arg MarkPendingDeletionParams) error {
 	_, err := q.db.Exec(ctx, markPendingDeletion, arg.Now, arg.StoreID)
 	return err
@@ -679,8 +653,6 @@ type OpenStoreClosureParams struct {
 	ClosedByMeasureID *uuid.UUID
 }
 
-// 記下這一次關店（目前的紀錄：reopened_at 為 NULL；一個 stint 同時最多一筆）。closed_by 是關閉的原因，終止合作另記造成關店的措施
-// （store_closures_measure_check）。
 func (q *Queries) OpenStoreClosure(ctx context.Context, arg OpenStoreClosureParams) error {
 	_, err := q.db.Exec(ctx, openStoreClosure,
 		arg.StoreID,
@@ -706,9 +678,6 @@ type ReopenStoreParams struct {
 	StoreID int64
 }
 
-// 恢復營業：CLOSED → ACTIVE。只作用於還沒退場的列（退場之後下游已刪除，不能恢復）；是否在保留期內由呼叫方以 RetireDueStores 與 StoreHolds 判斷
-// （清理與恢復共用同一個判斷式）。
-// 目前那筆關店紀錄由呼叫方同一個 transaction 以 EndStoreClosure 補上 reopened_at。
 func (q *Queries) ReopenStore(ctx context.Context, arg ReopenStoreParams) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, reopenStore, arg.Now, arg.StoreID)
 	var i SellerStore
@@ -749,7 +718,6 @@ FROM seller.stores
 WHERE store_code = $1
 `
 
-// 以 store_code 讀取指定 stint，包含已關閉的；是否可公開曝光由 exposure.Classify（seller.pub_exposable_stores）判斷，這裡不過濾。
 func (q *Queries) StoreByCode(ctx context.Context, storeCode int64) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, storeByCode, storeCode)
 	var i SellerStore
@@ -790,7 +758,6 @@ FROM seller.stores
 WHERE store_id = $1
 `
 
-// 讀取指定 stint，包含已關閉的。
 func (q *Queries) StoreByID(ctx context.Context, storeID int64) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, storeByID, storeID)
 	var i SellerStore
@@ -832,7 +799,6 @@ WHERE store_id = $1
 ORDER BY closed_at
 `
 
-// 一個 stint 的關店歷史（含目前這一次），舊到新。
 func (q *Queries) StoreClosures(ctx context.Context, storeID int64) ([]SellerStoreClosure, error) {
 	rows, err := q.db.Query(ctx, storeClosures, storeID)
 	if err != nil {
@@ -871,7 +837,6 @@ type StoreExposureChangedAtRow struct {
 	ExposableChangedAt *time.Time
 }
 
-// 這些店家最後公告的時間（還沒公告過的是 NULL），不鎖；唯讀。
 func (q *Queries) StoreExposureChangedAt(ctx context.Context, storeIds []int64) ([]StoreExposureChangedAtRow, error) {
 	rows, err := q.db.Query(ctx, storeExposureChangedAt, storeIds)
 	if err != nil {
@@ -899,8 +864,6 @@ WHERE account_id = $1
 ORDER BY store_id
 `
 
-// 帳號全部的 stint（含已關閉的），依 store_id；唯讀，不鎖（LockAccountStores 是寫入流程的鎖）。只給 legacy 的個資清除 consumer
-// 列舉歷史 store_id。
 func (q *Queries) StoreIDsByAccount(ctx context.Context, accountID int64) ([]int64, error) {
 	rows, err := q.db.Query(ctx, storeIDsByAccount, accountID)
 	if err != nil {
@@ -927,7 +890,6 @@ FROM seller.stores
 WHERE store_id = ANY($1::bigint[])
 `
 
-// 批次讀取指定 stint（含已關閉的），不存在的 ID 略過；是否可公開曝光由 exposure.Classify（seller.pub_exposable_stores）判斷，這裡不過濾。
 func (q *Queries) StoresByIDs(ctx context.Context, storeIds []int64) ([]SellerStore, error) {
 	rows, err := q.db.Query(ctx, storesByIDs, storeIds)
 	if err != nil {
@@ -993,7 +955,6 @@ type UpdateCoverParams struct {
 	ExpectedVersion int64
 }
 
-// 寫入已轉正的封面 object key；版本不符時 0 列。
 func (q *Queries) UpdateCover(ctx context.Context, arg UpdateCoverParams) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, updateCover,
 		arg.CoverKey,
@@ -1052,7 +1013,6 @@ type UpdateLogoParams struct {
 	ExpectedVersion int64
 }
 
-// 寫入已轉正的 logo object key；版本不符時 0 列。
 func (q *Queries) UpdateLogo(ctx context.Context, arg UpdateLogoParams) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, updateLogo,
 		arg.LogoKey,
@@ -1129,7 +1089,6 @@ type UpdateProfileParams struct {
 	ExpectedVersion     int64
 }
 
-// 寫入已在列鎖內合併的 profile 欄位；版本不符時 0 列。
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (SellerStore, error) {
 	row := q.db.QueryRow(ctx, updateProfile,
 		arg.StoreName,

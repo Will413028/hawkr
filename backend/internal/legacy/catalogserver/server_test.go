@@ -15,11 +15,11 @@ import (
 )
 
 type fakeCatalog struct {
-	stock map[uuid.UUID]int32
-	ops   map[string]fakeOp
-	snaps map[uuid.UUID]catalog.SkuSnapshot
-	calls int
-	err   error
+	stock   map[uuid.UUID]int32
+	ops     map[string]fakeOp
+	snaps   map[uuid.UUID]catalog.SkuSnapshot
+	calls   int
+	err     error
 	queried []uuid.UUID
 }
 

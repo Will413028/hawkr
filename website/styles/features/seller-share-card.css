@@ -107,7 +107,11 @@
 			rgba(241, 205, 112, 0.38),
 			transparent 38%
 		),
-		radial-gradient(circle at 86% 76%, rgb(var(--color-ink-400-rgb) / 0.2), transparent 42%),
+		radial-gradient(
+			circle at 86% 76%,
+			rgb(var(--color-ink-400-rgb) / 0.2),
+			transparent 42%
+		),
 		var(--color-ink-50);
 }
 .seller-business-card__cover img {
@@ -120,7 +124,11 @@
 	position: absolute;
 	inset: 0;
 	pointer-events: none;
-	background: linear-gradient(180deg, transparent, rgb(var(--color-ink-950-rgb) / 0.26));
+	background: linear-gradient(
+		180deg,
+		transparent,
+		rgb(var(--color-ink-950-rgb) / 0.26)
+	);
 }
 .seller-business-card__cover-fallback {
 	display: block;
@@ -161,7 +169,11 @@
 }
 .seller-business-card__avatar > span {
 	color: var(--color-brand-primary-strong);
-	background: linear-gradient(145deg, var(--color-ink-50), var(--color-ink-100));
+	background: linear-gradient(
+		145deg,
+		var(--color-ink-50),
+		var(--color-ink-100)
+	);
 }
 .seller-business-card__identity {
 	display: flex;

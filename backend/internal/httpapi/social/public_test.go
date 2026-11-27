@@ -185,9 +185,9 @@ func (f *fakeReads) TopPosts(_ context.Context, _ social.Caller, n int32) ([]soc
 }
 
 type fakeBuyers struct {
-	id int64
+	id           int64
 	displayCalls *int
-	displayIDs *[][]int64
+	displayIDs   *[][]int64
 }
 
 func (f fakeBuyers) CurrentBuyerID(context.Context, int64) (int64, error) { return f.id, nil }

@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
 	receiptConsentMaxRunes = 32
 

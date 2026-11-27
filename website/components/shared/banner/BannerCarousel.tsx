@@ -169,8 +169,7 @@ export default function BannerCarousel({
 		"flex flex-col",
 		size === "hero"
 			? "gap-5 w-full max-w-[1280px] mx-auto px-5"
-			:
-				`gap-[var(--hkui-space-4)] w-full overflow-hidden p-[var(--hkui-space-5)] animate-hk-fade-in ${FEATURE_CARD_CHROME}`,
+			: `gap-[var(--hkui-space-4)] w-full overflow-hidden p-[var(--hkui-space-5)] animate-hk-fade-in ${FEATURE_CARD_CHROME}`,
 		className,
 	);
 

@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 )
 
-
 // ErrPeerClientUnavailable 是 peer gRPC client 尚未落地時的 fail-loud 訊號。
 //
 // 🔴 它刻意是 error 而不是「回零值繼續走」：吞成零值會開出一張沒有品項、金額為 0 的
@@ -181,7 +180,6 @@ type AdjustmentApplier interface {
 type IssuancePreparer interface {
 	Prepare(ctx context.Context, in usecase.OrderPaidInput) (usecase.PrepareResult, error)
 }
-
 
 // UnavailableOrderFactsClient 在 peer client 落地前佔位。
 type UnavailableOrderFactsClient struct{}

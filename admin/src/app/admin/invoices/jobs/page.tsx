@@ -25,7 +25,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 const JOBS_ENDPOINT = "/api/v1/admin/invoices/jobs";
 const PAGE_SIZE = 20;
 
@@ -182,7 +181,6 @@ function JobsTable({ tab }: { tab: string }) {
 										<div className="cell-sub">{job.jobId}</div>
 									</td>
 									<td>
-
 										<div className="cell-main">{job.storeId}</div>
 									</td>
 									<td>
@@ -271,7 +269,6 @@ export default function InvoiceJobsPage() {
 				</div>
 			</div>
 
-
 			<p className="invoice-page-notice" role="note">
 				<MaterialSymbol name="local_shipping" />
 				<span>
@@ -299,7 +296,6 @@ export default function InvoiceJobsPage() {
 					</button>
 				))}
 			</div>
-
 
 			<JobsTable key={tab} tab={tab} />
 		</div>

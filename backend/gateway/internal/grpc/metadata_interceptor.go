@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-
 type contextKey string
 
 const (
@@ -22,7 +21,6 @@ const (
 	// CtxKeyRequestID 請求 ID（string）
 	CtxKeyRequestID contextKey = "auth-request-id"
 )
-
 
 // WithAuthContext 將身分資訊存入 Go context
 // 由 auth.go middleware 呼叫
@@ -53,7 +51,6 @@ func WithTraceContext(ctx context.Context, traceID, requestID string) context.Co
 func GenerateRequestID() string {
 	return uuid.New().String()
 }
-
 
 // AuthMetadataInterceptor 建立 gRPC Client UnaryInterceptor，
 // 自動從 Go context 提取身分與追蹤資訊，注入 gRPC outgoing metadata。

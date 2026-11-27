@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // ListBuyerInvoiceProfiles 買家常用發票資料列表
 // @Summary      買家常用發票資料列表
 // @Description  買家常用發票資料列表（58 號設計書 §6.1 端點 1）

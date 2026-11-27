@@ -5,7 +5,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/qualify"
 )
 
-
 // Stores 是「店家目前是否停權」的 port：賣家發行的活動在發行店家停權期間，領券與鎖券回 COUPON_STORE_SUSPENDED；
 // 平台（admin）發行的活動不受影響，Redeem、Release 不查（D8 修訂）。組裝點由 seller 模組的 `Store(ctx, id)`（`Suspended()`）接上。
 type Stores = qualify.Stores

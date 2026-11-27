@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 const testAccountID = int64(2623900520)
 
 type countingHandler struct {

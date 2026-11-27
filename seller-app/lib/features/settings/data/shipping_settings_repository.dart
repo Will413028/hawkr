@@ -67,6 +67,7 @@ class RemoteShippingSettingsRepository implements ShippingSettingsRepository {
     try {
       onboardings = await _remoteService.fetchOnboardings();
     } on AppException {
+      // Preserve the existing partial/fail-soft bootstrap.
     }
     return ShippingSettingsBootstrap(onboardings: onboardings);
   }

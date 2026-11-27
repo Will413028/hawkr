@@ -15,8 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
-
 const (
 	listDefaultPageSize int32 = 20
 	// ListMaxPageSize 由 gRPC handler 讀取，用來在型別邊界回 400。
@@ -72,7 +70,6 @@ func pageOf(page, pageSize int32) (domain.Page, int32, int32) {
 	normPage, normSize, offset := pagination.NormalizePage(page, pageSize, listDefaultPageSize, ListMaxPageSize)
 	return domain.Page{Limit: normSize, Offset: offset}, normPage, normSize
 }
-
 
 // DocumentListItem 是四個文件列表端點（68／30／72／47）的共用列。
 //
@@ -162,7 +159,6 @@ type JobPage struct {
 	PageSize int32
 }
 
-
 // BuyerDocumentsInput 是端點 68 的入參。
 type BuyerDocumentsInput struct {
 	BuyerID      int64
@@ -240,7 +236,6 @@ func documentBelongsToOrder(doc domain.Document, orderNo string) bool {
 func documentNotFound() error {
 	return pkgerrors.NewBusiness(bizcode.InvoiceDocumentNotFound, bizcode.Message(bizcode.InvoiceDocumentNotFound))
 }
-
 
 type carrierView int
 
@@ -343,7 +338,6 @@ func (u *Query) documentTimeline(ctx context.Context, documentID int64) ([]Timel
 }
 
 const subjectAdjustment = "ADJUSTMENT"
-
 
 const complaintOpenDelay = 24 * time.Hour
 
@@ -561,7 +555,6 @@ func (u *Query) openComplaintOfOrder(ctx context.Context, buyerID int64, orderNo
 	return c.ID, nil
 }
 
-
 // GetBuyerCorrection 回買家自己的一件修改申請（端點 12）。
 //
 // Tier A **三段述詞全部在 SQL**（§8.1.4(b)）：申請人 ＝ 當前買家、該 document 的
@@ -619,7 +612,6 @@ func (u *Query) complaintViews(ctx context.Context, rows []domain.Complaint) ([]
 	return out, nil
 }
 
-
 // SellerDocumentsInput 是端點 30 的入參。
 type SellerDocumentsInput struct {
 	StoreID      int64
@@ -639,12 +631,12 @@ type SellerDocumentsInput struct {
 func (u *Query) ListSellerDocuments(ctx context.Context, in SellerDocumentsInput) (DocumentListPage, error) {
 	page, normPage, normSize := pageOf(in.Page, in.PageSize)
 	q := domain.SellerDocumentQuery{
-		StoreID:      in.StoreID,
-		Dates:        in.Dates,
-		Mode:         in.Mode,
-		Status:       in.Status,
-		OrderNo:      in.OrderNo,
-		AbnormalOnly: in.AbnormalOnly,
+		StoreID:          in.StoreID,
+		Dates:            in.Dates,
+		Mode:             in.Mode,
+		Status:           in.Status,
+		OrderNo:          in.OrderNo,
+		AbnormalOnly:     in.AbnormalOnly,
 		AbnormalStatuses: abnormalDocumentStatuses,
 		Page:             page,
 	}
@@ -703,7 +695,6 @@ func (u *Query) GetSellerDocument(ctx context.Context, storeID, documentID int64
 	}, nil
 }
 
-
 // GetSellerJob 回賣家自己的一件開票作業（S08，端點 33）。
 //
 // 🔴 擁有者判定一律經 invoice_documents join（§8.1.4 末段）：invoice_operations
@@ -737,7 +728,6 @@ func (u *Query) ListOrderExternalIssuances(ctx context.Context, storeID int64, o
 	}
 	return JobPage{Records: rows, Total: clampCount(total), Page: normPage, PageSize: normSize}, nil
 }
-
 
 // SellerComplaintsInput 是端點 34 的入參。
 type SellerComplaintsInput struct {
@@ -808,7 +798,6 @@ func expandView[T any](table map[string]T, view string) (T, error) {
 	return v, nil
 }
 
-
 // ReceivedDocumentsInput 是端點 72 的入參。
 type ReceivedDocumentsInput struct {
 	StoreID  int64
@@ -858,7 +847,6 @@ func recipientNoteOf(row domain.ReceivedDocumentItem) string {
 	}
 	return row.FirstLineDescription
 }
-
 
 const taxReviewStatusNotStarted = "NOT_STARTED"
 
@@ -1011,7 +999,6 @@ func (u *Query) GetSellerInvoiceOverview(ctx context.Context, storeID int64) (Se
 	return out, nil
 }
 
-
 // AdminDocumentsInput 是端點 47 的入參。
 //
 // StoreID 是 *int64：nil ＝ 全平台。它在 ADM 面是**篩選**不是授權——這正是它不能
@@ -1056,7 +1043,6 @@ func (u *Query) ListDocumentsForAdmin(ctx context.Context, in AdminDocumentsInpu
 	return out, nil
 }
 
-
 // AdminJobsInput 是端點 50 的入參。
 type AdminJobsInput struct {
 	// Tab 是六個分頁名之一，空字串 ＝ 不篩。
@@ -1084,9 +1070,9 @@ func (u *Query) ListJobsForAdmin(ctx context.Context, in AdminJobsInput) (JobPag
 	}
 	sqlPage, normPage, normSize := pageOf(in.Page, in.PageSize)
 	q := domain.AdminOperationQuery{
-		StatusFilters: statuses,
-		IncludeManualDocuments: in.Tab == adminJobNeedsManualTab,
-		ManualDocumentStatuses: manualDocumentStatuses,
+		StatusFilters:            statuses,
+		IncludeManualDocuments:   in.Tab == adminJobNeedsManualTab,
+		ManualDocumentStatuses:   manualDocumentStatuses,
 		ExcludeResolvedDocuments: in.Tab == adminJobNeedsManualTab,
 		ResolvedDocumentStatuses: resolvedDocumentStatuses,
 		StoreID:                  in.StoreID,
@@ -1108,7 +1094,6 @@ func (u *Query) ListJobsForAdmin(ctx context.Context, in AdminJobsInput) (JobPag
 	}
 	return JobPage{Records: rows, Total: clampCount(total), Page: normPage, PageSize: normSize}, nil
 }
-
 
 // AdminComplaintsInput 是端點 58 的入參。
 type AdminComplaintsInput struct {
@@ -1132,13 +1117,13 @@ func (u *Query) ListComplaintsForAdmin(ctx context.Context, in AdminComplaintsIn
 	sqlPage, normPage, normSize := pageOf(in.Page, in.PageSize)
 	now := u.now()
 	q := domain.AdminComplaintQuery{
-		StatusFilters:      tab.Statuses,
-		IncludeDueOverdue:  tab.IncludeDueOverdue,
-		DueOverdueStatuses: tab.DueOverdue,
-		Now:                now,
-		StoreID:            in.StoreID,
-		OrderNo:            in.OrderNo,
-		SortByDue:          in.SortByDue,
+		StatusFilters:        tab.Statuses,
+		IncludeDueOverdue:    tab.IncludeDueOverdue,
+		DueOverdueStatuses:   tab.DueOverdue,
+		Now:                  now,
+		StoreID:              in.StoreID,
+		OrderNo:              in.OrderNo,
+		SortByDue:            in.SortByDue,
 		ViolationStatus:      violationComplaintStatus,
 		ViolationWindowStart: now.AddDate(0, 0, -violationWindowDays),
 		Page:                 sqlPage,
@@ -1169,7 +1154,6 @@ func (u *Query) ListComplaintsForAdmin(ctx context.Context, in AdminComplaintsIn
 	}
 	return out, nil
 }
-
 
 // AdminTaxReviewsInput 是端點 38 的入參。
 type AdminTaxReviewsInput struct {
@@ -1245,7 +1229,6 @@ func remainingDaysUntil(deadline *time.Time, now time.Time) *int64 {
 	return &days
 }
 
-
 // AdminProviderAccountsInput 是端點 42 的入參。
 type AdminProviderAccountsInput struct {
 	// Status 是含三態投影的狀態值（NOT_STARTED／CONFIG_ERROR 不落 DB）。空字串 ＝ 不篩。
@@ -1281,8 +1264,8 @@ type ProviderAccountListItem struct {
 func (u *Query) ListProviderAccountsForAdmin(ctx context.Context, in AdminProviderAccountsInput) (ProviderAccountPage, error) {
 	sqlPage, normPage, normSize := pageOf(in.Page, in.PageSize)
 	q := domain.AdminProviderAccountQuery{
-		Provider:     providerAMEGO,
-		StatusFilter: in.Status,
+		Provider:        providerAMEGO,
+		StatusFilter:    in.Status,
 		MatchNotStarted: in.Status == codemeta.InvoiceProviderAccountStatusNotStarted.Value,
 		Keyword:         in.Keyword,
 		Page:            sqlPage,
@@ -1307,7 +1290,6 @@ func (u *Query) ListProviderAccountsForAdmin(ctx context.Context, in AdminProvid
 	}
 	return out, nil
 }
-
 
 // AdminProviderCutoversInput 是端點 46 的入參。
 type AdminProviderCutoversInput struct {
@@ -1352,7 +1334,6 @@ func (u *Query) ListProviderCutoversForAdmin(ctx context.Context, in AdminProvid
 		PageSize: normSize,
 	}, nil
 }
-
 
 // AdminAuditLogsInput 是端點 61 的入參（九個 filter）。
 type AdminAuditLogsInput struct {
@@ -1413,7 +1394,6 @@ func (u *Query) ListAuditLogsForAdmin(ctx context.Context, in AdminAuditLogsInpu
 	}
 	return AuditLogPage{Records: rows, Total: clampCount(total), Page: normPage, PageSize: normSize}, nil
 }
-
 
 // KpiItem 是 A01 的一個 KPI。
 //
@@ -1483,8 +1463,8 @@ func (u *Query) GetInvoiceOverviewForAdmin(ctx context.Context) (AdminOverviewVi
 	}}
 
 	jobs, err := u.operations.ListPriorityViewsForAdmin(ctx, domain.PriorityOperationQuery{
-		OpenStatuses:           openJobStatuses(),
-		ManualDocumentStatuses: manualDocumentStatuses,
+		OpenStatuses:             openJobStatuses(),
+		ManualDocumentStatuses:   manualDocumentStatuses,
 		ResolvedDocumentStatuses: resolvedDocumentStatuses,
 		Limit:                    adminPriorityJobLimit,
 	})
@@ -1504,7 +1484,6 @@ func unavailableKpi(key string) KpiItem {
 	meta := kpiDefinitions[key]
 	return KpiItem{Key: key, Available: false, WindowLabel: meta.Window, Definition: meta.Definition}
 }
-
 
 func clampCount(v int64) int32 {
 	const maxInt32 = int64(^uint32(0) >> 1)

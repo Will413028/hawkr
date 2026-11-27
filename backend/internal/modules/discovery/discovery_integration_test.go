@@ -35,15 +35,15 @@ var clock = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 type fakes struct {
 	mu sync.Mutex
 
-	public     []int64
-	exposable  map[int64]time.Time
-	orders     map[int64]OrderStats
-	ratings    map[int64]RatingStats
-	productErr error
-	productAt []time.Time
-	orderErr  error
-	sellerErr error
-	ratingErr map[int64]error
+	public      []int64
+	exposable   map[int64]time.Time
+	orders      map[int64]OrderStats
+	ratings     map[int64]RatingStats
+	productErr  error
+	productAt   []time.Time
+	orderErr    error
+	sellerErr   error
+	ratingErr   map[int64]error
 	ratingExtra map[int64]RatingStats
 
 	onOrders func()

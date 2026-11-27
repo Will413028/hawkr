@@ -24,15 +24,15 @@ import (
 const (
 	callTimeout        = 20 * time.Second
 	requestCallTimeout = 10 * time.Second
-	createJobDelay = writeTimeout + requestCallTimeout + writeTimeout + 5*time.Second
-	descriptionMax = 200
-	writeTimeout = 15 * time.Second
-	jobTimeout = callTimeout + 3*writeTimeout
-	maxAttempts = 8
-	sweepBatch = 100
-	eventGrace = time.Minute
-	createIdle = 10 * time.Minute
-	readIdle = 30 * time.Minute
+	createJobDelay     = writeTimeout + requestCallTimeout + writeTimeout + 5*time.Second
+	descriptionMax     = 200
+	writeTimeout       = 15 * time.Second
+	jobTimeout         = callTimeout + 3*writeTimeout
+	maxAttempts        = 8
+	sweepBatch         = 100
+	eventGrace         = time.Minute
+	createIdle         = 10 * time.Minute
+	readIdle           = 30 * time.Minute
 	// IdempotencyRetention 是本模組依賴 provider 保存冪等鍵結果的時間（Stripe 至少 24 小時，取下限）：超過它的鍵從不重送，因為重送可能建出第二個物件。
 	IdempotencyRetention = 24 * time.Hour
 	// ResendWindow 是結果不明的呼叫從這把鍵的第一次呼叫起以同一把鍵重送的上限：必須小於 IdempotencyRetention，所以任何重送都在保存期內；
@@ -46,11 +46,11 @@ const (
 	// LookupFailureLimit 是連續查回失敗幾次之後進 ANOMALY。
 	LookupFailureLimit = 5
 	// EventRetention 是付款事件原始 payload 在 inbox 的保存期。
-	EventRetention = 30 * 24 * time.Hour
-	syncProcessor  = "payment.charge_sync"
-	eventProcessor = "payment.charge_event"
-	failedRefused  = "provider_refused"
-	failedNotFound = "provider_not_found"
+	EventRetention      = 30 * 24 * time.Hour
+	syncProcessor       = "payment.charge_sync"
+	eventProcessor      = "payment.charge_event"
+	failedRefused       = "provider_refused"
+	failedNotFound      = "provider_not_found"
 	failedFullyRefunded = "fully_refunded"
 )
 

@@ -132,7 +132,6 @@ export default function DelegatedDashboardPage() {
 			<div className="adm-dashboard__note" role="note">
 				<AppIcon name="info" size={20} />
 				<span>
-
 					{sectionsSentence(grantedSections)}{" "}
 					營收、瀏覽數與追蹤者屬於統計端點，不在代行授權範圍，因此不呈現。
 				</span>
@@ -200,7 +199,6 @@ export default function DelegatedDashboardPage() {
 							tint="secondary"
 							icon={<AppIcon name="document" size={20} />}
 						/>
-
 					</div>
 				</section>
 			) : null}
@@ -221,7 +219,6 @@ export default function DelegatedDashboardPage() {
 							tint="accent"
 							icon={<AppIcon name="edit" size={20} />}
 						/>
-
 					</div>
 				</section>
 			) : null}

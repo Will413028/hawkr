@@ -17,7 +17,6 @@
 import { authedFetch } from "../api/client";
 import type { CartSummary } from "./types";
 
-
 export async function fetchCart(): Promise<CartSummary> {
 	const env = await authedFetch<CartSummary | { groups?: never }>(
 		"/public/carts",
@@ -30,7 +29,6 @@ export async function fetchCart(): Promise<CartSummary> {
 		estimatedTotalAmount: data?.estimatedTotalAmount ?? "0",
 	};
 }
-
 
 export interface AddCartItemBody {
 	skuId: string;

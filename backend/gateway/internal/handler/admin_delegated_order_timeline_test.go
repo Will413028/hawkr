@@ -7,7 +7,6 @@ import (
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 )
 
-
 func timelineStatuses(entries []DelegatedOrderTimelineEntry) []string {
 	out := make([]string, 0, len(entries))
 	for _, e := range entries {

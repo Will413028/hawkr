@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/pgtree"
 )
 
-
 var builtinFuncs = []string{"count", "coalesce", "lower", "upper", "greatest", "least", "max", "min", "sum", "length", "char_length"}
 
 var timeFuncs = []string{"now", "clock_timestamp", "statement_timestamp", "transaction_timestamp", "timeofday", "localtimestamp", "current_timestamp", "current_date", "current_time"}

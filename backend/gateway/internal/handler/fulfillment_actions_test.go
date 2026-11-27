@@ -5,11 +5,9 @@ import (
 	"testing"
 )
 
-
 func in(action string, enabled bool, reason string, actors ...string) ActionInput {
 	return ActionInput{Action: action, Enabled: enabled, DisabledReasonCode: reason, ActorAccountTypes: actors}
 }
-
 
 // 這是 QA 在 dev 上實際量到損害的那一格：3001 黑貓單拿到指向 /print_cvs_label 的 href，
 // 賣家跟隨之後 label_print_status 由 4101 → 4104（列印失敗），並進入對帳排程的無限重試。
@@ -64,7 +62,6 @@ func TestBuildAllowedActions_CorrectProviderPairingsAreServed(t *testing.T) {
 	}
 }
 
-
 // 買家端不得出現賣家動作：QA 實測買家跟隨那些 href 得 403 seller access required。
 func TestBuildAllowedActions_BuyerNeverReceivesSellerActions(t *testing.T) {
 	actions, dropped := BuildAllowedActions("O1", providerCvs, ViewerBuyer, []ActionInput{
@@ -110,7 +107,6 @@ func TestBuildAllowedActions_MissingActorIsDropped(t *testing.T) {
 		t.Fatalf("缺 actor 應被丟棄且指得出原因，實得 actions=%+v dropped=%v", actions, dropped)
 	}
 }
-
 
 func TestBuildAllowedActions_UnknownActionIsDroppedNotGuessed(t *testing.T) {
 	actions, dropped := BuildAllowedActions("O123", providerCvs, ViewerBuyer, []ActionInput{
@@ -161,7 +157,6 @@ func TestBuildAllowedActions_ActorIsPartOfTheOutwardContract(t *testing.T) {
 		t.Fatalf("actor 應出現在對外契約且為 %q，實得 %q", ViewerSeller, actions[0].Actor)
 	}
 }
-
 
 // 🔴 賣家必須拿得到唯讀 fallback，而且 href 要指向**賣家自己的**端點。
 // 第一版把 track/view_only 一律標成 actor=買家，dev 實測 3001 賣家的 allowedActions
@@ -217,7 +212,6 @@ func TestBuildAllowedActions_PrintLabelDiffersByProvider(t *testing.T) {
 		t.Fatalf("3001 與 3002 的 print_label 指到同一個端點 ⇒ provider 維度不成立：%s", taqbin[0].Href)
 	}
 }
-
 
 // 🔴 這一支守的是「表上每一格都同時帶 action 與 provider」——
 // 有人把 provider 維度拿掉（退回 per-action 常數）時，這裡會編譯失敗或斷言失敗。

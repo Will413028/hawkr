@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
 )
 
-
 const (
 	buyerID   = int64(11)
 	storeID   = int64(22)

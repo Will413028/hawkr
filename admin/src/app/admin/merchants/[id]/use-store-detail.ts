@@ -18,7 +18,6 @@ import { onboardingSummaryOf } from "./onboarding-summary";
 import { paymentAccountOf } from "./payment-account";
 import { accountEmailOf } from "./store-detail";
 
-
 /** 店家詳情（GetStore）。已關閉的店照樣回傳；生效中的措施（active_measures）與店家是同一次讀取。storeId 為空時不發請求。 */
 export function useStoreDetail(storeId: string) {
 	return useConnectQuery(
@@ -38,7 +37,6 @@ export function useAccountEmail(accountId: string | undefined) {
 	);
 	return { value: accountEmailOf(query), retry: () => void query.refetch() };
 }
-
 
 /**
  * 商家認證的申請內容（GetKYCApplication）。申請 ID 來自 GetStore.kyc.application_id；沒有送出過的申請時 ID 為空，不發請求。

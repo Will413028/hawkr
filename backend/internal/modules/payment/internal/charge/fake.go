@@ -56,33 +56,33 @@ type Fake struct {
 	// Clock 不是 nil 時，物件建立時記下 Clock() 當作它在 provider 的 created 時刻，Find* 的 createdAfter 會排除比它早建立的物件（與 provider 的 created 篩選相同）；nil 時不篩。
 	Clock func() time.Time
 
-	mu           sync.Mutex
-	next         int
-	intents      map[string]*fakeIntent
-	byKey        map[string]string
-	createErrs   []error
-	lostErrs     []error
-	getErrs      []error
-	cancelErrs   []error
-	creates      int
-	createKeys   []string
-	createDescs  []string
-	gets         int
-	cancels      int
-	refunds      map[string]*fakeRefund
-	refundByKey  map[string]string
-	refundErrs   []error
-	refundLost   []error
-	refundSeen   []string
-	refundCalls  int
-	refundNext   RefundState
-	transfers    map[string]*fakeTransfer
-	transferKeys map[string]string
-	transferErrs []error
-	reversals    map[string]ReversalSnapshot
-	reversalKeys map[string]string
-	reversalOf   map[string]string
-	reversalErrs []error
+	mu            sync.Mutex
+	next          int
+	intents       map[string]*fakeIntent
+	byKey         map[string]string
+	createErrs    []error
+	lostErrs      []error
+	getErrs       []error
+	cancelErrs    []error
+	creates       int
+	createKeys    []string
+	createDescs   []string
+	gets          int
+	cancels       int
+	refunds       map[string]*fakeRefund
+	refundByKey   map[string]string
+	refundErrs    []error
+	refundLost    []error
+	refundSeen    []string
+	refundCalls   int
+	refundNext    RefundState
+	transfers     map[string]*fakeTransfer
+	transferKeys  map[string]string
+	transferErrs  []error
+	reversals     map[string]ReversalSnapshot
+	reversalKeys  map[string]string
+	reversalOf    map[string]string
+	reversalErrs  []error
 	transferSeen  []string
 	transferSums  []int64
 	reversalSeen  []string

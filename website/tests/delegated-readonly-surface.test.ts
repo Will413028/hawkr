@@ -91,7 +91,6 @@ function openingTags(text: string, name: string): string[] {
 	return out;
 }
 
-
 /**
  * 一份夠用的注入 scope。`SellerProfileBranding` 只讀 `mode`／`hasCapability`
  * （外加寫入時才會碰到的 `confirmMutation`／`repos`），其餘欄位給得出型別即可。
@@ -206,7 +205,6 @@ test("賣家自己的 /seller-center：沒有 provider 就沒有 capability 這�
 	assert.ok(html.includes('type="file"'));
 });
 
-
 test("商店設定：每個可編輯欄位在無 storefront.write 時都不可輸入", () => {
 	const text = source(PROFILE);
 	assert.match(
@@ -285,7 +283,6 @@ test("商店設定：唯讀時不渲染儲存鍵，提示也不再承諾寫入",
 		"唯讀時的提示仍寫著「將以平台管理員身分寫入」⇒ 指向一顆已經不在的按鈕",
 	);
 });
-
 
 test("商品頁副標：四種 capability 組合各說各的實話", () => {
 	assert.equal(

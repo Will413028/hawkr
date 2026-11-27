@@ -6,8 +6,6 @@ import (
 	"github.com/Will413028/hawkr/gateway/internal/response"
 )
 
-
-
 type ActOnInvoiceComplaintForAdminData struct {
 	ComplaintId    string                   `json:"complaintId"`
 	Status         string                   `json:"status"`
@@ -568,7 +566,6 @@ type TaxReviewNote struct {
 	Content   string `json:"content"`
 	CreatedAt string `json:"createdAt"`
 }
-
 
 func convInvActOnInvoiceComplaintForAdminData(m *pb.ActOnInvoiceComplaintForAdminData) ActOnInvoiceComplaintForAdminData {
 	var d ActOnInvoiceComplaintForAdminData
@@ -1320,7 +1317,6 @@ func convInvTaxReviewNote(m *pb.TaxReviewNote) TaxReviewNote {
 	d.CreatedAt = m.GetCreatedAt()
 	return d
 }
-
 
 func toPbInvInvoiceInputSpec(d InvoiceInputSpec) *pb.InvoiceInputSpec {
 	m := &pb.InvoiceInputSpec{}

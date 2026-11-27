@@ -138,13 +138,13 @@ func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]
 			OperationReason:       spec.OperationReason,
 			ResourceVersionBefore: before.Version,
 			BeforeSnapshotJson:    snapshot,
-			IdempotencyKey: spec.IdempotencyKey + ":" + item.ResourceID,
-			RequestId:      spec.RequestID,
-			CorrelationId:  spec.CorrelationID,
-			UserAgent:      spec.UserAgent,
-			PayloadHash:    spec.PayloadHash,
-			NotifySeller:   spec.NotifySeller,
-			Origin:         "interactive",
+			IdempotencyKey:        spec.IdempotencyKey + ":" + item.ResourceID,
+			RequestId:             spec.RequestID,
+			CorrelationId:         spec.CorrelationID,
+			UserAgent:             spec.UserAgent,
+			PayloadHash:           spec.PayloadHash,
+			NotifySeller:          spec.NotifySeller,
+			Origin:                "interactive",
 		})
 	}
 

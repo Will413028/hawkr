@@ -9,10 +9,9 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type issueOperationSpec struct {
-	OperationID int64
-	DocumentID  int64
+	OperationID         int64
+	DocumentID          int64
 	OriginalDocumentID  *int64
 	IssueAttemptSeq     int32
 	ProviderRequestNo   string

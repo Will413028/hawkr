@@ -26,7 +26,6 @@ import {
 	transferResolveTargets,
 } from "./resolve-anomaly";
 
-
 export const PAYMENT_LIST_PAGE_SIZE = 20;
 
 export interface PaymentFilters {

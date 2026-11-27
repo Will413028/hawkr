@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 func reviseInput() domain.ReviseSnapshotInput {
 	return domain.ReviseSnapshotInput{
 		OrderNo:                 "O20260831001",

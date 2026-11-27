@@ -38,7 +38,6 @@ Future<Map<String, ShipmentAnomaly>> shipmentAnomalyByOrderNo(Ref ref) async {
   }
 }
 
-
 /// Dashboard 列表查詢條件。
 class ShipmentAnomalyFilter {
   final String? anomalyType;

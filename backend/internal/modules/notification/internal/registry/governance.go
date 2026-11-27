@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 var governanceTypes = []Entry{
 	storeSuspended, storeUnsuspended, storeContentTakenDown,
 	storeMeasureIssued, storeMeasureRevised, storeMeasureEnded, storeMeasureRevoked, storeMeasureRequestDecided,

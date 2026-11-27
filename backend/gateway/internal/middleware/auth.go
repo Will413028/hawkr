@@ -49,10 +49,10 @@ func init() {
 }
 
 type identity struct {
-	AccountID   int64
-	AccountType int32
-	LoginRole   int32
-	Business    *calleridentity.Identity
+	AccountID          int64
+	AccountType        int32
+	LoginRole          int32
+	Business           *calleridentity.Identity
 	SellerCapabilities []authz.Capability
 }
 

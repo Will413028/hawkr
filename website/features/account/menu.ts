@@ -109,10 +109,7 @@ export const BUYER_MENU_GROUPS: ReadonlyArray<BuyerMenuGroup> = [
 	},
 	{
 		heading: "優惠與會員",
-		items: [
-			BASE_BUYER_MENU_ITEMS[2],
-			BASE_BUYER_MENU_ITEMS[3],
-		],
+		items: [BASE_BUYER_MENU_ITEMS[2], BASE_BUYER_MENU_ITEMS[3]],
 	},
 	{
 		heading: "互動",

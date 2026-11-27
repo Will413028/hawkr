@@ -6,7 +6,6 @@ import 'package:hawkr_buyer/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:flutter/material.dart';
 
-
 /// 購物車底部的付款詳情摘要卡片。
 ///
 /// [productTotal] 商品總金額。

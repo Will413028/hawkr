@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 type operationRow struct{ op domain.Operation }
 
 func (r operationRow) OutboxID() int64         { return r.op.ID }

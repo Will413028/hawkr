@@ -1,10 +1,8 @@
-
 .post-mgmt-page {
 	font-family: "Inter", system-ui, -apple-system, sans-serif;
 	color: var(--gray-900);
 	-webkit-font-smoothing: antialiased;
 }
-
 
 .post-mgmt-tabs {
 	display: inline-flex;
@@ -40,7 +38,6 @@
 	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
 	letter-spacing: 0;
 }
-
 
 .post-mgmt-table .post-id-cell {
 	font-size: 13px;
@@ -119,7 +116,6 @@
 	font-size: 13px;
 }
 
-
 .post-mgmt-pagination {
 	display: flex;
 	justify-content: center;
@@ -166,7 +162,6 @@
 	min-width: 100px;
 	text-align: center;
 }
-
 
 .post-moderate-modal {
 	width: 480px;

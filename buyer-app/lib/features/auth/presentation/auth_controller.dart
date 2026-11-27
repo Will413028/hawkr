@@ -44,7 +44,6 @@ class AuthController extends _$AuthController {
     }
   }
 
-
   /// 登入之後：GetSession 取得帳號、寫入 session。
   Future<void> _completeSignIn(AuthSession authSession) async {
     ref.read(sessionProvider.notifier).cancelRestore();

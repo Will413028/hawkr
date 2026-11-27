@@ -5,10 +5,9 @@ import (
 	"sync"
 )
 
-
 var (
 	registryMu sync.Mutex
-	registry = map[string]Capability{}
+	registry   = map[string]Capability{}
 )
 
 func routeKey(method, path string) string { return method + " " + path }
@@ -32,7 +31,6 @@ func LookupRoute(method, path string) (Capability, bool) {
 	registryMu.Unlock()
 	return cap, ok
 }
-
 
 var (
 	adminRegistryMu sync.Mutex

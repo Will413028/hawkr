@@ -247,7 +247,6 @@ function SkuCard({ sku, index, canRemove, onUpdate, onRemove }: SkuCardProps) {
 	);
 }
 
-
 function TextField({
 	id,
 	label,

@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	batchSize int32 = 100
-	maxBatches = 50
-	portTimeout = 10 * time.Second
-	purgeBatch int32 = 1000
+	batchSize   int32 = 100
+	maxBatches        = 50
+	portTimeout       = 10 * time.Second
+	purgeBatch  int32 = 1000
 )
 
 // Rollup 處理還沒處理的瀏覽事件並累加每日彙總，回傳處理的事件數。一批的流程：

@@ -55,7 +55,6 @@ const SESSION_PAGE = {
 	pageSize: "20",
 };
 
-
 test("列表 parser 收下整列治理欄位，並保留後端推導的 status", () => {
 	const parsed = parseDelegatedOperationSessionPage(SESSION_PAGE);
 	assert.ok(parsed);
@@ -175,7 +174,6 @@ test("列表列與摘要是兩種形狀，不得互相冒充", () => {
 	);
 });
 
-
 /**
  * 這一支是「查詢框的接受條件」的唯一判定處。把 `OPS-` 那一支拿掉就會紅 —— 而這正是
  * 修前的狀態：`isDelegatedSessionId` 只收 `^\d{1,19}$`，錯誤訊息還寫著「是一組數字」，
@@ -227,7 +225,6 @@ test("代號值域與 gateway／DB CHECK 同一份形狀", () => {
 		assert.equal(isDelegatedDisplayCode(bad), false);
 	}
 });
-
 
 test("篩選為空或格式不合時不送出該參數，且 page_size 夾在上限內", () => {
 	const empty = buildDelegatedSessionSearch({ page: 1, pageSize: 20 });
@@ -284,7 +281,6 @@ test("query key 就是送出去的 query string，兩者不可能漂移", () => 
 		buildDelegatedSessionSearch({ page: 1, pageSize: 20 }).toString(),
 	);
 });
-
 
 const requireFromTest = createRequire(__filename);
 requireFromTest.extensions[".css"] = () => {};
@@ -470,7 +466,6 @@ test("① 上游壞掉時說得出是壞掉，不是顯示成一份空列表", a
 	assert.doesNotMatch(html, /平台上還沒有任何代行工作階段/u);
 	assert.match(html, /代行營運服務暫時無法使用/u);
 });
-
 
 test("入口頁掛的是列表本體，不是一個自己持有查詢狀態的查詢框", async () => {
 	const page = await readFile(

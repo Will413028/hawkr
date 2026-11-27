@@ -131,7 +131,6 @@ func TestRateLimiter_AuthFailureIgnoresExemptRoutes(t *testing.T) {
 	}
 }
 
-
 func rlEngineMixed(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy, status *int) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

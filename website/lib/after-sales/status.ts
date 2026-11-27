@@ -156,7 +156,6 @@ export function afterSaleIsTerminal(c: AfterSaleCase): boolean {
 	return TERMINAL_STATUSES.has(c.status as never);
 }
 
-
 /**
  * codemeta `AfterSaleAppealState` (§10.2.1): NONE=0 / APPEALED=10 /
  * INVESTIGATING=20 (Phase 2, unused) / RESOLVED=30. The DB column is
@@ -261,7 +260,6 @@ export function afterSaleCanConfirmReceipt(
 	);
 }
 
-
 /**
  * Shared appeal display strings — list/card/summary rows fold these over the
  * raw status so an appealed case reads「申訴仲裁中」/「等待平台裁決」instead of
@@ -340,7 +338,6 @@ export function afterSaleNarrative(status: string): string {
 	}
 }
 
-
 export type AfterSaleStepState = "done" | "current" | "upcoming" | "failed";
 
 export interface AfterSaleStep {
@@ -393,7 +390,6 @@ export function afterSaleSteps(status: string): AfterSaleStep[] {
 		return { key: order[i], label: STEP_LABELS[i], state };
 	});
 }
-
 
 /** Statuses excluded from the seller order-list lookup (REJECTED/CANCELLED
  * never entered the refund flow — surfacing them misleads the seller). */

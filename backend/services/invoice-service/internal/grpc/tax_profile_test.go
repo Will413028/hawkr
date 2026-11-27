@@ -17,7 +17,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 const (
 	yStoreA int64 = 2685914682
 	yStoreB int64 = 2632049831
@@ -27,7 +26,6 @@ const (
 )
 
 var yNow = time.Date(2026, 3, 2, 6, 0, 0, 0, time.UTC)
-
 
 type yIssuers struct {
 	domain.IssuerRepository
@@ -122,7 +120,6 @@ func yProfile(status string) domain.SellerTaxProfile {
 	}
 }
 
-
 // TestTaxProfile_TierA_ForeignStoreIsByteIdenticalToMissing 驗四支賣家 RPC。
 //
 // 「越權」＝ 打別人的 store_id（yStoreB，解不出 issuer）；
@@ -208,7 +205,6 @@ func TestTaxProfile_TierA_AdminMissingStore(t *testing.T) {
 		t.Fatalf("兩支 ADM RPC 的查無出口不一致：%+v / %+v", dec, ext)
 	}
 }
-
 
 func TestTaxProfile_StateInvalidReturnsEnvelope(t *testing.T) {
 	s := newTaxServer(true, yProfile("SUBMITTED"))
@@ -343,7 +339,6 @@ func TestTaxProfile_AttestationEffective_AnchorsOnReviewStatus(t *testing.T) {
 		t.Fatal("SELF_ISSUE_PENDING 就是「自行開票責任生效中」，effective 必須是 true")
 	}
 }
-
 
 func TestTaxProfile_ContractViolationsAreInvalidArgument(t *testing.T) {
 	s := newTaxServer(true, yProfile("UNDER_REVIEW"))

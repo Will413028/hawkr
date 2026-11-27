@@ -18,8 +18,8 @@ import (
 type fakeAppModule struct {
 	payment payment.Payment
 	err     error
-	buyers []int64
-	orders []string
+	buyers  []int64
+	orders  []string
 }
 
 func (m *fakeAppModule) CreatePayment(_ context.Context, buyerID int64, orderNos []string) (payment.Payment, error) {

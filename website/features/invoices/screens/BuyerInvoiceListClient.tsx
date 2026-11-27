@@ -401,7 +401,6 @@ function DocumentRow({ item }: { item: BuyerInvoiceDocumentItem }) {
 				{dash(formatTaipeiDate(summary.issuedAt))}
 			</td>
 			<td className={TD_CLASS}>
-
 				<Link
 					className="font-semibold tabular-nums underline"
 					href={detailHref(summary.documentId)}

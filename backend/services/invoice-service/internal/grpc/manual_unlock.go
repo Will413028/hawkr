@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // RequestManualUnlockForAdmin 是 ADM 申請人工出口解鎖（端點 54）。
 func (s *InvoiceServer) RequestManualUnlockForAdmin(
 	ctx context.Context, req *pb.RequestManualUnlockForAdminRequest,
@@ -34,15 +33,15 @@ func (s *InvoiceServer) RequestManualUnlockForAdmin(
 	}
 
 	view, err := s.adminJobs.RequestManualUnlock(ctx, usecase.RequestManualUnlockInput{
-		ActorAccountID:        actor,
-		JobID:                 jobID,
-		ProviderCheckEvidence: req.GetProviderCheckEvidence(),
-		ProviderCheckedAt:     checkedAt,
-		Reason:                req.GetReason(),
-		ExpectedVersion:       version,
-		IdempotencyKey:        req.GetIdempotencyKey(),
-		CancelEvidenceKind:      req.GetCancelEvidenceKind(),
-		CancelEvidenceObjectKey: req.GetCancelEvidenceObjectKey(),
+		ActorAccountID:            actor,
+		JobID:                     jobID,
+		ProviderCheckEvidence:     req.GetProviderCheckEvidence(),
+		ProviderCheckedAt:         checkedAt,
+		Reason:                    req.GetReason(),
+		ExpectedVersion:           version,
+		IdempotencyKey:            req.GetIdempotencyKey(),
+		CancelEvidenceKind:        req.GetCancelEvidenceKind(),
+		CancelEvidenceObjectKey:   req.GetCancelEvidenceObjectKey(),
 		CancelEvidenceStagedToken: req.GetCancelEvidenceStagedToken(),
 	})
 	if err != nil {
@@ -129,8 +128,8 @@ func (s *InvoiceServer) ListProviderCutoversForAdmin(
 	records := make([]*pb.ProviderCutoverItem, 0, len(out.Records))
 	for _, row := range out.Records {
 		records = append(records, &pb.ProviderCutoverItem{
-			Version:   fmtInt64(row.AccountVersion),
-			CutoverAt: fmtTimeValue(row.CutoverAt),
+			Version:            fmtInt64(row.AccountVersion),
+			CutoverAt:          fmtTimeValue(row.CutoverAt),
 			DeactivatedAt:      fmtTime(row.DeactivatedAt),
 			Mode:               row.Mode,
 			CreatedByAccountId: fmtInt64(row.CreatedByAccountID),

@@ -23,26 +23,26 @@ import (
 type InvoiceServer struct {
 	pb.UnimplementedInvoiceServiceServer
 
-	checkout *usecase.Checkout
-	query    *usecase.Query
-	prefs *usecase.Preference
-	complaints *usecase.Complaint
-	taxProfiles *usecase.TaxProfile
-	adminJobs       *usecase.AdminJob
-	adminIssuance   *usecase.AdminIssuance
-	adminComplaints *usecase.AdminComplaint
+	checkout         *usecase.Checkout
+	query            *usecase.Query
+	prefs            *usecase.Preference
+	complaints       *usecase.Complaint
+	taxProfiles      *usecase.TaxProfile
+	adminJobs        *usecase.AdminJob
+	adminIssuance    *usecase.AdminIssuance
+	adminComplaints  *usecase.AdminComplaint
 	providerAccounts *usecase.ProviderAccount
 	sellerComplaints *usecase.SellerComplaint
-	sellerJobs *usecase.SellerJob
-	resends *usecase.NotificationResend
+	sellerJobs       *usecase.SellerJob
+	resends          *usecase.NotificationResend
 	correctionIntake *usecase.CorrectionIntake
-	files *usecase.DocumentFile
-	sellerNames SellerNameResolver
+	files            *usecase.DocumentFile
+	sellerNames      SellerNameResolver
 	shipmentStatuses ShipmentStatusResolver
-	buyerNames BuyerNameResolver
-	evidenceMeta EvidenceMetadataResolver
-	calendar *usecase.BusinessCalendarMirror
-	log      *zap.Logger
+	buyerNames       BuyerNameResolver
+	evidenceMeta     EvidenceMetadataResolver
+	calendar         *usecase.BusinessCalendarMirror
+	log              *zap.Logger
 }
 
 // NewInvoiceServer 組出 gRPC handler。
@@ -130,7 +130,7 @@ func (s *InvoiceServer) ResolveOrderInvoiceModeInternal(
 		Code:    0,
 		Message: "success",
 		Data: &pb.ResolveOrderInvoiceModeInternalData{
-			InvoiceMode: out.InvoiceMode,
+			InvoiceMode:      out.InvoiceMode,
 			SnapshotVersion:  "",
 			PreviewExpiresAt: timeutil.FormatISO8601(out.PreviewExpiresAt),
 			Amount:           toAmountBreakdown(out.Amount),
@@ -209,7 +209,6 @@ func (s *InvoiceServer) logger() *zap.Logger {
 	return s.log
 }
 
-
 func parseID(s string) (int64, error) {
 	if s == "" {
 		return 0, errEmptyID
@@ -255,7 +254,7 @@ func toAmountBreakdown(a usecase.CheckoutAmount) *pb.InvoiceAmountBreakdown {
 		ShippingAmount: strconv.FormatInt(a.ShippingAmount, 10),
 		DiscountAmount: strconv.FormatInt(a.DiscountAmount, 10),
 		InvoiceAmount:  strconv.FormatInt(a.InvoiceAmount, 10),
-		TaxCategory: strconv.Itoa(int(a.TaxCategory)),
+		TaxCategory:    strconv.Itoa(int(a.TaxCategory)),
 	}
 }
 

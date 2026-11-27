@@ -63,7 +63,6 @@ function makeCase(overrides: Partial<AfterSaleCase> = {}): AfterSaleCase {
 	};
 }
 
-
 test("afterSaleStatusLabel maps the return-logistics codes 26/27/28", () => {
 	assert.equal(afterSaleStatusLabel("26"), "超商待取");
 	assert.equal(afterSaleStatusLabel("27"), "退貨已送達");
@@ -95,7 +94,6 @@ test("afterSaleStatusLabel covers every AFTER_SALE_STATUS code and falls back on
 	assert.equal(afterSaleStatusLabel("999"), "售後處理中");
 });
 
-
 test("afterSaleTone follows the status/tone matrix and defaults to muted", () => {
 	assert.equal(afterSaleTone(AFTER_SALE_STATUS.PENDING), "warning");
 	assert.equal(afterSaleTone(AFTER_SALE_STATUS.RETURN_AT_STORE), "info");
@@ -106,7 +104,6 @@ test("afterSaleTone follows the status/tone matrix and defaults to muted", () =>
 	assert.equal(afterSaleTone(AFTER_SALE_STATUS.CANCELLED), "muted");
 	assert.equal(afterSaleTone("999"), "muted");
 });
-
 
 test("afterSaleNeedsSeller gates seller action to 0/27/30 only", () => {
 	const needsSeller = [
@@ -159,7 +156,6 @@ test("afterSaleNeedsSeller drops a case once it is under platform appeal", () =>
 	);
 });
 
-
 test("afterSaleDisplayLabel folds 申訴仲裁中 over the raw status under appeal", () => {
 	assert.equal(afterSaleDisplayLabel("60", "10"), AFTER_SALE_APPEAL_LABEL);
 	assert.equal(afterSaleDisplayLabel("20", "20"), AFTER_SALE_APPEAL_LABEL);
@@ -204,7 +200,6 @@ test("afterSaleIsTerminal is false for a rejected case that is under appeal", ()
 		true,
 	);
 });
-
 
 const ALL_STATUSES = [
 	"0",
@@ -342,7 +337,6 @@ test("empty status (drawer header before detail loads) enables nothing", () => {
 	assert.equal(afterSaleCanSupplement("", undefined), false);
 });
 
-
 test("afterSaleGroupOf buckets every status into the four filter groups", () => {
 	const expectations: Array<[string, string]> = [
 		["0", "pending"],
@@ -366,7 +360,6 @@ test("afterSaleGroupOf buckets every status into the four filter groups", () => 
 	}
 });
 
-
 test("afterSaleNarrative tells the rejected buyer about the appeal path", () => {
 	const narrative = afterSaleNarrative(AFTER_SALE_STATUS.REJECTED);
 	assert.ok(narrative.includes("申訴"));
@@ -385,7 +378,6 @@ test("afterSaleNarrative covers 26/27/28 with distinct copy and has a fallback",
 	assert.equal(fallback, "售後處理中。");
 	assert.ok(!atStore.includes(fallback));
 });
-
 
 test("afterSaleSteps marks 賣家審核 current while pending", () => {
 	for (const status of [AFTER_SALE_STATUS.PENDING]) {
@@ -435,7 +427,6 @@ test("afterSaleSteps treats an unknown status as freshly applied", () => {
 	);
 });
 
-
 test("arbitrationOutcomeLabel accepts codemeta names, ordinals and passes unknowns through", () => {
 	assert.equal(arbitrationOutcomeLabel("FULL_REFUND"), "全額退款");
 	assert.equal(arbitrationOutcomeLabel("2"), "部分退款");
@@ -448,7 +439,6 @@ test("arbitrationEventLabel accepts names and ordinals", () => {
 	assert.equal(arbitrationEventLabel("2"), "平台裁決");
 	assert.equal(arbitrationEventLabel("UNKNOWN"), "UNKNOWN");
 });
-
 
 test("buildAfterSaleLookup keeps the latest case per order", () => {
 	const older = makeCase({

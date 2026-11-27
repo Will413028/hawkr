@@ -340,7 +340,6 @@ export default function MasonryGrid<T>({
 						}
 			}
 		>
-
 			<div
 				ref={probeRef}
 				data-masonry-probe

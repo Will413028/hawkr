@@ -1,4877 +1,1941 @@
 [
-[
-"catalogReferences",
-"package.json",
-"@biomejs/biome"
-],
-[
-"catalogReferences",
-"package.json",
-"@bufbuild/protobuf"
-],
-[
-"catalogReferences",
-"package.json",
-"@connectrpc/connect"
-],
-[
-"catalogReferences",
-"package.json",
-"@connectrpc/connect-query"
-],
-[
-"catalogReferences",
-"package.json",
-"@connectrpc/connect-web"
-],
-[
-"catalogReferences",
-"package.json",
-"@types/node"
-],
-[
-"catalogReferences",
-"package.json",
-"@types/react"
-],
-[
-"catalogReferences",
-"package.json",
-"@types/react-dom"
-],
-[
-"catalogReferences",
-"package.json",
-"next"
-],
-[
-"catalogReferences",
-"package.json",
-"next-intl"
-],
-[
-"catalogReferences",
-"package.json",
-"react"
-],
-[
-"catalogReferences",
-"package.json",
-"react-dom"
-],
-[
-"catalogReferences",
-"package.json",
-"typescript"
-],
-[
-"catalogReferences",
-"package.json",
-"typescript-compiler-api"
-],
-[
-"catalogReferences",
-"package.json",
-"vitest"
-],
-[
-"dependencies",
-"package.json",
-"@editorjs/image"
-],
-[
-"dependencies",
-"package.json",
-"@heroui/styles"
-],
-[
-"dependencies",
-"package.json",
-"@sentry/vercel-edge"
-],
-[
-"dependencies",
-"package.json",
-"tw-animate-css"
-],
-[
-"dependencies",
-"package.json",
-"vanta"
-],
-[
-"devDependencies",
-"package.json",
-"webpack"
-],
-[
-"duplicates",
-"components/shared/AnimateHeight.tsx",
-"AnimateHeight|default"
-],
-[
-"duplicates",
-"components/shared/HeroUIProvider.tsx",
-"HeroUIProvider|UIProvider|default"
-],
-[
-"duplicates",
-"components/shared/SellerPageShell.tsx",
-"SellerPageShell|default"
-],
-[
-"duplicates",
-"components/shared/useDisclosureMenu.ts",
-"default|useDisclosureMenu"
-],
-[
-"duplicates",
-"components/ui/Dropdown.tsx",
-"Dropdown|default"
-],
-[
-"duplicates",
-"components/ui/Switch.tsx",
-"Switch|default"
-],
-[
-"duplicates",
-"features/account/screens/orders/OrderAfterSaleSummary.tsx",
-"OrderAfterSaleSummary|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleArbitrationCard.tsx",
-"AfterSaleArbitrationCard|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleCaseCard.tsx",
-"AfterSaleCaseCard|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleConfirmReceiptDialog.tsx",
-"AfterSaleConfirmReceiptDialog|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleDecisionDrawer.tsx",
-"AfterSaleDecisionDrawer|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleEvidenceGrid.tsx",
-"AfterSaleEvidenceGrid|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSalePhotoUploader.tsx",
-"AfterSalePhotoUploader|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleProgress.tsx",
-"AfterSaleProgress|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleRefundBanner.tsx",
-"AfterSaleRefundBanner|default"
-],
-[
-"duplicates",
-"features/after-sales/components/AfterSaleStatusBadge.tsx",
-"AfterSaleStatusBadge|default"
-],
-[
-"duplicates",
-"features/invoices/checkout/CheckoutInvoiceRows.tsx",
-"CheckoutInvoiceRows|default"
-],
-[
-"duplicates",
-"features/invoices/components/InvoiceComplaintSection.tsx",
-"InvoiceComplaintSection|default"
-],
-[
-"duplicates",
-"features/invoices/order/OrderInvoiceSection.tsx",
-"OrderInvoiceSection|default"
-],
-[
-"duplicates",
-"features/invoices/screens/InvoiceComplaintActionDialog.tsx",
-"InvoiceComplaintActionDialog|default"
-],
-[
-"duplicates",
-"features/invoices/screens/InvoiceComplaintDialog.tsx",
-"InvoiceComplaintDialog|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/SellerInvoiceDetailPage.tsx",
-"SellerInvoiceDetailPage|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/SellerInvoiceOverviewPage.tsx",
-"SellerInvoiceOverviewPage|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/SellerOrderInvoiceCard.tsx",
-"SellerOrderInvoiceCard|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/appeals/SellerInvoiceAppealDetailPage.tsx",
-"SellerInvoiceAppealDetailPage|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/appeals/SellerInvoiceAppealsPage.tsx",
-"SellerInvoiceAppealsPage|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/components/DeadlineCountdown.tsx",
-"DeadlineCountdown|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/components/InvoiceSnapshotBreakdown.tsx",
-"InvoiceSnapshotBreakdown|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/components/TaxStatusCard.tsx",
-"TaxStatusCard|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/documents/SellerInvoiceDocumentsPage.tsx",
-"SellerInvoiceDocumentsPage|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/documents/SellerReceivedInvoicesPanel.tsx",
-"SellerReceivedInvoicesPanel|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/jobs/ReportExternalIssuanceDialog.tsx",
-"ReportExternalIssuanceDialog|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/jobs/SellerInvoiceJobPage.tsx",
-"SellerInvoiceJobPage|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/tax-status/SellerTaxStatusPage.tsx",
-"SellerTaxStatusPage|default"
-],
-[
-"duplicates",
-"features/seller-center/invoices/tax-status/TaxSubmitSection.tsx",
-"TaxSubmitSection|default"
-],
-[
-"duplicates",
-"features/seller-center/orders/SellerOrderAfterSaleCard.tsx",
-"SellerOrderAfterSaleCard|default"
-],
-[
-"duplicates",
-"features/seller/components/SellerProfileBranding.tsx",
-"SellerProfileBranding|default"
-],
-[
-"duplicates",
-"lib/after-sales/seller-repo.ts",
-"fetchAfterSaleDetail|fetchSellerAfterSaleDetail"
-],
-[
-"exports",
-"app/(delegated)/adm/api/_csrf.ts",
-"IDEMPOTENCY_KEY_HEADER"
-],
-[
-"exports",
-"app/(delegated)/adm/api/_csrf.ts",
-"assertNoReservedHeaders"
-],
-[
-"exports",
-"app/(delegated)/adm/api/_csrf.ts",
-"assertSameOriginMutation"
-],
-[
-"exports",
-"app/(delegated)/adm/api/_forward.ts",
-"UPSTREAM_FAILURE"
-],
-[
-"exports",
-"components/shared/AnimateHeight.tsx",
-"default"
-],
-[
-"exports",
-"components/shared/CompactBackControl.tsx",
-"COMPACT_BACK_CONTROL_LABEL"
-],
-[
-"exports",
-"components/shared/FooterCategoryColumns.tsx",
-"FOOTER_COLUMN_ITEM_CAP"
-],
-[
-"exports",
-"components/shared/FooterCategoryColumns.tsx",
-"footerCategoryHref"
-],
-[
-"exports",
-"components/shared/FooterCategoryColumns.tsx",
-"footerHashtagHref"
-],
-[
-"exports",
-"components/shared/HeroUIProvider.tsx",
-"HeroUIProvider"
-],
-[
-"exports",
-"components/shared/HeroUIProvider.tsx",
-"default"
-],
-[
-"exports",
-"components/shared/ScPrimitives.tsx",
-"ScSection"
-],
-[
-"exports",
-"components/shared/SellerNavbarLoader.tsx",
-"sellerNavbarResource"
-],
-[
-"exports",
-"components/shared/useDisclosureMenu.ts",
-"default"
-],
-[
-"exports",
-"components/ui/Button.tsx",
-"ButtonLoadingContent"
-],
-[
-"exports",
-"components/ui/Card.tsx",
-"CardMedia"
-],
-[
-"exports",
-"components/ui/Dropdown.tsx",
-"default"
-],
-[
-"exports",
-"components/ui/index.ts",
-"CalendarMonth"
-],
-[
-"exports",
-"components/ui/index.ts",
-"CardBody"
-],
-[
-"exports",
-"components/ui/index.ts",
-"CardFooter"
-],
-[
-"exports",
-"components/ui/index.ts",
-"CardHeader"
-],
-[
-"exports",
-"components/ui/index.ts",
-"CardMedia"
-],
-[
-"exports",
-"components/ui/index.ts",
-"Switch"
-],
-[
-"exports",
-"features/account/screens/orders/OrderAfterSaleSummary.tsx",
-"OrderAfterSaleSummary"
-],
-[
-"exports",
-"features/account/screens/settings/SignInMethodsSection.tsx",
-"SETTINGS_PATH"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleArbitrationCard.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleCaseCard.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleConfirmReceiptDialog.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleDecisionDrawer.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleEvidenceGrid.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSalePhotoUploader.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleProgress.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleRefundBanner.tsx",
-"default"
-],
-[
-"exports",
-"features/after-sales/components/AfterSaleStatusBadge.tsx",
-"default"
-],
-[
-"exports",
-"features/delegated-operations/load-failure.ts",
-"DELEGATION_CAPABILITY_DENIED"
-],
-[
-"exports",
-"features/delegated-operations/load-failure.ts",
-"DELEGATION_RESOURCE_NOT_OWNED"
-],
-[
-"exports",
-"features/delegated-operations/nav-policy.ts",
-"delegatedAreaOperable"
-],
-[
-"exports",
-"features/delegated-operations/orders/RevealRecipientDialog.tsx",
-"OPERATION_REASON_MAX"
-],
-[
-"exports",
-"features/delegated-operations/products/edit-patch.ts",
-"sameImages"
-],
-[
-"exports",
-"features/delegated-operations/products/edit-patch.ts",
-"toImageInputs"
-],
-[
-"exports",
-"features/delegated-operations/products/repo.ts",
-"readDelegatedProductDetail"
-],
-[
-"exports",
-"features/delegated-operations/server/session.ts",
-"DELEGATED_COOKIE_PATH"
-],
-[
-"exports",
-"features/delegated-operations/server/session.ts",
-"LOCAL_DELEGATED_COOKIE_NAME"
-],
-[
-"exports",
-"features/delegated-operations/server/session.ts",
-"PRODUCTION_DELEGATED_COOKIE_NAME"
-],
-[
-"exports",
-"features/delegated-operations/server/session.ts",
-"parseDelegatedExpiry"
-],
-[
-"exports",
-"features/delegated-operations/state/session.ts",
-"DELEGATED_OPERATION_CLOCK_SKEW_SECONDS"
-],
-[
-"exports",
-"features/delegated-operations/state/session.ts",
-"DELEGATED_OPERATION_EXPIRING_SECONDS"
-],
-[
-"exports",
-"features/delegated-operations/state/session.ts",
-"DELEGATED_TERMINAL_BIZ_CODES"
-],
-[
-"exports",
-"features/delegated-operations/state/session.ts",
-"deriveDelegatedSessionState"
-],
-[
-"exports",
-"features/feed/nearbyStories.ts",
-"distanceKm"
-],
-[
-"exports",
-"features/invoices/checkout/CheckoutInvoiceRows.tsx",
-"default"
-],
-[
-"exports",
-"features/invoices/components/InvoiceComplaintSection.tsx",
-"default"
-],
-[
-"exports",
-"features/invoices/order/OrderInvoiceSection.tsx",
-"default"
-],
-[
-"exports",
-"features/invoices/screens/InvoiceComplaintActionDialog.tsx",
-"default"
-],
-[
-"exports",
-"features/invoices/screens/InvoiceComplaintDialog.tsx",
-"default"
-],
-[
-"exports",
-"features/orders/components/orderStatusTimelineModel.ts",
-"ORDER_STATUS_TIMELINE_INDEX"
-],
-[
-"exports",
-"features/procurement-assistant/AgentEntryPanel.tsx",
-"CapabilityButton"
-],
-[
-"exports",
-"features/procurement-assistant/AgentEntryPanel.tsx",
-"ENTRY_COMPOSER_PLACEHOLDER"
-],
-[
-"exports",
-"features/procurement-assistant/agent-motion.ts",
-"motionForStep"
-],
-[
-"exports",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"orderProvisioningStateSchema"
-],
-[
-"exports",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"sellerIdentityViewSchema"
-],
-[
-"exports",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"sellerQuotePayloadSchema"
-],
-[
-"exports",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"sellerQuoteResponseTypeSchema"
-],
-[
-"exports",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"taxInclusionBasisSchema"
-],
-[
-"exports",
-"features/procurement-assistant/capabilities.ts",
-"isFlagEnabled"
-],
-[
-"exports",
-"features/procurement-assistant/conversations.ts",
-"normalizeHawkrAgentCategoryId"
-],
-[
-"exports",
-"features/procurement-assistant/conversations.ts",
-"resetAgentConversationsProbe"
-],
-[
-"exports",
-"features/procurement-assistant/errors.ts",
-"isRequestNotFound"
-],
-[
-"exports",
-"features/procurement-assistant/rfq-price-contract.ts",
-"rfqBuyerRequestedRangeSchema"
-],
-[
-"exports",
-"features/procurement-assistant/rfq-price-contract.ts",
-"rfqQuoteTotalRangeSchema"
-],
-[
-"exports",
-"features/procurement-assistant/routes.ts",
-"ASSISTANT_DEMO_PATH"
-],
-[
-"exports",
-"features/procurement-assistant/routes.ts",
-"ASSISTANT_LEGACY_LIVE_CONVERSATION_ID"
-],
-[
-"exports",
-"features/procurement-assistant/routes.ts",
-"ASSISTANT_LEGACY_LIVE_PATH"
-],
-[
-"exports",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"RUN_CANCEL_DISPOSITIONS"
-],
-[
-"exports",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"runtimeSnapshotArtifactSchema"
-],
-[
-"exports",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"runtimeSnapshotOpenConfirmationSchema"
-],
-[
-"exports",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"runtimeSnapshotRunSchema"
-],
-[
-"exports",
-"features/procurement-assistant/steps.ts",
-"STEP_FALLBACK_LABELS"
-],
-[
-"exports",
-"features/procurement-assistant/telemetry.ts",
-"trackHawkrAgentTerminalRendered"
-],
-[
-"exports",
-"features/product/components/useGalleryImagePreset.ts",
-"galleryImagePreset"
-],
-[
-"exports",
-"features/product/deriveDetailLayoutProps.ts",
-"CARRIER_META"
-],
-[
-"exports",
-"features/product/deriveDetailLayoutProps.ts",
-"asRecord"
-],
-[
-"exports",
-"features/product/deriveDetailLayoutProps.ts",
-"descriptionImageRaw"
-],
-[
-"exports",
-"features/product/deriveDetailLayoutProps.ts",
-"textOrEmpty"
-],
-[
-"exports",
-"features/product/deriveDetailLayoutProps.ts",
-"textOrNumber"
-],
-[
-"exports",
-"features/product/index.ts",
-"ProductViewTracker"
-],
-[
-"exports",
-"features/seller-center/components/SellerPageSkeletons.tsx",
-"SellerDashboardSkeleton"
-],
-[
-"exports",
-"features/seller-center/components/SellerSkeletons.tsx",
-"SellerTableSkeleton"
-],
-[
-"exports",
-"features/seller-center/components/SellerSuspendedNotice.tsx",
-"TERMINATION_REASON_HEADING"
-],
-[
-"exports",
-"features/seller-center/components/SellerSuspendedNotice.tsx",
-"TERMINATION_SUBTITLE"
-],
-[
-"exports",
-"features/seller-center/components/ShelfStatusControl.tsx",
-"shelfToggleTarget"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"DashboardPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"EmptyState"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"InventoryPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"ProductFormPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"ProductsPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerCardGridSkeleton"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerDashboardSkeleton"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerInventorySkeletonRows"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerInvoiceAppealDetailPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerInvoiceAppealsPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerInvoiceDetailPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerInvoiceDocumentsPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerInvoiceJobPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerInvoiceOverviewPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerOrderInvoiceCard"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerOrdersPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerOrdersSkeletonRows"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerProductsSkeletonRows"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerStatRowSkeleton"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerTableSkeleton"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SellerTaxStatusPage"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"StatCard"
-],
-[
-"exports",
-"features/seller-center/index.ts",
-"SummaryStatCard"
-],
-[
-"exports",
-"features/seller-center/invoices/SellerInvoiceDetailPage.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/SellerInvoiceOverviewPage.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/SellerOrderInvoiceCard.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/appeals/SellerInvoiceAppealDetailPage.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/appeals/SellerInvoiceAppealsPage.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/components/DeadlineCountdown.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/components/InvoiceSnapshotBreakdown.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/components/TaxStatusCard.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/documents/SellerInvoiceDocumentsPage.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/documents/SellerReceivedInvoicesPanel.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/documents/invoiceDocumentsTabs.tsx",
-"INVOICE_DOCUMENTS_TABS"
-],
-[
-"exports",
-"features/seller-center/invoices/invoiceComplaintDisplay.ts",
-"DEFAULT_SELLER_COMPLAINT_VIEW"
-],
-[
-"exports",
-"features/seller-center/invoices/jobs/ReportExternalIssuanceDialog.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/jobs/SellerInvoiceJobPage.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/tax-status/SellerTaxStatusPage.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/invoices/tax-status/TaxSubmitSection.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/orders/SellerOrderAfterSaleCard.tsx",
-"default"
-],
-[
-"exports",
-"features/seller-center/orders/orderTabs.ts",
-"afterSaleOverridesOrderLifecycle"
-],
-[
-"exports",
-"features/seller-center/posts/postImageRequirement.ts",
-"POST_IMAGE_REQUIRED_DESCRIPTION"
-],
-[
-"exports",
-"features/seller-center/products-import/adapters/importItemAdapter.ts",
-"parseDescriptionJson"
-],
-[
-"exports",
-"features/seller-center/products-import/i18n.ts",
-"COMMIT_SKIP_REASON_LABEL"
-],
-[
-"exports",
-"features/seller-center/products-import/types.ts",
-"COMMIT_SKIP_REASON"
-],
-[
-"exports",
-"features/seller-center/products/components/ProductFormSections.tsx",
-"CARD"
-],
-[
-"exports",
-"features/seller/components/SellerProfileBranding.tsx",
-"default"
-],
-[
-"exports",
-"features/seller/components/categoryCreateFlow.ts",
-"existingCategoryChoice"
-],
-[
-"exports",
-"features/seller/components/categoryCreateFlow.ts",
-"validateNewCategoryName"
-],
-[
-"exports",
-"features/seller/measures/AppealEntry.tsx",
-"APPEAL_BUTTON_LABEL"
-],
-[
-"exports",
-"features/seller/measures/RemediationEntry.tsx",
-"REMEDIATION_BUTTON_LABEL"
-],
-[
-"exports",
-"features/seller/measures/appealEvidenceUpload.ts",
-"APPEAL_EVIDENCE_DOC_TYPE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"BUNDLE_CHOOSER"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"CALCULATOR_CROSSOVER_NOTE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"CALCULATOR_DEFAULT_AMOUNT"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"CALCULATOR_MAX_AMOUNT"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"CALCULATOR_NOTE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"CALCULATOR_ROUNDING_NOTE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"CALCULATOR_STEP"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"COLLABORATION_CHECK_NOTE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"COLLABORATION_NOTE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"HERO_TRUST_POINTS"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"SERVICE_BOUNDARY_NOTE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"SERVICE_BUNDLE_INTRO"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"SERVICE_PLATFORM_SCOPE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"SERVICE_PRINCIPLE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"SERVICE_SELLER_SCOPE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"SOURCE_NEUTRALITY_NOTE"
-],
-[
-"exports",
-"features/seller/pricing/data.ts",
-"TAX_NOTE"
-],
-[
-"exports",
-"lib/a11y/focusable.ts",
-"FOCUSABLE_SELECTOR"
-],
-[
-"exports",
-"lib/addresses/repo.ts",
-"fetchDefaultAddress"
-],
-[
-"exports",
-"lib/after-sales/seller-repo.ts",
-"fetchAfterSaleDetail"
-],
-[
-"exports",
-"lib/analytics/gtag.ts",
-"isEnabled"
-],
-[
-"exports",
-"lib/analytics/gtag.ts",
-"setConsent"
-],
-[
-"exports",
-"lib/animation/page-curl.ts",
-"PAGE_CURL_MAX_BEND_RADIANS"
-],
-[
-"exports",
-"lib/animation/page-turn-gesture.ts",
-"PAGE_TURN_FLING_MAX_AGE_MS"
-],
-[
-"exports",
-"lib/animation/page-turn-gesture.ts",
-"PAGE_TURN_PROJECTION_MS"
-],
-[
-"exports",
-"lib/api/client.ts",
-"__resetApiFailureDedupForTest"
-],
-[
-"exports",
-"lib/api/delegated.ts",
-"DELEGATED_BFF_PREFIX"
-],
-[
-"exports",
-"lib/api/index.ts",
-"fetchProduct"
-],
-[
-"exports",
-"lib/api/json.ts",
-"preserveBigInts"
-],
-[
-"exports",
-"lib/api/json.ts",
-"readJsonSafe"
-],
-[
-"exports",
-"lib/api/openapi-types.ts",
-"ACCOUNT_TYPE"
-],
-[
-"exports",
-"lib/api/openapi-types.ts",
-"roleFromAccountType"
-],
-[
-"exports",
-"lib/api/posts.ts",
-"likePost"
-],
-[
-"exports",
-"lib/api/posts.ts",
-"unlikePost"
-],
-[
-"exports",
-"lib/api/revalidate-request.ts",
-"MAX_REVALIDATION_TAG_LENGTH"
-],
-[
-"exports",
-"lib/auth/cross-tab-sync.ts",
-"SESSION_CHANNEL_NAME"
-],
-[
-"exports",
-"lib/auth/dal.ts",
-"SESSION_READ_TIMEOUT_MS"
-],
-[
-"exports",
-"lib/auth/dal.ts",
-"classifySession"
-],
-[
-"exports",
-"lib/auth/gsi.ts",
-"GSI_LOAD_TIMEOUT_MS"
-],
-[
-"exports",
-"lib/auth/gsi.ts",
-"GSI_RETRY_BACKOFF_MS"
-],
-[
-"exports",
-"lib/auth/gsi.ts",
-"GSI_SRC"
-],
-[
-"exports",
-"lib/auth/gsi.ts",
-"getGsiFailureAttempts"
-],
-[
-"exports",
-"lib/auth/local-private-state.ts",
-"LOCAL_STATE_OWNER_KEY"
-],
-[
-"exports",
-"lib/auth/oauth-start.ts",
-"OAUTH_START_PATH"
-],
-[
-"exports",
-"lib/auth/redirect.ts",
-"roleLabel"
-],
-[
-"exports",
-"lib/cart/flyToCart.ts",
-"bumpCartBadge"
-],
-[
-"exports",
-"lib/cart/resolve.ts",
-"resolveLegacyCartItem"
-],
-[
-"exports",
-"lib/cart/types.ts",
-"groupBySeller"
-],
-[
-"exports",
-"lib/chat/repo.ts",
-"fetchOnlineUsers"
-],
-[
-"exports",
-"lib/chat/repo.ts",
-"markAllChatRead"
-],
-[
-"exports",
-"lib/chat/repo.ts",
-"markMessagesRead"
-],
-[
-"exports",
-"lib/checkout/repo.ts",
-"parseAvailablePaymentMethods"
-],
-[
-"exports",
-"lib/checkout/repo.ts",
-"parseCheckoutInvoicePreview"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ACCOUNT_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AFTER_SALE_APPEAL_EVENT_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AFTER_SALE_APPEAL_STATE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AFTER_SALE_CASE_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AFTER_SALE_EVIDENCE_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AFTER_SALE_PLATFORM_DECISION_OUTCOME_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"APP_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AccountType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AfterSaleAppealEventType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AfterSalePlatformDecisionOutcome"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"AppType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CART_ITEM_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CART_ITEM_UNAVAILABLE_REASON_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CERTIFICATION_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CLIENT_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"COLLECTION_MODEL_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"COMMERCE_MODEL_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"COMMON_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"COUPON_INSTANCE_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"COUPON_TARGET_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"COUPON_TEMPLATE_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"COUPON_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CartItemStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CartItemUnavailableReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CertificationType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ClientType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CollectionModel"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CommerceModel"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CommonStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CouponInstanceStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CouponTargetType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CouponTemplateStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"CouponType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"DUPLICATE_NAME_KIND_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"DuplicateNameKind"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"FINANCIAL_LOG_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"FULFILLMENT_ACTION_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"FULFILLMENT_MODE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"FinancialLogType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"FulfillmentAction"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"FulfillmentMode"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"HTML_CONVERSION_WARNING_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"HtmlConversionWarning"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"IMPORT_ASSET_FAILURE_REASON_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"IMPORT_ASSET_LOCAL_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"IMPORT_ASSET_USAGE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"IMPORT_ITEM_ERROR_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"IMPORT_ITEM_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"IMPORT_JOB_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"INVOICE_COMPLAINT_EVENT_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"INVOICE_CORRECTION_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"INVOICE_ISSUER_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"INVOICE_MODEL_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"INVOICE_NOT_APPLICABLE_REASON_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ISSUER_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ImportAssetFailureReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ImportAssetLocalStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ImportAssetUsage"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ImportItemErrorType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ImportItemStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ImportJobStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintAction"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintEventType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceCorrectionRejectReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceCorrectionStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceDocumentTimelineEvent"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceIssuerType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceManualReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceModel"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceNotApplicableReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceOperationType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"InvoiceRecipientType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"IssuerType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"LABEL_PRINT_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"LOGISTICS_RECEIVABLE_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"LabelPrintStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"LogisticsReceivableStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"MEDIA_UPLOAD_SESSION_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"MediaUploadSessionStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ONBOARDING_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ORDER_CANCEL_BY_ROLE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ORDER_ITEM_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"OnboardingStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"OrderCancelReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"OrderItemStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PAYMENT_TRANSACTION_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PAYUNI_MERCHANT_VERIFICATION_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PAY_UNI_SUBMIT_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_ARTIFACT_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_ARTIFACT_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_CONFIRMATION_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_ERROR_REASON_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_LANE_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_LEDGER_EVENT_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_ORDER_PROVISIONING_STATE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_PUBLICATION_AUDIENCE_MODE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_PUBLICATION_STATE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_QUOTE_ACCEPTABILITY_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_RFQ_INVITE_DELIVERY_STATE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_RFQ_PUBLICATION_APPROVAL_STATE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_RUN_FAILURE_REASON_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_RUN_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_SELLER_PARTY_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_SELLER_RESPONSE_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_SELLER_RESPONSE_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_STEP_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_TAX_INCLUSION_BASIS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROCUREMENT_WISH_POOL_POLICY_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PRODUCT_CERTIFICATION_GOV_VERIFY_STATE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PRODUCT_CERTIFICATION_REJECT_REASON_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PRODUCT_CERTIFICATION_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PRODUCT_PUBLICATION_STATE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PRODUCT_SORT_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PROVIDER_SOURCE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PayUniSubmitStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PaymentMethodIneligibleReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PaymentTransactionStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"PayuniMerchantVerificationStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementArtifactStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementConfirmationStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementErrorReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementLaneStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementLedgerEventType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementPublicationAudienceMode"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementPublicationState"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementRfqPublicationApprovalState"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementRunFailureReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementRunStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementSellerPartyType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementSellerResponseStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProcurementWishPoolPolicy"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProductCertificationGovVerifyState"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProductCertificationRejectReason"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProductCertificationStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProductPublicationState"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProductSort"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ProviderSource"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"RECEIPT_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"REFUND_METHOD_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"REFUND_REQUEST_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"REFUND_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"REPORT_REASON_CODE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"REPORT_RESOLVE_ACTION_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"REPORT_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"REPORT_TARGET_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"RESPONSIBILITY_CAUSE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ReceiptStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"RefundMethod"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"RefundRequestStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"RefundStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ReportReasonCode"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ReportResolveAction"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ReportStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ReportTargetType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ResponsibilityCause"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SELLER_CANCEL_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SELLER_TAX_REVIEW_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SHIPMENT_ANOMALY_ACK_ACTION_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SHIPMENT_ANOMALY_SEVERITY_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SHIPMENT_ANOMALY_TYPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SHIPPING_AREA_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SHIPPING_FEE_PAYER_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SHIPPING_ROUTE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SHIPPING_TEMPERATURE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"STAGED_TOKEN_SCOPE_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"SellerCancelStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalyAckAction"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalySeverity"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalyType"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ShippingArea"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"ShippingRoute"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"StagedTokenScope"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"TCAT_CALL_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"TcatCallStatus"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"UBER_DELIVERY_OUTCOME_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"UberDeliveryOutcome"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"WORKER_TASK_STATUS_LABEL"
-],
-[
-"exports",
-"lib/codemeta/generated.ts",
-"WorkerTaskStatus"
-],
-[
-"exports",
-"lib/config/flavor.ts",
-"isDevFlavor"
-],
-[
-"exports",
-"lib/favorites/repo.ts",
-"addFavorite"
-],
-[
-"exports",
-"lib/hooks/useCart.ts",
-"parsePriceValue"
-],
-[
-"exports",
-"lib/hooks/useSellerMeasures.ts",
-"useInvalidateSellerMeasures"
-],
-[
-"exports",
-"lib/invoices/carrier.ts",
-"BUYER_NAME_MAX_RUNES"
-],
-[
-"exports",
-"lib/invoices/carrier.ts",
-"isKnownCarrierType"
-],
-[
-"exports",
-"lib/invoices/seller-repo.ts",
-"AMEGO_PROVIDER"
-],
-[
-"exports",
-"lib/invoices/seller-repo.ts",
-"RECEIPT_AUTH_CONSENT_VERSION"
-],
-[
-"exports",
-"lib/invoices/seller-repo.ts",
-"SELLER_COMPLAINT_ACTIONS"
-],
-[
-"exports",
-"lib/invoices/seller-repo.ts",
-"SELLER_COMPLAINT_SORT_DUE_ASC"
-],
-[
-"exports",
-"lib/loading/navigation-watchdog.ts",
-"MAIN_TAB_NAVIGATION_WATCHDOG_MS"
-],
-[
-"exports",
-"lib/market/listFilters.ts",
-"normaliseHashtags"
-],
-[
-"exports",
-"lib/market/listFilters.ts",
-"readDisplayOrigin"
-],
-[
-"exports",
-"lib/market/listFilters.ts",
-"readPriceMax"
-],
-[
-"exports",
-"lib/market/listFilters.ts",
-"readPriceMin"
-],
-[
-"exports",
-"lib/market/listFilters.ts",
-"readSellerId"
-],
-[
-"exports",
-"lib/market/listFilters.ts",
-"readSellerStoreCode"
-],
-[
-"exports",
-"lib/media/avatar-logo.ts",
-"AVATAR_LOGO_SAFE_INSET"
-],
-[
-"exports",
-"lib/media/gif-crop.ts",
-"GIF_CROP_MAX_DECODED_PIXELS"
-],
-[
-"exports",
-"lib/media/gif-crop.ts",
-"GIF_CROP_MAX_DIMENSION"
-],
-[
-"exports",
-"lib/media/gif-crop.ts",
-"GIF_CROP_MAX_FRAMES"
-],
-[
-"exports",
-"lib/media/gif-crop.ts",
-"GIF_CROP_MAX_LOGICAL_PIXELS"
-],
-[
-"exports",
-"lib/media/gif-timing.ts",
-"GIF_BROWSER_SHORT_DELAY_MS"
-],
-[
-"exports",
-"lib/media/product-image.ts",
-"PRODUCT_IMAGE_MAX_EDGE"
-],
-[
-"exports",
-"lib/navigation/history-marker.ts",
-"isBouncePathname"
-],
-[
-"exports",
-"lib/navigation/history-marker.ts",
-"previousPathname"
-],
-[
-"exports",
-"lib/navigation/recovery-state.ts",
-"MAIN_TAB_NAVIGATION_WATCHDOG_MS"
-],
-[
-"exports",
-"lib/orders/repo.ts",
-"createOrder"
-],
-[
-"exports",
-"lib/payment/apple-pay.ts",
-"applePayMerchantId"
-],
-[
-"exports",
-"lib/payment/google-pay.ts",
-"GOOGLE_PAY_MERCHANT_NAME"
-],
-[
-"exports",
-"lib/payment/google-pay.ts",
-"__resetGooglePayForTest"
-],
-[
-"exports",
-"lib/payment/google-pay.ts",
-"googlePayEnvironment"
-],
-[
-"exports",
-"lib/post-tags/repo.ts",
-"formatPostTag"
-],
-[
-"exports",
-"lib/products/clipboardGrid.ts",
-"htmlToGrid"
-],
-[
-"exports",
-"lib/products/pricing.ts",
-"formatPriceRange"
-],
-[
-"exports",
-"lib/products/pricing.ts",
-"hasSalePrice"
-],
-[
-"exports",
-"lib/products/publication.ts",
-"PUBLICATION_STATE"
-],
-[
-"exports",
-"lib/products/rating.ts",
-"formatRating"
-],
-[
-"exports",
-"lib/products/rating.ts",
-"hasRating"
-],
-[
-"exports",
-"lib/products/seller-repo.ts",
-"BLOCK_COLOR_PRESETS"
-],
-[
-"exports",
-"lib/products/seller-repo.ts",
-"BLOCK_FONT_SIZES"
-],
-[
-"exports",
-"lib/products/seller-repo.ts",
-"PRODUCT_STATUS"
-],
-[
-"exports",
-"lib/products/seller-repo.ts",
-"deleteProduct"
-],
-[
-"exports",
-"lib/seller-data/delegated-repos.ts",
-"DELEGATED_BATCH_UNPUBLISH_MAX"
-],
-[
-"exports",
-"lib/seller-data/delegated-repos.ts",
-"DelegatedEndpointMissingError"
-],
-[
-"exports",
-"lib/seller-data/delegated-repos.ts",
-"mapDelegatedPost"
-],
-[
-"exports",
-"lib/seller/after-sales.ts",
-"fetchAfterSaleDetail"
-],
-[
-"exports",
-"lib/seller/ai-image.ts",
-"AI_QUOTA_EXCEEDED_CODE"
-],
-[
-"exports",
-"lib/seller/certification-options.ts",
-"TAIWAN_CITIES"
-],
-[
-"exports",
-"lib/seller/contact-email.ts",
-"CONTACT_EMAIL_MAX_LENGTH"
-],
-[
-"exports",
-"lib/seller/kyc.ts",
-"KYC_FIELDS"
-],
-[
-"exports",
-"lib/seller/kyc.ts",
-"businessLookupOf"
-],
-[
-"exports",
-"lib/seller/kyc.ts",
-"isKycDocumentField"
-],
-[
-"exports",
-"lib/seller/measures.ts",
-"APPEAL_CONFLICT_NOTICE"
-],
-[
-"exports",
-"lib/seller/measures.ts",
-"APPEAL_RELOAD_FAILED_NOTICE"
-],
-[
-"exports",
-"lib/seller/measures.ts",
-"APPEAL_UNAVAILABLE_NOTICE"
-],
-[
-"exports",
-"lib/seller/measures.ts",
-"REMEDIATION_CONFLICT_NOTICE"
-],
-[
-"exports",
-"lib/seller/measures.ts",
-"REMEDIATION_UNAVAILABLE_NOTICE"
-],
-[
-"exports",
-"lib/seller/measures.ts",
-"appealFailure"
-],
-[
-"exports",
-"lib/seller/measures.ts",
-"remediationFailure"
-],
-[
-"exports",
-"lib/seller/share-card.ts",
-"buildSellerShareUrl"
-],
-[
-"exports",
-"lib/seller/shipment.ts",
-"SHIPMENT_STATUS"
-],
-[
-"exports",
-"lib/seller/shipment.ts",
-"incrementShipmentRetryCount"
-],
-[
-"exports",
-"lib/seller/shipment.ts",
-"isShipmentBackendStuck"
-],
-[
-"exports",
-"lib/seller/shipment.ts",
-"isTaqbinMethod"
-],
-[
-"exports",
-"lib/seller/shipment.ts",
-"isUnderShipmentCooldown"
-],
-[
-"exports",
-"lib/seller/shipment.ts",
-"shipmentBusinessCode"
-],
-[
-"exports",
-"lib/seller/shipment.ts",
-"shipmentCooldownRemainingSeconds"
-],
-[
-"exports",
-"lib/seller/shipping.ts",
-"ONBOARDING_STATUS"
-],
-[
-"exports",
-"lib/seller/shipping.ts",
-"isEnabled"
-],
-[
-"exports",
-"lib/seller/shipping.ts",
-"isToggleable"
-],
-[
-"exports",
-"lib/seller/store-contact.ts",
-"isKnownStoreField"
-],
-[
-"exports",
-"lib/seller/store.ts",
-"missingOf"
-],
-[
-"exports",
-"lib/seller/validators.ts",
-"validatePhone"
-],
-[
-"exports",
-"lib/seo/summary-rules.ts",
-"TITLE_SEPARATOR"
-],
-[
-"exports",
-"lib/shipping/anomalies.ts",
-"SHIPMENT_ANOMALY_SEVERITY"
-],
-[
-"exports",
-"lib/shipping/anomalies.ts",
-"SHIPMENT_ANOMALY_SEVERITY_LABEL"
-],
-[
-"exports",
-"lib/shipping/anomalies.ts",
-"SHIPMENT_ANOMALY_TYPE"
-],
-[
-"exports",
-"lib/shipping/anomalies.ts",
-"SHIPMENT_ANOMALY_TYPE_LABEL"
-],
-[
-"exports",
-"lib/shipping/anomalies.ts",
-"acknowledgeShipmentAnomaly"
-],
-[
-"exports",
-"lib/shipping/anomalies.ts",
-"ignoreShipmentAnomaly"
-],
-[
-"exports",
-"lib/theme/context.tsx",
-"ThemeProvider"
-],
-[
-"exports",
-"lib/theme/text-scale.ts",
-"TEXT_SCALE_ATTRIBUTE"
-],
-[
-"exports",
-"lib/theme/text-scale.ts",
-"TEXT_SCALE_EVENT"
-],
-[
-"exports",
-"lib/theme/text-scale.ts",
-"TEXT_SCALE_STORAGE_KEY"
-],
-[
-"exports",
-"lib/theme/text-scale.ts",
-"getTextScale"
-],
-[
-"exports",
-"lib/theme/text-scale.ts",
-"nextTextScale"
-],
-[
-"exports",
-"lib/theme/text-scale.ts",
-"setTextScale"
-],
-[
-"exports",
-"lib/validation/display-length.ts",
-"displayLength"
-],
-[
-"exports",
-"lib/vendor-portal/repo.ts",
-"VENDOR_PORTAL_BRAND"
-],
-[
-"files",
-".storybook/public/mockServiceWorker.js",
-".storybook/public/mockServiceWorker.js"
-],
-[
-"files",
-"features/procurement-assistant/HawkrAgentChatWorkspace.tsx",
-"features/procurement-assistant/HawkrAgentChatWorkspace.tsx"
-],
-[
-"files",
-"features/seller/landing/components/SellerVantaAtmosphere.tsx",
-"features/seller/landing/components/SellerVantaAtmosphere.tsx"
-],
-[
-"types",
-"components/shared/BrandLogo.tsx",
-"BrandLogoSize"
-],
-[
-"types",
-"components/shared/BrandLogo.tsx",
-"BrandLogoSurface"
-],
-[
-"types",
-"components/shared/BrandLogo.tsx",
-"BrandLogoVariant"
-],
-[
-"types",
-"components/shared/ProduceIcon.tsx",
-"ProduceIconName"
-],
-[
-"types",
-"components/shared/SellerSidebarIcon.tsx",
-"SellerSidebarIconName"
-],
-[
-"types",
-"components/ui/Button.tsx",
-"ButtonColor"
-],
-[
-"types",
-"components/ui/Button.tsx",
-"ButtonProps"
-],
-[
-"types",
-"components/ui/Button.tsx",
-"ButtonRadius"
-],
-[
-"types",
-"components/ui/Button.tsx",
-"ButtonSize"
-],
-[
-"types",
-"components/ui/Button.tsx",
-"ButtonVariant"
-],
-[
-"types",
-"components/ui/Card.tsx",
-"CardMediaProps"
-],
-[
-"types",
-"components/ui/Card.tsx",
-"CardRadius"
-],
-[
-"types",
-"components/ui/Card.tsx",
-"CardShadow"
-],
-[
-"types",
-"components/ui/Chip.tsx",
-"ChipSize"
-],
-[
-"types",
-"components/ui/Chip.tsx",
-"ChipVariant"
-],
-[
-"types",
-"components/ui/DatePicker.tsx",
-"DateGranularity"
-],
-[
-"types",
-"components/ui/GifEditControls.tsx",
-"GifEditorOptions"
-],
-[
-"types",
-"components/ui/Input.tsx",
-"InputSize"
-],
-[
-"types",
-"components/ui/Input.tsx",
-"InputVariant"
-],
-[
-"types",
-"components/ui/Tabs.tsx",
-"TabItem"
-],
-[
-"types",
-"components/ui/Tabs.tsx",
-"TabsSize"
-],
-[
-"types",
-"components/ui/Tabs.tsx",
-"TabsVariant"
-],
-[
-"types",
-"components/ui/index.ts",
-"ButtonColor"
-],
-[
-"types",
-"components/ui/index.ts",
-"ButtonProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"ButtonRadius"
-],
-[
-"types",
-"components/ui/index.ts",
-"ButtonSize"
-],
-[
-"types",
-"components/ui/index.ts",
-"ButtonVariant"
-],
-[
-"types",
-"components/ui/index.ts",
-"CalendarMonthProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"CalendarYearDisplayMode"
-],
-[
-"types",
-"components/ui/index.ts",
-"CardMediaProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"CardProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"CardRadius"
-],
-[
-"types",
-"components/ui/index.ts",
-"CardShadow"
-],
-[
-"types",
-"components/ui/index.ts",
-"ChipColor"
-],
-[
-"types",
-"components/ui/index.ts",
-"ChipProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"ChipSize"
-],
-[
-"types",
-"components/ui/index.ts",
-"ChipVariant"
-],
-[
-"types",
-"components/ui/index.ts",
-"DateGranularity"
-],
-[
-"types",
-"components/ui/index.ts",
-"DatePickerProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"DialogPlacement"
-],
-[
-"types",
-"components/ui/index.ts",
-"DialogProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"DialogSize"
-],
-[
-"types",
-"components/ui/index.ts",
-"DropdownItem"
-],
-[
-"types",
-"components/ui/index.ts",
-"DropdownProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"InputProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"InputSize"
-],
-[
-"types",
-"components/ui/index.ts",
-"InputVariant"
-],
-[
-"types",
-"components/ui/index.ts",
-"SelectProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"SheetSide"
-],
-[
-"types",
-"components/ui/index.ts",
-"SwitchProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"TabItem"
-],
-[
-"types",
-"components/ui/index.ts",
-"TabsProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"TabsSize"
-],
-[
-"types",
-"components/ui/index.ts",
-"TabsVariant"
-],
-[
-"types",
-"components/ui/index.ts",
-"TextareaProps"
-],
-[
-"types",
-"components/ui/index.ts",
-"WeekStartsOn"
-],
-[
-"types",
-"features/account/components/AccountEmptyIcon.tsx",
-"AccountEmptyIconVariant"
-],
-[
-"types",
-"features/cart/cartUiStore.ts",
-"AppliedCoupon"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedOrderBuyer"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedOrderItem"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedOrderListItem"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedOrderListParams"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedOrderListRecipient"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedOrderRecipient"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedOrderTimelineEntry"
-],
-[
-"types",
-"features/delegated-operations/orders/repo.ts",
-"DelegatedRecipientContact"
-],
-[
-"types",
-"features/delegated-operations/products/repo.ts",
-"DelegatedProductImage"
-],
-[
-"types",
-"features/delegated-operations/products/repo.ts",
-"DelegatedProductSku"
-],
-[
-"types",
-"features/delegated-operations/state/session.ts",
-"DelegatedSessionActor"
-],
-[
-"types",
-"features/delegated-operations/state/session.ts",
-"DelegatedSessionReason"
-],
-[
-"types",
-"features/delegated-operations/state/session.ts",
-"DelegatedSessionStatus"
-],
-[
-"types",
-"features/delegated-operations/state/session.ts",
-"DelegatedSessionTarget"
-],
-[
-"types",
-"features/feed/components/InfiniteFeed.tsx",
-"FeedFilterMode"
-],
-[
-"types",
-"features/invoices/screens/InvoiceComplaintDialog.tsx",
-"ComplaintReasonOption"
-],
-[
-"types",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"BuyerQuoteFailureCode"
-],
-[
-"types",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"OrderProvisioningState"
-],
-[
-"types",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"QuoteAcceptability"
-],
-[
-"types",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"SellerIdentityView"
-],
-[
-"types",
-"features/procurement-assistant/buyer-quote-contract.ts",
-"SellerQuotePayload"
-],
-[
-"types",
-"features/procurement-assistant/capabilities.ts",
-"WebAgentFlag"
-],
-[
-"types",
-"features/procurement-assistant/conversations.ts",
-"AgentTranscriptMessage"
-],
-[
-"types",
-"features/procurement-assistant/rfq-price-contract.ts",
-"RfqCommandFailureCode"
-],
-[
-"types",
-"features/procurement-assistant/rfq-price-contract.ts",
-"RfqQuoteTotalRange"
-],
-[
-"types",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"PublicationResultData"
-],
-[
-"types",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"RfqProgressStepKey"
-],
-[
-"types",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"RfqProgressStepState"
-],
-[
-"types",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"RunCancelResult"
-],
-[
-"types",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"RuntimeSnapshotArtifact"
-],
-[
-"types",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"RuntimeSnapshotOpenConfirmation"
-],
-[
-"types",
-"features/procurement-assistant/runtime-snapshot-contract.ts",
-"RuntimeSnapshotRun"
-],
-[
-"types",
-"features/procurement-assistant/session-logic.ts",
-"RawProcurementItemResolution"
-],
-[
-"types",
-"features/procurement-assistant/session-operation.ts",
-"ExclusiveMutationIdentity"
-],
-[
-"types",
-"features/procurement-assistant/session-operation.ts",
-"SessionMutationIdentity"
-],
-[
-"types",
-"features/procurement-assistant/session-operation.ts",
-"SessionOperationIdentity"
-],
-[
-"types",
-"features/procurement-assistant/useBuyerQuoteComparison.ts",
-"QuoteListState"
-],
-[
-"types",
-"features/procurement-assistant/useRfqRuntimeSnapshot.ts",
-"RuntimeSnapshotState"
-],
-[
-"types",
-"features/seller-center/components/SellerEmptyState.tsx",
-"SellerEmptyVariant"
-],
-[
-"types",
-"features/seller-center/components/sellerNav.tsx",
-"NavBadgeKey"
-],
-[
-"types",
-"features/seller-center/dashboard/onboardingTasks.ts",
-"OnboardingNext"
-],
-[
-"types",
-"features/seller-center/index.ts",
-"SellerEmptyVariant"
-],
-[
-"types",
-"features/seller-center/invoices/amego/amegoSetupState.ts",
-"AmegoPillTone"
-],
-[
-"types",
-"features/seller-center/orders/shipmentOperationStore.ts",
-"SellerShipmentOperationKind"
-],
-[
-"types",
-"features/seller-center/orders/shipmentOperationStore.ts",
-"SellerShipmentOperationPhase"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"CommitSkipReason"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"CommitSkipReasonCode"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"GalleryItem"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"ImportJobCounters"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"ImportJobProgress"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"ImportShippingMethodResponse"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"L1FailPayload"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"ProductDetailPresentation"
-],
-[
-"types",
-"features/seller-center/products-import/types.ts",
-"ProductListPresentation"
-],
-[
-"types",
-"features/seller-center/products/adapters/productFormAdapter.ts",
-"ShelfButton"
-],
-[
-"types",
-"features/seller-center/products/productsUiStore.ts",
-"ProductStatusFilter"
-],
-[
-"types",
-"features/seller/components/CategorySelector.tsx",
-"CategorySelectorTreeSource"
-],
-[
-"types",
-"features/seller/components/categoryCreateFlow.ts",
-"CategoryDraftChoice"
-],
-[
-"types",
-"features/seller/components/categoryCreateFlow.ts",
-"CategoryPathField"
-],
-[
-"types",
-"features/seller/components/categoryCreateFlow.ts",
-"ExistingCategoryChoice"
-],
-[
-"types",
-"features/seller/components/categoryCreateFlow.ts",
-"NewCategoryChoice"
-],
-[
-"types",
-"features/seller/pricing/data.ts",
-"CollaborationMode"
-],
-[
-"types",
-"features/seller/pricing/data.ts",
-"ResponsibilityActor"
-],
-[
-"types",
-"features/seller/pricing/data.ts",
-"ResponsibilityCell"
-],
-[
-"types",
-"features/seller/pricing/data.ts",
-"SellerPlanId"
-],
-[
-"types",
-"features/seller/pricing/data.ts",
-"ServiceBundleId"
-],
-[
-"types",
-"features/seller/pricing/data.ts",
-"ServiceInterestId"
-],
-[
-"types",
-"features/seller/pricing/lead-submission.ts",
-"SellerLeadTrackingContext"
-],
-[
-"types",
-"lib/after-sales/types.ts",
-"AfterSaleArbitrationDecision"
-],
-[
-"types",
-"lib/after-sales/types.ts",
-"AfterSaleArbitrationEvent"
-],
-[
-"types",
-"lib/after-sales/types.ts",
-"AfterSaleStatus"
-],
-[
-"types",
-"lib/after-sales/types.ts",
-"AppealAfterSaleInput"
-],
-[
-"types",
-"lib/api/client.ts",
-"ApiClient"
-],
-[
-"types",
-"lib/api/client.ts",
-"AuthedRequestOptions"
-],
-[
-"types",
-"lib/api/client.ts",
-"RequestOptions"
-],
-[
-"types",
-"lib/api/openapi-types.ts",
-"AccountTypeValue"
-],
-[
-"types",
-"lib/api/openapi-types.ts",
-"ApiEnvelope"
-],
-[
-"types",
-"lib/api/openapi-types.ts",
-"BuyerInfo"
-],
-[
-"types",
-"lib/api/openapi-types.ts",
-"PostProductData"
-],
-[
-"types",
-"lib/api/openapi-types.ts",
-"Role"
-],
-[
-"types",
-"lib/auth/local-private-keys.ts",
-"ClearPolicy"
-],
-[
-"types",
-"lib/auth/local-private-keys.ts",
-"StorageArea"
-],
-[
-"types",
-"lib/browser/in-app-browser.ts",
-"InAppBrowserGuideCorner"
-],
-[
-"types",
-"lib/browser/in-app-browser.ts",
-"MobileBrowserPlatform"
-],
-[
-"types",
-"lib/buyer/seller-match-chat.ts",
-"SellerCandidate"
-],
-[
-"types",
-"lib/chat/types.ts",
-"ChatMessageType"
-],
-[
-"types",
-"lib/checkout/draft.ts",
-"CheckoutDraftCoupon"
-],
-[
-"types",
-"lib/checkout/draft.ts",
-"CheckoutDraftSeller"
-],
-[
-"types",
-"lib/checkout/draft.ts",
-"CheckoutDraftStorePickup"
-],
-[
-"types",
-"lib/checkout/repo.ts",
-"AvailablePaymentMethod"
-],
-[
-"types",
-"lib/checkout/repo.ts",
-"CheckoutInvoiceAmount"
-],
-[
-"types",
-"lib/checkout/repo.ts",
-"CheckoutInvoiceDisclosure"
-],
-[
-"types",
-"lib/checkout/repo.ts",
-"CheckoutInvoiceIntakeLimit"
-],
-[
-"types",
-"lib/checkout/repo.ts",
-"CheckoutInvoiceProfile"
-],
-[
-"types",
-"lib/checkout/repo.ts",
-"UnavailableItem"
-],
-[
-"types",
-"lib/codemeta/enums.ts",
-"AfterSaleEvidenceTypeCode"
-],
-[
-"types",
-"lib/codemeta/enums.ts",
-"AfterSaleEvidenceTypeValue"
-],
-[
-"types",
-"lib/codemeta/enums.ts",
-"SellerCancelReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AccountTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AccountTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleAppealEventTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleAppealEventTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleAppealStateCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleAppealStateValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleCaseStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleCaseStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleEvidenceTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleEvidenceTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSalePlatformDecisionOutcomeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSalePlatformDecisionOutcomeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleRejectReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AfterSaleResolutionTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AppTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"AppTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CartItemStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CartItemStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CartItemUnavailableReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CartItemUnavailableReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CertificationTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CertificationTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ClientTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ClientTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CollectionModelCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CollectionModelValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CommerceModelCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CommerceModelValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CommonStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CommonStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponInstanceStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponInstanceStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponTargetTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponTargetTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponTemplateStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponTemplateStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"CouponTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"DuplicateNameKindCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"DuplicateNameKindValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"FinancialLogTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"FinancialLogTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"FulfillmentActionCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"FulfillmentActionValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"FulfillmentModeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"FulfillmentModeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"HtmlConversionWarningCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"HtmlConversionWarningValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportAssetFailureReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportAssetFailureReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportAssetLocalStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportAssetLocalStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportAssetUsageCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportAssetUsageValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportItemErrorTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportItemErrorTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportItemStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportItemStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportJobStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ImportJobStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceCarrierTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintActionCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintActionValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintEventTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintEventTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceComplaintStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceCorrectionRejectReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceCorrectionRejectReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceCorrectionStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceCorrectionStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceDocumentKindCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceDocumentKindValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceDocumentStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceDocumentStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceDocumentTimelineEventCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceDocumentTimelineEventValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceFulfillmentModeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceFulfillmentModeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceIssuerTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceIssuerTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceLineTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceLineTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceManualReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceManualReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceModelCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceModelValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceNotApplicableReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceNotApplicableReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceOperationStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceOperationStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceOperationTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceOperationTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceProviderAccountStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceProviderAccountStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceRecipientTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceRecipientTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceTaxCategoryCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"InvoiceTaxCategoryValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"IssuerTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"IssuerTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"LabelPrintStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"LabelPrintStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"LogisticsReceivableStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"LogisticsReceivableStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"MediaUploadSessionStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"MediaUploadSessionStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OnboardingStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OnboardingStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OrderCancelByRoleCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OrderCancelByRoleValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OrderCancelReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OrderCancelReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OrderItemStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OrderItemStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"OrderStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PayUniSubmitStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PayUniSubmitStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PaymentMethodCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PaymentMethodIneligibleReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PaymentMethodIneligibleReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PaymentStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PaymentTransactionStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PaymentTransactionStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PayuniMerchantVerificationStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PayuniMerchantVerificationStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"PostPublishStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementArtifactStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementArtifactStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementArtifactTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementArtifactTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementConfirmationStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementConfirmationStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementErrorReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementErrorReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementLaneStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementLaneStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementLedgerEventTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementLedgerEventTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementOrderProvisioningStateCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementOrderProvisioningStateValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementPublicationAudienceModeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementPublicationAudienceModeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementPublicationStateCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementPublicationStateValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementQuoteAcceptabilityCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementRfqPublicationApprovalStateCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementRfqPublicationApprovalStateValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementRunFailureReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementRunFailureReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementRunStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementRunStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementSellerPartyTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementSellerPartyTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementSellerResponseStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementSellerResponseStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementSellerResponseTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementSellerResponseTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementStepStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementTaxInclusionBasisCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementTaxInclusionBasisValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementWishPoolPolicyCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProcurementWishPoolPolicyValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductCertificationGovVerifyStateCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductCertificationGovVerifyStateValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductCertificationRejectReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductCertificationRejectReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductCertificationStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductCertificationStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductPublicationStateCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductPublicationStateValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductSortCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductSortValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProductStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProviderSourceCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ProviderSourceValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReceiptStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReceiptStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"RefundMethodCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"RefundMethodValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"RefundReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"RefundRequestStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"RefundRequestStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"RefundStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"RefundStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportReasonCodeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportReasonCodeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportResolveActionCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportResolveActionValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportTargetTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ReportTargetTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ResponsibilityCauseCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ResponsibilityCauseValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerCancelStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerCancelStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerSuspensionReasonCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerSuspensionReasonValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerTaxEntityTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerTaxEntityTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerTaxObligationCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerTaxObligationValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerTaxReviewStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"SellerTaxReviewStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalyAckActionCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalyAckActionValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalySeverityCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalySeverityValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalyTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShipmentAnomalyTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingAreaCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingAreaValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingFeePayerCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingFeePayerValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingMethodCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingRouteCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingRouteValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingTemperatureCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingTemperatureValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingTypeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"ShippingTypeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"StagedTokenScopeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"StagedTokenScopeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"TcatCallStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"TcatCallStatusValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"UberDeliveryOutcomeCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"UberDeliveryOutcomeValue"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"WeightUnitCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"WorkerTaskStatusCode"
-],
-[
-"types",
-"lib/codemeta/generated.ts",
-"WorkerTaskStatusValue"
-],
-[
-"types",
-"lib/content/data.ts",
-"FaqItem"
-],
-[
-"types",
-"lib/content/data.ts",
-"NavMegaColumn"
-],
-[
-"types",
-"lib/content/data.ts",
-"NavMegaFeature"
-],
-[
-"types",
-"lib/content/seller-guide-data.ts",
-"SellerGuideItem"
-],
-[
-"types",
-"lib/coupons/repo.ts",
-"CouponKind"
-],
-[
-"types",
-"lib/feed/listSnapshot.ts",
-"FeedListSnapshotFilterMode"
-],
-[
-"types",
-"lib/hooks/useCart.ts",
-"CartBanner"
-],
-[
-"types",
-"lib/hooks/useCart.ts",
-"MutationOutcome"
-],
-[
-"types",
-"lib/hooks/useSellerInvoiceRemedy.ts",
-"ReportExternalIssuanceArgs"
-],
-[
-"types",
-"lib/hooks/useSocial.ts",
-"PostCommentOptions"
-],
-[
-"types",
-"lib/invoices/documentStatus.ts",
-"InvoiceDocumentTone"
-],
-[
-"types",
-"lib/invoices/seller-types.ts",
-"InvoiceRetryPolicy"
-],
-[
-"types",
-"lib/invoices/slaCountdown.ts",
-"SlaTone"
-],
-[
-"types",
-"lib/media/gif-edit.ts",
-"GifPlannedFrame"
-],
-[
-"types",
-"lib/media/upload.ts",
-"UploadImageOptions"
-],
-[
-"types",
-"lib/member-cards/repo.ts",
-"SpendingRecord"
-],
-[
-"types",
-"lib/navigation/main-tab-pending.ts",
-"MainTabPendingVariant"
-],
-[
-"types",
-"lib/orders/repo.ts",
-"FetchOrdersParams"
-],
-[
-"types",
-"lib/orders/repo.ts",
-"OrderStatusCountsResult"
-],
-[
-"types",
-"lib/orders/types.ts",
-"AvailablePaymentMethod"
-],
-[
-"types",
-"lib/orders/types.ts",
-"CreateOrderItemInput"
-],
-[
-"types",
-"lib/orders/types.ts",
-"OrderPayment"
-],
-[
-"types",
-"lib/orders/types.ts",
-"OrderShipping"
-],
-[
-"types",
-"lib/orders/types.ts",
-"OrderStatus"
-],
-[
-"types",
-"lib/payment/apple-pay.ts",
-"ApplePayCompletion"
-],
-[
-"types",
-"lib/products/descriptionEditorActions.ts",
-"DescriptionHistoryInputKind"
-],
-[
-"types",
-"lib/products/seller-repo.ts",
-"ProductCreateResult"
-],
-[
-"types",
-"lib/products/seller-repo.ts",
-"SellerProductListParams"
-],
-[
-"types",
-"lib/reviews/repo.ts",
-"ReviewReply"
-],
-[
-"types",
-"lib/reviews/repo.ts",
-"ReviewStats"
-],
-[
-"types",
-"lib/search/repo.ts",
-"SearchSellerInfo"
-],
-[
-"types",
-"lib/seller-data/delegated-repos.ts",
-"DelegatedBatchResult"
-],
-[
-"types",
-"lib/seller-data/delegated-repos.ts",
-"DelegatedBatchResultItem"
-],
-[
-"types",
-"lib/seller-data/delegated-repos.ts",
-"DelegatedBatchUnpublishItem"
-],
-[
-"types",
-"lib/seller-data/scope.tsx",
-"SellerDataKeys"
-],
-[
-"types",
-"lib/seller-data/scope.tsx",
-"SellerDelegatedCommands"
-],
-[
-"types",
-"lib/seller/after-sales.ts",
-"AfterSaleListResult"
-],
-[
-"types",
-"lib/seller/ai-listing-chat.ts",
-"AiCertDraft"
-],
-[
-"types",
-"lib/seller/ai-listing-chat.ts",
-"AiSkuDraft"
-],
-[
-"types",
-"lib/seller/certification-options.ts",
-"TaiwanCity"
-],
-[
-"types",
-"lib/seller/shipping.ts",
-"OnboardingStatus"
-],
-[
-"types",
-"lib/seller/shipping.ts",
-"PayuniSubmitStatus"
-],
-[
-"types",
-"lib/seller/store-contact-saver.ts",
-"StoreSaveResult"
-],
-[
-"types",
-"lib/seller/storeCardView.ts",
-"StoreCardLabel"
-],
-[
-"types",
-"lib/shipping/anomalies.ts",
-"ShipmentAnomalyAckAction"
-],
-[
-"types",
-"lib/shipping/anomalies.ts",
-"ShipmentAnomalySeverity"
-],
-[
-"types",
-"lib/shipping/anomalies.ts",
-"ShipmentAnomalyType"
-],
-[
-"types",
-"lib/sse/client.ts",
-"SseReadyInfo"
-],
-[
-"types",
-"lib/sse/useCommentStream.ts",
-"UseCommentStreamHandlers"
-],
-[
-"types",
-"lib/state/main-tab-freshness-store.ts",
-"MainTabRefreshStatus"
-],
-[
-"types",
-"lib/theme/context.tsx",
-"Theme"
-],
-[
-"types",
-"lib/vendor-portal/draft.ts",
-"VendorOfferedQuality"
-],
-[
-"types",
-"lib/vendor-portal/draft.ts",
-"VendorUnitBasis"
-],
-[
-"types",
-"lib/vendor-portal/repo.ts",
-"VendorRfqRequestedPriceRange"
-],
-[
-"unlisted",
-"features/home/server/home-tab-bootstrap-route.ts",
-"server-only"
-],
-[
-"unlisted",
-"features/procurement-assistant/capabilities.server.ts",
-"server-only"
-],
-[
-"unlisted",
-"lib/api/home-bootstrap.server.ts",
-"server-only"
-],
-[
-"unlisted",
-"lib/auth/dal.ts",
-"server-only"
-],
-[
-"unlisted",
-"lib/auth/require-zone.ts",
-"server-only"
-]
+	["catalogReferences", "package.json", "@biomejs/biome"],
+	["catalogReferences", "package.json", "@bufbuild/protobuf"],
+	["catalogReferences", "package.json", "@connectrpc/connect"],
+	["catalogReferences", "package.json", "@connectrpc/connect-query"],
+	["catalogReferences", "package.json", "@connectrpc/connect-web"],
+	["catalogReferences", "package.json", "@types/node"],
+	["catalogReferences", "package.json", "@types/react"],
+	["catalogReferences", "package.json", "@types/react-dom"],
+	["catalogReferences", "package.json", "next"],
+	["catalogReferences", "package.json", "next-intl"],
+	["catalogReferences", "package.json", "react"],
+	["catalogReferences", "package.json", "react-dom"],
+	["catalogReferences", "package.json", "typescript"],
+	["catalogReferences", "package.json", "typescript-compiler-api"],
+	["catalogReferences", "package.json", "vitest"],
+	["dependencies", "package.json", "@editorjs/image"],
+	["dependencies", "package.json", "@heroui/styles"],
+	["dependencies", "package.json", "@sentry/vercel-edge"],
+	["dependencies", "package.json", "tw-animate-css"],
+	["dependencies", "package.json", "vanta"],
+	["devDependencies", "package.json", "webpack"],
+	[
+		"duplicates",
+		"components/shared/AnimateHeight.tsx",
+		"AnimateHeight|default"
+	],
+	[
+		"duplicates",
+		"components/shared/HeroUIProvider.tsx",
+		"HeroUIProvider|UIProvider|default"
+	],
+	[
+		"duplicates",
+		"components/shared/SellerPageShell.tsx",
+		"SellerPageShell|default"
+	],
+	[
+		"duplicates",
+		"components/shared/useDisclosureMenu.ts",
+		"default|useDisclosureMenu"
+	],
+	["duplicates", "components/ui/Dropdown.tsx", "Dropdown|default"],
+	["duplicates", "components/ui/Switch.tsx", "Switch|default"],
+	[
+		"duplicates",
+		"features/account/screens/orders/OrderAfterSaleSummary.tsx",
+		"OrderAfterSaleSummary|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleArbitrationCard.tsx",
+		"AfterSaleArbitrationCard|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleCaseCard.tsx",
+		"AfterSaleCaseCard|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleConfirmReceiptDialog.tsx",
+		"AfterSaleConfirmReceiptDialog|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleDecisionDrawer.tsx",
+		"AfterSaleDecisionDrawer|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleEvidenceGrid.tsx",
+		"AfterSaleEvidenceGrid|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSalePhotoUploader.tsx",
+		"AfterSalePhotoUploader|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleProgress.tsx",
+		"AfterSaleProgress|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleRefundBanner.tsx",
+		"AfterSaleRefundBanner|default"
+	],
+	[
+		"duplicates",
+		"features/after-sales/components/AfterSaleStatusBadge.tsx",
+		"AfterSaleStatusBadge|default"
+	],
+	[
+		"duplicates",
+		"features/invoices/checkout/CheckoutInvoiceRows.tsx",
+		"CheckoutInvoiceRows|default"
+	],
+	[
+		"duplicates",
+		"features/invoices/components/InvoiceComplaintSection.tsx",
+		"InvoiceComplaintSection|default"
+	],
+	[
+		"duplicates",
+		"features/invoices/order/OrderInvoiceSection.tsx",
+		"OrderInvoiceSection|default"
+	],
+	[
+		"duplicates",
+		"features/invoices/screens/InvoiceComplaintActionDialog.tsx",
+		"InvoiceComplaintActionDialog|default"
+	],
+	[
+		"duplicates",
+		"features/invoices/screens/InvoiceComplaintDialog.tsx",
+		"InvoiceComplaintDialog|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/SellerInvoiceDetailPage.tsx",
+		"SellerInvoiceDetailPage|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/SellerInvoiceOverviewPage.tsx",
+		"SellerInvoiceOverviewPage|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/SellerOrderInvoiceCard.tsx",
+		"SellerOrderInvoiceCard|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/appeals/SellerInvoiceAppealDetailPage.tsx",
+		"SellerInvoiceAppealDetailPage|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/appeals/SellerInvoiceAppealsPage.tsx",
+		"SellerInvoiceAppealsPage|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/components/DeadlineCountdown.tsx",
+		"DeadlineCountdown|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/components/InvoiceSnapshotBreakdown.tsx",
+		"InvoiceSnapshotBreakdown|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/components/TaxStatusCard.tsx",
+		"TaxStatusCard|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/documents/SellerInvoiceDocumentsPage.tsx",
+		"SellerInvoiceDocumentsPage|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/documents/SellerReceivedInvoicesPanel.tsx",
+		"SellerReceivedInvoicesPanel|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/jobs/ReportExternalIssuanceDialog.tsx",
+		"ReportExternalIssuanceDialog|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/jobs/SellerInvoiceJobPage.tsx",
+		"SellerInvoiceJobPage|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/tax-status/SellerTaxStatusPage.tsx",
+		"SellerTaxStatusPage|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/invoices/tax-status/TaxSubmitSection.tsx",
+		"TaxSubmitSection|default"
+	],
+	[
+		"duplicates",
+		"features/seller-center/orders/SellerOrderAfterSaleCard.tsx",
+		"SellerOrderAfterSaleCard|default"
+	],
+	[
+		"duplicates",
+		"features/seller/components/SellerProfileBranding.tsx",
+		"SellerProfileBranding|default"
+	],
+	[
+		"duplicates",
+		"lib/after-sales/seller-repo.ts",
+		"fetchAfterSaleDetail|fetchSellerAfterSaleDetail"
+	],
+	["exports", "app/(delegated)/adm/api/_csrf.ts", "IDEMPOTENCY_KEY_HEADER"],
+	["exports", "app/(delegated)/adm/api/_csrf.ts", "assertNoReservedHeaders"],
+	["exports", "app/(delegated)/adm/api/_csrf.ts", "assertSameOriginMutation"],
+	["exports", "app/(delegated)/adm/api/_forward.ts", "UPSTREAM_FAILURE"],
+	["exports", "components/shared/AnimateHeight.tsx", "default"],
+	[
+		"exports",
+		"components/shared/CompactBackControl.tsx",
+		"COMPACT_BACK_CONTROL_LABEL"
+	],
+	[
+		"exports",
+		"components/shared/FooterCategoryColumns.tsx",
+		"FOOTER_COLUMN_ITEM_CAP"
+	],
+	[
+		"exports",
+		"components/shared/FooterCategoryColumns.tsx",
+		"footerCategoryHref"
+	],
+	[
+		"exports",
+		"components/shared/FooterCategoryColumns.tsx",
+		"footerHashtagHref"
+	],
+	["exports", "components/shared/HeroUIProvider.tsx", "HeroUIProvider"],
+	["exports", "components/shared/HeroUIProvider.tsx", "default"],
+	["exports", "components/shared/ScPrimitives.tsx", "ScSection"],
+	[
+		"exports",
+		"components/shared/SellerNavbarLoader.tsx",
+		"sellerNavbarResource"
+	],
+	["exports", "components/shared/useDisclosureMenu.ts", "default"],
+	["exports", "components/ui/Button.tsx", "ButtonLoadingContent"],
+	["exports", "components/ui/Card.tsx", "CardMedia"],
+	["exports", "components/ui/Dropdown.tsx", "default"],
+	["exports", "components/ui/index.ts", "CalendarMonth"],
+	["exports", "components/ui/index.ts", "CardBody"],
+	["exports", "components/ui/index.ts", "CardFooter"],
+	["exports", "components/ui/index.ts", "CardHeader"],
+	["exports", "components/ui/index.ts", "CardMedia"],
+	["exports", "components/ui/index.ts", "Switch"],
+	[
+		"exports",
+		"features/account/screens/orders/OrderAfterSaleSummary.tsx",
+		"OrderAfterSaleSummary"
+	],
+	[
+		"exports",
+		"features/account/screens/settings/SignInMethodsSection.tsx",
+		"SETTINGS_PATH"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleArbitrationCard.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleCaseCard.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleConfirmReceiptDialog.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleDecisionDrawer.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleEvidenceGrid.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSalePhotoUploader.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleProgress.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleRefundBanner.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/after-sales/components/AfterSaleStatusBadge.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/delegated-operations/load-failure.ts",
+		"DELEGATION_CAPABILITY_DENIED"
+	],
+	[
+		"exports",
+		"features/delegated-operations/load-failure.ts",
+		"DELEGATION_RESOURCE_NOT_OWNED"
+	],
+	[
+		"exports",
+		"features/delegated-operations/nav-policy.ts",
+		"delegatedAreaOperable"
+	],
+	[
+		"exports",
+		"features/delegated-operations/orders/RevealRecipientDialog.tsx",
+		"OPERATION_REASON_MAX"
+	],
+	[
+		"exports",
+		"features/delegated-operations/products/edit-patch.ts",
+		"sameImages"
+	],
+	[
+		"exports",
+		"features/delegated-operations/products/edit-patch.ts",
+		"toImageInputs"
+	],
+	[
+		"exports",
+		"features/delegated-operations/products/repo.ts",
+		"readDelegatedProductDetail"
+	],
+	[
+		"exports",
+		"features/delegated-operations/server/session.ts",
+		"DELEGATED_COOKIE_PATH"
+	],
+	[
+		"exports",
+		"features/delegated-operations/server/session.ts",
+		"LOCAL_DELEGATED_COOKIE_NAME"
+	],
+	[
+		"exports",
+		"features/delegated-operations/server/session.ts",
+		"PRODUCTION_DELEGATED_COOKIE_NAME"
+	],
+	[
+		"exports",
+		"features/delegated-operations/server/session.ts",
+		"parseDelegatedExpiry"
+	],
+	[
+		"exports",
+		"features/delegated-operations/state/session.ts",
+		"DELEGATED_OPERATION_CLOCK_SKEW_SECONDS"
+	],
+	[
+		"exports",
+		"features/delegated-operations/state/session.ts",
+		"DELEGATED_OPERATION_EXPIRING_SECONDS"
+	],
+	[
+		"exports",
+		"features/delegated-operations/state/session.ts",
+		"DELEGATED_TERMINAL_BIZ_CODES"
+	],
+	[
+		"exports",
+		"features/delegated-operations/state/session.ts",
+		"deriveDelegatedSessionState"
+	],
+	["exports", "features/feed/nearbyStories.ts", "distanceKm"],
+	["exports", "features/invoices/checkout/CheckoutInvoiceRows.tsx", "default"],
+	[
+		"exports",
+		"features/invoices/components/InvoiceComplaintSection.tsx",
+		"default"
+	],
+	["exports", "features/invoices/order/OrderInvoiceSection.tsx", "default"],
+	[
+		"exports",
+		"features/invoices/screens/InvoiceComplaintActionDialog.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/invoices/screens/InvoiceComplaintDialog.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/orders/components/orderStatusTimelineModel.ts",
+		"ORDER_STATUS_TIMELINE_INDEX"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/AgentEntryPanel.tsx",
+		"CapabilityButton"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/AgentEntryPanel.tsx",
+		"ENTRY_COMPOSER_PLACEHOLDER"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/agent-motion.ts",
+		"motionForStep"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"orderProvisioningStateSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"sellerIdentityViewSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"sellerQuotePayloadSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"sellerQuoteResponseTypeSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"taxInclusionBasisSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/capabilities.ts",
+		"isFlagEnabled"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/conversations.ts",
+		"normalizeHawkrAgentCategoryId"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/conversations.ts",
+		"resetAgentConversationsProbe"
+	],
+	["exports", "features/procurement-assistant/errors.ts", "isRequestNotFound"],
+	[
+		"exports",
+		"features/procurement-assistant/rfq-price-contract.ts",
+		"rfqBuyerRequestedRangeSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/rfq-price-contract.ts",
+		"rfqQuoteTotalRangeSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/routes.ts",
+		"ASSISTANT_DEMO_PATH"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/routes.ts",
+		"ASSISTANT_LEGACY_LIVE_CONVERSATION_ID"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/routes.ts",
+		"ASSISTANT_LEGACY_LIVE_PATH"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"RUN_CANCEL_DISPOSITIONS"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"runtimeSnapshotArtifactSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"runtimeSnapshotOpenConfirmationSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"runtimeSnapshotRunSchema"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/steps.ts",
+		"STEP_FALLBACK_LABELS"
+	],
+	[
+		"exports",
+		"features/procurement-assistant/telemetry.ts",
+		"trackHawkrAgentTerminalRendered"
+	],
+	[
+		"exports",
+		"features/product/components/useGalleryImagePreset.ts",
+		"galleryImagePreset"
+	],
+	["exports", "features/product/deriveDetailLayoutProps.ts", "CARRIER_META"],
+	["exports", "features/product/deriveDetailLayoutProps.ts", "asRecord"],
+	[
+		"exports",
+		"features/product/deriveDetailLayoutProps.ts",
+		"descriptionImageRaw"
+	],
+	["exports", "features/product/deriveDetailLayoutProps.ts", "textOrEmpty"],
+	["exports", "features/product/deriveDetailLayoutProps.ts", "textOrNumber"],
+	["exports", "features/product/index.ts", "ProductViewTracker"],
+	[
+		"exports",
+		"features/seller-center/components/SellerPageSkeletons.tsx",
+		"SellerDashboardSkeleton"
+	],
+	[
+		"exports",
+		"features/seller-center/components/SellerSkeletons.tsx",
+		"SellerTableSkeleton"
+	],
+	[
+		"exports",
+		"features/seller-center/components/SellerSuspendedNotice.tsx",
+		"TERMINATION_REASON_HEADING"
+	],
+	[
+		"exports",
+		"features/seller-center/components/SellerSuspendedNotice.tsx",
+		"TERMINATION_SUBTITLE"
+	],
+	[
+		"exports",
+		"features/seller-center/components/ShelfStatusControl.tsx",
+		"shelfToggleTarget"
+	],
+	["exports", "features/seller-center/index.ts", "DashboardPage"],
+	["exports", "features/seller-center/index.ts", "EmptyState"],
+	["exports", "features/seller-center/index.ts", "InventoryPage"],
+	["exports", "features/seller-center/index.ts", "ProductFormPage"],
+	["exports", "features/seller-center/index.ts", "ProductsPage"],
+	["exports", "features/seller-center/index.ts", "SellerCardGridSkeleton"],
+	["exports", "features/seller-center/index.ts", "SellerDashboardSkeleton"],
+	["exports", "features/seller-center/index.ts", "SellerInventorySkeletonRows"],
+	[
+		"exports",
+		"features/seller-center/index.ts",
+		"SellerInvoiceAppealDetailPage"
+	],
+	["exports", "features/seller-center/index.ts", "SellerInvoiceAppealsPage"],
+	["exports", "features/seller-center/index.ts", "SellerInvoiceDetailPage"],
+	["exports", "features/seller-center/index.ts", "SellerInvoiceDocumentsPage"],
+	["exports", "features/seller-center/index.ts", "SellerInvoiceJobPage"],
+	["exports", "features/seller-center/index.ts", "SellerInvoiceOverviewPage"],
+	["exports", "features/seller-center/index.ts", "SellerOrderInvoiceCard"],
+	["exports", "features/seller-center/index.ts", "SellerOrdersPage"],
+	["exports", "features/seller-center/index.ts", "SellerOrdersSkeletonRows"],
+	["exports", "features/seller-center/index.ts", "SellerProductsSkeletonRows"],
+	["exports", "features/seller-center/index.ts", "SellerStatRowSkeleton"],
+	["exports", "features/seller-center/index.ts", "SellerTableSkeleton"],
+	["exports", "features/seller-center/index.ts", "SellerTaxStatusPage"],
+	["exports", "features/seller-center/index.ts", "StatCard"],
+	["exports", "features/seller-center/index.ts", "SummaryStatCard"],
+	[
+		"exports",
+		"features/seller-center/invoices/SellerInvoiceDetailPage.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/SellerInvoiceOverviewPage.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/SellerOrderInvoiceCard.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/appeals/SellerInvoiceAppealDetailPage.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/appeals/SellerInvoiceAppealsPage.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/components/DeadlineCountdown.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/components/InvoiceSnapshotBreakdown.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/components/TaxStatusCard.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/documents/SellerInvoiceDocumentsPage.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/documents/SellerReceivedInvoicesPanel.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/documents/invoiceDocumentsTabs.tsx",
+		"INVOICE_DOCUMENTS_TABS"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/invoiceComplaintDisplay.ts",
+		"DEFAULT_SELLER_COMPLAINT_VIEW"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/jobs/ReportExternalIssuanceDialog.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/jobs/SellerInvoiceJobPage.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/tax-status/SellerTaxStatusPage.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/invoices/tax-status/TaxSubmitSection.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/orders/SellerOrderAfterSaleCard.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller-center/orders/orderTabs.ts",
+		"afterSaleOverridesOrderLifecycle"
+	],
+	[
+		"exports",
+		"features/seller-center/posts/postImageRequirement.ts",
+		"POST_IMAGE_REQUIRED_DESCRIPTION"
+	],
+	[
+		"exports",
+		"features/seller-center/products-import/adapters/importItemAdapter.ts",
+		"parseDescriptionJson"
+	],
+	[
+		"exports",
+		"features/seller-center/products-import/i18n.ts",
+		"COMMIT_SKIP_REASON_LABEL"
+	],
+	[
+		"exports",
+		"features/seller-center/products-import/types.ts",
+		"COMMIT_SKIP_REASON"
+	],
+	[
+		"exports",
+		"features/seller-center/products/components/ProductFormSections.tsx",
+		"CARD"
+	],
+	[
+		"exports",
+		"features/seller/components/SellerProfileBranding.tsx",
+		"default"
+	],
+	[
+		"exports",
+		"features/seller/components/categoryCreateFlow.ts",
+		"existingCategoryChoice"
+	],
+	[
+		"exports",
+		"features/seller/components/categoryCreateFlow.ts",
+		"validateNewCategoryName"
+	],
+	[
+		"exports",
+		"features/seller/measures/AppealEntry.tsx",
+		"APPEAL_BUTTON_LABEL"
+	],
+	[
+		"exports",
+		"features/seller/measures/RemediationEntry.tsx",
+		"REMEDIATION_BUTTON_LABEL"
+	],
+	[
+		"exports",
+		"features/seller/measures/appealEvidenceUpload.ts",
+		"APPEAL_EVIDENCE_DOC_TYPE"
+	],
+	["exports", "features/seller/pricing/data.ts", "BUNDLE_CHOOSER"],
+	["exports", "features/seller/pricing/data.ts", "CALCULATOR_CROSSOVER_NOTE"],
+	["exports", "features/seller/pricing/data.ts", "CALCULATOR_DEFAULT_AMOUNT"],
+	["exports", "features/seller/pricing/data.ts", "CALCULATOR_MAX_AMOUNT"],
+	["exports", "features/seller/pricing/data.ts", "CALCULATOR_NOTE"],
+	["exports", "features/seller/pricing/data.ts", "CALCULATOR_ROUNDING_NOTE"],
+	["exports", "features/seller/pricing/data.ts", "CALCULATOR_STEP"],
+	["exports", "features/seller/pricing/data.ts", "COLLABORATION_CHECK_NOTE"],
+	["exports", "features/seller/pricing/data.ts", "COLLABORATION_NOTE"],
+	["exports", "features/seller/pricing/data.ts", "HERO_TRUST_POINTS"],
+	["exports", "features/seller/pricing/data.ts", "SERVICE_BOUNDARY_NOTE"],
+	["exports", "features/seller/pricing/data.ts", "SERVICE_BUNDLE_INTRO"],
+	["exports", "features/seller/pricing/data.ts", "SERVICE_PLATFORM_SCOPE"],
+	["exports", "features/seller/pricing/data.ts", "SERVICE_PRINCIPLE"],
+	["exports", "features/seller/pricing/data.ts", "SERVICE_SELLER_SCOPE"],
+	["exports", "features/seller/pricing/data.ts", "SOURCE_NEUTRALITY_NOTE"],
+	["exports", "features/seller/pricing/data.ts", "TAX_NOTE"],
+	["exports", "lib/a11y/focusable.ts", "FOCUSABLE_SELECTOR"],
+	["exports", "lib/addresses/repo.ts", "fetchDefaultAddress"],
+	["exports", "lib/after-sales/seller-repo.ts", "fetchAfterSaleDetail"],
+	["exports", "lib/analytics/gtag.ts", "isEnabled"],
+	["exports", "lib/analytics/gtag.ts", "setConsent"],
+	["exports", "lib/animation/page-curl.ts", "PAGE_CURL_MAX_BEND_RADIANS"],
+	[
+		"exports",
+		"lib/animation/page-turn-gesture.ts",
+		"PAGE_TURN_FLING_MAX_AGE_MS"
+	],
+	["exports", "lib/animation/page-turn-gesture.ts", "PAGE_TURN_PROJECTION_MS"],
+	["exports", "lib/api/client.ts", "__resetApiFailureDedupForTest"],
+	["exports", "lib/api/delegated.ts", "DELEGATED_BFF_PREFIX"],
+	["exports", "lib/api/index.ts", "fetchProduct"],
+	["exports", "lib/api/json.ts", "preserveBigInts"],
+	["exports", "lib/api/json.ts", "readJsonSafe"],
+	["exports", "lib/api/openapi-types.ts", "ACCOUNT_TYPE"],
+	["exports", "lib/api/openapi-types.ts", "roleFromAccountType"],
+	["exports", "lib/api/posts.ts", "likePost"],
+	["exports", "lib/api/posts.ts", "unlikePost"],
+	["exports", "lib/api/revalidate-request.ts", "MAX_REVALIDATION_TAG_LENGTH"],
+	["exports", "lib/auth/cross-tab-sync.ts", "SESSION_CHANNEL_NAME"],
+	["exports", "lib/auth/dal.ts", "SESSION_READ_TIMEOUT_MS"],
+	["exports", "lib/auth/dal.ts", "classifySession"],
+	["exports", "lib/auth/gsi.ts", "GSI_LOAD_TIMEOUT_MS"],
+	["exports", "lib/auth/gsi.ts", "GSI_RETRY_BACKOFF_MS"],
+	["exports", "lib/auth/gsi.ts", "GSI_SRC"],
+	["exports", "lib/auth/gsi.ts", "getGsiFailureAttempts"],
+	["exports", "lib/auth/local-private-state.ts", "LOCAL_STATE_OWNER_KEY"],
+	["exports", "lib/auth/oauth-start.ts", "OAUTH_START_PATH"],
+	["exports", "lib/auth/redirect.ts", "roleLabel"],
+	["exports", "lib/cart/flyToCart.ts", "bumpCartBadge"],
+	["exports", "lib/cart/resolve.ts", "resolveLegacyCartItem"],
+	["exports", "lib/cart/types.ts", "groupBySeller"],
+	["exports", "lib/chat/repo.ts", "fetchOnlineUsers"],
+	["exports", "lib/chat/repo.ts", "markAllChatRead"],
+	["exports", "lib/chat/repo.ts", "markMessagesRead"],
+	["exports", "lib/checkout/repo.ts", "parseAvailablePaymentMethods"],
+	["exports", "lib/checkout/repo.ts", "parseCheckoutInvoicePreview"],
+	["exports", "lib/codemeta/generated.ts", "ACCOUNT_TYPE_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"AFTER_SALE_APPEAL_EVENT_TYPE_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "AFTER_SALE_APPEAL_STATE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "AFTER_SALE_CASE_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "AFTER_SALE_EVIDENCE_TYPE_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"AFTER_SALE_PLATFORM_DECISION_OUTCOME_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "APP_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "AccountType"],
+	["exports", "lib/codemeta/generated.ts", "AfterSaleAppealEventType"],
+	["exports", "lib/codemeta/generated.ts", "AfterSalePlatformDecisionOutcome"],
+	["exports", "lib/codemeta/generated.ts", "AppType"],
+	["exports", "lib/codemeta/generated.ts", "CART_ITEM_STATUS_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"CART_ITEM_UNAVAILABLE_REASON_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "CERTIFICATION_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "CLIENT_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "COLLECTION_MODEL_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "COMMERCE_MODEL_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "COMMON_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "COUPON_INSTANCE_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "COUPON_TARGET_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "COUPON_TEMPLATE_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "COUPON_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "CartItemStatus"],
+	["exports", "lib/codemeta/generated.ts", "CartItemUnavailableReason"],
+	["exports", "lib/codemeta/generated.ts", "CertificationType"],
+	["exports", "lib/codemeta/generated.ts", "ClientType"],
+	["exports", "lib/codemeta/generated.ts", "CollectionModel"],
+	["exports", "lib/codemeta/generated.ts", "CommerceModel"],
+	["exports", "lib/codemeta/generated.ts", "CommonStatus"],
+	["exports", "lib/codemeta/generated.ts", "CouponInstanceStatus"],
+	["exports", "lib/codemeta/generated.ts", "CouponTargetType"],
+	["exports", "lib/codemeta/generated.ts", "CouponTemplateStatus"],
+	["exports", "lib/codemeta/generated.ts", "CouponType"],
+	["exports", "lib/codemeta/generated.ts", "DUPLICATE_NAME_KIND_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "DuplicateNameKind"],
+	["exports", "lib/codemeta/generated.ts", "FINANCIAL_LOG_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "FULFILLMENT_ACTION_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "FULFILLMENT_MODE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "FinancialLogType"],
+	["exports", "lib/codemeta/generated.ts", "FulfillmentAction"],
+	["exports", "lib/codemeta/generated.ts", "FulfillmentMode"],
+	["exports", "lib/codemeta/generated.ts", "HTML_CONVERSION_WARNING_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "HtmlConversionWarning"],
+	["exports", "lib/codemeta/generated.ts", "IMPORT_ASSET_FAILURE_REASON_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "IMPORT_ASSET_LOCAL_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "IMPORT_ASSET_USAGE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "IMPORT_ITEM_ERROR_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "IMPORT_ITEM_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "IMPORT_JOB_STATUS_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"INVOICE_COMPLAINT_EVENT_TYPE_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "INVOICE_CORRECTION_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "INVOICE_ISSUER_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "INVOICE_MODEL_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"INVOICE_NOT_APPLICABLE_REASON_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "ISSUER_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "ImportAssetFailureReason"],
+	["exports", "lib/codemeta/generated.ts", "ImportAssetLocalStatus"],
+	["exports", "lib/codemeta/generated.ts", "ImportAssetUsage"],
+	["exports", "lib/codemeta/generated.ts", "ImportItemErrorType"],
+	["exports", "lib/codemeta/generated.ts", "ImportItemStatus"],
+	["exports", "lib/codemeta/generated.ts", "ImportJobStatus"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceComplaintAction"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceComplaintEventType"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceCorrectionRejectReason"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceCorrectionStatus"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceDocumentTimelineEvent"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceIssuerType"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceManualReason"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceModel"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceNotApplicableReason"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceOperationType"],
+	["exports", "lib/codemeta/generated.ts", "InvoiceRecipientType"],
+	["exports", "lib/codemeta/generated.ts", "IssuerType"],
+	["exports", "lib/codemeta/generated.ts", "LABEL_PRINT_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "LOGISTICS_RECEIVABLE_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "LabelPrintStatus"],
+	["exports", "lib/codemeta/generated.ts", "LogisticsReceivableStatus"],
+	["exports", "lib/codemeta/generated.ts", "MEDIA_UPLOAD_SESSION_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "MediaUploadSessionStatus"],
+	["exports", "lib/codemeta/generated.ts", "ONBOARDING_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "ORDER_CANCEL_BY_ROLE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "ORDER_ITEM_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "OnboardingStatus"],
+	["exports", "lib/codemeta/generated.ts", "OrderCancelReason"],
+	["exports", "lib/codemeta/generated.ts", "OrderItemStatus"],
+	["exports", "lib/codemeta/generated.ts", "PAYMENT_TRANSACTION_STATUS_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PAYUNI_MERCHANT_VERIFICATION_STATUS_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "PAY_UNI_SUBMIT_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "PROCUREMENT_ARTIFACT_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "PROCUREMENT_ARTIFACT_TYPE_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_CONFIRMATION_STATUS_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "PROCUREMENT_ERROR_REASON_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "PROCUREMENT_LANE_STATUS_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_LEDGER_EVENT_TYPE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_ORDER_PROVISIONING_STATE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_PUBLICATION_AUDIENCE_MODE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_PUBLICATION_STATE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_QUOTE_ACCEPTABILITY_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_RFQ_INVITE_DELIVERY_STATE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_RFQ_PUBLICATION_APPROVAL_STATE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_RUN_FAILURE_REASON_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "PROCUREMENT_RUN_STATUS_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_SELLER_PARTY_TYPE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_SELLER_RESPONSE_STATUS_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_SELLER_RESPONSE_TYPE_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "PROCUREMENT_STEP_STATUS_LABEL"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_TAX_INCLUSION_BASIS_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PROCUREMENT_WISH_POOL_POLICY_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PRODUCT_CERTIFICATION_GOV_VERIFY_STATE_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PRODUCT_CERTIFICATION_REJECT_REASON_LABEL"
+	],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"PRODUCT_CERTIFICATION_STATUS_LABEL"
+	],
+	["exports", "lib/codemeta/generated.ts", "PRODUCT_PUBLICATION_STATE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "PRODUCT_SORT_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "PROVIDER_SOURCE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "PayUniSubmitStatus"],
+	["exports", "lib/codemeta/generated.ts", "PaymentMethodIneligibleReason"],
+	["exports", "lib/codemeta/generated.ts", "PaymentTransactionStatus"],
+	["exports", "lib/codemeta/generated.ts", "PayuniMerchantVerificationStatus"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementArtifactStatus"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementConfirmationStatus"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementErrorReason"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementLaneStatus"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementLedgerEventType"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"ProcurementPublicationAudienceMode"
+	],
+	["exports", "lib/codemeta/generated.ts", "ProcurementPublicationState"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"ProcurementRfqPublicationApprovalState"
+	],
+	["exports", "lib/codemeta/generated.ts", "ProcurementRunFailureReason"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementRunStatus"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementSellerPartyType"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementSellerResponseStatus"],
+	["exports", "lib/codemeta/generated.ts", "ProcurementWishPoolPolicy"],
+	[
+		"exports",
+		"lib/codemeta/generated.ts",
+		"ProductCertificationGovVerifyState"
+	],
+	["exports", "lib/codemeta/generated.ts", "ProductCertificationRejectReason"],
+	["exports", "lib/codemeta/generated.ts", "ProductCertificationStatus"],
+	["exports", "lib/codemeta/generated.ts", "ProductPublicationState"],
+	["exports", "lib/codemeta/generated.ts", "ProductSort"],
+	["exports", "lib/codemeta/generated.ts", "ProviderSource"],
+	["exports", "lib/codemeta/generated.ts", "RECEIPT_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "REFUND_METHOD_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "REFUND_REQUEST_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "REFUND_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "REPORT_REASON_CODE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "REPORT_RESOLVE_ACTION_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "REPORT_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "REPORT_TARGET_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "RESPONSIBILITY_CAUSE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "ReceiptStatus"],
+	["exports", "lib/codemeta/generated.ts", "RefundMethod"],
+	["exports", "lib/codemeta/generated.ts", "RefundRequestStatus"],
+	["exports", "lib/codemeta/generated.ts", "RefundStatus"],
+	["exports", "lib/codemeta/generated.ts", "ReportReasonCode"],
+	["exports", "lib/codemeta/generated.ts", "ReportResolveAction"],
+	["exports", "lib/codemeta/generated.ts", "ReportStatus"],
+	["exports", "lib/codemeta/generated.ts", "ReportTargetType"],
+	["exports", "lib/codemeta/generated.ts", "ResponsibilityCause"],
+	["exports", "lib/codemeta/generated.ts", "SELLER_CANCEL_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SELLER_TAX_REVIEW_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SHIPMENT_ANOMALY_ACK_ACTION_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SHIPMENT_ANOMALY_SEVERITY_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SHIPMENT_ANOMALY_TYPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SHIPPING_AREA_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SHIPPING_FEE_PAYER_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SHIPPING_ROUTE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SHIPPING_TEMPERATURE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "STAGED_TOKEN_SCOPE_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "SellerCancelStatus"],
+	["exports", "lib/codemeta/generated.ts", "ShipmentAnomalyAckAction"],
+	["exports", "lib/codemeta/generated.ts", "ShipmentAnomalySeverity"],
+	["exports", "lib/codemeta/generated.ts", "ShipmentAnomalyType"],
+	["exports", "lib/codemeta/generated.ts", "ShippingArea"],
+	["exports", "lib/codemeta/generated.ts", "ShippingRoute"],
+	["exports", "lib/codemeta/generated.ts", "StagedTokenScope"],
+	["exports", "lib/codemeta/generated.ts", "TCAT_CALL_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "TcatCallStatus"],
+	["exports", "lib/codemeta/generated.ts", "UBER_DELIVERY_OUTCOME_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "UberDeliveryOutcome"],
+	["exports", "lib/codemeta/generated.ts", "WORKER_TASK_STATUS_LABEL"],
+	["exports", "lib/codemeta/generated.ts", "WorkerTaskStatus"],
+	["exports", "lib/config/flavor.ts", "isDevFlavor"],
+	["exports", "lib/favorites/repo.ts", "addFavorite"],
+	["exports", "lib/hooks/useCart.ts", "parsePriceValue"],
+	["exports", "lib/hooks/useSellerMeasures.ts", "useInvalidateSellerMeasures"],
+	["exports", "lib/invoices/carrier.ts", "BUYER_NAME_MAX_RUNES"],
+	["exports", "lib/invoices/carrier.ts", "isKnownCarrierType"],
+	["exports", "lib/invoices/seller-repo.ts", "AMEGO_PROVIDER"],
+	["exports", "lib/invoices/seller-repo.ts", "RECEIPT_AUTH_CONSENT_VERSION"],
+	["exports", "lib/invoices/seller-repo.ts", "SELLER_COMPLAINT_ACTIONS"],
+	["exports", "lib/invoices/seller-repo.ts", "SELLER_COMPLAINT_SORT_DUE_ASC"],
+	[
+		"exports",
+		"lib/loading/navigation-watchdog.ts",
+		"MAIN_TAB_NAVIGATION_WATCHDOG_MS"
+	],
+	["exports", "lib/market/listFilters.ts", "normaliseHashtags"],
+	["exports", "lib/market/listFilters.ts", "readDisplayOrigin"],
+	["exports", "lib/market/listFilters.ts", "readPriceMax"],
+	["exports", "lib/market/listFilters.ts", "readPriceMin"],
+	["exports", "lib/market/listFilters.ts", "readSellerId"],
+	["exports", "lib/market/listFilters.ts", "readSellerStoreCode"],
+	["exports", "lib/media/avatar-logo.ts", "AVATAR_LOGO_SAFE_INSET"],
+	["exports", "lib/media/gif-crop.ts", "GIF_CROP_MAX_DECODED_PIXELS"],
+	["exports", "lib/media/gif-crop.ts", "GIF_CROP_MAX_DIMENSION"],
+	["exports", "lib/media/gif-crop.ts", "GIF_CROP_MAX_FRAMES"],
+	["exports", "lib/media/gif-crop.ts", "GIF_CROP_MAX_LOGICAL_PIXELS"],
+	["exports", "lib/media/gif-timing.ts", "GIF_BROWSER_SHORT_DELAY_MS"],
+	["exports", "lib/media/product-image.ts", "PRODUCT_IMAGE_MAX_EDGE"],
+	["exports", "lib/navigation/history-marker.ts", "isBouncePathname"],
+	["exports", "lib/navigation/history-marker.ts", "previousPathname"],
+	[
+		"exports",
+		"lib/navigation/recovery-state.ts",
+		"MAIN_TAB_NAVIGATION_WATCHDOG_MS"
+	],
+	["exports", "lib/orders/repo.ts", "createOrder"],
+	["exports", "lib/payment/apple-pay.ts", "applePayMerchantId"],
+	["exports", "lib/payment/google-pay.ts", "GOOGLE_PAY_MERCHANT_NAME"],
+	["exports", "lib/payment/google-pay.ts", "__resetGooglePayForTest"],
+	["exports", "lib/payment/google-pay.ts", "googlePayEnvironment"],
+	["exports", "lib/post-tags/repo.ts", "formatPostTag"],
+	["exports", "lib/products/clipboardGrid.ts", "htmlToGrid"],
+	["exports", "lib/products/pricing.ts", "formatPriceRange"],
+	["exports", "lib/products/pricing.ts", "hasSalePrice"],
+	["exports", "lib/products/publication.ts", "PUBLICATION_STATE"],
+	["exports", "lib/products/rating.ts", "formatRating"],
+	["exports", "lib/products/rating.ts", "hasRating"],
+	["exports", "lib/products/seller-repo.ts", "BLOCK_COLOR_PRESETS"],
+	["exports", "lib/products/seller-repo.ts", "BLOCK_FONT_SIZES"],
+	["exports", "lib/products/seller-repo.ts", "PRODUCT_STATUS"],
+	["exports", "lib/products/seller-repo.ts", "deleteProduct"],
+	[
+		"exports",
+		"lib/seller-data/delegated-repos.ts",
+		"DELEGATED_BATCH_UNPUBLISH_MAX"
+	],
+	[
+		"exports",
+		"lib/seller-data/delegated-repos.ts",
+		"DelegatedEndpointMissingError"
+	],
+	["exports", "lib/seller-data/delegated-repos.ts", "mapDelegatedPost"],
+	["exports", "lib/seller/after-sales.ts", "fetchAfterSaleDetail"],
+	["exports", "lib/seller/ai-image.ts", "AI_QUOTA_EXCEEDED_CODE"],
+	["exports", "lib/seller/certification-options.ts", "TAIWAN_CITIES"],
+	["exports", "lib/seller/contact-email.ts", "CONTACT_EMAIL_MAX_LENGTH"],
+	["exports", "lib/seller/kyc.ts", "KYC_FIELDS"],
+	["exports", "lib/seller/kyc.ts", "businessLookupOf"],
+	["exports", "lib/seller/kyc.ts", "isKycDocumentField"],
+	["exports", "lib/seller/measures.ts", "APPEAL_CONFLICT_NOTICE"],
+	["exports", "lib/seller/measures.ts", "APPEAL_RELOAD_FAILED_NOTICE"],
+	["exports", "lib/seller/measures.ts", "APPEAL_UNAVAILABLE_NOTICE"],
+	["exports", "lib/seller/measures.ts", "REMEDIATION_CONFLICT_NOTICE"],
+	["exports", "lib/seller/measures.ts", "REMEDIATION_UNAVAILABLE_NOTICE"],
+	["exports", "lib/seller/measures.ts", "appealFailure"],
+	["exports", "lib/seller/measures.ts", "remediationFailure"],
+	["exports", "lib/seller/share-card.ts", "buildSellerShareUrl"],
+	["exports", "lib/seller/shipment.ts", "SHIPMENT_STATUS"],
+	["exports", "lib/seller/shipment.ts", "incrementShipmentRetryCount"],
+	["exports", "lib/seller/shipment.ts", "isShipmentBackendStuck"],
+	["exports", "lib/seller/shipment.ts", "isTaqbinMethod"],
+	["exports", "lib/seller/shipment.ts", "isUnderShipmentCooldown"],
+	["exports", "lib/seller/shipment.ts", "shipmentBusinessCode"],
+	["exports", "lib/seller/shipment.ts", "shipmentCooldownRemainingSeconds"],
+	["exports", "lib/seller/shipping.ts", "ONBOARDING_STATUS"],
+	["exports", "lib/seller/shipping.ts", "isEnabled"],
+	["exports", "lib/seller/shipping.ts", "isToggleable"],
+	["exports", "lib/seller/store-contact.ts", "isKnownStoreField"],
+	["exports", "lib/seller/store.ts", "missingOf"],
+	["exports", "lib/seller/validators.ts", "validatePhone"],
+	["exports", "lib/seo/summary-rules.ts", "TITLE_SEPARATOR"],
+	["exports", "lib/shipping/anomalies.ts", "SHIPMENT_ANOMALY_SEVERITY"],
+	["exports", "lib/shipping/anomalies.ts", "SHIPMENT_ANOMALY_SEVERITY_LABEL"],
+	["exports", "lib/shipping/anomalies.ts", "SHIPMENT_ANOMALY_TYPE"],
+	["exports", "lib/shipping/anomalies.ts", "SHIPMENT_ANOMALY_TYPE_LABEL"],
+	["exports", "lib/shipping/anomalies.ts", "acknowledgeShipmentAnomaly"],
+	["exports", "lib/shipping/anomalies.ts", "ignoreShipmentAnomaly"],
+	["exports", "lib/theme/context.tsx", "ThemeProvider"],
+	["exports", "lib/theme/text-scale.ts", "TEXT_SCALE_ATTRIBUTE"],
+	["exports", "lib/theme/text-scale.ts", "TEXT_SCALE_EVENT"],
+	["exports", "lib/theme/text-scale.ts", "TEXT_SCALE_STORAGE_KEY"],
+	["exports", "lib/theme/text-scale.ts", "getTextScale"],
+	["exports", "lib/theme/text-scale.ts", "nextTextScale"],
+	["exports", "lib/theme/text-scale.ts", "setTextScale"],
+	["exports", "lib/validation/display-length.ts", "displayLength"],
+	["exports", "lib/vendor-portal/repo.ts", "VENDOR_PORTAL_BRAND"],
+	[
+		"files",
+		".storybook/public/mockServiceWorker.js",
+		".storybook/public/mockServiceWorker.js"
+	],
+	[
+		"files",
+		"features/procurement-assistant/HawkrAgentChatWorkspace.tsx",
+		"features/procurement-assistant/HawkrAgentChatWorkspace.tsx"
+	],
+	[
+		"files",
+		"features/seller/landing/components/SellerVantaAtmosphere.tsx",
+		"features/seller/landing/components/SellerVantaAtmosphere.tsx"
+	],
+	["types", "components/shared/BrandLogo.tsx", "BrandLogoSize"],
+	["types", "components/shared/BrandLogo.tsx", "BrandLogoSurface"],
+	["types", "components/shared/BrandLogo.tsx", "BrandLogoVariant"],
+	["types", "components/shared/ProduceIcon.tsx", "ProduceIconName"],
+	["types", "components/shared/SellerSidebarIcon.tsx", "SellerSidebarIconName"],
+	["types", "components/ui/Button.tsx", "ButtonColor"],
+	["types", "components/ui/Button.tsx", "ButtonProps"],
+	["types", "components/ui/Button.tsx", "ButtonRadius"],
+	["types", "components/ui/Button.tsx", "ButtonSize"],
+	["types", "components/ui/Button.tsx", "ButtonVariant"],
+	["types", "components/ui/Card.tsx", "CardMediaProps"],
+	["types", "components/ui/Card.tsx", "CardRadius"],
+	["types", "components/ui/Card.tsx", "CardShadow"],
+	["types", "components/ui/Chip.tsx", "ChipSize"],
+	["types", "components/ui/Chip.tsx", "ChipVariant"],
+	["types", "components/ui/DatePicker.tsx", "DateGranularity"],
+	["types", "components/ui/GifEditControls.tsx", "GifEditorOptions"],
+	["types", "components/ui/Input.tsx", "InputSize"],
+	["types", "components/ui/Input.tsx", "InputVariant"],
+	["types", "components/ui/Tabs.tsx", "TabItem"],
+	["types", "components/ui/Tabs.tsx", "TabsSize"],
+	["types", "components/ui/Tabs.tsx", "TabsVariant"],
+	["types", "components/ui/index.ts", "ButtonColor"],
+	["types", "components/ui/index.ts", "ButtonProps"],
+	["types", "components/ui/index.ts", "ButtonRadius"],
+	["types", "components/ui/index.ts", "ButtonSize"],
+	["types", "components/ui/index.ts", "ButtonVariant"],
+	["types", "components/ui/index.ts", "CalendarMonthProps"],
+	["types", "components/ui/index.ts", "CalendarYearDisplayMode"],
+	["types", "components/ui/index.ts", "CardMediaProps"],
+	["types", "components/ui/index.ts", "CardProps"],
+	["types", "components/ui/index.ts", "CardRadius"],
+	["types", "components/ui/index.ts", "CardShadow"],
+	["types", "components/ui/index.ts", "ChipColor"],
+	["types", "components/ui/index.ts", "ChipProps"],
+	["types", "components/ui/index.ts", "ChipSize"],
+	["types", "components/ui/index.ts", "ChipVariant"],
+	["types", "components/ui/index.ts", "DateGranularity"],
+	["types", "components/ui/index.ts", "DatePickerProps"],
+	["types", "components/ui/index.ts", "DialogPlacement"],
+	["types", "components/ui/index.ts", "DialogProps"],
+	["types", "components/ui/index.ts", "DialogSize"],
+	["types", "components/ui/index.ts", "DropdownItem"],
+	["types", "components/ui/index.ts", "DropdownProps"],
+	["types", "components/ui/index.ts", "InputProps"],
+	["types", "components/ui/index.ts", "InputSize"],
+	["types", "components/ui/index.ts", "InputVariant"],
+	["types", "components/ui/index.ts", "SelectProps"],
+	["types", "components/ui/index.ts", "SheetSide"],
+	["types", "components/ui/index.ts", "SwitchProps"],
+	["types", "components/ui/index.ts", "TabItem"],
+	["types", "components/ui/index.ts", "TabsProps"],
+	["types", "components/ui/index.ts", "TabsSize"],
+	["types", "components/ui/index.ts", "TabsVariant"],
+	["types", "components/ui/index.ts", "TextareaProps"],
+	["types", "components/ui/index.ts", "WeekStartsOn"],
+	[
+		"types",
+		"features/account/components/AccountEmptyIcon.tsx",
+		"AccountEmptyIconVariant"
+	],
+	["types", "features/cart/cartUiStore.ts", "AppliedCoupon"],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedOrderBuyer"
+	],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedOrderItem"
+	],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedOrderListItem"
+	],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedOrderListParams"
+	],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedOrderListRecipient"
+	],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedOrderRecipient"
+	],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedOrderTimelineEntry"
+	],
+	[
+		"types",
+		"features/delegated-operations/orders/repo.ts",
+		"DelegatedRecipientContact"
+	],
+	[
+		"types",
+		"features/delegated-operations/products/repo.ts",
+		"DelegatedProductImage"
+	],
+	[
+		"types",
+		"features/delegated-operations/products/repo.ts",
+		"DelegatedProductSku"
+	],
+	[
+		"types",
+		"features/delegated-operations/state/session.ts",
+		"DelegatedSessionActor"
+	],
+	[
+		"types",
+		"features/delegated-operations/state/session.ts",
+		"DelegatedSessionReason"
+	],
+	[
+		"types",
+		"features/delegated-operations/state/session.ts",
+		"DelegatedSessionStatus"
+	],
+	[
+		"types",
+		"features/delegated-operations/state/session.ts",
+		"DelegatedSessionTarget"
+	],
+	["types", "features/feed/components/InfiniteFeed.tsx", "FeedFilterMode"],
+	[
+		"types",
+		"features/invoices/screens/InvoiceComplaintDialog.tsx",
+		"ComplaintReasonOption"
+	],
+	[
+		"types",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"BuyerQuoteFailureCode"
+	],
+	[
+		"types",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"OrderProvisioningState"
+	],
+	[
+		"types",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"QuoteAcceptability"
+	],
+	[
+		"types",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"SellerIdentityView"
+	],
+	[
+		"types",
+		"features/procurement-assistant/buyer-quote-contract.ts",
+		"SellerQuotePayload"
+	],
+	["types", "features/procurement-assistant/capabilities.ts", "WebAgentFlag"],
+	[
+		"types",
+		"features/procurement-assistant/conversations.ts",
+		"AgentTranscriptMessage"
+	],
+	[
+		"types",
+		"features/procurement-assistant/rfq-price-contract.ts",
+		"RfqCommandFailureCode"
+	],
+	[
+		"types",
+		"features/procurement-assistant/rfq-price-contract.ts",
+		"RfqQuoteTotalRange"
+	],
+	[
+		"types",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"PublicationResultData"
+	],
+	[
+		"types",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"RfqProgressStepKey"
+	],
+	[
+		"types",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"RfqProgressStepState"
+	],
+	[
+		"types",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"RunCancelResult"
+	],
+	[
+		"types",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"RuntimeSnapshotArtifact"
+	],
+	[
+		"types",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"RuntimeSnapshotOpenConfirmation"
+	],
+	[
+		"types",
+		"features/procurement-assistant/runtime-snapshot-contract.ts",
+		"RuntimeSnapshotRun"
+	],
+	[
+		"types",
+		"features/procurement-assistant/session-logic.ts",
+		"RawProcurementItemResolution"
+	],
+	[
+		"types",
+		"features/procurement-assistant/session-operation.ts",
+		"ExclusiveMutationIdentity"
+	],
+	[
+		"types",
+		"features/procurement-assistant/session-operation.ts",
+		"SessionMutationIdentity"
+	],
+	[
+		"types",
+		"features/procurement-assistant/session-operation.ts",
+		"SessionOperationIdentity"
+	],
+	[
+		"types",
+		"features/procurement-assistant/useBuyerQuoteComparison.ts",
+		"QuoteListState"
+	],
+	[
+		"types",
+		"features/procurement-assistant/useRfqRuntimeSnapshot.ts",
+		"RuntimeSnapshotState"
+	],
+	[
+		"types",
+		"features/seller-center/components/SellerEmptyState.tsx",
+		"SellerEmptyVariant"
+	],
+	["types", "features/seller-center/components/sellerNav.tsx", "NavBadgeKey"],
+	[
+		"types",
+		"features/seller-center/dashboard/onboardingTasks.ts",
+		"OnboardingNext"
+	],
+	["types", "features/seller-center/index.ts", "SellerEmptyVariant"],
+	[
+		"types",
+		"features/seller-center/invoices/amego/amegoSetupState.ts",
+		"AmegoPillTone"
+	],
+	[
+		"types",
+		"features/seller-center/orders/shipmentOperationStore.ts",
+		"SellerShipmentOperationKind"
+	],
+	[
+		"types",
+		"features/seller-center/orders/shipmentOperationStore.ts",
+		"SellerShipmentOperationPhase"
+	],
+	[
+		"types",
+		"features/seller-center/products-import/types.ts",
+		"CommitSkipReason"
+	],
+	[
+		"types",
+		"features/seller-center/products-import/types.ts",
+		"CommitSkipReasonCode"
+	],
+	["types", "features/seller-center/products-import/types.ts", "GalleryItem"],
+	[
+		"types",
+		"features/seller-center/products-import/types.ts",
+		"ImportJobCounters"
+	],
+	[
+		"types",
+		"features/seller-center/products-import/types.ts",
+		"ImportJobProgress"
+	],
+	[
+		"types",
+		"features/seller-center/products-import/types.ts",
+		"ImportShippingMethodResponse"
+	],
+	["types", "features/seller-center/products-import/types.ts", "L1FailPayload"],
+	[
+		"types",
+		"features/seller-center/products-import/types.ts",
+		"ProductDetailPresentation"
+	],
+	[
+		"types",
+		"features/seller-center/products-import/types.ts",
+		"ProductListPresentation"
+	],
+	[
+		"types",
+		"features/seller-center/products/adapters/productFormAdapter.ts",
+		"ShelfButton"
+	],
+	[
+		"types",
+		"features/seller-center/products/productsUiStore.ts",
+		"ProductStatusFilter"
+	],
+	[
+		"types",
+		"features/seller/components/CategorySelector.tsx",
+		"CategorySelectorTreeSource"
+	],
+	[
+		"types",
+		"features/seller/components/categoryCreateFlow.ts",
+		"CategoryDraftChoice"
+	],
+	[
+		"types",
+		"features/seller/components/categoryCreateFlow.ts",
+		"CategoryPathField"
+	],
+	[
+		"types",
+		"features/seller/components/categoryCreateFlow.ts",
+		"ExistingCategoryChoice"
+	],
+	[
+		"types",
+		"features/seller/components/categoryCreateFlow.ts",
+		"NewCategoryChoice"
+	],
+	["types", "features/seller/pricing/data.ts", "CollaborationMode"],
+	["types", "features/seller/pricing/data.ts", "ResponsibilityActor"],
+	["types", "features/seller/pricing/data.ts", "ResponsibilityCell"],
+	["types", "features/seller/pricing/data.ts", "SellerPlanId"],
+	["types", "features/seller/pricing/data.ts", "ServiceBundleId"],
+	["types", "features/seller/pricing/data.ts", "ServiceInterestId"],
+	[
+		"types",
+		"features/seller/pricing/lead-submission.ts",
+		"SellerLeadTrackingContext"
+	],
+	["types", "lib/after-sales/types.ts", "AfterSaleArbitrationDecision"],
+	["types", "lib/after-sales/types.ts", "AfterSaleArbitrationEvent"],
+	["types", "lib/after-sales/types.ts", "AfterSaleStatus"],
+	["types", "lib/after-sales/types.ts", "AppealAfterSaleInput"],
+	["types", "lib/api/client.ts", "ApiClient"],
+	["types", "lib/api/client.ts", "AuthedRequestOptions"],
+	["types", "lib/api/client.ts", "RequestOptions"],
+	["types", "lib/api/openapi-types.ts", "AccountTypeValue"],
+	["types", "lib/api/openapi-types.ts", "ApiEnvelope"],
+	["types", "lib/api/openapi-types.ts", "BuyerInfo"],
+	["types", "lib/api/openapi-types.ts", "PostProductData"],
+	["types", "lib/api/openapi-types.ts", "Role"],
+	["types", "lib/auth/local-private-keys.ts", "ClearPolicy"],
+	["types", "lib/auth/local-private-keys.ts", "StorageArea"],
+	["types", "lib/browser/in-app-browser.ts", "InAppBrowserGuideCorner"],
+	["types", "lib/browser/in-app-browser.ts", "MobileBrowserPlatform"],
+	["types", "lib/buyer/seller-match-chat.ts", "SellerCandidate"],
+	["types", "lib/chat/types.ts", "ChatMessageType"],
+	["types", "lib/checkout/draft.ts", "CheckoutDraftCoupon"],
+	["types", "lib/checkout/draft.ts", "CheckoutDraftSeller"],
+	["types", "lib/checkout/draft.ts", "CheckoutDraftStorePickup"],
+	["types", "lib/checkout/repo.ts", "AvailablePaymentMethod"],
+	["types", "lib/checkout/repo.ts", "CheckoutInvoiceAmount"],
+	["types", "lib/checkout/repo.ts", "CheckoutInvoiceDisclosure"],
+	["types", "lib/checkout/repo.ts", "CheckoutInvoiceIntakeLimit"],
+	["types", "lib/checkout/repo.ts", "CheckoutInvoiceProfile"],
+	["types", "lib/checkout/repo.ts", "UnavailableItem"],
+	["types", "lib/codemeta/enums.ts", "AfterSaleEvidenceTypeCode"],
+	["types", "lib/codemeta/enums.ts", "AfterSaleEvidenceTypeValue"],
+	["types", "lib/codemeta/enums.ts", "SellerCancelReasonCode"],
+	["types", "lib/codemeta/generated.ts", "AccountTypeCode"],
+	["types", "lib/codemeta/generated.ts", "AccountTypeValue"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleAppealEventTypeCode"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleAppealEventTypeValue"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleAppealStateCode"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleAppealStateValue"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleCaseStatusCode"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleCaseStatusValue"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleEvidenceTypeCode"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleEvidenceTypeValue"],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"AfterSalePlatformDecisionOutcomeCode"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"AfterSalePlatformDecisionOutcomeValue"
+	],
+	["types", "lib/codemeta/generated.ts", "AfterSaleRejectReasonCode"],
+	["types", "lib/codemeta/generated.ts", "AfterSaleResolutionTypeCode"],
+	["types", "lib/codemeta/generated.ts", "AppTypeCode"],
+	["types", "lib/codemeta/generated.ts", "AppTypeValue"],
+	["types", "lib/codemeta/generated.ts", "CartItemStatusCode"],
+	["types", "lib/codemeta/generated.ts", "CartItemStatusValue"],
+	["types", "lib/codemeta/generated.ts", "CartItemUnavailableReasonCode"],
+	["types", "lib/codemeta/generated.ts", "CartItemUnavailableReasonValue"],
+	["types", "lib/codemeta/generated.ts", "CertificationTypeCode"],
+	["types", "lib/codemeta/generated.ts", "CertificationTypeValue"],
+	["types", "lib/codemeta/generated.ts", "ClientTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ClientTypeValue"],
+	["types", "lib/codemeta/generated.ts", "CollectionModelCode"],
+	["types", "lib/codemeta/generated.ts", "CollectionModelValue"],
+	["types", "lib/codemeta/generated.ts", "CommerceModelCode"],
+	["types", "lib/codemeta/generated.ts", "CommerceModelValue"],
+	["types", "lib/codemeta/generated.ts", "CommonStatusCode"],
+	["types", "lib/codemeta/generated.ts", "CommonStatusValue"],
+	["types", "lib/codemeta/generated.ts", "CouponInstanceStatusCode"],
+	["types", "lib/codemeta/generated.ts", "CouponInstanceStatusValue"],
+	["types", "lib/codemeta/generated.ts", "CouponTargetTypeCode"],
+	["types", "lib/codemeta/generated.ts", "CouponTargetTypeValue"],
+	["types", "lib/codemeta/generated.ts", "CouponTemplateStatusCode"],
+	["types", "lib/codemeta/generated.ts", "CouponTemplateStatusValue"],
+	["types", "lib/codemeta/generated.ts", "CouponTypeCode"],
+	["types", "lib/codemeta/generated.ts", "CouponTypeValue"],
+	["types", "lib/codemeta/generated.ts", "DuplicateNameKindCode"],
+	["types", "lib/codemeta/generated.ts", "DuplicateNameKindValue"],
+	["types", "lib/codemeta/generated.ts", "FinancialLogTypeCode"],
+	["types", "lib/codemeta/generated.ts", "FinancialLogTypeValue"],
+	["types", "lib/codemeta/generated.ts", "FulfillmentActionCode"],
+	["types", "lib/codemeta/generated.ts", "FulfillmentActionValue"],
+	["types", "lib/codemeta/generated.ts", "FulfillmentModeCode"],
+	["types", "lib/codemeta/generated.ts", "FulfillmentModeValue"],
+	["types", "lib/codemeta/generated.ts", "HtmlConversionWarningCode"],
+	["types", "lib/codemeta/generated.ts", "HtmlConversionWarningValue"],
+	["types", "lib/codemeta/generated.ts", "ImportAssetFailureReasonCode"],
+	["types", "lib/codemeta/generated.ts", "ImportAssetFailureReasonValue"],
+	["types", "lib/codemeta/generated.ts", "ImportAssetLocalStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ImportAssetLocalStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ImportAssetUsageCode"],
+	["types", "lib/codemeta/generated.ts", "ImportAssetUsageValue"],
+	["types", "lib/codemeta/generated.ts", "ImportItemErrorTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ImportItemErrorTypeValue"],
+	["types", "lib/codemeta/generated.ts", "ImportItemStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ImportItemStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ImportJobStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ImportJobStatusValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceCarrierTypeCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceComplaintActionCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceComplaintActionValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceComplaintEventTypeCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceComplaintEventTypeValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceComplaintStatusCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceComplaintStatusValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceCorrectionRejectReasonCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceCorrectionRejectReasonValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceCorrectionStatusCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceCorrectionStatusValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceDocumentKindCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceDocumentKindValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceDocumentStatusCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceDocumentStatusValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceDocumentTimelineEventCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceDocumentTimelineEventValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceFulfillmentModeCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceFulfillmentModeValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceIssuerTypeCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceIssuerTypeValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceLineTypeCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceLineTypeValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceManualReasonCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceManualReasonValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceModelCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceModelValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceNotApplicableReasonCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceNotApplicableReasonValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceOperationStatusCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceOperationStatusValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceOperationTypeCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceOperationTypeValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceProviderAccountStatusCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceProviderAccountStatusValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceRecipientTypeCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceRecipientTypeValue"],
+	["types", "lib/codemeta/generated.ts", "InvoiceTaxCategoryCode"],
+	["types", "lib/codemeta/generated.ts", "InvoiceTaxCategoryValue"],
+	["types", "lib/codemeta/generated.ts", "IssuerTypeCode"],
+	["types", "lib/codemeta/generated.ts", "IssuerTypeValue"],
+	["types", "lib/codemeta/generated.ts", "LabelPrintStatusCode"],
+	["types", "lib/codemeta/generated.ts", "LabelPrintStatusValue"],
+	["types", "lib/codemeta/generated.ts", "LogisticsReceivableStatusCode"],
+	["types", "lib/codemeta/generated.ts", "LogisticsReceivableStatusValue"],
+	["types", "lib/codemeta/generated.ts", "MediaUploadSessionStatusCode"],
+	["types", "lib/codemeta/generated.ts", "MediaUploadSessionStatusValue"],
+	["types", "lib/codemeta/generated.ts", "OnboardingStatusCode"],
+	["types", "lib/codemeta/generated.ts", "OnboardingStatusValue"],
+	["types", "lib/codemeta/generated.ts", "OrderCancelByRoleCode"],
+	["types", "lib/codemeta/generated.ts", "OrderCancelByRoleValue"],
+	["types", "lib/codemeta/generated.ts", "OrderCancelReasonCode"],
+	["types", "lib/codemeta/generated.ts", "OrderCancelReasonValue"],
+	["types", "lib/codemeta/generated.ts", "OrderItemStatusCode"],
+	["types", "lib/codemeta/generated.ts", "OrderItemStatusValue"],
+	["types", "lib/codemeta/generated.ts", "OrderStatusCode"],
+	["types", "lib/codemeta/generated.ts", "PayUniSubmitStatusCode"],
+	["types", "lib/codemeta/generated.ts", "PayUniSubmitStatusValue"],
+	["types", "lib/codemeta/generated.ts", "PaymentMethodCode"],
+	["types", "lib/codemeta/generated.ts", "PaymentMethodIneligibleReasonCode"],
+	["types", "lib/codemeta/generated.ts", "PaymentMethodIneligibleReasonValue"],
+	["types", "lib/codemeta/generated.ts", "PaymentStatusCode"],
+	["types", "lib/codemeta/generated.ts", "PaymentTransactionStatusCode"],
+	["types", "lib/codemeta/generated.ts", "PaymentTransactionStatusValue"],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"PayuniMerchantVerificationStatusCode"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"PayuniMerchantVerificationStatusValue"
+	],
+	["types", "lib/codemeta/generated.ts", "PostPublishStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementArtifactStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementArtifactStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementArtifactTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementArtifactTypeValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementConfirmationStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementConfirmationStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementErrorReasonCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementErrorReasonValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementLaneStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementLaneStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementLedgerEventTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementLedgerEventTypeValue"],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProcurementOrderProvisioningStateCode"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProcurementOrderProvisioningStateValue"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProcurementPublicationAudienceModeCode"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProcurementPublicationAudienceModeValue"
+	],
+	["types", "lib/codemeta/generated.ts", "ProcurementPublicationStateCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementPublicationStateValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementQuoteAcceptabilityCode"],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProcurementRfqPublicationApprovalStateCode"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProcurementRfqPublicationApprovalStateValue"
+	],
+	["types", "lib/codemeta/generated.ts", "ProcurementRunFailureReasonCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementRunFailureReasonValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementRunStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementRunStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementSellerPartyTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementSellerPartyTypeValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementSellerResponseStatusCode"],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProcurementSellerResponseStatusValue"
+	],
+	["types", "lib/codemeta/generated.ts", "ProcurementSellerResponseTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementSellerResponseTypeValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementStepStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementTaxInclusionBasisCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementTaxInclusionBasisValue"],
+	["types", "lib/codemeta/generated.ts", "ProcurementWishPoolPolicyCode"],
+	["types", "lib/codemeta/generated.ts", "ProcurementWishPoolPolicyValue"],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProductCertificationGovVerifyStateCode"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProductCertificationGovVerifyStateValue"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProductCertificationRejectReasonCode"
+	],
+	[
+		"types",
+		"lib/codemeta/generated.ts",
+		"ProductCertificationRejectReasonValue"
+	],
+	["types", "lib/codemeta/generated.ts", "ProductCertificationStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProductCertificationStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ProductPublicationStateCode"],
+	["types", "lib/codemeta/generated.ts", "ProductPublicationStateValue"],
+	["types", "lib/codemeta/generated.ts", "ProductSortCode"],
+	["types", "lib/codemeta/generated.ts", "ProductSortValue"],
+	["types", "lib/codemeta/generated.ts", "ProductStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ProductStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ProviderSourceCode"],
+	["types", "lib/codemeta/generated.ts", "ProviderSourceValue"],
+	["types", "lib/codemeta/generated.ts", "ReceiptStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ReceiptStatusValue"],
+	["types", "lib/codemeta/generated.ts", "RefundMethodCode"],
+	["types", "lib/codemeta/generated.ts", "RefundMethodValue"],
+	["types", "lib/codemeta/generated.ts", "RefundReasonCode"],
+	["types", "lib/codemeta/generated.ts", "RefundRequestStatusCode"],
+	["types", "lib/codemeta/generated.ts", "RefundRequestStatusValue"],
+	["types", "lib/codemeta/generated.ts", "RefundStatusCode"],
+	["types", "lib/codemeta/generated.ts", "RefundStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ReportReasonCodeCode"],
+	["types", "lib/codemeta/generated.ts", "ReportReasonCodeValue"],
+	["types", "lib/codemeta/generated.ts", "ReportResolveActionCode"],
+	["types", "lib/codemeta/generated.ts", "ReportResolveActionValue"],
+	["types", "lib/codemeta/generated.ts", "ReportStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ReportStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ReportTargetTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ReportTargetTypeValue"],
+	["types", "lib/codemeta/generated.ts", "ResponsibilityCauseCode"],
+	["types", "lib/codemeta/generated.ts", "ResponsibilityCauseValue"],
+	["types", "lib/codemeta/generated.ts", "SellerCancelStatusCode"],
+	["types", "lib/codemeta/generated.ts", "SellerCancelStatusValue"],
+	["types", "lib/codemeta/generated.ts", "SellerSuspensionReasonCode"],
+	["types", "lib/codemeta/generated.ts", "SellerSuspensionReasonValue"],
+	["types", "lib/codemeta/generated.ts", "SellerTaxEntityTypeCode"],
+	["types", "lib/codemeta/generated.ts", "SellerTaxEntityTypeValue"],
+	["types", "lib/codemeta/generated.ts", "SellerTaxObligationCode"],
+	["types", "lib/codemeta/generated.ts", "SellerTaxObligationValue"],
+	["types", "lib/codemeta/generated.ts", "SellerTaxReviewStatusCode"],
+	["types", "lib/codemeta/generated.ts", "SellerTaxReviewStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ShipmentAnomalyAckActionCode"],
+	["types", "lib/codemeta/generated.ts", "ShipmentAnomalyAckActionValue"],
+	["types", "lib/codemeta/generated.ts", "ShipmentAnomalySeverityCode"],
+	["types", "lib/codemeta/generated.ts", "ShipmentAnomalySeverityValue"],
+	["types", "lib/codemeta/generated.ts", "ShipmentAnomalyTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ShipmentAnomalyTypeValue"],
+	["types", "lib/codemeta/generated.ts", "ShippingAreaCode"],
+	["types", "lib/codemeta/generated.ts", "ShippingAreaValue"],
+	["types", "lib/codemeta/generated.ts", "ShippingFeePayerCode"],
+	["types", "lib/codemeta/generated.ts", "ShippingFeePayerValue"],
+	["types", "lib/codemeta/generated.ts", "ShippingMethodCode"],
+	["types", "lib/codemeta/generated.ts", "ShippingRouteCode"],
+	["types", "lib/codemeta/generated.ts", "ShippingRouteValue"],
+	["types", "lib/codemeta/generated.ts", "ShippingStatusCode"],
+	["types", "lib/codemeta/generated.ts", "ShippingStatusValue"],
+	["types", "lib/codemeta/generated.ts", "ShippingTemperatureCode"],
+	["types", "lib/codemeta/generated.ts", "ShippingTemperatureValue"],
+	["types", "lib/codemeta/generated.ts", "ShippingTypeCode"],
+	["types", "lib/codemeta/generated.ts", "ShippingTypeValue"],
+	["types", "lib/codemeta/generated.ts", "StagedTokenScopeCode"],
+	["types", "lib/codemeta/generated.ts", "StagedTokenScopeValue"],
+	["types", "lib/codemeta/generated.ts", "TcatCallStatusCode"],
+	["types", "lib/codemeta/generated.ts", "TcatCallStatusValue"],
+	["types", "lib/codemeta/generated.ts", "UberDeliveryOutcomeCode"],
+	["types", "lib/codemeta/generated.ts", "UberDeliveryOutcomeValue"],
+	["types", "lib/codemeta/generated.ts", "WeightUnitCode"],
+	["types", "lib/codemeta/generated.ts", "WorkerTaskStatusCode"],
+	["types", "lib/codemeta/generated.ts", "WorkerTaskStatusValue"],
+	["types", "lib/content/data.ts", "FaqItem"],
+	["types", "lib/content/data.ts", "NavMegaColumn"],
+	["types", "lib/content/data.ts", "NavMegaFeature"],
+	["types", "lib/content/seller-guide-data.ts", "SellerGuideItem"],
+	["types", "lib/coupons/repo.ts", "CouponKind"],
+	["types", "lib/feed/listSnapshot.ts", "FeedListSnapshotFilterMode"],
+	["types", "lib/hooks/useCart.ts", "CartBanner"],
+	["types", "lib/hooks/useCart.ts", "MutationOutcome"],
+	[
+		"types",
+		"lib/hooks/useSellerInvoiceRemedy.ts",
+		"ReportExternalIssuanceArgs"
+	],
+	["types", "lib/hooks/useSocial.ts", "PostCommentOptions"],
+	["types", "lib/invoices/documentStatus.ts", "InvoiceDocumentTone"],
+	["types", "lib/invoices/seller-types.ts", "InvoiceRetryPolicy"],
+	["types", "lib/invoices/slaCountdown.ts", "SlaTone"],
+	["types", "lib/media/gif-edit.ts", "GifPlannedFrame"],
+	["types", "lib/media/upload.ts", "UploadImageOptions"],
+	["types", "lib/member-cards/repo.ts", "SpendingRecord"],
+	["types", "lib/navigation/main-tab-pending.ts", "MainTabPendingVariant"],
+	["types", "lib/orders/repo.ts", "FetchOrdersParams"],
+	["types", "lib/orders/repo.ts", "OrderStatusCountsResult"],
+	["types", "lib/orders/types.ts", "AvailablePaymentMethod"],
+	["types", "lib/orders/types.ts", "CreateOrderItemInput"],
+	["types", "lib/orders/types.ts", "OrderPayment"],
+	["types", "lib/orders/types.ts", "OrderShipping"],
+	["types", "lib/orders/types.ts", "OrderStatus"],
+	["types", "lib/payment/apple-pay.ts", "ApplePayCompletion"],
+	[
+		"types",
+		"lib/products/descriptionEditorActions.ts",
+		"DescriptionHistoryInputKind"
+	],
+	["types", "lib/products/seller-repo.ts", "ProductCreateResult"],
+	["types", "lib/products/seller-repo.ts", "SellerProductListParams"],
+	["types", "lib/reviews/repo.ts", "ReviewReply"],
+	["types", "lib/reviews/repo.ts", "ReviewStats"],
+	["types", "lib/search/repo.ts", "SearchSellerInfo"],
+	["types", "lib/seller-data/delegated-repos.ts", "DelegatedBatchResult"],
+	["types", "lib/seller-data/delegated-repos.ts", "DelegatedBatchResultItem"],
+	[
+		"types",
+		"lib/seller-data/delegated-repos.ts",
+		"DelegatedBatchUnpublishItem"
+	],
+	["types", "lib/seller-data/scope.tsx", "SellerDataKeys"],
+	["types", "lib/seller-data/scope.tsx", "SellerDelegatedCommands"],
+	["types", "lib/seller/after-sales.ts", "AfterSaleListResult"],
+	["types", "lib/seller/ai-listing-chat.ts", "AiCertDraft"],
+	["types", "lib/seller/ai-listing-chat.ts", "AiSkuDraft"],
+	["types", "lib/seller/certification-options.ts", "TaiwanCity"],
+	["types", "lib/seller/shipping.ts", "OnboardingStatus"],
+	["types", "lib/seller/shipping.ts", "PayuniSubmitStatus"],
+	["types", "lib/seller/store-contact-saver.ts", "StoreSaveResult"],
+	["types", "lib/seller/storeCardView.ts", "StoreCardLabel"],
+	["types", "lib/shipping/anomalies.ts", "ShipmentAnomalyAckAction"],
+	["types", "lib/shipping/anomalies.ts", "ShipmentAnomalySeverity"],
+	["types", "lib/shipping/anomalies.ts", "ShipmentAnomalyType"],
+	["types", "lib/sse/client.ts", "SseReadyInfo"],
+	["types", "lib/sse/useCommentStream.ts", "UseCommentStreamHandlers"],
+	["types", "lib/state/main-tab-freshness-store.ts", "MainTabRefreshStatus"],
+	["types", "lib/theme/context.tsx", "Theme"],
+	["types", "lib/vendor-portal/draft.ts", "VendorOfferedQuality"],
+	["types", "lib/vendor-portal/draft.ts", "VendorUnitBasis"],
+	["types", "lib/vendor-portal/repo.ts", "VendorRfqRequestedPriceRange"],
+	[
+		"unlisted",
+		"features/home/server/home-tab-bootstrap-route.ts",
+		"server-only"
+	],
+	[
+		"unlisted",
+		"features/procurement-assistant/capabilities.server.ts",
+		"server-only"
+	],
+	["unlisted", "lib/api/home-bootstrap.server.ts", "server-only"],
+	["unlisted", "lib/auth/dal.ts", "server-only"],
+	["unlisted", "lib/auth/require-zone.ts", "server-only"]
 ]

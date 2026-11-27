@@ -184,139 +184,140 @@ void main() {
     const Size(402, 874),
     const Size(874, 402),
   ]) {
-    testWidgets('sheet reopen preserves draft/reply and guarded retry at $size', (
-      tester,
-    ) async {
-      final repo = await _pumpFeed(tester, size: size, scale: 1.4);
-      final mediaBefore = tester.getRect(
-        find.byKey(const ValueKey('seller-post-media-42')),
-      );
-      await _openComments(tester);
-      await tester.enterText(_input, '保留這份草稿');
-      await tester.pump();
-      final decorator = tester.widget<InputDecorator>(
-        find.descendant(of: _input, matching: find.byType(InputDecorator)),
-      );
-      expect(decorator.isFocused, isTrue);
-      expect(decorator.decoration.filled, isFalse);
-      expect(decorator.decoration.enabledBorder, InputBorder.none);
-      expect(decorator.decoration.focusedBorder, InputBorder.none);
-      await _closeComments(tester);
-      await _openComments(tester);
-      expect(tester.widget<TextField>(_input).controller!.text, '保留這份草稿');
-      expect(tester.widget<TextField>(_input).focusNode!.hasFocus, isFalse);
-      final reply = find.bySemanticsLabel('回覆 $_replyAuthor');
-      await tester.ensureVisible(reply);
-      await tester.tap(reply);
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(_input).focusNode!.hasFocus, isTrue);
-      final keyboardHeight = size.width > size.height ? 180.0 : 300.0;
-      tester.view.viewInsets = FakeViewPadding(bottom: keyboardHeight);
-      addTearDown(tester.view.resetViewInsets);
-      await tester.pumpAndSettle();
-      expect(
-        tester.getRect(_input).bottom,
-        lessThanOrEqualTo(size.height - keyboardHeight),
-      );
-      expect(
-        tester.getRect(find.byKey(const ValueKey('seller-post-media-42'))),
-        mediaBefore,
-      );
-      expect(tester.takeException(), isNull);
-      await _closeComments(tester);
-      tester.view.resetViewInsets();
-      await tester.pumpAndSettle();
-      await _openComments(tester);
-      expect(find.text('@$_replyAuthor'), findsOneWidget);
-      expect(tester.widget<TextField>(_input).controller!.text, '保留這份草稿');
-      expect(tester.widget<TextField>(_input).focusNode!.hasFocus, isTrue);
+    testWidgets(
+      'sheet reopen preserves draft/reply and guarded retry at $size',
+      (tester) async {
+        final repo = await _pumpFeed(tester, size: size, scale: 1.4);
+        final mediaBefore = tester.getRect(
+          find.byKey(const ValueKey('seller-post-media-42')),
+        );
+        await _openComments(tester);
+        await tester.enterText(_input, '保留這份草稿');
+        await tester.pump();
+        final decorator = tester.widget<InputDecorator>(
+          find.descendant(of: _input, matching: find.byType(InputDecorator)),
+        );
+        expect(decorator.isFocused, isTrue);
+        expect(decorator.decoration.filled, isFalse);
+        expect(decorator.decoration.enabledBorder, InputBorder.none);
+        expect(decorator.decoration.focusedBorder, InputBorder.none);
+        await _closeComments(tester);
+        await _openComments(tester);
+        expect(tester.widget<TextField>(_input).controller!.text, '保留這份草稿');
+        expect(tester.widget<TextField>(_input).focusNode!.hasFocus, isFalse);
+        final reply = find.bySemanticsLabel('回覆 $_replyAuthor');
+        await tester.ensureVisible(reply);
+        await tester.tap(reply);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(_input).focusNode!.hasFocus, isTrue);
+        final keyboardHeight = size.width > size.height ? 180.0 : 300.0;
+        tester.view.viewInsets = FakeViewPadding(bottom: keyboardHeight);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(_input).bottom,
+          lessThanOrEqualTo(size.height - keyboardHeight),
+        );
+        expect(
+          tester.getRect(find.byKey(const ValueKey('seller-post-media-42'))),
+          mediaBefore,
+        );
+        expect(tester.takeException(), isNull);
+        await _closeComments(tester);
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+        await _openComments(tester);
+        expect(find.text('@$_replyAuthor'), findsOneWidget);
+        expect(tester.widget<TextField>(_input).controller!.text, '保留這份草稿');
+        expect(tester.widget<TextField>(_input).focusNode!.hasFocus, isTrue);
 
-      var response = Completer<PostComment>();
-      when(
-        () => repo.createComment(
-          42,
-          body: '@$_replyAuthor 保留這份草稿',
-          parentId: '1',
-          replyToId: '2',
-        ),
-      ).thenAnswer((_) => response.future);
-      await tester.testTextInput.receiveAction(TextInputAction.send);
-      await tester.testTextInput.receiveAction(TextInputAction.send);
-      await tester.pump();
-      verify(
-        () => repo.createComment(
-          42,
-          body: '@$_replyAuthor 保留這份草稿',
-          parentId: '1',
-          replyToId: '2',
-        ),
-      ).called(1);
-      expect(tester.widget<TextField>(_input).enabled, isFalse);
-      response.completeError(StateError('offline'));
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(_input).controller!.text, '保留這份草稿');
-      expect(tester.widget<TextField>(_input).enabled, isTrue);
-      expect(find.text('@$_replyAuthor'), findsOneWidget);
-      expect(tester.takeException(), isNull);
+        var response = Completer<PostComment>();
+        when(
+          () => repo.createComment(
+            42,
+            body: '@$_replyAuthor 保留這份草稿',
+            parentId: '1',
+            replyToId: '2',
+          ),
+        ).thenAnswer((_) => response.future);
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pump();
+        verify(
+          () => repo.createComment(
+            42,
+            body: '@$_replyAuthor 保留這份草稿',
+            parentId: '1',
+            replyToId: '2',
+          ),
+        ).called(1);
+        expect(tester.widget<TextField>(_input).enabled, isFalse);
+        response.completeError(StateError('offline'));
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(_input).controller!.text, '保留這份草稿');
+        expect(tester.widget<TextField>(_input).enabled, isTrue);
+        expect(find.text('@$_replyAuthor'), findsOneWidget);
+        expect(tester.takeException(), isNull);
 
-      response = Completer<PostComment>();
-      await tester.tap(_input);
-      await tester.testTextInput.receiveAction(TextInputAction.send);
-      await tester.pump();
-      response.complete(testComment(id: '3', parentId: '1'));
-      await tester.pumpAndSettle();
-      verify(
-        () => repo.createComment(
-          42,
-          body: '@$_replyAuthor 保留這份草稿',
-          parentId: '1',
-          replyToId: '2',
-        ),
-      ).called(1);
-      verifyNever(
-        () => repo.createComment(
-          any(),
-          body: any(named: 'body'),
-          parentId: '2',
-          replyToId: any(named: 'replyToId'),
-        ),
-      );
-      verifyNever(
-        () => repo.createComment(
-          any(),
-          body: any(named: 'body'),
-          parentId: null,
-          replyToId: any(named: 'replyToId'),
-        ),
-      );
-      expect(tester.widget<TextField>(_input).controller!.text, isEmpty);
-      expect(find.text('@$_replyAuthor'), findsNothing);
-      final actions = find.byKey(const ValueKey('seller-post-action-bar-42'));
-      expect(
-        find.descendant(of: actions, matching: find.text('3')),
-        findsOneWidget,
-      );
+        response = Completer<PostComment>();
+        await tester.tap(_input);
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await tester.pump();
+        response.complete(testComment(id: '3', parentId: '1'));
+        await tester.pumpAndSettle();
+        verify(
+          () => repo.createComment(
+            42,
+            body: '@$_replyAuthor 保留這份草稿',
+            parentId: '1',
+            replyToId: '2',
+          ),
+        ).called(1);
+        verifyNever(
+          () => repo.createComment(
+            any(),
+            body: any(named: 'body'),
+            parentId: '2',
+            replyToId: any(named: 'replyToId'),
+          ),
+        );
+        verifyNever(
+          () => repo.createComment(
+            any(),
+            body: any(named: 'body'),
+            parentId: null,
+            replyToId: any(named: 'replyToId'),
+          ),
+        );
+        expect(tester.widget<TextField>(_input).controller!.text, isEmpty);
+        expect(find.text('@$_replyAuthor'), findsNothing);
+        final actions = find.byKey(const ValueKey('seller-post-action-bar-42'));
+        expect(
+          find.descendant(of: actions, matching: find.text('3')),
+          findsOneWidget,
+        );
 
-      when(
-        () => repo.createComment(42, body: '第二則獨立留言'),
-      ).thenAnswer((_) async => testComment(id: '4'));
-      await tester.enterText(_input, '第二則獨立留言');
-      await tester.pump();
-      final send = find.bySemanticsLabel('送出留言');
-      await tester.ensureVisible(send);
-      expect(tester.getSize(send).height, greaterThanOrEqualTo(48));
-      await tester.tap(send);
-      await tester.pumpAndSettle();
-      verify(() => repo.createComment(42, body: '第二則獨立留言')).called(1);
-      expect(tester.widget<TextField>(_input).controller!.text, isEmpty);
-      expect(
-        find.descendant(of: actions, matching: find.text('4')),
-        findsOneWidget,
-      );
-      await _closeComments(tester);
-      expect(find.bySemanticsLabel('留言，共 4 則'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 3));
-      expect(tester.takeException(), isNull);
-    });
+        when(
+          () => repo.createComment(42, body: '第二則獨立留言'),
+        ).thenAnswer((_) async => testComment(id: '4'));
+        await tester.enterText(_input, '第二則獨立留言');
+        await tester.pump();
+        final send = find.bySemanticsLabel('送出留言');
+        await tester.ensureVisible(send);
+        expect(tester.getSize(send).height, greaterThanOrEqualTo(48));
+        await tester.tap(send);
+        await tester.pumpAndSettle();
+        verify(() => repo.createComment(42, body: '第二則獨立留言')).called(1);
+        expect(tester.widget<TextField>(_input).controller!.text, isEmpty);
+        expect(
+          find.descendant(of: actions, matching: find.text('4')),
+          findsOneWidget,
+        );
+        await _closeComments(tester);
+        expect(find.bySemanticsLabel('留言，共 4 則'), findsOneWidget);
+        await tester.pump(const Duration(seconds: 3));
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 }

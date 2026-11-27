@@ -16,7 +16,6 @@ import { type DeadlineView, deadlineView } from "@/lib/deadline";
 import { ALL_CATEGORIES, ASSESSABLE_CATEGORIES } from "@/lib/policy-category";
 import { caseStatusText, reportStatusText } from "./report-text";
 
-
 export type ReportTabKey = "awaiting-triage" | "cases" | "all-reports";
 
 export interface ReportListTab {

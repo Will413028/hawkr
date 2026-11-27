@@ -12,7 +12,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import 'coupon_helpers.dart';
 
-
 /// 優惠券選擇彈窗 — 用於 showModalBottomSheet。
 ///
 /// [couponsFuture] 為非同步載入的優惠券列表。
@@ -107,7 +106,6 @@ class CouponSelectionSheet extends StatelessWidget {
     );
   }
 }
-
 
 /// 優惠券列表中的單張卡片 — 顯示名稱、折扣、有效期限、適用商家。
 class _CouponListTile extends StatelessWidget {

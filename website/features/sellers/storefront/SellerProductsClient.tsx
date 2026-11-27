@@ -75,8 +75,7 @@ export default function SellerProductsClient({
 				setProducts(data.records);
 				if (data.totalPages) setTotalPages(data.totalPages);
 			})
-			.catch(() => {
-			});
+			.catch(() => {});
 		return () => {
 			active = false;
 			controller.abort();

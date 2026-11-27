@@ -12,7 +12,6 @@ const bootstrapServerPath = new URL(
 	import.meta.url,
 );
 
-
 test("home page is a server component that renders the snapshot into HTML", async () => {
 	const source = await readFile(pagePath, "utf8");
 

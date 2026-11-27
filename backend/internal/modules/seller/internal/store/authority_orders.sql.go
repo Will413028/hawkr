@@ -40,8 +40,6 @@ type AdminAuthorityOrdersParams struct {
 	PageSize  int32
 }
 
-// 來函清單。state 是 OPEN：還沒完成也沒撤銷，依期限舊到新（due_at, id）；COMPLETED：已完成、REVOKED：已撤銷登記，依收文時間新到舊；沒有 state：全部，依收文時間新到舊。
-// account_id 篩選指名這個帳號的來函。keyset 的位置（after_at, after_id）的意義隨排序：OPEN 是 (due_at, id) 之後，其他是 (received_at, id) 之前。
 func (q *Queries) AdminAuthorityOrders(ctx context.Context, arg AdminAuthorityOrdersParams) ([]SellerAuthorityOrder, error) {
 	rows, err := q.db.Query(ctx, adminAuthorityOrders,
 		arg.State,
@@ -95,7 +93,6 @@ WHERE order_id = ANY($1::uuid[])
 ORDER BY order_id, seq
 `
 
-// 一批來函的延長歷史，舊到新。
 func (q *Queries) AuthorityHoldExtensions(ctx context.Context, orderIds []uuid.UUID) ([]SellerAuthorityOrderHoldExtension, error) {
 	rows, err := q.db.Query(ctx, authorityHoldExtensions, orderIds)
 	if err != nil {
@@ -169,7 +166,6 @@ type AuthorityOrderByRequestParams struct {
 	RequestID *uuid.UUID
 }
 
-// 冪等重送的查詢：範圍是 (管理員, request_id)。
 func (q *Queries) AuthorityOrderByRequest(ctx context.Context, arg AuthorityOrderByRequestParams) (SellerAuthorityOrder, error) {
 	row := q.db.QueryRow(ctx, authorityOrderByRequest, arg.AdminID, arg.RequestID)
 	var i SellerAuthorityOrder
@@ -211,8 +207,6 @@ type AuthorityOrderMeasureTargetsRow struct {
 	StoreID   int64
 }
 
-// 這份來函導出的措施所在的（帳號, 店家）：與 ListMeasures(source_authority_order_id) 同一個定義（明確連結 ∪ 認定引用），不看措施的狀態（已撤銷的措施
-// 當時的理由書也是告知）。完成來函時驗證「由措施告知」用；定義與清單的一致由資料集測試鎖住。
 func (q *Queries) AuthorityOrderMeasureTargets(ctx context.Context, orderID *uuid.UUID) ([]AuthorityOrderMeasureTargetsRow, error) {
 	rows, err := q.db.Query(ctx, authorityOrderMeasureTargets, orderID)
 	if err != nil {
@@ -241,7 +235,6 @@ WHERE t.order_id = ANY($1::uuid[])
 ORDER BY t.order_id, t.position
 `
 
-// 一批來函的對象，依來函與位置；店名在個資已清理後是 NULL。
 func (q *Queries) AuthorityOrderTargets(ctx context.Context, orderIds []uuid.UUID) ([]SellerAuthorityOrderTarget, error) {
 	rows, err := q.db.Query(ctx, authorityOrderTargets, orderIds)
 	if err != nil {
@@ -282,7 +275,6 @@ WHERE order_id = $1
 ORDER BY position, seq
 `
 
-// 一個對象被取代的告知，舊到新。
 func (q *Queries) AuthorityTargetNoticeHistory(ctx context.Context, orderID uuid.UUID) ([]SellerAuthorityTargetNoticeHistory, error) {
 	rows, err := q.db.Query(ctx, authorityTargetNoticeHistory, orderID)
 	if err != nil {
@@ -336,8 +328,6 @@ type AuthorityTargetStoresRow struct {
 	LatestOfAccount      bool
 }
 
-// 一批來函的對象在 seller 範圍內的店家（指名店家時只有那一家，不指定時是帳號全部的 stint），逐家列出；登記時的清理快照（purged_at_registration）與個資清理的時間決定涵蓋狀態（model.AuthorityOrder.StoreCoverageOf）。
-// closed 與 latest_of_account（帳號 store_id 最大的 stint，同 LatestStoreOfAccount）是建立措施的入口用的事實（model.TerminationTarget）。
 func (q *Queries) AuthorityTargetStores(ctx context.Context, orderIds []uuid.UUID) ([]AuthorityTargetStoresRow, error) {
 	rows, err := q.db.Query(ctx, authorityTargetStores, orderIds)
 	if err != nil {
@@ -379,7 +369,6 @@ type BumpAuthorityOrderParams struct {
 	ExpectedVersion int64
 }
 
-// 記下告知讓來函的版本前進；版本相符才寫入，否則 0 列。
 func (q *Queries) BumpAuthorityOrder(ctx context.Context, arg BumpAuthorityOrderParams) (SellerAuthorityOrder, error) {
 	row := q.db.QueryRow(ctx, bumpAuthorityOrder, arg.ID, arg.ExpectedVersion)
 	var i SellerAuthorityOrder
@@ -424,8 +413,6 @@ type CompleteAuthorityOrderParams struct {
 	ExpectedVersion   int64
 }
 
-// 完成來函；只在還沒完成而且版本相符時寫入，否則 0 列。hold_until 是完成之後的保存期限：沒有變就帶目前的值；調取資料的來函完成時依提供時間延長（呼叫方另寫一列
-// DATA_PROVIDED 的延長歷史），所以只能不早於目前的值。version 前進一次。
 func (q *Queries) CompleteAuthorityOrder(ctx context.Context, arg CompleteAuthorityOrderParams) (SellerAuthorityOrder, error) {
 	row := q.db.QueryRow(ctx, completeAuthorityOrder,
 		arg.Now,
@@ -473,7 +460,6 @@ type ExtendAuthorityOrderHoldParams struct {
 	ExpectedVersion int64
 }
 
-// 延長保存期限（只能延長：新值必須晚於目前）；版本相符才寫入，否則 0 列。version 前進。
 func (q *Queries) ExtendAuthorityOrderHold(ctx context.Context, arg ExtendAuthorityOrderHoldParams) (SellerAuthorityOrder, error) {
 	row := q.db.QueryRow(ctx, extendAuthorityOrderHold, arg.HoldUntil, arg.ID, arg.ExpectedVersion)
 	var i SellerAuthorityOrder
@@ -519,7 +505,6 @@ type InsertAuthorityHoldExtensionParams struct {
 	Now       time.Time
 }
 
-// 追加一列延長歷史（seq 接在最後一列之後）；呼叫方已鎖住來函列，所以 seq 不會撞。
 func (q *Queries) InsertAuthorityHoldExtension(ctx context.Context, arg InsertAuthorityHoldExtensionParams) error {
 	_, err := q.db.Exec(ctx, insertAuthorityHoldExtension,
 		arg.OrderID,
@@ -558,7 +543,6 @@ type InsertAuthorityOrderParams struct {
 	RequestHash []byte
 }
 
-// 登記一份來函：同一位管理員的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一份）。
 func (q *Queries) InsertAuthorityOrder(ctx context.Context, arg InsertAuthorityOrderParams) (SellerAuthorityOrder, error) {
 	row := q.db.QueryRow(ctx, insertAuthorityOrder,
 		arg.ID,
@@ -607,7 +591,6 @@ JOIN seller.stores s ON s.account_id = t.account_id AND (t.store_id IS NULL OR s
 WHERE t.order_id = $1 AND s.pii_purged_at IS NOT NULL
 `
 
-// 登記當下（已鎖住被指名帳號的店家列）個資已經清理的店家快照：涵蓋狀態 PURGED_BEFORE_REGISTRATION 的事實來源，與應用程式時鐘無關。
 func (q *Queries) InsertAuthorityOrderPrepurgedStores(ctx context.Context, orderID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, insertAuthorityOrderPrepurgedStores, orderID)
 	return err
@@ -626,7 +609,6 @@ type InsertAuthorityOrderTargetParams struct {
 	ProductIds []string
 }
 
-// 一個指名的對象；告知在完成時才寫。店家為 NULL 是帳號全部的店家。
 func (q *Queries) InsertAuthorityOrderTarget(ctx context.Context, arg InsertAuthorityOrderTargetParams) error {
 	_, err := q.db.Exec(ctx, insertAuthorityOrderTarget,
 		arg.OrderID,
@@ -655,7 +637,6 @@ type InsertAuthorityTargetNoticeHistoryParams struct {
 	Position int16
 }
 
-// 被取代的暫不告知（從目前列複製，seq 接在最後一列之後）；呼叫方已鎖住來函列。
 func (q *Queries) InsertAuthorityTargetNoticeHistory(ctx context.Context, arg InsertAuthorityTargetNoticeHistoryParams) error {
 	_, err := q.db.Exec(ctx, insertAuthorityTargetNoticeHistory,
 		arg.Now,
@@ -676,7 +657,6 @@ type InsertFindingAuthorityOrdersParams struct {
 	OrderIds    []uuid.UUID
 }
 
-// 認定引用的來函（集合；只在建立措施的 transaction 寫入）。
 func (q *Queries) InsertFindingAuthorityOrders(ctx context.Context, arg InsertFindingAuthorityOrdersParams) error {
 	_, err := q.db.Exec(ctx, insertFindingAuthorityOrders, arg.ViolationID, arg.OrderIds)
 	return err
@@ -689,7 +669,6 @@ WHERE id = $1
 FOR UPDATE
 `
 
-// 鎖順序：店家列（被指名的帳號，account_id 升序）、通報列、案件列、詢問列、措施列之後，來函列只由完成與延長鎖。
 func (q *Queries) LockAuthorityOrder(ctx context.Context, id uuid.UUID) (SellerAuthorityOrder, error) {
 	row := q.db.QueryRow(ctx, lockAuthorityOrder, id)
 	var i SellerAuthorityOrder
@@ -739,9 +718,6 @@ type OrdersNamingMeasureTargetRow struct {
 	Revoked bool
 }
 
-// 這些來函之中，指名了（帳號 account_id 的）店家 store_id 的：不指定店家的對象帳號的任何店家都算，指定時只算那一家（model.AuthorityOrderTarget.Names）。
-// 建立措施驗證來源來函與認定引用的來函用；不存在的來函不會出現在結果裡，revoked 是來函已撤銷登記（不能當作來源）。來函列以 FOR SHARE 鎖住：
-// 撤銷登記鎖同一列（FOR UPDATE），所以措施不會在撤銷之後還記成它導出的（鎖順序：呼叫方已鎖住措施帳號的店家列，來函列在後）。
 func (q *Queries) OrdersNamingMeasureTarget(ctx context.Context, arg OrdersNamingMeasureTargetParams) ([]OrdersNamingMeasureTargetRow, error) {
 	rows, err := q.db.Query(ctx, ordersNamingMeasureTarget, arg.OrderIds, arg.AccountID, arg.StoreID)
 	if err != nil {
@@ -780,7 +756,6 @@ type ReplaceWithheldAuthorityTargetNoticeParams struct {
 	Position   int16
 }
 
-// 把暫不告知的告知換成新的值（已告知或新的確認日期）；只換目前是 WITHHELD 的，被取代的值由呼叫方先寫進歷史。
 func (q *Queries) ReplaceWithheldAuthorityTargetNotice(ctx context.Context, arg ReplaceWithheldAuthorityTargetNoticeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, replaceWithheldAuthorityTargetNotice,
 		arg.Notice,
@@ -815,8 +790,6 @@ type ReviewAuthorityOrderByIDsRow struct {
 	DueAt            time.Time
 }
 
-// 這些來函的處理期限（資源的 deadline）。規則只有 seller.review_authority_order(at)（objects.sql）；已完成或撤銷的來函沒有列。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 func (q *Queries) ReviewAuthorityOrderByIDs(ctx context.Context, arg ReviewAuthorityOrderByIDsParams) ([]ReviewAuthorityOrderByIDsRow, error) {
 	rows, err := q.db.Query(ctx, reviewAuthorityOrderByIDs, arg.At, arg.Ids)
 	if err != nil {
@@ -852,7 +825,6 @@ type RevokeAuthorityOrderParams struct {
 	ExpectedVersion int64
 }
 
-// 撤銷登記（登記錯誤）：只在還沒完成、還沒撤銷而且版本相符時寫入，否則 0 列。保存隨之解除（StoreHolds 不看已撤銷的來函），hold_until 不改（紀錄保留）。
 func (q *Queries) RevokeAuthorityOrder(ctx context.Context, arg RevokeAuthorityOrderParams) (SellerAuthorityOrder, error) {
 	row := q.db.QueryRow(ctx, revokeAuthorityOrder,
 		arg.Now,
@@ -904,7 +876,6 @@ type SetAuthorityTargetNoticeParams struct {
 	Position   int16
 }
 
-// 完成來函時寫一個對象的告知（只寫還沒有告知的）。
 func (q *Queries) SetAuthorityTargetNotice(ctx context.Context, arg SetAuthorityTargetNoticeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setAuthorityTargetNotice,
 		arg.Notice,

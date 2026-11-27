@@ -199,7 +199,6 @@ function DocumentBody({
 						</dd>
 					</div>
 					<div>
-
 						<dt>發票號碼</dt>
 						<dd className="tabular-nums">{dash(summary.invoiceNumber)}</dd>
 					</div>
@@ -263,7 +262,6 @@ function DocumentBody({
 				<h2 className="m-0 text-sm font-bold">金額與稅額明細</h2>
 				<InvoiceSnapshotBreakdown detail={detail} />
 			</section>
-
 
 			{received ? null : <ResendNotice documentId={documentId} />}
 

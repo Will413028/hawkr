@@ -13,7 +13,6 @@ import (
 )
 
 const insertInactiveAuthor = `-- name: InsertInactiveAuthor :execrows
-
 INSERT INTO social.inactive_authors (buyer_id, since)
 VALUES ($1, $2)
 ON CONFLICT (buyer_id) DO NOTHING
@@ -24,8 +23,6 @@ type InsertInactiveAuthorParams struct {
 	Since   time.Time
 }
 
-// 買家刪帳的事實在 social 的複本（schema.sql 的 inactive_authors）：訂閱者在買家進入刪除中與關閉的同一個 transaction 寫入，每日對帳核對。
-// 冪等：買家的狀態不會回到營運中，所以只插入不刪除；已經有的列 0 列（呼叫方不必再重新求值）。
 func (q *Queries) InsertInactiveAuthor(ctx context.Context, arg InsertInactiveAuthorParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertInactiveAuthor, arg.BuyerID, arg.Since)
 	if err != nil {
@@ -47,7 +44,6 @@ type LockAuthorCommentsRow struct {
 	ParentID *uuid.UUID
 }
 
-// 買家寫過的全部留言（含已刪除的），依 ID 由小到大鎖住（FOR NO KEY UPDATE 在排序之後依序取鎖），帶回要鎖的 stats 的鍵。
 func (q *Queries) LockAuthorComments(ctx context.Context, buyerID int64) ([]LockAuthorCommentsRow, error) {
 	rows, err := q.db.Query(ctx, lockAuthorComments, buyerID)
 	if err != nil {
@@ -106,7 +102,6 @@ WHERE NOT EXISTS (SELECT 1 FROM social.inactive_authors AS ia WHERE ia.buyer_id 
 ORDER BY b.buyer_id
 `
 
-// buyer 發布的「此刻不是營運中的買家」裡，複本還沒有的（漂移）：每日對帳補上。
 func (q *Queries) MissingInactiveAuthors(ctx context.Context) ([]int64, error) {
 	rows, err := q.db.Query(ctx, missingInactiveAuthors)
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // AdminShipmentSummaryResp 物流異常列表單筆
 type AdminShipmentSummaryResp struct {
 	ShipmentId      string `json:"shipmentId"`

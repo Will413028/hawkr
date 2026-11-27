@@ -10,7 +10,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 // 佐證端點的 ServeMux 樣式：通報的佐證以通報 ID、措施上請求（申覆）的佐證以請求 ID、詢問回覆的附件以詢問 ID 定址。
 const (
 	EvidenceReportRoute  = "GET /api/files/admin/seller/reports/{report_id}/evidence/{position}"

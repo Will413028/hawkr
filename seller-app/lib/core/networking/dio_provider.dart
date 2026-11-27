@@ -158,7 +158,6 @@ Dio dio(Ref ref) {
     ),
   );
 
-
   void handleAccountSuspended(
     int? status,
     RequestOptions options,

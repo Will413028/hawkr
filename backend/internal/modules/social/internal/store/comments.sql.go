@@ -23,7 +23,6 @@ type CommentByRequestParams struct {
 	RequestID *uuid.UUID
 }
 
-// 冪等重送的查詢：範圍是 (互動者, request_id)。
 func (q *Queries) CommentByRequest(ctx context.Context, arg CommentByRequestParams) (SocialComment, error) {
 	row := q.db.QueryRow(ctx, commentByRequest, arg.ActorKind, arg.ActorID, arg.RequestID)
 	var i SocialComment
@@ -100,7 +99,6 @@ func (q *Queries) GetCommentCounts(ctx context.Context, id uuid.UUID) (GetCommen
 }
 
 const insertComment = `-- name: InsertComment :one
-
 INSERT INTO social.comments (id, post_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, request_id, request_hash)
 VALUES (
     $1, $2, $3, $4, $5, $6,
@@ -123,9 +121,6 @@ type InsertCommentParams struct {
 	RequestHash []byte
 }
 
-// 貼文的留言的寫入與店主、作者自己的讀取。帶「公開可讀、可見」規則的讀取（列表、佔位項目、回覆的對象檢查、隱藏旗標）是 go-jet 建的，
-// 在 internal/reads，規則在 internal/visibility。
-// 同一個互動者的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一則）。
 func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) (SocialComment, error) {
 	row := q.db.QueryRow(ctx, insertComment,
 		arg.ID,
@@ -173,7 +168,6 @@ type LockCommentRow struct {
 	PostStoreID   int64
 }
 
-// 鎖住留言（任何狀態）並帶回所屬貼文的店家：編輯與刪除要先確認作者與歸屬。
 func (q *Queries) LockComment(ctx context.Context, id uuid.UUID) (LockCommentRow, error) {
 	row := q.db.QueryRow(ctx, lockComment, id)
 	var i LockCommentRow
@@ -208,7 +202,6 @@ type SoftDeleteCommentParams struct {
 	ID  uuid.UUID
 }
 
-// 軟刪；已經刪除的 0 列（呼叫方不做副作用）。
 func (q *Queries) SoftDeleteComment(ctx context.Context, arg SoftDeleteCommentParams) (int64, error) {
 	result, err := q.db.Exec(ctx, softDeleteComment, arg.Now, arg.ID)
 	if err != nil {
@@ -229,7 +222,6 @@ type UpdateCommentBodyParams struct {
 	ID   uuid.UUID
 }
 
-// 呼叫方已在列鎖之下檢查版本與隱藏。
 func (q *Queries) UpdateCommentBody(ctx context.Context, arg UpdateCommentBodyParams) (SocialComment, error) {
 	row := q.db.QueryRow(ctx, updateCommentBody, arg.Body, arg.Now, arg.ID)
 	var i SocialComment

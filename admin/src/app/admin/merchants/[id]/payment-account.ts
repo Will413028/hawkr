@@ -7,7 +7,6 @@ import {
 import { PaymentAccountStatus } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import { skipToken } from "@tanstack/react-query";
 
-
 export type PaymentAccountState =
 	| { state: "loading" }
 	| { state: "error"; error?: unknown }

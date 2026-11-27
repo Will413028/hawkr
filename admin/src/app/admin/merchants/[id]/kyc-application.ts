@@ -28,8 +28,6 @@ import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 import { firstVisibleLabel } from "@/lib/unavailability";
 import { addressText } from "./store-detail";
 
-
-
 export const GCIS_PENDING_TEXT = "登記資料查詢中…";
 /** 實作者補：查詢超過伺服器保證的期限仍沒有終態（伺服器的錯誤，或這台電腦的時鐘比伺服器快）時的說明。 */
 export const GCIS_OVERDUE_TEXT = "登記資料查詢超過預定時間仍未完成";
@@ -50,7 +48,6 @@ export const REJECT_SUCCESS_TEXT =
 /** 實作者補：重新查詢的成功提示。 */
 export const REQUERY_SUCCESS_TEXT =
 	"已排入重新查詢，結果出來後會更新在商業登記欄。";
-
 
 /** 申請內容的讀取狀態：沒有送出過的申請（GetStore 沒有 kyc 摘要）時是 none，畫面不顯示 KYC 區塊。 */
 export type KycApplicationState =
@@ -81,7 +78,6 @@ export function kycApplicationOf(
 	if (!result.data.application) return { state: "error" };
 	return { state: "ready", application: result.data.application };
 }
-
 
 /** 退避的下限與上限（毫秒）：從要求的時間起，間隔隨已等待的時間成長（已等待時間的 1/4），上限 60 秒。 */
 export const POLL_MIN_MS = 3000;
@@ -124,7 +120,6 @@ export function registrationOverdue(
 	return now.getTime() >= timestampDate(pending.deadlineTime).getTime();
 }
 
-
 export interface ReviewActions {
 	/** 核准：伺服器說能核准（`can_approve`：審核中、店家營運中、帳號沒有停權），而且帶得出 id 與 etag（資料完整性，不是業務規則）。 */
 	canApprove: boolean;
@@ -164,7 +159,6 @@ export function reviewBlockedLabel(
 		: undefined;
 }
 
-
 /** 目錄認得的欄位（KYCField 的非 UNSPECIFIED 值）；新版伺服器才有的值不列。 */
 function isKnownKycField(field: KYCField): boolean {
 	return (
@@ -188,7 +182,6 @@ const DOCUMENT_FIELDS: ReadonlySet<KYCField> = new Set([
 export function isDocumentField(field: KYCField): boolean {
 	return DOCUMENT_FIELDS.has(field);
 }
-
 
 /** 原因碼的呈現文字（封閉集合；UNSPECIFIED 不是有效值）。 */
 export const KYC_ISSUE_CODE_LABEL: Record<
@@ -438,7 +431,6 @@ export function draftAfter(
 	return result.ok ? EMPTY_REVIEW_DRAFT : draft;
 }
 
-
 /** 審核紀錄的動作文字。 */
 export function reviewActionLabel(action: KYCReviewAction): string {
 	switch (action) {
@@ -506,7 +498,6 @@ export function documentsOf(
 		.sort((a, b) => a.position - b.position);
 }
 
-
 export function sellerTypeLabel(application: KYCApplication): string {
 	switch (application.subject.case) {
 		case "business":
@@ -524,7 +515,6 @@ export function dateText(
 ): string {
 	return formatCalendarDate(date) || "-";
 }
-
 
 export type GcisMark = "mismatch" | "unverifiable";
 
@@ -764,7 +754,6 @@ export function gcisView(
 export function gcisMarkLabel(mark: GcisMark): string {
 	return mark === "mismatch" ? "不一致" : "無法比對";
 }
-
 
 /**
  * 評分統計卡的值：只有讀到而且大於 0 的平均分才顯示（一位小數）；讀不到、還沒有評價、已關閉或未公開的店都是 undefined，

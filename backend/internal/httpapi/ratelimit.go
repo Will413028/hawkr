@@ -17,7 +17,6 @@ import (
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 )
 
-
 const rateWindow = time.Minute
 
 type rateTier struct {
@@ -26,10 +25,10 @@ type rateTier struct {
 }
 
 var (
-	tierPublic  = rateTier{name: "public", visitor: 600, ssr: 12000, ci: 300}
-	tierDefault = rateTier{name: "default", visitor: 300}
+	tierPublic      = rateTier{name: "public", visitor: 600, ssr: 12000, ci: 300}
+	tierDefault     = rateTier{name: "default", visitor: 300}
 	tierProductView = rateTier{name: "product-view", visitor: 120, ssr: 2400, ci: 60}
-	tierPostView = rateTier{name: "post-view", visitor: 120, ssr: 2400, ci: 60}
+	tierPostView    = rateTier{name: "post-view", visitor: 120, ssr: 2400, ci: 60}
 )
 
 var tierBeginUpload = rateTier{name: "begin-upload", visitor: 120}

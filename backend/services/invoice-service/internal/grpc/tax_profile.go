@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // SaveSellerTaxProfileDraft 儲存稅務資格草稿（端點 18 ＝ T01 ＋ 草稿存檔）。
 func (s *InvoiceServer) SaveSellerTaxProfileDraft(
 	ctx context.Context, req *pb.SaveSellerTaxProfileDraftRequest,
@@ -69,7 +68,7 @@ func (s *InvoiceServer) SubmitSellerTaxProfile(
 
 	res, err := s.taxProfiles.Submit(ctx, usecase.SubmitTaxProfileInput{
 		StoreID: storeID, ExpectedVersion: version,
-		AcceptedTerms: req.GetAcceptedTerms(),
+		AcceptedTerms:       req.GetAcceptedTerms(),
 		AcceptedByAccountID: req.GetAcceptedByAccountId(),
 	})
 	if err != nil {
@@ -170,13 +169,13 @@ func (s *InvoiceServer) DecideTaxReviewForAdmin(
 	}
 
 	res, err := s.taxProfiles.Decide(ctx, usecase.TaxDecisionInput{
-		ActorAccountID:     actor,
-		StoreID:            storeID,
-		Decision:           req.GetDecision(),
-		Reason:             req.GetReason(),
-		ApprovalValidUntil: validUntil,
-		Confirmed:          req.GetConfirmed(),
-		ExpectedVersion:    version,
+		ActorAccountID:       actor,
+		StoreID:              storeID,
+		Decision:             req.GetDecision(),
+		Reason:               req.GetReason(),
+		ApprovalValidUntil:   validUntil,
+		Confirmed:            req.GetConfirmed(),
+		ExpectedVersion:      version,
 		ApprovalBasisKey:     req.GetApprovalBasisKey(),
 		ApprovalBasisAssetID: req.GetApprovalBasisAssetId(),
 	})
@@ -225,7 +224,6 @@ func (s *InvoiceServer) DecideTaxExtensionForAdmin(
 	}, nil
 }
 
-
 func parseExpectedVersion(s string) (int64, error) {
 	if s == "" {
 		return 0, nil
@@ -265,10 +263,10 @@ func parseOptionalISO8601(s string) (*time.Time, error) {
 
 func toTaxDecisionData(res usecase.TaxDecisionResult) *pb.DecideTaxReviewForAdminData {
 	return &pb.DecideTaxReviewForAdminData{
-		StoreId:      fmtID(res.StoreID),
-		ReviewStatus: res.ReviewStatus,
-		Version:      fmtInt64(res.Version),
-		AuditLogId: fmtID(res.AuditLogID),
+		StoreId:            fmtID(res.StoreID),
+		ReviewStatus:       res.ReviewStatus,
+		Version:            fmtInt64(res.Version),
+		AuditLogId:         fmtID(res.AuditLogID),
 		RevokedEffectiveAt: fmtTime(res.RevokedEffectiveAt),
 	}
 }

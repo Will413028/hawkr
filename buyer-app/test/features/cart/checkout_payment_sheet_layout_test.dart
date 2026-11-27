@@ -154,11 +154,7 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'https://checkout.test'))
       ..httpClientAdapter = _CheckoutPreviewAdapter();
 
-    await _pumpCheckoutSheet(
-      tester,
-      dio: dio,
-      shippingMethod: '3003',
-    );
+    await _pumpCheckoutSheet(tester, dio: dio, shippingMethod: '3003');
     await tester.pumpAndSettle();
 
     expect(find.textContaining('此配送方式暫不支援'), findsWidgets);

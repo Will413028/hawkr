@@ -19,7 +19,6 @@ const stripComments = (source: string) =>
 const SUCCESS = "features/checkout/screens/CheckoutSuccessClient.tsx";
 const ROWS = "features/invoices/checkout/CheckoutInvoiceRows.tsx";
 
-
 test("付款成功頁掛上發票三列", () => {
 	assert.match(
 		read(SUCCESS),
@@ -27,7 +26,6 @@ test("付款成功頁掛上發票三列", () => {
 		`${SUCCESS} 沒有渲染 CheckoutInvoiceRows`,
 	);
 });
-
 
 test("發票三列零輪詢、零 SSE 訂閱", () => {
 	const source = stripComments(read(ROWS));

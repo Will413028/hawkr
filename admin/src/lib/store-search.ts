@@ -6,7 +6,6 @@ import {
 	StoreStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 
-
 /** 商家清單的篩選分頁（決策簡報 D4 第 1 點）。 */
 export const FILTER_TABS = [
 	"all",

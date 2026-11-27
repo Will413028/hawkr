@@ -1,7 +1,6 @@
 import type { LocalizedMessage } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import { StoreActionUnavailableReason } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 
-
 /** 伺服器說不能操作、但沒有給文字（原因清單空，或該原因沒有 message）時的文字：仍然相信伺服器的 false。 */
 export const GENERIC_UNAVAILABLE_LABEL = "目前不能操作";
 

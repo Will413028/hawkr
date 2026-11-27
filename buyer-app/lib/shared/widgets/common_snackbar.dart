@@ -117,6 +117,5 @@ void showCommonSnackBar(
   Duration duration = const Duration(seconds: 2),
   SnackBarAction? action,
 }) {
-
   showFloatingToast(context, message, duration: duration);
 }

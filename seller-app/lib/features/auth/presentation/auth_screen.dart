@@ -39,7 +39,6 @@ class AuthScreen extends HookConsumerWidget {
     final appVersionFuture = useMemoized(fetchAppVersion);
     final loadingProvider = useState<OAuthProvider?>(null);
 
-
     void navigateAfterAuth(BuildContext ctx) {
       if (!ctx.mounted) return;
       if (ref.read(needsOnboardingProvider) == true) {

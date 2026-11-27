@@ -26,7 +26,6 @@ type ClaimApprovalForExecuteParams struct {
 	BuyerID *int64
 }
 
-// PENDING 推進到 EXECUTING；(id, version, buyer_id, state, expires_at) 沒命中任何列就是 CAS 失敗（過期的 version 與過期的核准都要擋）。
 func (q *Queries) ClaimApprovalForExecute(ctx context.Context, arg ClaimApprovalForExecuteParams) (ProcurementRfqPublicationApproval, error) {
 	row := q.db.QueryRow(ctx, claimApprovalForExecute,
 		arg.Now,
@@ -177,7 +176,6 @@ type GetApprovalForBuyerParams struct {
 	BuyerID *int64
 }
 
-// 只依擁有者查（不收斂到需求）：核准屬於買家的另一張需求與核准不存在要分得開（前者是過時，後者是 NOT_FOUND）。
 func (q *Queries) GetApprovalForBuyer(ctx context.Context, arg GetApprovalForBuyerParams) (ProcurementRfqPublicationApproval, error) {
 	row := q.db.QueryRow(ctx, getApprovalForBuyer, arg.ID, arg.BuyerID)
 	var i ProcurementRfqPublicationApproval
@@ -215,7 +213,6 @@ type GetLatestPendingApprovalByRequestParams struct {
 	Now       time.Time
 }
 
-// 需求最新的、尚未過期的待執行核准（不論對應哪一版）；沒有回 ErrNoRows。planner 用它判斷詢價階段（A9-D35）。
 func (q *Queries) GetLatestPendingApprovalByRequest(ctx context.Context, arg GetLatestPendingApprovalByRequestParams) (ProcurementRfqPublicationApproval, error) {
 	row := q.db.QueryRow(ctx, getLatestPendingApprovalByRequest, arg.RequestID, arg.BuyerID, arg.Now)
 	var i ProcurementRfqPublicationApproval
@@ -267,7 +264,6 @@ type GetLatestPublicationByRequestRow struct {
 	QueuedCount    int32
 }
 
-// 需求最新一次的發布，連同核准的 ID、凍結的受眾數與邀請數，以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
 func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLatestPublicationByRequestParams) (GetLatestPublicationByRequestRow, error) {
 	row := q.db.QueryRow(ctx, getLatestPublicationByRequest, arg.RequestID, arg.BuyerID)
 	var i GetLatestPublicationByRequestRow
@@ -354,8 +350,6 @@ type GetOrderBasisRow struct {
 	OfferedQuantityUnit    string
 }
 
-// 建單 worker 用（系統內部，免 buyer_id；買家關閉後 buyer_id 為 NULL）：接受單、被接受的版本與當時的需求版本。
-// 品名由需求版本的品項（解析後的標籤優先）加被接受版本的報價數量與單位組成；數量去尾零。
 func (q *Queries) GetOrderBasis(ctx context.Context, id uuid.UUID) (GetOrderBasisRow, error) {
 	row := q.db.QueryRow(ctx, getOrderBasis, id)
 	var i GetOrderBasisRow
@@ -498,8 +492,6 @@ type InsertAcceptanceParams struct {
 	Now                       time.Time
 }
 
-// live 鎖（buyer_quote_acceptances_live）只擋 state = 'ACTIVE'：同一張需求已有 ACTIVE 的接受單時回 0 列。
-// 冪等鍵相同也回 0 列，呼叫端用 GetAcceptanceByClientRequest 區分。
 func (q *Queries) InsertAcceptance(ctx context.Context, arg InsertAcceptanceParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertAcceptance,
 		arg.ID,
@@ -805,7 +797,6 @@ type MarkApprovalSucceededParams struct {
 	Version int32
 }
 
-// 不帶 buyer_id：(id, version, state) 已是 CAS，擁有者在 ClaimApprovalForExecute 驗過；BuyerDeleted 把 buyer_id 設 NULL 後仍要能收尾。
 func (q *Queries) MarkApprovalSucceeded(ctx context.Context, arg MarkApprovalSucceededParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markApprovalSucceeded, arg.Now, arg.ID, arg.Version)
 	if err != nil {
@@ -827,7 +818,6 @@ type MarkOrderCreatedParams struct {
 	ID              uuid.UUID
 }
 
-// 建單 worker 專用（系統內部，免 buyer_id）：以 job 引數裡的接受單 id 定位，且買家關閉後接受單的 buyer_id 會被設為 NULL，帶 buyer_id 會讓已建好的單記不回來。
 func (q *Queries) MarkOrderCreated(ctx context.Context, arg MarkOrderCreatedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markOrderCreated,
 		arg.OrderNo,
@@ -853,7 +843,6 @@ type MarkOrderFailedParams struct {
 	ID     uuid.UUID
 }
 
-// 建單的 River job 重試用盡時呼叫（A9-D19 S6 修訂）：同時轉成 ORDER_FAILED 並解除 live 鎖。
 func (q *Queries) MarkOrderFailed(ctx context.Context, arg MarkOrderFailedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markOrderFailed, arg.Reason, arg.Now, arg.ID)
 	if err != nil {
@@ -871,7 +860,6 @@ type SetAcceptanceOrderJobParams struct {
 	ID    uuid.UUID
 }
 
-// 接受單寫入後、同 transaction 記下排入的建單 job，reconciler 以它判斷 job 是否已死。
 func (q *Queries) SetAcceptanceOrderJob(ctx context.Context, arg SetAcceptanceOrderJobParams) error {
 	_, err := q.db.Exec(ctx, setAcceptanceOrderJob, arg.JobID, arg.ID)
 	return err
@@ -881,8 +869,6 @@ const tryLockOrderProvisioning = `-- name: TryLockOrderProvisioning :one
 SELECT pg_try_advisory_xact_lock(hashtextextended('procurement.order_provisioning:' || $1::uuid::text, 0))::boolean AS locked
 `
 
-// 建單對帳在 transaction 內、呼叫 ordering 之前取得的接受單層級鎖（transaction 結束時釋放）：拿不到表示另一個對帳正在處理同一筆，這一筆略過。
-// 呼叫 ordering 與記下結果都在持鎖的同一個 transaction 內，兩個重疊的對帳不會一個記下訂單、另一個標成失敗。
 func (q *Queries) TryLockOrderProvisioning(ctx context.Context, id uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, tryLockOrderProvisioning, id)
 	var locked bool

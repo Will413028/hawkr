@@ -152,7 +152,6 @@ export default function HolidayCalendarPage() {
 
 	return (
 		<div className="hcal-page">
-
 			<div className="page-header">
 				<div>
 					<h1 className="page-title">假日行事曆管理</h1>
@@ -161,7 +160,6 @@ export default function HolidayCalendarPage() {
 					</p>
 				</div>
 			</div>
-
 
 			<div className="hcal-card">
 				<h2 className="hcal-card-title">
@@ -174,7 +172,6 @@ export default function HolidayCalendarPage() {
 					或
 					2，須涵蓋整年每一天）。系統會先檢查並預覽，確認後才覆寫該年度假日資料。
 				</p>
-
 
 				<input
 					ref={fileInputRef}
@@ -213,7 +210,6 @@ export default function HolidayCalendarPage() {
 						{parseError || (previewError ? errorMessage(previewError) : "")}
 					</div>
 				)}
-
 
 				{hasFile && (
 					<div className="hcal-preview">
@@ -296,7 +292,6 @@ export default function HolidayCalendarPage() {
 					</div>
 				)}
 
-
 				{importResult && (
 					<div className="hcal-result success">
 						<MaterialSymbol name="check_circle" />
@@ -306,7 +301,6 @@ export default function HolidayCalendarPage() {
 					</div>
 				)}
 			</div>
-
 
 			<div className="hcal-card">
 				<h2 className="hcal-card-title">
@@ -378,7 +372,6 @@ export default function HolidayCalendarPage() {
 					</table>
 				</div>
 			</div>
-
 
 			{showConfirm && previewReady && (
 				<Dialog

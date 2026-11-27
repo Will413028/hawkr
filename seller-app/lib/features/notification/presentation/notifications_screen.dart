@@ -243,7 +243,6 @@ class NotificationsScreen extends HookConsumerWidget {
   }
 }
 
-
 class _NotificationCard extends ConsumerStatefulWidget {
   final InboxItem notification;
   final bool isDeleteMode;
@@ -519,7 +518,6 @@ class _NotificationBuyerAvatar extends StatelessWidget {
   }
 }
 
-
 class _MarkAllReadDialog extends StatelessWidget {
   const _MarkAllReadDialog();
 
@@ -594,7 +592,6 @@ class _MarkAllReadDialog extends StatelessWidget {
     );
   }
 }
-
 
 class _DeleteBottomBar extends StatelessWidget {
   final int count;

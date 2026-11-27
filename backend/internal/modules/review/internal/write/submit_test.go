@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
 )
 
-
 type orders struct {
 	order model.OrderForReview
 	err   error

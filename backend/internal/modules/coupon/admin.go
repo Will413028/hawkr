@@ -7,7 +7,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 )
 
-
 // AdminCreateCampaign 以 actor 為發行者建立平台活動（DRAFT）；in.Issuer 被覆蓋。
 func (m *Module) AdminCreateCampaign(ctx context.Context, actor adminaudit.Actor, in CreateCampaignInput) (Campaign, error) {
 	return m.admin.CreateCampaign(ctx, actor, in)

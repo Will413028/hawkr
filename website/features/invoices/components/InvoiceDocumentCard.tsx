@@ -82,8 +82,7 @@ export function InvoiceDocumentCard({
 			await navigator.clipboard.writeText(document.invoiceNumber);
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), COPY_RESET_MS);
-		} catch {
-		}
+		} catch {}
 	};
 
 	return (

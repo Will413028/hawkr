@@ -23,10 +23,10 @@ import (
 )
 
 type fakeRegistry struct {
-	t       *testing.T
-	mu      sync.Mutex
-	replies []registryReply
-	calls   []string
+	t        *testing.T
+	mu       sync.Mutex
+	replies  []registryReply
+	calls    []string
 	onLookup func()
 }
 
@@ -994,7 +994,6 @@ func TestPendingFlagIgnoresThePreviousRoundsPendingCheck(t *testing.T) {
 		t.Fatalf("上一輪的 PENDING 讓這一輪顯示查詢中：check=%+v pending=%v", v.RegistrationCheck, (v.PendingRegistrationCheck != nil))
 	}
 }
-
 
 // 進行中的查詢帶要求時間與期限；期限在重試的最壞總長（約 94 分鐘）之後。
 func TestAPendingCheckCarriesItsRequestTimeAndDeadline(t *testing.T) {

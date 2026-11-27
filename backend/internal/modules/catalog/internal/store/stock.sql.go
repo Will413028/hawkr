@@ -28,7 +28,6 @@ type AdjustOwnSkuStockParams struct {
 	StoreID int64
 }
 
-// 賣家調整：只動自己店家、未刪除商品的未刪除 SKU；結果必須落在 0 到 INTEGER 上限之間（以 bigint 算，不溢位），否則回 0 列，庫存不變。
 func (q *Queries) AdjustOwnSkuStock(ctx context.Context, arg AdjustOwnSkuStockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, adjustOwnSkuStock,
 		arg.Delta,
@@ -54,7 +53,6 @@ type DeductSkuStockParams struct {
 	ID       uuid.UUID
 }
 
-// 條件式扣減：庫存不足或 SKU 已刪除回 0 列，不會變負（skus_stock_check 是後備）。
 func (q *Queries) DeductSkuStock(ctx context.Context, arg DeductSkuStockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deductSkuStock, arg.Quantity, arg.Now, arg.ID)
 	if err != nil {
@@ -72,7 +70,6 @@ type GetLiveSkuStockRow struct {
 	StockQty int32
 }
 
-// 未刪除的 SKU 的庫存；扣減失敗時用來區分「不存在或已刪除」與「庫存不足」。
 func (q *Queries) GetLiveSkuStock(ctx context.Context, id uuid.UUID) (GetLiveSkuStockRow, error) {
 	row := q.db.QueryRow(ctx, getLiveSkuStock, id)
 	var i GetLiveSkuStockRow
@@ -95,7 +92,6 @@ type GetOwnLiveSkuRow struct {
 	StockQty int32
 }
 
-// 店家自己的未刪除 SKU；調整失敗時用來區分「不存在、不是自己的或已刪除」與「結果超出範圍」。
 func (q *Queries) GetOwnLiveSku(ctx context.Context, arg GetOwnLiveSkuParams) (GetOwnLiveSkuRow, error) {
 	row := q.db.QueryRow(ctx, getOwnLiveSku, arg.ID, arg.StoreID)
 	var i GetOwnLiveSkuRow
@@ -125,7 +121,6 @@ type GetOwnSkuStateRow struct {
 	Sellable       bool
 }
 
-// 店家自己的 SKU 此刻的內容與可購買性；已刪除的 SKU 與商品也回列（庫存調整 commit 之後並行刪除、或重送時已刪除，回應仍要照實回報）。不是這家店的回無列。
 func (q *Queries) GetOwnSkuState(ctx context.Context, arg GetOwnSkuStateParams) (GetOwnSkuStateRow, error) {
 	row := q.db.QueryRow(ctx, getOwnSkuState, arg.ID, arg.StoreID)
 	var i GetOwnSkuStateRow
@@ -145,7 +140,6 @@ const getStockOperationByKey = `-- name: GetStockOperationByKey :one
 SELECT id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at FROM catalog.stock_operations WHERE idempotency_key = $1 AND store_id IS NULL
 `
 
-// 結帳扣減與歸還的操作（沒有店家）。
 func (q *Queries) GetStockOperationByKey(ctx context.Context, idempotencyKey string) (CatalogStockOperation, error) {
 	row := q.db.QueryRow(ctx, getStockOperationByKey, idempotencyKey)
 	var i CatalogStockOperation
@@ -170,7 +164,6 @@ type GetStoreStockOperationByKeyParams struct {
 	IdempotencyKey string
 }
 
-// 某家店的賣家調整操作；別家店的同名鍵不可見。
 func (q *Queries) GetStoreStockOperationByKey(ctx context.Context, arg GetStoreStockOperationByKeyParams) (CatalogStockOperation, error) {
 	row := q.db.QueryRow(ctx, getStoreStockOperationByKey, arg.StoreID, arg.IdempotencyKey)
 	var i CatalogStockOperation
@@ -202,7 +195,6 @@ func (q *Queries) InsertStockMovement(ctx context.Context, arg InsertStockMoveme
 }
 
 const insertStockOperation = `-- name: InsertStockOperation :execrows
-
 INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT DO NOTHING
@@ -218,10 +210,6 @@ type InsertStockOperationParams struct {
 	Now               time.Time
 }
 
-// 庫存：冪等的扣減與歸還。
-// 冪等鍵 UNIQUE 是唯一的判重點：同一個鍵的併發或重送，後到的交易在這裡等到先到的提交，然後回 0 列（呼叫端改走重送路徑）；
-// 先到的回滾時，後到的插入成功。沒有「先查再扣」。
-// 鍵的範圍：賣家調整帶 store_id，鍵只在該店家內唯一；結帳的扣減與歸還 store_id 為空，鍵全域唯一（兩個部分唯一索引，ON CONFLICT 不指定目標）。
 func (q *Queries) InsertStockOperation(ctx context.Context, arg InsertStockOperationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertStockOperation,
 		arg.ID,
@@ -271,7 +259,6 @@ const lockStockOperation = `-- name: LockStockOperation :one
 SELECT id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at FROM catalog.stock_operations WHERE id = $1 AND kind = 'DEDUCT' FOR UPDATE
 `
 
-// 歸還前鎖住原扣減：同一次扣減的多筆歸還（不同鍵）排隊，累計檢查看到前一筆已提交的結果。
 func (q *Queries) LockStockOperation(ctx context.Context, id uuid.UUID) (CatalogStockOperation, error) {
 	row := q.db.QueryRow(ctx, lockStockOperation, id)
 	var i CatalogStockOperation
@@ -299,7 +286,6 @@ type RestoreSkuStockParams struct {
 	ID       uuid.UUID
 }
 
-// 歸還不檢查 SKU 是否已刪除：訂單取消時商品可能已被賣家移除，庫存仍要記回（量由原扣減決定）。
 func (q *Queries) RestoreSkuStock(ctx context.Context, arg RestoreSkuStockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, restoreSkuStock, arg.Quantity, arg.Now, arg.ID)
 	if err != nil {
@@ -325,7 +311,6 @@ type SetOwnSkuStockParams struct {
 	Expected int32
 }
 
-// 賣家設定：只動自己店家、未刪除商品的未刪除 SKU，而且現值要等於 expected（比對與寫入是同一句 UPDATE，沒有「先查再設」）；不符回 0 列，庫存不變。
 func (q *Queries) SetOwnSkuStock(ctx context.Context, arg SetOwnSkuStockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setOwnSkuStock,
 		arg.Quantity,
@@ -352,7 +337,6 @@ type SkuInStoreParams struct {
 	StoreID int64
 }
 
-// SKU 是否屬於這家店（不看 SKU 或商品是否已刪除）；調整的冪等重送用它確認重送的人就是原本的店家。
 func (q *Queries) SkuInStore(ctx context.Context, arg SkuInStoreParams) (bool, error) {
 	row := q.db.QueryRow(ctx, skuInStore, arg.ID, arg.StoreID)
 	var exists bool
@@ -374,7 +358,6 @@ type SumRestoredBySkuRow struct {
 	Restored int32
 }
 
-// 一次扣減已歸還的累計量（正數），依 SKU。
 func (q *Queries) SumRestoredBySku(ctx context.Context, deductOperationID *uuid.UUID) ([]SumRestoredBySkuRow, error) {
 	rows, err := q.db.Query(ctx, sumRestoredBySku, deductOperationID)
 	if err != nil {

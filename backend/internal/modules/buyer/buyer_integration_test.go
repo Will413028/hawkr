@@ -37,10 +37,10 @@ var pg *testdb.Server
 func TestMain(module *testing.M) { testdb.Main(module, &pg) }
 
 type queue struct {
-	mu   sync.Mutex
-	args []river.JobArgs
-	opts []*river.InsertOpts
-	fail bool
+	mu        sync.Mutex
+	args      []river.JobArgs
+	opts      []*river.InsertOpts
+	fail      bool
 	outsideOK bool
 }
 
@@ -74,10 +74,10 @@ func (m *markDeletedFailer) MarkDeleted(ctx context.Context, ids []uuid.UUID) er
 }
 
 type fixture struct {
-	database *db.DB
-	module   *Module
-	bus      *events.Bus
-	jobs     *queue
+	database        *db.DB
+	module          *Module
+	bus             *events.Bus
+	jobs            *queue
 	failMarkDeleted atomic.Bool
 	media           *media.Module
 	now             time.Time

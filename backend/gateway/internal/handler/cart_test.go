@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type mockCartServiceClient struct {
 	AddItemFn         func(ctx context.Context, in *cartpb.AddItemRequest, opts ...grpc.CallOption) (*cartpb.AddItemResponse, error)
 	GetCartFn         func(ctx context.Context, in *cartpb.GetCartRequest, opts ...grpc.CallOption) (*cartpb.GetCartResponse, error)
@@ -60,7 +59,6 @@ func (m *mockCartServiceClient) RemoveItemsByCheckoutId(ctx context.Context, in 
 	return nil, nil
 }
 
-
 func setupCartRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
@@ -90,7 +88,6 @@ func setupCartRouter(h *Holder) *gin.Engine {
 
 	return r
 }
-
 
 func TestGetCartList_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
@@ -193,7 +190,6 @@ func TestGetCartList_GrpcError(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusServiceUnavailable)
 }
 
-
 func TestAddToCart_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
 		AddItemFn: func(ctx context.Context, in *cartpb.AddItemRequest, opts ...grpc.CallOption) (*cartpb.AddItemResponse, error) {
@@ -284,7 +280,6 @@ func TestAddToCart_GrpcError(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusServiceUnavailable)
 }
 
-
 func TestSetItemQuantity_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
 		SetItemQuantityFn: func(ctx context.Context, in *cartpb.SetItemQuantityRequest, opts ...grpc.CallOption) (*cartpb.SetItemQuantityResponse, error) {
@@ -334,7 +329,6 @@ func TestSetItemQuantity_BadRequest(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-
 func TestDeleteCartItem_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
 		SetItemQuantityFn: func(ctx context.Context, in *cartpb.SetItemQuantityRequest, opts ...grpc.CallOption) (*cartpb.SetItemQuantityResponse, error) {
@@ -375,7 +369,6 @@ func TestDeleteCartItem_GuestNoGuestId(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-
 func TestMergeCart_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
 		MergeCartFn: func(ctx context.Context, in *cartpb.MergeCartRequest, opts ...grpc.CallOption) (*cartpb.MergeCartResponse, error) {
@@ -406,7 +399,6 @@ func TestMergeCart_Success(t *testing.T) {
 	resp := parseJSON(t, w.Body)
 	assertCode(t, resp, 0)
 }
-
 
 func capturedXAccountID(ctx context.Context) string {
 	accountID, ok := ctx.Value(grpcclient.CtxKeyAccountID).(int64)

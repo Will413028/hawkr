@@ -20,7 +20,6 @@ const AppName = "hawkr_ai"
 
 const temperature = float32(0.3)
 
-
 const statusGuide = `訂單狀態碼（tool 回傳的 status 是代碼）：0=待付款, 10=已付款, 20=待出貨, 30=配送中, 32=待取貨, 35=物流異常, 40=已送達（待買家確認收貨）, 50=已完成, 54=配送失敗未退款, 60=部分退款, 70=全額退款, 80=已取消。回覆時把代碼說成買家語言的狀態名稱，不要直接顯示代碼。`
 
 const toolErrorGuide = `tool 失敗時回傳 {"error": 代碼}：upstream_unavailable=訂單服務暫時不可用、order_not_found=查無這筆訂單、forbidden=無權查詢、tool_failed 與 delegate_failed=查詢失敗、unknown_tool=呼叫了不存在的工具。遇到錯誤時用買家的語言簡短說明查不到或請稍後再試，不要顯示代碼。`

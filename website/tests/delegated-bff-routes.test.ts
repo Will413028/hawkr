@@ -140,7 +140,6 @@ const ROUTES: RouteCase[] = [
 		gateway: "/admin/sellers/4/products/77/unpublish",
 	},
 
-
 	{
 		module: "orders/[storeId]",
 		method: "GET",
@@ -165,7 +164,6 @@ const ROUTES: RouteCase[] = [
 		bff: "/adm/api/orders/4/HK260728001/recipient-contact",
 		gateway: "/admin/sellers/4/orders/HK260728001/recipient-contact",
 	},
-
 ];
 
 type Handler = (
@@ -655,7 +653,6 @@ test("session/end：target 相符 → DELETE，且只有拿到終止證明才清
 		unproven.restore();
 	}
 });
-
 
 const SERVICE = "hawkr.social.v1alpha1.SocialDelegatedService";
 const POST_ID = "5f0c9a52-7a4e-4f0b-8d2e-3b7c2a1d9e11";

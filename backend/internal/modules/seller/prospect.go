@@ -6,7 +6,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-
 // ProspectStatus 是業者的狀態（進行中、封存或被合併、已轉成店家）。
 type ProspectStatus = model.ProspectStatus
 

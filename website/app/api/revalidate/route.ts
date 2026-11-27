@@ -69,8 +69,7 @@ export async function POST(req: NextRequest) {
 	let body: unknown = null;
 	try {
 		body = rawBody ? JSON.parse(rawBody) : null;
-	} catch {
-	}
+	} catch {}
 	const result = parseRevalidateRequest(secretHeader, body, expectedSecret);
 	if (!result.ok) {
 		return NextResponse.json(

@@ -17,7 +17,6 @@ import {
 } from "@hawkr/ui-text/zh-TW";
 import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-
 export type MeasureTabKey = "pending" | "review-due" | "active" | "all";
 
 export interface MeasureListTab {
@@ -66,7 +65,6 @@ export function measureListRequest(
 ): MessageInitShape<typeof ListMeasuresRequestSchema> {
 	return { ...tab.filter, pageToken, pageSize };
 }
-
 
 /** 請求種類的顯示文字，取自共用文案目錄；UNSPECIFIED 與不認得的值是「未知」。 */
 export function requestKindLabel(kind: MeasureRequestKind): string {

@@ -928,7 +928,6 @@ export default function ProductsPage() {
 					</div>
 				)}
 
-
 				{delegated && batchResult && (
 					<div
 						className={`adm-batch-result${
@@ -958,7 +957,6 @@ export default function ProductsPage() {
 						</div>
 					</div>
 				)}
-
 
 				{statusConflict && (
 					<div className="adm-conflict" role="alert">
@@ -1002,7 +1000,6 @@ export default function ProductsPage() {
 				)}
 
 				<div className="seller-orders__card seller-products__card seller-mobile-disclosure-desktop">
-
 					{delegated && (
 						<p className="adm-products__scroll-hint">
 							<AppIcon name="arrow-right" size={14} className="shrink-0" />
@@ -1018,7 +1015,6 @@ export default function ProductsPage() {
 						>
 							<thead>
 								<tr>
-
 									{canPublish && (
 										<th className="seller-products-table__check">
 											<label className="seller-products-table__check-hit">
@@ -1068,7 +1064,6 @@ export default function ProductsPage() {
 									/>
 								) : visibleItems.length === 0 ? (
 									<tr>
-
 										<td
 											colSpan={(delegated ? 8 : 10) + (canPublish ? 1 : 0)}
 											className="seller-orders__empty"
@@ -1134,7 +1129,6 @@ export default function ProductsPage() {
 												</td>
 											)}
 											<td data-label="商品">
-
 												<ProductNameCell
 													delegated={delegated}
 													href={`/seller-center/products/${p.id}/edit`}
@@ -1174,7 +1168,6 @@ export default function ProductsPage() {
 													data-label="評分"
 													onClick={(e) => e.stopPropagation()}
 												>
-
 													<RatingCell
 														delegated={delegated}
 														productName={p.name || "未命名商品"}
@@ -1278,7 +1271,6 @@ export default function ProductsPage() {
 											{delegated ? (
 												<td data-label="操作">
 													<div className="adm-products__actions">
-
 														<Link
 															href={`${delegatedProductRoot}/${encodeURIComponent(String(p.id))}/edit`}
 															className="seller-table__action"

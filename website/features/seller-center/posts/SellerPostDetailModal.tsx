@@ -105,7 +105,6 @@ export default function SellerPostDetailModal({
 					<CloseIcon />
 				</button>
 
-
 				<div className="seller-post-modal__media relative grid flex-1 min-w-0 place-items-center bg-default-100 min-h-[320px] max-md:flex-none max-md:aspect-[4/3]">
 					{imageKey ? (
 						<AppImage
@@ -121,7 +120,6 @@ export default function SellerPostDetailModal({
 						<span className="text-foreground-soft text-sm">無圖片</span>
 					)}
 				</div>
-
 
 				<aside className="seller-post-modal__aside flex w-[420px] max-w-full shrink-0 flex-col overflow-y-auto border-l border-divider max-md:w-full max-md:border-l-0 max-md:border-t">
 					<header
@@ -157,7 +155,6 @@ export default function SellerPostDetailModal({
 							</div>
 						</div>
 					</header>
-
 
 					{!isPostHidden(post) && (
 						<PostPublishStatusBadge

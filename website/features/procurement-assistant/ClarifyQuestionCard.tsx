@@ -532,7 +532,6 @@ function ClarifyQuestionForm({
 										}
 										className="hawkr-agent-question-card__option hawkr-agent-question-card__option--unit"
 									>
-
 										{option.label}
 									</button>
 								))}

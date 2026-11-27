@@ -77,9 +77,9 @@ func (f *fakeMedia) Confirm(_ context.Context, _ media.Uploader, token string, _
 func (f *fakeMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }
 
 type fixture struct {
-	url    string
-	public contentv1alpha1connect.ContentPublicServiceClient
-	admin  adminconnect.ContentAdminServiceClient
+	url        string
+	public     contentv1alpha1connect.ContentPublicServiceClient
+	admin      adminconnect.ContentAdminServiceClient
 	adminToken string
 	buyerToken string
 }

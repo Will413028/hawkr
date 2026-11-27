@@ -91,8 +91,7 @@ export default function AiImageEnhanceDialog({
 					setQuota({ limit: list.weeklyLimit, usage: list.weeklyUsage });
 				}
 			})
-			.catch(() => {
-			});
+			.catch(() => {});
 		return () => ctrl.abort();
 	}, [open, category]);
 
@@ -183,7 +182,6 @@ export default function AiImageEnhanceDialog({
 			aria-modal="true"
 			aria-label="AI 圖片美化"
 		>
-
 			<div className="w-full max-w-2xl max-h-[calc(100dvh-var(--floating-nav-top-gap,16px)-var(--floating-nav-height,84px)-32px)] overflow-auto rounded-[var(--hkui-radius-2xl)] border border-white/55 bg-[linear-gradient(135deg,rgba(255,253,247,0.82),rgb(var(--color-ink-50-rgb)/0.66))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_24px_60px_-28px_rgb(var(--color-ink-950-rgb)/0.55)] backdrop-blur-[24px] backdrop-saturate-[130%] dark:border-[rgba(245,222,165,0.16)] dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] dark:shadow-[inset_0_1px_0_rgba(245,222,165,0.06),0_24px_60px_-28px_rgba(0,0,0,0.6)]">
 				<header className="flex items-center justify-between mb-4 gap-3">
 					<h2 className="font-display text-xl text-foreground m-0 inline-flex items-center gap-2">
@@ -337,7 +335,6 @@ export default function AiImageEnhanceDialog({
 						</div>
 					)}
 				</div>
-
 
 				<div className="min-h-5 mb-3">
 					{error && (

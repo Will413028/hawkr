@@ -26,7 +26,6 @@ export default function DelegatedOrderDetailDrawer({
 			title="訂單詳情"
 			className="max-w-md"
 		>
-
 			{orderNo ? (
 				<DelegatedOrderDetailPanel key={orderNo} orderNo={orderNo} />
 			) : null}

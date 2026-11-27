@@ -35,8 +35,6 @@ import { formatStaff } from "@hawkr/ui-text/zh-TW";
 import { formatDateTimeShort } from "@/lib/format";
 import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-
-
 /** 風險類型下拉的選項順序（不含 UNSPECIFIED；UNSPECIFIED 不是有效的送出值）。 */
 export const RISK_GROUND_OPTIONS: readonly RiskGround[] = [
 	RiskGround.TRANSACTION,
@@ -53,7 +51,6 @@ export const RISK_GROUND_OPTIONS: readonly RiskGround[] = [
 export function riskGroundLabel(ground: RiskGround): string {
 	return staffTextOrUnknown(sellerRiskGround(ground));
 }
-
 
 const STATE_VARIANT: Readonly<
 	Partial<Record<MeasureState, "danger" | "warning" | "gray">>
@@ -119,7 +116,6 @@ export function violationSeverityText(severity: ViolationSeverity): string {
 export function measureKindLabel(kind: MeasureKind): string {
 	return staffTextOrUnknown(sellerMeasureKind(kind));
 }
-
 
 /**
  * 伺服器此刻允許建立的終止合作（GetStoreResponse.available_terminations）對應的對話框選項：順序與內容都照伺服器給的（伺服器依 TerminationGround 的
@@ -238,7 +234,6 @@ export function revokeDetailText(
 		: "-";
 	return `${time}・${revokeReasonLabel(measure.revokeReason)}`;
 }
-
 
 export const STATEMENT_MAX_LENGTH = 2000;
 export const NOTE_MAX_LENGTH = 2000;
@@ -416,7 +411,6 @@ export function buildCreateRiskMeasure(
 		},
 	};
 }
-
 
 /**
  * 選到的終止合作，記住選項從哪裡來：`available` 是店家詳情的 available_terminations（一般的事由），依據的認定依選項的
@@ -607,7 +601,6 @@ export function scheduledTerminationText(
 	return earliest ? `預定終止：${formatDateTimeShort(earliest)}` : undefined;
 }
 
-
 /** 目前這個 request_id 是為哪一份內容產生的。 */
 export interface RequestIdSlot {
 	key: string;
@@ -646,10 +639,8 @@ export function requestIdFor(
 	return { key, id: generate() };
 }
 
-
 export const MEASURE_CONFLICT_TEXT =
 	"這個措施剛被更新，頁面已重新載入；請確認最新狀態後再操作。";
-
 
 /** 建立終止合作成功後的頁首提示；生效時間用伺服器回的 period.start_time（不自己推算）。 */
 export function terminationCreatedText(

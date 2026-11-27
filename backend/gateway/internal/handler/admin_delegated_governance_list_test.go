@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type governanceListStub struct {
 	accountpb.DelegationServiceClient
 
@@ -71,7 +70,6 @@ func sampleSessionRecord() *accountpb.DelegatedOperationSessionRecord {
 		RevokeReason:              &reason,
 	}
 }
-
 
 func TestListDelegatedOperations_QueryValidation(t *testing.T) {
 	cases := []struct {
@@ -141,7 +139,6 @@ func TestListAllDelegatedAuditLogs_QueryValidation(t *testing.T) {
 	}
 }
 
-
 // 這一條守的是靜默失效：handler 讀了 query 卻沒填進 request，回應仍是 200 ＋ 一份看起來
 // 正常的清單，只是內容是全平台的。沒有任何東西會轉紅，而操作者拿到的是別家店的資料。
 func TestListDelegatedOperations_ForwardsEveryFilter(t *testing.T) {
@@ -206,7 +203,6 @@ func TestListAllDelegatedAuditLogs_ForwardsEveryFilter(t *testing.T) {
 		}
 	}
 }
-
 
 // 分頁一律走 response.Page：data 恰為 {records,total,page,pageSize}。handler 自組 gin.H
 // 必然漂出 page_size 這種 snake 變體，前端讀通用 data.pageSize 就拿到 undefined。

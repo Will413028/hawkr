@@ -36,12 +36,12 @@ import (
 )
 
 type recorder struct {
-	mu         sync.Mutex
-	args       []intake.ProcessArgs
-	fanouts    []intake.FanoutArgs
-	fanoutOpts []*river.InsertOpts
-	deliveries []intake.DeliverArgs
-	purges     []purge.RecipientArgs
+	mu            sync.Mutex
+	args          []intake.ProcessArgs
+	fanouts       []intake.FanoutArgs
+	fanoutOpts    []*river.InsertOpts
+	deliveries    []intake.DeliverArgs
+	purges        []purge.RecipientArgs
 	deliverUnique []bool
 }
 
@@ -96,12 +96,12 @@ func (r *recorder) take() []intake.ProcessArgs {
 }
 
 type likeParams struct {
-	AccountID int64  `json:"account_id"`
-	EventID   string `json:"event_id"`
-	PostID    string `json:"post_id"`
-	ActorID   int64  `json:"actor_id"`
-	Note      string `json:"note"`
-	At time.Time `json:"at"`
+	AccountID int64     `json:"account_id"`
+	EventID   string    `json:"event_id"`
+	PostID    string    `json:"post_id"`
+	ActorID   int64     `json:"actor_id"`
+	Note      string    `json:"note"`
+	At        time.Time `json:"at"`
 }
 
 type pushParams struct {
@@ -266,18 +266,18 @@ func (f *fakeStores) retire(storeID int64) {
 }
 
 type fixture struct {
-	db       *db.DB
-	identity *identity.Module
-	buyer    *buyer.Module
-	stores   *fakeStores
-	bus      *events.Bus
-	jobs     *recorder
-	module   *Module
-	logs     *syncBuffer
-	push     *fcm.Fake
-	mail     *resend.Fake
-	contacts *fakeContacts
-	resolver Resolver
+	db        *db.DB
+	identity  *identity.Module
+	buyer     *buyer.Module
+	stores    *fakeStores
+	bus       *events.Bus
+	jobs      *recorder
+	module    *Module
+	logs      *syncBuffer
+	push      *fcm.Fake
+	mail      *resend.Fake
+	contacts  *fakeContacts
+	resolver  Resolver
 	sellerMod *seller.Module
 }
 

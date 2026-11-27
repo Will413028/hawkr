@@ -27,7 +27,6 @@ const (
 	favoriteTestBuyerID   int64 = 777
 )
 
-
 func setupProductRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
@@ -79,7 +78,6 @@ func setupProductRouterWithAuth(h *Holder) *gin.Engine {
 	}
 	return r
 }
-
 
 func TestGetProductList_Success(t *testing.T) {
 	mock := &mockProductServiceClient{
@@ -181,7 +179,6 @@ func TestGetProductList_GrpcError(t *testing.T) {
 	assertCode(t, resp, 503)
 }
 
-
 // TestGetProductList_FollowedFilterGating pins the behavior change reviewed
 // in phase 2: h.resolveBuyerID(c) is only consulted when followed_product_only
 // or followed_seller_only is active, and the resolved buyer_id (never the raw
@@ -264,7 +261,6 @@ func TestGetProductList_FollowedFilterGating(t *testing.T) {
 		assertCode(t, resp, 0)
 	})
 }
-
 
 // TestGetProductList_FavoritesAggregation proves the isFavorited aggregation
 // in GetProductList resolves account_id -> buyer_id via the soft-fail path
@@ -464,7 +460,6 @@ func TestGetProductList_RestockSubscribedAggregation(t *testing.T) {
 	})
 }
 
-
 func TestGetProductDetailByID_Success(t *testing.T) {
 	mock := &mockProductServiceClient{
 		GetPublicProductFn: func(ctx context.Context, in *productpb.GetPublicProductRequest, opts ...grpc.CallOption) (*productpb.GetProductResponse, error) {
@@ -522,7 +517,6 @@ func TestGetProductDetailByID_Success(t *testing.T) {
 		t.Errorf("storeId = %v, want 100", seller["storeId"])
 	}
 }
-
 
 // TestGetProductList_SellerLogoURLField proves the nested seller object in
 // /public/products list responses exposes the seller logo as the canonical
@@ -864,7 +858,6 @@ func TestGetProductDetailByID_SellerWithNoCurrentStore_FallsBackToRawAccountID(t
 	}
 }
 
-
 // TestGetProductDetailByID_FavoriteAggregation proves the isFavorited and
 // isRestockSubscribed aggregations in the PDP share a single soft-fail
 // buyer_id resolution (h.BuyerID.CurrentBuyerID, never h.resolveBuyerID which
@@ -1009,7 +1002,6 @@ func TestGetProductDetailByID_GrpcError(t *testing.T) {
 	assertCode(t, resp, 503)
 }
 
-
 func TestGetProductRating_Success(t *testing.T) {
 	mock := &mockProductServiceClient{
 		GetPublicProductFn: func(ctx context.Context, in *productpb.GetPublicProductRequest, opts ...grpc.CallOption) (*productpb.GetProductResponse, error) {
@@ -1047,7 +1039,6 @@ func TestGetProductRating_Success(t *testing.T) {
 		t.Errorf("reviewCount = %v, want 42", data["reviewCount"])
 	}
 }
-
 
 func purgeCacheRequest(t *testing.T, body string) *http.Request {
 	t.Helper()
@@ -1157,7 +1148,6 @@ func TestPurgeProductCache_ListScope_NoCurrentSeller_ReturnsZeroPurged(t *testin
 		t.Errorf("purgedKeys = %v, want 0", data["purgedKeys"])
 	}
 }
-
 
 func setupCertificationRouter(h *Holder) *gin.Engine {
 	r := gin.New()

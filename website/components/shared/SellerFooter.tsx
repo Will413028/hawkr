@@ -48,7 +48,6 @@ export default function SellerFooter() {
 			<div
 				className={`${FOOTER_SHELL} flex justify-between gap-x-20 gap-y-8 max-[960px]:flex-col max-[960px]:gap-y-8`}
 			>
-
 				<div className="max-[960px]:min-w-0 max-w-[320px] max-[960px]:max-w-none">
 					<BrandLogo tone="light" className={FOOTER_BRAND_LOGO} />
 					<p className={FOOTER_BRAND_TAGLINE}>賣家中心 · 經營你的線上商店。</p>
@@ -63,9 +62,7 @@ export default function SellerFooter() {
 					<TextScaleToggle className="mt-2" />
 				</div>
 
-
 				<div className="flex gap-20 max-[960px]:gap-12 max-[560px]:grid max-[560px]:grid-cols-2 max-[560px]:gap-x-3 max-[560px]:gap-y-[18px]">
-
 					<div className="max-[960px]:min-w-0">
 						<h2 className={FOOTER_HEADING}>
 							<span className={FOOTER_HEADING_DOT} />
@@ -81,7 +78,6 @@ export default function SellerFooter() {
 							))}
 						</ul>
 					</div>
-
 
 					<div className="max-[960px]:min-w-0">
 						<h2 className={FOOTER_HEADING}>

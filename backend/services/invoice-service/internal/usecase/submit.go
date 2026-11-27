@@ -18,7 +18,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // ClaimForSubmit 在**單一事務**內做兩件必須同時成立的事：
 //
 //	① operation READY／RETRY_SCHEDULED／SENDING → SENDING（J07，CAS，租約推到 now+120s）
@@ -68,7 +67,6 @@ func (u *Issuance) ClaimForSubmitAt(ctx context.Context, operationID int64, now,
 	})
 	return claimed, err
 }
-
 
 // Submit 送出一次開票。呼叫端（INV.op worker）必須已經 ClaimForSubmit 成功。
 //
@@ -596,7 +594,6 @@ func (u *Issuance) markReissueFailedIfAny(ctx context.Context, doc domain.Docume
 		corr.Status, codemeta.InvoiceCorrectionStatusReissueFailed.Value, "", "", now)
 }
 
-
 func buildIssueRequest(doc domain.Document, lines []domain.DocumentLine, secrets domain.RecipientSecrets) (amego.IssueRequest, error) {
 	items := make([]amego.IssueProductItem, 0, len(lines))
 	for _, l := range lines {
@@ -634,12 +631,11 @@ func buildIssueRequest(doc domain.Document, lines []domain.DocumentLine, secrets
 		TaxAmount:          strconv.FormatInt(doc.TaxAmount, 10),
 		TotalAmount:        strconv.FormatInt(doc.TotalAmount, 10),
 		TaxType:            strconv.FormatInt(int64(doc.TaxType), 10),
-		TaxRate:           domain.TaxRateLiteral,
-		DetailVat:         strconv.Itoa(domain.DetailVatInclusive),
-		DetailAmountRound: strconv.Itoa(domain.DetailAmountRoundOn),
+		TaxRate:            domain.TaxRateLiteral,
+		DetailVat:          strconv.Itoa(domain.DetailVatInclusive),
+		DetailAmountRound:  strconv.Itoa(domain.DetailAmountRoundOn),
 	}, nil
 }
-
 
 type issuedEvent struct {
 	NotificationRefID string            `json:"notification_ref_id"`
@@ -713,9 +709,9 @@ func (u *Issuance) reissuedEventPayload(
 		BuyerID:           eventwire.BuyerIDOfDocument(doc),
 		StoreID:           eventwire.StoreIDOf(issuer),
 		VoidedDocumentID:  strconv.FormatInt(original.ID, 10),
-		VoidedInvoiceNo: derefString(original.ProviderInvoiceNo),
-		NewInvoiceNo:    res.InvoiceNumber,
-		OccurredAt:      timeutil.FormatISO8601(now),
+		VoidedInvoiceNo:   derefString(original.ProviderInvoiceNo),
+		NewInvoiceNo:      res.InvoiceNumber,
+		OccurredAt:        timeutil.FormatISO8601(now),
 	})
 }
 
@@ -729,8 +725,8 @@ func (u *Issuance) failedEventPayload(issuer domain.Issuer, doc domain.Document,
 		StoreID:            eventwire.StoreIDOf(issuer),
 		FailureClass:       failureClass,
 		FailureReasonCode:  reasonCode,
-		ProviderErrorCode: providerCode,
-		OccurredAt:        timeutil.FormatISO8601(now),
+		ProviderErrorCode:  providerCode,
+		OccurredAt:         timeutil.FormatISO8601(now),
 	})
 }
 
@@ -747,7 +743,6 @@ func issuedEventType(documentKind string) pkgmq.EventType {
 	}
 	return pkgmq.EventTypeInvoiceIssued
 }
-
 
 func backoffFor(attempt int, base, max time.Duration) time.Duration {
 	d := base

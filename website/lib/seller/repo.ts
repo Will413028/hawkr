@@ -34,7 +34,6 @@ import { socialAppClient } from "../connect/social";
 import { createOwnerPostApi, type OwnerPostClient } from "../posts/owner";
 import type { AgreementAcceptanceInput } from "./agreements";
 
-
 /** 店面的地址：鄉鎮市區代碼（8 碼）與明細；明細可以是空字串。 */
 export interface StoreAddress {
 	townCode: string;
@@ -210,7 +209,6 @@ export async function closeMyStore(): Promise<Store> {
 	if (!res.store) throw new Error("CloseMyStore 的回應沒有店家");
 	return res.store;
 }
-
 
 /** Semantic coupon kind used by the web form (UI-friendly). Repo maps to
  * the backend's numeric `type` enum at send time. */
@@ -438,13 +436,11 @@ export async function createSellerCoupon(
 	};
 }
 
-
 export async function deleteSellerCoupon(id: string): Promise<void> {
 	await authedFetch(`/app/coupon_templates/${encodeURIComponent(id)}/revoke`, {
 		method: "POST",
 	});
 }
-
 
 /**
  * 建立貼文（`SocialAppService.CreatePost`）的輸入 — 可附一張圖片（stagedToken）與一個商品（productId）。

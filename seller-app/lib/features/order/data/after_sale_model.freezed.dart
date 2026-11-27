@@ -17,7 +17,7 @@ mixin _$AfterSaleCase {
 
  String get caseNo; String get orderNo; String get buyerId; String get storeId; String get buyerName;/// 買家頭像顯示 URL（Gateway 組）。契約欄名 `avatarUrl`，與 `avatarKey` 成對
 /// （49 §6.1；舊名 `buyerAvatarUrl` 已於 2026-08-05 收斂移除）。
- String get avatarUrl; String get shippingAddress; String get status; String get reason; String get description; String get refundableAmount; String get returnShipmentNo; String get returnShippingMethod; String? get shipTradeNo;@JsonKey(readValue: _readCaseValue) String get providerStatus;@JsonKey(readValue: _readCaseValue) String get providerMessage;@JsonKey(readValue: _readCaseValue) String get refundTaskStatus;@JsonKey(readValue: _readCaseValue) String get refundFailureMessage; String? get odno; String? get validationNo; String get createdAt; String get closedAt; List<AfterSaleItem> get items; List<String> get shipmentPhotoUrls; List<Map<String, dynamic>> get evidence; List<AfterSaleResolution> get resolutions;// B-130 / backend issue #568：處理時限與平台接手狀態
+ String get avatarUrl; String get shippingAddress; String get status; String get reason; String get description; String get refundableAmount; String get returnShipmentNo; String get returnShippingMethod; String? get shipTradeNo;@JsonKey(readValue: _readCaseValue) String get providerStatus;@JsonKey(readValue: _readCaseValue) String get providerMessage;@JsonKey(readValue: _readCaseValue) String get refundTaskStatus;@JsonKey(readValue: _readCaseValue) String get refundFailureMessage; String? get odno; String? get validationNo; String get createdAt; String get closedAt; List<AfterSaleItem> get items; List<String> get shipmentPhotoUrls; List<Map<String, dynamic>> get evidence; List<AfterSaleResolution> get resolutions;// 處理時限與平台接手狀態。
  String get processDeadline; bool get autoEscalated; int get processDeadlineHours;/// 申訴狀態（AppealState：'0'=未申訴；'10' APPEALED / '20' INVESTIGATING
 /// 進入平台仲裁）。後端列表 summary 已回傳；賣家卡片需據此把狀態折疊成
 /// 「申訴仲裁中」，否則只看 status 會顯示已拒絕 / 待處理。
@@ -299,7 +299,7 @@ class _AfterSaleCase implements AfterSaleCase {
   return EqualUnmodifiableListView(_resolutions);
 }
 
-// B-130 / backend issue #568：處理時限與平台接手狀態
+// 處理時限與平台接手狀態。
 @override@JsonKey() final  String processDeadline;
 @override@JsonKey() final  bool autoEscalated;
 @override@JsonKey() final  int processDeadlineHours;
@@ -401,7 +401,7 @@ as String,
 /// @nodoc
 mixin _$AfterSaleItem {
 
- String get orderItemId; String get skuId; String get skuName; String get quantity;// PayUni #758: 新欄位（成交單價 / 原價）
+ String get orderItemId; String get skuId; String get skuName; String get quantity;// 成交單價與原價快照。
  String get unitPrice; String get listPrice;/// Deprecated: 舊欄位 fallback。
  String get originalPrice; String get actualPayAmount; String get shareDiscount;/// 商品圖 objectKey（SSOT；49 §6.1）。Gateway 成對回 imageKey / imageUrl，
 /// 後者是它由 key 組出的衍生物
@@ -617,7 +617,7 @@ class _AfterSaleItem implements AfterSaleItem {
 @override@JsonKey() final  String skuId;
 @override@JsonKey() final  String skuName;
 @override@JsonKey() final  String quantity;
-// PayUni #758: 新欄位（成交單價 / 原價）
+// 成交單價與原價快照。
 @override@JsonKey() final  String unitPrice;
 @override@JsonKey() final  String listPrice;
 /// Deprecated: 舊欄位 fallback。

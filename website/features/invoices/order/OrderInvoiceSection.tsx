@@ -280,8 +280,7 @@ export function OrderInvoiceSection({
 					try {
 						const records = await listOrderInvoiceComplaints(orderNo);
 						existing = records[0]?.complaintId ?? "";
-					} catch {
-					}
+					} catch {}
 				}
 				if (existing) setFoundComplaintId(existing);
 				setDialogOpen(false);
@@ -342,7 +341,6 @@ export function OrderInvoiceSection({
 				</p>
 			)}
 
-
 			{invoice.documents.length > 0 ? (
 				<p
 					className="m-0 mt-4 rounded-hkui-md border border-info-200 bg-info-50 p-3 text-xs leading-relaxed text-info-700"
@@ -351,7 +349,6 @@ export function OrderInvoiceSection({
 					{invoice.shippingFeeNotice || T.shippingFeeNotice}
 				</p>
 			) : null}
-
 
 			{latestCorrection ? (
 				<p
@@ -365,7 +362,6 @@ export function OrderInvoiceSection({
 
 			{showEntry || correction.visible ? (
 				<div className="mt-4 flex flex-wrap justify-end gap-2">
-
 					{correction.visible ? (
 						<Button
 							variant="light"

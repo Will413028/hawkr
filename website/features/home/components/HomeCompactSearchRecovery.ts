@@ -20,8 +20,7 @@ export function saveSearchDraftForTechnicalReload(
 			`${DRAFT_KEY}:${scope}`,
 			JSON.stringify({ ...draft, path, savedAt: now }),
 		);
-	} catch {
-	}
+	} catch {}
 }
 
 /** One shot, same URL, one minute. No account data and no durable search history. */

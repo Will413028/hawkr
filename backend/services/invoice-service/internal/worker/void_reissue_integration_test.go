@@ -21,10 +21,9 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 )
 
-
 type voidAmego struct {
-	srv *httptest.Server
-	voidCode atomic.Value
+	srv       *httptest.Server
+	voidCode  atomic.Value
 	queryType atomic.Value
 	issueSeq  atomic.Int64
 	voidCalls atomic.Int64
@@ -319,7 +318,6 @@ func TestIntegration_VoidReissue_ProviderRejects(t *testing.T) {
 	}
 }
 
-
 func submitCorrectionFor(doc domain.Document, orderNo string) usecase.SubmitCorrectionInput {
 	name := "整合測試股份有限公司"
 	taxID := "12345678"
@@ -341,7 +339,7 @@ func submitCorrectionFor(doc domain.Document, orderNo string) usecase.SubmitCorr
 			AlreadyReported:     false,
 		},
 		Revised: domain.ReviseDocumentSnapshot{
-			RecipientType: codemeta.InvoiceRecipientTypeBuyer.Value,
+			RecipientType:  codemeta.InvoiceRecipientTypeBuyer.Value,
 			RecipientRefID: doc.RecipientRefID,
 			RecipientName:  name,
 			RecipientTaxID: taxID,
@@ -390,7 +388,6 @@ func (e *voidEnv) mustLoadReissue(t *testing.T, orig domain.Document) domain.Doc
 	}
 	return d
 }
-
 
 // 待審中的賣家接單時，pending_order_count／amount 必須在**建 document 的同交易內**累加。
 //

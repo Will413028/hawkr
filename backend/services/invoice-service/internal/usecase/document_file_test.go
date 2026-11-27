@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type fakeSecureReader struct {
 	wantKey   string
 	wantRefID string

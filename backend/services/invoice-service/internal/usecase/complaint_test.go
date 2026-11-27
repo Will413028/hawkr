@@ -14,18 +14,16 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
-	cBuyerA int64 = 2623900520
-	cBuyerB int64 = 2688637900
-	cDocID  int64 = 7001
+	cBuyerA  int64 = 2623900520
+	cBuyerB  int64 = 2688637900
+	cDocID   int64 = 7001
 	cIssuer  int64 = 5001
 	cStoreID int64 = 2685914682
 	cOrder         = "O20260830000001"
 )
 
 var cNow = time.Date(2026, 3, 2, 6, 0, 0, 0, time.UTC)
-
 
 type cDocs struct {
 	domain.DocumentRepository
@@ -237,7 +235,6 @@ func (r *cComplaints) AppendEvent(_ context.Context, in domain.NewComplaintEvent
 	return e, nil
 }
 
-
 type cFixture struct {
 	uc      *Complaint
 	repo    *cComplaints
@@ -288,7 +285,6 @@ func bizCodeOf(t *testing.T, err error) int32 {
 	}
 	return code
 }
-
 
 func TestFileComplaintCreatesCaseWithSlaEventAndOutbox(t *testing.T) {
 	fx := newComplaintUC(t)
@@ -414,7 +410,6 @@ func TestFileComplaintWithStaleCalendarUsesHardCap(t *testing.T) {
 		t.Fatalf("remaining = %d，行事曆未涵蓋時應保持未計算", *res.View.RemainingBusinessDays)
 	}
 }
-
 
 func TestRejectEscalatesToAdm(t *testing.T) {
 	row := complaintRow(5001, cBuyerA, codemeta.InvoiceComplaintStatusSellerResponded.Value, 3)
@@ -640,7 +635,6 @@ func TestRejectRequiresReasonAndWithdrawDoesNot(t *testing.T) {
 	}
 }
 
-
 type failingTx struct{ err error }
 
 func (f failingTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
@@ -681,7 +675,6 @@ func errAsBiz(err error) (int32, string, bool) {
 	}
 	return int32(de.Code), de.DomainMessage(), true
 }
-
 
 // 逾期的申訴必須標成 OVERDUE **並**通知賣家。
 //

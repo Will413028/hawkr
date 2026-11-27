@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type certEndpointStub struct {
 	productpb.ProductServiceClient
 	lastList     *productpb.ListProductCertificationApplicationsRequest
@@ -24,7 +23,7 @@ type certEndpointStub struct {
 	lastReverify *productpb.ReverifyProductCertificationForAdminRequest
 	lastGetAdmin *productpb.GetProductCertificationApplicationForAdminRequest
 	lastAudit    *productpb.ListProductCertificationAuditLogsForAdminRequest
-	code int32
+	code         int32
 }
 
 func fullApplication() *productpb.ProductCertificationApplication {

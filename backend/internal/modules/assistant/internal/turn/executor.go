@@ -47,8 +47,8 @@ const (
 	DefaultMaxConcurrentTurns = 2
 	// DefaultMaxSubmitsPerMinute 是每位買家每分鐘的送出次數上限。
 	DefaultMaxSubmitsPerMinute = 10
-	submitWindow = time.Minute
-	concurrentRetryAfter = 5 * time.Second
+	submitWindow               = time.Minute
+	concurrentRetryAfter       = 5 * time.Second
 
 	minBufferCapacity = 2
 )
@@ -92,7 +92,7 @@ type Ref struct {
 type turnState struct {
 	buyerID int64
 	buf     *buffer
-	stop context.CancelFunc
+	stop    context.CancelFunc
 }
 
 // Executor 是輪次執行器。
@@ -103,10 +103,10 @@ type Executor struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	mu     sync.Mutex
-	closed bool
-	turns  map[string]*turnState
-	active map[string]struct{}
+	mu      sync.Mutex
+	closed  bool
+	turns   map[string]*turnState
+	active  map[string]struct{}
 	running map[int64]int
 	recent  map[int64][]time.Time
 	idem    map[string]*idemEntry

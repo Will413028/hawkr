@@ -1,4 +1,3 @@
-
 body .page-content:has(.chat-page) {
 	background: transparent;
 	min-height: 0;
@@ -1298,17 +1297,12 @@ body .page-content:has(.chat-page) {
 	text-align: right;
 }
 
-
-
 .chat-card--order {
 	border-radius: var(--radius-lg);
 }
 .chat-card--order[data-self="true"] {
 	border-radius: 20px;
 }
-
-
-
 
 .thread-page__bubble small {
 	float: right;
@@ -1976,7 +1970,8 @@ body .page-content:has(.chat-page) {
 	color: var(--theme-text-inverse);
 }
 
-.seller-shell .seller-messages__filters
+.seller-shell
+	.seller-messages__filters
 	.seller-messages__chip-row
 	button.seller-orders__chip.is-selected[aria-pressed="true"] {
 	border-color: var(--theme-primary-border);
@@ -2388,9 +2383,9 @@ body .page-content:has(.chat-page) {
 		min-height: 420px;
 	}
 	body
-	.page-content:has(
-		.chat-page[data-chat-workspace="buyer"][data-chat-view="thread"]
-	) {
+		.page-content:has(
+			.chat-page[data-chat-workspace="buyer"][data-chat-view="thread"]
+		) {
 		padding-bottom: 0;
 	}
 	.chat-page[data-chat-workspace="buyer"][data-chat-view="thread"] .chat-shell {
@@ -2449,7 +2444,6 @@ body .page-content:has(.chat-page) {
 	.thread-page__compose {
 		padding: var(--hkui-space-3);
 	}
-
 
 	.chat-sidebar__head {
 		padding: var(--hkui-space-4) var(--hkui-space-4) var(--hkui-space-2);

@@ -16,7 +16,6 @@ const hasActiveHide = `-- name: HasActiveHide :one
 SELECT EXISTS (SELECT 1 FROM review.hides WHERE review_id = $1 AND restored_at IS NULL)
 `
 
-// 訊息或評價目前有沒有未還原的隱藏；還原沒有列時用來分辨「沒有隱藏」與「隱藏來源不符」。
 func (q *Queries) HasActiveHide(ctx context.Context, reviewID uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasActiveHide, reviewID)
 	var exists bool
@@ -25,7 +24,6 @@ func (q *Queries) HasActiveHide(ctx context.Context, reviewID uuid.UUID) (bool, 
 }
 
 const insertHide = `-- name: InsertHide :one
-
 INSERT INTO review.hides (id, review_id, reason_category, reason_text, source_ref, admin_id, hidden_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (review_id) WHERE restored_at IS NULL
@@ -43,8 +41,6 @@ type InsertHideParams struct {
 	Now            time.Time
 }
 
-// 評價的隱藏紀錄（可多次隱藏與還原）。可見性只由 review 寫；呼叫者是 moderation 的 transaction，先鎖評價列（LockReview）。
-// 同一則評價已經有未還原的隱藏時回既有的那一列（冪等）；回傳的 id 等於傳入的 id 才是新增。
 func (q *Queries) InsertHide(ctx context.Context, arg InsertHideParams) (ReviewHide, error) {
 	row := q.db.QueryRow(ctx, insertHide,
 		arg.ID,
@@ -86,7 +82,6 @@ type RestoreHideParams struct {
 	SourceRef *string
 }
 
-// 還原評價目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
 func (q *Queries) RestoreHide(ctx context.Context, arg RestoreHideParams) (ReviewHide, error) {
 	row := q.db.QueryRow(ctx, restoreHide,
 		arg.Now,
@@ -116,7 +111,6 @@ SELECT td.content_id::uuid AS review_id FROM seller.pub_content_takedowns() AS t
 WHERE td.content_kind = 'REVIEW_REPLY' AND td.content_id = ANY($1::uuid[])
 `
 
-// 店家回覆被內容下架措施下架的評價（seller.pub_content_takedowns()，content_id 是評價 ID）：讀取時把回覆換成沒有回覆，評價本身不受影響。
 func (q *Queries) TakenDownReplyIDs(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, takenDownReplyIDs, ids)
 	if err != nil {

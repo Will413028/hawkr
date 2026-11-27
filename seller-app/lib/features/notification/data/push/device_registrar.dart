@@ -270,8 +270,7 @@ class DeviceRegistrationCoordinator {
   Future<void> _settleOpposing(Future<DeviceMutationOutcome> opposing) async {
     try {
       await opposing;
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   /// 斷路器：register / remove 合計超過視窗閾值即短路，連請求都不送出。

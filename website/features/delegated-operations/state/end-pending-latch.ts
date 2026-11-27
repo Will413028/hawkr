@@ -60,8 +60,7 @@ export function writeEndPendingSessionId(
 	if (!store || sessionId.length === 0) return;
 	try {
 		store.setItem(DELEGATED_END_PENDING_STORAGE_KEY, sessionId);
-	} catch {
-	}
+	} catch {}
 }
 
 export function clearEndPendingSessionId(
@@ -70,8 +69,7 @@ export function clearEndPendingSessionId(
 	if (!store) return;
 	try {
 		store.removeItem(DELEGATED_END_PENDING_STORAGE_KEY);
-	} catch {
-	}
+	} catch {}
 }
 
 /**

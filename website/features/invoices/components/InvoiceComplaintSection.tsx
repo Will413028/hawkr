@@ -331,7 +331,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 				<strong className="mt-2 block text-base">{banner.title}</strong>
 				<p className="m-0 mt-1 leading-relaxed">{banner.body}</p>
 
-
 				{actions.canReject && reviewDue ? (
 					<p className="m-0 mt-1 text-xs">{T.buyerReviewDue(reviewDue)}</p>
 				) : null}
@@ -440,7 +439,6 @@ export const InvoiceComplaintSection = React.forwardRef<
 					) : null}
 				</div>
 			) : null}
-
 
 			{showActions && reopenHint ? (
 				<p className="m-0 mt-2 text-xs text-hk-muted">{reopenHint}</p>

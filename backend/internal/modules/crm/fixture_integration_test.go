@@ -140,7 +140,6 @@ func (g *suspendable) Store(ctx context.Context, storeID int64) (seller.Store, e
 	return st, err
 }
 
-
 func seedBuyers(t *testing.T, d *db.DB, lo, hi int64) {
 	t.Helper()
 	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)

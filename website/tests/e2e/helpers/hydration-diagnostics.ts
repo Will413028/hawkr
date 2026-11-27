@@ -82,8 +82,7 @@ export function captureHydrationDiagnostics(page: Page): void {
 					].join("\n"),
 					contentType: "text/plain",
 				});
-			} catch {
-			}
+			} catch {}
 		})();
 	};
 

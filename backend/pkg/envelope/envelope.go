@@ -70,7 +70,6 @@ type PageData struct {
 	PageSize string      `json:"pageSize"`
 }
 
-
 // OK 成功回應 {code:0, message:"success", data:{...}}
 func OK(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Envelope{Code: 0, Message: "success", Data: data})
@@ -92,7 +91,6 @@ func Page(c *gin.Context, records interface{}, total, page, pageSize string) {
 		},
 	})
 }
-
 
 // Err 通用錯誤回應
 func Err(c *gin.Context, httpStatus int, code int32, message string) {
@@ -138,7 +136,6 @@ func NotFound(c *gin.Context, message string) {
 func ServiceUnavailable(c *gin.Context, service string) {
 	Err(c, http.StatusServiceUnavailable, 503, service+" service unavailable")
 }
-
 
 // GrpcResult 轉發 gRPC 回應
 // code=0 → 成功回應帶 data
@@ -229,7 +226,6 @@ func GrpcDomainErr(c *gin.Context, service string, err error) {
 	GrpcErr(c, service, err)
 }
 
-
 var protoMarshaler = protojson.MarshalOptions{EmitUnpopulated: true}
 
 // ProtoToRaw 將 proto message 序列化為 json.RawMessage，
@@ -241,7 +237,6 @@ func ProtoToRaw(msg proto.Message) json.RawMessage {
 	}
 	return b
 }
-
 
 // ExtractTraceID 從請求中提取 trace ID。
 //

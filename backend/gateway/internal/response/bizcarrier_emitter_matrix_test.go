@@ -23,7 +23,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-
 func runEmit(t *testing.T, fn gin.HandlerFunc) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -73,7 +72,6 @@ func bodyCode(t *testing.T, w *httptest.ResponseRecorder) (int32, bool) {
 	return *env.Code, true
 }
 
-
 type sample struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -83,11 +81,11 @@ type sample struct {
 var payload = sample{ID: "2685914682", Name: "測試店", Flag: false}
 
 type emitterCase struct {
-	fn       string
-	name     string
-	declared int32
-	invoke   gin.HandlerFunc
-	legacy gin.HandlerFunc
+	fn          string
+	name        string
+	declared    int32
+	invoke      gin.HandlerFunc
+	legacy      gin.HandlerFunc
 	rewriteData interface{}
 }
 
@@ -227,7 +225,6 @@ func emitterCases() []emitterCase {
 	}
 }
 
-
 var nonEmitters = map[string]string{
 	"SetRateLimitHeaders": "只寫 Retry-After / X-RateLimit-* header，不寫 body，沒有 envelope code 可言",
 }
@@ -310,7 +307,6 @@ func TestEmitterTableCoversEveryExportedEmitter(t *testing.T) {
 		len(srcPaths), len(declared), len(emitterCases()), len(nonEmitters))
 }
 
-
 func TestEmitterMatrix_IdleShapesUnchanged(t *testing.T) {
 	for _, cse := range emitterCases() {
 		cse := cse
@@ -342,7 +338,6 @@ func TestEmitterMatrix_DeclaredCodeMatchesBody(t *testing.T) {
 		})
 	}
 }
-
 
 func TestEmitterMatrix_ZeroCodeEmittersAreRewritten(t *testing.T) {
 	n := 0
@@ -408,7 +403,6 @@ func TestEscapeCounterActuallyFiresOnRealBypass(t *testing.T) {
 	}
 }
 
-
 func TestGrpcErrNeverWritesZeroCode(t *testing.T) {
 	allCodes := []codes.Code{
 		codes.OK, codes.Canceled, codes.Unknown, codes.InvalidArgument, codes.DeadlineExceeded,
@@ -456,7 +450,6 @@ func TestGrpcErrNeverWritesZeroCode(t *testing.T) {
 	}
 }
 
-
 func TestEmitterMatrix_PayloadKindsUnchanged(t *testing.T) {
 	kinds := []struct {
 		name string
@@ -491,7 +484,6 @@ func TestEmitterMatrix_PayloadKindsUnchanged(t *testing.T) {
 		})
 	}
 }
-
 
 func TestZeroCodeEmitIsBlockedByAnotherMethodsPendingFailure(t *testing.T) {
 	const otherMethod = "/hawkr.seller.SellerService/GetSellerSimple"

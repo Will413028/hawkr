@@ -25,9 +25,9 @@ import (
 )
 
 type scriptedOrders struct {
-	results []provisioning.Result
-	errs    []error
-	got     []provisioning.Command
+	results    []provisioning.Result
+	errs       []error
+	got        []provisioning.Command
 	parties    provisioning.Parties
 	partiesErr error
 	onCreate   func()

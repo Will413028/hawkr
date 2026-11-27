@@ -24,7 +24,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-
 const (
 	inquiryCreator  = 21
 	inquiryRecorder = 22

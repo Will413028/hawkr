@@ -2,7 +2,6 @@ package social
 
 import "github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 
-
 // PostPublished 貼文轉為公開（建立時直接發布、發布、下架後再發布、排程到點發布）；建立草稿不發。Origin 區分 DIRECT 與 SCHEDULED，排程的帶排程 ID 與發起者。
 type PostPublished = model.PostPublished
 

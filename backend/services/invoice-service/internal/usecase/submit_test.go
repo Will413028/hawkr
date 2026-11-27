@@ -48,7 +48,6 @@ func submitHarness(t *testing.T, mutateDoc func(*domain.Document)) *harness {
 	return h
 }
 
-
 func TestSubmit_SuccessIssuesAndEnqueuesOutbox(t *testing.T) {
 	h := submitHarness(t, nil)
 
@@ -120,7 +119,6 @@ func TestSubmit_CarrierInvoiceSkipsPdfCandidateSet(t *testing.T) {
 		t.Error("載具明文未送出（解密只在 callback 內，但要真的用到）")
 	}
 }
-
 
 func TestSubmit_ErrorClassRouting(t *testing.T) {
 	cases := []struct {
@@ -430,7 +428,6 @@ func TestSubmit_ReissueWithoutCorrectionStillEmitsReissued(t *testing.T) {
 	}
 }
 
-
 func barcodeHarness(t *testing.T, barcode string) *harness {
 	t.Helper()
 	carrier := domain.AmegoCarrierMobileBarcode
@@ -523,7 +520,6 @@ func TestSubmit_NonMobileBarcodeSkipsVerification(t *testing.T) {
 		t.Fatalf("無載具的發票照常開，f0401 實得 %d 次", len(h.provider.requests))
 	}
 }
-
 
 // 🔴 這支掃描之前不存在，而 §5.2.1 逐字要求它。business-alerts.yml 的
 // InvoiceStatutoryDeadlineOverdue 註解 2026-09-05 已記載「那支掃描不存在」，

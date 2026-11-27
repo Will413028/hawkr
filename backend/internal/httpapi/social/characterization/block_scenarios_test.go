@@ -6,7 +6,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-
 func blockAuthorByCommentReferenceIsIdempotent(ctx context.Context, t ch.T, d Driver) {
 	p := newPost(ctx, t, d, ch.Seller)
 	c := ch.Must(t, ch.Ret(d.CreateComment(ctx, ch.Buyer2, p.ID, "留言 "+ch.Nonce())))

@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type fakeOps struct {
 	domain.OperationRepository
 
@@ -96,8 +95,8 @@ type fakeSubmitter struct {
 	submitted  []int64
 	submitErr  error
 	beforeExit func()
-	strict bool
-	t      *testing.T
+	strict     bool
+	t          *testing.T
 }
 
 func strictSubmitter(t *testing.T) *fakeSubmitter {
@@ -136,7 +135,6 @@ func sendingOp(id int64, docID int64) domain.Operation {
 		MaxAttempts:   13,
 	}
 }
-
 
 // TestIssueWorker_LeaseBaselineIsPerRow 是**變異③的靶心**。
 //
@@ -273,8 +271,8 @@ type fakeVoider struct {
 	claimOK   bool
 	claimErr  error
 	submitErr error
-	strict bool
-	t      *testing.T
+	strict    bool
+	t         *testing.T
 }
 
 func (f *fakeVoider) ClaimForVoidAt(_ context.Context, id int64, now, leaseUntil time.Time) (bool, error) {
@@ -328,7 +326,6 @@ func strictAllowancer(t *testing.T) *fakeAllowancer {
 	t.Helper()
 	return &fakeAllowancer{strict: true, t: t}
 }
-
 
 func allowanceOp(id, docID int64) domain.Operation {
 	op := sendingOp(id, docID)

@@ -442,8 +442,7 @@ export async function createSellerShareCardBlob(
 ): Promise<Blob> {
 	try {
 		await document.fonts?.ready;
-	} catch {
-	}
+	} catch {}
 
 	const qrSvg = element.querySelector<SVGElement>(
 		".seller-business-card__qr > svg",

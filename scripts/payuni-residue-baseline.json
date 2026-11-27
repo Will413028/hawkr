@@ -5,7 +5,6 @@
   "backend/internal/legacy/gen/seller/seller.pb.go": 7,
   "backend/internal/legacy/paymentrelay/relay.go": 4,
   "backend/internal/legacy/paymentrelay/relay_test.go": 2,
-  "backend/internal/legacy/sellerserver/server.go": 1,
   "backend/internal/legacy/sellerserver/server_integration_test.go": 1,
   "backend/internal/legacy/sellerserver/server_test.go": 4,
   "backend/internal/modules/buyer/CARRYOVER.md": 1,

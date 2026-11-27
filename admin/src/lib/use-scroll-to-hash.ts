@@ -15,8 +15,7 @@ export function useScrollToHash(ready: boolean): void {
 		let id = raw;
 		try {
 			id = decodeURIComponent(raw);
-		} catch {
-		}
+		} catch {}
 		document.getElementById(id)?.scrollIntoView({ block: "start" });
 	}, [ready]);
 }

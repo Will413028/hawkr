@@ -18,7 +18,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 const (
 	buyerA = int64(2623900520)
 	buyerB = int64(2688637900)
@@ -209,7 +208,6 @@ func notFoundBiz(code int32) error {
 	return newBizErr(code)
 }
 
-
 type qFixture struct {
 	server *InvoiceServer
 	audit  *qAudit
@@ -277,7 +275,6 @@ func newQueryServer(t *testing.T, mut func(*qFixture)) *qFixture {
 }
 
 func strp(s string) *string { return &s }
-
 
 // TestGetInvoiceComplaint_TierA_ForeignIsIndistinguishableFromMissing 是本波最重要的一支。
 //
@@ -412,7 +409,6 @@ func TestGetSellerProviderAccount_TierA_ForeignStoreIsIndistinguishable(t *testi
 	}
 }
 
-
 func TestQueryRPCs_RejectMissingPrincipal(t *testing.T) {
 	fx := newQueryServer(t, nil)
 	ctx := context.Background()
@@ -427,7 +423,6 @@ func TestQueryRPCs_RejectMissingPrincipal(t *testing.T) {
 		t.Fatalf("actor_account_id=0 應回 InvalidArgument，實得 %v", err)
 	}
 }
-
 
 // TestGetSellerProviderAccount_NeverExposesCredential 釘住 §8.1.2 層 1／§8.1.3 的 C 類規則。
 //
@@ -536,7 +531,6 @@ func TestGetInvoiceJobForAdmin_MapsStateDerivedFlags(t *testing.T) {
 		t.Fatalf("retry_policy 必須反映服務實際使用的參數，實得 %v", job.GetRetryPolicy())
 	}
 }
-
 
 func assertProtoBytesEqual(t *testing.T, a, b proto.Message, why string) {
 	t.Helper()

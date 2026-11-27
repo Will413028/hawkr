@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
 	sellerExternalEvidenceMax = 5
 )
@@ -101,17 +100,16 @@ func (u *SellerJob) ReportExternalIssuance(ctx context.Context, in ReportExterna
 
 		now := u.jobs.now()
 		if rerr := u.jobs.resolveExternally(ctx, op, doc, externalIssuance{
-			InvoiceNo:   in.InvoiceNo,
-			InvoiceDate: invoiceDate,
-			TotalAmount: doc.TotalAmount,
-			Note:        externalNoteWithEvidence(in.Note, in.EvidenceAssetKeys),
+			InvoiceNo:      in.InvoiceNo,
+			InvoiceDate:    invoiceDate,
+			TotalAmount:    doc.TotalAmount,
+			Note:           externalNoteWithEvidence(in.Note, in.EvidenceAssetKeys),
 			ActorType:      providerActorSeller,
 			ActorAccountID: in.StoreID,
 			Now:            now,
 		}); rerr != nil {
 			return rerr
 		}
-
 
 		updated, err := u.ops.GetViewForSeller(ctx, in.JobID, in.StoreID)
 		if err != nil {

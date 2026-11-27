@@ -1,6 +1,5 @@
 @import "./cart-typography.css";
 
-
 :root {
 	--cart-danger: #c0392b;
 	--cart-danger-rgb: 192 57 43;
@@ -288,7 +287,6 @@
 	box-shadow: 0 8px 18px rgb(0 0 0 / 0.2);
 }
 
-
 .cart-page__shop-icon {
 	width: 28px;
 	height: 28px;
@@ -336,7 +334,6 @@
 	text-decoration: underline;
 }
 
-
 .cart-page__summary-action {
 	width: 100%;
 	padding: 11px 14px;
@@ -369,7 +366,6 @@
 	);
 	transform: translateY(-1px);
 }
-
 
 .cart-page__checkout {
 	justify-content: center;
@@ -404,8 +400,6 @@
 .cart-page__summary-foot a:hover {
 	text-decoration: underline;
 }
-
-
 
 .cart-tile {
 	display: grid;
@@ -665,7 +659,6 @@
 	background: rgb(var(--cart-danger-rgb) / 0.08);
 }
 
-
 .cart-page__multi-seller {
 	padding: 12px 16px;
 	border-radius: var(--radius-md);
@@ -674,7 +667,6 @@
 	font-weight: var(--cart-weight-emphasis);
 	font-size: var(--cart-type-support);
 }
-
 
 .shipping-group {
 	display: flex;
@@ -849,7 +841,6 @@
 	font-weight: var(--cart-weight-body);
 	line-height: calc(20 / 14);
 }
-
 
 .coupon-dialog {
 	--coupon-row-background: var(--hkui-surface);
@@ -1152,7 +1143,6 @@
 	color: var(--cart-danger-on-dark);
 }
 
-
 .cart-page__coupon-trigger {
 	width: 100%;
 	padding: 12px 14px;
@@ -1171,7 +1161,6 @@
 .cart-page__coupon-trigger:hover {
 	background: rgb(var(--color-brand-primary-rgb) / 0.06);
 }
-
 
 @media (max-width: 960px) {
 	.cart-page__seller-group {

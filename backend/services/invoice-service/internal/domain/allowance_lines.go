@@ -107,8 +107,8 @@ func BuildAllowanceDraft(docLines []Line, refundAmount int64, ctx AllowanceConte
 			OriginalInvoiceNumber: ctx.ProviderInvoiceNo,
 			OriginalInvoiceDate:   ctx.InvoiceDateTaipeiYmd,
 			TaxCategory:           l.TaxCategory,
-			Quantity:    1,
-			GrossAmount: a,
+			Quantity:              1,
+			GrossAmount:           a,
 		}
 		if l.TaxCategory == TaxCategoryTaxable && splitTax {
 			al.Amount = Untax(a)

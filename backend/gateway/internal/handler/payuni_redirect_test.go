@@ -16,8 +16,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-
-
 type mockStoreMapRedirectFormClient struct {
 	shippingpb.ShippingServiceClient
 	fn func(context.Context, *shippingpb.GetStoreMapRedirectFormRequest, ...grpc.CallOption) (*shippingpb.GetStoreMapRedirectFormResponse, error)
@@ -44,7 +42,6 @@ func assertNoActiveInjection(t *testing.T, body string) {
 		t.Fatalf("output contains attribute-breaking un-escaped quote:\n%s", body)
 	}
 }
-
 
 func TestStoreMapRedirect_EscapesAllFields(t *testing.T) {
 	mock := &mockStoreMapRedirectFormClient{

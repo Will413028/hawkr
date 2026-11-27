@@ -92,7 +92,6 @@ function derive(detail: DelegatedProductDetail = DETAIL) {
 	});
 }
 
-
 test("預覽映射：images[].imageKey → imageKeys（漏掉＝圖庫整片空白）", () => {
 	assert.deepEqual(derive().thumbnails, [
 		"public/product/one.jpg",
@@ -138,7 +137,6 @@ test("預覽映射：skus[].spec → skuName（漏掉＝規格名變成「規格
 	);
 });
 
-
 test("預覽聚合：商品層 shippingMethods 取聯集並去重，配送業者 icon 因此畫得出來", () => {
 	assert.deepEqual(
 		derive().enabledCarriers.map((carrier) => carrier.method),
@@ -152,7 +150,6 @@ test("預覽聚合：商品層 shippingMethods 取聯集並去重，配送業者
 	);
 });
 
-
 test("預覽不借用評價：rating／reviewCount／reviews 全部缺席 → 尚無評價", () => {
 	const derived = derive();
 	const product = delegatedPreviewProduct(DETAIL, "2685914682");
@@ -162,7 +159,6 @@ test("預覽不借用評價：rating／reviewCount／reviews 全部缺席 → �
 	assert.deepEqual(derived.reviews, []);
 	assert.equal(derived.reviewTotal, 0);
 });
-
 
 test("預覽注入 storeId，否則整張賣家卡不畫", () => {
 	assert.equal(derive().sellerStoreId, "2685914682");
@@ -175,7 +171,6 @@ test("預覽注入 storeId，否則整張賣家卡不畫", () => {
 	});
 	assert.equal(withoutStore.sellerStoreId, "");
 });
-
 
 /**
  * 上面每一條驗的都是**送進 layout 的 props**。這一條驗的是 layout 真的把它畫出來、

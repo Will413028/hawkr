@@ -12,8 +12,7 @@ export function setPendingPurchase(orderNos: string[]): void {
 	if (typeof sessionStorage === "undefined" || orderNos.length === 0) return;
 	try {
 		sessionStorage.setItem(PENDING_KEY, JSON.stringify(orderNos));
-	} catch {
-	}
+	} catch {}
 }
 
 export function readPendingPurchase(): string[] {
@@ -31,8 +30,7 @@ export function clearPendingPurchase(): void {
 	if (typeof sessionStorage === "undefined") return;
 	try {
 		sessionStorage.removeItem(PENDING_KEY);
-	} catch {
-	}
+	} catch {}
 }
 
 /** Returns true the first time an orderNo is seen; false on refresh/re-entry. */

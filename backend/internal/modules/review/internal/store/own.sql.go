@@ -16,7 +16,6 @@ const authorInactive = `-- name: AuthorInactive :one
 SELECT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = $1::bigint)
 `
 
-// 提交評價的提早檢查（transaction 外，只為省掉轉正圖片）：買家不再營運中。正確性由 transaction 內的 buyer.LockActive 保證。
 func (q *Queries) AuthorInactive(ctx context.Context, buyerID int64) (bool, error) {
 	row := q.db.QueryRow(ctx, authorInactive, buyerID)
 	var exists bool
@@ -48,7 +47,6 @@ type GetReviewForDiagnosisRow struct {
 	Hidden       bool
 }
 
-// 回覆被拒時分流用：不過濾可見性。
 func (q *Queries) GetReviewForDiagnosis(ctx context.Context, id uuid.UUID) (GetReviewForDiagnosisRow, error) {
 	row := q.db.QueryRow(ctx, getReviewForDiagnosis, id)
 	var i GetReviewForDiagnosisRow
@@ -85,7 +83,6 @@ type GetReviewStoreRow struct {
 	Public  bool
 }
 
-// 回覆的店家推導用：不過濾可見性，回評價所屬的店與它現在是否公開可讀（述詞與 testdata/public_predicate.sql 同一段）。
 func (q *Queries) GetReviewStore(ctx context.Context, id uuid.UUID) (GetReviewStoreRow, error) {
 	row := q.db.QueryRow(ctx, getReviewStore, id)
 	var i GetReviewStoreRow
@@ -94,7 +91,6 @@ func (q *Queries) GetReviewStore(ctx context.Context, id uuid.UUID) (GetReviewSt
 }
 
 const insertReview = `-- name: InsertReview :one
-
 INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, content, sku_name, item_image_key, price, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (order_item_id) DO NOTHING
@@ -116,9 +112,6 @@ type InsertReviewParams struct {
 	CreatedAt    time.Time
 }
 
-// 寫入路徑與作者本人的讀取。公開讀取在 public.sql（那裡每支都帶公開可讀述詞）；這個檔的查詢都不是公開讀取，
-// TestNonPublicReviewReadsAreListed 要求每一支讀 review.reviews 的查詢不是在 public.sql，就是在這裡明列的名單裡。
-// 同一個訂單項目已有評價時沒有列（ON CONFLICT DO NOTHING，不丟 23505：撞唯一鍵後同一個 transaction 不再下 SQL）。
 func (q *Queries) InsertReview(ctx context.Context, arg InsertReviewParams) (ReviewReview, error) {
 	row := q.db.QueryRow(ctx, insertReview,
 		arg.ID,
@@ -194,7 +187,6 @@ type ListMyReviewsParams struct {
 	PageSize       int32
 }
 
-// 作者本人：隱藏的評價不給作者（舊行為）。order_item_id 大於 0 時只列那個訂單項目的評價（至多一則）。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListMyReviews(ctx context.Context, arg ListMyReviewsParams) ([]ReviewReview, error) {
 	rows, err := q.db.Query(ctx, listMyReviews,
 		arg.BuyerID,
@@ -242,7 +234,6 @@ WHERE review_id = ANY($1::uuid[])
 ORDER BY review_id, position
 `
 
-// 已經過可讀述詞的評價的附圖，依評價與位置。
 func (q *Queries) ListReviewImages(ctx context.Context, reviewIds []uuid.UUID) ([]ReviewReviewImage, error) {
 	rows, err := q.db.Query(ctx, listReviewImages, reviewIds)
 	if err != nil {
@@ -272,7 +263,6 @@ const lockReview = `-- name: LockReview :one
 SELECT id, order_no, order_item_id, buyer_id, store_id, product_id, rating, content, sku_name, item_image_key, price, created_at, reply_content, replied_at FROM review.reviews WHERE id = $1 FOR NO KEY UPDATE
 `
 
-// 隱藏與還原先鎖評價列（只鎖自己的列）。
 func (q *Queries) LockReview(ctx context.Context, id uuid.UUID) (ReviewReview, error) {
 	row := q.db.QueryRow(ctx, lockReview, id)
 	var i ReviewReview
@@ -313,7 +303,6 @@ type ReplyToReviewParams struct {
 	StoreID int64
 }
 
-// 店家回覆（可覆蓋）：擁有權、公開可讀與回覆沒被內容下架（生效中的 REVIEW_REPLY 措施，先鎖評價列，與建立措施序列化）都在 WHERE，0 列由呼叫端補查分流（不存在、不是這家店、不可回覆）。
 func (q *Queries) ReplyToReview(ctx context.Context, arg ReplyToReviewParams) (ReviewReview, error) {
 	row := q.db.QueryRow(ctx, replyToReview,
 		arg.Content,

@@ -48,7 +48,6 @@ class StepIndicator extends StatelessWidget {
   static const double _lineH = 3;
   static const Color _inactiveColor = AppIconColors.disabled;
 
-
   /// 售後流程 4 步（Figma 10108:94700）— 正常完成分支
   static const afterSaleSteps = [
     StepDef(label: '售後申請', icon: AppIcons.assignmentOutlined),
@@ -98,7 +97,6 @@ class StepIndicator extends StatelessWidget {
     StepDef(label: '已送達', icon: AppIcons.location),
   ];
 
-
   /// 售後狀態碼 → 進度步驟 index（0-3）
   ///
   /// 對齊後端 AfterSaleCaseStatus 9 種狀態：
@@ -111,9 +109,7 @@ class StepIndicator extends StatelessWidget {
     '0' => 1,
     '20' || '25' || '30' => 2,
     '40' => 2,
-    '50' ||
-    '70' ||
-    '71' => 3,
+    '50' || '70' || '71' => 3,
     '60' => 3,
     _ => 0,
   };
@@ -129,7 +125,6 @@ class StepIndicator extends StatelessWidget {
 
   /// 已取消訂單 step：固定停在「已取消」（index 1）。
   static int cancelledStepIndex() => 1;
-
 
   @override
   Widget build(BuildContext context) {

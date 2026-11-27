@@ -23,7 +23,6 @@ type DeleteAccountPreferenceOverridesParams struct {
 	Audience  *string
 }
 
-// 個資清除：刪帳號的偏好覆寫；偏好是 (帳號, 受眾) 的，沒有店別，audience 為 NULL 是全部受眾。每個帳號最多 14 分類乘 3 渠道乘 2 受眾列，一次刪完。
 func (q *Queries) DeleteAccountPreferenceOverrides(ctx context.Context, arg DeleteAccountPreferenceOverridesParams) error {
 	_, err := q.db.Exec(ctx, deleteAccountPreferenceOverrides, arg.AccountID, arg.Audience)
 	return err
@@ -44,7 +43,6 @@ type DeleteExpiredDeliveriesParams struct {
 	MaxRows int32
 }
 
-// 保留期清除：created_at 早於 cutoff 的投遞紀錄，依 created_at 分批。先刪投遞，intents 才刪得掉（deliveries.intent_id 是 RESTRICT）。
 func (q *Queries) DeleteExpiredDeliveries(ctx context.Context, arg DeleteExpiredDeliveriesParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredDeliveries, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -68,7 +66,6 @@ type DeleteExpiredInboxItemsParams struct {
 	MaxRows int32
 }
 
-// 保留期清除：updated_at（最後一次合併）早於 cutoff 的收件匣列，依 updated_at 分批；連結隨列 CASCADE 刪除。
 func (q *Queries) DeleteExpiredInboxItems(ctx context.Context, arg DeleteExpiredInboxItemsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredInboxItems, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -93,7 +90,6 @@ type DeleteExpiredIntentsParams struct {
 	MaxRows int32
 }
 
-// 保留期清除：created_at 早於 cutoff 且已沒有投遞紀錄的意圖（投遞紀錄還在保留期內的意圖留著）；inbox_item_intents 的連結隨意圖 CASCADE 刪除。
 func (q *Queries) DeleteExpiredIntents(ctx context.Context, arg DeleteExpiredIntentsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredIntents, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -120,7 +116,6 @@ type DeleteRecipientInboxItemsParams struct {
 	MaxRows   int32
 }
 
-// 個資清除：刪該收件人的收件匣列（連結隨列 CASCADE），分批。
 func (q *Queries) DeleteRecipientInboxItems(ctx context.Context, arg DeleteRecipientInboxItemsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteRecipientInboxItems,
 		arg.AccountID,
@@ -140,8 +135,6 @@ SET params = '{}'::jsonb
 WHERE id = $1 AND params <> '{}'::jsonb
 `
 
-// 個資清除：Process 發現收件人已刪除或退場而略過時，把這一個意圖的參數換成 '{}'（意圖還沒有收件匣連結或投遞紀錄，
-// ScrubRecipientIntentParams 找不到它）；已是 '{}' 時不動，所以可重跑。
 func (q *Queries) ScrubIntentParams(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, scrubIntentParams, id)
 	return err
@@ -167,7 +160,6 @@ type ScrubRecipientDeliveryTextParams struct {
 	MaxRows   int32
 }
 
-// 個資清除：該收件人的投遞紀錄清掉送出文字與語系（列留著，D16），分批；已清過的不再處理。
 func (q *Queries) ScrubRecipientDeliveryText(ctx context.Context, arg ScrubRecipientDeliveryTextParams) (int64, error) {
 	result, err := q.db.Exec(ctx, scrubRecipientDeliveryText,
 		arg.AccountID,
@@ -213,9 +205,6 @@ type ScrubRecipientIntentParamsParams struct {
 	MaxRows   int32
 }
 
-// 個資清除：把該收件人的意圖參數換成 '{}'（意圖經 inbox_item_intents 與 deliveries 找到），分批；已是 '{}' 的不再處理，所以可重跑。
-// 收件人範圍：audience 為 NULL 是帳號的全部列；store_id 為 NULL 不限店。
-// 公告的意圖（id 與公告相同）由全部推播收件人共用，參數只有公告 ID、沒有個資，不在單一收件人的清除範圍內。
 func (q *Queries) ScrubRecipientIntentParams(ctx context.Context, arg ScrubRecipientIntentParamsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, scrubRecipientIntentParams,
 		arg.AccountID,

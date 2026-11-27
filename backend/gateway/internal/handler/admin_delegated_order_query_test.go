@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 func newDelegatedOrderListRouter(t *testing.T) (*gin.Engine, *[]*orderpb.GetSellerOrdersRequest) {
 	t.Helper()
 	return newDelegatedOrderListRouterReturning(t, &orderpb.GetSellerOrdersResponse{

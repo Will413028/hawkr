@@ -32,7 +32,6 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 function shipmentStatusCell(code: string, degraded: boolean) {
 	const view = shipmentStatusDisplay(code, degraded);
 	if (view.kind === "degraded") {
@@ -322,7 +321,6 @@ export default function InvoiceDocumentsPage() {
 										<div className="cell-sub">{row.summary.documentId}</div>
 									</td>
 									<td>
-
 										<div className="cell-main">
 											{row.summary.invoiceNumber || "—"}
 										</div>

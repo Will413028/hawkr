@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 )
 
-
 func bannerPaths(b *adminpb.Banner) rpc.FieldPaths {
 	p := rpc.FieldPaths{
 		"Title":             "banner.title",

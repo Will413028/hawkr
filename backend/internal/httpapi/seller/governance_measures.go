@@ -153,8 +153,8 @@ func toAdminMeasure(m model.Measure) *adminpb.Measure {
 
 func toTerminationOption(e model.TerminationEffect) *adminpb.TerminationOption {
 	out := &adminpb.TerminationOption{
-		Ground:      rpc.EnumToProto[pb.TerminationGround](e.Ground),
-		Explanation: rpc.LocalizedMessage(e.Message()),
+		Ground:               rpc.EnumToProto[pb.TerminationGround](e.Ground),
+		Explanation:          rpc.LocalizedMessage(e.Message()),
 		ViolationRequirement: rpc.EnumToProto[adminpb.TerminationViolationRequirement](e.Ground.ViolationRequirement()),
 	}
 	if e.EffectiveAt != nil {

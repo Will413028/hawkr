@@ -26,7 +26,6 @@ type CountInboxItemsParams struct {
 	Types     []string
 }
 
-// 與 ListInboxItems 同一組篩選（受眾、店、型別）的全部筆數。
 func (q *Queries) CountInboxItems(ctx context.Context, arg CountInboxItemsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countInboxItems,
 		arg.AccountID,
@@ -75,7 +74,6 @@ type DeleteDeviceTokenParams struct {
 	AccountID int64
 }
 
-// 只刪呼叫者自己的 token；不存在或屬於別的帳號都是 0 列，呼叫端一律回成功。
 func (q *Queries) DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenParams) error {
 	_, err := q.db.Exec(ctx, deleteDeviceToken, arg.Token, arg.AccountID)
 	return err
@@ -96,7 +94,6 @@ type DeleteInboxItemsRow struct {
 	StoreID  *int64
 }
 
-// 只刪擁有者（帳號）的列，回傳被刪列的受眾與店（串流訊號的收件人）；呼叫端比較刪除筆數與 ids 的數量，不符就回滾（全有或全無）。
 func (q *Queries) DeleteInboxItems(ctx context.Context, arg DeleteInboxItemsParams) ([]DeleteInboxItemsRow, error) {
 	rows, err := q.db.Query(ctx, deleteInboxItems, arg.Ids, arg.AccountID)
 	if err != nil {
@@ -129,7 +126,6 @@ type DeletePreferenceOverrideParams struct {
 	Channel   string
 }
 
-// 設回預設值時不留覆寫列（只存與預設不同的值）。
 func (q *Queries) DeletePreferenceOverride(ctx context.Context, arg DeletePreferenceOverrideParams) error {
 	_, err := q.db.Exec(ctx, deletePreferenceOverride,
 		arg.AccountID,
@@ -155,7 +151,6 @@ type LatestInboxItemIDParams struct {
 	Types     []string
 }
 
-// 串流訊號的最新一列：與 CountUnreadInboxItems 同一組篩選（受眾、店、型別），updated_at 最新（再依 id）的列；沒有列是 pgx.ErrNoRows。
 func (q *Queries) LatestInboxItemID(ctx context.Context, arg LatestInboxItemIDParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, latestInboxItemID,
 		arg.AccountID,
@@ -196,9 +191,6 @@ type ListInboxItemsRow struct {
 	UpdatedAt time.Time
 }
 
-// 收件人（帳號、受眾、店）的收件匣，新到舊（updated_at：聚合列是最後一次合併的時間，再依 id）。types 是呼叫端依受眾與分類從註冊表算出的型別名稱：
-// 沒有註冊的型別（已退場）不顯示也不計數。BUYER 列的 store_id 一定是 NULL（CHECK）：店家條件寫成「等於店家 ID，或兩邊都是 NULL」，參數是常數時只剩一邊，
-// 讓 (account_id, audience, store_id, updated_at, id) 的索引從 store_id 到排序都用得上（IS NOT DISTINCT FROM 不能用索引）。after_* 都是 NULL 表示第一頁。
 func (q *Queries) ListInboxItems(ctx context.Context, arg ListInboxItemsParams) ([]ListInboxItemsRow, error) {
 	rows, err := q.db.Query(ctx, listInboxItems,
 		arg.AccountID,
@@ -281,7 +273,6 @@ type MarkInboxItemReadRow struct {
 	StoreID  *int64
 }
 
-// 只有擁有者（帳號）能標；已讀的列保留原本的已讀時間。不存在與不是擁有者都是 0 列（pgx.ErrNoRows），呼叫端不區分。
 func (q *Queries) MarkInboxItemRead(ctx context.Context, arg MarkInboxItemReadParams) (MarkInboxItemReadRow, error) {
 	row := q.db.QueryRow(ctx, markInboxItemRead, arg.Now, arg.ID, arg.AccountID)
 	var i MarkInboxItemReadRow
@@ -338,7 +329,6 @@ type UpsertDeviceTokenParams struct {
 	Now       time.Time
 }
 
-// token 是主鍵：同一個 token 換帳號登入時改綁給呼叫者，並更新最後註冊時間。
 func (q *Queries) UpsertDeviceToken(ctx context.Context, arg UpsertDeviceTokenParams) error {
 	_, err := q.db.Exec(ctx, upsertDeviceToken,
 		arg.Token,

@@ -2,7 +2,6 @@ package usecase
 
 import "testing"
 
-
 func TestCarrierShapeValid(t *testing.T) {
 	cases := []struct {
 		name string

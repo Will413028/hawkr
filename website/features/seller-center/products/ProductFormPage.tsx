@@ -164,7 +164,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 				</p>
 			</header>
 
-
 			<ol className="min-[961px]:hidden flex items-center gap-1.5 mb-4 list-none p-0">
 				{WIZARD_STEPS.map((s) => {
 					const active = s.step === step;
@@ -206,7 +205,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 				</form>
 				{locked && <LockedOverlay />}
 			</div>
-
 
 			<div
 				className="max-[960px]:hidden fixed left-0 right-0 bottom-0 bg-hk-surface-card border-t border-hk-border-soft shadow-hk-lift px-5 py-3 flex gap-4 justify-between items-center z-[var(--z-sticky)] dark:bg-white/4 dark:border-[#f5dea5]/14"
@@ -259,7 +257,6 @@ export default function ProductFormPage({ mode, productId }: Props) {
 					)}
 				</div>
 			</div>
-
 
 			<div
 				className="product-form__mobile-toolbar min-[961px]:hidden fixed left-0 right-0 bottom-0 z-[var(--z-sticky)] bg-hk-surface-card border-t border-hk-border-soft shadow-hk-lift px-4 py-3 flex items-center gap-3 dark:bg-white/4 dark:border-[#f5dea5]/14"

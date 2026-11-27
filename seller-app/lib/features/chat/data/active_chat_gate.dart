@@ -10,8 +10,8 @@ part 'active_chat_gate.g.dart';
 @freezed
 abstract class ActiveChat with _$ActiveChat {
   const factory ActiveChat({
-    String? peerId,
-    String? conversationId,
+    String? peerId, // seller 側是 buyer/customer accountId。
+    String? conversationId, // server roomId，可能晚於 peerId 到達。
   }) = _ActiveChat;
 }
 

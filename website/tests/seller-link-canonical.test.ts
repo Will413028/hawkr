@@ -418,7 +418,6 @@ test("conversation rows carry the seller store_code the wire sends", async () =>
 	assert.equal(canonicalOnly(buyerPeer.storeCode), "");
 });
 
-
 /**
  * The routes build their canonical from the PAYLOAD, and the payload spells the
  * segment `storeCode`.
@@ -506,7 +505,6 @@ test("every seller route derives its canonical through sellerCanonicalUrl", () =
 		);
 	}
 });
-
 
 /**
  * Wire names the 2026-08-05/06 camelCase convergence (backend#2235) retired,

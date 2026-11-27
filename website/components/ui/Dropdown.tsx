@@ -166,7 +166,6 @@ export function Dropdown({
 	const invalid = isInvalid || Boolean(errorMessage);
 	const hasContent = Boolean(shownItem);
 
-
 	const recomputePosition = React.useCallback(() => {
 		const anchor = wrapRef.current ?? triggerRef.current;
 		if (!anchor) return;
@@ -347,7 +346,6 @@ export function Dropdown({
 		}
 	};
 
-
 	const handleTriggerKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
 		if (disabled) return;
 		if (open) {
@@ -366,7 +364,6 @@ export function Dropdown({
 				break;
 		}
 	};
-
 
 	const wrapperClasses = [
 		inputWrapperClasses({

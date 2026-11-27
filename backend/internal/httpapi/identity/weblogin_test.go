@@ -84,8 +84,8 @@ func (m *fakeModule) Login(_ context.Context, in identity.LoginInput) (identity.
 }
 
 type fakeProvider struct {
-	p      identity.Provider
-	issuer string
+	p              identity.Provider
+	issuer         string
 	requiresIssuer bool
 	identity       identity.ProviderIdentity
 	err            error

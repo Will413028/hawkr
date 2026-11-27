@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 // TrackLister 是事實蒐集需要的 AMEGO 出向面（只要一支）。
 type TrackLister interface {
 	ListTracks(ctx context.Context, c amego.Credential, year, period int) ([]amego.Track, error)
@@ -67,14 +66,14 @@ func (u *Correction) GatherCorrectionFacts(
 	}
 
 	facts := CorrectionFacts{
-		DocumentStatus: doc.Status,
-		OperationOpen:  in.OpenOperationID != 0,
+		DocumentStatus:      doc.Status,
+		OperationOpen:       in.OpenOperationID != 0,
 		AlreadyReported:     reported != domain.ReportedStatusNotReported,
 		WithinVoidDeadline:  withinVoid,
 		NoExistingAllowance: noAllowance,
 		ProviderAvailable:   in.ProviderStatus == codemeta.InvoiceProviderAccountStatusActive.Value,
-		CarrierValid: true,
-		TrackSufficient: true,
+		CarrierValid:        true,
+		TrackSufficient:     true,
 	}
 
 	if doc.Status != codemeta.InvoiceDocumentStatusIssued.Value {

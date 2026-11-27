@@ -14,7 +14,6 @@ import '../../data/cart_model.dart';
 import 'cart_product_tile.dart';
 import 'merchant_group.dart';
 
-
 /// 購物車中單個商家分組的卡片。
 ///
 /// [group] 商家分組數據。

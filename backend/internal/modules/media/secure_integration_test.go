@@ -149,7 +149,6 @@ func noWrites(t *testing.T, f *fixture) {
 	}
 }
 
-
 func noObjects(t *testing.T, f *fixture) {
 	t.Helper()
 	if len(f.store.puts) != 0 || len(f.store.Keys()) != 0 {
@@ -818,7 +817,6 @@ func TestProcess_SecureRowIsPermanentFailure(t *testing.T) {
 	}
 }
 
-
 // 對應 test-map 列 9、12（原名 TestReadSecure_ReturnsPlaintextForAsset、TestReadSecure_DecryptsStoredObject）。
 func TestReadSecure_ReturnsPlaintextForAssetAcrossSegments(t *testing.T) {
 	f := setup(t)
@@ -1048,7 +1046,6 @@ func TestReadSecure_FailsForUnknownKekID(t *testing.T) {
 	}
 }
 
-
 func TestReadStagedSecure_OnlyTheUploaderCanPreviewBeforeConfirm(t *testing.T) {
 	f := setup(t)
 	data := pdfOf(5000)
@@ -1088,7 +1085,6 @@ func TestReadStagedSecure_RejectsPublicStaging(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
-
 
 func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 	f := setup(t)

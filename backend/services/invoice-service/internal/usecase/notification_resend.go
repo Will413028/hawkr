@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const resendWindow = 10 * time.Minute
 
 // NotificationResend 是三個重寄入口的共用 usecase。

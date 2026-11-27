@@ -173,10 +173,10 @@ var interiorSpaceFormats = map[string]string{
 
 var (
 	regexSpaceClass = regexp.MustCompile(`\\[sS]|\[:(?:space|blank):\]`)
-	regexpCall = regexp.MustCompile(`(?i)\bregexp_(?:replace|match|matches|like|count|instr|substr|split_to_array|split_to_table)\s*\(`)
-	patternOp  = regexp.MustCompile(`(?i)(?:!?~~?\*?|\b(?:I?LIKE|SIMILAR\s+TO)\b)\s*\(*\s*$`)
-	literalAt  = regexp.MustCompile(`(?i)^(?:E|U&)?'`)
-	castSuffix = regexp.MustCompile(`(?i)^(.*?)\s*(?:::\s*(?:text|character varying|varchar|bpchar))?$`)
+	regexpCall      = regexp.MustCompile(`(?i)\bregexp_(?:replace|match|matches|like|count|instr|substr|split_to_array|split_to_table)\s*\(`)
+	patternOp       = regexp.MustCompile(`(?i)(?:!?~~?\*?|\b(?:I?LIKE|SIMILAR\s+TO)\b)\s*\(*\s*$`)
+	literalAt       = regexp.MustCompile(`(?i)^(?:E|U&)?'`)
+	castSuffix      = regexp.MustCompile(`(?i)^(.*?)\s*(?:::\s*(?:text|character varying|varchar|bpchar))?$`)
 )
 
 func trimChars(name, args, orig string) (string, bool) {

@@ -4,7 +4,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-
 // CorrectionRoute 是分流結果。
 type CorrectionRoute int
 
@@ -38,7 +37,6 @@ type CorrectionFacts struct {
 	// OperationOpen ＝ 這張憑證還有一筆未送出的 operation（READY／RETRY_SCHEDULED）。
 	// 它決定 R03 這條邊**有沒有對象可以 HELD**；真正搶得到與否要打 DB。
 	OperationOpen bool
-
 
 	// TrackSufficient ＝ 重開需要的新號碼，字軌餘量夠。
 	TrackSufficient bool

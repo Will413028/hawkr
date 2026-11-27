@@ -226,7 +226,6 @@ export default function SellerLandingPage() {
 							<li className="process-step" key={step.title}>
 								<h3>{step.title}</h3>
 								<figure className="process-step__visual">
-
 									<AppImage
 										className="process-step__image"
 										src={step.visual.src}

@@ -30,7 +30,6 @@ func fakeSellerAuth() gin.HandlerFunc {
 	}
 }
 
-
 // TestGetSellerProducts_LogoCanonicalFields proves /public/sellers/:id/products
 // exposes the canonical logo_key/logo_url fields (issue #1782/B-238) on
 // records[].seller — this construction site was missed by the original Task 7

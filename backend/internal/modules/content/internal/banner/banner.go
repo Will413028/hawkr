@@ -148,7 +148,7 @@ const maxButtonTextRunes = 12
 const (
 	defaultBannerPage = 50
 	maxBannerPage     = 100
-	maxActiveBanners = 20
+	maxActiveBanners  = 20
 )
 
 func validateInput(in model.BannerInput) error {

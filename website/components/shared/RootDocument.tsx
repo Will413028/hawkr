@@ -91,7 +91,6 @@ export default function RootDocument({
 				<JsonLd data={[organizationSchema(locale), webSiteSchema(locale)]} />
 			</head>
 			<body>
-
 				<script
 					id="hk-theme-boot"
 					// biome-ignore lint/security/noDangerouslySetInnerHtml: trusted boot script
@@ -172,7 +171,6 @@ export default function RootDocument({
 												<SellerWorkspaceLock />
 											</Suspense>
 											<div className="page-wrapper">
-
 												<Suspense
 													fallback={
 														<div
@@ -185,7 +183,6 @@ export default function RootDocument({
 												</Suspense>
 												<AccountSuspensionBanner />
 												<main className="page-content">
-
 													<Suspense fallback={null}>
 														<PageTransition controllerOnly />
 														<MainTabPending />

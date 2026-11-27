@@ -9,7 +9,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-
 type protoEnum interface {
 	~int32
 	protoreflect.Enum

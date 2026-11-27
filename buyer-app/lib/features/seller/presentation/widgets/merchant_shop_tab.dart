@@ -102,7 +102,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
   bool _loadingProducts = false;
   bool _prefetchApplied = false;
 
-
   @override
   void initState() {
     super.initState();
@@ -137,7 +136,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
       }
     }
   }
-
 
   Future<void> _loadFavorites() async {
     try {
@@ -211,7 +209,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
     }
   }
 
-
   bool _isFavorited(Map m) {
     final raw = m['isFavorited'];
     if (raw is bool) return raw;
@@ -234,7 +231,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
       showCommonSnackBar(context, isFav ? '取消喜愛失敗' : '加入喜愛失敗');
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -533,7 +529,6 @@ class _MerchantShopTabState extends State<MerchantShopTab>
   }
 }
 
-
 /// 商城商品卡片（水平佈局）。
 ///
 /// 左側為可滑動多圖 [PageView]（或單圖），右側縱向排列：
@@ -678,7 +673,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
     _restockSubscribed = widget.isRestockSubscribed;
   }
 
-
   Future<void> _addToCart() async {
     if (widget.sku.isEmpty) return;
     final ref = widget.widgetRef;
@@ -810,7 +804,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
         .then(applyResult);
   }
 
-
   String get _priceDisplayText {
     if (_minPrice == null) {
       return PriceDisplay.formatPriceRange(
@@ -833,7 +826,6 @@ class _MerchantShopCardState extends State<MerchantShopCard> {
     if (highest <= pMin) return '';
     return PriceDisplay.formatPriceRange(lpMin, lpMax, prefix: 'NT\$ ');
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1311,7 +1303,6 @@ class _ShopFavoriteButtonState extends State<_ShopFavoriteButton> {
     );
   }
 }
-
 
 /// 商城商品載入期間的骨架屏佔位卡片。
 ///

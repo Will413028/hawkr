@@ -53,7 +53,6 @@ type ExtendPresenceStreamsParams struct {
 	PartyIds []int64
 }
 
-// 延長仍在跑的串流的存活期；列被清掉（過期超過清理門檻、或資料庫重啟後 UNLOGGED 表是空的）的串流以同一句補回，所以仍被計數、仍顯示在線。
 func (q *Queries) ExtendPresenceStreams(ctx context.Context, arg ExtendPresenceStreamsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, extendPresenceStreams,
 		arg.TtlMs,
@@ -98,18 +97,15 @@ type LockPartyStreamsParams struct {
 	PartyID int64
 }
 
-// 同一個 Party 的訂閱以 transaction 層級的 advisory lock 序列化（不鎖業務列，不在鎖序裡）。
 func (q *Queries) LockPartyStreams(ctx context.Context, arg LockPartyStreamsParams) error {
 	_, err := q.db.Exec(ctx, lockPartyStreams, arg.Kind, arg.PartyID)
 	return err
 }
 
 const notify = `-- name: Notify :exec
-
 SELECT pg_notify('im_events', $1::text)
 `
 
-// 串流的存活標記（presence 與並行上限）與 NOTIFY。時間只由 SQL 的 now() 產生與比較，沒有時間參數。
 func (q *Queries) Notify(ctx context.Context, payload string) error {
 	_, err := q.db.Exec(ctx, notify, payload)
 	return err
@@ -147,8 +143,6 @@ type PresenceForPartyRow struct {
 	PeerOnline       bool
 }
 
-// 一次處理整批對話的在線狀態：只回呼叫者這一方的對話（授權的述詞；缺列由呼叫端判成 NotFound），對方是否已關閉或退場、買家是否封鎖了店、
-// 對方是否有未過期的串流。對方的 kind 由呼叫者的 kind 決定；時間只用資料庫的 now()。店家封鎖買家在 seller，由呼叫端另查。
 func (q *Queries) PresenceForParty(ctx context.Context, arg PresenceForPartyParams) ([]PresenceForPartyRow, error) {
 	rows, err := q.db.Query(ctx, presenceForParty, arg.Kind, arg.Ids, arg.PartyID)
 	if err != nil {

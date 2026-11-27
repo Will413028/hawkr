@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	buyerIDHeader = "x-buyer-id"
-	storeIDHeader = "x-store-id"
+	buyerIDHeader   = "x-buyer-id"
+	storeIDHeader   = "x-store-id"
 	accountIDHeader = "x-account-id"
 )
 

@@ -16,10 +16,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
-
 type recorder struct {
 	auditor
-	got []model.FailureAuditInput
+	got        []model.FailureAuditInput
 	opsGot     []model.OperationAuditInput
 	replayed   bool
 	ran        bool

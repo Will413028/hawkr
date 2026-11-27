@@ -27,7 +27,7 @@ type sellerRelayFixture struct {
 	sellers *seller.Module
 	account int64
 	store   seller.Store
-	now *time.Time
+	now     *time.Time
 }
 
 func newSellerRelayFixture(t *testing.T) *sellerRelayFixture {

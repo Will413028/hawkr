@@ -90,8 +90,7 @@ export function setTextScale(scale: TextScale): void {
 	}
 	try {
 		localStorage.setItem(TEXT_SCALE_STORAGE_KEY, scale);
-	} catch {
-	}
+	} catch {}
 	window.dispatchEvent(new CustomEvent(TEXT_SCALE_EVENT, { detail: scale }));
 }
 

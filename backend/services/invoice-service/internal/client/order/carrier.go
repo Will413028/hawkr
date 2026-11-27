@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 // ErrNoDefaultPreference 表示該買家沒有存活的預設常用發票資料。
 //
 // 它是**正常值不是錯誤**：對應 §6.1.2(b) 的第 ② 步「無載具發票」。具名而不是回零值，
@@ -165,7 +164,6 @@ func isBizCode(err error, code int32) bool {
 	var de *pkgerrors.DomainError
 	return stderrors.As(err, &de) && int32(de.Code) == code
 }
-
 
 // RepoPreferenceReader 把 `domain.BuyerPreferenceRepository` 接成 BuyerPreferenceReader。
 //

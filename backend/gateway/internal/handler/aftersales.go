@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // CreateAfterSaleCaseRequest 申請售後請求
 type CreateAfterSaleCaseRequest struct {
 	OrderNo     string   `json:"orderNo" binding:"required"` // 訂單編號
@@ -174,7 +173,6 @@ type CancelShipmentResultResponse struct {
 	RefundAmount string `json:"refundAmount"`
 }
 
-
 func convertAfterSaleSummary(s *pb.AfterSaleCaseSummary, mediaBase string) AfterSaleCaseSummaryResponse {
 	if s == nil {
 		return AfterSaleCaseSummaryResponse{}
@@ -294,14 +292,13 @@ func convertAfterSaleDetail(d *pb.AfterSaleCaseDetailView, mediaBase string) Aft
 		StorePickupDeadlineAt: d.GetStorePickupDeadlineAt(),
 		SellerPickedUpAt:      d.GetSellerPickedUpAt(),
 		AutoCompleteAtStamp:   d.GetAutoCompleteAtStamp(),
-		ShipBackDeadlineAt: d.GetShipBackDeadlineAt(),
+		ShipBackDeadlineAt:    d.GetShipBackDeadlineAt(),
 	}
 }
 
 func mapResolutionType(s string) string {
 	return s
 }
-
 
 // CreateAfterSaleCase 申請售後
 // @Summary      申請售後
@@ -526,7 +523,6 @@ func (h *Holder) CancelAfterSaleCase(c *gin.Context) {
 
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
-
 
 // GetSellerAfterSaleCases 賣家售後列表
 // @Summary      賣家售後列表
@@ -808,7 +804,6 @@ func (h *Holder) CancelShipment(c *gin.Context) {
 
 var _ = strconv.Itoa
 
-
 // SubmitAppealRequest 買家申訴 Request
 type SubmitAppealRequest struct {
 	Reason              string   `json:"reason" binding:"required,max=128"`   // 申訴理由分類或簡述
@@ -863,7 +858,6 @@ type AppealSummaryResponse struct {
 	SellerAvatarKey string `json:"logoKey"` // 商家 logo objectKey（SSOT；49 §6.1）
 	SellerAvatarUrl string `json:"logoUrl"` // 商家 logo 顯示 URL（Gateway 組）
 }
-
 
 // AdminAppealDetailResponse Admin 單案詳情四層結構（§29 加 providerContext）
 type AdminAppealDetailResponse struct {

@@ -62,7 +62,6 @@ export const SELLER_CANCEL_REASON_LABEL: Record<
 	"9299": "其他原因",
 };
 
-
 /**
  * 售後證據類型（CodeMeta `AfterSaleEvidenceType`，backend `內部技術碼.md`）。
  *
@@ -85,7 +84,6 @@ export const AfterSaleEvidenceType = {
 export type AfterSaleEvidenceTypeCode = keyof typeof AfterSaleEvidenceType;
 export type AfterSaleEvidenceTypeValue =
 	(typeof AfterSaleEvidenceType)[AfterSaleEvidenceTypeCode];
-
 
 /**
  * 把後端送來的配送方式值正規化成 CodeMeta `ShippingMethod` value。

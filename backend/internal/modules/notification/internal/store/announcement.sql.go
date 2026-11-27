@@ -85,7 +85,6 @@ type AnnouncementsByIDsRow struct {
 	Body  string
 }
 
-// 收件匣一頁一次讀多則公告的標題與內文；查不到的 id 不在結果裡。
 func (q *Queries) AnnouncementsByIDs(ctx context.Context, ids []uuid.UUID) ([]AnnouncementsByIDsRow, error) {
 	rows, err := q.db.Query(ctx, announcementsByIDs, ids)
 	if err != nil {
@@ -123,7 +122,6 @@ type InsertAnnouncementParams struct {
 	CreatedAt time.Time
 }
 
-// 建立公告。(admin_id, request_id) 已存在時什麼都不寫（回 0 列，pgx.ErrNoRows），呼叫端讀回第一次的那一列並比對內容；沒有 request_id（NULL）不衝突。
 func (q *Queries) InsertAnnouncement(ctx context.Context, arg InsertAnnouncementParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, insertAnnouncement,
 		arg.ID,
@@ -155,7 +153,6 @@ type InsertAnnouncementInboxParams struct {
 	Now            time.Time
 }
 
-// 把公告寫進一個收件人的收件匣；同一個 (公告, 收件人) 已有列時什麼都不寫（回 0 列，job 重試安全）。參數只有公告 ID，文案讀取時由公告型別解析。
 func (q *Queries) InsertAnnouncementInbox(ctx context.Context, arg InsertAnnouncementInboxParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertAnnouncementInbox,
 		arg.ID,
@@ -185,7 +182,6 @@ type ListAnnouncementsParams struct {
 	PageSize       int32
 }
 
-// 新到舊（created_at，再依 id），keyset 分頁；after_created_at 為 NULL 是第一頁。呼叫端要 limit + 1 筆來判斷有沒有下一頁。
 func (q *Queries) ListAnnouncements(ctx context.Context, arg ListAnnouncementsParams) ([]NotificationAnnouncement, error) {
 	rows, err := q.db.Query(ctx, listAnnouncements, arg.AfterCreatedAt, arg.AfterID, arg.PageSize)
 	if err != nil {

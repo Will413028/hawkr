@@ -60,7 +60,6 @@ const REVOKED_SUMMARY = {
 	revokeReason: REVOKE_REASON,
 };
 
-
 test("① 摘要 parser 收下撤銷四件套", () => {
 	const parsed = parseDelegatedSessionReport(REVOKED_SUMMARY);
 	assert.ok(parsed);
@@ -123,7 +122,6 @@ test("摘要 parser 是冪等的：BFF 與瀏覽器會各解析一次同一份�
 	assert.deepEqual(second, first);
 });
 
-
 test("撤銷者那一行：全形括號結尾不再補半形空格", () => {
 	const line = sessionRevokedByText(
 		REVOKED_AT,
@@ -148,7 +146,6 @@ test("撤銷者缺席時說得出缺了什麼，不是省略整句", () => {
 		/由 未記錄操作者撤銷$/u,
 	);
 });
-
 
 const requireFromTest = createRequire(__filename);
 requireFromTest.extensions[".css"] = () => {};

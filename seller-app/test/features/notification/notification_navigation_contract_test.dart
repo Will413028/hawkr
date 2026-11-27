@@ -55,7 +55,6 @@ void main() {
   });
 }
 
-
 class _NavCall {
   const _NavCall({
     required this.firstArgument,

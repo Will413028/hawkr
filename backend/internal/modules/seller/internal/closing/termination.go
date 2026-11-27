@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-
 // TerminationEffectArgs 是終止合作生效的 job，以 measure_id 為唯一鍵（重跑沒有副作用：每一步都重讀並重新判斷）。
 type TerminationEffectArgs struct {
 	MeasureID uuid.UUID `json:"measure_id" river:"unique"`

@@ -75,7 +75,6 @@ export function toHexColor(raw: string | null | undefined): string | undefined {
 	return undefined;
 }
 
-
 /** A single run → the inline HTML Editor.js understands (link outermost so a
  *  linked bold word round-trips). */
 function runToHtml(run: InlineRun): string {
@@ -128,12 +127,12 @@ function normalizeRuns(runs: InlineRun[]): InlineRun[] {
 
 function walkInline(node: Node, style: InlineRun, runs: InlineRun[]): void {
 	for (const child of Array.from(node.childNodes)) {
-		if (child.nodeType === 3 ) {
+		if (child.nodeType === 3) {
 			const text = child.textContent ?? "";
 			if (text) runs.push({ ...style, text });
 			continue;
 		}
-		if (child.nodeType !== 1 ) continue;
+		if (child.nodeType !== 1) continue;
 		const el = child as HTMLElement;
 		const tag = el.tagName.toLowerCase();
 		if (tag === "br") {
@@ -218,7 +217,6 @@ function alignmentFromTunes(
 	return a === "center" || a === "right" ? a : undefined;
 }
 
-
 interface TableCell {
 	runs?: InlineRun[];
 	textAlign?: "center" | "right";
@@ -290,7 +288,6 @@ function editorDataToTableJson(data: unknown): string | null {
 	return JSON.stringify({ withHeadings: !!d?.withHeadings, rows });
 }
 
-
 interface ListItem {
 	runs?: InlineRun[];
 }
@@ -349,7 +346,6 @@ function editorDataToListJson(
 		...(textAlign ? { textAlign } : {}),
 	});
 }
-
 
 /** backend description → Editor.js initial/render data. */
 export function toEditorData(

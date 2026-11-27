@@ -59,7 +59,6 @@ export function SellerPageShell({
 		<div className={cn("flex flex-col gap-[var(--hkui-space-6)]", className)}>
 			<header className="flex justify-between items-end gap-[var(--hkui-space-4)] flex-wrap m-0">
 				<div className="flex flex-col gap-1 min-w-0">
-
 					{eyebrow ? (
 						<small className="text-[length:var(--hkui-text-tiny)] font-bold tracking-[0.12em] uppercase text-[var(--hkui-foreground-muted)]">
 							{eyebrow}

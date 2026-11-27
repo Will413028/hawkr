@@ -62,7 +62,6 @@ function renderActivityRow(
 			data-status={event.status}
 			data-row-id={event.rowId}
 		>
-
 			{running ? (
 				<HawkrAgentSprite
 					state={motion}
@@ -125,7 +124,6 @@ export default function AgentActivityRail({
 									className="hawkr-agent-rail__row"
 									data-status={step.status}
 								>
-
 									{running ? (
 										<HawkrAgentSprite
 											state={motion}

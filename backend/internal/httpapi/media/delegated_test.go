@@ -28,11 +28,11 @@ const (
 )
 
 type fakeSessions struct {
-	sessions map[string]moddelegation.DelegationSession
-	denied   []moddelegation.DelegatedMethod
-	touched  []int64
-	storeErr error
-	reads    int
+	sessions  map[string]moddelegation.DelegationSession
+	denied    []moddelegation.DelegatedMethod
+	touched   []int64
+	storeErr  error
+	reads     int
 	readStore int64
 }
 

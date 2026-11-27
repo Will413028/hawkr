@@ -10,7 +10,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-
 // TestLegacy 經入口對舊的 gateway 與 Java product-service 跑情境（D8：先對舊實作跑過）。
 func TestLegacy(t *testing.T) {
 	tokens := ch.EnvTokens(t)

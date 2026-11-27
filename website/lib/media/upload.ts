@@ -280,8 +280,7 @@ async function decodeImage(file: File): Promise<DecodedImage> {
 	if (typeof createImageBitmap === "function") {
 		try {
 			return await createImageBitmap(file);
-		} catch {
-		}
+		} catch {}
 	}
 	return loadHtmlImage(file);
 }

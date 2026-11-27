@@ -15,8 +15,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
-
 type authorizationStub struct {
 	accountpb.DelegationServiceClient
 
@@ -131,7 +129,6 @@ func validGrantBody(extra string) string {
 		`"grantedCapabilities":["products.read","products.write"],"operationReason":"依合約開通商品代管"` + extra + `}`
 }
 
-
 // 欄位集合全等。多一欄：任何憑證／PII 被誰加進來時這裡轉紅。少一欄：ADM 的 parser
 // 在必填欄缺席時整份判 502，面板打不開。
 func TestDelegationAuthorizationData_KeySet(t *testing.T) {
@@ -236,7 +233,6 @@ func TestDelegationAuthorizationHistoryEntry_KeySet(t *testing.T) {
 	}
 }
 
-
 // 目錄必須涵蓋全部九值、依宣告順序、每一項都帶 risk 與 dependsOn（後者恆為陣列）。
 // 少任何一項，ADM 的勾選畫面就少一個能力而沒有任何錯誤；dependsOn 是 null 的話連動
 // 規則整段不執行，使用者送出的組合會被後端以 9287 擋下而畫面說不出為什麼。
@@ -278,7 +274,6 @@ func TestListDelegationCapabilities_Catalog(t *testing.T) {
 	}
 }
 
-
 // 七支全部掛在 ADM host 組：身分缺席一律 9261／401，絕不出現 www host 組的 9274。
 func TestDelegationAuthorizationEndpoints_RequireAdminIdentity(t *testing.T) {
 	h := &Holder{}
@@ -310,7 +305,6 @@ func TestDelegationAuthorizationEndpoints_RequireAdminIdentity(t *testing.T) {
 		})
 	}
 }
-
 
 func TestGrantDelegationAuthorization_BodyValidation(t *testing.T) {
 	cases := []struct {
@@ -500,7 +494,6 @@ func TestGrantDelegationAuthorization_AbsentEffectiveUntilStaysUnset(t *testing.
 	}
 }
 
-
 func TestGetDelegationAuthorization_LookupShape(t *testing.T) {
 	w, c := newDelegationTestContext(t, http.MethodGet,
 		"/api/v1/admin/delegated-operations/authorizations/2685914682", "")
@@ -552,7 +545,6 @@ func (s *emptyLookupStub) GetDelegationAuthorization(ctx context.Context, in *ac
 		Data: &accountpb.GetDelegationAuthorizationData{Exists: false},
 	}, nil
 }
-
 
 func TestListDelegationAuthorizations_QueryValidation(t *testing.T) {
 	cases := []struct {
@@ -633,7 +625,6 @@ func TestListDelegationAuthorizations_ForwardsFilters(t *testing.T) {
 		t.Fatalf("篩選與分頁未逐欄傳遞：%+v", got)
 	}
 }
-
 
 func TestUpdateAndRevokeDelegationAuthorization_Validation(t *testing.T) {
 	t.Run("update 的 storeId 走 path，格式錯即 9260", func(t *testing.T) {

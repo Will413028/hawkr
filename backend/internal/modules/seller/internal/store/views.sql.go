@@ -44,9 +44,6 @@ type ApplyProductViewResolutionsParams struct {
 	ProcessedAt time.Time
 }
 
-// 一句話內標記事件並累加每日彙總：被標記的列才進彙總，所以標記與計數不會分開成功。store_ids 與 event_ids 逐項對應，0 表示
-// 商品不存在或沒有店家，或店家不在 seller.stores（UNRESOLVED，不計入，不讓每日彙總違反 store_id 的外鍵）。台北日曆日取自
-// 事件的 occurred_at，不是處理時間。回傳標記的事件數。
 func (q *Queries) ApplyProductViewResolutions(ctx context.Context, arg ApplyProductViewResolutionsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, applyProductViewResolutions, arg.EventIds, arg.StoreIds, arg.ProcessedAt)
 	var column_1 int64
@@ -64,8 +61,6 @@ type DeleteProductViewsDailyParams struct {
 	ToDay   time.Time
 }
 
-// 重算的第一步：刪區間 [from_day, to_day] 內的每日彙總。與下一句分成兩句：同一句的 CTE 看到同一份 snapshot，刪除還沒生效，
-// 重建會撞主鍵。兩句在同一個 transaction（獨占鎖之下），沒有彙總缺漏的空窗。
 func (q *Queries) DeleteProductViewsDaily(ctx context.Context, arg DeleteProductViewsDailyParams) error {
 	_, err := q.db.Exec(ctx, deleteProductViewsDaily, arg.FromDay, arg.ToDay)
 	return err
@@ -83,7 +78,6 @@ type InsertProductViewEventParams struct {
 	OccurredAt time.Time
 }
 
-// 寫入端只追加一列；event_id 由產生端給（UUIDv7），重送的事件不會多一列。
 func (q *Queries) InsertProductViewEvent(ctx context.Context, arg InsertProductViewEventParams) error {
 	_, err := q.db.Exec(ctx, insertProductViewEvent, arg.EventID, arg.ProductID, arg.OccurredAt)
 	return err
@@ -105,9 +99,6 @@ type InsertRebuiltProductViewsDailyParams struct {
 	ToDay   time.Time
 }
 
-// 重算的第二步：以已處理的事件（COUNTED，儲存的 store_id）重建區間 [from_day, to_day] 的每日彙總；日期取自 occurred_at 的
-// 台北日曆日。與解析路徑一樣只認 seller.stores 裡有的店：切換之前已計入的事件，store_id 可能是舊 seller-service 的店號
-// （product_view_events.store_id 沒有 FK），不在 seller.stores 的略過，不讓整個重算被 product_views_daily 的 FK 擋下。
 func (q *Queries) InsertRebuiltProductViewsDaily(ctx context.Context, arg InsertRebuiltProductViewsDailyParams) error {
 	_, err := q.db.Exec(ctx, insertRebuiltProductViewsDaily, arg.FromDay, arg.ToDay)
 	return err
@@ -126,7 +117,6 @@ type LockPendingProductViewEventsRow struct {
 	ProductID uuid.UUID
 }
 
-// 鎖住這批裡仍然沒處理的事件；已被別的彙總 job 鎖住的跳過，已處理的不會再選中。
 func (q *Queries) LockPendingProductViewEvents(ctx context.Context, eventIds []uuid.UUID) ([]LockPendingProductViewEventsRow, error) {
 	rows, err := q.db.Query(ctx, lockPendingProductViewEvents, eventIds)
 	if err != nil {
@@ -151,7 +141,6 @@ const lockProductViewMaintenance = `-- name: LockProductViewMaintenance :exec
 SELECT pg_advisory_xact_lock_shared(hashtextextended('seller.product_views', 0))
 `
 
-// 彙總 job 取共享鎖（彼此可以並行，以 SKIP LOCKED 分批）；重算與清理取獨占鎖（見 LockProductViewRebuild）。
 func (q *Queries) LockProductViewMaintenance(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockProductViewMaintenance)
 	return err
@@ -161,7 +150,6 @@ const lockProductViewRebuild = `-- name: LockProductViewRebuild :exec
 SELECT pg_advisory_xact_lock(hashtextextended('seller.product_views', 0))
 `
 
-// 重算與清理取獨占鎖：重算的刪除與重建之間不會有彙總 job 插進來，清理也不會在重算讀事件時刪掉它們。
 func (q *Queries) LockProductViewRebuild(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, lockProductViewRebuild)
 	return err
@@ -180,7 +168,6 @@ type PendingProductViewEventsRow struct {
 	ProductID uuid.UUID
 }
 
-// 還沒處理的事件，依發生順序取一批（不加鎖：解析在 transaction 之外，寫入時才鎖）。
 func (q *Queries) PendingProductViewEvents(ctx context.Context, batchLimit int32) ([]PendingProductViewEventsRow, error) {
 	rows, err := q.db.Query(ctx, pendingProductViewEvents, batchLimit)
 	if err != nil {
@@ -213,7 +200,6 @@ type ProductViewsBetweenParams struct {
 	EndDay   time.Time
 }
 
-// 店家在 [first_day, end_day)（台北日曆日，左閉右開）的瀏覽總數；沒有彙總列的日子是 0。
 func (q *Queries) ProductViewsBetween(ctx context.Context, arg ProductViewsBetweenParams) (int64, error) {
 	row := q.db.QueryRow(ctx, productViewsBetween, arg.StoreID, arg.FirstDay, arg.EndDay)
 	var views int64
@@ -240,7 +226,6 @@ type PurgeProcessedProductViewEventsParams struct {
 	BatchLimit int32
 }
 
-// 刪除發生時間早於 cutoff 且已處理的事件（沒處理的不刪：它們還沒進彙總）；一次最多 batch_limit 列，回傳刪除的列數。
 func (q *Queries) PurgeProcessedProductViewEvents(ctx context.Context, arg PurgeProcessedProductViewEventsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, purgeProcessedProductViewEvents, arg.Cutoff, arg.BatchLimit)
 	var column_1 int64

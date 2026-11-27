@@ -319,8 +319,8 @@
    "id": "fix3-r3",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/turn/apply.go",
-   "old": "return decideMatches(l, p.Query, current), nil\n}\n\n// applyGroup",
-   "new": "return interrupt(l, buildCard(p.Query, matchesOf(current))), nil\n}\n\n// applyGroup",
+   "old": "return decideMatches(l, p.Query, current), nil",
+   "new": "return interrupt(l, buildCard(p.Query, matchesOf(current))), nil",
    "test": "internal/modules/procurement/internal/turn ^TestStalePickRebuildsThroughDecideMatches$",
    "why": "過期選項重建不走 decideMatches：只剩 1 個命中時出 1 個選項的卡而不是確認"
   },

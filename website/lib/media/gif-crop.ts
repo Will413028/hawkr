@@ -138,8 +138,7 @@ export async function cropAnimatedGifFile(
 			if (options.signal?.aborted) throw abortError();
 			try {
 				options.onProgress?.(1);
-			} catch {
-			}
+			} catch {}
 			return result;
 		} catch (error) {
 			if (options.signal?.aborted) throw abortError();
@@ -179,8 +178,7 @@ function runWorkerAttempt(
 		const reportProgress = (progress: number) => {
 			try {
 				options.onProgress?.(progress);
-			} catch {
-			}
+			} catch {}
 		};
 		const settleReject = (error: unknown) => {
 			if (settled) return;

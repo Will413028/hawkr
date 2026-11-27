@@ -79,7 +79,6 @@ func guardNonSuccess(c *gin.Context) {
 	bizcarrier.EmitNonSuccess(c)
 }
 
-
 // OK 成功回應 {code:0, message:"success", data:{...}}
 //
 // ⚠️ 若本請求有未處理的 preserveData 業務碼，本函式會改送 Biz(code, message, data)。
@@ -116,7 +115,6 @@ func Page(c *gin.Context, records interface{}, total, page, pageSize string) {
 	}
 	envelope.Page(c, records, total, page, pageSize)
 }
-
 
 // Err 通用錯誤回應
 func Err(c *gin.Context, httpStatus int, code int32, message string) {
@@ -221,7 +219,6 @@ func ServiceUnavailable(c *gin.Context, service string) {
 	envelope.ServiceUnavailable(c, service)
 }
 
-
 // BizDeny 送出 Gateway 原生的業務拒絕：HTTP 409（塌縮）+ envelope 帶業務碼
 // （前端解析 code / messageZh，不用 HTTP status 分流；409 也用於 duplicate，見
 // reference_gateway_bizcode_collapses_to_409）。輸出 envelope 形狀與 GrpcDomainErr
@@ -297,7 +294,6 @@ func TooManyRequests(c *gin.Context, message string) {
 	Err(c, http.StatusTooManyRequests, 429, message)
 }
 
-
 // CacheControlPrivateNoStore 是 AI 與採購（Hawkr 幫找）回應的 Cache-Control 值。
 // 這條路徑的回應逐一綁定登入者身分（對話內容、候選廠商、報價金額），被共享快取或
 // 瀏覽器磁碟快取留下，同一台機器的下一個使用者就讀得到。no-store 連寫入都禁止，
@@ -307,7 +303,6 @@ func TooManyRequests(c *gin.Context, message string) {
 // SSE header 都引用這個常數，不各自寫字面值。seller_city_summary 的 `public, max-age=300` 是刻意不同的快取
 // 政策（可共享的公開資料），不要合併過來。判準見 API 設計規範「回應快取政策」。
 const CacheControlPrivateNoStore = "private, no-store"
-
 
 // GrpcResult 轉發 gRPC 回應
 // code=0 → 成功回應帶 data
@@ -362,7 +357,6 @@ func GrpcDomainErr(c *gin.Context, service string, err error) {
 	// （envelope.GrpcDomainErr 自己也只是轉呼 envelope.GrpcErr，見 pkg/envelope/envelope.go:259。）
 	GrpcErr(c, service, err)
 }
-
 
 // ProtoToRaw 將 proto message 序列化為 json.RawMessage，
 // 可直接放入 gin.H 或 Envelope.Data 而不會被二次編碼。

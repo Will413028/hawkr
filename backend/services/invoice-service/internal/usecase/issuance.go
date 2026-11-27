@@ -118,7 +118,6 @@ func (u *Issuance) WithClock(now func() time.Time) *Issuance {
 	return u
 }
 
-
 // OrderPaidInput 是 Prepare 的全部輸入。
 //
 // 它刻意是**值**而不是「幾個 client 介面」：三份事實（ORD 快照／PAY 付款事實／本地稅務
@@ -159,7 +158,6 @@ type OrderPaidInput struct {
 	PreferenceOwnershipMismatch bool
 
 	CorrelationID string
-
 
 	// IssueAttemptSeq 是實體軸（§5：同一 snapshot_version 下第幾張實體發票，
 	// 作廢重開 +1）。**零值視為 1**，讓一般開票路徑不必知道這一欄存在。
@@ -299,12 +297,12 @@ func (u *Issuance) Prepare(ctx context.Context, in OrderPaidInput) (PrepareResul
 }
 
 type issuancePlan struct {
-	doc         domain.NewDocument
-	lines       []domain.NewDocumentLine
-	makeOp      bool
-	op          domain.NewOperation
-	opNextState string
-	opNextAt    time.Time
+	doc           domain.NewDocument
+	lines         []domain.NewDocumentLine
+	makeOp        bool
+	op            domain.NewOperation
+	opNextState   string
+	opNextAt      time.Time
 	manualReason  string
 	correlationID string
 	now           time.Time
@@ -361,24 +359,24 @@ func (u *Issuance) buildPlan(
 		now:           now,
 		correlationID: in.CorrelationID,
 		doc: domain.NewDocument{
-			ID:                  documentID,
-			IssuerID:            issuer.ID,
-			IssuerNameSnapshot:  issuerNameSnapshot(issuer, profile),
-			IssuerTaxIDSnapshot: derefString(profile.TaxID),
-			SourceType:          sourceTypeOrder,
-			SourceRef:           in.OrderNo,
-			TriggerType:         triggerTypeAuto,
-			RecipientType:       codemeta.InvoiceRecipientTypeBuyer.Value,
-			RecipientRefID:      &buyerID,
-			RecipientName:       recipientName(decision.DocumentKind, in.BuyerTitle),
-			RecipientTaxID:      recipientTaxID(decision.DocumentKind, in.BuyerTaxID),
-			RecipientEmail:      in.NotifyEmail,
-			CarrierType:         carrierType,
-			CarrierID1:          carrierID1,
-			CarrierID2:          carrierID2,
-			DonationCode:        donation,
-			DocumentKind:        decision.DocumentKind,
-			FulfillmentMode:     decision.FulfillmentMode,
+			ID:                          documentID,
+			IssuerID:                    issuer.ID,
+			IssuerNameSnapshot:          issuerNameSnapshot(issuer, profile),
+			IssuerTaxIDSnapshot:         derefString(profile.TaxID),
+			SourceType:                  sourceTypeOrder,
+			SourceRef:                   in.OrderNo,
+			TriggerType:                 triggerTypeAuto,
+			RecipientType:               codemeta.InvoiceRecipientTypeBuyer.Value,
+			RecipientRefID:              &buyerID,
+			RecipientName:               recipientName(decision.DocumentKind, in.BuyerTitle),
+			RecipientTaxID:              recipientTaxID(decision.DocumentKind, in.BuyerTaxID),
+			RecipientEmail:              in.NotifyEmail,
+			CarrierType:                 carrierType,
+			CarrierID1:                  carrierID1,
+			CarrierID2:                  carrierID2,
+			DonationCode:                donation,
+			DocumentKind:                decision.DocumentKind,
+			FulfillmentMode:             decision.FulfillmentMode,
 			Status:                      creationStatus(decision),
 			NotApplicableReason:         decision.NotApplicableReason,
 			SnapshotVersion:             in.SnapshotVersion,
@@ -397,12 +395,12 @@ func (u *Issuance) buildPlan(
 			ReceiptNo:                   receiptNo,
 			ReceiptAuthorizationVersion: receiptAuthNoneV1,
 			InvoiceDateTaipei:           &invoiceDate,
-			TaxPeriodCode: taxPeriodFor(decision.DocumentKind, invoiceDate),
-			IssueNotBefore: in.PaidAt,
-			PaidAt:              &in.PaidAt,
-			StatutoryDeadlineAt: deadline,
-			SourceSnapshot:      snapshotJSON,
-			Now:                 now,
+			TaxPeriodCode:               taxPeriodFor(decision.DocumentKind, invoiceDate),
+			IssueNotBefore:              in.PaidAt,
+			PaidAt:                      &in.PaidAt,
+			StatutoryDeadlineAt:         deadline,
+			SourceSnapshot:              snapshotJSON,
+			Now:                         now,
 		},
 		manualReason: decision.ManualReasonCode,
 	}

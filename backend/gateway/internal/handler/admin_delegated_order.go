@@ -19,7 +19,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // DelegatedOrderBuyer carries the買家顯示名 only.
 type DelegatedOrderBuyer struct {
 	DisplayName string `json:"displayName"`
@@ -321,20 +320,20 @@ func (h *Holder) RevealDelegatedRecipientContact(c *gin.Context) {
 
 	orch := h.orchestrator()
 	result, denial := orch.Orchestrate(c.Request.Context(), delegation.Spec{
-		Session:      req.Session,
-		Action:       "ORDER_PII_REVEAL",
-		ResourceType: "order",
-		ReadCap:      authz.AdminCapOrdersRead,
-		WriteCap:     authz.AdminCapOrdersRead,
-		SnapshotFields:  nil,
-		OperationReason: reason,
-		NotifySeller:    false,
-		IdempotencyKey: "",
-		RequestID:      req.RequestID,
-		CorrelationID:  req.CorrelationID,
-		UserAgent:      req.UserAgent,
-		ResourceID:     orderNo,
-		ResourceName: orderNo,
+		Session:          req.Session,
+		Action:           "ORDER_PII_REVEAL",
+		ResourceType:     "order",
+		ReadCap:          authz.AdminCapOrdersRead,
+		WriteCap:         authz.AdminCapOrdersRead,
+		SnapshotFields:   nil,
+		OperationReason:  reason,
+		NotifySeller:     false,
+		IdempotencyKey:   "",
+		RequestID:        req.RequestID,
+		CorrelationID:    req.CorrelationID,
+		UserAgent:        req.UserAgent,
+		ResourceID:       orderNo,
+		ResourceName:     orderNo,
 		SnapshotOverride: map[string]any{"revealedFields": []string{"phone", "fullAddress"}},
 		Write: func(ctx context.Context, dctx *commonpb.DelegationContext) (*delegation.Resource, *delegation.Denial) {
 			detail, denial := h.readDelegatedOrder(ctx, req, orderNo, true, dctx)
@@ -421,7 +420,7 @@ func delegatedOrderDetailDTO(d *orderpb.OrderDetailView) DelegatedOrderDetail {
 		CancelByRole:        d.GetCancelByRole(),
 		Buyer:               DelegatedOrderBuyer{DisplayName: d.GetBuyerNickname()},
 		Recipient: DelegatedOrderRecipient{
-			Name: d.GetRecipientName(),
+			Name:        d.GetRecipientName(),
 			MaskedPhone: d.GetRecipientPhone(),
 			City:        city,
 			District:    district,

@@ -10,7 +10,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 // DocumentRoute 是補充文件端點的 ServeMux 樣式。
 const DocumentRoute = "GET /api/files/admin/seller/kyc_applications/{application_id}/documents/{position}"
 

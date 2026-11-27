@@ -421,7 +421,6 @@ type KYCCancelled struct {
 	StoreID, AccountID int64
 }
 
-
 var (
 	taxIDRe  = regexp.MustCompile(`^[0-9]{8}$`)
 	mobileRe = regexp.MustCompile(`^09[0-9]{8}$`)

@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-
 type orderPaidPayload struct {
 	EventID               string `json:"event_id"`
 	OrderNo               string `json:"order_no"`
@@ -46,7 +45,6 @@ type orderCancelledPayload struct {
 	BuyerID      int64  `json:"buyer_id"`
 	CancelReason string `json:"cancel_reason"`
 }
-
 
 func parseWireAmount(field, raw string) (int64, error) {
 	s := strings.TrimSpace(raw)
@@ -96,10 +94,9 @@ func (p orderRefundFinalizedPayload) toRefundFinalized(occurredAt time.Time) (Re
 	}, nil
 }
 
-
 const (
 	dedupPrefixOrderPaid = "ORDER_PAID:"
-	dedupPrefixRefund = "REFUND:"
+	dedupPrefixRefund    = "REFUND:"
 
 	dedupPrefixOrderCancelled = "ORDER_CANCELLED:"
 
@@ -118,7 +115,6 @@ func checkDedupKey(key string) error {
 	}
 	return nil
 }
-
 
 var eventTimeLayouts = []string{
 	time.RFC3339Nano,

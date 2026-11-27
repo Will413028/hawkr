@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 
-
 export interface ZoomRect {
 	top: number;
 	left: number;

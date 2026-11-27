@@ -356,7 +356,7 @@ func toComment(r reads.CommentRow) model.Comment {
 type scope struct {
 	ownerStore int64
 	post       store.GetPostRow
-	readable bool
+	readable   bool
 }
 
 func (s *Service) scope(ctx context.Context, c model.Caller, postID uuid.UUID) (scope, error) {

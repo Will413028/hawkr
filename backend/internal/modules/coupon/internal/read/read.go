@@ -23,7 +23,7 @@ const (
 	// DefaultPageSize 與 MaxPageSize 是列表一頁的預設與上限。
 	DefaultPageSize = 20
 	MaxPageSize     = 100
-	scanBatch = 100
+	scanBatch       = 100
 )
 
 // Deps 是讀取路徑的依賴。

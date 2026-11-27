@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 )
 
-
 func (s *Server) ListDelegationAuthorizations(ctx context.Context, req *connect.Request[pb.ListDelegationAuthorizationsRequest]) (*connect.Response[pb.ListDelegationAuthorizationsResponse], error) {
 	m := req.Msg
 	reply := func(code int32, msg string) (*connect.Response[pb.ListDelegationAuthorizationsResponse], error) {

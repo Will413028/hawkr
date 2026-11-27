@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-
 var delegationUpstreamBranchExceptions = map[string]string{
 	"EndCurrentDelegatedOperation": "失敗情境表只有 9280 一列；分流業務碼會永久封鎖結束動作",
 }

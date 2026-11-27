@@ -52,7 +52,7 @@ type App struct {
 	stores        Stores
 	images        rpc.Images
 	log           *slog.Logger
-	lifetime func() time.Duration
+	lifetime      func() time.Duration
 }
 
 var _ notificationv1alpha1connect.NotificationAppServiceHandler = (*App)(nil)

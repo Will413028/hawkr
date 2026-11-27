@@ -385,7 +385,6 @@ export function getCachedSellerProducts(id: string, page = 1, pageSize = 12) {
 	return readSellerProducts(id, page, pageSize).then(settled);
 }
 
-
 async function readHotProducts(limit: number) {
 	"use cache";
 	cacheTag(PUBLIC_CACHE_TAGS.products);

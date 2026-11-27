@@ -160,7 +160,6 @@ export function CartProductTile({
 			</label>
 
 			<div className="cart-tile__thumb">
-
 				<AppImage
 					src={imageSrc}
 					alt={item.name}
@@ -211,7 +210,6 @@ export function CartProductTile({
 											: "cart-tile__stock"
 								}
 							>
-
 								{reason === "DELISTED"
 									? "已下架"
 									: reason === "OUT_OF_STOCK" || stockOut
@@ -290,7 +288,6 @@ export function CartProductTile({
 			</div>
 
 			<div className="cart-tile__actions">
-
 				{isUnavailable ? null : (
 					<Button
 						type="button"

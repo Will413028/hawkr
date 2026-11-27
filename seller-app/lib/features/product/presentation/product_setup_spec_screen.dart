@@ -67,8 +67,7 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
   final String category;
   final String subCategory;
   final int? catalogId;
-  final bool
-  isCandidateCategory;
+  final bool isCandidateCategory;
   final int? l1Id;
   final String? l1Name;
   final int? l2Id;

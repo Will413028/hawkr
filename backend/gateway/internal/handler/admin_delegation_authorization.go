@@ -12,8 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
-
 var delegationAuthorizationSources = map[string]struct{}{
 	"contract":        {},
 	"ticket":          {},
@@ -26,7 +24,6 @@ var delegationAuthorizationStatuses = map[string]struct{}{
 }
 
 var delegationEffectiveUntilRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`)
-
 
 // DelegationAuthorizationData 是授權列對外的唯一投影。
 //
@@ -140,7 +137,6 @@ type DelegationAuthorizationHistoryEntry struct {
 	CreatedAt            string   `json:"createdAt"`
 }
 
-
 // GrantDelegationAuthorizationRequest 是開通／復權的 body。
 type GrantDelegationAuthorizationRequest struct {
 	StoreID             string   `json:"storeId"`
@@ -167,7 +163,6 @@ type UpdateDelegationAuthorizationRequest struct {
 type RevokeDelegationAuthorizationRequest struct {
 	RevokeReason string `json:"revokeReason"`
 }
-
 
 func delegationAuthorizationStoreID(c *gin.Context) (string, bool) {
 	storeID := c.Param("store_id")
@@ -314,7 +309,6 @@ func delegationAuthorizationUpstream(h *Holder, c *gin.Context, event string) bo
 	return true
 }
 
-
 // ListDelegationCapabilities 下發代行能力目錄（值／風險／依賴）
 // GET /api/v1/admin/delegated-operations/capabilities
 // @Summary      代行能力目錄
@@ -346,7 +340,6 @@ func (h *Holder) ListDelegationCapabilities(c *gin.Context) {
 	}
 	response.OK(c, DelegationCapabilityCatalogData{Capabilities: caps})
 }
-
 
 // ListDelegationAuthorizations 列出代行授權（治理總覽）
 // GET /api/v1/admin/delegated-operations/authorizations
@@ -416,7 +409,6 @@ func (h *Holder) ListDelegationAuthorizations(c *gin.Context) {
 	response.Page(c, records, resp.GetTotal(), resp.GetPage(), resp.GetPageSize())
 }
 
-
 // GetDelegationAuthorization 查詢單店的代行授權設定
 // GET /api/v1/admin/delegated-operations/authorizations/{store_id}
 // @Summary      單店代行授權
@@ -482,7 +474,6 @@ func (h *Holder) GetDelegationAuthorization(c *gin.Context) {
 	}
 	response.OK(c, out)
 }
-
 
 // GrantDelegationAuthorization 開通或重新開通一家店的代行授權
 // POST /api/v1/admin/delegated-operations/authorizations
@@ -562,7 +553,6 @@ func (h *Holder) GrantDelegationAuthorization(c *gin.Context) {
 		Outcome:       data.GetOutcome(),
 	})
 }
-
 
 // UpdateDelegationAuthorization 調整既有有效授權的範圍／依據／期限
 // PUT /api/v1/admin/delegated-operations/authorizations/{store_id}
@@ -644,7 +634,6 @@ func (h *Holder) UpdateDelegationAuthorization(c *gin.Context) {
 	})
 }
 
-
 // RevokeDelegationAuthorization 撤回一家店的代行授權
 // POST /api/v1/admin/delegated-operations/authorizations/{store_id}/revoke
 // @Summary      撤回代行授權
@@ -724,7 +713,6 @@ func (h *Holder) RevokeDelegationAuthorization(c *gin.Context) {
 		RevokedSessionIDs: sessions,
 	})
 }
-
 
 // ListDelegationAuthorizationHistory 列出單店的授權變更歷程
 // GET /api/v1/admin/delegated-operations/authorizations/{store_id}/history

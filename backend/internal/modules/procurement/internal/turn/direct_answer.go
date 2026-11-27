@@ -41,11 +41,11 @@ var answerable = []model.SlotKey{
 }
 
 type answerPlan struct {
-	slot model.SlotKey
-	skip bool
+	slot               model.SlotKey
+	skip               bool
 	text, option, unit string
 	number             *int64
-	message string
+	message            string
 }
 
 func planAnswer(in AnswerSlotInput) (answerPlan, error) {

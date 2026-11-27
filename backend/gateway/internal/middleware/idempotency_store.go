@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-
 const (
 	idempotencyMaxEntries = 1024
 
@@ -14,7 +13,6 @@ const (
 
 	idempotencyTTL = 10 * time.Minute
 )
-
 
 type idempotencyOutcome int
 

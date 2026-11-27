@@ -212,7 +212,6 @@ export default function SellerCenterShell({
 				data-hk-seller-workspace-ready
 				data-sidebar-open={open}
 			>
-
 				<header className="seller-shell__mobile-bar">
 					<button
 						type="button"
@@ -284,7 +283,6 @@ export default function SellerCenterShell({
 						<SellerAvatarImage src={avatar} alt="" variant="identity" />
 					</div>
 				</header>
-
 
 				<button
 					type="button"

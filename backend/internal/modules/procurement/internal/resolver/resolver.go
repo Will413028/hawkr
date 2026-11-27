@@ -126,11 +126,11 @@ type Resolver struct {
 	synonyms Synonyms
 	now      func() time.Time
 
-	mu       sync.Mutex
-	tree     *index
-	loading  *treeLoad
-	loadedAt time.Time
-	readStart time.Time
+	mu         sync.Mutex
+	tree       *index
+	loading    *treeLoad
+	loadedAt   time.Time
+	readStart  time.Time
 	retryAfter time.Time
 	lastErr    error
 
@@ -336,8 +336,8 @@ func (r *Resolver) load(ctx context.Context, l *treeLoad) {
 }
 
 type index struct {
-	nodes  map[uuid.UUID]Node
-	byNorm map[string][]uuid.UUID
+	nodes    map[uuid.UUID]Node
+	byNorm   map[string][]uuid.UUID
 	order    []uuid.UUID
 	hasChild map[uuid.UUID]bool
 }

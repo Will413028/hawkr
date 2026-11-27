@@ -237,7 +237,6 @@ class _InitialErrorCard extends StatelessWidget {
   }
 }
 
-
 class _ProductCardSkeleton extends StatelessWidget {
   const _ProductCardSkeleton();
 

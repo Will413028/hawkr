@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type fakeCancelled struct {
 	rows      map[string]domain.CancelledOrder
 	inserts   int
@@ -113,7 +112,6 @@ func producerShapedCancelledBody(t *testing.T, overrides map[string]any) []byte 
 	return b
 }
 
-
 // TestOrderCancelled_RealProducerPayloadIsConsumed 是 #2904 的主證明。
 //
 // 斷言四件事同時成立，缺一都可能是「看起來修好了」：
@@ -179,7 +177,6 @@ func TestOrderCancelled_StringBuyerIDIsRejected(t *testing.T) {
 		t.Error("解析失敗卻寫了資料")
 	}
 }
-
 
 // TestOrderCancelled_MalformedBodyGoesToDLQ 釘住慣例①：反序列化失敗 return error。
 func TestOrderCancelled_MalformedBodyGoesToDLQ(t *testing.T) {
@@ -283,7 +280,6 @@ func TestOrderCancelled_NullCancelReasonIsNormal(t *testing.T) {
 		t.Errorf("cancel_reason = %q, want 空字串", row.CancelReason)
 	}
 }
-
 
 // TestOrderCancelled_FailureRollsBackTheDedupKey 守住本設計唯一的理由。
 //

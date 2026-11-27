@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 const hcInterval = 60 * time.Second
 
 type hcRunner interface {

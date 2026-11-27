@@ -16,11 +16,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type certCapturingProductStub struct {
 	productpb.ProductServiceClient
-	lastCreate *productpb.CreateProductRequest
-	lastUpdate *productpb.UpdateProductRequest
+	lastCreate       *productpb.CreateProductRequest
+	lastUpdate       *productpb.UpdateProductRequest
 	upstreamWarnings []*productpb.CertificationWarning
 }
 
@@ -244,7 +243,6 @@ func TestCreateSellerProduct_CertificationCountLimitStillRejects(t *testing.T) {
 	}
 }
 
-
 func newDelegatedCertRouter(stub *certCapturingProductStub) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	h := &Holder{
@@ -283,7 +281,6 @@ func TestDelegatedProductCreate_IllegalCertificationIsDroppedNotRejected(t *test
 		t.Fatalf("送往 gRPC 的 certifications = %+v, want 只留 3701 那一筆", got)
 	}
 }
-
 
 // certificationInputRejection 是賣家與代行兩條路徑共用的唯一規則來源。
 // 它必須引用既有的 certNoPattern / certNoMaxLength，不得再抄一份字面值。

@@ -25,8 +25,7 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 		await page.addInitScript(() => {
 			try {
 				sessionStorage.setItem("hawkr:initial-loader-seen", "1");
-			} catch {
-			}
+			} catch {}
 		});
 		await installProviderMocks(page);
 	});

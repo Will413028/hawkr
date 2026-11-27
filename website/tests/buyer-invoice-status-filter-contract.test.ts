@@ -53,7 +53,6 @@ function oneToOneStatuses(): Set<string> {
 	return out;
 }
 
-
 test("B09 推導前提成立（值域、pill、1:1 集合都不是空的）", () => {
 	assert.ok(
 		ALL_STATUSES.length > 0,
@@ -68,7 +67,6 @@ test("B09 推導前提成立（值域、pill、1:1 集合都不是空的）", ()
 		"推導出的 1:1 集合是空的——fold 把所有狀態都折在一起了？",
 	);
 });
-
 
 test("B09 每顆狀態 pill 都是買家投影 1:1 的原值（折疊值不得開 pill）", () => {
 	const buckets = bucketsByFoldedLabel();

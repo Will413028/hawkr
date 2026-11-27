@@ -452,7 +452,6 @@ export default function DelegatedProductEditPage({
 				subtitle={`商品管理 / ${detail.name || "未命名商品"}`}
 				actions={
 					<>
-
 						<Link
 							href={`${productsHref}/${encodeURIComponent(productId)}/preview`}
 							className="seller-orders__btn"
@@ -574,7 +573,6 @@ export default function DelegatedProductEditPage({
 								))}
 								{editable && images.length < IMAGE_MAX ? (
 									<li className="adm-product-edit__image-add">
-
 										<Button
 											type="button"
 											variant="light"

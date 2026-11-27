@@ -39,12 +39,12 @@ type fixture struct {
 	now          time.Time
 	completed    []DelegationOperationCompleted
 	completedErr error
-	storeFn func(id int64) (seller.Store, error)
-	social Social
-	realSocial *social.Module
-	media      *media.Fake
-	sellers    *seller.Reader
-	nextID     int64
+	storeFn      func(id int64) (seller.Store, error)
+	social       Social
+	realSocial   *social.Module
+	media        *media.Fake
+	sellers      *seller.Reader
+	nextID       int64
 }
 
 type noSchedules struct{}

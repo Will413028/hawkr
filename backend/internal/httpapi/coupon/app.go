@@ -60,8 +60,8 @@ type App struct {
 	stores    Stores
 	images    rpc.Images
 	log       *slog.Logger
-	reasonOf func(error) coupon.Reason
-	table    map[string]declaration
+	reasonOf  func(error) coupon.Reason
+	table     map[string]declaration
 }
 
 var _ couponv1alpha1connect.CouponAppServiceHandler = (*App)(nil)

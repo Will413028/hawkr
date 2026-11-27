@@ -1,10 +1,8 @@
-
 .hcal-page {
 	font-family: "Inter", system-ui, -apple-system, sans-serif;
 	color: var(--gray-900);
 	-webkit-font-smoothing: antialiased;
 }
-
 
 .hcal-card {
 	background: var(--white, #ffffff);
@@ -36,7 +34,6 @@
 	margin: 0 0 20px 0;
 	line-height: 1.6;
 }
-
 
 .hcal-dropzone {
 	display: block;
@@ -75,7 +72,6 @@
 	font-weight: 600;
 	color: var(--gray-700);
 }
-
 
 .hcal-preview {
 	margin-top: 20px;
@@ -182,7 +178,6 @@
 	font-size: 14px;
 }
 
-
 .hcal-actions {
 	display: flex;
 	justify-content: flex-end;
@@ -208,7 +203,6 @@
 	background: var(--danger-bg, #ffebee);
 	color: var(--danger, #e7000b);
 }
-
 
 .hcal-coverage-summary {
 	display: flex;
@@ -275,7 +269,6 @@
 	display: block;
 	margin-bottom: 12px;
 }
-
 
 .hcal-confirm-stats {
 	display: flex;

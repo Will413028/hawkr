@@ -36,7 +36,6 @@ type ClaimPurgeRow struct {
 	Attempts    int32
 }
 
-// worker 認領到期、沒被認領（或租約已過）的列：SKIP LOCKED 讓多個 worker 分開，寫租約 lease_until，回認領當下的 requested_at 與 attempts。
 func (q *Queries) ClaimPurge(ctx context.Context, arg ClaimPurgeParams) ([]ClaimPurgeRow, error) {
 	rows, err := q.db.Query(ctx, claimPurge, arg.LeaseUntil, arg.Now, arg.MaxRows)
 	if err != nil {
@@ -81,7 +80,6 @@ type ClaimRestockRow struct {
 	Attempts    int32
 }
 
-// worker 認領到期、沒被認領（或租約已過）的列：SKIP LOCKED 讓多個 worker 分開，寫租約 lease_until，回認領當下的 requested_at 與 attempts。
 func (q *Queries) ClaimRestock(ctx context.Context, arg ClaimRestockParams) ([]ClaimRestockRow, error) {
 	rows, err := q.db.Query(ctx, claimRestock, arg.LeaseUntil, arg.Now, arg.MaxRows)
 	if err != nil {
@@ -120,9 +118,6 @@ type EnqueuePurgeParams struct {
 	Now   time.Time
 }
 
-// 排一個 SKU 的請求（呼叫方的 transaction 內）。沒有列就新增；有列且沒被認領就不動（合併，保留較早的 due_at）；
-// 被認領處理中（claimed_until 非空）只把 requested_at 往前推（至少加 1 微秒，時鐘不動也一定不同），worker 完成時比對它而不是刪列，所以處理中的新轉換不會遺失；
-// 已停手的列（failed_at 非空）被新請求重置成全新的一列。
 func (q *Queries) EnqueuePurge(ctx context.Context, arg EnqueuePurgeParams) error {
 	_, err := q.db.Exec(ctx, enqueuePurge, arg.SkuID, arg.DueAt, arg.Now)
 	return err
@@ -146,9 +141,6 @@ type EnqueueRestockParams struct {
 	Now   time.Time
 }
 
-// 排一個 SKU 的請求（呼叫方的 transaction 內）。沒有列就新增；有列且沒被認領就不動（合併，保留較早的 due_at）；
-// 被認領處理中（claimed_until 非空）只把 requested_at 往前推（至少加 1 微秒，時鐘不動也一定不同），worker 完成時比對它而不是刪列，所以處理中的新轉換不會遺失；
-// 已停手的列（failed_at 非空）被新請求重置成全新的一列。
 func (q *Queries) EnqueueRestock(ctx context.Context, arg EnqueueRestockParams) error {
 	_, err := q.db.Exec(ctx, enqueueRestock, arg.SkuID, arg.DueAt, arg.Now)
 	return err
@@ -174,8 +166,6 @@ type EnqueueRestockOfProductParams struct {
 	ProductID uuid.UUID
 }
 
-// 商品切成 ACTIVE：它每一個沒刪除的 SKU 都排一列，不看庫存（庫存與可買由 worker 執行時重新確認），所以不需要在這個 transaction 讀別的 SKU 的庫存，
-// 也就不會漏掉與另一個 SKU 的 0 到正庫存變更並行時雙方都看不到對方的情況。語意同 EnqueueRestock。
 func (q *Queries) EnqueueRestockOfProduct(ctx context.Context, arg EnqueueRestockOfProductParams) error {
 	_, err := q.db.Exec(ctx, enqueueRestockOfProduct, arg.DueAt, arg.Now, arg.ProductID)
 	return err
@@ -194,7 +184,6 @@ type FailPurgeParams struct {
 	RequestedAt time.Time
 }
 
-// 處理失敗：同一列次數加一、退避到 due_at、放掉租約並記錯誤；failed_at 有給就停手（超過上限）。只在 requested_at 沒變時；回 0 表示處理中有新請求，呼叫方改用 Rearm。
 func (q *Queries) FailPurge(ctx context.Context, arg FailPurgeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, failPurge,
 		arg.DueAt,
@@ -222,7 +211,6 @@ type FailRestockParams struct {
 	RequestedAt time.Time
 }
 
-// 處理失敗：同一列次數加一、退避到 due_at、放掉租約並記錯誤；failed_at 有給就停手（超過上限）。只在 requested_at 沒變時；回 0 表示處理中有新請求，呼叫方改用 Rearm。
 func (q *Queries) FailRestock(ctx context.Context, arg FailRestockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, failRestock,
 		arg.DueAt,
@@ -246,7 +234,6 @@ type FinishPurgeParams struct {
 	RequestedAt time.Time
 }
 
-// 處理完（成功或不需要通知）：只在 requested_at 還是認領時讀到的值才刪；回 0 表示處理中又有新請求（或列已被別人處理掉）。
 func (q *Queries) FinishPurge(ctx context.Context, arg FinishPurgeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, finishPurge, arg.SkuID, arg.RequestedAt)
 	if err != nil {
@@ -264,7 +251,6 @@ type FinishRestockParams struct {
 	RequestedAt time.Time
 }
 
-// 處理完（成功或不需要通知）：只在 requested_at 還是認領時讀到的值才刪；回 0 表示處理中又有新請求（或列已被別人處理掉）。
 func (q *Queries) FinishRestock(ctx context.Context, arg FinishRestockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, finishRestock, arg.SkuID, arg.RequestedAt)
 	if err != nil {
@@ -274,7 +260,6 @@ func (q *Queries) FinishRestock(ctx context.Context, arg FinishRestockParams) (i
 }
 
 const getSkuRestockState = `-- name: GetSkuRestockState :one
-
 SELECT s.product_id, p.store_id, p.title, s.stock_qty,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        (s.deleted_at IS NULL AND s.stock_qty > 0 AND p.deleted_at IS NULL AND p.status = 'ACTIVE'
@@ -297,8 +282,6 @@ type GetSkuRestockStateRow struct {
 	Purchasable bool
 }
 
-// 補貨：SKU 由不可買變可買（有庫存、商品 ACTIVE 且未刪、SKU 未刪、店家在 at 可曝光）的偵測、執行時重新確認，與補貨、清訂閱兩張佇列表（D26）。
-// 一個 SKU 此刻的庫存與可買與否，加上通知用的最新快照（商品名稱、主圖 key）。SKU 已刪除也回列（歸還不看刪除），purchasable 為 false。
 func (q *Queries) GetSkuRestockState(ctx context.Context, arg GetSkuRestockStateParams) (GetSkuRestockStateRow, error) {
 	row := q.db.QueryRow(ctx, getSkuRestockState, arg.At, arg.ID)
 	var i GetSkuRestockStateRow
@@ -323,7 +306,6 @@ type RearmPurgeParams struct {
 	SkuID uuid.UUID
 }
 
-// 處理中來了新請求：放掉租約、重新計 Delay 與失敗次數，下一輪再處理（只動還被認領的列）。
 func (q *Queries) RearmPurge(ctx context.Context, arg RearmPurgeParams) error {
 	_, err := q.db.Exec(ctx, rearmPurge, arg.DueAt, arg.SkuID)
 	return err
@@ -339,7 +321,6 @@ type RearmRestockParams struct {
 	SkuID uuid.UUID
 }
 
-// 處理中來了新請求：放掉租約、重新計 Delay 與失敗次數，下一輪再處理（只動還被認領的列）。
 func (q *Queries) RearmRestock(ctx context.Context, arg RearmRestockParams) error {
 	_, err := q.db.Exec(ctx, rearmRestock, arg.DueAt, arg.SkuID)
 	return err

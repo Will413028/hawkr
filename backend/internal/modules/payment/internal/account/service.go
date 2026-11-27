@@ -22,14 +22,14 @@ import (
 )
 
 const (
-	callTimeout = 20 * time.Second
+	callTimeout            = 20 * time.Second
 	maxProviderCallsPerJob = 2
-	jobTimeout = maxProviderCallsPerJob*callTimeout + 4*writeTimeout
-	writeTimeout = 15 * time.Second
-	maxAttempts = 8
-	sweepBatch = 100
-	eventGrace = time.Minute
-	createIdle = 10 * time.Minute
+	jobTimeout             = maxProviderCallsPerJob*callTimeout + 4*writeTimeout
+	writeTimeout           = 15 * time.Second
+	maxAttempts            = 8
+	sweepBatch             = 100
+	eventGrace             = time.Minute
+	createIdle             = 10 * time.Minute
 	// IdempotencyRetention 是金流商保證同一把冪等鍵回同一個結果的時間（Stripe 保存 30 天）；超過之後重送同一把鍵可能建出新的帳戶，所以從不對超過它的鍵重送。
 	IdempotencyRetention = 30 * 24 * time.Hour
 	// UnresolvedDeadline 是「呼叫過、沒有外部 ID」的列從 create_called_at 起最久等多久（D63）：期限內週期掃描以同一把鍵重送取回 ID；到了仍了結不了就進終局

@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 func TestRecheck_J24_PassesCancelEvidenceThrough(t *testing.T) {
 	uc, ops, _ := rcFixture(t, true)
 

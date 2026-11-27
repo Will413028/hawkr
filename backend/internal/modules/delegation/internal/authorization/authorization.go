@@ -503,12 +503,12 @@ type authorizationAudit struct {
 
 func (m *Module) writeAuthorizationAudit(ctx context.Context, q *store.Queries, a authorizationAudit, now time.Time) error {
 	params := store.InsertDelegationAuthorizationAuditLogParams{
-		ID:               m.d.NewID(),
-		AuthorizationID:  a.row.ID,
-		Action:           string(a.action),
-		ActorAdminID:     a.admin.ID,
-		ActorDisplayName: a.admin.Email,
-		OperationReason:  a.reason,
+		ID:                  m.d.NewID(),
+		AuthorizationID:     a.row.ID,
+		Action:              string(a.action),
+		ActorAdminID:        a.admin.ID,
+		ActorDisplayName:    a.admin.Email,
+		OperationReason:     a.reason,
 		CapabilitiesAfter:   a.row.GrantedCapabilities,
 		EffectiveUntilAfter: a.row.EffectiveUntil,
 		IdempotencyKey:      model.Optional(a.key),

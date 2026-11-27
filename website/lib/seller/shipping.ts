@@ -18,7 +18,6 @@
 import { authedFetch } from "@/lib/api/client";
 import { ShippingMethod } from "@/lib/codemeta/enums";
 
-
 export const SHIPPING_TYPE = {
 	HOME_DELIVERY: "3652",
 	CVS: "3651",
@@ -43,7 +42,6 @@ export const ONBOARDING_STATUS = {
 } as const;
 export type OnboardingStatus =
 	(typeof ONBOARDING_STATUS)[keyof typeof ONBOARDING_STATUS];
-
 
 export interface ShippingOnboarding {
 	onboardingId?: string;
@@ -75,7 +73,6 @@ export async function fetchShippingOnboardings(): Promise<
 	return Array.isArray(env.data) ? env.data : [];
 }
 
-
 export interface SubmitHomeDeliveryInput {
 	productCategory?: string;
 	senderName: string;
@@ -98,7 +95,6 @@ export async function submitHomeDeliveryOnboarding(
 	);
 	return env.data ?? {};
 }
-
 
 export interface SubmitCvsInput {
 	senderName: string;
@@ -134,7 +130,6 @@ export async function toggleOnboarding(
 	);
 	return env.data ?? {};
 }
-
 
 /**
  * 這批 onboarding 裡「本頁畫不出來」的 shippingType（去重、保留原碼）。
@@ -209,10 +204,7 @@ export function statusLabel(o: ShippingOnboarding | undefined): string {
 	}
 }
 
-export type ShippingMethodOpenState =
-	| "open"
-	| "disabled"
-	| "not_opened";
+export type ShippingMethodOpenState = "open" | "disabled" | "not_opened";
 
 /**
  * 判斷賣家是否已在「物流設定」開通某個物流商，給商品上架的可配送方案

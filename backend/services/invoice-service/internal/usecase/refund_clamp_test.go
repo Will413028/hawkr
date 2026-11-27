@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 func allowancedDoc(alreadyAllowanced int64) domain.Document {
 	d := voidableDoc()
 	d.AllowanceTotalAmount = alreadyAllowanced

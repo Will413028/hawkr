@@ -143,9 +143,9 @@ func (c *OrderCancelledConsumer) Handle(ctx context.Context, routingKey string, 
 			AggregateRef:     &aggregateRef,
 			Payload:          json.RawMessage(body),
 			Status:           inboxStatusReceived,
-			NextAttemptAt: now,
-			OccurredAt:    occurredAt,
-			Now:           now,
+			NextAttemptAt:    now,
+			OccurredAt:       occurredAt,
+			Now:              now,
 		})
 		if err != nil {
 			return fmt.Errorf("insert inbox: %w", err)

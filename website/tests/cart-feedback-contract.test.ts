@@ -8,7 +8,6 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (relativePath: string) =>
 	readFileSync(path.join(root, relativePath), "utf8");
 
-
 test("solid Button colours do not pin their text with !important", () => {
 	const source = read("components/ui/Button.tsx");
 	const block = source.slice(
@@ -57,7 +56,6 @@ test("Button marks itself so the dark-mode anchor rule skips it", () => {
 	);
 });
 
-
 test("cart snackbar renders a distinct error tone", () => {
 	const source = read("components/shared/CartSnackbar.tsx");
 
@@ -102,7 +100,6 @@ test("every add-to-cart refusal carries tone: error", () => {
 	}
 });
 
-
 test("AddToCartButton delays its pending skin below the perception threshold", () => {
 	const source = read("components/shared/AddToCartButton.tsx");
 
@@ -123,7 +120,6 @@ test("AddToCartButton delays its pending skin below the perception threshold", (
 	assert.match(source, /\n\t\t\t\tdisabled=\{disabled\}/);
 	assert.match(source, /if \(disabled \|\| pending \|\| authWaiting\) return;/);
 });
-
 
 test("the add-to-cart flight has a landing target and degrades safely", () => {
 	const fly = read("lib/cart/flyToCart.ts");

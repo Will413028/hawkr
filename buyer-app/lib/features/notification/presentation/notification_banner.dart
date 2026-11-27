@@ -229,7 +229,6 @@ class _NotificationBannerState extends State<NotificationBanner>
   }
 }
 
-
 /// 橫幅底部的倒數進度條，與 5 秒自動消失同步。
 class _CountdownBar extends StatefulWidget {
   final Duration duration;

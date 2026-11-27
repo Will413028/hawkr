@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 // 代行的參數：常數，不是環境變數，沒有任何部署需要不同的值。TTL 的上限同時是 DB 的 CHECK
 // （delegated_operation_sessions_lifetime_check），閒置逾時必須小於 TTL 的上限。
 const (
@@ -29,9 +28,9 @@ const (
 	// DelegationAuditRetentionDays 是畫面顯示的稽核保留天數（DELEGATION_AUDIT_RETENTION_DAYS）。只下發給畫面，
 	// 沒有清理：設計書的清理是維運 SQL，系統沒有上線、也沒有會過期的資料（見沿用盤點）。
 	DelegationAuditRetentionDays = 730
-	delegationMaxBatch = 50
-	delegationDefaultPageSize = 20
-	delegationMaxPageSize     = 50
+	delegationMaxBatch           = 50
+	delegationDefaultPageSize    = 20
+	delegationMaxPageSize        = 50
 )
 
 // Capability 是代行的能力：封閉的十個值，沒有任何履約或金流的能力。值等於 DB 的 CHECK
@@ -356,11 +355,10 @@ func SameCapabilitySet(a, b []Capability) bool {
 	return slices.Equal(x, y)
 }
 
-
 const (
 	HandoffPrefix    = "dhof_"
 	CredentialPrefix = "dops_"
-	tokenLength = 48
+	tokenLength      = 48
 )
 
 // NewHandoffCode 產生一次性的 handoff code。

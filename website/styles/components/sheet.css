@@ -1,4 +1,3 @@
-
 .cart-sheet {
 	position: fixed;
 	inset: 0;
@@ -201,7 +200,6 @@
 	color: var(--cart-danger);
 }
 
-
 .cart-sheet__form {
 	margin-top: 14px;
 	padding-top: 14px;
@@ -285,7 +283,6 @@
 	color: var(--ink-soft);
 	font-size: 0.75rem;
 }
-
 
 .cart-sheet__store-pick {
 	display: flex;

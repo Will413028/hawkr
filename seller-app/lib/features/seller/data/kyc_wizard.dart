@@ -144,7 +144,6 @@ class KycWizard extends _$KycWizard {
     if (ref.mounted) state = change(state);
   }
 
-
   bool get hydrated => state.hydrated;
 
   /// 申請的唯一來源：共用的 [currentKycProvider]。
@@ -179,7 +178,6 @@ class KycWizard extends _$KycWizard {
   bool get editable => kycEditable(application);
 
   bool get canDiscard => kycCanDiscard(application);
-
 
   AsyncValue<AccountContactEmail?>? get _contactRead =>
       ref.read(currentContactEmailProvider);
@@ -338,7 +336,6 @@ class KycWizard extends _$KycWizard {
 
   Store? get _currentStore => ref.read(myStoreSnapshotProvider)?.store;
 
-
   /// 以共用快取裡的申請（沒有申請就是從頭開始）與店家載入表單。新申請才套用店家的預設值（公司電話取商店電話）；
   /// 既有的申請以申請為準。[requested] 是呼叫端帶來的身分提示，只在還沒有申請時生效。申請還沒讀到時不動。
   void hydrate({KycSubject? requested}) {
@@ -381,7 +378,6 @@ class KycWizard extends _$KycWizard {
     return KycForm(companyPhone: store.contactPhone.trim());
   }
 
-
   void updateForm(KycForm Function(KycForm current) change) {
     _set((s) => s.copyWith(form: change(s.form)));
   }
@@ -402,7 +398,6 @@ class KycWizard extends _$KycWizard {
     if (state.error == null) return;
     _set((s) => s.copyWith(error: null));
   }
-
 
   SaveKYCDraftRequest? _draftRequest(
     KycForm form,
@@ -656,7 +651,6 @@ class KycWizard extends _$KycWizard {
     );
   }
 
-
   /// 新增一張企業文件（最多 [KycDocs.maxCompanyDocuments] 張），上傳完成後存進申請。
   Future<bool> addCompanyDocument(
     Uint8List bytes, {
@@ -703,7 +697,6 @@ class KycWizard extends _$KycWizard {
       ),
     );
   }
-
 
   /// 以 8 碼統編查登記資料並帶入公司名稱、設立日期與地址（不帶組織型態）。查無是 [KycLookupNotFound]，不是錯誤；查詢失敗退回手動填寫。
   Future<void> lookupTaxId(String taxId) async {
@@ -774,7 +767,6 @@ class KycWizard extends _$KycWizard {
     _set((s) => s.copyWith(lookup: const KycLookupIdle()));
   }
 
-
   /// 把聯絡資料與地址寫進店家（`UpdateMyStore`）。沒有要寫的欄位、已寫完回 true；格式不合、地址不完整、版本衝突或失敗回 false，
   /// 原因在 [error]，輸入保留。成功後重讀申請，缺項以伺服器的清單為準。
   Future<bool> flushStore() async {
@@ -842,7 +834,6 @@ class KycWizard extends _$KycWizard {
       _set((s) => s.copyWith(storeSaving: false));
     }
   }
-
 
   /// 送出認證：先把店家資料寫進店家、存好草稿，再以 [acceptances]（個資告知的現行版本）直接送出 `SubmitKYC`。
   Future<KycSubmitOutcome> submit(List<AgreementAcceptance> acceptances) async {

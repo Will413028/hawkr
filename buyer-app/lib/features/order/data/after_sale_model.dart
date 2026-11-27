@@ -33,9 +33,11 @@ abstract class AfterSaleCase with _$AfterSaleCase {
 
     /// 是否可以發起申訴（賣家拒絕後買家可於期限內申訴）
     @Default(false) bool canAppeal,
+    // 賣家處理時限與平台接手狀態。
     @Default('') String processDeadline,
     @Default(false) bool autoEscalated,
     @Default(0) int processDeadlineHours,
+    // 退款任務進度。
     /// 退款任務狀態（[RefundTaskStatus]）：後端 WorkerTaskStatus，保留舊數字碼相容。
     @Default('') String refundTaskStatus,
 
@@ -44,6 +46,7 @@ abstract class AfterSaleCase with _$AfterSaleCase {
     @Default('') String providerStatus,
     @Default('') String providerMessage,
     @Default('') String appealDeadline,
+    // 7-11 出貨便代碼，退貨寄件時用於列印託運單。
     /// 母代碼（3 碼）— 顯示條件：resolutionType=1 + returnShippingMethod=3002 + status≥20
     @Default('') String partnerId,
 
@@ -93,6 +96,7 @@ abstract class AfterSaleItem with _$AfterSaleItem {
     @Default('') String skuId,
     @Default('') String skuName,
     @Default('') String quantity,
+    // 成交單價與原價快照。
     @Default('') String unitPrice,
     @Default('') String listPrice,
 
@@ -140,6 +144,7 @@ abstract class AfterSaleResolution with _$AfterSaleResolution {
     @Default('') String rejectMessage,
     @Default('') String negotiationReason,
     @Default('') String createdAt,
+    // 驗貨扣款原因（resolutionType=6）。
     /// 扣款原因（賣家驗貨後填寫，部分退款場景）
     @Default('') String deductionReason,
 
@@ -154,25 +159,25 @@ abstract class AfterSaleResolution with _$AfterSaleResolution {
 /// 售後決議類型（resolutionType）
 class ResolutionType {
   ResolutionType._();
-  static const String approved = '1';
-  static const String coupon = '2';
-  static const String reject = '3';
-  static const String negotiation = '4';
-  static const String inspectionDeduction = '6';
+  static const String approved = '1'; // 同意退款（決議金額）
+  static const String coupon = '2'; // 改發優惠券
+  static const String reject = '3'; // 拒絕
+  static const String negotiation = '4'; // 協商中
+  static const String inspectionDeduction = '6'; // 驗貨扣款
 }
 
 /// 證據類型（evidence.evidenceType）
 class EvidenceType {
   EvidenceType._();
-  static const String buyerProof = '8601';
-  static const String sellerInspection = '8602';
+  static const String buyerProof = '8601'; // 買家提交的舉證
+  static const String sellerInspection = '8602'; // 賣家驗貨照片
 }
 
 /// 退貨方式
 class ReturnShippingMethod {
   ReturnShippingMethod._();
-  static const String kuroneko = '3001';
-  static const String sevenEleven = '3002';
+  static const String kuroneko = '3001'; // 黑貓宅配
+  static const String sevenEleven = '3002'; // 7-11 店到店
 }
 
 /// B-93 出貨便代碼（7-11）顯示條件判斷
@@ -192,9 +197,9 @@ extension AfterSale711CodeX on AfterSaleCase {
 /// 售後狀態碼（對齊 backend/docs/代碼管理（CodeMeta）/業務狀態碼.md#AfterSaleCaseStatus）
 class AfterSaleStatus {
   static const String pending = '0';
-  static const String awaitingReturn = '20';
-  static const String returnInTransit = '25';
-  static const String returnReceived = '30';
+  static const String awaitingReturn = '20'; // RETURN_PENDING 待退貨
+  static const String returnInTransit = '25'; // RETURN_SHIPPING 退貨運送中
+  static const String returnReceived = '30'; // RETURN_RECEIVED 已收退貨
   /// 待寄回逾時自動關案（PR #983 新增）
   /// 買家未在 shipBackDeadlineAt 前寄回退貨商品，系統自動關案；72h 內可申訴。
   static const String autoCompletedReturnPendingTimeout = '33';
@@ -202,7 +207,7 @@ class AfterSaleStatus {
   static const String closed = '50';
   static const String rejected = '60';
   static const String cancelled = '70';
-  static const String cancelledByConfirmReceipt = '71';
+  static const String cancelledByConfirmReceipt = '71'; // 確認收貨取消
 
   static String label(String status) => switch (status) {
     '0' => '待處理',

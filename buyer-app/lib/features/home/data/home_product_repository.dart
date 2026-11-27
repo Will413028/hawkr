@@ -80,6 +80,8 @@ class DioHomeProductRepository implements HomeProductRepository {
         final product = HomeProduct.fromJson(Map<String, dynamic>.from(raw));
         if (seenIds.add(product.id)) products.add(product);
       } on FormatException {
+        // A malformed record must not make valid cards on the same page
+        // unusable. Page-level schema failures still surface explicitly.
       }
     }
 

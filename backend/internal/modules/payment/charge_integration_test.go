@@ -55,16 +55,16 @@ func (o *chargeOrders) put(order PaymentOrder) {
 }
 
 type chargeFixture struct {
-	db      *db.DB
-	jobs    *queue
-	inbox   *inbox.Inbox
-	fake    *ChargeFake
-	orders  *chargeOrders
-	module  *Module
-	now     time.Time
-	changes []PaymentChanged
-	anomalies   []MoneyAnomaly
-	anomalyInTx []bool
+	db              *db.DB
+	jobs            *queue
+	inbox           *inbox.Inbox
+	fake            *ChargeFake
+	orders          *chargeOrders
+	module          *Module
+	now             time.Time
+	changes         []PaymentChanged
+	anomalies       []MoneyAnomaly
+	anomalyInTx     []bool
 	refundChanges   []RefundChanged
 	autoDone        []AutoRefundCompleted
 	refundEventInTx []bool

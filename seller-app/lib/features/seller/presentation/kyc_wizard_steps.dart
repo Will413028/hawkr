@@ -136,7 +136,6 @@ class KycButtonBar extends StatelessWidget {
   );
 }
 
-
 class _CompanyStep extends StatelessWidget {
   const _CompanyStep(this.c, this.actions);
 
@@ -284,7 +283,6 @@ class _LookupNotice extends StatelessWidget {
   }
 }
 
-
 class _OtherStep extends StatelessWidget {
   const _OtherStep(this.c, this.actions);
 
@@ -352,7 +350,6 @@ class _OtherStep extends StatelessWidget {
   }
 }
 
-
 class _DocumentsStep extends StatelessWidget {
   const _DocumentsStep(this.c, this.actions);
 
@@ -416,7 +413,6 @@ class _DocumentsStep extends StatelessWidget {
     );
   }
 }
-
 
 /// 收款聯絡信箱欄位（D23 修訂）：金流商用這個信箱聯絡賣家。帳號有 provider 驗證過的信箱時唯讀、不給輸入；沒有任何信箱或
 /// 只有自填的信箱時才可以輸入（寫回帳號）。帳號的信箱還沒讀到時不顯示；讀取失敗顯示重試。

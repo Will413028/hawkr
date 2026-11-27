@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
 	alwOpID  = int64(6101)
 	alwAdjID = int64(7101)
@@ -122,12 +121,12 @@ func (f *alwDocs) AddLineAllowancedAmount(_ context.Context, lineID, amount int6
 
 type alwOps struct {
 	domain.OperationRepository
-	op      domain.Operation
-	claimOK bool
-	claimed int
-	doneCnt int
-	recheckDoneCnt int
-	waitNextAt     time.Time
+	op                 domain.Operation
+	claimOK            bool
+	claimed            int
+	doneCnt            int
+	recheckDoneCnt     int
+	waitNextAt         time.Time
 	gotProviderCode    string
 	gotProviderMessage string
 
@@ -136,7 +135,7 @@ type alwOps struct {
 
 	recheckUnresolvedCnt int
 	gotUnresolvedNextAt  time.Time
-	gotResolved *domain.MarkRecheckResult
+	gotResolved          *domain.MarkRecheckResult
 }
 
 func (f *alwOps) GetByID(context.Context, int64) (domain.Operation, error) { return f.op, nil }
@@ -247,12 +246,12 @@ func (f *alwOps) MarkRecheckUnresolved(_ context.Context, in domain.MarkRecheckR
 }
 
 type alwHarness struct {
-	uc   *Allowance
-	adjs *alwAdjs
-	docs *alwDocs
-	ops  *alwOps
-	prov *fakeProvider
-	out  *fakeOutbox
+	uc    *Allowance
+	adjs  *alwAdjs
+	docs  *alwDocs
+	ops   *alwOps
+	prov  *fakeProvider
+	out   *fakeOutbox
 	audit *fakeAudit
 }
 

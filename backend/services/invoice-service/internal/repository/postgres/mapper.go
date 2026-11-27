@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres/gen"
 )
 
-
 // KeyRing 統一持有 master key 的現行版與前一版，依列上的 credential_key_version
 // （smallint，不是字串標籤）選 cipher。
 //
@@ -101,7 +100,6 @@ func (k *KeyRing) openCredential(row gen.InvoiceProviderAccount) (string, error)
 	return decryptCredential(enc, row.CredentialCiphertext)
 }
 
-
 func toProviderAccount(row gen.InvoiceProviderAccount) domain.ProviderAccount {
 	return domain.ProviderAccount{
 		ID:                   row.ID,
@@ -135,7 +133,6 @@ func toProviderAccounts(rows []gen.InvoiceProviderAccount) []domain.ProviderAcco
 	}
 	return out
 }
-
 
 func ts(t time.Time) pgtype.Timestamptz { return pgxutil.TimestamptzParam(t) }
 
@@ -690,7 +687,6 @@ func toAdminAuditLogEntrys(rows []gen.InvoiceAdminAuditLog) []domain.AdminAuditL
 	}
 	return out
 }
-
 
 func (k *KeyRing) encryptOptional(plaintext string) (*string, error) {
 	if plaintext == "" {

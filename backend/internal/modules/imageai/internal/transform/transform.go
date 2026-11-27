@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	busyRetryAfter = 10 * time.Second
+	busyRetryAfter         = 10 * time.Second
 	providerBusyRetryAfter = 30 * time.Second
 )
 

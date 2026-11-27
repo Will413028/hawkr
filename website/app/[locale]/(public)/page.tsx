@@ -53,7 +53,6 @@ export default async function Page({
 
 	return (
 		<>
-
 			{productUrls.length > 0 && <JsonLd data={itemListSchema(productUrls)} />}
 			<HomePage snapshot={snapshot} />
 		</>

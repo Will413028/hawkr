@@ -23,14 +23,14 @@ const (
 )
 
 type payload struct {
-	V    int    `json:"v"`
-	Kind string `json:"k"`
+	V        int    `json:"v"`
+	Kind     string `json:"k"`
 	Account  int64  `json:"a,omitempty"`
 	Audience string `json:"u,omitempty"`
 	Store    int64  `json:"s,omitempty"`
 	Hint     string `json:"h,omitempty"`
-	Item   string `json:"i,omitempty"`
-	Change int    `json:"c,omitempty"`
+	Item     string `json:"i,omitempty"`
+	Change   int    `json:"c,omitempty"`
 }
 
 var errPayload = errors.New("notification/stream：不合法的通知")

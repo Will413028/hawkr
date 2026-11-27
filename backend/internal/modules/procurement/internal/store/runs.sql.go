@@ -23,7 +23,6 @@ type CancelInterruptsOfRunParams struct {
 	RunID uuid.UUID
 }
 
-// 提問的 run 被取消或被取代：它的 PENDING 中斷轉 CANCELLED，讓每個需求最多一筆 PENDING 的索引不被它佔住。
 func (q *Queries) CancelInterruptsOfRun(ctx context.Context, arg CancelInterruptsOfRunParams) (int64, error) {
 	result, err := q.db.Exec(ctx, cancelInterruptsOfRun, arg.Now, arg.RunID)
 	if err != nil {
@@ -88,8 +87,6 @@ type ExpireRunEventsRow struct {
 	Events int64
 }
 
-// 結束超過保留期的 run，一次最多 @batch 個：min_available_seq 推到 last_event_seq + 1，並刪掉範圍之外的事件（A9-D20 R1）。
-// 回傳推進的 run 數與刪除的事件數；推進過的 run 不再符合條件，呼叫端迴圈到 runs 為 0。
 func (q *Queries) ExpireRunEvents(ctx context.Context, arg ExpireRunEventsParams) (ExpireRunEventsRow, error) {
 	row := q.db.QueryRow(ctx, expireRunEvents, arg.Cutoff, arg.Batch)
 	var i ExpireRunEventsRow
@@ -109,7 +106,6 @@ type GetInProgressRunForRequestParams struct {
 	BuyerID   int64
 }
 
-// 需求目前進行中（QUEUED、RUNNING、CANCEL_REQUESTED）的 run；同一需求同時最多一個（A9-D24(6)），多筆時取最新的。
 func (q *Queries) GetInProgressRunForRequest(ctx context.Context, arg GetInProgressRunForRequestParams) (ProcurementAgentRun, error) {
 	row := q.db.QueryRow(ctx, getInProgressRunForRequest, arg.RequestID, arg.BuyerID)
 	var i ProcurementAgentRun
@@ -214,7 +210,6 @@ type GetOpenInterruptForRequestRow struct {
 	Processing    bool
 }
 
-// 一個需求目前等買家回答的中斷（部分唯一索引保證最多一筆）；processing 同上。
 func (q *Queries) GetOpenInterruptForRequest(ctx context.Context, arg GetOpenInterruptForRequestParams) (GetOpenInterruptForRequestRow, error) {
 	row := q.db.QueryRow(ctx, getOpenInterruptForRequest, arg.RequestID, arg.BuyerID)
 	var i GetOpenInterruptForRequestRow
@@ -261,7 +256,6 @@ type GetOpenInterruptForRunRow struct {
 	Processing    bool
 }
 
-// 一個 run 的未回答中斷：只認等待輸入的 run；被取消或被取代的 run 的中斷已是 CANCELLED。processing：有回答它的 run 還在進行中（QUEUED、RUNNING、CANCEL_REQUESTED）。
 func (q *Queries) GetOpenInterruptForRun(ctx context.Context, arg GetOpenInterruptForRunParams) (GetOpenInterruptForRunRow, error) {
 	row := q.db.QueryRow(ctx, getOpenInterruptForRun, arg.RunID, arg.BuyerID)
 	var i GetOpenInterruptForRunRow
@@ -408,7 +402,6 @@ type ListActiveRunIDsAfterParams struct {
 	Batch int32
 }
 
-// reconciler 要對帳的 run：有 job 在管的三個狀態（WAITING_FOR_INPUT 沒有 job）。以 id 為游標分頁（UUIDv7 依時間遞增）。
 func (q *Queries) ListActiveRunIDsAfter(ctx context.Context, arg ListActiveRunIDsAfterParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, listActiveRunIDsAfter, arg.After, arg.Batch)
 	if err != nil {
@@ -482,7 +475,6 @@ type ListRunsByRequestParams struct {
 	MaxRows   int32
 }
 
-// 目前需求的 run，新到舊（UUIDv7 的 id 依時間遞增，同時間戳用 id 定序），最多 @max_rows 筆；讀取模型 GetRuntimeSnapshot.runs 用。
 func (q *Queries) ListRunsByRequest(ctx context.Context, arg ListRunsByRequestParams) ([]ProcurementAgentRun, error) {
 	rows, err := q.db.Query(ctx, listRunsByRequest, arg.RequestID, arg.BuyerID, arg.MaxRows)
 	if err != nil {
@@ -534,7 +526,6 @@ type ListUnfinishedRunIDsByRequestParams struct {
 	BuyerID   int64
 }
 
-// 需求還沒結束的 run（含等待輸入的），依 id 升序；不鎖：呼叫端逐個依全域鎖順序鎖並重讀狀態（刪除對話時全部取消）。
 func (q *Queries) ListUnfinishedRunIDsByRequest(ctx context.Context, arg ListUnfinishedRunIDsByRequestParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, listUnfinishedRunIDsByRequest, arg.RequestID, arg.BuyerID)
 	if err != nil {
@@ -566,7 +557,6 @@ type ListWaitingRunIDsParams struct {
 	RequestID uuid.UUID
 }
 
-// 同一個買家、同一個需求裡等待輸入的 run（每個需求最多一筆 PENDING 中斷的索引也是以需求為單位）；不鎖：呼叫端依全域鎖順序（提問的 run、中斷、回答的 run）逐個鎖並重讀狀態。
 func (q *Queries) ListWaitingRunIDs(ctx context.Context, arg ListWaitingRunIDsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, listWaitingRunIDs, arg.BuyerID, arg.RequestID)
 	if err != nil {
@@ -593,7 +583,6 @@ WHERE id = $1 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 FOR UPDATE SKIP LOCKED
 `
 
-// 逐列處理時鎖住該列；別的交易正在寫它（例如 executor）就略過，下一輪再看。
 func (q *Queries) LockActiveRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun, error) {
 	row := q.db.QueryRow(ctx, lockActiveRun, id)
 	var i ProcurementAgentRun
@@ -625,7 +614,6 @@ const lockBuyerSubmits = `-- name: LockBuyerSubmits :exec
 SELECT pg_advisory_xact_lock(hashtextextended('procurement.run_submit:' || $1::bigint, 0))
 `
 
-// 同一位買家的送出在這裡排隊（交易級 advisory lock），之後的進行中數與每分鐘送出數才看得到前一個交易已提交的 run。
 func (q *Queries) LockBuyerSubmits(ctx context.Context, buyerID int64) error {
 	_, err := q.db.Exec(ctx, lockBuyerSubmits, buyerID)
 	return err
@@ -639,7 +627,6 @@ ORDER BY a.id
 FOR UPDATE OF a
 `
 
-// 回答 @run_id 的中斷、還在進行中（排隊或執行中）的回答 run；提問的 run 被取消或被取代時一併要求取消它們。
 func (q *Queries) LockInProgressAnswerRuns(ctx context.Context, runID uuid.UUID) ([]ProcurementAgentRun, error) {
 	rows, err := q.db.Query(ctx, lockInProgressAnswerRuns, runID)
 	if err != nil {
@@ -745,8 +732,6 @@ type NextRunSeqParams struct {
 	Statuses []string
 }
 
-// 事件的序號由 run 列配發（同一個 run 的寫入者在列鎖下排隊）；run 是否還活著由 River job 的狀態決定，不看 updated_at。
-// 只在 run 的狀態屬於 @statuses 時配發：終態之後的寫入拿不到序號。
 func (q *Queries) NextRunSeq(ctx context.Context, arg NextRunSeqParams) (int64, error) {
 	row := q.db.QueryRow(ctx, nextRunSeq, arg.Now, arg.ID, arg.Statuses)
 	var last_event_seq int64
@@ -776,7 +761,6 @@ type OldestBuyerRunsSinceParams struct {
 	MaxRows int32
 }
 
-// 買家在 @since 之後建立的 run 的時間，新的在前，最多 @max_rows 筆；每分鐘送出上限用它判斷並算出要等多久。
 func (q *Queries) OldestBuyerRunsSince(ctx context.Context, arg OldestBuyerRunsSinceParams) ([]time.Time, error) {
 	rows, err := q.db.Query(ctx, oldestBuyerRunsSince, arg.BuyerID, arg.Since, arg.MaxRows)
 	if err != nil {
@@ -808,7 +792,6 @@ type ResolveInterruptParams struct {
 	ID  uuid.UUID
 }
 
-// 回答成功的提交點：只有仍是 PENDING 的中斷會轉。
 func (q *Queries) ResolveInterrupt(ctx context.Context, arg ResolveInterruptParams) (int64, error) {
 	result, err := q.db.Exec(ctx, resolveInterrupt, arg.Now, arg.ID)
 	if err != nil {
@@ -851,7 +834,6 @@ type TransitionRunParams struct {
 	FromStatuses  []string
 }
 
-// 唯一的狀態轉換：只有目前狀態在 @from_statuses（由允許的邊算出）時才寫，UPDATE 持有 run 列鎖到 transaction 結束。
 func (q *Queries) TransitionRun(ctx context.Context, arg TransitionRunParams) (ProcurementAgentRun, error) {
 	row := q.db.QueryRow(ctx, transitionRun,
 		arg.ToStatus,

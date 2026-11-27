@@ -168,7 +168,6 @@ function UnsupportedOnboardingNotice({ rows }: { rows: ShippingOnboarding[] }) {
 	);
 }
 
-
 function HomeDeliverySection({
 	rows,
 	store,
@@ -386,7 +385,6 @@ function HomeDeliverySection({
 		</section>
 	);
 }
-
 
 interface CvsForm {
 	senderName: string;
@@ -637,7 +635,6 @@ function CvsSection({
 		</section>
 	);
 }
-
 
 function StatusPill({ row }: { row: ShippingOnboarding | undefined }) {
 	if (!row?.payuniSubmitStatus) {

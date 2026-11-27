@@ -190,7 +190,6 @@ func TestDiff_OrderRuleTableIsEmpty(t *testing.T) {
 	}
 }
 
-
 // 這是本 bug 的最小重現：before 是完整投影、after 只有一個鍵（媒體端點的寫入回應就
 // 是這個形狀），於是缺席的每一欄都被記成「被清空」。dev 實測換一次 logo 得到 10 列，
 // 其中 9 列是從未發生的變更。

@@ -77,7 +77,6 @@ func (c *InvoiceServiceClient) Close() error {
 	return nil
 }
 
-
 // ListBuyerInvoiceProfiles （端點 1）
 func (c *InvoiceServiceClient) ListBuyerInvoiceProfiles(ctx context.Context, req *pb.ListBuyerInvoiceProfilesRequest) (*pb.ListBuyerInvoiceProfilesResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, invoiceDeadline)
@@ -198,7 +197,6 @@ func (c *InvoiceServiceClient) GetInvoiceComplaint(ctx context.Context, req *pb.
 	defer cancel()
 	return c.client.GetInvoiceComplaint(ctx, req)
 }
-
 
 // GetSellerInvoiceOverview （端點 16）
 func (c *InvoiceServiceClient) GetSellerInvoiceOverview(ctx context.Context, req *pb.GetSellerInvoiceOverviewRequest) (*pb.GetSellerInvoiceOverviewResponse, error) {
@@ -346,7 +344,6 @@ func (c *InvoiceServiceClient) RespondSellerInvoiceComplaint(ctx context.Context
 	defer cancel()
 	return c.client.RespondSellerInvoiceComplaint(ctx, req)
 }
-
 
 // GetInvoiceOverviewForAdmin （端點 37）
 func (c *InvoiceServiceClient) GetInvoiceOverviewForAdmin(ctx context.Context, req *pb.GetInvoiceOverviewForAdminRequest) (*pb.GetInvoiceOverviewForAdminResponse, error) {
@@ -530,14 +527,12 @@ func (c *InvoiceServiceClient) ListInvoiceAuditLogsForAdmin(ctx context.Context,
 	return c.client.ListInvoiceAuditLogsForAdmin(ctx, req)
 }
 
-
 // ReportExternalIssuance （端點 62）
 func (c *InvoiceServiceClient) ReportExternalIssuance(ctx context.Context, req *pb.ReportExternalIssuanceRequest) (*pb.GetSellerInvoiceJobResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, invoiceDeadline)
 	defer cancel()
 	return c.client.ReportExternalIssuance(ctx, req)
 }
-
 
 // RejectInvoiceComplaintResponse （端點 63）
 func (c *InvoiceServiceClient) RejectInvoiceComplaintResponse(ctx context.Context, req *pb.RejectInvoiceComplaintResponseRequest) (*pb.InvoiceComplaintResponse, error) {
@@ -560,7 +555,6 @@ func (c *InvoiceServiceClient) ReopenInvoiceComplaint(ctx context.Context, req *
 	return c.client.ReopenInvoiceComplaint(ctx, req)
 }
 
-
 // ReactivateProviderAccountForAdmin （端點 66；連線測試 deadline）
 func (c *InvoiceServiceClient) ReactivateProviderAccountForAdmin(ctx context.Context, req *pb.ReactivateProviderAccountForAdminRequest) (*pb.GetProviderAccountForAdminResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, invoiceCredentialTestDeadline)
@@ -574,7 +568,6 @@ func (c *InvoiceServiceClient) RevokeProviderAccountForAdmin(ctx context.Context
 	defer cancel()
 	return c.client.RevokeProviderAccountForAdmin(ctx, req)
 }
-
 
 // ListOrderExternalIssuances （端點 62R）
 func (c *InvoiceServiceClient) ListOrderExternalIssuances(ctx context.Context, req *pb.ListOrderExternalIssuancesRequest) (*pb.ListOrderExternalIssuancesResponse, error) {

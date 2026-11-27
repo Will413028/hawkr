@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 var adminNow = time.Date(2026, 8, 30, 3, 0, 0, 0, time.UTC)
 
 type jobAdjs struct {
@@ -178,7 +177,6 @@ func docAt(status string, manualReason string) domain.Document {
 	d.RecipientRefID = &buyer
 	return d
 }
-
 
 func TestAdminJob_Retry_FailedPermanent(t *testing.T) {
 	fx := newJobFixture(opAt("FAILED_PERMANENT", 5), docAt("ISSUE_FAILED", ""))
@@ -448,7 +446,6 @@ func TestAdminJob_Retry_ReasonRequired(t *testing.T) {
 	}
 }
 
-
 func TestAdminJob_Cancel_Success(t *testing.T) {
 	fx := newJobFixture(opAt("FAILED_PERMANENT", 5), docAt("ISSUE_FAILED", ""))
 	got, err := fx.uc.Cancel(context.Background(), CancelJobInput{
@@ -519,8 +516,6 @@ func TestAdminJob_Cancel_DetailRequired(t *testing.T) {
 		t.Fatalf("期望 ErrJobCancelDetailRequired，實得 %v", err)
 	}
 }
-
-
 
 // TestAdminJob_ReportManualResult_ReissueSettlesChain 守 2026-09-08 dev 實測抓到的缺口。
 //
@@ -776,7 +771,6 @@ func TestNeedsFundingDecision(t *testing.T) {
 	}
 }
 
-
 func adjustmentOpAt(status string, version int64, adjID int64) domain.Operation {
 	op := opAt(status, version)
 	op.OperationType = codemeta.InvoiceOperationTypeAllowance.Value
@@ -861,7 +855,6 @@ func TestAdminJob_CancelLeavesSendingAdjustmentAlone(t *testing.T) {
 		t.Errorf("adjustment = %q，want 留在 SENDING —— 它可能正在打 AMEGO", got)
 	}
 }
-
 
 func reissueDocAt(status string, originalID int64) domain.Document {
 	d := docAt(status, "")

@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 type imageKind struct {
 	field   string
 	assetOf func(store.SellerProspect) *uuid.UUID

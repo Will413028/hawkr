@@ -17,12 +17,12 @@ import (
 )
 
 type authorityIn struct {
-	AdminID, StoreID int64
-	Now              time.Time
-	Eligibility bool
-	Permission bool
+	AdminID, StoreID   int64
+	Now                time.Time
+	Eligibility        bool
+	Permission         bool
 	MissingAdminDenies bool
-	Capability model.Capability
+	Capability         model.Capability
 }
 
 type authorityState struct {

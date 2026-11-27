@@ -13,7 +13,6 @@ import '../../../address/data/address_model.dart';
 
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
-
 /// 購物車的配送方式區塊。
 ///
 /// 顯示配送選項（分組、可折疊）、驗證錯誤提示、
@@ -257,7 +256,6 @@ class _ShippingSectionState extends State<ShippingSection> {
       ),
     );
   }
-
 
   Widget _buildAddressRequiredCard() {
     return Semantics(

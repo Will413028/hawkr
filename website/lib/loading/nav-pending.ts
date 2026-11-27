@@ -99,7 +99,6 @@ export function beginNavPending(): (options?: EndNavPendingOptions) => void {
 	};
 }
 
-
 const ROUTER_COMMIT_POLL_MS = 120;
 /** 對齊 PageTransition 的 MAX_LOADING_VISIBLE_MS：超過視為導航被放棄。 */
 const ROUTER_HOLD_FUSE_MS = 4000;

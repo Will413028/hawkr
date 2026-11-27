@@ -25,7 +25,6 @@ type PostOwnerRow struct {
 	Readable  bool  `db:"readable"`
 }
 
-
 // GetCommentOwner 是留言的歸屬：readable 是留言可見且所屬貼文公開可讀。
 func GetCommentOwner(id uuid.UUID, now time.Time) SelectStatement {
 	c := visibility.CommentsOf("c", visibility.Anonymous)

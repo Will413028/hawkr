@@ -64,7 +64,6 @@ class _MerchantSkeletonBoxState extends State<MerchantSkeletonBox>
   }
 }
 
-
 /// 商家頁圖片渲染共用邏輯（base64 / OSS URL / 預設佔位）。
 class MerchantImageHelper {
   MerchantImageHelper._();
@@ -204,7 +203,6 @@ class MerchantImageHelper {
   );
 }
 
-
 /// 後端 API list 響應解析共用邏輯。
 class MerchantApiHelper {
   MerchantApiHelper._();
@@ -231,7 +229,6 @@ class MerchantApiHelper {
     ];
   }
 }
-
 
 /// 從 Map 中按候選 key 順序提取第一個非空字串值。
 class MerchantFieldHelper {

@@ -19,7 +19,6 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-
 const (
 	topologyFile  = "../../../infra/mq/topology/topology.yaml"
 	backendRoot   = "../../.."

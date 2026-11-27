@@ -30,14 +30,12 @@ export default function BannerLoadingCard({
 			role="status"
 			aria-live="polite"
 		>
-
 			{heading ? (
 				<h3 className="m-0 text-[length:var(--text-sm)] font-bold leading-normal text-[var(--page-banner-heading-fg)] tracking-[0.5px]">
 					{heading}
 				</h3>
 			) : null}
 			<div className={`${FEATURE_CARD_WELL} aspect-[16/9]`}>
-
 				<span
 					className="absolute bottom-3 left-1/2 -translate-x-1/2"
 					aria-hidden="true"

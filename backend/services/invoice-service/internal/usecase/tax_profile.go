@@ -20,16 +20,15 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
-	taxSubmitWindow = 60 * 24 * time.Hour
-	taxReapplyCooldown = 7 * 24 * time.Hour
-	taxApprovalValidity = 365 * 24 * time.Hour
+	taxSubmitWindow         = 60 * 24 * time.Hour
+	taxReapplyCooldown      = 7 * 24 * time.Hour
+	taxApprovalValidity     = 365 * 24 * time.Hour
 	taxExtensionDefaultDays = 30
-	taxExtensionMaxDays = 365
+	taxExtensionMaxDays     = 365
 
-	taxEvidenceMax = 10
-	taxReasonMaxRunes = 500
+	taxEvidenceMax           = 10
+	taxReasonMaxRunes        = 500
 	taxAttestationVersionMax = 32
 	// SelfIssueTermsVersion 是**當期生效**的自行開票責任條款版本，服務端唯一真實來源。
 	//
@@ -42,7 +41,7 @@ const (
 	// 形狀與買家側法定告知的 invoiceDisclosureTermsVersion（checkout.go）一致：
 	// 日期字串、改版時同時改本常數與 docs/legal/ 的條款全文。
 	SelfIssueTermsVersion = "2026-10-25"
-	taxLegalNameMax = 120
+	taxLegalNameMax       = 120
 	taxEntityTypeMax      = 32
 	taxResponsibleNameMax = 60
 	taxAddressPartMax     = 32
@@ -181,7 +180,6 @@ func (u *TaxProfile) WithClock(now func() time.Time) *TaxProfile {
 	return u
 }
 
-
 // SaveTaxDraftInput 是端點 18 的輸入。
 //
 // EvidenceObjectKeys 是**保留清單**不是新增清單（§6.1.7）：後端以「保留清單 ∪ 本次換發
@@ -297,20 +295,20 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 		}
 
 		ok, err := u.profiles.UpdateDraft(ctx, domain.UpdateSellerTaxDraft{
-			ID:                fresh.ID,
-			ExpectedVersion:   fresh.Version,
-			ClaimedObligation: normalizeObligation(in.ClaimedStatus),
-			EntityTaxType:     in.EntityType,
-			LegalName:         in.LegalName,
-			TaxID:             in.TaxID,
-			ResponsiblePerson: in.ResponsibleName,
-			BusinessAddress:   joinAddress(in.AddressCity, in.AddressDistrict, in.AddressDetail),
-			AddressCity:     strings.TrimSpace(in.AddressCity),
-			AddressDistrict: strings.TrimSpace(in.AddressDistrict),
+			ID:                 fresh.ID,
+			ExpectedVersion:    fresh.Version,
+			ClaimedObligation:  normalizeObligation(in.ClaimedStatus),
+			EntityTaxType:      in.EntityType,
+			LegalName:          in.LegalName,
+			TaxID:              in.TaxID,
+			ResponsiblePerson:  in.ResponsibleName,
+			BusinessAddress:    joinAddress(in.AddressCity, in.AddressDistrict, in.AddressDetail),
+			AddressCity:        strings.TrimSpace(in.AddressCity),
+			AddressDistrict:    strings.TrimSpace(in.AddressDistrict),
 			DefaultTaxCategory: fresh.DefaultTaxCategory,
 			EvidenceObjectKeys: merged,
-			ReviewNote: derefString(fresh.ReviewNote),
-			Now:        now,
+			ReviewNote:         derefString(fresh.ReviewNote),
+			Now:                now,
 		})
 		if err != nil {
 			return err
@@ -408,7 +406,6 @@ func (u *TaxProfile) ensureProfile(
 	})
 	return issuer, profile, err
 }
-
 
 // SubmitTaxProfileInput 是端點 19 的輸入。
 type SubmitTaxProfileInput struct {
@@ -531,7 +528,6 @@ func (u *TaxProfile) Submit(ctx context.Context, in SubmitTaxProfileInput) (Subm
 	return out, nil
 }
 
-
 // RequestTaxExtensionInput 是端點 20 的輸入。
 type RequestTaxExtensionInput struct {
 	StoreID         int64
@@ -585,7 +581,6 @@ func (u *TaxProfile) RequestExtension(ctx context.Context, in RequestTaxExtensio
 	}
 	return out, nil
 }
-
 
 // AcceptAttestationInput 是端點 22 的輸入。
 type AcceptAttestationInput struct {
@@ -645,7 +640,6 @@ func (u *TaxProfile) AcceptAttestation(ctx context.Context, in AcceptAttestation
 	}
 	return out, nil
 }
-
 
 // TaxDecisionInput 是端點 40 的輸入。
 type TaxDecisionInput struct {
@@ -865,7 +859,6 @@ func (u *TaxProfile) applyDecision(
 	return "", nil, ErrTaxDecisionUnknown
 }
 
-
 // TaxExtensionDecisionInput 是端點 41 的輸入。
 type TaxExtensionDecisionInput struct {
 	ActorAccountID  int64
@@ -944,9 +937,9 @@ func (u *TaxProfile) DecideExtension(ctx context.Context, in TaxExtensionDecisio
 			ResourceID:     profile.ID,
 			BeforeState:    before,
 			AfterState:     after,
-			ReasonCode:   taxExtensionReasonCode(in.Decision),
-			ReasonDetail: in.Reason,
-			Now:          now,
+			ReasonCode:     taxExtensionReasonCode(in.Decision),
+			ReasonDetail:   in.Reason,
+			Now:            now,
 		})
 		if err != nil {
 			return err
@@ -966,7 +959,6 @@ func (u *TaxProfile) DecideExtension(ctx context.Context, in TaxExtensionDecisio
 	}
 	return out, nil
 }
-
 
 func (u *TaxProfile) loadForSeller(ctx context.Context, storeID int64) (domain.Issuer, domain.SellerTaxProfile, error) {
 	issuer, err := u.issuers.GetByRef(ctx, codemeta.InvoiceIssuerTypeSeller.Value, storeID)

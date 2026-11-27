@@ -177,7 +177,6 @@ class SearchScreen extends HookConsumerWidget {
   }
 }
 
-
 Future<void> _loadRecommendedProducts({
   required ValueNotifier<bool> isLoading,
   required ValueNotifier<List<_SearchResult>> products,
@@ -358,7 +357,6 @@ Future<List<_SearchResult>?> _fetchSearchResults({
   if (searchSerial.value != requestId) return null;
   return mapped;
 }
-
 
 class _TopBar extends StatelessWidget {
   const _TopBar({

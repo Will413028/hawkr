@@ -85,7 +85,6 @@ interface ConfirmDeps {
 export async function confirmPaymentReturn(deps: ConfirmDeps): Promise<void> {
 	try {
 		await deps.refreshAccount();
-	} catch {
-	}
+	} catch {}
 	await deps.readAccount();
 }

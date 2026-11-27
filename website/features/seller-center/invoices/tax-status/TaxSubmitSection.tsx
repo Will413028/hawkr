@@ -120,7 +120,6 @@ export function TaxSubmitSection({
 					送出後平台會開始審核，期間資料無法修改。審核完成前，這段期間的發票由你自行開立與交付。
 				</p>
 
-
 				<ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[0.8125rem] text-[var(--hkui-foreground-soft)]">
 					<li>
 						審核完成前，你是這些訂單的發票銷售人，發票由你自行開立並交付買家。

@@ -24,8 +24,6 @@
 import { ApiClientError, authedFetch } from "@/lib/api/client";
 import { normalizeShippingMethod, ShippingMethod } from "@/lib/codemeta/enums";
 
-
-
 /**
  * Carrier shipment-status values — sourced from the seller App's authoritative
  * `ShippingStatus` enum (`lib/core/codemeta/code_meta.dart`). The previous web
@@ -76,7 +74,6 @@ export function lgsTypeForShippingMethod(
 	}
 }
 
-
 export interface BusinessDay {
 	/** yyyy-MM-dd */
 	date: string;
@@ -125,7 +122,6 @@ export interface LogisticsInfo {
 	isFinalStatus: boolean;
 	isErrorStatus: boolean;
 }
-
 
 /** GET /app/shipping_business_days — 明日起 7 個工作天（排週日 + 國定假日） */
 export async function fetchShippingBusinessDays(): Promise<BusinessDay[]> {
@@ -274,7 +270,6 @@ export async function queryLogistics(
 	};
 }
 
-
 const SHIP_STATUS_TEXT: Record<number, string> = {
 	0: "初始狀態",
 	1: "已取號",
@@ -387,7 +382,6 @@ function cvsC2cProgressPercent(code: number): number {
 			return 50;
 	}
 }
-
 
 const BIZ_CODE_PREFIX = /^\[(\d+)\]/;
 
@@ -628,7 +622,6 @@ export function shipmentErrorGuidance(
 	return null;
 }
 
-
 const SHIPMENT_COOLDOWN_MS = 30_000;
 const SHIPMENT_BACKEND_STUCK_THRESHOLD = 3;
 
@@ -713,7 +706,6 @@ export function effectiveValidationNo(
 	}
 	return localOdnoOverride.get(orderNo)?.validationNo ?? "";
 }
-
 
 export type ShipmentAction =
 	| { kind: "tcat-reserve" }

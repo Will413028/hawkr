@@ -8,7 +8,6 @@
  *   - Email / phone use lightweight format checks (server is the truth)
  */
 
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** 客服電子信箱的長度上限：254（RFC 5321 的路徑上限），與伺服器相同。 */

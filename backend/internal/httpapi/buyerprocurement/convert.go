@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 )
 
-
 func runStatusToProto(code string) (pb.RunStatus, error) {
 	v, ok := pb.RunStatus_value["RUN_STATUS_"+code]
 	if !ok || v == int32(pb.RunStatus_RUN_STATUS_UNSPECIFIED) {

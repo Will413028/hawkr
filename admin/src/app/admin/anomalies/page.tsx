@@ -63,7 +63,6 @@ import {
 } from "./payment-lists";
 import ResolveAnomalyAction from "./ResolveAnomalyAction";
 
-
 type TabKey = "shipping" | "orders" | "payments" | "refunds" | "grants";
 
 const TABS: Array<{ key: TabKey; label: string; icon: MaterialSymbolName }> = [
@@ -75,7 +74,6 @@ const TABS: Array<{ key: TabKey; label: string; icon: MaterialSymbolName }> = [
 ];
 
 const PAGE_SIZE = 20;
-
 
 const thStyle: React.CSSProperties = {
 	padding: "12px 16px",
@@ -225,7 +223,6 @@ const ignoreBtnStyle: React.CSSProperties = {
 	border: "1px solid #9ca3af",
 	color: "#6b7280",
 };
-
 
 interface AdminShipmentAnomaly {
 	shipmentId: string;
@@ -516,7 +513,6 @@ function ShippingAnomaliesTab() {
 	);
 }
 
-
 interface AbnormalOrder {
 	orderNo: string;
 	buyerId: string;
@@ -710,7 +706,6 @@ function AbnormalOrdersTab({ handoff }: { handoff: AnomalyHandoff }) {
 		</div>
 	);
 }
-
 
 const subTextStyle: React.CSSProperties = { fontSize: 12, color: "#9ca3af" };
 
@@ -1171,7 +1166,6 @@ function GrantAnomaliesTab() {
 		</div>
 	);
 }
-
 
 export default function AnomaliesPage() {
 	const searchParams = useSearchParams();

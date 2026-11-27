@@ -1,4 +1,3 @@
-
 :root {
 	--color-brand-primary: #e4572e;
 	--color-brand-primary-rgb: 228 87 46;
@@ -329,7 +328,6 @@
 	--page-rating-star: #f5a623;
 
 	--page-card-blur-border: rgb(var(--color-neutral-white-rgb) / 0.4);
-
 
 	--page-accent-marker: var(--action-primary);
 

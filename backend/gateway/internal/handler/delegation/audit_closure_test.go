@@ -9,13 +9,12 @@ import (
 	commonpb "github.com/Will413028/hawkr/go-pkg/proto/common"
 )
 
-
 type closureAuditStub struct {
 	replayed      bool
 	existingState string
 
-	intents  []*accountpb.RecordAuditIntentRequest
-	confirms []*accountpb.ConfirmAuditResultRequest
+	intents       []*accountpb.RecordAuditIntentRequest
+	confirms      []*accountpb.ConfirmAuditResultRequest
 	confirmCtxErr error
 
 	batchIntentResults []*accountpb.RecordAuditIntentItemResult

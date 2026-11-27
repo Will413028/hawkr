@@ -254,8 +254,6 @@ func (p *Publisher) PublishDelayed(ctx context.Context, exchange, routingKey str
 	return nil
 }
 
-
-
 // Close closes the publisher and stops its reconnect watcher.
 func (p *Publisher) Close() error {
 	p.mu.Lock()

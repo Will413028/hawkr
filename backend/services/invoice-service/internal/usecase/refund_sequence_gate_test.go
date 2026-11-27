@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 func gateOp(opType, status string) domain.Operation {
 	return domain.Operation{ID: 9001, DocumentID: 5101, OperationType: opType, Status: status}
 }

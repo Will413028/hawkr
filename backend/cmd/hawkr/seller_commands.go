@@ -26,8 +26,8 @@ type sellerCommand struct {
 	Jobs     jobs.Enqueuer
 	Identity *identity.Module
 	Seller   *seller.Module
-	Owners *sellerOwners
-	Logger *slog.Logger
+	Owners   *sellerOwners
+	Logger   *slog.Logger
 }
 
 func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCommand, error) {

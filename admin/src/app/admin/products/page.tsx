@@ -13,7 +13,6 @@ import { getStatusMeta } from "@/lib/product-status";
 import { api } from "@/services/api";
 import { useEnvironment } from "@/services/environment";
 
-
 interface Product {
 	id: string;
 	name: string;
@@ -278,7 +277,6 @@ const ProductList: React.FC = () => {
 										<div className="cell-sub">{formatDate(p.createdAt)}</div>
 									</td>
 									<td>
-
 										{p.status !== ProductStatus.DRAFT && (
 											<button
 												type="button"

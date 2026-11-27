@@ -61,8 +61,7 @@ export function cancelNavigationRecovery(): void {
 function emitLifecycle(event: NavigationLifecycleEvent): void {
 	try {
 		lifecycleObserver?.(event);
-	} catch {
-	}
+	} catch {}
 }
 
 function cancelForLifecycle(event: NavigationLifecycleEvent): void {
@@ -71,8 +70,7 @@ function cancelForLifecycle(event: NavigationLifecycleEvent): void {
 	emitLifecycle(event);
 	try {
 		notify?.(event.reason);
-	} catch {
-	}
+	} catch {}
 }
 
 export function observeNavigationLifecycle(
@@ -130,8 +128,7 @@ export function observeNavigationLifecycle(
 		recoveryUsed = false;
 		try {
 			window.sessionStorage.removeItem(RECOVERY_STORAGE_KEY);
-		} catch {
-		}
+		} catch {}
 		cancelForLifecycle({ reason: "interaction" });
 	};
 	for (const type of ["pointerdown", "click", "keydown", "input"]) {
@@ -229,8 +226,7 @@ export function scheduleNavigationRecovery(options: {
 						? "offline"
 						: "hidden",
 			);
-		} catch {
-		}
+		} catch {}
 		return;
 	}
 	const token = generation;

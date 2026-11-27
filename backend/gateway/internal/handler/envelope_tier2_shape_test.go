@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 var envelopeTopLevelKeys = map[string]bool{
 	"code": true, "message": true, "data": true, "traceId": true, "messageZh": true,
 }

@@ -98,7 +98,6 @@ func (c *BuyerClient) BatchCheckFavorites(ctx context.Context, buyerID int64, pr
 	return resp.FavoritedProductIds, nil
 }
 
-
 // BatchCheckRestockSubscriptions returns the set of product IDs the buyer has ACTIVE
 // restock subscriptions for, keyed by product_id string.
 func (c *BuyerClient) BatchCheckRestockSubscriptions(ctx context.Context, buyerID int64, productIDs []string) (map[string]bool, error) {

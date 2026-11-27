@@ -6,7 +6,6 @@ import { __setFlavorForTest } from "../lib/config/flavor";
 
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-
 let server: Server;
 const prevApiBase = process.env.API_BASE_URL;
 

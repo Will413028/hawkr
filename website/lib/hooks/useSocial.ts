@@ -325,7 +325,6 @@ export function usePostComments(
 	};
 }
 
-
 /**
  * 觀看者在這則貼文的留言權限與身分，由伺服器依觀看者算。貼文已經帶著（依觀看者讀的）答案時呼叫端傳
  * `enabled: false`，不重讀。
@@ -342,7 +341,6 @@ export function usePostViewerState(
 		queryFn: ({ signal }) => fetchPostViewerState(postId ?? "", signal),
 	});
 }
-
 
 interface UsePostInteractionsResult {
 	liked: boolean;
@@ -450,7 +448,6 @@ export function usePostInteractions(
 		toggleLike,
 	};
 }
-
 
 interface ReplyContext extends SubmitContext {
 	countBumped?: boolean;

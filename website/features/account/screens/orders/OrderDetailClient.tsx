@@ -262,7 +262,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 						shippingMethod={order.shipping?.method}
 					/>
 
-
 					{order.status === "pending_payment" ? (
 						<PendingPaymentBanner
 							order={order}
@@ -281,7 +280,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 							pausedAt={order.countdownPausedAt}
 						/>
 					) : null}
-
 
 					{order.status === "delivered" ? (
 						<section className="flex flex-col gap-3 rounded-hkui-lg border border-divider bg-content1 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -458,7 +456,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 						</dl>
 					</section>
 
-
 					<OrderInvoiceSection
 						orderNo={order.orderNo}
 						sellerName={order.sellerName?.trim() || ""}
@@ -473,7 +470,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 					/>
 
 					<section className="flex gap-2 flex-wrap justify-end mt-4">
-
 						{order.status === "shipping" ? (
 							<Button
 								href={`/account/orders/${order.orderNo}/tracking`}

@@ -159,11 +159,11 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 
 // Module 是 coupon 模組。
 type Module struct {
-	admin    *admin.Service
-	campaign *campaign.Service
-	voucher  *voucher.Service
-	read     *read.Service
-	expiry   *expiry.Service
+	admin       *admin.Service
+	campaign    *campaign.Service
+	voucher     *voucher.Service
+	read        *read.Service
+	expiry      *expiry.Service
 	expiryReady bool
 	member      *membership.Service
 	purge       *purge.Service
@@ -188,7 +188,6 @@ func New(d Deps) *Module {
 		purge:       purge.New(purge.Deps{DB: d.DB, Now: d.Now}),
 	}
 }
-
 
 // CreateCampaign 建立活動：賣家的直接 ACTIVE 並檢查配額，admin 的是 DRAFT。
 func (m *Module) CreateCampaign(ctx context.Context, in CreateCampaignInput) (Campaign, error) {

@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	rollupID = "seller.product_views_rollup"
-	purgeID = "seller.product_views_purge"
+	rollupID       = "seller.product_views_rollup"
+	purgeID        = "seller.product_views_purge"
 	rollupInterval = 5 * time.Minute
-	purgeInterval = time.Hour
+	purgeInterval  = time.Hour
 )
 
 // RollupArgs 是瀏覽事件彙總的工作。

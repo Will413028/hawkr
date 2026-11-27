@@ -211,7 +211,6 @@ func (r *DocumentRepository) RecordUploadRecheckResult(ctx context.Context, id i
 	return err
 }
 
-
 // Create 建立一列文件。inserted=false 代表這份文件已建過（重複消費 order.paid）。
 //
 // ON CONFLICT DO NOTHING **不指名 conflict target**：本表有四個 partial unique
@@ -554,7 +553,6 @@ func (r *DocumentRepository) GetByProviderRequestNo(ctx context.Context, provide
 	}
 	return toDocument(row)
 }
-
 
 // MarkVoiding 是 ISSUED → VOIDING。
 func (r *DocumentRepository) MarkVoiding(ctx context.Context, id int64, now time.Time) (bool, error) {

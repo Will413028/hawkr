@@ -103,7 +103,6 @@ const Analytics: React.FC = () => {
 				</div>
 			</div>
 
-
 			<div className="stats-row">
 				<StatCard
 					label="總訂單數"
@@ -128,7 +127,6 @@ const Analytics: React.FC = () => {
 					variant="success"
 				/>
 			</div>
-
 
 			<div className="grid-2 mb-24">
 				<div className="card">
@@ -200,7 +198,6 @@ const Analytics: React.FC = () => {
 				</div>
 			</div>
 
-
 			<div className="card mb-24">
 				<div className="card-header">
 					<h3>
@@ -262,7 +259,6 @@ const Analytics: React.FC = () => {
 					)}
 				</div>
 			</div>
-
 
 			<div className="card">
 				<div className="card-header">

@@ -292,7 +292,6 @@ export default function MegaMenu({
 		trigger.focus({ preventScroll: true });
 	}, []);
 
-
 	const activeItem = openId
 		? items.find((it) => it.label === openId && it.panel)
 		: null;
@@ -419,9 +418,6 @@ export default function MegaMenu({
 					);
 				})}
 			</nav>
-
-
-
 
 			<section
 				ref={panelRef}

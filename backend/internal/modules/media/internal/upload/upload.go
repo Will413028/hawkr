@@ -48,9 +48,9 @@ type Deps struct {
 
 // Service 是暫存上傳的服務。
 type Service struct {
-	d Deps
-	secureSlots chan struct{}
-	publicSlots chan struct{}
+	d                  Deps
+	secureSlots        chan struct{}
+	publicSlots        chan struct{}
 	afterRewrapUploads func(context.Context)
 }
 

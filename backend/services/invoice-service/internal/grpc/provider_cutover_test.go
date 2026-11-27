@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 const (
 	pcStoreID   = int64(2685914682)
 	pcIssuerID  = int64(900)

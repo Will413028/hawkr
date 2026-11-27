@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 const clearDefaultSentinel = "0"
 
 // CreateBuyerInvoiceProfile 新增常用發票資料（端點 2）。
@@ -24,13 +23,13 @@ func (s *InvoiceServer) CreateBuyerInvoiceProfile(
 	}
 
 	profile, err := s.prefs.Create(ctx, usecase.CreateProfileInput{
-		BuyerID:     buyerID,
-		CarrierType: req.GetCarrierType(),
-		Value:       req.GetValue(),
-		BuyerTaxID:  req.GetBuyerTaxId(),
-		BuyerName:   req.GetBuyerName(),
-		Label:       req.GetLabel(),
-		SetDefault:  req.GetSetDefault(),
+		BuyerID:        buyerID,
+		CarrierType:    req.GetCarrierType(),
+		Value:          req.GetValue(),
+		BuyerTaxID:     req.GetBuyerTaxId(),
+		BuyerName:      req.GetBuyerName(),
+		Label:          req.GetLabel(),
+		SetDefault:     req.GetSetDefault(),
 		IdempotencyKey: req.GetIdempotencyKey(),
 	})
 	if err != nil {

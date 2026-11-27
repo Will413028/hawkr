@@ -25,8 +25,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-
-
 const (
 	bvComplaintID int64 = 6900
 	bvStoreID     int64 = 2685914682
@@ -179,7 +177,6 @@ func bvServer(status string, version int64) *InvoiceServer {
 	return NewInvoiceServer(nil, q, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
-
 type bvCall struct {
 	status  string
 	version int64
@@ -241,7 +238,6 @@ func bvBuyerCalls() map[string]bvCall {
 		},
 	}
 }
-
 
 const forbiddenBuyerPhrase = "違規"
 
@@ -424,7 +420,6 @@ func bvStringLit(e ast.Expr) (string, bool) {
 	return s, true
 }
 
-
 // 這一支釘住「推導器壞掉會讓陰性斷言恆綠」那個 bug class。三件事一起驗：
 //
 //	① 推導結果非空（路徑打錯／生成檔換形狀 ⇒ 空集合 ⇒ 下面每一條 for 迴圈都不執行）
@@ -482,7 +477,6 @@ func TestViolationWordedCodeMetaEntriesAreDerivedNotEnumerated(t *testing.T) {
 	}
 }
 
-
 type wireLeaf struct {
 	Path  string
 	Value string
@@ -526,7 +520,6 @@ func appendWireLeaf(fd protoreflect.FieldDescriptor, v protoreflect.Value, path 
 		*out = append(*out, wireLeaf{Path: path, Value: string(v.Bytes())})
 	}
 }
-
 
 // 🔴 本檔最重要的一支。標的來自 CodeMeta 推導，斷言分三層：
 //
@@ -585,7 +578,6 @@ func TestBuyerComplaintPayloadNeverLeaksViolationWording(t *testing.T) {
 		})
 	}
 }
-
 
 // 依 58A §B07 版面結構逐字「角色（賣家／**平台**）」：平台那一列必須還在，
 // 只是動作被投影成對買家安全的那一個。整列刪掉會讓案件從「平台處理中」跳到
@@ -679,7 +671,6 @@ func TestSellerComplaintViewStillCarriesTheRuling(t *testing.T) {
 		t.Fatal("賣家視角必須看得到 ADM 的裁決理由")
 	}
 }
-
 
 // 判定不靠命名也不靠人記得：從 proto 描述子推導「入參帶 buyer_id 且回應可遞移到達
 // InvoiceComplaintInfo」的 RPC 全集，再與上面那張覆蓋表對帳。

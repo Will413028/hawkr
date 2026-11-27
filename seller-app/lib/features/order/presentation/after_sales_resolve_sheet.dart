@@ -20,7 +20,6 @@ import '../data/after_sale_evidence.dart';
 import '../data/after_sale_model.dart';
 import 'widgets/appeal_deadline_card.dart';
 
-
 /// 從售後卡片的「售後申請」按鈕呼叫。
 /// [afterSaleCase] 帶入退貨原因 / 詳細說明 / 照片。
 /// [orderNo] 用於顯示原訂單編號。
@@ -58,7 +57,6 @@ void showAfterSalesResolveSheet({
     ),
   );
 }
-
 
 class _ResolveEntrySheet extends StatelessWidget {
   const _ResolveEntrySheet({
@@ -220,7 +218,6 @@ class _ResolveEntrySheet extends StatelessWidget {
     );
   }
 
-
   void _showReturnRefundDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -264,7 +261,6 @@ class _ResolveEntrySheet extends StatelessWidget {
     );
   }
 }
-
 
 /// 買家舉證照片 + 出貨照片。前者是 objectKey、後者是 Gateway 組好的顯示 URL，
 /// 兩者都直接餵給 `OptimizedNetworkImage`（內部走 buildImageUrl 唯一入口）。
@@ -606,7 +602,6 @@ class _OptionCard extends StatelessWidget {
   }
 }
 
-
 class _ResolveDialog extends StatelessWidget {
   const _ResolveDialog({
     required this.title,
@@ -753,7 +748,6 @@ class _ResolveDialog extends StatelessWidget {
     );
   }
 }
-
 
 class _ReturnRefundDialog extends StatefulWidget {
   const _ReturnRefundDialog({
@@ -1206,7 +1200,6 @@ class _LogisticsCard extends StatelessWidget {
   }
 }
 
-
 class _PartialRefundDialog extends StatefulWidget {
   const _PartialRefundDialog({required this.maxAmount, required this.onSubmit});
   final String maxAmount;
@@ -1294,7 +1287,6 @@ class _PartialRefundDialogState extends State<_PartialRefundDialog> {
     }
   }
 }
-
 
 class _FullRefundDialog extends StatefulWidget {
   const _FullRefundDialog({required this.refundAmount, required this.onSubmit});
@@ -1384,7 +1376,6 @@ class _FullRefundDialogState extends State<_FullRefundDialog> {
   }
 }
 
-
 class _CouponDialog extends StatefulWidget {
   const _CouponDialog({required this.onSubmit});
   final Future<void> Function(Map<String, dynamic>) onSubmit;
@@ -1468,7 +1459,6 @@ class _CouponDialogState extends State<_CouponDialog> {
     }
   }
 }
-
 
 class _RejectDialog extends StatefulWidget {
   const _RejectDialog({required this.afterSaleCase, required this.onSubmit});
@@ -1557,7 +1547,6 @@ class _RejectDialogState extends State<_RejectDialog> {
     }
   }
 }
-
 
 class _InputField extends StatelessWidget {
   const _InputField({

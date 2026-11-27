@@ -659,7 +659,6 @@ export function buildDelegatedAuditLogSearch(
 	return search;
 }
 
-
 /**
  * `GET /api/v1/admin/delegated-operations` 的一列。
  *

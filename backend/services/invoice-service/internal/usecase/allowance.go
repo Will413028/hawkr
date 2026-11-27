@@ -18,7 +18,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // Allowance 是折讓軸。
 //
 // 它與 Voiding 分開而不是加一個 if：兩者送的 payload、落的狀態、要維護的反正規化欄位
@@ -34,8 +33,8 @@ type Allowance struct {
 	outbox      domain.OutboxRepository
 	provider    ProviderClient
 
-	now func() time.Time
-	cfg IssuanceConfig
+	now         func() time.Time
+	cfg         IssuanceConfig
 	b2cSplitTax bool
 	log         *zap.Logger
 }
@@ -433,7 +432,6 @@ func (u *Allowance) adjustmentOf(ctx context.Context, op domain.Operation) (doma
 	return u.adjustments.GetByID(ctx, *op.AdjustmentID)
 }
 
-
 func (u *Allowance) finishOperation(ctx context.Context, op domain.Operation, now time.Time) error {
 	return u.tx.WithTx(ctx, func(ctx context.Context) error {
 		return u.finishOperationTx(ctx, op, now)
@@ -511,7 +509,6 @@ func adjustmentAlreadySettled(status string) bool {
 }
 
 const outboxAggregateAdjustment = "ADJUSTMENT"
-
 
 // ConfirmAllowance 是折讓的「結果未明」收斂路徑，由 INV.rc 分派進來。
 //

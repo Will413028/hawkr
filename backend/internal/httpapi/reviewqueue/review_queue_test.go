@@ -169,19 +169,19 @@ func TestKindsAreOneToOneWithTheContract(t *testing.T) {
 		t.Errorf("種類 %d 個，預期 13 個", len(all))
 	}
 	wantPerm := map[rq.Kind]adminperm.Permission{
-		rq.ReportTriage:          adminperm.SellerReportsList,
-		rq.CaseDecision:          adminperm.SellerCasesList,
-		rq.CaseInquiryOverdue:    adminperm.SellerCaseInquiriesList,
-		rq.AuthorityOrder:        adminperm.SellerAuthorityOrdersList,
-		rq.AuthorityTargetNotice: adminperm.SellerAuthorityOrdersList,
-		rq.MeasureAppeal:         adminperm.SellerMeasuresList,
-		rq.MeasureLiftRequest:    adminperm.SellerMeasuresList,
-		rq.MeasureReview:         adminperm.SellerMeasuresList,
-		rq.KYCApplication:        adminperm.SellerKYCApplicationsList,
+		rq.ReportTriage:               adminperm.SellerReportsList,
+		rq.CaseDecision:               adminperm.SellerCasesList,
+		rq.CaseInquiryOverdue:         adminperm.SellerCaseInquiriesList,
+		rq.AuthorityOrder:             adminperm.SellerAuthorityOrdersList,
+		rq.AuthorityTargetNotice:      adminperm.SellerAuthorityOrdersList,
+		rq.MeasureAppeal:              adminperm.SellerMeasuresList,
+		rq.MeasureLiftRequest:         adminperm.SellerMeasuresList,
+		rq.MeasureReview:              adminperm.SellerMeasuresList,
+		rq.KYCApplication:             adminperm.SellerKYCApplicationsList,
 		rq.PaymentAccountCreateFailed: adminperm.PaymentAccountsGet,
 		rq.PaymentAccountPurgeStuck:   adminperm.PaymentAccountsGet,
-		rq.SharedBankAccount: adminperm.SellerMeasuresList,
-		rq.ModerationCase: adminperm.ModerationCasesList,
+		rq.SharedBankAccount:          adminperm.SellerMeasuresList,
+		rq.ModerationCase:             adminperm.ModerationCasesList,
 	}
 	for _, k := range rq.Kinds() {
 		perm, ok := kindPermissions[k]

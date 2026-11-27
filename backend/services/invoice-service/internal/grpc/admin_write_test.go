@@ -66,7 +66,6 @@ func TestAdminWrite_RequiresExpectedVersion(t *testing.T) {
 	}
 }
 
-
 type notFoundOps struct{ domain.OperationRepository }
 
 func (notFoundOps) GetByID(context.Context, int64) (domain.Operation, error) {

@@ -76,10 +76,10 @@ func (f *fakeReviews) StoreStats(_ context.Context, id int64) (review.StoreStats
 }
 
 var (
-	eventID    = uuid.MustParse("01990000-0000-7000-8000-000000000001")
-	reviewID   = uuid.MustParse("01990000-0000-7000-8000-0000000000a1")
-	product700 = uuid.MustParse("01990000-0000-7000-8000-000000000700")
-	occurredAt = time.Date(2026, 11, 20, 9, 30, 15, 123456789, time.FixedZone("TST", 8*3600))
+	eventID       = uuid.MustParse("01990000-0000-7000-8000-000000000001")
+	reviewID      = uuid.MustParse("01990000-0000-7000-8000-0000000000a1")
+	product700    = uuid.MustParse("01990000-0000-7000-8000-000000000700")
+	occurredAt    = time.Date(2026, 11, 20, 9, 30, 15, 123456789, time.FixedZone("TST", 8*3600))
 	wireTimestamp = "2026-11-20T01:30:15.123456789Z"
 	createdAt     = time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC)
 )

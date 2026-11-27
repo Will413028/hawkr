@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
 	unlockRequester = int64(4201)
 	unlockApprover  = int64(4202)
@@ -39,7 +38,6 @@ func requestInput() RequestManualUnlockInput {
 		IdempotencyKey:        "idem-unlock-1",
 	}
 }
-
 
 func TestManualUnlock_Request_CreatesAwaitingRow(t *testing.T) {
 	fx := newJobFixture(cancelledJob(5), docAt("ISSUE_FAILED", ""))
@@ -183,7 +181,6 @@ func TestManualUnlock_Request_AcceptsExactly1000Runes(t *testing.T) {
 		t.Fatalf("1000 字應合法（DB CHECK 的上界是 <= 1000），實得 %v", err)
 	}
 }
-
 
 func approveFixture(t *testing.T) (*jobFixture, int64) {
 	t.Helper()
@@ -334,7 +331,6 @@ func TestManualUnlock_Approve_RejectsSecondApproval(t *testing.T) {
 	}
 }
 
-
 func TestManualUnlock_LatestProjectsExpired(t *testing.T) {
 	fx, _ := approveFixture(t)
 
@@ -366,7 +362,6 @@ func TestManualUnlock_LatestReturnsNotFoundWhenNeverRequested(t *testing.T) {
 	}
 }
 
-
 func assertBizCode(t *testing.T, err error, want int32) {
 	t.Helper()
 	if err == nil {
@@ -392,7 +387,6 @@ func repeatRune(r rune, n int) string {
 func containsSubstring(haystack, needle string) bool {
 	return strings.Contains(haystack, needle)
 }
-
 
 func blockedJob(version int64) domain.Operation {
 	op := opAt("CANCEL_BLOCKED_UNKNOWN", version)
@@ -605,7 +599,6 @@ func TestManualUnlock_Request_IssuanceTypeStillAllowed(t *testing.T) {
 		t.Fatalf("REISSUE 是開立類，必須走得通：%v", err)
 	}
 }
-
 
 type fakeUnlockEvidence struct {
 	key    string

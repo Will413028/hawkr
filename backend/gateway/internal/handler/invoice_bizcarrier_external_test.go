@@ -20,7 +20,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-
 type externalProbeServer struct {
 	pb.UnimplementedInvoiceServiceServer
 }

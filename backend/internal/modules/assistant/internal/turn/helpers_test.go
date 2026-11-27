@@ -24,7 +24,7 @@ type chunk struct {
 	Thought      bool       `json:"thought"`
 	FunctionCall *chunkCall `json:"function_call"`
 	Error        string     `json:"error"`
-	ErrorCode string `json:"error_code"`
+	ErrorCode    string     `json:"error_code"`
 }
 
 type chunkCall struct {
@@ -33,8 +33,8 @@ type chunkCall struct {
 }
 
 type scriptedCall struct {
-	Agent  string  `json:"agent"`
-	Chunks []chunk `json:"chunks"`
+	Agent        string              `json:"agent"`
+	Chunks       []chunk             `json:"chunks"`
 	FinishReason *genai.FinishReason `json:"finish_reason"`
 }
 
@@ -44,9 +44,9 @@ type llmRequest struct {
 	FileURIs              []string
 	FunctionResponsesBack []map[string]any
 	HistoryContents       int
-	CallingMode   string
-	AllowedNames  []string
-	DeclaredNames []string
+	CallingMode           string
+	AllowedNames          []string
+	DeclaredNames         []string
 }
 
 func agentOf(req *adkmodel.LLMRequest) string {

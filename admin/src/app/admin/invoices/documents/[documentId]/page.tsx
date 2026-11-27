@@ -48,7 +48,6 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 function Section({
 	title,
 	hint,
@@ -323,7 +322,6 @@ export default function InvoiceDocumentDetailPage() {
 					</div>
 				</div>
 				<div className="header-actions">
-
 					{detail ? (
 						<Button
 							variant="outline"
@@ -377,7 +375,6 @@ export default function InvoiceDocumentDetailPage() {
 							</div>
 						</div>
 					) : null}
-
 
 					<p className="invoice-page-notice" role="note">
 						<MaterialSymbol name="shield_lock" />

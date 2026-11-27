@@ -389,7 +389,6 @@ func (d *connectDriver) SellerRevoke(ctx context.Context, c ch.Caller, id, _ str
 	return kindOf(err)
 }
 
-
 func (d *connectDriver) AdminCreate(ctx context.Context, c ch.Caller, in TemplateInput) (Template, error) {
 	campaign := &adminpb.AdminCampaignInput{
 		Title: in.Title, ThresholdAmount: in.Threshold, TargetType: targetOf(in.Target),

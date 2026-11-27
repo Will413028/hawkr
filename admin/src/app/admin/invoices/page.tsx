@@ -30,7 +30,6 @@ import "@/styles/pages/Invoice.css";
 import "@/styles/pages/DelegatedOperations.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 const OVERVIEW_ENDPOINT = "/api/v1/admin/invoices/overview";
 
 export default function InvoiceOverviewPage() {
@@ -128,7 +127,6 @@ export default function InvoiceOverviewPage() {
 				})}
 			</div>
 
-
 			{orderedKpis.length > 0 ? (
 				<dl className="invoice-kpi-definitions">
 					{orderedKpis.map((kpi) => {
@@ -225,7 +223,6 @@ export default function InvoiceOverviewPage() {
 					</div>
 				</div>
 			</div>
-
 
 			<div className="adm-page-footer-actions">
 				<Button

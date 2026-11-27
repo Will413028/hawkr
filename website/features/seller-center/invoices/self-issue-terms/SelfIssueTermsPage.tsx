@@ -133,7 +133,6 @@ export function SelfIssueTermsPage() {
 		>
 			<BackLink fallbackHref={OVERVIEW_HREF}>回發票與稅籍</BackLink>
 
-
 			<div className="mt-4 flex flex-col-reverse gap-4 md:grid md:grid-cols-[minmax(0,1fr)_360px] md:items-start">
 				<section className="seller-card p-5">
 					<h2 className="text-sm font-extrabold text-foreground">
@@ -229,7 +228,6 @@ export function SelfIssueTermsPage() {
 								}
 							/>
 							<Row label="條款版本" value={attestation?.termsVersion || "—"} />
-
 						</dl>
 					)}
 
@@ -246,7 +244,6 @@ export function SelfIssueTermsPage() {
 					</div>
 				</section>
 			</div>
-
 
 			<p
 				role="status"

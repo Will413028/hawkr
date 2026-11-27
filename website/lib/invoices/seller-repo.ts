@@ -101,7 +101,6 @@ import type {
 
 const BASE = "/app/seller/invoices";
 
-
 /**
  * 58 §6.1.0 (13) 的碼表中，本波四個畫面會遇到的那些。文案在 `./errorCopy.ts`。
  *
@@ -173,7 +172,6 @@ export const SELLER_INVOICE_BIZ_CODE = {
 	/** Tier A：越權與不存在同碼 ⇒ 文案不得寫「沒有權限」（S10）。 */
 	COMPLAINT_NOT_FOUND: 9309,
 } as const;
-
 
 function str(value: unknown): string {
 	return value == null ? "" : String(value);
@@ -248,7 +246,6 @@ function normalizeIntakeLimit(raw: unknown): SellerIntakeLimit {
 	};
 }
 
-
 /** 端點 16。唯讀聚合，`recentDocuments` 固定 5 筆、不接受 query 調整。 */
 export async function fetchSellerInvoiceOverview(): Promise<SellerInvoiceOverview> {
 	const env = await apiClient.authed.get<Record<string, unknown>>(
@@ -270,7 +267,6 @@ export async function fetchSellerInvoiceOverview(): Promise<SellerInvoiceOvervie
 		recentDocuments: arr(raw.recentDocuments).map(normalizeDocumentSummary),
 	};
 }
-
 
 function normalizeTaxIdentity(raw: unknown): SellerTaxIdentity {
 	const it = obj(raw);
@@ -418,7 +414,6 @@ function normalizeExtensionRequest(
 	return { requestedAt, reason: str(raw.reason) };
 }
 
-
 /** 端點 30 的 query。全部走 URL query，值域見 §S06 的表。 */
 export interface SellerInvoiceDocumentsQuery {
 	dateFrom?: string;
@@ -476,7 +471,6 @@ export async function listSellerInvoiceDocuments(
 	};
 }
 
-
 /**
  * 端點 31。回應把明細包在 `detail` 之下、賣家專屬欄位平放在外層，這裡攤平成一層
  * ——`detail` 那一層在畫面上沒有任何語意，留著只會讓每個消費點多寫一次 `.detail`。
@@ -510,7 +504,6 @@ export async function fetchSellerInvoiceDocument(
 		latestJobId: str(raw.latestJobId),
 	};
 }
-
 
 function normalizeRetryPolicy(raw: unknown): InvoiceJobInfo["retryPolicy"] {
 	const it = obj(raw);
@@ -625,7 +618,6 @@ export const EXTERNAL_INVOICE_NO_PATTERN = /^[A-Z]{2}[0-9]{8}$/;
 /** 端點 62 的 `note` 長度上限（後端 `adminNoteMaxRunes`）。 */
 export const EXTERNAL_ISSUANCE_NOTE_MAX = 500;
 
-
 /**
  * 端點 33（S08 唯一資料源）。
  *
@@ -640,7 +632,6 @@ export async function fetchSellerInvoiceJob(
 	);
 	return normalizeJobInfo(obj(env.data));
 }
-
 
 /**
  * 端點 34 的 query。
@@ -740,7 +731,6 @@ export async function fetchSellerInvoiceComplaint(
 	return normalizeComplaint(obj(env.data));
 }
 
-
 /** 端點 72 的 query。與端點 30 不同：**沒有** `mode`／`abnormal_only`／`order_no`。 */
 export interface SellerReceivedInvoicesQuery {
 	dateFrom?: string;
@@ -787,7 +777,6 @@ export async function listSellerReceivedInvoiceDocuments(
 	};
 }
 
-
 /**
  * 賣家面 PDF 的絕對網址（`GET /documents/{document_id}/file/content`，
  * `CapInvoiceManage` 與端點 31 同 cap）。
@@ -803,7 +792,6 @@ export function sellerInvoiceFileUrl(documentId: string): string {
 		`${BASE}/documents/${encodeURIComponent(documentId)}/file/content`,
 	);
 }
-
 
 /**
  * `PUT /credentials` 的 `consentVersion`（後端 `requireConsentVersion` 只驗非空 ＋ 長度）。
@@ -950,7 +938,6 @@ function normalizeProviderAccount(data: unknown): SellerProviderAccount {
 	};
 }
 
-
 /**
  * 端點 21。**恆有回應**（未簽過的賣家拿到 `termsVersion: ""` ＋ 非空的
  * `currentTermsVersion`），所以沒有 empty 態。
@@ -987,7 +974,6 @@ export async function acceptSelfIssueAttestation(args: {
 	);
 	return normalizeAttestation(env.data);
 }
-
 
 /**
  * 端點 29 的 `consentVersion`。與 S03 的 `AMEGO_CONSENT_VERSION` 同理：後端只驗
@@ -1041,7 +1027,6 @@ function normalizeReceiptAuthorization(
 	};
 }
 
-
 /**
  * 賣家可選的三個 action。
  *
@@ -1084,7 +1069,6 @@ export async function respondSellerInvoiceComplaint(args: {
 	);
 	return normalizeComplaint(obj(env.data));
 }
-
 
 /**
  * 端點 18。存草稿。**這是整條發票鏈的第一步**：只有這支會寫
@@ -1139,7 +1123,6 @@ export async function requestSellerTaxExtension(args: {
 	);
 	return normalizeTaxProfile(env.data);
 }
-
 
 /**
  * 端點 32。重寄發票通知信給買家。

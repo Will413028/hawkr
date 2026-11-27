@@ -7,7 +7,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/timeutil"
 )
 
-
 const trackTick = time.Hour
 
 const periodStartFastHours = 4

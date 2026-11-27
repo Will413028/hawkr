@@ -22,7 +22,6 @@ import (
 	invoicemq "github.com/Will413028/hawkr/invoice-service/internal/mq"
 )
 
-
 type dlClaim struct {
 	id              int64
 	leaseUntil      time.Time
@@ -302,7 +301,6 @@ func (r *recordingRefundReprocessor) ReprocessFromInbox(_ context.Context, ev do
 	r.seen = append(r.seen, ev.ID)
 	return r.err
 }
-
 
 // TestDeadlineWorker_ClaimHappensBeforeSideEffect 守規則 ①：搶佔在副作用之前。
 //

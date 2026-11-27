@@ -192,7 +192,6 @@ class ProductItem {
     return [];
   }
 
-
   String get displayImage {
     if (imageUrl != null && imageUrl!.isNotEmpty && imageUrl != 'null') {
       return imageUrl!;

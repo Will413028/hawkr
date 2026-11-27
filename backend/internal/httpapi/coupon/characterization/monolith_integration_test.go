@@ -144,13 +144,13 @@ func (b buyerExists) Existing(ctx context.Context, ids []int64) ([]int64, error)
 }
 
 type monolith struct {
-	db       *db.DB
-	identity *identity.Module
-	buyers   *buyer.Module
-	sellers  *seller.Module
-	coupon   *coupon.Module
-	crm      *crm.Module
-	srv      *httptest.Server
+	db         *db.DB
+	identity   *identity.Module
+	buyers     *buyer.Module
+	sellers    *seller.Module
+	coupon     *coupon.Module
+	crm        *crm.Module
+	srv        *httptest.Server
 	adminToken string
 }
 

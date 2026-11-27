@@ -53,7 +53,6 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 function Section({
 	title,
 	hint,
@@ -455,7 +454,6 @@ export default function TaxReviewDetailPage() {
 			) : (
 				<div className="invoice-detail-grid">
 					<div>
-
 						{reviewStatus === "APPROVED_INVOICE_EXEMPT" &&
 						!profile.receiptAuthorized ? (
 							<section className="invoice-section">
@@ -538,12 +536,10 @@ export default function TaxReviewDetailPage() {
 										<tbody>
 											{profile.documents.map((doc) => (
 												<tr key={doc.documentId}>
-
 													<td className="invoice-code">{doc.kind || "—"}</td>
 													<td>{doc.fileName || "—"}</td>
 													<td>{formatDateTime(doc.uploadedAt)}</td>
 													<td>
-
 														{doc.fileDownloadPath ? (
 															<a
 																className="invoice-doc-link"
@@ -595,7 +591,6 @@ export default function TaxReviewDetailPage() {
 								) : null}
 							</div>
 						</Section>
-
 
 						<Section
 							title="審核備註"
@@ -730,7 +725,6 @@ export default function TaxReviewDetailPage() {
 								</>
 							)}
 						</section>
-
 
 						<section className="invoice-section">
 							<h2 className="invoice-section__title">延長申請</h2>
@@ -874,7 +868,6 @@ export default function TaxReviewDetailPage() {
 											<option value="">不指定</option>
 											{(profile?.documents ?? []).map((doc) => (
 												<option key={doc.documentId} value={doc.documentId}>
-
 													{doc.kind ? `${doc.kind}｜` : ""}
 
 													{doc.fileName || `文件 #${doc.documentId}`}

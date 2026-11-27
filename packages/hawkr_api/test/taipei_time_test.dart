@@ -406,13 +406,7 @@ void main() {
       'an unmarked wall clock reads the same relative label from a UTC-5 device',
       () {
         final instant = tryParseTaipeiInstant('2026-07-30 08:30:00')!;
-        final now = DateTime.utc(
-          2026,
-          7,
-          30,
-          2,
-          30,
-        );
+        final now = DateTime.utc(2026, 7, 30, 2, 30);
         expect(taipeiTimeAgo(instant, now: now), const TimeAgoHours(2));
       },
     );

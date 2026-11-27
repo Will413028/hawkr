@@ -17,7 +17,6 @@ WHERE store_id = $1
 FOR UPDATE
 `
 
-// 鎖定店家的開通閘門副本（PayoutAccountChanged 的訂閱者；payment 的帳戶列已在同一個 transaction 先鎖，全域鎖順序 payment 先於 seller）。
 func (q *Queries) LockPayoutCapability(ctx context.Context, storeID int64) (bool, error) {
 	row := q.db.QueryRow(ctx, lockPayoutCapability, storeID)
 	var transfers_active bool
@@ -41,7 +40,6 @@ type UpsertPayoutCapabilityParams struct {
 	Now             time.Time
 }
 
-// 寫入 payment 發布的轉帳能力；沒有列時建立。
 func (q *Queries) UpsertPayoutCapability(ctx context.Context, arg UpsertPayoutCapabilityParams) error {
 	_, err := q.db.Exec(ctx, upsertPayoutCapability,
 		arg.StoreID,

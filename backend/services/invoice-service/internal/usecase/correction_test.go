@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type corrOps struct {
 	domain.OperationRepository
 	holdOK         bool
@@ -39,10 +38,10 @@ type corrOps struct {
 	keyByType      map[string]string
 	gotOpKey       string
 	gotOpType      string
-	order *[]string
+	order          *[]string
 
 	voidGateHeld bool
-	byKey map[string]domain.Operation
+	byKey        map[string]domain.Operation
 }
 
 func (f *corrOps) GetByKey(_ context.Context, key string) (domain.Operation, error) {
@@ -111,15 +110,15 @@ func (f *corrOps) ReleaseHold(_ context.Context, _ int64, _ time.Time) (bool, er
 
 type corrDocs struct {
 	domain.DocumentRepository
-	reviseOK   bool
-	reviseErr  error
-	deleteCall int
-	insertCall int
-	reviseCall int
-	lockCalls  int
-	gotRevise  domain.ReviseDocumentSnapshot
-	gotLines   []domain.NewDocumentLine
-	lockErr    error
+	reviseOK           bool
+	reviseErr          error
+	deleteCall         int
+	insertCall         int
+	reviseCall         int
+	lockCalls          int
+	gotRevise          domain.ReviseDocumentSnapshot
+	gotLines           []domain.NewDocumentLine
+	lockErr            error
 	docSnapshotVersion int32
 	order              *[]string
 
@@ -274,7 +273,7 @@ type corrOrders struct {
 	err     error
 	calls   int
 	order   *[]string
-	got domain.ReviseSnapshotInput
+	got     domain.ReviseSnapshotInput
 }
 
 // ReviseOrderInvoiceSnapshot **鏡射 order-service 的必填驗證**。
@@ -569,8 +568,8 @@ func submitInput(f CorrectionFacts) SubmitCorrectionInput {
 		Revised: domain.ReviseDocumentSnapshot{
 			ExpectedVersion: 3,
 			DocumentKind:    codemeta.InvoiceDocumentKindB2c.Value,
-			RecipientTaxID: domain.B2CBuyerIdentifier,
-			SalesAmount:    1050, TotalAmount: 1050,
+			RecipientTaxID:  domain.B2CBuyerIdentifier,
+			SalesAmount:     1050, TotalAmount: 1050,
 		},
 	}
 }
@@ -730,7 +729,6 @@ func TestGatherCorrectionFacts_ExistingAllowanceBlocksVoid(t *testing.T) {
 		t.Fatal("已有 ALLOWANCE 時 NoExistingAllowance 必須為 false")
 	}
 }
-
 
 type intakeDocs struct {
 	corrDocs
@@ -1153,7 +1151,6 @@ func TestCorrectionIntake_PicksCurrentDocumentNotSupersededOriginal(t *testing.T
 	}
 }
 
-
 func intakeFixtureFor(t *testing.T, doc domain.Document, lines []domain.DocumentLine) (*corrHarness, *CorrectionIntake) {
 	t.Helper()
 	h := newCorrHarness(t)
@@ -1370,9 +1367,9 @@ func TestCorrectionIntake_CompletedReissueStillAllowsNewCorrection(t *testing.T)
 	ops := &intakeOps{listed: []domain.Operation{{ID: 3003, Status: codemeta.InvoiceOperationStatusReady.Value}}}
 	ops.corrOps = corrOps{holdOK: true, releaseOK: true, promoteOK: true, order: h.calls}
 	intake := NewCorrectionIntake(CorrectionIntakeDeps{
-		Documents:  docs,
-		Operations: ops,
-		Accounts:   &intakeAccounts{acct: domain.ProviderAccount{ID: 5, Status: codemeta.InvoiceProviderAccountStatusActive.Value}},
+		Documents:   docs,
+		Operations:  ops,
+		Accounts:    &intakeAccounts{acct: domain.ProviderAccount{ID: 5, Status: codemeta.InvoiceProviderAccountStatusActive.Value}},
 		Corrections: &fakeCorrections{},
 		Tracks:      &corrTracks{},
 	}, h.uc)

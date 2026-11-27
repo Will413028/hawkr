@@ -28,8 +28,6 @@ import {
 	toLocalInput,
 } from "../merchants/[id]/measure";
 
-
-
 export interface ActionState {
 	/** 隱藏的動作（伺服器說不能做且不需要說明）不渲染。 */
 	visible: boolean;
@@ -85,7 +83,6 @@ export function actionBar(measure: Measure): ActionBar {
 		decideRemediation: visibleWhen(measure.canDecideRemediation),
 	};
 }
-
 
 export interface UpdateForm {
 	/** 給賣家的理由。 */
@@ -283,7 +280,6 @@ export function buildUpdateMeasure(
 	return { measure: next, updateMask: fieldMask(MeasureSchema, paths) };
 }
 
-
 export type DecideKind = "appeal" | "remediation";
 export const DECISION_REASON_MAX_LENGTH = 2000;
 
@@ -357,7 +353,6 @@ export function buildDecideRemediation(
 	};
 }
 
-
 /** 撤銷可以選的原因：契約的 AdminRevokeReason 本來就只有管理員能選的值（系統寫入的原因不在裡面），這裡只去掉 UNSPECIFIED。順序同 enum。 */
 export type AdminRevokeOption = Exclude<
 	AdminRevokeReason,
@@ -392,7 +387,6 @@ export function buildRevoke(
 		etag: measure.etag,
 	};
 }
-
 
 export interface ScheduleForm {
 	/** 新的複審期限，`datetime-local` 的值（台北時間）。 */
@@ -432,14 +426,12 @@ export function buildScheduleReview(
 	};
 }
 
-
 export function buildCreateNote(
 	measureId: string,
 	body: string,
 ): MessageInitShape<typeof CreateMeasureNoteRequestSchema> {
 	return { measureId, note: { body: trimGoSpace(body) } };
 }
-
 
 /** 「賣家提出時是第 {r} 版，目前是第 {c} 版」。 */
 export function submittedVersionText(

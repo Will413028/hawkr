@@ -5,7 +5,6 @@ import InvoiceAuditConsole from "@/features/invoices/components/InvoiceAuditCons
 import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 
-
 export default function InvoiceAuditLogsPage() {
 	const searchParams = useSearchParams();
 	return (

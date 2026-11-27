@@ -218,9 +218,7 @@ export default function DelegatedOrderDetailPanel({
 				) : null}
 			</section>
 
-
 			<section className="adm-order-lock">
-
 				<AppIcon name={terminal ? "info" : "lock"} size={22} />
 				{terminal ? (
 					<>
@@ -243,7 +241,6 @@ export default function DelegatedOrderDetailPanel({
 					</>
 				)}
 			</section>
-
 
 			{summary?.target.storeId ? (
 				<a

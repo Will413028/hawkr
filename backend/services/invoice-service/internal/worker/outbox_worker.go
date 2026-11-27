@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 type outboxRow struct{ ev domain.OutboxEvent }
 
 func (r outboxRow) OutboxID() int64         { return r.ev.ID }
@@ -46,7 +45,7 @@ func (UnresolvedSellerAccountResolver) ResolveSellerAccountID(context.Context, i
 }
 
 type outboxRepo struct {
-	repo domain.OutboxRepository
+	repo         domain.OutboxRepository
 	parkInterval time.Duration
 	log          *zap.Logger
 }

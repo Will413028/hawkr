@@ -61,8 +61,7 @@ export function saveMarketListSnapshot(snapshot: MarketListSnapshot): void {
 			STORAGE_KEY,
 			JSON.stringify({ ...snapshot, savedAt: Date.now() }),
 		);
-	} catch {
-	}
+	} catch {}
 }
 
 /**
@@ -94,7 +93,6 @@ export function takeMarketListSnapshot(key: string): MarketListSnapshot | null {
 	const snapshot = readStoredMarketListSnapshot(key);
 	try {
 		window.sessionStorage.removeItem(STORAGE_KEY);
-	} catch {
-	}
+	} catch {}
 	return snapshot;
 }

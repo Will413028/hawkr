@@ -10,8 +10,7 @@ part 'order_status_notifier.g.dart';
 class OrderStatusEvent {
   final String? orderId;
   final String? orderSn;
-  final String
-  eventType;
+  final String eventType;
   final int? status;
   final Map<String, dynamic>? data;
   final DateTime timestamp;

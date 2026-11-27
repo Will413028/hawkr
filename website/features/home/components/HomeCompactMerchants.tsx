@@ -170,7 +170,6 @@ export default function HomeCompactMerchants({
 
 	return (
 		<section className="home-fixed-section relative z-[2]" aria-label={title}>
-
 			<div className="home-section-surface rounded-[24px] border border-[rgba(58,42,26,0.07)] bg-hk-home-postcard px-[18px] pt-[18px] shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_12px_36px_-22px_rgba(76,50,20,0.18)] dark:border-[rgba(245,222,165,0.12)] dark:shadow-[0_12px_36px_-22px_rgba(0,0,0,0.55)]">
 				<header className="mb-4 flex items-center justify-between gap-3 px-1">
 					<h2 className="m-0 text-[1.625rem] font-black leading-tight text-hk-heading">
@@ -239,7 +238,6 @@ export default function HomeCompactMerchants({
 									</span>
 								</Link>
 								<div className="flex flex-1 flex-col px-2.5 pb-2.5 pt-0">
-
 									<Link
 										href={seller.href}
 										draggable={false}

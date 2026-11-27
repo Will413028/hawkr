@@ -7,7 +7,6 @@ import {
 } from "../lib/products/descriptionEditorJs";
 import type { ProductDescription } from "../lib/products/seller-repo";
 
-
 test("fromEditorData maps a list block to backend listJson (ordered flag + items)", () => {
 	const saved = fromEditorData({
 		blocks: [

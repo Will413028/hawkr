@@ -19,7 +19,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-
 const bypassProbeCode int32 = 9331
 
 func bypassProbeData() *pb.SellerProviderAccountData {
@@ -111,7 +110,6 @@ func probeCall(h *Holder, c *gin.Context) (*pb.GetProviderAccountForAdminRespons
 	}
 	return resp, true
 }
-
 
 func fetchProviderHealth(h *Holder, ctx context.Context) (*pb.GetProviderAccountForAdminResponse, error) {
 	return h.Invoice.HealthCheckProviderAccountForAdmin(ctx,

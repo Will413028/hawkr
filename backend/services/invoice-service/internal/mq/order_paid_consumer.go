@@ -95,9 +95,9 @@ func (c *OrderPaidConsumer) Handle(ctx context.Context, routingKey string, body 
 		AggregateRef:     &aggregateRef,
 		Payload:          json.RawMessage(body),
 		Status:           inboxStatusReceived,
-		NextAttemptAt: now.Add(handlerLease),
-		OccurredAt:    occurredAt,
-		Now:           now,
+		NextAttemptAt:    now.Add(handlerLease),
+		OccurredAt:       occurredAt,
+		Now:              now,
 	})
 	if err != nil {
 		return fmt.Errorf("invoice: order.paid %s: insert inbox: %w", p.OrderNo, err)

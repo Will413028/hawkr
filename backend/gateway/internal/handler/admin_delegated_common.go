@@ -22,7 +22,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-
 var delegatedIdempotencyKeyRE = middleware.IdempotencyKeyPattern
 
 var delegatedVersionRE = regexp.MustCompile(`^\d{1,19}$`)
@@ -55,8 +54,8 @@ func resolveDelegatedRequest(c *gin.Context, requireIdempotency bool) (*delegate
 	}
 
 	req := &delegatedRequest{
-		Session: session,
-		StoreID: storeID,
+		Session:       session,
+		StoreID:       storeID,
 		RequestID:     requestTraceValue(c, "request_id", "X-Request-Id"),
 		CorrelationID: requestTraceValue(c, "trace_id", "x-trace-id"),
 		UserAgent:     c.GetHeader("User-Agent"),
@@ -229,9 +228,9 @@ func respondDelegatedMutation(c *gin.Context, result *delegation.Result) {
 }
 
 type delegatedProductMutationData struct {
-	AuditLogID string `json:"auditLogId"`
-	Version    string `json:"version"`
-	Resource   any    `json:"resource"`
+	AuditLogID            string                       `json:"auditLogId"`
+	Version               string                       `json:"version"`
+	Resource              any                          `json:"resource"`
 	CertificationWarnings []CertificationWarningOutput `json:"certificationWarnings"`
 }
 

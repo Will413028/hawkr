@@ -26,7 +26,6 @@ type AddTopupReversalParams struct {
 	ID     uuid.UUID
 }
 
-// 累加補差額轉帳這次撤回的額度（同 transaction 已鎖擁有它的退款列；超過退款額時 CHECK refunds_topup_reversed_check 擋下）。
 func (q *Queries) AddTopupReversal(ctx context.Context, arg AddTopupReversalParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, addTopupReversal, arg.Amount, arg.Now, arg.ID)
 	var i PaymentRefund
@@ -75,7 +74,6 @@ type AnomalyReversalParams struct {
 	ID     uuid.UUID
 }
 
-// 撤回與 provider 不符、前置條件不成立或查回連續失敗：REVERSING 進 ANOMALY（佔住目標的額度，補掃不再重試），原因記在 reason。
 func (q *Queries) AnomalyReversal(ctx context.Context, arg AnomalyReversalParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, anomalyReversal, arg.Reason, arg.Now, arg.ID)
 	var i PaymentRefundReversal
@@ -114,7 +112,6 @@ type ApplyRefundReversalParams struct {
 	ID         uuid.UUID
 }
 
-// 撤回成功：REVERSING → REVERSED 並記 provider 的撤回 ID（與目標累計撤回額的累加、彙總狀態的重算在同一個 transaction）。
 func (q *Queries) ApplyRefundReversal(ctx context.Context, arg ApplyRefundReversalParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, applyRefundReversal, arg.ExternalID, arg.Now, arg.ID)
 	var i PaymentRefundReversal
@@ -175,7 +172,6 @@ FROM payment.refunds
 WHERE payment_order_id = $1 AND topup_status = 'DONE'
 `
 
-// 訂單應收底下成功的補差額轉帳的剩餘可撤額度加總（退款額 - 已撤回，不扣預留；預留由 PendingReversalTotal 扣）。
 func (q *Queries) DoneTopupCapacity(ctx context.Context, paymentOrderID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, doneTopupCapacity, paymentOrderID)
 	var total int64
@@ -200,7 +196,6 @@ type InsertRefundReversalParams struct {
 	Now              time.Time
 }
 
-// 開始收回時為每個目標寫一列撤回（呼叫端已鎖付款列與訂單應收列、轉帳列與相關退款列）。
 func (q *Queries) InsertRefundReversal(ctx context.Context, arg InsertRefundReversalParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, insertRefundReversal,
 		arg.ID,
@@ -271,7 +266,6 @@ ORDER BY id
 FOR UPDATE
 `
 
-// 依 ID 升序鎖一組退款列（撤回落地時鎖擁有者退款與補差額轉帳的擁有者）。
 func (q *Queries) LockRefundsByID(ctx context.Context, ids []uuid.UUID) ([]PaymentRefund, error) {
 	rows, err := q.db.Query(ctx, lockRefundsByID, ids)
 	if err != nil {
@@ -331,7 +325,6 @@ type MarkRefundReversalCalledParams struct {
 	ID  uuid.UUID
 }
 
-// 撤回 provider 之前先記「已呼叫」的時刻（這把鍵已記過的保留最早的）。只有 REVERSING 的列寫。
 func (q *Queries) MarkRefundReversalCalled(ctx context.Context, arg MarkRefundReversalCalledParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, markRefundReversalCalled, arg.Now, arg.ID)
 	var i PaymentRefundReversal
@@ -361,7 +354,6 @@ FROM payment.refund_reversals
 WHERE payment_order_id = $1 AND target_refund_id IS NULL AND status IN ('REVERSING', 'ANOMALY')
 `
 
-// 原轉帳上進行中與 ANOMALY 的撤回列額度（還沒累加到 transfers.reversed_amount，佔住剩餘可撤額）。
 func (q *Queries) OpenReversalTotalOnTransfer(ctx context.Context, paymentOrderID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, openReversalTotalOnTransfer, paymentOrderID)
 	var total int64
@@ -405,7 +397,6 @@ WHERE refund_id = $1
 ORDER BY seq
 `
 
-// 一筆退款的全部撤回列（依 seq）。
 func (q *Queries) RefundReversalsByRefund(ctx context.Context, refundID uuid.UUID) ([]PaymentRefundReversal, error) {
 	rows, err := q.db.Query(ctx, refundReversalsByRefund, refundID)
 	if err != nil {
@@ -457,7 +448,6 @@ type ReleaseReversalParams struct {
 	ID     uuid.UUID
 }
 
-// 撤回的終局失敗（provider 永久拒絕，或查回證明上一次不存在又過了最短等待）：REVERSING 進 RELEASED，原因記在 reason。
 func (q *Queries) ReleaseReversal(ctx context.Context, arg ReleaseReversalParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, releaseReversal, arg.Reason, arg.Now, arg.ID)
 	var i PaymentRefundReversal
@@ -499,7 +489,6 @@ type ResolveReversalDoneParams struct {
 	ID         uuid.UUID
 }
 
-// 後台人工結案（撤回的 ANOMALY）：provider 確實撤回了（external_id 是證據），進 REVERSED。
 func (q *Queries) ResolveReversalDone(ctx context.Context, arg ResolveReversalDoneParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, resolveReversalDone, arg.ExternalID, arg.Now, arg.ID)
 	var i PaymentRefundReversal
@@ -538,7 +527,6 @@ type ResolveReversalReleasedParams struct {
 	ID     uuid.UUID
 }
 
-// 後台人工結案（撤回的 ANOMALY）：確認 provider 沒有撤回，釋出。
 func (q *Queries) ResolveReversalReleased(ctx context.Context, arg ResolveReversalReleasedParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, resolveReversalReleased, arg.Reason, arg.Now, arg.ID)
 	var i PaymentRefundReversal
@@ -577,7 +565,6 @@ type ReversibleTopupsRow struct {
 	Free       int64
 }
 
-// 訂單應收底下成功的補差額轉帳（DONE）與各自的剩餘可撤額度（退款額 - 已撤回 - 進行中與 ANOMALY 的撤回列），依退款 ID 升序；已沒有額度的不列出。呼叫端已鎖付款列、訂單應收列與轉帳列。
 func (q *Queries) ReversibleTopups(ctx context.Context, paymentOrderID uuid.UUID) ([]ReversibleTopupsRow, error) {
 	rows, err := q.db.Query(ctx, reversibleTopups, paymentOrderID)
 	if err != nil {
@@ -613,7 +600,6 @@ type ReversingRefundIDsParams struct {
 	Batch      int32
 }
 
-// 週期掃描：有 REVERSING 的撤回列、閒置超過門檻的退款（ANOMALY 不在內，partial index refund_reversals_reversing）。
 func (q *Queries) ReversingRefundIDs(ctx context.Context, arg ReversingRefundIDsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, reversingRefundIDs, arg.IdleBefore, arg.AfterID, arg.Batch)
 	if err != nil {
@@ -641,7 +627,6 @@ WHERE refund_id = $1 AND status = 'REVERSING'
 ORDER BY seq
 `
 
-// 一筆退款進行中的撤回列（依 seq）：撤回 job 逐列收斂。
 func (q *Queries) ReversingReversalsByRefund(ctx context.Context, refundID uuid.UUID) ([]PaymentRefundReversal, error) {
 	rows, err := q.db.Query(ctx, reversingReversalsByRefund, refundID)
 	if err != nil {
@@ -694,7 +679,6 @@ type RotateReversalKeyParams struct {
 	OldKey uuid.UUID
 }
 
-// 撤回被 provider 已知拒絕（可重試、沒有執行）：換新的撤回冪等鍵（也是新的嘗試 ID），清掉呼叫時刻與查回失敗次數，不計任何期限。
 func (q *Queries) RotateReversalKey(ctx context.Context, arg RotateReversalKeyParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, rotateReversalKey, arg.Now, arg.ID, arg.OldKey)
 	var i PaymentRefundReversal
@@ -742,8 +726,6 @@ type SettleRefundReversalParams struct {
 	ID  uuid.UUID
 }
 
-// 重算退款列上向賣家收回的彙總（呼叫端已鎖付款列與訂單應收列與該退款列，撤回列剛改完）：有 ANOMALY 的列是 ANOMALY，其次有 REVERSING 的是 REVERSING，其次有 RELEASED 的是 RELEASED，其餘 REVERSED；
-// reversal_recovered 是 REVERSED 列的加總，reversal_reason 取 ANOMALY 或 RELEASED 列的原因。只改 REVERSING 或 ANOMALY 的彙總（已 RELEASED 或 REVERSED 的不再變）。
 func (q *Queries) SettleRefundReversal(ctx context.Context, arg SettleRefundReversalParams) error {
 	_, err := q.db.Exec(ctx, settleRefundReversal, arg.Now, arg.ID)
 	return err

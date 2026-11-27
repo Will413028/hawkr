@@ -59,7 +59,6 @@ const ENTRY = {
 
 const PAGE = { records: [ENTRY], total: "1", page: "1", pageSize: "20" };
 
-
 test("① actorAdminId／storeId 空字串時不得出現在 query string", () => {
 	const search = buildDelegatedAllAuditLogSearch({
 		page: 1,
@@ -91,7 +90,6 @@ test("① 非空時逐字送出，且沿用 per-session 版的其餘欄位", () 
 	assert.equal(search.get("date_to"), "2026-08-31T23:59:59Z");
 });
 
-
 test("② 換篩選就換 key：否則畫面拿上一組條件的快取當新結果", () => {
 	const base = { page: 1, pageSize: 20, actorAdminId: "", storeId: "" };
 	const a = delegatedAllAuditLogQueryKey(base);
@@ -105,7 +103,6 @@ test("② 換篩選就換 key：否則畫面拿上一組條件的快取當新結
 	assert.notDeepEqual(b, c);
 	assert.equal(a[1], "all-audit-logs");
 });
-
 
 test("跨工作階段的列共用同一份 parser，且每列的 actor／target 可以不同", () => {
 	const parsed = parseDelegatedAuditLogPage({
@@ -170,7 +167,6 @@ test("真的空集合是合法回應，不得與解析失敗混為一談", () =>
 	assert.equal(empty.records.length, 0);
 	assert.equal(empty.total, 0);
 });
-
 
 test("③ 載入中／篩選無結果／真的沒有紀錄，三句話互不相同", async () => {
 	const src = await readFile(

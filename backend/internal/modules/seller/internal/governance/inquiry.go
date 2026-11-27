@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 func errInquiryNotFound() error {
 	m, _ := uitext.For(uitext.ZhTW).CommonError("NOT_FOUND")
 	return apperr.NotFound("%s", m.Text)

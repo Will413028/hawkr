@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 const (
 	raStoreID  = int64(2685914682)
 	raIssuerID = int64(900)
@@ -89,7 +88,6 @@ func raServer(p domain.SellerTaxProfile) *InvoiceServer {
 	return NewInvoiceServer(nil, q, nil, nil, tp, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 }
 
-
 func TestGetSellerReceiptAuthorization_EligibleWithBasis(t *testing.T) {
 	s := raServer(raProfile(codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value, raBasisKey))
 
@@ -149,7 +147,6 @@ func TestGetSellerReceiptAuthorization_RejectsMissingStore(t *testing.T) {
 		t.Fatalf("缺 store_id 應回 InvalidArgument，實得 %v", err)
 	}
 }
-
 
 func TestConfirmSellerReceiptAuthorization_Success(t *testing.T) {
 	s := raServer(raProfile(codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value, raBasisKey))

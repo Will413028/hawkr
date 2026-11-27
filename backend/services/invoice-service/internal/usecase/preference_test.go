@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
 	prefBuyerA int64 = 2623900520
 	prefBuyerB int64 = 2688637900
@@ -304,7 +303,6 @@ func countAliveDefaults(repo *memPrefRepo, buyerID int64) int {
 	return n
 }
 
-
 func TestPreference_Create_MobileBarcode(t *testing.T) {
 	uc, repo := newPreferenceHarness(t)
 
@@ -423,7 +421,6 @@ func TestPreference_Create_LimitIsPerBuyer(t *testing.T) {
 	}
 }
 
-
 func TestPreference_Update_SupersedesAndInheritsDefault(t *testing.T) {
 	uc, repo := newPreferenceHarness(t, carrierRow(401, prefBuyerA, "/AAA***1", true))
 
@@ -471,7 +468,6 @@ func TestPreference_Update_ValidatesAgainstStoredKind(t *testing.T) {
 	}
 }
 
-
 func TestPreference_Delete(t *testing.T) {
 	uc, repo := newPreferenceHarness(t, carrierRow(501, prefBuyerA, "/AAA***1", false))
 
@@ -497,7 +493,6 @@ func TestPreference_Delete_DefaultIsBlocked(t *testing.T) {
 		t.Fatalf("被擋下時不得留下任何刪除痕跡")
 	}
 }
-
 
 func TestPreference_SetDefault_ExactlyOneDefault(t *testing.T) {
 	uc, repo := newPreferenceHarness(t,
@@ -559,7 +554,6 @@ func TestPreference_ClearDefault(t *testing.T) {
 		t.Fatalf("清除預設打到了別人的列：buyer_id 沒有進述詞")
 	}
 }
-
 
 func TestPreference_TierA_ForeignAndMissingAreIdentical(t *testing.T) {
 	uc, _ := newPreferenceHarness(t, carrierRow(901, prefBuyerB, "/BBB***2", false))

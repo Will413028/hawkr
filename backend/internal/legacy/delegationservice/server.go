@@ -114,13 +114,13 @@ func (s *Server) CreateSession(ctx context.Context, req *connect.Request[pb.Crea
 		AdminDisplayName: m.GetActorDisplayName(),
 		StoreID:          storeID,
 		Reason:           fromWire[delegation.DelegationReason](m.GetReasonCode()),
-		CaseReference:  m.CaseReference,
-		Capabilities:   toCapabilities(m.GetRequestedCapabilities()),
-		TTLSeconds:     m.GetRequestedTtlSeconds(),
-		IdempotencyKey: m.GetIdempotencyKey(),
-		RequestID:      m.GetRequestId(),
-		CorrelationID:  m.GetCorrelationId(),
-		UserAgent:      m.GetUserAgent(),
+		CaseReference:    m.CaseReference,
+		Capabilities:     toCapabilities(m.GetRequestedCapabilities()),
+		TTLSeconds:       m.GetRequestedTtlSeconds(),
+		IdempotencyKey:   m.GetIdempotencyKey(),
+		RequestID:        m.GetRequestId(),
+		CorrelationID:    m.GetCorrelationId(),
+		UserAgent:        m.GetUserAgent(),
 	})
 	if err != nil {
 		code, msg, err := s.reject(ctx, "CreateSession", err)
@@ -180,7 +180,6 @@ func (s *Server) RevokeSession(ctx context.Context, req *connect.Request[pb.Revo
 		RevokedAt: formatTimePtr(sess.RevokedAt),
 	}}), nil
 }
-
 
 func parseID(s string) (int64, bool) {
 	v, err := strconv.ParseInt(s, 10, 64)

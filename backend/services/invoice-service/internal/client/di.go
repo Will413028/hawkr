@@ -88,17 +88,17 @@ func newAmegoClient(cfg *config.Config, audits domain.AuditRepository, log *zap.
 	deadlines := amego.Deadlines{
 		Issue: time.Duration(cfg.Amego.TimeoutIssueMS) * time.Millisecond,
 		Query: time.Duration(cfg.Amego.TimeoutQueryMS) * time.Millisecond,
-		List: 20 * time.Second,
-		Time: 5 * time.Second,
+		List:  20 * time.Second,
+		Time:  5 * time.Second,
 	}
 	transport, err := amego.NewTransport(context.Background(), cfg.Amego.BaseURL, cfg.Amego.ProxyCallerKeyFile, deadlines.Issue+5*time.Second)
 	if err != nil {
 		return nil, err
 	}
 	return amego.New(amego.Options{
-		BaseURL:    cfg.Amego.BaseURL,
-		HTTPClient: transport,
-		Audit: &repoAuditSink{repo: audits, log: log},
+		BaseURL:          cfg.Amego.BaseURL,
+		HTTPClient:       transport,
+		Audit:            &repoAuditSink{repo: audits, log: log},
 		AllowRealInvoice: cfg.Amego.AllowRealInvoice,
 		TestInvoice:      cfg.Amego.TestInvoice,
 		RateLimitQPS:     cfg.Amego.RateLimitQPS,

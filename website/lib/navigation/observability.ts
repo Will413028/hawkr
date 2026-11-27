@@ -86,8 +86,7 @@ let pendingRouterOwner:
 function runTelemetrySafely(callback: () => void): void {
 	try {
 		callback();
-	} catch {
-	}
+	} catch {}
 }
 
 function now(): number {
@@ -175,8 +174,7 @@ function eventParams(
 function clearPersistedHardNavigation(): void {
 	try {
 		window.sessionStorage.removeItem(HARD_NAVIGATION_STORAGE_KEY);
-	} catch {
-	}
+	} catch {}
 }
 
 function persistHardNavigation(transaction: NavigationTransaction): void {
@@ -201,8 +199,7 @@ function persistHardNavigation(transaction: NavigationTransaction): void {
 				startedWallAt: transaction.startedWallAt,
 			}),
 		);
-	} catch {
-	}
+	} catch {}
 }
 
 function restoreHardNavigation(): NavigationTransaction | null {
@@ -423,8 +420,7 @@ export function navigateDocument(
 			mode: "hard",
 			...options,
 		});
-	} catch {
-	}
+	} catch {}
 	try {
 		commitDocumentNavigation(url.href, options.replace);
 	} catch (error) {

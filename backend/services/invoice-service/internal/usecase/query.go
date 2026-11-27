@@ -19,20 +19,20 @@ import (
 // 「有人以為可以在這裡開票／發事件」的路。唯一的寫入是 ADM 揭露 P 類資料時的稽核列
 // （§8.1.3(c) 裁定 2），那是讀取的**代價**不是業務寫入，走 audit repository 單列 append。
 type Query struct {
-	issuers    domain.IssuerRepository
-	profiles   domain.SellerTaxProfileRepository
-	accounts   domain.ProviderAccountRepository
-	prefs      domain.BuyerPreferenceRepository
-	documents  domain.DocumentRepository
-	operations domain.OperationRepository
-	complaints domain.ComplaintRepository
-	audit      domain.AuditRepository
-	adjustments domain.AdjustmentRepository
-	corrections domain.CorrectionRequestRepository
-	overview domain.OverviewRepository
-	businessDay domain.BusinessDayRepository
-	cutovers domain.ProviderCutoverRepository
-	unlocks domain.ManualUnlockRepository
+	issuers         domain.IssuerRepository
+	profiles        domain.SellerTaxProfileRepository
+	accounts        domain.ProviderAccountRepository
+	prefs           domain.BuyerPreferenceRepository
+	documents       domain.DocumentRepository
+	operations      domain.OperationRepository
+	complaints      domain.ComplaintRepository
+	audit           domain.AuditRepository
+	adjustments     domain.AdjustmentRepository
+	corrections     domain.CorrectionRequestRepository
+	overview        domain.OverviewRepository
+	businessDay     domain.BusinessDayRepository
+	cutovers        domain.ProviderCutoverRepository
+	unlocks         domain.ManualUnlockRepository
 	cancelledOrders domain.CancelledOrderRepository
 	cfg             IssuanceConfig
 	now             func() time.Time
@@ -89,7 +89,6 @@ func (u *Query) WithClock(now func() time.Time) *Query {
 	return u
 }
 
-
 const (
 	auditActionPIIReveal = "INVOICE_PII_REVEAL"
 
@@ -123,7 +122,6 @@ func (u *Query) recordPIIReveal(ctx context.Context, actorAccountID int64, resou
 	observeAdminPIIReveal()
 	return nil
 }
-
 
 const buyerProfileCap = 20
 
@@ -172,7 +170,6 @@ func (u *Query) ListBuyerProfiles(ctx context.Context, buyerID int64, page, page
 	}
 	return out, nil
 }
-
 
 // ComplaintView 是一件申訴案的完整投影。
 //
@@ -290,7 +287,6 @@ func complaintNotFound() error {
 	return pkgerrors.NewBusiness(bizcode.InvoiceComplaintNotFound, bizcode.Message(bizcode.InvoiceComplaintNotFound))
 }
 
-
 // SellerTaxProfileView 是稅務資格的投影。賣家面與 ADM 面讀的是同一份資料
 // （proto 的 GetTaxReviewForAdminResponse 直接回 SellerTaxProfileData），差別只在
 // 授權方式，故共用同一個 view。
@@ -327,7 +323,6 @@ func (u *Query) GetSellerTaxProfile(ctx context.Context, storeID int64) (SellerT
 func (u *Query) GetTaxReviewForAdmin(ctx context.Context, storeID int64) (SellerTaxProfileView, error) {
 	return u.GetSellerTaxProfile(ctx, storeID)
 }
-
 
 // ProviderAccountView 是 provider 帳號的投影。
 //
@@ -389,7 +384,6 @@ func (u *Query) sellerIssuer(ctx context.Context, storeID int64, notFoundCode in
 	}
 	return domain.Issuer{}, err
 }
-
 
 // AdminDocumentView 是 ADM 的發票詳情（A06 的四層）。
 //
@@ -524,7 +518,6 @@ func (u *Query) logger() *zap.Logger {
 	}
 	return u.log
 }
-
 
 // RetryPolicyView 是 T-I12 要求進 job DTO 的退避參數（前端不得自行猜測）。
 type RetryPolicyView struct {

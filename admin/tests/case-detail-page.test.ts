@@ -1118,7 +1118,6 @@ test("改嚴重度：開對話框送出，請求帶案件的 etag", async () => 
 	assert.equal(changed[0].note, "又有人送醫");
 });
 
-
 function citableReports(count: number, prefix = "r") {
 	return Array.from({ length: count }, (_, i) =>
 		report({

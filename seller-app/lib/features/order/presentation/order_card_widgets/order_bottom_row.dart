@@ -259,7 +259,6 @@ class OrderBottomRow extends ConsumerWidget {
     ];
   }
 
-
   /// 售後申請 — 內聯彈 resolve sheet，提交決策後刷新列表與 lookup 快取。
   /// 複製自 after_sales_screen._AfterSaleCard._showResolve，改用 [onReload]
   /// 作為刷新鉤子並 invalidate [sellerAfterSaleLookupProvider] 讓
@@ -291,8 +290,7 @@ class OrderBottomRow extends ConsumerWidget {
           if (buyerReceiptPhotoUrls.isEmpty) {
             buyerReceiptPhotoUrls = orderDetail.receiptPhotoUrls;
           }
-        } catch (_) {
-        }
+        } catch (_) {}
       }
     } catch (_) {
       if (context.mounted) {

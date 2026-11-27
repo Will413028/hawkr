@@ -320,7 +320,6 @@ export function SellerInvoiceDocumentsPage() {
 				<>
 					<section className="seller-card">
 						<ScrollableTableRegion label={recordsLabel}>
-
 							<table className="hidden seller-table md:table">
 								<caption className="sr-only">{recordsLabel}</caption>
 								<thead>
@@ -581,7 +580,6 @@ function DocumentRow({
 				</Chip>
 			</td>
 			<td>
-
 				<ShipmentStatusChip
 					code={item.shipmentStatus}
 					degraded={shipmentDegraded}

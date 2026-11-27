@@ -13,7 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 const (
 	pBuyerA int64 = 2623900520
 	pBuyerB int64 = 2688637900
@@ -72,7 +71,6 @@ func prefRow(id, buyerID int64, isDefault bool) domain.BuyerPreference {
 		UpdatedAt:        time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC),
 	}
 }
-
 
 // TestPreference_TierA_ByteIdentical 是 §8.1.4(b) 的機械保證。
 //
@@ -146,7 +144,6 @@ func bizCodeOf(t *testing.T, m proto.Message) int32 {
 		return 0
 	}
 }
-
 
 // TestPreference_ProfileIDZeroIsRejected 釘住 §6.1.1「端點 2／3／4 的 profile_id = "0"
 // 一律 400」：它是「清除預設」的哨兵，不是一筆資料。

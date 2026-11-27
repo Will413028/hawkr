@@ -495,8 +495,6 @@ export default function SellerProfileClient() {
 
 				<div className="seller-profile__save-bar">
 					<small className="seller-profile__save-hint">
-
-
 						{!canWrite
 							? delegated
 								? "本工作階段沒有核發店面編輯權限，這裡只能檢視"

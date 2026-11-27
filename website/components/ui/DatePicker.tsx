@@ -495,7 +495,6 @@ export function DatePicker({
 
 	const popoverNode = open ? (
 		<>
-
 			<button
 				type="button"
 				className="hkui-datepicker__scrim"
@@ -650,7 +649,6 @@ export function DatePicker({
 				}
 			/>
 			{name && <input type="hidden" name={name} value={value} />}
-
 
 			{popoverNode && typeof document !== "undefined"
 				? createPortal(popoverNode, document.body)

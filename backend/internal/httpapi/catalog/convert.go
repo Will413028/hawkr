@@ -115,7 +115,7 @@ type view struct {
 	axes        []*pb.OptionAxis
 	skus        []*pb.Sku
 	hashtags    []*pb.ProductHashtag
-	available bool
+	available   bool
 }
 
 func newView(images rpc.Images, p catalog.Product, withAsset bool) (view, error) {

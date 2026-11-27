@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-
 // ReportModule 是通報入口使用的模組方法。
 type ReportModule interface {
 	SubmitReport(context.Context, model.SubmitReportInput) (model.SubmitReportResult, error)

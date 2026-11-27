@@ -5,7 +5,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-
 var (
 	trackRemainingMin = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "invoice_track_remaining_min",

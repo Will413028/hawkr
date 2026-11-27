@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-
 // StoredCodeException 是一個有理由的例外，以（模組、constraint 名）為鍵：同一個 CHECK 的所有值都豁免。
 type StoredCodeException struct {
 	Module     string

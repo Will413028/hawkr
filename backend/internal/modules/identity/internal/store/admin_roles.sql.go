@@ -14,7 +14,6 @@ const adminIDsByEmail = `-- name: AdminIDsByEmail :many
 SELECT id FROM identity.admins WHERE lower(email) = lower($1) ORDER BY id
 `
 
-// 以 email 找管理員（不分大小寫）；email 不是唯一的，多於一筆時由呼叫方要求改用 ID。
 func (q *Queries) AdminIDsByEmail(ctx context.Context, lower string) ([]int64, error) {
 	rows, err := q.db.Query(ctx, adminIDsByEmail, lower)
 	if err != nil {
@@ -39,7 +38,6 @@ const adminRoleHolderExists = `-- name: AdminRoleHolderExists :one
 SELECT EXISTS (SELECT 1 FROM identity.admin_roles WHERE role = $1) AS held
 `
 
-// 有沒有任何管理員持有這個角色。
 func (q *Queries) AdminRoleHolderExists(ctx context.Context, role string) (bool, error) {
 	row := q.db.QueryRow(ctx, adminRoleHolderExists, role)
 	var held bool
@@ -56,7 +54,6 @@ type DeleteAdminRoleParams struct {
 	Role    string
 }
 
-// 撤銷角色；沒有這個角色時回傳 0。刪除會等待持有同一列 FOR SHARE 的 transaction（代行的開始）結束。
 func (q *Queries) DeleteAdminRole(ctx context.Context, arg DeleteAdminRoleParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAdminRole, arg.AdminID, arg.Role)
 	if err != nil {
@@ -77,7 +74,6 @@ type InsertAdminRoleParams struct {
 	Now     time.Time
 }
 
-// 授予角色；已經有時回傳 0。
 func (q *Queries) InsertAdminRole(ctx context.Context, arg InsertAdminRoleParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertAdminRole, arg.AdminID, arg.Role, arg.Now)
 	if err != nil {
@@ -101,7 +97,6 @@ type InsertAdminRoleEventParams struct {
 	Now     time.Time
 }
 
-// 追加一筆授予或撤銷的紀錄。db_user 是連線的 session_user，未經驗證，只供參考。
 func (q *Queries) InsertAdminRoleEvent(ctx context.Context, arg InsertAdminRoleEventParams) error {
 	_, err := q.db.Exec(ctx, insertAdminRoleEvent,
 		arg.AdminID,
@@ -119,8 +114,6 @@ const listAdminRoles = `-- name: ListAdminRoles :many
 SELECT role FROM identity.admin_roles WHERE admin_id = $1 ORDER BY role
 `
 
-// 不鎖的角色讀取：呼叫方已經持有比 identity 更上層的列鎖（排程發布的重驗，鎖著 social 的貼文列），再鎖 identity 的角色列會倒退
-// 鎖順序。正確性由呼叫方的鎖保證，不靠這次讀取。
 func (q *Queries) ListAdminRoles(ctx context.Context, adminID int64) ([]string, error) {
 	rows, err := q.db.Query(ctx, listAdminRoles, adminID)
 	if err != nil {
@@ -145,8 +138,6 @@ const listAdminRolesForShare = `-- name: ListAdminRolesForShare :many
 SELECT role FROM identity.admin_roles WHERE admin_id = $1 ORDER BY role FOR SHARE
 `
 
-// 在呼叫方的 transaction 內讀管理員的角色並鎖住這些列（FOR SHARE）：撤銷的 DELETE 與它互相等待，讀到的角色在 transaction
-// 結束之前不會被撤銷。
 func (q *Queries) ListAdminRolesForShare(ctx context.Context, adminID int64) ([]string, error) {
 	rows, err := q.db.Query(ctx, listAdminRolesForShare, adminID)
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // PrintCvsLabelReq 超商出貨單列印請求
 type PrintCvsLabelReq struct {
 	ShipDate string `json:"shipDate"` // 出貨日期，接受 yyyy-MM-dd 或 yyyyMMdd（首次列印必填，重複列印可不傳）
@@ -176,8 +175,6 @@ type ShippingOnboardingViewResp struct {
 	CreatedAt           string `json:"createdAt"`
 	UpdatedAt           string `json:"updatedAt"`
 }
-
-
 
 // PrintCvsLabel 超商出貨單列印
 // @Summary      超商出貨單列印
@@ -464,7 +461,6 @@ func (h *Holder) CallTcat(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, data)
 }
 
-
 // OnboardCvsShipping 超商 C2C 建店
 // @Summary      超商 C2C 建店
 // @Description  賣家申請超商 C2C 物流建店（7-ELEVEN），呼叫 PayUni 建店 API 取得物流代碼
@@ -686,7 +682,6 @@ func (h *Holder) ToggleShippingOnboarding(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-
 // SellerShippingMethodResp 賣家配送方式回應
 type SellerShippingMethodResp struct {
 	ShippingMethod     string `json:"shippingMethod"`
@@ -698,7 +693,6 @@ type SellerShippingMethodResp struct {
 	Available          bool   `json:"available"`
 	OnboardingRequired bool   `json:"onboardingRequired"`
 }
-
 
 // ListSellerShippingMethods 查詢賣家可用配送方式
 // @Summary      查詢賣家可用配送方式
@@ -757,7 +751,6 @@ func (h *Holder) ListSellerShippingMethods(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, items)
 }
 
-
 // AddStorePickupReq 新增常用門市請求
 type AddStorePickupReq struct {
 	StoreCode     string `json:"storeCode" binding:"required"`
@@ -790,7 +783,6 @@ type BuyerStorePickupResp struct {
 	CreatedAt     string `json:"createdAt"`
 	UpdatedAt     string `json:"updatedAt"`
 }
-
 
 // AddBuyerStorePickup 新增常用門市
 // @Summary      新增常用門市
@@ -1126,7 +1118,6 @@ func (h *Holder) ConfirmCvsShipment(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-
 // OrderLogisticsResp 買家物流追蹤回應（單點狀態，PayUni 無多筆軌跡）
 // 最小揭露：不含 recipientPhone / recipientAddress / labelUrl / sender 資訊
 type OrderLogisticsResp struct {
@@ -1230,7 +1221,7 @@ func (h *Holder) GetOrderLogistics(c *gin.Context) {
 		RecipientName:   d.GetRecipientName(),
 		CreatedAt:       d.GetCreatedAt(),
 		CvsStoreCode:    d.GetCvsStoreCode(),
-		AllowedActions: allowedActionsOf(d, ViewerBuyer),
+		AllowedActions:  allowedActionsOf(d, ViewerBuyer),
 	}
 	response.GrpcResult(c, resp.Code, resp.Message, data)
 }
@@ -1289,7 +1280,7 @@ func (h *Holder) GetSellerShipmentTracking(c *gin.Context) {
 		RecipientName:   d.GetRecipientName(),
 		CreatedAt:       d.GetCreatedAt(),
 		CvsStoreCode:    d.GetCvsStoreCode(),
-		AllowedActions: allowedActionsOf(d, ViewerSeller),
+		AllowedActions:  allowedActionsOf(d, ViewerSeller),
 	}
 	response.GrpcResult(c, resp.Code, resp.Message, data)
 }

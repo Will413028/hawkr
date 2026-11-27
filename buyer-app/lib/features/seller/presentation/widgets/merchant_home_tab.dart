@@ -94,10 +94,8 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     ref.invalidate(feed);
     try {
       await ref.read(feed.future);
-    } catch (_) {
-    }
+    } catch (_) {}
   }
-
 
   Future<void> _openCommentSheet(int postId) async {
     if (!mounted) return;
@@ -114,7 +112,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     if (!mounted) return;
     await ref.read(postEntityStoreProvider.notifier).refresh(postId);
   }
-
 
   /// 貼文封面圖的顯示值（已過 `_toAbsolute`）。
   String _pickImageUrl(Post post) => _toAbsolute(post.imageUrl);
@@ -154,7 +151,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     if (s.startsWith('/')) return '$origin$s';
     return '$origin/$s';
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -391,7 +387,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     ),
   );
 
-
   void _showPostPreviewAt(Offset globalPos, int postId) {
     SystemSound.play(SystemSoundType.click);
     final post = ref.read(postEntityStoreProvider).posts[postId];
@@ -489,7 +484,6 @@ class _MerchantHomeTabState extends ConsumerState<MerchantHomeTab>
     ).whenComplete(() => _previewContext = null);
   }
 }
-
 
 /// 貼文長壓預覽卡。
 ///
@@ -720,7 +714,6 @@ class _StableNetImageState extends State<_StableNetImage> {
     return Container(color: AppColors.dividerLight);
   }
 }
-
 
 /// 雙擊媒體觸發愛心噴發動畫的包裝器。
 ///

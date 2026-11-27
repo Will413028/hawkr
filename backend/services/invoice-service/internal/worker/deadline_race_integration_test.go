@@ -74,7 +74,7 @@ func seedDueInbox(t *testing.T, env *e2eEnv, eventID string, nextAttemptAt time.
 	t.Helper()
 	inbox := postgres.NewInboxRepository(env.pool)
 	id, inserted, err := inbox.Insert(context.Background(), domain.NewInboxEvent{
-		EventID: eventID,
+		EventID:          eventID,
 		EventType:        string(pkgmq.EventTypeOrderPaid),
 		RoutingKey:       "order.paid",
 		Exchange:         "hawkr.order",
@@ -110,7 +110,6 @@ func inboxRowState(t *testing.T, env *e2eEnv, id int64) (status string, attempt 
 	}
 	return
 }
-
 
 // TestIntegration_DLRace_ClaimIsAtomicUnderRealConcurrency 攻擊「兩個 pod 同時掃到同一列」。
 //
@@ -153,7 +152,6 @@ func TestIntegration_DLRace_ClaimIsAtomicUnderRealConcurrency(t *testing.T) {
 			"同一列會被多個副本同時處理", racers, got)
 	}
 }
-
 
 // TestIntegration_DLRace_TwoPodsProduceOneInvoice 攻擊整支 DeadlineWorker，不只 SQL。
 //
@@ -242,7 +240,6 @@ func TestIntegration_DLRace_TwoPodsRealIssuanceOneDocument(t *testing.T) {
 		t.Fatalf("ORD GetOrderInvoiceSnapshot 被呼叫 %d 次，want 1", got)
 	}
 }
-
 
 // TestIntegration_DLRace_ExpiredLeaseLetsASecondPodInWhileTheFirstStillRuns 是本檔最重要的一支。
 //
@@ -406,7 +403,6 @@ func TestIntegration_DLRace_ZombieCannotResurrectACompletedRow(t *testing.T) {
 	}
 }
 
-
 // TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent 攻擊「持有者在
 // 副作用做到一半就消失」。
 //
@@ -482,7 +478,6 @@ func TestIntegration_DLRace_CrashMidSideEffectIsRecoveredAndIdempotent(t *testin
 		t.Fatalf("接手成功後狀態 = %s，want PROCESSED", status)
 	}
 }
-
 
 // TestIntegration_DLRace_RunningHandlerIsNotPreemptedByARealScan 用**真的**
 // DeadlineWorker 打真的 DB，驗 handlerLease 擋得住兜底掃描。

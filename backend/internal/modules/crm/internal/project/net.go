@@ -16,8 +16,8 @@ func contribution(s state) int64 {
 }
 
 type step struct {
-	Next state
-	Delta int64
+	Next    state
+	Delta   int64
 	Changed bool
 }
 

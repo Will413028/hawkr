@@ -173,7 +173,6 @@ export default function DelegatedOrdersPage() {
 				subtitle="沿用賣家工作區的查詢體驗，但履約仍由賣家本人負責"
 				toolbar={
 					<>
-
 						<div className="adm-orders__notice" role="note">
 							<AppIcon name="lock" size={20} />
 
@@ -199,7 +198,6 @@ export default function DelegatedOrdersPage() {
 							))}
 						</div>
 						<div className="adm-orders__filters">
-
 							<div className="seller-orders__search">
 								<AppIcon name="search" />
 								<input
@@ -308,7 +306,6 @@ export default function DelegatedOrdersPage() {
 								) : records.length === 0 ? (
 									<tr>
 										<td colSpan={7}>
-
 											{emptyCopy ? (
 												<SellerEmptyState
 													variant="orders"
@@ -378,7 +375,6 @@ export default function DelegatedOrdersPage() {
 												</span>
 											</td>
 											<td>
-
 												{shippingStatusText(
 													order.shippingStatus,
 													order.shippingStatusLabel,

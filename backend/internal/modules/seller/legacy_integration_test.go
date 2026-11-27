@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-
 type legacyWorld struct {
 	exposed, pending, suspended, deleting, closed, reopened Store
 	closedAccount                                           int64

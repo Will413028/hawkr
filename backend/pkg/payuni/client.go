@@ -266,7 +266,6 @@ func (c *Client) GetSellerStatus(ctx context.Context, merID string) (*SellerStat
 		return nil, fmt.Errorf("decrypt failed: %w", err)
 	}
 
-
 	vals, err := url.ParseQuery(decryptedJson)
 	if err != nil {
 		return nil, fmt.Errorf("parse decrypted query string failed: %w", err)

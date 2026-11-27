@@ -43,7 +43,6 @@ type AddProspectContactsParams struct {
 	Primaries  []bool
 }
 
-// 四個陣列逐項對應；match_keys 的空字串是沒有比對鍵（NULL）。每個類型恰好一個主要的由 deferred 外鍵在 commit 時檢查。
 func (q *Queries) AddProspectContacts(ctx context.Context, arg AddProspectContactsParams) error {
 	_, err := q.db.Exec(ctx, addProspectContacts,
 		arg.ProspectID,
@@ -135,7 +134,6 @@ type ArchiveProspectParams struct {
 	ProspectID int64
 }
 
-// 封存：圖片欄位清成 NULL（引用由呼叫方記成退場、同步 job 解除）；聯絡方式留著，live 讓出統編的唯一性、不再被比對。
 func (q *Queries) ArchiveProspect(ctx context.Context, arg ArchiveProspectParams) (SellerProspect, error) {
 	row := q.db.QueryRow(ctx, archiveProspect, arg.AdminID, arg.Now, arg.ProspectID)
 	var i SellerProspect
@@ -189,7 +187,6 @@ type CarryProspectTaxIDParams struct {
 	WinnerID int64
 }
 
-// 贏家沒有統編時收下輸家的；呼叫方已先清掉輸家的統編（兩列都 live，同一個號碼不能短暫並存）。
 func (q *Queries) CarryProspectTaxID(ctx context.Context, arg CarryProspectTaxIDParams) (SellerProspect, error) {
 	row := q.db.QueryRow(ctx, carryProspectTaxID,
 		arg.TaxID,
@@ -263,7 +260,6 @@ type ConfirmDistinctProspectsParams struct {
 	Others     []int64
 }
 
-// 管理員確認 prospect_id 與 others 不是同一家：每一對較小的 ID 在前，已標記的略過（保留第一次的管理員與時間）。
 func (q *Queries) ConfirmDistinctProspects(ctx context.Context, arg ConfirmDistinctProspectsParams) error {
 	_, err := q.db.Exec(ctx, confirmDistinctProspects,
 		arg.ProspectID,
@@ -294,7 +290,6 @@ type ConvertProspectParams struct {
 	ProspectID int64
 }
 
-// 轉成店家：只有 ACTIVE 的列可以轉（二次轉換的防線，0 列）；同一個店家只能被一個業者認領（prospects_converted_store）。
 func (q *Queries) ConvertProspect(ctx context.Context, arg ConvertProspectParams) (SellerProspect, error) {
 	row := q.db.QueryRow(ctx, convertProspect,
 		arg.StoreID,
@@ -347,7 +342,6 @@ type CopyProspectCategoriesParams struct {
 	LoserID  int64
 }
 
-// 合併：輸家的分類補進贏家（已有的略過）；輸家的分類由呼叫方接著清掉。
 func (q *Queries) CopyProspectCategories(ctx context.Context, arg CopyProspectCategoriesParams) error {
 	_, err := q.db.Exec(ctx, copyProspectCategories, arg.WinnerID, arg.LoserID)
 	return err
@@ -384,7 +378,6 @@ type CreateProspectParams struct {
 	Now             time.Time
 }
 
-// 建立業者；聯絡方式與分類在同一個 transaction 內另外寫入。
 func (q *Queries) CreateProspect(ctx context.Context, arg CreateProspectParams) (SellerProspect, error) {
 	row := q.db.QueryRow(ctx, createProspect,
 		arg.DisplayName,
@@ -439,7 +432,6 @@ const currentStoreExists = `-- name: CurrentStoreExists :one
 SELECT EXISTS (SELECT 1 FROM seller.stores WHERE store_id = $1 AND status <> 'CLOSED')
 `
 
-// 轉成店家前的存在性驗證：必須是目前的 stint（status 不是 CLOSED）。
 func (q *Queries) CurrentStoreExists(ctx context.Context, storeID int64) (bool, error) {
 	row := q.db.QueryRow(ctx, currentStoreExists, storeID)
 	var exists bool
@@ -451,7 +443,6 @@ const deleteDistinctPairsOf = `-- name: DeleteDistinctPairsOf :exec
 DELETE FROM seller.prospect_distinct_pairs WHERE low_prospect_id = $1 OR high_prospect_id = $1
 `
 
-// 合併：輸家的配對（含與贏家的那一對：明確合併一對標記為不是同一家的業者，就是撤銷那個標記）全部刪除。
 func (q *Queries) DeleteDistinctPairsOf(ctx context.Context, lowProspectID int64) error {
 	_, err := q.db.Exec(ctx, deleteDistinctPairsOf, lowProspectID)
 	return err
@@ -471,7 +462,6 @@ WITH reasons AS (
     JOIN seller.prospects pb ON pb.prospect_id = cb.prospect_id AND pb.status = 'ACTIVE'
     WHERE ca.match_key IS NOT NULL
 ), candidates AS (
-    -- matched_on：這一對命中的原因（NAME 或比對鍵的種類 EMAIL、PHONE、DOMAIN、SOCIAL，值同 MatchReason），排序固定。
     SELECT left_id, right_id, array_agg(reason ORDER BY reason)::text[] AS matched_on
     FROM reasons
     GROUP BY left_id, right_id
@@ -502,8 +492,6 @@ type DuplicateProspectPairsRow struct {
 	MatchedOn        []string
 }
 
-// 疑似重複的清單（ADR 2026-10-04-prospect-contact-points-and-matching D4）：尚未處理的候選配對，來源是名稱相同（忽略大小寫；頭尾空白由 CHECK 排除）
-// 與比對鍵相同（並行建立漏網的），兩邊都是 ACTIVE，排除已標記不是同一家的。左邊的 ID 較小讓一對只出現一次；以 (左, 右) 的 ID 做 keyset。
 func (q *Queries) DuplicateProspectPairs(ctx context.Context, arg DuplicateProspectPairsParams) ([]DuplicateProspectPairsRow, error) {
 	rows, err := q.db.Query(ctx, duplicateProspectPairs, arg.AfterLeftID, arg.AfterRightID, arg.PageSize)
 	if err != nil {
@@ -595,7 +583,6 @@ FROM (
 WHERE c.prospect_id = $1 AND c.kind = pick.kind AND c.value = pick.value
 `
 
-// 有聯絡方式卻沒有主要的類型，把值排序最前的那一列補成主要的（合併帶入的類型）。
 func (q *Queries) EnsureProspectPrimaries(ctx context.Context, prospectID int64) error {
 	_, err := q.db.Exec(ctx, ensureProspectPrimaries, prospectID)
 	return err
@@ -634,7 +621,6 @@ type ListProspectsParams struct {
 	PageSize       int32
 }
 
-// admin 清單：status 沒指定時只看 ACTIVE；關鍵字（ILIKE，呼叫方已跳脫 % _ \）找名稱與三段文字；新到舊的 keyset。
 func (q *Queries) ListProspects(ctx context.Context, arg ListProspectsParams) ([]SellerProspect, error) {
 	rows, err := q.db.Query(ctx, listProspects,
 		arg.Status,
@@ -703,7 +689,6 @@ type LiveProspectByTaxIDRow struct {
 	Status     string
 }
 
-// 統編目前的持有者與它的狀態（live 的列；T1）。
 func (q *Queries) LiveProspectByTaxID(ctx context.Context, taxID *string) (LiveProspectByTaxIDRow, error) {
 	row := q.db.QueryRow(ctx, liveProspectByTaxID, taxID)
 	var i LiveProspectByTaxIDRow
@@ -715,7 +700,6 @@ const lockProspectTaxID = `-- name: LockProspectTaxID :exec
 SELECT pg_advisory_xact_lock(hashtextextended('seller.prospect_tax_id:' || $1::text, 0))
 `
 
-// 同一個統編的寫入排隊（交易級 advisory lock，交易結束時釋放）；取得之後的 LiveProspectByTaxID 看得到前一個交易已提交的持有者。
 func (q *Queries) LockProspectTaxID(ctx context.Context, taxID string) error {
 	_, err := q.db.Exec(ctx, lockProspectTaxID, taxID)
 	return err
@@ -725,8 +709,6 @@ const lockProspects = `-- name: LockProspects :many
 SELECT prospect_id, version, display_name, vendor_type, status, outreach_status, live, tax_id, converted_store_id, converted_at, merged_into, category, region, product_summary, positioning, research_summary, priority_letter, priority_stars, logo_key, logo_asset_id, logo_source_url, cover_key, cover_asset_id, cover_source_url, created_by_admin_id, updated_by_admin_id, created_at, updated_at FROM seller.prospects WHERE prospect_id = ANY($1::bigint[]) ORDER BY prospect_id FOR NO KEY UPDATE
 `
 
-// 依 prospect_id 的順序鎖定，兩個管理員對同一對做反向合併時不會互鎖。FOR NO KEY UPDATE：寫入 prospect_contacts 與 prospect_distinct_pairs 的外鍵檢查
-// 對被指的業者列取 KEY SHARE，FOR UPDATE 會讓兩個互相確認的請求互鎖；任何寫入都不改 prospect_id（沒有別的外鍵目標的唯一鍵），所以不需要 FOR UPDATE。
 func (q *Queries) LockProspects(ctx context.Context, prospectIds []int64) ([]SellerProspect, error) {
 	rows, err := q.db.Query(ctx, lockProspects, prospectIds)
 	if err != nil {
@@ -789,7 +771,6 @@ type MarkDistinctPairParams struct {
 	Now      time.Time
 }
 
-// 管理員直接標記一對候選不是同一家（ADR 2026-10-04-prospect-contact-points-and-matching 的修訂）：較小的 ID 在前，已標記的略過（保留第一次的管理員與時間）。
 func (q *Queries) MarkDistinctPair(ctx context.Context, arg MarkDistinctPairParams) error {
 	_, err := q.db.Exec(ctx, markDistinctPair,
 		arg.FirstID,
@@ -879,7 +860,6 @@ type ProspectContactForShareRow struct {
 	PrimaryEmail *string
 }
 
-// 主要 email 與狀態，帶共享鎖：與封存、合併的 FOR NO KEY UPDATE 衝突（呼叫方在自己的 transaction 內讀時序列化）。
 func (q *Queries) ProspectContactForShare(ctx context.Context, prospectID int64) (ProspectContactForShareRow, error) {
 	row := q.db.QueryRow(ctx, prospectContactForShare, prospectID)
 	var i ProspectContactForShareRow
@@ -902,7 +882,6 @@ type ProspectContactsRow struct {
 	IsPrimary bool
 }
 
-// 業者的聯絡方式（原值）；同類型主要的在前。
 func (q *Queries) ProspectContacts(ctx context.Context, prospectID int64) ([]ProspectContactsRow, error) {
 	rows, err := q.db.Query(ctx, prospectContacts, prospectID)
 	if err != nil {
@@ -953,9 +932,6 @@ type ProspectTaxIDMatchesRow struct {
 	KycStatus   string
 }
 
-// 統編對帳：業者的統編對得上某個店家的 KYC 申請、但還沒有連起來；已被其他業者認領（converted_store_id）的店家不列。申請以 store_id 為鍵（目前的 stint）；不限申請狀態
-// （草稿與未核准的申請一樣代表「這家已經來了」），把 KYC 狀態一併回給管理員判斷；同一個店家有多次申請取最新一筆。
-// 以 (業者, 店家) 的 ID 做 keyset。
 func (q *Queries) ProspectTaxIDMatches(ctx context.Context, arg ProspectTaxIDMatchesParams) ([]ProspectTaxIDMatchesRow, error) {
 	rows, err := q.db.Query(ctx, prospectTaxIDMatches, arg.AfterProspectID, arg.AfterStoreID, arg.PageSize)
 	if err != nil {
@@ -1042,7 +1018,6 @@ ORDER BY prospect_id
 LIMIT 20
 `
 
-// T3：名稱（忽略大小寫；頭尾空白由 CHECK 排除，參數由呼叫端以 platform/trimtext 去掉）相同的 ACTIVE 業者，只供人判斷，不自動合併。
 func (q *Queries) ProspectsByName(ctx context.Context, displayName string) ([]SellerProspect, error) {
 	rows, err := q.db.Query(ctx, prospectsByName, displayName)
 	if err != nil {
@@ -1110,7 +1085,6 @@ type RepointDistinctPairsParams struct {
 	LoserID  int64
 }
 
-// 合併：輸家的「不是同一家」配對改掛贏家；與贏家自己的那一對（變成自己對自己）不搬，已有的略過。
 func (q *Queries) RepointDistinctPairs(ctx context.Context, arg RepointDistinctPairsParams) error {
 	_, err := q.db.Exec(ctx, repointDistinctPairs, arg.WinnerID, arg.LoserID)
 	return err
@@ -1125,7 +1099,6 @@ type RepointMergedProspectsParams struct {
 	LoserID  *int64
 }
 
-// 路徑壓縮：已被輸家吸收的列改指贏家，merged_into 的鏈永遠只有一層。
 func (q *Queries) RepointMergedProspects(ctx context.Context, arg RepointMergedProspectsParams) error {
 	_, err := q.db.Exec(ctx, repointMergedProspects, arg.WinnerID, arg.LoserID)
 	return err
@@ -1147,7 +1120,6 @@ type RestoreProspectParams struct {
 	ProspectID int64
 }
 
-// 還原：被合併的列（merged_into 有值）不可還原。統編已被別的業者拿走時，這個 UPDATE 違反唯一性（呼叫方先查，這是並行的保底）。
 func (q *Queries) RestoreProspect(ctx context.Context, arg RestoreProspectParams) (SellerProspect, error) {
 	row := q.db.QueryRow(ctx, restoreProspect, arg.AdminID, arg.Now, arg.ProspectID)
 	var i SellerProspect
@@ -1237,10 +1209,6 @@ type SearchProspectsRow struct {
 	PrimaryWebsite *string
 }
 
-// 採購候選搜尋（P5）：加權 OR，不是 AND——分類與地區都對、描述沒有字面提到關鍵字的候選不能消失。category、region 與
-// keywords 是 ILIKE 的部分比對（呼叫方已跳脫 % _ \）：匯入來源的產地有 195 種細粒度值，精確比對會漏掉「台南」這種泛稱；
-// 分類樹 ID 走子表。ACTIVE 就是跨 lane 去重（已入駐的業者不該出現在「找平台外的業者」）。LIMIT 只是服務端的安全上限，
-// 不排序：算分與排序是呼叫端的事，用它當「回傳筆數」會變成先對任意幾列算分再排序。
 func (q *Queries) SearchProspects(ctx context.Context, arg SearchProspectsParams) ([]SearchProspectsRow, error) {
 	rows, err := q.db.Query(ctx, searchProspects,
 		arg.Category,
@@ -1323,8 +1291,6 @@ type SharedKeyHoldersRow struct {
 	MatchKey   string
 }
 
-// 這些比對鍵（種類:正規化值）目前被哪些其他業者持有：live 的列（ACTIVE 與 CONVERTED）、而且與 self_id 沒有標記為不是同一家。
-// self_id 為 0 是建立之前的查詢（沒有標記可言）。一列一個（業者, 命中的鍵）。
 func (q *Queries) SharedKeyHolders(ctx context.Context, arg SharedKeyHoldersParams) ([]SharedKeyHoldersRow, error) {
 	rows, err := q.db.Query(ctx, sharedKeyHolders, arg.SelfID, arg.Keys)
 	if err != nil {
@@ -1358,7 +1324,6 @@ type TouchProspectParams struct {
 	ProspectID int64
 }
 
-// 贏家吸收了輸家的鍵與分類：版本加一，讓還開著的編輯畫面衝突、重新讀取。
 func (q *Queries) TouchProspect(ctx context.Context, arg TouchProspectParams) (SellerProspect, error) {
 	row := q.db.QueryRow(ctx, touchProspect, arg.AdminID, arg.Now, arg.ProspectID)
 	var i SellerProspect
@@ -1412,8 +1377,6 @@ type UnionProspectContactsParams struct {
 	LoserID  int64
 }
 
-// 合併：輸家的聯絡方式併入贏家；同一個比對鍵、或同類型同一個值的只留贏家那一列。贏家在這個類型還沒有聯絡方式時，輸家那個類型的
-// 主要的成為主要的；其餘留給 EnsureProspectPrimaries 補齊。
 func (q *Queries) UnionProspectContacts(ctx context.Context, arg UnionProspectContactsParams) error {
 	_, err := q.db.Exec(ctx, unionProspectContacts, arg.WinnerID, arg.LoserID)
 	return err
@@ -1471,8 +1434,6 @@ type UpdateProspectParams struct {
 	ExpectedVersion int64
 }
 
-// 寫入已在列鎖內合併的欄位；set_logo、set_cover 為 true 時連同那張圖片（key、asset ID、來源網址）一起換，另一張原樣保留；
-// 只有 ACTIVE 的列可以改，版本不符時 0 列。
 func (q *Queries) UpdateProspect(ctx context.Context, arg UpdateProspectParams) (SellerProspect, error) {
 	row := q.db.QueryRow(ctx, updateProspect,
 		arg.DisplayName,

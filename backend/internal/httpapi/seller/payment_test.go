@@ -25,17 +25,17 @@ import (
 )
 
 type paymentModule struct {
-	account    payment.Account
-	configured bool
-	sessionFor int64
-	runtimes   []payment.EmbeddedRuntime
-	calls      int
-	returnURL  string
-	refreshURL string
-	err        error
-	session payment.OnboardingSession
-	syncedFor []int64
-	syncErr   error
+	account        payment.Account
+	configured     bool
+	sessionFor     int64
+	runtimes       []payment.EmbeddedRuntime
+	calls          int
+	returnURL      string
+	refreshURL     string
+	err            error
+	session        payment.OnboardingSession
+	syncedFor      []int64
+	syncErr        error
 	earningsStore  int64
 	earningsFilter payment.EarningsFilter
 	earningsAfter  *payment.RecordCursor

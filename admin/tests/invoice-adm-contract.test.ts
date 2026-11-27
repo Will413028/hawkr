@@ -240,7 +240,6 @@ test("ApiClientError 帶得動 envelope 的 data（preserveData 家族的價值�
 	assert.match(bizThrow.slice(0, 500), /data\.traceId,\s*\n\s*data\.data,/u);
 });
 
-
 import {
 	COMPLAINT_STATUS_BADGE_VARIANT,
 	PROVIDER_ACCOUNT_STATUS_BADGE_VARIANT,
@@ -418,7 +417,6 @@ test("stripComments 只剝註解，不會多吃真正的 code", () => {
 	assert.match(out, /這在字串裡/u);
 });
 
-
 test("A05：六個分頁的聯集 ＝ InvoiceOperationStatus 的 20 值", () => {
 	const union = JOB_TABS.flatMap((tab) => tab.statuses);
 	assert.deepEqual(
@@ -501,7 +499,6 @@ test("A05：五個不在列表 DTO 上的欄名一律不得出現", async () => 
 	}
 });
 
-
 test("A06：不得把分頁名／結果簡稱當成 job 狀態字面值", async () => {
 	const source = await readCode(INVOICE_PAGES.a06);
 	assert.doesNotMatch(
@@ -509,7 +506,6 @@ test("A06：不得把分頁名／結果簡稱當成 job 狀態字面值", async 
 		/'(SELF_ISSUED_REPORTED|COMPLETED|CANCELLED)'|"(SELF_ISSUED_REPORTED|COMPLETED|CANCELLED)"/u,
 	);
 });
-
 
 test("A04：provider 顏色表 ＝ CodeMeta 的 13 值，且不含 SUSPENDING", () => {
 	assert.deepEqual(
@@ -565,7 +561,6 @@ test("A07：逾期橫幅的筆數來自獨立查詢，不是數當前分頁的 r
 	assert.doesNotMatch(source, /合計/u);
 });
 
-
 test("四張顏色表都不是 exhaustive：未知值查得到 undefined，由頁面的 ?? 接住", () => {
 	for (const map of [
 		INVOICE_OPERATION_STATUS_BADGE_VARIANT,
@@ -589,7 +584,6 @@ test("每一頁的 badge 查表都有 ?? 兜底", async () => {
 		);
 	}
 });
-
 
 /**
  * 全部 ADM 發票寫入端點的路徑尾段（逐字取自
@@ -1137,7 +1131,6 @@ test("A08：措施只經建立措施對話框的 CreateMeasure 建立，不呼�
 	assert.doesNotMatch(source, /invoice_not_issued/u);
 });
 
-
 /**
  * 刻意不進 Sidebar 的非動態發票路由。
  *
@@ -1205,7 +1198,6 @@ test("Sidebar 豁免的發票頁仍然有入口（不得只靠直接輸入網址
 	}
 });
 
-
 import {
 	auditActionGroupOf,
 	auditActionOptionGroups,
@@ -1239,7 +1231,6 @@ const WAVE3_PAGES = {
 	a13: "src/app/admin/invoices/documents/[documentId]/page.tsx",
 } as const;
 
-
 test("A12：文件狀態顏色表 ＝ CodeMeta 的 11 值（VOIDING 與 RESOLVED_EXTERNALLY 不得漏）", () => {
 	assert.deepEqual(
 		Object.keys(DOCUMENT_STATUS_BADGE_VARIANT).sort(),
@@ -1268,7 +1259,6 @@ test("A12：開票模式顏色表 ＝ CodeMeta 的 4 值，LEGACY_MANUAL 不得�
 	assert.notEqual(FULFILLMENT_MODE_BADGE_VARIANT.LEGACY_MANUAL, "danger");
 });
 
-
 test("A13：timeline 的中文查文件狀態表（契約給的是 to_status，不是 timeline event）", () => {
 	assert.equal(
 		documentTimelineLabel("AWAITING_MANUAL"),
@@ -1287,7 +1277,6 @@ test("A12：fileUnavailableReason 不寫死中文對照（那個值域沒有 SSO
 	assert.ok(fileUnavailableText("CARRIER_NOT_WON").includes("CARRIER_NOT_WON"));
 	assert.equal(fileUnavailableText(""), "沒有可下載的檔案");
 });
-
 
 test("A10：變更摘要沒有 PENDING 分支，且『未寫入』與『無欄位差異』不共用一句", () => {
 	assert.equal(auditChangeSummary("FAILED", "", ""), "未寫入");
@@ -1326,7 +1315,6 @@ test("A10：操作類型下拉分組涵蓋 CodeMeta 的六個值，且沒有空�
 	assert.equal(auditActionGroupOf("SOMETHING_NEW_FROM_BACKEND"), "other");
 });
 
-
 test("端點 47／61 的日期是 YYYY-MM-DD，且 from > to 前端就擋（後端不會報錯）", () => {
 	assert.ok(isWireDate("2026-08-30"));
 	assert.equal(isWireDate("2026-08-30T14:00"), false);
@@ -1352,7 +1340,6 @@ test('A10／A12 的日期輸入是 type="date" 不是 datetime-local', async () 
 		assert.match(source, /type="date"/u, `${path} 沒有日期輸入`);
 	}
 });
-
 
 test("A10／A12 一律唯讀；A13 的寫入只有登記過的那兩條", async () => {
 	for (const [name, path] of Object.entries(WAVE3_PAGES)) {
@@ -1417,7 +1404,6 @@ test("A10 不做輪詢，也不畫匯出鍵", async () => {
 	assert.doesNotMatch(source, /匯出|下載/u);
 });
 
-
 test("A12／A13 不得出現契約上不存在的欄名（渲染 undefined 沒有東西會轉紅）", async () => {
 	const a12 = await readCode(WAVE3_PAGES.a12);
 	for (const field of ["storeName"]) {
@@ -1465,7 +1451,6 @@ test("A13 的 ?from=duplicate 是 info 不是 error", async () => {
 	assert.match(banner.slice(0, 400), /role="status"/u);
 	assert.doesNotMatch(banner.slice(0, 400), /role="alert"/u);
 });
-
 
 test("A10／A12 的表格有 sr-only caption，且 .sr-only 真的有宣告", async () => {
 	for (const path of [WAVE3_PAGES.a10Console, WAVE3_PAGES.a12]) {
@@ -1550,7 +1535,6 @@ test("A10 的明細 dialog 用共用 Dialog（portal 是 Dialog 唯一的行為�
 		/import \{[^}]*\bDialog\b[^}]*\} from "@\/components\/UI"/u,
 	);
 });
-
 
 /**
  * ADM **沒有路由清冊 gate**（58A §B-3.1.1），所以「按鈕指向一個不存在的頁面」在這個
@@ -1645,7 +1629,6 @@ test("發票模組內所有指向 /admin/invoices 的連結都有對應的頁面
 		"這些連結沒有對應的 page.tsx ⇒ 按下去是 404，而 ADM 沒有任何 gate 會告訴你",
 	);
 });
-
 
 test("A12：降級與「還沒出貨」必須是兩種顯示，不得塌成同一格", () => {
 	assert.deepEqual(shipmentStatusDisplay("", true), { kind: "degraded" });

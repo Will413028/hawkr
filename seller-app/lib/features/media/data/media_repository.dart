@@ -95,7 +95,6 @@ class MediaRepository {
   String _rejectText(RejectReason reason) =>
       reason.uiText(_locale()) ?? _defaults(Code.internal);
 
-
   /// 上傳頭像（Session 流程 + 前端預處理）
   Future<MediaUploadResult> uploadAvatar({
     required Uint8List bytes,
@@ -117,7 +116,6 @@ class MediaRepository {
     );
   }
 
-
   /// 上傳聊天圖片
   Future<MediaUploadResult> uploadChatImage({required Uint8List bytes}) async {
     HKLog.logD('[MediaRepo] Uploading chat image: ${bytes.length} bytes');
@@ -128,7 +126,6 @@ class MediaRepository {
       compress: true,
     );
   }
-
 
   /// 批次上傳圖片（最多 9 個）
   Future<List<MediaUploadResult>> uploadBatch({
@@ -168,7 +165,6 @@ class MediaRepository {
     return results;
   }
 
-
   /// 上傳私密文件（伺服器端加密），回傳 staged token。
   Future<String> uploadPrivateDocument({required Uint8List bytes}) async {
     try {
@@ -193,7 +189,6 @@ class MediaRepository {
       throw UnknownException(message: _failureText(e));
     }
   }
-
 
   /// 將 objectKey 或 URL 轉換為可顯示的 URL
   ///
@@ -229,7 +224,6 @@ class MediaRepository {
     }
     return null;
   }
-
 
   /// 是否要在上傳前進入 JPEG 壓縮器。
   ///
@@ -278,7 +272,6 @@ const _serverImageTypes = {
   'image/webp',
   'image/gif',
 };
-
 
 /// MediaRepository Provider
 final mediaRepositoryProvider = Provider<MediaRepository>((ref) {

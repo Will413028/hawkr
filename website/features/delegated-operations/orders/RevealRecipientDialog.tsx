@@ -72,7 +72,6 @@ export default function RevealRecipientDialog({
 			}
 		>
 			<div className="adm-reveal-form">
-
 				<p className="adm-reveal-form__hint">
 					{
 						"這是本次代行唯一會取得未遮罩收件資訊的動作，會以高風險等級寫入代行紀錄，並計入結束摘要的風險操作次數。請寫下需要查看的理由。"

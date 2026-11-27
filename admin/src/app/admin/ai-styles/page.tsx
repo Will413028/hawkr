@@ -344,7 +344,6 @@ const AiStyleManagement: React.FC = () => {
 				AI 修圖管理
 			</h1>
 
-
 			<div
 				style={{
 					display: "flex",
@@ -397,7 +396,6 @@ const AiStyleManagement: React.FC = () => {
 
 			{activeTab === "styles" && (
 				<div>
-
 					<div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
 						{(["product", "post"] as CategoryFilter[]).map((cat) => (
 							<button
@@ -423,7 +421,6 @@ const AiStyleManagement: React.FC = () => {
 						))}
 					</div>
 
-
 					<div style={{ marginBottom: "16px" }}>
 						<button
 							type="button"
@@ -442,7 +439,6 @@ const AiStyleManagement: React.FC = () => {
 							新增風格
 						</button>
 					</div>
-
 
 					{loading ? (
 						<p style={{ color: "#999" }}>載入中...</p>
@@ -616,7 +612,6 @@ const AiStyleManagement: React.FC = () => {
 
 			{activeTab === "quotas" && (
 				<div>
-
 					<div
 						style={{
 							display: "flex",
@@ -810,7 +805,6 @@ const AiStyleManagement: React.FC = () => {
 					)}
 				</div>
 			)}
-
 
 			{showForm && (
 				<Dialog

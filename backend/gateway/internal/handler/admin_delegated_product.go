@@ -17,7 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // DelegatedProductListItem is one row of GET .../products.
 //
 // 不含 rating／reviewCount／favoriteCount（買家側社群數據，不是賣家自主維護欄位）、
@@ -242,7 +241,6 @@ type DelegatedBatchUnpublishData struct {
 	Results   []DelegatedBatchResultItem `json:"results"`
 }
 
-
 // ListDelegatedProducts handles GET .../products.
 func (h *Holder) ListDelegatedProducts(c *gin.Context) {
 	req, ok := resolveDelegatedRequest(c, false)
@@ -353,12 +351,12 @@ func (h *Holder) CreateDelegatedProduct(c *gin.Context) {
 
 	orch := h.orchestrator()
 	result, denial := orch.Orchestrate(c.Request.Context(), delegation.Spec{
-		Session:      req.Session,
-		Action:       "PRODUCT_CREATE",
-		ResourceType: "product",
-		ReadCap:      authz.AdminCapProductsRead,
-		WriteCap:     authz.AdminCapProductsWrite,
-		SnapshotFields: nil,
+		Session:         req.Session,
+		Action:          "PRODUCT_CREATE",
+		ResourceType:    "product",
+		ReadCap:         authz.AdminCapProductsRead,
+		WriteCap:        authz.AdminCapProductsWrite,
+		SnapshotFields:  nil,
 		ResourceName:    body.Name,
 		OperationReason: reason,
 		NotifySeller:    notifySellerOrDefault(body.NotifySeller),
@@ -386,9 +384,9 @@ func (h *Holder) CreateDelegatedProduct(c *gin.Context) {
 				StoreId:        req.StoreID,
 				Origin:         body.Origin,
 				Certifications: toCertificationProtos(body.Certifications),
-				Status:     strconv.Itoa(codemeta.ProductStatusInactive),
-				Hashtags:   body.Hashtags,
-				Delegation: dctx,
+				Status:         strconv.Itoa(codemeta.ProductStatusInactive),
+				Hashtags:       body.Hashtags,
+				Delegation:     dctx,
 			}, h.Delegation.GrpcDeadlineDomainWriteMs)
 			if err != nil {
 				return nil, denialFromGrpcErr(err)
@@ -454,11 +452,11 @@ func (h *Holder) UpdateDelegatedProduct(c *gin.Context) {
 	var before *DelegatedProductDetail
 	orch := h.orchestrator()
 	result, denial := orch.Orchestrate(c.Request.Context(), delegation.Spec{
-		Session:      req.Session,
-		Action:       "PRODUCT_UPDATE",
-		ResourceType: "product",
-		ReadCap:      authz.AdminCapProductsRead,
-		WriteCap:     authz.AdminCapProductsWrite,
+		Session:         req.Session,
+		Action:          "PRODUCT_UPDATE",
+		ResourceType:    "product",
+		ReadCap:         authz.AdminCapProductsRead,
+		WriteCap:        authz.AdminCapProductsWrite,
 		SnapshotFields:  nil,
 		OperationReason: reason,
 		NotifySeller:    notifySellerOrDefault(body.NotifySeller),
@@ -512,8 +510,8 @@ func (h *Holder) UpdateDelegatedProduct(c *gin.Context) {
 				Skus:                 skus,
 				Certifications:       toCertificationProtos(certifications),
 				UpdateCertifications: updateCertifications,
-				ExpectedVersion: body.ExpectedVersion,
-				Delegation:      dctx,
+				ExpectedVersion:      body.ExpectedVersion,
+				Delegation:           dctx,
 			}
 			if before != nil {
 				updateReq.Name = before.Name
@@ -582,11 +580,11 @@ func (h *Holder) changeDelegatedProductStatus(c *gin.Context, action, targetStat
 
 	orch := h.orchestrator()
 	result, denial := orch.Orchestrate(c.Request.Context(), delegation.Spec{
-		Session:      req.Session,
-		Action:       action,
-		ResourceType: "product",
-		ReadCap:      authz.AdminCapProductsRead,
-		WriteCap:     authz.AdminCapProductsPublish,
+		Session:         req.Session,
+		Action:          action,
+		ResourceType:    "product",
+		ReadCap:         authz.AdminCapProductsRead,
+		WriteCap:        authz.AdminCapProductsPublish,
 		SnapshotFields:  delegation.ScopeProductStatus(),
 		OperationReason: reason,
 		NotifySeller:    notifySellerOrDefault(body.NotifySeller),
@@ -707,7 +705,7 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 				protoItems = append(protoItems, &productpb.BatchProductStatusItem{
 					ProductId:       wi.ResourceID,
 					ExpectedVersion: wi.ExpectedVersion,
-					AuditLogId: wi.AuditLogID,
+					AuditLogId:      wi.AuditLogID,
 				})
 			}
 			resp, err := h.Product.BatchUpdateSellerProductStatusForDelegation(ctx, &productpb.BatchUpdateSellerProductStatusRequest{
@@ -766,7 +764,6 @@ func (h *Holder) BatchUnpublishDelegatedProducts(c *gin.Context) {
 	data.Failed = strconv.Itoa(failed)
 	response.OK(c, data)
 }
-
 
 func (h *Holder) readProduct(ctx context.Context, storeID int64, productID string, dctx *commonpb.DelegationContext) (*delegation.Resource, *delegation.Denial) {
 	if h.Product == nil {
@@ -838,11 +835,11 @@ func (h *Holder) productResource(detail *productpb.ProductDetail) *delegation.Re
 	}
 
 	dto := DelegatedProductDetail{
-		ProductID:   detail.GetId(),
-		Version:     detail.GetVersion(),
-		Name:        detail.GetName(),
-		Status:      detail.GetStatus(),
-		StatusLabel: codemeta.ProductStatusLabel(detail.GetStatus()),
+		ProductID:        detail.GetId(),
+		Version:          detail.GetVersion(),
+		Name:             detail.GetName(),
+		Status:           detail.GetStatus(),
+		StatusLabel:      codemeta.ProductStatusLabel(detail.GetStatus()),
 		PublicationState: detail.GetPublicationState(),
 		Purchasable:      detail.GetPurchasable(),
 		CategoryID:       detail.GetCategoryLv3Id(),
@@ -871,14 +868,14 @@ func (h *Holder) productResource(detail *productpb.ProductDetail) *delegation.Re
 		ImageKey: imageKey,
 		Version:  dto.Version,
 		Fields: map[string]any{
-			"name":         dto.Name,
-			"categoryName": dto.CategoryName,
-			"description":  descriptionPlainText(dto.Description),
-			"origin":       dto.Origin,
-			"status":       dto.Status,
-			"priceMin":     dto.PriceMin,
-			"priceMax":     dto.PriceMax,
-			"stockQty":     dto.StockQty,
+			"name":           dto.Name,
+			"categoryName":   dto.CategoryName,
+			"description":    descriptionPlainText(dto.Description),
+			"origin":         dto.Origin,
+			"status":         dto.Status,
+			"priceMin":       dto.PriceMin,
+			"priceMax":       dto.PriceMax,
+			"stockQty":       dto.StockQty,
 			"skus":           strconv.Itoa(len(skus)),
 			"images":         strconv.Itoa(len(images)),
 			"hashtags":       joinForDisplay(hashtags),
@@ -1070,7 +1067,6 @@ func verifySkuOwnership(skus []DelegatedProductSkuInput, removed []string, befor
 	}
 	return nil
 }
-
 
 func validateProductName(c *gin.Context, name *string) bool {
 	if name == nil {

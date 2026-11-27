@@ -67,7 +67,7 @@ function scan(path: string): void {
 		path,
 		source,
 		ts.ScriptTarget.Latest,
-		 true,
+		true,
 		ts.ScriptKind.TSX,
 	);
 

@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$OrderItem {
 
- String get id; String get productId; String get productName; String get skuId; String get skuName; String get quantity;// PayUni #758: 新欄位（成交單價 / 原價快照）
+ String get id; String get productId; String get productName; String get skuId; String get skuName; String get quantity;// 成交單價與原價快照。
  String get unitPrice; String get listPrice;/// Deprecated: 舊欄位 fallback；新訂單請用 unitPrice。
  String get originalPrice; String get actualPayAmount; String get refundStatus; String get shareDiscount; String get imageUrl;
 /// Create a copy of OrderItem
@@ -232,7 +232,7 @@ class _OrderItem implements OrderItem {
 @override@JsonKey() final  String skuId;
 @override@JsonKey() final  String skuName;
 @override@JsonKey() final  String quantity;
-// PayUni #758: 新欄位（成交單價 / 原價快照）
+// 成交單價與原價快照。
 @override@JsonKey() final  String unitPrice;
 @override@JsonKey() final  String listPrice;
 /// Deprecated: 舊欄位 fallback；新訂單請用 unitPrice。
@@ -599,7 +599,7 @@ mixin _$Order {
  int get id;@JsonKey(name: 'orderNo') String get orderSn; String get status; String get totalOriginalAmount; String get totalActualAmount; String get createTime; String get payTime; String get shipTime; String get shipmentNo; String get transactionId; String get buyerId; String get shippingMethod; String get shippingFee; String get shippingFeePayer; String get shippingArea; String get couponId; String get discountAmount; String get shippingStatus; String get statusTime; String get statusSummary;/// B-124：送達後自動完成時間（ISO 8601 UTC，status=40 時有值）
 /// 政策：送達後 3 天自動完成（從 7 天縮短，2026-04-25 後生效）
  String get autoCompleteAt;/// B-132：買家付款後賣家須於此時間前處理物流，逾時後端自動取消。
- String get processingDeadline; String get labelUrl; String get recipientName; String get recipientPhone; String get shippingAddress; String get shippingNote; String get orderRemark; String get partnerId; String get odno; String get validationNo; String get paymentMethod;// 付款期限（ISO 8601 UTC，僅 status='0' 時有值；超過後訂單會被系統自動取消，cancelReason 9101）
+ String get processingDeadline; String get labelUrl; String get recipientName; String get recipientPhone; String get shippingAddress; String get shippingNote; String get orderRemark; String get partnerId; String get odno; String get validationNo; String get paymentMethod;// 付款期限（ISO 8601 UTC），僅未付款訂單有值；逾時後端會自動取消。
  String get paymentDeadline; String get itemCount; String get sellerName;@JsonKey(name: 'logoUrl') String get sellerAvatarUrl; String get sellerCity; String get sellerDistrict; String get pickupStoreName; String get storeId; bool get isReviewed;/// B-101：後端回傳目前是否仍可評價。預設 true 以保留舊 API 行為。
  bool get canReview;/// B-101：評價截止時間（ISO 8601 UTC，status=50 且可評價時有值）。
  String get reviewDeadline;/// 買家給此訂單的評分（1~5），未評分為 0。
@@ -890,7 +890,7 @@ class _Order implements Order {
 @override@JsonKey() final  String odno;
 @override@JsonKey() final  String validationNo;
 @override@JsonKey() final  String paymentMethod;
-// 付款期限（ISO 8601 UTC，僅 status='0' 時有值；超過後訂單會被系統自動取消，cancelReason 9101）
+// 付款期限（ISO 8601 UTC），僅未付款訂單有值；逾時後端會自動取消。
 @override@JsonKey() final  String paymentDeadline;
 @override@JsonKey() final  String itemCount;
 @override@JsonKey() final  String sellerName;

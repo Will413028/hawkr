@@ -18,7 +18,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-
 const (
 	// HeaderOperationCredential 是 www host 組的身分本體：那些請求沒有 ADM cookie
 	// （host-only，工作區在另一個 origin）也沒有 JWT。
@@ -32,10 +31,9 @@ const (
 
 var (
 	delegationIdempotencyKeyRE = middleware.IdempotencyKeyPattern
-	delegationSessionIDRE = regexp.MustCompile(`^\d{1,19}$`)
-	delegationHandoffCodeRE = regexp.MustCompile(`^dhof_[A-Za-z0-9_-]{43}$`)
+	delegationSessionIDRE      = regexp.MustCompile(`^\d{1,19}$`)
+	delegationHandoffCodeRE    = regexp.MustCompile(`^dhof_[A-Za-z0-9_-]{43}$`)
 )
-
 
 // DelegationTargetData 是代行對象店家。
 type DelegationTargetData struct {
@@ -158,7 +156,6 @@ type DelegationRedeemData struct {
 	Session             DelegationSessionData `json:"session"`
 }
 
-
 // CreateDelegatedOperationRequest 是 S2 的 body。
 type CreateDelegatedOperationRequest struct {
 	StoreID    string `json:"storeId"`
@@ -181,7 +178,6 @@ type RevokeDelegatedOperationRequest struct {
 type RedeemDelegationHandoffRequest struct {
 	HandoffCode string `json:"handoffCode"`
 }
-
 
 func delegationLocalMessage(code int32) string {
 	switch code {
@@ -358,7 +354,6 @@ func toDelegationSessionData(s *accountpb.OperationSessionSummary) DelegationSes
 	return out
 }
 
-
 // GetDelegatedOperationPreflight 判定此刻能否對該店家開始代行
 // GET /api/v1/admin/sellers/{store_id}/delegated-operation/preflight
 // @Summary      代行營運 preflight
@@ -441,7 +436,6 @@ func (h *Holder) GetDelegatedOperationPreflight(c *gin.Context) {
 	})
 }
 
-
 // CreateDelegatedOperation 建立代行工作階段
 // POST /api/v1/admin/delegated-operations
 // @Summary      建立代行營運工作階段
@@ -515,9 +509,9 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 	}
 
 	grpcReq := &accountpb.CreateSessionRequest{
-		ActorAdminId:  strconv.FormatInt(adminID, 10),
-		TargetStoreId: req.StoreID,
-		ReasonCode:    req.ReasonCode,
+		ActorAdminId:          strconv.FormatInt(adminID, 10),
+		TargetStoreId:         req.StoreID,
+		ReasonCode:            req.ReasonCode,
 		RequestedCapabilities: req.Capabilities,
 		RequestedTtlSeconds:   *req.TTLSeconds,
 		IdempotencyKey:        idempotencyKey,
@@ -549,7 +543,6 @@ func (h *Holder) CreateDelegatedOperation(c *gin.Context) {
 		Session:     toDelegationSessionData(data.GetSession()),
 	})
 }
-
 
 // GetCurrentDelegatedOperation 由 credential 反查當前工作階段
 // GET /api/v1/admin/delegated-operations/current
@@ -589,7 +582,6 @@ func (h *Holder) GetCurrentDelegatedOperation(c *gin.Context) {
 	response.OK(c, toDelegationSessionData(data))
 }
 
-
 // EndCurrentDelegatedOperation 結束當前工作階段
 // DELETE /api/v1/admin/delegated-operations/current
 // @Summary      結束當前代行工作階段
@@ -621,7 +613,6 @@ func (h *Holder) EndCurrentDelegatedOperation(c *gin.Context) {
 
 	response.OK(c, DelegationEndData{Ended: true})
 }
-
 
 // RevokeDelegatedOperation 撤銷指定工作階段
 // POST /api/v1/admin/delegated-operations/{session_id}/revoke
@@ -695,7 +686,6 @@ func (h *Holder) RevokeDelegatedOperation(c *gin.Context) {
 		RevokedAt: data.GetRevokedAt(),
 	})
 }
-
 
 // RedeemDelegationHandoff 兌換一次性 handoff code
 // POST /api/v1/admin/delegated-operations/handoff/redeem

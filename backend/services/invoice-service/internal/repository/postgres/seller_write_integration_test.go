@@ -23,7 +23,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const sellerStoreA int64 = 2685914682
 
 func TestIntegration_Complaint_SellerRespondGuards(t *testing.T) {
@@ -164,7 +163,6 @@ func TestIntegration_Complaint_SellerRespondGuards(t *testing.T) {
 		}
 	})
 }
-
 
 // TestIntegration_Operation_FailOpenForIssuer 是這句 `UPDATE ... FROM` 的**首次實跑**。
 //

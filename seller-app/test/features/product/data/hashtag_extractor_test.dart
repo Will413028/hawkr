@@ -24,10 +24,11 @@ void main() {
     });
 
     test('排除標點 / 空白 / emoji', () {
-      expect(
-        HashtagExtractor.extractFromText('#fo!odie #good 🎉 #台灣🇹🇼'),
-        ['fo', 'good', '台灣'],
-      );
+      expect(HashtagExtractor.extractFromText('#fo!odie #good 🎉 #台灣🇹🇼'), [
+        'fo',
+        'good',
+        '台灣',
+      ]);
     });
 
     test('dedup (case-insensitive)', () {

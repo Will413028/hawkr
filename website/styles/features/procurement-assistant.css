@@ -1,4 +1,3 @@
-
 .chat-sidebar__agent {
 	display: flex;
 	flex-direction: column;
@@ -279,7 +278,7 @@
 }
 
 .search-page:has([data-search-empty] [data-hawkr-agent-entry])
-.search-page__agent-entry {
+	.search-page__agent-entry {
 	display: none;
 }
 
@@ -721,7 +720,6 @@
 .assistant-candidate-row__selection-mark[data-selected] {
 	border-color: transparent;
 }
-
 
 .assistant-candidate-identity {
 	display: flex;
@@ -3440,7 +3438,6 @@
 	}
 }
 
-
 .hawkr-agent-thread .thread-page__head-status[data-state="assistant"]::before {
 	display: none;
 }
@@ -3634,7 +3631,6 @@
 		text-align: left;
 	}
 }
-
 
 .hawkr-agent-entry {
 	display: flex;
@@ -4024,7 +4020,6 @@
 	color: var(--hkui-foreground-muted);
 }
 
-
 .hawkr-agent-processing {
 	align-self: flex-start;
 	width: 100%;
@@ -4066,7 +4061,6 @@
 .hawkr-agent-processing .assistant-progress__list {
 	padding: 0;
 }
-
 
 .hawkr-agent-panel {
 	display: flex;

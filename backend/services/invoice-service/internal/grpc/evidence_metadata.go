@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // EvidenceMetadataResolver 是佐證中介資料的出向面（實作在 client/media）。
 type EvidenceMetadataResolver interface {
 	BatchGetEvidenceMetadata(ctx context.Context, objectKeys []string, taxProfileID int64) (map[string]media.AssetMetadata, error)

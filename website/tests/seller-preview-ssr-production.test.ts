@@ -326,8 +326,7 @@ async function waitForNext(
 				signal: AbortSignal.timeout(2_000),
 			});
 			if (response.status < 500) return;
-		} catch {
-		}
+		} catch {}
 		await new Promise((resolve) => setTimeout(resolve, 200));
 	}
 	throw new Error(`next start did not become ready\n${logs()}`);

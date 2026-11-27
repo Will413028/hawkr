@@ -146,8 +146,7 @@ function siteOrigin(req: NextRequest): string {
 	if (env) {
 		try {
 			return new URL(env).origin;
-		} catch {
-		}
+		} catch {}
 	}
 	const proto = req.headers.get("x-forwarded-proto") ?? "https";
 	const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");

@@ -308,6 +308,7 @@ void main() {
           ).checkAppVersion(CheckAppVersionRequest(clientVersion: '1.0.0'));
         }
       } on ConnectException {
+        // 錯誤原樣丟出。
       }
       return signals;
     }

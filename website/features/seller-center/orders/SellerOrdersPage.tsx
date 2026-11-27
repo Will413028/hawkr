@@ -1092,7 +1092,6 @@ export default function SellerOrdersPage() {
 				/>
 			</div>
 
-
 			<RealtimeSyncNotice status={realtimeStatus} />
 
 			{isAfterSaleTab ? (
@@ -1173,7 +1172,6 @@ export default function SellerOrdersPage() {
 		</SellerPageShell>
 	);
 }
-
 
 interface OrdersTabBodyProps {
 	quickFilter: QuickFilter;
@@ -1487,7 +1485,6 @@ function OrdersTabBody({
 		</>
 	);
 }
-
 
 interface BulkActionBarProps {
 	className?: string;
@@ -2888,7 +2885,6 @@ function statusClass(status: string): string {
 function shippingMethodLabel(raw: string | undefined): string {
 	return formatShippingMethodLabel(raw);
 }
-
 
 function BuyerCell({
 	avatar,

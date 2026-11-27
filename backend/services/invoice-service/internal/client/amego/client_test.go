@@ -22,8 +22,8 @@ const (
 )
 
 type recordingSink struct {
-	mu   sync.Mutex
-	rows []Exchange
+	mu        sync.Mutex
+	rows      []Exchange
 	panicOnce bool
 }
 
@@ -121,7 +121,6 @@ func sampleIssueRequest() IssueRequest {
 	}
 }
 
-
 // TestGuardEnvironmentBlocksBeforeAnyRequest 是本 package 最重要的一支測試。
 //
 // 🔴 斷言的是 **request count == 0**，不是只看回傳值：「回了 ENV_GUARD」在
@@ -190,7 +189,6 @@ func TestGuardAppliesToReadOnlyCalls(t *testing.T) {
 	}
 }
 
-
 // TestSignIsComputedOverTheExactBytesSent 是「序列化一次」的端到端鑑別力測試。
 //
 // 伺服器端拿**收到的 data 字串**重算 md5(data+time+AppKey) 並與收到的 sign 比對——
@@ -233,7 +231,6 @@ func TestSignIsComputedOverTheExactBytesSent(t *testing.T) {
 		t.Fatalf("path = %q, want %q", p, EndpointIssue)
 	}
 }
-
 
 // TestIssueResultComesFromTopLevel：f0401 的業務結果攤在頂層、不放 data。
 func TestIssueResultComesFromTopLevel(t *testing.T) {
@@ -365,7 +362,6 @@ func TestTransportTimeoutIsReconcileAndAudited(t *testing.T) {
 	}
 }
 
-
 // TestBreakerTripsAndStopsSendingRequests 斷言跳閘後**不再發出請求**（request count），
 // 而不是只看回傳值。
 func TestBreakerTripsAndStopsSendingRequests(t *testing.T) {
@@ -426,7 +422,6 @@ func TestExcludedFailuresNeverTripBreaker(t *testing.T) {
 		t.Fatalf("request count = %d, want 12", n)
 	}
 }
-
 
 // TestAuditRecordsOnceWithMaskedSignAndNoAppKey。
 func TestAuditRecordsOnceWithMaskedSignAndNoAppKey(t *testing.T) {
@@ -493,7 +488,6 @@ func TestAuditSinkPanicDoesNotFailTheCall(t *testing.T) {
 		t.Fatalf("結果 = %+v", got)
 	}
 }
-
 
 // TestCode71IsNotAnError：71 是「180 天內確定沒有」，與 51「不確定」語意完全不同。
 func TestCode71IsNotAnError(t *testing.T) {

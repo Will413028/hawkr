@@ -127,7 +127,7 @@ func (f *fakeWrites) MarkAllRead(_ context.Context, p im.Party) error {
 type fakeBuyers struct {
 	displays []buyer.Display
 	batches  [][]int64
-	swapped atomic.Int64
+	swapped  atomic.Int64
 }
 
 func (f *fakeBuyers) CurrentBuyerID(_ context.Context, accountID int64) (int64, error) {

@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-
 var metricsOwnedHere = []string{
 	"invoice_amego_request_duration_seconds",
 	"invoice_amego_response_code_total",

@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 func inputPaths(prefix string) rpc.FieldPaths {
 	p := map[string]string{
 		"Title":                       "title",
@@ -55,12 +54,12 @@ func inputPaths(prefix string) rpc.FieldPaths {
 }
 
 var (
-	createPaths = merge(inputPaths("product."), rpc.FieldPaths{"RequestID": "request_id"})
-	updatePaths = merge(inputPaths("product."), rpc.FieldPaths{"Etag": "etag"})
-	statusPaths = rpc.FieldPaths{"Status": "status", "Etag": "etag"}
-	deletePaths = rpc.FieldPaths{"Etag": "etag"}
-	adjustPaths = rpc.FieldPaths{"RequestID": "request_id", "Delta": "delta"}
-	setPaths    = rpc.FieldPaths{"RequestID": "request_id", "Quantity": "quantity"}
+	createPaths     = merge(inputPaths("product."), rpc.FieldPaths{"RequestID": "request_id"})
+	updatePaths     = merge(inputPaths("product."), rpc.FieldPaths{"Etag": "etag"})
+	statusPaths     = rpc.FieldPaths{"Status": "status", "Etag": "etag"}
+	deletePaths     = rpc.FieldPaths{"Etag": "etag"}
+	adjustPaths     = rpc.FieldPaths{"RequestID": "request_id", "Delta": "delta"}
+	setPaths        = rpc.FieldPaths{"RequestID": "request_id", "Quantity": "quantity"}
 	sellerListPaths = rpc.FieldPaths{"Status": "filter.status", "StockStatus": "filter.stock_status"}
 	publicListPaths = rpc.FieldPaths{"Sort": "sort", "Hashtags": "filter.hashtags"}
 	noPaths         = rpc.FieldPaths{}

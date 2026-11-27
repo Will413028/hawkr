@@ -48,7 +48,7 @@ type Outcome struct {
 	Reason     InvalidReason
 	Resolution *slots.Resolution
 	Next       *InterruptPayload
-	card *pendingCard
+	card       *pendingCard
 }
 
 // CheckAnswer 是回答的形狀檢查（A9-D30(1)）：不讀分類樹，ResumeRun 在送出時同步用它，executor 的 ApplyAnswer 再用一次；回空字串表示形狀合法。

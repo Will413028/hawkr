@@ -16,7 +16,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const checkoutPreviewTTL = 2 * time.Minute
 
 const invoiceDisclosureTermsVersion = "2026-08-30"
@@ -79,7 +78,6 @@ func (u *Checkout) WithClock(now func() time.Time) *Checkout {
 	}
 	return u
 }
-
 
 // CheckoutAmount 是發票金額拆解（proto InvoiceAmountBreakdown）。
 type CheckoutAmount struct {
@@ -195,7 +193,6 @@ type ValidateInvoiceOutput struct {
 	IntakeLimit          CheckoutIntakeLimit
 }
 
-
 // ResolveMode 解析這一筆結帳的開票模式、金額拆解、法定告知與待審接單上限。
 //
 // 🔴 履約模式一律經 domain.ResolveFulfillmentMode —— 與 order.paid 的 Prepare 同一支。
@@ -236,7 +233,6 @@ func (u *Checkout) ResolveMode(ctx context.Context, in ResolveModeInput) (Resolv
 	}, nil
 }
 
-
 // ValidateInput 驗證買家的發票輸入並回傳可持久化的快照。
 //
 // 檢查順序（每一格失敗即回，不累積）：
@@ -273,7 +269,6 @@ func (u *Checkout) ValidateInput(ctx context.Context, in ValidateInvoiceInput) (
 		}, nil
 	}
 
-
 	identity, rej, err := u.resolveIdentity(ctx, in.BuyerID, in.Invoice)
 	if err != nil {
 		return ValidateInvoiceOutput{}, err
@@ -306,7 +301,6 @@ func (u *Checkout) ValidateInput(ctx context.Context, in ValidateInvoiceInput) (
 		IntakeLimit:          limit,
 	}, nil
 }
-
 
 type checkoutSellerFacts struct {
 	issuer  domain.Issuer
@@ -346,12 +340,12 @@ func (u *Checkout) sellerFacts(ctx context.Context, storeID int64) (checkoutSell
 
 func fulfillmentInputFor(f checkoutSellerFacts, invoiceAmount int64, now time.Time, buyerHasTaxID bool) domain.FulfillmentInput {
 	return domain.FulfillmentInput{
-		TotalActualAmount:   invoiceAmount,
-		SellerReviewStatus:  f.profile.ReviewStatus,
-		ProviderStatus:      f.account.Status,
-		AutomationCutoverAt: f.account.AutomationCutoverAt,
-		InvoiceDate:         now,
-		BuyerHasTaxID:       buyerHasTaxID,
+		TotalActualAmount:       invoiceAmount,
+		SellerReviewStatus:      f.profile.ReviewStatus,
+		ProviderStatus:          f.account.Status,
+		AutomationCutoverAt:     f.account.AutomationCutoverAt,
+		InvoiceDate:             now,
+		BuyerHasTaxID:           buyerHasTaxID,
 		SellerReceiptAuthorized: f.profile.ReceiptAuthorizedAt != nil,
 	}
 }
@@ -425,7 +419,6 @@ func disclosureFor(mode string) CheckoutDisclosure {
 	}
 }
 
-
 type checkoutRejection struct {
 	Code    int32
 	Message string
@@ -439,13 +432,13 @@ func rejectWith(code int32) checkoutRejection {
 
 type checkoutIdentity struct {
 	SelectionMode string
-	PreferenceID int64
-	CarrierType  string
-	CarrierValue string
-	DisplayValue string
-	BuyerTaxID   string
-	BuyerName    string
-	DonationCode string
+	PreferenceID  int64
+	CarrierType   string
+	CarrierValue  string
+	DisplayValue  string
+	BuyerTaxID    string
+	BuyerName     string
+	DonationCode  string
 
 	HasCarrier bool
 
@@ -710,7 +703,6 @@ func forecastDraft(amount CheckoutAmount, id checkoutIdentity) *domain.IssueDraf
 	return draft
 }
 
-
 type orderInvoiceSnapshot struct {
 	OrderNo                  string  `json:"order_no"`
 	SnapshotVersion          int32   `json:"snapshot_version"`
@@ -755,7 +747,6 @@ func marshalOrderInvoiceSnapshot(in ValidateInvoiceInput, id checkoutIdentity) (
 	}
 	return json.Marshal(snap)
 }
-
 
 func maskCarrierValue(v string) string {
 	r := []rune(v)

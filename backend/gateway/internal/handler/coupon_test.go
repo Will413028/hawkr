@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type couponMockCouponSvcClient struct {
 	ListMyCouponsFn                func(ctx context.Context, in *pb.ListMyCouponsRequest, opts ...grpc.CallOption) (*pb.ListMyCouponsResponse, error)
 	ListAvailableCouponsFn         func(ctx context.Context, in *pb.ListAvailableCouponsRequest, opts ...grpc.CallOption) (*pb.ListAvailableCouponsResponse, error)
@@ -130,7 +129,6 @@ func (m *couponMockCouponSvcClient) GrantSellerCompensationCoupon(ctx context.Co
 	return nil, nil
 }
 
-
 func fakeBuyerAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.GetHeader("X-Account-Id")
@@ -165,7 +163,6 @@ func fakeAdminAuth() gin.HandlerFunc {
 	}
 }
 
-
 func offsetBuyerResolverForTest(offset int64) *buyerid.Resolver {
 	return buyerid.New(buyerid.GetterFunc(func(_ context.Context, accountID int64) (*buyerpb.BuyerInfo, error) {
 		return &buyerpb.BuyerInfo{
@@ -174,7 +171,6 @@ func offsetBuyerResolverForTest(offset int64) *buyerid.Resolver {
 		}, nil
 	}))
 }
-
 
 func setupCouponRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -240,7 +236,6 @@ func TestAdminCreateCouponTemplate_ResolvesBuyerAccountIds(t *testing.T) {
 
 	assertHTTPStatus(t, w, http.StatusOK)
 }
-
 
 func TestGetCoupons_Success(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -404,7 +399,6 @@ func TestGetCoupons_Unauthorized(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusUnauthorized)
 }
 
-
 func TestListAvailableCoupons_Success(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
 		ListAvailableCouponsFn: func(ctx context.Context, in *pb.ListAvailableCouponsRequest, opts ...grpc.CallOption) (*pb.ListAvailableCouponsResponse, error) {
@@ -488,7 +482,6 @@ func TestListAvailableCoupons_WithSellerFilter(t *testing.T) {
 	resp := parseJSON(t, w.Body)
 	assertCode(t, resp, 0)
 }
-
 
 func setupSellerCouponRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -578,7 +571,6 @@ func TestCreateCouponTemplate_BadRequest_MissingTitle(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-
 func TestListCouponTemplates_Success(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
 		SellerListTemplatesFn: func(ctx context.Context, in *pb.SellerListTemplatesRequest, opts ...grpc.CallOption) (*pb.SellerListTemplatesResponse, error) {
@@ -630,7 +622,6 @@ func TestListCouponTemplates_Success(t *testing.T) {
 	}
 }
 
-
 func TestGetCouponTemplateDetail_ResolvesStoreId(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
 		SellerGetTemplateDetailFn: func(ctx context.Context, in *pb.SellerGetTemplateDetailRequest, opts ...grpc.CallOption) (*pb.SellerGetTemplateDetailResponse, error) {
@@ -664,7 +655,6 @@ func TestGetCouponTemplateDetail_ResolvesStoreId(t *testing.T) {
 	assertCode(t, resp, 0)
 }
 
-
 func TestRevokeCouponTemplate_ResolvesStoreId(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
 		SellerRevokeTemplateFn: func(ctx context.Context, in *pb.SellerRevokeTemplateRequest, opts ...grpc.CallOption) (*pb.SellerRevokeTemplateResponse, error) {
@@ -694,7 +684,6 @@ func TestRevokeCouponTemplate_ResolvesStoreId(t *testing.T) {
 	resp := parseJSON(t, w.Body)
 	assertCode(t, resp, 0)
 }
-
 
 func TestGetCoupons_SellerAvatarKey_PassThrough(t *testing.T) {
 	const avatarURL = "https://cdn.example.com/seller/avatar.jpg"
@@ -797,8 +786,6 @@ func TestGetCoupons_SellerAvatarKey_EmptyForPlatformCoupon(t *testing.T) {
 	}
 }
 
-
-
 func TestGetCoupons_ResolvesBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
 		ListMyCouponsFn: func(ctx context.Context, in *pb.ListMyCouponsRequest, opts ...grpc.CallOption) (*pb.ListMyCouponsResponse, error) {
@@ -845,7 +832,6 @@ func TestGetCoupons_NoCurrentBuyer_Returns403(t *testing.T) {
 	}
 }
 
-
 func TestListAvailableCoupons_ResolvesBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
 		ListAvailableCouponsFn: func(ctx context.Context, in *pb.ListAvailableCouponsRequest, opts ...grpc.CallOption) (*pb.ListAvailableCouponsResponse, error) {
@@ -871,7 +857,6 @@ func TestListAvailableCoupons_ResolvesBuyerID(t *testing.T) {
 
 	assertHTTPStatus(t, w, http.StatusOK)
 }
-
 
 func TestClaimCoupon_ResolvesBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -921,7 +906,6 @@ func TestClaimCoupon_NoCurrentBuyer_Returns403(t *testing.T) {
 	assertCode(t, resp, 403)
 }
 
-
 func TestGetCoupons_SellerView_RejectsLegacyBuyerAccountIDQuery(t *testing.T) {
 	h := &Holder{
 		Coupon:  grpcclient.NewCouponClientForTest(&couponMockCouponSvcClient{}),
@@ -963,7 +947,6 @@ func TestGetCoupons_SellerView_BuyerIDDirect_NoDoubleResolve(t *testing.T) {
 
 	assertHTTPStatus(t, w, http.StatusOK)
 }
-
 
 func TestAdminGrantCompensation_ResolvesTargetBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -1090,7 +1073,6 @@ func TestAdminGrantCompensation_LegacySellerAccountIDKey_ReturnsBadRequest(t *te
 	}
 }
 
-
 func TestCreateCouponTemplate_ResolvesBuyerAccountIds(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
 		SellerCreateTemplateFn: func(ctx context.Context, in *pb.SellerCreateTemplateRequest, opts ...grpc.CallOption) (*pb.SellerCreateTemplateResponse, error) {
@@ -1130,7 +1112,6 @@ func TestCreateCouponTemplate_ResolvesBuyerAccountIds(t *testing.T) {
 
 	assertHTTPStatus(t, w, http.StatusOK)
 }
-
 
 func TestCreateCouponTemplate_AcceptsAlreadyResolvedBuyerIds(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -1244,7 +1225,6 @@ func TestCreateCouponTemplate_InvalidBuyerIds_BadRequest(t *testing.T) {
 
 	assertHTTPStatus(t, w, http.StatusBadRequest)
 }
-
 
 func TestAdminIssueCoupons_ResolvesBuyerAccountIds(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{

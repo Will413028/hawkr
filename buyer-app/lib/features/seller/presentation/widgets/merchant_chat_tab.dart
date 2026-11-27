@@ -39,7 +39,6 @@ import '../../../../shared/widgets/login_to_comment_prompt.dart';
 import 'merchant_layout.dart';
 import '../../../../shared/time/taipei_display.dart';
 
-
 /// 討論區項目節點（支援樹狀回覆結構）。包著生成的 [pb.ForumEntry]：能不能編輯、刪除、回覆只讀它的
 /// `viewer_can_*`。[replies] 在懶加載回覆時更新。
 class _CommentNode {
@@ -67,7 +66,6 @@ class _CommentNode {
   bool get isPlaceholder =>
       entry.state != pb.CommentState.COMMENT_STATE_VISIBLE;
 }
-
 
 /// 商家頁「留言」Tab。
 ///
@@ -117,14 +115,12 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     super.dispose();
   }
 
-
   Future<void> _reload() async {
     final ok = await _notifier.reload();
     if (!ok && mounted && _forum.phase == ThreadPhase.ready) {
       showCommonSnackBar(context, '載入失敗，請稍後再試');
     }
   }
-
 
   void _reportFailure(Object? error, String message) {
     if (!mounted) return;
@@ -263,7 +259,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     }
   }
 
-
   ThreadTree<pb.ForumEntry>? _nodesTree;
   List<_CommentNode> _nodesCache = const [];
 
@@ -313,7 +308,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
       replies: replies,
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -557,7 +551,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     ),
   );
 
-
   Widget _buildInputBar(ForumState forum) {
     final submitting = forum.submitting;
     final isEditing = _editingNode != null;
@@ -747,7 +740,6 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     );
   }
 }
-
 
 /// 單則留言的展示卡片。
 ///
@@ -960,7 +952,6 @@ class _CommentCard extends ConsumerWidget {
   }
 }
 
-
 /// 留言的編輯 / 刪除操作選單內容區域。
 ///
 /// 以自訂容器（白底圓角 + 細邊框 + 陰影）取代系統預設 PopupMenu 背景。
@@ -1046,7 +1037,6 @@ class _ActionMenuContent extends StatelessWidget {
     );
   }
 }
-
 
 /// 繪製留言回覆的弧形引導線。
 ///

@@ -215,14 +215,13 @@ func e2ePaidBody(t *testing.T, eventID string, env *e2eEnv) []byte {
 		"buyer_id":            2623900520,
 		"store_id":            env.storeID,
 		"total_actual_amount": 100,
-		"occurred_at": time.Now().UTC().Format("2006-01-02T15:04:05.999999999"),
+		"occurred_at":         time.Now().UTC().Format("2006-01-02T15:04:05.999999999"),
 	})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
 	return b
 }
-
 
 func TestIntegration_EndToEnd_PaidToPublished(t *testing.T) {
 	ctx := context.Background()
@@ -320,7 +319,6 @@ func TestIntegration_EndToEnd_PaidToPublished(t *testing.T) {
 	}
 }
 
-
 func TestIntegration_EndToEnd_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	env := setupE2E(t)
@@ -405,7 +403,6 @@ func TestIntegration_EndToEnd_OutOfOrderRefundIsDeferred(t *testing.T) {
 		t.Fatal("deferred_until 必須非空 —— 兜底掃描靠它回到候選集合")
 	}
 }
-
 
 type resolveOnlyStoreID struct {
 	storeID   int64
@@ -498,7 +495,6 @@ func countRows(t *testing.T, env *e2eEnv, q string, args ...any) int {
 	}
 	return n
 }
-
 
 type stubReceiptRenderer struct{}
 

@@ -26,8 +26,7 @@ export function useChatSidebarCollapsed() {
 			if (window.localStorage.getItem(STORAGE_KEY) === "1") {
 				setCollapsed(true);
 			}
-		} catch {
-		}
+		} catch {}
 	}, []);
 
 	const toggle = React.useCallback(() => {
@@ -35,8 +34,7 @@ export function useChatSidebarCollapsed() {
 			const next = !prev;
 			try {
 				window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
-			} catch {
-			}
+			} catch {}
 			return next;
 		});
 	}, []);

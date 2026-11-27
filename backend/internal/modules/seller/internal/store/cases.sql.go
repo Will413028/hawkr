@@ -51,8 +51,6 @@ type AdminCasesRow struct {
 	StorePurged bool
 }
 
-// admin 的案件清單：開案時間新到舊（keyset），篩選條件為 NULL 時不篩；state 是 OPEN 或 CLOSED（與 model.Case.Open 同一個定義）；
-// awaiting_seller 為 true 只列進行中而且有還沒結束的詢問的案件（與 model.Case.AwaitingSeller、OpenCaseInquiries 同一個定義）。
 func (q *Queries) AdminCases(ctx context.Context, arg AdminCasesParams) ([]AdminCasesRow, error) {
 	rows, err := q.db.Query(ctx, adminCases,
 		arg.State,
@@ -110,7 +108,6 @@ type BumpCaseParams struct {
 	ID  uuid.UUID
 }
 
-// 案件層級的處理（成員進出、成員有了結果）：版本加一，updated_at 是上一次處理的時間。
 func (q *Queries) BumpCase(ctx context.Context, arg BumpCaseParams) error {
 	_, err := q.db.Exec(ctx, bumpCase, arg.Now, arg.ID)
 	return err
@@ -168,9 +165,6 @@ type CaseMeasureCountsRow struct {
 	UnrevokedMeasures int32
 }
 
-// 每個案件導出的措施數（不論狀態）與其中未撤銷的數目。措施 m 是案件 C 導出的 ⇔ m.source_case_id = C，或 m 依據的認定（含引用的既有認定）以 C 的通報為來源
-// （measure_findings → finding_reports → reports.case_id）。這個定義有兩處 SQL：這裡與 ListMeasures 的 source_case_id 篩選（measures.sql），由資料集測試鎖住一致。
-// 沒有導出措施的案件不出現在結果裡（呼叫方當成 0）。
 func (q *Queries) CaseMeasureCounts(ctx context.Context, caseIds []uuid.UUID) ([]CaseMeasureCountsRow, error) {
 	rows, err := q.db.Query(ctx, caseMeasureCounts, caseIds)
 	if err != nil {
@@ -198,7 +192,6 @@ WHERE from_case_id = $1 OR to_case_id = $1
 ORDER BY moved_at, id
 `
 
-// 移入或移出這個案件的移動，舊到新。
 func (q *Queries) CaseMoves(ctx context.Context, fromCaseID uuid.UUID) ([]SellerReportCaseMove, error) {
 	rows, err := q.db.Query(ctx, caseMoves, fromCaseID)
 	if err != nil {
@@ -254,7 +247,6 @@ type CaseReportCountsRow struct {
 	UnseenSupplementReports int32
 }
 
-// 每個案件的成員數、還沒有結果的成員數、結果是已採取措施的成員數，與有補充還沒被管理員看過的成員數（還沒有結果，而且存在編號大於通報的 supplements_seen_seq 的補充；與 model.Report.HasUnseenSupplements 同一個定義）。
 func (q *Queries) CaseReportCounts(ctx context.Context, caseIds []uuid.UUID) ([]CaseReportCountsRow, error) {
 	rows, err := q.db.Query(ctx, caseReportCounts, caseIds)
 	if err != nil {
@@ -288,7 +280,6 @@ WHERE case_id = $1
 ORDER BY created_at, id
 `
 
-// 案件的成員，舊到新。
 func (q *Queries) CaseReportIDs(ctx context.Context, caseID *uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, caseReportIDs, caseID)
 	if err != nil {
@@ -327,7 +318,6 @@ type CasesByIDsRow struct {
 	StorePurged bool
 }
 
-// 一批案件加上店名（個資清理之後是 NULL）、店家是否已關閉與個資是否已清理。
 func (q *Queries) CasesByIDs(ctx context.Context, ids []uuid.UUID) ([]CasesByIDsRow, error) {
 	rows, err := q.db.Query(ctx, casesByIDs, ids)
 	if err != nil {
@@ -381,7 +371,6 @@ type ChangeCaseSeverityParams struct {
 	ExpectedVersion int64
 }
 
-// 改嚴重度；只在進行中、版本相符時寫入，否則 0 列。
 func (q *Queries) ChangeCaseSeverity(ctx context.Context, arg ChangeCaseSeverityParams) (SellerCase, error) {
 	row := q.db.QueryRow(ctx, changeCaseSeverity,
 		arg.Severity,
@@ -425,7 +414,6 @@ type CloseEmptyCaseParams struct {
 	ID      uuid.UUID
 }
 
-// 通報都移走的案件以 NO_REPORTS 自動關閉（不算決定）；案件還有成員或已結案時 0 列。呼叫方已鎖住案件列。
 func (q *Queries) CloseEmptyCase(ctx context.Context, arg CloseEmptyCaseParams) (SellerCase, error) {
 	row := q.db.QueryRow(ctx, closeEmptyCase, arg.Now, arg.AdminID, arg.ID)
 	var i SellerCase
@@ -469,7 +457,6 @@ type DecideCaseParams struct {
 	ExpectedVersion int64
 }
 
-// 決定即結案；只在進行中、版本相符時寫入，否則 0 列。
 func (q *Queries) DecideCase(ctx context.Context, arg DecideCaseParams) (SellerCase, error) {
 	row := q.db.QueryRow(ctx, decideCase,
 		arg.Now,
@@ -513,7 +500,6 @@ type InsertCaseParams struct {
 	AdminID  int64
 }
 
-// 開案（分案或移動時，這家店的這個類別沒有進行中的案件）；cases_one_open 是保底：呼叫方已鎖住店家列，同一家店的分案、移動、結案彼此串行。
 func (q *Queries) InsertCase(ctx context.Context, arg InsertCaseParams) (SellerCase, error) {
 	row := q.db.QueryRow(ctx, insertCase,
 		arg.ID,
@@ -606,7 +592,6 @@ ORDER BY id
 FOR UPDATE
 `
 
-// 依 id 升序鎖定一批案件（鎖順序：店家列、通報列、案件列（id 升序）、措施列）。
 func (q *Queries) LockCases(ctx context.Context, ids []uuid.UUID) ([]SellerCase, error) {
 	rows, err := q.db.Query(ctx, lockCases, ids)
 	if err != nil {
@@ -653,7 +638,6 @@ type LockOpenCaseParams struct {
 	Category string
 }
 
-// 鎖定這家店這個類別進行中的案件（沒有時 0 列）。
 func (q *Queries) LockOpenCase(ctx context.Context, arg LockOpenCaseParams) (SellerCase, error) {
 	row := q.db.QueryRow(ctx, lockOpenCase, arg.StoreID, arg.Category)
 	var i SellerCase
@@ -686,7 +670,6 @@ type OpenCaseOfParams struct {
 	Category string
 }
 
-// 這家店這個類別進行中的案件（不鎖；呼叫方已鎖住店家列，所有改案件的指令都先鎖店家，所以讀到之後不會被別人關閉或另開）。
 func (q *Queries) OpenCaseOf(ctx context.Context, arg OpenCaseOfParams) (SellerCase, error) {
 	row := q.db.QueryRow(ctx, openCaseOf, arg.StoreID, arg.Category)
 	var i SellerCase
@@ -714,7 +697,6 @@ FROM seller.cases
 WHERE store_id = $1 AND closed_at IS NULL
 `
 
-// 這家店全部進行中的案件（每個類別最多一個；不鎖，同 OpenCaseOf）：分案與移動的去處。
 func (q *Queries) OpenCasesOfStore(ctx context.Context, storeID int64) ([]SellerCase, error) {
 	rows, err := q.db.Query(ctx, openCasesOfStore, storeID)
 	if err != nil {
@@ -766,9 +748,6 @@ type ReviewCaseDecisionByIDsRow struct {
 	DueAt   time.Time
 }
 
-// 這些案件的「待決定」開始時間與期限（資源的 decide_deadline）。規則只有 seller.review_case_decision(at)（objects.sql）；不是待決定的案件
-// （已結案、等賣家回覆）沒有列。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 func (q *Queries) ReviewCaseDecisionByIDs(ctx context.Context, arg ReviewCaseDecisionByIDsParams) ([]ReviewCaseDecisionByIDsRow, error) {
 	rows, err := q.db.Query(ctx, reviewCaseDecisionByIDs, arg.At, arg.Ids)
 	if err != nil {

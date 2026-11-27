@@ -50,8 +50,8 @@ func (c *steppingClock) Now() time.Time {
 }
 
 type jobQueue struct {
-	mu      sync.Mutex
-	pending []river.JobArgs
+	mu       sync.Mutex
+	pending  []river.JobArgs
 	enqueued map[string]int
 }
 

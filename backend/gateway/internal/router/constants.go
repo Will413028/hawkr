@@ -1,6 +1,5 @@
 package router
 
-
 const (
 	// API 基礎路徑
 	APIV1Path = "/api/v1"
@@ -11,19 +10,16 @@ const (
 	AdminPath  = "/admin"  // 管理員專用
 )
 
-
 const (
 	StoreMapSessionsPath = "/store_map_sessions"
 	StoreMapRedirectPath = "/store_map/redirect"
 	StoreMapReturnPath   = "/store_map/return"
 )
 
-
 const (
 	StorePickupsPath = "/store_pickups"
 	StorePickupID    = "/:store_pickup_id"
 )
-
 
 const (
 	ProductsPath            = "/products"
@@ -53,7 +49,6 @@ const (
 	ProductCertificationApplicationWithdraw = "/:id/certification_applications/:application_id/withdraw"
 )
 
-
 const (
 	CategoriesPath         = "/categories"
 	CategoriesTree         = "/tree"
@@ -65,7 +60,6 @@ const (
 	ProductsBatchChangeCat = "/products/batch-change-category"
 )
 
-
 const (
 	OrdersPath               = "/orders"
 	OrderStatusCounts        = "/status_counts"
@@ -76,7 +70,6 @@ const (
 	OrderSellerCancellations = "/:order_no/seller_cancellations"
 	OrderRetryGrant          = "/:order_no/retry_grant"
 )
-
 
 const (
 	ShipmentsPath                   = "/shipments"
@@ -93,7 +86,6 @@ const (
 	ShipmentsAnomalyIgnore      = "/anomalies/:shipment_id/:anomaly_type/ignore"
 )
 
-
 const (
 	ShippingOnboardingsPath         = "/shipping_onboardings"
 	ShippingOnboardingsCvs          = "/cvs"
@@ -102,16 +94,13 @@ const (
 	ShippingOnboardingToggle        = "/:onboarding_id/toggle"
 )
 
-
 const (
 	ShippingMethodsPath = "/shipping_methods"
 )
 
-
 const (
 	ShippingBusinessDaysPath = "/shipping_business_days"
 )
-
 
 const (
 	CartsPath        = "/carts"
@@ -121,7 +110,6 @@ const (
 	CartsMerge       = "/merge"
 )
 
-
 const (
 	CheckoutPath        = "/checkout"
 	CheckoutValidate    = "/validate"
@@ -130,11 +118,9 @@ const (
 	CheckoutConfirm     = "/confirm"
 )
 
-
 const (
 	ShippingQuotesPath = "/shipping_quotes"
 )
-
 
 const (
 	AdminProductsPath  = "/products"
@@ -143,7 +129,6 @@ const (
 	AdminProductStatus = "/products/:id/status"
 	AdminProductCache  = "/products/cache"
 )
-
 
 // ⚠️ 路徑刻意是 product_certification_applications 而不是 certifications：
 // /admin/certifications* 是商家實名認證（KYC，`docs/modules/seller.md` §13）的前綴，兩者是不同的東西；KYC 審核在單體
@@ -160,7 +145,6 @@ const (
 	AdminProductCertificationReverify = "/product_certification_applications/:id/reverify"
 )
 
-
 const (
 	AdminShipmentsPath              = "/shipments"
 	AdminShipmentDetail             = "/shipments/:id"
@@ -170,7 +154,6 @@ const (
 	AdminShipmentsAnomalyAcknowledge = "/shipments/anomalies/:shipment_id/:anomaly_type/acknowledge"
 	AdminShipmentsAnomalyIgnore      = "/shipments/anomalies/:shipment_id/:anomaly_type/ignore"
 )
-
 
 const (
 	SearchPath     = "/search"
@@ -186,11 +169,9 @@ const (
 	SellersProducts = "/sellers/:id/products"
 )
 
-
 const (
 	BuyersPath = "/buyers/me"
 )
-
 
 const (
 	// 共用 Resource
@@ -221,8 +202,6 @@ const (
 	AdminCouponQuotaSeller = "/:store_id"
 )
 
-
-
 const (
 	AfterSalesPath                       = "/after_sales"
 	AfterSalesCaseNo                     = "/:case_no"
@@ -240,7 +219,6 @@ const (
 	AdminAfterSalesRetryPrintReturnLabel = "/:case_no/retry_print_return_label" // §5.3.6 admin/ops 人工重試 7-11 退貨列印
 	AdminAfterSalesForceConfirmReceipt   = "/:case_no/force_confirm_receipt"    // §5.3.12 Admin 強制確認收貨
 )
-
 
 const (
 	// 群組根路徑
@@ -330,18 +308,15 @@ const (
 	AdminInvoiceTaxDocumentContent   = "/tax_reviews/:store_id/documents/:document_id/content"  // ADM 稅籍佐證檔二進位子路由（plan 8f-1）
 )
 
-
 const (
 	ShareURLPath = "/share_url"
 )
-
 
 const (
 	CachesPath         = "/caches"
 	CachesFlush        = "/flush"
 	CachesFlushService = "/flush/:service"
 )
-
 
 const (
 

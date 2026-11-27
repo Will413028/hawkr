@@ -33,7 +33,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
   /// 編輯模式時帶入的現有商品資料
   final Map<String, dynamic>? existingProduct;
 
-
   static const List<String> _defaultTopTabs = [
     'Vegetables',
     'Fruits',
@@ -81,7 +80,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     'Processed',
     'Flowers',
   };
-
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -254,7 +252,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       return null;
     }, const []);
 
-
     void onSearch() {
       final key = searchCtrl.text.trim().toLowerCase();
       if (key.isEmpty) return;
@@ -406,7 +403,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       );
     }
 
-
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       body: Column(
@@ -500,7 +496,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     );
   }
 
-
   static String _computeInitialActiveTop({
     required bool isEditMode,
     required Map<String, dynamic>? existingProduct,
@@ -549,7 +544,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     }
     return trimmed;
   }
-
 
   /// 接收「已經發起」的 product detail Future，等其完成後把資料套進 picker state。
   /// 跟 _load (category tree) 平行跑，把兩個獨立網路 call 的總耗時從

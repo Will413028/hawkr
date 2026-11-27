@@ -18,7 +18,6 @@ WHERE id = $1 AND closed_at IS NULL
 RETURNING id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id, reversed_at, reversed_by_admin_id, reverse_reason
 `
 
-// 新檢舉掛進案件：加一版本並鎖住案件列（同一個案件的結案與其他檢舉的掛入都要等這個 transaction 提交）；回傳 0 列就是案件已被結掉。
 func (q *Queries) AttachToCase(ctx context.Context, id uuid.UUID) (ModerationCase, error) {
 	row := q.db.QueryRow(ctx, attachToCase, id)
 	var i ModerationCase
@@ -58,7 +57,6 @@ type BumpDailyCountParams struct {
 	DailyLimit      int32
 }
 
-// 每日上限 20：單一 upsert 原子地換日重算、未達上限才加一；沒有回傳列就是已到上限。DO UPDATE 的 WHERE 讓到上限時不改列。
 func (q *Queries) BumpDailyCount(ctx context.Context, arg BumpDailyCountParams) (int32, error) {
 	row := q.db.QueryRow(ctx, bumpDailyCount, arg.ReporterBuyerID, arg.Day, arg.DailyLimit)
 	var submitted int32
@@ -82,7 +80,6 @@ type BumpStoreDailyCountParams struct {
 	DailyLimit      int32
 }
 
-// 店家檢舉人的每日上限，與買家各自計數，規則同 BumpDailyCount。
 func (q *Queries) BumpStoreDailyCount(ctx context.Context, arg BumpStoreDailyCountParams) (int32, error) {
 	row := q.db.QueryRow(ctx, bumpStoreDailyCount, arg.ReporterStoreID, arg.Day, arg.DailyLimit)
 	var submitted int32
@@ -108,7 +105,6 @@ type BuyerReportersOfCaseRow struct {
 	ReporterID int64
 }
 
-// 案件的買家檢舉人，依 reporter_buyer_id 由小到大的 keyset（一案一位買家一筆，UNIQUE (case_id, reporter_buyer_id)）；第一頁的游標是 0。
 func (q *Queries) BuyerReportersOfCase(ctx context.Context, arg BuyerReportersOfCaseParams) ([]BuyerReportersOfCaseRow, error) {
 	rows, err := q.db.Query(ctx, buyerReportersOfCase, arg.CaseID, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -145,7 +141,6 @@ type ClearExpiredDescriptionsBatchParams struct {
 	MaxRows int32
 }
 
-// 結案早於 cutoff 的案件的檢舉說明（同快照的保留期，A7-D21）。
 func (q *Queries) ClearExpiredDescriptionsBatch(ctx context.Context, arg ClearExpiredDescriptionsBatchParams) (int64, error) {
 	result, err := q.db.Exec(ctx, clearExpiredDescriptionsBatch, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -158,7 +153,6 @@ const clearReporterDescriptions = `-- name: ClearReporterDescriptions :execrows
 UPDATE moderation.reports SET description = NULL WHERE reporter_buyer_id = $1 AND description IS NOT NULL
 `
 
-// 檢舉人刪帳（A7-D21）：清掉他全部檢舉的說明；檢舉列與 reporter_buyer_id（假名鍵）留著。
 func (q *Queries) ClearReporterDescriptions(ctx context.Context, reporterBuyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, clearReporterDescriptions, reporterBuyerID)
 	if err != nil {
@@ -171,7 +165,6 @@ const clearStoreReporterDescriptions = `-- name: ClearStoreReporterDescriptions 
 UPDATE moderation.reports SET description = NULL WHERE reporter_store_id = $1 AND description IS NOT NULL
 `
 
-// 店家退場：清掉該店以檢舉人身分送出的全部檢舉的說明；檢舉列與 reporter_store_id（業務鍵）留著。
 func (q *Queries) ClearStoreReporterDescriptions(ctx context.Context, reporterStoreID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, clearStoreReporterDescriptions, reporterStoreID)
 	if err != nil {
@@ -198,7 +191,6 @@ type CloseCaseParams struct {
 	Version          int64
 }
 
-// 結案是終態：只有進行中而且版本相符的案件轉移成功；回傳 0 列表示已被結掉或版本過期。
 func (q *Queries) CloseCase(ctx context.Context, arg CloseCaseParams) (int64, error) {
 	result, err := q.db.Exec(ctx, closeCase,
 		arg.Decision,
@@ -244,7 +236,6 @@ type DeleteExpiredReportRequestsBatchParams struct {
 	MaxRows int32
 }
 
-// 結案早於 cutoff 的案件的檢舉的冪等紀錄（同說明與快照的保留期，A7-D21）。
 func (q *Queries) DeleteExpiredReportRequestsBatch(ctx context.Context, arg DeleteExpiredReportRequestsBatchParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredReportRequestsBatch, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -269,7 +260,6 @@ const deleteReporterRequests = `-- name: DeleteReporterRequests :execrows
 DELETE FROM moderation.report_requests WHERE reporter_buyer_id = $1
 `
 
-// 檢舉人刪帳（A7-D21）：刪掉他的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
 func (q *Queries) DeleteReporterRequests(ctx context.Context, reporterBuyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteReporterRequests, reporterBuyerID)
 	if err != nil {
@@ -282,7 +272,6 @@ const deleteSnapshots = `-- name: DeleteSnapshots :many
 DELETE FROM moderation.case_snapshots WHERE id = ANY($1::uuid[]) RETURNING asset_ids
 `
 
-// 刪快照並回傳各自擁有的圖片資產（呼叫方在同一個 transaction 內 MarkDeleted）；檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
 func (q *Queries) DeleteSnapshots(ctx context.Context, ids []uuid.UUID) ([][]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, deleteSnapshots, ids)
 	if err != nil {
@@ -319,7 +308,6 @@ const deleteStoreReporterRequests = `-- name: DeleteStoreReporterRequests :execr
 DELETE FROM moderation.report_requests WHERE reporter_store_id = $1
 `
 
-// 店家退場：刪掉該店的冪等紀錄；request_hash 是說明的雜湊，不能比說明活得久。
 func (q *Queries) DeleteStoreReporterRequests(ctx context.Context, reporterStoreID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteStoreReporterRequests, reporterStoreID)
 	if err != nil {
@@ -344,7 +332,6 @@ type ExistingOpenReportParams struct {
 	ReporterStoreID *int64
 }
 
-// 這位檢舉人（買家或店家，另一欄傳 NULL）對這個對象在進行中案件裡已有的檢舉。
 func (q *Queries) ExistingOpenReport(ctx context.Context, arg ExistingOpenReportParams) (ModerationReport, error) {
 	row := q.db.QueryRow(ctx, existingOpenReport,
 		arg.TargetKind,
@@ -381,7 +368,6 @@ type ExpiredSnapshotsBatchParams struct {
 	MaxRows int32
 }
 
-// 結案早於 cutoff 的案件的快照：鎖住這些列，同一個 transaction 內刪除。
 func (q *Queries) ExpiredSnapshotsBatch(ctx context.Context, arg ExpiredSnapshotsBatchParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, expiredSnapshotsBatch, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -442,7 +428,6 @@ type InsertBuyerCaseParams struct {
 	OpenedAt time.Time
 }
 
-// 買家對象開案：同 InsertContentCase。
 func (q *Queries) InsertBuyerCase(ctx context.Context, arg InsertBuyerCaseParams) (ModerationCase, error) {
 	row := q.db.QueryRow(ctx, insertBuyerCase, arg.ID, arg.BuyerID, arg.OpenedAt)
 	var i ModerationCase
@@ -480,7 +465,6 @@ type InsertContentCaseParams struct {
 	OpenedAt   time.Time
 }
 
-// 內容對象開案：同一對象已有進行中案件時什麼都不寫（沒有回傳列），呼叫方接著讀進行中的案件（撞唯一鍵用 ON CONFLICT，不在同一個 transaction 繼續下 SQL）。
 func (q *Queries) InsertContentCase(ctx context.Context, arg InsertContentCaseParams) (ModerationCase, error) {
 	row := q.db.QueryRow(ctx, insertContentCase,
 		arg.ID,
@@ -527,7 +511,6 @@ type InsertReportParams struct {
 	CreatedAt       time.Time
 }
 
-// 同一位檢舉人在同一個案件的第二筆，什麼都不寫（沒有回傳列）。
 func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (ModerationReport, error) {
 	row := q.db.QueryRow(ctx, insertReport,
 		arg.ID,
@@ -567,7 +550,6 @@ type InsertReportRequestParams struct {
 	RequestHash     []byte
 }
 
-// 記下 (檢舉人, request_id) 對應的檢舉；同一個 (檢舉人, request_id) 已有紀錄時什麼都不寫（回 0 列，呼叫端重試並比對內容）。
 func (q *Queries) InsertReportRequest(ctx context.Context, arg InsertReportRequestParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertReportRequest,
 		arg.ReporterBuyerID,
@@ -597,7 +579,6 @@ type InsertSnapshotParams struct {
 	CapturedAt    time.Time
 }
 
-// 同一案同一份內容已有快照時什麼都不寫（0 列）。
 func (q *Queries) InsertSnapshot(ctx context.Context, arg InsertSnapshotParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertSnapshot,
 		arg.ID,
@@ -617,7 +598,6 @@ const latestSnapshotContent = `-- name: LatestSnapshotContent :one
 SELECT content FROM moderation.case_snapshots WHERE case_id = $1 ORDER BY captured_at DESC, id DESC LIMIT 1
 `
 
-// 案件最近一份凍結的內容（內容已被刪除時用它確認作者）。
 func (q *Queries) LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (string, error) {
 	row := q.db.QueryRow(ctx, latestSnapshotContent, caseID)
 	var content string
@@ -637,7 +617,6 @@ type LatestSnapshotContentsOfCasesRow struct {
 	Content string
 }
 
-// 一頁案件各自最近一份凍結的內容；沒有快照（已過保留期被刪除）的案件沒有列。
 func (q *Queries) LatestSnapshotContentsOfCases(ctx context.Context, caseIds []uuid.UUID) ([]LatestSnapshotContentsOfCasesRow, error) {
 	rows, err := q.db.Query(ctx, latestSnapshotContentsOfCases, caseIds)
 	if err != nil {
@@ -674,7 +653,6 @@ type ListAllCasesParams struct {
 	MaxRows     int32
 }
 
-// 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；不分狀態；target_kind 空字串不篩。
 func (q *Queries) ListAllCases(ctx context.Context, arg ListAllCasesParams) ([]ModerationCase, error) {
 	rows, err := q.db.Query(ctx, listAllCases,
 		arg.TargetKind,
@@ -733,7 +711,6 @@ type ListClosedCasesParams struct {
 	MaxRows     int32
 }
 
-// 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；已結案的案件；target_kind 空字串不篩。
 func (q *Queries) ListClosedCases(ctx context.Context, arg ListClosedCasesParams) ([]ModerationCase, error) {
 	rows, err := q.db.Query(ctx, listClosedCases,
 		arg.TargetKind,
@@ -792,8 +769,6 @@ type ListOpenCasesParams struct {
 	MaxRows     int32
 }
 
-// 列案件依狀態分三個查詢：狀態是述詞的常數而不是參數，OPEN 才證明得出 partial index cases_open_by_time 適用（參數化的 catch-all 述詞在 generic plan 下證明不了）。
-// 後台列案件，開案時間新的在前（keyset：(opened_at, id) 由大到小）；進行中的案件；target_kind 空字串不篩。
 func (q *Queries) ListOpenCases(ctx context.Context, arg ListOpenCasesParams) ([]ModerationCase, error) {
 	rows, err := q.db.Query(ctx, listOpenCases,
 		arg.TargetKind,
@@ -861,7 +836,6 @@ type ListReportsOfReporterRow struct {
 	ClosedAt         *time.Time
 }
 
-// 檢舉人自己的檢舉，新的在前，帶所屬案件的對象與決定（結果由案件推導）。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListReportsOfReporter(ctx context.Context, arg ListReportsOfReporterParams) ([]ListReportsOfReporterRow, error) {
 	rows, err := q.db.Query(ctx, listReportsOfReporter,
 		arg.ReporterBuyerID,
@@ -927,7 +901,6 @@ type ListReportsOfStoreReporterRow struct {
 	ClosedAt         *time.Time
 }
 
-// 店家檢舉人自己的檢舉（只有聊天訊息），形狀與 ListReportsOfReporter 相同。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListReportsOfStoreReporter(ctx context.Context, arg ListReportsOfStoreReporterParams) ([]ListReportsOfStoreReporterRow, error) {
 	rows, err := q.db.Query(ctx, listReportsOfStoreReporter,
 		arg.ReporterStoreID,
@@ -979,7 +952,6 @@ type OpenCaseByTargetParams struct {
 	BuyerID    *int64
 }
 
-// 對象目前進行中的案件（沒有就是 ErrNoRows）；內容對象帶 content_id、買家對象帶 buyer_id，另一個是 NULL。
 func (q *Queries) OpenCaseByTarget(ctx context.Context, arg OpenCaseByTargetParams) (ModerationCase, error) {
 	row := q.db.QueryRow(ctx, openCaseByTarget, arg.TargetKind, arg.ContentID, arg.BuyerID)
 	var i ModerationCase
@@ -1016,7 +988,6 @@ type OpenReportCountsOfPostsRow struct {
 	Reports int64
 }
 
-// 貼文在進行中案件裡的檢舉數（已結案案件的檢舉不算）；沒有進行中案件的貼文沒有列。
 func (q *Queries) OpenReportCountsOfPosts(ctx context.Context, postIds []uuid.UUID) ([]OpenReportCountsOfPostsRow, error) {
 	rows, err := q.db.Query(ctx, openReportCountsOfPosts, postIds)
 	if err != nil {
@@ -1055,7 +1026,6 @@ type ReportByRequestRow struct {
 	RequestHash      []byte
 }
 
-// 這位檢舉人以這個 request_id 第一次得到的檢舉與當時的內容雜湊（不看案件狀態，A7-D28 第 3 點）。
 func (q *Queries) ReportByRequest(ctx context.Context, arg ReportByRequestParams) (ReportByRequestRow, error) {
 	row := q.db.QueryRow(ctx, reportByRequest, arg.ReporterBuyerID, arg.ReporterStoreID, arg.RequestID)
 	var i ReportByRequestRow
@@ -1085,7 +1055,6 @@ type ReportCountsOfCasesRow struct {
 	Reports int64
 }
 
-// 一頁案件的檢舉數（一個查詢，不逐案件查）。
 func (q *Queries) ReportCountsOfCases(ctx context.Context, caseIds []uuid.UUID) ([]ReportCountsOfCasesRow, error) {
 	rows, err := q.db.Query(ctx, reportCountsOfCases, caseIds)
 	if err != nil {
@@ -1115,7 +1084,6 @@ type ReportIDsOfCaseParams struct {
 	MaxRows int32
 }
 
-// 認定引用的來源檢舉（最早的幾筆）。
 func (q *Queries) ReportIDsOfCase(ctx context.Context, arg ReportIDsOfCaseParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, reportIDsOfCase, arg.CaseID, arg.MaxRows)
 	if err != nil {
@@ -1151,7 +1119,6 @@ type ReportWithOutcomeRow struct {
 	ClosedAt         *time.Time
 }
 
-// 一筆檢舉與它所屬案件的決定：檢舉不存結果，結果由案件推導。
 func (q *Queries) ReportWithOutcome(ctx context.Context, id uuid.UUID) (ReportWithOutcomeRow, error) {
 	row := q.db.QueryRow(ctx, reportWithOutcome, id)
 	var i ReportWithOutcomeRow
@@ -1218,7 +1185,6 @@ type ReverseCaseParams struct {
 	ID         uuid.UUID
 }
 
-// 撤銷 HIDE 決定：案件維持結案、決定不改，撤銷記在原決定旁。只有已結案、處置是 HIDE、還沒撤銷的案件轉移成功；0 列表示不符合（已被撤銷或不是 HIDE）。
 func (q *Queries) ReverseCase(ctx context.Context, arg ReverseCaseParams) (int64, error) {
 	result, err := q.db.Exec(ctx, reverseCase,
 		arg.ReversedAt,
@@ -1277,7 +1243,6 @@ type StoreReportersOfCaseRow struct {
 	ReporterID int64
 }
 
-// 案件的店家檢舉人，依 reporter_store_id 由小到大的 keyset（一案一家店一筆，UNIQUE (case_id, reporter_store_id)）；第一頁的游標是 0。
 func (q *Queries) StoreReportersOfCase(ctx context.Context, arg StoreReportersOfCaseParams) ([]StoreReportersOfCaseRow, error) {
 	rows, err := q.db.Query(ctx, storeReportersOfCase, arg.CaseID, arg.AfterID, arg.MaxRows)
 	if err != nil {

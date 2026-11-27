@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
-
 type mockAftersalesAdminServiceClient struct {
 	aftersalespb.AfterSalesServiceClient
 	ListAfterSaleCasesForAdminFn func(ctx context.Context, in *aftersalespb.ListAfterSaleCasesForAdminRequest, opts ...grpc.CallOption) (*aftersalespb.ListAfterSaleCasesForAdminResponse, error)

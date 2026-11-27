@@ -49,8 +49,7 @@ export function saveFeedListSnapshot(snapshot: FeedListSnapshot): void {
 			STORAGE_KEY,
 			JSON.stringify({ ...snapshot, savedAt: Date.now() }),
 		);
-	} catch {
-	}
+	} catch {}
 }
 
 /**
@@ -82,7 +81,6 @@ export function takeFeedListSnapshot(key: string): FeedListSnapshot | null {
 	const snapshot = readStoredFeedListSnapshot(key);
 	try {
 		window.sessionStorage.removeItem(STORAGE_KEY);
-	} catch {
-	}
+	} catch {}
 	return snapshot;
 }

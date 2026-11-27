@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-
 // TestEventDroppedDomainCoversEveryCallSite 是上面那段的機械保證。
 func TestEventDroppedDomainCoversEveryCallSite(t *testing.T) {
 	callTypes, callReasons := observeEventDroppedCallSites(t)

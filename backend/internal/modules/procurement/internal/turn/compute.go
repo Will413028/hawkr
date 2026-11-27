@@ -36,8 +36,8 @@ var searchAffectingFields = []model.SlotKey{slots.ItemResolution}
 const (
 	maxTitleRunes   = 40
 	maxPreviewRunes = 200
-	maxReplyRunes = 4000
-	titleSeparator = "｜"
+	maxReplyRunes   = 4000
+	titleSeparator  = "｜"
 )
 
 type priorState struct {

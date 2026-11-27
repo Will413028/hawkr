@@ -52,7 +52,6 @@ import type {
 
 const BASE = "/app/buyers/me/invoice_profiles";
 
-
 /**
  * 58 §6.1.0 (13) 的碼表中，買家常用發票資料會遇到的五個。
  *
@@ -129,7 +128,6 @@ export function invoiceErrorMessage(err: unknown): string {
 	return err.message.replace(BIZ_CODE_PREFIX, "").trim();
 }
 
-
 /**
  * 一次「使用者意圖」一把（§0.4 ②）。
  *
@@ -144,7 +142,6 @@ export function newIdempotencyKey(): string {
 function idempotent(key: string): { headers: Record<string, string> } {
 	return { headers: { "Idempotency-Key": key } };
 }
-
 
 function str(value: unknown): string {
 	return value == null ? "" : String(value);
@@ -172,7 +169,6 @@ function normalizeProfile(raw: Record<string, unknown>): InvoiceProfile {
 		updatedAt: str(raw.updatedAt),
 	};
 }
-
 
 /**
  * 每個買家最多 20 筆（invoice-service `buyerProfileCap`），而端點 1 的預設
@@ -264,7 +260,6 @@ export async function setDefaultInvoiceProfile(
 	);
 	return normalizeProfile(env.data ?? {});
 }
-
 
 function bool(value: unknown): boolean {
 	return value === true;
@@ -433,7 +428,6 @@ export async function resendBuyerInvoiceNotification(
 	};
 }
 
-
 /**
  * 端點 68 的 query。日期是 `YYYY-MM-DD`；`status` 與 `documentKind` 是 CodeMeta 值
  * （`InvoiceDocumentStatus`／`InvoiceDocumentKind`）。
@@ -502,7 +496,6 @@ export async function listBuyerInvoiceDocuments(
 
 /** 端點 68 的頁大小。值域 1–50（見 `listBuyerInvoiceDocuments` 第 2 點）。 */
 export const BUYER_DOCUMENTS_PAGE_SIZE = 20;
-
 
 const COMPLAINT_BASE = (orderNo: string) =>
 	`/app/orders/${encodeURIComponent(orderNo)}/invoice_complaints`;
@@ -663,7 +656,6 @@ export async function reopenInvoiceComplaint(
 	);
 	return normalizeComplaint(env.data ?? {});
 }
-
 
 const CORRECTION_BASE = (orderNo: string) =>
 	`/app/orders/${encodeURIComponent(orderNo)}/invoice_corrections`;

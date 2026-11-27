@@ -109,12 +109,12 @@ type Service struct{ d Deps }
 func New(d Deps) *Service { return &Service{d: d} }
 
 type plan struct {
-	delivery store.DeliveryForUpdateRow
-	typeName string
-	entry    registry.Entry
-	params   json.RawMessage
-	rendered registry.Rendered
-	tokens   []string
+	delivery    store.DeliveryForUpdateRow
+	typeName    string
+	entry       registry.Entry
+	params      json.RawMessage
+	rendered    registry.Rendered
+	tokens      []string
 	inboxItemID *uuid.UUID
 	imageURL    string
 	address     string

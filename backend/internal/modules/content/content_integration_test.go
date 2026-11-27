@@ -162,7 +162,6 @@ func wantKind(t *testing.T, err error, want apperr.Kind) {
 	}
 }
 
-
 func bannerInput() content.BannerInput {
 	return content.BannerInput{
 		Title:             "中秋禮盒",
@@ -472,7 +471,6 @@ func TestListBannersPagesInDisplayOrder(t *testing.T) {
 	}
 }
 
-
 func TestUpdateBannerRejectsAStaleVersionBeforeFinalizing(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -527,7 +525,6 @@ func TestDeleteChecksTheVersionWhenGiven(t *testing.T) {
 	}
 	wantKind(t, f.m.DeleteBanner(ctx, b.ID, b.Version), apperr.KindNotFound)
 }
-
 
 func TestCheckAppVersion(t *testing.T) {
 	t.Parallel()

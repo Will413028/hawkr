@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
 
-
 import {
 	cleanup,
 	fireEvent,

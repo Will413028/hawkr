@@ -27,7 +27,6 @@ import { whenDocumentSettled } from "@/lib/hydration/document-settled";
 import { buildImageUrl } from "@/lib/media/cdn";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 
-
 type Gsap = typeof import("gsap")["gsap"];
 
 let gsapModule: Gsap | null = null;
@@ -150,7 +149,6 @@ const SONNER_CLEARANCE_PX = 8;
 const NAVBAR_CLEARANCE_CLASS =
 	"pt-[calc(var(--floating-nav-height,84px)+var(--floating-nav-top-gap,16px)+12px)]";
 
-
 const KIND_ICON: Record<ToastKind, ToastIconKind> = {
 	order: "order",
 	message: "message",
@@ -190,7 +188,6 @@ const DEFAULT_CONTAINER_CLASS =
 	"bg-[color-mix(in_srgb,var(--hkui-primary)_14%,transparent)] text-hk-primary";
 const DEFAULT_BAR_CLASS =
 	"bg-[color-mix(in_srgb,var(--hkui-primary)_55%,transparent)]";
-
 
 interface ToastCardProps {
 	toast: ToastView;
@@ -302,8 +299,7 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 			if (Math.abs(d.dx) > 4) {
 				try {
 					e.currentTarget.setPointerCapture(d.id);
-				} catch {
-				}
+				} catch {}
 			}
 			const el = elRef.current;
 			if (el)
@@ -425,7 +421,6 @@ const ToastCard = React.forwardRef<HTMLDivElement, ToastCardProps>(
 		);
 	},
 );
-
 
 function ToastStack({
 	items,
@@ -581,7 +576,6 @@ function ToastStack({
 	);
 }
 
-
 /** Group toasts by `groupKey` (singletons get their own key), newest card
  *  first within a group, newest group on top. */
 function groupToasts(toasts: ToastView[]): ToastView[][] {
@@ -654,7 +648,6 @@ export function NotificationToastViewport({
 			aria-label="通知"
 			className={`pointer-events-none fixed inset-x-0 top-0 z-[1100] flex flex-col items-center gap-2 px-3 ${NAVBAR_CLEARANCE_CLASS}`}
 		>
-
 			<span className="sr-only" aria-live="polite">
 				{announcement}
 			</span>

@@ -28,7 +28,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 const TAX_REVIEWS_ENDPOINT = "/api/v1/admin/invoices/tax_reviews";
 const PAGE_SIZE = 20;
 
@@ -200,7 +199,6 @@ export default function TaxReviewQueuePage() {
 											{codeLabel(SELLER_TAX_ENTITY_TYPE_LABEL, item.entityType)}
 										</td>
 										<td>
-
 											{codeLabel(
 												SELLER_TAX_OBLIGATION_LABEL,
 												item.claimedStatus,

@@ -426,7 +426,6 @@ func (h *Holder) RestoreCategoryAdmin(c *gin.Context) {
 	response.OK(c, protoToCategory(resp.Category))
 }
 
-
 func writeBackendError(c *gin.Context, resp interface {
 	GetCode() int32
 	GetMessage() string

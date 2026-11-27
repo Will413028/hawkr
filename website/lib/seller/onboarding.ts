@@ -181,7 +181,6 @@ export async function finalizeSellerOnboarding(
 	await deps.complete(store.etag);
 	try {
 		deps.onCompleted(result);
-	} catch {
-	}
+	} catch {}
 	return result;
 }

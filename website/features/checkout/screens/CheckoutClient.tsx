@@ -821,7 +821,6 @@ export default function CheckoutClient() {
 						</div>
 					</section>
 
-
 					{preview?.invoice ? (
 						<CheckoutInvoiceSection
 							invoice={preview.invoice}
@@ -1023,7 +1022,6 @@ export default function CheckoutClient() {
 					</p>
 				</aside>
 			</div>
-
 
 			{preview?.invoice ? (
 				<InvoiceMethodSheet

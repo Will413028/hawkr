@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 var (
 	appealPaths  = rpc.FieldPaths{"MeasureID": "measure_id", "Reason": "reason", "EvidenceTokens[]": "evidence_staged_tokens[]", "ExpectedVersion": "etag"}
 	measurePaths = rpc.FieldPaths{"State": "state"}

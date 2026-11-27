@@ -224,7 +224,6 @@ function BuyerMenu({ onSignOut }: { onSignOut: SignOutAction }) {
 				<div ref={panelRef} className={SITE_NAV_USER_MENU} {...menu.panelProps}>
 					<div className={SITE_NAV_USER_MENU_HEADER}>
 						<strong>{displayName}</strong>
-
 					</div>
 					<ul className={SITE_NAV_USER_MENU_LIST}>
 						{buyerMenuItems.map((item) => (
@@ -376,10 +375,7 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 				) : null}
 
 				<div className={SITE_NAV_RIGHT}>
-
 					<ThemeToggle className="size-11" />
-
-
 
 					{status === "signedIn" && (
 						<TextScaleToggle className="size-11 [@media(max-width:840px)]:hidden" />
@@ -406,7 +402,6 @@ export default function Navbar({ megaMenuDynamicLinks }: NavbarProps = {}) {
 						</span>
 						<span aria-hidden="true">購物車</span>
 					</CartBubble>
-
 
 					{railMode === "skeleton" ? (
 						<>

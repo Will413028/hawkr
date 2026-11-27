@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 func previewInputFrom(in OrderPaidInput) ResolveModeInput {
 	return ResolveModeInput{
 		StoreID:        in.StoreID,
@@ -171,7 +170,6 @@ func TestResolveMode_MatchesPrepare_AllLeaves(t *testing.T) {
 		}
 	}
 }
-
 
 func snapshotMap(t *testing.T, out ValidateInvoiceOutput) map[string]any {
 	t.Helper()

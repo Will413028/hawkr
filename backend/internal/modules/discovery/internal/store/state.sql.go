@@ -37,7 +37,6 @@ WHERE job = $1
 FOR UPDATE
 `
 
-// 取代快照的 transaction 先鎖狀態列，序列化重疊的重算；回傳的 last_succeeded_started_at 決定這次能不能寫。
 func (q *Queries) LockRecomputeState(ctx context.Context, job string) (DiscoveryRecomputeState, error) {
 	row := q.db.QueryRow(ctx, lockRecomputeState, job)
 	var i DiscoveryRecomputeState
@@ -64,7 +63,6 @@ type MarkRecomputeSucceededParams struct {
 	Job        string
 }
 
-// 與取代快照同一個 transaction：快照與「它是哪一次重算的結果」一起生效。
 func (q *Queries) MarkRecomputeSucceeded(ctx context.Context, arg MarkRecomputeSucceededParams) error {
 	_, err := q.db.Exec(ctx, markRecomputeSucceeded, arg.StartedAt, arg.FinishedAt, arg.Job)
 	return err
@@ -82,7 +80,6 @@ type RecordRecomputeAttemptParams struct {
 	StartedAt time.Time
 }
 
-// 一次重算開始：記下開始時間（沒有這一列就建立）。取較大的值，亂序到達的舊嘗試不會把它倒退。
 func (q *Queries) RecordRecomputeAttempt(ctx context.Context, arg RecordRecomputeAttemptParams) error {
 	_, err := q.db.Exec(ctx, recordRecomputeAttempt, arg.Job, arg.StartedAt)
 	return err
@@ -106,7 +103,6 @@ type RecordRecomputeFailureParams struct {
 	Error     string
 }
 
-// 記下失敗的時間與（已截斷的）錯誤。只有比目前記錄更晚的失敗才覆蓋，亂序到達的舊失敗不會蓋掉新的。
 func (q *Queries) RecordRecomputeFailure(ctx context.Context, arg RecordRecomputeFailureParams) error {
 	_, err := q.db.Exec(ctx, recordRecomputeFailure,
 		arg.Job,

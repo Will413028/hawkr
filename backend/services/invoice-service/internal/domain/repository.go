@@ -63,7 +63,6 @@ type ProviderAccount struct {
 	CredentialUpdatedAt *time.Time
 }
 
-
 // Issuer mirrors the InvoiceIssuer row with framework-free types.
 type Issuer struct {
 	ID          int64
@@ -488,7 +487,6 @@ type AdminAuditLogEntry struct {
 	OccurredAt             time.Time
 }
 
-
 // NewProviderAccount 是首次綁定憑證的輸入。AppKey 是**明文**，方向是往內（§8.1.1(h) 第 3 段）；
 // repository 負責加密、算 fingerprint 與 last4，呼叫端不得自己算其中任何一個。
 type NewProviderAccount struct {
@@ -604,7 +602,6 @@ type ProviderAccountRepository interface {
 	StartCredentialRotation(ctx context.Context, in StartCredentialRotation) error
 	PromoteCredential(ctx context.Context, in PromoteCredential) error
 	UpdateStatus(ctx context.Context, in UpdateProviderAccountStatus) error
-
 
 	// ResubmitCredential 是端點 24 的覆寫分支（既有列）。落地即 CREDENTIAL_VERIFYING。
 	// taken=true ＝ 撞 uq_ipa_fingerprint（這組統編＋AppKey 已被另一個同時有效的 issuer
@@ -729,7 +726,6 @@ type SellerTaxProfileRepository interface {
 	ListReviewsForAdmin(ctx context.Context, in AdminTaxReviewQuery) ([]AdminTaxReviewItem, error)
 	CountReviewsForAdmin(ctx context.Context, in AdminTaxReviewQuery) (int64, error)
 
-
 	// Create 建 DRAFT（T01 的 `[*]` 形態）。inserted=false ＝ 該 issuer 已有 profile。
 	Create(ctx context.Context, id, issuerID int64, now time.Time) (SellerTaxProfile, bool, error)
 	// ResetToDraft 是 T01 的 REJECTED／EXPIRED → DRAFT，7 天冷卻寫在 SQL 的 WHERE。
@@ -795,7 +791,6 @@ type UpdateSellerTaxDraft struct {
 	ReviewNote         string
 	Now                time.Time
 }
-
 
 // NewDocument 是建立一列 invoice_documents 的輸入。
 //
@@ -1290,7 +1285,6 @@ type OperationRepository interface {
 	// 且仍有非終態 VOID／ALLOWANCE／VOID_ALLOWANCE operation 的筆數。唯讀。
 	CountCrossPeriodPending(ctx context.Context, now time.Time) (int64, error)
 
-
 	// AdminRetryAfterFix 是 J18（FAILED_PERMANENT → READY）。attempt_count **不歸零**。
 	AdminRetryAfterFix(ctx context.Context, id, expectedVersion int64, requestSnapshotHash string, now time.Time) (bool, error)
 	// AdminResetAttempts 是 J19（FAILED_RETRY_EXHAUSTED → READY）＋ J34（SELLER_ACTION_REQUIRED
@@ -1607,7 +1601,6 @@ type AdjustmentRepository interface {
 	ListStaleBlocked(ctx context.Context, staleBefore time.Time, limit int32) ([]Adjustment, error)
 	ListLines(ctx context.Context, adjustmentID int64) ([]AdjustmentLine, error)
 
-
 	// InsertLines 建折讓明細（G01 的一部分，與 adjustment 同交易）。
 	InsertLines(ctx context.Context, adjustmentID int64, lines []NewAdjustmentLine, now time.Time) error
 	// NextAllowanceNumber 取我方自產的折讓單號（§5.3.3）。
@@ -1697,7 +1690,6 @@ type DecideComplaint struct {
 type ComplaintRepository interface {
 	GetByID(ctx context.Context, id int64) (Complaint, error)
 
-
 	// Create 走 ON CONFLICT DO NOTHING（不指名 target）。inserted=false ⇒ 這份 document
 	// 已有一件未結案的申訴（uq_invcomp_open_per_document），呼叫端改回 9310 並帶既有 id。
 	Create(ctx context.Context, in NewComplaint) (c Complaint, inserted bool, err error)
@@ -1718,12 +1710,10 @@ type ComplaintRepository interface {
 	// 同時按下（各自讀到 0 再各自寫 1）。
 	Reopen(ctx context.Context, id, buyerID, expectedVersion int64, slaDueAt, now time.Time) (bool, error)
 
-
 	// DecideEscalated 是 K08（→ RESOLVED）與 K09（→ VIOLATION_CONFIRMED），共用一句。
 	DecideEscalated(ctx context.Context, in DecideComplaint) (bool, error)
 	// ReturnToSeller 是 K10（ESCALATED_TO_ADM → OPEN），sla_due_at 由呼叫端以工作天曆重算。
 	ReturnToSeller(ctx context.Context, id, expectedVersion int64, slaDueAt, now time.Time) (bool, error)
-
 
 	// MarkSellerResponded 是 K02（OPEN／OVERDUE → SELLER_RESPONDED）。
 	// buyerReviewDueAt 由呼叫端算（now + 72h）：它是 K06「逾期視為接受」唯一的觸發依據，
@@ -2124,7 +2114,6 @@ type BusinessDayRepository interface {
 	Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *BusinessDayCoverage, error)
 }
 
-
 // Page 是 OFFSET 分頁的入參。
 //
 // 用 OFFSET 而非 keyset 是被對外契約決定的：每個 List*Response 的 data 都要回
@@ -2509,7 +2498,6 @@ type OverviewRepository interface {
 	AdminCounts(ctx context.Context, in AdminOverviewCountsQuery) (AdminOverviewCounts, error)
 }
 
-
 // ManualUnlock 是一列 invoice_manual_unlocks。
 //
 // Status 是**DB 上的值**，不是對外的值：仍掛著但已過期的那一列在 DB 上仍是
@@ -2601,7 +2589,6 @@ type ManualUnlockRepository interface {
 	Decide(ctx context.Context, in DecideManualUnlock) (bool, error)
 }
 
-
 // ProviderCutover 是一列 invoice_provider_cutovers。
 //
 // DeactivatedAt 為 nil ＝ 現行有效的那一次切點。同一個帳戶最多只有一列如此
@@ -2673,7 +2660,6 @@ type ApproveSellerTaxProfile struct {
 	ApprovalBasisAssetID *int64
 	Now                  time.Time
 }
-
 
 // ClaimIdempotency 是認領一把冪等鍵所需的全部輸入。
 type ClaimIdempotency struct {

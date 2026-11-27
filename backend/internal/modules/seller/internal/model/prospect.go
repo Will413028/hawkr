@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-
 // ProspectStatus 是業者的狀態。
 type ProspectStatus string
 

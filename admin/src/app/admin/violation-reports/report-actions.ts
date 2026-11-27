@@ -30,7 +30,6 @@ import {
 import { policyCategoryText } from "@/lib/policy-category";
 import { reportOutcomeText } from "./report-text";
 
-
 export const RESULT_NOTE_MAX_LENGTH = 2000;
 export const SEVERITY_NOTE_MAX_LENGTH = 2000;
 
@@ -84,7 +83,6 @@ export const NEW_SUPPLEMENTS_BADGE = "新的補充";
 function tooLong(value: string, max: number): boolean {
 	return goTrimmedRuneCount(value) > max;
 }
-
 
 export interface AssessForm {
 	category: PolicyCategory;
@@ -189,7 +187,6 @@ export function buildMove(
 	};
 }
 
-
 export interface ResolveForm {
 	outcome: ReportOutcome;
 	/** 給檢舉人的結果說明（選填）。 */
@@ -257,7 +254,6 @@ export function buildResolve(
 	};
 }
 
-
 export interface DecideForm {
 	decision: CaseDecision;
 	/** 給檢舉人的結果說明（選填），會帶入還沒有結果的通報。 */
@@ -314,7 +310,6 @@ export function bringInText(
 	return `${first}還沒有結果的 ${unresolvedReportCount} 筆通報會帶入「${reportOutcomeText(defaultOutcome)}」。`;
 }
 
-
 export interface SeverityForm {
 	severity: ViolationSeverity;
 	/** 原因，寫成案件的一則內部註記。 */
@@ -352,14 +347,12 @@ export function buildChangeSeverity(
 	};
 }
 
-
 export function buildCreateCaseNote(
 	caseId: string,
 	body: string,
 ): MessageInitShape<typeof CreateCaseNoteRequestSchema> {
 	return { caseId, note: { body: trimGoSpace(body) } };
 }
-
 
 /** 預先勾選的來源通報超過一次能選的上限時，建立措施對話框的說明。 */
 export const SOURCE_OVERFLOW_TEXT = `這個案件超過 ${SOURCE_REPORTS_MAX} 筆可以當來源的通報，已預先勾選最早的 ${SOURCE_REPORTS_MAX} 筆。`;

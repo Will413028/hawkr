@@ -331,7 +331,6 @@ export default function MergeDialog({
 							</div>
 						</div>
 						<ul>
-
 							<li>
 								{`「${loserName}」會被封存，並在其資料列指向「${winnerName}」`}
 							</li>

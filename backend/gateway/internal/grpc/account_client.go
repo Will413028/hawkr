@@ -13,8 +13,8 @@ import (
 
 // AccountClient is the gRPC client for account service
 type AccountClient struct {
-	conn   *grpc.ClientConn
-	client pb.AccountServiceClient
+	conn       *grpc.ClientConn
+	client     pb.AccountServiceClient
 	delegation pb.DelegationServiceClient
 }
 

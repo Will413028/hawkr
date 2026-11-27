@@ -85,11 +85,11 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 		"asset not on the application": {true, []KYCIssue{documentIssue(docs, uuid.NewV7().String(), IssueUnreadable)}, "Issues[0].DocumentAssetID"},
 		"business field on individual": {false, []KYCIssue{issueOn("business.tax_id", IssueMismatch)}, "Issues[0].Field"},
 		"document field on individual": {false, []KYCIssue{issueOn(docs, IssueMissing)}, "Issues[0].Field"},
-		"unreadable without an asset": {true, []KYCIssue{issueOn(docs, IssueUnreadable)}, "Issues[0].DocumentAssetID"},
-		"expired without an asset":    {true, []KYCIssue{issueOn(docs, IssueExpired)}, "Issues[0].DocumentAssetID"},
-		"mismatch without an asset":   {true, []KYCIssue{issueOn(docs, IssueMismatch)}, "Issues[0].DocumentAssetID"},
-		"invalid without an asset":    {true, []KYCIssue{issueOn(docs, IssueInvalid)}, "Issues[0].DocumentAssetID"},
-		"missing with an asset":       {true, []KYCIssue{documentIssue(docs, co1, IssueMissing)}, "Issues[0].DocumentAssetID"},
+		"unreadable without an asset":  {true, []KYCIssue{issueOn(docs, IssueUnreadable)}, "Issues[0].DocumentAssetID"},
+		"expired without an asset":     {true, []KYCIssue{issueOn(docs, IssueExpired)}, "Issues[0].DocumentAssetID"},
+		"mismatch without an asset":    {true, []KYCIssue{issueOn(docs, IssueMismatch)}, "Issues[0].DocumentAssetID"},
+		"invalid without an asset":     {true, []KYCIssue{issueOn(docs, IssueInvalid)}, "Issues[0].DocumentAssetID"},
+		"missing with an asset":        {true, []KYCIssue{documentIssue(docs, co1, IssueMissing)}, "Issues[0].DocumentAssetID"},
 	} {
 		sub := individualSub
 		if c.company {

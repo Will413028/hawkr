@@ -21,8 +21,8 @@ func TestAvatarDTOs_OutwardJSONKeyIsFlatAvatarKey(t *testing.T) {
 	const url = "https://cdn.test/i/original/public/buyer_avatar/2623900520/a.png"
 
 	cases := []struct {
-		name string
-		v    any
+		name     string
+		v        any
 		alsoWant []string
 	}{
 		{"OrderDetailResponse", OrderDetailResponse{

@@ -4,8 +4,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-
-
 var (
 	abnormalDocumentStatuses = []string{
 		codemeta.InvoiceDocumentStatusIssueFailed.Value,
@@ -30,7 +28,6 @@ var (
 		codemeta.InvoiceDocumentStatusResolvedExternally.Value,
 	}
 )
-
 
 var sellerComplaintViews = map[string][]string{
 	"AWAITING_SELLER": {
@@ -58,7 +55,6 @@ var openComplaintStatuses = []string{
 var overdueComplaintStatuses = []string{
 	codemeta.InvoiceComplaintStatusOverdue.Value,
 }
-
 
 type adminComplaintTab struct {
 	Statuses          []string
@@ -94,7 +90,6 @@ var adminComplaintTabs = map[string]adminComplaintTab{
 }
 
 var violationComplaintStatus = codemeta.InvoiceComplaintStatusViolationConfirmed.Value
-
 
 var adminJobTabs = map[string][]string{
 	"PENDING": {
@@ -150,7 +145,6 @@ func pendingJobStatuses() []string {
 
 func needsManualJobStatuses() []string { return adminJobTabs[adminJobNeedsManualTab] }
 
-
 type uploadStatusProjection struct {
 	Codes       []int16
 	IncludeNull bool
@@ -162,7 +156,6 @@ var uploadStatusProjections = map[string]uploadStatusProjection{
 	"FAILED":    {Codes: []int16{91}},
 	"NOT_FOUND": {Codes: []int16{-1}},
 }
-
 
 type adminTaxReviewFilter struct {
 	Statuses     []string
@@ -191,7 +184,6 @@ var adminTaxReviewFilters = map[string]adminTaxReviewFilter{
 	"EXPIRED":       {Statuses: []string{codemeta.SellerTaxReviewStatusExpired.Value}},
 }
 
-
 var providerErrorStatuses = []string{
 	codemeta.InvoiceProviderAccountStatusInvalidCredential.Value,
 	codemeta.InvoiceProviderAccountStatusProviderRejected.Value,
@@ -209,7 +201,6 @@ func projectProviderStatus(hasAccount bool, status string) string {
 	return status
 }
 
-
 const (
 	orderInvoiceStateAwaitingPayment  = "AWAITING_PAYMENT"
 	orderInvoiceStateProcessing       = "PROCESSING"
@@ -219,7 +210,7 @@ const (
 	orderInvoiceStateFailed           = "FAILED"
 	orderInvoiceStateSellerWillIssue  = "SELLER_WILL_ISSUE"
 	orderInvoiceStateSelfIssued       = "SELLER_SELF_ISSUED"
-	orderInvoiceStateOrderCancelled = "ORDER_CANCELLED"
+	orderInvoiceStateOrderCancelled   = "ORDER_CANCELLED"
 )
 
 var orderInvoiceStateNotices = map[string]string{
@@ -231,7 +222,7 @@ var orderInvoiceStateNotices = map[string]string{
 	orderInvoiceStateFailed:           "發票開立遇到問題，平台處理中",
 	orderInvoiceStateSellerWillIssue:  "本筆由賣家自行開立發票",
 	orderInvoiceStateSelfIssued:       "賣家已自行開立發票，如未收到請聯繫賣家",
-	orderInvoiceStateOrderCancelled: "訂單已取消，不會開立發票",
+	orderInvoiceStateOrderCancelled:   "訂單已取消，不會開立發票",
 }
 
 var receiptStateNotices = map[string]string{
@@ -298,7 +289,7 @@ var CorrectionStatusNotices = map[string]string{
 	codemeta.InvoiceCorrectionStatusUpdatedBeforeIssue.Value:    "發票尚未開立，已直接更新為新的資料",
 	codemeta.InvoiceCorrectionStatusVoidReissueInProgress.Value: "原發票作廢與重新開立處理中，完成後會寄送 Email",
 	codemeta.InvoiceCorrectionStatusCompleted.Value:             "已重新開立發票，已寄送至您的電子信箱",
-	codemeta.InvoiceCorrectionStatusReissueFailed.Value: "原發票已作廢、新發票尚未開立，平台正在處理",
+	codemeta.InvoiceCorrectionStatusReissueFailed.Value:         "原發票已作廢、新發票尚未開立，平台正在處理",
 }
 
 var documentStatusToBuyerState = map[string]string{
@@ -314,7 +305,6 @@ var documentStatusToBuyerState = map[string]string{
 	codemeta.InvoiceDocumentStatusResolvedExternally.Value:   orderInvoiceStateSelfIssued,
 	codemeta.InvoiceDocumentStatusCancelledBeforeIssue.Value: orderInvoiceStateVoided,
 }
-
 
 func timelineEventOf(subjectType, toStatus string) (string, bool) {
 	switch {

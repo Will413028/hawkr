@@ -100,7 +100,7 @@ func qitSeedDocument(t *testing.T, env *qitEnv, docID int64, buyerID int64, orde
 		ID: docID, IssuerID: env.issuerID, IssuerNameSnapshot: "查詢整合測試賣場",
 		SourceType: "ORDER", SourceRef: orderNo, TriggerType: "AUTO",
 		RecipientType: "BUYER", RecipientRefID: &buyerID,
-		RecipientName: "測試買家",
+		RecipientName:  "測試買家",
 		RecipientTaxID: "0000000000",
 		RecipientEmail: qitEmailPlain,
 		CarrierID1:     qitCarrierPlain,
@@ -120,7 +120,6 @@ func qitSeedDocument(t *testing.T, env *qitEnv, docID int64, buyerID int64, orde
 	}
 	return doc
 }
-
 
 // TestIntegration_Query_TierA_ComplaintOwnerIsInSQLPredicate 是「把擁有者條件從 WHERE
 // 拿掉」這個變異的唯一偵測點。
@@ -213,7 +212,6 @@ func TestIntegration_Query_TierA_BuyerProfilesOwnerIsInSQLPredicate(t *testing.T
 		t.Fatalf("🔴 另一位買家看到了 %d 筆 —— buyer_id 沒有進 SQL 的 WHERE", other.Total)
 	}
 }
-
 
 // TestIntegration_Query_AdminDocumentDetail_RevealsPlaintextAndWritesAuditRow 驗兩半。
 //

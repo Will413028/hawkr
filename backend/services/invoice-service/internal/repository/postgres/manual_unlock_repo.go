@@ -47,14 +47,14 @@ func (r *ManualUnlockRepository) ExpireStale(ctx context.Context, operationID in
 // TSID），DO NOTHING 會靜默不插入而呼叫端拿不到任何列可回。
 func (r *ManualUnlockRepository) Create(ctx context.Context, in domain.NewManualUnlock) (domain.ManualUnlock, bool, error) {
 	row, err := r.q(ctx).InsertManualUnlock(ctx, gen.InsertManualUnlockParams{
-		ID:                    in.ID,
-		OperationID:           in.OperationID,
-		RequestedByAccountID:  in.RequestedByAccountID,
-		RequestReason:         in.RequestReason,
-		ProviderCheckEvidence: in.ProviderCheckEvidence,
-		ProviderCheckedAt:     ts(in.ProviderCheckedAt),
-		Now:                   ts(in.Now),
-		ExpiresAt:             ts(in.ExpiresAt),
+		ID:                      in.ID,
+		OperationID:             in.OperationID,
+		RequestedByAccountID:    in.RequestedByAccountID,
+		RequestReason:           in.RequestReason,
+		ProviderCheckEvidence:   in.ProviderCheckEvidence,
+		ProviderCheckedAt:       ts(in.ProviderCheckedAt),
+		Now:                     ts(in.Now),
+		ExpiresAt:               ts(in.ExpiresAt),
 		CancelEvidenceKind:      in.CancelEvidenceKind,
 		CancelEvidenceObjectKey: in.CancelEvidenceObjectKey,
 	})

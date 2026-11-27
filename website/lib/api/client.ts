@@ -226,8 +226,7 @@ function reportApiFailure(
 				},
 			});
 		})
-		.catch(() => {
-		});
+		.catch(() => {});
 }
 
 export function __resetApiFailureDedupForTest(): void {
@@ -262,10 +261,8 @@ function recordApiBreadcrumb(data: {
 				data,
 			});
 		})
-		.catch(() => {
-		});
+		.catch(() => {});
 }
-
 
 function apiBase(): string {
 	const e = getEnv();
@@ -491,8 +488,7 @@ async function dispatch<T>(
 		if (opts.onUnauthorized) {
 			try {
 				await opts.onUnauthorized();
-			} catch {
-			}
+			} catch {}
 		}
 		if (mode === "authed" && !opts.suppressAuthExpired) {
 			emitAuthExpired({

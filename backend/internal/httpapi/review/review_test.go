@@ -32,20 +32,20 @@ const (
 var at = time.Date(2026, 11, 2, 3, 4, 5, 0, time.UTC)
 
 type fakeReads struct {
-	page   review.Page
-	one    review.Review
-	stats  review.StoreStats
-	pstats review.ProductStats
-	err    error
-	calls  []string
-	viewer int64
-	id     int64
-	filter review.Filter
-	item   int64
-	after  *review.Cursor
-	size   int32
-	gotID  uuid.UUID
-	hidden bool
+	page    review.Page
+	one     review.Review
+	stats   review.StoreStats
+	pstats  review.ProductStats
+	err     error
+	calls   []string
+	viewer  int64
+	id      int64
+	filter  review.Filter
+	item    int64
+	after   *review.Cursor
+	size    int32
+	gotID   uuid.UUID
+	hidden  bool
 	product uuid.UUID
 }
 

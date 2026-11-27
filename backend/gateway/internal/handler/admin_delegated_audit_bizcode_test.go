@@ -19,7 +19,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-
 type delegationAuditFakeServer struct {
 	accountpb.UnimplementedDelegationServiceServer
 	envelopeCode int32

@@ -60,6 +60,7 @@ abstract class AfterSaleCase with _$AfterSaleCase {
     @Default([]) List<String> shipmentPhotoUrls,
     @Default([]) List<Map<String, dynamic>> evidence,
     @Default([]) List<AfterSaleResolution> resolutions,
+    // 處理時限與平台接手狀態。
     @Default('') String processDeadline,
     @Default(false) bool autoEscalated,
     @Default(0) int processDeadlineHours,
@@ -82,6 +83,7 @@ abstract class AfterSaleItem with _$AfterSaleItem {
     @Default('') String skuId,
     @Default('') String skuName,
     @Default('') String quantity,
+    // 成交單價與原價快照。
     @Default('') String unitPrice,
     @Default('') String listPrice,
 

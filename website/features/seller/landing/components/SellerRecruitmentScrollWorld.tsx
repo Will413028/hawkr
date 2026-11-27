@@ -170,8 +170,7 @@ export default function SellerRecruitmentScrollWorld({
 		try {
 			if (sessionStorage.getItem("seller-scroll-world-hint-seen")) return;
 			sessionStorage.setItem("seller-scroll-world-hint-seen", "1");
-		} catch {
-		}
+		} catch {}
 
 		setShowScrollHint(true);
 	}, []);

@@ -19,11 +19,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 const (
 	preserveDataInterceptorPath = "../grpc/envelope_guard_interceptor.go"
-	preserveDataMapName = "envelopeCodePreserveData"
-	responsePkgPath = "github.com/Will413028/hawkr/gateway/internal/response"
+	preserveDataMapName         = "envelopeCodePreserveData"
+	responsePkgPath             = "github.com/Will413028/hawkr/gateway/internal/response"
 )
 
 func premiseParseFile(t *testing.T, fset *token.FileSet, path string) *ast.File {
@@ -156,7 +155,6 @@ func preserveDataBranchReturnsNil(f *ast.File) bool {
 	return found
 }
 
-
 func invoiceHandlerFiles(t *testing.T) []string {
 	t.Helper()
 	all, err := filepath.Glob("invoice_*.go")
@@ -198,7 +196,7 @@ type emitSite struct {
 type aliasState int
 
 const (
-	aliasAbsent    aliasState = iota
+	aliasAbsent aliasState = iota
 	aliasUsable
 	aliasAmbiguous
 )

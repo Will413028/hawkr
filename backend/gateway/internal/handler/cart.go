@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // AddToCartRequest 加入購物車請求
 type AddToCartRequest struct {
 	GuestID  string `json:"guestId"`
@@ -78,7 +77,6 @@ type CartItemResponse struct {
 	UnavailableReason string   `json:"unavailableReason,omitempty"` // 不可購買原因（CartItemUnavailableReason value：DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）
 }
 
-
 func getOptionalAccountID(c *gin.Context) int64 {
 	accountIDRaw, exists := c.Get("accountId")
 	if !exists {
@@ -105,7 +103,6 @@ func (h *Holder) resolveCartBuyerID(c *gin.Context, accountID int64) (int64, boo
 	}
 	return int64(resolved), true
 }
-
 
 // AddToCart 加入購物車
 // @Summary      加入購物車

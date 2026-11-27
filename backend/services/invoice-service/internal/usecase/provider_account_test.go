@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 var providerNow = time.Date(2026, 8, 30, 6, 0, 0, 0, time.UTC)
 
 const testAppKey = "amego-app-key-SECRET-9f2c"
@@ -78,7 +77,6 @@ func accountAt(status string, version int64) domain.ProviderAccount {
 		Status: status, Version: version, CredentialLast4: "9f2c", VerifiedAt: &verified,
 	}
 }
-
 
 func TestProviderAccount_PutCredentials_FirstBind(t *testing.T) {
 	fx := newProviderFixture(domain.ProviderAccount{})
@@ -226,7 +224,6 @@ func TestProviderAccount_AppKeyNeverLeavesRepository(t *testing.T) {
 	}
 }
 
-
 func TestProviderAccount_Verify_Success(t *testing.T) {
 	fx := newProviderFixture(accountAt("CREDENTIAL_SUBMITTED", 2))
 
@@ -370,7 +367,6 @@ func TestProviderAccount_Verify_StateNotAllowed(t *testing.T) {
 	}
 }
 
-
 func TestProviderAccount_Activate(t *testing.T) {
 	fx := newProviderFixture(accountAt("ACTIVE", 6))
 	cutover := providerNow.Add(2 * time.Hour)
@@ -420,7 +416,6 @@ func TestProviderAccount_Activate_NotVerified(t *testing.T) {
 		t.Fatalf("CAS 不成立時不得寫狀態歷程")
 	}
 }
-
 
 func TestProviderAccount_Rotate_Success(t *testing.T) {
 	fx := newProviderFixture(accountAt("ACTIVE", 8))
@@ -483,7 +478,6 @@ func TestProviderAccount_Rotate_SameKey(t *testing.T) {
 	}
 }
 
-
 // TestProviderAccount_HealthCheck_ActiveStaysActive 驗定版③：ACTIVE 通過 ⇒ status 完全不動。
 func TestProviderAccount_HealthCheck_ActiveStaysActive(t *testing.T) {
 	fx := newProviderFixture(accountAt("ACTIVE", 4))
@@ -541,7 +535,6 @@ func TestProviderAccount_HealthCheck_CredentialFaultLandsError(t *testing.T) {
 		t.Fatalf("應落 INVALID_CREDENTIAL，實得 %q", view.Account.Status)
 	}
 }
-
 
 func TestProviderAccount_Deactivate(t *testing.T) {
 	fx := newProviderFixture(accountAt("ACTIVE", 4))
@@ -738,7 +731,6 @@ func TestProviderAccount_Revoke_VersionConflict(t *testing.T) {
 	}
 }
 
-
 // TestProviderAccount_TierA_UnknownStoreIsIndistinguishable 驗越權與查無共用 9330。
 //
 // store_id 是 GetByRef 的述詞之一 ⇒ 別的 store_id 解出別的 issuer、拿不到這一列。
@@ -780,7 +772,6 @@ func assertBiz(t *testing.T, err error, code int32) {
 		t.Fatalf("應回業務碼 %d，實得 %v", code, err)
 	}
 }
-
 
 // 端點 26 必須在**同一交易**內留下一列切點歷史，否則端點 46 永遠是空清單，
 // 而空清單看起來就像「這個賣家還沒設過切點」。

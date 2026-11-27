@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type mockAftersalesBuyerServiceClient struct {
 	aftersalespb.AfterSalesServiceClient
 	CreateAfterSaleCaseFn    func(ctx context.Context, in *aftersalespb.CreateAfterSaleCaseRequest, opts ...grpc.CallOption) (*aftersalespb.CreateAfterSaleCaseResponse, error)
@@ -74,7 +73,6 @@ func successStubMock() *mockAftersalesBuyerServiceClient {
 	}
 }
 
-
 func setupAftersalesBuyerRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	app := r.Group("/api/v1/app", fakeJWTAuth())
@@ -110,7 +108,6 @@ func doAftersalesBuyerReq(t *testing.T, r *gin.Engine, method, path, body string
 	r.ServeHTTP(w, req)
 	return w
 }
-
 
 func TestCreateAfterSaleCase_UsesResolvedBuyerID(t *testing.T) {
 	var gotBuyerID int64
@@ -230,7 +227,6 @@ func TestGetArbitration_UsesResolvedBuyerID(t *testing.T) {
 		t.Errorf("GetArbitrationRequest.BuyerId = %d, want resolved buyer_id %d (not raw account_id %d)", gotBuyerID, aftersalesTestBuyerID, aftersalesTestAccountID)
 	}
 }
-
 
 func TestAftersalesBuyerHandlers_NoCurrentBuyer_Forbidden(t *testing.T) {
 	cases := []struct {

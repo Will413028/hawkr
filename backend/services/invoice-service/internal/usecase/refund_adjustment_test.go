@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 var refundTestNow = time.Date(2026, 8, 20, 4, 0, 0, 0, time.UTC)
 
 func voidableDoc() domain.Document {
@@ -185,7 +184,6 @@ func TestPlanRefundAdjustment_CumulativeTakesMax(t *testing.T) {
 			got.Kind, got.Reason)
 	}
 }
-
 
 type refundAdjs struct {
 	byRefund   map[string]domain.Adjustment

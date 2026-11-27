@@ -53,8 +53,7 @@ export default function CommentsBottomSheet({ postId, open, onClose }: Props) {
 		setDragging(true);
 		try {
 			e.currentTarget.setPointerCapture(e.pointerId);
-		} catch {
-		}
+		} catch {}
 	};
 
 	const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -72,8 +71,7 @@ export default function CommentsBottomSheet({ postId, open, onClose }: Props) {
 			if (e.currentTarget.hasPointerCapture(e.pointerId)) {
 				e.currentTarget.releasePointerCapture(e.pointerId);
 			}
-		} catch {
-		}
+		} catch {}
 		const dy = Math.max(0, e.clientY - g.startY);
 		const dt = Math.max(performance.now() - g.startTime, 1);
 		const velocity = dy / dt;

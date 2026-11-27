@@ -18,8 +18,6 @@ type Lock struct {
 	Waits bool
 }
 
-
-
 var classified sync.Map
 
 // Classify 回傳 sql 會加的列鎖。不帶 schema 的表（CTE 的名稱）略過。

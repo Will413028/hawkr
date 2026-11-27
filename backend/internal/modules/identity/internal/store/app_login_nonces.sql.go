@@ -14,7 +14,6 @@ const consumeAppLoginNonce = `-- name: ConsumeAppLoginNonce :one
 DELETE FROM identity.app_login_nonces WHERE nonce_hash = $1 RETURNING expires_at
 `
 
-// 單次使用：取出同時刪除，逾時的判斷在呼叫方。
 func (q *Queries) ConsumeAppLoginNonce(ctx context.Context, nonceHash []byte) (time.Time, error) {
 	row := q.db.QueryRow(ctx, consumeAppLoginNonce, nonceHash)
 	var expires_at time.Time

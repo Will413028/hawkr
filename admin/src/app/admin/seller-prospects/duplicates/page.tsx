@@ -91,7 +91,6 @@ export default function SellerProspectDuplicatesPage() {
 				</div>
 			</div>
 
-
 			<div className="table-container" style={{ overflowX: "auto" }}>
 				<table className="data-table">
 					<thead>

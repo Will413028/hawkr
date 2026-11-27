@@ -202,7 +202,6 @@ func (c *ShippingClient) ListBusinessDays(ctx context.Context, req *pb.ListBusin
 	return c.shippingClient.ListBusinessDays(ctx, req)
 }
 
-
 // ListShipmentsForAdmin 列物流異常
 func (c *ShippingClient) ListShipmentsForAdmin(ctx context.Context, req *pb.ListShipmentsForAdminRequest) (*pb.ListShipmentsForAdminResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -223,7 +222,6 @@ func (c *ShippingClient) ListSellerShipmentSettingsForAdmin(ctx context.Context,
 	defer cancel()
 	return c.shippingClient.ListSellerShipmentSettingsForAdmin(ctx, req)
 }
-
 
 // ListSellerShipmentAnomalies 列賣家配送異常 dashboard
 func (c *ShippingClient) ListSellerShipmentAnomalies(ctx context.Context, req *pb.ListSellerShipmentAnomaliesRequest) (*pb.ListSellerShipmentAnomaliesResponse, error) {

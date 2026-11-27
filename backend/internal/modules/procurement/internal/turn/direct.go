@@ -33,7 +33,7 @@ type commandKey struct {
 	source   string
 	message  string
 	expected uuid.UUID
-	slot model.SlotKey
+	slot     model.SlotKey
 }
 
 type directState struct {

@@ -1405,7 +1405,11 @@
 	content: "";
 	background-image:
 		linear-gradient(rgb(var(--color-ink-700-rgb) / 0.045) 1px, transparent 1px),
-		linear-gradient(90deg, rgb(var(--color-ink-700-rgb) / 0.045) 1px, transparent 1px);
+		linear-gradient(
+			90deg,
+			rgb(var(--color-ink-700-rgb) / 0.045) 1px,
+			transparent 1px
+		);
 	background-size: 28px 28px;
 	mask-image: linear-gradient(
 		to bottom,
@@ -1439,7 +1443,12 @@
 			rgba(122, 162, 192, 0.12),
 			transparent 30%
 		),
-		linear-gradient(135deg, var(--color-ink-950) 0%, var(--color-ink-950) 54%, var(--color-ink-950) 100%);
+		linear-gradient(
+			135deg,
+			var(--color-ink-950) 0%,
+			var(--color-ink-950) 54%,
+			var(--color-ink-950) 100%
+		);
 }
 
 [data-theme="dark"] .auth-brand-loading::before {

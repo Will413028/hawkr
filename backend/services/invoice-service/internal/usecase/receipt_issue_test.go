@@ -60,7 +60,6 @@ func receiptHarness(t *testing.T, authorized bool) *harness {
 	return h
 }
 
-
 func TestSubmit_PlatformReceiptProducesPdfAndIssues(t *testing.T) {
 	h := receiptHarness(t, true)
 
@@ -143,7 +142,6 @@ func TestSubmit_PlatformReceiptRendersCorrectData(t *testing.T) {
 		t.Errorf("contentType = %q，want application/pdf", h.receiptS.contentType)
 	}
 }
-
 
 // 授權在「建立 document」與「產製」之間被取消 ⇒ 轉人工，不得以賣家名義產出。
 func TestSubmit_PlatformReceiptWithoutAuthorizationGoesManual(t *testing.T) {

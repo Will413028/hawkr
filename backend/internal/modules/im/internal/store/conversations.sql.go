@@ -24,7 +24,6 @@ type ActiveConversationIDsBuyerParams struct {
 	MaxRows int64
 }
 
-// 監聽重連後的補洞：這個買家在 since（資料庫時間）之後有新訊息的對話，最多 max_rows 筆。
 func (q *Queries) ActiveConversationIDsBuyer(ctx context.Context, arg ActiveConversationIDsBuyerParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, activeConversationIDsBuyer, arg.BuyerID, arg.Since, arg.MaxRows)
 	if err != nil {
@@ -78,7 +77,6 @@ func (q *Queries) ActiveConversationIDsStore(ctx context.Context, arg ActiveConv
 }
 
 const allocateSeq = `-- name: AllocateSeq :one
-
 INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, buyer_last_read_seq, store_last_read_seq, last_message_at, created_at)
 VALUES (
     $1, $2, $3, 1,
@@ -108,10 +106,6 @@ type AllocateSeqRow struct {
 	LastMessageAt time.Time
 }
 
-// 對話列：建立、配發 seq、已讀游標、列表與未讀。
-// 同一句 SQL 建立對話（還不存在時）、配發 seq，並把寄件人那一方的已讀游標推到新的 seq。並行送出在 ON CONFLICT 的列鎖上排隊，
-// 所以 seq 連續而且不重複；SET 右側讀的是更新前的列。last_message_at 只由資料庫的 clock_timestamp() 寫入（取更新前的值與它的較大者，
-// 所以不會倒退），並回傳給呼叫者當這則訊息的時間：監聽重連的補洞以資料庫時間比較，訊息的 created_at 與事件時間用同一個值。
 func (q *Queries) AllocateSeq(ctx context.Context, arg AllocateSeqParams) (AllocateSeqRow, error) {
 	row := q.db.QueryRow(ctx, allocateSeq,
 		arg.NewID,
@@ -139,7 +133,6 @@ type ConversationPartiesRow struct {
 	StoreID        int64
 }
 
-// 對話的雙方（歸屬）：不鎖列。
 func (q *Queries) ConversationParties(ctx context.Context, id uuid.UUID) (ConversationPartiesRow, error) {
 	row := q.db.QueryRow(ctx, conversationParties, id)
 	var i ConversationPartiesRow
@@ -151,7 +144,6 @@ const databaseNow = `-- name: DatabaseNow :one
 SELECT clock_timestamp()::timestamptz
 `
 
-// 監聽迴圈啟動時讀一次資料庫時間當作第一個補洞起點。用 clock_timestamp()：存活確認的 SELECT now() 是測試與維運辨認監聽連線的字首。
 func (q *Queries) DatabaseNow(ctx context.Context) (time.Time, error) {
 	row := q.db.QueryRow(ctx, databaseNow)
 	var column_1 time.Time
@@ -210,7 +202,6 @@ type GetConversationStoreBuyerRow struct {
 	Hidden        bool
 }
 
-// 店家依買家取對話：欄位與預覽同 ListConversationsStore；(buyer_id, store_id) 唯一，最多一列。
 func (q *Queries) GetConversationStoreBuyer(ctx context.Context, arg GetConversationStoreBuyerParams) (GetConversationStoreBuyerRow, error) {
 	row := q.db.QueryRow(ctx, getConversationStoreBuyer, arg.StoreID, arg.BuyerID)
 	var i GetConversationStoreBuyerRow
@@ -268,7 +259,6 @@ type ListConversationsBuyerRow struct {
 	Hidden        bool
 }
 
-// 預覽在讀取時由最後一則訊息推導（隱藏與抹除不必另外更新對話列）：以 (id, last_seq) 取最後一則，LEFT JOIN 未還原的隱藏。
 func (q *Queries) ListConversationsBuyer(ctx context.Context, arg ListConversationsBuyerParams) ([]ListConversationsBuyerRow, error) {
 	rows, err := q.db.Query(ctx, listConversationsBuyer,
 		arg.BuyerID,
@@ -437,8 +427,6 @@ type MarkReadBuyerRow struct {
 	Advanced bool
 }
 
-// 只前進不後退，也不超過 last_seq；沒有這個買家的對話沒有列。advanced 表示游標真的前進（冪等重送為假）：先 FOR UPDATE 鎖住並讀出
-// 更新前的值（並行的 MarkRead 在這裡排隊，拿到的是對方提交後的值），再與它比較，所以同一次前進只會有一個呼叫者得到 advanced。
 func (q *Queries) MarkReadBuyer(ctx context.Context, arg MarkReadBuyerParams) (MarkReadBuyerRow, error) {
 	row := q.db.QueryRow(ctx, markReadBuyer, arg.UptoSeq, arg.ID, arg.BuyerID)
 	var i MarkReadBuyerRow

@@ -113,7 +113,6 @@ export function TruckOverlay({
 			aria-live="polite"
 		>
 			<div className="relative w-[200px] h-20 bg-[var(--hkui-content1)] border border-[var(--hkui-divider)] rounded-[14px] overflow-hidden dark:bg-[var(--page-truck-panel-on-dark)] dark:border-[var(--page-truck-panel-border-on-dark)]">
-
 				<span
 					className="absolute bottom-2.5 left-1/2 -translate-x-1/2"
 					aria-hidden="true"

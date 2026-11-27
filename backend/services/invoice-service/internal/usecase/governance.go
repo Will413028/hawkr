@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const govBatch = 500
 
 const reapplyCooldown = 7 * 24 * time.Hour
@@ -87,9 +86,9 @@ type GovernanceObserver interface {
 
 // Governance 是 INV.gov 的 usecase。
 type Governance struct {
-	profiles GovernanceStore
-	counter  CrossPeriodCounter
-	obs      GovernanceObserver
+	profiles   GovernanceStore
+	counter    CrossPeriodCounter
+	obs        GovernanceObserver
 	inbox      InboxPayloadPurger
 	outboxRows OutboxCleaner
 	log        *zap.Logger
@@ -107,9 +106,9 @@ func (u *Governance) WithRetention(inbox InboxPayloadPurger, outboxRows OutboxCl
 }
 
 const (
-	inboxPayloadRetention = 90 * 24 * time.Hour
-	outboxDoneRetention   = 30 * 24 * time.Hour
-	retentionBatch int32 = 500
+	inboxPayloadRetention       = 90 * 24 * time.Hour
+	outboxDoneRetention         = 30 * 24 * time.Hour
+	retentionBatch        int32 = 500
 )
 
 // NewGovernance 建 INV.gov usecase。

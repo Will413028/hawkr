@@ -185,7 +185,6 @@ export interface AfterSaleDetail extends AfterSaleCase {
 	returnProviderStatus?: string;
 }
 
-
 /** A single arbitration timeline event. */
 export interface AfterSaleArbitrationEvent {
 	/** codemeta AfterSaleAppealEventType (APPEAL_SUBMITTED / DECISION_MADE). */
@@ -225,7 +224,6 @@ export interface AfterSaleListResult {
 	records: AfterSaleCase[];
 	total: number;
 }
-
 
 /** Buyer: POST /app/after_sales. */
 export interface CreateAfterSaleInput {

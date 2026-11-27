@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 const (
 	nrDocID   = int64(8001)
 	nrStoreID = int64(2685914682)
@@ -26,8 +25,8 @@ var nrNow = time.Date(2026, 8, 30, 6, 0, 0, 0, time.UTC)
 
 type nrDocs struct {
 	domain.DocumentRepository
-	doc     domain.Document
-	claimed int
+	doc        domain.Document
+	claimed    int
 	windowOpen bool
 }
 
@@ -77,12 +76,12 @@ func nrServer(windowOpen bool) *InvoiceServer {
 	cipher := "ENCRYPTED-EMAIL"
 	docs := &nrDocs{windowOpen: windowOpen, doc: domain.Document{
 		ID: nrDocID, IssuerID: 900,
-		Status:            codemeta.InvoiceDocumentStatusIssued.Value,
-		DocumentKind:      codemeta.InvoiceDocumentKindB2c.Value,
-		RecipientType:     codemeta.InvoiceRecipientTypeBuyer.Value,
-		RecipientRefID:    &buyer,
-		RecipientTaxID:    domain.B2CBuyerIdentifier,
-		ProviderInvoiceNo: &no,
+		Status:                   codemeta.InvoiceDocumentStatusIssued.Value,
+		DocumentKind:             codemeta.InvoiceDocumentKindB2c.Value,
+		RecipientType:            codemeta.InvoiceRecipientTypeBuyer.Value,
+		RecipientRefID:           &buyer,
+		RecipientTaxID:           domain.B2CBuyerIdentifier,
+		ProviderInvoiceNo:        &no,
 		RecipientEmailCiphertext: &cipher,
 		TotalAmount:              1000,
 	}}

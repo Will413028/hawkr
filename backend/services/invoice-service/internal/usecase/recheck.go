@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const recheckOpLease = 60 * time.Second
 
 const recheckUploadLease = 120 * time.Second
@@ -84,9 +83,9 @@ type Recheck struct {
 	docs       RecheckDocumentStore
 	accounts   RecheckCredentialSource
 	amego      RecheckQuerier
-	audit domain.AuditRepository
-	log   *zap.Logger
-	now   func() time.Time
+	audit      domain.AuditRepository
+	log        *zap.Logger
+	now        func() time.Time
 }
 
 // NewRecheck 建 INV.rc usecase。
@@ -230,7 +229,7 @@ func (u *Recheck) applyDecision(ctx context.Context, op domain.Operation, d Rech
 		completed := now
 		ok, err = u.ops.MarkRecheckResolved(ctx, domain.MarkRecheckResult{
 			ID: op.ID, NextStatus: d.NextStatus, NextAttemptAt: d.NextAttemptAt,
-			CompletedAt: &completed,
+			CompletedAt:        &completed,
 			CancelEvidenceKind: d.CancelEvidenceKind,
 			CancelConfirmedAt:  d.CancelConfirmedAt,
 			Now:                now,

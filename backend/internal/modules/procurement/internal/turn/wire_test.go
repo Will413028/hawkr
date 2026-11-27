@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 func goldenIDs() ids {
 	mk := func(s string) uuid.UUID { return uuid.MustParse(s) }
 	return ids{

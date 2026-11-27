@@ -115,7 +115,6 @@ export async function deleteStorePickup(id: string): Promise<void> {
 	});
 }
 
-
 export interface StoreMapSession {
 	redirectUrl?: string;
 	formAction?: string;
@@ -231,8 +230,7 @@ export function openStoreMapPopup(
 			cleanup();
 			try {
 				popup.close();
-			} catch {
-			}
+			} catch {}
 			resolve({
 				storeId: payload.storeId,
 				storeName: payload.storeName,

@@ -7,7 +7,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/timeutil"
 )
 
-
 func tpe(y int, m time.Month, d, hh int) time.Time {
 	return time.Date(y, m, d, hh, 0, 0, 0, timeutil.LocationTaipei)
 }

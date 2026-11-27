@@ -55,9 +55,9 @@ type Stores interface {
 }
 
 type presenter struct {
-	buyers Buyers
-	images rpc.Images
-	log    *slog.Logger
+	buyers   Buyers
+	images   rpc.Images
+	log      *slog.Logger
 	reasonOf func(error) review.Reason
 }
 

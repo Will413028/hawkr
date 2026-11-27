@@ -76,8 +76,6 @@ export const EMPTY_KYC_DOCS: KycDocs = {
 	companyDocuments: [],
 };
 
-
-
 export function kycTypeOf(app: KYCApplication | null): SellerType | null {
 	switch (app?.subject.case) {
 		case "individual":
@@ -173,8 +171,6 @@ export function baselineAfterSave(
 	}
 	return next as unknown as KycForm;
 }
-
-
 
 type ApplicationInit = MessageInitShape<typeof KYCApplicationSchema>;
 
@@ -297,7 +293,6 @@ export function buildSaveKycDraftRequest(
 	});
 }
 
-
 export const SECTION_LABELS: Record<CertificationSectionId, string> = {
 	company: "公司資訊",
 	other: "商家營運資訊",
@@ -371,7 +366,6 @@ export function resumeSectionOf(
 	return SECTION_ORDER.find((s) => sections.has(s)) ?? null;
 }
 
-
 /**
  * 衝突之後的表單：使用者改過的欄位（與舊 baseline 不同）保留輸入，沒改的欄位換成最新版本。
  */
@@ -424,7 +418,6 @@ export function adoptSavedDocs(
 	};
 }
 
-
 const FORM_KEY_OF_FIELD: Partial<Record<KYCField, keyof KycForm>> = {
 	[KYCField.KYC_FIELD_PRODUCT_TYPE]: "productType",
 	[KYCField.KYC_FIELD_BUSINESS_COMPANY_NAME]: "companyName",
@@ -439,7 +432,6 @@ export function kycFormKeyOfDraftPath(path: string): keyof KycForm | undefined {
 	const field = kycFieldOfPath(path.replace(/^application\./, ""));
 	return field === undefined ? undefined : FORM_KEY_OF_FIELD[field];
 }
-
 
 /** 賣家還沒處理的退回問題（伺服器的 `outstanding_issues`），整理成表單上各處要顯示的說明。 */
 export interface KycIssueMessages {
@@ -487,7 +479,6 @@ export function kycIssueMessages(
 	}
 	return out;
 }
-
 
 /** 表單可以編輯：沒有申請（要建立），或申請是草稿、被退回（送出審核中與已通過的申請不能改）。 */
 export function kycEditable(app: KYCApplication | null): boolean {
@@ -561,7 +552,6 @@ export function kycDocumentNotice(
 		index === undefined ? label : `${label}（第 ${Number(index) + 1} 張）`;
 	return `${where}：${message}`;
 }
-
 
 type SellerClient = ReturnType<typeof sellerAppClient>;
 

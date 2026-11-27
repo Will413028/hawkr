@@ -288,8 +288,8 @@ func handlerOptions(log *slog.Logger) []connect.HandlerOption {
 }
 
 type fileRoute struct {
-	pattern string
-	handler http.Handler
+	pattern    string
+	handler    http.Handler
 	permission adminperm.Permission
 }
 

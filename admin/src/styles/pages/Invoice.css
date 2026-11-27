@@ -1,5 +1,3 @@
-
-
 .invoice-kpi-definitions {
 	margin: 0 0 24px;
 	padding: 16px 20px;
@@ -24,7 +22,6 @@
 	margin-bottom: 0;
 }
 
-
 .adm-page-footer-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -40,7 +37,6 @@
 	color: var(--admin-muted-aa);
 	font-size: 13px;
 }
-
 
 .invoice-row--warning td {
 	background: var(--admin-warning-soft);
@@ -59,7 +55,6 @@
 	color: var(--admin-danger);
 	font-weight: 700;
 }
-
 
 .invoice-risk-flags {
 	display: flex;
@@ -94,7 +89,6 @@
 	font-size: 20px;
 }
 
-
 .invoice-pagination {
 	display: flex;
 	justify-content: center;
@@ -104,7 +98,6 @@
 	color: var(--admin-muted-aa);
 	font-size: 14px;
 }
-
 
 .invoice-detail-grid {
 	display: grid;
@@ -132,7 +125,6 @@
 		position: static;
 	}
 }
-
 
 .invoice-section {
 	margin-bottom: 24px;
@@ -231,7 +223,6 @@
 	gap: 6px;
 }
 
-
 .invoice-unavailable-notice {
 	display: flex;
 	align-items: flex-start;
@@ -261,7 +252,6 @@
 	line-height: 1.6;
 }
 
-
 .invoice-page-notice {
 	display: flex;
 	align-items: flex-start;
@@ -280,7 +270,6 @@
 	font-size: 20px;
 	line-height: 1.4;
 }
-
 
 .invoice-timeline {
 	margin: 0;
@@ -340,7 +329,6 @@
 	font-size: 14px;
 }
 
-
 .invoice-secret {
 	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
 	letter-spacing: 0.05em;
@@ -362,7 +350,6 @@
 .invoice-details + .invoice-details {
 	margin-top: 12px;
 }
-
 
 .invoice-exchange {
 	padding: 12px 0;
@@ -386,7 +373,6 @@
 	font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
 	font-weight: 600;
 }
-
 
 .invoice-tab-note {
 	flex-basis: 100%;
@@ -424,7 +410,6 @@
 	text-decoration: underline;
 	cursor: pointer;
 }
-
 
 .sr-only {
 	position: absolute;
@@ -464,7 +449,6 @@
 	color: var(--admin-muted-aa);
 	font-size: 14px;
 }
-
 
 .invoice-scope-notice {
 	display: flex;

@@ -135,8 +135,8 @@ func (m *Module) RecordDelegationAuditIntent(ctx context.Context, in model.Audit
 		ResourceVersionBefore: in.ResourceVersionBefore,
 		UserAgent:             model.Optional(in.UserAgent),
 		RiskLevel:             string(in.Action.RiskLevel()),
-		NotifySeller: in.NotifySeller && in.Action.MayNotifySeller(),
-		Now:          now,
+		NotifySeller:          in.NotifySeller && in.Action.MayNotifySeller(),
+		Now:                   now,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		intent, ok, err := replayedIntent(ctx, q, in)

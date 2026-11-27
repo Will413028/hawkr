@@ -316,7 +316,6 @@ export function ImageUploader({
 				</label>
 			)}
 
-
 			<input
 				ref={inputRef}
 				id={inputId}
@@ -446,7 +445,6 @@ export function ImageUploader({
 								aria-valuemax={100}
 								aria-valuenow={Math.round(clampedProgress * 100)}
 							>
-
 								<span
 									className="block h-full w-full origin-left bg-[var(--hkui-primary)] transition-transform duration-200 ease-out motion-reduce:transition-none"
 									style={{ transform: `scaleX(${clampedProgress})` }}

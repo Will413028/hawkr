@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-
 // Registry 是登記資料來源的 port：真正的實作是 platform/gcis 的 Client（回來源的原始資料，轉成模組的型別只有 model.NewRegistration
 // 一處），測試用替身。found 為 false 且沒有錯誤是查無；來源這一次沒有給出可用的答案回 gcis.ErrUnavailable，統編格式不合回
 // gcis.ErrInvalidTaxID。外部呼叫，不可在資料庫 transaction 內呼叫。
@@ -27,14 +26,14 @@ type Registry interface {
 }
 
 const (
-	registryCallTimeout = 15 * time.Second
-	registryJobTimeout = 60 * time.Second
-	registryWriteTimeout = 15 * time.Second
-	registryMaxAttempts = 8
-	registryDeadline = 15 * time.Minute
+	registryCallTimeout   = 15 * time.Second
+	registryJobTimeout    = 60 * time.Second
+	registryWriteTimeout  = 15 * time.Second
+	registryMaxAttempts   = 8
+	registryDeadline      = 15 * time.Minute
 	registrySweepInterval = time.Minute
-	registryResyncIdle = 3 * time.Minute
-	registrySweepBatch = 100
+	registryResyncIdle    = 3 * time.Minute
+	registrySweepBatch    = 100
 )
 
 func registryCheckDeadline(requestedAt time.Time) time.Time { return requestedAt.Add(registryDeadline) }

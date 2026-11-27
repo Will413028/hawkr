@@ -23,7 +23,6 @@ const layout = readFileSync(
 	"utf8",
 );
 
-
 test("transcript／snapshot 的 query key 是 identity-scoped（切帳號不得沿用他人對話）", () => {
 	assert.match(
 		keys,

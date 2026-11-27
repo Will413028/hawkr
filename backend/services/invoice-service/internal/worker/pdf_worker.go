@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 const pdfInterval = 60 * time.Second
 
 type pdfRunner interface {

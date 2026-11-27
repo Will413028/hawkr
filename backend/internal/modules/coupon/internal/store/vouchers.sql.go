@@ -187,7 +187,6 @@ func (q *Queries) InsertLog(ctx context.Context, arg InsertLogParams) error {
 }
 
 const insertVoucher = `-- name: InsertVoucher :execrows
-
 INSERT INTO coupon.coupon_vouchers (id, campaign_id, buyer_id, origin, source_type, source_id, status, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, 'AVAILABLE', $7, $7)
 ON CONFLICT (campaign_id, buyer_id) DO NOTHING
@@ -203,7 +202,6 @@ type InsertVoucherParams struct {
 	Now        time.Time
 }
 
-// 券：建立、鎖定、核銷、釋放、作廢與稽核紀錄。
 func (q *Queries) InsertVoucher(ctx context.Context, arg InsertVoucherParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertVoucher,
 		arg.ID,
@@ -237,7 +235,6 @@ type ListBuyerVouchersParams struct {
 	MaxRows        int32
 }
 
-// 買家的券（錢包）；statuses 為空陣列是全部狀態。
 func (q *Queries) ListBuyerVouchers(ctx context.Context, arg ListBuyerVouchersParams) ([]CouponCouponVoucher, error) {
 	rows, err := q.db.Query(ctx, listBuyerVouchers,
 		arg.BuyerID,
@@ -327,7 +324,6 @@ type LockVoucherRow struct {
 	BuyerID    int64
 }
 
-// 一張券同時只被一筆訂單鎖：只有 AVAILABLE 的券能被鎖，回 ErrNoRows 表示沒有符合的券（不存在、不是本人的，或已被鎖定、核銷、作廢）。
 func (q *Queries) LockVoucher(ctx context.Context, arg LockVoucherParams) (LockVoucherRow, error) {
 	row := q.db.QueryRow(ctx, lockVoucher,
 		arg.OrderNo,
@@ -387,7 +383,6 @@ type ReleaseVoucherRow struct {
 	BuyerID    int64
 }
 
-// 釋放持有這張券的訂單（鎖定或已核銷，後者是賣家取消已付款訂單）。活動已結束時券不回到可用，改為作廢（D5：結束後 AVAILABLE 都作廢）。
 func (q *Queries) ReleaseVoucher(ctx context.Context, arg ReleaseVoucherParams) (ReleaseVoucherRow, error) {
 	row := q.db.QueryRow(ctx, releaseVoucher,
 		arg.ToStatus,
@@ -411,7 +406,6 @@ type VoidAvailableVouchersParams struct {
 	CampaignID uuid.UUID
 }
 
-// 結束活動：只作廢 AVAILABLE；LOCKED 仍可核銷或釋放（D5）。
 func (q *Queries) VoidAvailableVouchers(ctx context.Context, arg VoidAvailableVouchersParams) (int64, error) {
 	result, err := q.db.Exec(ctx, voidAvailableVouchers, arg.Now, arg.CampaignID)
 	if err != nil {
@@ -438,7 +432,6 @@ type VoidVoucherRow struct {
 	BuyerID    int64
 }
 
-// admin 作廢單張券：AVAILABLE 或 LOCKED（Release 漏送而卡住的券，D3）；已核銷的不能作廢。
 func (q *Queries) VoidVoucher(ctx context.Context, arg VoidVoucherParams) (VoidVoucherRow, error) {
 	row := q.db.QueryRow(ctx, voidVoucher, arg.Now, arg.ID)
 	var i VoidVoucherRow

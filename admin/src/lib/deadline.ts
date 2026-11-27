@@ -1,4 +1,3 @@
-
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import type { Deadline } from "@hawkr/api/gen/hawkr/common/v1alpha1/deadline_pb";
 import { formatDateTimeShort } from "./format";

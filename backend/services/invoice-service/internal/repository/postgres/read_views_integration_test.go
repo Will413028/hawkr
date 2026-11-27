@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type seedWorld struct {
 	StoreID      int64
 	BuyerID      int64
@@ -206,7 +205,6 @@ func buildWorld(ctx context.Context, t *testing.T, pool *pgxpool.Pool, tag int64
 
 func fullPage() domain.Page { return domain.Page{Limit: 50, Offset: 0} }
 
-
 func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -224,7 +222,7 @@ func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 	externalStatuses := []string{"MANUAL_PROCESS_ALLOWED", "RESOLVED_EXTERNALLY"}
 
 	listCases := []struct {
-		name string
+		name  string
 		own   func() (int, error)
 		cross func() (int, error)
 	}{
@@ -417,7 +415,6 @@ func TestIntegration_ReadViews_OwnerScopingIsInThePredicate(t *testing.T) {
 	})
 }
 
-
 func TestIntegration_ListOrderDocumentsForBuyer_ReturnsEveryDocumentOfTheOrder(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -450,7 +447,6 @@ func TestIntegration_ListOrderDocumentsForBuyer_ReturnsEveryDocumentOfTheOrder(t
 		t.Fatalf("GetForBuyer 回了不屬於這張訂單的文件：%d", one.ID)
 	}
 }
-
 
 func walkPages(t *testing.T, total int64, pageSize int32, fetch func(page domain.Page) ([]int64, error)) int {
 	t.Helper()
@@ -572,7 +568,6 @@ func TestIntegration_ReadViews_CountMatchesPagedList(t *testing.T) {
 	})
 }
 
-
 func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -669,7 +664,6 @@ func TestIntegration_ResolvedDocumentsExcludedFromAllThreeNeedsManualOutlets(t *
 	})
 }
 
-
 func TestIntegration_ListInvoiceOperationsForAdmin_NeedsManualIsUnionWithDocumentStatus(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -731,7 +725,6 @@ func TestIntegration_ListInvoiceOperationsForAdmin_NeedsManualIsUnionWithDocumen
 	}
 }
 
-
 func TestIntegration_ListInvoiceComplaintsForAdmin_OverdueIsCrossCutting(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -784,7 +777,6 @@ func TestIntegration_ListInvoiceComplaintsForAdmin_OverdueIsCrossCutting(t *test
 	}
 }
 
-
 func TestIntegration_ListProviderAccountsForAdmin_IncludesIssuersWithoutAccountRow(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -828,7 +820,6 @@ func TestIntegration_ListProviderAccountsForAdmin_IncludesIssuersWithoutAccountR
 	}
 }
 
-
 func TestIntegration_ListSellerReceivedInvoiceDocuments_ExposesNoteInputs(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -852,7 +843,6 @@ func TestIntegration_ListSellerReceivedInvoiceDocuments_ExposesNoteInputs(t *tes
 		t.Fatalf("lineCount = %d, want 3（「等 N 項」的 N 算不出來）", got[0].LineCount)
 	}
 }
-
 
 func TestIntegration_OverviewCounts(t *testing.T) {
 	ctx := context.Background()
@@ -908,7 +898,6 @@ func TestIntegration_OverviewCounts(t *testing.T) {
 		t.Fatalf("ADM openComplaintCount = %d, want >= 1", admin.OpenComplaintCount)
 	}
 }
-
 
 func TestIntegration_ReadViews_AdminQueriesExecuteAndAgreeWithCount(t *testing.T) {
 	ctx := context.Background()

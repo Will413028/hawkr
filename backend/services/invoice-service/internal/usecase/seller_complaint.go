@@ -18,7 +18,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
 	complaintActorSeller = "SELLER"
 
@@ -38,10 +37,10 @@ var ErrComplaintActionInvalid = errors.New(
 // 述詞是 complainant_buyer_id、賣家側是經 invoice_issuers 解析的 store_id。共用一個
 // 型別會讓兩個歸屬鍵在同一組方法上流動，而那正是 Tier A 最容易破的地方。
 type SellerComplaint struct {
-	tx         database.TxManager
-	complaints domain.ComplaintRepository
-	issuers domain.IssuerRepository
-	outbox  domain.OutboxRepository
+	tx          database.TxManager
+	complaints  domain.ComplaintRepository
+	issuers     domain.IssuerRepository
+	outbox      domain.OutboxRepository
 	audit       domain.AuditRepository
 	businessDay domain.BusinessDayRepository
 

@@ -18,8 +18,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
-
 // ListBuyerInvoiceProfiles 是 B08「我的發票資料」列表（端點 5）。
 func (s *InvoiceServer) ListBuyerInvoiceProfiles(
 	ctx context.Context, req *pb.ListBuyerInvoiceProfilesRequest,
@@ -80,7 +78,6 @@ func (s *InvoiceServer) GetInvoiceComplaint(
 	return &pb.InvoiceComplaintResponse{Code: 0, Message: msgSuccess, Data: toBuyerComplaintInfo(view)}, nil
 }
 
-
 // GetSellerTaxProfile 是 S02 稅務身分現況（端點 20）。
 func (s *InvoiceServer) GetSellerTaxProfile(
 	ctx context.Context, req *pb.GetSellerTaxProfileRequest,
@@ -136,7 +133,6 @@ func (s *InvoiceServer) GetSellerProviderAccount(
 	}
 	return &pb.SellerProviderAccountResponse{Code: 0, Message: msgSuccess, Data: toProviderAccountData(view)}, nil
 }
-
 
 // GetTaxReviewForAdmin 是 A03 稅務身分審核詳情（端點 39）。
 func (s *InvoiceServer) GetTaxReviewForAdmin(
@@ -254,7 +250,6 @@ func (s *InvoiceServer) GetInvoiceComplaintForAdmin(
 	return &pb.InvoiceComplaintResponse{Code: 0, Message: msgSuccess, Data: info}, nil
 }
 
-
 const msgSuccess = "success"
 
 func requirePrincipal(v int64, field string) (int64, error) {
@@ -354,20 +349,19 @@ func firstNonEmptyStr(vals ...*string) string {
 	return ""
 }
 
-
 func toComplaintInfo(v usecase.ComplaintView) *pb.InvoiceComplaintInfo {
 	c := v.Complaint
 	out := &pb.InvoiceComplaintInfo{
-		ComplaintId: fmtID(c.ID),
-		CaseNo:  fmtID(c.ID),
-		OrderNo: str(c.OrderNo),
-		StoreId:     "",
-		Status:      c.Status,
-		DueAt:       fmtTimeValue(c.SlaDueAt),
-		Description: str(c.Description),
-		Version:     fmtInt64(c.Version),
-		CreatedAt:   fmtTimeValue(c.CreatedAt),
-		ReopenCount: fmtInt64(int64(c.ReopenCount)),
+		ComplaintId:     fmtID(c.ID),
+		CaseNo:          fmtID(c.ID),
+		OrderNo:         str(c.OrderNo),
+		StoreId:         "",
+		Status:          c.Status,
+		DueAt:           fmtTimeValue(c.SlaDueAt),
+		Description:     str(c.Description),
+		Version:         fmtInt64(c.Version),
+		CreatedAt:       fmtTimeValue(c.CreatedAt),
+		ReopenCount:     fmtInt64(int64(c.ReopenCount)),
 		ExpectedDocKind: v.ExpectedDocKind,
 	}
 	if v := v.RemainingBusinessDays; v != nil {
@@ -399,24 +393,23 @@ const (
 	complaintStatusResolved        = "RESOLVED"
 )
 
-
 func (s *InvoiceServer) toSellerTaxProfileData(ctx context.Context, v usecase.SellerTaxProfileView) *pb.SellerTaxProfileData {
 	p := v.Profile
 	out := &pb.SellerTaxProfileData{
-		StoreId:        fmtID(v.StoreID),
-		ReviewStatus:   p.ReviewStatus,
-		Version:        fmtInt64(p.Version),
-		SubmittedAt:    fmtTime(p.SubmittedAt),
-		DeadlineAt:     fmtTime(p.PendingValidUntil),
-		ExtensionCount: fmtInt64(int64(p.ExtensionCount)),
+		StoreId:              fmtID(v.StoreID),
+		ReviewStatus:         p.ReviewStatus,
+		Version:              fmtInt64(p.Version),
+		SubmittedAt:          fmtTime(p.SubmittedAt),
+		DeadlineAt:           fmtTime(p.PendingValidUntil),
+		ExtensionCount:       fmtInt64(int64(p.ExtensionCount)),
 		CanRequestExtension:  usecase.CanRequestTaxExtension(p),
 		ReapplyCooldownUntil: fmtTime(p.CooldownUntil),
 		TaxIdentity:          toSellerTaxIdentity(p),
 		SelfIssueAttestation: toSelfIssueAttestation(p),
 		IntakeLimit:          toProfileIntakeLimit(p),
 		Documents:            s.toTaxDocuments(ctx, p),
-		ReceiptAuthorized:   p.ReceiptAuthorizedAt != nil,
-		ReceiptAuthorizedAt: fmtTime(p.ReceiptAuthorizedAt),
+		ReceiptAuthorized:    p.ReceiptAuthorizedAt != nil,
+		ReceiptAuthorizedAt:  fmtTime(p.ReceiptAuthorizedAt),
 	}
 	if req := pendingExtensionOf(ctx, s.query, p); req != nil {
 		out.PendingExtensionRequest = &pb.TaxExtensionRequestInfo{
@@ -426,8 +419,8 @@ func (s *InvoiceServer) toSellerTaxProfileData(ctx context.Context, v usecase.Se
 	}
 	if note := str(p.ReviewNote); note != "" {
 		out.AdmNotes = []*pb.TaxReviewNote{{
-			NoteId:  fmtID(p.ID),
-			Content: note,
+			NoteId:    fmtID(p.ID),
+			Content:   note,
 			CreatedAt: fmtTime(p.ReviewNoteAt),
 		}}
 	}
@@ -447,7 +440,7 @@ func addressDetailOf(p domain.SellerTaxProfile) string {
 
 func toSellerTaxIdentity(p domain.SellerTaxProfile) *pb.SellerTaxIdentity {
 	return &pb.SellerTaxIdentity{
-		EntityType: str(p.EntityTaxType),
+		EntityType:      str(p.EntityTaxType),
 		TaxId:           str(p.TaxID),
 		LegalName:       str(p.LegalName),
 		ResponsibleName: str(p.ResponsiblePerson),
@@ -506,16 +499,15 @@ func (s *InvoiceServer) toTaxDocuments(ctx context.Context, p domain.SellerTaxPr
 	return out
 }
 
-
 func toProviderAccountData(v usecase.ProviderAccountView) *pb.SellerProviderAccountData {
 	a := v.Account
 	out := &pb.SellerProviderAccountData{
-		Provider:        a.Provider,
-		Status:          a.Status,
-		StatusNotice:    str(a.StatusReason),
-		Version:         fmtInt64(a.Version),
-		SellerTaxId:     a.ProviderTaxID,
-		CredentialLast4: a.CredentialLast4,
+		Provider:            a.Provider,
+		Status:              a.Status,
+		StatusNotice:        str(a.StatusReason),
+		Version:             fmtInt64(a.Version),
+		SellerTaxId:         a.ProviderTaxID,
+		CredentialLast4:     a.CredentialLast4,
 		CredentialUpdatedAt: fmtTime(a.CredentialUpdatedAt),
 		LastVerifiedAt:      fmtTime(a.VerifiedAt),
 		AutomationCutoverAt: fmtTime(a.AutomationCutoverAt),
@@ -527,7 +519,6 @@ func toProviderAccountData(v usecase.ProviderAccountView) *pb.SellerProviderAcco
 	out.LastRequestId = v.LastRequestID
 	return out
 }
-
 
 func (s *InvoiceServer) toAdminDocumentDetail(v usecase.AdminDocumentView) *pb.AdminInvoiceDocumentDetail {
 	out := &pb.AdminInvoiceDocumentDetail{
@@ -658,8 +649,8 @@ func (s *InvoiceServer) toJobInfo(op domain.Operation, doc domain.Document, issu
 		orderNo = str(doc.SourceRef)
 	}
 	return s.toJobInfoView(domain.OperationView{
-		Operation:   op,
-		IssuerRefID: issuer.IssuerRefID,
+		Operation:                op,
+		IssuerRefID:              issuer.IssuerRefID,
 		DocumentKind:             doc.DocumentKind,
 		DocumentStatus:           doc.Status,
 		DocumentSourceRef:        orderNo,
@@ -673,8 +664,8 @@ func (s *InvoiceServer) toJobInfo(op domain.Operation, doc domain.Document, issu
 const (
 	sourceTypeOrder                     = "ORDER"
 	operationStatusManualProcessAllowed = "MANUAL_PROCESS_ALLOWED"
-	shipmentUnaffectedNotice        = "發票開立與出貨進度互不影響，出貨不會因為發票異常而停下。"
-	shipmentUnaffectedNoticeReceipt = "收據開立與出貨進度互不影響，出貨不會因為收據異常而停下。"
+	shipmentUnaffectedNotice            = "發票開立與出貨進度互不影響，出貨不會因為發票異常而停下。"
+	shipmentUnaffectedNoticeReceipt     = "收據開立與出貨進度互不影響，出貨不會因為收據異常而停下。"
 )
 
 func noticeForKind(documentKind string) string {
@@ -686,11 +677,11 @@ func noticeForKind(documentKind string) string {
 
 func toProviderExchange(e domain.ProviderAuditLogEntry) *pb.ProviderExchangeItem {
 	return &pb.ProviderExchangeItem{
-		ExchangeId:   fmtID(e.ID),
-		OccurredAt:   fmtTimeValue(e.OccurredAt),
-		Endpoint:     e.Endpoint,
-		ProviderCode: str(e.ProviderCode),
-		ProviderMessage: str(e.ProviderMessage),
+		ExchangeId:         fmtID(e.ID),
+		OccurredAt:         fmtTimeValue(e.OccurredAt),
+		Endpoint:           e.Endpoint,
+		ProviderCode:       str(e.ProviderCode),
+		ProviderMessage:    str(e.ProviderMessage),
 		RequestId:          str(e.CorrelationID),
 		MaskedRequestBody:  string(e.RequestMasked),
 		MaskedResponseBody: string(e.ResponseMasked),

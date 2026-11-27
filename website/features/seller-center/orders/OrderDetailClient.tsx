@@ -253,7 +253,6 @@ export default function OrderDetailClient({
 
 	const shippingMethod = order?.shipping?.method ?? "";
 
-
 	const handleTcatReserve = async (
 		result: TcatReservationResult,
 	): Promise<TcatReservationSubmitResult> => {
@@ -387,7 +386,6 @@ export default function OrderDetailClient({
 		}
 	};
 
-
 	if (loading && !order) {
 		return (
 			<div className="seller-order-detail">
@@ -433,7 +431,6 @@ export default function OrderDetailClient({
 	const labelExpired = isLabelExpired(order.shipping);
 	const shipmentPhotos = order.shipping?.shipmentPhotoUrls ?? [];
 	const receiptPhotos = order.shipping?.receiptPhotoUrls ?? [];
-
 
 	let primaryCta: React.ReactNode = null;
 	if (action.kind === "tcat-reserve") {
@@ -947,7 +944,6 @@ export default function OrderDetailClient({
 							</dl>
 						</section>
 
-
 						<SellerOrderInvoiceCard orderNo={orderNo} />
 
 						{aftersaleCase && !aftersaleNeedsAction ? (
@@ -1110,8 +1106,7 @@ function CopyButton({
 			await navigator.clipboard.writeText(value);
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), 1500);
-		} catch {
-		}
+		} catch {}
 	};
 	return (
 		<button
@@ -1123,7 +1118,6 @@ function CopyButton({
 		</button>
 	);
 }
-
 
 function LogisticsTracking({
 	orderNo,
@@ -1231,7 +1225,6 @@ function SellerReviewCard({ review }: { review: OrderReview }) {
 				<h2>商品評價</h2>
 			</header>
 			<div className="seller-order-detail__info">
-
 				<div
 					style={{
 						display: "flex",

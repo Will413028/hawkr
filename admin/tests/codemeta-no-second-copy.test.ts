@@ -133,7 +133,6 @@ test("toOptions 不會漏掉 order 沒列到的值域（新增碼值不會從下
 	]);
 });
 
-
 /**
  * 「殘缺的碼表」偵測器。
  *
@@ -267,7 +266,6 @@ test("殘缺碼表偵測式本身有鑑別力", () => {
 	);
 });
 
-
 test("每個 ProductStatus 值都有自己的呈現 token，且四種狀態彼此可分辨", () => {
 	const codes = Object.values(ProductStatus);
 
@@ -320,7 +318,6 @@ test("每個狀態的呈現 token 都對得到真的樣式（不是一個對不�
 	}
 	assert.deepEqual(missing, [], missing.join("\n"));
 });
-
 
 test("對話框一律 portal 到 body：共用 Dialog 沒有 portal 開關，也沒有人傳", async () => {
 	const dialog = readFileSync(
@@ -521,7 +518,6 @@ test("稽核內容對話框走共用 Dialog（a11y 三件套在 Dialog 內），
 		"稽核內容對話框不是條件渲染 —— 它會在首屏就掛載，踩破 Dialog portal 的 SSR 前提",
 	);
 });
-
 
 /**
  * 「字串碼值的殘缺對照表」偵測器。
@@ -739,7 +735,6 @@ test("字串碼表偵測式本身有鑑別力", () => {
 		"switch 的 case 標籤被誤判成對照表",
 	);
 });
-
 
 /**
  * 篩選下拉裡手寫的 `<option value="PENDING">` 是碼表的另一種寄生形態 —— 它連物件字面值
