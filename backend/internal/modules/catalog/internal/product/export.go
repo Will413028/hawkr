@@ -10,7 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 )
 
-// 給別的模組與 legacy 轉接層的批次讀取與收藏計數（B4-4a）。批次讀取一句 SQL 一份快照；不存在的 ID 不在回傳裡，呼叫端以缺席判斷。
+// 給別的模組與 legacy 轉接層的批次讀取與收藏計數。批次讀取一句 SQL 一份快照；不存在的 ID 不在回傳裡，呼叫端以缺席判斷。
 
 func checkBatch(ids []uuid.UUID) error {
 	if len(ids) > model.MaxBatchIDs {

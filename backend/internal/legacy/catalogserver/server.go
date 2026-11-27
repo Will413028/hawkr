@@ -3,7 +3,7 @@
 // （GetStock 與沒人呼叫的方法不轉接；買家、賣家、後台的入口已經是 Connect）。本套件隨 Java 的呼叫端刪除。
 //
 // 契約與舊 product-service 相同（庫存操作用 status 字串、其餘用 code／message 的 envelope，gRPC 狀態是 OK），差異：
-//   - 商品與 SKU 的 ID 是字串 UUID（D27），不是 TSID 數字字串。
+//   - 商品與 SKU 的 ID 是字串 UUID，不是 TSID 數字字串。
 //   - 配送溫層、配送方式、重量與尺寸不在 catalog（D10）：delivery_temps、shipping_methods、temperature、weight、unit、length_cm、width_cm、height_cm 不填。
 //   - 價格：price 是實際成交單價（catalog 的售價），list_price 是原價（有 compare_at_price 用它，否則同售價），sale_price 只有在有原價時才有值。
 //   - 扣減與歸還的冪等鍵是 stock_tx_id：扣減用它本身，歸還用 RestoreKey(stock_tx_id) 並指向原扣減；重送回 SUCCESS（catalog 不區分第一次與重送，舊的 ALREADY_APPLIED 兩邊的呼叫端處理相同）。
@@ -83,7 +83,7 @@ func parseItems(in []*pb.StockItem) ([]catalog.StockItem, string) {
 	out := make([]catalog.StockItem, 0, len(in))
 	for _, it := range in {
 		id, err := uuid.Parse(it.GetSkuId())
-		if err != nil {
+		if err != nil || id == uuid.Nil() {
 			return nil, fmt.Sprintf("sku_id %q 不是 UUID", it.GetSkuId())
 		}
 		q, err := strconv.ParseInt(it.GetQuantity(), 10, 32)
@@ -198,7 +198,7 @@ func listPrice(s catalog.SkuSnapshot) int64 {
 	return s.Price
 }
 
-// GetProductSimple 讀一個 SKU 的簡化資訊（cart 加入購物車用）。sku_id 空或不是 UUID 回 code=400，SKU 不存在回 404；已下架與已刪除的 SKU 照回，is_active 為假。
+// GetProductSimple 讀一個 SKU 的簡化資訊（cart 加入購物車用）。sku_id 空、不是 UUID 或全零回 code=400，SKU 不存在回 404；已下架與已刪除的 SKU 照回，is_active 為假。
 // max_limit 是目前庫存。
 func (s *Server) GetProductSimple(ctx context.Context, req *connect.Request[pb.GetProductSimpleRequest]) (*connect.Response[pb.GetProductSimpleResponse], error) {
 	reply := func(code int32, msg string, data *pb.ProductSimpleInfo) (*connect.Response[pb.GetProductSimpleResponse], error) {
@@ -209,7 +209,7 @@ func (s *Server) GetProductSimple(ctx context.Context, req *connect.Request[pb.G
 		return reply(codeInvalidParam, "sku_id 不可為空", nil)
 	}
 	id, err := uuid.Parse(raw)
-	if err != nil {
+	if err != nil || id == uuid.Nil() {
 		return reply(codeInvalidParam, "sku_id 不是 UUID", nil)
 	}
 	snaps, err := s.catalog.SkuCartInfo(ctx, []uuid.UUID{id})
@@ -227,11 +227,11 @@ func (s *Server) GetProductSimple(ctx context.Context, req *connect.Request[pb.G
 	})
 }
 
-// parseIDs 解析批次的 SKU ID：格式錯誤的略過（舊契約），重複的合併。
+// parseIDs 解析批次的 SKU ID：格式錯誤與全零的略過（當作查無的 SKU，舊契約），重複的合併。
 func parseIDs(raw []string) []uuid.UUID {
 	out := make([]uuid.UUID, 0, len(raw))
 	for _, r := range raw {
-		if id, err := uuid.Parse(r); err == nil && !slices.Contains(out, id) {
+		if id, err := uuid.Parse(r); err == nil && id != uuid.Nil() && !slices.Contains(out, id) {
 			out = append(out, id)
 		}
 	}

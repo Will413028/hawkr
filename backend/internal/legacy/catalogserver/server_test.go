@@ -21,6 +21,8 @@ type fakeCatalog struct {
 	snaps map[uuid.UUID]catalog.SkuSnapshot
 	calls int
 	err   error
+	// SkuCartInfo 與 CheckoutSnapshot 收到的 ID（每次呼叫累加）。
+	queried []uuid.UUID
 }
 
 type fakeOp struct {
@@ -103,6 +105,7 @@ func (f *fakeCatalog) CheckoutSnapshot(ctx context.Context, ids []uuid.UUID) (ma
 }
 
 func (f *fakeCatalog) SkuCartInfo(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]catalog.SkuSnapshot, error) {
+	f.queried = append(f.queried, ids...)
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -252,6 +255,7 @@ func TestInvalidStockRequestsAreSystemErrorWithoutCallingCatalog(t *testing.T) {
 		"缺 stock_tx_id":     {"", items(line{sku, "1"})},
 		"沒有品項":              {"tx", nil},
 		"sku_id 不是 UUID":    {"tx", []*pb.StockItem{{SkuId: "123", Quantity: "1"}}},
+		"sku_id 全零":         {"tx", []*pb.StockItem{{SkuId: uuid.Nil().String(), Quantity: "1"}}},
 		"quantity 不是數字":     {"tx", []*pb.StockItem{{SkuId: sku.String(), Quantity: "x"}}},
 		"quantity 為零":       {"tx", items(line{sku, "0"})},
 		"quantity 為負":       {"tx", items(line{sku, "-1"})},
@@ -323,7 +327,7 @@ func TestGetProductSimpleRejectsBadAndMissingSkus(t *testing.T) {
 	for name, c := range map[string]struct {
 		id   string
 		code int32
-	}{"空": {"", codeInvalidParam}, "不是 UUID": {"123", codeInvalidParam}, "不存在": {uuid.NewV7().String(), codeNotFound}} {
+	}{"空": {"", codeInvalidParam}, "不是 UUID": {"123", codeInvalidParam}, "全零": {uuid.Nil().String(), codeInvalidParam}, "不存在": {uuid.NewV7().String(), codeNotFound}} {
 		r, err := s.GetProductSimple(context.Background(), connect.NewRequest(&pb.GetProductSimpleRequest{SkuId: c.id}))
 		if err != nil || r.Msg.GetCode() != c.code || r.Msg.GetData() != nil {
 			t.Errorf("%s：code = %d err = %v data = %v，要 %d 且沒有 data", name, r.Msg.GetCode(), err, r.Msg.GetData(), c.code)
@@ -344,6 +348,34 @@ func TestBatchGetSkuCartInfoOmitsMissingAndKeepsInactive(t *testing.T) {
 	got := r.Msg.GetSkus()
 	if len(got) != 2 || !got[live.String()].GetIsActive() || got[delisted.String()].GetIsActive() || got[live.String()].GetStockQty() != "3" || got[live.String()].GetPrice() != "100" {
 		t.Fatalf("skus = %v，要 live（上架）與 delisted（is_active 為假），不含查無與格式錯誤的", got)
+	}
+}
+
+func TestBatchCallsTreatNilUUIDAsUnknownAndDoNotQueryIt(t *testing.T) {
+	t.Parallel()
+	live := uuid.NewV7()
+	f := newFake(nil)
+	f.snaps[live] = snap(live, uuid.NewV7(), 100, nil, 3, true)
+	s := server(f)
+	nilID := uuid.Nil().String()
+
+	cart, err := s.BatchGetSkuCartInfo(context.Background(), connect.NewRequest(&pb.BatchGetSkuCartInfoRequest{SkuIds: []string{nilID, live.String()}}))
+	if err != nil || cart.Msg.GetCode() != codeOK || len(cart.Msg.GetSkus()) != 1 {
+		t.Fatalf("cart：code = %d err = %v skus = %v，要只回 live", cart.Msg.GetCode(), err, cart.Msg.GetSkus())
+	}
+	co, err := s.BatchGetProductForCheckout(context.Background(), connect.NewRequest(&pb.BatchGetProductForCheckoutRequest{SkuIds: []string{nilID, live.String()}}))
+	if err != nil || co.Msg.GetCode() != codeOK || len(co.Msg.GetData()) != 1 {
+		t.Fatalf("checkout：code = %d err = %v data = %v，要只回 live", co.Msg.GetCode(), err, co.Msg.GetData())
+	}
+	for _, id := range f.queried {
+		if id == uuid.Nil() {
+			t.Fatalf("catalog 收到了全零的 ID：%v", f.queried)
+		}
+	}
+
+	only, err := s.BatchGetSkuCartInfo(context.Background(), connect.NewRequest(&pb.BatchGetSkuCartInfoRequest{SkuIds: []string{nilID}}))
+	if err != nil || only.Msg.GetCode() != codeOK || len(only.Msg.GetSkus()) != 0 {
+		t.Fatalf("只有全零：code = %d err = %v skus = %v，要空結果", only.Msg.GetCode(), err, only.Msg.GetSkus())
 	}
 }
 

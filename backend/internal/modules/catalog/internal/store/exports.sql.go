@@ -72,7 +72,7 @@ type GetProductCardsRow struct {
 	SortKey           int64
 }
 
-// 提供給別的模組與 legacy 轉接層的批次讀取與計數（B4-4a）。每個讀取是一句 SQL（一份快照；會被別的模組呼叫，規則 3 不讓開 InReadSnapshot）。
+// 提供給別的模組與 legacy 轉接層的批次讀取與計數。每個讀取是一句 SQL（一份快照；會被別的模組呼叫，規則 3 不讓開 InReadSnapshot）。
 // 批次商品卡片：沒刪除的商品；include_inactive 為假時只回 ACTIVE 且店家在 at 可曝光的（公開可見），為真時任何狀態都回（直接連結仍可瀏覽）。
 // 欄位同 ListPublicProducts 的一列（sort_key 固定 0），讓列表的轉換共用。
 func (q *Queries) GetProductCards(ctx context.Context, arg GetProductCardsParams) ([]GetProductCardsRow, error) {
