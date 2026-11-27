@@ -60,7 +60,3 @@ SELECT * FROM review.reviews WHERE id = sqlc.arg(id) FOR NO KEY UPDATE;
 -- name: AuthorInactive :one
 -- 提交評價的提早檢查（transaction 外，只為省掉轉正圖片）：買家不再營運中。正確性由 transaction 內的 buyer.LockActive 保證。
 SELECT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = sqlc.arg(buyer_id)::bigint);
-
--- name: LockProductRatingSync :exec
--- 以交易層級的 advisory lock 序列化同一商品的評分重算與 SetRating，避免 READ COMMITTED 下並發寫入彼此覆蓋。
-SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(product_id)::uuid::text, 0));

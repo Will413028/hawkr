@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -61,6 +60,28 @@ type catalogSocialReviewFixture struct {
 	orders  *fakeReviewOrders
 	now     time.Time
 	seq     int
+}
+
+// runRatings 跑一輪評分投影；清到沒有待重算列為止（最多數輪，處理中到的請求會重排）。
+func (f *catalogSocialReviewFixture) runRatings(ctx context.Context) {
+	f.t.Helper()
+	for range 5 {
+		if err := f.review.RunRatingProjection(ctx); err != nil {
+			f.t.Fatal(err)
+		}
+		if f.pendingRatingRows(ctx) == 0 {
+			return
+		}
+	}
+}
+
+func (f *catalogSocialReviewFixture) pendingRatingRows(ctx context.Context) int64 {
+	f.t.Helper()
+	var n int64
+	if err := f.d.Pool().QueryRow(ctx, `SELECT count(*) FROM review.rating_recompute_queue`).Scan(&n); err != nil {
+		f.t.Fatal(err)
+	}
+	return n
 }
 
 func newCatalogSocialReviewFixture(t *testing.T) *catalogSocialReviewFixture {
@@ -243,7 +264,7 @@ func TestSocialProductsVerifiesCatalogProductAndStoreOwnership(t *testing.T) {
 	}
 }
 
-func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
+func TestReviewProjectsRatingToCatalogAsynchronouslyAndToleratesMissingProduct(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newCatalogSocialReviewFixture(t)
@@ -278,6 +299,14 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got.RatingAverage != 0 || got.ReviewCount != 0 {
+		t.Fatalf("評分由 worker 非同步寫入，worker 跑之前 catalog 不變：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
+	}
+	f.runRatings(ctx)
+	got, err = f.catalog.Product(ctx, store1, prod.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.RatingAverage != 4.5 || got.ReviewCount != 2 {
 		t.Fatalf("Submit 後評分應為 (4.5, 2)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
 	}
@@ -285,6 +314,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if _, err := f.review.Hide(ctx, review.HideInput{ReviewID: r1.ID, AdminID: 9, Category: "SPAM", Text: "垃圾訊息"}); err != nil {
 		t.Fatal(err)
 	}
+	f.runRatings(ctx)
 	got, err = f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -296,6 +326,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if _, err := f.review.Restore(ctx, review.RestoreInput{ReviewID: r1.ID, AdminID: 9, Reason: "誤判"}); err != nil {
 		t.Fatal(err)
 	}
+	f.runRatings(ctx)
 	got, err = f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -304,17 +335,20 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 		t.Fatalf("Restore 後評分應為 (4.5, 2)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
 	}
 
-	// 不存在的商品：SetRating 回 ErrProductNotFound，評價寫入必須一起回滾。
-	_, err = f.review.Submit(ctx, review.SubmitInput{BuyerID: b2, OrderNo: "ORD-MISSING", OrderItemID: 3, Rating: 5, Content: "不存在商品"})
-	if !errors.Is(err, catalog.ErrProductNotFound) {
-		t.Fatalf("不存在商品應回 catalog.ErrProductNotFound：%v", err)
+	// 不存在的商品：評價照常成功；worker 記錄後刪掉待重算列，不重試。
+	if _, err := f.review.Submit(ctx, review.SubmitInput{BuyerID: b2, OrderNo: "ORD-MISSING", OrderItemID: 3, Rating: 5, Content: "不存在商品"}); err != nil {
+		t.Fatalf("商品不存在不影響評價：%v", err)
 	}
 	var cnt int64
 	if err := f.d.Pool().QueryRow(ctx, `SELECT count(*) FROM review.reviews WHERE order_no = 'ORD-MISSING'`).Scan(&cnt); err != nil {
 		t.Fatal(err)
 	}
-	if cnt != 0 {
-		t.Fatalf("SetRating 失敗時評價必須回滾：count=%d", cnt)
+	if cnt != 1 {
+		t.Fatalf("評價要保留：count=%d", cnt)
+	}
+	f.runRatings(ctx)
+	if n := f.pendingRatingRows(ctx); n != 0 {
+		t.Fatalf("商品不存在：待重算列要被刪掉而不是留著重試：%d", n)
 	}
 
 	// 買家停用並 PurgeAuthor 後，catalog 評分同步為剩餘公開評價 (4.0, 1)。
@@ -324,6 +358,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if err := f.review.PurgeAuthor(ctx, b1); err != nil {
 		t.Fatal(err)
 	}
+	f.runRatings(ctx)
 	got, err = f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -333,7 +368,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	}
 }
 
-func TestReviewSyncsRatingConcurrentlyWithoutLostUpdates(t *testing.T) {
+func TestReviewRatingProjectionConvergesAfterConcurrentSubmits(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newCatalogSocialReviewFixture(t)
@@ -383,6 +418,7 @@ func TestReviewSyncsRatingConcurrentlyWithoutLostUpdates(t *testing.T) {
 		}
 	}
 
+	f.runRatings(ctx)
 	got, err := f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)

@@ -84,3 +84,21 @@ CREATE TABLE review.hides (
 );
 CREATE UNIQUE INDEX hides_active_review ON review.hides (review_id) WHERE restored_at IS NULL;
 CREATE INDEX hides_review ON review.hides (review_id, hidden_at);
+
+-- 商品評分的待重算佇列（transactional outbox，D3）：評價集合改變的 transaction（提交、隱藏、還原、刪帳清除）在同 transaction 登記商品，
+-- 週期 worker 以 SKIP LOCKED 認領到期列、寫租約，鎖 catalog 商品列後無鎖讀統計並寫回絕對值。
+-- 必要條件：catalog 排在 review 之前（platform/lockorder），review 鎖了自己的列之後不能再等 catalog 的列，所以評分不能在評價的 transaction 內寫。
+-- seq 是請求序號：每次登記加一；worker 完成時只在 seq 仍是認領時讀到的值才刪列，變了就重新排（處理中到的請求不遺失）。
+-- claimed_until 是認領的租約；attempts、last_error 記失敗；failed_at 非空表示超過重試上限而停手（列保留供查，下一次請求會重置）。
+CREATE TABLE review.rating_recompute_queue (
+    product_id    UUID        PRIMARY KEY,
+    seq           BIGINT      NOT NULL DEFAULT 1,
+    due_at        TIMESTAMPTZ NOT NULL,
+    claimed_until TIMESTAMPTZ,
+    attempts      INTEGER     NOT NULL DEFAULT 0,
+    last_error    TEXT,
+    failed_at     TIMESTAMPTZ,
+    CONSTRAINT rating_recompute_queue_seq_check CHECK (seq >= 1),
+    CONSTRAINT rating_recompute_queue_attempts_check CHECK (attempts >= 0)
+);
+CREATE INDEX rating_recompute_queue_due ON review.rating_recompute_queue (due_at) WHERE failed_at IS NULL;

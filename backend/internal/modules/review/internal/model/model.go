@@ -7,6 +7,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -248,8 +249,10 @@ type ReviewCreated struct {
 	ProductID  uuid.UUID
 }
 
-// Catalog 是 review 同步商品評分的 catalog 公開 API；在改變公開評價集合的同一個 transaction 內呼叫，失敗讓整個 transaction 回滾。
+// Catalog 是評分 worker 寫商品評分的 catalog 公開 API：同一個 transaction 內先 LockProduct（鎖商品列並回目前的評分）、再 SetRating 寫絕對值；
+// 兩個方法的 ctx 都必須帶 transaction。商品不存在回 catalog.ErrProductNotFound。
 type Catalog interface {
+	LockProduct(ctx context.Context, productID uuid.UUID) (catalog.Rating, error)
 	SetRating(ctx context.Context, productID uuid.UUID, average float64, count int32) error
 }
 

@@ -34,6 +34,8 @@ const MaxListPageSize int32 = 100
 var (
 	// ErrProductNotFound 表示商品不存在、已刪除，或不屬於這家店。
 	ErrProductNotFound = errors.New("catalog: product not found")
+	// ErrTxRequired 表示 LockProduct 的 ctx 沒有 transaction：行鎖在語句結束就放掉，鎖了等於沒鎖。
+	ErrTxRequired = errors.New("catalog: a transaction is required to lock a product")
 	// ErrActiveRequiresGalleryImage 表示 ACTIVE 的商品必須至少有一張主圖：切成 ACTIVE 或寫入 ACTIVE 商品的內容時主圖是空的。
 	ErrActiveRequiresGalleryImage = errors.New("catalog: an active product needs at least one gallery image")
 	// ErrInvalidInput 表示輸入不合法；具體的欄位與原因在 *InvalidInputError。

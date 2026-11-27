@@ -41,7 +41,7 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 
 - 運費設定與報價：seller（B3）。
 - 結帳時的扣庫存呼叫與訂單快照的保存：ordering（B8）；catalog 只提供 `DeductStock`／`RestoreStock` 與結帳用的商品快照（B4-4）。
-- 評分與則數的事實：review，經 `SetRating` 傳絕對值寫進商品（B4-3）；收藏的事實：buyer。
+- 評分與則數的事實：review，經 `SetRating` 傳絕對值寫進商品（B4-4e）；收藏的事實：buyer。
 - 商品限制措施（平台下架）的事實：seller 擁有措施，catalog 讀取（B4-5）。
 - 媒體檔案的儲存與刪除：media；catalog 只存引用並在自己的 transaction 內 `Confirm`／`MarkDeleted`。
 

@@ -199,24 +199,6 @@
    "why": "批次查詢的回應以解析後的小寫 UUID 為 key：大寫輸入對不上，原字串保留的測試要紅。"
   },
   {
-   "id": "review-submit-drops-set-rating",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/review/internal/write/write.go",
-   "old": "\t\tif err := rows.SyncProductRating(ctx, q, s.d.Catalog, item.ProductID); err != nil {\n\t\t\treturn err\n\t\t}\n",
-   "new": "\t\t_ = rows.SyncProductRating\n",
-   "test": "cmd/hawkr ^TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct$",
-   "why": "提交評價後不呼叫 SetRating 同步評分：catalog 商品的評分與則數停在 0，測試要紅。"
-  },
-  {
-   "id": "review-hide-drops-set-rating",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/review/internal/write/write.go",
-   "old": "\treturn rows.SyncProductRating(ctx, q, s.d.Catalog, productID)\n",
-   "new": "\t_ = q\n\treturn nil\n",
-   "test": "cmd/hawkr ^TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct$",
-   "why": "隱藏與還原評價時不呼叫 SetRating 同步評分：catalog 商品的評分在隱藏後沒有更新，測試要紅。"
-  },
-  {
    "id": "social-verify-product-skips-ownership",
    "stack": "go-integration",
    "file": "backend/cmd/hawkr/social.go",
@@ -224,6 +206,87 @@
    "new": "\tcase false && card.StoreID != storeID:\n\t\treturn social.ErrProductNotOwned\n",
    "test": "cmd/hawkr ^TestSocialProductsVerifiesCatalogProductAndStoreOwnership$",
    "why": "social 的商品驗證略過店家歸屬比對：他店上架商品被當成自家商品收下，他店商品被拒的測試要紅。"
+  },
+  {
+   "id": "review-submit-drops-pending-row",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/write/write.go",
+   "old": "\t\tif err := rows.RequestRatingRecompute(ctx, q, now, item.ProductID); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/review ^TestSubmitRequestsRatingRecomputeAndWorkerProjectsIt$",
+   "why": "提交評價時不登記評分待重算：沒有佇列列，worker 不會重算，測試要紅。"
+  },
+  {
+   "id": "review-hide-drops-pending-row",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/write/write.go",
+   "old": "\treturn rows.RequestRatingRecompute(ctx, q, s.d.Now().UTC(), productID)\n",
+   "new": "\t_ = q\n\treturn nil\n",
+   "test": "internal/modules/review ^TestRD3HideCanBeRestoredAndHiddenAgain$",
+   "why": "隱藏與還原評價時不登記評分待重算：catalog 的評分在隱藏後不會更新，測試要紅。"
+  },
+  {
+   "id": "review-purge-drops-pending-row",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/purge/purge.go",
+   "old": "\t\tif err := rows.RequestRatingRecompute(ctx, q, s.d.Now().UTC(), distinctProductIDs(products)...); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/review ^TestPurgeRequestsProductRatingRecomputePerProduct$",
+   "why": "刪帳清除評價時不登記評分待重算：沒有佇列列，測試要紅。"
+  },
+  {
+   "id": "rating-finish-ignores-seq",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
+   "old": "DELETE FROM review.rating_recompute_queue WHERE product_id = $1 AND seq = $2",
+   "new": "DELETE FROM review.rating_recompute_queue WHERE product_id = $1 AND $2::bigint IS NOT NULL",
+   "test": "internal/modules/review ^TestRequestArrivingWhileProcessingIsNotLost$",
+   "why": "完成時不比對序號就刪列：處理中到的新請求被一起刪掉（lost update），測試要紅。"
+  },
+  {
+   "id": "rating-worker-skips-catalog-lock",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/rating/rating.go",
+   "old": "\tcur, err := s.d.Catalog.LockProduct(ctx, productID)\n\tif err != nil {\n\t\treturn err\n\t}\n",
+   "new": "\tvar cur catalog.Rating\n",
+   "test": "internal/modules/review ^TestProductCacheIsBustedAfterSetRating$",
+   "why": "worker 不先鎖 catalog 商品列就讀統計與寫入：呼叫順序少了 lock，測試要紅。"
+  },
+  {
+   "id": "rating-bust-before-set-rating",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/rating/rating.go",
+   "old": "\tif err := s.d.Catalog.SetRating(ctx, productID, st.AvgRating, count); err != nil {\n\t\treturn err\n\t}\n\treturn s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: []string{revalidate.ProductTag(productID)}}, nil)\n",
+   "new": "\tif err := s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: []string{revalidate.ProductTag(productID)}}, nil); err != nil {\n\t\treturn err\n\t}\n\treturn s.d.Catalog.SetRating(ctx, productID, st.AvgRating, count)\n",
+   "test": "internal/modules/review ^TestProductCacheIsBustedAfterSetRating$",
+   "why": "商品快取失效排在 SetRating 之前：順序變成 lock、revalidate、set，測試要紅。"
+  },
+  {
+   "id": "rating-not-found-is-retried",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/rating/rating.go",
+   "old": "\t\t\tif !errors.Is(err, catalog.ErrProductNotFound) {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "\t\t\tif !errors.Is(err, catalog.ErrProductNotFound) || true {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "test": "internal/modules/review ^TestReviewSucceedsWhenProductIsMissingAndWorkerDropsTheRow$",
+   "why": "商品不存在也當成失敗重試：待重算列留在表上（含失敗次數），測試要紅。"
+  },
+  {
+   "id": "rating-unchanged-still-writes",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/rating/rating.go",
+   "old": "\tif cur.Average == st.AvgRating && cur.Count == count {\n",
+   "new": "\tif false {\n",
+   "test": "internal/modules/review ^TestUnchangedRatingIsNotWrittenNorBusted$",
+   "why": "統計與目前相同仍寫入並清快取：全量對帳會製造寫入與失效，測試要紅。"
+  },
+  {
+   "id": "rating-reconcile-ignores-products",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
+   "old": "    WHERE r.product_id > $2::uuid\n",
+   "new": "    WHERE r.product_id > $2::uuid AND false\n",
+   "test": "internal/modules/review ^TestReconcileFixesDriftFromDeactivatedBuyer$",
+   "why": "全量對帳不登記任何商品：買家停用造成的評分偏差不會被補正，測試要紅。"
   }
  ]
 }

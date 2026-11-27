@@ -7,11 +7,14 @@ package counter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"math"
 	"slices"
 	"time"
 	"unicode/utf8"
 	"uuid"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
@@ -56,6 +59,22 @@ func (s *Service) SetRating(ctx context.Context, productID uuid.UUID, average fl
 		return model.ErrProductNotFound
 	}
 	return nil
+}
+
+// LockProduct 在呼叫方的 transaction 內鎖住商品列（FOR NO KEY UPDATE），回目前的評分與則數；之後的 SetRating 與其他寫入者序列化。不看 deleted_at。
+// ctx 沒有 transaction 時回 model.ErrTxRequired（行鎖在語句結束就放掉，沒有意義）；商品不存在回 model.ErrProductNotFound。
+func (s *Service) LockProduct(ctx context.Context, productID uuid.UUID) (model.Rating, error) {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return model.Rating{}, model.ErrTxRequired
+	}
+	r, err := s.q(ctx).LockProduct(ctx, productID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Rating{}, model.ErrProductNotFound
+	}
+	if err != nil {
+		return model.Rating{}, err
+	}
+	return model.Rating{Average: r.RatingAverage, Count: r.ReviewCount}, nil
 }
 
 // RecordSales 把一筆訂單的銷量累計到各商品，同一個 orderNo 只累計一次：先 INSERT … ON CONFLICT DO NOTHING 登記 orderNo，只有第一次插入成功才增加 sales_count，

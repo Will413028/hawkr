@@ -52,6 +52,23 @@ func (q *Queries) ClaimSalesOrder(ctx context.Context, arg ClaimSalesOrderParams
 	return result.RowsAffected(), nil
 }
 
+const lockProduct = `-- name: LockProduct :one
+SELECT rating_average, review_count FROM catalog.products WHERE id = $1 FOR NO KEY UPDATE
+`
+
+type LockProductRow struct {
+	RatingAverage float64
+	ReviewCount   int32
+}
+
+// 在呼叫方的 transaction 內鎖商品列（FOR NO KEY UPDATE）並回目前的評分與則數，不看 deleted_at（已刪除的商品仍收評分）；沒有列是商品不存在。
+func (q *Queries) LockProduct(ctx context.Context, id uuid.UUID) (LockProductRow, error) {
+	row := q.db.QueryRow(ctx, lockProduct, id)
+	var i LockProductRow
+	err := row.Scan(&i.RatingAverage, &i.ReviewCount)
+	return i, err
+}
+
 const setProductRating = `-- name: SetProductRating :execrows
 
 UPDATE catalog.products

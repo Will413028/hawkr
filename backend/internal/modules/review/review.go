@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/purge"
+	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/rating"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/write"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -45,7 +46,7 @@ type Buyers = write.Buyers
 // Stores 是讀店家（取 store_code）的 seller 公開 API；正式組裝傳 *seller.Module。
 type Stores = write.Stores
 
-// Catalog 是同步商品評分的 catalog 公開 API；正式組裝傳 *catalog.Module。
+// Catalog 是評分 worker 寫商品評分的 catalog 公開 API；正式組裝傳 *catalog.Module。
 type Catalog = model.Catalog
 
 // ErrOrderNotFound 是 Orders 的實作回報「訂單不存在」的方式。
@@ -117,9 +118,10 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 
 // Module 是 review 模組。
 type Module struct {
-	write *write.Service
-	read  *read.Service
-	purge *purge.Service
+	write  *write.Service
+	read   *read.Service
+	purge  *purge.Service
+	rating *rating.Service
 }
 
 // New 建立模組。
@@ -135,12 +137,13 @@ func New(d Deps) *Module {
 	}
 	return &Module{
 		write: write.New(write.Deps{
-			DB: d.DB, Events: d.Events, Media: d.Media, Jobs: d.Jobs, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders, Catalog: d.Catalog,
+			DB: d.DB, Events: d.Events, Media: d.Media, Jobs: d.Jobs, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders,
 			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
-		read: read.New(read.Deps{DB: d.DB}),
+		read:   read.New(read.Deps{DB: d.DB}),
+		rating: rating.New(rating.Deps{DB: d.DB, Jobs: d.Jobs, Catalog: d.Catalog, Now: d.Now, Logger: d.Logger}),
 		purge: purge.New(purge.Deps{
-			DB: d.DB, Jobs: d.Jobs, Media: d.Media, Stores: d.Stores, Catalog: d.Catalog, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
+			DB: d.DB, Jobs: d.Jobs, Media: d.Media, Stores: d.Stores, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
 	}
 }
@@ -155,10 +158,10 @@ func (m *Module) Reply(ctx context.Context, in ReplyInput) (Review, error) {
 	return m.write.Reply(ctx, in)
 }
 
-// Hide 隱藏一則評價（moderation 呼叫），冪等；新隱藏時同 transaction 同步商品評分。
+// Hide 隱藏一則評價（moderation 呼叫），冪等；新隱藏時同 transaction 登記商品評分待重算。
 func (m *Module) Hide(ctx context.Context, in HideInput) (Hide, error) { return m.write.Hide(ctx, in) }
 
-// Restore 還原目前未還原的隱藏，同 transaction 同步商品評分。
+// Restore 還原目前未還原的隱藏，同 transaction 登記商品評分待重算。
 func (m *Module) Restore(ctx context.Context, in RestoreInput) (Hide, error) {
 	return m.write.Restore(ctx, in)
 }
@@ -241,15 +244,22 @@ func (m *Module) ReviewStore(ctx context.Context, id uuid.UUID) (ReviewStore, er
 	return m.read.ReviewStore(ctx, id)
 }
 
-// AddWorkers 登記 River worker（刪帳清除與其保底掃描）。由 cmd/hawkr 接上。
+// AddWorkers 登記 River worker（刪帳清除與其保底掃描、評分投影與其全量對帳）。由 cmd/hawkr 接上。
 func (m *Module) AddWorkers(workers *river.Workers) {
 	purge.AddWorkers(workers, m.purge)
+	rating.AddWorkers(workers, m.rating)
 }
 
-// PeriodicJobs 回傳保底掃描的排程（刪帳清除）。
+// PeriodicJobs 回傳週期排程：刪帳清除的保底掃描、評分投影的處理輪與全量對帳。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
-	return purge.PeriodicJobs()
+	return append(purge.PeriodicJobs(), rating.PeriodicJobs()...)
 }
+
+// RunRatingProjection 處理一輪到期的評分待重算列（週期 job 的內容；測試與維運也可直接呼叫）：每個商品鎖 catalog 商品列、重算、寫回絕對值並清快取。
+func (m *Module) RunRatingProjection(ctx context.Context) error { return m.rating.Run(ctx) }
+
+// ReconcileRatings 把每個有評價的商品登記為待重算，回傳登記的商品數；補買家停用或復用等不經評價寫入的統計變動。
+func (m *Module) ReconcileRatings(ctx context.Context) (int, error) { return m.rating.Reconcile(ctx) }
 
 // OnMeasureCreated 是 seller 建立內容下架措施時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：只處理店家對評價的回覆（Contents 裡種類是 REVIEW_REPLY 的對象），
 // 鎖住列並核對歸屬，不存複本（讀取述詞 join seller.pub_content_takedowns()，A6-D21）；對象不是措施的店家的評價回覆時回 *TakedownContentError 讓措施回滾。

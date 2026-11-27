@@ -6,6 +6,10 @@ UPDATE catalog.products
 SET rating_average = sqlc.arg(rating_average), review_count = sqlc.arg(review_count), updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id);
 
+-- name: LockProduct :one
+-- 在呼叫方的 transaction 內鎖商品列（FOR NO KEY UPDATE）並回目前的評分與則數，不看 deleted_at（已刪除的商品仍收評分）；沒有列是商品不存在。
+SELECT rating_average, review_count FROM catalog.products WHERE id = sqlc.arg(id) FOR NO KEY UPDATE;
+
 -- name: ClaimSalesOrder :execrows
 -- 銷量去重：同一個 order_no 只有第一次插入成功（回 1 列），重送回 0 列，呼叫端不再累計。
 INSERT INTO catalog.sales_orders (order_no, recorded_at) VALUES (sqlc.arg(order_no), sqlc.arg(now))

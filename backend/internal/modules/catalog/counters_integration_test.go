@@ -3,6 +3,7 @@
 package catalog
 
 import (
+	"context"
 	"errors"
 	"math"
 	"testing"
@@ -152,5 +153,35 @@ func TestRecordSalesRejectsBadInputAndRollsBackOnAMissingProduct(t *testing.T) {
 	}
 	if got := f.counters(a.ID).SalesCount; got != 1 {
 		t.Fatalf("the order_no is not claimed by the failed attempt: %d, want 1", got)
+	}
+}
+
+func TestLockProductReturnsTheCurrentRatingInsideATransaction(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	p := f.create(storeID, acct, f.input("鎖商品"))
+	if err := f.m.SetRating(f.ct, p.ID, 4.5, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := f.m.LockProduct(f.ct, p.ID); !errors.Is(err, ErrTxRequired) {
+		t.Fatalf("outside a transaction the row lock would be released at once: %v", err)
+	}
+	err := f.d.InTx(f.ct, func(ctx context.Context) error {
+		got, err := f.m.LockProduct(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		if got.Average != 4.5 || got.Count != 10 {
+			t.Errorf("current rating: %+v", got)
+		}
+		if _, err := f.m.LockProduct(ctx, uuid.NewV7()); !errors.Is(err, ErrProductNotFound) {
+			t.Errorf("a missing product: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

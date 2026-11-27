@@ -101,6 +101,8 @@ var nonPublicReads = map[string]bool{
 	"InsertReviewImage": true, "ListReviewImages": true,
 	// 刪帳清除與 relay（purge.sql）：作者已不是營運中，公開述詞必定排除他的評價；清除要鎖與刪他的全部列，relay 要讀原始列。
 	"LockBuyerReviewBatch": true, "DeleteReviewsByID": true, "ListInactiveBuyersWithReviews": true, "GetReviewByID": true, "IsReviewPublic": true,
+	// 評分全量對帳（rating_queue.sql）：只列哪些商品有評價列、不回內容，與可見性無關（公開統計由 ProductStats 算）。
+	"RequestRatingReconcileBatch": true,
 }
 
 // ReplyToReview 雖然不在 public.sql，仍以公開可讀為回覆的前提。

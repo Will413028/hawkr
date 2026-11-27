@@ -58,3 +58,9 @@ type SkuSnapshot struct {
 	Deleted bool
 	Active  bool
 }
+
+// Rating 是商品目前的評分平均與評價則數（LockProduct 回傳）。
+type Rating struct {
+	Average float64
+	Count   int32
+}
