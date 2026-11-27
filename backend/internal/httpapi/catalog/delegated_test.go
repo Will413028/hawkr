@@ -676,8 +676,8 @@ func TestPublishAndUnpublishAnswerFromTheWrittenProductWithoutReReading(t *testi
 	}
 }
 
-// 代行不能下架草稿：單一與批次都是 failed_precondition，批次在訊息裡列出全部草稿商品的 ID（沒有 ErrorReason，metadata 帶不出去）。
-func TestDelegatedUnpublishOfDraftsIsFailedPrecondition(t *testing.T) {
+// 代行不能下架草稿：單一與批次都是 failed_precondition 與 PRODUCT_NOT_PUBLISHED，ErrorInfo.metadata 的 notPublishedProductIds 是逗號連接、由小到大的草稿商品（單一就是那一個）。
+func TestDelegatedUnpublishOfDraftsIsFailedPreconditionWithTheDraftIDs(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
 	r.m.err = catalog.ErrNotPublished
@@ -685,15 +685,34 @@ func TestDelegatedUnpublishOfDraftsIsFailedPrecondition(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("單一下架草稿 code = %v，預期 failed_precondition：%v", connect.CodeOf(err), err)
 	}
+	if info := errorInfoOf(t, err); info == nil || info.GetReason() != "PRODUCT_NOT_PUBLISHED" || info.GetMetadata()["notPublishedProductIds"] != (uuid.UUID{1}).String() {
+		t.Fatalf("單一 ErrorInfo = %v，預期 PRODUCT_NOT_PUBLISHED 與該商品 ID", info)
+	}
 	r.m.err = &catalog.BatchNotPublishedError{ProductIDs: []uuid.UUID{{3}, {9}}}
 	_, err = r.client.BatchUnpublishStoreProducts(t.Context(), asSession(batchRequest(item(3, "3"), item(9, "3"), item(5, "3"))))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("批次含草稿 code = %v，預期 failed_precondition：%v", connect.CodeOf(err), err)
 	}
 	want := uuid.UUID{3}.String() + "," + uuid.UUID{9}.String()
-	if !strings.Contains(err.Error(), want) {
-		t.Fatalf("錯誤訊息 %q，預期列出全部草稿商品 %q", err.Error(), want)
+	if info := errorInfoOf(t, err); info == nil || info.GetReason() != "PRODUCT_NOT_PUBLISHED" || info.GetMetadata()["notPublishedProductIds"] != want {
+		t.Fatalf("批次 ErrorInfo = %v，預期 PRODUCT_NOT_PUBLISHED 與 %q", info, want)
 	}
+}
+
+func errorInfoOf(t *testing.T, err error) *errdetails.ErrorInfo {
+	t.Helper()
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		t.Fatal(err)
+	}
+	for _, d := range ce.Details() {
+		if v, e := d.Value(); e == nil {
+			if x, ok := v.(*errdetails.ErrorInfo); ok {
+				return x
+			}
+		}
+	}
+	return nil
 }
 
 // 代行建立的 request_id 這家店已用過（不是這個 session 的重送）：failed_precondition，不是 internal。

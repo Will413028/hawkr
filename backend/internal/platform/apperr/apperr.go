@@ -242,6 +242,9 @@ var ReasonCouponQuotaExceeded = newReason("COUPON_QUOTA_EXCEEDED")
 // ReasonRestockSKUInStock 表示規格（SKU）目前有貨，不接受補貨訂閱；搭配 FailedPrecondition。
 var ReasonRestockSKUInStock = newReason("RESTOCK_SKU_IN_STOCK")
 
+// ReasonProductNotPublished 表示代行下架的商品是草稿，草稿沒有上架過、不能下架；搭配 FailedPrecondition，Metadata 的 notPublishedProductIds 列出草稿商品。
+var ReasonProductNotPublished = newReason("PRODUCT_NOT_PUBLISHED")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

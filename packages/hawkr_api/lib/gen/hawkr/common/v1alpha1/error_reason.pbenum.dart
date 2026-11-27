@@ -270,6 +270,11 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason RESTOCK_SKU_IN_STOCK =
       ErrorReason._(49, _omitEnumNames ? '' : 'RESTOCK_SKU_IN_STOCK');
 
+  /// 代行下架的商品是草稿（搭配 failed_precondition）：草稿沒有上架過，不能下架。ErrorInfo.metadata 的 notPublishedProductIds 是草稿商品的 ID，
+  /// 逗號連接、由小到大（單一下架就是那一個）。CatalogDelegatedService.UnpublishStoreProduct、BatchUnpublishStoreProducts。client 把這些商品從下架清單移除後再送出。
+  static const ErrorReason PRODUCT_NOT_PUBLISHED =
+      ErrorReason._(50, _omitEnumNames ? '' : 'PRODUCT_NOT_PUBLISHED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -320,10 +325,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     COUPON_ISSUE_LIMIT_REACHED,
     COUPON_QUOTA_EXCEEDED,
     RESTOCK_SKU_IN_STOCK,
+    PRODUCT_NOT_PUBLISHED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 49);
+      $pb.ProtobufEnum.$_initByValueList(values, 50);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

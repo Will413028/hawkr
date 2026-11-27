@@ -133,10 +133,10 @@ func failure(err error, paths rpc.FieldPaths) error {
 		for i, id := range batchDrafts.ProductIDs {
 			text[i] = id.String()
 		}
-		// 沒有對應的 ErrorReason（ErrorInfo 只在有 reason 時才送出，metadata 帶不出去），草稿商品的 ID 寫在訊息裡。
-		return apperr.FailedPrecondition("有 %d 個商品是草稿，草稿沒有上架過、不能下架：%s", len(text), strings.Join(text, ","))
+		return apperr.FailedPrecondition("有 %d 個商品是草稿，草稿沒有上架過、不能下架", len(text)).
+			WithReason(apperr.ReasonProductNotPublished).WithMetadata("notPublishedProductIds", strings.Join(text, ","))
 	case errors.Is(err, catalog.ErrNotPublished):
-		return apperr.FailedPrecondition("草稿沒有上架過，不能下架")
+		return apperr.FailedPrecondition("草稿沒有上架過，不能下架").WithReason(apperr.ReasonProductNotPublished)
 	case errors.Is(err, catalog.ErrCreateReplayed):
 		return apperr.FailedPrecondition("這個 request_id 已經用來建立過這家店的商品，請改用新的 request_id")
 	case errors.Is(err, catalog.ErrVersionConflict):

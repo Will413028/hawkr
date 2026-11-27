@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -21,6 +22,7 @@ import (
 	moddelegation "github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
@@ -403,7 +405,12 @@ func (h *Delegated) transition(ctx context.Context, op *commonpb.DelegatedOperat
 		Op: o, ResourceID: id.String(), Version: &version, PayloadHash: moddelegation.DelegatedPayloadHash(action, id, version),
 	}, id, func(ctx context.Context, _ moddelegation.DelegatedCaller, st seller.Store, actor *delegatedactor.Actor) (catalog.Product, error) {
 		p, err := h.m.SetProductStatus(ctx, st.StoreID, id, version, to, actor)
-		return p, failure(err, statusPaths)
+		out := failure(err, statusPaths)
+		var ae *apperr.Error
+		if errors.Is(err, catalog.ErrNotPublished) && errors.As(out, &ae) {
+			_ = ae.WithMetadata("notPublishedProductIds", id.String())
+		}
+		return p, out
 	})
 }
 
