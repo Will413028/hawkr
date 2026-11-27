@@ -162,17 +162,6 @@ test("seller order action column contains the stable shipment action group", () 
 	);
 });
 
-test("restock reports branded pending state without a pre-request animation delay", () => {
-	const restock = readFileSync(
-		path.join(root, "components/shared/RestockNotifyButton.tsx"),
-		"utf8",
-	);
-
-	assert.match(restock, /setPhase\("subscribing"\);/);
-	assert.match(restock, /isLoading=\{loading\}/);
-	assert.doesNotMatch(restock, /RING_MS|phase === "ringing"/);
-});
-
 test("navbar logout keeps its initiating menu action visible until settlement", () => {
 	const navbar = readFileSync(
 		path.join(root, "components/shared/Navbar.tsx"),
@@ -221,13 +210,8 @@ test("optimistic toggle hooks reject same-frame duplicate requests", () => {
 		path.join(root, "lib/hooks/useSellerSubscription.ts"),
 		"utf8",
 	);
-	const restock = readFileSync(
-		path.join(root, "components/shared/RestockNotifyButton.tsx"),
-		"utf8",
-	);
 
 	assert.match(social, /const togglePendingRef = React\.useRef\(false\)/);
 	assert.match(social, /if \(!postId \|\| togglePendingRef\.current\)/);
 	assert.match(subscription, /if \(togglePendingRef\.current\)/);
-	assert.match(restock, /if \(pendingRef\.current\) return;/);
 });

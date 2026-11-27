@@ -538,6 +538,7 @@ test("member card ignores a coverUrl that arrives without its key", () => {
 test("generated restock subscription resolves its image URI template", () => {
 	const record = restockFromConnect(
 		create(RestockSubscriptionSchema, {
+			skuId: "9",
 			product: {
 				id: "866353737479521547",
 				image: { uriTemplate: "https://media.example/i/{preset}/product.png" },
@@ -545,6 +546,7 @@ test("generated restock subscription resolves its image URI template", () => {
 		}),
 	);
 	assert.equal(record.productImage, "https://media.example/i/card/product.png");
+	assert.equal(record.skuId, "9");
 	assert.equal(
 		restockFromConnect(
 			create(RestockSubscriptionSchema, { product: { id: "3" } }),

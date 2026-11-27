@@ -6,13 +6,17 @@ import { buyerAppClient } from "../connect/buyer";
 import { imageUri } from "../media/image";
 
 /**
- * Subscribe the current buyer to product restock notifications.
+ * Subscribe the current buyer to restock notifications for one SKU of a product.
  * Idempotent — backend returns the existing subscription if already ACTIVE.
  */
 export async function subscribeRestock(
 	productId: number | string,
+	skuId: number | string,
 ): Promise<void> {
-	await buyerAppClient().subscribeRestock({ productId: String(productId) });
+	await buyerAppClient().subscribeRestock({
+		productId: String(productId),
+		skuId: String(skuId),
+	});
 }
 
 /**
@@ -28,6 +32,7 @@ export async function unsubscribeRestock(
 export interface RestockSubscriptionItem {
 	subscriptionId: string;
 	productId: string;
+	skuId: string;
 	productName: string;
 	productImage: string;
 	productStatus: string;
@@ -40,8 +45,9 @@ export function restockFromConnect(
 	row: RestockSubscription,
 ): RestockSubscriptionItem {
 	return {
-		subscriptionId: row.product?.id ?? "",
+		subscriptionId: row.skuId,
 		productId: row.product?.id ?? "",
+		skuId: row.skuId,
 		productName: row.product?.name ?? "",
 		productImage: imageUri(row.product?.image, "card") ?? "",
 		productStatus: "",

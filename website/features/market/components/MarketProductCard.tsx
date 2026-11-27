@@ -318,10 +318,8 @@ function MarketProductCard({
 					{soldOut && !previewMode ? (
 						<RestockNotifyButton
 							className="market-product-card__cart-btn relative z-20 inline-flex h-10 flex-none items-center justify-center gap-1.5 border-0 rounded-hk-pill px-3.5 text-[0.8125rem] font-extrabold cursor-pointer transition-[background,color,filter] hover:enabled:brightness-105 disabled:pointer-events-auto disabled:cursor-not-allowed disabled:opacity-70"
-							productId={product.id}
+							href={product.href}
 							productName={product.name}
-							initialSubscribed={product.isRestockSubscribed}
-							stopPropagation
 						/>
 					) : (
 						<AddToCartButton

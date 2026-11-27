@@ -222,13 +222,13 @@ export default function ProductPurchaseBox({
 		setRestockOn(next);
 		try {
 			if (next) {
-				await subscribeRestock(productId);
+				await subscribeRestock(productId, selected.id);
 				emitCartToast({
 					message: "已開啟補貨通知",
 					actionHref: null,
 				});
 			} else {
-				await unsubscribeRestock(productId);
+				await unsubscribeRestock(selected.id);
 				emitCartToast({ message: "已取消補貨通知", actionHref: null });
 			}
 		} catch {
