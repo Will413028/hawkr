@@ -15,6 +15,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 )
 
@@ -45,7 +46,7 @@ func TestCreateLoserReadsBackTheWinnerWhenItsImageTokenWasConfirmedElsewhere(t *
 	var winner Product
 	rm := &racingMedia{Media: f.media}
 	rm.before = func() {
-		w, err := f.m.CreateProduct(f.ct, storeID, up, key, in)
+		w, err := f.m.CreateProduct(f.ct, storeID, up, key, in, nil)
 		if err != nil {
 			t.Error(err)
 		}
@@ -53,7 +54,7 @@ func TestCreateLoserReadsBackTheWinnerWhenItsImageTokenWasConfirmedElsewhere(t *
 	}
 	loser := New(f.deps(f.d, rm))
 	// 輸家的第一次查詢（transaction 內）還沒有商品；贏家在輸家確認圖片時才提交。
-	got, err := loser.CreateProduct(f.ct, storeID, up, key, in)
+	got, err := loser.CreateProduct(f.ct, storeID, up, key, in, nil)
 	if err != nil {
 		t.Fatalf("the loser reads back the winner: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestMigrationBackfillsTheRequestHashOfPreexistingAdjustOperations(t *testin
 	f.must(f.exec(`INSERT INTO catalog.stock_movements (operation_id, sku_id, delta) VALUES ($1, $2, 7)`, op, sku))
 
 	apply(targetFile)
-	f.m = New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }, Restock: stubNotifier{}})
+	f.m = New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }, Events: events.NewBus(), Restock: stubNotifier{}})
 
 	f.must(f.m.AdjustStock(ctx, 501, "legacy:1", sku, 7))
 	if got := f.stockOf(sku); got != 12 {

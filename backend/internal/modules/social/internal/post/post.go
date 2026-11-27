@@ -158,16 +158,7 @@ func (s *Service) publishedEvent(ctx context.Context, p store.SocialPost, now ti
 	if origin == model.OriginScheduled {
 		e.ScheduleID, e.ScheduledBy = sc.ID, model.ScheduledBy{Kind: model.ScheduleKind(sc.ScheduledByKind), Ref: sc.ScheduledByRef}
 	}
-	return emit(ctx, s.d.Events, e, actor)
-}
-
-// emit 發布事件 e：帶代行者（actor 非 nil）的事件一定要有名為 delegatedactor.AuditHandler 的 handler（events.PublishRequired），沒有就失敗關閉，不會有沒稽核的代行寫入；
-// 店主自己的寫入沒有訂閱者也照發。「指名的 handler 必須存在」只在 events 套件的 PublishRequired 一處保證。
-func emit[E any](ctx context.Context, b *events.Bus, e E, actor *delegatedactor.Actor) error {
-	if actor != nil {
-		return events.PublishRequired(ctx, b, e, delegatedactor.AuditHandler)
-	}
-	return events.Publish(ctx, b, e)
+	return delegatedactor.Publish(ctx, s.d.Events, e, actor)
 }
 
 // postWritten 是貼文寫入事件共用的欄位：寫入後貼文的內容（呼叫方手上已有，不再讀），店主的寫入 actor 是 nil。
@@ -284,7 +275,7 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 		if out, err = s.Own(ctx, st.StoreID, id); err != nil {
 			return err
 		}
-		return emit(ctx, s.d.Events, model.PostCreated{PostWritten: s.postWritten(out.ID, out.StoreID, out.Body, out.Version, actor)}, actor)
+		return delegatedactor.Publish(ctx, s.d.Events, model.PostCreated{PostWritten: s.postWritten(out.ID, out.StoreID, out.Body, out.Version, actor)}, actor)
 	})
 	if err != nil && in.RequestID != nil && errors.Is(err, media.ErrUploadAlreadyConfirmed) {
 		// 並行的重送輸家：同一個圖片 token 已被贏家的 transaction 確認並提交（B1-D23），這時贏家的貼文讀得到；回滾後再 replay 一次，不加鎖。
@@ -480,7 +471,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 		if out, err = s.Own(ctx, st.StoreID, in.PostID); err != nil {
 			return err
 		}
-		return emit(ctx, s.d.Events, model.PostUpdated{PostWritten: s.postWritten(out.ID, out.StoreID, out.Body, out.Version, actor)}, actor)
+		return delegatedactor.Publish(ctx, s.d.Events, model.PostUpdated{PostWritten: s.postWritten(out.ID, out.StoreID, out.Body, out.Version, actor)}, actor)
 	})
 	if err != nil {
 		return model.Post{}, err
@@ -510,7 +501,7 @@ func (s *Service) Publish(ctx context.Context, st seller.Store, postID uuid.UUID
 			return err
 		}
 		if row.Status == string(model.StatusPublished) {
-			return emit(ctx, s.d.Events, model.PostPublishRepeated{PostWritten: s.postWritten(row.ID, row.StoreID, row.Body, row.Version, actor)}, actor)
+			return delegatedactor.Publish(ctx, s.d.Events, model.PostPublishRepeated{PostWritten: s.postWritten(row.ID, row.StoreID, row.Body, row.Version, actor)}, actor)
 		}
 		if row.Version != version {
 			return versionConflict(ctx)
@@ -546,7 +537,7 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 		}
 		switch model.PostStatus(row.Status) {
 		case model.StatusUnpublished:
-			return emit(ctx, s.d.Events, model.PostUnpublishRepeated{PostWritten: s.postWritten(row.ID, row.StoreID, row.Body, row.Version, actor)}, actor)
+			return delegatedactor.Publish(ctx, s.d.Events, model.PostUnpublishRepeated{PostWritten: s.postWritten(row.ID, row.StoreID, row.Body, row.Version, actor)}, actor)
 		case model.StatusDraft:
 			return apperr.FailedPrecondition("%s", text.PostUnpublishDraft(uitext.LocaleFrom(ctx)))
 		case model.StatusPublished:
@@ -564,7 +555,7 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 		if err := s.d.Cache.BustPost(ctx, postID, st.StoreID); err != nil {
 			return err
 		}
-		return emit(ctx, s.d.Events, model.PostUnpublished{PostWritten: s.postWritten(upd.ID, upd.StoreID, upd.Body, upd.Version, actor)}, actor)
+		return delegatedactor.Publish(ctx, s.d.Events, model.PostUnpublished{PostWritten: s.postWritten(upd.ID, upd.StoreID, upd.Body, upd.Version, actor)}, actor)
 	})
 	if err != nil {
 		return model.Post{}, err

@@ -213,7 +213,7 @@ func runServe(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	catalogModule := newCatalog(d, med, buyerModule)
+	catalogModule := newCatalog(d, bus, med, buyerModule)
 	subscribeCatalogFavorites(bus, catalogModule)
 	box := newInbox(d, jc, log)
 	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
@@ -428,7 +428,7 @@ func runWorker(ctx context.Context) error {
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
-	catalogModule := newCatalog(d, med, buyerModule)
+	catalogModule := newCatalog(d, bus, med, buyerModule)
 	subscribeCatalogFavorites(bus, catalogModule)
 	box := newInbox(d, jc, log)
 	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)

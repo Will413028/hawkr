@@ -10,3 +10,6 @@
 - 低庫存以 SKU 判斷、只算 ACTIVE、門檻是商品的 `low_stock_threshold`（沒設 5），售完另計。守門：`TestLowStockCountIsPerSkuActiveOnlyWithPerProductThreshold`。
 - 搜尋與賣家關鍵字用 `searchable_text`（含選項軸名稱與值）的 `ILIKE`（GIN trigram 索引），相關度排序 `word_similarity`；keyset 游標是 (排序鍵, ID)。守門：`TestPublicSearchFindsAndPagesWithoutRepeatOrGap`、`TestSellerQueryHitsAcrossPagesAndMatchesSkuOptions`。
 - 指定店家的公開列表空清單是空頁，不是不篩選（`ListPublicProductsOfStores`）。守門：`TestPublicFiltersAndStoreScopedList`。
+- 代行寫入（B4-5d，A7-D27）：`Create`、`Update`、`SetStatus` 明確收 `actor *delegatedactor.Actor`（店主傳 nil），成功的寫入在同 transaction 內以 `delegatedactor.Publish` 發一個事件（`ProductCreated`、`ProductUpdated`、目標 ACTIVE／ARCHIVED 的 `ProductPublished`／`ProductUnpublished`，已在目標狀態的是 `*Repeated`）；帶 actor 的事件沒有名為 `delegatedactor.AuditHandler` 的 handler 就失敗關閉，目標 DRAFT 不接受 actor。守門：`TestProductWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber`、`TestDelegatedWritesCarryTheActorAndShareTheWriteTransaction`。
+- 批次下架（D29）`UnpublishMany`：一個 transaction、商品依 ID 升序鎖列、一個 `ProductsUnpublished`；任一項版本不符整批回 `*BatchVersionConflictError`（列出全部衝突）且不寫入，已 ARCHIVED 的項目是成功、不比對版本、不改版本。守門：`TestUnpublishProductsIsAllOrNothing`。
+

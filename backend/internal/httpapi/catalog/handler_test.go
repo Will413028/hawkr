@@ -23,6 +23,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -113,19 +114,19 @@ func (f *fakeModule) OwnSku(_ context.Context, storeID int64, _ uuid.UUID) (cata
 	return f.sku, f.err
 }
 
-func (f *fakeModule) CreateProduct(_ context.Context, storeID int64, up media.Uploader, _ uuid.UUID, _ catalog.ProductInput) (catalog.Product, error) {
+func (f *fakeModule) CreateProduct(_ context.Context, storeID int64, up media.Uploader, _ uuid.UUID, _ catalog.ProductInput, _ *delegatedactor.Actor) (catalog.Product, error) {
 	f.rec("CreateProduct")
 	f.stores, f.uploader = append(f.stores, storeID), append(f.uploader, up.ID)
 	return f.product, f.err
 }
 
-func (f *fakeModule) UpdateProduct(_ context.Context, storeID int64, up media.Uploader, _ uuid.UUID, version int64, _ catalog.ProductInput) (catalog.Product, error) {
+func (f *fakeModule) UpdateProduct(_ context.Context, storeID int64, up media.Uploader, _ uuid.UUID, version int64, _ catalog.ProductInput, _ *delegatedactor.Actor) (catalog.Product, error) {
 	f.rec("UpdateProduct")
 	f.stores, f.uploader, f.versions = append(f.stores, storeID), append(f.uploader, up.ID), append(f.versions, version)
 	return f.product, f.err
 }
 
-func (f *fakeModule) SetProductStatus(_ context.Context, storeID int64, _ uuid.UUID, version int64, _ catalog.ProductStatus) error {
+func (f *fakeModule) SetProductStatus(_ context.Context, storeID int64, _ uuid.UUID, version int64, _ catalog.ProductStatus, _ *delegatedactor.Actor) error {
 	f.rec("SetProductStatus")
 	f.stores, f.versions = append(f.stores, storeID), append(f.versions, version)
 	return f.err

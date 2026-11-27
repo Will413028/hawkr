@@ -917,7 +917,7 @@ func (q *Queries) LockLiveSkus(ctx context.Context, productID uuid.UUID) ([]Lock
 }
 
 const lockOwnProduct = `-- name: LockOwnProduct :one
-SELECT id, status, first_published_at, content_version FROM catalog.products
+SELECT id, title, status, first_published_at, content_version FROM catalog.products
 WHERE id = $1 AND store_id = $2 AND deleted_at IS NULL
 FOR UPDATE
 `
@@ -929,6 +929,7 @@ type LockOwnProductParams struct {
 
 type LockOwnProductRow struct {
 	ID               uuid.UUID
+	Title            string
 	Status           string
 	FirstPublishedAt *time.Time
 	ContentVersion   int64
@@ -940,6 +941,7 @@ func (q *Queries) LockOwnProduct(ctx context.Context, arg LockOwnProductParams) 
 	var i LockOwnProductRow
 	err := row.Scan(
 		&i.ID,
+		&i.Title,
 		&i.Status,
 		&i.FirstPublishedAt,
 		&i.ContentVersion,

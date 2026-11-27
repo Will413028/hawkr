@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/hashtag"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -30,6 +31,7 @@ type productFixture struct {
 	d     *db.DB
 	m     *Module
 	rn    *recordingNotifier
+	bus   *events.Bus
 	media *media.Fake
 	ct    context.Context
 	mu    sync.Mutex
@@ -47,6 +49,7 @@ func newProductFixture(t *testing.T) *productFixture {
 	))
 	f := &productFixture{t: t, d: d, ct: context.Background(), media: media.NewFake(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
 	f.rn = &recordingNotifier{}
+	f.bus = events.NewBus()
 	f.m = New(f.deps(d, f.media))
 	// 測試只關心 catalog 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(`DO $$ DECLARE r record; BEGIN
@@ -58,7 +61,7 @@ func newProductFixture(t *testing.T) *productFixture {
 
 // deps 是這個 fixture 的模組依賴；換 database 連線或 media 的測試用它組出另一個 Module。
 func (f *productFixture) deps(d *db.DB, m Media) Deps {
-	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Restock: f.rn}
+	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Events: f.bus, Restock: f.rn}
 }
 
 func (f *productFixture) clock() time.Time {
@@ -144,7 +147,7 @@ func (f *productFixture) create(storeID, accountID int64, in ProductInput) Produ
 
 // createP 以新的 request_id 建立商品。
 func createP(m *Module, ct context.Context, storeID int64, up media.Uploader, in ProductInput) (Product, error) {
-	return m.CreateProduct(ct, storeID, up, uuid.NewV7(), in)
+	return m.CreateProduct(ct, storeID, up, uuid.NewV7(), in, nil)
 }
 
 // updateP 讀目前的版本再整體取代；並行的修改造成版本衝突時重讀重試（測試關心的是寫入本身，不是版本競爭）。
@@ -154,7 +157,7 @@ func updateP(m *Module, ct context.Context, storeID int64, up media.Uploader, id
 		if err != nil {
 			return Product{}, err
 		}
-		p, err := m.UpdateProduct(ct, storeID, up, id, cur.Version, in)
+		p, err := m.UpdateProduct(ct, storeID, up, id, cur.Version, in, nil)
 		if !errors.Is(err, ErrVersionConflict) {
 			return p, err
 		}
@@ -169,7 +172,7 @@ func setStatusP(m *Module, ct context.Context, storeID int64, id uuid.UUID, to P
 		if err != nil {
 			return err
 		}
-		err = m.SetProductStatus(ct, storeID, id, cur.Version, to)
+		err = m.SetProductStatus(ct, storeID, id, cur.Version, to, nil)
 		if !errors.Is(err, ErrVersionConflict) {
 			return err
 		}

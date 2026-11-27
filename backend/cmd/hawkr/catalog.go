@@ -15,8 +15,8 @@ import (
 
 // newCatalog 組出 catalog 模組給消費端（procurement、discovery、content、buyer 與 seller 的商品 port）用。它的事件訂閱、週期 job 與補貨 worker 不在這裡登記：
 // 舊服務處理商品流量到切換（B4-6）。補貨通知的下游是 buyer（catalogRestock）；收藏數的訂閱見 subscribeCatalogFavorites。
-func newCatalog(d *db.DB, med catalog.Media, buyers *buyer.Module) *catalog.Module {
-	return catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: time.Now, Media: med, Restock: catalogRestock{buyer: buyers}})
+func newCatalog(d *db.DB, bus *events.Bus, med catalog.Media, buyers *buyer.Module) *catalog.Module {
+	return catalog.New(catalog.Deps{DB: d, Events: bus, NewID: uuid.NewV7, Now: time.Now, Media: med, Restock: catalogRestock{buyer: buyers}})
 }
 
 // restockBuyers 是補貨通知用到的 buyer 方法（*buyer.Module 滿足它）。

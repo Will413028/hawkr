@@ -11,6 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
 // PublicModule 是公開讀取用到的 catalog 方法（*catalog.Module）。每個方法都帶請求的 clock（at）：店家可不可曝光依它判斷，不用 client 的時間。
@@ -29,9 +30,9 @@ type SellerModule interface {
 	CountSellerProducts(ctx context.Context, storeID int64, f catalog.SellerFilter) (int32, error)
 	Product(ctx context.Context, storeID int64, productID uuid.UUID) (catalog.Product, error)
 	OwnSku(ctx context.Context, storeID int64, skuID uuid.UUID) (catalog.SkuState, error)
-	CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in catalog.ProductInput) (catalog.Product, error)
-	UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in catalog.ProductInput) (catalog.Product, error)
-	SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to catalog.ProductStatus) error
+	CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in catalog.ProductInput, actor *delegatedactor.Actor) (catalog.Product, error)
+	UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in catalog.ProductInput, actor *delegatedactor.Actor) (catalog.Product, error)
+	SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to catalog.ProductStatus, actor *delegatedactor.Actor) error
 	DeleteProduct(ctx context.Context, storeID int64, productID uuid.UUID, version int64) error
 	AdjustStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, delta int32) error
 	SetStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, quantity, expected int32) error

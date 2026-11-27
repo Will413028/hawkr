@@ -160,7 +160,7 @@ func newCatalogSocialReviewFixture(t *testing.T) *catalogSocialReviewFixture {
 	subscribeBuyerLifecycle(bus, f.buyers)
 	f.sellers = seller.NewReader(d, clock)
 	med := media.NewFake()
-	f.catalog = newCatalog(d, med, f.buyers)
+	f.catalog = newCatalog(d, bus, med, f.buyers)
 	f.social = newSocial(
 		d, bus, jc, f.buyers, testSocialSellers{f.sellers}, med, socialProducts{catalog: f.catalog},
 		social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error { return social.ErrScheduleDenied }),
@@ -240,12 +240,12 @@ func (f *catalogSocialReviewFixture) createProduct(ctx context.Context, storeID,
 		CategoryID: leaf,
 		Gallery:    []catalog.Image{{Token: fmt.Sprintf("img-%d", f.seq)}},
 		Skus:       []catalog.SkuInput{{Price: 120, StockQty: 5}},
-	})
+	}, nil)
 	if err != nil {
 		f.t.Fatal(err)
 	}
 	if status != catalog.StatusDraft {
-		if err := f.catalog.SetProductStatus(ctx, storeID, p.ID, p.Version, status); err != nil {
+		if err := f.catalog.SetProductStatus(ctx, storeID, p.ID, p.Version, status, nil); err != nil {
 			f.t.Fatal(err)
 		}
 		p, err = f.catalog.Product(ctx, storeID, p.ID)

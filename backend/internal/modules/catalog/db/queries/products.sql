@@ -14,7 +14,7 @@ SELECT id, request_hash, deleted_at FROM catalog.products WHERE store_id = sqlc.
 
 -- name: LockOwnProduct :one
 -- 店家自己的、沒刪除的商品，鎖列；同一個商品的寫入都從這裡開始，所以 SKU、選項與價格區間的重算不會並行交錯。
-SELECT id, status, first_published_at, content_version FROM catalog.products
+SELECT id, title, status, first_published_at, content_version FROM catalog.products
 WHERE id = sqlc.arg(id) AND store_id = sqlc.arg(store_id) AND deleted_at IS NULL
 FOR UPDATE;
 

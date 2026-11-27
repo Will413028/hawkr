@@ -15,6 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -37,9 +38,11 @@ type World struct {
 	DB     *db.DB
 	Module *catalog.Module
 	Media  *media.Fake
-	mu     sync.Mutex
-	now    time.Time
-	seq    int64
+	// Bus 是 catalog 發布寫入事件的 bus：要驗證代行稽核的測試在上面訂閱 delegation。
+	Bus *events.Bus
+	mu  sync.Mutex
+	now time.Time
+	seq int64
 }
 
 // New 建立世界：套用 media、buyer、seller、catalog 的 migration（catalog 讀 seller 的 pub_exposable_stores）。
@@ -51,8 +54,8 @@ func New(t *testing.T, pg *testdb.Server) *World {
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "catalog", Dir: catalog.Migrations()},
 	))
-	w := &World{T: t, DB: d, Media: media.NewFake(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
-	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media, Restock: Notifier{}})
+	w := &World{T: t, DB: d, Media: media.NewFake(), Bus: events.NewBus(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
+	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media, Events: w.Bus, Restock: Notifier{}})
 	// 只關心 catalog 讀 seller 的 pub_exposable_stores：KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	w.Exec(`DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
@@ -127,7 +130,7 @@ func (w *World) Input(title string, stock int32) catalog.ProductInput {
 // Create 以模組建立商品（草稿）。
 func (w *World) Create(storeID, accountID int64, in catalog.ProductInput) catalog.Product {
 	w.T.Helper()
-	p, err := w.Module.CreateProduct(context.Background(), storeID, media.Uploader{ID: accountID}, uuid.NewV7(), in)
+	p, err := w.Module.CreateProduct(context.Background(), storeID, media.Uploader{ID: accountID}, uuid.NewV7(), in, nil)
 	if err != nil {
 		w.T.Fatal(err)
 	}
@@ -141,7 +144,7 @@ func (w *World) SetStatus(storeID int64, id uuid.UUID, to catalog.ProductStatus)
 	if err != nil {
 		w.T.Fatal(err)
 	}
-	if err := w.Module.SetProductStatus(context.Background(), storeID, id, cur.Version, to); err != nil {
+	if err := w.Module.SetProductStatus(context.Background(), storeID, id, cur.Version, to, nil); err != nil {
 		w.T.Fatal(err)
 	}
 }

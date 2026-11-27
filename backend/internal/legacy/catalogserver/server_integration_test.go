@@ -18,6 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -52,7 +53,7 @@ func setup(t *testing.T) (*fixture, context.Context) {
 		migrate.Module{Name: "catalog", Dir: catalog.Migrations()},
 	))
 	now := time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
-	m := catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return now }, Media: media.NewFake(), Restock: noopNotifier{}})
+	m := catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return now }, Media: media.NewFake(), Events: events.NewBus(), Restock: noopNotifier{}})
 	return &fixture{t: t, m: m, srv: New(m, slog.New(slog.NewTextHandler(io.Discard, nil)))}, context.Background()
 }
 
@@ -74,11 +75,11 @@ func (f *fixture) product(ctx context.Context, title string, stock int32, compar
 	p, err := f.m.CreateProduct(ctx, storeID, media.Uploader{ID: accountID}, uuid.NewV7(), catalog.ProductInput{
 		Title: title, CategoryID: leaf, Gallery: []catalog.Image{{Token: fmt.Sprintf("img-%d", f.seq)}},
 		Skus: []catalog.SkuInput{{Price: 120, CompareAtPrice: compare, StockQty: stock}},
-	})
+	}, nil)
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if err := f.m.SetProductStatus(ctx, storeID, p.ID, p.Version, catalog.StatusActive); err != nil {
+	if err := f.m.SetProductStatus(ctx, storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
 		f.t.Fatal(err)
 	}
 	return p
@@ -175,7 +176,7 @@ func TestSnapshotRpcsAgainstTheRealCatalog(t *testing.T) {
 		t.Fatalf("checkout info = %v", x)
 	}
 
-	if err := f.m.SetProductStatus(ctx, storeID, p.ID, mustVersion(t, f, ctx, p.ID), catalog.StatusArchived); err != nil {
+	if err := f.m.SetProductStatus(ctx, storeID, p.ID, mustVersion(t, f, ctx, p.ID), catalog.StatusArchived, nil); err != nil {
 		t.Fatal(err)
 	}
 	checkout, _ = f.srv.BatchGetProductForCheckout(ctx, connect.NewRequest(&pb.BatchGetProductForCheckoutRequest{SkuIds: []string{sku.String()}}))
