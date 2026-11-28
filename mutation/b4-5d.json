@@ -15,7 +15,7 @@
    "file": "backend/internal/modules/delegation/delegated.go",
    "old": "productPublishWrite        = postWrite{CapabilityProductsPublish, AuditProductPublish}",
    "new": "productPublishWrite        = postWrite{CapabilityProductsWrite, AuditProductPublish}",
-   "test": "internal/modules/delegation ^TestMissingProductCapabilityIsRejectedForEveryWriteAndLeavesFailedRows$",
+   "test": "internal/modules/delegation ^TestEveryDelegatedProductWriteLeavesOneSucceededAuditRow$",
    "why": "上架只要 products.write：只有寫入能力的 session 能上架，products.publish 不再是獨立的能力"
   },
   {
@@ -33,7 +33,7 @@
    "file": "backend/internal/httpapi/catalog/delegated.go",
    "old": "catalogv1alpha1connect.CatalogDelegatedServiceUnpublishStoreProductProcedure:       writeMethod(catalog.ProductUnpublished{}),",
    "new": "catalogv1alpha1connect.CatalogDelegatedServiceUnpublishStoreProductProcedure: productMethod(moddelegation.CapabilityProductsRead, moddelegation.AuditProductUnpublish),",
-   "test": "internal/httpapi/catalog ^TestMissingCapabilityIsPermissionDeniedForEveryMethod$",
+   "test": "internal/httpapi/catalog ^TestSessionWithoutPublishCapabilityCannotPublishOrUnpublish$",
    "why": "下架的宣告被改成只要 products.read：沒有 products.publish 的代行不再被 interceptor 拒絕"
   },
   {

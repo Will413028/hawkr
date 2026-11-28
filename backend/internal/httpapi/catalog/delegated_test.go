@@ -275,6 +275,24 @@ func TestMissingCapabilityIsPermissionDeniedForEveryMethod(t *testing.T) {
 	}
 }
 
+func TestSessionWithoutPublishCapabilityCannotPublishOrUnpublish(t *testing.T) {
+	t.Parallel()
+	for _, proc := range []string{
+		catalogv1alpha1connect.CatalogDelegatedServicePublishStoreProductProcedure,
+		catalogv1alpha1connect.CatalogDelegatedServiceUnpublishStoreProductProcedure,
+		catalogv1alpha1connect.CatalogDelegatedServiceBatchUnpublishStoreProductsProcedure,
+	} {
+		r := newDelegatedRig(t, moddelegation.CapabilityProductsRead, moddelegation.CapabilityProductsWrite)
+		err := r.calls(t)[proc]()
+		if connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Errorf("%s 沒有 products.publish：%v，預期 permission_denied", proc, err)
+		}
+		if len(r.m.calls) != 0 {
+			t.Errorf("%s 被拒絕後仍呼叫了模組：%v", proc, r.m.calls)
+		}
+	}
+}
+
 func TestEveryDelegatedMethodUsesTheSessionStoreAndPassesTheActor(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
