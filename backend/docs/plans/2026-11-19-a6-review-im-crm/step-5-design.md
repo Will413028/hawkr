@@ -6,7 +6,7 @@
 
 - 本設計只定契約（proto 形狀、身分推導、錯誤、串流 helper 的責任）與 5b–5d 的分工；程式在 5b–5d。
 - 既定不重開：A6-D3（server streaming＋unary 送出）、A6-D4（封鎖過濾，統計不濾）、A6-D8／CD8（CRM 不回聯絡資料）、A6-D14 W6（卡片是伺服器參照，client 不送文字）、A6-D15（不做打字中）、A6-D16 W1–W5、A6-D18 W3 (a)（CRM 不回優惠券）、A6-D18 W5 (a)（客戶列表拿掉關鍵字搜尋）、A6-D21 W3 (a)（店家只檢舉 `CHAT_MESSAGE`）、A6-D22。
-- 命名照 `docs/共通規範/API 設計規範（Connect）.md` 與 ADR `2026-10-07-connect-without-perspective` 的 10-17 修訂：計畫寫的 `ReviewService`、`ChatService`、`SellerCrmService` 是暫名，正式名見 §2。
+- 命名照 `docs/conventions/api-design-guidelines-connect.md` 與 ADR `2026-10-07-connect-without-perspective` 的 10-17 修訂：計畫寫的 `ReviewService`、`ChatService`、`SellerCrmService` 是暫名，正式名見 §2。
 - 並行期：舊服務在 gateway 後面處理 client 流量到 A6-6e。5b–5d 在單體註冊 Connect handler 不會讓 client 改走新路徑（client 在 A6-6 才改），系統從未上線、沒有舊資料要搬，所以單體 handler 與舊服務同時存在不違反「單一生效者」不變量；relay 與 consumer 仍到 6e 才接（計畫不變量）【推，依計畫不變量表第 9 列】。
 
 ## 1. 34 支逐支去向（取代計畫「34 扣 8」的口徑）

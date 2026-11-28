@@ -7,7 +7,7 @@
 | 影響範圍 | ai-service `internal/procurement/`、gateway 的 procurement 端點 |
 | 路徑基準 | `backend/` |
 
-規格本身見 `docs/詳細設計書/55-Hawkr 幫找採購助手（Procurement Assistant）詳細設計書.md`。
+規格本身見 `docs/detailed-design/55-procurement-assistant-detailed-design.md`。
 本檔只保存「為什麼選它、否決了什麼」。
 
 ## D1：下一題由誰決定 → 固定 slot ＋ 純函式選題，模型只負責文案

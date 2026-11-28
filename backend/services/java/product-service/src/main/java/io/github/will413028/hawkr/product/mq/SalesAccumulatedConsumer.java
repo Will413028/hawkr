@@ -30,7 +30,7 @@ import java.util.List;
  * <ul>
  *   <li>同事務先以 order_no claim 去重表（INSERT ON CONFLICT DO NOTHING），rowsAffected=1 才累計；
  *       redelivery（MaxRetries requeue / 連線中斷重投 / 手動重放）造成的重複累加由此擋下（比照 FavoriteCountService）</li>
- *   <li>同事務內逐筆 UPDATE，by productId ASC 排序避免死鎖（docs/開發規範/後端服務責任邊界規範.md §三）</li>
+ *   <li>同事務內逐筆 UPDATE，by productId ASC 排序避免死鎖（docs/dev-guidelines/backend-service-responsibility-boundaries.md §三）</li>
  *   <li>UPDATE 是 DB-side atomic increment（{@code sales_count = sales_count + ?}），無需 SELECT FOR UPDATE</li>
  *   <li>publisher 端已 group by productId，consumer 不需重複合併</li>
  * </ul>

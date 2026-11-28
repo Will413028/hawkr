@@ -1,6 +1,6 @@
 # B4-3 catalog Connect API：業界基準對照與設計決策簡報
 
-快照：dev `cb273c7d9`。輸入：`b4-3-proto-draft.md`（下稱「草稿」）、計畫 `backend/docs/plans/2026-11-24-b4-catalog.md`、規範 `docs/共通規範/API 設計規範（Connect）.md`（下稱「規範」）、特性測試 `backend/internal/httpapi/catalog/characterization/scenarios_test.go`。
+快照：dev `cb273c7d9`。輸入：`b4-3-proto-draft.md`（下稱「草稿」）、計畫 `backend/docs/plans/2026-11-24-b4-catalog.md`、規範 `docs/conventions/api-design-guidelines-connect.md`（下稱「規範」）、特性測試 `backend/internal/httpapi/catalog/characterization/scenarios_test.go`。
 
 證據標記：【量】在 repo 讀檔或跑指令（附指令）；【文件】公開文件（附 URL；本 session 沒有重新開啟網頁，內容依既有知識，交付前建議抽查標★的幾條）；【推】推論。
 

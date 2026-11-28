@@ -10,7 +10,7 @@ import (
 // OriginSummaryItem 對應 GetPublicOriginsSummary 回應條目（02 §5.13）。
 type OriginSummaryItem struct {
 	Origin       string `json:"origin"`       // 產地字串（如「台灣」「日本」）
-	ProductCount string `json:"productCount"` // 該產地下 ACTIVE 商品數（對外數字一律 string，見 docs/開發規範/Java 微服務開發規範.md §2）
+	ProductCount string `json:"productCount"` // 該產地下 ACTIVE 商品數（對外數字一律 string，見 docs/dev-guidelines/java-microservices-development-guidelines.md §2）
 }
 
 // OriginsSummaryResponse /public/origins/summary 回應 data。

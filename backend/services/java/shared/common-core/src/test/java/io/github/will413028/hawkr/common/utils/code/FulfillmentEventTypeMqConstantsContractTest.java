@@ -134,7 +134,7 @@ class FulfillmentEventTypeMqConstantsContractTest {
         });
         assertTrue(missing.isEmpty(),
                 "以下 MqConstants 常數不在 FulfillmentEventType 值域內 ⇒ 又一條字面值：" + missing
-                        + "。修法：改 內部技術碼.md 的 FulfillmentEventType 表格後跑 generate.sh --all。"
+                        + "。修法：改 internal-technical-codes.md 的 FulfillmentEventType 表格後跑 generate.sh --all。"
                         + "🔴 不得改塞進 ShippingEventType——那個 enum 的守門測試看不到 fulfillment. 前綴");
     }
 

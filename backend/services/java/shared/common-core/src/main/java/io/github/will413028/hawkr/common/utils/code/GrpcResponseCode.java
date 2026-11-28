@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * <p>含 {@code %s} 的 message 為模板，由 BusinessException 透過
  * {@code String.format(message, args)} 組裝動態訊息。</p>
  *
- * <p>⚠ 此檔案由 generate.sh 自動生成，請以 docs/代碼管理（CodeMeta）/錯誤碼.md 為唯一來源。</p>
+ * <p>⚠ 此檔案由 generate.sh 自動生成，請以 docs/codemeta/error-codes.md 為唯一來源。</p>
  */
 public enum GrpcResponseCode {
 

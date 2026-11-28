@@ -20,7 +20,7 @@ import java.util.Set;
  *
  * <p>集中「組 tag → tx commit 後 bust」邏輯，尤其批次 mutation（改分類 / 分類 cascade /
  * 庫存變動）影響多筆商品、可能橫跨多賣家時，統一在此反查 sellerId 並去重，避免各 service
- * 各寫一份（docs/開發規範/Java 微服務開發規範.md §15）。tag 命名與 frontend {@code lib/seo/tags.ts} 對齊。
+ * 各寫一份（docs/dev-guidelines/java-microservices-development-guidelines.md §15）。tag 命名與 frontend {@code lib/seo/tags.ts} 對齊。
  *
  * <p><b>producer 只發 entity tag</b>（{@code product:<id>} / {@code seller:<id>} / {@code category:<id>}）；
  * domain-collection（{@code products:list} / {@code sellers:list} / {@code categories} …）由 web {@code /api/revalidate}

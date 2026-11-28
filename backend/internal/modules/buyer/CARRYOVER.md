@@ -63,7 +63,7 @@
 | visit_history 不設筆數或期限 | 每個 buyer×product 僅需最後瀏覽時間 | 成立；upsert 使每 stint 筆數受 catalog 大小限制 | 複合鍵保留最後時間；以量測決定 cap／TTL | 維持無 cap／retention。觸發條件：單一買家超過 1,000 列，或 `ListVisits` 的 p95 超過 200 ms；量測要等部署後的監控（見第 19 列），第一次部署時一併加上這兩個指標 |
 | 地址標籤（label：HOME／COMPANY／OTHER，REQUIRED＋CHECK） | 有人設定（使用者選）或有人讀（畫面或下游） | 不成立：沒有畫面設定也沒有讀者，buyer-app 的選擇器 2026-07-16 品牌改版刪除（`d09f9fa61`），值全由 client 編造；legacy gRPC 轉送但沒有讀者 | ［外部，未查證］零售平台的地址標籤是使用者選的選填欄位；沒有功能就不存欄位 | 刪除（5c F1 α）；產品要讓買家替地址分類時以選填加回，同時做選擇器與顯示 |
 | buyer-app 地址 ID 以 `int` 保存（`address_repository.dart` 的 `int.parse`） | 契約的地址 `id` 是整數 | 不成立：契約 `id` 是不透明字串（AIP-122），`int` 是舊 REST 時期的形狀 | ［外部，AIP-122，本次未重新查證］業界把資源 ID 當不透明字串，client 不解析 | 保留；buyer-app 結帳改走 Connect（ordering 搬進單體）時改成 `String` |
-| 性別的「沒有填」（`GENDER_UNSPECIFIED` 當清除） | 契約要能表達沒有填 | 成立，但零值承載意義，與 Q4 相反 | AIP-126 零值不使用、AIP-149 只建議數值用 `optional`［外部］；本庫依 Q4 以欄位有沒有設值表達（`API 設計規範（Connect）.md` 的 `optional` 條） | 改 `optional`，`UNSPECIFIED` 回 `invalid_argument`（5d G1 α） |
+| 性別的「沒有填」（`GENDER_UNSPECIFIED` 當清除） | 契約要能表達沒有填 | 成立，但零值承載意義，與 Q4 相反 | AIP-126 零值不使用、AIP-149 只建議數值用 `optional`［外部］；本庫依 Q4 以欄位有沒有設值表達（`api-design-guidelines-connect.md` 的 `optional` 條） | 改 `optional`，`UNSPECIFIED` 回 `invalid_argument`（5d G1 α） |
 | 封鎖主鍵 tsid（舊 `social-service` 的 `user_blocks`） | 多服務各自發號 | 不成立；封鎖沒有 Java 消費端的 BIGINT 主鍵 | row-identity ADR：關聯用自然鍵的複合主鍵 | 複合主鍵：`blocked_buyers` (blocker_buyer_id, blocked_buyer_id)、`blocked_stores` (blocker_buyer_id, store_id)，加反向索引；沒有代理主鍵 |
 | 封鎖名單 OFFSET 分頁（`ListBlocks(limit, offset)`） | 名單可能很長，翻頁不重不漏 | 不成立：OFFSET 隨頁數變慢，翻頁中新增或解除會重複或漏列 | AIP-158 的 page token（keyset） | `ListBlockedBuyers`、`ListBlockedStores` 以 (created_at, 對象 ID) 降冪 keyset 分頁，cursor 驗證合法性 |
 | 混合號碼空間：單表的 `blocked_id` 同時放現任 buyer_id、store_id 或舊 account_id，寫入時用 `resolvePrincipal`（舊 `usecase/block.go`）逐軸反解 | 舊 social 不知道號碼屬於買家還是店 | 不成立：新系統的買家 ID 與店家 ID 各自發號、呼叫端知道對象的種類 | 對象種類不同就分表，各表的對象欄位帶自己的外鍵或約束（多型關聯建不了 FK） | 兩張表：買家封鎖買家（`blocked_buyer_id REFERENCES buyers`、CHECK 不能封鎖自己）、買家封鎖店（`store_id` 跨模組不建 FK、CHECK > 0）；反解不搬。「同一人以買家與賣家兩個身分」的跨身分封鎖由 A7-2 的 handler 經 identity 判斷後拒絕（買家封鎖自己的店、店家封鎖店主本人），buyer 只擋同表的自我封鎖 |
@@ -71,7 +71,7 @@
 | 買家刪帳後封鎖列的去向 | 對象退場後名單與過濾是否保留他 | 不成立：墓碑對象的列沒有讀者（名單顯示不出內容，過濾對一個已不公開的對象沒有效果） | 帳號刪除時一併清除與該帳號有關的關聯（雙向） | 買家刪帳時 buyer 在自己的刪帳 transaction 刪他發起的兩種封鎖與以他為對象的 `blocked_buyers` 列；各店對他的封鎖由 accountdeletion 在同一個 transaction 刪（seller 擁有）。店退場後以店為對象的列保留 |
 | 封鎖與並發寫入的鎖 | 封鎖生效後不應再有新內容寫入 | 不成立為強保證：封鎖與他人的寫入各自提交，READ COMMITTED 下封鎖提交前開始的寫入可以成功 | Mastodon 的封鎖與寫入不互鎖，寫入前檢查 | 封鎖與他人的寫入不互鎖：寫入端在 transaction 內檢查封鎖（social），封鎖提交之後開始的寫入被擋。封鎖買家則在同一個 transaction 依 buyer_id 升冪鎖發起者（排他）與對象（FOR KEY SHARE），鎖到後才檢查對象狀態，所以不會留下指向已關閉買家的列，兩人同時互相封鎖也不互等（`TestMutualBlocksDoNotDeadlock`、`TestBlockingAClosedBuyerFails`）。重新評估條件：營運出現「封鎖之後仍寫入成功」的檢舉 |
 
-瀏覽事件依據：[設計書 13](../../../docs/詳細設計書/13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md) 的賣家通知模板。
+瀏覽事件依據：[設計書 13](../../../docs/detailed-design/13-notification-template-detailed-design.md) 的賣家通知模板。
 
 ## 傳輸層的沿用盤點
 

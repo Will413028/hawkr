@@ -45,7 +45,7 @@ import static org.mockito.Mockito.mock;
 class PayUniInboundWireContractTest {
 
     private static final Path API_DOC = repoRoot()
-            .resolve("docs/第三方整合/PayUni 物流官方 API 總覽.md");
+            .resolve("docs/third-party-integrations/payuni-official-logistics-api-overview.md");
 
     @Test
     @DisplayName("貨態欄名取自官方文件：ShipStatusDesc／ShipStatusTime 必須真的被 adapter 讀到")

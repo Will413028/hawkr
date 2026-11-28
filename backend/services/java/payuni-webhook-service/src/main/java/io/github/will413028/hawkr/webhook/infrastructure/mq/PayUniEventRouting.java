@@ -8,7 +8,7 @@ import io.github.will413028.hawkr.common.utils.code.PayUniEventType;
  * PayUni Webhook 事件 → MQ exchange / routing key 對應。
  *
  * 此類別承載 MQ 拓樸決策（屬於 payuni-webhook-service 內部關注），
- * 與 CodeMeta enum 解耦（CodeMeta enum 不得含業務輔助方法，見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * 與 CodeMeta enum 解耦（CodeMeta enum 不得含業務輔助方法，見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public final class PayUniEventRouting {
 

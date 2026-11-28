@@ -182,5 +182,5 @@
 - legacy server 實作清單：`rg -n "^func \(s \*Server\) [A-Z]" backend/internal/legacy/sellerserver`。
 - CSV：`rg -n ",<RPC>," backend/docs/plans/2026-09-24-go-modular-monolith/rpc-*.csv`。
 - 零消費者：`rg -n "violation_reports|food_safety_reports|violations/public" website buyer-app/lib seller-app/lib`。
-- 設計書：`rg -n "public/sellers|public/marketplace|products/(\{id\}|:id)/view|RecordProductView|GetRecommendedSellers" backend/docs/詳細設計書`。
+- 設計書：`rg -n "public/sellers|public/marketplace|products/(\{id\}|:id)/view|RecordProductView|GetRecommendedSellers" backend/docs/detailed-design`。
 - 10e 重疊：`git diff --name-only main...local/10e`、`git diff main...local/10e -- <file>`。

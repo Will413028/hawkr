@@ -107,7 +107,7 @@ public interface ProductSkuRepository extends BaseMapper<ProductSkuEntity> {
      * 用於庫存 cascade、cache eviction 等只需 (skuId, productId, stockQty) 三元組的場景。
      * <p>
      * 回傳 record projection 而非 ProductSkuEntity，使 caller 看見的欄位等同 SQL SELECT
-     * 的欄位（避免 partial-projection 撒謊；docs/開發規範/Java 微服務開發規範.md §9.2）。
+     * 的欄位（避免 partial-projection 撒謊；docs/dev-guidelines/java-microservices-development-guidelines.md §9.2）。
      */
     @Select("""
         <script>
@@ -128,7 +128,7 @@ public interface ProductSkuRepository extends BaseMapper<ProductSkuEntity> {
      * UpdateProductStatus / DeductStock 期間 snapshot 漂移造成 cart 假 DELISTED
      * （#1133）。
      * <p>
-     * 回傳 record projection（docs/開發規範/Java 微服務開發規範.md §9.2），非 partial-projection 的 Entity，
+     * 回傳 record projection（docs/dev-guidelines/java-microservices-development-guidelines.md §9.2），非 partial-projection 的 Entity，
      * 保證 caller 看到的欄位等同 SQL SELECT 列。
      * <p>
      * product 找不到（LEFT JOIN 後 productStatus 為 null）= product orphan，
@@ -158,7 +158,7 @@ public interface ProductSkuRepository extends BaseMapper<ProductSkuEntity> {
      * 批量查詢商品 SKU 名稱（供商品列表使用）。
      * <p>
      * 回傳 record projection 而非 ProductSkuEntity，避免 partial-projection 反模式
-     * （docs/開發規範/Java 微服務開發規範.md §9.2）。
+     * （docs/dev-guidelines/java-microservices-development-guidelines.md §9.2）。
      */
     @Select("""
         <script>

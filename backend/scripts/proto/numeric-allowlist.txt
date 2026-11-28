@@ -1,7 +1,7 @@
 # Proto numeric-field allowlist — grandfathered §6 violations (ratchet).
 #
 # Each line is a response-exposed proto field that still uses int64/int32/double,
-# in violation of `backend/docs/開發規範/Proto 管理規範.md` §6.1. They are tolerated only
+# in violation of `backend/docs/dev-guidelines/proto-management-guidelines.md` §6.1. They are tolerated only
 # because they predate the gate; `protonumericlint` (pkg/cmd/protonumericlint) blocks
 # any NEW violation and FAILS if a line here is no longer a violation (stale).
 #

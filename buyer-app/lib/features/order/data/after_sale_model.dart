@@ -194,7 +194,7 @@ extension AfterSale711CodeX on AfterSaleCase {
   String get formatted711Code => '$partnerId $odno $validationNo';
 }
 
-/// 售後狀態碼（對齊 backend/docs/代碼管理（CodeMeta）/業務狀態碼.md#AfterSaleCaseStatus）
+/// 售後狀態碼（對齊 backend/docs/codemeta/business-status-codes.md#AfterSaleCaseStatus）
 class AfterSaleStatus {
   static const String pending = '0';
   static const String awaitingReturn = '20'; // RETURN_PENDING 待退貨
@@ -242,7 +242,7 @@ class AfterSaleStatus {
 }
 
 /// 退貨流程 ShippingStatus code（對齊 CodeMeta）。
-/// 出處：backend-payuni/docs/代碼管理（CodeMeta）/業務狀態碼.md#ShippingStatus
+/// 出處：backend-payuni/docs/codemeta/business-status-codes.md#ShippingStatus
 ///
 /// 等買家寄：
 ///   `21` PENDING_SHIPMENT       待出貨（尚未進入運送）

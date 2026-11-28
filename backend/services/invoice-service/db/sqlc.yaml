@@ -1,5 +1,5 @@
 # invoice-service sqlc 設定
-# SSOT：docs/詳細設計書/58-電子發票服務（Invoice Service）詳細設計書.md §5.4.2
+# SSOT：docs/detailed-design/58-invoice-service-detailed-design.md §5.4.2
 #
 # overrides 每一條對應 schema.sql 的一個 jsonb 欄位（目前 11 個），go_type 一律
 # encoding/json.RawMessage。新增任何 jsonb 欄位時必須同步加一條：漏了不會編譯錯、

@@ -63,7 +63,7 @@
 
 ### D4 對外 API 形狀（擋 B4-3；修 CD9）
 - 基線：依呼叫者角色分 API（Shopify Storefront／Admin API、蝦皮 Open API 的賣家端【文件】）；店家身分來自憑證；寫入用 idempotency key（Stripe【文件】）。
-- 本 repo SSOT：〈API 設計規範（Connect）〉已規定依角色分 service、`*DelegatedService` 由擁有資源的模組擁有、寫入帶 `request_id`（`docs/共通規範/API 設計規範（Connect）.md:30`、`:176`【量】）。
+- 本 repo SSOT：〈API 設計規範（Connect）〉已規定依角色分 service、`*DelegatedService` 由擁有資源的模組擁有、寫入帶 `request_id`（`docs/conventions/api-design-guidelines-connect.md:30`、`:176`【量】）。
 - 現有機制：gateway REST 一套路由、`store_id` 由請求帶（CD9）；冪等用 `idempotency_request` 表；並發用 `version` 欄（V16、V17，代行寫入比對 `expectedVersion` 回 409【量】）。
 - 選項：
   - A：公開瀏覽／搜尋、買家、賣家、後台、代行（D9）各一支 service；寫入用 `request_id` 冪等，**取代 `idempotency_request` 表**；並發用 etag（ADR `2026-09-25-optimistic-concurrency-etag`，規範 `:127`【量】），取代 `version`／`expectedVersion`。失敗條件：無（SSOT 已規定）。（建議）

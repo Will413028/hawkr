@@ -508,7 +508,7 @@ public interface ProductRepository extends BaseMapper<ProductEntity> {
      * <p>
      * 用於 StockService.cascadeProductStock reflow 前一次批量取得偵測 0→&gt;0 transition
      * 所需的 product 層級欄位（stock_qty / status / name / 主圖 objectKey / store_id /
-     * deleted_at），避免回傳完整 ProductEntity 造成 docs/開發規範/Java 微服務開發規範.md §9.2 partial-projection 反模式。
+     * deleted_at），避免回傳完整 ProductEntity 造成 docs/dev-guidelines/java-microservices-development-guidelines.md §9.2 partial-projection 反模式。
      * <p>
      * primaryObjectKey 從 gallery JSONB 第一個 element 抽出（{@code gallery->0->>'objectKey'}），
      * 由 caller 原樣填入 MQ payload 的 imageKey 欄位（49 §6.3：MQ 只帶 objectKey，顯示 URL 由消費端組）。

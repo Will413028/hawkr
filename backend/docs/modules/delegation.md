@@ -7,7 +7,7 @@
 - 判定店家授權與管理員資格、建立與撤銷工作階段、核發 credential、兌換一次性 handoff code。
 - 管理店家的代行授權及只追加的治理歷史（§4）。
 - 記錄兩階段操作稽核與唯讀回看；確認成功時在同一個 transaction 發出 `DelegationOperationCompleted`（§6）。
-- gateway 編排跨服務寫入，經 `internal/legacy/delegationservice` 呼叫模組的公開 API；舊契約的業務碼與文字映射在該轉接層。gateway、領域服務與兩個前端的代行行為見 [詳細設計書 56](../詳細設計書/56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md)。
+- gateway 編排跨服務寫入，經 `internal/legacy/delegationservice` 呼叫模組的公開 API；舊契約的業務碼與文字映射在該轉接層。gateway、領域服務與兩個前端的代行行為見 [詳細設計書 56](../detailed-design/56-delegated-operations-detailed-design.md)。
 - 根套件只組裝 `Module`、轉呼叫、公開 `internal/model` 的型別別名與事件。
 - 模組沒有 `db/pub.sql`，不發布 `pub_*`。
 

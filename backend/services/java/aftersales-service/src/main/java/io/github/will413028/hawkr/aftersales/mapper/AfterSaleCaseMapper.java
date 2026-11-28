@@ -335,7 +335,7 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
      * <p>
      * 供退款完成（{@code publishRefundCompleted}）補發賣家工作區 realtime 用——退款任務
      * （{@code RefundTaskEntity}）不帶 storeId，由 caller 以 caseNo 反查。
-     * 回 scalar 非 Entity，避免 partial-projection 反模式（docs/開發規範/Java 微服務開發規範.md §9.2）。
+     * 回 scalar 非 Entity，避免 partial-projection 反模式（docs/dev-guidelines/java-microservices-development-guidelines.md §9.2）。
      *
      * @return 賣家 store_id；查無 case 回 {@code null}
      */
@@ -347,7 +347,7 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
      * <p>
      * 供退款完成（{@code publishRefundCompleted}）補上 notify_buyer_account_id 用
      * （issue #1626）——退款任務（{@code RefundTaskEntity}）不帶 buyerId，由 caller 以 caseNo 反查。
-     * 回 scalar 非 Entity，避免 partial-projection 反模式（docs/開發規範/Java 微服務開發規範.md §9.2）。
+     * 回 scalar 非 Entity，避免 partial-projection 反模式（docs/dev-guidelines/java-microservices-development-guidelines.md §9.2）。
      *
      * @return 買家 buyer_id；查無 case 回 {@code null}
      */
@@ -1022,7 +1022,7 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
      * <p>
      * 只取 order_no / status / appeal_state 三欄，交由 {@code AfterSaleCaseStatusRules}
      * 在記憶體做 canonical 分類（active / terminal-override），canonical SSOT 集中於 helper
-     * 而非散落 SQL（docs/開發規範/Java 微服務開發規範.md §6 / §15）。
+     * 而非散落 SQL（docs/dev-guidelines/java-microservices-development-guidelines.md §6 / §15）。
      */
     @Select("""
             SELECT order_no, status, appeal_state

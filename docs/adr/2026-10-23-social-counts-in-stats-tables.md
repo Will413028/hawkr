@@ -39,7 +39,7 @@
 |---|---|---|
 | 沒有正式流量資料，熱點競爭沒有量測 | REAL（缺資料） | 不推離基準；只決定何時改成分片或緩衝（下方觸發） |
 | 單體規則 2 與 `TestEveryModuleStaysInsideItsOwnSchema`：migration 單獨套用在空的 database 上必須成功，DB 物件不能參照別的模組的 `pub_*`（`buyer.pub_inactive_buyers`、之後的 `seller.pub_content_takedowns`） | REAL（我們自己的規則，但保證 migration 可獨立套用；改規則的成本高於這裡的代價） | 「是否計入」的組合規則在 `social.comment_counted`，social 之外的事實由呼叫方帶入；trigger（plpgsql，執行時才綁定，單體規則 6 的例外）與重算的 query 各讀一次，用資料集測試鎖住相等 |
-| 公司時期規範「對帳 job 不寫進後端」（`後端服務責任邊界規範.md` §三） | SELF-IMPOSED，與基準（Discourse 定期對帳、Mastodon 手動重算）相反 | 不採：加每日對帳 |
+| 公司時期規範「對帳 job 不寫進後端」（`backend-service-responsibility-boundaries.md` §三） | SELF-IMPOSED，與基準（Discourse 定期對帳、Mastodon 手動重算）相反 | 不採：加每日對帳 |
 | 舊 ADR 的「DB trigger 難測、難觀測」 | SELF-IMPOSED，且已被資料集測試處理 | trigger 是計數唯一的維護路徑，`TestSchemaFileMatchesMigrations` 涵蓋它，`TestStatsMatchTheDatasetAfterRandomWrites` 對任意一串寫入比對 |
 | 刪帳申請不能撤回（`accountdeletion` 只有 `Request` 與 `CompletePending`） | 事實 | 申請起就可以把買家的內容標成刪除 |
 

@@ -6,7 +6,7 @@ import io.github.will413028.hawkr.common.utils.code.AfterSaleAppealState;
 /**
  * §8.5 AfterSaleCaseStatus 業務狀態規則 helper（跨 aftersales + order 服務共用）。
  * <p>
- * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/開發規範/Java 微服務開發規範.md §6）。
+ * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  * 本 helper 收斂「售後 case 是否活躍 / 是否終態覆蓋 / 是否覆蓋訂單生命週期」三組
  * 判定，作為 canonical SSOT（詳見 09 §2.1「售後 active / terminal canonical 判定」）：
  * <ul>

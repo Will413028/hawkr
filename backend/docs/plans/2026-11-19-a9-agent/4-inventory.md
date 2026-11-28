@@ -98,7 +98,7 @@ AiStyle（admin）：`name`、`category` IMMUTABLE；`default_style`、`enabled`
 
 | # | 差異 | 證據 | 處置 |
 |---|---|---|---|
-| C1 | **請求大小**：舊入口 10 MiB（body_guard）、gRPC 20 MB；單體 `connect.WithReadMaxBytes(2<<20)` 全域（`backend/internal/httpapi/server.go:148,218`），規範 §十「2 MiB」、§十一「檔案上傳用 presigned URL，API 只處理 metadata」（`docs/共通規範/API 設計規範（Connect）.md:195,202`）【量】。P 把原圖放 `bytes`，與 §十一 抵觸 | 如左 | §5 Q1（需 Will） |
+| C1 | **請求大小**：舊入口 10 MiB（body_guard）、gRPC 20 MB；單體 `connect.WithReadMaxBytes(2<<20)` 全域（`backend/internal/httpapi/server.go:148,218`），規範 §十「2 MiB」、§十一「檔案上傳用 presigned URL，API 只處理 metadata」（`docs/conventions/api-design-guidelines-connect.md:195,202`）【量】。P 把原圖放 `bytes`，與 §十一 抵觸 | 如左 | §5 Q1（需 Will） |
 | C2 | 回應 `bytes image_data`：Connect JSON codec 下是 base64（膨脹約 1/3），binary codec 無膨脹【推】；§十三 只為「回應是檔案本身」開了 `/api/files/` 例外（`:209-214`）【量】 | 如左 | 隨 Q1 一起決定 |
 | C3 | 數字碼 4291／9250–9253 → `ErrorReason`；`IMAGE_QUOTA_EXCEEDED` 新增 metadata `remaining`、`resetTime` | `error_reason.proto:128-131` | 實作照契約 |
 | C4 | 字串數字 → `int32`；`is_default`→`default_style`、`sort_order`→`display_order`、`thumbnailKey/Url`→`Image` | P、PA | 照契約 |

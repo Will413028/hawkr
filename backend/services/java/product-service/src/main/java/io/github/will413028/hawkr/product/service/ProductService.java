@@ -2354,14 +2354,14 @@ public class ProductService {
     }
 
     /**
-     * 從 gallery 中收集所有有效的 assetId（委派共用元件，避免重複實作 docs/開發規範/Java 微服務開發規範.md §15）
+     * 從 gallery 中收集所有有效的 assetId（委派共用元件，避免重複實作 docs/dev-guidelines/java-microservices-development-guidelines.md §15）
      */
     private List<String> collectGalleryAssetIds(List<ProductEntity.GalleryItem> gallery) {
         return mediaReferenceLinker.collectGalleryAssetIds(gallery);
     }
 
     /**
-     * 從 description 的 image blocks 中收集所有有效的 assetId（委派共用元件，避免重複實作 docs/開發規範/Java 微服務開發規範.md §15）
+     * 從 description 的 image blocks 中收集所有有效的 assetId（委派共用元件，避免重複實作 docs/dev-guidelines/java-microservices-development-guidelines.md §15）
      */
     private List<String> collectDescriptionAssetIds(ProductEntity.ProductDescription description) {
         return mediaReferenceLinker.collectDescriptionAssetIds(description);

@@ -27,7 +27,7 @@ public class RabbitMqConfig {
 
     /**
      * 02 §5.13b / 36 §3.6h / 39 §5.5a / #942 — 補貨 transition event 之 exchange。
-     * product-service 為 producer 端，必須自行宣告 (docs/開發規範/MQ 與事件管理規範.md §1.3)，避免 buyer-service consumer
+     * product-service 為 producer 端，必須自行宣告 (docs/dev-guidelines/mq-and-event-management-guidelines.md §1.3)，避免 buyer-service consumer
      * 尚未啟動時的首次 publish 因 NOT_FOUND 被 broker 丟棄（review #942 ultra HIGH finding）。
      */
     @Bean

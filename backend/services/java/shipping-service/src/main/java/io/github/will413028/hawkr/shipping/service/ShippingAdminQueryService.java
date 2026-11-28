@@ -348,7 +348,7 @@ public class ShippingAdminQueryService {
         }
     }
 
-    /** ISO 8601 UTC with Z suffix（docs/開發規範/Java 微服務開發規範.md §2.3）。 */
+    /** ISO 8601 UTC with Z suffix（docs/dev-guidelines/java-microservices-development-guidelines.md §2.3）。 */
     private String formatIso(LocalDateTime t) {
         return DateTimeUtils.formatIso8601(t);
     }

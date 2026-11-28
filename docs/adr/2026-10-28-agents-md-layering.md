@@ -4,7 +4,7 @@
 |---|---|
 | 狀態 | superseded by `2026-10-31-agents-md-layering-consolidated.md`（修訂已滿 3 段，整合並加上子領域檔案；本檔保留脈絡、方案與歷史） |
 | 日期 | 2026-10-28（Will 決定） |
-| 影響範圍 | repo 內所有 `AGENTS.md`、`cmd/new-module` 的模板、`docs/共通規範/設計文件治理規範.md` 的文件 taxonomy、單體 ADR `2026-09-24-go-modular-monolith.md` 對模組 `AGENTS.md` 的定義 |
+| 影響範圍 | repo 內所有 `AGENTS.md`、`cmd/new-module` 的模板、`docs/conventions/design-document-governance-guidelines.md` 的文件 taxonomy、單體 ADR `2026-09-24-go-modular-monolith.md` 對模組 `AGENTS.md` 的定義 |
 | 執行計畫 | `2026-10-28-agents-md-layering`（已刪除，見文末修訂） |
 | 路徑基準 | `backend/` |
 
@@ -71,7 +71,7 @@
 
 ## 修訂（2026-10-28）
 
-「舊設計書在檔頭標明現行規格的位置」改為：舊設計書的內容已被新規格完整涵蓋且它描述的系統已不在運作，就刪除；否則保留，檔頭標成該服務的現行規格，服務搬進單體時刪除。不再有「只當歷史參考」的中間狀態。規則見 `docs/共通規範/設計文件治理規範.md` §7。
+「舊設計書在檔頭標明現行規格的位置」改為：舊設計書的內容已被新規格完整涵蓋且它描述的系統已不在運作，就刪除；否則保留，檔頭標成該服務的現行規格，服務搬進單體時刪除。不再有「只當歷史參考」的中間狀態。規則見 `docs/conventions/design-document-governance-guidelines.md` §7。
 
 ## 修訂：D4 的後備沒有用上（2026-10-29）
 

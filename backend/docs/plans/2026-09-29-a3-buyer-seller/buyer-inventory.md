@@ -93,13 +93,13 @@
 
 | 項目 | 值 | 定義位置 | 用在 |
 |---|---|---|---|
-| `RestockSubscriptionStatus` | ACTIVE 9501／NOTIFIED 9502／CANCELLED 9503 | `業務狀態碼.md:661`，使用服務只有 buyer | `restock_subscription.status`（字串、無 CHECK）與 partial index 的 WHERE |
-| `BuyerEventType` | `BUYER_FAVORITE_ADDED`／`BUYER_FAVORITE_REMOVED` | `內部技術碼.md:542`（buyer、product） | 事件的 `eventType`；product 的 dedup 表 |
-| `ProductEventType`（消費端） | `PRODUCT_RESTOCK`、`PRODUCT_RESTOCK_TARGET` 等 | `內部技術碼.md:705` | restock consumer 與 fan-out |
-| `MembershipEventType` | `PAYMENT_MEMBERSHIP_BUYER_SUCCESS/FAILED` 等 | `內部技術碼.md:235`（使用服務含 buyer） | **buyer 端沒有實作**（D8 不搬） |
-| `MembershipBillingErrorCode` | — | `內部技術碼.md:260`（使用服務含 buyer） | buyer 端沒有使用；計費沒有接上 |
-| `AssetReferenceType` | `BUYER_AVATAR` 7112 | `業務類型碼.md:352` | media 的 ref_type |
-| `OrderStatus`（消費端） | 0,10,20,30,32,35,40 視為「未結」 | `業務狀態碼.md:7` | `client/order/order_client.go:64` 寫死字串 `"0,10,20,30,32,35,40"` |
+| `RestockSubscriptionStatus` | ACTIVE 9501／NOTIFIED 9502／CANCELLED 9503 | `business-status-codes.md:661`，使用服務只有 buyer | `restock_subscription.status`（字串、無 CHECK）與 partial index 的 WHERE |
+| `BuyerEventType` | `BUYER_FAVORITE_ADDED`／`BUYER_FAVORITE_REMOVED` | `internal-technical-codes.md:542`（buyer、product） | 事件的 `eventType`；product 的 dedup 表 |
+| `ProductEventType`（消費端） | `PRODUCT_RESTOCK`、`PRODUCT_RESTOCK_TARGET` 等 | `internal-technical-codes.md:705` | restock consumer 與 fan-out |
+| `MembershipEventType` | `PAYMENT_MEMBERSHIP_BUYER_SUCCESS/FAILED` 等 | `internal-technical-codes.md:235`（使用服務含 buyer） | **buyer 端沒有實作**（D8 不搬） |
+| `MembershipBillingErrorCode` | — | `internal-technical-codes.md:260`（使用服務含 buyer） | buyer 端沒有使用；計費沒有接上 |
+| `AssetReferenceType` | `BUYER_AVATAR` 7112 | `business-type-codes.md:352` | media 的 ref_type |
+| `OrderStatus`（消費端） | 0,10,20,30,32,35,40 視為「未結」 | `business-status-codes.md:7` | `client/order/order_client.go:64` 寫死字串 `"0,10,20,30,32,35,40"` |
 | 內部 Go enum（不在 CodeMeta）：`BuyerStatus`、`MemberLevel`（bronze/silver/gold/platinum，永遠是 bronze）、membership `source`/`status`、outbox `status`、地址 `label`、`gender` | — | `domain/*`、`valueobject/member_level.go` | 前兩個有 CHECK，其餘沒有 |
 
 錯誤碼（`bizcode`，`pkg/errors/bizcode/bizcode.go`）：

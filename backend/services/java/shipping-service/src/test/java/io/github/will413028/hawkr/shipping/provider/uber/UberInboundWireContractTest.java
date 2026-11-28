@@ -54,7 +54,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class UberInboundWireContractTest {
 
     private static final Path API_DOC = repoRoot()
-            .resolve("docs/第三方整合/Uber Direct API 總覽.md");
+            .resolve("docs/third-party-integrations/uber-direct-api-overview.md");
 
     /** 66 §7.3.1：Pick &amp; Pack 專屬，我方非代購情境不訂閱 ⇒ 容忍值，不是我們要映射的狀態。 */
     private static final String TOLERATED = "shopping_completed";

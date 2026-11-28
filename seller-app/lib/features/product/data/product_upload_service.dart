@@ -16,7 +16,7 @@ enum UploadStatus { pending, uploading, success, failed }
 
 /// SKU / 商品樂觀鎖版本衝突的業務碼。
 ///
-/// SSOT 是後端 `backend/docs/代碼管理（CodeMeta）/錯誤碼.md` 的
+/// SSOT 是後端 `backend/docs/codemeta/error-codes.md` 的
 /// `DELEGATION_RESOURCE_VERSION_CONFLICT`（訊息「資料已被更新，請重新載入後再試」）。
 ///
 /// dev 實測（2026-08-22）：`PUT /app/products/{id}` 帶過期的 `skus[].expectedVersion`

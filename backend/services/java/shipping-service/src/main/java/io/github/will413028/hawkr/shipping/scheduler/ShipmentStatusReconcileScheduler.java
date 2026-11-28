@@ -38,7 +38,7 @@ import java.util.List;
  * 而該方法同時被 §5.7 按需查詢 API 共用——改成 CAS 會讓 API 路徑的退避刷新靜默失效。
  * claim 與 finally 兩次寫入都是往前推，不互相衝突。
  *
- * 設計書：docs/詳細設計書/06-物流微服務（Shipping Service）詳細設計書.md §5.19 / §8.5
+ * 設計書：docs/detailed-design/06-shipping-service-detailed-design.md §5.19 / §8.5
  */
 @Component
 @ConditionalOnProperty(name = "hawkr.shipping.reconcile.enabled", havingValue = "true", matchIfMissing = true)

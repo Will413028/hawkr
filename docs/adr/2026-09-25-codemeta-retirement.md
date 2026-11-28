@@ -4,7 +4,7 @@
 |---|---|
 | 狀態 | accepted |
 | 日期 | 2026-09-25 |
-| 影響範圍 | `docs/代碼管理（CodeMeta）/` 與生成器、`internal/platform/codemeta`、`api/`、各模組的 schema 與傳輸層、四個 client 的 CodeMeta 生成物；〈API 設計規範（Connect）〉§四、〈PostgreSQL 設計規範〉§五、根目錄與 `backend/` 的 `AGENTS.md`、遷移計畫 |
+| 影響範圍 | `docs/codemeta/` 與生成器、`internal/platform/codemeta`、`api/`、各模組的 schema 與傳輸層、四個 client 的 CodeMeta 生成物；〈API 設計規範（Connect）〉§四、〈PostgreSQL 設計規範〉§五、根目錄與 `backend/` 的 `AGENTS.md`、遷移計畫 |
 | 上層決策 | `2026-09-24-go-modular-monolith.md` D2、D3、D8；Connect 試點計畫 |
 | 相關 | `2026-09-25-api-error-model.md`（錯誤原因的形式） |
 | 路徑基準 | `backend/` |

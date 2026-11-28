@@ -167,7 +167,7 @@ public class HashtagService {
 
     /**
      * 詳情/列表用 hashtag 條目（name + display + 公開商品數）。
-     * <p>{@code productCount} 為字串型別，遵守 docs/開發規範/Java 微服務開發規範.md §2.1（對外數字一律 string）。
+     * <p>{@code productCount} 為字串型別，遵守 docs/dev-guidelines/java-microservices-development-guidelines.md §2.1（對外數字一律 string）。
      */
     public record HashtagDisplayItem(String canonicalName, String displayName, String productCount) {}
 

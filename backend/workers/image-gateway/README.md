@@ -1,7 +1,7 @@
 # image-gateway
 
 全平台圖片唯一公開出口（Cloudflare Worker）。對應
-[49 號設計書：多媒體儲存與圖片服務（Cloudflare R2 & Image Gateway）](../../docs/詳細設計書/49-多媒體儲存與圖片服務（Cloudflare%20R2%20&%20Image%20Gateway）詳細設計書.md)。
+[49 號設計書：多媒體儲存與圖片服務（Cloudflare R2 & Image Gateway）](../../docs/detailed-design/49-cloudflare-r2-and-image-gateway-detailed-design.md)。
 
 ## 職責
 

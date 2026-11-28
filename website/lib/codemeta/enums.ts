@@ -63,7 +63,7 @@ export const SELLER_CANCEL_REASON_LABEL: Record<
 };
 
 /**
- * 售後證據類型（CodeMeta `AfterSaleEvidenceType`，backend `內部技術碼.md`）。
+ * 售後證據類型（CodeMeta `AfterSaleEvidenceType`，backend `internal-technical-codes.md`）。
  *
  * 手寫，非 CodeMeta 生成 —— 該 enum 在 CodeMeta 標「前端可見: No」，`generate.sh --web`
  * 只輸出 Yes 的項目，所以 ./generated 裡沒有它。但 Gateway 的售後詳情回應（買家

@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 訂單／售後單在「與第三方對帳」時，`providerStatus` / `providerMessage` 這組欄位究竟來自哪一個第三方環節（[09 §29 異常訂單](../詳細設計書/09-售後微服務（AfterSales%20Service）詳細設計書.md)）。決定 ADM 異常訂單頁要把 provider 回應歸類到金流還是物流，以及要補哪些對帳細節欄位（`providerTradeNo` / `providerRefundNo` / `shipTradeNo`）。**空字串代表「該訂單目前沒有第三方環節可對帳」，不是本 enum 的成員**，前端不得為空字串準備標籤。
+ * 訂單／售後單在「與第三方對帳」時，`providerStatus` / `providerMessage` 這組欄位究竟來自哪一個第三方環節（[09 §29 異常訂單](../detailed-design/09-aftersales-service-detailed-design.md)）。決定 ADM 異常訂單頁要把 provider 回應歸類到金流還是物流，以及要補哪些對帳細節欄位（`providerTradeNo` / `providerRefundNo` / `shipTradeNo`）。**空字串代表「該訂單目前沒有第三方環節可對帳」，不是本 enum 的成員**，前端不得為空字串準備標籤。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum ProviderSource implements CodeMeta {
 

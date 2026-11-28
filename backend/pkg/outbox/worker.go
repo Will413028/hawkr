@@ -1,7 +1,7 @@
 // Package outbox provides a generic, multi-replica-safe polling worker for
 // the Transactional Outbox pattern: claim a due row with a CAS lease, run a
 // caller-supplied side effect, then mark the row done or retry it with
-// exponential backoff. See docs/開發規範/多副本排程搶佔規範.md for the
+// exponential backoff. See docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md for the
 // design this implements — Claim is the preemption gate (rule ①/③/⑤/⑦),
 // and Worker never uses FOR UPDATE SKIP LOCKED (rule ②: it protects nothing
 // once the candidate SELECT runs under autocommit).
@@ -71,7 +71,7 @@ type Hooks[T Row] struct {
 }
 
 // Config holds the retry/backoff/batch tuning for a Worker. See
-// docs/開發規範/多副本排程搶佔規範.md §三 for how to size ClaimLease.
+// docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md §三 for how to size ClaimLease.
 type Config struct {
 	// MaxAttempts is the cap; once a row's attempt count would reach this
 	// value, it is terminally failed instead of retried. The first call is

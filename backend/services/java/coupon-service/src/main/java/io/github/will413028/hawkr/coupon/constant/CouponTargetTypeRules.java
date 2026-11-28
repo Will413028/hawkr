@@ -8,7 +8,7 @@ import java.util.Set;
 /**
  * CouponTargetType 業務輔助規則
  *
- * 依 docs/開發規範/Java 微服務開發規範.md §6：CodeMeta enum 不得內嵌業務輔助方法，
+ * 依 docs/dev-guidelines/java-microservices-development-guidelines.md §6：CodeMeta enum 不得內嵌業務輔助方法，
  * 此 helper 集中 coupon-service 對 target_type 的判斷邏輯。
  */
 public final class CouponTargetTypeRules {

@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * §5.21 配送異常賣家通知 — Severity 與異常推導規則 helper（跨服務共用）。
  * <p>
- * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/開發規範/Java 微服務開發規範.md §6）。
+ * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  * 本 helper 集中放在 common-core，因為 shipping-service（發送 5 種 anomaly）
  * 與 aftersales-service（B-143 即時偵測 PAYUNI_LGS_NO_CODE、RETURN_STUCK 排程）
  * 都需要相同 severity 對應，避免複製造成不一致。

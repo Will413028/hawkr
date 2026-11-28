@@ -18,7 +18,7 @@
  * 的原圖，縮圖位置用它等於拉原圖）。
  */
 
-/** AfterSaleEvidenceType value（CodeMeta `內部技術碼.md`）。 */
+/** AfterSaleEvidenceType value（CodeMeta `internal-technical-codes.md`）。 */
 export const EVIDENCE_TYPE_BUYER = "8601";
 export const EVIDENCE_TYPE_SELLER_INSPECTION = "8602";
 

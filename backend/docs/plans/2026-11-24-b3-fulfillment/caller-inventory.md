@@ -210,15 +210,15 @@ gateway 由 CI 對齊 openapi（`router/openapi_coverage_test.go`），所以刪
 
 | 值域 | 位置（md） | 值 | 其他使用處（【量】`rg -l` 只列主程式） | 去向 |
 |---|---|---|---|---|
-| `ShippingMethod`（3001~3099） | `業務類型碼.md:102` | 3001 `TAQBIN` 黑貓、3002 `SEVEN_ELEVEN_STORE_PICKUP`、3003 `UBER_INSTANT`、3005 `MERCHANT_DELIVERY` | `orders.shipping_method`、`product_sku.shipping_method` JSONB `.type`；buyer-app `shipping_presentation.dart`、`logistics_track.dart`、`order_card.dart`、`after_sale_detail_screen.dart`；`internal/legacy/orderservice`、assistant | |
-| `ShipmentAnomalyType` | `業務類型碼.md:577` | 11 值：`TCAT_CALL_FAILED`、`CVS_LABEL_UNPRINTED`、`PROVIDER_STATUS_ABNORMAL`、`PACKAGE_LOST`、`DELIVERY_OVERDUE`、`PAYUNI_LGS_NO_CODE`、`RETURN_STUCK`、`UBER_COURIER_UNASSIGNED`、`UBER_PICKUP_STUCK`、`UBER_CREATE_UNKNOWN_UNRESOLVED`、`UBER_POD_MISSING`（4 個 UBER 值） | seller-app `shipment_anomaly_presentation.dart`、`features/shipment_anomaly/data/shipment_anomaly_model.dart`、website `lib/shipping/anomalies.ts`、admin `app/admin/anomalies/page.tsx`；`shipment_anomaly_acknowledgments.anomaly_type` | |
-| `ShipmentAnomalySeverity`、`ShipmentAnomalyAckAction` | `業務類型碼.md:626、644` | 嚴重度與處置動作；`ShipmentAnomalyRules.severityOf` 在 `CC/utils/code/helper/` | 同上 | |
-| `UberDeliveryOutcome` | `業務類型碼.md:1687` | 5 值：`PROVIDER_UNDELIVERABLE`、`PROVIDER_CANCELED`、`SELLER_CANCELED`、`ADMIN_CANCELED`、`CREATE_FAILED` | 只有 CodeMeta 生成物（【量】buyer-app、seller-app、website、admin、Go、Java 共 6 個生成檔，無手寫使用） | |
-| `ShippingTemperature`（3201~3299） | `業務類型碼.md:139` | 3201 常溫、3202、3203 低溫 | `orders.delivery_temp`、SKU JSONB `.temperature`；website/admin/兩 App 生成檔 | |
-| 錯誤碼 9024 | `錯誤碼.md:485`（AfterSales 段 9001~9099） | `AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER`，Uber 即時配送訂單暫不支援退貨退款 | 計畫補充範圍：`pkg/errors/bizcode` 的 9024 | |
-| 同號段其他 | `錯誤碼.md:52-105`（Shipping 業務碼 5001~5099，49 筆，含 `SHIPMENT_*`、`SHIPPING_ONBOARDING_*`、`SHIPPING_GOODS_TYPE_INVALID` 等）、`:489-605`（物流履約業務碼 9500~9699，61 筆）、`:32-50` 內 4008、4010、4016 | B3 刪除或改寫時要核對哪些碼仍有主程式引用 | |
-| 其他物流值域（計畫沒逐一列名） | `業務類型碼.md`：`ShippingType`（`:120`，3651~3654 超商／宅配）、`ShippingFeePayer`（`:157`，3101~3199）、`ShippingArea`（`:173`）、`ShippingRoute`（`:189`）、`ProviderSource`（`:661`）、`FulfillmentMode`（`:1445`）、`FulfillmentAction`（`:1481`）、`FulfillmentExceptionCategory`（`:1624`）、`FulfillmentCaseResolutionType`（`:1643`）、`ProviderFeeType`（`:1666`）、`CommerceModel`（`:1407`）；`業務狀態碼.md`：`ShippingStatus`（`:319`）、`OnboardingStatus`（`:452`）、`LabelPrintStatus`（`:489`）、`TcatCallStatus`（`:508`）、`LogisticsReceivableStatus`（`:607`）；`內部技術碼.md`：`WebhookProvider`（`:185`）、`OnboardingLogAction`（`:392`）、`OnboardingLogResult`（`:409`）、`DeliveryZoneKey`（`:574`）、`ShippingEventType`（`:1009`）、`FulfillmentEventType`（`:1039`）、`LogisticsEventType`（`:1063`） | 計畫 B3 與 B10 只點名四個值域；`ShippingFeePayer`、`FulfillmentMode`、`CommerceModel` 在自寄主線**仍有用**（§1.3），其餘多數沒有消費者。逐值域的存續要決策 | |
-| 生成腳本與文件 | `D/代碼管理（CodeMeta）/scripts/generate.sh`（admin 的 `ADMIN_ENUMS` allowlist）、`README.md:241-243` 號段表（3001、3101、3201、3601~3699 屬物流）、`踩坑與變遷紀錄.md` | 刪值域時要同步 allowlist 與號段表 | |
+| `ShippingMethod`（3001~3099） | `business-type-codes.md:102` | 3001 `TAQBIN` 黑貓、3002 `SEVEN_ELEVEN_STORE_PICKUP`、3003 `UBER_INSTANT`、3005 `MERCHANT_DELIVERY` | `orders.shipping_method`、`product_sku.shipping_method` JSONB `.type`；buyer-app `shipping_presentation.dart`、`logistics_track.dart`、`order_card.dart`、`after_sale_detail_screen.dart`；`internal/legacy/orderservice`、assistant | |
+| `ShipmentAnomalyType` | `business-type-codes.md:577` | 11 值：`TCAT_CALL_FAILED`、`CVS_LABEL_UNPRINTED`、`PROVIDER_STATUS_ABNORMAL`、`PACKAGE_LOST`、`DELIVERY_OVERDUE`、`PAYUNI_LGS_NO_CODE`、`RETURN_STUCK`、`UBER_COURIER_UNASSIGNED`、`UBER_PICKUP_STUCK`、`UBER_CREATE_UNKNOWN_UNRESOLVED`、`UBER_POD_MISSING`（4 個 UBER 值） | seller-app `shipment_anomaly_presentation.dart`、`features/shipment_anomaly/data/shipment_anomaly_model.dart`、website `lib/shipping/anomalies.ts`、admin `app/admin/anomalies/page.tsx`；`shipment_anomaly_acknowledgments.anomaly_type` | |
+| `ShipmentAnomalySeverity`、`ShipmentAnomalyAckAction` | `business-type-codes.md:626、644` | 嚴重度與處置動作；`ShipmentAnomalyRules.severityOf` 在 `CC/utils/code/helper/` | 同上 | |
+| `UberDeliveryOutcome` | `business-type-codes.md:1687` | 5 值：`PROVIDER_UNDELIVERABLE`、`PROVIDER_CANCELED`、`SELLER_CANCELED`、`ADMIN_CANCELED`、`CREATE_FAILED` | 只有 CodeMeta 生成物（【量】buyer-app、seller-app、website、admin、Go、Java 共 6 個生成檔，無手寫使用） | |
+| `ShippingTemperature`（3201~3299） | `business-type-codes.md:139` | 3201 常溫、3202、3203 低溫 | `orders.delivery_temp`、SKU JSONB `.temperature`；website/admin/兩 App 生成檔 | |
+| 錯誤碼 9024 | `error-codes.md:485`（AfterSales 段 9001~9099） | `AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER`，Uber 即時配送訂單暫不支援退貨退款 | 計畫補充範圍：`pkg/errors/bizcode` 的 9024 | |
+| 同號段其他 | `error-codes.md:52-105`（Shipping 業務碼 5001~5099，49 筆，含 `SHIPMENT_*`、`SHIPPING_ONBOARDING_*`、`SHIPPING_GOODS_TYPE_INVALID` 等）、`:489-605`（物流履約業務碼 9500~9699，61 筆）、`:32-50` 內 4008、4010、4016 | B3 刪除或改寫時要核對哪些碼仍有主程式引用 | |
+| 其他物流值域（計畫沒逐一列名） | `business-type-codes.md`：`ShippingType`（`:120`，3651~3654 超商／宅配）、`ShippingFeePayer`（`:157`，3101~3199）、`ShippingArea`（`:173`）、`ShippingRoute`（`:189`）、`ProviderSource`（`:661`）、`FulfillmentMode`（`:1445`）、`FulfillmentAction`（`:1481`）、`FulfillmentExceptionCategory`（`:1624`）、`FulfillmentCaseResolutionType`（`:1643`）、`ProviderFeeType`（`:1666`）、`CommerceModel`（`:1407`）；`business-status-codes.md`：`ShippingStatus`（`:319`）、`OnboardingStatus`（`:452`）、`LabelPrintStatus`（`:489`）、`TcatCallStatus`（`:508`）、`LogisticsReceivableStatus`（`:607`）；`internal-technical-codes.md`：`WebhookProvider`（`:185`）、`OnboardingLogAction`（`:392`）、`OnboardingLogResult`（`:409`）、`DeliveryZoneKey`（`:574`）、`ShippingEventType`（`:1009`）、`FulfillmentEventType`（`:1039`）、`LogisticsEventType`（`:1063`） | 計畫 B3 與 B10 只點名四個值域；`ShippingFeePayer`、`FulfillmentMode`、`CommerceModel` 在自寄主線**仍有用**（§1.3），其餘多數沒有消費者。逐值域的存續要決策 | |
+| 生成腳本與文件 | `D/codemeta/scripts/generate.sh`（admin 的 `ADMIN_ENUMS` allowlist）、`README.md:241-243` 號段表（3001、3101、3201、3601~3699 屬物流）、`pitfalls-and-change-history.md` | 刪值域時要同步 allowlist 與號段表 | |
 
 ## 6. 設計書 65–70
 
@@ -236,7 +236,7 @@ gateway 由 CI 對齊 openapi（`router/openapi_coverage_test.go`），所以刪
 
 ### 6.2 設計書 65（現存）
 
-詳細設計書 `65-物流履約平台（Fulfillment Platform）詳細設計書.md`（429 行）：
+詳細設計書 `65-fulfillment-platform-detailed-design.md`（429 行）：
 
 | 章節 | 行 | 假設 | 備註 | 去向 |
 |---|---|---|---|---|

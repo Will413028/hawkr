@@ -144,7 +144,7 @@ class ShippingEventTypeMqConstantsContractTest {
     /**
      * CodeMeta「機械檢查」欄逐字要求的那一條。
      * <p>失敗的修法：改 {@code docs/代碼管理（CodeMeta）/內部技術碼.md} 的 ShippingEventType 表格，
-     * 再跑 {@code docs/代碼管理（CodeMeta）/scripts/generate.sh --all}（禁止手改生成檔）。
+     * 再跑 {@code docs/codemeta/scripts/generate.sh --all}（禁止手改生成檔）。
      */
     @Test
     @DisplayName("MqConstants 每一條 shipment.* routing key 都在 ShippingEventType 值域內")
@@ -158,7 +158,7 @@ class ShippingEventTypeMqConstantsContractTest {
         assertTrue(missing.isEmpty(),
                 "以下 MqConstants 常數不在 ShippingEventType 值域內 ⇒ 又一條字面值："
                         + missing
-                        + "。修法：改 內部技術碼.md 的 ShippingEventType 表格後跑 generate.sh --all，"
+                        + "。修法：改 internal-technical-codes.md 的 ShippingEventType 表格後跑 generate.sh --all，"
                         + "禁止手改生成檔。若該 key 真的不屬物流領域，理由要寫進本檔 javadoc 的值域邊界。");
     }
 

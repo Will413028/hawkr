@@ -5,7 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-08-27 ~ 2026-08-29 |
 | 影響範圍 | `buyer-service`（membership 模組）、`ai-service`（procurement quota）、`api/proto/buyer/buyer.proto` |
-| 規格 | [59-買家會員分級與 Agent 額度方案](/backend/docs/詳細設計書/59-買家會員分級與%20Agent%20額度方案（Buyer%20Membership%20&%20Entitlement）詳細設計書.md) |
+| 規格 | [59-買家會員分級與 Agent 額度方案](../../backend/docs/detailed-design/59-buyer-membership-and-entitlement-detailed-design.md) |
 | 路徑基準 | `backend/` |
 
 ## 脈絡

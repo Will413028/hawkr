@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
  * <p>修復前的形狀：dedup INSERT 在事務內（正確），但 sales.accumulated 走
  * {@code afterCommit} ＋ {@code OrderEventPublisher.publish}（吞掉所有例外）
  * ⇒ commit 之後 publish 失敗、事件遺失，而同一則 {@code payment.success} 重投一律被 dedup 擋掉
- * ⇒ {@code product.sales_count} <b>永久少算</b>，且 docs/開發規範/後端服務責任邊界規範.md 禁止寫 reconciliation job ⇒ 無救濟。
+ * ⇒ {@code product.sales_count} <b>永久少算</b>，且 docs/dev-guidelines/backend-service-responsibility-boundaries.md 禁止寫 reconciliation job ⇒ 無救濟。
  *
  * <p>鑑別力：把 sales.accumulated 改回 {@code afterCommit + publishOrderSalesAccumulated}
  * ⇒ outbox 只會被 insert 一次（order.paid）⇒ 本檔第一支測試轉紅。

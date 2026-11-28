@@ -180,7 +180,7 @@ type OrderSummaryResponse struct {
 // 在共用摘要之上補 admin 交易頁欄位；App 端列表 DTO（OrderSummaryResponse）不揭露。
 type AdminOrderSummaryResponse struct {
 	OrderSummaryResponse
-	PaymentMethod string `json:"paymentMethod,omitempty"` // 付款方式（PaymentMethod value；合法值以 CodeMeta 業務類型碼.md 為準，2001-2004；未付款為空字串）
+	PaymentMethod string `json:"paymentMethod,omitempty"` // 付款方式（PaymentMethod value；合法值以 CodeMeta business-type-codes.md 為準，2001-2004；未付款為空字串）
 }
 
 // OrderItemViewResponse 訂單摘要明細項目

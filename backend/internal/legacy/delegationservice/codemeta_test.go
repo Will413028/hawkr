@@ -33,7 +33,7 @@ var codemetaNames = map[delegation.DelegationDenial]string{
 }
 
 func TestBusinessCodesMatchCodeMeta(t *testing.T) {
-	md, err := os.ReadFile("../../../docs/代碼管理（CodeMeta）/錯誤碼.md")
+	md, err := os.ReadFile("../../../docs/codemeta/error-codes.md")
 	if err != nil {
 		t.Fatal(err)
 	}

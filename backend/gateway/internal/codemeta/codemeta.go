@@ -1,7 +1,7 @@
 // Package codemeta mirrors the subset of CodeMeta enum string values that the
 // gateway needs to inject into downstream gRPC requests.
 //
-// Source of truth: backend/docs/代碼管理（CodeMeta）/.
+// Source of truth: backend/docs/codemeta/.
 //
 // We do not import the generated internal/platform/codemeta/code_meta.go: it
 // belongs to the monolith module, which gateway cannot import; keeping a thin local mirror
@@ -9,7 +9,7 @@
 package codemeta
 
 // AfterSaleAppealState values (CodeMeta BusinessStatusCode "AfterSaleAppealState",
-// docs/代碼管理（CodeMeta）/業務狀態碼.md). These are the enum *Value* column —
+// docs/codemeta/business-status-codes.md). These are the enum *Value* column —
 // aftersale_cases.appeal_state stores the Value and every API surface (request
 // filter and response field alike) carries the same Value, never the Name.
 const (
@@ -20,7 +20,7 @@ const (
 )
 
 // WeightUnit values (CodeMeta BusinessTypeCode "WeightUnit",
-// docs/代碼管理（CodeMeta）/業務類型碼.md). product_sku.unit stores the *Value*,
+// docs/codemeta/business-type-codes.md). product_sku.unit stores the *Value*,
 // not the Code and not the Chinese label.
 //
 // 這裡鏡像的是**值域**不是 Label：Label 一律走生成的 pkg/codemeta（手寫第二份中文
