@@ -10,7 +10,7 @@ website (Next.js, buyers+sellers) ─┼─ Connect (api/) ─▶ backend (Go mo
 admin (Next.js, operators) ───────┘
 ```
 
-- **API contract:** `api/` holds the Protobuf + [Connect](https://connectrpc.com) definitions. Every client uses code generated from it (`packages/hawkr-api-ts`, `packages/hawkr_api`); nobody hand-writes API calls.
+- **API contract:** `api/` holds the Protobuf + [Connect](https://connectrpc.com) definitions. Clients call it through generated code (`packages/hawkr-api-ts`, `packages/hawkr_api`); endpoints still served by the REST gateway are described in `backend/api/openapi/openapi.yaml`.
 - **Backend:** a Go modular monolith with enforced dependency directions (`backend/internal/modules/`). Services not yet moved into it run behind a REST gateway in `backend/services/` and `backend/gateway/`.
 - **Shared packages:** UI text catalog, icons, Taiwan address codes, and native sign-in live in `packages/`, generated from a single source where possible.
 
