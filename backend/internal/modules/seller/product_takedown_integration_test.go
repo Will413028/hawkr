@@ -4,6 +4,7 @@ package seller_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"uuid"
@@ -55,5 +56,24 @@ func TestCreateMeasureRejectsASnapshotOnAProductAndAProductTargetTwice(t *testin
 	f.takedownSnapshots(t, s.StoreID, []TakedownContent{{ContentRef: ContentRef{Kind: ContentProduct, ID: id}}})
 	if _, err := f.module.CreateMeasure(ctx, f.takedownWith(s.StoreID, []TakedownContent{{ContentRef: ContentRef{Kind: ContentProduct, ID: id}}})); err == nil {
 		t.Fatal("同一件商品已有生效中的下架措施，不能再建一個")
+	}
+}
+
+func TestMeasureContentsRejectsAProductThatIsNotOwnerHeldAndOwnerHeldOnAnythingElse(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, s := f.open(t)
+	product := TakedownContent{ContentRef: ContentRef{Kind: ContentProduct, ID: uuid.NewV7()}}
+	post := withSnapshots([]ContentRef{{Kind: ContentPost, ID: uuid.NewV7()}})[0]
+	m := f.takedownSnapshots(t, s.StoreID, []TakedownContent{product, post})
+
+	_, err := f.db.Pool().Exec(ctx, `UPDATE seller.measure_contents SET snapshot_state = 'CLEARED' WHERE measure_id = $1 AND content_kind = 'PRODUCT'`, m.ID)
+	if err == nil || !strings.Contains(err.Error(), "measure_contents_product_owner_held_check") {
+		t.Fatalf("商品列改成 CLEARED 必須被 measure_contents_product_owner_held_check 擋下：%v", err)
+	}
+	_, err = f.db.Pool().Exec(ctx, `UPDATE seller.measure_contents SET snapshot_state = 'OWNER_HELD', snapshot_body = NULL, snapshot_authored_at = NULL, snapshot_image_count = NULL, link_post_id = NULL WHERE measure_id = $1 AND content_kind = 'POST'`, m.ID)
+	if err == nil || !strings.Contains(err.Error(), "measure_contents_product_owner_held_check") {
+		t.Fatalf("貼文列改成 OWNER_HELD 必須被 measure_contents_product_owner_held_check 擋下：%v", err)
 	}
 }

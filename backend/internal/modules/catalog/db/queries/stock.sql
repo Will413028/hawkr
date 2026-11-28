@@ -29,9 +29,10 @@ ORDER BY m.sku_id;
 
 -- name: DeductSkuStock :execrows
 UPDATE catalog.product_skus s
-SET stock_qty = s.stock_qty - sqlc.arg(quantity)::integer, updated_at = sqlc.arg(now)
-FROM catalog.buyer_visible_products(sqlc.arg(now)::timestamptz) AS p
-WHERE s.id = sqlc.arg(id) AND p.id = s.product_id AND s.deleted_at IS NULL AND s.stock_qty >= sqlc.arg(quantity)::integer;
+SET stock_qty = s.stock_qty - sqlc.arg(quantity)::integer, updated_at = sqlc.arg(at)::timestamptz
+FROM catalog.products AS p
+WHERE s.id = sqlc.arg(id) AND p.id = s.product_id AND s.deleted_at IS NULL AND s.stock_qty >= sqlc.arg(quantity)::integer
+  AND p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id);
 
 -- name: RestoreSkuStock :execrows
 UPDATE catalog.product_skus
@@ -40,7 +41,7 @@ WHERE id = sqlc.arg(id);
 
 -- name: GetLiveSkuStock :one
 SELECT s.id, s.stock_qty,
-       EXISTS (SELECT 1 FROM catalog.buyer_visible_products(sqlc.arg(now)::timestamptz) v WHERE v.id = s.product_id) AS product_visible
+       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = s.product_id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)) AS product_visible
 FROM catalog.product_skus s WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL;
 
 -- name: AdjustOwnSkuStock :execrows

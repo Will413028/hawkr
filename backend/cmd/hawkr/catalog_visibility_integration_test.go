@@ -317,7 +317,7 @@ func TestProductUnderMeasureIsNotVisible(t *testing.T) {
 	f.expectBuyerVisibility(p, true, "撤銷後")
 }
 
-func TestArchivedProductPageStaysViewableUnderViewableFunction(t *testing.T) {
+func TestArchivedProductPageStaysViewableButNotVisible(t *testing.T) {
 	t.Parallel()
 	f := newVisibilityFixture(t)
 	ctx := context.Background()

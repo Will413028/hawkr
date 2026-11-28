@@ -88,7 +88,7 @@ func planNodes(t *testing.T, raw []byte) []planNode {
 	return out
 }
 
-func TestBuyerVisibilityFunctionsAreInlinedAndUseNamedIndexes(t *testing.T) {
+func TestBuyerVisibilityPredicateIsInlinedAndUsesNamedIndexes(t *testing.T) {
 	t.Parallel()
 	f := newVisibilityFixture(t)
 	ctx := context.Background()
@@ -176,7 +176,7 @@ func TestBuyerVisibilityFunctionsAreInlinedAndUseNamedIndexes(t *testing.T) {
 			cases["ListPublicProducts"+m.name+"/"+shape.label] = planCase{sql, args, []string{"products"}, shape.want}
 		}
 	}
-	deduct, deductArgs := catalogStatement(t, "stock.sql", "DeductSkuStock", map[string]any{"quantity": int32(1), "now": f.now, "id": sku})
+	deduct, deductArgs := catalogStatement(t, "stock.sql", "DeductSkuStock", map[string]any{"quantity": int32(1), "at": f.now, "id": sku})
 	cases["DeductSkuStock"] = planCase{deduct, deductArgs, []string{"products", "product_skus"}, []string{"product_skus_pkey"}}
 	for name, c := range cases {
 		var raw []byte
@@ -186,7 +186,7 @@ func TestBuyerVisibilityFunctionsAreInlinedAndUseNamedIndexes(t *testing.T) {
 		var indexes []string
 		for _, n := range planNodes(t, raw) {
 			if n.Type == "Function Scan" {
-				t.Errorf("%s：計畫有 Function Scan，可見性函式沒有被內聯：\n%s", name, raw)
+				t.Errorf("%s：計畫有 Function Scan，內嵌可見性條件裡的 seller.pub_exposable_stores 或 pub_content_takedowns 沒有被內聯：\n%s", name, raw)
 			}
 			if n.Type == "Seq Scan" && slices.Contains(c.relations, n.Relation) {
 				t.Errorf("%s：對 catalog.%s 做了 Seq Scan：\n%s", name, n.Relation, raw)

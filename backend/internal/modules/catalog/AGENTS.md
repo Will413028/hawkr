@@ -18,7 +18,7 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 
 - 根套件只有 `Module`、`New`、轉呼叫方法、型別別名與錯誤。
 - 子領域分工見 `backend/docs/modules/catalog.md` 第 10 節；`restock` 的 River worker 不經 `platform/jobs`。
-- 依賴 media（圖片 `Confirm`／`MarkDeleted`）與 seller 的 `pub_exposable_stores`、`pub_content_takedowns`（只有可見性函式讀，`db/sqlc.yaml` 讀 seller 的 `pub.sql`）；hashtag 規則在 `platform/hashtag`，與 social 共用。
+- 依賴 media（圖片 `Confirm`／`MarkDeleted`）與 seller 的 `pub_exposable_stores`、`pub_content_takedowns`（只有內嵌的可見性條件讀；`sqlc.yaml` 讀 seller 的 `pub.sql`）；hashtag 規則在 `platform/hashtag`，與 social 共用。
 - 依賴圖唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`，增加子領域時同步改；各子領域宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
@@ -27,13 +27,13 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 - 歸還依原扣減，只認原扣減的冪等鍵；先 `LockStockOperation` 鎖原扣減列，累計不超過原扣減量，原扣減沒有的 SKU 被拒。守門：`TestRestoreFollowsTheOriginalDeduction`。
 - 同一個冪等鍵以不同內容重送回 `ErrIdempotencyKeyReused`，內容相同回成功且不改庫存。`DeductStock`／`RestoreStock` 在呼叫方的 transaction 內失敗時，呼叫方必須整個回滾。
 - 分類只在 migration 變動，兩層；商品只掛葉節點（`IsLeafCategory`）；名稱 `LocalizedText`（必有 zh-TW）。守門：`TestSeedTaxonomyShape`、`TestOnlyLeafCategoriesTakeProducts`、`categories_name_check`。
-- 商品狀態是 `DRAFT`／`ACTIVE`／`ARCHIVED`，`ACTIVE` 必有 `first_published_at`；刪除是 `deleted_at`，列保留。可見性只有 `db/objects.sql` 的 `buyer_visible_products(at)`／`buyer_viewable_products(at)`（含 ARCHIVED，單筆頁）：狀態 ∧ 店家可曝光 ∧ 無生效中的 `PRODUCT` 措施，不寫進狀態欄；買家面 query 走函式，其餘登記 `arch.CatalogNonBuyerProductQueries`；`products` 加欄位時重建函式。守門：`TestProductUnderMeasureIsNotVisible`。
-- 商品寫入在新圖 `Confirm` 之後從 `LockOwnProduct`（以 `storeID` 限定）的列鎖開始，既有 SKU 列接著依 ID 升序鎖住（`LockLiveSkus`，與 `DeductStock` 同序）。守門：`TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder`、`TestUpdateConfirmsNewImagesBeforeLockingTheProductRow`。
+- 商品狀態是 `DRAFT`／`ACTIVE`／`ARCHIVED`，`ACTIVE` 必有 `first_published_at`；刪除是 `deleted_at`，列保留。可見性只有 `arch.CatalogVisibilityPredicate` 一份條件文字（visible＝ACTIVE，viewable 含 ARCHIVED）：狀態 ∧ 店家可曝光 ∧ 無生效中的 `PRODUCT` 措施，不寫進狀態欄；買家面（`arch.CatalogBuyerFacingQueries`）逐字內嵌，其餘讀 `products` 的登記 `arch.CatalogNonBuyerProductQueries`；不建 DB 函式（規則 2、6）。守門：`TestProductUnderMeasureIsNotVisible`。
+- 商品寫入在新圖 `Confirm` 後從 `LockOwnProduct`（以 `storeID` 限定）的列鎖開始，既有 SKU 列接著依 ID 升序鎖住（`LockLiveSkus`，與 `DeductStock` 同序）。守門：`TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder`、`TestUpdateConfirmsNewImagesBeforeLockingTheProductRow`。
 - 讀取：商品列與子表一句 SQL 讀出（一份快照；會被別模組呼叫，規則 3 不開 `InReadSnapshot`）。守門：`TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts`。
 - 圖片：新 token 在鎖商品列之前 `Confirm`，退場資產在鎖住之後 `MarkDeleted`（media 只 INSERT），都在寫入的 transaction 內，失敗整筆回滾；描述圖片區塊只存 `asset_id`。守門：`TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved`、`TestMediaFailuresRollBackTheProductWrite`。
 - 狀態（D22）任兩個都能互切（無效目標回 `InvalidInputError`）；ACTIVE 的商品在切成 ACTIVE 與每次寫入時至少 1 張主圖；`first_published_at` 只在第一次 ACTIVE 填，不清除。刪除把還在的 SKU 一併標刪除（扣減與調整找不到，歸還仍可）。守門：`TestDeleteProductMakesItsSkusUndeductibleButRestorable`、`TestProductLifecycleAndFirstPublishedAt`。
-- 公開列表只含 ACTIVE、沒刪除、店家可曝光、無生效中措施的商品；公開單筆另含 ARCHIVED，草稿不可讀；賣家清單不過濾狀態與曝光。守門：`TestPublicListOnlyActiveProductsOfExposableStores`、`TestArchivedProductPageIsPublicButDraftIsNot`。
-- 購物車 `Active` 與扣庫存（`ErrProductNotPurchasable`）用同一個可見性，扣減的 `UPDATE` 內再判一次。守門：`TestSuspendedStoreSkuIsNotPurchasableAtCheckout`。
+- 公開列表用 visible 版本，單筆頁用 viewable 版本（草稿不可讀）；賣家清單不過濾狀態與曝光。守門：`TestPublicListOnlyActiveProductsOfExposableStores`、`TestArchivedProductPageIsPublicButDraftIsNot`。
+- 購物車 `Active` 與扣庫存（`ErrProductNotPurchasable`）同一個條件，扣減的 `UPDATE` 內再判一次。守門：`TestSuspendedStoreSkuIsNotPurchasableAtCheckout`。
 - SKU 組合、價格區間、etag（`content_version`）、請求冪等、`SetStock`、低庫存、搜尋與列表篩選的不變量在 `internal/product/AGENTS.md`。
 - 補貨通知（D26）：不可買變可買時同 transaction 寫佇列表，週期 worker 在外經 `RestockNotifier` 通知；不變量在 `internal/restock/AGENTS.md`。
 

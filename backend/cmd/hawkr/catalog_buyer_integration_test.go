@@ -290,8 +290,7 @@ func TestBuyerSkusReportsStockFromTheCatalogSnapshot(t *testing.T) {
 	}
 }
 
-// 店家不可曝光時，有庫存的規格也不算有貨（D26 的「可買」），但規格仍存在，買家可以訂閱。
-func TestBuyerSkusTreatsAStockedSKUOfAnUnexposableStoreAsOutOfStock(t *testing.T) {
+func TestBuyerSkusDoesNotFindTheSKUOfAnUnexposableStore(t *testing.T) {
 	ctx := context.Background()
 	f := newCatalogBuyerFixture(t)
 	product := f.product(ctx, 3)
@@ -301,7 +300,23 @@ func TestBuyerSkusTreatsAStockedSKUOfAnUnexposableStoreAsOutOfStock(t *testing.T
 		t.Fatalf("exposable store: sku=%+v found=%v err=%v, want in stock", got, found, err)
 	}
 	f.exec(ctx, "UPDATE seller.kyc_applications SET status = 'REJECTED' WHERE store_id = $1", f.storeID)
-	if got, found, err := skus.RestockSku(ctx, sku); err != nil || !found || got.InStock || got.ProductID != product.ID {
-		t.Fatalf("unexposable store: sku=%+v found=%v err=%v, want found and not in stock", got, found, err)
+	if got, found, err := skus.RestockSku(ctx, sku); err != nil || found {
+		t.Fatalf("unexposable store: sku=%+v found=%v err=%v, want not found", got, found, err)
+	}
+}
+
+func TestSocialCardsAreNotAvailableWhenTheProductIsNotBuyerVisible(t *testing.T) {
+	ctx := context.Background()
+	f := newCatalogBuyerFixture(t)
+	product := f.product(ctx, 3)
+	cards := socialCards{catalog: f.catalog}
+	got, err := cards.Cards(ctx, []uuid.UUID{product.ID}, true)
+	if err != nil || !got[product.ID].Available {
+		t.Fatalf("exposable store: card=%+v err=%v, want available", got[product.ID], err)
+	}
+	f.exec(ctx, "UPDATE seller.kyc_applications SET status = 'REJECTED' WHERE store_id = $1", f.storeID)
+	got, err = cards.Cards(ctx, []uuid.UUID{product.ID}, true)
+	if err != nil || len(got) != 1 || got[product.ID].Available {
+		t.Fatalf("unexposable store: cards=%+v err=%v, want the card present and not available", got, err)
 	}
 }

@@ -46,7 +46,14 @@ func (a buyerSkus) RestockSku(ctx context.Context, skuID uuid.UUID) (httpbuyer.R
 		return httpbuyer.RestockSku{}, false, err
 	}
 	snapshot, ok := snapshots[skuID]
-	if !ok || snapshot.Deleted || snapshot.Status == catalog.StatusDraft {
+	if !ok || snapshot.Deleted {
+		return httpbuyer.RestockSku{}, false, nil
+	}
+	cards, err := a.catalog.ProductCards(ctx, time.Now(), []uuid.UUID{snapshot.ProductID}, true)
+	if err != nil {
+		return httpbuyer.RestockSku{}, false, err
+	}
+	if card, found := cards[snapshot.ProductID]; !found || !card.Visible {
 		return httpbuyer.RestockSku{}, false, nil
 	}
 	purchasable, err := a.catalog.SkuPurchasable(ctx, skuID)

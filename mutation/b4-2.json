@@ -75,20 +75,20 @@
   {
    "id": "public-list-without-exposure-join",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
-   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
-   "new": "",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "(extract(epoch FROM p.first_published_at) * 1000000)::bigint AS sort_key\nFROM catalog.products AS p\nWHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)",
+   "new": "(extract(epoch FROM p.first_published_at) * 1000000)::bigint AS sort_key\nFROM catalog.products AS p\nWHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND $1::timestamptz IS NOT NULL",
    "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
-   "why": "可見性函式拿掉 seller.pub_exposable_stores 的條件（公開列表與單筆共用同一份定義）：停權店的 ACTIVE 商品出現在公開列表，測試要紅。"
+   "why": "公開列表（最新）內嵌的標準可見性條件拿掉店家可曝光：停權店的 ACTIVE 商品出現在公開列表，測試要紅。"
   },
   {
    "id": "public-get-without-exposure-join",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
-   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
-   "new": "",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "WHERE p.id = $1::uuid\n  AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "new": "WHERE p.id = $1::uuid\n  AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL AND $2::timestamptz IS NOT NULL",
    "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
-   "why": "可見性函式拿掉曝光條件：停權店的商品仍可公開讀取，測試要紅。"
+   "why": "公開單筆內嵌的標準可見性條件拿掉曝光條件：停權店的商品仍可公開讀取，測試要紅。"
   },
   {
    "id": "sku-write-without-price-range-recompute",

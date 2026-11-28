@@ -119,9 +119,13 @@ func (s *Server) DeductStock(ctx context.Context, req *connect.Request[pb.Deduct
 	case err == nil:
 		return stockResponse(statusSuccess, "庫存扣減成功"), nil
 	case errors.As(err, &short):
-		return s.insufficient(ctx, err, items, func(it catalog.StockItem, _ catalog.SkuSnapshot, _ bool) bool { return it.SkuID == short.SkuID }), nil
+		return s.insufficient(ctx, err, items, false, func(it catalog.StockItem, _ catalog.SkuSnapshot, _ bool) bool { return it.SkuID == short.SkuID }), nil
 	case errors.Is(err, catalog.ErrSkuNotFound):
-		return s.insufficient(ctx, err, items, func(_ catalog.StockItem, snap catalog.SkuSnapshot, found bool) bool { return !found || snap.Deleted }), nil
+		return s.insufficient(ctx, err, items, false, func(_ catalog.StockItem, snap catalog.SkuSnapshot, found bool) bool { return !found || snap.Deleted }), nil
+	case errors.Is(err, catalog.ErrProductNotPurchasable):
+		return s.insufficient(ctx, err, items, true, func(_ catalog.StockItem, snap catalog.SkuSnapshot, found bool) bool {
+			return found && !snap.Deleted && !snap.Active
+		}), nil
 	case errors.Is(err, catalog.ErrInvalidStockInput), errors.Is(err, catalog.ErrIdempotencyKeyReused):
 		s.log.Warn("catalogserver：DeductStock 請求不合法", "stock_tx_id", m.GetStockTxId(), "err", err)
 		return stockResponse(statusSystemError, "參數格式錯誤: "+err.Error()), nil
@@ -131,7 +135,7 @@ func (s *Server) DeductStock(ctx context.Context, req *connect.Request[pb.Deduct
 	}
 }
 
-func (s *Server) insufficient(ctx context.Context, cause error, items []catalog.StockItem, match func(catalog.StockItem, catalog.SkuSnapshot, bool) bool) *connect.Response[pb.StockOperationResponse] {
+func (s *Server) insufficient(ctx context.Context, cause error, items []catalog.StockItem, unavailable bool, match func(catalog.StockItem, catalog.SkuSnapshot, bool) bool) *connect.Response[pb.StockOperationResponse] {
 	ids := make([]uuid.UUID, len(items))
 	for i, it := range items {
 		ids[i] = it.SkuID
@@ -148,7 +152,7 @@ func (s *Server) insufficient(ctx context.Context, cause error, items []catalog.
 			continue
 		}
 		available := int32(0)
-		if found && !snap.Deleted {
+		if found && !snap.Deleted && !unavailable {
 			available = snap.StockQty
 		}
 		out = append(out, &pb.InsufficientItem{SkuId: it.SkuID.String(), RequestedQty: strconv.Itoa(int(it.Quantity)), AvailableQty: strconv.Itoa(int(available))})

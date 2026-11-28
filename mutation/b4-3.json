@@ -156,29 +156,29 @@
   {
    "id": "public-list-exposure-join-dropped",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
-   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
-   "new": "",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "::integer AS total_stock\n    FROM catalog.products AS p\n    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "new": "::integer AS total_stock\n    FROM catalog.products AS p\n    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND $2::timestamptz IS NOT NULL",
    "test": "internal/httpapi/catalog ^TestNonExposableStoreProductsAreInvisibleToThePublic$",
-   "why": "可見性函式不再看店家可不可曝光（列表與搜尋共用，B4-3b 的 Connect 層讀同一份定義）：不可曝光的店的商品出現在列表與搜尋，停權店測試要紅。"
+   "why": "搜尋（RELEVANCE）列表內嵌的標準可見性條件不再看店家可不可曝光：不可曝光的店的商品出現在搜尋，停權店測試要紅。"
   },
   {
    "id": "public-get-exposure-join-dropped",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
-   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
-   "new": "",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "WHERE p.id = $1::uuid\n  AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "new": "WHERE p.id = $1::uuid\n  AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL AND $2::timestamptz IS NOT NULL",
    "test": "internal/httpapi/catalog ^TestNonExposableStoreProductsAreInvisibleToThePublic$",
-   "why": "可見性函式不再看店家可不可曝光：不可曝光的店的商品頁讀得到，GetProduct 要回 not_found 的斷言要紅。"
+   "why": "公開商品頁內嵌的標準可見性條件不再看店家可不可曝光：不可曝光的店的商品頁讀得到，GetProduct 要回 not_found 的斷言要紅。"
   },
   {
    "id": "archived-public-page-not-found",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
-   "old": "WHERE p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL",
-   "new": "WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "AND p.status IN ('ACTIVE', 'ARCHIVED')",
+   "new": "AND p.status = 'ACTIVE'",
    "test": "internal/httpapi/catalog ^TestArchivedProductPageIsReadableButNotPurchasable$",
-   "why": "buyer_viewable_products 改回只含 ACTIVE（D24 Q10 之前的行為）：已下架（ARCHIVED）的公開商品頁回 not_found，下架商品頁要讀得到的測試要紅。"
+   "why": "公開單筆的可見性條件改回只含 ACTIVE（D24 Q10 之前的行為）：已下架（ARCHIVED）的公開商品頁回 not_found，下架商品頁要讀得到的測試要紅。"
   },
   {
    "id": "archived-sku-still-purchasable",
@@ -364,19 +364,19 @@
    "id": "restock-ignores-product-status",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
-   "old": "FROM catalog.buyer_visible_products($1::timestamptz) v WHERE v.id = p.id",
-   "new": "FROM catalog.buyer_viewable_products($1::timestamptz) v WHERE v.id = p.id",
+   "old": "v.status = 'ACTIVE' AND v.deleted_at IS NULL",
+   "new": "v.status IN ('ACTIVE', 'ARCHIVED') AND v.deleted_at IS NULL",
    "test": "internal/modules/catalog ^TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
-   "why": "補貨可買改用含 ARCHIVED 的可見性函式（不看商品是否 ACTIVE）：已下架的商品補庫存也排 job，測試要紅。"
+   "why": "補貨「可買」改用含 ARCHIVED 的可見性條件（不看商品是否 ACTIVE）：已下架的商品補庫存也排 job，測試要紅。"
   },
   {
    "id": "restock-ignores-store-exposure",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
-   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
-   "new": "",
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "s.stock_qty > 0\n        AND EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)",
+   "new": "s.stock_qty > 0\n        AND EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND $1::timestamptz IS NOT NULL",
    "test": "internal/modules/catalog ^TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
-   "why": "共用的可見性函式不再看店家曝光（狀態與下架措施仍看）：補貨路徑的商品狀態斷言仍綠，只有「店家不曝光時補庫存不排 job」的斷言變紅。"
+   "why": "補貨「可買」內嵌的可見性條件不再看店家曝光（狀態與下架措施仍看）：「店家不曝光時補庫存不排 job」的斷言變紅。"
   },
   {
    "id": "restock-job-skips-recheck",

@@ -281,13 +281,14 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.firs
        COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
                  FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
 
-FROM catalog.buyer_viewable_products($1::timestamptz) AS p
-WHERE p.id = $2::uuid
+FROM catalog.products AS p
+WHERE p.id = $1::uuid
+  AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
 `
 
 type GetPublicProductParams struct {
-	At time.Time
 	ID uuid.UUID
+	At time.Time
 }
 
 type GetPublicProductRow struct {
@@ -315,7 +316,7 @@ type GetPublicProductRow struct {
 }
 
 func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductParams) (GetPublicProductRow, error) {
-	row := q.db.QueryRow(ctx, getPublicProduct, arg.At, arg.ID)
+	row := q.db.QueryRow(ctx, getPublicProduct, arg.ID, arg.At)
 	var i GetPublicProductRow
 	err := row.Scan(
 		&i.ID,
@@ -630,8 +631,9 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
        (extract(epoch FROM p.first_published_at) * 1000000)::bigint AS sort_key
-FROM catalog.buyer_visible_products($1::timestamptz) AS p
-WHERE (cardinality($2::uuid[]) = 0
+FROM catalog.products AS p
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+  AND (cardinality($2::uuid[]) = 0
        OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
   AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
   AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
@@ -736,8 +738,9 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
        (-p.min_price)::bigint AS sort_key
-FROM catalog.buyer_visible_products($1::timestamptz) AS p
-WHERE (cardinality($2::uuid[]) = 0
+FROM catalog.products AS p
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+  AND (cardinality($2::uuid[]) = 0
        OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
   AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
   AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
@@ -842,8 +845,9 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
        p.max_price AS sort_key
-FROM catalog.buyer_visible_products($1::timestamptz) AS p
-WHERE (cardinality($2::uuid[]) = 0
+FROM catalog.products AS p
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+  AND (cardinality($2::uuid[]) = 0
        OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
   AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
   AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
@@ -948,8 +952,9 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
        round(p.rating_average * 1000)::bigint AS sort_key
-FROM catalog.buyer_visible_products($1::timestamptz) AS p
-WHERE (cardinality($2::uuid[]) = 0
+FROM catalog.products AS p
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+  AND (cardinality($2::uuid[]) = 0
        OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
   AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
   AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
@@ -1056,8 +1061,9 @@ FROM (
            round(word_similarity($1::text, p.searchable_text) * 1000000)::bigint AS sort_key,
            COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
            COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock
-    FROM catalog.buyer_visible_products($2::timestamptz) AS p
-    WHERE (cardinality($3::uuid[]) = 0
+    FROM catalog.products AS p
+    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+      AND (cardinality($3::uuid[]) = 0
            OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($3::uuid[]) OR c.parent_id = ANY($3::uuid[])))
       AND ($4::bigint IS NULL OR p.max_price >= $4::bigint)
       AND ($5::bigint IS NULL OR p.min_price <= $5::bigint)
@@ -1165,8 +1171,9 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
        p.sales_count::bigint AS sort_key
-FROM catalog.buyer_visible_products($1::timestamptz) AS p
-WHERE (cardinality($2::uuid[]) = 0
+FROM catalog.products AS p
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+  AND (cardinality($2::uuid[]) = 0
        OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
   AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
   AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
@@ -1548,8 +1555,9 @@ func (q *Queries) SoftDeleteSku(ctx context.Context, arg SoftDeleteSkuParams) er
 const suggestHashtags = `-- name: SuggestHashtags :many
 SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
 FROM catalog.product_hashtags h
-JOIN catalog.buyer_visible_products($1::timestamptz) AS p ON p.id = h.product_id
-WHERE h.name ILIKE $2::text
+JOIN catalog.products AS p ON p.id = h.product_id
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+  AND h.name ILIKE $2::text
 GROUP BY h.name
 ORDER BY count(*) DESC, h.name
 LIMIT $3
@@ -1591,8 +1599,9 @@ const suggestProductNames = `-- name: SuggestProductNames :many
 SELECT t.title::text AS title
 FROM (
     SELECT p.title, max(word_similarity($1::text, p.title)) AS score
-    FROM catalog.buyer_visible_products($2::timestamptz) AS p
-    WHERE p.title ILIKE $3::text
+    FROM catalog.products AS p
+    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
+      AND p.title ILIKE $3::text
     GROUP BY p.title
 ) t
 ORDER BY t.score DESC, t.title
@@ -1634,7 +1643,8 @@ func (q *Queries) SuggestProductNames(ctx context.Context, arg SuggestProductNam
 const trendingHashtags = `-- name: TrendingHashtags :many
 SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
 FROM catalog.product_hashtags h
-JOIN catalog.buyer_visible_products($1::timestamptz) AS p ON p.id = h.product_id
+JOIN catalog.products AS p ON p.id = h.product_id
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
 GROUP BY h.name
 ORDER BY count(*) DESC, h.name
 LIMIT $2

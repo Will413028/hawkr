@@ -1,9 +1,2 @@
 -- Modify "measure_contents" table
-ALTER TABLE "seller"."measure_contents" DROP CONSTRAINT "measure_contents_content_kind_check", ADD CONSTRAINT "measure_contents_content_kind_check" CHECK (content_kind = ANY (ARRAY['POST'::text, 'COMMENT'::text, 'FORUM_ENTRY'::text, 'CHAT_MESSAGE'::text, 'REVIEW_REPLY'::text, 'PRODUCT'::text])), DROP CONSTRAINT "measure_contents_link_check", ADD CONSTRAINT "measure_contents_link_check" CHECK ((snapshot_state <> 'CAPTURED'::text) OR
-CASE content_kind
-    WHEN 'FORUM_ENTRY'::text THEN ((link_post_id IS NULL) AND (link_store_id IS NOT NULL) AND (link_store_id > 0) AND (link_thread_id IS NOT NULL))
-    WHEN 'CHAT_MESSAGE'::text THEN ((link_post_id IS NULL) AND (link_store_id IS NULL) AND (link_thread_id IS NULL))
-    WHEN 'REVIEW_REPLY'::text THEN ((link_post_id IS NULL) AND (link_store_id IS NULL) AND (link_thread_id IS NULL))
-    WHEN 'PRODUCT'::text THEN ((link_post_id IS NULL) AND (link_store_id IS NULL) AND (link_thread_id IS NULL))
-    ELSE ((link_post_id IS NOT NULL) AND (link_store_id IS NULL) AND (link_thread_id IS NULL))
-END), DROP CONSTRAINT "measure_contents_snapshot_state_check", ADD CONSTRAINT "measure_contents_snapshot_state_check" CHECK (snapshot_state = ANY (ARRAY['CAPTURED'::text, 'CLEARED'::text, 'OWNER_HELD'::text]));
+ALTER TABLE "seller"."measure_contents" DROP CONSTRAINT "measure_contents_content_kind_check", ADD CONSTRAINT "measure_contents_content_kind_check" CHECK (content_kind = ANY (ARRAY['POST'::text, 'COMMENT'::text, 'FORUM_ENTRY'::text, 'CHAT_MESSAGE'::text, 'REVIEW_REPLY'::text, 'PRODUCT'::text])), DROP CONSTRAINT "measure_contents_snapshot_state_check", ADD CONSTRAINT "measure_contents_snapshot_state_check" CHECK (snapshot_state = ANY (ARRAY['CAPTURED'::text, 'CLEARED'::text, 'OWNER_HELD'::text])), ADD CONSTRAINT "measure_contents_product_owner_held_check" CHECK ((content_kind = 'PRODUCT'::text) = (snapshot_state = 'OWNER_HELD'::text));

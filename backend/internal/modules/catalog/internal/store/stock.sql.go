@@ -43,19 +43,20 @@ func (q *Queries) AdjustOwnSkuStock(ctx context.Context, arg AdjustOwnSkuStockPa
 
 const deductSkuStock = `-- name: DeductSkuStock :execrows
 UPDATE catalog.product_skus s
-SET stock_qty = s.stock_qty - $1::integer, updated_at = $2
-FROM catalog.buyer_visible_products($2::timestamptz) AS p
+SET stock_qty = s.stock_qty - $1::integer, updated_at = $2::timestamptz
+FROM catalog.products AS p
 WHERE s.id = $3 AND p.id = s.product_id AND s.deleted_at IS NULL AND s.stock_qty >= $1::integer
+  AND p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
 `
 
 type DeductSkuStockParams struct {
 	Quantity int32
-	Now      time.Time
+	At       time.Time
 	ID       uuid.UUID
 }
 
 func (q *Queries) DeductSkuStock(ctx context.Context, arg DeductSkuStockParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deductSkuStock, arg.Quantity, arg.Now, arg.ID)
+	result, err := q.db.Exec(ctx, deductSkuStock, arg.Quantity, arg.At, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -64,13 +65,13 @@ func (q *Queries) DeductSkuStock(ctx context.Context, arg DeductSkuStockParams) 
 
 const getLiveSkuStock = `-- name: GetLiveSkuStock :one
 SELECT s.id, s.stock_qty,
-       EXISTS (SELECT 1 FROM catalog.buyer_visible_products($1::timestamptz) v WHERE v.id = s.product_id) AS product_visible
+       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = s.product_id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)) AS product_visible
 FROM catalog.product_skus s WHERE s.id = $2 AND s.deleted_at IS NULL
 `
 
 type GetLiveSkuStockParams struct {
-	Now time.Time
-	ID  uuid.UUID
+	At time.Time
+	ID uuid.UUID
 }
 
 type GetLiveSkuStockRow struct {
@@ -80,7 +81,7 @@ type GetLiveSkuStockRow struct {
 }
 
 func (q *Queries) GetLiveSkuStock(ctx context.Context, arg GetLiveSkuStockParams) (GetLiveSkuStockRow, error) {
-	row := q.db.QueryRow(ctx, getLiveSkuStock, arg.Now, arg.ID)
+	row := q.db.QueryRow(ctx, getLiveSkuStock, arg.At, arg.ID)
 	var i GetLiveSkuStockRow
 	err := row.Scan(&i.ID, &i.StockQty, &i.ProductVisible)
 	return i, err

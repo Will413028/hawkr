@@ -574,6 +574,7 @@ CREATE TABLE seller.measure_contents (
     CONSTRAINT measure_contents_measure_status_fkey FOREIGN KEY (measure_id, measure_status) REFERENCES seller.measures (id, status) ON UPDATE CASCADE,
     CONSTRAINT measure_contents_content_kind_check CHECK (content_kind IN ('POST', 'COMMENT', 'FORUM_ENTRY', 'CHAT_MESSAGE', 'REVIEW_REPLY', 'PRODUCT')),
     CONSTRAINT measure_contents_snapshot_state_check CHECK (snapshot_state IN ('CAPTURED', 'CLEARED', 'OWNER_HELD')),
+    CONSTRAINT measure_contents_product_owner_held_check CHECK ((content_kind = 'PRODUCT') = (snapshot_state = 'OWNER_HELD')),
     CONSTRAINT measure_contents_snapshot_fields_check CHECK (
         (snapshot_state = 'CAPTURED') = (snapshot_body IS NOT NULL AND snapshot_authored_at IS NOT NULL AND snapshot_image_count IS NOT NULL)
         AND (snapshot_state = 'CAPTURED' OR (snapshot_body IS NULL AND snapshot_authored_at IS NULL AND snapshot_image_count IS NULL
@@ -585,7 +586,6 @@ CREATE TABLE seller.measure_contents (
             WHEN 'FORUM_ENTRY' THEN link_post_id IS NULL AND link_store_id IS NOT NULL AND link_store_id > 0 AND link_thread_id IS NOT NULL
             WHEN 'CHAT_MESSAGE' THEN link_post_id IS NULL AND link_store_id IS NULL AND link_thread_id IS NULL
             WHEN 'REVIEW_REPLY' THEN link_post_id IS NULL AND link_store_id IS NULL AND link_thread_id IS NULL
-            WHEN 'PRODUCT' THEN link_post_id IS NULL AND link_store_id IS NULL AND link_thread_id IS NULL
             ELSE link_post_id IS NOT NULL AND link_store_id IS NULL AND link_thread_id IS NULL
         END
     ))

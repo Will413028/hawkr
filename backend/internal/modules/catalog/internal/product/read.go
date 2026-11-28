@@ -311,8 +311,6 @@ func (s *Service) ListAdmin(ctx context.Context, f model.AdminFilter, after *mod
 	return finishPage(out, size), total, nil
 }
 
-// ListPublic 是公開列表與搜尋：只含 ACTIVE、沒刪除、店家在 at 這一刻可曝光的商品。at 是請求的 clock，不是 client 送的。
-// sort 空字串是 LATEST（有關鍵字時 RELEVANCE 要自己指定）；RELEVANCE 沒有關鍵字回 model.Invalid。
 func (s *Service) ListPublic(ctx context.Context, at time.Time, f model.PublicFilter, sort model.ProductSort, after *model.ListCursor, size int32) (model.ProductPage, error) {
 	if sort == "" {
 		sort = model.SortLatest

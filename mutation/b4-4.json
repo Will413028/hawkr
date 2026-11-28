@@ -163,13 +163,13 @@
    "why": "規格有貨的判斷不看 catalog 的可買（庫存與店家可曝光）：缺貨的規格被當成有貨，缺貨規格的測試要紅。"
   },
   {
-   "id": "buyer-skus-ignores-store-exposure",
+   "id": "buyer-skus-ignores-viewability",
    "stack": "go-integration",
    "file": "backend/cmd/hawkr/buyer_ports.go",
-   "old": "InStock: purchasable",
-   "new": "InStock: purchasable && false || snapshot.Active && snapshot.StockQty > 0",
-   "test": "cmd/hawkr ^TestBuyerSkusTreatsAStockedSKUOfAnUnexposableStoreAsOutOfStock$",
-   "why": "有貨只看快照的庫存、不看店家可曝光：不可曝光店家的有庫存規格被當成有貨，該測試要紅。"
+   "old": "!found || !card.Visible {",
+   "new": "!found || card.ID == uuid.Nil() {",
+   "test": "cmd/hawkr ^TestBuyerSkusDoesNotFindTheSKUOfAnUnexposableStore$",
+   "why": "補貨訂閱不看商品對買家是否可瀏覽：不可曝光店家的規格仍被找到，該測試要紅。"
   },
   {
    "id": "restock-list-drops-sku-id",

@@ -22,7 +22,6 @@ func checkBatch(ids []uuid.UUID) error {
 	return nil
 }
 
-// Cards 批次讀商品卡片：沒刪除的商品；includeInactive 為假時只回 ACTIVE 且店家在 at 可曝光的（公開可見），為真時任何狀態都回。
 func (s *Service) Cards(ctx context.Context, at time.Time, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]model.ProductCard, error) {
 	if err := checkBatch(ids); err != nil {
 		return nil, err
