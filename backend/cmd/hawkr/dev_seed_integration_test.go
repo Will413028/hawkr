@@ -642,7 +642,7 @@ func insertTermination(t *testing.T, d *db.DB, storeID int64) {
 	}
 }
 
-func insertViolationMeasure(t *testing.T, d *db.DB, storeID int64, id, kind string, withAppeal bool) {
+func insertViolationMeasure(t *testing.T, d *db.DB, storeID int64, kind string, withAppeal bool) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
 	module, err := sellerfixture.NewModule(d, time.Now)
@@ -673,6 +673,7 @@ func insertViolationMeasure(t *testing.T, d *db.DB, storeID int64, id, kind stri
 			t.Fatal(err)
 		}
 	}
+	return created.Measure.ID
 }
 
 // 種子不悄悄還原有下游消費者的生命週期狀態：停權與處分、到期後還沒結束的停權期間、等待刪除、關閉、進行中的刪帳申請，前提檢查與寫入都拒絕、不寫任何資料
@@ -689,7 +690,10 @@ func TestDevSeedRefusesLifecycleStateItWouldHaveToRevert(t *testing.T) {
 			insertRiskSuspension(t, d, ids[0], false)
 		}, []string{"種子帳號 9", "生效中的停權措施（RISK）", "EndMeasure"}},
 		{"依據認定的停權措施", func(t *testing.T, d *db.DB) {
-			insertViolationMeasure(t, d, ids[1], "00000000-0000-7000-8000-000000000001", "SUSPENSION", false)
+			measureID := insertViolationMeasure(t, d, ids[1], "SUSPENSION", false)
+			if n := count(t, d, `SELECT count(*) FROM seller.measures WHERE id = $1 AND status = 'ENFORCED' AND kind = 'SUSPENSION'`, measureID); n != 1 {
+				t.Fatalf("建立的停權措施 %s 不存在或未生效：%d 列", measureID, n)
+			}
 		}, []string{"種子帳號 4", "生效中的停權措施（VIOLATION）", "RevokeMeasure"}},
 		{"生效中的終止合作", func(t *testing.T, d *db.DB) {
 			insertTermination(t, d, ids[0])
@@ -854,10 +858,23 @@ func TestDevSeedDeletesTheEvidenceRowsItOwns(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	insertViolationMeasure(t, d, id, "00000000-0000-7000-8000-0000000000b1", "WARNING", true)
+	measureID := insertViolationMeasure(t, d, id, "WARNING", true)
+	if n := count(t, d, `SELECT count(*) FROM seller.measure_request_evidence e JOIN seller.measure_requests r ON r.id = e.request_id WHERE r.measure_id = $1`, measureID); n < 1 {
+		t.Fatalf("措施 %s 沒有申訴佐證：%d 列", measureID, n)
+	}
+	const kycEvidenceAssetID = "00000000-0000-7000-8000-0000000000c2"
+	if n := count(t, d, `SELECT count(*) FROM seller.kyc_documents WHERE asset_id = $1`, kycEvidenceAssetID); n < 1 {
+		t.Fatalf("KYC 證件沒有待刪列：%d 列", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM seller.report_evidence`); n < 1 {
+		t.Fatalf("通報沒有佐證列：%d 列", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM seller.measure_request_evidence`); n < 1 {
+		t.Fatalf("申訴沒有佐證列：%d 列", n)
+	}
 	seedOK(t)
-	if n := count(t, d, `SELECT (SELECT count(*) FROM seller.kyc_documents WHERE asset_id IN ('00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-0000000000c2', '00000000-0000-7000-8000-0000000000c3'))
-		+ (SELECT count(*) FROM seller.report_evidence) + (SELECT count(*) FROM seller.measure_request_evidence)`); n != 0 {
+	if n := count(t, d, `SELECT (SELECT count(*) FROM seller.kyc_documents WHERE asset_id = $1)
+		+ (SELECT count(*) FROM seller.report_evidence) + (SELECT count(*) FROM seller.measure_request_evidence)`, kycEvidenceAssetID); n != 0 {
 		t.Errorf("種子的證件與佐證列沒有刪乾淨：%d 列", n)
 	}
 }

@@ -695,7 +695,7 @@ func TestCloseMyStoreIsRejectedWhileTheStoreHasOpenOrders(t *testing.T) {
 	}
 }
 
-func TestGetMyStoreShowsASuspensionRecordedOnAnEarlierStint(t *testing.T) {
+func TestGetMyStoreShowsAnEarlierStintMeasureAsEndedAfterReapply(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()

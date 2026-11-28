@@ -720,7 +720,7 @@ func (f *adminFixture) suspendWithRisk(t *testing.T, storeID int64) uuid.UUID {
 	return res.Measure.ID
 }
 
-func TestGetStoreAndListStoresTreatAnEndedEarlierStintMeasureAsHistorical(t *testing.T) {
+func TestGetStoreAndListStoresShowNoSuspensionAfterAnEarlierStintMeasureEnds(t *testing.T) {
 	t.Parallel()
 	f := setupAdmin(t)
 	ctx := context.Background()
