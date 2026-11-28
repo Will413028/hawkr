@@ -255,7 +255,7 @@ func TestDelegatedProductReplayReturnsTheFirstResultWithoutAnotherWrite(t *testi
 }
 
 func (f *fixture) batchRows(t *testing.T, sid int64) int {
-	return f.auditRows(t, sid, "PRODUCT_BATCH_UNPUBLISH")
+	return f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action = 'PRODUCT_BATCH_UNPUBLISH' AND result = 'SUCCEEDED'`, sid)
 }
 
 type batchItemRow struct {
@@ -412,6 +412,27 @@ func TestBatchUnpublishWritesOneAuditRowWithItsItemsAndOneNotification(t *testin
 	_, err = f.batchUnpublish(call, op, versioned(a))
 	if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialIdempotencyKeyReused {
 		t.Fatalf("同鍵不同內容 = %v，預期 DenialIdempotencyKeyReused", err)
+	}
+}
+
+func TestDelegatedWriteActorStoreIsTheSessionTargetStoreNotTheAdminID(t *testing.T) {
+	f := build(t, true)
+	f.exposableStore(t)
+	f.exposableStore(t)
+	o := f.newOperator(t, "actor-store", productCaps...)
+	if o.storeID == o.admin {
+		t.Fatalf("店家 ID 與管理員 ID 同為 %d，測不出代行者店家的來源", o.storeID)
+	}
+	p := f.activeProduct(t, o, "甲")
+	sid := o.session.Session.ID
+	if f.resultRows(t, sid, "SUCCEEDED") != 2 || f.resultRows(t, sid, "FAILED") != 0 {
+		t.Fatalf("SUCCEEDED %d、FAILED %d，預期 2 與 0", f.resultRows(t, sid, "SUCCEEDED"), f.resultRows(t, sid, "FAILED"))
+	}
+	if _, err := f.batchUnpublish(f.caller(t, o, methodProductBatch), f.op("批次下架"), versioned(p)); err != nil {
+		t.Fatal(err)
+	}
+	if f.batchRows(t, sid) != 1 {
+		t.Fatalf("批次列 %d，預期 1", f.batchRows(t, sid))
 	}
 }
 
