@@ -56,13 +56,13 @@ func (d takedowns) create(t *testing.T, storeID int64, refs ...seller.ContentRef
 
 func (d takedowns) revoke(t *testing.T, storeID int64, id uuid.UUID, refs ...seller.ContentRef) {
 	t.Helper()
+	d.f.jobs.reset()
 	current, err := d.f.sellerMod.CurrentMeasure(context.Background(), id)
 	must(t, err)
 	_, err = d.f.sellerMod.RevokeMeasure(context.Background(), seller.RevokeMeasureInput{
 		MeasureID: id, ExpectedVersion: current.Version, AdminID: 9, Reason: seller.RevokeAdminCorrection,
 	})
 	must(t, err)
-	d.f.jobs.reset()
 }
 
 func (d takedowns) revokeWithoutEvent(t *testing.T, id uuid.UUID) {

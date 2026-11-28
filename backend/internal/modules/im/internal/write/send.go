@@ -287,7 +287,7 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 
 	if authErr := seller.Authorize(t.store, seller.CapChatSend); authErr != nil {
 		if apperr.KindOf(authErr) == apperr.KindNotFound {
-			inactive, queryErr := s.q(ctx).PartyInactive(ctx, store.PartyInactiveParams{Kind: string(model.PartyStore), PartyID: t.store.StoreID})
+			inactive, queryErr := s.inactive(ctx, model.PartyStore, t.store.StoreID)
 			if queryErr != nil {
 				return unavailable(l, queryErr)
 			}
