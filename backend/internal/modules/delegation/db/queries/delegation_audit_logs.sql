@@ -152,3 +152,12 @@ SELECT count(*) FILTER (WHERE result = 'SUCCEEDED')                         AS s
        count(*) FILTER (WHERE lower(action) LIKE ANY (sqlc.arg(finance_patterns)::text[]))     AS finance_count
 FROM delegation.admin_operation_audit_logs
 WHERE session_id = sqlc.arg(session_id);
+
+-- name: InsertDelegationAuditLogItem :exec
+INSERT INTO delegation.admin_operation_audit_log_items (audit_log_id, resource_id, resource_name, resource_version_before, resource_version_after)
+VALUES (sqlc.arg(audit_log_id), sqlc.arg(resource_id), sqlc.narg(resource_name), sqlc.narg(resource_version_before), sqlc.narg(resource_version_after));
+
+-- name: ListDelegationAuditLogItems :many
+SELECT * FROM delegation.admin_operation_audit_log_items
+WHERE audit_log_id = sqlc.arg(audit_log_id)
+ORDER BY resource_id;

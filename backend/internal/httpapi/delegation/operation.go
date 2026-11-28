@@ -1,0 +1,33 @@
+package delegation
+
+import (
+	"context"
+	"fmt"
+
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	moddelegation "github.com/Will413028/hawkr/backend/internal/modules/delegation"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
+)
+
+func ParseOperation(op *commonpb.DelegatedOperation) (moddelegation.DelegatedOperation, error) {
+	if !op.ProtoReflect().IsValid() {
+		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation", "operation 必填")
+	}
+	id, err := rpc.ParseRequestID(op.GetRequestId())
+	if err != nil || id == nil {
+		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.request_id", "operation.request_id 必填，而且必須是 UUIDv4")
+	}
+	reason, ok := moddelegation.LegalOperationReason(op.GetOperationReason())
+	if !ok {
+		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.operation_reason",
+			fmt.Sprintf("operation.operation_reason 必填，去除首尾空白後 1 到 %d 個字元，不得含控制字元", moddelegation.OperationReasonMaxRunes))
+	}
+	return moddelegation.DelegatedOperation{RequestID: *id, Reason: reason, NotifySeller: op.NotifySeller == nil || op.GetNotifySeller()}, nil
+}
+
+type Runner interface {
+	DelegatedRead(ctx context.Context, c moddelegation.DelegatedCaller, read func(ctx context.Context, st seller.Store) error) error
+	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error) (moddelegation.DelegatedWriteResult, error)
+}

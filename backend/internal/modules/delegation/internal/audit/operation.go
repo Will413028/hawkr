@@ -30,7 +30,28 @@ func (m *Module) LookupOperation(ctx context.Context, in model.OperationAuditInp
 	if !sameOperation(existing, in) {
 		return model.AuditLog{}, false, model.Deny(model.DenialIdempotencyKeyReused, "request_id 已用於不同的請求內容")
 	}
-	return toAuditLog(existing), true, nil
+	out := toAuditLog(existing)
+	if model.AuditAction(existing.Action) == model.AuditProductBatchUnpublish {
+		items, err := m.q(ctx).ListDelegationAuditLogItems(ctx, existing.ID)
+		if err != nil {
+			return model.AuditLog{}, false, fmt.Errorf("delegation：讀取批次稽核的商品清單：%w", err)
+		}
+		for _, it := range items {
+			out.Items = append(out.Items, model.AuditItem{
+				ResourceID: it.ResourceID, ResourceName: deref(it.ResourceName),
+				VersionBefore: deref(it.ResourceVersionBefore), VersionAfter: deref(it.ResourceVersionAfter),
+			})
+		}
+	}
+	return out, true, nil
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }
 
 // RecordOperation 是代行互動寫入的單段稽核，由資源模組的事件訂閱者在寫入的同一個 transaction 內呼叫（A7-D26）：檢查 session 此刻還能用且帶有 in.Capability
@@ -97,6 +118,18 @@ func (m *Module) RecordOperation(ctx context.Context, in model.OperationAuditInp
 	})
 	if err != nil {
 		return fmt.Errorf("delegation：補上代行稽核的資源：%w", err)
+	}
+	if len(outcome.Items) > 0 && in.Action != model.AuditProductBatchUnpublish {
+		return fmt.Errorf("delegation：只有批次動作的稽核列帶商品清單，卻收到 %s 的 %d 項", in.Action, len(outcome.Items))
+	}
+	for _, it := range outcome.Items {
+		before, after := it.VersionBefore, it.VersionAfter
+		if err := q.InsertDelegationAuditLogItem(ctx, store.InsertDelegationAuditLogItemParams{
+			AuditLogID: row.ID, ResourceID: it.ResourceID, ResourceName: model.Optional(truncateRunes(it.ResourceName, model.ResourceNameMaxRunes)),
+			ResourceVersionBefore: &before, ResourceVersionAfter: &after,
+		}); err != nil {
+			return fmt.Errorf("delegation：寫入批次稽核的商品 %s：%w", it.ResourceID, err)
+		}
 	}
 	if row.NotifiedAt != nil {
 		return events.Publish(ctx, m.d.Events, delegationCompleted(row, s))

@@ -246,6 +246,15 @@ CREATE INDEX idx_admin_operation_audit_logs_store_created_at
 CREATE INDEX idx_admin_operation_audit_logs_actor_created_at
     ON delegation.admin_operation_audit_logs (actor_admin_id, created_at DESC);
 
+CREATE TABLE delegation.admin_operation_audit_log_items (
+    audit_log_id            UUID   NOT NULL REFERENCES delegation.admin_operation_audit_logs (id),
+    resource_id             TEXT   NOT NULL,
+    resource_name           TEXT,
+    resource_version_before BIGINT,
+    resource_version_after  BIGINT,
+    PRIMARY KEY (audit_log_id, resource_id)
+);
+
 CREATE TABLE delegation.delegation_authorization_audit_logs (
     id                     UUID         PRIMARY KEY,
     authorization_id       UUID         NOT NULL REFERENCES delegation.seller_delegation_authorizations (id),

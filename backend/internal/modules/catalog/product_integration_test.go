@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/hashtag"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -30,6 +31,7 @@ type productFixture struct {
 	d     *db.DB
 	m     *Module
 	rn    *recordingNotifier
+	bus   *events.Bus
 	media *media.Fake
 	ct    context.Context
 	mu    sync.Mutex
@@ -47,6 +49,7 @@ func newProductFixture(t *testing.T) *productFixture {
 	))
 	f := &productFixture{t: t, d: d, ct: context.Background(), media: media.NewFake(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
 	f.rn = &recordingNotifier{}
+	f.bus = events.NewBus()
 	f.m = New(f.deps(d, f.media))
 	f.exec(`DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
@@ -56,7 +59,7 @@ func newProductFixture(t *testing.T) *productFixture {
 }
 
 func (f *productFixture) deps(d *db.DB, m Media) Deps {
-	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Restock: f.rn}
+	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Events: f.bus, Restock: f.rn}
 }
 
 func (f *productFixture) clock() time.Time {
@@ -138,7 +141,7 @@ func (f *productFixture) create(storeID, accountID int64, in ProductInput) Produ
 }
 
 func createP(m *Module, ct context.Context, storeID int64, up media.Uploader, in ProductInput) (Product, error) {
-	return m.CreateProduct(ct, storeID, up, uuid.NewV7(), in)
+	return m.CreateProduct(ct, storeID, up, uuid.NewV7(), in, nil)
 }
 
 func updateP(m *Module, ct context.Context, storeID int64, up media.Uploader, id uuid.UUID, in ProductInput) (Product, error) {
@@ -147,7 +150,7 @@ func updateP(m *Module, ct context.Context, storeID int64, up media.Uploader, id
 		if err != nil {
 			return Product{}, err
 		}
-		p, err := m.UpdateProduct(ct, storeID, up, id, cur.Version, in)
+		p, err := m.UpdateProduct(ct, storeID, up, id, cur.Version, in, nil)
 		if !errors.Is(err, ErrVersionConflict) {
 			return p, err
 		}
@@ -161,7 +164,7 @@ func setStatusP(m *Module, ct context.Context, storeID int64, id uuid.UUID, to P
 		if err != nil {
 			return err
 		}
-		err = m.SetProductStatus(ct, storeID, id, cur.Version, to)
+		_, err = m.SetProductStatus(ct, storeID, id, cur.Version, to, nil)
 		if !errors.Is(err, ErrVersionConflict) {
 			return err
 		}

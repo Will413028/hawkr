@@ -314,3 +314,123 @@ extension type SellerCatalogAppServiceClient (connect.Transport _transport) {
     );
   }
 }
+extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
+  Future<hawkrcatalogv1alpha1catalog.ListStoreProductsResponse> listStoreProducts(
+    hawkrcatalogv1alpha1catalog.ListStoreProductsRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.CatalogDelegatedService.listStoreProducts,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  Future<hawkrcatalogv1alpha1catalog.GetStoreProductResponse> getStoreProduct(
+    hawkrcatalogv1alpha1catalog.GetStoreProductRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.CatalogDelegatedService.getStoreProduct,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  Future<hawkrcatalogv1alpha1catalog.CreateStoreProductResponse> createStoreProduct(
+    hawkrcatalogv1alpha1catalog.CreateStoreProductRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.CatalogDelegatedService.createStoreProduct,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  Future<hawkrcatalogv1alpha1catalog.UpdateStoreProductResponse> updateStoreProduct(
+    hawkrcatalogv1alpha1catalog.UpdateStoreProductRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.CatalogDelegatedService.updateStoreProduct,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  Future<hawkrcatalogv1alpha1catalog.PublishStoreProductResponse> publishStoreProduct(
+    hawkrcatalogv1alpha1catalog.PublishStoreProductRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.CatalogDelegatedService.publishStoreProduct,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  Future<hawkrcatalogv1alpha1catalog.UnpublishStoreProductResponse> unpublishStoreProduct(
+    hawkrcatalogv1alpha1catalog.UnpublishStoreProductRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.CatalogDelegatedService.unpublishStoreProduct,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  Future<hawkrcatalogv1alpha1catalog.BatchUnpublishStoreProductsResponse> batchUnpublishStoreProducts(
+    hawkrcatalogv1alpha1catalog.BatchUnpublishStoreProductsRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.CatalogDelegatedService.batchUnpublishStoreProducts,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+}

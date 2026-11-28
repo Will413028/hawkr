@@ -162,7 +162,7 @@ func (h *App) CreateProduct(ctx context.Context, req *connect.Request[pb.CreateP
 	if err != nil {
 		return nil, err
 	}
-	p, err := h.m.CreateProduct(ctx, c.storeID, media.Uploader{ID: c.accountID}, rid, in)
+	p, err := h.m.CreateProduct(ctx, c.storeID, media.Uploader{ID: c.accountID}, rid, in, nil)
 	if err != nil {
 		return nil, failure(err, createPaths)
 	}
@@ -194,7 +194,7 @@ func (h *App) UpdateProduct(ctx context.Context, req *connect.Request[pb.UpdateP
 	if err != nil {
 		return nil, err
 	}
-	p, err := h.m.UpdateProduct(ctx, c.storeID, media.Uploader{ID: c.accountID}, id, version, in)
+	p, err := h.m.UpdateProduct(ctx, c.storeID, media.Uploader{ID: c.accountID}, id, version, in, nil)
 	if err != nil {
 		return nil, failure(err, updatePaths)
 	}
@@ -223,12 +223,9 @@ func (h *App) SetProductStatus(ctx context.Context, req *connect.Request[pb.SetP
 	if to == "" {
 		return nil, fieldError("status", "status 必填")
 	}
-	if err := h.m.SetProductStatus(ctx, c.storeID, id, version, to); err != nil {
-		return nil, failure(err, statusPaths)
-	}
-	p, err := h.m.Product(ctx, c.storeID, id)
+	p, err := h.m.SetProductStatus(ctx, c.storeID, id, version, to, nil)
 	if err != nil {
-		return nil, failure(err, noPaths)
+		return nil, failure(err, statusPaths)
 	}
 	out, err := sellerProduct(h.images, p)
 	if err != nil {

@@ -25,6 +25,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
 )
 
@@ -35,10 +37,11 @@ const (
 
 // Deps 是商品的依賴。
 type Deps struct {
-	DB    *db.DB
-	NewID func() uuid.UUID
-	Now   func() time.Time
-	Media model.Media
+	DB     *db.DB
+	NewID  func() uuid.UUID
+	Now    func() time.Time
+	Media  model.Media
+	Events *events.Bus
 	// Restock 在商品切成 ACTIVE 時排補貨通知，並在商品或 SKU 刪除時排清訂閱的 job（都在寫入的 transaction 內）。
 	Restock *restock.Service
 }
@@ -49,6 +52,10 @@ type Service struct{ d Deps }
 // New 建立商品 use case。
 func New(d Deps) *Service { return &Service{d: d} }
 
+func (s *Service) written(id uuid.UUID, storeID int64, title string, version int64, actor *delegatedactor.Actor) model.ProductWritten {
+	return model.ProductWritten{EventID: uuid.NewV7(), OccurredAt: s.d.Now().UTC(), ProductID: id, StoreID: storeID, Title: title, Version: version, Actor: actor}
+}
+
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
 type errReplayed struct{ id uuid.UUID }
@@ -56,9 +63,8 @@ type errReplayed struct{ id uuid.UUID }
 func (e errReplayed) Error() string { return "catalog: create replayed" }
 
 // Create 建立一個草稿商品。uploader 是新圖 staged token 的上傳者（店家所屬的帳號，由呼叫端推導）。
-// requestID 是建立的冪等鍵（範圍是店家，永久保存）：同一家店以同一個鍵重送回第一次建立的商品目前的樣子，不重複建立；內容不同回 model.ErrIdempotencyKeyReused；
 // 兩個同鍵請求同時在途也只建立一個（INSERT … ON CONFLICT DO NOTHING 回 0 列的那個讀回先到的、比對請求雜湊）。重送時不再 Confirm 新圖（token 已用過）。
-func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in model.ProductInput) (model.Product, error) {
+func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in model.ProductInput, actor *delegatedactor.Actor) (model.Product, error) {
 	if storeID <= 0 {
 		return model.Product{}, model.Invalid("StoreID", model.ReasonRequired)
 	}
@@ -124,11 +130,16 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 		if err := s.writeTags(ctx, q, id, p); err != nil {
 			return err
 		}
-		out, err = s.load(ctx, q, id, storeID, nil)
-		return err
+		if out, err = s.load(ctx, q, id, storeID, nil); err != nil {
+			return err
+		}
+		return delegatedactor.Publish(ctx, s.d.Events, model.ProductCreated{ProductWritten: s.written(id, storeID, out.Title, out.Version, actor)}, actor)
 	})
 	var rep errReplayed
 	if errors.As(err, &rep) {
+		if actor != nil {
+			return model.Product{}, model.ErrCreateReplayed
+		}
 		return s.Get(ctx, storeID, rep.id)
 	}
 	if errors.Is(err, media.ErrUploadAlreadyConfirmed) {
@@ -137,6 +148,9 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 			return model.Product{}, rerr
 		}
 		if found {
+			if actor != nil {
+				return model.Product{}, model.ErrCreateReplayed
+			}
 			return s.Get(ctx, storeID, id)
 		}
 	}
@@ -163,7 +177,7 @@ func (s *Service) replayedCreate(ctx context.Context, q *store.Queries, storeID 
 // Update 整體取代商品的內容（狀態不變）。選項軸、hashtag 與圖片整組取代；SKU 以選項值的組合辨識：組合還在就更新價格（庫存不動），
 // 新組合新增，不在輸入裡的組合刪除（deleted_at）。
 // version 是讀取時拿到的版本（etag），與鎖住商品列之後的目前版本不符回 model.ErrVersionConflict、不寫入。
-func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in model.ProductInput) (model.Product, error) {
+func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in model.ProductInput, actor *delegatedactor.Actor) (model.Product, error) {
 	if version < 1 {
 		return model.Product{}, model.Invalid("Etag", model.ReasonRequired)
 	}
@@ -234,8 +248,10 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 		if err := s.writeTags(ctx, q, productID, p); err != nil {
 			return err
 		}
-		out, err = s.load(ctx, q, productID, storeID, nil)
-		return err
+		if out, err = s.load(ctx, q, productID, storeID, nil); err != nil {
+			return err
+		}
+		return delegatedactor.Publish(ctx, s.d.Events, model.ProductUpdated{ProductWritten: s.written(productID, storeID, out.Title, out.Version, actor)}, actor)
 	})
 	return out, err
 }
@@ -243,43 +259,130 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 // SetStatus 切換狀態：三個狀態任兩個都能互切（目標不是有效狀態回 model.Invalid）。設成 ACTIVE 時 first_published_at 只在還是空的時候填，切回其他狀態不清除。
 // 切成目前的狀態是 no-op；切成 ACTIVE 而商品沒有主圖回 model.ErrActiveRequiresGalleryImage。
 // version 是讀取時拿到的版本（etag），必填：狀態要改變而版本不符回 model.ErrVersionConflict；同狀態是 no-op，不比對版本（重送冪等，etag 不變）。狀態改變時版本加一，no-op 不加。
-func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to model.ProductStatus) error {
-	if !to.Valid() {
-		return model.Invalid("Status", model.ReasonUnknown)
+func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to model.ProductStatus, actor *delegatedactor.Actor) (model.Product, error) {
+	if !to.Valid() || (actor != nil && to == model.StatusDraft) {
+		return model.Product{}, model.Invalid("Status", model.ReasonUnknown)
 	}
 	if version < 1 {
-		return model.Invalid("Etag", model.ReasonRequired)
+		return model.Product{}, model.Invalid("Etag", model.ReasonRequired)
 	}
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		q := s.q(ctx)
-		cur, err := s.lock(ctx, q, storeID, productID)
+	var out model.Product
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := s.setStatus(ctx, storeID, productID, version, to, actor); err != nil {
+			return err
+		}
+		var err error
+		out, err = s.load(ctx, s.q(ctx), productID, storeID, nil)
+		return err
+	})
+	return out, err
+}
+
+func (s *Service) setStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to model.ProductStatus, actor *delegatedactor.Actor) error {
+	q := s.q(ctx)
+	cur, err := s.lock(ctx, q, storeID, productID)
+	if err != nil {
+		return err
+	}
+	from := model.ProductStatus(cur.Status)
+	if from == to {
+		w := s.written(productID, storeID, cur.Title, cur.ContentVersion, actor)
+		switch to {
+		case model.StatusActive:
+			return delegatedactor.Publish(ctx, s.d.Events, model.ProductPublishRepeated{ProductWritten: w}, actor)
+		case model.StatusArchived:
+			return delegatedactor.Publish(ctx, s.d.Events, model.ProductUnpublishRepeated{ProductWritten: w}, actor)
+		case model.StatusDraft:
+		}
+		return nil
+	}
+	if actor != nil && from == model.StatusDraft && to == model.StatusArchived {
+		return model.ErrNotPublished
+	}
+	if cur.ContentVersion != version {
+		return model.ErrVersionConflict
+	}
+	if to == model.StatusActive {
+		imgs, err := q.ListProductImages(ctx, productID)
 		if err != nil {
 			return err
 		}
-		from := model.ProductStatus(cur.Status)
-		if from == to {
-			return nil
+		if !slices.ContainsFunc(imgs, func(i store.CatalogProductImage) bool { return i.Kind == kindGallery }) {
+			return model.ErrActiveRequiresGalleryImage
 		}
-		if cur.ContentVersion != version {
-			return model.ErrVersionConflict
+	}
+	if err := q.SetProductStatus(ctx, store.SetProductStatusParams{ID: productID, Status: string(to), Now: s.d.Now()}); err != nil {
+		return err
+	}
+	w := s.written(productID, storeID, cur.Title, cur.ContentVersion+1, actor)
+	switch to {
+	case model.StatusActive:
+		if err := s.d.Restock.ProductActivated(ctx, productID); err != nil {
+			return err
 		}
-		if to == model.StatusActive {
-			imgs, err := q.ListProductImages(ctx, productID)
+		return delegatedactor.Publish(ctx, s.d.Events, model.ProductPublished{ProductWritten: w}, actor)
+	case model.StatusArchived:
+		return delegatedactor.Publish(ctx, s.d.Events, model.ProductUnpublished{ProductWritten: w}, actor)
+	case model.StatusDraft:
+	}
+	return nil
+}
+
+func (s *Service) UnpublishMany(ctx context.Context, storeID int64, items []model.VersionedProduct, actor *delegatedactor.Actor) ([]model.UnpublishedItem, error) {
+	if len(items) == 0 {
+		return nil, model.Invalid("Items", model.ReasonRequired)
+	}
+	sorted := slices.Clone(items)
+	slices.SortFunc(sorted, func(a, b model.VersionedProduct) int { return a.ProductID.Compare(b.ProductID) })
+	for i, it := range sorted {
+		switch {
+		case it.Version < 1:
+			return nil, model.Invalid("Etag", model.ReasonRequired)
+		case i > 0 && sorted[i-1].ProductID == it.ProductID:
+			return nil, model.Invalid("Items", model.ReasonDuplicate)
+		}
+	}
+	var out []model.UnpublishedItem
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		var conflicts, drafts []uuid.UUID
+		out = make([]model.UnpublishedItem, 0, len(sorted))
+		var toArchive []uuid.UUID
+		for _, it := range sorted {
+			cur, err := s.lock(ctx, q, storeID, it.ProductID)
 			if err != nil {
 				return err
 			}
-			if !slices.ContainsFunc(imgs, func(i store.CatalogProductImage) bool { return i.Kind == kindGallery }) {
-				return model.ErrActiveRequiresGalleryImage
+			switch {
+			case model.ProductStatus(cur.Status) == model.StatusArchived:
+				out = append(out, model.UnpublishedItem{ProductID: it.ProductID, Title: cur.Title, VersionBefore: cur.ContentVersion, VersionAfter: cur.ContentVersion})
+			case actor != nil && model.ProductStatus(cur.Status) == model.StatusDraft:
+				drafts = append(drafts, it.ProductID)
+			case cur.ContentVersion != it.Version:
+				conflicts = append(conflicts, it.ProductID)
+			default:
+				toArchive = append(toArchive, it.ProductID)
+				out = append(out, model.UnpublishedItem{ProductID: it.ProductID, Title: cur.Title, VersionBefore: it.Version, VersionAfter: cur.ContentVersion + 1, Changed: true})
 			}
 		}
-		if err := q.SetProductStatus(ctx, store.SetProductStatusParams{ID: productID, Status: string(to), Now: s.d.Now()}); err != nil {
-			return err
+		if len(drafts) > 0 {
+			return &model.BatchNotPublishedError{ProductIDs: drafts}
 		}
-		if to == model.StatusActive {
-			return s.d.Restock.ProductActivated(ctx, productID)
+		if len(conflicts) > 0 {
+			return &model.BatchVersionConflictError{ProductIDs: conflicts}
 		}
-		return nil
+		now := s.d.Now()
+		for _, id := range toArchive {
+			if err := q.SetProductStatus(ctx, store.SetProductStatusParams{ID: id, Status: string(model.StatusArchived), Now: now}); err != nil {
+				return err
+			}
+		}
+		return delegatedactor.Publish(ctx, s.d.Events, model.ProductsUnpublished{EventID: uuid.NewV7(), OccurredAt: now.UTC(), StoreID: storeID, Items: out, Actor: actor}, actor)
 	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Delete 刪除商品：設 deleted_at，它還在的 SKU 同 transaction 一併標刪除，不可還原，列與圖片引用保留（訂單與評價仍引用）。

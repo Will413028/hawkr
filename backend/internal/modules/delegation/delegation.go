@@ -210,6 +210,8 @@ type StartDelegationInput = model.StartDelegationInput
 type StartedDelegation = model.StartedDelegation
 type RiskLevel = model.RiskLevel
 
+type AuditItem = model.AuditItem
+
 const (
 	CapabilityStorefrontRead  = model.CapabilityStorefrontRead
 	CapabilityStorefrontWrite = model.CapabilityStorefrontWrite

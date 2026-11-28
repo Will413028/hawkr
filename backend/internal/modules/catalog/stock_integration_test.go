@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 var epoch = time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
@@ -30,7 +31,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	d := setup(t)
 	rn := &recordingNotifier{}
-	return &fixture{t: t, d: d, ct: context.Background(), rn: rn, m: New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }, Restock: rn})}
+	return &fixture{t: t, d: d, ct: context.Background(), rn: rn, m: New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }, Events: events.NewBus(), Restock: rn})}
 }
 
 func (f *fixture) exec(sql string, args ...any) error {

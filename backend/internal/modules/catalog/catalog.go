@@ -20,6 +20,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/taxonomy"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -94,7 +96,19 @@ type (
 	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
 	RestockedSKU = model.RestockedSKU
 	// SkuSnapshot 是一個 SKU 與它的商品此刻的內容（結帳快照與購物車資訊共用）。
-	SkuSnapshot = model.SkuSnapshot
+	SkuSnapshot               = model.SkuSnapshot
+	ProductWritten            = model.ProductWritten
+	ProductCreated            = model.ProductCreated
+	ProductUpdated            = model.ProductUpdated
+	ProductPublished          = model.ProductPublished
+	ProductUnpublished        = model.ProductUnpublished
+	ProductPublishRepeated    = model.ProductPublishRepeated
+	ProductUnpublishRepeated  = model.ProductUnpublishRepeated
+	ProductsUnpublished       = model.ProductsUnpublished
+	UnpublishedItem           = model.UnpublishedItem
+	VersionedProduct          = model.VersionedProduct
+	BatchVersionConflictError = model.BatchVersionConflictError
+	BatchNotPublishedError    = model.BatchNotPublishedError
 	// RestockNotifier 是 catalog 宣告、補貨通知下游（buyer，B4-4 接線）實作的 port。
 	RestockNotifier = model.RestockNotifier
 )
@@ -145,6 +159,8 @@ var (
 	ErrInvalidInput               = model.ErrInvalidInput
 	// ErrVersionConflict 表示依據的版本（etag）已過時，沒有寫入。
 	ErrVersionConflict = model.ErrVersionConflict
+	ErrCreateReplayed  = model.ErrCreateReplayed
+	ErrNotPublished    = model.ErrNotPublished
 )
 
 // InvalidInputError.Reason 的值：欄位為什麼不合法。
@@ -175,7 +191,8 @@ type Deps struct {
 	// Now 是目前時間；測試注入固定值。
 	Now func() time.Time
 	// Media 是 media 模組；新圖的 Confirm 與退場資產的 MarkDeleted 在商品寫入的 transaction 內呼叫。
-	Media Media
+	Media  Media
+	Events *events.Bus
 	// Restock 是補貨通知的下游：catalog 的週期 worker 在 transaction 外呼叫它（B4-4 接 buyer，之前由組裝點給替身）。
 	Restock RestockNotifier
 }
@@ -194,11 +211,14 @@ func New(d Deps) *Module {
 	if d.Restock == nil {
 		panic("catalog：Restock 是必要的")
 	}
+	if d.Events == nil {
+		panic("catalog：Events 是必要的")
+	}
 	rs := restock.New(restock.Deps{DB: d.DB, Now: d.Now, Notifier: d.Restock})
 	return &Module{
 		stock:    stock.New(stock.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Restock: rs}),
 		taxonomy: taxonomy.New(taxonomy.Deps{DB: d.DB}),
-		product:  product.New(product.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Media: d.Media, Restock: rs}),
+		product:  product.New(product.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Media: d.Media, Events: d.Events, Restock: rs}),
 		counter:  counter.New(counter.Deps{DB: d.DB, Now: d.Now}),
 		restock:  rs,
 	}
@@ -306,23 +326,23 @@ func (m *Module) IsLeafCategory(ctx context.Context, id uuid.UUID) (bool, error)
 	return m.taxonomy.RequireLeaf(ctx, id)
 }
 
-// CreateProduct 建立一個草稿商品。storeID 是呼叫端從登入身分推導的店家（不信任 client 送的店家）；uploader 是新圖 staged token 的上傳者；
 // requestID 是冪等鍵（範圍是店家，永久保存）：同一家店以同一個鍵重送回第一次建立的商品目前的樣子，不重複建立（同時在途也只建立一個），內容不同回 ErrIdempotencyKeyReused。
 // 圖片的 Confirm 在建立的 transaction 內，失敗整筆回滾。輸入不合法回 *InvalidInputError。
-func (m *Module) CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in ProductInput) (Product, error) {
-	return m.product.Create(ctx, storeID, uploader, requestID, in)
+func (m *Module) CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in ProductInput, actor *delegatedactor.Actor) (Product, error) {
+	return m.product.Create(ctx, storeID, uploader, requestID, in, actor)
 }
 
-// UpdateProduct 整體取代商品的內容，狀態不變（ACTIVE 的商品輸入沒有主圖回 ErrActiveRequiresGalleryImage）；SKU 以選項值的組合辨識（組合還在就更新價格，庫存不動）。
 // version 是讀取時拿到的版本（Product.Version，對外是 Etag），必填；與目前的不符回 ErrVersionConflict、不寫入。商品不是這家店的或已刪除回 ErrProductNotFound。
-func (m *Module) UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in ProductInput) (Product, error) {
-	return m.product.Update(ctx, storeID, uploader, productID, version, in)
+func (m *Module) UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in ProductInput, actor *delegatedactor.Actor) (Product, error) {
+	return m.product.Update(ctx, storeID, uploader, productID, version, in, actor)
 }
 
-// SetProductStatus 切換商品狀態：DRAFT、ACTIVE、ARCHIVED 任兩個都能互切，切成目前狀態是 no-op（不改版本）。切成 ACTIVE 時商品沒有主圖回 ErrActiveRequiresGalleryImage；
-// first_published_at 只在第一次 ACTIVE 時填，之後不清除。version 必填，不符回 ErrVersionConflict。
-func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to ProductStatus) error {
-	return m.product.SetStatus(ctx, storeID, productID, version, to)
+func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to ProductStatus, actor *delegatedactor.Actor) (Product, error) {
+	return m.product.SetStatus(ctx, storeID, productID, version, to, actor)
+}
+
+func (m *Module) UnpublishProducts(ctx context.Context, storeID int64, items []VersionedProduct, actor *delegatedactor.Actor) ([]UnpublishedItem, error) {
+	return m.product.UnpublishMany(ctx, storeID, items, actor)
 }
 
 // DeleteProduct 刪除商品（設 deleted_at，不可還原，列保留）。version 選填：0 不比對，非 0 要與目前版本相符，否則回 ErrVersionConflict。

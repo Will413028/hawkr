@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { DelegatedOperationSchema } from "@hawkr/api/gen/hawkr/common/v1alpha1/delegated_operation_pb";
 import {
-	DelegatedOperationSchema,
 	type Post,
 	PostSchema,
 	PostStatus,

@@ -13,8 +13,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-func newCatalog(d *db.DB, med catalog.Media, buyers *buyer.Module) *catalog.Module {
-	return catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: time.Now, Media: med, Restock: catalogRestock{buyer: buyers}})
+func newCatalog(d *db.DB, bus *events.Bus, med catalog.Media, buyers *buyer.Module) *catalog.Module {
+	return catalog.New(catalog.Deps{DB: d, Events: bus, NewID: uuid.NewV7, Now: time.Now, Media: med, Restock: catalogRestock{buyer: buyers}})
 }
 
 type restockBuyers interface {

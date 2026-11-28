@@ -169,6 +169,7 @@ type ChangedField struct {
 
 // AuditLog 是一列代行稽核。actor 與 target 是寫入當下的快照，不由 session 推導（中途改名時兩者可能不同）。
 type AuditLog struct {
+	Items        []AuditItem
 	ID           uuid.UUID
 	SessionID    int64
 	Actor        DelegationActor
@@ -300,6 +301,14 @@ type OperationOutcome struct {
 	ResourceName string
 	// VersionAfter 是資源寫入後的版本；0 表示沒有版本。
 	VersionAfter int64
+	Items        []AuditItem
+}
+
+type AuditItem struct {
+	ResourceID    string
+	ResourceName  string
+	VersionBefore int64
+	VersionAfter  int64
 }
 
 // FailureAuditInput 是一次失敗的代行請求的稽核：被拒絕（能力不足、session 已失效、店家不可代行，含讀取）或寫入的業務失敗。Session 是請求當時解析到的

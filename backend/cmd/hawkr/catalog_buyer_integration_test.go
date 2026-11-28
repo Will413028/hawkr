@@ -53,7 +53,7 @@ func newCatalogBuyerFixture(t *testing.T) *catalogBuyerFixture {
 	f.accts = identity.New(identity.Deps{DB: d, Events: bus, Now: now, Logger: logger})
 	f.buyers = buyer.New(buyer.Deps{DB: d, Events: bus, Now: now, Logger: logger})
 	subscribeBuyerLifecycle(bus, f.buyers)
-	f.catalog = newCatalog(d, media.NewFake(), f.buyers)
+	f.catalog = newCatalog(d, bus, media.NewFake(), f.buyers)
 	subscribeCatalogFavorites(bus, f.catalog)
 	f.storeID = f.seedExposableStore()
 	return f
@@ -133,11 +133,11 @@ func (f *catalogBuyerFixture) product(ctx context.Context, stocks ...int32) cata
 			skus[i].Option1 = values[i]
 		}
 	}
-	p, err := f.catalog.CreateProduct(ctx, f.storeID, media.Uploader{ID: testAccountID}, uuid.NewV7(), input)
+	p, err := f.catalog.CreateProduct(ctx, f.storeID, media.Uploader{ID: testAccountID}, uuid.NewV7(), input, nil)
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if err := f.catalog.SetProductStatus(ctx, f.storeID, p.ID, p.Version, catalog.StatusActive); err != nil {
+	if _, err := f.catalog.SetProductStatus(ctx, f.storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
 		f.t.Fatal(err)
 	}
 	return p

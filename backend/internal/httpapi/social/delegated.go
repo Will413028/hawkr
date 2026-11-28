@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -58,11 +59,7 @@ func postMethod(c moddelegation.Capability, a moddelegation.AuditAction) moddele
 	return moddelegation.DelegatedMethod{Capability: c, Action: a, Resource: moddelegation.ResourcePost}
 }
 
-// DelegationRunner 是 handler 需要的 delegation 公開 API（*delegation.Module）：授權、重送偵測與稽核（DelegatedWrite；不開 transaction，稽核由 social 的事件在 social 自己的 transaction 內寫，A7-D26），與讀取的授權（DelegatedRead）。
-type DelegationRunner interface {
-	DelegatedRead(ctx context.Context, c moddelegation.DelegatedCaller, read func(ctx context.Context, st seller.Store) error) error
-	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error) (moddelegation.DelegatedWriteResult, error)
-}
+type DelegationRunner = httpdelegation.Runner
 
 // DelegatedPosts 是代行讀寫貼文的來源（*social.Module）：與店主同一組方法（店家由 delegation 以 session 的目標店家讀出後交給模組），加上重送時讀回排程時間。
 type DelegatedPosts interface {
@@ -88,22 +85,6 @@ func NewDelegated(runner DelegationRunner, posts DelegatedPosts, buyers Buyers, 
 		return nil, fmt.Errorf("httpapi/social：貼文的單篇網址需要 WebOrigin")
 	}
 	return &Delegated{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log}, runner: runner, posts: posts}, nil
-}
-
-func delegatedOperation(op *pb.DelegatedOperation) (moddelegation.DelegatedOperation, error) {
-	if !op.ProtoReflect().IsValid() {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation", "operation 必填")
-	}
-	id, err := rpc.ParseRequestID(op.GetRequestId())
-	if err != nil || id == nil {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.request_id", "operation.request_id 必填，而且必須是 UUIDv4")
-	}
-	reason, ok := moddelegation.LegalOperationReason(op.GetOperationReason())
-	if !ok {
-		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation.operation_reason",
-			fmt.Sprintf("operation.operation_reason 必填，去除首尾空白後 1 到 %d 個字元，不得含控制字元", moddelegation.OperationReasonMaxRunes))
-	}
-	return moddelegation.DelegatedOperation{RequestID: *id, Reason: reason, NotifySeller: op.NotifySeller == nil || op.GetNotifySeller()}, nil
 }
 
 func postPreview(body string) string {
@@ -240,7 +221,7 @@ func (h *Delegated) GetStorePost(ctx context.Context, req *connect.Request[pb.Ge
 
 func (h *Delegated) CreateStorePost(ctx context.Context, req *connect.Request[pb.CreateStorePostRequest]) (*connect.Response[pb.CreateStorePostResponse], error) {
 	msg := req.Msg
-	op, err := delegatedOperation(msg.GetOperation())
+	op, err := httpdelegation.ParseOperation(msg.GetOperation())
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +247,7 @@ func (h *Delegated) CreateStorePost(ctx context.Context, req *connect.Request[pb
 }
 
 func (h *Delegated) UpdateStorePost(ctx context.Context, req *connect.Request[pb.UpdateStorePostRequest]) (*connect.Response[pb.UpdateStorePostResponse], error) {
-	op, err := delegatedOperation(req.Msg.GetOperation())
+	op, err := httpdelegation.ParseOperation(req.Msg.GetOperation())
 	if err != nil {
 		return nil, err
 	}
@@ -303,9 +284,9 @@ func (h *Delegated) UpdateStorePost(ctx context.Context, req *connect.Request[pb
 	return connect.NewResponse(&pb.UpdateStorePostResponse{Post: out, AuditLogId: auditID}), nil
 }
 
-func (h *Delegated) transition(ctx context.Context, op *pb.DelegatedOperation, postID, etag string, action moddelegation.AuditAction,
+func (h *Delegated) transition(ctx context.Context, op *commonpb.DelegatedOperation, postID, etag string, action moddelegation.AuditAction,
 	do func(context.Context, seller.Store, uuid.UUID, int64, *delegatedactor.Actor) (social.Post, error)) (*pb.Post, string, error) {
-	o, err := delegatedOperation(op)
+	o, err := httpdelegation.ParseOperation(op)
 	if err != nil {
 		return nil, "", err
 	}
@@ -348,7 +329,7 @@ func (h *Delegated) UnpublishStorePost(ctx context.Context, req *connect.Request
 
 func (h *Delegated) ScheduleStorePost(ctx context.Context, req *connect.Request[pb.ScheduleStorePostRequest]) (*connect.Response[pb.ScheduleStorePostResponse], error) {
 	msg := req.Msg
-	op, err := delegatedOperation(msg.GetOperation())
+	op, err := httpdelegation.ParseOperation(msg.GetOperation())
 	if err != nil {
 		return nil, err
 	}

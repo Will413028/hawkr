@@ -15,9 +15,12 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart'
+    as $4;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $2;
 
+import '../../common/v1alpha1/delegated_operation.pbjson.dart' as $3;
 import '../../common/v1alpha1/image.pbjson.dart' as $0;
 import '../../common/v1alpha1/store_card.pbjson.dart' as $1;
 
@@ -1719,6 +1722,399 @@ final $typed_data.Uint8List skuInputDescriptor = $convert.base64Decode(
     'IAEoA0gAUg5jb21wYXJlQXRQcmljZYgBARIjCg1pbml0aWFsX3N0b2NrGAUgASgFUgxpbml0aW'
     'FsU3RvY2tCEwoRX2NvbXBhcmVfYXRfcHJpY2U=');
 
+@$core.Deprecated('Use listStoreProductsRequestDescriptor instead')
+const ListStoreProductsRequest$json = {
+  '1': 'ListStoreProductsRequest',
+  '2': [
+    {
+      '1': 'filter',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.MyProductFilter',
+      '10': 'filter'
+    },
+    {'1': 'page_size', '3': 2, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 3, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListStoreProductsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listStoreProductsRequestDescriptor = $convert.base64Decode(
+    'ChhMaXN0U3RvcmVQcm9kdWN0c1JlcXVlc3QSPwoGZmlsdGVyGAEgASgLMicuaGF3a3IuY2F0YW'
+    'xvZy52MWFscGhhMS5NeVByb2R1Y3RGaWx0ZXJSBmZpbHRlchIbCglwYWdlX3NpemUYAiABKAVS'
+    'CHBhZ2VTaXplEh0KCnBhZ2VfdG9rZW4YAyABKAlSCXBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use listStoreProductsResponseDescriptor instead')
+const ListStoreProductsResponse$json = {
+  '1': 'ListStoreProductsResponse',
+  '2': [
+    {
+      '1': 'products',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.SellerProductSummary',
+      '10': 'products'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListStoreProductsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listStoreProductsResponseDescriptor = $convert.base64Decode(
+    'ChlMaXN0U3RvcmVQcm9kdWN0c1Jlc3BvbnNlEkgKCHByb2R1Y3RzGAEgAygLMiwuaGF3a3IuY2'
+    'F0YWxvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0U3VtbWFyeVIIcHJvZHVjdHMSJgoPbmV4dF9w'
+    'YWdlX3Rva2VuGAIgASgJUg1uZXh0UGFnZVRva2Vu');
+
+@$core.Deprecated('Use getStoreProductRequestDescriptor instead')
+const GetStoreProductRequest$json = {
+  '1': 'GetStoreProductRequest',
+  '2': [
+    {'1': 'product_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+  ],
+};
+
+/// Descriptor for `GetStoreProductRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStoreProductRequestDescriptor =
+    $convert.base64Decode(
+        'ChZHZXRTdG9yZVByb2R1Y3RSZXF1ZXN0EiIKCnByb2R1Y3RfaWQYASABKAlCA+BBAlIJcHJvZH'
+        'VjdElk');
+
+@$core.Deprecated('Use getStoreProductResponseDescriptor instead')
+const GetStoreProductResponse$json = {
+  '1': 'GetStoreProductResponse',
+  '2': [
+    {
+      '1': 'product',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.SellerProduct',
+      '10': 'product'
+    },
+  ],
+};
+
+/// Descriptor for `GetStoreProductResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getStoreProductResponseDescriptor =
+    $convert.base64Decode(
+        'ChdHZXRTdG9yZVByb2R1Y3RSZXNwb25zZRI/Cgdwcm9kdWN0GAEgASgLMiUuaGF3a3IuY2F0YW'
+        'xvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0Ugdwcm9kdWN0');
+
+@$core.Deprecated('Use createStoreProductRequestDescriptor instead')
+const CreateStoreProductRequest$json = {
+  '1': 'CreateStoreProductRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {
+      '1': 'product',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.ProductInput',
+      '8': {},
+      '10': 'product'
+    },
+  ],
+};
+
+/// Descriptor for `CreateStoreProductRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createStoreProductRequestDescriptor = $convert.base64Decode(
+    'ChlDcmVhdGVTdG9yZVByb2R1Y3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLm'
+    'NvbW1vbi52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEkMKB3By'
+    'b2R1Y3QYAiABKAsyJC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RJbnB1dEID4EECUg'
+    'dwcm9kdWN0');
+
+@$core.Deprecated('Use createStoreProductResponseDescriptor instead')
+const CreateStoreProductResponse$json = {
+  '1': 'CreateStoreProductResponse',
+  '2': [
+    {
+      '1': 'product',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.SellerProduct',
+      '10': 'product'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `CreateStoreProductResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createStoreProductResponseDescriptor =
+    $convert.base64Decode(
+        'ChpDcmVhdGVTdG9yZVByb2R1Y3RSZXNwb25zZRI/Cgdwcm9kdWN0GAEgASgLMiUuaGF3a3IuY2'
+        'F0YWxvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0Ugdwcm9kdWN0EiAKDGF1ZGl0X2xvZ19pZBgC'
+        'IAEoCVIKYXVkaXRMb2dJZA==');
+
+@$core.Deprecated('Use updateStoreProductRequestDescriptor instead')
+const UpdateStoreProductRequest$json = {
+  '1': 'UpdateStoreProductRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {'1': 'product_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'etag', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+    {
+      '1': 'product',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.ProductInput',
+      '8': {},
+      '10': 'product'
+    },
+    {
+      '1': 'update_mask',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.FieldMask',
+      '8': {},
+      '10': 'updateMask'
+    },
+  ],
+};
+
+/// Descriptor for `UpdateStoreProductRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateStoreProductRequestDescriptor = $convert.base64Decode(
+    'ChlVcGRhdGVTdG9yZVByb2R1Y3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2tyLm'
+    'NvbW1vbi52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEiIKCnBy'
+    'b2R1Y3RfaWQYAiABKAlCA+BBAlIJcHJvZHVjdElkEhcKBGV0YWcYAyABKAlCA+BBAlIEZXRhZx'
+    'JDCgdwcm9kdWN0GAQgASgLMiQuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0SW5wdXRC'
+    'A+BBAlIHcHJvZHVjdBJACgt1cGRhdGVfbWFzaxgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaW'
+    'VsZE1hc2tCA+BBAlIKdXBkYXRlTWFzaw==');
+
+@$core.Deprecated('Use updateStoreProductResponseDescriptor instead')
+const UpdateStoreProductResponse$json = {
+  '1': 'UpdateStoreProductResponse',
+  '2': [
+    {
+      '1': 'product',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.SellerProduct',
+      '10': 'product'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `UpdateStoreProductResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateStoreProductResponseDescriptor =
+    $convert.base64Decode(
+        'ChpVcGRhdGVTdG9yZVByb2R1Y3RSZXNwb25zZRI/Cgdwcm9kdWN0GAEgASgLMiUuaGF3a3IuY2'
+        'F0YWxvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0Ugdwcm9kdWN0EiAKDGF1ZGl0X2xvZ19pZBgC'
+        'IAEoCVIKYXVkaXRMb2dJZA==');
+
+@$core.Deprecated('Use publishStoreProductRequestDescriptor instead')
+const PublishStoreProductRequest$json = {
+  '1': 'PublishStoreProductRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {'1': 'product_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'etag', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `PublishStoreProductRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List publishStoreProductRequestDescriptor = $convert.base64Decode(
+    'ChpQdWJsaXNoU3RvcmVQcm9kdWN0UmVxdWVzdBJMCglvcGVyYXRpb24YASABKAsyKS5oYXdrci'
+    '5jb21tb24udjFhbHBoYTEuRGVsZWdhdGVkT3BlcmF0aW9uQgPgQQJSCW9wZXJhdGlvbhIiCgpw'
+    'cm9kdWN0X2lkGAIgASgJQgPgQQJSCXByb2R1Y3RJZBIXCgRldGFnGAMgASgJQgPgQQJSBGV0YW'
+    'c=');
+
+@$core.Deprecated('Use publishStoreProductResponseDescriptor instead')
+const PublishStoreProductResponse$json = {
+  '1': 'PublishStoreProductResponse',
+  '2': [
+    {
+      '1': 'product',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.SellerProduct',
+      '10': 'product'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `PublishStoreProductResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List publishStoreProductResponseDescriptor =
+    $convert.base64Decode(
+        'ChtQdWJsaXNoU3RvcmVQcm9kdWN0UmVzcG9uc2USPwoHcHJvZHVjdBgBIAEoCzIlLmhhd2tyLm'
+        'NhdGFsb2cudjFhbHBoYTEuU2VsbGVyUHJvZHVjdFIHcHJvZHVjdBIgCgxhdWRpdF9sb2dfaWQY'
+        'AiABKAlSCmF1ZGl0TG9nSWQ=');
+
+@$core.Deprecated('Use unpublishStoreProductRequestDescriptor instead')
+const UnpublishStoreProductRequest$json = {
+  '1': 'UnpublishStoreProductRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {'1': 'product_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'etag', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `UnpublishStoreProductRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishStoreProductRequestDescriptor = $convert.base64Decode(
+    'ChxVbnB1Ymxpc2hTdG9yZVByb2R1Y3RSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCzIpLmhhd2'
+    'tyLmNvbW1vbi52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0aW9uEiIK'
+    'CnByb2R1Y3RfaWQYAiABKAlCA+BBAlIJcHJvZHVjdElkEhcKBGV0YWcYAyABKAlCA+BBAlIEZX'
+    'RhZw==');
+
+@$core.Deprecated('Use unpublishStoreProductResponseDescriptor instead')
+const UnpublishStoreProductResponse$json = {
+  '1': 'UnpublishStoreProductResponse',
+  '2': [
+    {
+      '1': 'product',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.SellerProduct',
+      '10': 'product'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `UnpublishStoreProductResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishStoreProductResponseDescriptor =
+    $convert.base64Decode(
+        'Ch1VbnB1Ymxpc2hTdG9yZVByb2R1Y3RSZXNwb25zZRI/Cgdwcm9kdWN0GAEgASgLMiUuaGF3a3'
+        'IuY2F0YWxvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0Ugdwcm9kdWN0EiAKDGF1ZGl0X2xvZ19p'
+        'ZBgCIAEoCVIKYXVkaXRMb2dJZA==');
+
+@$core.Deprecated('Use batchUnpublishStoreProductsRequestDescriptor instead')
+const BatchUnpublishStoreProductsRequest$json = {
+  '1': 'BatchUnpublishStoreProductsRequest',
+  '2': [
+    {
+      '1': 'operation',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.hawkr.common.v1alpha1.DelegatedOperation',
+      '8': {},
+      '10': 'operation'
+    },
+    {
+      '1': 'items',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.BatchUnpublishItem',
+      '8': {},
+      '10': 'items'
+    },
+  ],
+};
+
+/// Descriptor for `BatchUnpublishStoreProductsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List batchUnpublishStoreProductsRequestDescriptor =
+    $convert.base64Decode(
+        'CiJCYXRjaFVucHVibGlzaFN0b3JlUHJvZHVjdHNSZXF1ZXN0EkwKCW9wZXJhdGlvbhgBIAEoCz'
+        'IpLmhhd2tyLmNvbW1vbi52MWFscGhhMS5EZWxlZ2F0ZWRPcGVyYXRpb25CA+BBAlIJb3BlcmF0'
+        'aW9uEksKBWl0ZW1zGAIgAygLMiouaGF3a3IuY2F0YWxvZy52MWFscGhhMS5CYXRjaFVucHVibG'
+        'lzaEl0ZW1CCeBBApK1GAIIMlIFaXRlbXM=');
+
+@$core.Deprecated('Use batchUnpublishItemDescriptor instead')
+const BatchUnpublishItem$json = {
+  '1': 'BatchUnpublishItem',
+  '2': [
+    {'1': 'product_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+  ],
+};
+
+/// Descriptor for `BatchUnpublishItem`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List batchUnpublishItemDescriptor = $convert.base64Decode(
+    'ChJCYXRjaFVucHVibGlzaEl0ZW0SIgoKcHJvZHVjdF9pZBgBIAEoCUID4EECUglwcm9kdWN0SW'
+    'QSFwoEZXRhZxgCIAEoCUID4EECUgRldGFn');
+
+@$core.Deprecated('Use batchUnpublishStoreProductsResponseDescriptor instead')
+const BatchUnpublishStoreProductsResponse$json = {
+  '1': 'BatchUnpublishStoreProductsResponse',
+  '2': [
+    {
+      '1': 'products',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.catalog.v1alpha1.UnpublishedProduct',
+      '10': 'products'
+    },
+    {'1': 'audit_log_id', '3': 2, '4': 1, '5': 9, '10': 'auditLogId'},
+  ],
+};
+
+/// Descriptor for `BatchUnpublishStoreProductsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List batchUnpublishStoreProductsResponseDescriptor =
+    $convert.base64Decode(
+        'CiNCYXRjaFVucHVibGlzaFN0b3JlUHJvZHVjdHNSZXNwb25zZRJGCghwcm9kdWN0cxgBIAMoCz'
+        'IqLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVW5wdWJsaXNoZWRQcm9kdWN0Ughwcm9kdWN0cxIg'
+        'CgxhdWRpdF9sb2dfaWQYAiABKAlSCmF1ZGl0TG9nSWQ=');
+
+@$core.Deprecated('Use unpublishedProductDescriptor instead')
+const UnpublishedProduct$json = {
+  '1': 'UnpublishedProduct',
+  '2': [
+    {'1': 'product_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'productId'},
+    {'1': 'etag', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'etag'},
+    {
+      '1': 'status',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.catalog.v1alpha1.ProductStatus',
+      '8': {},
+      '10': 'status'
+    },
+  ],
+};
+
+/// Descriptor for `UnpublishedProduct`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List unpublishedProductDescriptor = $convert.base64Decode(
+    'ChJVbnB1Ymxpc2hlZFByb2R1Y3QSIgoKcHJvZHVjdF9pZBgBIAEoCUID4EEDUglwcm9kdWN0SW'
+    'QSFwoEZXRhZxgCIAEoCUID4EEDUgRldGFnEkIKBnN0YXR1cxgDIAEoDjIlLmhhd2tyLmNhdGFs'
+    'b2cudjFhbHBoYTEuUHJvZHVjdFN0YXR1c0ID4EEDUgZzdGF0dXM=');
+
 const $core.Map<$core.String, $core.dynamic> CatalogPublicServiceBase$json = {
   '1': 'CatalogPublicService',
   '2': [
@@ -1951,3 +2347,127 @@ final $typed_data.Uint8List sellerCatalogAppServiceDescriptor = $convert.base64D
     'dG9ja1JlcXVlc3QaKy5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkFkanVzdFN0b2NrUmVzcG9uc2'
     'USXQoIU2V0U3RvY2sSJy5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlNldFN0b2NrUmVxdWVzdBoo'
     'Lmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2V0U3RvY2tSZXNwb25zZQ==');
+
+const $core.Map<$core.String, $core.dynamic> CatalogDelegatedServiceBase$json =
+    {
+  '1': 'CatalogDelegatedService',
+  '2': [
+    {
+      '1': 'ListStoreProducts',
+      '2': '.hawkr.catalog.v1alpha1.ListStoreProductsRequest',
+      '3': '.hawkr.catalog.v1alpha1.ListStoreProductsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'GetStoreProduct',
+      '2': '.hawkr.catalog.v1alpha1.GetStoreProductRequest',
+      '3': '.hawkr.catalog.v1alpha1.GetStoreProductResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'CreateStoreProduct',
+      '2': '.hawkr.catalog.v1alpha1.CreateStoreProductRequest',
+      '3': '.hawkr.catalog.v1alpha1.CreateStoreProductResponse'
+    },
+    {
+      '1': 'UpdateStoreProduct',
+      '2': '.hawkr.catalog.v1alpha1.UpdateStoreProductRequest',
+      '3': '.hawkr.catalog.v1alpha1.UpdateStoreProductResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'PublishStoreProduct',
+      '2': '.hawkr.catalog.v1alpha1.PublishStoreProductRequest',
+      '3': '.hawkr.catalog.v1alpha1.PublishStoreProductResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'UnpublishStoreProduct',
+      '2': '.hawkr.catalog.v1alpha1.UnpublishStoreProductRequest',
+      '3': '.hawkr.catalog.v1alpha1.UnpublishStoreProductResponse',
+      '4': {'34': 2},
+    },
+    {
+      '1': 'BatchUnpublishStoreProducts',
+      '2': '.hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest',
+      '3': '.hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse',
+      '4': {'34': 2},
+    },
+  ],
+};
+
+@$core.Deprecated('Use catalogDelegatedServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+    CatalogDelegatedServiceBase$messageJson = {
+  '.hawkr.catalog.v1alpha1.ListStoreProductsRequest':
+      ListStoreProductsRequest$json,
+  '.hawkr.catalog.v1alpha1.MyProductFilter': MyProductFilter$json,
+  '.hawkr.catalog.v1alpha1.ListStoreProductsResponse':
+      ListStoreProductsResponse$json,
+  '.hawkr.catalog.v1alpha1.SellerProductSummary': SellerProductSummary$json,
+  '.hawkr.common.v1alpha1.Image': $0.Image$json,
+  '.google.protobuf.Timestamp': $2.Timestamp$json,
+  '.hawkr.catalog.v1alpha1.GetStoreProductRequest': GetStoreProductRequest$json,
+  '.hawkr.catalog.v1alpha1.GetStoreProductResponse':
+      GetStoreProductResponse$json,
+  '.hawkr.catalog.v1alpha1.SellerProduct': SellerProduct$json,
+  '.hawkr.catalog.v1alpha1.ProductImage': ProductImage$json,
+  '.hawkr.catalog.v1alpha1.ProductDescriptionBlock':
+      ProductDescriptionBlock$json,
+  '.hawkr.catalog.v1alpha1.BulletList': BulletList$json,
+  '.hawkr.catalog.v1alpha1.Table': Table$json,
+  '.hawkr.catalog.v1alpha1.TableRow': TableRow$json,
+  '.hawkr.catalog.v1alpha1.OptionAxis': OptionAxis$json,
+  '.hawkr.catalog.v1alpha1.Sku': Sku$json,
+  '.hawkr.catalog.v1alpha1.ProductHashtag': ProductHashtag$json,
+  '.hawkr.catalog.v1alpha1.CreateStoreProductRequest':
+      CreateStoreProductRequest$json,
+  '.hawkr.common.v1alpha1.DelegatedOperation': $3.DelegatedOperation$json,
+  '.hawkr.catalog.v1alpha1.ProductInput': ProductInput$json,
+  '.hawkr.catalog.v1alpha1.ImageInput': ImageInput$json,
+  '.hawkr.catalog.v1alpha1.DescriptionBlock': DescriptionBlock$json,
+  '.hawkr.catalog.v1alpha1.OptionAxisInput': OptionAxisInput$json,
+  '.hawkr.catalog.v1alpha1.SkuInput': SkuInput$json,
+  '.hawkr.catalog.v1alpha1.CreateStoreProductResponse':
+      CreateStoreProductResponse$json,
+  '.hawkr.catalog.v1alpha1.UpdateStoreProductRequest':
+      UpdateStoreProductRequest$json,
+  '.google.protobuf.FieldMask': $4.FieldMask$json,
+  '.hawkr.catalog.v1alpha1.UpdateStoreProductResponse':
+      UpdateStoreProductResponse$json,
+  '.hawkr.catalog.v1alpha1.PublishStoreProductRequest':
+      PublishStoreProductRequest$json,
+  '.hawkr.catalog.v1alpha1.PublishStoreProductResponse':
+      PublishStoreProductResponse$json,
+  '.hawkr.catalog.v1alpha1.UnpublishStoreProductRequest':
+      UnpublishStoreProductRequest$json,
+  '.hawkr.catalog.v1alpha1.UnpublishStoreProductResponse':
+      UnpublishStoreProductResponse$json,
+  '.hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsRequest':
+      BatchUnpublishStoreProductsRequest$json,
+  '.hawkr.catalog.v1alpha1.BatchUnpublishItem': BatchUnpublishItem$json,
+  '.hawkr.catalog.v1alpha1.BatchUnpublishStoreProductsResponse':
+      BatchUnpublishStoreProductsResponse$json,
+  '.hawkr.catalog.v1alpha1.UnpublishedProduct': UnpublishedProduct$json,
+};
+
+/// Descriptor for `CatalogDelegatedService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List catalogDelegatedServiceDescriptor = $convert.base64Decode(
+    'ChdDYXRhbG9nRGVsZWdhdGVkU2VydmljZRJ9ChFMaXN0U3RvcmVQcm9kdWN0cxIwLmhhd2tyLm'
+    'NhdGFsb2cudjFhbHBoYTEuTGlzdFN0b3JlUHJvZHVjdHNSZXF1ZXN0GjEuaGF3a3IuY2F0YWxv'
+    'Zy52MWFscGhhMS5MaXN0U3RvcmVQcm9kdWN0c1Jlc3BvbnNlIgOQAgESdwoPR2V0U3RvcmVQcm'
+    '9kdWN0Ei4uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5HZXRTdG9yZVByb2R1Y3RSZXF1ZXN0Gi8u'
+    'aGF3a3IuY2F0YWxvZy52MWFscGhhMS5HZXRTdG9yZVByb2R1Y3RSZXNwb25zZSIDkAIBEnsKEk'
+    'NyZWF0ZVN0b3JlUHJvZHVjdBIxLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuQ3JlYXRlU3RvcmVQ'
+    'cm9kdWN0UmVxdWVzdBoyLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuQ3JlYXRlU3RvcmVQcm9kdW'
+    'N0UmVzcG9uc2USgAEKElVwZGF0ZVN0b3JlUHJvZHVjdBIxLmhhd2tyLmNhdGFsb2cudjFhbHBo'
+    'YTEuVXBkYXRlU3RvcmVQcm9kdWN0UmVxdWVzdBoyLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVX'
+    'BkYXRlU3RvcmVQcm9kdWN0UmVzcG9uc2UiA5ACAhKDAQoTUHVibGlzaFN0b3JlUHJvZHVjdBIy'
+    'Lmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHVibGlzaFN0b3JlUHJvZHVjdFJlcXVlc3QaMy5oYX'
+    'drci5jYXRhbG9nLnYxYWxwaGExLlB1Ymxpc2hTdG9yZVByb2R1Y3RSZXNwb25zZSIDkAICEokB'
+    'ChVVbnB1Ymxpc2hTdG9yZVByb2R1Y3QSNC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlVucHVibG'
+    'lzaFN0b3JlUHJvZHVjdFJlcXVlc3QaNS5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlVucHVibGlz'
+    'aFN0b3JlUHJvZHVjdFJlc3BvbnNlIgOQAgISmwEKG0JhdGNoVW5wdWJsaXNoU3RvcmVQcm9kdW'
+    'N0cxI6Lmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuQmF0Y2hVbnB1Ymxpc2hTdG9yZVByb2R1Y3Rz'
+    'UmVxdWVzdBo7Lmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuQmF0Y2hVbnB1Ymxpc2hTdG9yZVByb2'
+    'R1Y3RzUmVzcG9uc2UiA5ACAg==');

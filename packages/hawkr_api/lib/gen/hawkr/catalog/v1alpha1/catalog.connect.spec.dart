@@ -172,3 +172,62 @@ abstract final class SellerCatalogAppService {
     hawkrcatalogv1alpha1catalog.SetStockResponse.new,
   );
 }
+abstract final class CatalogDelegatedService {
+  /// Fully-qualified name of the CatalogDelegatedService service.
+  static const name = 'hawkr.catalog.v1alpha1.CatalogDelegatedService';
+
+  static const listStoreProducts = connect.Spec(
+    '/$name/ListStoreProducts',
+    connect.StreamType.unary,
+    hawkrcatalogv1alpha1catalog.ListStoreProductsRequest.new,
+    hawkrcatalogv1alpha1catalog.ListStoreProductsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  static const getStoreProduct = connect.Spec(
+    '/$name/GetStoreProduct',
+    connect.StreamType.unary,
+    hawkrcatalogv1alpha1catalog.GetStoreProductRequest.new,
+    hawkrcatalogv1alpha1catalog.GetStoreProductResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  static const createStoreProduct = connect.Spec(
+    '/$name/CreateStoreProduct',
+    connect.StreamType.unary,
+    hawkrcatalogv1alpha1catalog.CreateStoreProductRequest.new,
+    hawkrcatalogv1alpha1catalog.CreateStoreProductResponse.new,
+  );
+
+  static const updateStoreProduct = connect.Spec(
+    '/$name/UpdateStoreProduct',
+    connect.StreamType.unary,
+    hawkrcatalogv1alpha1catalog.UpdateStoreProductRequest.new,
+    hawkrcatalogv1alpha1catalog.UpdateStoreProductResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  static const publishStoreProduct = connect.Spec(
+    '/$name/PublishStoreProduct',
+    connect.StreamType.unary,
+    hawkrcatalogv1alpha1catalog.PublishStoreProductRequest.new,
+    hawkrcatalogv1alpha1catalog.PublishStoreProductResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  static const unpublishStoreProduct = connect.Spec(
+    '/$name/UnpublishStoreProduct',
+    connect.StreamType.unary,
+    hawkrcatalogv1alpha1catalog.UnpublishStoreProductRequest.new,
+    hawkrcatalogv1alpha1catalog.UnpublishStoreProductResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  static const batchUnpublishStoreProducts = connect.Spec(
+    '/$name/BatchUnpublishStoreProducts',
+    connect.StreamType.unary,
+    hawkrcatalogv1alpha1catalog.BatchUnpublishStoreProductsRequest.new,
+    hawkrcatalogv1alpha1catalog.BatchUnpublishStoreProductsResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+}

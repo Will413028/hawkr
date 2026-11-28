@@ -1,6 +1,5 @@
 syntax = "proto3";
 
-// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），以及賣家管理自己店家的商品（SellerCatalogAppService）；
 // 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
 // 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
@@ -13,7 +12,9 @@ package hawkr.catalog.v1alpha1;
 
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/delegated_operation.proto";
 import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/limits.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
@@ -112,6 +113,34 @@ service SellerCatalogAppService {
   // 現值不等於預期（期間有訂單扣減或別處調整）回 failed_precondition，不寫入，client 重讀後再決定。
   // 同一家店以同一個 request_id 重送且內容相同只生效一次；內容不同回 invalid_argument。不改商品的 etag。
   rpc SetStock(SetStockRequest) returns (SetStockResponse);
+}
+
+service CatalogDelegatedService {
+  rpc ListStoreProducts(ListStoreProductsRequest) returns (ListStoreProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc GetStoreProduct(GetStoreProductRequest) returns (GetStoreProductResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc CreateStoreProduct(CreateStoreProductRequest) returns (CreateStoreProductResponse);
+
+  rpc UpdateStoreProduct(UpdateStoreProductRequest) returns (UpdateStoreProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc PublishStoreProduct(PublishStoreProductRequest) returns (PublishStoreProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc UnpublishStoreProduct(UnpublishStoreProductRequest) returns (UnpublishStoreProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  rpc BatchUnpublishStoreProducts(BatchUnpublishStoreProductsRequest) returns (BatchUnpublishStoreProductsResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 }
 
 // ProductStatus 是商品的狀態（賣家與後台看得到，公開訊息不帶）。
@@ -674,4 +703,93 @@ message SkuInput {
   optional int64 compare_at_price = 4;
   // 新組合的初始庫存，不得為負。
   int32 initial_stock = 5;
+}
+
+
+message ListStoreProductsRequest {
+  MyProductFilter filter = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListStoreProductsResponse {
+  repeated SellerProductSummary products = 1;
+  string next_page_token = 2;
+}
+
+message GetStoreProductRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStoreProductResponse {
+  SellerProduct product = 1;
+}
+
+message CreateStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  ProductInput product = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateStoreProductResponse {
+  SellerProduct product = 1;
+  string audit_log_id = 2;
+}
+
+message UpdateStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  string product_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+  ProductInput product = 4 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.FieldMask update_mask = 5 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateStoreProductResponse {
+  SellerProduct product = 1;
+  string audit_log_id = 2;
+}
+
+message PublishStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  string product_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PublishStoreProductResponse {
+  SellerProduct product = 1;
+  string audit_log_id = 2;
+}
+
+message UnpublishStoreProductRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  string product_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UnpublishStoreProductResponse {
+  SellerProduct product = 1;
+  string audit_log_id = 2;
+}
+
+message BatchUnpublishStoreProductsRequest {
+  hawkr.common.v1alpha1.DelegatedOperation operation = 1 [(google.api.field_behavior) = REQUIRED];
+  repeated BatchUnpublishItem items = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits).max_items = 50
+  ];
+}
+
+message BatchUnpublishItem {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message BatchUnpublishStoreProductsResponse {
+  repeated UnpublishedProduct products = 1;
+  string audit_log_id = 2;
+}
+
+message UnpublishedProduct {
+  string product_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string etag = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ProductStatus status = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

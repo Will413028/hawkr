@@ -47,16 +47,16 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, p.Version+1, f.input("改名")); !errors.Is(err, ErrVersionConflict) {
+	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, p.Version+1, f.input("改名"), nil); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag on update must be rejected: %v", err)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, p.Version+1, StatusActive); !errors.Is(err, ErrVersionConflict) {
+	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, p.Version+1, StatusActive, nil); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag on status change must be rejected: %v", err)
 	}
 	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, p.Version+1); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag on delete must be rejected: %v", err)
 	}
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, 0, f.input("x")); !errors.Is(err, ErrInvalidInput) {
+	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, 0, f.input("x"), nil); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("update without an etag is a client error: %v", err)
 	}
 	if got := f.mustProduct(storeID, p.ID); got.Title != "山藥" || got.Version != p.Version {
@@ -72,7 +72,7 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 	if got := f.mustProduct(storeID, p.ID); got.Version != p.Version {
 		t.Fatalf("stock and counters must not move the version: %d -> %d", p.Version, got.Version)
 	}
-	updated, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, p.Version, f.input("山藥二號"))
+	updated, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, p.Version, f.input("山藥二號"), nil)
 	if err != nil {
 		t.Fatalf("editing with the version read before the stock changes must succeed: %v", err)
 	}
@@ -83,20 +83,20 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 		t.Fatalf("an update leaves the stock alone: %d", updated.Skus[0].StockQty)
 	}
 
-	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
 	active := f.mustProduct(storeID, p.ID)
 	if active.Version != updated.Version+1 {
 		t.Fatalf("a status change bumps the version: %d -> %d", updated.Version, active.Version)
 	}
-	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, active.Version, StatusActive))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, active.Version, StatusActive, nil))
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a no-op status change must not bump the version: %d -> %d", active.Version, got.Version)
 	}
-	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a retried status change must leave the etag alone: %d -> %d", active.Version, got.Version)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusArchived); !errors.Is(err, ErrVersionConflict) {
+	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusArchived, nil); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag with a different target is still a conflict: %v", err)
 	}
 }
@@ -128,11 +128,11 @@ func TestCreateIsIdempotentByRequestID(t *testing.T) {
 	in := f.input("山藥")
 	key := uuid.NewV7()
 
-	first, err := f.m.CreateProduct(f.ct, storeID, up, key, in)
+	first, err := f.m.CreateProduct(f.ct, storeID, up, key, in, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := f.m.CreateProduct(f.ct, storeID, up, key, in)
+	again, err := f.m.CreateProduct(f.ct, storeID, up, key, in, nil)
 	if err != nil || again.ID != first.ID {
 		t.Fatalf("a replay returns the first product: %v %v", again.ID, err)
 	}
@@ -140,30 +140,30 @@ func TestCreateIsIdempotentByRequestID(t *testing.T) {
 		t.Fatalf("a replay must not create a second product, got %d", n)
 	}
 	f.activate(storeID, first.ID)
-	if got, _ := f.m.CreateProduct(f.ct, storeID, up, key, in); got.Status != StatusActive {
+	if got, _ := f.m.CreateProduct(f.ct, storeID, up, key, in, nil); got.Status != StatusActive {
 		t.Fatalf("a replay shows the product as it is now: %s", got.Status)
 	}
 
 	changed := in
 	changed.Title = "地瓜"
-	if _, err := f.m.CreateProduct(f.ct, storeID, up, key, changed); !errors.Is(err, ErrIdempotencyKeyReused) {
+	if _, err := f.m.CreateProduct(f.ct, storeID, up, key, changed, nil); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("the same key with different content is rejected: %v", err)
 	}
 	if n := f.count(`SELECT count(*) FROM catalog.products WHERE store_id = $1`, storeID); n != 1 {
 		t.Fatalf("a rejected replay must not create a product, got %d", n)
 	}
 
-	mine, err := f.m.CreateProduct(f.ct, other, media.Uploader{ID: otherAcct}, key, f.input("別家"))
+	mine, err := f.m.CreateProduct(f.ct, other, media.Uploader{ID: otherAcct}, key, f.input("別家"), nil)
 	if err != nil || mine.ID == first.ID {
 		t.Fatalf("another store's key is its own: %v %v", mine.ID, err)
 	}
 
-	if _, err := f.m.CreateProduct(f.ct, storeID, up, uuid.Nil(), in); !errors.Is(err, ErrInvalidInput) {
+	if _, err := f.m.CreateProduct(f.ct, storeID, up, uuid.Nil(), in, nil); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a create without a request id is a client error: %v", err)
 	}
 
 	f.must(f.m.DeleteProduct(f.ct, storeID, first.ID, 0))
-	if _, err := f.m.CreateProduct(f.ct, storeID, up, key, in); !errors.Is(err, ErrProductNotFound) {
+	if _, err := f.m.CreateProduct(f.ct, storeID, up, key, in, nil); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("a replay of a deleted product is not found: %v", err)
 	}
 }
@@ -185,7 +185,7 @@ func TestConcurrentCreatesWithOneRequestIDMakeOneProduct(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			p, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: acct}, key, in)
+			p, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: acct}, key, in, nil)
 			ids[i], errs[i] = p.ID, err
 		}()
 	}
@@ -727,6 +727,11 @@ func TestHashtagSuggestionsCountOnlyVisibleProducts(t *testing.T) {
 	if err != nil || len(trend) != 2 || trend[0].Name != "yam" || trend[0].ProductCount != 2 {
 		t.Fatalf("trending is ordered by visible product count: %+v %v", trend, err)
 	}
+}
+
+func (f *productFixture) mustStatus(_ Product, err error) {
+	f.t.Helper()
+	f.must(err)
 }
 
 func (f *productFixture) must(err error) {

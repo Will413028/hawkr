@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package hawkr.common.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+
+message DelegatedOperation {
+  string request_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string operation_reason = 2 [(google.api.field_behavior) = REQUIRED];
+  optional bool notify_seller = 3;
+}

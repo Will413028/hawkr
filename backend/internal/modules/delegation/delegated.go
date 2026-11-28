@@ -12,6 +12,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -61,6 +62,7 @@ type DelegatedWriteResult struct {
 	Store      seller.Store
 	AuditLogID uuid.UUID
 	ResourceID string
+	Items      []model.AuditItem
 	Replayed   bool
 }
 
@@ -114,9 +116,6 @@ func (m *Module) DelegatedRead(ctx context.Context, c DelegatedCaller, read func
 // 資源模組在自己的 transaction 內為寫入發帶代行者的事件，delegation 的訂閱者（OnPostCreated 等，依事件種類決定稽核動作）同 transaction 檢查 session 與能力、再次確認店家可代行、寫一列 SUCCEEDED
 // （request_id 對到 (session_id, idempotency_key)）。do 失敗時資源模組的 transaction rollback，稽核列跟著消失，所以「有 SUCCEEDED」等於「寫入成功」。
 //
-// 同一個 session 以同一個 request_id 重送（內容相同）不呼叫 do，回第一次的結果（不再檢查店家此刻可不可代行）；內容不同回 DenialIdempotencyKeyReused。並行的重送：後到的訂閱者撞稽核表唯一鍵、
-// 回 ErrOperationKeyTaken 讓資源模組的 transaction rollback，這裡再讀那一列，收斂成重送。任何失敗（被拒絕或 do 的業務失敗）都另開 transaction 寫一列 FAILED。
-//
 // do 不得假設自己在 transaction 內：外部 provider 的呼叫與 transaction 由資源模組自己安排（單體規則 3、5）。
 func (m *Module) DelegatedWrite(ctx context.Context, c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error) (DelegatedWriteResult, error) {
 	if w.PayloadHash == "" {
@@ -168,18 +167,15 @@ func (m *Module) delegatedWrite(ctx context.Context, c DelegatedCaller, w Delega
 	if err != nil {
 		return DelegatedWriteResult{}, err
 	}
-	err = do(ctx, st, actorOf(in, c))
-	if errors.Is(err, model.ErrOperationKeyTaken) {
-		if log, found, err = m.audit.LookupOperation(ctx, in); err != nil {
-			return DelegatedWriteResult{}, err
+	doErr := do(ctx, st, actorOf(in, c))
+	if doErr != nil {
+		if log, found, lerr := m.audit.LookupOperation(ctx, in); lerr == nil && found {
+			return m.replayResult(ctx, c, log)
 		}
-		if !found {
+		if errors.Is(doErr, model.ErrOperationKeyTaken) {
 			return DelegatedWriteResult{}, fmt.Errorf("delegation：並行的請求 %s 寫下的稽核列讀不到", in.RequestID)
 		}
-		return m.replayResult(ctx, c, log)
-	}
-	if err != nil {
-		return DelegatedWriteResult{}, err
+		return DelegatedWriteResult{}, doErr
 	}
 	log, found, err = m.audit.LookupOperation(ctx, in)
 	if err != nil {
@@ -203,11 +199,11 @@ func (m *Module) replayResult(ctx context.Context, c DelegatedCaller, log model.
 	if !state.Found {
 		return DelegatedWriteResult{}, replayReadError{fmt.Errorf("delegation：重送的稽核列 %s 的店家 %d 不存在", log.ID, c.Session.Target.StoreID)}
 	}
-	out := DelegatedWriteResult{Store: st, AuditLogID: log.ID, Replayed: true}
+	out := DelegatedWriteResult{Store: st, AuditLogID: log.ID, Replayed: true, Items: log.Items}
 	if log.ResourceID != nil {
 		out.ResourceID = *log.ResourceID
 	}
-	if out.ResourceID == "" {
+	if out.ResourceID == "" && len(out.Items) == 0 {
 		return DelegatedWriteResult{}, replayReadError{fmt.Errorf("delegation：重送的稽核列 %s 沒有資源 ID", log.ID)}
 	}
 	return out, nil
@@ -236,11 +232,12 @@ var (
 	postScheduleWrite  = postWrite{CapabilityPostsPublish, AuditPostSchedule}
 )
 
-// PostWriteAudit 是一種貼文寫入事件在稽核上的能力與動作。
-type PostWriteAudit struct {
+type WriteAudit struct {
 	Capability Capability
 	Action     AuditAction
 }
+
+type PostWriteAudit = WriteAudit
 
 // PostWriteFor 回傳 social 貼文寫入事件 e（值，不是指標）對應的能力與動作，不是代行會寫入的事件回 false。這是代行寫入宣告的唯一來源：
 // 訂閱者寫稽核列用它，httpapi 的 DelegatedDeclaration 也由它衍生每個寫入方法的能力與動作，兩邊不會各寫一份而不一致。
@@ -298,22 +295,120 @@ func (m *Module) recordPostWrite(ctx context.Context, w postWrite, e social.Post
 }
 
 func (m *Module) recordPostWriteBy(ctx context.Context, w postWrite, a *delegatedactor.Actor, postID uuid.UUID, storeID int64, preview string, version int64) error {
-	if storeID != a.StoreID {
-		return fmt.Errorf("delegation：貼文寫入事件的店家 %d 與代行者的店家 %d 不一致", storeID, a.StoreID)
-	}
-	if _, err := m.operableStore(ctx, a.StoreID); err != nil {
+	if err := m.checkWriteStore(ctx, "貼文", storeID, a); err != nil {
 		return err
 	}
+	name := AuditName(preview)
+	return m.audit.RecordOperation(ctx, m.writeAuditInput(w, ResourcePost, a, postID.String(), name),
+		model.OperationOutcome{ResourceID: postID.String(), ResourceName: name, VersionAfter: version})
+}
+
+var (
+	productCreateWrite         = postWrite{CapabilityProductsWrite, AuditProductCreate}
+	productUpdateWrite         = postWrite{CapabilityProductsWrite, AuditProductUpdate}
+	productPublishWrite        = postWrite{CapabilityProductsPublish, AuditProductPublish}
+	productUnpublishWrite      = postWrite{CapabilityProductsPublish, AuditProductUnpublish}
+	productBatchUnpublishWrite = postWrite{CapabilityProductsPublish, AuditProductBatchUnpublish}
+)
+
+func ProductWriteFor(e any) (WriteAudit, bool) {
+	var w postWrite
+	switch e.(type) {
+	case catalog.ProductCreated:
+		w = productCreateWrite
+	case catalog.ProductUpdated:
+		w = productUpdateWrite
+	case catalog.ProductPublished, catalog.ProductPublishRepeated:
+		w = productPublishWrite
+	case catalog.ProductUnpublished, catalog.ProductUnpublishRepeated:
+		w = productUnpublishWrite
+	case catalog.ProductsUnpublished:
+		w = productBatchUnpublishWrite
+	default:
+		return WriteAudit{}, false
+	}
+	return WriteAudit{Capability: w.capability, Action: w.action}, true
+}
+
+func (m *Module) OnProductCreated(ctx context.Context, e catalog.ProductCreated) error {
+	return m.recordProductWrite(ctx, productCreateWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductUpdated(ctx context.Context, e catalog.ProductUpdated) error {
+	return m.recordProductWrite(ctx, productUpdateWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductPublished(ctx context.Context, e catalog.ProductPublished) error {
+	return m.recordProductWrite(ctx, productPublishWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductUnpublished(ctx context.Context, e catalog.ProductUnpublished) error {
+	return m.recordProductWrite(ctx, productUnpublishWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductPublishRepeated(ctx context.Context, e catalog.ProductPublishRepeated) error {
+	return m.recordProductWrite(ctx, productPublishWrite, e.ProductWritten)
+}
+
+func (m *Module) OnProductUnpublishRepeated(ctx context.Context, e catalog.ProductUnpublishRepeated) error {
+	return m.recordProductWrite(ctx, productUnpublishWrite, e.ProductWritten)
+}
+
+func (m *Module) recordProductWrite(ctx context.Context, w postWrite, e catalog.ProductWritten) error {
+	a := e.Actor
+	if a == nil {
+		return nil
+	}
+	if err := m.checkWriteStore(ctx, "商品", e.StoreID, a); err != nil {
+		return err
+	}
+	name := AuditName(e.Title)
+	return m.audit.RecordOperation(ctx, m.writeAuditInput(w, ResourceProduct, a, e.ProductID.String(), name),
+		model.OperationOutcome{ResourceID: e.ProductID.String(), ResourceName: name, VersionAfter: e.Version})
+}
+
+func (m *Module) OnProductsUnpublished(ctx context.Context, e catalog.ProductsUnpublished) error {
+	a := e.Actor
+	if a == nil {
+		return nil
+	}
+	if err := m.checkWriteStore(ctx, "商品", e.StoreID, a); err != nil {
+		return err
+	}
+	items := make([]model.AuditItem, len(e.Items))
+	for i, it := range e.Items {
+		items[i] = model.AuditItem{ResourceID: it.ProductID.String(), ResourceName: AuditName(it.Title), VersionBefore: it.VersionBefore, VersionAfter: it.VersionAfter}
+	}
+	name := BatchResourceName(len(e.Items))
+	return m.audit.RecordOperation(ctx, m.writeAuditInput(productBatchUnpublishWrite, ResourceProduct, a, "", name),
+		model.OperationOutcome{ResourceName: name, Items: items})
+}
+
+func BatchResourceName(n int) string { return fmt.Sprintf("%d 項商品", n) }
+
+func (m *Module) checkWriteStore(ctx context.Context, what string, storeID int64, a *delegatedactor.Actor) error {
+	if storeID != a.StoreID {
+		return fmt.Errorf("delegation：%s寫入事件的店家 %d 與代行者的店家 %d 不一致", what, storeID, a.StoreID)
+	}
+	_, err := m.operableStore(ctx, a.StoreID)
+	return err
+}
+
+func AuditName(preview string) string {
 	name := strings.TrimSpace(preview)
 	if r := []rune(name); len(r) > auditNameRunes {
 		name = string(r[:auditNameRunes])
 	}
-	return m.audit.RecordOperation(ctx, model.OperationAuditInput{
-		SessionID: a.SessionID, Capability: w.capability, Action: w.action, ResourceType: ResourcePost,
-		ResourceID: postID.String(), ResourceName: name, ResourceVersionBefore: a.ResourceVersionBefore,
+	return name
+}
+
+func (m *Module) writeAuditInput(w postWrite, rt AuditResourceType, a *delegatedactor.Actor, resourceID, name string) model.OperationAuditInput {
+	return model.OperationAuditInput{
+		SessionID: a.SessionID, Capability: w.capability, Action: w.action, ResourceType: rt,
+		ResourceID: resourceID, ResourceName: name, ResourceVersionBefore: a.ResourceVersionBefore,
 		OperationReason: a.Reason, NotifySeller: a.NotifySeller,
 		RequestID: a.RequestID, CorrelationID: a.CorrelationID, UserAgent: a.UserAgent, PayloadHash: a.PayloadHash,
-	}, model.OperationOutcome{ResourceID: postID.String(), ResourceName: name, VersionAfter: version})
+	}
 }
 
 const failureTimeout = 5 * time.Second

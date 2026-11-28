@@ -2,7 +2,12 @@
 // 領域事件並附上它，稽核的訂閱者同 transaction 寫 SUCCEEDED。資源模組只傳遞它、不解讀它、不 import delegation，所以放在 platform。
 package delegatedactor
 
-// AuditHandler 是代行寫入的稽核 handler 在 events.Bus 上的註冊名稱：delegation 以它訂閱 social 的貼文寫入事件，social 帶代行者發布事件時用
+import (
+	"context"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
+)
+
 // events.PublishRequired 指名要求它存在，沒有就失敗關閉（A7-D27）。
 const AuditHandler = "delegation.audit"
 
@@ -22,4 +27,11 @@ type Actor struct {
 	ResourceVersionBefore *int64
 	CorrelationID         string
 	UserAgent             string
+}
+
+func Publish[E any](ctx context.Context, b *events.Bus, e E, actor *Actor) error {
+	if actor != nil {
+		return events.PublishRequired(ctx, b, e, AuditHandler)
+	}
+	return events.Publish(ctx, b, e)
 }

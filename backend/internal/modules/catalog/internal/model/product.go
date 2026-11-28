@@ -40,6 +40,8 @@ var (
 	ErrInvalidInput = errors.New("catalog: invalid input")
 	// ErrVersionConflict 表示呼叫端依據的版本（etag）已經過時：與目前的不符，沒有寫入。
 	ErrVersionConflict = errors.New("catalog: product version conflict")
+	ErrCreateReplayed  = errors.New("catalog: request_id already used for a product of this store")
+	ErrNotPublished    = errors.New("catalog: a draft product cannot be unpublished by delegation")
 )
 
 // DefaultLowStockThreshold 是商品沒有自己的低庫存門檻時用的平台預設值；MaxLowStockThreshold 是商品門檻的上限（products_low_stock_check）。

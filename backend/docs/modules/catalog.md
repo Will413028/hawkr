@@ -87,3 +87,10 @@
 - 批次輸入最多 `MaxBatchIDs`（200）個，超過或含零值回 `*InvalidInputError`；空輸入回空 map。
 - `AddFavorite(productID)`／`RemoveFavorite(productID)`（D3）：buyer 在收藏列同一個 transaction 內加減收藏數，ctx 沒有 transaction 時是單句寫入；不改 etag。`AddFavorite` 對已刪除的商品回 `ErrProductNotFound`；`RemoveFavorite` 下限 0、已刪除的商品照減（計數跟著收藏列走）。重複與去重是呼叫方的事（收藏列的唯一鍵），這裡不去重。
 - 轉接：`internal/legacy/catalogserver` 以舊的 product gRPC 契約服務 Java cart 的 `GetProductSimple`、`BatchGetSkuCartInfo` 與 order 的 `DeductStock`、`RestoreStock`、`BatchGetProductForCheckout`；`internal/legacy/catalogconsumer` 消費 `order.cancelled`（歸還）與 `order.sales.accumulated`（銷量）。兩者的歸還鍵是 `catalogserver.RestoreKey(stock_tx_id)`，指向原扣減 `stock_tx_id`。組裝在 B4-6。
+
+## 9. 代行寫入與批次下架（B4-5d）
+
+- `CreateProduct`、`UpdateProduct`、`SetProductStatus` 帶明確的代行者參數（店主傳 nil），成功的寫入在商品寫入的 transaction 內發事件（`ProductCreated`、`ProductUpdated`、`ProductPublished`、`ProductUnpublished`，已在目標狀態時發 `ProductPublishRepeated`、`ProductUnpublishRepeated`）；帶代行者的事件要有稽核 handler（`delegatedactor.AuditHandler`）才發得出去。重送的建立不寫入、不發事件；代行者建立時同一家店的 `request_id` 已建立過商品，回 `ErrCreateReplayed`（不發事件；同 session 同 `request_id` 的重送由 delegation 的稽核列在呼叫之前就回了第一次的結果）。`SetProductStatus` 回傳寫入後（no-op 時是目前）在同一個 transaction 內讀出的商品。
+- `UnpublishProducts`（D29）原子批次下架：商品依 ID 升序鎖列，任一項版本與目前不符整批回 `*BatchVersionConflictError`（`errors.Is(err, ErrVersionConflict)` 成立，列出全部衝突的商品）、沒有寫入；已經下架的項目視為成功（不改版本，`VersionBefore` 與 `VersionAfter` 都是目前版本）；代行者的批次裡有草稿商品整批回 `*BatchNotPublishedError`（`errors.Is(err, ErrNotPublished)`，列出全部草稿）、沒有寫入；別家或不存在的商品整批回 `ErrProductNotFound`；成功發一個 `ProductsUnpublished`（項目依商品 ID 升序），並把同一份項目回給呼叫方（呼叫方據它組回應，不再讀商品）。
+- 代行者不得把商品切成草稿（回 `*InvalidInputError`，`Field` 是 `Status`），也不得下架草稿商品（回 `ErrNotPublished`，與 social 的代行下架同規則）。
+

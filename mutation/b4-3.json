@@ -13,8 +13,8 @@
    "id": "status-etag-not-compared",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}\n\t\tif to == model.StatusActive {",
-   "new": "\t\tif to == model.StatusActive {",
+   "old": "\tif cur.ContentVersion != version {\n\t\treturn model.ErrVersionConflict\n\t}\n\tif to == model.StatusActive {",
+   "new": "\tif to == model.StatusActive {",
    "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
    "why": "上下架不再比對 etag：用過期畫面上架別人剛改的內容也成功，測試要紅。"
   },
@@ -103,8 +103,8 @@
    "id": "status-same-target-checks-etag-first",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\t\tif from == to {\n\t\t\treturn nil\n\t\t}\n\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}",
-   "new": "\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}\n\t\tif from == to {\n\t\t\treturn nil\n\t\t}",
+   "old": "\tfrom := model.ProductStatus(cur.Status)\n\tif from == to {",
+   "new": "\tfrom := model.ProductStatus(cur.Status)\n\tif cur.ContentVersion != version {\n\t\treturn model.ErrVersionConflict\n\t}\n\tif from == to {",
    "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
    "why": "同狀態 no-op 不再先於 etag 比對：用切換前的舊 etag 重送同一個目標狀態回 VERSION_CONFLICT，不是成功，測試要紅。"
   },
@@ -220,8 +220,8 @@
    "id": "seller-status-etag-dropped",
    "stack": "go-integration",
    "file": "backend/internal/httpapi/catalog/seller.go",
-   "old": "h.m.SetProductStatus(ctx, c.storeID, id, version, to)",
-   "new": "h.m.SetProductStatus(ctx, c.storeID, id, version*0, to)",
+   "old": "h.m.SetProductStatus(ctx, c.storeID, id, version, to, nil)",
+   "new": "h.m.SetProductStatus(ctx, c.storeID, id, version*0, to, nil)",
    "test": "internal/httpapi/catalog ^TestSellerWritesCarryEtagAndRequestID$",
    "why": "切換狀態的 etag 沒有傳進模組：過時的 etag 不再回 VERSION_CONFLICT（版本 0 被模組當成缺 etag），etag 測試要紅。"
   },
@@ -346,8 +346,8 @@
    "id": "restock-activation-does-not-enqueue",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\t\t\treturn s.d.Restock.ProductActivated(ctx, productID)\n",
-   "new": "\t\t\treturn nil\n",
+   "old": "\t\tif err := s.d.Restock.ProductActivated(ctx, productID); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
    "test": "internal/modules/catalog ^TestRestockIsEnqueuedWhenAProductBecomesActiveWithStock$",
    "why": "DRAFT 或 ARCHIVED 改回 ACTIVE 時有庫存的 SKU 不排補貨 job，測試要紅。"
   },

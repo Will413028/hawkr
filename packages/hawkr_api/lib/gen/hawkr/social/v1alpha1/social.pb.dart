@@ -20,8 +20,9 @@ import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $0;
 
+import '../../common/v1alpha1/delegated_operation.pb.dart' as $4;
 import '../../common/v1alpha1/image.pb.dart' as $2;
-import '../../common/v1alpha1/policy_category.pbenum.dart' as $4;
+import '../../common/v1alpha1/policy_category.pbenum.dart' as $5;
 import '../../common/v1alpha1/store_card.pb.dart' as $1;
 import 'social.pbenum.dart';
 
@@ -6066,92 +6067,6 @@ class PostStatusCount extends $pb.GeneratedMessage {
   void clearCount() => $_clearField(2);
 }
 
-/// DelegatedOperation 是每個代行寫入都要帶的稽核資料。
-class DelegatedOperation extends $pb.GeneratedMessage {
-  factory DelegatedOperation({
-    $core.String? requestId,
-    $core.String? operationReason,
-    $core.bool? notifySeller,
-  }) {
-    final result = DelegatedOperation._();
-    if (requestId != null) result.requestId = requestId;
-    if (operationReason != null) result.operationReason = operationReason;
-    if (notifySeller != null) result.notifySeller = notifySeller;
-    return result;
-  }
-
-  DelegatedOperation._();
-
-  factory DelegatedOperation.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      DelegatedOperation()..mergeFromBuffer(data, registry);
-  factory DelegatedOperation.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      DelegatedOperation()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DelegatedOperation',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
-      createEmptyInstance: DelegatedOperation.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..aOS(2, _omitFieldNames ? '' : 'operationReason')
-    ..aOB(3, _omitFieldNames ? '' : 'notifySeller')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DelegatedOperation clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DelegatedOperation copyWith(void Function(DelegatedOperation) updates) =>
-      super.copyWith((message) => updates(message as DelegatedOperation))
-          as DelegatedOperation;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use DelegatedOperation() / DelegatedOperation.new instead')
-  static DelegatedOperation create() => DelegatedOperation._();
-  static $pb.GeneratedMessage $_createMessage() => DelegatedOperation._();
-  @$core.override
-  DelegatedOperation createEmptyInstance() => DelegatedOperation._();
-  @$core.pragma('dart2js:noInline')
-  static DelegatedOperation getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DelegatedOperation>(
-          DelegatedOperation.$_createMessage);
-  static DelegatedOperation? _defaultInstance;
-
-  /// UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
-  @$pb.TagNumber(1)
-  $core.String get requestId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set requestId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasRequestId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearRequestId() => $_clearField(1);
-
-  /// 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
-  @$pb.TagNumber(2)
-  $core.String get operationReason => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set operationReason($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasOperationReason() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearOperationReason() => $_clearField(2);
-
-  /// 是否在完成後通知店主；不設是通知。
-  @$pb.TagNumber(3)
-  $core.bool get notifySeller => $_getBF(2);
-  @$pb.TagNumber(3)
-  set notifySeller($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasNotifySeller() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearNotifySeller() => $_clearField(3);
-}
-
 class ListStorePostsRequest extends $pb.GeneratedMessage {
   factory ListStorePostsRequest({
     $core.int? pageSize,
@@ -6430,7 +6345,7 @@ class GetStorePostResponse extends $pb.GeneratedMessage {
 
 class CreateStorePostRequest extends $pb.GeneratedMessage {
   factory CreateStorePostRequest({
-    DelegatedOperation? operation,
+    $4.DelegatedOperation? operation,
     $core.String? body,
     $core.String? imageStagedToken,
     $core.String? productId,
@@ -6459,8 +6374,8 @@ class CreateStorePostRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: CreateStorePostRequest.$_createMessage)
-    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
-        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOM<$4.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $4.DelegatedOperation.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'body')
     ..aOS(3, _omitFieldNames ? '' : 'imageStagedToken')
     ..aOS(4, _omitFieldNames ? '' : 'productId')
@@ -6492,15 +6407,15 @@ class CreateStorePostRequest extends $pb.GeneratedMessage {
   static CreateStorePostRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  DelegatedOperation get operation => $_getN(0);
+  $4.DelegatedOperation get operation => $_getN(0);
   @$pb.TagNumber(1)
-  set operation(DelegatedOperation value) => $_setField(1, value);
+  set operation($4.DelegatedOperation value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasOperation() => $_has(0);
   @$pb.TagNumber(1)
   void clearOperation() => $_clearField(1);
   @$pb.TagNumber(1)
-  DelegatedOperation ensureOperation() => $_ensure(0);
+  $4.DelegatedOperation ensureOperation() => $_ensure(0);
 
   /// 內文，去除首尾空白後最多 2200 個字元；草稿可以是空的。
   @$pb.TagNumber(2)
@@ -6615,7 +6530,7 @@ class CreateStorePostResponse extends $pb.GeneratedMessage {
 
 class UpdateStorePostRequest extends $pb.GeneratedMessage {
   factory UpdateStorePostRequest({
-    DelegatedOperation? operation,
+    $4.DelegatedOperation? operation,
     Post? post,
     $3.FieldMask? updateMask,
   }) {
@@ -6640,8 +6555,8 @@ class UpdateStorePostRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: UpdateStorePostRequest.$_createMessage)
-    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
-        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOM<$4.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $4.DelegatedOperation.$_createMessage)
     ..aOM<Post>(2, _omitFieldNames ? '' : 'post',
         subBuilder: Post.$_createMessage)
     ..aOM<$3.FieldMask>(3, _omitFieldNames ? '' : 'updateMask',
@@ -6673,15 +6588,15 @@ class UpdateStorePostRequest extends $pb.GeneratedMessage {
   static UpdateStorePostRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  DelegatedOperation get operation => $_getN(0);
+  $4.DelegatedOperation get operation => $_getN(0);
   @$pb.TagNumber(1)
-  set operation(DelegatedOperation value) => $_setField(1, value);
+  set operation($4.DelegatedOperation value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasOperation() => $_has(0);
   @$pb.TagNumber(1)
   void clearOperation() => $_clearField(1);
   @$pb.TagNumber(1)
-  DelegatedOperation ensureOperation() => $_ensure(0);
+  $4.DelegatedOperation ensureOperation() => $_ensure(0);
 
   /// id 與 etag 必填。可以修改的欄位是 body、image_staged_token、product_id、hashtag_inputs，update_mask 要列至少一個；沒列的欄位保留目前的值。
   @$pb.TagNumber(2)
@@ -6784,7 +6699,7 @@ class UpdateStorePostResponse extends $pb.GeneratedMessage {
 
 class PublishStorePostRequest extends $pb.GeneratedMessage {
   factory PublishStorePostRequest({
-    DelegatedOperation? operation,
+    $4.DelegatedOperation? operation,
     $core.String? postId,
     $core.String? etag,
   }) {
@@ -6809,8 +6724,8 @@ class PublishStorePostRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: PublishStorePostRequest.$_createMessage)
-    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
-        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOM<$4.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $4.DelegatedOperation.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'postId')
     ..aOS(3, _omitFieldNames ? '' : 'etag')
     ..hasRequiredFields = false;
@@ -6840,15 +6755,15 @@ class PublishStorePostRequest extends $pb.GeneratedMessage {
   static PublishStorePostRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  DelegatedOperation get operation => $_getN(0);
+  $4.DelegatedOperation get operation => $_getN(0);
   @$pb.TagNumber(1)
-  set operation(DelegatedOperation value) => $_setField(1, value);
+  set operation($4.DelegatedOperation value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasOperation() => $_has(0);
   @$pb.TagNumber(1)
   void clearOperation() => $_clearField(1);
   @$pb.TagNumber(1)
-  DelegatedOperation ensureOperation() => $_ensure(0);
+  $4.DelegatedOperation ensureOperation() => $_ensure(0);
 
   /// 貼文 ID。
   @$pb.TagNumber(2)
@@ -6949,7 +6864,7 @@ class PublishStorePostResponse extends $pb.GeneratedMessage {
 
 class UnpublishStorePostRequest extends $pb.GeneratedMessage {
   factory UnpublishStorePostRequest({
-    DelegatedOperation? operation,
+    $4.DelegatedOperation? operation,
     $core.String? postId,
     $core.String? etag,
   }) {
@@ -6974,8 +6889,8 @@ class UnpublishStorePostRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: UnpublishStorePostRequest.$_createMessage)
-    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
-        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOM<$4.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $4.DelegatedOperation.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'postId')
     ..aOS(3, _omitFieldNames ? '' : 'etag')
     ..hasRequiredFields = false;
@@ -7007,15 +6922,15 @@ class UnpublishStorePostRequest extends $pb.GeneratedMessage {
   static UnpublishStorePostRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  DelegatedOperation get operation => $_getN(0);
+  $4.DelegatedOperation get operation => $_getN(0);
   @$pb.TagNumber(1)
-  set operation(DelegatedOperation value) => $_setField(1, value);
+  set operation($4.DelegatedOperation value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasOperation() => $_has(0);
   @$pb.TagNumber(1)
   void clearOperation() => $_clearField(1);
   @$pb.TagNumber(1)
-  DelegatedOperation ensureOperation() => $_ensure(0);
+  $4.DelegatedOperation ensureOperation() => $_ensure(0);
 
   /// 貼文 ID。
   @$pb.TagNumber(2)
@@ -7118,7 +7033,7 @@ class UnpublishStorePostResponse extends $pb.GeneratedMessage {
 
 class ScheduleStorePostRequest extends $pb.GeneratedMessage {
   factory ScheduleStorePostRequest({
-    DelegatedOperation? operation,
+    $4.DelegatedOperation? operation,
     $core.String? postId,
     $core.String? etag,
     $0.Timestamp? publishTime,
@@ -7145,8 +7060,8 @@ class ScheduleStorePostRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.social.v1alpha1'),
       createEmptyInstance: ScheduleStorePostRequest.$_createMessage)
-    ..aOM<DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
-        subBuilder: DelegatedOperation.$_createMessage)
+    ..aOM<$4.DelegatedOperation>(1, _omitFieldNames ? '' : 'operation',
+        subBuilder: $4.DelegatedOperation.$_createMessage)
     ..aOS(2, _omitFieldNames ? '' : 'postId')
     ..aOS(3, _omitFieldNames ? '' : 'etag')
     ..aOM<$0.Timestamp>(4, _omitFieldNames ? '' : 'publishTime',
@@ -7179,15 +7094,15 @@ class ScheduleStorePostRequest extends $pb.GeneratedMessage {
   static ScheduleStorePostRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  DelegatedOperation get operation => $_getN(0);
+  $4.DelegatedOperation get operation => $_getN(0);
   @$pb.TagNumber(1)
-  set operation(DelegatedOperation value) => $_setField(1, value);
+  set operation($4.DelegatedOperation value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasOperation() => $_has(0);
   @$pb.TagNumber(1)
   void clearOperation() => $_clearField(1);
   @$pb.TagNumber(1)
-  DelegatedOperation ensureOperation() => $_ensure(0);
+  $4.DelegatedOperation ensureOperation() => $_ensure(0);
 
   /// 貼文 ID。
   @$pb.TagNumber(2)
@@ -7461,7 +7376,7 @@ class Sanction extends $pb.GeneratedMessage {
   factory Sanction({
     $core.String? id,
     SanctionKind? kind,
-    $4.PolicyCategory? category,
+    $5.PolicyCategory? category,
     $core.String? reason,
     $0.Timestamp? createTime,
   }) {
@@ -7491,8 +7406,8 @@ class Sanction extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aE<SanctionKind>(2, _omitFieldNames ? '' : 'kind',
         enumValues: SanctionKind.values)
-    ..aE<$4.PolicyCategory>(3, _omitFieldNames ? '' : 'category',
-        enumValues: $4.PolicyCategory.values)
+    ..aE<$5.PolicyCategory>(3, _omitFieldNames ? '' : 'category',
+        enumValues: $5.PolicyCategory.values)
     ..aOS(4, _omitFieldNames ? '' : 'reason')
     ..aOM<$0.Timestamp>(5, _omitFieldNames ? '' : 'createTime',
         subBuilder: $0.Timestamp.$_createMessage)
@@ -7538,9 +7453,9 @@ class Sanction extends $pb.GeneratedMessage {
 
   /// 政策分類；不設表示沒有對應的分類。
   @$pb.TagNumber(3)
-  $4.PolicyCategory get category => $_getN(2);
+  $5.PolicyCategory get category => $_getN(2);
   @$pb.TagNumber(3)
-  set category($4.PolicyCategory value) => $_setField(3, value);
+  set category($5.PolicyCategory value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasCategory() => $_has(2);
   @$pb.TagNumber(3)
@@ -7725,7 +7640,7 @@ class HiddenContent extends $pb.GeneratedMessage {
     $core.String? storeId,
     $core.String? body,
     $0.Timestamp? createTime,
-    $4.PolicyCategory? category,
+    $5.PolicyCategory? category,
     $core.String? reason,
     $0.Timestamp? hideTime,
   }) {
@@ -7766,8 +7681,8 @@ class HiddenContent extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'body')
     ..aOM<$0.Timestamp>(7, _omitFieldNames ? '' : 'createTime',
         subBuilder: $0.Timestamp.$_createMessage)
-    ..aE<$4.PolicyCategory>(8, _omitFieldNames ? '' : 'category',
-        enumValues: $4.PolicyCategory.values)
+    ..aE<$5.PolicyCategory>(8, _omitFieldNames ? '' : 'category',
+        enumValues: $5.PolicyCategory.values)
     ..aOS(9, _omitFieldNames ? '' : 'reason')
     ..aOM<$0.Timestamp>(10, _omitFieldNames ? '' : 'hideTime',
         subBuilder: $0.Timestamp.$_createMessage)
@@ -7866,9 +7781,9 @@ class HiddenContent extends $pb.GeneratedMessage {
   $0.Timestamp ensureCreateTime() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  $4.PolicyCategory get category => $_getN(7);
+  $5.PolicyCategory get category => $_getN(7);
   @$pb.TagNumber(8)
-  set category($4.PolicyCategory value) => $_setField(8, value);
+  set category($5.PolicyCategory value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasCategory() => $_has(7);
   @$pb.TagNumber(8)

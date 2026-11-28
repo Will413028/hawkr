@@ -9,7 +9,7 @@ ON CONFLICT DO NOTHING;
 SELECT id, request_hash, deleted_at FROM catalog.products WHERE store_id = sqlc.arg(store_id) AND request_id = sqlc.arg(request_id);
 
 -- name: LockOwnProduct :one
-SELECT id, status, first_published_at, content_version FROM catalog.products
+SELECT id, title, status, first_published_at, content_version FROM catalog.products
 WHERE id = sqlc.arg(id) AND store_id = sqlc.arg(store_id) AND deleted_at IS NULL
 FOR UPDATE;
 

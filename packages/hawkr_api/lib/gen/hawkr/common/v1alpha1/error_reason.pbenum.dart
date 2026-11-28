@@ -269,6 +269,8 @@ class ErrorReason extends $pb.ProtobufEnum {
   /// 規格（SKU）目前有貨，不接受補貨訂閱（搭配 failed_precondition）：BuyerAppService.SubscribeRestock。client 改提示直接購買。
   static const ErrorReason RESTOCK_SKU_IN_STOCK =
       ErrorReason._(49, _omitEnumNames ? '' : 'RESTOCK_SKU_IN_STOCK');
+  static const ErrorReason PRODUCT_NOT_PUBLISHED =
+      ErrorReason._(50, _omitEnumNames ? '' : 'PRODUCT_NOT_PUBLISHED');
 
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
@@ -320,10 +322,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     COUPON_ISSUE_LIMIT_REACHED,
     COUPON_QUOTA_EXCEEDED,
     RESTOCK_SKU_IN_STOCK,
+    PRODUCT_NOT_PUBLISHED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 49);
+      $pb.ProtobufEnum.$_initByValueList(values, 50);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
