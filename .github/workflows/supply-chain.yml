@@ -11,7 +11,6 @@ name: supply chain
 # 已知問題的基準（新的才擋）：
 #   - govulncheck：scripts/govulncheck-allowlist.json（每筆有理由與期限）
 #   - OSV-Scanner、shaded-jar-gate（shaded jar 內含的函式庫，scripts/shaded-jar-gate.py）：osv-scanner.toml 的 IgnoredVulns（每筆有理由與 ignoreUntil）
-#   - gitleaks：.gitleaks.toml（誤報放行）與 .gitleaks-baseline.json（待人工確認的歷史命中）
 #   - zizmor：.github/zizmor.yml（每條停用有理由）
 
 on:
@@ -257,11 +256,10 @@ jobs:
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
           mkdir "$RUNNER_TEMP/gitleaks-bin"
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
-      # --redact：輸出不含秘密本體；--baseline-path：基準內的歷史命中不算失敗。
       - name: gitleaks
         run: |
           "$RUNNER_TEMP/gitleaks-bin/gitleaks" git --config .gitleaks.toml \
-            --baseline-path .gitleaks-baseline.json --redact --no-banner --verbose .
+            --redact --no-banner --verbose .
 
   zizmor:
     name: zizmor（workflow 安全）

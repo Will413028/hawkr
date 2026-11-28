@@ -1,5 +1,4 @@
 # gitleaks 設定：沿用內建規則，只對「明確是誤報」的樣式放行。
-# .gitleaks-baseline.json 放待人工確認的歷史命中（只擋新增的外洩），目前為空。
 title = "hawkr gitleaks"
 
 [extend]

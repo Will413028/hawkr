@@ -28,7 +28,7 @@
 | `docs/` | ADR、conventions、跨專案計畫；分界與路徑寫法見 `docs/README.md` | `.github/workflows/repo-hygiene.yml` |
 | `scripts/` | 跨專案的檢查 | `.github/workflows/repo-hygiene.yml` |
 | `mutation/` | mutation 驗收清單，格式見其 `README.md` | `.github/workflows/mutation.yml` |
-| 根目錄供應鏈設定 | `SECURITY.md`、`.github/dependabot.yml`、`.github/zizmor.yml`、`.gitleaks.toml` 與 `.gitleaks-baseline.json`、`osv-scanner.toml`、`scripts/govulncheck-allowlist.json` | `.github/workflows/supply-chain.yml` |
+| 根目錄供應鏈設定 | `SECURITY.md`、`.github/dependabot.yml`、`.github/zizmor.yml`、`.gitleaks.toml`、`osv-scanner.toml`、`scripts/govulncheck-allowlist.json` | `.github/workflows/supply-chain.yml` |
 
 
 - `packages/hawkr-*-ts` 只發佈 TS 原始碼：消費端以 `transpilePackages` 編譯，用 subpath exports，不做 barrel。
