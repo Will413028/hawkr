@@ -109,7 +109,7 @@ func TestBuyerVisibilityPredicateIsInlinedAndUsesNamedIndexes(t *testing.T) {
 		       CASE WHEN i % 10 = 0 THEN 'DRAFT' WHEN i % 10 = 1 THEN 'ARCHIVED' ELSE 'ACTIVE' END,
 		       CASE WHEN i % 10 = 0 THEN NULL ELSE $3::timestamptz - (i || ' minutes')::interval END,
 		       100, 200, i % 500, 'p' || i, $3, $3
-		FROM generate_series(1, 10000) i`, storeIDs, leaf, f.now)
+		FROM generate_series(1, 100000) i`, storeIDs, leaf, f.now)
 	f.exec(`INSERT INTO catalog.product_skus (id, product_id, price, stock_qty, created_at, updated_at)
 		SELECT uuidv7(), id, 150, 10, $1, $1 FROM catalog.products`, f.now)
 	rows, err := f.d.Pool().Query(ctx, `SELECT id, store_id FROM catalog.products WHERE status = 'ACTIVE' AND store_id = ANY($1) ORDER BY id LIMIT 50`, storeIDs[20:])

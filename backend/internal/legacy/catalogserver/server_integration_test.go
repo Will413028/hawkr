@@ -163,7 +163,7 @@ func TestSnapshotRpcsAgainstTheRealCatalog(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := one.Msg.GetData()
-	if one.Msg.GetCode() != codeOK || d.GetProductId() != p.ID.String() || d.GetStoreId() != "7001" || d.GetName() != "手工皂" || !d.GetIsActive() ||
+	if one.Msg.GetCode() != codeOK || d.GetProductId() != p.ID.String() || d.GetStoreId() != fmt.Sprint(f.storeID) || d.GetName() != "手工皂" || !d.GetIsActive() ||
 		d.GetPrice() != "120" || d.GetListPrice() != "150" || d.GetMaxLimit() != "5" || d.GetImageObjectKey() == "" {
 		t.Fatalf("GetProductSimple = %v", one.Msg)
 	}

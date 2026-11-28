@@ -108,7 +108,18 @@ func TestMigrationBackfillsTheRequestHashOfPreexistingAdjustOperations(t *testin
 		t.Fatalf("migration %s not found", target)
 	}
 
-	sku, noMovementSku := f.sku(12), f.sku(5)
+	var categoryID uuid.UUID
+	if err := d.Pool().QueryRow(ctx, `SELECT id FROM catalog.categories WHERE parent_id IS NOT NULL ORDER BY id LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Fatal(err)
+	}
+	createSKU := func(qty int) uuid.UUID {
+		productID, skuID := uuid.NewV7(), uuid.NewV7()
+		f.must(f.exec(`INSERT INTO catalog.products (id, store_id, category_id, title, status, min_price, max_price, created_at, updated_at)
+			VALUES ($1, 501, $2, 'p', 'DRAFT', 100, 100, $3, $3)`, productID, categoryID, epoch))
+		f.must(f.exec(`INSERT INTO catalog.product_skus (id, product_id, price, stock_qty, created_at, updated_at) VALUES ($1, $2, 100, $3, $4, $4)`, skuID, productID, qty, epoch))
+		return skuID
+	}
+	sku, noMovementSku := createSKU(12), createSKU(5)
 	op, orphan := uuid.NewV7(), uuid.NewV7()
 	f.must(f.exec(`INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, created_at) VALUES ($1, 'legacy:1', 'ADJUST', 501, $2), ($3, 'legacy:orphan', 'ADJUST', 501, $2)`, op, epoch, orphan))
 	f.must(f.exec(`INSERT INTO catalog.stock_movements (operation_id, sku_id, delta) VALUES ($1, $2, 7)`, op, sku))

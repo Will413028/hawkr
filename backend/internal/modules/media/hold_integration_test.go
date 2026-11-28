@@ -513,7 +513,7 @@ func TestCopyToSecureKeepsOriginalUntilCopyCompletes(t *testing.T) {
 func TestCopyToSecureAbandonsTheRequestWhenTheOriginalIsGone(t *testing.T) {
 	f := setup(t)
 	src, _ := publicSource(t, f)
-	copyID := requestCopy(t, f, src.ID, f.clock.Now().Add(24*time.Hour))
+	copyID := requestCopy(t, f, src.ID, f.clock.Now().Add(media.CopyHoldTTL))
 	f.clock.Advance(media.CopyHoldTTL + time.Minute)
 	if err := markDeletedInTx(f, src.ID); err != nil {
 		t.Fatal(err)
@@ -738,6 +738,9 @@ func TestGCSkipsAnUncommittedHoldOnAStagedUpload(t *testing.T) {
 	ownerErr := make(chan error, 1)
 	go func() {
 		ownerErr <- f.d.InTx(t.Context(), func(ctx context.Context) error {
+			if _, err := f.m.Confirm(ctx, owner, res.Token, media.VisibilitySecure); err != nil {
+				return err
+			}
 			if err := f.m.Hold(ctx, []uuid.UUID{assetID}, holdSource, uuid.New(), f.clock.Now().Add(100*media.UploadTTL)); err != nil {
 				return err
 			}
