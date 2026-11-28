@@ -21,6 +21,8 @@ on:
       - 'backend/internal/**'
       - 'backend/Makefile'
       - 'backend/scripts/gen-sqlc.sh'
+      - 'backend/scripts/integration-packages.py'
+      - 'backend/scripts/test_integration_packages.py'
       - 'backend/docs/代碼管理（CodeMeta）/**'
       - 'backend/pkg/media/ref_type.go'
       - 'website/lib/codemeta/generated.ts'
@@ -86,9 +88,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout PR history
+        if: github.event_name == 'pull_request' && github.base_ref != 'main'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout default history
+        if: github.event_name != 'pull_request' || github.base_ref == 'main'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: integration package selector tests
+        run: python3 -m unittest scripts/test_integration_packages.py
       - name: 安裝 libvips（media 模組以 cgo 連結）
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -104,6 +116,11 @@ jobs:
           restore-keys: |
             go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
             go-monolith-integration-${{ runner.os }}-
+      - name: 讀取 PR 改動路徑
+        if: github.event_name == 'pull_request' && github.base_ref != 'main'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git -c core.quotepath=false diff --name-only --no-renames "origin/$BASE_REF"...HEAD > "$RUNNER_TEMP/changed-files"
       # 只跑加上 integration tag 後測試執行檔會改變的 package（自己或連結進來的依賴有 tag 檔，
       # 見 scripts/integration-packages.py）；其餘 package 的測試執行檔和 check job 的 go test 相同，不重跑。
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
@@ -114,9 +131,17 @@ jobs:
           TESTCONTAINERS_RYUK_RECONNECTION_TIMEOUT: 15m
           HAWKR_STRESS_TESTS: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
         run: |
-          python3 scripts/integration-packages.py > "$RUNNER_TEMP/integration-packages"
+          args=()
+          if [[ -f "$RUNNER_TEMP/changed-files" ]]; then
+            args+=(--changed-files "$RUNNER_TEMP/changed-files")
+          fi
+          python3 scripts/integration-packages.py "${args[@]}" > "$RUNNER_TEMP/integration-packages"
           mapfile -t pkgs < "$RUNNER_TEMP/integration-packages"
           echo "integration packages: ${#pkgs[@]}"
+          if [[ ${#args[@]} -gt 0 && ${#pkgs[@]} -eq 0 ]]; then
+            echo "no affected integration packages; skipping go test"
+            exit 0
+          fi
           go test -race -timeout 15m -tags integration "${pkgs[@]}"
       - name: 刪掉 7 天沒用到的 build cache
         if: always() && github.event_name == 'push'
