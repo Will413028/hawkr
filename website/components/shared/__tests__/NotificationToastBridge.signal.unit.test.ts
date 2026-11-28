@@ -139,6 +139,7 @@ describe("NotificationToastBridge inbox signal", () => {
 		setVisibility("hidden");
 		render(React.createElement(NotificationToastBridge));
 		await signal({ unreadCount: 3, hints: [], newInboxItemIds: ["12"] });
+		expect(repo.listInboxItems).not.toHaveBeenCalled();
 		expect(toast.show).not.toHaveBeenCalled();
 	});
 

@@ -1,15 +1,55 @@
 # Hawkr
 
-English | [繁體中文](README.zh-TW.md)
+An e-commerce platform for buyers, sellers, and platform operators: a Go backend, two Next.js web apps, and two Flutter apps sharing one Protobuf API contract.
 
-An e-commerce platform serving buyers, sellers, and platform operators (no longer in operation). This repository merges the `dev` branches of five formerly separate repositories with their full commit history; credentials and keys have been removed from history or replaced with `REDACTED`.
+## Architecture
 
-| Directory | Original repository | Stack |
-|---|---|---|
-| `backend/` | backend-payuni | Go modular monolith, being migrated from the Go / Java microservices and REST gateway that remain alongside it |
-| `website/` | hawkr-website | Next.js consumer website |
-| `admin/` | hawkr-admin | Next.js admin |
-| `buyer-app/` | hawkr_buyer | Flutter |
-| `seller-app/` | hawkr_seller | Flutter |
-| `api/` | — | Protobuf + Connect contract for the external API |
-| `packages/` | — | Shared packages: generated API clients (TypeScript, Dart), auth, UI text, icons, address codes |
+```
+buyer-app / seller-app (Flutter) ─┐
+website (Next.js, buyers+sellers) ─┼─ Connect (api/) ─▶ backend (Go modular monolith) ─▶ PostgreSQL
+admin (Next.js, operators) ───────┘
+```
+
+- **API contract:** `api/` holds the Protobuf + [Connect](https://connectrpc.com) definitions. Clients call it through generated code (`packages/hawkr-api-ts`, `packages/hawkr_api`); endpoints still served by the REST gateway are described in `backend/api/openapi/openapi.yaml`.
+- **Backend:** a Go modular monolith with enforced dependency directions (`backend/internal/modules/`). Services not yet moved into it run behind a REST gateway in `backend/services/` and `backend/gateway/`.
+- **Shared packages:** UI text catalog, icons, Taiwan address codes, and native sign-in live in `packages/`, generated from a single source where possible.
+
+## Repository layout
+
+| Path | What it is |
+|---|---|
+| [`backend/`](backend/) | Go modular monolith |
+| [`website/`](website/) | Next.js site for buyers and sellers |
+| [`admin/`](admin/) | Next.js operator console |
+| [`buyer-app/`](buyer-app/) | Flutter buyer app |
+| [`seller-app/`](seller-app/) | Flutter seller app |
+| [`api/`](api/) | Protobuf + Connect contract |
+| [`packages/`](packages/) | Shared TypeScript and Dart packages |
+| [`docs/`](docs/) | Architecture decision records and cross-project conventions |
+| [`mutation/`](mutation/) | Mutation-testing manifests run in CI |
+
+## Getting started
+
+Tool versions are pinned in the repository: Go in `backend/.go-version`, Node in `.nvmrc`, pnpm in `package.json` (`packageManager`), Flutter in each app's `.fvmrc`, buf in `api/.buf-version`.
+
+```bash
+pnpm install        # website and admin share one pnpm workspace
+```
+
+Each project's README has its own setup and run commands:
+[backend](backend/README.md) · [website](website/README.md) · [admin](admin/README.md) · [buyer-app](buyer-app/README.md) · [seller-app](seller-app/README.md)
+
+## Development
+
+- **Checks:** CI lives in [`.github/workflows/`](.github/workflows/); run the same checks locally before pushing. Each project's README lists them.
+- **Changing the API:** edit `api/`, then regenerate every client in the same change (`make connect` in `backend/`, `pnpm --filter @hawkr/api gen:api`, `../../api/generate.sh buf.gen.yaml` in `packages/hawkr_api`).
+- **Conventions:** [`AGENTS.md`](AGENTS.md) holds the cross-project rules; decisions are recorded in [`docs/adr/`](docs/adr/).
+- **Branches:** work lands on `dev` through pull requests; `main` only receives `dev` via merge commits.
+
+## Security
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE). Third-party assets keep their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
