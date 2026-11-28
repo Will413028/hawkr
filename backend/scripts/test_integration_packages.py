@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import importlib.util
 import io
@@ -82,6 +84,12 @@ class IntegrationPackagesTest(unittest.TestCase):
             {CATALOG, SELLER},
         )
 
+    def test_unmapped_non_ascii_backend_path_keeps_all_integration_packages(self):
+        self.assertEqual(
+            self.selected(["backend/docs/代碼管理（CodeMeta）/x.md"]),
+            {CATALOG, SELLER},
+        )
+
     def test_test_input_paths_keep_all_integration_packages(self):
         for path in (
             "api/hawkr/procurement/v1alpha1/procurement.proto",
@@ -147,6 +155,20 @@ class IntegrationPackagesTest(unittest.TestCase):
         with patch.object(integration_packages, "go_list", side_effect=[[], [], []]):
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 result = integration_packages.main([])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("the filter is broken", stderr.getvalue())
+
+    def test_empty_full_selection_in_changed_files_mode_is_a_failure(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            changed_files = Path(temp_dir) / "changed-files"
+            changed_files.write_text("docs/README.md\n", encoding="utf-8")
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with patch.object(integration_packages, "go_list", side_effect=[[], [], PACKAGES]):
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    result = integration_packages.main(["--changed-files", str(changed_files)])
 
         self.assertEqual(result, 1)
         self.assertEqual(stdout.getvalue(), "")

@@ -6,8 +6,7 @@ linked into its test binary, change under `-tags integration`. Every other packa
 builds the same test binary with and without the tag, so the plain `go test` run
 already covers it.
 
-Run from backend/ with GOWORK=off. Prints one import path per line. Unfiltered
-mode exits non-zero when nothing qualifies; changed-file mode allows an empty result.
+Run from backend/ with GOWORK=off. Prints one import path per line.
 """
 
 import argparse
@@ -193,10 +192,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.changed_files
         else None
     )
+    full_selection = select_packages(plain, tagged, packages)
     selected = select_packages(plain, tagged, packages, changed_paths)
 
     if not selected:
-        if args.changed_files:
+        if args.changed_files and full_selection:
             return 0
         print("integration-packages: no package changes under the integration tag; the filter is broken", file=sys.stderr)
         return 1

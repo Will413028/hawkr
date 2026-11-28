@@ -120,7 +120,7 @@ jobs:
         if: github.event_name == 'pull_request' && github.base_ref != 'main'
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: git diff --name-only --no-renames "origin/$BASE_REF"...HEAD > "$RUNNER_TEMP/changed-files"
+        run: git -c core.quotepath=false diff --name-only --no-renames "origin/$BASE_REF"...HEAD > "$RUNNER_TEMP/changed-files"
       # 只跑加上 integration tag 後測試執行檔會改變的 package（自己或連結進來的依賴有 tag 檔，
       # 見 scripts/integration-packages.py）；其餘 package 的測試執行檔和 check job 的 go test 相同，不重跑。
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
