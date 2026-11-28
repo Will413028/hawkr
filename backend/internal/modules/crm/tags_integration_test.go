@@ -50,15 +50,15 @@ func TestAddCustomerTagsConcurrentSameNameCreatesOneTag(t *testing.T) {
 	f := setup(t)
 	const buyers = 16
 	for i := 0; i < buyers; i++ {
-		f.mustOrder(fmt.Sprintf("evt-%d", i), fmt.Sprintf("O%d", i), storeA, buyer1+int64(i), 100)
+		f.mustOrder(fmt.Sprintf("evt-%d", i), fmt.Sprintf("O%d", i), f.storeA, buyer1+int64(i), 100)
 	}
 	f.exec(`CREATE FUNCTION crm.slow_tag_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.2); RETURN NEW; END $$`)
 	f.exec(`CREATE TRIGGER slow_tag_insert BEFORE INSERT ON crm.tags FOR EACH ROW EXECUTE FUNCTION crm.slow_tag_insert()`)
 	errs := parallel(buyers, func(i int) error {
-		return errOnly(f.m.AddCustomerTags(context.Background(), storeA, buyer1+int64(i), []string{"常客"}))
+		return errOnly(f.m.AddCustomerTags(context.Background(), f.storeA, buyer1+int64(i), []string{"常客"}))
 	})
 	noErrors(t, errs)
-	if got := f.tagNames(storeA); len(got) != 1 || got[0] != "常客" {
+	if got := f.tagNames(f.storeA); len(got) != 1 || got[0] != "常客" {
 		t.Fatalf("標籤 %v，預期只有一個「常客」", got)
 	}
 	if n := f.count("crm.customer_tags"); n != buyers {
@@ -71,11 +71,11 @@ func TestAddCustomerTagsConcurrentSameNameCreatesOneTag(t *testing.T) {
 func TestAddCustomerTagsIsAtomicWhenALaterStepFails(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
 	f.exec(`CREATE FUNCTION crm.fail_on_boom() RETURNS trigger LANGUAGE plpgsql AS $$
 		BEGIN IF NEW.name = 'boom' THEN RAISE EXCEPTION 'injected failure'; END IF; RETURN NEW; END $$`)
 	f.exec(`CREATE TRIGGER fail_on_boom BEFORE INSERT ON crm.tags FOR EACH ROW EXECUTE FUNCTION crm.fail_on_boom()`)
-	_, err := f.m.AddCustomerTags(context.Background(), storeA, buyer1, []string{"alpha", "boom", "gamma"})
+	_, err := f.m.AddCustomerTags(context.Background(), f.storeA, buyer1, []string{"alpha", "boom", "gamma"})
 	if err == nil || !strings.Contains(err.Error(), "injected failure") {
 		t.Fatalf("err=%v，預期注入的失敗", err)
 	}
@@ -91,8 +91,8 @@ func TestAddCustomerTagsIsAtomicWhenALaterStepFails(t *testing.T) {
 func TestAddCustomerTagsWithOneTooLongNameWritesNothing(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	_, err := f.m.AddCustomerTags(context.Background(), storeA, buyer1, []string{"ok", strings.Repeat("長", crm.MaxTagNameRunes+1)})
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	_, err := f.m.AddCustomerTags(context.Background(), f.storeA, buyer1, []string{"ok", strings.Repeat("長", crm.MaxTagNameRunes+1)})
 	wantKind(t, err, apperr.KindInvalidInput, "")
 	if f.count("crm.tags") != 0 || f.count("crm.customer_tags") != 0 {
 		t.Fatal("超長名稱使整批的其他標籤被寫入")
@@ -102,22 +102,22 @@ func TestAddCustomerTagsWithOneTooLongNameWritesNothing(t *testing.T) {
 func TestAddCustomerTagsInputValidation(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
 	ctx := context.Background()
 	var many []string
 	for i := 0; i <= crm.MaxTagsPerCall; i++ {
 		many = append(many, fmt.Sprintf("t%d", i))
 	}
 	for name, names := range map[string][]string{"空清單": nil, "超過單次上限": many, "空白名稱": {"  "}} {
-		if _, err := f.m.AddCustomerTags(ctx, storeA, buyer1, names); apperr.KindOf(err) != apperr.KindInvalidInput {
+		if _, err := f.m.AddCustomerTags(ctx, f.storeA, buyer1, names); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%s：err=%v，預期 InvalidInput", name, err)
 		}
 	}
-	f.mustAddTags(storeA, buyer1, " 常客", "常客 ", "常客")
-	if got := f.tagNames(storeA); len(got) != 1 {
+	f.mustAddTags(f.storeA, buyer1, " 常客", "常客 ", "常客")
+	if got := f.tagNames(f.storeA); len(got) != 1 {
 		t.Fatalf("標籤 %v，預期去重成一個", got)
 	}
-	f.mustAddTags(storeA, buyer1, "常客")
+	f.mustAddTags(f.storeA, buyer1, "常客")
 	if n := f.count("crm.customer_tags"); n != 1 {
 		t.Fatalf("貼標 %d 筆，預期 1", n)
 	}
@@ -127,7 +127,7 @@ func TestAddCustomerTagsInputValidation(t *testing.T) {
 func TestAddCustomerTagsToNonCustomerIsNotFoundAndCreatesNothing(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	_, err := f.m.AddCustomerTags(context.Background(), storeA, buyer1, []string{"常客"})
+	_, err := f.m.AddCustomerTags(context.Background(), f.storeA, buyer1, []string{"常客"})
 	wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	if f.count("crm.tags") != 0 {
 		t.Fatal("非客戶的貼標建立了標籤")
@@ -138,23 +138,23 @@ func TestAddCustomerTagsToNonCustomerIsNotFoundAndCreatesNothing(t *testing.T) {
 func TestCustomerTagsRejectsAnotherStoresTag(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	tagB, err := f.m.CreateTag(context.Background(), storeB, "他店的標籤")
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	tagB, err := f.m.CreateTag(context.Background(), f.storeB, "他店的標籤")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.db.Pool().Exec(context.Background(),
-		"INSERT INTO crm.customer_tags (store_id, buyer_id, tag_id, created_at) VALUES ($1, $2, $3, now())", storeA, buyer1, tagB.ID)
+		"INSERT INTO crm.customer_tags (store_id, buyer_id, tag_id, created_at) VALUES ($1, $2, $3, now())", f.storeA, buyer1, tagB.ID)
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != "23503" {
 		t.Fatalf("err=%v，預期外鍵違反 23503", err)
 	}
-	tagA, err := f.m.CreateTag(context.Background(), storeA, "本店")
+	tagA, err := f.m.CreateTag(context.Background(), f.storeA, "本店")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.db.Pool().Exec(context.Background(),
-		"INSERT INTO crm.customer_tags (store_id, buyer_id, tag_id, created_at) VALUES ($1, $2, $3, now())", storeA, buyer2, tagA.ID)
+		"INSERT INTO crm.customer_tags (store_id, buyer_id, tag_id, created_at) VALUES ($1, $2, $3, now())", f.storeA, buyer2, tagA.ID)
 	if !errors.As(err, &pgErr) || pgErr.Code != "23503" {
 		t.Fatalf("非客戶貼標 err=%v，預期外鍵違反 23503", err)
 	}
@@ -164,60 +164,60 @@ func TestCreateRenameDeleteTag(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	a, err := f.m.CreateTag(ctx, storeA, "  甲  ")
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	a, err := f.m.CreateTag(ctx, f.storeA, "  甲  ")
 	if err != nil || a.Name != "甲" {
 		t.Fatalf("tag=%+v err=%v（名稱要 trim）", a, err)
 	}
-	b, err := f.m.CreateTag(ctx, storeA, "乙")
+	b, err := f.m.CreateTag(ctx, f.storeA, "乙")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.m.CreateTag(ctx, storeA, "甲")
+	_, err = f.m.CreateTag(ctx, f.storeA, "甲")
 	wantKind(t, err, apperr.KindAlreadyExists, crm.ReasonTagNameTaken)
-	wantKind(t, errOnly(f.m.RenameTag(ctx, storeA, b.ID, "甲")), apperr.KindAlreadyExists, crm.ReasonTagNameTaken)
-	if _, err := f.m.CreateTag(ctx, storeB, "甲"); err != nil {
+	wantKind(t, errOnly(f.m.RenameTag(ctx, f.storeA, b.ID, "甲")), apperr.KindAlreadyExists, crm.ReasonTagNameTaken)
+	if _, err := f.m.CreateTag(ctx, f.storeB, "甲"); err != nil {
 		t.Fatalf("別家店同名被擋：%v", err)
 	}
-	if _, err := f.m.RenameTag(ctx, storeA, b.ID, "乙"); err != nil {
+	if _, err := f.m.RenameTag(ctx, f.storeA, b.ID, "乙"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.RenameTag(ctx, storeA, b.ID, "丙"); err != nil {
+	if _, err := f.m.RenameTag(ctx, f.storeA, b.ID, "丙"); err != nil {
 		t.Fatal(err)
 	}
-	wantKind(t, errOnly(f.m.RenameTag(ctx, storeB, b.ID, "丁")), apperr.KindNotFound, crm.ReasonTagNotFound)
-	wantKind(t, errOnly(f.m.RenameTag(ctx, storeA, uuid.UUID{}, "丁")), apperr.KindNotFound, crm.ReasonTagNotFound)
-	wantKind(t, f.m.DeleteTag(ctx, storeB, b.ID), apperr.KindNotFound, crm.ReasonTagNotFound)
-	f.mustAddTags(storeA, buyer1, "甲", "丙")
-	if err := f.m.DeleteTag(ctx, storeA, b.ID); err != nil {
+	wantKind(t, errOnly(f.m.RenameTag(ctx, f.storeB, b.ID, "丁")), apperr.KindNotFound, crm.ReasonTagNotFound)
+	wantKind(t, errOnly(f.m.RenameTag(ctx, f.storeA, uuid.UUID{}, "丁")), apperr.KindNotFound, crm.ReasonTagNotFound)
+	wantKind(t, f.m.DeleteTag(ctx, f.storeB, b.ID), apperr.KindNotFound, crm.ReasonTagNotFound)
+	f.mustAddTags(f.storeA, buyer1, "甲", "丙")
+	if err := f.m.DeleteTag(ctx, f.storeA, b.ID); err != nil {
 		t.Fatal(err)
 	}
-	c, err := f.m.GetCustomer(ctx, storeA, buyer1)
+	c, err := f.m.GetCustomer(ctx, f.storeA, buyer1)
 	if err != nil || len(c.Tags) != 1 || c.Tags[0].Name != "甲" {
 		t.Fatalf("customer=%+v err=%v，預期只剩「甲」", c, err)
 	}
-	wantKind(t, f.m.DeleteTag(ctx, storeA, b.ID), apperr.KindNotFound, crm.ReasonTagNotFound)
+	wantKind(t, f.m.DeleteTag(ctx, f.storeA, b.ID), apperr.KindNotFound, crm.ReasonTagNotFound)
 }
 
 func TestRemoveCustomerTagIsIdempotent(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	tg, err := f.m.CreateTag(ctx, storeA, "甲")
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	tg, err := f.m.CreateTag(ctx, f.storeA, "甲")
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.mustAddTags(storeA, buyer1, "甲")
+	f.mustAddTags(f.storeA, buyer1, "甲")
 	for i := 0; i < 2; i++ {
-		if _, err := f.m.RemoveCustomerTag(ctx, storeA, buyer1, tg.ID); err != nil {
+		if _, err := f.m.RemoveCustomerTag(ctx, f.storeA, buyer1, tg.ID); err != nil {
 			t.Fatalf("第 %d 次移除：%v", i, err)
 		}
 	}
 	if n := f.count("crm.customer_tags"); n != 0 {
 		t.Fatalf("貼標 %d 筆", n)
 	}
-	if got := f.tagNames(storeA); len(got) != 1 {
+	if got := f.tagNames(f.storeA); len(got) != 1 {
 		t.Fatalf("移除關聯不該刪標籤：%v", got)
 	}
 }
@@ -227,31 +227,31 @@ func TestTagLimits(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
 	f.exec(`INSERT INTO crm.tags (id, store_id, name, created_at, updated_at)
-		SELECT gen_random_uuid(), $1, 'fill' || g, now(), now() FROM generate_series(1, $2) g`, storeA, crm.MaxTagsPerStore-1)
-	if _, err := f.m.CreateTag(ctx, storeA, "最後一個"); err != nil {
+		SELECT gen_random_uuid(), $1, 'fill' || g, now(), now() FROM generate_series(1, $2) g`, f.storeA, crm.MaxTagsPerStore-1)
+	if _, err := f.m.CreateTag(ctx, f.storeA, "最後一個"); err != nil {
 		t.Fatalf("第 %d 個標籤被擋：%v", crm.MaxTagsPerStore, err)
 	}
-	_, err := f.m.CreateTag(ctx, storeA, "多一個")
+	_, err := f.m.CreateTag(ctx, f.storeA, "多一個")
 	wantKind(t, err, apperr.KindFailedPrecondition, crm.ReasonTagLimit)
-	_, err = f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"最後一個", "又一個新的"})
+	_, err = f.m.AddCustomerTags(ctx, f.storeA, buyer1, []string{"最後一個", "又一個新的"})
 	wantKind(t, err, apperr.KindFailedPrecondition, crm.ReasonTagLimit)
 	if n := f.count("crm.customer_tags"); n != 0 {
 		t.Fatalf("超過每店上限的整批仍貼了 %d 筆", n)
 	}
-	f.mustOrder("evt-2", "O2", storeB, buyer1, 100)
+	f.mustOrder("evt-2", "O2", f.storeB, buyer1, 100)
 	var names []string
 	for i := 0; i < crm.MaxTagsPerCustomer; i++ {
 		names = append(names, fmt.Sprintf("c%d", i))
 	}
-	f.mustAddTags(storeB, buyer1, names...)
-	_, err = f.m.AddCustomerTags(ctx, storeB, buyer1, []string{"c0", "超過"})
+	f.mustAddTags(f.storeB, buyer1, names...)
+	_, err = f.m.AddCustomerTags(ctx, f.storeB, buyer1, []string{"c0", "超過"})
 	wantKind(t, err, apperr.KindFailedPrecondition, crm.ReasonTagLimit)
-	if got := f.tagNames(storeB); len(got) != crm.MaxTagsPerCustomer {
+	if got := f.tagNames(f.storeB); len(got) != crm.MaxTagsPerCustomer {
 		t.Fatalf("店 B 有 %d 個標籤，預期 %d（超過上限的整批要連新標籤一起回滾）", len(got), crm.MaxTagsPerCustomer)
 	}
-	f.mustAddTags(storeB, buyer1, names...)
+	f.mustAddTags(f.storeB, buyer1, names...)
 }
 
 func (f *fixture) slowInsert(table string) {
@@ -266,18 +266,18 @@ func TestAddCustomerTagsConcurrentWithDeleteTag(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	tag, err := f.m.CreateTag(ctx, storeA, "常客")
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	tag, err := f.m.CreateTag(ctx, f.storeA, "常客")
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.slowInsert("customer_tags")
 	errs := parallel(2, func(i int) error {
 		if i == 0 {
-			return errOnly(f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"常客"}))
+			return errOnly(f.m.AddCustomerTags(ctx, f.storeA, buyer1, []string{"常客"}))
 		}
 		time.Sleep(100 * time.Millisecond)
-		return f.m.DeleteTag(ctx, storeA, tag.ID)
+		return f.m.DeleteTag(ctx, f.storeA, tag.ID)
 	})
 	noErrors(t, errs)
 	if n := f.scalar("SELECT count(*) FROM crm.customer_tags ct LEFT JOIN crm.tags t ON t.store_id = ct.store_id AND t.id = ct.tag_id WHERE t.id IS NULL"); n != 0 {
@@ -290,25 +290,25 @@ func TestAddCustomerTagsConcurrentWithRenameTag(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	old, err := f.m.CreateTag(ctx, storeA, "舊名")
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	old, err := f.m.CreateTag(ctx, f.storeA, "舊名")
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.slowInsert("tags")
 	errs := parallel(2, func(i int) error {
 		if i == 0 {
-			return errOnly(f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"新名"}))
+			return errOnly(f.m.AddCustomerTags(ctx, f.storeA, buyer1, []string{"新名"}))
 		}
 		time.Sleep(100 * time.Millisecond)
-		_, err := f.m.RenameTag(ctx, storeA, old.ID, "新名")
+		_, err := f.m.RenameTag(ctx, f.storeA, old.ID, "新名")
 		if crm.ReasonOf(err) == crm.ReasonTagNameTaken {
 			return nil
 		}
 		return err
 	})
 	noErrors(t, errs)
-	if got := f.tagNames(storeA); len(got) == 0 {
+	if got := f.tagNames(f.storeA); len(got) == 0 {
 		t.Fatal("標籤全不見了")
 	}
 }

@@ -15,13 +15,16 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -30,7 +33,12 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
 func setup(t *testing.T) (*db.DB, *reviewqueue.Module) {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: seller.Migrations()}, migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "moderation", Dir: moderation.Migrations()}))
+	d := pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: "identity", Dir: identity.Migrations()},
+		migrate.Module{Name: "seller", Dir: seller.Migrations()},
+		migrate.Module{Name: "payment", Dir: payment.Migrations()},
+		migrate.Module{Name: "moderation", Dir: moderation.Migrations()},
+	))
 	return d, reviewqueue.New(reviewqueue.Deps{DB: d})
 }
 
@@ -48,31 +56,37 @@ func must(t *testing.T, err error) {
 func seedStore(t *testing.T, d *db.DB, n int, name string) int64 {
 	t.Helper()
 	ctx := context.Background()
-	var id int64
-	must(t, d.Conn(ctx).QueryRow(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $4) RETURNING store_id`, 2600000000+int64(n), 1000+int64(n), name, base).Scan(&id))
+	accountID, err := sellerfixture.NewAccount(ctx, d, base)
+	must(t, err)
+	id, err := sellerfixture.ExposableStoreNamed(ctx, d, accountID, base, name+fmt.Sprint(n))
+	must(t, err)
 	return id
 }
 
 func seedReport(t *testing.T, d *db.DB, storeID int64, category string, created time.Time) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
-	id := uuid.NewV7()
 	buyer := reporterSeq.Add(1)
-	_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at)
-		VALUES ($1, $2, $3, '測試', $4, $5, $5)`, id, storeID, category, buyer, created)
+	module, err := sellerfixture.NewModule(d, func() time.Time { return created })
 	must(t, err)
-	return id
+	report, err := module.SubmitReport(ctx, seller.SubmitReportInput{StoreID: storeID, Category: policy.Category(category), Description: "測試", ReporterBuyerID: buyer})
+	must(t, err)
+	return report.ReportID
 }
 
 func seedOrder(t *testing.T, d *db.DB, no int, received, due time.Time) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
-	id := uuid.NewV7()
-	_, err := d.Conn(ctx).Exec(ctx, `INSERT INTO seller.authority_orders (id, agency, document_no, received_at, kind, summary, due_at, hold_until, registered_at, registered_by_admin_id)
-		VALUES ($1, '測試機關', $2, $3, 'OTHER', '測試', $4, $5, $3, 1)`, id, fmt.Sprintf("測字第%d號", no), received, due, received.Add(184*24*time.Hour))
+	accountID, err := sellerfixture.NewAccount(ctx, d, received)
 	must(t, err)
-	return id
+	module, err := sellerfixture.NewModule(d, func() time.Time { return received })
+	must(t, err)
+	result, err := module.CreateAuthorityOrder(ctx, seller.CreateAuthorityOrderInput{
+		AdminID: 1, Agency: "測試機關", DocumentNo: fmt.Sprintf("測字第%d號", no), ReceivedAt: received,
+		Kind: seller.AuthorityOther, Summary: "測試", Targets: []seller.AuthorityTargetInput{{AccountID: accountID}}, DueAt: &due,
+	})
+	must(t, err)
+	return result.Order.ID
 }
 
 func world(t *testing.T, d *db.DB) {

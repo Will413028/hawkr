@@ -24,18 +24,17 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
-const testAccountID = int64(1001)
-
 type catalogBuyerFixture struct {
-	t       *testing.T
-	d       *db.DB
-	bus     *events.Bus
-	buyers  *buyer.Module
-	catalog *catalog.Module
-	storeID int64
-	accts   *identity.Module
-	seq     int
-	logins  int
+	t         *testing.T
+	d         *db.DB
+	bus       *events.Bus
+	buyers    *buyer.Module
+	catalog   *catalog.Module
+	storeID   int64
+	accountID int64
+	accts     *identity.Module
+	seq       int
+	logins    int
 }
 
 func newCatalogBuyerFixture(t *testing.T) *catalogBuyerFixture {
@@ -49,7 +48,7 @@ func newCatalogBuyerFixture(t *testing.T) *catalogBuyerFixture {
 	))
 	bus := events.NewBus()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	now := func() time.Time { return time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC) }
+	now := func() time.Time { return catalogBuyerNow() }
 	f := &catalogBuyerFixture{t: t, d: d, bus: bus}
 	f.accts = identity.New(identity.Deps{DB: d, Events: bus, Now: now, Logger: logger})
 	f.buyers = buyer.New(buyer.Deps{DB: d, Events: bus, Now: now, Logger: logger})
@@ -63,18 +62,21 @@ func newCatalogBuyerFixture(t *testing.T) *catalogBuyerFixture {
 func (f *catalogBuyerFixture) seedExposableStore() int64 {
 	f.t.Helper()
 	ctx := context.Background()
-	storeID, err := sellerfixture.ExposableStore(ctx, f.d, testAccountID, time.Now())
+	now := catalogBuyerNow()
+	accountID, err := sellerfixture.NewAccount(ctx, f.d, now)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	f.accountID = accountID
+	storeID, err := sellerfixture.ExposableStore(ctx, f.d, accountID, now)
 	if err != nil {
 		f.t.Fatal(err)
 	}
 	return storeID
 }
 
-func (f *catalogBuyerFixture) exec(ctx context.Context, sql string, args ...any) {
-	f.t.Helper()
-	if _, err := f.d.Pool().Exec(ctx, sql, args...); err != nil {
-		f.t.Fatal(err)
-	}
+func catalogBuyerNow() time.Time {
+	return time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
 }
 
 func (f *catalogBuyerFixture) newBuyer(ctx context.Context) int64 {
@@ -124,7 +126,7 @@ func (f *catalogBuyerFixture) product(ctx context.Context, stocks ...int32) cata
 			skus[i].Option1 = values[i]
 		}
 	}
-	p, err := f.catalog.CreateProduct(ctx, f.storeID, media.Uploader{ID: testAccountID}, uuid.NewV7(), input, nil)
+	p, err := f.catalog.CreateProduct(ctx, f.storeID, media.Uploader{ID: f.accountID}, uuid.NewV7(), input, nil)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -290,7 +292,9 @@ func TestBuyerSkusDoesNotFindTheSKUOfAnUnexposableStore(t *testing.T) {
 	if got, found, err := skus.RestockSku(ctx, sku); err != nil || !found || !got.InStock {
 		t.Fatalf("exposable store: sku=%+v found=%v err=%v, want in stock", got, found, err)
 	}
-	f.exec(ctx, "UPDATE seller.kyc_applications SET status = 'REJECTED' WHERE store_id = $1", f.storeID)
+	if err := sellerfixture.SetPayoutCapability(ctx, f.d, f.storeID, catalogBuyerNow(), false); err != nil {
+		t.Fatal(err)
+	}
 	if got, found, err := skus.RestockSku(ctx, sku); err != nil || found {
 		t.Fatalf("unexposable store: sku=%+v found=%v err=%v, want not found", got, found, err)
 	}
@@ -305,7 +309,9 @@ func TestSocialCardsAreNotAvailableWhenTheProductIsNotBuyerVisible(t *testing.T)
 	if err != nil || !got[product.ID].Available {
 		t.Fatalf("exposable store: card=%+v err=%v, want available", got[product.ID], err)
 	}
-	f.exec(ctx, "UPDATE seller.kyc_applications SET status = 'REJECTED' WHERE store_id = $1", f.storeID)
+	if err := sellerfixture.SetPayoutCapability(ctx, f.d, f.storeID, catalogBuyerNow(), false); err != nil {
+		t.Fatal(err)
+	}
 	got, err = cards.Cards(ctx, []uuid.UUID{product.ID}, true)
 	if err != nil || len(got) != 1 || got[product.ID].Available {
 		t.Fatalf("unexposable store: cards=%+v err=%v, want the card present and not available", got, err)

@@ -38,6 +38,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -213,10 +214,6 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeleted)
 	events.Subscribe(bus, f.module.Retention().OnStoreRetired)
-	f.exec(t, `DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
 }
 
@@ -256,28 +253,24 @@ func (f *fixture) newBuyer(t *testing.T) (buyerID, accountID int64) {
 
 func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
-	return f.exposableStoreOn(t, f.next())
+	return f.exposableStoreWithNewAccount(t)
 }
 
 func (f *fixture) exposableStoreOnIdentityAccount(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
-		t.Fatal(err)
-	}
-	return f.exposableStoreOn(t, accountID)
+	return f.exposableStoreWithNewAccount(t)
 }
 
-func (f *fixture) exposableStoreOn(t *testing.T, accountID int64) (storeID, _ int64) {
+func (f *fixture) exposableStoreWithNewAccount(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
-	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $2, '測試店', 'logo/k', uuidv7(), '63000010', $3, $3)`, accountID, accountID, f.clock())
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
+	ctx := context.Background()
+	var err error
+	if accountID, err = sellerfixture.NewAccount(ctx, f.db, f.clock()); err != nil {
 		t.Fatal(err)
 	}
-	f.exec(t, `INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
-	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
-	f.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.clock())
+	if storeID, err = sellerfixture.ExposableStore(ctx, f.db, accountID, f.clock()); err != nil {
+		t.Fatal(err)
+	}
 	return storeID, accountID
 }
 

@@ -55,6 +55,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -90,6 +91,7 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 
 type adminStack struct {
 	db              *db.DB
+	now             *time.Time
 	identity        *identity.Module
 	buyers          *buyer.Module
 	social          *social.Module
@@ -135,20 +137,22 @@ func startAdminStack(t *testing.T) *adminStack {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
-	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
+	now := time.Now().UTC()
+	clock := func() time.Time { return now }
+	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: clock, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: clock, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	fakeMedia := media.NewFake()
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: fakeMedia, Orders: noOrders{}, KYCMAC: sealtest.MAC(t),
-		ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log,
-		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
+		ProductStores: noProducts{}, Registry: noRegistry{}, Now: clock, Logger: log,
+		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, clock), Events: bus, Jobs: queue, Now: clock, Logger: log}),
 	})
-	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noOrders{}, Now: time.Now, Logger: log})
-	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellers, Now: time.Now, Logger: log}
-	reader := seller.NewReader(d, time.Now)
+	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noOrders{}, Now: clock, Logger: log})
+	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellers, Now: clock, Logger: log}
+	reader := seller.NewReader(d, clock)
 	socialModule := social.New(social.Deps{
-		DB: d, Events: bus, Media: ownerMedia{}, Jobs: queue, Buyers: buyers, Stores: reader, StoreBlocks: sellers, NewID: uuid.NewV7, Now: time.Now, Logger: log,
+		DB: d, Events: bus, Media: ownerMedia{}, Jobs: queue, Buyers: buyers, Stores: reader, StoreBlocks: sellers, NewID: uuid.NewV7, Now: clock, Logger: log,
 		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: delegation.NewScheduleAuthorizer(delegationDeps)},
 	})
 	delegationDeps.Social = socialModule
@@ -157,7 +161,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellers, Logger: log})
 	mod := moderation.New(moderation.Deps{
 		DB: d, Events: bus, Social: socialModule, Review: &review.Module{}, IM: &im.Module{}, Seller: sellers, Buyer: buyers, Suspension: suspension,
-		Media: fakeMedia, NewID: uuid.NewV7, Now: time.Now, Logger: log,
+		Media: fakeMedia, NewID: uuid.NewV7, Now: clock, Logger: log,
 	})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
@@ -193,19 +197,12 @@ func startAdminStack(t *testing.T) *adminStack {
 	}
 	hc := srv.Client()
 	return &adminStack{
-		db: d, identity: id, buyers: buyers, social: socialModule, sellers: reader, sellerMod: sellers, moderation: mod,
+		db: d, now: &now, identity: id, buyers: buyers, social: socialModule, sellers: reader, sellerMod: sellers, moderation: mod,
 		customerAccount: customerAccount, app: appconnect.NewModerationAppServiceClient(hc, srv.URL, bearer(customerToken)),
 		admin:    moderationv1alpha1connect.NewModerationAdminServiceClient(hc, srv.URL, bearer(ownerToken)),
 		noRole:   moderationv1alpha1connect.NewModerationAdminServiceClient(hc, srv.URL, bearer(noRoleToken)),
 		customer: moderationv1alpha1connect.NewModerationAdminServiceClient(hc, srv.URL, bearer(customerToken)),
 		visitor:  moderationv1alpha1connect.NewModerationAdminServiceClient(hc, srv.URL),
-	}
-}
-
-func (s *adminStack) exec(t *testing.T, sql string, args ...any) {
-	t.Helper()
-	if _, err := s.db.Conn(t.Context()).Exec(t.Context(), sql, args...); err != nil {
-		t.Fatalf("%v\n%s", err, sql)
 	}
 }
 
@@ -234,29 +231,23 @@ func (s *adminStack) newBuyer(t *testing.T) int64 {
 	return p.BuyerID
 }
 
-type world struct{ postOpen, postClosed, commentOpen string }
+type world struct {
+	storeID                           int64
+	postOpen, postClosed, commentOpen string
+}
 
 func (s *adminStack) world(t *testing.T) world {
 	t.Helper()
 	ctx := t.Context()
 	now := time.Now()
-	var storeID, accountID int64
-	if err := s.db.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
+	accountID, err := sellerfixture.NewAccount(ctx, s.db, now)
+	if err != nil {
 		t.Fatal(err)
 	}
-	s.exec(t, `DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
-	s.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $1, '測試店', 'logo/k', uuidv7(), '63000010', $2, $2)`, accountID, now)
-	if err := s.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
+	storeID, err := sellerfixture.ExposableStore(ctx, s.db, accountID, now)
+	if err != nil {
 		t.Fatal(err)
 	}
-	s.exec(t, `INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
-	s.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, now, uuid.NewV7())
-	s.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
 	st, err := s.sellers.Store(ctx, storeID)
 	if err != nil {
 		t.Fatal(err)
@@ -283,6 +274,7 @@ func (s *adminStack) world(t *testing.T) world {
 		return r.Case.ID.String()
 	}
 	w := world{
+		storeID:     storeID,
 		postClosed:  submit(moderation.Target{Kind: moderation.TargetPost, ContentID: second.ID}),
 		postOpen:    submit(moderation.Target{Kind: moderation.TargetPost, ContentID: first.ID}),
 		commentOpen: submit(moderation.Target{Kind: moderation.TargetComment, ContentID: comment.ID}),

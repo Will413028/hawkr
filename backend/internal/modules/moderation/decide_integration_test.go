@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 func (f *fixture) openCase(t *testing.T, target Target) Case {
@@ -342,9 +343,12 @@ func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) 
 	t.Parallel()
 	f := setup(t)
 	_, ownerAccount := f.newBuyer(t)
-	f.exec(t, "INSERT INTO identity.account_roles (account_id, role) VALUES ($1, 'SELLER')", ownerAccount)
 	w := world{storeAccount: ownerAccount}
-	w.storeID, _ = f.exposableStoreOn(t, ownerAccount)
+	var err error
+	w.storeID, err = sellerfixture.ExposableStore(context.Background(), f.db, ownerAccount, f.clock())
+	if err != nil {
+		t.Fatal(err)
+	}
 	w.post = f.post(t, w.storeID, "貼文")
 	reporter, _ := f.newBuyer(t)
 	c := f.submit(t, reporter, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case

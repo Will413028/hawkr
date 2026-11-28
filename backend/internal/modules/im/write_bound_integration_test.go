@@ -20,9 +20,9 @@ func TestWriteTxBeyondTheBoundFails(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	sent := f.say(t, f.buyerParty(b1), s1, "hello")
+	sent := f.say(t, f.buyerParty(b1), f.s1, "hello")
 	conv, msg := sent.ConversationID, sent.ID
-	store := f.storeParty(t, s1)
+	store := f.storeParty(t, f.s1)
 	buyer := f.buyerParty(b1)
 	lockConversation := `SELECT 1 FROM im.conversations WHERE id = $1 FOR UPDATE`
 	lockMessage := `SELECT 1 FROM im.messages WHERE id = $1 FOR UPDATE`
@@ -34,7 +34,7 @@ func TestWriteTxBeyondTheBoundFails(t *testing.T) {
 		call func() error
 	}{
 		{"Send", lockBuyer, b1, func() error {
-			_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "blocked"})
+			_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: f.s1, Type: im.TypeText, Text: "blocked"})
 			return err
 		}},
 		{"Hide", lockMessage, msg, func() error { _, err := f.m.Hide(ctx, f.hideInput(msg)); return err }},
@@ -109,7 +109,7 @@ func TestSendStraddlingLastOKIsResyncedOnReconnect(t *testing.T) {
 	holder := make(chan error, 1)
 	go func() {
 		holder <- f.db.InTx(ctx, func(ctx context.Context) error {
-			m, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "straddles"})
+			m, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "straddles"})
 			if err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func TestSendStraddlingLastOKIsResyncedOnReconnect(t *testing.T) {
 	}
 	m := f.newModule(cfg)
 	f.run(t, m)
-	sub := f.subscribe(t, m, f.storeParty(t, s1), nil)
+	sub := f.subscribe(t, m, f.storeParty(t, f.s1), nil)
 	untilReady(t, sub)
 	f.exec(t, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND query LIKE 'SELECT now()%'`)
 	<-slept

@@ -728,12 +728,12 @@ func TestOwnerScheduleIsCanceledWhenTheStoreHasNoRightToPost(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	storeID, _ := f.exposableStore(t)
+	storeID, accountID := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
-	f.exec(t, `WITH closure AS (
-		INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, $2, 'ACCOUNT_OWNER') RETURNING closed_at)
-		UPDATE seller.stores SET status = 'CLOSED', current_closed_at = (SELECT closed_at FROM closure) WHERE store_id = $1`, storeID, f.clock())
+	if _, err := f.sellerMod.CloseCurrent(ctx, accountID); err != nil {
+		t.Fatal(err)
+	}
 	f.advance(time.Hour)
 	must(t, f.module.PublishScheduled(ctx, s.ID))
 	f.wantSchedule(t, s.ID, "CANCELED", "AUTHORITY_LOST")
@@ -747,10 +747,10 @@ func TestOwnerScheduleIsRetriedWhileThePreconditionIsMissing(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	storeID, _ := f.exposableStore(t)
+	storeID, accountID := f.exposableStore(t)
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
-	f.exec(t, "UPDATE seller.stores SET status = 'PENDING_DELETION' WHERE store_id = $1", storeID)
+	f.beginAccountDeletion(t, accountID)
 	f.advance(time.Hour)
 	if err := f.module.PublishScheduled(ctx, s.ID); err == nil {
 		t.Fatal("FailedPrecondition 是暫時的，要回錯誤讓 job 重試")

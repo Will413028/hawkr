@@ -152,15 +152,13 @@ func contains(ids []string, id uuid.UUID) bool {
 	return false
 }
 
-// 跨店的讀與寫都被拒（與不存在一樣是 not_found，不洩漏商品存在）：另一家店對這家店的商品與 SKU 做每一種賣家操作，
-// 回應都是 not_found，而且商品的內容、狀態、庫存與版本完全沒變。店家 ID（7000 起）與帳號 ID（1001 起）刻意不同值。
 func TestSellerCannotReadOrWriteAnotherStoresProduct(t *testing.T) {
 	t.Parallel()
 	e := setup(t)
 	ctx := context.Background()
 	storeA, acctA := e.w.Store()
 	storeB, acctB := e.w.Store()
-	if storeA < catalogtest.FirstStoreID || storeB < catalogtest.FirstStoreID || storeA == acctA || storeB == acctB {
+	if storeA == storeB || acctA == acctB || storeA == acctA || storeA == acctB || storeB == acctA || storeB == acctB {
 		t.Fatalf("測試的店家 ID（%d、%d）與帳號 ID（%d、%d）要互不相同", storeA, storeB, acctA, acctB)
 	}
 	a := e.w.Active(storeA, acctA, e.w.Input("A 店的山藥", 5))

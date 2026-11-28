@@ -19,12 +19,8 @@ import (
 func TestListMyReportsMergesTheRealModulesInterleavedOwnerOnly(t *testing.T) {
 	s := startAdminStack(t)
 	ctx := t.Context()
-	s.world(t)
-	var storeID int64
-	if err := s.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores LIMIT 1").Scan(&storeID); err != nil {
-		t.Fatal(err)
-	}
-	s.exec(t, "UPDATE seller.stores SET first_exposed_at = $2 WHERE store_id = $1", storeID, time.Now())
+	w := s.world(t)
+	storeID := w.storeID
 	profile, err := s.buyers.Profile(ctx, s.customerAccount)
 	if err != nil {
 		t.Fatal(err)
@@ -35,16 +31,16 @@ func TestListMyReportsMergesTheRealModulesInterleavedOwnerOnly(t *testing.T) {
 	categories := []policy.Category{policy.Fraud, policy.FoodSafety, policy.MisleadingInfo, policy.Other}
 	var want []string
 	for i := range 4 {
+		*s.now = base.Add(-time.Duration(2*i+1) * time.Minute)
 		c, err := s.moderation.SubmitReport(ctx, moderation.SubmitInput{ReporterBuyerID: me, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: s.newBuyer(t)}, Category: policy.Spam})
 		if err != nil {
 			t.Fatal(err)
 		}
-		s.exec(t, "UPDATE moderation.reports SET created_at = $2 WHERE id = $1", c.Report.ID, base.Add(-time.Duration(2*i+1)*time.Minute))
+		*s.now = base.Add(-time.Duration(2*i+2) * time.Minute)
 		st, err := s.sellerMod.SubmitReport(ctx, seller.SubmitReportInput{StoreID: storeID, ReporterBuyerID: me, Category: categories[i], Description: "店家檢舉"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		s.exec(t, "UPDATE seller.reports SET created_at = $2 WHERE id = $1", st.ReportID, base.Add(-time.Duration(2*i+2)*time.Minute))
 		want = append(want, c.Report.ID.String(), st.ReportID.String())
 	}
 	if _, err := s.moderation.SubmitReport(ctx, moderation.SubmitInput{ReporterBuyerID: other, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: me}, Category: policy.Spam}); err != nil {

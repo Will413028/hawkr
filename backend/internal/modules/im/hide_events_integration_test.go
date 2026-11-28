@@ -42,8 +42,8 @@ func TestHidePublishesMessageHiddenForTheSenderAndRestorePublishesMessageRestore
 	ctx := context.Background()
 	f := setup(t)
 	hidden, restored := record[im.MessageHidden](f), record[im.MessageRestored](f)
-	buyerMsg := f.say(t, f.buyerParty(b1), s1, "買家說的")
-	storeMsg := f.say(t, f.storeParty(t, s1), b1, "店家說的")
+	buyerMsg := f.say(t, f.buyerParty(b1), f.s1, "買家說的")
+	storeMsg := f.say(t, f.storeParty(t, f.s1), b1, "店家說的")
 	in := im.HideInput{MessageID: buyerMsg.ID, AdminID: 1, Category: string(policy.Spam), Text: "管理員自由文字", SourceRef: "moderation:case:5"}
 	h := mustHide(t)(f.m.Hide(ctx, in))
 	got := hidden.all()
@@ -76,7 +76,7 @@ func TestMessageHideEventFailureRollsBackTheHide(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	events.Subscribe(f.bus, func(context.Context, im.MessageHidden) error { return errors.New("reject") })
-	m := f.say(t, f.buyerParty(b1), s1, "會被隱藏")
+	m := f.say(t, f.buyerParty(b1), f.s1, "會被隱藏")
 	if _, err := f.m.Hide(context.Background(), f.hideInput(m.ID)); err == nil {
 		t.Fatal("event failure lost")
 	}
@@ -89,7 +89,7 @@ func TestMessageRestoreEventFailureRollsBackTheRestore(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	events.Subscribe(f.bus, func(context.Context, im.MessageRestored) error { return errors.New("reject") })
-	m := f.say(t, f.buyerParty(b1), s1, "會被隱藏")
+	m := f.say(t, f.buyerParty(b1), f.s1, "會被隱藏")
 	mustHide(t)(f.m.Hide(context.Background(), f.hideInput(m.ID)))
 	if _, err := f.m.Restore(context.Background(), im.RestoreInput{MessageID: m.ID, AdminID: 1, Reason: "誤判"}); err == nil {
 		t.Fatal("event failure lost")

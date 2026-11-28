@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 func (f *fixture) markInactive(kind string, id int64) {
@@ -21,9 +23,26 @@ func (f *fixture) markInactive(kind string, id int64) {
 		f.exec("UPDATE buyer.buyers SET status = 'CLOSED', deleted_at = now() WHERE buyer_id = $1", id)
 		return
 	}
-	if err := f.db.InTx(ctx, func(ctx context.Context) error { return closeStoreRows(ctx, f.db, id) }); err != nil {
+	store, err := f.gate.Store(ctx, id)
+	if err != nil {
 		f.t.Fatal(err)
 	}
+	if _, err := f.gate.CloseCurrent(ctx, store.AccountID); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func (f *fixture) retireLocked(ctx context.Context, storeID int64) error {
+	store, err := f.gate.Store(ctx, storeID)
+	if err != nil {
+		return err
+	}
+	if _, err := f.gate.CloseCurrent(ctx, store.AccountID); err != nil {
+		return err
+	}
+	f.tick.Add(int64((seller.StoreRetention + time.Second) / time.Second))
+	_, err = f.gate.PurgePII(ctx)
+	return err
 }
 
 // 可見性在清除 job 跑之前就已經改好：已停用（買家關閉、店家退場）的買家或店家，讀取看不到、賣家寫入被拒（客戶不存在、標籤不存在），資料還在表裡（job 還沒跑）。
@@ -31,50 +50,50 @@ func TestInactiveBuyerIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	f.mustOrder("evt-2", "O2", storeA, buyer2, 100)
-	f.mustAddTags(storeA, buyer1, "舊")
-	f.mustAddTags(storeA, buyer2, "舊")
-	if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	f.mustOrder("evt-2", "O2", f.storeA, buyer2, 100)
+	f.mustAddTags(f.storeA, buyer1, "舊")
+	f.mustAddTags(f.storeA, buyer2, "舊")
+	if _, err := f.m.SetCustomerType(ctx, f.storeA, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
-	tags, err := f.m.ListTags(ctx, storeA)
+	tags, err := f.m.ListTags(ctx, f.storeA)
 	if err != nil || len(tags) != 1 {
 		t.Fatalf("tags=%v err=%v", tags, err)
 	}
 	f.markInactive("BUYER", buyer1)
 
 	t.Run("ListCustomers", func(t *testing.T) {
-		page, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeA, Sort: crm.SortTotalSpent})
+		page, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: f.storeA, Sort: crm.SortTotalSpent})
 		if err != nil || len(page.Customers) != 1 || page.Customers[0].BuyerID != buyer2 {
 			t.Fatalf("page=%+v err=%v，預期只有買家 2", page.Customers, err)
 		}
 	})
 	t.Run("GetCustomer", func(t *testing.T) {
-		_, err := f.m.GetCustomer(ctx, storeA, buyer1)
+		_, err := f.m.GetCustomer(ctx, f.storeA, buyer1)
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("VIPStatuses", func(t *testing.T) {
-		got, err := f.m.VIPStatuses(ctx, buyer1, []int64{storeA})
-		if err != nil || got[storeA] {
+		got, err := f.m.VIPStatuses(ctx, buyer1, []int64{f.storeA})
+		if err != nil || got[f.storeA] {
 			t.Fatalf("got=%v err=%v，預期 false", got, err)
 		}
 	})
 	t.Run("SetCustomerType", func(t *testing.T) {
-		wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeNormal)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.SetCustomerType(ctx, f.storeA, buyer1, crm.TypeNormal)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 		if n := f.scalar("SELECT count(*) FROM crm.customers WHERE buyer_id = $1 AND customer_type = 'VIP'", buyer1); n != 1 {
 			t.Fatal("被拒的寫入改了資料")
 		}
 	})
 	t.Run("RemoveCustomerTag", func(t *testing.T) {
-		wantKind(t, errOnly(f.m.RemoveCustomerTag(ctx, storeA, buyer1, tags[0].ID)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
-		if n := f.scalar("SELECT count(*) FROM crm.customer_tags WHERE store_id = $1 AND buyer_id = $2", storeA, buyer1); n != 1 {
+		wantKind(t, errOnly(f.m.RemoveCustomerTag(ctx, f.storeA, buyer1, tags[0].ID)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		if n := f.scalar("SELECT count(*) FROM crm.customer_tags WHERE store_id = $1 AND buyer_id = $2", f.storeA, buyer1); n != 1 {
 			t.Fatalf("被拒的移除改了資料：%d 筆關聯", n)
 		}
 	})
 	t.Run("AddCustomerTags", func(t *testing.T) {
-		wantKind(t, errOnly(f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"新"})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
-		if got := f.tagNames(storeA); len(got) != 1 {
+		wantKind(t, errOnly(f.m.AddCustomerTags(ctx, f.storeA, buyer1, []string{"新"})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		if got := f.tagNames(f.storeA); len(got) != 1 {
 			t.Fatalf("標籤 %v，被拒的寫入不該建立新標籤", got)
 		}
 	})
@@ -84,55 +103,55 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeB, buyer1, 100)
-	f.mustAddTags(storeB, buyer1, "舊")
-	if _, err := f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeVIP); err != nil {
+	f.mustOrder("evt-1", "O1", f.storeB, buyer1, 100)
+	f.mustAddTags(f.storeB, buyer1, "舊")
+	if _, err := f.m.SetCustomerType(ctx, f.storeB, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
-	tags, _ := f.m.ListTags(ctx, storeB)
+	tags, _ := f.m.ListTags(ctx, f.storeB)
 	tagID := tags[0].ID
-	f.markInactive("STORE", storeB)
+	f.markInactive("STORE", f.storeB)
 
 	t.Run("ListCustomers", func(t *testing.T) {
-		_, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeB, Sort: crm.SortTotalSpent})
+		_, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: f.storeB, Sort: crm.SortTotalSpent})
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("GetCustomer", func(t *testing.T) {
-		_, err := f.m.GetCustomer(ctx, storeB, buyer1)
+		_, err := f.m.GetCustomer(ctx, f.storeB, buyer1)
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("ListTags", func(t *testing.T) {
-		_, err := f.m.ListTags(ctx, storeB)
+		_, err := f.m.ListTags(ctx, f.storeB)
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonTagNotFound)
 	})
 	t.Run("VIPStatuses", func(t *testing.T) {
-		got, err := f.m.VIPStatuses(ctx, buyer1, []int64{storeB})
-		if err != nil || got[storeB] {
+		got, err := f.m.VIPStatuses(ctx, buyer1, []int64{f.storeB})
+		if err != nil || got[f.storeB] {
 			t.Fatalf("got=%v err=%v，預期 false", got, err)
 		}
 	})
 	t.Run("SetCustomerType", func(t *testing.T) {
-		wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeNormal)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.SetCustomerType(ctx, f.storeB, buyer1, crm.TypeNormal)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("RemoveCustomerTag", func(t *testing.T) {
-		wantKind(t, errOnly(f.m.RemoveCustomerTag(ctx, storeB, buyer1, tagID)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.RemoveCustomerTag(ctx, f.storeB, buyer1, tagID)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("AddCustomerTags", func(t *testing.T) {
-		wantKind(t, errOnly(f.m.AddCustomerTags(ctx, storeB, buyer1, []string{"新"})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
-		if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1", storeB); n != 1 {
+		wantKind(t, errOnly(f.m.AddCustomerTags(ctx, f.storeB, buyer1, []string{"新"})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1", f.storeB); n != 1 {
 			t.Fatalf("店 B 有 %d 個標籤，預期維持 1", n)
 		}
 	})
 	t.Run("CreateTag", func(t *testing.T) {
-		_, err := f.m.CreateTag(ctx, storeB, "新")
+		_, err := f.m.CreateTag(ctx, f.storeB, "新")
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonTagNotFound)
 	})
 	t.Run("RenameTag", func(t *testing.T) {
-		wantKind(t, errOnly(f.m.RenameTag(ctx, storeB, tagID, "改")), apperr.KindNotFound, crm.ReasonTagNotFound)
+		wantKind(t, errOnly(f.m.RenameTag(ctx, f.storeB, tagID, "改")), apperr.KindNotFound, crm.ReasonTagNotFound)
 	})
 	t.Run("DeleteTag", func(t *testing.T) {
-		wantKind(t, f.m.DeleteTag(ctx, storeB, tagID), apperr.KindNotFound, crm.ReasonTagNotFound)
-		if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1 AND name = '舊'", storeB); n != 1 {
+		wantKind(t, f.m.DeleteTag(ctx, f.storeB, tagID), apperr.KindNotFound, crm.ReasonTagNotFound)
+		if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1 AND name = '舊'", f.storeB); n != 1 {
 			t.Fatal("被拒的刪除仍刪了標籤")
 		}
 	})
@@ -145,8 +164,19 @@ func TestRetiringManyStoresWhileProjectingDoesNotDeadlock(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	const stores, buyers = 6, 6
-	storeID := func(i int) int64 { return 200 + int64(i%stores) }
-	seedStores(t, f.db, storeID(0), storeID(stores-1))
+	storeIDs := []int64{f.storeA, f.storeB, f.storeC}
+	for len(storeIDs) < stores {
+		accountID, err := sellerfixture.NewAccount(ctx, f.db, epoch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		storeID, err := sellerfixture.ExposableStore(ctx, f.db, accountID, epoch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		storeIDs = append(storeIDs, storeID)
+	}
+	storeID := func(i int) int64 { return storeIDs[i%stores] }
 	seedBuyers(t, f.db, 300, 300+buyers-1)
 	started := make(chan struct{})
 	retired := make(chan error, 1)
@@ -257,21 +287,21 @@ func TestProjectionSkipLogLevel(t *testing.T) {
 	cases := []struct {
 		name  string
 		setup func(f *fixture)
-		store int64
+		store func(f *fixture) int64
 		buyer int64
 		want  string
 	}{
-		{"closed buyer", func(f *fixture) { f.markInactive("BUYER", buyer1) }, storeA, buyer1, "INFO"},
-		{"missing buyer", func(*fixture) {}, storeA, missingBuyer, "ERROR"},
-		{"retired store", func(f *fixture) { f.markInactive("STORE", storeB) }, storeB, buyer1, "INFO"},
-		{"missing store", func(*fixture) {}, missingStore, buyer1, "ERROR"},
+		{"closed buyer", func(f *fixture) { f.markInactive("BUYER", buyer1) }, func(f *fixture) int64 { return f.storeA }, buyer1, "INFO"},
+		{"missing buyer", func(*fixture) {}, func(f *fixture) int64 { return f.storeA }, missingBuyer, "ERROR"},
+		{"retired store", func(f *fixture) { f.markInactive("STORE", f.storeB) }, func(f *fixture) int64 { return f.storeB }, buyer1, "INFO"},
+		{"missing store", func(*fixture) {}, func(*fixture) int64 { return missingStore }, buyer1, "ERROR"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			f := setup(t)
 			c.setup(f)
-			recorded, err := f.order("evt-1", "O1", c.store, c.buyer, 100)
+			recorded, err := f.order("evt-1", "O1", c.store(f), c.buyer, 100)
 			if err != nil || recorded {
 				t.Fatalf("recorded=%v err=%v，預期略過", recorded, err)
 			}
@@ -288,7 +318,7 @@ func TestProjectionSkipLogLevel(t *testing.T) {
 	t.Run("normal path logs nothing", func(t *testing.T) {
 		t.Parallel()
 		f := setup(t)
-		f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+		f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
 		if got := f.logs.levels(); len(got) != 0 {
 			t.Fatalf("正常路徑記了 log：%v", got)
 		}
@@ -304,7 +334,7 @@ func TestProjectionSkipClassificationFailure(t *testing.T) {
 		LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'classification boom'; END $$`); err != nil {
 		t.Fatal(err)
 	}
-	recorded, err := f.order("evt-1", "O1", storeA, 900, 100)
+	recorded, err := f.order("evt-1", "O1", f.storeA, 900, 100)
 	if err != nil || recorded {
 		t.Fatalf("recorded=%v err=%v，預期略過且成功", recorded, err)
 	}
