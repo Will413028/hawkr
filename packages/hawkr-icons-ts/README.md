@@ -7,7 +7,7 @@ Material Symbols（Apache-2.0）的 SVG 圖形與繪製元件，website 與 admi
 | 路徑 | 內容 |
 |---|---|
 | `src/names.ts` | 手寫：用到的 Material Symbols 名稱 |
-| `src/material-symbols.gen.ts` | 名稱 → outlined 與 filled 的 path data，由 `tools/gen.ts` 從 `@material-symbols/svg-400`（鎖定 0.48.3）生成。**不得手改** |
+| `src/material-symbols.gen.ts` | 名稱 → outlined 與 filled 的 path data，由 `tools/gen.ts` 從 `@material-symbols/svg-400`（鎖定 0.49.0）生成。**不得手改** |
 | `src/material-symbol.tsx` | `MaterialSymbol` 元件與 `MaterialSymbolName` 型別 |
 | `LICENSE` | 上游的 Apache-2.0 全文（登記在根目錄 `THIRD_PARTY_NOTICES.md`） |
 
