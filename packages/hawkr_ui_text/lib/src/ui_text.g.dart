@@ -610,6 +610,7 @@ return switch ((l, value)) {
 (UiLocale.zhTW || UiLocale.en, 3) => '討論區留言',
 (UiLocale.zhTW || UiLocale.en, 4) => '聊天訊息',
 (UiLocale.zhTW || UiLocale.en, 5) => '評價回覆',
+(UiLocale.zhTW || UiLocale.en, 6) => '商品',
 _ => null,
 };
 }

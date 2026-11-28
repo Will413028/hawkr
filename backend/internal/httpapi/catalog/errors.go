@@ -111,6 +111,8 @@ func failure(err error, paths rpc.FieldPaths) error {
 		return apperr.NotFound("找不到這個商品")
 	case errors.Is(err, catalog.ErrSkuNotFound):
 		return apperr.NotFound("找不到這個規格")
+	case errors.Is(err, catalog.ErrProductNotPurchasable):
+		return apperr.FailedPrecondition("這個商品目前無法購買").WithReason(apperr.ReasonProductNotPurchasable)
 	case errors.As(err, &batchConflict):
 		ids := batchConflict.SortedIDs()
 		text := make([]string, len(ids))

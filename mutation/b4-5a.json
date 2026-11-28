@@ -1,0 +1,193 @@
+{
+ "mutants": [
+  {
+   "id": "deduct-drops-store-exposure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "s.stock_qty >= $1::integer\n  AND p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "new": "s.stock_qty >= $1::integer\n  AND p.status = 'ACTIVE' AND p.deleted_at IS NULL AND $2::timestamptz IS NOT NULL",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "DeductSkuStock 內嵌的可見性條件拿掉店家可曝光：停權店家的商品仍可扣庫存，DeductStock 回 ErrProductNotPurchasable 的斷言要紅。"
+  },
+  {
+   "id": "deduct-drops-takedown-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "s.stock_qty >= $1::integer\n  AND p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)\n",
+   "new": "s.stock_qty >= $1::integer\n  AND p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)\n",
+   "test": "cmd/hawkr ^TestProductUnderMeasureIsNotVisible$",
+   "why": "DeductSkuStock 內嵌的可見性條件拿掉 PRODUCT 下架措施：措施中的商品仍可扣庫存，措施測試要紅。"
+  },
+  {
+   "id": "cards-flag-drops-takedown-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/exports.sql.go",
+   "old": "0::bigint AS sort_key,\n       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status IN ('ACTIVE', 'ARCHIVED') AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)) AS visible",
+   "new": "0::bigint AS sort_key,\n       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status IN ('ACTIVE', 'ARCHIVED') AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)) AS visible",
+   "test": "cmd/hawkr ^TestProductUnderMeasureIsNotVisible$",
+   "why": "商品卡片的 visible 旗標（含 ARCHIVED 版本）拿掉 PRODUCT 下架措施：措施中的商品卡片 visible 仍為真，措施測試要紅。"
+  },
+  {
+   "id": "cards-filter-drops-store-exposure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/exports.sql.go",
+   "old": "OR EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)",
+   "new": "OR EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND $1::timestamptz IS NOT NULL",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "商品卡片的公開過濾（include_inactive=false）拿掉店家可曝光：停權店家的商品仍出現在公開卡片，停權測試要紅。"
+  },
+  {
+   "id": "sku-snapshot-drops-store-exposure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/exports.sql.go",
+   "old": "(s.deleted_at IS NOT NULL)::boolean AS sku_deleted,\n       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)",
+   "new": "(s.deleted_at IS NOT NULL)::boolean AS sku_deleted,\n       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND $1::timestamptz IS NOT NULL",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "SKU 快照的 product_visible 拿掉店家可曝光：停權店家的購物車快照 active 仍為真，停權測試要紅。"
+  },
+  {
+   "id": "restock-state-drops-takedown-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "s.stock_qty > 0\n        AND EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)))::boolean AS purchasable",
+   "new": "s.stock_qty > 0\n        AND EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)))::boolean AS purchasable",
+   "test": "cmd/hawkr ^TestProductUnderMeasureIsNotVisible$",
+   "why": "補貨「可買」拿掉 PRODUCT 下架措施：措施中的商品仍被判可買，措施測試要紅。"
+  },
+  {
+   "id": "stores-with-products-drops-takedown-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/exports.sql.go",
+   "old": "SELECT DISTINCT p.store_id FROM catalog.products AS p\nWHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)\nORDER BY p.store_id",
+   "new": "SELECT DISTINCT p.store_id FROM catalog.products AS p\nWHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)\nORDER BY p.store_id",
+   "test": "cmd/hawkr ^TestProductUnderMeasureIsNotVisible$",
+   "why": "有公開商品的店家清單拿掉 PRODUCT 下架措施：店家唯一的商品被下架後仍列在清單，措施測試要紅。"
+  },
+  {
+   "id": "public-list-drops-takedown-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "(extract(epoch FROM p.first_published_at) * 1000000)::bigint AS sort_key\nFROM catalog.products AS p\nWHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)\n  AND (cardinality",
+   "new": "(extract(epoch FROM p.first_published_at) * 1000000)::bigint AS sort_key\nFROM catalog.products AS p\nWHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)\n  AND (cardinality",
+   "test": "cmd/hawkr ^TestProductUnderMeasureIsNotVisible$",
+   "why": "公開列表（最新）拿掉 PRODUCT 下架措施：措施中的商品仍在公開列表，措施測試要紅。"
+  },
+  {
+   "id": "public-get-drops-takedown-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "WHERE p.id = $1::uuid\n  AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)",
+   "new": "WHERE p.id = $1::uuid\n  AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "test": "cmd/hawkr ^TestProductUnderMeasureIsNotVisible$",
+   "why": "公開單筆拿掉 PRODUCT 下架措施：措施中的商品頁仍讀得到，措施測試要紅。"
+  },
+  {
+   "id": "sku-snapshot-active-only-checks-status",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/export.go",
+   "old": "Active: r.ProductVisible && !r.SkuDeleted,",
+   "new": "Active: status == model.StatusActive && !deleted,",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "GetSkuSnapshots 的 active 改回只看狀態與刪除（既有缺陷復原）：停權店家的購物車快照 active 仍為 true，購物車斷言要紅。"
+  },
+  {
+   "id": "arch-allowlist-admits-a-buyer-facing-query",
+   "stack": "go",
+   "file": "backend/internal/arch/catalogvis.go",
+   "old": "\t\"SkuInStore\":                \"SKU 是否屬於某家店（歸屬查詢）\",\n",
+   "new": "\t\"SkuInStore\":                \"SKU 是否屬於某家店（歸屬查詢）\",\n\t\"ListPublicProductsLatest\":  \"x\",\n",
+   "test": "internal/arch ^TestCatalogVisibilityLintRejectsUnlistedProductQuery$",
+   "why": "白名單多放一支買家面的 query（ListPublicProductsLatest）：可見性 lint 的守門測試要紅。"
+  },
+  {
+   "id": "contentkind-values-drops-product",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/contentkind/contentkind.go",
+   "old": "return []Kind{Post, Comment, ForumEntry, ChatMessage, ReviewReply, Product}",
+   "new": "return []Kind{Post, Comment, ForumEntry, ChatMessage, ReviewReply}",
+   "test": "internal/modules/seller ^TestCreateMeasureStoresProductContentAsOwnerHeld$",
+   "why": "contentkind.Values 拿掉 Product：Valid 不再承認 PRODUCT，CreateMeasure 拒絕商品對象，OWNER_HELD 儲存測試要紅。"
+  },
+  {
+   "id": "deduct-stock-drops-visibility-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "FROM catalog.products AS p\nWHERE s.id = $3 AND p.id = s.product_id AND s.deleted_at IS NULL AND s.stock_qty >= $1::integer\n  AND p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)\n",
+   "new": "WHERE s.id = $3 AND s.deleted_at IS NULL AND s.stock_qty >= $1::integer\n",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "DeductSkuStock 的 UPDATE 不再過濾可見性（既有缺陷復原）：停權店家的商品仍可扣庫存，DeductStock 回 ErrProductNotPurchasable 的斷言要紅。"
+  },
+  {
+   "id": "social-cards-available-ignores-visibility",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/social.go",
+   "old": "item.Visible && item.Status == catalog.StatusActive",
+   "new": "item.Status == catalog.StatusActive",
+   "test": "cmd/hawkr ^TestSocialCardsAreNotAvailableWhenTheProductIsNotBuyerVisible$",
+   "why": "社群商品卡的 Available 不看買家可見性：停權店家的商品卡仍可購買，該測試要紅。"
+  },
+  {
+   "id": "legacy-deduct-maps-not-purchasable-to-system-error",
+   "stack": "go",
+   "file": "backend/internal/legacy/catalogserver/server.go",
+   "old": "case errors.Is(err, catalog.ErrProductNotPurchasable):",
+   "new": "case errors.Is(err, catalog.ErrProductNotPurchasable) && false:",
+   "test": "internal/legacy/catalogserver ^TestNotPurchasableSkuIsReportedAsInsufficientWithZeroAvailable$",
+   "why": "不可購買回到預設的 SYSTEM_ERROR（會被 order 重試）：該測試要紅。"
+  },
+  {
+   "id": "legacy-deduct-not-purchasable-reports-stock",
+   "stack": "go",
+   "file": "backend/internal/legacy/catalogserver/server.go",
+   "old": "found && !snap.Deleted && !unavailable",
+   "new": "found && !snap.Deleted",
+   "test": "internal/legacy/catalogserver ^TestNotPurchasableSkuIsReportedAsInsufficientWithZeroAvailable$",
+   "why": "不可購買的 SKU 明細回報現有庫存而不是 0：available 的斷言要紅。"
+  },
+  {
+   "id": "owner-held-check-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/db/migrations/20261128034522_seller_content_kind_product_owner_held.sql",
+   "old": ", ADD CONSTRAINT \"measure_contents_product_owner_held_check\" CHECK ((content_kind = 'PRODUCT'::text) = (snapshot_state = 'OWNER_HELD'::text));",
+   "new": ";",
+   "test": "internal/modules/seller ^TestMeasureContentsRejectsAProductThatIsNotOwnerHeldAndOwnerHeldOnAnythingElse$",
+   "why": "measure_contents 不再約束 PRODUCT 與 OWNER_HELD 互為充要：商品列改成 CLEARED、貼文列改成 OWNER_HELD 都寫得進去，測試要紅。"
+  },
+  {
+   "id": "arch-lint-accepts-or-bypass",
+   "stack": "go",
+   "file": "backend/internal/arch/catalogvis.go",
+   "old": "case catalogOrAtGroup(q.Body, groups, groups[b.at]):",
+   "new": "case false && catalogOrAtGroup(q.Body, groups, groups[b.at]):",
+   "test": "internal/arch ^TestCatalogBuyerQueriesMustCarryTheCanonicalPredicate$",
+   "why": "arch lint 不再擋 OR 繞過可見性條件：OR 的案例要紅。"
+  },
+  {
+   "id": "arch-lint-ignores-predicate-scope",
+   "stack": "go",
+   "file": "backend/internal/arch/catalogvis.go",
+   "old": "groups[k] != groups[b.at] || ",
+   "new": "",
+   "test": "internal/arch ^TestCatalogBuyerQueriesMustCarryTheCanonicalPredicate$",
+   "why": "arch lint 的條件不必和商品別名在同一個範圍：條件只套在子查詢、外層商品列沒有條件的反例要紅。"
+  },
+  {
+   "id": "arch-lint-skips-child-tables",
+   "stack": "go",
+   "file": "backend/internal/arch/catalogvis.go",
+   "old": "for _, table := range catalogChildTables {",
+   "new": "for _, table := range catalogChildTables[:0] {",
+   "test": "internal/arch ^TestCatalogBuyerQueriesMustCarryTheCanonicalPredicate$",
+   "why": "arch lint 不檢查 product_skus、product_images、product_hashtags 是否綁在商品上：子表沒綁商品的案例要紅。"
+  },
+  {
+   "id": "arch-lint-allows-unlisted-product-reads",
+   "stack": "go",
+   "file": "backend/internal/arch/catalogvis.go",
+   "old": "if _, ok := allowed[q.Name]; !ok {",
+   "new": "if _, ok := allowed[q.Name]; !ok && false {",
+   "test": "internal/arch ^TestCatalogVisibilityLintRejectsUnlistedProductQuery$",
+   "why": "arch lint 放行沒登記的商品表讀取：新的買家面 query 能不帶條件通過，測試要紅。"
+  }
+ ]
+}

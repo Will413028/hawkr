@@ -262,8 +262,8 @@ func (q *Queries) FinishRestock(ctx context.Context, arg FinishRestockParams) (i
 const getSkuRestockState = `-- name: GetSkuRestockState :one
 SELECT s.product_id, p.store_id, p.title, s.stock_qty,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
-       (s.deleted_at IS NULL AND s.stock_qty > 0 AND p.deleted_at IS NULL AND p.status = 'ACTIVE'
-        AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e))::boolean AS purchasable
+       (s.deleted_at IS NULL AND s.stock_qty > 0
+        AND EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)))::boolean AS purchasable
 FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
 WHERE s.id = $2
 `

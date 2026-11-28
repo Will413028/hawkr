@@ -969,6 +969,9 @@ func TestValidateContentTargetsRules(t *testing.T) {
 		{"留言連到討論串", with(post(ContentComment, 1), func(c *TakedownContent) { c.Snapshot.Link = ContentLink{StoreID: 7, ThreadID: id(8)} }), false},
 		{"討論區留言連到貼文", with(forum(1), func(c *TakedownContent) { c.Snapshot.Link = ContentLink{PostID: id(9)} }), false},
 		{"討論區留言缺店家", with(forum(1), func(c *TakedownContent) { c.Snapshot.Link.StoreID = 0 }), false},
+		{"商品不帶快照", []TakedownContent{{ContentRef: ContentRef{ContentProduct, id(1)}}}, true},
+		{"商品與貼文混合", []TakedownContent{{ContentRef: ContentRef{ContentProduct, id(1)}}, post(ContentPost, 2)}, true},
+		{"商品帶快照", with(post(ContentProduct, 1), func(c *TakedownContent) {}), false},
 		{"超過上限", func() []TakedownContent {
 			var out []TakedownContent
 			for i := range MaxTakedownContents + 1 {
@@ -1076,7 +1079,7 @@ func TestValidateContentRefsChecksShapeWithoutSnapshots(t *testing.T) {
 }
 
 func TestSnapshotStateValuesAreAllValuid(t *testing.T) {
-	if got := SnapshotStateValues(); len(got) != 2 {
+	if got := SnapshotStateValues(); len(got) != 3 {
 		t.Fatalf("%v", got)
 	}
 }

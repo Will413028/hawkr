@@ -407,6 +407,7 @@ type ProductCard struct {
 	StoreId           string `protobuf:"bytes,10,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
 	Store         *v1alpha1.StoreCard `protobuf:"bytes,11,opt,name=store,proto3" json:"store,omitempty"`
+	Visible       bool                `protobuf:"varint,12,opt,name=visible,proto3" json:"visible,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -516,6 +517,13 @@ func (x *ProductCard) GetStore() *v1alpha1.StoreCard {
 		return x.Store
 	}
 	return nil
+}
+
+func (x *ProductCard) GetVisible() bool {
+	if x != nil {
+		return x.Visible
+	}
+	return false
 }
 
 // Favorite 是收藏的商品。
@@ -4133,7 +4141,7 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x12\n" +
-	"\x04etag\x18\b \x01(\tR\x04etag\"\x81\x03\n" +
+	"\x04etag\x18\b \x01(\tR\x04etag\"\x9b\x03\n" +
 	"\vProductCard\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\adeleted\x18\x02 \x01(\bR\adeleted\x12\x12\n" +
@@ -4146,7 +4154,8 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\x12restock_subscribed\x18\t \x01(\bR\x11restockSubscribed\x12\x19\n" +
 	"\bstore_id\x18\n" +
 	" \x01(\tR\astoreId\x126\n" +
-	"\x05store\x18\v \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05storeB\t\n" +
+	"\x05store\x18\v \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\x12\x18\n" +
+	"\avisible\x18\f \x01(\bR\avisibleB\t\n" +
 	"\a_rating\"\x84\x01\n" +
 	"\bFavorite\x12;\n" +
 	"\aproduct\x18\x01 \x01(\v2!.hawkr.buyer.v1alpha1.ProductCardR\aproduct\x12;\n" +

@@ -197,6 +197,7 @@ export type UiTextKey =
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
 	| "seller.ContentKind.CONTENT_KIND_POST"
+	| "seller.ContentKind.CONTENT_KIND_PRODUCT"
 	| "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY"
 	| "seller.InquiryKind.INQUIRY_KIND_EXPLANATION"
 	| "seller.InquiryKind.INQUIRY_KIND_RECORDS"
@@ -868,6 +869,7 @@ const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
 	3: "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY",
 	4: "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE",
 	5: "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY",
+	6: "seller.ContentKind.CONTENT_KIND_PRODUCT",
 };
 
 /** seller.ContentKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

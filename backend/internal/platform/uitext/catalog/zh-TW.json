@@ -716,6 +716,10 @@
       "message": "貼文",
       "description": "店家貼文。"
     },
+    "seller.ContentKind.CONTENT_KIND_PRODUCT": {
+      "message": "商品",
+      "description": "ContentKind 是內容下架措施對象的種類，對應社群內容的三種寫入。（值 CONTENT_KIND_PRODUCT）"
+    },
     "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY": {
       "message": "評價回覆",
       "description": "店家對評價的回覆（ID 是評價的 ID）。"

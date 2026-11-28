@@ -115,7 +115,7 @@ RETURNING upload_id;
 UPDATE media.staged_uploads
 SET state = 'DELETING', updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
-RETURNING asset_id;
+RETURNING asset_id, planned_asset_id;
 
 -- name: ListDeletingUploads :many
 SELECT id, tmp_key, final_key, asset_id, planned_asset_id FROM media.staged_uploads
@@ -140,3 +140,40 @@ WHERE u.id IN (
     LIMIT sqlc.arg(max_rows)
     FOR NO KEY UPDATE OF u2 SKIP LOCKED)
   AND u.state = 'READY';
+
+-- name: LockDeletingUpload :one
+SELECT id, asset_id, planned_asset_id FROM media.staged_uploads WHERE id = sqlc.arg(id) AND state = 'DELETING' FOR NO KEY UPDATE;
+
+-- name: RestoreHeldUpload :execrows
+UPDATE media.staged_uploads SET state = 'READY', updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND state = 'DELETING' AND asset_id IS NOT NULL AND reject_reason IS NULL;
+
+-- name: InsertCopyUpload :exec
+INSERT INTO media.staged_uploads (
+    id, token_hash, uploader_id, uploader_admin, delegated_store_id, visibility, declared_size, declared_content_type,
+    state, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at)
+VALUES (
+    sqlc.arg(id), sqlc.arg(token_hash), sqlc.arg(uploader_id), sqlc.arg(uploader_admin), sqlc.narg(delegated_store_id)::bigint, 'SECURE',
+    sqlc.arg(declared_size), sqlc.arg(declared_content_type)::text, 'CONFIRMED', sqlc.arg(final_key), sqlc.arg(asset_id)::uuid, sqlc.arg(asset_id)::uuid,
+    sqlc.arg(chunk_count)::integer, sqlc.arg(chunk_count)::integer, sqlc.arg(kek_id)::text, sqlc.arg(wrapped_dek), sqlc.arg(expires_at), sqlc.arg(now), sqlc.arg(now));
+
+-- name: InsertConfirmedClaim :exec
+INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
+VALUES (sqlc.arg(upload_id), 'CONFIRMED', sqlc.arg(asset_id), sqlc.arg(now));
+
+-- name: InsertOrphanObject :exec
+INSERT INTO media.orphan_objects (object_key, recorded_at)
+VALUES (sqlc.arg(object_key), sqlc.arg(now))
+ON CONFLICT (object_key) DO NOTHING;
+
+-- name: ListOrphanObjects :many
+SELECT object_key FROM media.orphan_objects
+WHERE object_key > sqlc.arg(after_key)
+ORDER BY object_key
+LIMIT sqlc.arg(max_rows);
+
+-- name: IsChunkObjectReferenced :one
+SELECT EXISTS (SELECT 1 FROM media.secure_chunks WHERE object_key = sqlc.arg(object_key))::boolean;
+
+-- name: DeleteOrphanObject :exec
+DELETE FROM media.orphan_objects WHERE object_key = sqlc.arg(object_key);

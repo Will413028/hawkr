@@ -271,6 +271,8 @@ class ErrorReason extends $pb.ProtobufEnum {
       ErrorReason._(49, _omitEnumNames ? '' : 'RESTOCK_SKU_IN_STOCK');
   static const ErrorReason PRODUCT_NOT_PUBLISHED =
       ErrorReason._(50, _omitEnumNames ? '' : 'PRODUCT_NOT_PUBLISHED');
+  static const ErrorReason PRODUCT_NOT_PURCHASABLE =
+      ErrorReason._(51, _omitEnumNames ? '' : 'PRODUCT_NOT_PURCHASABLE');
 
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
@@ -323,10 +325,11 @@ class ErrorReason extends $pb.ProtobufEnum {
     COUPON_QUOTA_EXCEEDED,
     RESTOCK_SKU_IN_STOCK,
     PRODUCT_NOT_PUBLISHED,
+    PRODUCT_NOT_PURCHASABLE,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 50);
+      $pb.ProtobufEnum.$_initByValueList(values, 51);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

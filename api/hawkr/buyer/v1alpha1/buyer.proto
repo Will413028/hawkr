@@ -251,6 +251,7 @@ message ProductCard {
   string store_id = 10;
   // 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
   hawkr.common.v1alpha1.StoreCard store = 11;
+  bool visible = 12;
 }
 
 // Favorite 是收藏的商品。

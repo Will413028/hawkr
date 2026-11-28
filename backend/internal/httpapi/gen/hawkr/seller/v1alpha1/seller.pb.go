@@ -1139,6 +1139,7 @@ const (
 	ContentKind_CONTENT_KIND_CHAT_MESSAGE ContentKind = 4
 	// 店家對評價的回覆（ID 是評價的 ID）。
 	ContentKind_CONTENT_KIND_REVIEW_REPLY ContentKind = 5
+	ContentKind_CONTENT_KIND_PRODUCT      ContentKind = 6
 )
 
 // Enum value maps for ContentKind.
@@ -1150,6 +1151,7 @@ var (
 		3: "CONTENT_KIND_FORUM_ENTRY",
 		4: "CONTENT_KIND_CHAT_MESSAGE",
 		5: "CONTENT_KIND_REVIEW_REPLY",
+		6: "CONTENT_KIND_PRODUCT",
 	}
 	ContentKind_value = map[string]int32{
 		"CONTENT_KIND_UNSPECIFIED":  0,
@@ -1158,6 +1160,7 @@ var (
 		"CONTENT_KIND_FORUM_ENTRY":  3,
 		"CONTENT_KIND_CHAT_MESSAGE": 4,
 		"CONTENT_KIND_REVIEW_REPLY": 5,
+		"CONTENT_KIND_PRODUCT":      6,
 	}
 )
 
@@ -1196,7 +1199,8 @@ const (
 	// 快照在：excerpt、authored_time 與連結目標都有值。
 	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CAPTURED ContentSnapshotState = 1
 	// 快照已依保留期（措施撤銷後 184 天）或店家退場清空；沒有 excerpt、authored_time 與連結目標。
-	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CLEARED ContentSnapshotState = 2
+	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CLEARED    ContentSnapshotState = 2
+	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_OWNER_HELD ContentSnapshotState = 3
 )
 
 // Enum value maps for ContentSnapshotState.
@@ -1205,11 +1209,13 @@ var (
 		0: "CONTENT_SNAPSHOT_STATE_UNSPECIFIED",
 		1: "CONTENT_SNAPSHOT_STATE_CAPTURED",
 		2: "CONTENT_SNAPSHOT_STATE_CLEARED",
+		3: "CONTENT_SNAPSHOT_STATE_OWNER_HELD",
 	}
 	ContentSnapshotState_value = map[string]int32{
 		"CONTENT_SNAPSHOT_STATE_UNSPECIFIED": 0,
 		"CONTENT_SNAPSHOT_STATE_CAPTURED":    1,
 		"CONTENT_SNAPSHOT_STATE_CLEARED":     2,
+		"CONTENT_SNAPSHOT_STATE_OWNER_HELD":  3,
 	}
 )
 
@@ -9168,18 +9174,20 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x14MEASURE_KIND_WARNING\x10\x01\x12\x1b\n" +
 	"\x17MEASURE_KIND_SUSPENSION\x10\x02\x12\x1c\n" +
 	"\x18MEASURE_KIND_TERMINATION\x10\x03\x12!\n" +
-	"\x1dMEASURE_KIND_CONTENT_TAKEDOWN\x10\x04*\xb8\x01\n" +
+	"\x1dMEASURE_KIND_CONTENT_TAKEDOWN\x10\x04*\xd2\x01\n" +
 	"\vContentKind\x12\x1c\n" +
 	"\x18CONTENT_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11CONTENT_KIND_POST\x10\x01\x12\x18\n" +
 	"\x14CONTENT_KIND_COMMENT\x10\x02\x12\x1c\n" +
 	"\x18CONTENT_KIND_FORUM_ENTRY\x10\x03\x12\x1d\n" +
 	"\x19CONTENT_KIND_CHAT_MESSAGE\x10\x04\x12\x1d\n" +
-	"\x19CONTENT_KIND_REVIEW_REPLY\x10\x05*\x87\x01\n" +
+	"\x19CONTENT_KIND_REVIEW_REPLY\x10\x05\x12\x18\n" +
+	"\x14CONTENT_KIND_PRODUCT\x10\x06*\xae\x01\n" +
 	"\x14ContentSnapshotState\x12&\n" +
 	"\"CONTENT_SNAPSHOT_STATE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fCONTENT_SNAPSHOT_STATE_CAPTURED\x10\x01\x12\"\n" +
-	"\x1eCONTENT_SNAPSHOT_STATE_CLEARED\x10\x02*~\n" +
+	"\x1eCONTENT_SNAPSHOT_STATE_CLEARED\x10\x02\x12%\n" +
+	"!CONTENT_SNAPSHOT_STATE_OWNER_HELD\x10\x03*~\n" +
 	"\fMeasureBasis\x12\x1d\n" +
 	"\x19MEASURE_BASIS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17MEASURE_BASIS_VIOLATION\x10\x01\x12\x16\n" +

@@ -35,18 +35,19 @@ const getProductCards = `-- name: GetProductCards :many
 SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
-       0::bigint AS sort_key
+       0::bigint AS sort_key,
+       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status IN ('ACTIVE', 'ARCHIVED') AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)) AS visible
 FROM catalog.products p
-WHERE p.id = ANY($1::uuid[]) AND p.deleted_at IS NULL
-  AND ($2::boolean
-       OR (p.status = 'ACTIVE' AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($3::timestamptz) e)))
+WHERE p.id = ANY($2::uuid[]) AND p.deleted_at IS NULL
+  AND ($3::boolean
+       OR EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)))
 ORDER BY p.id
 `
 
 type GetProductCardsParams struct {
+	At              time.Time
 	Ids             []uuid.UUID
 	IncludeInactive bool
-	At              time.Time
 }
 
 type GetProductCardsRow struct {
@@ -68,10 +69,11 @@ type GetProductCardsRow struct {
 	CoverKey          string
 	TotalStock        int32
 	SortKey           int64
+	Visible           bool
 }
 
 func (q *Queries) GetProductCards(ctx context.Context, arg GetProductCardsParams) ([]GetProductCardsRow, error) {
-	rows, err := q.db.Query(ctx, getProductCards, arg.Ids, arg.IncludeInactive, arg.At)
+	rows, err := q.db.Query(ctx, getProductCards, arg.At, arg.Ids, arg.IncludeInactive)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +100,7 @@ func (q *Queries) GetProductCards(ctx context.Context, arg GetProductCardsParams
 			&i.CoverKey,
 			&i.TotalStock,
 			&i.SortKey,
+			&i.Visible,
 		); err != nil {
 			return nil, err
 		}
@@ -144,12 +147,18 @@ const getSkuSnapshots = `-- name: GetSkuSnapshots :many
 SELECT s.id AS sku_id, s.product_id, p.store_id, p.title, p.status,
        (p.deleted_at IS NOT NULL)::boolean AS product_deleted,
        (s.deleted_at IS NOT NULL)::boolean AS sku_deleted,
+       EXISTS (SELECT 1 FROM catalog.products v WHERE v.id = p.id AND v.status = 'ACTIVE' AND v.deleted_at IS NULL AND v.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = v.id)) AS product_visible,
        s.option1_value, s.option2_value, s.price, s.compare_at_price, s.stock_qty,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key
 FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
-WHERE s.id = ANY($1::uuid[])
+WHERE s.id = ANY($2::uuid[])
 ORDER BY s.id
 `
+
+type GetSkuSnapshotsParams struct {
+	At  time.Time
+	Ids []uuid.UUID
+}
 
 type GetSkuSnapshotsRow struct {
 	SkuID          uuid.UUID
@@ -159,6 +168,7 @@ type GetSkuSnapshotsRow struct {
 	Status         string
 	ProductDeleted bool
 	SkuDeleted     bool
+	ProductVisible bool
 	Option1Value   *string
 	Option2Value   *string
 	Price          int64
@@ -167,8 +177,8 @@ type GetSkuSnapshotsRow struct {
 	CoverKey       string
 }
 
-func (q *Queries) GetSkuSnapshots(ctx context.Context, ids []uuid.UUID) ([]GetSkuSnapshotsRow, error) {
-	rows, err := q.db.Query(ctx, getSkuSnapshots, ids)
+func (q *Queries) GetSkuSnapshots(ctx context.Context, arg GetSkuSnapshotsParams) ([]GetSkuSnapshotsRow, error) {
+	rows, err := q.db.Query(ctx, getSkuSnapshots, arg.At, arg.Ids)
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +194,7 @@ func (q *Queries) GetSkuSnapshots(ctx context.Context, ids []uuid.UUID) ([]GetSk
 			&i.Status,
 			&i.ProductDeleted,
 			&i.SkuDeleted,
+			&i.ProductVisible,
 			&i.Option1Value,
 			&i.Option2Value,
 			&i.Price,
@@ -221,9 +232,8 @@ func (q *Queries) IncrementProductFavorites(ctx context.Context, arg IncrementPr
 }
 
 const listStoresWithPublicProducts = `-- name: ListStoresWithPublicProducts :many
-SELECT DISTINCT p.store_id FROM catalog.products p
-WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)
+SELECT DISTINCT p.store_id FROM catalog.products AS p
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e) AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id)
 ORDER BY p.store_id
 `
 

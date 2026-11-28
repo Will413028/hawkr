@@ -278,6 +278,7 @@
       "CONTENT_KIND_COMMENT": "留言",
       "CONTENT_KIND_FORUM_ENTRY": "討論區留言",
       "CONTENT_KIND_POST": "貼文",
+      "CONTENT_KIND_PRODUCT": "商品",
       "CONTENT_KIND_REVIEW_REPLY": "評價回覆"
     },
     "InquiryKind": {

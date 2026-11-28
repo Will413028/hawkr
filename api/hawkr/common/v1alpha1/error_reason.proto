@@ -163,4 +163,5 @@ enum ErrorReason {
   // 規格（SKU）目前有貨，不接受補貨訂閱（搭配 failed_precondition）：BuyerAppService.SubscribeRestock。client 改提示直接購買。
   RESTOCK_SKU_IN_STOCK = 49;
   PRODUCT_NOT_PUBLISHED = 50;
+  PRODUCT_NOT_PURCHASABLE = 51;
 }

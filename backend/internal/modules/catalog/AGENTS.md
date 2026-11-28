@@ -4,11 +4,11 @@
 
 ## 職責
 
-商品、規格（選項軸與 SKU）、庫存與平台分類樹；行為規格的唯一來源是 `backend/docs/modules/catalog.md`，決策是 `backend/docs/plans/2026-11-24-b4-catalog.md` 的 D1–D26。
+商品、規格（選項軸與 SKU）、庫存與平台分類樹；行為規格唯一來源 `backend/docs/modules/catalog.md`，決策 `backend/docs/plans/2026-11-24-b4-catalog.md` 的 D1–D26。
 
 ## 擁有的資料
 
-schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`、`sales_orders`、`restock_queue`、`restock_purge_queue`。讀取模型：無。依賴擴充 `pg_trgm`（平台安裝，單體規則 6）。
+schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`、`sales_orders`、`restock_queue`、`restock_purge_queue`。讀取模型：無。依賴擴充 `pg_trgm`（平台安裝）。
 
 ## 發布的讀取介面
 
@@ -16,9 +16,9 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 
 ## 模組內部結構
 
-- 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與錯誤。
-- `internal/model` 放對外型別與錯誤；`internal/stock` 是庫存的冪等扣減與歸還；`internal/taxonomy` 讀分類樹；`internal/counter` 是評分與銷量；`internal/restock` 是補貨佇列與 River 週期 worker（不經 `platform/jobs`）；`internal/product` 是商品的寫入、讀取與兩種列表；`internal/description` 是描述區塊的純驗證與編碼；`internal/store` 是 sqlc 的查詢套件。
-- 依賴 media（圖片 `Confirm`／`MarkDeleted`）與 seller 的 `pub_exposable_stores`（公開列表的 join，`db/sqlc.yaml` 讀 seller 的 `pub.sql`）；hashtag 規則在 `platform/hashtag`，與 social 共用。
+- 根套件只有 `Module`、`New`、轉呼叫方法、型別別名與錯誤。
+- 子領域分工見 `backend/docs/modules/catalog.md` 第 10 節；`restock` 的 River worker 不經 `platform/jobs`。
+- 依賴 media（圖片 `Confirm`／`MarkDeleted`）與 seller 的 `pub_exposable_stores`、`pub_content_takedowns`（只有內嵌的可見性條件讀；`sqlc.yaml` 讀 seller 的 `pub.sql`）；hashtag 規則在 `platform/hashtag`，與 social 共用。
 - 依賴圖唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`，增加子領域時同步改；各子領域宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
@@ -26,24 +26,24 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 - 庫存只由 `stock` 改：扣減是 `UPDATE … WHERE stock_qty >= n`，先插入 `stock_operations`（冪等鍵唯一；結帳的操作全域唯一，賣家調整的鍵依 `store_id` 只在店家內唯一）再扣，不「先查再扣」；SKU 列依 ID 升序鎖定；庫存不為負。守門：`TestConcurrentSameKeyDeductsOnce`、`TestMultiItemDeductsInOppositeOrderDoNotDeadlock`、`TestAdjustKeyIsScopedPerStore`。
 - 歸還依原扣減，只認原扣減的冪等鍵；先 `LockStockOperation` 鎖原扣減列，累計不超過原扣減量，原扣減沒有的 SKU 被拒。守門：`TestRestoreFollowsTheOriginalDeduction`。
 - 同一個冪等鍵以不同內容重送回 `ErrIdempotencyKeyReused`，內容相同回成功且不改庫存。`DeductStock`／`RestoreStock` 在呼叫方的 transaction 內失敗時，呼叫方必須整個回滾。
-- 分類只在 migration 變動，兩層；商品只能掛葉節點（`IsLeafCategory`）；名稱是 `LocalizedText`（必有 zh-TW）。守門：`TestSeedTaxonomyShape`、`TestOnlyLeafCategoriesTakeProducts`、`categories_name_check`。
-- 商品狀態是 `DRAFT`／`ACTIVE`／`ARCHIVED`，`ACTIVE` 必有 `first_published_at`；刪除是 `deleted_at`，列保留。可見性是狀態 ∧ 店家可曝光（join `seller.pub_exposable_stores`）∧ 沒有有效限制措施，不寫進狀態欄。
-- 商品寫入在新圖 `Confirm` 之後從 `LockOwnProduct`（以 `storeID` 限定）的列鎖開始，既有 SKU 列接著依 ID 升序鎖住（`LockLiveSkus`，與 `DeductStock` 同序）。守門：`TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder`、`TestUpdateConfirmsNewImagesBeforeLockingTheProductRow`。
-- 讀取：商品列與子表一句 SQL 讀出（一份快照；會被別的模組呼叫，規則 3 不讓開 `InReadSnapshot`）。守門：`TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts`。
-- 圖片：新 token 在鎖商品列之前 `Confirm`，退場的資產在鎖住之後 `MarkDeleted`（media 只 INSERT），都在寫入的 transaction 內，失敗整筆回滾；描述圖片區塊只存 `asset_id`。守門：`TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved`、`TestMediaFailuresRollBackTheProductWrite`。
+- 分類只在 migration 變動，兩層；商品只掛葉節點（`IsLeafCategory`）；名稱 `LocalizedText`（必有 zh-TW）。守門：`TestSeedTaxonomyShape`、`TestOnlyLeafCategoriesTakeProducts`、`categories_name_check`。
+- 商品狀態是 `DRAFT`／`ACTIVE`／`ARCHIVED`，`ACTIVE` 必有 `first_published_at`；刪除是 `deleted_at`，列保留。可見性只有 `arch.CatalogVisibilityPredicate` 一份條件文字（visible＝ACTIVE，viewable 含 ARCHIVED）：狀態 ∧ 店家可曝光 ∧ 無生效中的 `PRODUCT` 措施，不寫進狀態欄；買家面（`arch.CatalogBuyerFacingQueries`）逐字內嵌，其餘讀 `products` 的登記 `arch.CatalogNonBuyerProductQueries`；不建 DB 函式（規則 2、6）。守門：`TestProductUnderMeasureIsNotVisible`。
+- 商品寫入在新圖 `Confirm` 後從 `LockOwnProduct`（以 `storeID` 限定）的列鎖開始，既有 SKU 列接著依 ID 升序鎖住（`LockLiveSkus`，與 `DeductStock` 同序）。守門：`TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder`、`TestUpdateConfirmsNewImagesBeforeLockingTheProductRow`。
+- 讀取：商品列與子表一句 SQL 讀出（一份快照；會被別模組呼叫，規則 3 不開 `InReadSnapshot`）。守門：`TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts`。
+- 圖片：新 token 在鎖商品列之前 `Confirm`，退場資產在鎖住之後 `MarkDeleted`（media 只 INSERT），都在寫入的 transaction 內，失敗整筆回滾；描述圖片區塊只存 `asset_id`。守門：`TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved`、`TestMediaFailuresRollBackTheProductWrite`。
 - 狀態（D22）任兩個都能互切（無效目標回 `InvalidInputError`）；ACTIVE 的商品在切成 ACTIVE 與每次寫入時至少 1 張主圖；`first_published_at` 只在第一次 ACTIVE 填，不清除。刪除把還在的 SKU 一併標刪除（扣減與調整找不到，歸還仍可）。守門：`TestDeleteProductMakesItsSkusUndeductibleButRestorable`、`TestProductLifecycleAndFirstPublishedAt`。
-- 公開列表只含 ACTIVE、沒刪除、店家可曝光的商品；公開單筆另含 ARCHIVED，草稿不可讀；賣家清單不過濾狀態與曝光。守門：`TestPublicListOnlyActiveProductsOfExposableStores`、`TestArchivedProductPageIsPublicButDraftIsNot`。
+- 公開列表用 visible 版本，單筆頁用 viewable 版本（草稿不可讀）；賣家清單不過濾狀態與曝光。守門：`TestPublicListOnlyActiveProductsOfExposableStores`、`TestArchivedProductPageIsPublicButDraftIsNot`。
+- 購物車 `Active` 與扣庫存（`ErrProductNotPurchasable`）同一個條件，扣減的 `UPDATE` 內再判一次。守門：`TestSuspendedStoreSkuIsNotPurchasableAtCheckout`。
 - SKU 組合、價格區間、etag（`content_version`）、請求冪等、`SetStock`、低庫存、搜尋與列表篩選的不變量在 `internal/product/AGENTS.md`。
 - 補貨通知（D26）：不可買變可買時同 transaction 寫佇列表，週期 worker 在外經 `RestockNotifier` 通知；不變量在 `internal/restock/AGENTS.md`。
-- 運費與配送方式不在 catalog（D10）。
 
 ## 不負責
 
-- 運費設定與報價：seller（B3）。
-- 結帳時的扣庫存呼叫與訂單快照的保存：ordering（B8）；catalog 只提供 `DeductStock`／`RestoreStock` 與結帳用的商品快照（B4-4）。
-- 評分與則數的事實：review，經 `SetRating` 傳絕對值寫進商品（B4-4e）；收藏的事實：buyer。
+- 運費與配送方式（D10）、運費設定與報價：seller（B3）。
+- 結帳的扣庫存呼叫與訂單快照保存：ordering（B8）；catalog 只提供 `DeductStock`／`RestoreStock` 與結帳商品快照。
+- 評分與則數：review，經 `SetRating` 寫絕對值（B4-4e）；收藏：buyer。
 - 商品限制措施（平台下架）的事實：seller 擁有措施，catalog 讀取（B4-5）。
-- 媒體檔案的儲存與刪除：media；catalog 只存引用並在自己的 transaction 內 `Confirm`／`MarkDeleted`。
+- 媒體檔案的儲存與刪除：media；catalog 只存引用。
 
 ## 決策紀錄
 

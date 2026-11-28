@@ -15,12 +15,13 @@ import (
 )
 
 type fakeCatalog struct {
-	stock   map[uuid.UUID]int32
-	ops     map[string]fakeOp
-	snaps   map[uuid.UUID]catalog.SkuSnapshot
-	calls   int
-	err     error
-	queried []uuid.UUID
+	stock     map[uuid.UUID]int32
+	ops       map[string]fakeOp
+	snaps     map[uuid.UUID]catalog.SkuSnapshot
+	calls     int
+	err       error
+	deductErr error
+	queried   []uuid.UUID
 }
 
 type fakeOp struct {
@@ -36,6 +37,9 @@ func (f *fakeCatalog) DeductStock(_ context.Context, key string, items []catalog
 	f.calls++
 	if f.err != nil {
 		return f.err
+	}
+	if f.deductErr != nil {
+		return f.deductErr
 	}
 	if key == "" || len(items) == 0 {
 		return catalog.ErrInvalidStockInput
@@ -239,6 +243,22 @@ func TestMissingSkuIsReportedAsInsufficientWithZeroAvailable(t *testing.T) {
 		if it.GetAvailableQty() != "0" || it.GetSkuId() == known.String() {
 			t.Fatalf("明細 %v：available 要 0，而且不含存在的 SKU", it)
 		}
+	}
+}
+
+func TestNotPurchasableSkuIsReportedAsInsufficientWithZeroAvailable(t *testing.T) {
+	t.Parallel()
+	hidden, live := uuid.NewV7(), uuid.NewV7()
+	f := newFake(map[uuid.UUID]int32{hidden: 5, live: 5})
+	f.snaps[hidden] = catalog.SkuSnapshot{SkuID: hidden, StockQty: 5, Active: false}
+	f.snaps[live] = catalog.SkuSnapshot{SkuID: live, StockQty: 5, Active: true}
+	f.deductErr = catalog.ErrProductNotPurchasable
+	r := deduct(t, server(f), "tx-1", items(line{live, "1"}, line{hidden, "2"}))
+	if r.GetStatus() != statusInsufficientStock || len(r.GetInsufficientItems()) != 1 {
+		t.Fatalf("status = %s、明細 %v，不可購買要回 INSUFFICIENT_STOCK 與一筆明細，不是會被重試的 SYSTEM_ERROR", r.GetStatus(), r.GetInsufficientItems())
+	}
+	if got := r.GetInsufficientItems()[0]; got.GetSkuId() != hidden.String() || got.GetRequestedQty() != "2" || got.GetAvailableQty() != "0" {
+		t.Fatalf("明細 = %v，要不可購買的 sku %s、requested 2、available 0", got, hidden)
 	}
 }
 

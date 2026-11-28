@@ -136,3 +136,53 @@ CREATE TABLE media.asset_deletion_requests (
     CONSTRAINT asset_deletion_requests_asset_fkey FOREIGN KEY (asset_id) REFERENCES media.assets (id)
 );
 CREATE INDEX asset_deletion_requests_pending ON media.asset_deletion_requests (requested_at) WHERE applied_at IS NULL;
+
+CREATE TABLE media.asset_gates (
+    asset_id   UUID        PRIMARY KEY,
+    kind       TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT asset_gates_asset_fkey FOREIGN KEY (asset_id) REFERENCES media.assets (id),
+    CONSTRAINT asset_gates_kind_check CHECK (kind IN ('HOLD', 'DELETE')),
+    CONSTRAINT asset_gates_kind_key UNIQUE (asset_id, kind)
+);
+
+CREATE TABLE media.asset_holds (
+    hold_id    UUID        PRIMARY KEY,
+    asset_id   UUID        NOT NULL,
+    gate_kind  TEXT        NOT NULL DEFAULT 'HOLD',
+    source     TEXT        NOT NULL,
+    source_id  UUID        NOT NULL,
+    until      TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT asset_holds_gate_fkey FOREIGN KEY (asset_id, gate_kind) REFERENCES media.asset_gates (asset_id, kind),
+    CONSTRAINT asset_holds_gate_kind_check CHECK (gate_kind = 'HOLD'),
+    CONSTRAINT asset_holds_source_check CHECK (source <> '')
+);
+CREATE INDEX asset_holds_asset ON media.asset_holds (asset_id);
+CREATE INDEX asset_holds_source ON media.asset_holds (source, source_id);
+CREATE INDEX asset_holds_until ON media.asset_holds (until);
+
+CREATE TABLE media.asset_hold_releases (
+    hold_id     UUID        PRIMARY KEY,
+    released_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT asset_hold_releases_hold_fkey FOREIGN KEY (hold_id) REFERENCES media.asset_holds (hold_id)
+);
+
+CREATE TABLE media.asset_copy_requests (
+    asset_id        UUID        PRIMARY KEY,
+    source_asset_id UUID        NOT NULL,
+    requested_at    TIMESTAMPTZ NOT NULL,
+    completed_at    TIMESTAMPTZ,
+    failed_at       TIMESTAMPTZ,
+    CONSTRAINT asset_copy_requests_asset_fkey FOREIGN KEY (asset_id) REFERENCES media.assets (id),
+    CONSTRAINT asset_copy_requests_source_fkey FOREIGN KEY (source_asset_id) REFERENCES media.assets (id),
+    CONSTRAINT asset_copy_requests_outcome_check CHECK (completed_at IS NULL OR failed_at IS NULL),
+    CONSTRAINT asset_copy_requests_self_check CHECK (asset_id <> source_asset_id)
+);
+CREATE INDEX asset_copy_requests_pending ON media.asset_copy_requests (requested_at) WHERE completed_at IS NULL AND failed_at IS NULL;
+
+CREATE TABLE media.orphan_objects (
+    object_key  TEXT        PRIMARY KEY,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT orphan_objects_object_key_check CHECK (object_key LIKE 'secure/%')
+);

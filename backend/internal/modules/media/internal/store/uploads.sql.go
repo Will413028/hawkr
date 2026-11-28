@@ -71,6 +71,15 @@ func (q *Queries) DeleteClaimOfUpload(ctx context.Context, uploadID uuid.UUID) (
 	return result.RowsAffected(), nil
 }
 
+const deleteOrphanObject = `-- name: DeleteOrphanObject :exec
+DELETE FROM media.orphan_objects WHERE object_key = $1
+`
+
+func (q *Queries) DeleteOrphanObject(ctx context.Context, objectKey string) error {
+	_, err := q.db.Exec(ctx, deleteOrphanObject, objectKey)
+	return err
+}
+
 const deleteSecureChunks = `-- name: DeleteSecureChunks :exec
 DELETE FROM media.secure_chunks WHERE asset_id = $1
 `
@@ -251,6 +260,85 @@ func (q *Queries) GetUploadView(ctx context.Context, id uuid.UUID) (GetUploadVie
 	return i, err
 }
 
+const insertConfirmedClaim = `-- name: InsertConfirmedClaim :exec
+INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
+VALUES ($1, 'CONFIRMED', $2, $3)
+`
+
+type InsertConfirmedClaimParams struct {
+	UploadID uuid.UUID
+	AssetID  *uuid.UUID
+	Now      time.Time
+}
+
+func (q *Queries) InsertConfirmedClaim(ctx context.Context, arg InsertConfirmedClaimParams) error {
+	_, err := q.db.Exec(ctx, insertConfirmedClaim, arg.UploadID, arg.AssetID, arg.Now)
+	return err
+}
+
+const insertCopyUpload = `-- name: InsertCopyUpload :exec
+INSERT INTO media.staged_uploads (
+    id, token_hash, uploader_id, uploader_admin, delegated_store_id, visibility, declared_size, declared_content_type,
+    state, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at)
+VALUES (
+    $1, $2, $3, $4, $5::bigint, 'SECURE',
+    $6, $7::text, 'CONFIRMED', $8, $9::uuid, $9::uuid,
+    $10::integer, $10::integer, $11::text, $12, $13, $14, $14)
+`
+
+type InsertCopyUploadParams struct {
+	ID                  uuid.UUID
+	TokenHash           []byte
+	UploaderID          int64
+	UploaderAdmin       bool
+	DelegatedStoreID    *int64
+	DeclaredSize        int64
+	DeclaredContentType string
+	FinalKey            *string
+	AssetID             uuid.UUID
+	ChunkCount          int32
+	KekID               string
+	WrappedDek          []byte
+	ExpiresAt           time.Time
+	Now                 time.Time
+}
+
+func (q *Queries) InsertCopyUpload(ctx context.Context, arg InsertCopyUploadParams) error {
+	_, err := q.db.Exec(ctx, insertCopyUpload,
+		arg.ID,
+		arg.TokenHash,
+		arg.UploaderID,
+		arg.UploaderAdmin,
+		arg.DelegatedStoreID,
+		arg.DeclaredSize,
+		arg.DeclaredContentType,
+		arg.FinalKey,
+		arg.AssetID,
+		arg.ChunkCount,
+		arg.KekID,
+		arg.WrappedDek,
+		arg.ExpiresAt,
+		arg.Now,
+	)
+	return err
+}
+
+const insertOrphanObject = `-- name: InsertOrphanObject :exec
+INSERT INTO media.orphan_objects (object_key, recorded_at)
+VALUES ($1, $2)
+ON CONFLICT (object_key) DO NOTHING
+`
+
+type InsertOrphanObjectParams struct {
+	ObjectKey string
+	Now       time.Time
+}
+
+func (q *Queries) InsertOrphanObject(ctx context.Context, arg InsertOrphanObjectParams) error {
+	_, err := q.db.Exec(ctx, insertOrphanObject, arg.ObjectKey, arg.Now)
+	return err
+}
+
 const insertSecureChunk = `-- name: InsertSecureChunk :exec
 INSERT INTO media.secure_chunks (asset_id, idx, object_key)
 VALUES ($1, $2, $3)
@@ -351,6 +439,17 @@ func (q *Queries) InsertUpload(ctx context.Context, arg InsertUploadParams) erro
 	return err
 }
 
+const isChunkObjectReferenced = `-- name: IsChunkObjectReferenced :one
+SELECT EXISTS (SELECT 1 FROM media.secure_chunks WHERE object_key = $1)::boolean
+`
+
+func (q *Queries) IsChunkObjectReferenced(ctx context.Context, objectKey string) (bool, error) {
+	row := q.db.QueryRow(ctx, isChunkObjectReferenced, objectKey)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const listDeletingUploads = `-- name: ListDeletingUploads :many
 SELECT id, tmp_key, final_key, asset_id, planned_asset_id FROM media.staged_uploads
 WHERE state = 'DELETING' AND id > $1
@@ -390,6 +489,38 @@ func (q *Queries) ListDeletingUploads(ctx context.Context, arg ListDeletingUploa
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrphanObjects = `-- name: ListOrphanObjects :many
+SELECT object_key FROM media.orphan_objects
+WHERE object_key > $1
+ORDER BY object_key
+LIMIT $2
+`
+
+type ListOrphanObjectsParams struct {
+	AfterKey string
+	MaxRows  int32
+}
+
+func (q *Queries) ListOrphanObjects(ctx context.Context, arg ListOrphanObjectsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listOrphanObjects, arg.AfterKey, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -520,11 +651,28 @@ func (q *Queries) ListUploadsToRewrap(ctx context.Context, arg ListUploadsToRewr
 	return items, nil
 }
 
+const lockDeletingUpload = `-- name: LockDeletingUpload :one
+SELECT id, asset_id, planned_asset_id FROM media.staged_uploads WHERE id = $1 AND state = 'DELETING' FOR NO KEY UPDATE
+`
+
+type LockDeletingUploadRow struct {
+	ID             uuid.UUID
+	AssetID        *uuid.UUID
+	PlannedAssetID *uuid.UUID
+}
+
+func (q *Queries) LockDeletingUpload(ctx context.Context, id uuid.UUID) (LockDeletingUploadRow, error) {
+	row := q.db.QueryRow(ctx, lockDeletingUpload, id)
+	var i LockDeletingUploadRow
+	err := row.Scan(&i.ID, &i.AssetID, &i.PlannedAssetID)
+	return i, err
+}
+
 const markReclaimedUploadDeleting = `-- name: MarkReclaimedUploadDeleting :one
 UPDATE media.staged_uploads
 SET state = 'DELETING', updated_at = $1
 WHERE id = $2 AND state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
-RETURNING asset_id
+RETURNING asset_id, planned_asset_id
 `
 
 type MarkReclaimedUploadDeletingParams struct {
@@ -532,11 +680,16 @@ type MarkReclaimedUploadDeletingParams struct {
 	ID  uuid.UUID
 }
 
-func (q *Queries) MarkReclaimedUploadDeleting(ctx context.Context, arg MarkReclaimedUploadDeletingParams) (*uuid.UUID, error) {
+type MarkReclaimedUploadDeletingRow struct {
+	AssetID        *uuid.UUID
+	PlannedAssetID *uuid.UUID
+}
+
+func (q *Queries) MarkReclaimedUploadDeleting(ctx context.Context, arg MarkReclaimedUploadDeletingParams) (MarkReclaimedUploadDeletingRow, error) {
 	row := q.db.QueryRow(ctx, markReclaimedUploadDeleting, arg.Now, arg.ID)
-	var asset_id *uuid.UUID
-	err := row.Scan(&asset_id)
-	return asset_id, err
+	var i MarkReclaimedUploadDeletingRow
+	err := row.Scan(&i.AssetID, &i.PlannedAssetID)
+	return i, err
 }
 
 const markSecureUploadReady = `-- name: MarkSecureUploadReady :execrows
@@ -675,6 +828,24 @@ type RejectSecureUploadAtFirstChunkParams struct {
 
 func (q *Queries) RejectSecureUploadAtFirstChunk(ctx context.Context, arg RejectSecureUploadAtFirstChunkParams) (int64, error) {
 	result, err := q.db.Exec(ctx, rejectSecureUploadAtFirstChunk, arg.Reason, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restoreHeldUpload = `-- name: RestoreHeldUpload :execrows
+UPDATE media.staged_uploads SET state = 'READY', updated_at = $1
+WHERE id = $2 AND state = 'DELETING' AND asset_id IS NOT NULL AND reject_reason IS NULL
+`
+
+type RestoreHeldUploadParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+func (q *Queries) RestoreHeldUpload(ctx context.Context, arg RestoreHeldUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreHeldUpload, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}

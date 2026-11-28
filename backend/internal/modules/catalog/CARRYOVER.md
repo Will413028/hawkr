@@ -52,3 +52,9 @@ product-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - hashtag：明確欄位輸入，正規化在 `platform/hashtag`，與 social 同一份（Java 從描述抽取）。
 - 刪除商品不 `MarkDeleted` 圖片：列保留給訂單與評價引用，圖片的去留待訂單快照（D20、B4-4）決定。
 - 計數與補貨（B4-3b）：`SetRating` 傳絕對值、由 review 的評分 worker 在 `LockProduct` 鎖住商品列的 transaction 內呼叫（D3，B4-4e 起非同步），沒有版本欄；Java 的 `ReviewStatsService` 以事件累計。銷量以 `sales_orders`（`order_no` 去重）冪等，必要條件是 Java order 的 MQ 會重送，B8 之後退場。補貨通知（D26）是新增：Java 只有賣家以外的路徑會通知、賣家補庫存不通知（視為缺陷）；實作是 transactional outbox 的 polling publisher（前例 media 的刪除請求表）：同 transaction 寫 `catalog.restock_queue`，River 週期 worker 以 `SKIP LOCKED` 認領、租約、在 transaction 外通知，失敗同列退避、5 次後 `failed_at` 停手（不刪）。必要條件：通知 port 不能在寫庫存的 transaction 內呼叫（單體規則 5），又不能因 crash 或下游失敗而漏掉；處理中的新轉換靠 `requested_at` 比對（完成只在它沒變時刪，否則重新排），所以不需要 River 唯一鍵、標記或 job id 綁定（先前的每 SKU job 加 `restock_pending` 標記方案已移除）。切成 ACTIVE 對每個沒刪除的 SKU 都排、不讀庫存，避免與另一個 SKU 的 0 到正庫存並行時雙方互相看不到而漏通知。商品與 SKU 刪除的清訂閱走同形的 `restock_purge_queue`。不以店家恢復曝光觸發（Will 2026-11-27）。
+
+## 待補的缺口
+
+| 缺口 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
+|---|---|---|---|---|
+| 店家退場（`seller.StoreRetired`）時清理該店商品與商品圖 | 退場店家的個資與媒體在保存期過後要刪 | 不成立：catalog 沒有訂閱 `StoreRetired`（`rg -n StoreRetired backend/internal/modules/catalog backend/cmd/hawkr` 無 catalog 命中），退場店家的商品圖永遠不會 `MarkDeleted` | 擁有資料的模組訂閱退場事件，在同 transaction 內軟刪並登記媒體刪除（moderation、im 的寫法） | 排進計畫 B4-6：catalog 訂閱 `StoreRetired`，軟刪該店商品並對圖片 `MarkDeleted`。觸發條件：B4-5b 完成（media 保全存在後，退場刪圖才不會毀掉證據保全）。見 `backend/docs/plans/2026-11-24-b4-catalog.md` B4-6 |

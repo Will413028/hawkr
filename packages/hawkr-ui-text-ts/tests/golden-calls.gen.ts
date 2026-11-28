@@ -190,6 +190,7 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_COMMENT": 2,
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_FORUM_ENTRY": 3,
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_POST": 1,
+	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_PRODUCT": 6,
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_REVIEW_REPLY": 5,
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_UNSPECIFIED": 0,
 	"hawkr.seller.v1alpha1.InquiryKind.INQUIRY_KIND_EXPLANATION": 2,

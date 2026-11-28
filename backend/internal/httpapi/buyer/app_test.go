@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1"
@@ -171,7 +172,7 @@ func TestProductCardsRestockSubscribed(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := mustApp(t, fakeModule{restock: map[uuid.UUID]bool{product9: true}}, images, Ports{
-		Products: fakeProducts{cards: map[uuid.UUID]ProductInfo{product9: {ID: product9, Name: "蘋果", StoreID: 3, MinPrice: 20, MaxPrice: 30, Available: true, ImageKey: "products/apple"}}},
+		Products: fakeProducts{cards: map[uuid.UUID]ProductInfo{product9: {ID: product9, Name: "蘋果", StoreID: 3, MinPrice: 20, MaxPrice: 30, Available: true, Visible: true, ImageKey: "products/apple"}}},
 		Stores:   fakeStores{cards: []seller.StoreCard{openStoreCard(3, "店家", "stores/logo")}},
 	}, testStats(&countedRatings{}))
 	cards, err := h.productCards(context.Background(), 1, []model.ProductItem{{ID: product9, Time: time.Now()}}, true)
@@ -180,6 +181,24 @@ func TestProductCardsRestockSubscribed(t *testing.T) {
 	}
 	if !cards[product9].RestockSubscribed || !cards[product9].Available || cards[product9].Store == nil || cards[product9].Image == nil {
 		t.Fatalf("card=%+v", cards[product9])
+	}
+}
+
+func TestProductCardsOfAProductTheBuyerCannotViewCarryOnlyTheIDAndVisible(t *testing.T) {
+	images, err := rpc.NewImages("http://localhost:8787")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := mustApp(t, fakeModule{restock: map[uuid.UUID]bool{product9: true}}, images, Ports{
+		Products: fakeProducts{cards: map[uuid.UUID]ProductInfo{product9: {ID: product9, Name: "被下架的商品", StoreID: 3, MinPrice: 20, MaxPrice: 30, Available: true, ImageKey: "products/apple"}}},
+		Stores:   fakeStores{cards: []seller.StoreCard{openStoreCard(3, "店家", "stores/logo")}},
+	}, testStats(&countedRatings{}))
+	cards, err := h.productCards(context.Background(), 1, []model.ProductItem{{ID: product9, Time: time.Now()}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proto.Equal(cards[product9], &pb.ProductCard{Id: product9.String()}) {
+		t.Fatalf("card=%+v，不可瀏覽的商品只能有 id", cards[product9])
 	}
 }
 

@@ -12,45 +12,26 @@ import (
 	"uuid"
 )
 
-const applyDeletionRequests = `-- name: ApplyDeletionRequests :many
-WITH picked AS (
-    SELECT asset_id FROM media.asset_deletion_requests
-    WHERE applied_at IS NULL
-    ORDER BY requested_at, asset_id
-    LIMIT $2
-    FOR UPDATE SKIP LOCKED),
-marked AS (
-    UPDATE media.assets AS a SET state = 'DELETING', updated_at = $1::timestamptz
-    FROM picked AS p WHERE a.id = p.asset_id AND a.state = 'STAGED'
-    RETURNING a.id)
-UPDATE media.asset_deletion_requests AS r SET applied_at = $1::timestamptz
-FROM picked AS p WHERE r.asset_id = p.asset_id
-RETURNING r.asset_id
+const applyDeletionRequest = `-- name: ApplyDeletionRequest :execrows
+WITH marked AS (
+    UPDATE media.assets SET state = 'DELETING', updated_at = $1::timestamptz
+    WHERE id = $2::uuid AND state = 'STAGED'
+    RETURNING id)
+UPDATE media.asset_deletion_requests SET applied_at = $1::timestamptz
+WHERE asset_id = $2::uuid AND applied_at IS NULL
 `
 
-type ApplyDeletionRequestsParams struct {
+type ApplyDeletionRequestParams struct {
 	Now     time.Time
-	MaxRows int32
+	AssetID uuid.UUID
 }
 
-func (q *Queries) ApplyDeletionRequests(ctx context.Context, arg ApplyDeletionRequestsParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, applyDeletionRequests, arg.Now, arg.MaxRows)
+func (q *Queries) ApplyDeletionRequest(ctx context.Context, arg ApplyDeletionRequestParams) (int64, error) {
+	result, err := q.db.Exec(ctx, applyDeletionRequest, arg.Now, arg.AssetID)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var asset_id uuid.UUID
-		if err := rows.Scan(&asset_id); err != nil {
-			return nil, err
-		}
-		items = append(items, asset_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return result.RowsAffected(), nil
 }
 
 const claimAssetsOfUploads = `-- name: ClaimAssetsOfUploads :execrows
@@ -71,6 +52,24 @@ func (q *Queries) ClaimAssetsOfUploads(ctx context.Context, arg ClaimAssetsOfUpl
 	return result.RowsAffected(), nil
 }
 
+const completeCopyRequest = `-- name: CompleteCopyRequest :execrows
+UPDATE media.asset_copy_requests SET completed_at = $1
+WHERE asset_id = $2 AND completed_at IS NULL AND failed_at IS NULL
+`
+
+type CompleteCopyRequestParams struct {
+	Now     *time.Time
+	AssetID uuid.UUID
+}
+
+func (q *Queries) CompleteCopyRequest(ctx context.Context, arg CompleteCopyRequestParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeCopyRequest, arg.Now, arg.AssetID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteClaimsOfAsset = `-- name: DeleteClaimsOfAsset :execrows
 DELETE FROM media.upload_claims WHERE asset_id = $1::uuid
 `
@@ -83,12 +82,120 @@ func (q *Queries) DeleteClaimsOfAsset(ctx context.Context, assetID uuid.UUID) (i
 	return result.RowsAffected(), nil
 }
 
+const deleteDeadHolds = `-- name: DeleteDeadHolds :one
+WITH dead AS (
+    SELECT h.hold_id FROM media.asset_holds AS h
+    WHERE h.asset_id = $1::uuid
+      AND (h.until <= $2::timestamptz OR EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))),
+gone AS (
+    DELETE FROM media.asset_hold_releases WHERE hold_id IN (SELECT hold_id FROM dead)),
+removed AS (
+    DELETE FROM media.asset_holds WHERE hold_id IN (SELECT hold_id FROM dead) RETURNING asset_id, source, source_id)
+SELECT count(*) FROM (SELECT DISTINCT asset_id, source, source_id FROM removed) AS r
+`
+
+type DeleteDeadHoldsParams struct {
+	AssetID uuid.UUID
+	Now     time.Time
+}
+
+func (q *Queries) DeleteDeadHolds(ctx context.Context, arg DeleteDeadHoldsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, deleteDeadHolds, arg.AssetID, arg.Now)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteHoldsOfSource = `-- name: DeleteHoldsOfSource :execrows
+WITH dead AS (
+    SELECT h.hold_id FROM media.asset_holds AS h
+    WHERE h.asset_id = $1::uuid AND h.source = $2 AND h.source_id = $3::uuid),
+gone AS (
+    DELETE FROM media.asset_hold_releases WHERE hold_id IN (SELECT hold_id FROM dead))
+DELETE FROM media.asset_holds WHERE hold_id IN (SELECT hold_id FROM dead)
+`
+
+type DeleteHoldsOfSourceParams struct {
+	AssetID  uuid.UUID
+	Source   string
+	SourceID uuid.UUID
+}
+
+func (q *Queries) DeleteHoldsOfSource(ctx context.Context, arg DeleteHoldsOfSourceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteHoldsOfSource, arg.AssetID, arg.Source, arg.SourceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteIdleHoldGate = `-- name: DeleteIdleHoldGate :execrows
+DELETE FROM media.asset_gates AS g
+WHERE g.asset_id = $1 AND g.kind = 'HOLD'
+  AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = g.asset_id)
+`
+
+func (q *Queries) DeleteIdleHoldGate(ctx context.Context, assetID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteIdleHoldGate, assetID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteRequestOfAsset = `-- name: DeleteRequestOfAsset :execrows
 DELETE FROM media.asset_deletion_requests WHERE asset_id = $1
 `
 
 func (q *Queries) DeleteRequestOfAsset(ctx context.Context, assetID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteRequestOfAsset, assetID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const extendHolds = `-- name: ExtendHolds :exec
+INSERT INTO media.asset_holds (hold_id, asset_id, source, source_id, until, created_at)
+SELECT gen_random_uuid(), l.asset_id, l.source, l.source_id, $1::timestamptz, $2::timestamptz
+FROM (
+    SELECT h.asset_id, h.source, h.source_id, max(h.until) AS latest
+    FROM media.asset_holds AS h
+    WHERE h.source = $3 AND h.source_id = $4::uuid AND h.until > $2::timestamptz
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id)
+    GROUP BY h.asset_id, h.source, h.source_id) AS l
+WHERE l.latest < $1::timestamptz
+`
+
+type ExtendHoldsParams struct {
+	Until    time.Time
+	Now      time.Time
+	Source   string
+	SourceID uuid.UUID
+}
+
+func (q *Queries) ExtendHolds(ctx context.Context, arg ExtendHoldsParams) error {
+	_, err := q.db.Exec(ctx, extendHolds,
+		arg.Until,
+		arg.Now,
+		arg.Source,
+		arg.SourceID,
+	)
+	return err
+}
+
+const failCopyRequest = `-- name: FailCopyRequest :execrows
+UPDATE media.asset_copy_requests SET failed_at = $1
+WHERE asset_id = $2 AND completed_at IS NULL AND failed_at IS NULL
+`
+
+type FailCopyRequestParams struct {
+	Now     *time.Time
+	AssetID uuid.UUID
+}
+
+func (q *Queries) FailCopyRequest(ctx context.Context, arg FailCopyRequestParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failCopyRequest, arg.Now, arg.AssetID)
 	if err != nil {
 		return 0, err
 	}
@@ -139,6 +246,34 @@ func (q *Queries) GetAssetView(ctx context.Context, id uuid.UUID) (GetAssetViewR
 	return i, err
 }
 
+const getCopyRequest = `-- name: GetCopyRequest :one
+SELECT asset_id, source_asset_id, requested_at, completed_at, failed_at FROM media.asset_copy_requests WHERE asset_id = $1
+`
+
+func (q *Queries) GetCopyRequest(ctx context.Context, assetID uuid.UUID) (MediaAssetCopyRequest, error) {
+	row := q.db.QueryRow(ctx, getCopyRequest, assetID)
+	var i MediaAssetCopyRequest
+	err := row.Scan(
+		&i.AssetID,
+		&i.SourceAssetID,
+		&i.RequestedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+	)
+	return i, err
+}
+
+const getGateKind = `-- name: GetGateKind :one
+SELECT kind FROM media.asset_gates WHERE asset_id = $1
+`
+
+func (q *Queries) GetGateKind(ctx context.Context, assetID uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getGateKind, assetID)
+	var kind string
+	err := row.Scan(&kind)
+	return kind, err
+}
+
 const insertAsset = `-- name: InsertAsset :exec
 INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, created_at, updated_at)
 VALUES (
@@ -171,6 +306,116 @@ func (q *Queries) InsertAsset(ctx context.Context, arg InsertAssetParams) error 
 	return err
 }
 
+const insertCopyAsset = `-- name: InsertCopyAsset :exec
+INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at)
+VALUES (
+    $1, 'SECURE', $2, $3, $4, 'STAGED',
+    $5::text, $6, $7::integer, $8, $8)
+`
+
+type InsertCopyAssetParams struct {
+	ID          uuid.UUID
+	ObjectKey   string
+	ContentType string
+	SizeBytes   int64
+	KekID       string
+	WrappedDek  []byte
+	ChunkCount  int32
+	Now         time.Time
+}
+
+func (q *Queries) InsertCopyAsset(ctx context.Context, arg InsertCopyAssetParams) error {
+	_, err := q.db.Exec(ctx, insertCopyAsset,
+		arg.ID,
+		arg.ObjectKey,
+		arg.ContentType,
+		arg.SizeBytes,
+		arg.KekID,
+		arg.WrappedDek,
+		arg.ChunkCount,
+		arg.Now,
+	)
+	return err
+}
+
+const insertCopyRequest = `-- name: InsertCopyRequest :exec
+INSERT INTO media.asset_copy_requests (asset_id, source_asset_id, requested_at)
+VALUES ($1, $2, $3)
+`
+
+type InsertCopyRequestParams struct {
+	AssetID       uuid.UUID
+	SourceAssetID uuid.UUID
+	Now           time.Time
+}
+
+func (q *Queries) InsertCopyRequest(ctx context.Context, arg InsertCopyRequestParams) error {
+	_, err := q.db.Exec(ctx, insertCopyRequest, arg.AssetID, arg.SourceAssetID, arg.Now)
+	return err
+}
+
+const insertDeleteGate = `-- name: InsertDeleteGate :exec
+INSERT INTO media.asset_gates (asset_id, kind, created_at)
+SELECT a.id, 'DELETE', $1::timestamptz FROM media.assets AS a WHERE a.id = $2::uuid
+ON CONFLICT (asset_id) DO NOTHING
+`
+
+type InsertDeleteGateParams struct {
+	Now     time.Time
+	AssetID uuid.UUID
+}
+
+func (q *Queries) InsertDeleteGate(ctx context.Context, arg InsertDeleteGateParams) error {
+	_, err := q.db.Exec(ctx, insertDeleteGate, arg.Now, arg.AssetID)
+	return err
+}
+
+const insertHoldGates = `-- name: InsertHoldGates :exec
+INSERT INTO media.asset_gates (asset_id, kind, created_at)
+SELECT unnest($1::uuid[]), 'HOLD', $2::timestamptz
+ON CONFLICT (asset_id) DO NOTHING
+`
+
+type InsertHoldGatesParams struct {
+	Ids []uuid.UUID
+	Now time.Time
+}
+
+func (q *Queries) InsertHoldGates(ctx context.Context, arg InsertHoldGatesParams) error {
+	_, err := q.db.Exec(ctx, insertHoldGates, arg.Ids, arg.Now)
+	return err
+}
+
+const insertHolds = `-- name: InsertHolds :exec
+INSERT INTO media.asset_holds (hold_id, asset_id, source, source_id, until, created_at)
+SELECT gen_random_uuid(), t.id, $1, $2::uuid, $3::timestamptz, $4::timestamptz
+FROM unnest($5::uuid[]) AS t(id)
+WHERE NOT EXISTS (
+    SELECT 1 FROM media.asset_holds AS h
+    WHERE h.asset_id = t.id AND h.source = $1 AND h.source_id = $2::uuid
+      AND h.until >= $3::timestamptz
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))
+`
+
+type InsertHoldsParams struct {
+	Source   string
+	SourceID uuid.UUID
+	Until    time.Time
+	Now      time.Time
+	Ids      []uuid.UUID
+}
+
+func (q *Queries) InsertHolds(ctx context.Context, arg InsertHoldsParams) error {
+	_, err := q.db.Exec(ctx, insertHolds,
+		arg.Source,
+		arg.SourceID,
+		arg.Until,
+		arg.Now,
+		arg.Ids,
+	)
+	return err
+}
+
 const insertSecureAssetFromUpload = `-- name: InsertSecureAssetFromUpload :exec
 INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at)
 SELECT u.planned_asset_id, 'SECURE', $1, u.declared_content_type, u.declared_size, 'STAGED', u.kek_id, u.wrapped_dek, u.chunk_count,
@@ -190,6 +435,74 @@ func (q *Queries) InsertSecureAssetFromUpload(ctx context.Context, arg InsertSec
 	return err
 }
 
+const isAssetHeld = `-- name: IsAssetHeld :one
+SELECT EXISTS (
+    SELECT 1 FROM media.asset_holds AS h
+    WHERE h.asset_id = $1 AND h.until > $2
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))::boolean
+`
+
+type IsAssetHeldParams struct {
+	AssetID uuid.UUID
+	Now     time.Time
+}
+
+func (q *Queries) IsAssetHeld(ctx context.Context, arg IsAssetHeldParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isAssetHeld, arg.AssetID, arg.Now)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const isHoldSourceLive = `-- name: IsHoldSourceLive :one
+SELECT EXISTS (
+    SELECT 1 FROM media.asset_holds AS h
+    WHERE h.source = $1 AND h.source_id = $2::uuid AND h.until > $3::timestamptz
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))::boolean
+`
+
+type IsHoldSourceLiveParams struct {
+	Source   string
+	SourceID uuid.UUID
+	Now      time.Time
+}
+
+func (q *Queries) IsHoldSourceLive(ctx context.Context, arg IsHoldSourceLiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isHoldSourceLive, arg.Source, arg.SourceID, arg.Now)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const listAssetGates = `-- name: ListAssetGates :many
+SELECT asset_id, kind FROM media.asset_gates WHERE asset_id = ANY($1::uuid[]) ORDER BY asset_id
+`
+
+type ListAssetGatesRow struct {
+	AssetID uuid.UUID
+	Kind    string
+}
+
+func (q *Queries) ListAssetGates(ctx context.Context, ids []uuid.UUID) ([]ListAssetGatesRow, error) {
+	rows, err := q.db.Query(ctx, listAssetGates, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAssetGatesRow{}
+	for rows.Next() {
+		var i ListAssetGatesRow
+		if err := rows.Scan(&i.AssetID, &i.Kind); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAssetIDs = `-- name: ListAssetIDs :many
 SELECT id FROM media.assets ORDER BY id
 `
@@ -207,6 +520,73 @@ func (q *Queries) ListAssetIDs(ctx context.Context) ([]uuid.UUID, error) {
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAssetStates = `-- name: ListAssetStates :many
+SELECT a.id, a.state, a.visibility,
+    EXISTS (SELECT 1 FROM media.upload_claims AS c WHERE c.asset_id = a.id AND c.kind = 'CONFIRMED')::boolean AS confirmed
+FROM media.assets AS a WHERE a.id = ANY($1::uuid[]) ORDER BY a.id
+`
+
+type ListAssetStatesRow struct {
+	ID         uuid.UUID
+	State      string
+	Visibility string
+	Confirmed  bool
+}
+
+func (q *Queries) ListAssetStates(ctx context.Context, ids []uuid.UUID) ([]ListAssetStatesRow, error) {
+	rows, err := q.db.Query(ctx, listAssetStates, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAssetStatesRow{}
+	for rows.Next() {
+		var i ListAssetStatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.State,
+			&i.Visibility,
+			&i.Confirmed,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAssetsOfHoldSource = `-- name: ListAssetsOfHoldSource :many
+SELECT DISTINCT asset_id FROM media.asset_holds WHERE source = $1 AND source_id = $2::uuid ORDER BY asset_id
+`
+
+type ListAssetsOfHoldSourceParams struct {
+	Source   string
+	SourceID uuid.UUID
+}
+
+func (q *Queries) ListAssetsOfHoldSource(ctx context.Context, arg ListAssetsOfHoldSourceParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAssetsOfHoldSource, arg.Source, arg.SourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var asset_id uuid.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -253,6 +633,40 @@ func (q *Queries) ListAssetsToRewrap(ctx context.Context, arg ListAssetsToRewrap
 	return items, nil
 }
 
+const listAssetsWithDeadHolds = `-- name: ListAssetsWithDeadHolds :many
+SELECT DISTINCT h.asset_id FROM media.asset_holds AS h
+WHERE h.asset_id > $1::uuid
+  AND (h.until <= $2::timestamptz OR EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))
+ORDER BY h.asset_id
+LIMIT $3
+`
+
+type ListAssetsWithDeadHoldsParams struct {
+	AfterID uuid.UUID
+	Now     time.Time
+	MaxRows int32
+}
+
+func (q *Queries) ListAssetsWithDeadHolds(ctx context.Context, arg ListAssetsWithDeadHoldsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAssetsWithDeadHolds, arg.AfterID, arg.Now, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var asset_id uuid.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDeletingAssets = `-- name: ListDeletingAssets :many
 SELECT id, object_key, visibility FROM media.assets
 WHERE state = 'DELETING' AND id > $1
@@ -291,6 +705,117 @@ func (q *Queries) ListDeletingAssets(ctx context.Context, arg ListDeletingAssets
 	return items, nil
 }
 
+const listPendingCopyRequests = `-- name: ListPendingCopyRequests :many
+SELECT asset_id, source_asset_id, requested_at, completed_at, failed_at FROM media.asset_copy_requests
+WHERE completed_at IS NULL AND failed_at IS NULL
+  AND (requested_at, asset_id) > ($1::timestamptz, $2::uuid)
+ORDER BY requested_at, asset_id
+LIMIT $3
+`
+
+type ListPendingCopyRequestsParams struct {
+	AfterRequestedAt time.Time
+	AfterID          uuid.UUID
+	MaxRows          int32
+}
+
+func (q *Queries) ListPendingCopyRequests(ctx context.Context, arg ListPendingCopyRequestsParams) ([]MediaAssetCopyRequest, error) {
+	rows, err := q.db.Query(ctx, listPendingCopyRequests, arg.AfterRequestedAt, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MediaAssetCopyRequest{}
+	for rows.Next() {
+		var i MediaAssetCopyRequest
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.SourceAssetID,
+			&i.RequestedAt,
+			&i.CompletedAt,
+			&i.FailedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingDeletionRequests = `-- name: ListPendingDeletionRequests :many
+SELECT asset_id, requested_at FROM media.asset_deletion_requests
+WHERE applied_at IS NULL AND (requested_at, asset_id) > ($1::timestamptz, $2::uuid)
+ORDER BY requested_at, asset_id
+LIMIT $3
+`
+
+type ListPendingDeletionRequestsParams struct {
+	AfterRequestedAt time.Time
+	AfterID          uuid.UUID
+	MaxRows          int32
+}
+
+type ListPendingDeletionRequestsRow struct {
+	AssetID     uuid.UUID
+	RequestedAt time.Time
+}
+
+func (q *Queries) ListPendingDeletionRequests(ctx context.Context, arg ListPendingDeletionRequestsParams) ([]ListPendingDeletionRequestsRow, error) {
+	rows, err := q.db.Query(ctx, listPendingDeletionRequests, arg.AfterRequestedAt, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingDeletionRequestsRow{}
+	for rows.Next() {
+		var i ListPendingDeletionRequestsRow
+		if err := rows.Scan(&i.AssetID, &i.RequestedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockAssetStateShared = `-- name: LockAssetStateShared :one
+SELECT state FROM media.assets WHERE id = $1::uuid FOR SHARE
+`
+
+func (q *Queries) LockAssetStateShared(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, lockAssetStateShared, id)
+	var state string
+	err := row.Scan(&state)
+	return state, err
+}
+
+const lockDeletingAsset = `-- name: LockDeletingAsset :one
+SELECT id FROM media.assets WHERE id = $1 AND state = 'DELETING' FOR NO KEY UPDATE
+`
+
+func (q *Queries) LockDeletingAsset(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockDeletingAsset, id)
+	var id_2 uuid.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const lockHoldGate = `-- name: LockHoldGate :one
+SELECT asset_id FROM media.asset_gates WHERE asset_id = $1 AND kind = 'HOLD' FOR UPDATE
+`
+
+func (q *Queries) LockHoldGate(ctx context.Context, assetID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockHoldGate, assetID)
+	var asset_id uuid.UUID
+	err := row.Scan(&asset_id)
+	return asset_id, err
+}
+
 const markAssetDeleted = `-- name: MarkAssetDeleted :execrows
 UPDATE media.assets SET state = 'DELETED', updated_at = $1
 WHERE id = $2 AND state = 'DELETING'
@@ -303,6 +828,37 @@ type MarkAssetDeletedParams struct {
 
 func (q *Queries) MarkAssetDeleted(ctx context.Context, arg MarkAssetDeletedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markAssetDeleted, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const releaseHolds = `-- name: ReleaseHolds :exec
+INSERT INTO media.asset_hold_releases (hold_id, released_at)
+SELECT h.hold_id, $1::timestamptz FROM media.asset_holds AS h
+WHERE h.source = $2 AND h.source_id = $3::uuid
+  AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id)
+ON CONFLICT (hold_id) DO NOTHING
+`
+
+type ReleaseHoldsParams struct {
+	Now      time.Time
+	Source   string
+	SourceID uuid.UUID
+}
+
+func (q *Queries) ReleaseHolds(ctx context.Context, arg ReleaseHoldsParams) error {
+	_, err := q.db.Exec(ctx, releaseHolds, arg.Now, arg.Source, arg.SourceID)
+	return err
+}
+
+const reopenDeletionRequest = `-- name: ReopenDeletionRequest :execrows
+UPDATE media.asset_deletion_requests SET applied_at = NULL WHERE asset_id = $1
+`
+
+func (q *Queries) ReopenDeletionRequest(ctx context.Context, assetID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, reopenDeletionRequest, assetID)
 	if err != nil {
 		return 0, err
 	}
@@ -341,6 +897,23 @@ func (q *Queries) RequestDeletions(ctx context.Context, arg RequestDeletionsPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreHeldAsset = `-- name: RestoreHeldAsset :execrows
+UPDATE media.assets SET state = 'STAGED', updated_at = $1 WHERE id = $2 AND state = 'DELETING'
+`
+
+type RestoreHeldAssetParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+func (q *Queries) RestoreHeldAsset(ctx context.Context, arg RestoreHeldAssetParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreHeldAsset, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const rewrapAsset = `-- name: RewrapAsset :execrows

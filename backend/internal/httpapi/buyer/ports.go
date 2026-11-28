@@ -18,6 +18,7 @@ type ProductInfo struct {
 	MaxPrice  int64
 	Rating    *float32
 	Available bool
+	Visible   bool
 }
 
 // MerchantSummary 是單一店家的累計訂單金額。

@@ -393,6 +393,7 @@ const ContentKind$json = {
     {'1': 'CONTENT_KIND_FORUM_ENTRY', '2': 3},
     {'1': 'CONTENT_KIND_CHAT_MESSAGE', '2': 4},
     {'1': 'CONTENT_KIND_REVIEW_REPLY', '2': 5},
+    {'1': 'CONTENT_KIND_PRODUCT', '2': 6},
   ],
 };
 
@@ -401,7 +402,7 @@ final $typed_data.Uint8List contentKindDescriptor = $convert.base64Decode(
     'CgtDb250ZW50S2luZBIcChhDT05URU5UX0tJTkRfVU5TUEVDSUZJRUQQABIVChFDT05URU5UX0'
     'tJTkRfUE9TVBABEhgKFENPTlRFTlRfS0lORF9DT01NRU5UEAISHAoYQ09OVEVOVF9LSU5EX0ZP'
     'UlVNX0VOVFJZEAMSHQoZQ09OVEVOVF9LSU5EX0NIQVRfTUVTU0FHRRAEEh0KGUNPTlRFTlRfS0'
-    'lORF9SRVZJRVdfUkVQTFkQBQ==');
+    'lORF9SRVZJRVdfUkVQTFkQBRIYChRDT05URU5UX0tJTkRfUFJPRFVDVBAG');
 
 @$core.Deprecated('Use contentSnapshotStateDescriptor instead')
 const ContentSnapshotState$json = {
@@ -410,6 +411,7 @@ const ContentSnapshotState$json = {
     {'1': 'CONTENT_SNAPSHOT_STATE_UNSPECIFIED', '2': 0},
     {'1': 'CONTENT_SNAPSHOT_STATE_CAPTURED', '2': 1},
     {'1': 'CONTENT_SNAPSHOT_STATE_CLEARED', '2': 2},
+    {'1': 'CONTENT_SNAPSHOT_STATE_OWNER_HELD', '2': 3},
   ],
 };
 
@@ -417,7 +419,8 @@ const ContentSnapshotState$json = {
 final $typed_data.Uint8List contentSnapshotStateDescriptor = $convert.base64Decode(
     'ChRDb250ZW50U25hcHNob3RTdGF0ZRImCiJDT05URU5UX1NOQVBTSE9UX1NUQVRFX1VOU1BFQ0'
     'lGSUVEEAASIwofQ09OVEVOVF9TTkFQU0hPVF9TVEFURV9DQVBUVVJFRBABEiIKHkNPTlRFTlRf'
-    'U05BUFNIT1RfU1RBVEVfQ0xFQVJFRBAC');
+    'U05BUFNIT1RfU1RBVEVfQ0xFQVJFRBACEiUKIUNPTlRFTlRfU05BUFNIT1RfU1RBVEVfT1dORV'
+    'JfSEVMRBAD');
 
 @$core.Deprecated('Use measureBasisDescriptor instead')
 const MeasureBasis$json = {
