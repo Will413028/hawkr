@@ -31,8 +31,8 @@
    "id": "listen-dispatch-drops-item",
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/stream/listen.go",
-   "old": "p.Store, model.StateHint(p.Hint), item)",
-   "new": "p.Store, model.StateHint(p.Hint), uuid.Nil())",
+   "old": "var item uuid.UUID\n\t\tif p.Item != \"\" {\n\t\t\titem = uuid.MustParse(p.Item)\n\t\t}\n\t\th.InboxChanged(Key{AccountID: p.Account, Audience: model.Audience(p.Audience)}, p.Store, model.StateHint(p.Hint), item)",
+   "new": "if p.Item != \"\" {\n\t\t\tuuid.MustParse(p.Item)\n\t\t}\n\t\th.InboxChanged(Key{AccountID: p.Account, Audience: model.Audience(p.Audience)}, p.Store, model.StateHint(p.Hint), uuid.Nil())",
    "test": "internal/modules/notification/internal/stream ^TestDispatchDeliversTheItemIDOfTheNotification$",
    "why": "The hub ignores the item id carried by the NOTIFY payload."
   },

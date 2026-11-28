@@ -1,30 +1,68 @@
-# Hawkr Backend
+# Hawkr backend
 
-生鮮電商後端 monorepo。Gateway（Go/Gin）+ 10 個 Go 微服務 + 10 個 Java/Spring Boot 微服務，
-透過 gRPC 同步通信、RabbitMQ 異步事件、PostgreSQL/Redis 為主要儲存，部署在 k3s 上。
+The Hawkr API server: a Go modular monolith (`cmd/hawkr`) serving the Connect API defined in [`api/`](../api/) to the website, admin console, and mobile apps. Services that have not moved into the monolith yet run in `services/` behind the REST gateway in `gateway/`; the monolith forwards their routes.
 
-## 文件入口
+## Architecture
 
-| 文件 | 用途 |
+| Path | Role |
 |---|---|
-| [backend/docs/index.md](docs/index.md) | **完整技術文件**：詳細設計書（29 份）、開發規範、CodeMeta、基礎建設、踩坑紀錄、decisions、postmortems、runbooks |
-| [QUICKSTART.md](QUICKSTART.md) | 新機器 git clone 後的環境設定、部署、常用指令 |
-| [rules.md](rules.md) | Go API stack 規範（由維護者本機 hook 自動同步，來源不在本 repo） |
-| [scripts/README.md](scripts/README.md) | 開發、smoke test、資料同步等本機腳本 |
+| `cmd/hawkr` | The single deployed binary and the only place modules are wired together (`serve`, `worker`, `migrate`, operational subcommands) |
+| `internal/modules/<name>` | Business modules; each owns its PostgreSQL schema, exposes its API from the root package, and keeps the implementation in its own `internal/` |
+| `internal/httpapi` | Connect handlers: transport, authorization declarations, and read composition for screens |
+| `internal/platform` | Shared infrastructure (database, events, jobs, errors, UI text) that depends on no module |
+| `internal/arch` | Tests that enforce the module dependency graph |
+| `gateway/`, `services/` | Services not yet moved into the monolith, and their REST gateway |
 
-## 服務一覽
+Module specs live in [`docs/modules/`](docs/modules/); the allowed dependencies between modules are defined in `internal/arch/modules.go`. The rules every change must follow are in [`AGENTS.md`](AGENTS.md).
 
-- **Gateway**（`gateway/`, Go/Gin, port 9900）：REST → gRPC 路由、JWT auth、rate limit、circuit breaker、OTel tracing
-- **Go 服務**（`services/`）：account / buyer / seller / im / ai / content / crm / social / review / notification — 使用 **Atlas declarative** schema migration
-- **Java 服務**（`services/`, Spring Boot）：product / order / media / aftersales / payment / cart / shipping / coupon / payuni-webhook — 使用 **Flyway** migration
+Storage and runtime: PostgreSQL, River for background jobs, S3-compatible object storage for media.
 
-各服務 port、API、資料模型詳見 [backend/docs/詳細設計書/](docs/詳細設計書/)。
+## Prerequisites
 
-## 開發規範（最高優先級）
+- Go (version in [`.go-version`](.go-version))
+- Docker, for local infrastructure, code generators, and integration tests
+- libvips (`brew install vips` or `apt-get install libvips-dev`); on macOS also `export PKG_CONFIG_PATH="$(brew --prefix libarchive)/lib/pkgconfig"`
 
-- [API 設計規範](docs/開發規範/API%20設計規範.md)
-- [開發工作流程](docs/開發規範/開發工作流程.md)（設計書 → Code Gen → DB → 程式碼 → 測試 強制順序）
-- [Java 微服務開發規範](docs/開發規範/Java%20微服務開發規範.md)
-- [Proto 管理規範](docs/開發規範/Proto%20管理規範.md)
+## Run locally
 
-其餘規範與設計書見 [backend/docs/index.md](docs/index.md)。
+```bash
+make infra-up              # PostgreSQL and supporting services
+make migrate
+make serve                 # HTTP on :8080, /healthz and /readyz
+make worker                # background jobs
+make dev-seed              # reset test data
+make dev-token args='-account 2001'          # customer session token
+make dev-token args='-admin -user dev_ops'   # admin token
+```
+
+`go run ./cmd/hawkr` lists every subcommand.
+
+## Test and check
+
+```bash
+GOWORK=off go test -race ./...                     # unit tests, including dependency checks
+GOWORK=off go test -race -tags integration ./...   # integration tests (Docker)
+make lint-monolith
+```
+
+CI runs the same checks from [`.github/workflows/backend-*.yml`](../.github/workflows/).
+
+## Code generation
+
+Generated code is never edited by hand.
+
+| After changing | Run |
+|---|---|
+| `api/**/*.proto` | `make connect` |
+| a module's `db/schema.sql`, `objects.sql`, or `queries/` | `make sqlc` |
+| a module's `db/schema.sql` (migration) | `make atlas-diff module=<name> name=<migration>` |
+| the UI text catalog or a module's `text/*.json` | `make uitext` |
+
+New modules start from `make new-module`.
+
+## Documentation
+
+- [`AGENTS.md`](AGENTS.md): monolith structure and rules
+- [`docs/modules/`](docs/modules/): per-module specifications
+- [`docs/plans/`](docs/plans/): migration plans and progress
+- [`../docs/adr/`](../docs/adr/): architecture decision records

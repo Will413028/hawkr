@@ -34,7 +34,7 @@
    "old": "\t\t\tif (document.visibilityState !== \"visible\") return;\n\t\t\tconst requestedFor",
    "new": "\t\t\tconst requestedFor",
    "test": "components/shared/__tests__/NotificationToastBridge.signal.unit.test.ts toasts nothing in a hidden tab",
-   "why": "背景分頁也 toast"
+   "why": "背景分頁仍會讀收件匣列表"
   },
   {
    "id": "toast-fetches-list-for-idless-signal",

@@ -76,8 +76,8 @@
       "id": "store-id-instead-of-store-code",
       "stack": "go",
       "file": "backend/internal/modules/notification/internal/registry/content.go",
-      "old": "Loaded{StoreCode: codes[storeID(p)]}",
-      "new": "Loaded{StoreCode: storeID(p)}",
+      "old": "codes, err := src.StoreCodes(ctx, slices.Compact(ids))\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tout := make([]Loaded, len(ps))\n\t\tfor i, p := range ps {\n\t\t\tout[i] = Loaded{StoreCode: codes[storeID(p)]}\n\t\t}\n\t\treturn out, nil",
+      "new": "_, err := src.StoreCodes(ctx, slices.Compact(ids))\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tout := make([]Loaded, len(ps))\n\t\tfor i, p := range ps {\n\t\t\tout[i] = Loaded{StoreCode: storeID(p)}\n\t\t}\n\t\treturn out, nil",
       "test": "internal/modules/notification/internal/registry ^TestContentLoadResolvesStoreCodesInOneCall$",
       "why": "深連結改用 store_id 當路徑段，不經 store_code 對照"
     },
