@@ -177,11 +177,9 @@ jobs:
           go vet -tags integration ./...
           go vet -tags gateway ./internal/httpapi/...
 
-      - name: go test（含依賴方向檢查；-race 只在 push 與 dev→main PR）
+      - name: go test（含依賴方向檢查）
         if: always()
-        env:
-          RACE: ${{ (github.event_name != 'pull_request' || github.base_ref == 'main') && '-race' || '' }}
-        run: go test ${RACE:+"$RACE"} ./...
+        run: go test -race ./...
 
       - name: 讀取 buf 的版本
         if: always()
