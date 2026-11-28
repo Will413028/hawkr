@@ -40,7 +40,7 @@
    "id": "delete-failure-still-marks-deleted",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
-   "old": "} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\treturn fmt.Errorf(\"media：刪除資產 %s 的物件：%w\", r.ID, err)\n\t}",
+   "old": "} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\treturn false, fmt.Errorf(\"media：刪除資產 %s 的物件：%w\", r.ID, err)\n\t}",
    "new": "} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\ts.d.Logger.WarnContext(ctx, \"delete failed\", \"error\", err)\n\t}",
    "test": "internal/modules/media ^TestDeleteJob_StorageFailureKeepsRowRetryable$",
    "why": "a failed object delete is swallowed and the asset is marked DELETED while its object still exists"

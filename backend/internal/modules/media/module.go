@@ -103,6 +103,7 @@ const (
 	UploadTTL = model.UploadTTL
 	// StuckUploadGrace 是卡在 UPLOADED 的暫存列過期後、GC 回收它之前的寬限。
 	StuckUploadGrace = model.StuckUploadGrace
+	CopyHoldTTL      = model.CopyHoldTTL
 	// ProcessQueue 與 ProcessQueueWorkers 是處理 job 專用的 River queue 與它的併發上限，worker 角色必須設定這個 queue。
 	ProcessQueue        = model.ProcessQueue
 	ProcessQueueWorkers = model.ProcessQueueWorkers
@@ -146,6 +147,9 @@ var (
 	ErrNoKeyring = model.ErrNoKeyring
 	// ErrNoTransaction：Confirm、MarkDeleted 必須在擁有者的 transaction 內呼叫。
 	ErrNoTransaction = model.ErrNoTransaction
+	ErrAssetGone     = model.ErrAssetGone
+	ErrAssetNotFound = model.ErrAssetNotFound
+	ErrHoldNotFound  = model.ErrHoldNotFound
 )
 
 // Permanent 把處理的永久失敗標上拒絕原因：暫存列立即轉 REJECTED，不重試。
@@ -265,6 +269,26 @@ func (m *Module) CopyPublic(ctx context.Context, uploader Uploader, sourceID uui
 	return m.upload.CopyPublic(ctx, uploader, sourceID)
 }
 
+func (m *Module) Hold(ctx context.Context, assetIDs []uuid.UUID, source string, sourceID uuid.UUID, until time.Time) error {
+	return m.reclaim.Hold(ctx, assetIDs, source, sourceID, until)
+}
+
+func (m *Module) ExtendHold(ctx context.Context, source string, sourceID uuid.UUID, until time.Time) error {
+	return m.reclaim.ExtendHold(ctx, source, sourceID, until)
+}
+
+func (m *Module) ReleaseHold(ctx context.Context, source string, sourceID uuid.UUID) error {
+	return m.reclaim.ReleaseHold(ctx, source, sourceID)
+}
+
+func (m *Module) ExpireHolds(ctx context.Context) (int, error) { return m.reclaim.ExpireHolds(ctx) }
+
+func (m *Module) CopyToSecure(ctx context.Context, uploader Uploader, sourceID uuid.UUID) (uuid.UUID, error) {
+	return m.upload.CopyToSecure(ctx, uploader, sourceID)
+}
+
+func (m *Module) ProcessCopies(ctx context.Context) (int, error) { return m.upload.ProcessCopies(ctx) }
+
 // ProcessUpload 是 media.process_upload job 的內容，給 worker 與測試呼叫。
 func (m *Module) ProcessUpload(ctx context.Context, uploadID uuid.UUID, attempt, maxAttempts int) error {
 	return m.upload.Process(ctx, uploadID, attempt, maxAttempts)
@@ -305,5 +329,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	reclaim.AddWorkers(workers, m.reclaim)
 }
 
-// PeriodicJobs 回傳暫存 GC 的排程。
-func (m *Module) PeriodicJobs() []*river.PeriodicJob { return reclaim.PeriodicJobs() }
+// PeriodicJobs 回傳暫存 GC、保全到期整理與副本複製的排程。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob {
+	return append(reclaim.PeriodicJobs(), upload.PeriodicJobs()...)
+}

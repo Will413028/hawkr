@@ -25,10 +25,26 @@ type MediaAsset struct {
 	UpdatedAt   time.Time
 }
 
+type MediaAssetCopyRequest struct {
+	AssetID       uuid.UUID
+	SourceAssetID uuid.UUID
+	RequestedAt   time.Time
+	CompletedAt   *time.Time
+	FailedAt      *time.Time
+}
+
 type MediaAssetDeletionRequest struct {
 	AssetID     uuid.UUID
 	RequestedAt time.Time
 	AppliedAt   *time.Time
+}
+
+type MediaAssetHold struct {
+	AssetID   uuid.UUID
+	Source    string
+	SourceID  uuid.UUID
+	Until     time.Time
+	CreatedAt time.Time
 }
 
 type MediaSecureChunk struct {

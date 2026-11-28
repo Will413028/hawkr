@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "apply-picked-drops-hold-condition",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+   "old": "\n      AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = r.asset_id AND h.until > $1::timestamptz)",
+   "new": "",
+   "test": "internal/modules/media ^TestApplyDeletionsSkipsHeldAsset$",
+   "why": "ApplyDeletionRequests 的 picked 不再排除有生效保全的請求：被保全的資產被推進 DELETING 並刪物件，跳過保全測試要紅。"
+  },
+  {
+   "id": "apply-picked-hold-expiry-inverted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+   "old": "h.asset_id = r.asset_id AND h.until > $1::timestamptz)",
+   "new": "h.asset_id = r.asset_id AND h.until < $1::timestamptz)",
+   "test": "internal/modules/media ^(TestApplyDeletionsSkipsHeldAsset|TestExpiredHoldAllowsDeletion)$",
+   "why": "保全期限的比較方向反了：保全中的請求被套用（跳過保全測試紅），到期的請求反而一直被擋（到期放行測試紅）。"
+  },
+  {
+   "id": "claim-assets-of-uploads-drops-hold-condition",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+   "old": "\n  AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = a.id AND h.until > $1::timestamptz)",
+   "new": "",
+   "test": "internal/modules/media ^TestClaimAssetsOfUploadsSkipsHeldAsset$",
+   "why": "ClaimAssetsOfUploads 不再排除有生效保全的資產：暫存逾期回收時被保全的資產被推進 DELETING，測試要紅。"
+  },
+  {
+   "id": "reclaim-upload-deleting-drops-hold-condition",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "\n  AND NOT EXISTS (\n    SELECT 1 FROM media.asset_holds AS h\n    WHERE h.asset_id IN (u.asset_id, u.planned_asset_id) AND h.until > $1::timestamptz)",
+   "new": "",
+   "test": "internal/modules/media ^TestReclaimUploadWithHeldAssetKeepsUploadStateAndRollsBackClaim$",
+   "why": "MarkReclaimedUploadDeleting 不再排除資產有生效保全的暫存列：GC 認領了被保全的暫存（Claimed 不為 0），測試要紅。"
+  },
+  {
+   "id": "delete-upload-drops-hold-recheck",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "\tproceed, err := s.recheckUpload(ctx, r.ID)\n\tif err != nil || !proceed {\n\t\treturn false, err\n\t}\n",
+   "new": "\tvar err error\n",
+   "test": "internal/modules/media ^TestDeleteUploadRechecksHoldBeforeDeletingObjects$",
+   "why": "deleteUpload 刪物件前不再鎖列再檢查保全：SQL 認領之後才登記保全的暫存，物件被刪，測試要紅。"
+  },
+  {
+   "id": "delete-asset-drops-hold-recheck",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "\tproceed, err := s.recheckAsset(ctx, r.ID)\n\tif err != nil || !proceed {\n\t\treturn false, err\n\t}\n",
+   "new": "\tvar err error\n",
+   "test": "internal/modules/media ^TestDeleteAssetRechecksHoldBeforeDeletingObject$",
+   "why": "deleteAsset 刪物件前不再鎖列再檢查保全：Apply 之後才登記保全的資產，物件被刪，測試要紅（公開與 SECURE 都紅）。"
+  },
+  {
+   "id": "hold-drops-asset-gone-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "\t\tif model.AssetState(r.State) != model.AssetStaged {\n\t\t\treturn model.ErrAssetGone\n\t\t}\n",
+   "new": "\t\t_ = r\n",
+   "test": "internal/modules/media ^TestHoldOnDeletingAssetReturnsAssetGone$",
+   "why": "Hold 不再因資產不是 STAGED 回 ErrAssetGone：對刪除中的資產登記了保全，測試要紅。"
+  }
+ ]
+}

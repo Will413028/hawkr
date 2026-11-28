@@ -30,9 +30,10 @@ RETURNING asset_id;
 
 -- name: ApplyDeletionRequests :many
 WITH picked AS (
-    SELECT asset_id FROM media.asset_deletion_requests
-    WHERE applied_at IS NULL
-    ORDER BY requested_at, asset_id
+    SELECT r.asset_id FROM media.asset_deletion_requests AS r
+    WHERE r.applied_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = r.asset_id AND h.until > sqlc.arg(now)::timestamptz)
+    ORDER BY r.requested_at, r.asset_id
     LIMIT sqlc.arg(max_rows)
     FOR UPDATE SKIP LOCKED),
 marked AS (
@@ -44,8 +45,9 @@ FROM picked AS p WHERE r.asset_id = p.asset_id
 RETURNING r.asset_id;
 
 -- name: ClaimAssetsOfUploads :execrows
-UPDATE media.assets SET state = 'DELETING', updated_at = sqlc.arg(now)
-WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND state = 'STAGED';
+UPDATE media.assets AS a SET state = 'DELETING', updated_at = sqlc.arg(now)
+WHERE a.id = ANY(sqlc.arg(ids)::uuid[]) AND a.state = 'STAGED'
+  AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = a.id AND h.until > sqlc.arg(now)::timestamptz);
 
 -- name: ListDeletingAssets :many
 SELECT id, object_key, visibility FROM media.assets
@@ -77,3 +79,60 @@ DELETE FROM media.upload_claims WHERE asset_id = sqlc.arg(asset_id)::uuid;
 
 -- name: DeleteRequestOfAsset :execrows
 DELETE FROM media.asset_deletion_requests WHERE asset_id = sqlc.arg(asset_id);
+
+-- name: LockAssetsForHold :many
+SELECT id, state FROM media.assets WHERE id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY id FOR SHARE;
+
+-- name: UpsertHolds :exec
+INSERT INTO media.asset_holds (asset_id, source, source_id, until, created_at)
+SELECT unnest(sqlc.arg(ids)::uuid[]), sqlc.arg(source), sqlc.arg(source_id)::uuid, sqlc.arg(until)::timestamptz, sqlc.arg(now)::timestamptz
+ON CONFLICT (asset_id, source, source_id) DO UPDATE SET until = GREATEST(media.asset_holds.until, EXCLUDED.until);
+
+-- name: ExtendHolds :execrows
+UPDATE media.asset_holds SET until = GREATEST(until, sqlc.arg(until)::timestamptz)
+WHERE source = sqlc.arg(source) AND source_id = sqlc.arg(source_id);
+
+-- name: ReleaseHolds :execrows
+DELETE FROM media.asset_holds WHERE source = sqlc.arg(source) AND source_id = sqlc.arg(source_id);
+
+-- name: DeleteExpiredHolds :execrows
+DELETE FROM media.asset_holds WHERE until <= sqlc.arg(now);
+
+-- name: LockDeletingAsset :one
+SELECT id FROM media.assets WHERE id = sqlc.arg(id) AND state = 'DELETING' FOR UPDATE;
+
+-- name: IsAssetHeld :one
+SELECT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = sqlc.arg(asset_id) AND h.until > sqlc.arg(now))::boolean;
+
+-- name: RestoreHeldAsset :execrows
+UPDATE media.assets SET state = 'STAGED', updated_at = sqlc.arg(now) WHERE id = sqlc.arg(id) AND state = 'DELETING';
+
+-- name: ReopenDeletionRequest :execrows
+UPDATE media.asset_deletion_requests SET applied_at = NULL WHERE asset_id = sqlc.arg(asset_id);
+
+-- name: InsertCopyAsset :exec
+INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at)
+VALUES (
+    sqlc.arg(id), 'SECURE', sqlc.arg(object_key), sqlc.arg(content_type), sqlc.arg(size_bytes), 'STAGED',
+    sqlc.arg(kek_id)::text, sqlc.arg(wrapped_dek), sqlc.arg(chunk_count)::integer, sqlc.arg(now), sqlc.arg(now));
+
+-- name: InsertCopyRequest :exec
+INSERT INTO media.asset_copy_requests (asset_id, source_asset_id, requested_at)
+VALUES (sqlc.arg(asset_id), sqlc.arg(source_asset_id), sqlc.arg(now));
+
+-- name: GetCopyRequest :one
+SELECT * FROM media.asset_copy_requests WHERE asset_id = sqlc.arg(asset_id);
+
+-- name: ListPendingCopyRequests :many
+SELECT * FROM media.asset_copy_requests
+WHERE completed_at IS NULL AND failed_at IS NULL
+ORDER BY requested_at, asset_id
+LIMIT sqlc.arg(max_rows);
+
+-- name: CompleteCopyRequest :execrows
+UPDATE media.asset_copy_requests SET completed_at = sqlc.arg(now)
+WHERE asset_id = sqlc.arg(asset_id) AND completed_at IS NULL AND failed_at IS NULL;
+
+-- name: FailCopyRequest :execrows
+UPDATE media.asset_copy_requests SET failed_at = sqlc.arg(now)
+WHERE asset_id = sqlc.arg(asset_id) AND completed_at IS NULL AND failed_at IS NULL;

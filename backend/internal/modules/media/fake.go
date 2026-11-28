@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
@@ -38,11 +39,18 @@ type Fake struct {
 	secure    map[uuid.UUID][]byte
 	calls     []string
 	copies    int
+	holds     map[fakeHold]time.Time
+}
+
+type fakeHold struct {
+	asset    uuid.UUID
+	source   string
+	sourceID uuid.UUID
 }
 
 // NewFake 建立空的 Fake。
 func NewFake() *Fake {
-	return &Fake{confirmed: map[uuid.UUID]ConfirmedAsset{}, deleted: map[uuid.UUID]bool{}, secure: map[uuid.UUID][]byte{}}
+	return &Fake{confirmed: map[uuid.UUID]ConfirmedAsset{}, deleted: map[uuid.UUID]bool{}, secure: map[uuid.UUID][]byte{}, holds: map[fakeHold]time.Time{}}
 }
 
 // AssetFor 是 token 確認後的資產 ID。
@@ -122,6 +130,90 @@ func (f *Fake) MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error {
 		f.deleted[id] = true
 	}
 	return nil
+}
+
+func (f *Fake) Hold(ctx context.Context, assetIDs []uuid.UUID, source string, sourceID uuid.UUID, until time.Time) error {
+	if err := requireTx(ctx); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "hold "+source)
+	for _, id := range assetIDs {
+		if f.deleted[id] {
+			return ErrAssetGone
+		}
+	}
+	for _, id := range assetIDs {
+		k := fakeHold{asset: id, source: source, sourceID: sourceID}
+		if until.After(f.holds[k]) {
+			f.holds[k] = until
+		}
+	}
+	return nil
+}
+
+func (f *Fake) ExtendHold(ctx context.Context, source string, sourceID uuid.UUID, until time.Time) error {
+	if err := requireTx(ctx); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "extend-hold "+source)
+	found := false
+	for k, v := range f.holds {
+		if k.source == source && k.sourceID == sourceID {
+			found = true
+			if until.After(v) {
+				f.holds[k] = until
+			}
+		}
+	}
+	if !found {
+		return ErrHoldNotFound
+	}
+	return nil
+}
+
+func (f *Fake) ReleaseHold(ctx context.Context, source string, sourceID uuid.UUID) error {
+	if err := requireTx(ctx); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "release-hold "+source)
+	for k := range f.holds {
+		if k.source == source && k.sourceID == sourceID {
+			delete(f.holds, k)
+		}
+	}
+	return nil
+}
+
+func (f *Fake) IsHeld(assetID uuid.UUID) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k := range f.holds {
+		if k.asset == assetID {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *Fake) CopyToSecure(ctx context.Context, u Uploader, sourceID uuid.UUID) (uuid.UUID, error) {
+	if err := requireTx(ctx); err != nil {
+		return uuid.UUID{}, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "copy-to-secure "+sourceID.String())
+	if f.deleted[sourceID] || u.ID <= 0 {
+		return uuid.UUID{}, apperr.NotFound("找不到圖片")
+	}
+	id := uuid.New()
+	f.confirmed[id] = ConfirmedAsset{ID: id, Visibility: VisibilitySecure, SizeBytes: 1}
+	return id, nil
 }
 
 // ReadSecure 是 *Module.ReadSecure 的替身：只讀得到 PutSecure 放的資產（型別由內容辨認），其餘 NotFound。

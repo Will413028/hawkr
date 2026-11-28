@@ -154,6 +154,13 @@ func (s *Service) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadClo
 	if deriveState(a) != model.AssetActive {
 		return nil, "", apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
+	copyReq, err := s.q(ctx).GetCopyRequest(ctx, assetID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", fmt.Errorf("media：讀取資產 %s 的複製請求：%w", assetID, err)
+	}
+	if err == nil && copyReq.CompletedAt == nil {
+		return nil, "", apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
+	}
 	rc, err := s.openAsset(ctx, assetFromView(a))
 	if err != nil {
 		return nil, "", err

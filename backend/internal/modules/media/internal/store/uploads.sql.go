@@ -251,6 +251,69 @@ func (q *Queries) GetUploadView(ctx context.Context, id uuid.UUID) (GetUploadVie
 	return i, err
 }
 
+const insertConfirmedClaim = `-- name: InsertConfirmedClaim :exec
+INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
+VALUES ($1, 'CONFIRMED', $2, $3)
+`
+
+type InsertConfirmedClaimParams struct {
+	UploadID uuid.UUID
+	AssetID  *uuid.UUID
+	Now      time.Time
+}
+
+func (q *Queries) InsertConfirmedClaim(ctx context.Context, arg InsertConfirmedClaimParams) error {
+	_, err := q.db.Exec(ctx, insertConfirmedClaim, arg.UploadID, arg.AssetID, arg.Now)
+	return err
+}
+
+const insertCopyUpload = `-- name: InsertCopyUpload :exec
+INSERT INTO media.staged_uploads (
+    id, token_hash, uploader_id, uploader_admin, delegated_store_id, visibility, declared_size, declared_content_type,
+    state, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at)
+VALUES (
+    $1, $2, $3, $4, $5::bigint, 'SECURE',
+    $6, $7::text, 'CONFIRMED', $8, $9::uuid, $9::uuid,
+    $10::integer, $10::integer, $11::text, $12, $13, $14, $14)
+`
+
+type InsertCopyUploadParams struct {
+	ID                  uuid.UUID
+	TokenHash           []byte
+	UploaderID          int64
+	UploaderAdmin       bool
+	DelegatedStoreID    *int64
+	DeclaredSize        int64
+	DeclaredContentType string
+	FinalKey            *string
+	AssetID             uuid.UUID
+	ChunkCount          int32
+	KekID               string
+	WrappedDek          []byte
+	ExpiresAt           time.Time
+	Now                 time.Time
+}
+
+func (q *Queries) InsertCopyUpload(ctx context.Context, arg InsertCopyUploadParams) error {
+	_, err := q.db.Exec(ctx, insertCopyUpload,
+		arg.ID,
+		arg.TokenHash,
+		arg.UploaderID,
+		arg.UploaderAdmin,
+		arg.DelegatedStoreID,
+		arg.DeclaredSize,
+		arg.DeclaredContentType,
+		arg.FinalKey,
+		arg.AssetID,
+		arg.ChunkCount,
+		arg.KekID,
+		arg.WrappedDek,
+		arg.ExpiresAt,
+		arg.Now,
+	)
+	return err
+}
+
 const insertSecureChunk = `-- name: InsertSecureChunk :exec
 INSERT INTO media.secure_chunks (asset_id, idx, object_key)
 VALUES ($1, $2, $3)
@@ -520,11 +583,31 @@ func (q *Queries) ListUploadsToRewrap(ctx context.Context, arg ListUploadsToRewr
 	return items, nil
 }
 
+const lockDeletingUpload = `-- name: LockDeletingUpload :one
+SELECT id, asset_id, planned_asset_id FROM media.staged_uploads WHERE id = $1 AND state = 'DELETING' FOR UPDATE
+`
+
+type LockDeletingUploadRow struct {
+	ID             uuid.UUID
+	AssetID        *uuid.UUID
+	PlannedAssetID *uuid.UUID
+}
+
+func (q *Queries) LockDeletingUpload(ctx context.Context, id uuid.UUID) (LockDeletingUploadRow, error) {
+	row := q.db.QueryRow(ctx, lockDeletingUpload, id)
+	var i LockDeletingUploadRow
+	err := row.Scan(&i.ID, &i.AssetID, &i.PlannedAssetID)
+	return i, err
+}
+
 const markReclaimedUploadDeleting = `-- name: MarkReclaimedUploadDeleting :one
-UPDATE media.staged_uploads
+UPDATE media.staged_uploads AS u
 SET state = 'DELETING', updated_at = $1
-WHERE id = $2 AND state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
-RETURNING asset_id
+WHERE u.id = $2 AND u.state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
+  AND NOT EXISTS (
+    SELECT 1 FROM media.asset_holds AS h
+    WHERE h.asset_id IN (u.asset_id, u.planned_asset_id) AND h.until > $1::timestamptz)
+RETURNING u.asset_id
 `
 
 type MarkReclaimedUploadDeletingParams struct {
@@ -675,6 +758,24 @@ type RejectSecureUploadAtFirstChunkParams struct {
 
 func (q *Queries) RejectSecureUploadAtFirstChunk(ctx context.Context, arg RejectSecureUploadAtFirstChunkParams) (int64, error) {
 	result, err := q.db.Exec(ctx, rejectSecureUploadAtFirstChunk, arg.Reason, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restoreHeldUpload = `-- name: RestoreHeldUpload :execrows
+UPDATE media.staged_uploads SET state = 'READY', updated_at = $1
+WHERE id = $2 AND state = 'DELETING' AND asset_id IS NOT NULL AND reject_reason IS NULL
+`
+
+type RestoreHeldUploadParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+func (q *Queries) RestoreHeldUpload(ctx context.Context, arg RestoreHeldUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreHeldUpload, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}

@@ -202,4 +202,7 @@ func (w *processWorker) Work(ctx context.Context, job *river.Job[ProcessArgs]) e
 func (w *processWorker) Timeout(*river.Job[ProcessArgs]) time.Duration { return ProcessTimeout }
 
 // AddWorkers 登記處理 job 的 River worker。
-func AddWorkers(workers *river.Workers, s *Service) { river.AddWorker(workers, &processWorker{svc: s}) }
+func AddWorkers(workers *river.Workers, s *Service) {
+	river.AddWorker(workers, &processWorker{svc: s})
+	river.AddWorker(workers, &copyWorker{svc: s})
+}
