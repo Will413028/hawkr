@@ -244,7 +244,6 @@ var ReasonRestockSKUInStock = newReason("RESTOCK_SKU_IN_STOCK")
 
 var ReasonProductNotPublished = newReason("PRODUCT_NOT_PUBLISHED")
 
-// ReasonProductNotPurchasable 表示商品現在買家不能購買（沒上架、被措施下架、店家不可曝光）；搭配 FailedPrecondition。
 var ReasonProductNotPurchasable = newReason("PRODUCT_NOT_PURCHASABLE")
 
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、

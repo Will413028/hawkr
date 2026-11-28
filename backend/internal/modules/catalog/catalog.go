@@ -53,8 +53,7 @@ type (
 	Product = model.Product
 	// ProductSummary 是列表的一列。
 	ProductSummary = model.ProductSummary
-	// ProductCard 是批次讀取的商品卡片：商品摘要加上買家此刻能不能瀏覽它（Visible）。
-	ProductCard = model.ProductCard
+	ProductCard    = model.ProductCard
 	// ProductPage 是列表的一頁。
 	ProductPage = model.ProductPage
 	// ListCursor 是列表 keyset 分頁的游標。
@@ -254,7 +253,6 @@ func (m *Module) RecordSales(ctx context.Context, orderNo string, items []SalesI
 }
 
 // DeductStock 以冪等鍵 key 扣減庫存，與呼叫方的 transaction 同進退（ctx 沒有 transaction 時自己開一個）。
-// 同一個 key 重送且內容相同不再扣減；任何一個 SKU 庫存不足整次不生效，回 *InsufficientStockError；SKU 所屬的商品買家不能購買（沒上架、被措施下架、店家不可曝光）整次不生效，回 ErrProductNotPurchasable（可見性在扣減的同一句 UPDATE 判斷，提交點再判一次）。
 // 在呼叫方的 transaction 內失敗時，呼叫方必須讓整個 transaction 回滾，不能吞掉錯誤繼續。
 func (m *Module) DeductStock(ctx context.Context, key string, items []StockItem) error {
 	return m.stock.Deduct(ctx, key, items)
@@ -279,8 +277,6 @@ func (m *Module) SetStock(ctx context.Context, storeID int64, key string, skuID 
 	return m.stock.SetQuantity(ctx, storeID, key, skuID, quantity, expected)
 }
 
-// ProductCards 批次讀商品卡片（沒刪除的商品，缺席的 ID 表示不存在或已刪除）：includeInactive 為假時只回買家看得到的商品（上架中、店家在 at 可曝光、沒有生效中的下架措施），為真時任何狀態都回（直接連結仍可瀏覽），
-// 並以 Visible 標出此刻買家能不能瀏覽（已下架的商品直接連結仍可讀，被措施下架或店家不可曝光的不行）；Visible 為假的卡片呼叫端不得對外露出內容。
 // ids 最多 MaxBatchIDs 個，超過或含零值回 *InvalidInputError。
 func (m *Module) ProductCards(ctx context.Context, at time.Time, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]ProductCard, error) {
 	return m.product.Cards(ctx, at, ids, includeInactive)
@@ -291,13 +287,11 @@ func (m *Module) ProductStoreIDs(ctx context.Context, ids []uuid.UUID) (map[uuid
 	return m.product.StoreIDs(ctx, ids)
 }
 
-// StoresWithPublicProducts 回至少有一件買家看得到的商品（上架中、沒有生效中的下架措施）且店家在 at 可曝光的店家 ID，升序。
 func (m *Module) StoresWithPublicProducts(ctx context.Context, at time.Time) ([]int64, error) {
 	return m.product.StoresWithPublicProducts(ctx, at)
 }
 
-// CheckoutSnapshot 是結帳用的 SKU 快照（D20，不版本化：訂單自己保存當時讀到的內容）：不過濾狀態與刪除，已下架與已刪除的 SKU 也回，
-// 由 Active 判斷可不可以買（商品買家看得到、SKU 沒刪除）、StockQty 看庫存；缺席的 SKU 表示不存在。配送方式、重量與尺寸不在 catalog（D10）。輸入限制同 ProductCards。
+// CheckoutSnapshot 是結帳用的 SKU 快照（D20，不版本化：訂單自己保存當時讀到的內容）：不過濾狀態與刪除，已下架與已刪除的 SKU 也回。
 func (m *Module) CheckoutSnapshot(ctx context.Context, skuIDs []uuid.UUID) (map[uuid.UUID]SkuSnapshot, error) {
 	return m.product.SkuSnapshots(ctx, skuIDs)
 }
@@ -307,7 +301,6 @@ func (m *Module) SkuCartInfo(ctx context.Context, skuIDs []uuid.UUID) (map[uuid.
 	return m.product.SkuSnapshots(ctx, skuIDs)
 }
 
-// SkuPurchasable 回報 SKU 此刻是否可買（D26）：有庫存、SKU 未刪、商品買家看得到（上架中、店家可曝光、沒有生效中的下架措施、沒刪除；與補貨通知同一個判斷）；SKU 不存在回 false。
 func (m *Module) SkuPurchasable(ctx context.Context, skuID uuid.UUID) (bool, error) {
 	return m.restock.Purchasable(ctx, skuID)
 }

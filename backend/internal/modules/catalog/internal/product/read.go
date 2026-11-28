@@ -336,19 +336,66 @@ func (s *Service) ListPublic(ctx context.Context, at time.Time, f model.PublicFi
 	if after != nil {
 		akey, aid = &after.Key, &after.ID
 	}
-	rows, err := s.q(ctx).ListPublicProducts(ctx, store.ListPublicProductsParams{
-		Sort: string(sort), Query: trimtext.Trim(f.Query), At: at, CategoryIds: nonNil(f.CategoryIDs), PriceMin: f.PriceMin, PriceMax: f.PriceMax,
+	params := store.ListPublicProductsLatestParams{
+		At: at, CategoryIds: nonNil(f.CategoryIDs), PriceMin: f.PriceMin, PriceMax: f.PriceMax,
 		Hashtags: nonNil(names), HashtagAll: f.HashtagAll, StoreIds: nonNil(f.StoreIDs), QueryPattern: likePattern(f.Query),
 		AfterKey: akey, AfterID: aid, RowLimit: size + 1,
-	})
-	if err != nil {
-		return model.ProductPage{}, err
 	}
-	out := make([]summaryRow, len(rows))
-	for i, r := range rows {
-		out[i] = summaryRow(r)
+	q := s.q(ctx)
+	var out []summaryRow
+	switch sort {
+	case model.SortLatest:
+		rows, err := q.ListPublicProductsLatest(ctx, params)
+		if err != nil {
+			return model.ProductPage{}, err
+		}
+		out = convertRows(rows, func(r store.ListPublicProductsLatestRow) summaryRow { return summaryRow(r) })
+	case model.SortPriceAsc:
+		rows, err := q.ListPublicProductsPriceAsc(ctx, store.ListPublicProductsPriceAscParams(params))
+		if err != nil {
+			return model.ProductPage{}, err
+		}
+		out = convertRows(rows, func(r store.ListPublicProductsPriceAscRow) summaryRow { return summaryRow(r) })
+	case model.SortPriceDesc:
+		rows, err := q.ListPublicProductsPriceDesc(ctx, store.ListPublicProductsPriceDescParams(params))
+		if err != nil {
+			return model.ProductPage{}, err
+		}
+		out = convertRows(rows, func(r store.ListPublicProductsPriceDescRow) summaryRow { return summaryRow(r) })
+	case model.SortSales:
+		rows, err := q.ListPublicProductsSales(ctx, store.ListPublicProductsSalesParams(params))
+		if err != nil {
+			return model.ProductPage{}, err
+		}
+		out = convertRows(rows, func(r store.ListPublicProductsSalesRow) summaryRow { return summaryRow(r) })
+	case model.SortRating:
+		rows, err := q.ListPublicProductsRating(ctx, store.ListPublicProductsRatingParams(params))
+		if err != nil {
+			return model.ProductPage{}, err
+		}
+		out = convertRows(rows, func(r store.ListPublicProductsRatingRow) summaryRow { return summaryRow(r) })
+	case model.SortRelevance:
+		rows, err := q.ListPublicProductsRelevance(ctx, store.ListPublicProductsRelevanceParams{
+			Query: trimtext.Trim(f.Query), At: params.At, CategoryIds: params.CategoryIds, PriceMin: params.PriceMin, PriceMax: params.PriceMax,
+			Hashtags: params.Hashtags, HashtagAll: params.HashtagAll, StoreIds: params.StoreIds, QueryPattern: params.QueryPattern,
+			AfterKey: params.AfterKey, AfterID: params.AfterID, RowLimit: params.RowLimit,
+		})
+		if err != nil {
+			return model.ProductPage{}, err
+		}
+		out = convertRows(rows, func(r store.ListPublicProductsRelevanceRow) summaryRow { return summaryRow(r) })
+	default:
+		return model.ProductPage{}, model.Invalid("Sort", model.ReasonUnknown)
 	}
 	return finishPage(out, size), nil
+}
+
+func convertRows[R any](rows []R, conv func(R) summaryRow) []summaryRow {
+	out := make([]summaryRow, len(rows))
+	for i, r := range rows {
+		out[i] = conv(r)
+	}
+	return out
 }
 
 func nonNil[T any](s []T) []T {

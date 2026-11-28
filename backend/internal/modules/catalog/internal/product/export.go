@@ -69,7 +69,6 @@ func (s *Service) StoresWithPublicProducts(ctx context.Context, at time.Time) ([
 	return nonNil(ids), nil
 }
 
-// SkuSnapshots 批次讀 SKU 與它的商品此刻的內容，不過濾狀態與刪除；Active 在這裡判定：商品在買家可見的商品之內（ACTIVE、店家可曝光、沒有生效中的下架措施、沒刪除）且 SKU 沒刪除。
 func (s *Service) SkuSnapshots(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]model.SkuSnapshot, error) {
 	if err := checkBatch(ids); err != nil {
 		return nil, err

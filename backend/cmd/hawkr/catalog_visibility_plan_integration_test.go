@@ -141,20 +141,44 @@ func TestBuyerVisibilityFunctionsAreInlinedAndUseNamedIndexes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	list, listArgs := catalogStatement(t, "products.sql", "ListPublicProducts", map[string]any{
-		"sort": "LATEST", "query": "", "at": f.now, "category_ids": []uuid.UUID{}, "price_min": nil, "price_max": nil, "hashtags": []string{}, "hashtag_all": false,
-		"store_ids": []int64{storeIDs[100]}, "query_pattern": "", "after_key": nil, "after_id": nil, "row_limit": int32(20),
-	})
+	type planCase struct {
+		sql        string
+		args       []any
+		relations  []string
+		wantAnyIdx []string
+	}
+	cases := map[string]planCase{}
+	listModes := []struct{ name, query, index string }{
+		{"Latest", "", "products_public_new_idx"},
+		{"PriceAsc", "", "products_public_price_asc_idx"},
+		{"PriceDesc", "", "products_public_price_desc_idx"},
+		{"Sales", "", "products_public_sales_idx"},
+		{"Rating", "", "products_public_rating_idx"},
+		{"Relevance", "p9999", "products_search_idx"},
+	}
+	for _, m := range listModes {
+		pattern := ""
+		if m.query != "" {
+			pattern = "%" + m.query + "%"
+		}
+		for _, shape := range []struct {
+			label  string
+			stores []int64
+			want   []string
+		}{
+			{"unfiltered", []int64{}, []string{m.index}},
+			{"store", []int64{storeIDs[100]}, []string{m.index, "products_store_idx"}},
+		} {
+			sql, args := catalogStatement(t, "products.sql", "ListPublicProducts"+m.name, map[string]any{
+				"query": m.query, "at": f.now, "category_ids": []uuid.UUID{}, "price_min": nil, "price_max": nil, "hashtags": []string{}, "hashtag_all": false,
+				"store_ids": shape.stores, "query_pattern": pattern, "after_key": nil, "after_id": nil, "row_limit": int32(20),
+			})
+			cases["ListPublicProducts"+m.name+"/"+shape.label] = planCase{sql, args, []string{"products"}, shape.want}
+		}
+	}
 	deduct, deductArgs := catalogStatement(t, "stock.sql", "DeductSkuStock", map[string]any{"quantity": int32(1), "now": f.now, "id": sku})
-	for name, c := range map[string]struct {
-		sql         string
-		args        []any
-		relations   []string
-		wantIndexes []string
-	}{
-		"ListPublicProducts": {list, listArgs, []string{"products"}, []string{"products_store_idx"}},
-		"DeductSkuStock":     {deduct, deductArgs, []string{"products", "product_skus"}, []string{"product_skus_pkey"}},
-	} {
+	cases["DeductSkuStock"] = planCase{deduct, deductArgs, []string{"products", "product_skus"}, []string{"product_skus_pkey"}}
+	for name, c := range cases {
 		var raw []byte
 		if err := f.d.Pool().QueryRow(ctx, "EXPLAIN (FORMAT JSON) "+c.sql, c.args...).Scan(&raw); err != nil {
 			t.Fatalf("%s：%v\n%s", name, err, c.sql)
@@ -171,10 +195,8 @@ func TestBuyerVisibilityFunctionsAreInlinedAndUseNamedIndexes(t *testing.T) {
 				indexes = append(indexes, n.Index)
 			}
 		}
-		for _, want := range c.wantIndexes {
-			if !slices.Contains(indexes, want) {
-				t.Errorf("%s：計畫沒有走 %s（用到的索引 %v）：\n%s", name, want, indexes, raw)
-			}
+		if !slices.ContainsFunc(c.wantAnyIdx, func(want string) bool { return slices.Contains(indexes, want) }) {
+			t.Errorf("%s：計畫沒有走 %v 其中之一（用到的索引 %v）：\n%s", name, c.wantAnyIdx, indexes, raw)
 		}
 		t.Logf("%s 用到的索引：%v", name, indexes)
 	}

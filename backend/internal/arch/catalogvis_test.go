@@ -50,7 +50,7 @@ func TestCatalogVisibilityLintRejectsUnlistedProductQuery(t *testing.T) {
 			t.Errorf("%s：不該被擋：%v", name, got)
 		}
 	}
-	if got := BuyerFacingOnAllowlist(map[string]string{"ListPublicProducts": "x"}); len(got) != 1 {
+	if got := BuyerFacingOnAllowlist(map[string]string{"ListPublicProductsLatest": "x"}); len(got) != 1 {
 		t.Errorf("買家面 query 放進白名單要被擋下：%v", got)
 	}
 	if got := BuyerFacingOnAllowlist(CatalogNonBuyerProductQueries); len(got) != 0 {

@@ -14,14 +14,12 @@ const (
 	ChatMessage Kind = "CHAT_MESSAGE"
 	// ReviewReply 是店家對評價的回覆（review.reviews.id，一則評價至多一則回覆）。
 	ReviewReply Kind = "REVIEW_REPLY"
-	// Product 是店家的商品（catalog.products.id）；證據由擁有內容的 catalog 保存，措施列只存參照。
-	Product Kind = "PRODUCT"
+	Product     Kind = "PRODUCT"
 )
 
 // Values 回傳全部種類。
 func Values() []Kind { return []Kind{Post, Comment, ForumEntry, ChatMessage, ReviewReply, Product} }
 
-// Valid 回傳 k 是否為已知種類；已知種類只有 Values 一份。
 func (k Kind) Valid() bool { return slices.Contains(Values(), k) }
 
 // Social 回傳 k 是否為社群內容（social 擁有並寫下架複本）；其他種類由 im、review 在讀取時經 seller.pub_content_takedowns() 判斷。

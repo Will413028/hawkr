@@ -31,10 +31,10 @@
    "id": "snapshot-skips-the-archived-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/export.go",
-   "old": "Active: status == model.StatusActive && !deleted,",
-   "new": "Active: !deleted,",
+   "old": "Active: r.ProductVisible && !r.SkuDeleted,",
+   "new": "Active: !r.SkuDeleted,",
    "test": "internal/modules/catalog ^TestCheckoutSnapshotReportsArchivedAndDeletedSkuAsInactive$",
-   "why": "結帳快照不看商品狀態：下架與草稿商品的 SKU 被判成可購買，快照測試要紅。"
+   "why": "結帳快照不看商品可見性：下架與草稿商品的 SKU 被判成可購買，快照測試要紅。"
   },
   {
    "id": "snapshot-ignores-deleted-flag",

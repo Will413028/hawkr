@@ -306,10 +306,8 @@ type ProductSummary struct {
 	Version           int64
 }
 
-// ProductCard 是批次讀取的商品卡片：商品摘要加上買家此刻能不能瀏覽它。
 type ProductCard struct {
 	ProductSummary
-	// Visible 為真表示商品此刻買家可以瀏覽（上架中或已下架但直接連結仍可讀，店家可曝光，沒有生效中的商品下架措施）；為假時其餘欄位仍有值，呼叫端不得對外露出。
 	Visible bool
 }
 

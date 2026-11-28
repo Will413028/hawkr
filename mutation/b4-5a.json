@@ -41,9 +41,9 @@
    "stack": "go",
    "file": "backend/internal/arch/catalogvis.go",
    "old": "\t\"SkuInStore\":                \"SKU 是否屬於某家店（歸屬查詢）\",\n",
-   "new": "\t\"SkuInStore\":                \"SKU 是否屬於某家店（歸屬查詢）\",\n\t\"ListPublicProducts\":        \"x\",\n",
+   "new": "\t\"SkuInStore\":                \"SKU 是否屬於某家店（歸屬查詢）\",\n\t\"ListPublicProductsLatest\":  \"x\",\n",
    "test": "internal/arch ^TestCatalogVisibilityLintRejectsUnlistedProductQuery$",
-   "why": "白名單多放一支買家面的 query（ListPublicProducts）：可見性 lint 的守門測試要紅。"
+   "why": "白名單多放一支買家面的 query（ListPublicProductsLatest）：可見性 lint 的守門測試要紅。"
   },
   {
    "id": "contentkind-values-drops-product",

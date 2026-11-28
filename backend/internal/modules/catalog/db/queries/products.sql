@@ -192,20 +192,108 @@ WHERE p.deleted_at IS NULL
   AND (sqlc.narg(store_id)::bigint IS NULL OR p.store_id = sqlc.narg(store_id)::bigint)
   AND (sqlc.arg(query_pattern)::text = '' OR p.searchable_text ILIKE sqlc.arg(query_pattern)::text);
 
--- name: ListPublicProducts :many
+-- name: ListPublicProductsLatest :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       (extract(epoch FROM p.first_published_at) * 1000000)::bigint AS sort_key
+FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
+WHERE (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY(sqlc.arg(category_ids)::uuid[]) OR c.parent_id = ANY(sqlc.arg(category_ids)::uuid[])))
+  AND (sqlc.narg(price_min)::bigint IS NULL OR p.max_price >= sqlc.narg(price_min)::bigint)
+  AND (sqlc.narg(price_max)::bigint IS NULL OR p.min_price <= sqlc.narg(price_max)::bigint)
+  AND (cardinality(sqlc.arg(hashtags)::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY(sqlc.arg(hashtags)::text[]))
+          >= CASE WHEN sqlc.arg(hashtag_all)::boolean THEN cardinality(sqlc.arg(hashtags)::text[]) ELSE 1 END)
+  AND (cardinality(sqlc.arg(store_ids)::bigint[]) = 0 OR p.store_id = ANY(sqlc.arg(store_ids)::bigint[]))
+  AND (sqlc.arg(query_pattern)::text = '' OR p.searchable_text ILIKE sqlc.arg(query_pattern)::text)
+  AND (sqlc.narg(after_key)::bigint IS NULL OR (p.first_published_at, p.id) < ('epoch'::timestamptz + interval '1 microsecond' * sqlc.narg(after_key)::bigint, sqlc.narg(after_id)::uuid))
+ORDER BY p.first_published_at DESC, p.id DESC
+LIMIT sqlc.arg(row_limit);
+
+-- name: ListPublicProductsPriceAsc :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       (-p.min_price)::bigint AS sort_key
+FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
+WHERE (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY(sqlc.arg(category_ids)::uuid[]) OR c.parent_id = ANY(sqlc.arg(category_ids)::uuid[])))
+  AND (sqlc.narg(price_min)::bigint IS NULL OR p.max_price >= sqlc.narg(price_min)::bigint)
+  AND (sqlc.narg(price_max)::bigint IS NULL OR p.min_price <= sqlc.narg(price_max)::bigint)
+  AND (cardinality(sqlc.arg(hashtags)::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY(sqlc.arg(hashtags)::text[]))
+          >= CASE WHEN sqlc.arg(hashtag_all)::boolean THEN cardinality(sqlc.arg(hashtags)::text[]) ELSE 1 END)
+  AND (cardinality(sqlc.arg(store_ids)::bigint[]) = 0 OR p.store_id = ANY(sqlc.arg(store_ids)::bigint[]))
+  AND (sqlc.arg(query_pattern)::text = '' OR p.searchable_text ILIKE sqlc.arg(query_pattern)::text)
+  AND (sqlc.narg(after_key)::bigint IS NULL OR (-p.min_price, p.id) < (sqlc.narg(after_key)::bigint, sqlc.narg(after_id)::uuid))
+ORDER BY -p.min_price DESC, p.id DESC
+LIMIT sqlc.arg(row_limit);
+
+-- name: ListPublicProductsPriceDesc :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       p.max_price AS sort_key
+FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
+WHERE (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY(sqlc.arg(category_ids)::uuid[]) OR c.parent_id = ANY(sqlc.arg(category_ids)::uuid[])))
+  AND (sqlc.narg(price_min)::bigint IS NULL OR p.max_price >= sqlc.narg(price_min)::bigint)
+  AND (sqlc.narg(price_max)::bigint IS NULL OR p.min_price <= sqlc.narg(price_max)::bigint)
+  AND (cardinality(sqlc.arg(hashtags)::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY(sqlc.arg(hashtags)::text[]))
+          >= CASE WHEN sqlc.arg(hashtag_all)::boolean THEN cardinality(sqlc.arg(hashtags)::text[]) ELSE 1 END)
+  AND (cardinality(sqlc.arg(store_ids)::bigint[]) = 0 OR p.store_id = ANY(sqlc.arg(store_ids)::bigint[]))
+  AND (sqlc.arg(query_pattern)::text = '' OR p.searchable_text ILIKE sqlc.arg(query_pattern)::text)
+  AND (sqlc.narg(after_key)::bigint IS NULL OR (p.max_price, p.id) < (sqlc.narg(after_key)::bigint, sqlc.narg(after_id)::uuid))
+ORDER BY p.max_price DESC, p.id DESC
+LIMIT sqlc.arg(row_limit);
+
+-- name: ListPublicProductsSales :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       p.sales_count::bigint AS sort_key
+FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
+WHERE (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY(sqlc.arg(category_ids)::uuid[]) OR c.parent_id = ANY(sqlc.arg(category_ids)::uuid[])))
+  AND (sqlc.narg(price_min)::bigint IS NULL OR p.max_price >= sqlc.narg(price_min)::bigint)
+  AND (sqlc.narg(price_max)::bigint IS NULL OR p.min_price <= sqlc.narg(price_max)::bigint)
+  AND (cardinality(sqlc.arg(hashtags)::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY(sqlc.arg(hashtags)::text[]))
+          >= CASE WHEN sqlc.arg(hashtag_all)::boolean THEN cardinality(sqlc.arg(hashtags)::text[]) ELSE 1 END)
+  AND (cardinality(sqlc.arg(store_ids)::bigint[]) = 0 OR p.store_id = ANY(sqlc.arg(store_ids)::bigint[]))
+  AND (sqlc.arg(query_pattern)::text = '' OR p.searchable_text ILIKE sqlc.arg(query_pattern)::text)
+  AND (sqlc.narg(after_key)::bigint IS NULL OR (p.sales_count, p.id) < (sqlc.narg(after_key)::bigint, sqlc.narg(after_id)::uuid))
+ORDER BY p.sales_count DESC, p.id DESC
+LIMIT sqlc.arg(row_limit);
+
+-- name: ListPublicProductsRating :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       round(p.rating_average * 1000)::bigint AS sort_key
+FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
+WHERE (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY(sqlc.arg(category_ids)::uuid[]) OR c.parent_id = ANY(sqlc.arg(category_ids)::uuid[])))
+  AND (sqlc.narg(price_min)::bigint IS NULL OR p.max_price >= sqlc.narg(price_min)::bigint)
+  AND (sqlc.narg(price_max)::bigint IS NULL OR p.min_price <= sqlc.narg(price_max)::bigint)
+  AND (cardinality(sqlc.arg(hashtags)::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY(sqlc.arg(hashtags)::text[]))
+          >= CASE WHEN sqlc.arg(hashtag_all)::boolean THEN cardinality(sqlc.arg(hashtags)::text[]) ELSE 1 END)
+  AND (cardinality(sqlc.arg(store_ids)::bigint[]) = 0 OR p.store_id = ANY(sqlc.arg(store_ids)::bigint[]))
+  AND (sqlc.arg(query_pattern)::text = '' OR p.searchable_text ILIKE sqlc.arg(query_pattern)::text)
+  AND (sqlc.narg(after_key)::bigint IS NULL OR (round(p.rating_average * 1000)::bigint, p.id) < (sqlc.narg(after_key)::bigint, sqlc.narg(after_id)::uuid))
+ORDER BY round(p.rating_average * 1000)::bigint DESC, p.id DESC
+LIMIT sqlc.arg(row_limit);
+
+-- name: ListPublicProductsRelevance :many
 SELECT t.id, t.store_id, t.category_id, t.title, t.status, t.first_published_at, t.min_price, t.max_price, t.sales_count, t.favorite_count, t.rating_average, t.review_count, t.low_stock_threshold, t.content_version, t.created_at, t.cover_key, t.total_stock, t.sort_key
 FROM (
     SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
-       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
-       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
-           CASE sqlc.arg(sort)::text
-              WHEN 'LATEST' THEN (extract(epoch FROM p.first_published_at) * 1000000)::bigint
-              WHEN 'PRICE_ASC' THEN -p.min_price
-              WHEN 'PRICE_DESC' THEN p.max_price
-              WHEN 'SALES' THEN p.sales_count::bigint
-              WHEN 'RATING' THEN round(p.rating_average * 1000)::bigint
-              ELSE round(word_similarity(sqlc.arg(query)::text, p.searchable_text) * 1000000)::bigint
-          END AS sort_key
+           round(word_similarity(sqlc.arg(query)::text, p.searchable_text) * 1000000)::bigint AS sort_key,
+           COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+           COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock
     FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
     WHERE (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
            OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY(sqlc.arg(category_ids)::uuid[]) OR c.parent_id = ANY(sqlc.arg(category_ids)::uuid[])))

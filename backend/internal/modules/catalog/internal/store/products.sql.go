@@ -625,39 +625,27 @@ func (q *Queries) ListProductImages(ctx context.Context, productID uuid.UUID) ([
 	return items, nil
 }
 
-const listPublicProducts = `-- name: ListPublicProducts :many
-SELECT t.id, t.store_id, t.category_id, t.title, t.status, t.first_published_at, t.min_price, t.max_price, t.sales_count, t.favorite_count, t.rating_average, t.review_count, t.low_stock_threshold, t.content_version, t.created_at, t.cover_key, t.total_stock, t.sort_key
-FROM (
-    SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+const listPublicProductsLatest = `-- name: ListPublicProductsLatest :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
        COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
        COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
-           CASE $1::text
-              WHEN 'LATEST' THEN (extract(epoch FROM p.first_published_at) * 1000000)::bigint
-              WHEN 'PRICE_ASC' THEN -p.min_price
-              WHEN 'PRICE_DESC' THEN p.max_price
-              WHEN 'SALES' THEN p.sales_count::bigint
-              WHEN 'RATING' THEN round(p.rating_average * 1000)::bigint
-              ELSE round(word_similarity($2::text, p.searchable_text) * 1000000)::bigint
-          END AS sort_key
-    FROM catalog.buyer_visible_products($3::timestamptz) AS p
-    WHERE (cardinality($4::uuid[]) = 0
-           OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($4::uuid[]) OR c.parent_id = ANY($4::uuid[])))
-      AND ($5::bigint IS NULL OR p.max_price >= $5::bigint)
-      AND ($6::bigint IS NULL OR p.min_price <= $6::bigint)
-      AND (cardinality($7::text[]) = 0
-           OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($7::text[]))
-              >= CASE WHEN $8::boolean THEN cardinality($7::text[]) ELSE 1 END)
-      AND (cardinality($9::bigint[]) = 0 OR p.store_id = ANY($9::bigint[]))
-      AND ($10::text = '' OR p.searchable_text ILIKE $10::text)
-) t
-WHERE $11::bigint IS NULL OR (t.sort_key, t.id) < ($11::bigint, $12::uuid)
-ORDER BY t.sort_key DESC, t.id DESC
-LIMIT $13
+       (extract(epoch FROM p.first_published_at) * 1000000)::bigint AS sort_key
+FROM catalog.buyer_visible_products($1::timestamptz) AS p
+WHERE (cardinality($2::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
+  AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
+  AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
+  AND (cardinality($5::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($5::text[]))
+          >= CASE WHEN $6::boolean THEN cardinality($5::text[]) ELSE 1 END)
+  AND (cardinality($7::bigint[]) = 0 OR p.store_id = ANY($7::bigint[]))
+  AND ($8::text = '' OR p.searchable_text ILIKE $8::text)
+  AND ($9::bigint IS NULL OR (p.first_published_at, p.id) < ('epoch'::timestamptz + interval '1 microsecond' * $9::bigint, $10::uuid))
+ORDER BY p.first_published_at DESC, p.id DESC
+LIMIT $11
 `
 
-type ListPublicProductsParams struct {
-	Sort         string
-	Query        string
+type ListPublicProductsLatestParams struct {
 	At           time.Time
 	CategoryIds  []uuid.UUID
 	PriceMin     *int64
@@ -671,7 +659,7 @@ type ListPublicProductsParams struct {
 	RowLimit     int32
 }
 
-type ListPublicProductsRow struct {
+type ListPublicProductsLatestRow struct {
 	ID                uuid.UUID
 	StoreID           int64
 	CategoryID        uuid.UUID
@@ -692,9 +680,436 @@ type ListPublicProductsRow struct {
 	SortKey           int64
 }
 
-func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProductsParams) ([]ListPublicProductsRow, error) {
-	rows, err := q.db.Query(ctx, listPublicProducts,
-		arg.Sort,
+func (q *Queries) ListPublicProductsLatest(ctx context.Context, arg ListPublicProductsLatestParams) ([]ListPublicProductsLatestRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProductsLatest,
+		arg.At,
+		arg.CategoryIds,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.Hashtags,
+		arg.HashtagAll,
+		arg.StoreIds,
+		arg.QueryPattern,
+		arg.AfterKey,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicProductsLatestRow{}
+	for rows.Next() {
+		var i ListPublicProductsLatestRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
+			&i.CreatedAt,
+			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicProductsPriceAsc = `-- name: ListPublicProductsPriceAsc :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       (-p.min_price)::bigint AS sort_key
+FROM catalog.buyer_visible_products($1::timestamptz) AS p
+WHERE (cardinality($2::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
+  AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
+  AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
+  AND (cardinality($5::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($5::text[]))
+          >= CASE WHEN $6::boolean THEN cardinality($5::text[]) ELSE 1 END)
+  AND (cardinality($7::bigint[]) = 0 OR p.store_id = ANY($7::bigint[]))
+  AND ($8::text = '' OR p.searchable_text ILIKE $8::text)
+  AND ($9::bigint IS NULL OR (-p.min_price, p.id) < ($9::bigint, $10::uuid))
+ORDER BY -p.min_price DESC, p.id DESC
+LIMIT $11
+`
+
+type ListPublicProductsPriceAscParams struct {
+	At           time.Time
+	CategoryIds  []uuid.UUID
+	PriceMin     *int64
+	PriceMax     *int64
+	Hashtags     []string
+	HashtagAll   bool
+	StoreIds     []int64
+	QueryPattern string
+	AfterKey     *int64
+	AfterID      *uuid.UUID
+	RowLimit     int32
+}
+
+type ListPublicProductsPriceAscRow struct {
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
+}
+
+func (q *Queries) ListPublicProductsPriceAsc(ctx context.Context, arg ListPublicProductsPriceAscParams) ([]ListPublicProductsPriceAscRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProductsPriceAsc,
+		arg.At,
+		arg.CategoryIds,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.Hashtags,
+		arg.HashtagAll,
+		arg.StoreIds,
+		arg.QueryPattern,
+		arg.AfterKey,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicProductsPriceAscRow{}
+	for rows.Next() {
+		var i ListPublicProductsPriceAscRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
+			&i.CreatedAt,
+			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicProductsPriceDesc = `-- name: ListPublicProductsPriceDesc :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       p.max_price AS sort_key
+FROM catalog.buyer_visible_products($1::timestamptz) AS p
+WHERE (cardinality($2::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
+  AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
+  AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
+  AND (cardinality($5::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($5::text[]))
+          >= CASE WHEN $6::boolean THEN cardinality($5::text[]) ELSE 1 END)
+  AND (cardinality($7::bigint[]) = 0 OR p.store_id = ANY($7::bigint[]))
+  AND ($8::text = '' OR p.searchable_text ILIKE $8::text)
+  AND ($9::bigint IS NULL OR (p.max_price, p.id) < ($9::bigint, $10::uuid))
+ORDER BY p.max_price DESC, p.id DESC
+LIMIT $11
+`
+
+type ListPublicProductsPriceDescParams struct {
+	At           time.Time
+	CategoryIds  []uuid.UUID
+	PriceMin     *int64
+	PriceMax     *int64
+	Hashtags     []string
+	HashtagAll   bool
+	StoreIds     []int64
+	QueryPattern string
+	AfterKey     *int64
+	AfterID      *uuid.UUID
+	RowLimit     int32
+}
+
+type ListPublicProductsPriceDescRow struct {
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
+}
+
+func (q *Queries) ListPublicProductsPriceDesc(ctx context.Context, arg ListPublicProductsPriceDescParams) ([]ListPublicProductsPriceDescRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProductsPriceDesc,
+		arg.At,
+		arg.CategoryIds,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.Hashtags,
+		arg.HashtagAll,
+		arg.StoreIds,
+		arg.QueryPattern,
+		arg.AfterKey,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicProductsPriceDescRow{}
+	for rows.Next() {
+		var i ListPublicProductsPriceDescRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
+			&i.CreatedAt,
+			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicProductsRating = `-- name: ListPublicProductsRating :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       round(p.rating_average * 1000)::bigint AS sort_key
+FROM catalog.buyer_visible_products($1::timestamptz) AS p
+WHERE (cardinality($2::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
+  AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
+  AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
+  AND (cardinality($5::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($5::text[]))
+          >= CASE WHEN $6::boolean THEN cardinality($5::text[]) ELSE 1 END)
+  AND (cardinality($7::bigint[]) = 0 OR p.store_id = ANY($7::bigint[]))
+  AND ($8::text = '' OR p.searchable_text ILIKE $8::text)
+  AND ($9::bigint IS NULL OR (round(p.rating_average * 1000)::bigint, p.id) < ($9::bigint, $10::uuid))
+ORDER BY round(p.rating_average * 1000)::bigint DESC, p.id DESC
+LIMIT $11
+`
+
+type ListPublicProductsRatingParams struct {
+	At           time.Time
+	CategoryIds  []uuid.UUID
+	PriceMin     *int64
+	PriceMax     *int64
+	Hashtags     []string
+	HashtagAll   bool
+	StoreIds     []int64
+	QueryPattern string
+	AfterKey     *int64
+	AfterID      *uuid.UUID
+	RowLimit     int32
+}
+
+type ListPublicProductsRatingRow struct {
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
+}
+
+func (q *Queries) ListPublicProductsRating(ctx context.Context, arg ListPublicProductsRatingParams) ([]ListPublicProductsRatingRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProductsRating,
+		arg.At,
+		arg.CategoryIds,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.Hashtags,
+		arg.HashtagAll,
+		arg.StoreIds,
+		arg.QueryPattern,
+		arg.AfterKey,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicProductsRatingRow{}
+	for rows.Next() {
+		var i ListPublicProductsRatingRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
+			&i.CreatedAt,
+			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicProductsRelevance = `-- name: ListPublicProductsRelevance :many
+SELECT t.id, t.store_id, t.category_id, t.title, t.status, t.first_published_at, t.min_price, t.max_price, t.sales_count, t.favorite_count, t.rating_average, t.review_count, t.low_stock_threshold, t.content_version, t.created_at, t.cover_key, t.total_stock, t.sort_key
+FROM (
+    SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+           round(word_similarity($1::text, p.searchable_text) * 1000000)::bigint AS sort_key,
+           COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+           COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock
+    FROM catalog.buyer_visible_products($2::timestamptz) AS p
+    WHERE (cardinality($3::uuid[]) = 0
+           OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($3::uuid[]) OR c.parent_id = ANY($3::uuid[])))
+      AND ($4::bigint IS NULL OR p.max_price >= $4::bigint)
+      AND ($5::bigint IS NULL OR p.min_price <= $5::bigint)
+      AND (cardinality($6::text[]) = 0
+           OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($6::text[]))
+              >= CASE WHEN $7::boolean THEN cardinality($6::text[]) ELSE 1 END)
+      AND (cardinality($8::bigint[]) = 0 OR p.store_id = ANY($8::bigint[]))
+      AND ($9::text = '' OR p.searchable_text ILIKE $9::text)
+) t
+WHERE $10::bigint IS NULL OR (t.sort_key, t.id) < ($10::bigint, $11::uuid)
+ORDER BY t.sort_key DESC, t.id DESC
+LIMIT $12
+`
+
+type ListPublicProductsRelevanceParams struct {
+	Query        string
+	At           time.Time
+	CategoryIds  []uuid.UUID
+	PriceMin     *int64
+	PriceMax     *int64
+	Hashtags     []string
+	HashtagAll   bool
+	StoreIds     []int64
+	QueryPattern string
+	AfterKey     *int64
+	AfterID      *uuid.UUID
+	RowLimit     int32
+}
+
+type ListPublicProductsRelevanceRow struct {
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
+}
+
+func (q *Queries) ListPublicProductsRelevance(ctx context.Context, arg ListPublicProductsRelevanceParams) ([]ListPublicProductsRelevanceRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProductsRelevance,
 		arg.Query,
 		arg.At,
 		arg.CategoryIds,
@@ -712,9 +1127,115 @@ func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProducts
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListPublicProductsRow{}
+	items := []ListPublicProductsRelevanceRow{}
 	for rows.Next() {
-		var i ListPublicProductsRow
+		var i ListPublicProductsRelevanceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
+			&i.CreatedAt,
+			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicProductsSales = `-- name: ListPublicProductsSales :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+       p.sales_count::bigint AS sort_key
+FROM catalog.buyer_visible_products($1::timestamptz) AS p
+WHERE (cardinality($2::uuid[]) = 0
+       OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($2::uuid[]) OR c.parent_id = ANY($2::uuid[])))
+  AND ($3::bigint IS NULL OR p.max_price >= $3::bigint)
+  AND ($4::bigint IS NULL OR p.min_price <= $4::bigint)
+  AND (cardinality($5::text[]) = 0
+       OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($5::text[]))
+          >= CASE WHEN $6::boolean THEN cardinality($5::text[]) ELSE 1 END)
+  AND (cardinality($7::bigint[]) = 0 OR p.store_id = ANY($7::bigint[]))
+  AND ($8::text = '' OR p.searchable_text ILIKE $8::text)
+  AND ($9::bigint IS NULL OR (p.sales_count, p.id) < ($9::bigint, $10::uuid))
+ORDER BY p.sales_count DESC, p.id DESC
+LIMIT $11
+`
+
+type ListPublicProductsSalesParams struct {
+	At           time.Time
+	CategoryIds  []uuid.UUID
+	PriceMin     *int64
+	PriceMax     *int64
+	Hashtags     []string
+	HashtagAll   bool
+	StoreIds     []int64
+	QueryPattern string
+	AfterKey     *int64
+	AfterID      *uuid.UUID
+	RowLimit     int32
+}
+
+type ListPublicProductsSalesRow struct {
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
+}
+
+func (q *Queries) ListPublicProductsSales(ctx context.Context, arg ListPublicProductsSalesParams) ([]ListPublicProductsSalesRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProductsSales,
+		arg.At,
+		arg.CategoryIds,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.Hashtags,
+		arg.HashtagAll,
+		arg.StoreIds,
+		arg.QueryPattern,
+		arg.AfterKey,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicProductsSalesRow{}
+	for rows.Next() {
+		var i ListPublicProductsSalesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.StoreID,

@@ -31,7 +31,7 @@
    "id": "deduct-without-stock-guard",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
-   "old": "AND stock_qty >= $1::integer",
+   "old": "AND s.stock_qty >= $1::integer",
    "new": "AND $1::integer > 0",
    "test": "internal/modules/catalog ^TestInsufficientStockRollsBackTheWholeOperation$",
    "why": "扣減不再有 stock_qty >= n 的條件：庫存不足不是回 InsufficientStockError，而是撞到 CHECK，測試要紅。"
@@ -75,20 +75,20 @@
   {
    "id": "public-list-without-exposure-join",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
-   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($3::timestamptz) e)",
-   "new": "$3::timestamptz IS NOT NULL",
+   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
+   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
+   "new": "",
    "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
-   "why": "公開列表拿掉 seller.pub_exposable_stores 的 join：停權店的 ACTIVE 商品出現在公開列表，測試要紅。"
+   "why": "可見性函式拿掉 seller.pub_exposable_stores 的條件（公開列表與單筆共用同一份定義）：停權店的 ACTIVE 商品出現在公開列表，測試要紅。"
   },
   {
    "id": "public-get-without-exposure-join",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
-   "old": "p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL\n  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
-   "new": "p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL\n  AND $2::timestamptz IS NOT NULL",
+   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
+   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
+   "new": "",
    "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
-   "why": "公開單筆讀取拿掉曝光條件：停權店的商品仍可公開讀取，測試要紅。"
+   "why": "可見性函式拿掉曝光條件：停權店的商品仍可公開讀取，測試要紅。"
   },
   {
    "id": "sku-write-without-price-range-recompute",

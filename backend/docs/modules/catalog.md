@@ -94,3 +94,7 @@
 - `UnpublishProducts`（D29）原子批次下架：商品依 ID 升序鎖列，任一項版本與目前不符整批回 `*BatchVersionConflictError`（`errors.Is(err, ErrVersionConflict)` 成立，列出全部衝突的商品）、沒有寫入；已經下架的項目視為成功（不改版本，`VersionBefore` 與 `VersionAfter` 都是目前版本）；代行者的批次裡有草稿商品整批回 `*BatchNotPublishedError`（`errors.Is(err, ErrNotPublished)`，列出全部草稿）、沒有寫入；別家或不存在的商品整批回 `ErrProductNotFound`；成功發一個 `ProductsUnpublished`（項目依商品 ID 升序），並把同一份項目回給呼叫方（呼叫方據它組回應，不再讀商品）。
 - 代行者不得把商品切成草稿（回 `*InvalidInputError`，`Field` 是 `Status`），也不得下架草稿商品（回 `ErrNotPublished`，與 social 的代行下架同規則）。
 
+## 10. 內部結構
+
+- `internal/model` 放對外型別與錯誤；`internal/stock` 是庫存的冪等扣減與歸還；`internal/taxonomy` 讀分類樹；`internal/counter` 是評分與銷量；`internal/restock` 是補貨佇列與 River 週期 worker（不經 `platform/jobs`）；`internal/product` 是商品的寫入、讀取與兩種列表；`internal/description` 是描述區塊的純驗證與編碼；`internal/store` 是 sqlc 的查詢套件。
+- 公開列表依排序各有一支 query（`ListPublicProductsLatest`、`PriceAsc`、`PriceDesc`、`Sales`、`Rating`、`Relevance`），ORDER BY 與 keyset 條件都在有索引的欄位或運算式上（`products_public_*_idx`；`Relevance` 的比對走 `products_search_idx`，分數只對符合的列排序），不用依排序參數切換的 `CASE`，列表才不會退化成全表掃描；EXPLAIN 驗收是 `cmd/hawkr` 的 `TestBuyerVisibilityFunctionsAreInlinedAndUseNamedIndexes`。

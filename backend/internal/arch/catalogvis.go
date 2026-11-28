@@ -106,7 +106,7 @@ func StaleCatalogAllowlist(queries []CatalogQuery, allowed map[string]string) []
 }
 
 var CatalogBuyerFacingQueries = []string{
-	"GetPublicProduct", "ListPublicProducts", "SuggestProductNames", "SuggestHashtags", "TrendingHashtags",
+	"GetPublicProduct", "ListPublicProductsLatest", "ListPublicProductsPriceAsc", "ListPublicProductsPriceDesc", "ListPublicProductsSales", "ListPublicProductsRating", "ListPublicProductsRelevance", "SuggestProductNames", "SuggestHashtags", "TrendingHashtags",
 	"GetProductCards", "ListStoresWithPublicProducts", "GetSkuSnapshots", "GetSkuRestockState", "DeductSkuStock",
 }
 

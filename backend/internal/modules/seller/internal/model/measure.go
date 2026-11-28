@@ -51,8 +51,7 @@ const (
 	ContentChatMessage = contentkind.ChatMessage
 	// ContentReviewReply 店家對評價的回覆（review，content_id 是評價 ID）。
 	ContentReviewReply = contentkind.ReviewReply
-	// ContentProduct 店家的商品（catalog，content_id 是商品 ID）。
-	ContentProduct = contentkind.Product
+	ContentProduct     = contentkind.Product
 )
 
 // ContentKindValues 回傳全部內容種類，與 DB 的 measure_contents_content_kind_check 一致。
@@ -71,8 +70,7 @@ const (
 	// SnapshotCaptured 快照在：本文、發文時間、圖片張數與連結目標都有值。
 	SnapshotCaptured SnapshotState = "CAPTURED"
 	// SnapshotCleared 快照已依保留期（撤銷後 184 天）或店家退場清空。
-	SnapshotCleared SnapshotState = "CLEARED"
-	// SnapshotOwnerHeld 證據由擁有內容的模組保存，措施列沒有快照與連結目標；PRODUCT 種類一律是這個狀態。
+	SnapshotCleared   SnapshotState = "CLEARED"
 	SnapshotOwnerHeld SnapshotState = "OWNER_HELD"
 )
 
@@ -116,7 +114,6 @@ func ExcerptOf(prefix string, truncated bool) string {
 	return prefix
 }
 
-// TakedownContent 是建立內容下架時的一個對象：內容參照加上快照；快照必填，只有 PRODUCT 種類不帶（證據由 catalog 保存，措施列存 OWNER_HELD）。
 type TakedownContent struct {
 	ContentRef
 	Snapshot *ContentSnapshot
@@ -136,8 +133,6 @@ type MeasureContent struct {
 // MaxTakedownContents 是一個內容下架措施最多的對象數。
 const MaxTakedownContents = 20
 
-// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複，每筆都帶快照（PRODUCT 種類必須不帶），
-// 快照的發文時間、圖片張數與連結目標格式正確（連結依種類：FORUM_ENTRY 是店家加討論串，其餘是貼文）。內容屬於哪個店家由呼叫方驗證，快照是否屬實由入口保證。
 func ValidateContentTargets(field string, targets []TakedownContent) error {
 	refs := make([]ContentRef, len(targets))
 	for i, t := range targets {
