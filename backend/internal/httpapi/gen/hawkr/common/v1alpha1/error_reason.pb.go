@@ -180,9 +180,7 @@ const (
 	// 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
 	ErrorReason_COUPON_QUOTA_EXCEEDED ErrorReason = 48
 	// 規格（SKU）目前有貨，不接受補貨訂閱（搭配 failed_precondition）：BuyerAppService.SubscribeRestock。client 改提示直接購買。
-	ErrorReason_RESTOCK_SKU_IN_STOCK ErrorReason = 49
-	// 代行下架的商品是草稿（搭配 failed_precondition）：草稿沒有上架過，不能下架。ErrorInfo.metadata 的 notPublishedProductIds 是草稿商品的 ID，
-	// 逗號連接、由小到大（單一下架就是那一個）。CatalogDelegatedService.UnpublishStoreProduct、BatchUnpublishStoreProducts。client 把這些商品從下架清單移除後再送出。
+	ErrorReason_RESTOCK_SKU_IN_STOCK  ErrorReason = 49
 	ErrorReason_PRODUCT_NOT_PUBLISHED ErrorReason = 50
 )
 

@@ -1,4 +1,3 @@
--- Create "admin_operation_audit_log_items" table
 CREATE TABLE "delegation"."admin_operation_audit_log_items" (
   "audit_log_id" uuid NOT NULL,
   "resource_id" text NOT NULL,

@@ -18,9 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
-// 代行商品寫入（B4-5d）：catalog 在自己的 transaction 內發帶代行者的事件，delegation 的訂閱者同 transaction 寫 SUCCEEDED（批次是一列加商品清單）；
-// handler 的角色由下面的輔助函式扮演（httpapi/catalog 的 Delegated）。
-
 var (
 	productCaps = []Capability{CapabilityProductsRead, CapabilityProductsWrite, CapabilityProductsPublish}
 
@@ -44,7 +41,6 @@ func (f *fixture) uploader(storeID int64) media.Uploader {
 	return media.Uploader{ID: 1, Admin: true, Store: storeID}
 }
 
-// handlerErr 扮演 handler 在 do 裡把模組錯誤轉成對外的錯誤（httpapi/catalog 的 failure）：delegation 以錯誤鏈上的原因寫 FAILED 列。
 func handlerErr(err error) error {
 	var batch *catalog.BatchVersionConflictError
 	switch {
@@ -227,7 +223,6 @@ func TestEveryDelegatedProductWriteLeavesOneSucceededAuditRow(t *testing.T) {
 	}
 }
 
-// 重送（同一個 session、同一把 request_id、同一份內容）不再呼叫 catalog：回第一次的商品與同一列稽核，不重複建立、不重複通知。
 func TestDelegatedProductReplayReturnsTheFirstResultWithoutAnotherWrite(t *testing.T) {
 	f := build(t, true)
 	o := f.newOperator(t, "prod-replay", productCaps...)
@@ -253,7 +248,6 @@ func TestDelegatedProductReplayReturnsTheFirstResultWithoutAnotherWrite(t *testi
 	if n := f.auditRowsOfKey(t, sid, op.RequestID.String()); n != 1 || len(f.completed) != notified {
 		t.Fatalf("稽核 %d 列、通知 %d -> %d，預期 1 列、不再通知", n, notified, len(f.completed))
 	}
-	// 同一把 request_id、不同內容：不是重送。
 	_, err = f.createProduct(t, c, op, f.productInput(t, "不同的內容"))
 	if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialIdempotencyKeyReused {
 		t.Fatalf("同鍵不同內容 = %v，預期 DenialIdempotencyKeyReused", err)
@@ -296,7 +290,6 @@ func versioned(ps ...catalog.Product) []catalog.VersionedProduct {
 	return out
 }
 
-// D29：任一項版本衝突整批不寫（商品都沒動、沒有 SUCCEEDED 列與商品清單），FAILED 列記 VERSION_CONFLICT；同一個 request_id 以正確版本重試成功，仍只有一列 SUCCEEDED。
 func TestBatchUnpublishConflictWritesNothingAndTheRetryRecordsOneRow(t *testing.T) {
 	f := build(t, true)
 	o := f.newOperator(t, "batch-conflict", productCaps...)
@@ -318,7 +311,7 @@ func TestBatchUnpublishConflictWritesNothingAndTheRetryRecordsOneRow(t *testing.
 			t.Fatalf("商品 %s 被拒絕的批次改動：%s v%d", p.ID, st, v)
 		}
 	}
-	if f.resultRows(t, sid, "SUCCEEDED") != 3 /* 三個上架 */ +3 /* 三個建立 */ || f.batchRows(t, sid) != 0 {
+	if f.resultRows(t, sid, "SUCCEEDED") != 3+3 || f.batchRows(t, sid) != 0 {
 		t.Fatalf("被拒絕的批次留下 SUCCEEDED 的批次列")
 	}
 	row := f.failedRow(t, sid, "PRODUCT_BATCH_UNPUBLISH")
@@ -336,7 +329,6 @@ func TestBatchUnpublishConflictWritesNothingAndTheRetryRecordsOneRow(t *testing.
 	}
 }
 
-// D29：一個 request_id、一個 transaction、一列稽核（記錄本批商品與版本）、一則賣家通知；已下架的項目視為成功（版本不變）；同一個 request_id 重送回原結果、不再寫稽核與通知。
 func TestBatchUnpublishWritesOneAuditRowWithItsItemsAndOneNotification(t *testing.T) {
 	f := build(t, true)
 	ctx := context.Background()
@@ -417,14 +409,12 @@ func TestBatchUnpublishWritesOneAuditRowWithItsItemsAndOneNotification(t *testin
 	if f.batchRows(t, sid) != 1 || len(f.completed) != completed+1 || len(f.batchItemRows(t, res.AuditLogID)) != 3 {
 		t.Fatal("重送不該再寫稽核、商品清單或通知")
 	}
-	// 同一把 request_id、不同的商品：不是重送。
 	_, err = f.batchUnpublish(call, op, versioned(a))
 	if d, ok := DelegationDenialOf(err); !ok || d.Denial != DenialIdempotencyKeyReused {
 		t.Fatalf("同鍵不同內容 = %v，預期 DenialIdempotencyKeyReused", err)
 	}
 }
 
-// 批次裡有別家的商品：整批 not found、什麼都不動，FAILED 列記 NOT_FOUND。
 func TestBatchUnpublishWithAnotherStoresProductWritesNothing(t *testing.T) {
 	f := build(t, true)
 	o := f.newOperator(t, "batch-store-a", productCaps...)
@@ -453,7 +443,6 @@ func TestBatchUnpublishWithAnotherStoresProductWritesNothing(t *testing.T) {
 	}
 }
 
-// 代行寫入只在 session 的店家：用別家的商品 ID 修改、上下架都是 not found，別家的商品不動，留下 FAILED。
 func TestDelegatedProductWritesStayInTheSessionStore(t *testing.T) {
 	f := build(t, true)
 	o := f.newOperator(t, "scope-a", productCaps...)
@@ -478,13 +467,11 @@ func TestDelegatedProductWritesStayInTheSessionStore(t *testing.T) {
 	}
 }
 
-// 缺少能力的 session：每一種商品寫入都被擋在 catalog 之前（沒有商品被建立或改動），留下 FAILED（CAPABILITY_DENIED）；有 products.read 的讀取不稽核。
 func TestMissingProductCapabilityIsRejectedForEveryWriteAndLeavesFailedRows(t *testing.T) {
 	f := build(t, true)
 	full := f.newOperator(t, "prod-full", productCaps...)
 	p := f.activeProduct(t, full, "既有商品")
 	o := f.newOperator(t, "prod-readonly", CapabilityProductsRead)
-	// 同一家店的唯讀 session：換成唯讀的店家授權不方便，直接用唯讀 operator 的 session 對自己的店寫（沒有商品）與對 full 的商品寫（別家）都要被擋在能力檢查。
 	sid := o.session.Session.ID
 	deny := func(name string, err error) {
 		t.Helper()
@@ -518,7 +505,6 @@ func TestMissingProductCapabilityIsRejectedForEveryWriteAndLeavesFailedRows(t *t
 	if st, v := f.productStatus(t, full.storeID, p.ID); st != catalog.StatusActive || v != p.Version {
 		t.Fatalf("既有商品被動到：%s v%d", st, v)
 	}
-	// 只有 products.write 的 session 不能上下架（products.publish 是獨立的能力）。
 	w := f.newOperator(t, "prod-writeonly", CapabilityProductsWrite)
 	mine := f.mustCreateProduct(t, w, "自己的")
 	_, err = f.setProductStatus(f.caller(t, w, methodProductPublish), f.op("r"), mine.ID, mine.Version, catalog.StatusActive)
@@ -528,7 +514,6 @@ func TestMissingProductCapabilityIsRejectedForEveryWriteAndLeavesFailedRows(t *t
 	}
 }
 
-// 店主自己的商品寫入（沒有代行者）不留代行稽核列，批次下架也一樣。
 func TestOwnerProductWritesLeaveNoAuditRows(t *testing.T) {
 	f := build(t, true)
 	ctx := context.Background()
@@ -549,7 +534,6 @@ func TestOwnerProductWritesLeaveNoAuditRows(t *testing.T) {
 	}
 }
 
-// 並行的同 request_id（同 session、同內容）：輸家的寫入可能因贏家已提交而版本衝突，不能寫 FAILED、不能回 ABORTED，兩個呼叫都回第一次的結果，稽核只有一列。
 func TestConcurrentWritesWithTheSameRequestIDAllReturnTheFirstResultAndRecordOneRow(t *testing.T) {
 	f := build(t, true)
 	o := f.newOperator(t, "prod-concurrent", productCaps...)
@@ -603,7 +587,6 @@ func TestConcurrentWritesWithTheSameRequestIDAllReturnTheFirstResultAndRecordOne
 	}
 }
 
-// 代行建立的 request_id 已被這家店的另一次建立用過（不是這個 session 的重送）：FAILED_PRECONDITION，不是 INTERNAL；沒有 SUCCEEDED 的建立列、沒有第二個商品。
 func TestDelegatedCreateWithARequestIDTheStoreAlreadyUsedFailsAPreconditionNotInternal(t *testing.T) {
 	f := build(t, true)
 	ctx := context.Background()
@@ -630,7 +613,6 @@ func TestDelegatedCreateWithARequestIDTheStoreAlreadyUsedFailsAPreconditionNotIn
 	}
 }
 
-// 批次裡有草稿：整批 FAILED_PRECONDITION、沒有任何商品被動、沒有 SUCCEEDED 的批次列。
 func TestBatchUnpublishWithADraftWritesNothing(t *testing.T) {
 	f := build(t, true)
 	o := f.newOperator(t, "batch-draft", productCaps...)

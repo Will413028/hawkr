@@ -4875,7 +4875,6 @@ class ListStoreProductsRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   MyProductFilter ensureFilter() => $_ensure(0);
 
-  /// 預設 20，上限 50。
   @$pb.TagNumber(2)
   $core.int get pageSize => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -4885,7 +4884,6 @@ class ListStoreProductsRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearPageSize() => $_clearField(2);
 
-  /// page_token 與 filter 綁定。
   @$pb.TagNumber(3)
   $core.String get pageToken => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -5156,7 +5154,6 @@ class CreateStoreProductRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $3.DelegatedOperation ensureOperation() => $_ensure(0);
 
-  /// 完整內容；建立一律是草稿。
   @$pb.TagNumber(2)
   ProductInput get product => $_getN(1);
   @$pb.TagNumber(2)
@@ -5237,7 +5234,6 @@ class CreateStoreProductResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   SellerProduct ensureProduct() => $_ensure(0);
 
-  /// 這次寫入的稽核列 ID（重送時是第一次的）。
   @$pb.TagNumber(2)
   $core.String get auditLogId => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -5335,7 +5331,6 @@ class UpdateStoreProductRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearProductId() => $_clearField(2);
 
-  /// 讀取時拿到的 etag，必填。
   @$pb.TagNumber(3)
   $core.String get etag => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -5345,7 +5340,6 @@ class UpdateStoreProductRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearEtag() => $_clearField(3);
 
-  /// 要修改的欄位的新值；只讀 update_mask 列出的欄位。
   @$pb.TagNumber(4)
   ProductInput get product => $_getN(3);
   @$pb.TagNumber(4)
@@ -5357,8 +5351,6 @@ class UpdateStoreProductRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   ProductInput ensureProduct() => $_ensure(3);
 
-  /// ProductInput 最上層欄位的子集（title、category_id、hashtag_inputs、gallery、description、axes、skus、low_stock_threshold），至少一個；沒列的欄位保留目前的值。
-  /// axes 與 skus 要一起列（SKU 的選項值要對得上選項軸）。
   @$pb.TagNumber(5)
   $4.FieldMask get updateMask => $_getN(4);
   @$pb.TagNumber(5)
@@ -5529,7 +5521,6 @@ class PublishStoreProductRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearProductId() => $_clearField(2);
 
-  /// 讀取時拿到的 etag，必填。
   @$pb.TagNumber(3)
   $core.String get etag => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -5700,7 +5691,6 @@ class UnpublishStoreProductRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearProductId() => $_clearField(2);
 
-  /// 讀取時拿到的 etag，必填。
   @$pb.TagNumber(3)
   $core.String get etag => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -5861,12 +5851,10 @@ class BatchUnpublishStoreProductsRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $3.DelegatedOperation ensureOperation() => $_ensure(0);
 
-  /// 要下架的商品，1 到 50 項，商品 ID 不得重複。
   @$pb.TagNumber(2)
   $pb.PbList<BatchUnpublishItem> get items => $_getList(1);
 }
 
-/// BatchUnpublishItem 是批次下架的一項：商品與讀取時拿到的 etag。
 class BatchUnpublishItem extends $pb.GeneratedMessage {
   factory BatchUnpublishItem({
     $core.String? productId,
@@ -5927,7 +5915,6 @@ class BatchUnpublishItem extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearProductId() => $_clearField(1);
 
-  /// 讀取時拿到的 etag，必填。
   @$pb.TagNumber(2)
   $core.String get etag => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -5998,11 +5985,9 @@ class BatchUnpublishStoreProductsResponse extends $pb.GeneratedMessage {
           BatchUnpublishStoreProductsResponse.$_createMessage);
   static BatchUnpublishStoreProductsResponse? _defaultInstance;
 
-  /// 下架後的商品（已經下架的項目也在其中），順序同請求的 items；重送時是它們目前的狀態。
   @$pb.TagNumber(1)
   $pb.PbList<UnpublishedProduct> get products => $_getList(0);
 
-  /// 這一批唯一的稽核列 ID（重送時是第一次的）。
   @$pb.TagNumber(2)
   $core.String get auditLogId => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -6013,7 +5998,6 @@ class BatchUnpublishStoreProductsResponse extends $pb.GeneratedMessage {
   void clearAuditLogId() => $_clearField(2);
 }
 
-/// UnpublishedProduct 是批次下架後一個商品的狀態：client 以它更新列表上的狀態與 etag，不必重讀整份。
 class UnpublishedProduct extends $pb.GeneratedMessage {
   factory UnpublishedProduct({
     $core.String? productId,
@@ -6078,7 +6062,6 @@ class UnpublishedProduct extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearProductId() => $_clearField(1);
 
-  /// 下架後的 etag（已經下架的項目是它目前的 etag，沒有改動）。
   @$pb.TagNumber(2)
   $core.String get etag => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -6228,47 +6211,27 @@ class SellerCatalogAppServiceApi {
           'SetStock', request, SetStockResponse());
 }
 
-/// CatalogDelegatedService 是代行營運中的平台管理員讀寫代行店家的商品：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
-/// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。回應一律不可快取（private, no-store）。
-/// 商品、狀態與內容的規則與 SellerCatalogAppService 相同（同一組模組方法），回應也用同一組賣家訊息（SellerProduct、SellerProductSummary）。
-///
-/// 能力（products.read、products.write、products.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
-/// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
-///
-/// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
-/// 成功的讀取不稽核。
 class CatalogDelegatedServiceApi {
   final $pb.RpcClient _client;
 
   CatalogDelegatedServiceApi(this._client);
 
-  /// ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
   $async.Future<ListStoreProductsResponse> listStoreProducts(
           $pb.ClientContext? ctx, ListStoreProductsRequest request) =>
       _client.invoke<ListStoreProductsResponse>(ctx, 'CatalogDelegatedService',
           'ListStoreProducts', request, ListStoreProductsResponse());
-
-  /// GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
   $async.Future<GetStoreProductResponse> getStoreProduct(
           $pb.ClientContext? ctx, GetStoreProductRequest request) =>
       _client.invoke<GetStoreProductResponse>(ctx, 'CatalogDelegatedService',
           'GetStoreProduct', request, GetStoreProductResponse());
-
-  /// CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
-  /// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
   $async.Future<CreateStoreProductResponse> createStoreProduct(
           $pb.ClientContext? ctx, CreateStoreProductRequest request) =>
       _client.invoke<CreateStoreProductResponse>(ctx, 'CatalogDelegatedService',
           'CreateStoreProduct', request, CreateStoreProductResponse());
-
-  /// UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
-  /// VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
   $async.Future<UpdateStoreProductResponse> updateStoreProduct(
           $pb.ClientContext? ctx, UpdateStoreProductRequest request) =>
       _client.invoke<UpdateStoreProductResponse>(ctx, 'CatalogDelegatedService',
           'UpdateStoreProduct', request, UpdateStoreProductResponse());
-
-  /// PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
   $async.Future<PublishStoreProductResponse> publishStoreProduct(
           $pb.ClientContext? ctx, PublishStoreProductRequest request) =>
       _client.invoke<PublishStoreProductResponse>(
@@ -6277,8 +6240,6 @@ class CatalogDelegatedServiceApi {
           'PublishStoreProduct',
           request,
           PublishStoreProductResponse());
-
-  /// UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
   $async.Future<UnpublishStoreProductResponse> unpublishStoreProduct(
           $pb.ClientContext? ctx, UnpublishStoreProductRequest request) =>
       _client.invoke<UnpublishStoreProductResponse>(
@@ -6287,10 +6248,6 @@ class CatalogDelegatedServiceApi {
           'UnpublishStoreProduct',
           request,
           UnpublishStoreProductResponse());
-
-  /// BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
-  /// 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
-  /// （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
   $async.Future<BatchUnpublishStoreProductsResponse>
       batchUnpublishStoreProducts($pb.ClientContext? ctx,
               BatchUnpublishStoreProductsRequest request) =>

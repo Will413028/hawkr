@@ -4,7 +4,6 @@
 // 	protoc        (unknown)
 // source: hawkr/catalog/v1alpha1/catalog.proto
 
-// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），賣家管理自己店家的商品（SellerCatalogAppService），以及代行營運的平台管理員管理代行店家的商品（CatalogDelegatedService）；
 // 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
 // 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
@@ -3913,12 +3912,10 @@ func (x *SkuInput) GetInitialStock() int32 {
 }
 
 type ListStoreProductsRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Filter *MyProductFilter       `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
-	// 預設 20，上限 50。
-	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// page_token 與 filter 綁定。
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Filter        *MyProductFilter       `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	PageSize      int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4115,10 +4112,9 @@ func (x *GetStoreProductResponse) GetProduct() *SellerProduct {
 }
 
 type CreateStoreProductRequest struct {
-	state     protoimpl.MessageState       `protogen:"open.v1"`
-	Operation *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
-	// 完整內容；建立一律是草稿。
-	Product       *ProductInput `protobuf:"bytes,2,opt,name=product,proto3" json:"product,omitempty"`
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Operation     *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
+	Product       *ProductInput                `protobuf:"bytes,2,opt,name=product,proto3" json:"product,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4168,10 +4164,9 @@ func (x *CreateStoreProductRequest) GetProduct() *ProductInput {
 }
 
 type CreateStoreProductResponse struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Product *SellerProduct         `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
-	// 這次寫入的稽核列 ID（重送時是第一次的）。
-	AuditLogId    string `protobuf:"bytes,2,opt,name=audit_log_id,json=auditLogId,proto3" json:"audit_log_id,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *SellerProduct         `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	AuditLogId    string                 `protobuf:"bytes,2,opt,name=audit_log_id,json=auditLogId,proto3" json:"audit_log_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4221,16 +4216,12 @@ func (x *CreateStoreProductResponse) GetAuditLogId() string {
 }
 
 type UpdateStoreProductRequest struct {
-	state     protoimpl.MessageState       `protogen:"open.v1"`
-	Operation *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
-	ProductId string                       `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	// 讀取時拿到的 etag，必填。
-	Etag string `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
-	// 要修改的欄位的新值；只讀 update_mask 列出的欄位。
-	Product *ProductInput `protobuf:"bytes,4,opt,name=product,proto3" json:"product,omitempty"`
-	// ProductInput 最上層欄位的子集（title、category_id、hashtag_inputs、gallery、description、axes、skus、low_stock_threshold），至少一個；沒列的欄位保留目前的值。
-	// axes 與 skus 要一起列（SKU 的選項值要對得上選項軸）。
-	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,5,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Operation     *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
+	ProductId     string                       `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Etag          string                       `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
+	Product       *ProductInput                `protobuf:"bytes,4,opt,name=product,proto3" json:"product,omitempty"`
+	UpdateMask    *fieldmaskpb.FieldMask       `protobuf:"bytes,5,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4353,11 +4344,10 @@ func (x *UpdateStoreProductResponse) GetAuditLogId() string {
 }
 
 type PublishStoreProductRequest struct {
-	state     protoimpl.MessageState       `protogen:"open.v1"`
-	Operation *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
-	ProductId string                       `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	// 讀取時拿到的 etag，必填。
-	Etag          string `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Operation     *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
+	ProductId     string                       `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Etag          string                       `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4466,11 +4456,10 @@ func (x *PublishStoreProductResponse) GetAuditLogId() string {
 }
 
 type UnpublishStoreProductRequest struct {
-	state     protoimpl.MessageState       `protogen:"open.v1"`
-	Operation *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
-	ProductId string                       `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	// 讀取時拿到的 etag，必填。
-	Etag          string `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Operation     *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
+	ProductId     string                       `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Etag          string                       `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4579,10 +4568,9 @@ func (x *UnpublishStoreProductResponse) GetAuditLogId() string {
 }
 
 type BatchUnpublishStoreProductsRequest struct {
-	state     protoimpl.MessageState       `protogen:"open.v1"`
-	Operation *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
-	// 要下架的商品，1 到 50 項，商品 ID 不得重複。
-	Items         []*BatchUnpublishItem `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Operation     *v1alpha1.DelegatedOperation `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
+	Items         []*BatchUnpublishItem        `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4631,12 +4619,10 @@ func (x *BatchUnpublishStoreProductsRequest) GetItems() []*BatchUnpublishItem {
 	return nil
 }
 
-// BatchUnpublishItem 是批次下架的一項：商品與讀取時拿到的 etag。
 type BatchUnpublishItem struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	ProductId string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	// 讀取時拿到的 etag，必填。
-	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Etag          string                 `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4686,11 +4672,9 @@ func (x *BatchUnpublishItem) GetEtag() string {
 }
 
 type BatchUnpublishStoreProductsResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 下架後的商品（已經下架的項目也在其中），順序同請求的 items；重送時是它們目前的狀態。
-	Products []*UnpublishedProduct `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
-	// 這一批唯一的稽核列 ID（重送時是第一次的）。
-	AuditLogId    string `protobuf:"bytes,2,opt,name=audit_log_id,json=auditLogId,proto3" json:"audit_log_id,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Products      []*UnpublishedProduct  `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	AuditLogId    string                 `protobuf:"bytes,2,opt,name=audit_log_id,json=auditLogId,proto3" json:"audit_log_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4739,13 +4723,11 @@ func (x *BatchUnpublishStoreProductsResponse) GetAuditLogId() string {
 	return ""
 }
 
-// UnpublishedProduct 是批次下架後一個商品的狀態：client 以它更新列表上的狀態與 etag，不必重讀整份。
 type UnpublishedProduct struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	ProductId string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	// 下架後的 etag（已經下架的項目是它目前的 etag，沒有改動）。
-	Etag          string        `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
-	Status        ProductStatus `protobuf:"varint,3,opt,name=status,proto3,enum=hawkr.catalog.v1alpha1.ProductStatus" json:"status,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Etag          string                 `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	Status        ProductStatus          `protobuf:"varint,3,opt,name=status,proto3,enum=hawkr.catalog.v1alpha1.ProductStatus" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

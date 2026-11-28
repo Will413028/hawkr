@@ -15,28 +15,20 @@ export const file_hawkr_common_v1alpha1_delegated_operation: GenFile = /*@__PURE
   fileDesc("Ci9oYXdrci9jb21tb24vdjFhbHBoYTEvZGVsZWdhdGVkX29wZXJhdGlvbi5wcm90bxIVaGF3a3IuY29tbW9uLnYxYWxwaGExIoIBChJEZWxlZ2F0ZWRPcGVyYXRpb24SHwoKcmVxdWVzdF9pZBgBIAEoCUIL4EEC4ozP1wgCCAESHQoQb3BlcmF0aW9uX3JlYXNvbhgCIAEoCUID4EECEhoKDW5vdGlmeV9zZWxsZXIYAyABKAhIAIgBAUIQCg5fbm90aWZ5X3NlbGxlcmIGcHJvdG8z", [file_google_api_field_behavior, file_google_api_field_info]);
 
 /**
- * DelegatedOperation 是每個代行寫入都要帶的稽核資料，所有 `<模組>DelegatedService` 的寫入共用（API 設計規範（Connect）§二的 Delegated）。
- *
  * @generated from message hawkr.common.v1alpha1.DelegatedOperation
  */
 export type DelegatedOperation = Message<"hawkr.common.v1alpha1.DelegatedOperation"> & {
   /**
-   * UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
-   *
    * @generated from field: string request_id = 1;
    */
   requestId: string;
 
   /**
-   * 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
-   *
    * @generated from field: string operation_reason = 2;
    */
   operationReason: string;
 
   /**
-   * 是否在完成後通知店主；不設是通知。
-   *
    * @generated from field: optional bool notify_seller = 3;
    */
   notifySeller?: boolean | undefined;

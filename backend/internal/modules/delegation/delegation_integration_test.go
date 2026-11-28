@@ -205,7 +205,6 @@ func (noSchedules) PendingSchedulerRefs(context.Context, social.ScheduleKind) ([
 	return nil, nil
 }
 
-// noRestock 是補貨通知的替身：代行測試不跑補貨 job。
 type noRestock struct{}
 
 func (noRestock) NotifyRestocked(context.Context, catalog.RestockedSKU) error { return nil }

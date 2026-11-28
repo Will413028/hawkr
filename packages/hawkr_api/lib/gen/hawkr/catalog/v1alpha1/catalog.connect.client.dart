@@ -314,15 +314,7 @@ extension type SellerCatalogAppServiceClient (connect.Transport _transport) {
     );
   }
 }
-/// CatalogDelegatedService 是代行營運中的平台管理員讀寫代行店家的商品：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 website 的 BFF 轉送，不放在請求訊息），
-/// 不讀顧客或管理員的身分；目標店家是 session 建立當下綁定的那一家，請求不帶 store_id。回應一律不可快取（private, no-store）。
-/// 商品、狀態與內容的規則與 SellerCatalogAppService 相同（同一組模組方法），回應也用同一組賣家訊息（SellerProduct、SellerProductSummary）。
-/// 能力（products.read、products.write、products.publish）依方法宣告：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；
-/// session 沒有授予對應的能力回 permission_denied；店家此刻不可代行（不存在、已關閉、等待刪除、停權）回 failed_precondition，只拒絕、不撤銷 session。
-/// 稽核：成功的寫入在同一個 transaction 內留下一列 SUCCEEDED（寫入失敗時一併 rollback）；被拒絕的請求（含讀取）與寫入的業務失敗另開 transaction 留下一列 FAILED；
-/// 成功的讀取不稽核。
 extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
-  /// ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
   Future<hawkrcatalogv1alpha1catalog.ListStoreProductsResponse> listStoreProducts(
     hawkrcatalogv1alpha1catalog.ListStoreProductsRequest input, {
     connect.Headers? headers,
@@ -340,7 +332,6 @@ extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
   Future<hawkrcatalogv1alpha1catalog.GetStoreProductResponse> getStoreProduct(
     hawkrcatalogv1alpha1catalog.GetStoreProductRequest input, {
     connect.Headers? headers,
@@ -358,8 +349,6 @@ extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
-  /// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
   Future<hawkrcatalogv1alpha1catalog.CreateStoreProductResponse> createStoreProduct(
     hawkrcatalogv1alpha1catalog.CreateStoreProductRequest input, {
     connect.Headers? headers,
@@ -377,8 +366,6 @@ extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
-  /// VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
   Future<hawkrcatalogv1alpha1catalog.UpdateStoreProductResponse> updateStoreProduct(
     hawkrcatalogv1alpha1catalog.UpdateStoreProductRequest input, {
     connect.Headers? headers,
@@ -396,7 +383,6 @@ extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
   Future<hawkrcatalogv1alpha1catalog.PublishStoreProductResponse> publishStoreProduct(
     hawkrcatalogv1alpha1catalog.PublishStoreProductRequest input, {
     connect.Headers? headers,
@@ -414,7 +400,6 @@ extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
   Future<hawkrcatalogv1alpha1catalog.UnpublishStoreProductResponse> unpublishStoreProduct(
     hawkrcatalogv1alpha1catalog.UnpublishStoreProductRequest input, {
     connect.Headers? headers,
@@ -432,9 +417,6 @@ extension type CatalogDelegatedServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
-  /// 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
-  /// （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
   Future<hawkrcatalogv1alpha1catalog.BatchUnpublishStoreProductsResponse> batchUnpublishStoreProducts(
     hawkrcatalogv1alpha1catalog.BatchUnpublishStoreProductsRequest input, {
     connect.Headers? headers,

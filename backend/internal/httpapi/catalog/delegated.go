@@ -26,9 +26,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
-// DelegatedDeclaration 是 CatalogDelegatedService 每個方法的代行宣告（API 設計規範（Connect）§二的 Delegated）：需要的代行能力，以及稽核列的動作與資源種類
-// （讀取被拒絕時寫 PRODUCT_READ）。key 是生成的 procedure 常數；interceptor（httpapi/delegation）啟動時檢查它與 service 的方法一一對應。
-// 寫入方法的能力與動作由該方法發的 catalog 事件種類衍生（delegation.ProductWriteFor，與稽核訂閱者共用，不在這裡再寫一份）。
 var DelegatedDeclaration = httpdelegation.Declaration{
 	Service: pb.File_hawkr_catalog_v1alpha1_catalog_proto.Services().ByName("CatalogDelegatedService"),
 	Methods: map[string]moddelegation.DelegatedMethod{
@@ -54,7 +51,6 @@ func productMethod(c moddelegation.Capability, a moddelegation.AuditAction) modd
 	return moddelegation.DelegatedMethod{Capability: c, Action: a, Resource: moddelegation.ResourceProduct}
 }
 
-// DelegatedModule 是代行讀寫商品用到的 catalog 方法（*catalog.Module）：與賣家同一組方法（店家由 delegation 以 session 的目標店家讀出後交給模組），加上批次下架。
 type DelegatedModule interface {
 	ListSellerProducts(ctx context.Context, storeID int64, f catalog.SellerFilter, after *catalog.ListCursor, size int32) (catalog.ProductPage, error)
 	Product(ctx context.Context, storeID int64, productID uuid.UUID) (catalog.Product, error)
@@ -64,11 +60,8 @@ type DelegatedModule interface {
 	UnpublishProducts(ctx context.Context, storeID int64, items []catalog.VersionedProduct, actor *delegatedactor.Actor) ([]catalog.UnpublishedItem, error)
 }
 
-// maxDelegatedPageSize 是代行列表一頁的上限（proto 註解寫的 50）。
 const maxDelegatedPageSize = 50
 
-// Delegated 實作 CatalogDelegatedService：只做傳輸（解析請求、組回應）；授權、稽核、冪等與失敗紀錄在 delegation 的 DelegatedRead／DelegatedWrite，商品的規則與寫入在 catalog 模組。
-// 店家只來自代行 session（DelegatedRead／DelegatedWrite 交給回呼的 seller.Store），請求沒有 store_id。
 type Delegated struct {
 	runner httpdelegation.Runner
 	m      DelegatedModule
@@ -77,7 +70,6 @@ type Delegated struct {
 
 var _ catalogv1alpha1connect.CatalogDelegatedServiceHandler = (*Delegated)(nil)
 
-// NewDelegated 建立 handler。
 func NewDelegated(runner httpdelegation.Runner, m DelegatedModule, images rpc.Images, log *slog.Logger) (*Delegated, error) {
 	switch {
 	case log == nil:
@@ -95,7 +87,6 @@ var (
 	batchPaths           = rpc.FieldPaths{"Items": "items", "Etag": "items[].etag"}
 )
 
-// uploaderOf 是代行寫入新圖時確認 staged token 的上傳者：與代行的圖片上傳同一個（httpapi/media 的 withUploader，B1-D21）——session 的管理員，綁被代行的店家。
 func uploaderOf(c moddelegation.DelegatedCaller, st seller.Store) media.Uploader {
 	return media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}
 }
@@ -161,10 +152,6 @@ func (h *Delegated) GetStoreProduct(ctx context.Context, req *connect.Request[pb
 	return connect.NewResponse(out), nil
 }
 
-// delegatedWrite 是每個單一商品的代行寫入共同的流程：交給 delegation 檢查重送與店家，帶著代行者（明確的參數，A7-D27）執行 do（catalog 在自己的 transaction 內發帶代行者的事件，稽核同 transaction 寫入）；
-// 第一次寫入的商品由 do 在寫入的 transaction 內回傳（建立、修改、切換狀態），不再讀一次；重送時 do 沒被呼叫（或輸給並行的第一次寫入），稽核列只記資源 ID 與版本，
-// 回應讀回第一次寫入的商品目前的樣子。回傳商品與稽核列 ID。
-// do 內的模組錯誤先轉成對外的錯誤（failure）：delegation 以錯誤鏈上的原因寫 FAILED 列（NOT_FOUND、VERSION_CONFLICT…），而不是 INTERNAL。
 func (h *Delegated) delegatedWrite(ctx context.Context, w moddelegation.DelegatedWrite, productID uuid.UUID,
 	do func(ctx context.Context, c moddelegation.DelegatedCaller, st seller.Store, actor *delegatedactor.Actor) (catalog.Product, error)) (*pb.SellerProduct, string, error) {
 	c, err := httpdelegation.CallerFrom(ctx)
@@ -234,10 +221,8 @@ func (h *Delegated) CreateStoreProduct(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&pb.CreateStoreProductResponse{Product: out, AuditLogId: auditID}), nil
 }
 
-// updatableProductFields 是 UpdateStoreProduct 的 update_mask 可以列的欄位：ProductInput 最上層的每個欄位。
 var updatableProductFields = []string{"title", "category_id", "hashtag_inputs", "gallery", "description", "axes", "skus", "low_stock_threshold"}
 
-// updateMaskPaths 是 update_mask 選到的欄位（由小到大）：至少一個，只能是 ProductInput 最上層的欄位；axes 與 skus 要一起列（SKU 的選項值要對得上選項軸）。
 func updateMaskPaths(in *pb.ProductInput, mask *fieldmaskpb.FieldMask) ([]string, error) {
 	if len(mask.GetPaths()) == 0 {
 		return nil, rpc.RequiredField("update_mask", "update_mask 必須列至少一個可以修改的欄位")
@@ -272,7 +257,6 @@ func joinFields(fields []string) string {
 	return out
 }
 
-// maskedBytes 是請求的 ProductInput 只保留 update_mask 選到的欄位後的位元組（決定性編碼）：沒選到的欄位不影響結果，也不該影響「是不是同一個請求」。
 func maskedBytes(in *pb.ProductInput, paths []string) ([]byte, error) {
 	m := proto.Clone(in).ProtoReflect()
 	fields := m.Descriptor().Fields()
@@ -284,7 +268,6 @@ func maskedBytes(in *pb.ProductInput, paths []string) ([]byte, error) {
 	return proto.MarshalOptions{Deterministic: true}.Marshal(m.Interface())
 }
 
-// currentInput 是商品目前內容的寫入形狀：沒列在 update_mask 的欄位照它保留。圖片以現有的資產 ID 沿用，SKU 以選項值的組合辨識（既有組合的庫存不經這裡改，StockQty 只在新組合有意義）。
 func currentInput(p catalog.Product) catalog.ProductInput {
 	in := catalog.ProductInput{
 		Title: p.Title, CategoryID: p.CategoryID, LowStockThreshold: p.LowStockThreshold,
@@ -314,7 +297,6 @@ func existingImage(i catalog.Image) catalog.Image {
 	return catalog.Image{AssetID: i.AssetID, Alt: i.Alt}
 }
 
-// mergeInput 以 patch 的 paths 欄位取代 cur（目前的內容）對應的欄位。
 func mergeInput(cur catalog.ProductInput, patch catalog.ProductInput, paths []string) catalog.ProductInput {
 	has := func(p string) bool { return slices.Contains(paths, p) }
 	if has("title") {
@@ -387,7 +369,6 @@ func (h *Delegated) UpdateStoreProduct(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&pb.UpdateStoreProductResponse{Product: out, AuditLogId: auditID}), nil
 }
 
-// transition 是上架與下架共同的流程：operation、商品 ID 與必填的 etag，再由模組切換狀態。
 func (h *Delegated) transition(ctx context.Context, op *commonpb.DelegatedOperation, productID, etag string, action moddelegation.AuditAction, to catalog.ProductStatus) (*pb.SellerProduct, string, error) {
 	o, err := httpdelegation.ParseOperation(op)
 	if err != nil {
@@ -430,7 +411,6 @@ func (h *Delegated) UnpublishStoreProduct(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&pb.UnpublishStoreProductResponse{Product: p, AuditLogId: audit}), nil
 }
 
-// batchItems 解析並檢查批次下架的項目：1 到 DelegationMaxBatch 項，商品 ID 不得重複，每項的 etag 必填。回傳請求順序的項目。
 func batchItems(in []*pb.BatchUnpublishItem) ([]catalog.VersionedProduct, error) {
 	if len(in) == 0 || len(in) > moddelegation.DelegationMaxBatch {
 		return nil, rpc.RequiredField("items", fmt.Sprintf("items 必須是 1 到 %d 項", moddelegation.DelegationMaxBatch))
@@ -468,7 +448,6 @@ func (h *Delegated) BatchUnpublishStoreProducts(ctx context.Context, req *connec
 	if err != nil {
 		return nil, err
 	}
-	// 請求內容雜湊與項目順序無關（依商品 ID 排序）：同一批商品與版本是同一個請求。
 	sorted := slices.Clone(items)
 	slices.SortFunc(sorted, func(a, b catalog.VersionedProduct) int { return a.ProductID.Compare(b.ProductID) })
 	var written []catalog.UnpublishedItem
@@ -483,7 +462,6 @@ func (h *Delegated) BatchUnpublishStoreProducts(ctx context.Context, req *connec
 	if err != nil {
 		return nil, err
 	}
-	// 回應來自寫入的結果（第一次）或稽核列記下的商品清單（重送），不再讀商品：商品之後被修改、刪除不影響同一個請求的回覆。
 	after := make(map[uuid.UUID]int64, len(items))
 	if res.Replayed {
 		for _, it := range res.Items {
@@ -511,7 +489,6 @@ func (h *Delegated) BatchUnpublishStoreProducts(ctx context.Context, req *connec
 	return connect.NewResponse(out), nil
 }
 
-// truncatedTitle 是建立失敗時稽核列的資源名稱：標題去除首尾空白後的前 60 個字元（與事件訂閱者寫成功列的名稱一致）。
 func truncatedTitle(title string) string {
 	return moddelegation.AuditName(title)
 }

@@ -62,9 +62,8 @@ type DelegatedWriteResult struct {
 	Store      seller.Store
 	AuditLogID uuid.UUID
 	ResourceID string
-	// Items 是批次寫入（PRODUCT_BATCH_UNPUBLISH）第一次寫入的商品清單，只有重送（Replayed）時填；批次的稽核列沒有單一資源，ResourceID 是空的。
-	Items    []model.AuditItem
-	Replayed bool
+	Items      []model.AuditItem
+	Replayed   bool
 }
 
 // DelegatedPayloadHash 是請求內容的雜湊：parts 依序編成 JSON，動作與所有影響結果的欄位都要放進去。
@@ -116,9 +115,6 @@ func (m *Module) DelegatedRead(ctx context.Context, c DelegatedCaller, read func
 // DelegatedWrite 在代行店家上執行一次寫入 do（A7-D26）：不開 transaction。先查重送，再檢查 session 此刻還能用並帶有能力（公開 API 的縱深防禦：資源模組的業務驗證不得先於授權），再讀店家此刻可不可代行，然後把代行者（platform/delegatedactor，明確的參數、不經 ctx）交給 do；
 // 資源模組在自己的 transaction 內為寫入發帶代行者的事件，delegation 的訂閱者（OnPostCreated 等，依事件種類決定稽核動作）同 transaction 檢查 session 與能力、再次確認店家可代行、寫一列 SUCCEEDED
 // （request_id 對到 (session_id, idempotency_key)）。do 失敗時資源模組的 transaction rollback，稽核列跟著消失，所以「有 SUCCEEDED」等於「寫入成功」。
-//
-// 同一個 session 以同一個 request_id 重送（內容相同）不呼叫 do，回第一次的結果（不再檢查店家此刻可不可代行）；內容不同回 DenialIdempotencyKeyReused。並行的重送：後到的請求在資源模組的 transaction 內失敗（訂閱者撞稽核表唯一鍵回 ErrOperationKeyTaken、版本衝突、建立的 request_id 已用過…），
-// do 失敗時這裡再讀那一列，贏家的 SUCCEEDED 已在就收斂成重送、不寫 FAILED。任何失敗（被拒絕或 do 的業務失敗）都另開 transaction 寫一列 FAILED。
 //
 // do 不得假設自己在 transaction 內：外部 provider 的呼叫與 transaction 由資源模組自己安排（單體規則 3、5）。
 func (m *Module) DelegatedWrite(ctx context.Context, c DelegatedCaller, w DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error) (DelegatedWriteResult, error) {
@@ -173,8 +169,6 @@ func (m *Module) delegatedWrite(ctx context.Context, c DelegatedCaller, w Delega
 	}
 	doErr := do(ctx, st, actorOf(in, c))
 	if doErr != nil {
-		// 並行的同 request_id：輸家的 do 可能因贏家已提交而失敗（版本衝突、建立的 request_id 已用過、撞稽核唯一鍵）。贏家的 SUCCEEDED 列已經在，
-		// 這個請求就是重送：回贏家的結果，不寫 FAILED。讀不到列（或內容不同）時回 do 自己的錯誤。
 		if log, found, lerr := m.audit.LookupOperation(ctx, in); lerr == nil && found {
 			return m.replayResult(ctx, c, log)
 		}
@@ -238,13 +232,11 @@ var (
 	postScheduleWrite  = postWrite{CapabilityPostsPublish, AuditPostSchedule}
 )
 
-// WriteAudit 是一種資源寫入事件在稽核上的能力與動作。
 type WriteAudit struct {
 	Capability Capability
 	Action     AuditAction
 }
 
-// PostWriteAudit 是貼文寫入事件的 WriteAudit。
 type PostWriteAudit = WriteAudit
 
 // PostWriteFor 回傳 social 貼文寫入事件 e（值，不是指標）對應的能力與動作，不是代行會寫入的事件回 false。這是代行寫入宣告的唯一來源：
@@ -319,8 +311,6 @@ var (
 	productBatchUnpublishWrite = postWrite{CapabilityProductsPublish, AuditProductBatchUnpublish}
 )
 
-// ProductWriteFor 回傳 catalog 商品寫入事件 e（值，不是指標）對應的能力與動作，不是代行會寫入的事件回 false。與 PostWriteFor 同理：訂閱者寫稽核列用它，
-// catalog httpapi 的 DelegatedDeclaration 也由它衍生每個寫入方法的能力與動作。
 func ProductWriteFor(e any) (WriteAudit, bool) {
 	var w postWrite
 	switch e.(type) {
@@ -340,9 +330,6 @@ func ProductWriteFor(e any) (WriteAudit, bool) {
 	return WriteAudit{Capability: w.capability, Action: w.action}, true
 }
 
-// OnProductCreated、OnProductUpdated、OnProductPublished、OnProductUnpublished、OnProductPublishRepeated、OnProductUnpublishRepeated、OnProductsUnpublished 訂閱 catalog 的同名事件
-// （組裝點以 events.SubscribeNamed 與 delegatedactor.AuditHandler 訂閱）：事件帶代行者時，代行寫入在 catalog 的 transaction 內，依事件種類決定稽核動作，再寫一列 SUCCEEDED；
-// 沒有代行者（店主自己的寫入）略過。批次下架是一個事件、一列稽核（商品清單記在 admin_operation_audit_log_items）、一則賣家通知（D29）。
 func (m *Module) OnProductCreated(ctx context.Context, e catalog.ProductCreated) error {
 	return m.recordProductWrite(ctx, productCreateWrite, e.ProductWritten)
 }
@@ -367,7 +354,6 @@ func (m *Module) OnProductUnpublishRepeated(ctx context.Context, e catalog.Produ
 	return m.recordProductWrite(ctx, productUnpublishWrite, e.ProductWritten)
 }
 
-// recordProductWrite 同 recordPostWrite：核對店家、確認店家此刻可代行，再寫一列 SUCCEEDED；任何一步失敗 catalog 的 transaction 整個 rollback。
 func (m *Module) recordProductWrite(ctx context.Context, w postWrite, e catalog.ProductWritten) error {
 	a := e.Actor
 	if a == nil {
@@ -381,7 +367,6 @@ func (m *Module) recordProductWrite(ctx context.Context, w postWrite, e catalog.
 		model.OperationOutcome{ResourceID: e.ProductID.String(), ResourceName: name, VersionAfter: e.Version})
 }
 
-// OnProductsUnpublished 為一次批次下架寫一列 SUCCEEDED（PRODUCT_BATCH_UNPUBLISH）：父列的資源是整批（沒有單一資源 ID，名稱是商品數），商品清單逐項記下。
 func (m *Module) OnProductsUnpublished(ctx context.Context, e catalog.ProductsUnpublished) error {
 	a := e.Actor
 	if a == nil {
@@ -399,10 +384,8 @@ func (m *Module) OnProductsUnpublished(ctx context.Context, e catalog.ProductsUn
 		model.OperationOutcome{ResourceName: name, Items: items})
 }
 
-// BatchResourceName 是批次稽核列的資源名稱（商品數）；handler 寫 FAILED 列時用同一個。
 func BatchResourceName(n int) string { return fmt.Sprintf("%d 項商品", n) }
 
-// checkWriteStore 核對事件的店家與代行者的店家一致、店家此刻可代行（第一次寫入；重送在呼叫資源模組之前就回了）。
 func (m *Module) checkWriteStore(ctx context.Context, what string, storeID int64, a *delegatedactor.Actor) error {
 	if storeID != a.StoreID {
 		return fmt.Errorf("delegation：%s寫入事件的店家 %d 與代行者的店家 %d 不一致", what, storeID, a.StoreID)
@@ -411,7 +394,6 @@ func (m *Module) checkWriteStore(ctx context.Context, what string, storeID int64
 	return err
 }
 
-// AuditName 是稽核列的資源名稱：預覽文字去除首尾空白後的前 auditNameRunes 個字元（事件訂閱者寫成功列與 handler 寫失敗列用同一個）。
 func AuditName(preview string) string {
 	name := strings.TrimSpace(preview)
 	if r := []rune(name); len(r) > auditNameRunes {

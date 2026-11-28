@@ -18,7 +18,6 @@ func testActor() *delegatedactor.Actor {
 	return &delegatedactor.Actor{SessionID: 9, AdminID: 3, RequestID: uuid.NewV7().String(), Reason: "測試", NotifySeller: true, PayloadHash: "h"}
 }
 
-// listen 收集商品寫入事件的種類名稱；named 為真時以稽核 handler 的名稱訂閱（帶代行者的事件才發得出去）。
 func (f *productFixture) listen(named bool) *[]string {
 	var got []string
 	record := func(name string) { got = append(got, name) }
@@ -63,7 +62,6 @@ func TestProductWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(
 		t.Fatalf("events = %v, want %v", *got, want)
 	}
 
-	// 帶代行者的寫入，沒有名為稽核 handler 的訂閱者：失敗關閉，商品沒有被建立。
 	before := f.count(`SELECT count(*) FROM catalog.products WHERE store_id = $1`, storeID)
 	if _, err := f.m.CreateProduct(f.ct, storeID, up, uuid.NewV7(), f.input("代行"), testActor()); !errors.Is(err, events.ErrNoSubscriber) {
 		t.Fatalf("delegated create without an audit handler = %v, want ErrNoSubscriber", err)
@@ -71,7 +69,6 @@ func TestProductWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(
 	if after := f.count(`SELECT count(*) FROM catalog.products WHERE store_id = $1`, storeID); after != before {
 		t.Fatalf("a failed-closed delegated create left %d products, want %d", after, before)
 	}
-	// 代行者只能上架與下架：切成草稿被拒絕。
 	cur, _ := f.m.Product(f.ct, storeID, p.ID)
 	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, cur.Version, StatusDraft, testActor()); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("delegated set to draft = %v, want ErrInvalidInput", err)
@@ -98,7 +95,6 @@ func TestDelegatedWritesCarryTheActorAndShareTheWriteTransaction(t *testing.T) {
 	if len(seen) != 1 || seen[0] != actor {
 		t.Fatalf("the created event carried %v, want the actor passed to CreateProduct", seen)
 	}
-	// 稽核 handler 失敗：商品寫入跟著 rollback（稽核與寫入同 transaction）。
 	failNext = true
 	before := f.count(`SELECT count(*) FROM catalog.products WHERE store_id = $1`, storeID)
 	if _, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: acct}, uuid.NewV7(), f.input("會被回滾"), testActor()); err == nil {
@@ -151,7 +147,6 @@ func TestUnpublishProductsIsAllOrNothing(t *testing.T) {
 		return append(out, VersionedProduct{ProductID: archived.ID, Version: archived.Version})
 	}
 
-	// 兩項版本過時：整批回衝突、列出兩個商品，沒有任何商品被下架、沒有事件。
 	_, err := f.m.UnpublishProducts(f.ct, storeID, items(0, 2), testActor())
 	var conflict *BatchVersionConflictError
 	if !errors.As(err, &conflict) || !errors.Is(err, ErrVersionConflict) {
@@ -169,14 +164,12 @@ func TestUnpublishProductsIsAllOrNothing(t *testing.T) {
 		t.Fatalf("a rejected batch published %d events", len(batches))
 	}
 
-	// 別家的商品：整批 ErrProductNotFound，同樣不動。
 	other, otherAcct := f.store()
 	foreign := f.create(other, otherAcct, f.input("別家"))
 	if _, err := f.m.UnpublishProducts(f.ct, storeID, append(items(), VersionedProduct{ProductID: foreign.ID, Version: foreign.Version}), testActor()); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("batch with a foreign product = %v, want ErrProductNotFound", err)
 	}
 
-	// 全部版本正確（含已下架的一項）：全部下架、一個事件，已下架的項目是成功且不改版本。
 	if _, err := f.m.UnpublishProducts(f.ct, storeID, items(), testActor()); err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +196,6 @@ func TestUnpublishProductsIsAllOrNothing(t *testing.T) {
 		}
 	}
 
-	// 輸入檢查：空批、重複商品、沒有版本。
 	for name, in := range map[string][]VersionedProduct{
 		"empty":     nil,
 		"duplicate": {{ProductID: ps[0].ID, Version: 1}, {ProductID: ps[0].ID, Version: 1}},
@@ -215,7 +207,6 @@ func TestUnpublishProductsIsAllOrNothing(t *testing.T) {
 	}
 }
 
-// 代行建立遇到這家店已用過的 request_id：不寫入、不發事件，回 ErrCreateReplayed（代行自己的重送由 delegation 的稽核列處理）；店主自己的重送仍回第一次的商品。
 func TestDelegatedCreateWithAUsedRequestIDReportsAReplayWithoutAnEvent(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
@@ -248,7 +239,6 @@ func TestDelegatedCreateWithAUsedRequestIDReportsAReplayWithoutAnEvent(t *testin
 	}
 }
 
-// 代行者不能下架草稿（單一與批次，批次整批拒絕並列出全部草稿），店主自己可以；已經下架的批次項目記目前的版本（before == after），不照請求的 etag。
 func TestDelegatedUnpublishRejectsDraftsAndRecordsTheCurrentVersionOfUnchangedItems(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
@@ -280,7 +270,6 @@ func TestDelegatedUnpublishRejectsDraftsAndRecordsTheCurrentVersionOfUnchangedIt
 	if len(batches) != 0 {
 		t.Fatalf("a rejected batch published %d events", len(batches))
 	}
-	// 店主自己（沒有代行者）仍可以把草稿切成下架。
 	if got, err := f.m.SetProductStatus(f.ct, storeID, draft.ID, draft.Version, StatusArchived, nil); err != nil || got.Status != StatusArchived || got.Version != draft.Version+1 {
 		t.Fatalf("owner archives a draft = %s v%d, %v", got.Status, got.Version, err)
 	}
@@ -310,7 +299,6 @@ func TestDelegatedUnpublishRejectsDraftsAndRecordsTheCurrentVersionOfUnchangedIt
 	}
 }
 
-// SetProductStatus 回傳寫入後在同一個 transaction 內讀出的商品。
 func TestSetProductStatusReturnsTheWrittenProduct(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)

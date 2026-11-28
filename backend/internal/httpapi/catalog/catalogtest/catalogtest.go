@@ -38,11 +38,10 @@ type World struct {
 	DB     *db.DB
 	Module *catalog.Module
 	Media  *media.Fake
-	// Bus 是 catalog 發布寫入事件的 bus：要驗證代行稽核的測試在上面訂閱 delegation。
-	Bus *events.Bus
-	mu  sync.Mutex
-	now time.Time
-	seq int64
+	Bus    *events.Bus
+	mu     sync.Mutex
+	now    time.Time
+	seq    int64
 }
 
 // New 建立世界：套用 media、buyer、seller、catalog 的 migration（catalog 讀 seller 的 pub_exposable_stores）。

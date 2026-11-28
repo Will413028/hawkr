@@ -37,7 +37,6 @@ const (
 
 var allProductCaps = []moddelegation.Capability{moddelegation.CapabilityProductsRead, moddelegation.CapabilityProductsWrite, moddelegation.CapabilityProductsPublish}
 
-// fakeSessions 以憑證回 session；AuthorizeDelegated 以與模組相同的規則（非 ACTIVE 或缺能力）拒絕，並記下被拒絕的呼叫（FAILED 稽核由模組的 integration 測試守）。
 type fakeSessions struct {
 	sessions map[string]moddelegation.DelegationSession
 	denied   []string
@@ -69,7 +68,6 @@ func sessionWith(caps ...moddelegation.Capability) moddelegation.DelegationSessi
 	}
 }
 
-// fakeRunner 像元件一樣先執行 read 與 do，但不寫稽核也不做冪等（那是模組的規則，見 delegation 的 integration 測試）。
 type fakeRunner struct {
 	write    moddelegation.DelegatedWrite
 	replayed bool
@@ -95,7 +93,6 @@ func (f *fakeRunner) DelegatedWrite(ctx context.Context, c moddelegation.Delegat
 	return moddelegation.DelegatedWriteResult{Store: st, AuditLogID: f.audit}, nil
 }
 
-// fakeDelegatedModule 記錄 catalog 模組收到的店家、上傳者、版本、輸入與代行者。
 type fakeDelegatedModule struct {
 	calls     []string
 	stores    []int64
@@ -204,7 +201,6 @@ func operation() *commonpb.DelegatedOperation {
 	return &commonpb.DelegatedOperation{RequestId: validRequestID(), OperationReason: "  店家請我們代為處理  "}
 }
 
-// calls 是每個方法的一個合法請求。
 func (r *delegatedRig) calls(t *testing.T) map[string]func() error {
 	t.Helper()
 	ctx := t.Context()
@@ -241,7 +237,6 @@ func (r *delegatedRig) calls(t *testing.T) map[string]func() error {
 	}
 }
 
-// 每個 RPC 需要的能力是一張寫死的對照表：宣告被改弱（例如 publish 只要 products.write）時這裡變紅，不是拿宣告對宣告。
 func TestEveryDelegatedMethodDeclaresItsCapabilityAndAuditAction(t *testing.T) {
 	t.Parallel()
 	want := map[string]moddelegation.DelegatedMethod{
@@ -263,7 +258,6 @@ func TestEveryDelegatedMethodDeclaresItsCapabilityAndAuditAction(t *testing.T) {
 	}
 }
 
-// 缺少該方法需要的能力：每個 RPC 都是 permission_denied，不到元件與模組；FAILED 稽核由模組寫（這裡記下被拒絕的動作）。
 func TestMissingCapabilityIsPermissionDeniedForEveryMethod(t *testing.T) {
 	t.Parallel()
 	for proc, w := range DelegatedDeclaration.Methods {
@@ -281,8 +275,6 @@ func TestMissingCapabilityIsPermissionDeniedForEveryMethod(t *testing.T) {
 	}
 }
 
-// 每個方法都以 session 的店家呼叫模組（不是管理員 ID、不是請求裡的任何值）；每個寫入都把元件交來的代行者原樣傳給模組（傳 nil 會被當成店主寫入而不稽核）；
-// 新圖的上傳者是 session 的管理員並綁被代行的店家。
 func TestEveryDelegatedMethodUsesTheSessionStoreAndPassesTheActor(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
@@ -476,7 +468,6 @@ func TestListClampsThePageSizeAndBindsTheTokenToTheSessionStoreAndFilter(t *test
 	if token == "" {
 		t.Fatal("有下一頁卻沒有 next_page_token")
 	}
-	// token 與篩選綁定：換了狀態就不能用。
 	_, err = r.client.ListStoreProducts(t.Context(), asSession(&pb.ListStoreProductsRequest{PageToken: token, Filter: &pb.MyProductFilter{Status: pb.ProductStatus_PRODUCT_STATUS_DRAFT}}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("換篩選用同一個 token：%v，預期 invalid_argument", err)
@@ -517,7 +508,6 @@ func TestBatchUnpublishValidatesItems(t *testing.T) {
 	}
 }
 
-// 批次：一次元件呼叫、一次模組呼叫，請求內容雜湊與項目順序無關；回應依請求順序，帶下架後的 etag 與狀態。
 func TestBatchUnpublishIsOneComponentCallOneModuleCallAndOrderIndependentHash(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
@@ -555,7 +545,6 @@ func TestBatchUnpublishIsOneComponentCallOneModuleCallAndOrderIndependentHash(t 
 	}
 }
 
-// 整批版本衝突：aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 是逗號連接、由小到大的衝突商品。
 func TestBatchConflictIsAbortedWithTheConflictingIDsInTheErrorDetails(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
@@ -595,7 +584,6 @@ func TestSingleVersionConflictIsAbortedWithVersionConflict(t *testing.T) {
 	}
 }
 
-// 寫入宣告的能力與動作，等於稽核訂閱者對「這個方法發的事件」寫的能力與動作（A7-D27）：宣告由 delegation.ProductWriteFor 衍生。
 func TestWriteDeclarationsAgreeWithTheAuditSubscriberMapping(t *testing.T) {
 	t.Parallel()
 	events := map[string]any{
@@ -619,7 +607,6 @@ func TestWriteDeclarationsAgreeWithTheAuditSubscriberMapping(t *testing.T) {
 	}
 }
 
-// 批次下架的回應來自寫入的結果（重送時是稽核列記下的清單），不再讀商品：重送時商品已被刪除也回第一次的結果。
 func TestBatchUnpublishReplayAnswersFromTheRecordedItemsWithoutReadingProducts(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
@@ -645,7 +632,6 @@ func TestBatchUnpublishReplayAnswersFromTheRecordedItemsWithoutReadingProducts(t
 	}
 }
 
-// 第一次的批次下架也不讀商品：回應用模組回傳的寫入結果。
 func TestBatchUnpublishFirstCallAnswersFromTheWriteOutcome(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
@@ -657,7 +643,6 @@ func TestBatchUnpublishFirstCallAnswersFromTheWriteOutcome(t *testing.T) {
 	}
 }
 
-// 單一上架與下架回應用寫入的 transaction 內回傳的商品，不在提交後再讀一次。
 func TestPublishAndUnpublishAnswerFromTheWrittenProductWithoutReReading(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
@@ -676,7 +661,6 @@ func TestPublishAndUnpublishAnswerFromTheWrittenProductWithoutReReading(t *testi
 	}
 }
 
-// 代行不能下架草稿：單一與批次都是 failed_precondition 與 PRODUCT_NOT_PUBLISHED，ErrorInfo.metadata 的 notPublishedProductIds 是逗號連接、由小到大的草稿商品（單一就是那一個）。
 func TestDelegatedUnpublishOfDraftsIsFailedPreconditionWithTheDraftIDs(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)
@@ -715,7 +699,6 @@ func errorInfoOf(t *testing.T, err error) *errdetails.ErrorInfo {
 	return nil
 }
 
-// 代行建立的 request_id 這家店已用過（不是這個 session 的重送）：failed_precondition，不是 internal。
 func TestDelegatedCreateWithAUsedRequestIDIsFailedPrecondition(t *testing.T) {
 	t.Parallel()
 	r := newDelegatedRig(t, allProductCaps...)

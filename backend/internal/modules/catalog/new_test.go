@@ -18,7 +18,6 @@ func TestNewRequiresRestock(t *testing.T) {
 	New(Deps{})
 }
 
-// Events 缺了同樣在組裝時 panic：寫入事件的發布不能留到第一次寫入才 nil 解參考。
 func TestNewRequiresEvents(t *testing.T) {
 	defer func() {
 		if recover() == nil {

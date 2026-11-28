@@ -418,9 +418,6 @@ export enum ErrorReason {
   RESTOCK_SKU_IN_STOCK = 49,
 
   /**
-   * 代行下架的商品是草稿（搭配 failed_precondition）：草稿沒有上架過，不能下架。ErrorInfo.metadata 的 notPublishedProductIds 是草稿商品的 ID，
-   * 逗號連接、由小到大（單一下架就是那一個）。CatalogDelegatedService.UnpublishStoreProduct、BatchUnpublishStoreProducts。client 把這些商品從下架清單移除後再送出。
-   *
    * @generated from enum value: PRODUCT_NOT_PUBLISHED = 50;
    */
   PRODUCT_NOT_PUBLISHED = 50,

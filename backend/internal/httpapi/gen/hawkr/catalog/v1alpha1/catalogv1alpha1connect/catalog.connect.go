@@ -2,7 +2,6 @@
 //
 // Source: hawkr/catalog/v1alpha1/catalog.proto
 
-// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），賣家管理自己店家的商品（SellerCatalogAppService），以及代行營運的平台管理員管理代行店家的商品（CatalogDelegatedService）；
 // 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
 // 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
@@ -709,23 +708,12 @@ func (UnimplementedSellerCatalogAppServiceHandler) SetStock(context.Context, *co
 // CatalogDelegatedServiceClient is a client for the hawkr.catalog.v1alpha1.CatalogDelegatedService
 // service.
 type CatalogDelegatedServiceClient interface {
-	// ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
 	ListStoreProducts(context.Context, *connect.Request[v1alpha1.ListStoreProductsRequest]) (*connect.Response[v1alpha1.ListStoreProductsResponse], error)
-	// GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
 	GetStoreProduct(context.Context, *connect.Request[v1alpha1.GetStoreProductRequest]) (*connect.Response[v1alpha1.GetStoreProductResponse], error)
-	// CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
-	// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
 	CreateStoreProduct(context.Context, *connect.Request[v1alpha1.CreateStoreProductRequest]) (*connect.Response[v1alpha1.CreateStoreProductResponse], error)
-	// UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
-	// VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
 	UpdateStoreProduct(context.Context, *connect.Request[v1alpha1.UpdateStoreProductRequest]) (*connect.Response[v1alpha1.UpdateStoreProductResponse], error)
-	// PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
 	PublishStoreProduct(context.Context, *connect.Request[v1alpha1.PublishStoreProductRequest]) (*connect.Response[v1alpha1.PublishStoreProductResponse], error)
-	// UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
 	UnpublishStoreProduct(context.Context, *connect.Request[v1alpha1.UnpublishStoreProductRequest]) (*connect.Response[v1alpha1.UnpublishStoreProductResponse], error)
-	// BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
-	// 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
-	// （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
 	BatchUnpublishStoreProducts(context.Context, *connect.Request[v1alpha1.BatchUnpublishStoreProductsRequest]) (*connect.Response[v1alpha1.BatchUnpublishStoreProductsResponse], error)
 }
 
@@ -842,23 +830,12 @@ func (c *catalogDelegatedServiceClient) BatchUnpublishStoreProducts(ctx context.
 // CatalogDelegatedServiceHandler is an implementation of the
 // hawkr.catalog.v1alpha1.CatalogDelegatedService service.
 type CatalogDelegatedServiceHandler interface {
-	// ListStoreProducts 列出代行店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前（keyset 翻頁）。需要能力 products.read。
 	ListStoreProducts(context.Context, *connect.Request[v1alpha1.ListStoreProductsRequest]) (*connect.Response[v1alpha1.ListStoreProductsResponse], error)
-	// GetStoreProduct 讀代行店家的商品完整內容（任何狀態，含 etag）；別家的商品與不存在一樣回 not_found。需要能力 products.read。
 	GetStoreProduct(context.Context, *connect.Request[v1alpha1.GetStoreProductRequest]) (*connect.Response[v1alpha1.GetStoreProductResponse], error)
-	// CreateStoreProduct 以代行店家建立草稿商品（建立一律是草稿；要上架再呼叫 PublishStoreProduct）。同一個 session 以同一個 request_id 重送回第一次建立的商品目前的樣子，
-	// 不重複建立、不重複寫稽核；內容不同回 failed_precondition。需要能力 products.write。
 	CreateStoreProduct(context.Context, *connect.Request[v1alpha1.CreateStoreProductRequest]) (*connect.Response[v1alpha1.CreateStoreProductResponse], error)
-	// UpdateStoreProduct 修改代行店家的商品：update_mask 列 ProductInput 最上層欄位的子集，沒列的欄位保留目前的值；etag 必填，與目前版本不符回 aborted 與
-	// VERSION_CONFLICT，不寫入也不留成功的稽核。重送規則同 CreateStoreProduct。需要能力 products.write。
 	UpdateStoreProduct(context.Context, *connect.Request[v1alpha1.UpdateStoreProductRequest]) (*connect.Response[v1alpha1.UpdateStoreProductResponse], error)
-	// PublishStoreProduct 把商品上架（切成 ACTIVE；商品至少要有一張主圖，否則回 failed_precondition）；etag 必填。商品已經是上架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
 	PublishStoreProduct(context.Context, *connect.Request[v1alpha1.PublishStoreProductRequest]) (*connect.Response[v1alpha1.PublishStoreProductResponse], error)
-	// UnpublishStoreProduct 把商品下架（切成 ARCHIVED）；etag 必填。商品已經是下架時回成功、不改 etag。重送規則同 CreateStoreProduct。需要能力 products.publish。
 	UnpublishStoreProduct(context.Context, *connect.Request[v1alpha1.UnpublishStoreProductRequest]) (*connect.Response[v1alpha1.UnpublishStoreProductResponse], error)
-	// BatchUnpublishStoreProducts 原子地下架多個商品（AIP-233）：一個 request_id、一個 transaction，全部下架或全部不動；一筆稽核列（PRODUCT_BATCH_UNPUBLISH）記錄本批商品，
-	// 一則賣家通知。任一項的 etag 與目前版本不符，整批拒絕，回 aborted 與 VERSION_CONFLICT，ErrorInfo.metadata 的 conflictingProductIds 列出衝突的商品 ID
-	// （逗號連接、由小到大排列）；已經下架的項目視為成功（不改它的 etag）；任一項不是代行店家的商品回 not_found，整批不動。同一個 request_id 重送回第一次的結果。需要能力 products.publish。
 	BatchUnpublishStoreProducts(context.Context, *connect.Request[v1alpha1.BatchUnpublishStoreProductsRequest]) (*connect.Response[v1alpha1.BatchUnpublishStoreProductsResponse], error)
 }
 

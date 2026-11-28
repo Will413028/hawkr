@@ -96,25 +96,19 @@ type (
 	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
 	RestockedSKU = model.RestockedSKU
 	// SkuSnapshot 是一個 SKU 與它的商品此刻的內容（結帳快照與購物車資訊共用）。
-	SkuSnapshot = model.SkuSnapshot
-	// ProductWritten 是商品寫入事件共用的欄位（見 internal/model/events.go）。
-	ProductWritten = model.ProductWritten
-	// ProductCreated、ProductUpdated、ProductPublished、ProductUnpublished、ProductPublishRepeated、ProductUnpublishRepeated 是單一商品的寫入事件，
-	// ProductsUnpublished 是一次批次下架的事件（UnpublishedItem 是其中一項）；在商品寫入的 transaction 內發布，Actor 非 nil 時是代行寫入（A7-D27）。
-	ProductCreated           = model.ProductCreated
-	ProductUpdated           = model.ProductUpdated
-	ProductPublished         = model.ProductPublished
-	ProductUnpublished       = model.ProductUnpublished
-	ProductPublishRepeated   = model.ProductPublishRepeated
-	ProductUnpublishRepeated = model.ProductUnpublishRepeated
-	ProductsUnpublished      = model.ProductsUnpublished
-	UnpublishedItem          = model.UnpublishedItem
-	// VersionedProduct 是批次操作的一項：商品與讀取時拿到的版本。
-	VersionedProduct = model.VersionedProduct
-	// BatchVersionConflictError 是批次下架有版本衝突時的錯誤，列出全部衝突的商品；errors.Is(err, ErrVersionConflict) 成立。
+	SkuSnapshot               = model.SkuSnapshot
+	ProductWritten            = model.ProductWritten
+	ProductCreated            = model.ProductCreated
+	ProductUpdated            = model.ProductUpdated
+	ProductPublished          = model.ProductPublished
+	ProductUnpublished        = model.ProductUnpublished
+	ProductPublishRepeated    = model.ProductPublishRepeated
+	ProductUnpublishRepeated  = model.ProductUnpublishRepeated
+	ProductsUnpublished       = model.ProductsUnpublished
+	UnpublishedItem           = model.UnpublishedItem
+	VersionedProduct          = model.VersionedProduct
 	BatchVersionConflictError = model.BatchVersionConflictError
-	// BatchNotPublishedError 是代行批次下架含草稿時的錯誤，列出全部草稿商品；errors.Is(err, ErrNotPublished) 成立。
-	BatchNotPublishedError = model.BatchNotPublishedError
+	BatchNotPublishedError    = model.BatchNotPublishedError
 	// RestockNotifier 是 catalog 宣告、補貨通知下游（buyer，B4-4 接線）實作的 port。
 	RestockNotifier = model.RestockNotifier
 )
@@ -165,10 +159,8 @@ var (
 	ErrInvalidInput               = model.ErrInvalidInput
 	// ErrVersionConflict 表示依據的版本（etag）已過時，沒有寫入。
 	ErrVersionConflict = model.ErrVersionConflict
-	// ErrCreateReplayed 見 model.ErrCreateReplayed：代行建立的 request_id 在這家店已用過。
-	ErrCreateReplayed = model.ErrCreateReplayed
-	// ErrNotPublished 見 model.ErrNotPublished：代行不能下架草稿。
-	ErrNotPublished = model.ErrNotPublished
+	ErrCreateReplayed  = model.ErrCreateReplayed
+	ErrNotPublished    = model.ErrNotPublished
 )
 
 // InvalidInputError.Reason 的值：欄位為什麼不合法。
@@ -199,8 +191,7 @@ type Deps struct {
 	// Now 是目前時間；測試注入固定值。
 	Now func() time.Time
 	// Media 是 media 模組；新圖的 Confirm 與退場資產的 MarkDeleted 在商品寫入的 transaction 內呼叫。
-	Media Media
-	// Events 是寫入事件的 bus（ProductCreated 等在商品寫入的 transaction 內發布）；必要的，沒給就 panic。
+	Media  Media
 	Events *events.Bus
 	// Restock 是補貨通知的下游：catalog 的週期 worker 在 transaction 外呼叫它（B4-4 接 buyer，之前由組裝點給替身）。
 	Restock RestockNotifier
@@ -335,28 +326,21 @@ func (m *Module) IsLeafCategory(ctx context.Context, id uuid.UUID) (bool, error)
 	return m.taxonomy.RequireLeaf(ctx, id)
 }
 
-// CreateProduct 建立一個草稿商品。actor 是代行者（明確的參數，A7-D27；店主自己的寫入傳 nil）：成功的寫入在同一個 transaction 內發 ProductCreated 並帶著它，代行的稽核訂閱者同 transaction 寫入稽核；重送（沒有寫入）不發事件。storeID 是呼叫端從登入身分推導的店家（不信任 client 送的店家）；uploader 是新圖 staged token 的上傳者；
 // requestID 是冪等鍵（範圍是店家，永久保存）：同一家店以同一個鍵重送回第一次建立的商品目前的樣子，不重複建立（同時在途也只建立一個），內容不同回 ErrIdempotencyKeyReused。
 // 圖片的 Confirm 在建立的 transaction 內，失敗整筆回滾。輸入不合法回 *InvalidInputError。
 func (m *Module) CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in ProductInput, actor *delegatedactor.Actor) (Product, error) {
 	return m.product.Create(ctx, storeID, uploader, requestID, in, actor)
 }
 
-// UpdateProduct 整體取代商品的內容（actor 同 CreateProduct，發 ProductUpdated），狀態不變（ACTIVE 的商品輸入沒有主圖回 ErrActiveRequiresGalleryImage）；SKU 以選項值的組合辨識（組合還在就更新價格，庫存不動）。
 // version 是讀取時拿到的版本（Product.Version，對外是 Etag），必填；與目前的不符回 ErrVersionConflict、不寫入。商品不是這家店的或已刪除回 ErrProductNotFound。
 func (m *Module) UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in ProductInput, actor *delegatedactor.Actor) (Product, error) {
 	return m.product.Update(ctx, storeID, uploader, productID, version, in, actor)
 }
 
-// SetProductStatus 切換商品狀態（actor 同 CreateProduct；事件依目標狀態是 ProductPublished 或 ProductUnpublished，已經在目標狀態時是 *Repeated，目標 DRAFT 沒有事件也不接受 actor）：DRAFT、ACTIVE、ARCHIVED 任兩個都能互切，切成目前狀態是 no-op（不改版本）。切成 ACTIVE 時商品沒有主圖回 ErrActiveRequiresGalleryImage；
-// first_published_at 只在第一次 ACTIVE 時填，之後不清除。version 必填，不符回 ErrVersionConflict。代行者不能下架草稿（回 ErrNotPublished）。回傳寫入後（no-op 時是目前）的商品，在寫入的 transaction 內讀出。
 func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to ProductStatus, actor *delegatedactor.Actor) (Product, error) {
 	return m.product.SetStatus(ctx, storeID, productID, version, to, actor)
 }
 
-// UnpublishProducts 原子地下架多個商品（D29）：一個 transaction、一個事件，全部下架或全部不動；任一項版本不符整批回 *BatchVersionConflictError（列出全部衝突的商品），
-// 已經下架的項目視為成功（兩個版本都是目前版本）。商品不是這家店的回 ErrProductNotFound。actor 同 SetProductStatus；代行者的批次裡有草稿，整批回 *BatchNotPublishedError（ErrNotPublished）。
-// 回傳每一項寫入後的結果（依商品 ID 由小到大），與事件同一份，呼叫方據它組回應、不必再讀商品。
 func (m *Module) UnpublishProducts(ctx context.Context, storeID int64, items []VersionedProduct, actor *delegatedactor.Actor) ([]UnpublishedItem, error) {
 	return m.product.UnpublishMany(ctx, storeID, items, actor)
 }

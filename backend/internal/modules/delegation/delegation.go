@@ -210,7 +210,6 @@ type StartDelegationInput = model.StartDelegationInput
 type StartedDelegation = model.StartedDelegation
 type RiskLevel = model.RiskLevel
 
-// AuditItem 是批次稽核列裡的一個資源（PRODUCT_BATCH_UNPUBLISH，D29）。
 type AuditItem = model.AuditItem
 
 const (

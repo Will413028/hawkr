@@ -40,11 +40,8 @@ var (
 	ErrInvalidInput = errors.New("catalog: invalid input")
 	// ErrVersionConflict 表示呼叫端依據的版本（etag）已經過時：與目前的不符，沒有寫入。
 	ErrVersionConflict = errors.New("catalog: product version conflict")
-	// ErrCreateReplayed 表示代行建立的 request_id 在這家店已經建立過商品（沒有寫入、沒有事件）：代行的冪等由 delegation 的稽核列負責（同 session、同 request_id），
-	// 這裡的 request_id 是別的 session 或店主自己用過的，不是這個代行 session 的重送。
-	ErrCreateReplayed = errors.New("catalog: request_id already used for a product of this store")
-	// ErrNotPublished 表示代行下架的商品是草稿：草稿沒有上架過，不能下架（與 social 的代行下架同規則）。
-	ErrNotPublished = errors.New("catalog: a draft product cannot be unpublished by delegation")
+	ErrCreateReplayed  = errors.New("catalog: request_id already used for a product of this store")
+	ErrNotPublished    = errors.New("catalog: a draft product cannot be unpublished by delegation")
 )
 
 // DefaultLowStockThreshold 是商品沒有自己的低庫存門檻時用的平台預設值；MaxLowStockThreshold 是商品門檻的上限（products_low_stock_check）。

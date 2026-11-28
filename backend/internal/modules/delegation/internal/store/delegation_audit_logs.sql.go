@@ -399,7 +399,6 @@ type InsertDelegationAuditLogItemParams struct {
 	ResourceVersionAfter  *int64
 }
 
-// 批次稽核列的一個商品；與父列同 transaction（RecordOperation）寫入。
 func (q *Queries) InsertDelegationAuditLogItem(ctx context.Context, arg InsertDelegationAuditLogItemParams) error {
 	_, err := q.db.Exec(ctx, insertDelegationAuditLogItem,
 		arg.AuditLogID,
@@ -762,7 +761,6 @@ WHERE audit_log_id = $1
 ORDER BY resource_id
 `
 
-// 批次稽核列的商品清單，依資源 ID 由小到大。
 func (q *Queries) ListDelegationAuditLogItems(ctx context.Context, auditLogID uuid.UUID) ([]DelegationAdminOperationAuditLogItem, error) {
 	rows, err := q.db.Query(ctx, listDelegationAuditLogItems, auditLogID)
 	if err != nil {

@@ -23,7 +23,6 @@ func (noSeller) Store(context.Context, int64) (seller.Store, error) { return sel
 
 type noSocial struct{ delegation.Social }
 
-// newDelegation 以 delegatedactor.AuditHandler 這個名字訂閱 social 每一種貼文寫入事件與 catalog 每一種商品寫入事件（代行寫入的稽核靠它們，A7-D27）。保證在發布時的
 // events.PublishRequired（指名的 handler 不在就失敗關閉），不在這裡；serve、worker 與 CLI 的組裝（newDelegation、newDelegationOffline）都經過它，
 // 所以這個測試確認正式組裝真的接了這些事件，兩條路徑各一次。
 func TestNewDelegationSubscribesEveryPostAndProductWriteEvent(t *testing.T) {

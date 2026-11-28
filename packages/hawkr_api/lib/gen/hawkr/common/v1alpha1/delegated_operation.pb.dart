@@ -16,7 +16,6 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
-/// DelegatedOperation 是每個代行寫入都要帶的稽核資料，所有 `<模組>DelegatedService` 的寫入共用（API 設計規範（Connect）§二的 Delegated）。
 class DelegatedOperation extends $pb.GeneratedMessage {
   factory DelegatedOperation({
     $core.String? requestId,
@@ -71,7 +70,6 @@ class DelegatedOperation extends $pb.GeneratedMessage {
           DelegatedOperation.$_createMessage);
   static DelegatedOperation? _defaultInstance;
 
-  /// UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
   @$pb.TagNumber(1)
   $core.String get requestId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -81,7 +79,6 @@ class DelegatedOperation extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearRequestId() => $_clearField(1);
 
-  /// 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
   @$pb.TagNumber(2)
   $core.String get operationReason => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -91,7 +88,6 @@ class DelegatedOperation extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearOperationReason() => $_clearField(2);
 
-  /// 是否在完成後通知店主；不設是通知。
   @$pb.TagNumber(3)
   $core.bool get notifySeller => $_getBF(2);
   @$pb.TagNumber(3)

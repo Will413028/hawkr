@@ -22,17 +22,13 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// DelegatedOperation 是每個代行寫入都要帶的稽核資料，所有 `<模組>DelegatedService` 的寫入共用（API 設計規範（Connect）§二的 Delegated）。
 type DelegatedOperation struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// UUIDv4（AIP-155）：同一個代行 session 內以同一個 request_id 重送，回第一次的結果，不重做寫入也不再寫稽核；同一個 request_id 用在不同的請求內容回 failed_precondition。必填。
-	RequestId string `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// 操作原因，去除首尾空白後 1 到 100 個字元，不得含控制字元；寫進稽核，必填。
-	OperationReason string `protobuf:"bytes,2,opt,name=operation_reason,json=operationReason,proto3" json:"operation_reason,omitempty"`
-	// 是否在完成後通知店主；不設是通知。
-	NotifySeller  *bool `protobuf:"varint,3,opt,name=notify_seller,json=notifySeller,proto3,oneof" json:"notify_seller,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	OperationReason string                 `protobuf:"bytes,2,opt,name=operation_reason,json=operationReason,proto3" json:"operation_reason,omitempty"`
+	NotifySeller    *bool                  `protobuf:"varint,3,opt,name=notify_seller,json=notifySeller,proto3,oneof" json:"notify_seller,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *DelegatedOperation) Reset() {

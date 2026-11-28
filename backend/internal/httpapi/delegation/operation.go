@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
-// ParseOperation 解析每個代行寫入共同的稽核資料（所有 <模組>DelegatedService 共用）：request_id 必填（UUIDv4）；操作原因 1 到 100 字；notify_seller 不設是通知。
 func ParseOperation(op *commonpb.DelegatedOperation) (moddelegation.DelegatedOperation, error) {
 	if !op.ProtoReflect().IsValid() {
 		return moddelegation.DelegatedOperation{}, rpc.RequiredField("operation", "operation 必填")
@@ -28,8 +27,6 @@ func ParseOperation(op *commonpb.DelegatedOperation) (moddelegation.DelegatedOpe
 	return moddelegation.DelegatedOperation{RequestID: *id, Reason: reason, NotifySeller: op.NotifySeller == nil || op.GetNotifySeller()}, nil
 }
 
-// Runner 是每個 <模組>DelegatedService 的 handler 需要的 delegation 公開 API（*delegation.Module）：授權、重送偵測與稽核（DelegatedWrite；不開 transaction，稽核由資源模組的事件在資源模組自己的
-// transaction 內寫，A7-D26），與讀取的授權（DelegatedRead）。
 type Runner interface {
 	DelegatedRead(ctx context.Context, c moddelegation.DelegatedCaller, read func(ctx context.Context, st seller.Store) error) error
 	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error) (moddelegation.DelegatedWriteResult, error)

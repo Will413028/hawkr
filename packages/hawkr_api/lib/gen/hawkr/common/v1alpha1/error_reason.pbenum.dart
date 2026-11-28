@@ -269,9 +269,6 @@ class ErrorReason extends $pb.ProtobufEnum {
   /// 規格（SKU）目前有貨，不接受補貨訂閱（搭配 failed_precondition）：BuyerAppService.SubscribeRestock。client 改提示直接購買。
   static const ErrorReason RESTOCK_SKU_IN_STOCK =
       ErrorReason._(49, _omitEnumNames ? '' : 'RESTOCK_SKU_IN_STOCK');
-
-  /// 代行下架的商品是草稿（搭配 failed_precondition）：草稿沒有上架過，不能下架。ErrorInfo.metadata 的 notPublishedProductIds 是草稿商品的 ID，
-  /// 逗號連接、由小到大（單一下架就是那一個）。CatalogDelegatedService.UnpublishStoreProduct、BatchUnpublishStoreProducts。client 把這些商品從下架清單移除後再送出。
   static const ErrorReason PRODUCT_NOT_PUBLISHED =
       ErrorReason._(50, _omitEnumNames ? '' : 'PRODUCT_NOT_PUBLISHED');
 
