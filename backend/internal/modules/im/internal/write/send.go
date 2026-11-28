@@ -285,11 +285,18 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		}
 	}
 
-	if err := seller.Authorize(t.store, seller.CapChatSend); err != nil {
-		if apperr.KindOf(err) == apperr.KindNotFound {
+	if authErr := seller.Authorize(t.store, seller.CapChatSend); authErr != nil {
+		if apperr.KindOf(authErr) == apperr.KindNotFound {
+			inactive, queryErr := s.q(ctx).PartyInactive(ctx, store.PartyInactiveParams{Kind: string(model.PartyStore), PartyID: t.store.StoreID})
+			if queryErr != nil {
+				return unavailable(l, queryErr)
+			}
+			if inactive {
+				return s.closedGuardError(l, nil, authErr, sender.Kind)
+			}
 			return model.WithReason(apperr.FailedPrecondition("%s", text.ImStoreClosed(l)), model.ReasonStoreClosed)
 		}
-		return unavailable(l, err)
+		return unavailable(l, authErr)
 	}
 
 	blocked, err := s.d.Buyers.IsBlockingStore(ctx, t.buyerID, t.store.StoreID)

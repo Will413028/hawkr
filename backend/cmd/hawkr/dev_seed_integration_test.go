@@ -68,6 +68,12 @@ func devSeedEnv(t *testing.T) *db.DB {
 			t.Fatal(err)
 		}
 	}
+	identityModule := identity.New(identity.Deps{DB: d, Events: events.NewBus(), Now: time.Now})
+	for _, id := range []int64{9, 4} {
+		if err := identityModule.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return d
 }
 
@@ -701,6 +707,7 @@ func TestDevSeedRefusesLifecycleStateItWouldHaveToRevert(t *testing.T) {
 			requestPendingDeletion(t, d, 4)
 		}, []string{"帳號 [4]", "刪帳申請"}},
 		{"種子買家帳號有進行中的刪帳申請", func(t *testing.T, d *db.DB) {
+			newAccount(t, d, 2001)
 			requestPendingDeletion(t, d, 2001)
 		}, []string{"帳號 [2001]", "刪帳申請"}},
 	} {

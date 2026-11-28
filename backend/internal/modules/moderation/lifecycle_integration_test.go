@@ -480,13 +480,6 @@ func TestRetiredStoreCannotSubmitAsReporter(t *testing.T) {
 	firstRID, secondRID := uuid.New(), uuid.New()
 	in := SubmitInput{ReporterStoreID: storeID, Target: target, Category: policy.Harassment, Description: "退場前的說明", RequestID: &firstRID}
 	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, in))
-	if _, err := f.seller.CloseCurrent(ctx, storeAccount); err != nil {
-		t.Fatalf("關店：%v", err)
-	}
-	f.advance(seller.StoreRetention + time.Second)
-	if _, err := f.seller.PurgePII(ctx); err != nil {
-		t.Fatal(err)
-	}
 	counts := func() (reports, requests, submitted int) {
 		reports = f.count(t, "SELECT count(*) FROM moderation.reports WHERE reporter_store_id = $1", storeID)
 		requests = f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_store_id = $1", storeID)
@@ -497,6 +490,14 @@ func TestRetiredStoreCannotSubmitAsReporter(t *testing.T) {
 	if wantReports != 1 || wantRequests != 1 || wantSubmitted != 1 {
 		t.Fatalf("退場前各有一筆：%d %d %d", wantReports, wantRequests, wantSubmitted)
 	}
+	if _, err := f.seller.CloseCurrent(ctx, storeAccount); err != nil {
+		t.Fatalf("關店：%v", err)
+	}
+	f.advance(seller.StoreRetention + time.Second)
+	if _, err := f.seller.PurgePII(ctx); err != nil {
+		t.Fatal(err)
+	}
+	wantReports, wantRequests, wantSubmitted = counts()
 	for name, rid := range map[string]uuid.UUID{"新的 request_id（併入進行中案件）": secondRID, "同一個 request_id（重送）": firstRID} {
 		in.RequestID = &rid
 		_, err := f.module.SubmitReport(ctx, in)

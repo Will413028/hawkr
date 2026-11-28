@@ -342,6 +342,7 @@ func TestTakedownStoresTheLatestCaseSnapshot(t *testing.T) {
 func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
+	f.newBuyer(t)
 	_, ownerAccount := f.newBuyer(t)
 	w := world{storeAccount: ownerAccount}
 	var err error

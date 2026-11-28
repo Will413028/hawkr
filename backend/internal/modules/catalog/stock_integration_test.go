@@ -430,8 +430,8 @@ func TestSellerAdjustMovesStockAndWritesTheLedger(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	sku := f.sku(5)
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:1", sku, 7))
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:2", sku, -4))
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:1", sku, 7))
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:2", sku, -4))
 	if got := f.stockOf(sku); got != 8 {
 		t.Fatalf("庫存 = %d，want 8", got)
 	}
@@ -445,30 +445,30 @@ func TestAdjustReplayIsNoOpAndDifferentContentIsRejected(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	sku, other := f.sku(5), f.sku(5)
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:r", sku, 3))
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:r", sku, 3))
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:r", sku, 3))
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:r", sku, 3))
 	if got := f.stockOf(sku); got != 8 {
 		t.Fatalf("重送後庫存 = %d，want 8（只生效一次）", got)
 	}
-	if err := f.m.AdjustStock(f.ct, 501, "adj:r", sku, 4); !errors.Is(err, ErrIdempotencyKeyReused) {
+	if err := f.m.AdjustStock(f.ct, f.storeID, "adj:r", sku, 4); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("不同變動量重送 err = %v，want ErrIdempotencyKeyReused", err)
 	}
-	if err := f.m.AdjustStock(f.ct, 501, "adj:r", other, 3); !errors.Is(err, ErrIdempotencyKeyReused) {
+	if err := f.m.AdjustStock(f.ct, f.storeID, "adj:r", other, 3); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("不同 SKU 重送 err = %v，want ErrIdempotencyKeyReused", err)
 	}
-	if err := f.m.AdjustStock(f.ct, 502, "adj:r", sku, 3); !errors.Is(err, ErrSkuNotFound) {
+	if err := f.m.AdjustStock(f.ct, f.otherStoreID, "adj:r", sku, 3); !errors.Is(err, ErrSkuNotFound) {
 		t.Fatalf("別家店用同一個 key 調整這個 SKU err = %v，want ErrSkuNotFound", err)
 	}
 	foreign := f.sku(5)
-	f.must(f.exec(`UPDATE catalog.products SET store_id = 502 WHERE id = (SELECT product_id FROM catalog.product_skus WHERE id = $1)`, foreign))
-	if err := f.m.AdjustStock(f.ct, 501, "adj:r", foreign, 3); !errors.Is(err, ErrSkuNotFound) {
+	f.must(f.exec(`UPDATE catalog.products SET store_id = $2 WHERE id = (SELECT product_id FROM catalog.product_skus WHERE id = $1)`, foreign, f.otherStoreID))
+	if err := f.m.AdjustStock(f.ct, f.storeID, "adj:r", foreign, 3); !errors.Is(err, ErrSkuNotFound) {
 		t.Fatalf("同店同一個 key 重送別家店的 SKU err = %v，want ErrSkuNotFound（不是 ErrIdempotencyKeyReused）", err)
 	}
 	if got := f.stockOf(sku); got != 8 {
 		t.Fatalf("跨店重送後庫存 = %d，want 8", got)
 	}
 	f.must(f.m.DeductStock(f.ct, "adj:d", items(sku, 1)))
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:d", sku, -1))
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:d", sku, -1))
 	f.must(f.m.DeductStock(f.ct, "adj:d", items(sku, 1)))
 	if got := f.stockOf(sku); got != 6 {
 		t.Fatalf("結帳鍵與賣家調整鍵各自獨立：庫存 = %d，want 6（扣 1、調整 -1、重送不再扣）", got)
@@ -480,17 +480,17 @@ func TestAdjustKeyIsScopedPerStore(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	a, b := f.sku(5), f.sku(5)
-	f.must(f.exec(`UPDATE catalog.products SET store_id = 502 WHERE id = (SELECT product_id FROM catalog.product_skus WHERE id = $1)`, b))
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:shared", a, 3))
-	f.must(f.m.AdjustStock(f.ct, 502, "adj:shared", b, 7))
+	f.must(f.exec(`UPDATE catalog.products SET store_id = $2 WHERE id = (SELECT product_id FROM catalog.product_skus WHERE id = $1)`, b, f.otherStoreID))
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:shared", a, 3))
+	f.must(f.m.AdjustStock(f.ct, f.otherStoreID, "adj:shared", b, 7))
 	if got := f.stockOf(a); got != 8 {
-		t.Fatalf("店家 501 的 SKU 庫存 = %d，want 8", got)
+		t.Fatalf("店家 %d 的 SKU 庫存 = %d，want 8", f.storeID, got)
 	}
 	if got := f.stockOf(b); got != 12 {
-		t.Fatalf("店家 502 的 SKU 庫存 = %d，want 12（同一個鍵在別家店獨立生效）", got)
+		t.Fatalf("店家 %d 的 SKU 庫存 = %d，want 12（同一個鍵在別家店獨立生效）", f.otherStoreID, got)
 	}
-	f.must(f.m.AdjustStock(f.ct, 502, "adj:shared", b, 7))
-	if err := f.m.AdjustStock(f.ct, 502, "adj:shared", b, 1); !errors.Is(err, ErrIdempotencyKeyReused) {
+	f.must(f.m.AdjustStock(f.ct, f.otherStoreID, "adj:shared", b, 7))
+	if err := f.m.AdjustStock(f.ct, f.otherStoreID, "adj:shared", b, 1); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("同店不同內容重送 err = %v，want ErrIdempotencyKeyReused", err)
 	}
 	if got := f.stockOf(b); got != 12 {
@@ -514,7 +514,7 @@ func TestConcurrentSameKeyAdjustsOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			errs[i] = f.m.AdjustStock(f.ct, 501, "adj:c", sku, 5)
+			errs[i] = f.m.AdjustStock(f.ct, f.storeID, "adj:c", sku, 5)
 		}()
 	}
 	close(start)
@@ -534,7 +534,7 @@ func TestAdjustNeverGoesNegativeAndRollsBackTheOperation(t *testing.T) {
 	f := newFixture(t)
 	sku := f.sku(3)
 	var short *InsufficientStockError
-	if err := f.m.AdjustStock(f.ct, 501, "adj:neg", sku, -4); !errors.As(err, &short) || short.SkuID != sku {
+	if err := f.m.AdjustStock(f.ct, f.storeID, "adj:neg", sku, -4); !errors.As(err, &short) || short.SkuID != sku {
 		t.Fatalf("err = %v，want *InsufficientStockError", err)
 	}
 	if got := f.stockOf(sku); got != 3 {
@@ -543,7 +543,7 @@ func TestAdjustNeverGoesNegativeAndRollsBackTheOperation(t *testing.T) {
 	if got := f.count(`SELECT count(*) FROM catalog.stock_operations WHERE idempotency_key = 'adj:neg'`); got != 0 {
 		t.Fatalf("失敗的調整留下 %d 列操作，want 0", got)
 	}
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:neg", sku, -3))
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:neg", sku, -3))
 	if got := f.stockOf(sku); got != 0 {
 		t.Fatalf("庫存 = %d，want 0", got)
 	}
@@ -553,7 +553,7 @@ func TestAdjustOverflowIsRejected(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	sku := f.sku(2147483647)
-	if err := f.m.AdjustStock(f.ct, 501, "adj:big", sku, 1); !errors.Is(err, ErrInvalidStockInput) {
+	if err := f.m.AdjustStock(f.ct, f.storeID, "adj:big", sku, 1); !errors.Is(err, ErrInvalidStockInput) {
 		t.Fatalf("err = %v，want ErrInvalidStockInput", err)
 	}
 	if got := f.stockOf(sku); got != 2147483647 {
@@ -565,17 +565,17 @@ func TestAdjustOnAnotherStoresSkuOrDeletedSkuIsNotFound(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	sku := f.sku(5)
-	if err := f.m.AdjustStock(f.ct, 502, "adj:x", sku, 10); !errors.Is(err, ErrSkuNotFound) {
+	if err := f.m.AdjustStock(f.ct, f.otherStoreID, "adj:x", sku, 10); !errors.Is(err, ErrSkuNotFound) {
 		t.Fatalf("跨店調整 err = %v，want ErrSkuNotFound", err)
 	}
 	if got := f.stockOf(sku); got != 5 {
 		t.Fatalf("庫存 = %d，want 5（跨店調整不得生效）", got)
 	}
 	f.must(f.exec(`UPDATE catalog.product_skus SET deleted_at = $2 WHERE id = $1`, sku, epoch))
-	if err := f.m.AdjustStock(f.ct, 501, "adj:del", sku, 1); !errors.Is(err, ErrSkuNotFound) {
+	if err := f.m.AdjustStock(f.ct, f.storeID, "adj:del", sku, 1); !errors.Is(err, ErrSkuNotFound) {
 		t.Fatalf("已刪除 SKU err = %v，want ErrSkuNotFound", err)
 	}
-	if err := f.m.AdjustStock(f.ct, 501, "adj:none", uuid.NewV7(), 1); !errors.Is(err, ErrSkuNotFound) {
+	if err := f.m.AdjustStock(f.ct, f.storeID, "adj:none", uuid.NewV7(), 1); !errors.Is(err, ErrSkuNotFound) {
 		t.Fatalf("不存在的 SKU err = %v，want ErrSkuNotFound", err)
 	}
 }

@@ -23,11 +23,7 @@ func (f *fixture) markInactive(kind string, id int64) {
 		f.exec("UPDATE buyer.buyers SET status = 'CLOSED', deleted_at = now() WHERE buyer_id = $1", id)
 		return
 	}
-	store, err := f.gate.Store(ctx, id)
-	if err != nil {
-		f.t.Fatal(err)
-	}
-	if _, err := f.gate.CloseCurrent(ctx, store.AccountID); err != nil {
+	if err := f.retireLocked(ctx, id); err != nil {
 		f.t.Fatal(err)
 	}
 }
