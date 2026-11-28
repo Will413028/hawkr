@@ -51,6 +51,8 @@ const (
 	ContentChatMessage = contentkind.ChatMessage
 	// ContentReviewReply 店家對評價的回覆（review，content_id 是評價 ID）。
 	ContentReviewReply = contentkind.ReviewReply
+	// ContentProduct 店家的商品（catalog，content_id 是商品 ID）。
+	ContentProduct = contentkind.Product
 )
 
 // ContentKindValues 回傳全部內容種類，與 DB 的 measure_contents_content_kind_check 一致。
@@ -70,11 +72,13 @@ const (
 	SnapshotCaptured SnapshotState = "CAPTURED"
 	// SnapshotCleared 快照已依保留期（撤銷後 184 天）或店家退場清空。
 	SnapshotCleared SnapshotState = "CLEARED"
+	// SnapshotOwnerHeld 證據由擁有內容的模組保存，措施列沒有快照與連結目標；PRODUCT 種類一律是這個狀態。
+	SnapshotOwnerHeld SnapshotState = "OWNER_HELD"
 )
 
 // SnapshotStateValues 回傳全部快照狀態，與 DB 的 measure_contents_snapshot_state_check 一致。
 func SnapshotStateValues() []SnapshotState {
-	return []SnapshotState{SnapshotCaptured, SnapshotCleared}
+	return []SnapshotState{SnapshotCaptured, SnapshotCleared, SnapshotOwnerHeld}
 }
 
 // ContentLink 是快照內容的連結目標（A7-D29）：貼文與貼文留言連到貼文（PostID），討論區發言連到店家加討論串（StoreID、ThreadID）；兩組二擇一。
@@ -112,7 +116,7 @@ func ExcerptOf(prefix string, truncated bool) string {
 	return prefix
 }
 
-// TakedownContent 是建立內容下架時的一個對象：內容參照加上快照；快照必填。
+// TakedownContent 是建立內容下架時的一個對象：內容參照加上快照；快照必填，只有 PRODUCT 種類不帶（證據由 catalog 保存，措施列存 OWNER_HELD）。
 type TakedownContent struct {
 	ContentRef
 	Snapshot *ContentSnapshot
@@ -132,7 +136,7 @@ type MeasureContent struct {
 // MaxTakedownContents 是一個內容下架措施最多的對象數。
 const MaxTakedownContents = 20
 
-// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複，每筆都帶快照，
+// ValidateContentTargets 檢查內容下架對象清單的形狀：1 到 MaxTakedownContents 筆、種類合法、ID 不為空、(種類, ID) 不重複，每筆都帶快照（PRODUCT 種類必須不帶），
 // 快照的發文時間、圖片張數與連結目標格式正確（連結依種類：FORUM_ENTRY 是店家加討論串，其餘是貼文）。內容屬於哪個店家由呼叫方驗證，快照是否屬實由入口保證。
 func ValidateContentTargets(field string, targets []TakedownContent) error {
 	refs := make([]ContentRef, len(targets))
@@ -144,6 +148,12 @@ func ValidateContentTargets(field string, targets []TakedownContent) error {
 	}
 	for i, t := range targets {
 		at := apperr.IndexedField(field, i)
+		if t.Kind == contentkind.Product {
+			if t.Snapshot != nil {
+				return apperr.InvalidInputOn([]string{at}, "商品的證據由商品的擁有模組保存，不帶快照")
+			}
+			continue
+		}
 		if t.Snapshot == nil {
 			return apperr.InvalidInputOn([]string{at}, "內容必須帶快照")
 		}
@@ -197,6 +207,9 @@ func ValidateSnapshot(kind ContentKind, s ContentSnapshot) error {
 }
 
 func validateSnapshot(at string, kind ContentKind, s ContentSnapshot) error {
+	if kind == contentkind.Product {
+		return apperr.InvalidInputOn([]string{at}, "商品的證據由商品的擁有模組保存，不帶快照")
+	}
 	switch {
 	case s.AuthoredAt.IsZero():
 		return apperr.InvalidInputOn([]string{at}, "快照的發文時間不可為空")

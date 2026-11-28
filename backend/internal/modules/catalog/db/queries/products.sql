@@ -113,9 +113,8 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.firs
        COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
                  FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
 
-FROM catalog.products p
-WHERE p.id = sqlc.arg(id) AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e);
+FROM catalog.buyer_viewable_products(sqlc.arg(at)::timestamptz) AS p
+WHERE p.id = sqlc.arg(id)::uuid;
 
 -- name: GetAdminProduct :one
 SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at, p.updated_at,
@@ -207,10 +206,8 @@ FROM (
               WHEN 'RATING' THEN round(p.rating_average * 1000)::bigint
               ELSE round(word_similarity(sqlc.arg(query)::text, p.searchable_text) * 1000000)::bigint
           END AS sort_key
-    FROM catalog.products p
-    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e)
-      AND (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
+    FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
+    WHERE (cardinality(sqlc.arg(category_ids)::uuid[]) = 0
            OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY(sqlc.arg(category_ids)::uuid[]) OR c.parent_id = ANY(sqlc.arg(category_ids)::uuid[])))
       AND (sqlc.narg(price_min)::bigint IS NULL OR p.max_price >= sqlc.narg(price_min)::bigint)
       AND (sqlc.narg(price_max)::bigint IS NULL OR p.min_price <= sqlc.narg(price_max)::bigint)
@@ -228,10 +225,8 @@ LIMIT sqlc.arg(row_limit);
 SELECT t.title::text AS title
 FROM (
     SELECT p.title, max(word_similarity(sqlc.arg(query)::text, p.title)) AS score
-    FROM catalog.products p
-    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e)
-      AND p.title ILIKE sqlc.arg(query_pattern)::text
+    FROM catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p
+    WHERE p.title ILIKE sqlc.arg(query_pattern)::text
     GROUP BY p.title
 ) t
 ORDER BY t.score DESC, t.title
@@ -240,10 +235,8 @@ LIMIT sqlc.arg(row_limit);
 -- name: SuggestHashtags :many
 SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
 FROM catalog.product_hashtags h
-JOIN catalog.products p ON p.id = h.product_id
-WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e)
-  AND h.name ILIKE sqlc.arg(name_pattern)::text
+JOIN catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p ON p.id = h.product_id
+WHERE h.name ILIKE sqlc.arg(name_pattern)::text
 GROUP BY h.name
 ORDER BY count(*) DESC, h.name
 LIMIT sqlc.arg(row_limit);
@@ -251,9 +244,7 @@ LIMIT sqlc.arg(row_limit);
 -- name: TrendingHashtags :many
 SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
 FROM catalog.product_hashtags h
-JOIN catalog.products p ON p.id = h.product_id
-WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e)
+JOIN catalog.buyer_visible_products(sqlc.arg(at)::timestamptz) AS p ON p.id = h.product_id
 GROUP BY h.name
 ORDER BY count(*) DESC, h.name
 LIMIT sqlc.arg(row_limit);

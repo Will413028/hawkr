@@ -22,6 +22,8 @@ var (
 	ErrInvalidStockInput = errors.New("catalog: invalid stock input")
 	// ErrSkuNotFound 表示有 SKU 不存在，或扣減時已被刪除。
 	ErrSkuNotFound = errors.New("catalog: sku not found")
+	// ErrProductNotPurchasable 表示有 SKU 所屬的商品現在買家不能購買：不是上架中、被平台下架、店家不可曝光（含停權）或已刪除；整次扣減沒有生效。
+	ErrProductNotPurchasable = errors.New("catalog: product not purchasable")
 	// ErrIdempotencyKeyReused 表示同一個冪等鍵以不同的內容（種類、原扣減或品項）重送；重送要與第一次完全相同。
 	ErrIdempotencyKeyReused = errors.New("catalog: idempotency key reused with a different request")
 	// ErrDeductionNotFound 表示歸還指向的扣減不存在。

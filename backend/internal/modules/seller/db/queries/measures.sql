@@ -95,9 +95,9 @@ INSERT INTO seller.measure_contents (
     link_post_id, link_store_id, link_thread_id
 )
 SELECT sqlc.arg(measure_id)::uuid, (sqlc.arg(kinds)::text[])[i], (sqlc.arg(ids)::uuid[])[i], (sqlc.arg(states)::text[])[i],
-       (sqlc.arg(bodies)::text[])[i],
-       (sqlc.arg(authored_ats)::timestamptz[])[i],
-       (sqlc.arg(image_counts)::int[])[i],
+       CASE WHEN (sqlc.arg(states)::text[])[i] = 'OWNER_HELD' THEN NULL ELSE (sqlc.arg(bodies)::text[])[i] END,
+       CASE WHEN (sqlc.arg(states)::text[])[i] = 'OWNER_HELD' THEN NULL ELSE (sqlc.arg(authored_ats)::timestamptz[])[i] END,
+       CASE WHEN (sqlc.arg(states)::text[])[i] = 'OWNER_HELD' THEN NULL ELSE (sqlc.arg(image_counts)::int[])[i] END,
        NULLIF((sqlc.arg(link_post_ids)::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid),
        NULLIF((sqlc.arg(link_store_ids)::bigint[])[i], 0::bigint),
        NULLIF((sqlc.arg(link_thread_ids)::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid)

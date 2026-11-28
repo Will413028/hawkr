@@ -23,11 +23,11 @@ func checkBatch(ids []uuid.UUID) error {
 }
 
 // Cards 批次讀商品卡片：沒刪除的商品；includeInactive 為假時只回 ACTIVE 且店家在 at 可曝光的（公開可見），為真時任何狀態都回。
-func (s *Service) Cards(ctx context.Context, at time.Time, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]model.ProductSummary, error) {
+func (s *Service) Cards(ctx context.Context, at time.Time, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]model.ProductCard, error) {
 	if err := checkBatch(ids); err != nil {
 		return nil, err
 	}
-	out := make(map[uuid.UUID]model.ProductSummary, len(ids))
+	out := make(map[uuid.UUID]model.ProductCard, len(ids))
 	if len(ids) == 0 {
 		return out, nil
 	}
@@ -36,7 +36,7 @@ func (s *Service) Cards(ctx context.Context, at time.Time, ids []uuid.UUID, incl
 		return nil, err
 	}
 	for _, r := range rows {
-		out[r.ID] = summaryRow(r).summary()
+		out[r.ID] = model.ProductCard{ProductSummary: cardSummary(r), Visible: r.Visible}
 	}
 	return out, nil
 }
@@ -69,7 +69,7 @@ func (s *Service) StoresWithPublicProducts(ctx context.Context, at time.Time) ([
 	return nonNil(ids), nil
 }
 
-// SkuSnapshots 批次讀 SKU 與它的商品此刻的內容，不過濾狀態與刪除；Active 在這裡判定：商品 ACTIVE、商品與 SKU 都沒刪除。
+// SkuSnapshots 批次讀 SKU 與它的商品此刻的內容，不過濾狀態與刪除；Active 在這裡判定：商品在買家可見的商品之內（ACTIVE、店家可曝光、沒有生效中的下架措施、沒刪除）且 SKU 沒刪除。
 func (s *Service) SkuSnapshots(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]model.SkuSnapshot, error) {
 	if err := checkBatch(ids); err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (s *Service) SkuSnapshots(ctx context.Context, ids []uuid.UUID) (map[uuid.U
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, err := s.q(ctx).GetSkuSnapshots(ctx, ids)
+	rows, err := s.q(ctx).GetSkuSnapshots(ctx, store.GetSkuSnapshotsParams{At: s.d.Now(), Ids: ids})
 	if err != nil {
 		return nil, err
 	}
@@ -90,10 +90,19 @@ func (s *Service) SkuSnapshots(ctx context.Context, ids []uuid.UUID) (map[uuid.U
 			SkuName:  skuName(r.Option1Value, r.Option2Value),
 			CoverKey: r.CoverKey, Price: r.Price, CompareAtPrice: r.CompareAtPrice, StockQty: r.StockQty,
 			Status: status, Deleted: deleted,
-			Active: status == model.StatusActive && !deleted,
+			Active: r.ProductVisible && !r.SkuDeleted,
 		}
 	}
 	return out, nil
+}
+
+func cardSummary(r store.GetProductCardsRow) model.ProductSummary {
+	return summaryRow{
+		ID: r.ID, StoreID: r.StoreID, CategoryID: r.CategoryID, Title: r.Title, Status: r.Status, FirstPublishedAt: r.FirstPublishedAt,
+		MinPrice: r.MinPrice, MaxPrice: r.MaxPrice, SalesCount: r.SalesCount, FavoriteCount: r.FavoriteCount, RatingAverage: r.RatingAverage,
+		ReviewCount: r.ReviewCount, LowStockThreshold: r.LowStockThreshold, ContentVersion: r.ContentVersion, CreatedAt: r.CreatedAt,
+		CoverKey: r.CoverKey, TotalStock: r.TotalStock, SortKey: r.SortKey,
+	}.summary()
 }
 
 func skuName(o1, o2 *string) string {

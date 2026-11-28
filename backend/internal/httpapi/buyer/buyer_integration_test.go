@@ -525,7 +525,7 @@ func TestConnectDeletedStoreCardsAndUnfollow(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.source.stores[3], f.source.owners[3] = openCard(3, "店家"), 999
-	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", Available: true}
+	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", Available: true, Visible: true}
 	if _, err := f.app.FollowStore(ctx, connect.NewRequest(&pb.FollowStoreRequest{StoreId: "3"})); err != nil {
 		t.Fatal(err)
 	}
@@ -569,7 +569,7 @@ func TestConnectPendingAndProductCards(t *testing.T) {
 	ctx := context.Background()
 	f.source.stores[3], f.source.owners[3] = openCard(3, "店家"), 999
 	f.source.stores[4], f.source.owners[4] = openCard(4, "自己"), f.accountID
-	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", MinPrice: 10, MaxPrice: 10, Available: true}
+	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", MinPrice: 10, MaxPrice: 10, Available: true, Visible: true}
 	_, err := f.app.AddFavorite(ctx, connect.NewRequest(&pb.AddFavoriteRequest{ProductId: product9.String()}))
 	if err != nil {
 		t.Fatal(err)
@@ -625,7 +625,7 @@ func TestConnectRestockSubscriptionIsPerSKUAndRejectedWhenInStock(t *testing.T) 
 	f := setup(t)
 	ctx := context.Background()
 	f.source.stores[3] = openCard(3, "店家")
-	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", MinPrice: 10, MaxPrice: 10}
+	f.source.products[product9] = httpbuyer.ProductInfo{ID: product9, StoreID: 3, Name: "蘋果", MinPrice: 10, MaxPrice: 10, Visible: true}
 	soldOut := uuid.MustParse("0190a000-0000-7000-8000-0000000000b1")
 	inStock := uuid.MustParse("0190a000-0000-7000-8000-0000000000b2")
 	otherProduct := uuid.MustParse("0190a000-0000-7000-8000-0000000000b3")

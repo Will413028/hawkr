@@ -76,7 +76,7 @@ func (s *Service) Deduct(ctx context.Context, key string, items []model.StockIte
 				return err
 			}
 			if affected == 0 {
-				return s.whyNotDeducted(ctx, q, it.SkuID)
+				return s.whyNotDeducted(ctx, q, it.SkuID, now)
 			}
 			if err := q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: it.SkuID, Delta: -it.Quantity}); err != nil {
 				return err
@@ -316,13 +316,16 @@ func (s *Service) replay(ctx context.Context, q *store.Queries, key, kind string
 	return nil
 }
 
-func (s *Service) whyNotDeducted(ctx context.Context, q *store.Queries, sku uuid.UUID) error {
-	_, err := q.GetLiveSkuStock(ctx, sku)
+func (s *Service) whyNotDeducted(ctx context.Context, q *store.Queries, sku uuid.UUID, now time.Time) error {
+	state, err := q.GetLiveSkuStock(ctx, store.GetLiveSkuStockParams{Now: now, ID: sku})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrSkuNotFound
 	}
 	if err != nil {
 		return err
+	}
+	if !state.ProductVisible {
+		return model.ErrProductNotPurchasable
 	}
 	return &model.InsufficientStockError{SkuID: sku}
 }

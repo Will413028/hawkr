@@ -24,7 +24,7 @@ func (a buyerProducts) Cards(ctx context.Context, ids []uuid.UUID, includeInacti
 	return out, nil
 }
 
-func productInfo(card catalog.ProductSummary) httpbuyer.ProductInfo {
+func productInfo(card catalog.ProductCard) httpbuyer.ProductInfo {
 	var rating *float32
 	if card.ReviewCount > 0 {
 		value := float32(card.RatingAverage)
@@ -34,6 +34,7 @@ func productInfo(card catalog.ProductSummary) httpbuyer.ProductInfo {
 		ID: card.ID, StoreID: card.StoreID, Name: card.Title, ImageKey: card.CoverKey,
 		MinPrice: card.MinPrice, MaxPrice: card.MaxPrice, Rating: rating,
 		Available: card.Status == catalog.StatusActive && card.TotalStock > 0,
+		Visible:   card.Visible,
 	}
 }
 

@@ -1044,6 +1044,8 @@ enum ContentKind {
   CONTENT_KIND_CHAT_MESSAGE = 4;
   // 店家對評價的回覆（ID 是評價的 ID）。
   CONTENT_KIND_REVIEW_REPLY = 5;
+  // 店家的商品（ID 是商品的 ID）；處分依據由商品的擁有模組保存，措施上沒有快照（snapshot_state 是 OWNER_HELD）。
+  CONTENT_KIND_PRODUCT = 6;
 }
 
 // ContentSnapshotState 是內容下架對象上處分依據快照的狀態。
@@ -1053,6 +1055,8 @@ enum ContentSnapshotState {
   CONTENT_SNAPSHOT_STATE_CAPTURED = 1;
   // 快照已依保留期（措施撤銷後 184 天）或店家退場清空；沒有 excerpt、authored_time 與連結目標。
   CONTENT_SNAPSHOT_STATE_CLEARED = 2;
+  // 處分依據由內容的擁有模組保存，措施上沒有快照；只有商品。沒有 excerpt、authored_time 與連結目標。
+  CONTENT_SNAPSHOT_STATE_OWNER_HELD = 3;
 }
 
 // ForumThreadLink 指向一則討論區留言所屬的討論串：店家加討論串 id（不透明的字串）。

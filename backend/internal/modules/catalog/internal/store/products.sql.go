@@ -281,14 +281,13 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.firs
        COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
                  FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
 
-FROM catalog.products p
-WHERE p.id = $1 AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)
+FROM catalog.buyer_viewable_products($1::timestamptz) AS p
+WHERE p.id = $2::uuid
 `
 
 type GetPublicProductParams struct {
-	ID uuid.UUID
 	At time.Time
+	ID uuid.UUID
 }
 
 type GetPublicProductRow struct {
@@ -316,7 +315,7 @@ type GetPublicProductRow struct {
 }
 
 func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductParams) (GetPublicProductRow, error) {
-	row := q.db.QueryRow(ctx, getPublicProduct, arg.ID, arg.At)
+	row := q.db.QueryRow(ctx, getPublicProduct, arg.At, arg.ID)
 	var i GetPublicProductRow
 	err := row.Scan(
 		&i.ID,
@@ -640,10 +639,8 @@ FROM (
               WHEN 'RATING' THEN round(p.rating_average * 1000)::bigint
               ELSE round(word_similarity($2::text, p.searchable_text) * 1000000)::bigint
           END AS sort_key
-    FROM catalog.products p
-    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($3::timestamptz) e)
-      AND (cardinality($4::uuid[]) = 0
+    FROM catalog.buyer_visible_products($3::timestamptz) AS p
+    WHERE (cardinality($4::uuid[]) = 0
            OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($4::uuid[]) OR c.parent_id = ANY($4::uuid[])))
       AND ($5::bigint IS NULL OR p.max_price >= $5::bigint)
       AND ($6::bigint IS NULL OR p.min_price <= $6::bigint)
@@ -1030,10 +1027,8 @@ func (q *Queries) SoftDeleteSku(ctx context.Context, arg SoftDeleteSkuParams) er
 const suggestHashtags = `-- name: SuggestHashtags :many
 SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
 FROM catalog.product_hashtags h
-JOIN catalog.products p ON p.id = h.product_id
-WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)
-  AND h.name ILIKE $2::text
+JOIN catalog.buyer_visible_products($1::timestamptz) AS p ON p.id = h.product_id
+WHERE h.name ILIKE $2::text
 GROUP BY h.name
 ORDER BY count(*) DESC, h.name
 LIMIT $3
@@ -1075,10 +1070,8 @@ const suggestProductNames = `-- name: SuggestProductNames :many
 SELECT t.title::text AS title
 FROM (
     SELECT p.title, max(word_similarity($1::text, p.title)) AS score
-    FROM catalog.products p
-    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)
-      AND p.title ILIKE $3::text
+    FROM catalog.buyer_visible_products($2::timestamptz) AS p
+    WHERE p.title ILIKE $3::text
     GROUP BY p.title
 ) t
 ORDER BY t.score DESC, t.title
@@ -1120,9 +1113,7 @@ func (q *Queries) SuggestProductNames(ctx context.Context, arg SuggestProductNam
 const trendingHashtags = `-- name: TrendingHashtags :many
 SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
 FROM catalog.product_hashtags h
-JOIN catalog.products p ON p.id = h.product_id
-WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)
+JOIN catalog.buyer_visible_products($1::timestamptz) AS p ON p.id = h.product_id
 GROUP BY h.name
 ORDER BY count(*) DESC, h.name
 LIMIT $2

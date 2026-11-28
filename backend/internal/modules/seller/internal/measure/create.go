@@ -483,6 +483,10 @@ func insertContentsParams(measureID uuid.UUID, contents []model.TakedownContent)
 		AuthoredAts: make([]time.Time, n), ImageCounts: make([]int32, n), LinkPostIds: make([]uuid.UUID, n), LinkStoreIds: make([]int64, n), LinkThreadIds: make([]uuid.UUID, n),
 	}
 	for i, c := range contents {
+		if c.Kind == model.ContentProduct {
+			p.Kinds[i], p.Ids[i], p.States[i] = string(c.Kind), c.ID, string(model.SnapshotOwnerHeld)
+			continue
+		}
 		sn := c.Snapshot
 		p.Kinds[i], p.Ids[i], p.States[i] = string(c.Kind), c.ID, string(model.SnapshotCaptured)
 		p.Bodies[i], p.AuthoredAts[i], p.ImageCounts[i] = sn.Body, sn.AuthoredAt.UTC(), sn.ImageCount

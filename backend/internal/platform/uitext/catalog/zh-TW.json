@@ -716,6 +716,10 @@
       "message": "貼文",
       "description": "店家貼文。"
     },
+    "seller.ContentKind.CONTENT_KIND_PRODUCT": {
+      "message": "商品",
+      "description": "店家的商品（ID 是商品的 ID）；處分依據由商品的擁有模組保存，措施上沒有快照（snapshot_state 是 OWNER_HELD）。"
+    },
     "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY": {
       "message": "評價回覆",
       "description": "店家對評價的回覆（ID 是評價的 ID）。"

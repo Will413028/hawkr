@@ -369,6 +369,8 @@
   {"key":"seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE","fn":"seller.ContentKind","value":"CONTENT_KIND_CHAT_MESSAGE","audience":"default","locale":"en","want":"聊天訊息"},
   {"key":"seller.ContentKind.CONTENT_KIND_REVIEW_REPLY","fn":"seller.ContentKind","value":"CONTENT_KIND_REVIEW_REPLY","audience":"default","locale":"zh-TW","want":"評價回覆"},
   {"key":"seller.ContentKind.CONTENT_KIND_REVIEW_REPLY","fn":"seller.ContentKind","value":"CONTENT_KIND_REVIEW_REPLY","audience":"default","locale":"en","want":"評價回覆"},
+  {"key":"seller.ContentKind.CONTENT_KIND_PRODUCT","fn":"seller.ContentKind","value":"CONTENT_KIND_PRODUCT","audience":"default","locale":"zh-TW","want":"商品"},
+  {"key":"seller.ContentKind.CONTENT_KIND_PRODUCT","fn":"seller.ContentKind","value":"CONTENT_KIND_PRODUCT","audience":"default","locale":"en","want":"商品"},
   {"key":"seller.InquiryKind.INQUIRY_KIND_RECORDS","fn":"seller.InquiryKind","value":"INQUIRY_KIND_RECORDS","audience":"default","locale":"zh-TW","want":"提供紀錄"},
   {"key":"seller.InquiryKind.INQUIRY_KIND_RECORDS","fn":"seller.InquiryKind","value":"INQUIRY_KIND_RECORDS","audience":"default","locale":"en","want":"Provide records"},
   {"key":"seller.InquiryKind.INQUIRY_KIND_EXPLANATION","fn":"seller.InquiryKind","value":"INQUIRY_KIND_EXPLANATION","audience":"default","locale":"zh-TW","want":"請說明"},

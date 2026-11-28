@@ -1,0 +1,58 @@
+{
+ "mutants": [
+  {
+   "id": "visibility-drops-store-exposure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
+   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "buyer_viewable_products 不再要求店家可曝光：停權店家的商品仍出現在公開頁、列表、購物車快照與扣庫存，停權測試要紅。"
+  },
+  {
+   "id": "visibility-drops-takedown-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
+   "old": "\n      AND NOT EXISTS (SELECT 1 FROM seller.pub_content_takedowns() t WHERE t.content_kind = 'PRODUCT' AND t.content_id = p.id);",
+   "new": ";",
+   "test": "cmd/hawkr ^TestProductUnderMeasureIsNotVisible$",
+   "why": "可見性函式不再排除有生效中 PRODUCT 下架措施的商品：建立措施後商品仍可見，措施測試要紅。"
+  },
+  {
+   "id": "deduct-stock-drops-visibility-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "FROM catalog.buyer_visible_products($2::timestamptz) AS p\nWHERE s.id = $3 AND p.id = s.product_id AND s.deleted_at IS NULL",
+   "new": "WHERE s.id = $3 AND s.deleted_at IS NULL",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "DeductSkuStock 的 UPDATE 不再過濾可見性（既有缺陷復原）：停權店家的商品仍可扣庫存，DeductStock 回 ErrProductNotPurchasable 的斷言要紅。"
+  },
+  {
+   "id": "sku-snapshot-active-only-checks-status",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/export.go",
+   "old": "Active: r.ProductVisible && !r.SkuDeleted,",
+   "new": "Active: status == model.StatusActive && !deleted,",
+   "test": "cmd/hawkr ^TestSuspendedStoreProductIsNotVisible$",
+   "why": "GetSkuSnapshots 的 active 改回只看狀態與刪除（既有缺陷復原）：停權店家的購物車快照 active 仍為 true，購物車斷言要紅。"
+  },
+  {
+   "id": "arch-allowlist-admits-a-buyer-facing-query",
+   "stack": "go",
+   "file": "backend/internal/arch/catalogvis.go",
+   "old": "\t\"SkuInStore\":                \"SKU 是否屬於某家店（歸屬查詢）\",\n",
+   "new": "\t\"SkuInStore\":                \"SKU 是否屬於某家店（歸屬查詢）\",\n\t\"ListPublicProducts\":        \"x\",\n",
+   "test": "internal/arch ^TestCatalogVisibilityLintRejectsUnlistedProductQuery$",
+   "why": "白名單多放一支買家面的 query（ListPublicProducts）：可見性 lint 的守門測試要紅。"
+  },
+  {
+   "id": "contentkind-values-drops-product",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/contentkind/contentkind.go",
+   "old": "return []Kind{Post, Comment, ForumEntry, ChatMessage, ReviewReply, Product}",
+   "new": "return []Kind{Post, Comment, ForumEntry, ChatMessage, ReviewReply}",
+   "test": "internal/modules/seller ^TestCreateMeasureStoresProductContentAsOwnerHeld$",
+   "why": "contentkind.Values 拿掉 Product：Valid 不再承認 PRODUCT，CreateMeasure 拒絕商品對象，OWNER_HELD 儲存測試要紅。"
+  }
+ ]
+}

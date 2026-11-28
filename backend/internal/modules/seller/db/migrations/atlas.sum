@@ -1,4 +1,4 @@
-h1:lkQpBJLejAOBs57Z/pq9WC591eHv1H32IPy2vuD4xNg=
+h1:UKVrePItSETHFOv3ZH66rDkE/gmUneo/BWIMI2xedTQ=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -79,3 +79,4 @@ h1:lkQpBJLejAOBs57Z/pq9WC591eHv1H32IPy2vuD4xNg=
 20261121120000_seller_pub_content_takedowns_enforced_filter.sql h1:GdBBzP/RbSwvghEUCPMFQizPfgAE5F7CO6X1bLVkwIs=
 20261123041016_seller_media_port.sql h1:OpX8uGqZnUIve9uIdFJZbBcUvxQYn/CDUx6FMjEcBEQ=
 20261127114158_seller_view_events_product_uuid.sql h1:bFqsYxyy10VUrykyFMr3ktW35mEDDSqDZ7eBnj5ov4M=
+20261128034522_seller_content_kind_product_owner_held.sql h1:Tld1zdUBe595Vmx2g2UWApnhHTsjriSWDBCxSk/p3wg=

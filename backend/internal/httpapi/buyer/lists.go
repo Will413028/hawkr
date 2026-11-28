@@ -101,6 +101,9 @@ func (h *App) productCards(ctx context.Context, buyerID int64, items []model.Pro
 	}
 	storeSet := map[int64]bool{}
 	for _, p := range products {
+		if !p.Visible {
+			continue
+		}
 		if p.StoreID <= 0 {
 			return nil, apperr.Unavailable("商品的店家資料不完整")
 		}
@@ -127,6 +130,11 @@ func (h *App) productCards(ctx context.Context, buyerID int64, items []model.Pro
 			out[id] = card
 			continue
 		}
+		if !p.Visible {
+			out[id] = card
+			continue
+		}
+		card.Visible = true
 		store := stores[p.StoreID]
 		if err := rpc.ObjectKey(p.ImageKey); err != nil {
 			return nil, err

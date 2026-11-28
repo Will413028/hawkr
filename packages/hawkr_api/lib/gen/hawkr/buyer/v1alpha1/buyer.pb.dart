@@ -416,6 +416,7 @@ class ProductCard extends $pb.GeneratedMessage {
     $core.bool? restockSubscribed,
     $core.String? storeId,
     $4.StoreCard? store,
+    $core.bool? visible,
   }) {
     final result = ProductCard._();
     if (id != null) result.id = id;
@@ -429,6 +430,7 @@ class ProductCard extends $pb.GeneratedMessage {
     if (restockSubscribed != null) result.restockSubscribed = restockSubscribed;
     if (storeId != null) result.storeId = storeId;
     if (store != null) result.store = store;
+    if (visible != null) result.visible = visible;
     return result;
   }
 
@@ -459,6 +461,7 @@ class ProductCard extends $pb.GeneratedMessage {
     ..aOS(10, _omitFieldNames ? '' : 'storeId')
     ..aOM<$4.StoreCard>(11, _omitFieldNames ? '' : 'store',
         subBuilder: $4.StoreCard.$_createMessage)
+    ..aOB(12, _omitFieldNames ? '' : 'visible')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -591,6 +594,17 @@ class ProductCard extends $pb.GeneratedMessage {
   void clearStore() => $_clearField(11);
   @$pb.TagNumber(11)
   $4.StoreCard ensureStore() => $_ensure(10);
+
+  /// 買家現在可以瀏覽這個商品。false（被平台下架、店家不可曝光或商品沒有上架過）時只有 id 與 visible，其他欄位不設，client 顯示「已無法瀏覽」且不可點；
+  /// 賣家自己下架的商品直接連結仍可瀏覽，是 true 並以 available 為 false 表示不可購買。商品已經刪除時只有 id 與 deleted。
+  @$pb.TagNumber(12)
+  $core.bool get visible => $_getBF(11);
+  @$pb.TagNumber(12)
+  set visible($core.bool value) => $_setBool(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasVisible() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearVisible() => $_clearField(12);
 }
 
 /// Favorite 是收藏的商品。
