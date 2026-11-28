@@ -764,7 +764,7 @@ func TestGCSkipsAnUncommittedHoldOnAStagedUpload(t *testing.T) {
 	if err != nil || gc.Claimed != 0 || gc.Deleted != 0 {
 		t.Fatalf("保全提交之後 GC = %+v, %v，預期不認領", gc, err)
 	}
-	if got := uploadState(t, f, uploadID); got != "READY" || physicalAssetState(t, f, assetID) != "STAGED" || !hasAll(f, keys) {
+	if got := uploadState(t, f, uploadID); got != "CONFIRMED" || physicalAssetState(t, f, assetID) != "STAGED" || !hasAll(f, keys) {
 		t.Fatalf("暫存 = %s，資產 = %s，物件在 = %v", got, physicalAssetState(t, f, assetID), hasAll(f, keys))
 	}
 }
