@@ -95,8 +95,6 @@ jobs:
         with:
           go-version-file: backend/.go-version
           cache: false
-      - name: 標記快取還原前的時間
-        run: touch "$RUNNER_TEMP/go-cache-marker"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -106,6 +104,8 @@ jobs:
           restore-keys: |
             go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
             go-monolith-integration-${{ runner.os }}-
+      - name: 把還原的 build cache 時間設成很久以前
+        run: find ~/.cache/go-build -type f -exec touch -m -d 2000-01-01T00:00:00Z {} + 2>/dev/null || true
       # 只跑加上 integration tag 後測試執行檔會改變的 package（自己或連結進來的依賴有 tag 檔，
       # 見 scripts/integration-packages.py）；其餘 package 的測試執行檔和 check job 的 go test 相同，不重跑。
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
@@ -124,7 +124,7 @@ jobs:
         if: always() && github.event_name == 'push'
         run: |
           du -sh ~/.cache/go-build
-          find ~/.cache/go-build -type f ! -newer "$RUNNER_TEMP/go-cache-marker" -delete
+          find ~/.cache/go-build -type f ! -newermt 2000-01-02T00:00:00Z -delete
           du -sh ~/.cache/go-build
       - name: 存 Go 快取（只有 main、dev 的 push）
         if: always() && github.event_name == 'push'
@@ -149,8 +149,6 @@ jobs:
         with:
           go-version-file: backend/.go-version
           cache: false
-      - name: 標記快取還原前的時間
-        run: touch "$RUNNER_TEMP/go-cache-marker"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -160,6 +158,8 @@ jobs:
           restore-keys: |
             go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
             go-monolith-check-${{ runner.os }}-
+      - name: 把還原的 build cache 時間設成很久以前
+        run: find ~/.cache/go-build -type f -exec touch -m -d 2000-01-01T00:00:00Z {} + 2>/dev/null || true
 
       - name: gofmt -l
         run: |
@@ -260,7 +260,7 @@ jobs:
         if: always() && github.event_name == 'push'
         run: |
           du -sh ~/.cache/go-build
-          find ~/.cache/go-build -type f ! -newer "$RUNNER_TEMP/go-cache-marker" -delete
+          find ~/.cache/go-build -type f ! -newermt 2000-01-02T00:00:00Z -delete
           du -sh ~/.cache/go-build
       - name: 存 Go 快取（只有 main、dev 的 push）
         if: always() && github.event_name == 'push'
