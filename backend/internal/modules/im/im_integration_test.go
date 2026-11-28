@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 const (
@@ -216,6 +217,21 @@ func TestConversationAuthorizationIsByIDAndSide(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
+	seedBuyers(t, f.db, []int64{f.s1})
+	for storeID := f.s2; storeID < b1; {
+		accountID, err := sellerfixture.NewAccount(ctx, f.db, f.clock())
+		if err != nil {
+			t.Fatal(err)
+		}
+		store, err := f.stores.owner.Apply(ctx, seller.ApplyInput{
+			AccountID: accountID, StoreName: "身分隔離測試店", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路一號",
+			AcceptedAgreements: seller.CurrentApplyAcceptances(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		storeID = store.StoreID
+	}
 	f.say(t, f.buyerParty(b1), f.s1, "hi")
 	conv := f.conversation(t, b1, f.s1)
 	wrong := []im.Party{f.buyerParty(b2), f.buyerParty(f.s1), f.storeParty(t, f.s2), f.storeParty(t, b1)}
@@ -585,7 +601,7 @@ func TestSweepReachesPartiesBeyondOneBatch(t *testing.T) {
 	f.exec(t, `INSERT INTO buyer.buyers (buyer_id, account_id, status, display_name, created_at, updated_at, deleted_at)
 		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'CLOSED', 'b', now(), now(), now() FROM generate_series(1000, $1::bigint) AS g`, last)
 	f.exec(t, `INSERT INTO im.conversations (id, buyer_id, store_id, last_seq, last_message_at, created_at)
-		SELECT gen_random_uuid(), g, 1, 1, now(), now() FROM generate_series(1000, $1::bigint) AS g`, last)
+		SELECT gen_random_uuid(), g, $2, 1, now(), now() FROM generate_series(1000, $1::bigint) AS g`, last, f.s1)
 	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
 		SELECT gen_random_uuid(), c.id, 1, 'BUYER', 'TEXT', 'x', now(), gen_random_uuid() FROM im.conversations AS c`)
 	seen := func() map[int64]int {
@@ -604,6 +620,7 @@ func TestSweepReachesPartiesBeyondOneBatch(t *testing.T) {
 		}
 		return out
 	}
+	f.jobs.reset()
 	n, err := f.m.SweepErase(ctx)
 	if err != nil || n != parties {
 		t.Fatalf("掃到 %d 個身分 err=%v，預期 %d", n, err, parties)

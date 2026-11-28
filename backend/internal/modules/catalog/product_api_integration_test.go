@@ -223,7 +223,7 @@ func TestSetStockChecksTheExpectedQuantityAndWritesTheLedger(t *testing.T) {
 	sku := f.sku(10)
 
 	var mm *StockMismatchError
-	if err := f.m.SetStock(f.ct, 501, "set:bad", sku, 99, 11); !errors.As(err, &mm) || mm.Current != 10 || mm.SkuID != sku {
+	if err := f.m.SetStock(f.ct, f.storeID, "set:bad", sku, 99, 11); !errors.As(err, &mm) || mm.Current != 10 || mm.SkuID != sku {
 		t.Fatalf("an expected value that is not the current one is a precondition failure carrying the current value: %v", err)
 	}
 	if got := f.stockOf(sku); got != 10 {
@@ -233,14 +233,14 @@ func TestSetStockChecksTheExpectedQuantityAndWritesTheLedger(t *testing.T) {
 		t.Fatalf("a failed set leaves no operation row (the key stays usable): %d", n)
 	}
 
-	f.must(f.m.SetStock(f.ct, 501, "set:1", sku, 25, 10))
+	f.must(f.m.SetStock(f.ct, f.storeID, "set:1", sku, 25, 10))
 	if got := f.stockOf(sku); got != 25 {
 		t.Fatalf("stock = %d, want 25", got)
 	}
 	if got := f.count(`SELECT m.delta FROM catalog.stock_movements m JOIN catalog.stock_operations o ON o.id = m.operation_id WHERE o.idempotency_key = 'set:1' AND o.kind = 'SET'`); got != 15 {
 		t.Fatalf("the ledger records the difference, got %d", got)
 	}
-	f.must(f.m.SetStock(f.ct, 501, "set:same", sku, 25, 25))
+	f.must(f.m.SetStock(f.ct, f.storeID, "set:same", sku, 25, 25))
 	if n := f.count(`SELECT count(*) FROM catalog.stock_operations WHERE idempotency_key = 'set:same'`); n != 1 {
 		t.Fatalf("a no-change set still records its operation: %d", n)
 	}
@@ -251,10 +251,10 @@ func TestSetStockChecksTheExpectedQuantityAndWritesTheLedger(t *testing.T) {
 		qty, exp int32
 		want     error
 	}{
-		"another store's sku": {502, sku, 1, 25, ErrSkuNotFound},
-		"unknown sku":         {501, uuid.NewV7(), 1, 0, ErrSkuNotFound},
-		"negative quantity":   {501, sku, -1, 25, ErrInvalidStockInput},
-		"negative expected":   {501, sku, 1, -1, ErrInvalidStockInput},
+		"another store's sku": {f.otherStoreID, sku, 1, 25, ErrSkuNotFound},
+		"unknown sku":         {f.storeID, uuid.NewV7(), 1, 0, ErrSkuNotFound},
+		"negative quantity":   {f.storeID, sku, -1, 25, ErrInvalidStockInput},
+		"negative expected":   {f.storeID, sku, 1, -1, ErrInvalidStockInput},
 	} {
 		if err := f.m.SetStock(f.ct, c.store, "set:"+name, c.sku, c.qty, c.exp); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
@@ -266,8 +266,8 @@ func TestSetStockReplaysOnceAndRejectsADifferentRequest(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
 	sku, other := f.sku(10), f.sku(10)
-	f.must(f.m.SetStock(f.ct, 501, "set:r", sku, 30, 10))
-	f.must(f.m.SetStock(f.ct, 501, "set:r", sku, 30, 10))
+	f.must(f.m.SetStock(f.ct, f.storeID, "set:r", sku, 30, 10))
+	f.must(f.m.SetStock(f.ct, f.storeID, "set:r", sku, 30, 10))
 	if got := f.stockOf(sku); got != 30 {
 		t.Fatalf("stock = %d", got)
 	}
@@ -275,17 +275,17 @@ func TestSetStockReplaysOnceAndRejectsADifferentRequest(t *testing.T) {
 		t.Fatalf("one operation, got %d", n)
 	}
 	for name, err := range map[string]error{
-		"quantity": f.m.SetStock(f.ct, 501, "set:r", sku, 31, 10),
-		"expected": f.m.SetStock(f.ct, 501, "set:r", sku, 30, 11),
-		"sku":      f.m.SetStock(f.ct, 501, "set:r", other, 30, 10),
-		"kind":     f.m.AdjustStock(f.ct, 501, "set:r", sku, 1),
+		"quantity": f.m.SetStock(f.ct, f.storeID, "set:r", sku, 31, 10),
+		"expected": f.m.SetStock(f.ct, f.storeID, "set:r", sku, 30, 11),
+		"sku":      f.m.SetStock(f.ct, f.storeID, "set:r", other, 30, 10),
+		"kind":     f.m.AdjustStock(f.ct, f.storeID, "set:r", sku, 1),
 	} {
 		if !errors.Is(err, ErrIdempotencyKeyReused) {
 			t.Errorf("a different %s under the same key is rejected: %v", name, err)
 		}
 	}
-	f.must(f.m.AdjustStock(f.ct, 501, "adj:k", sku, 1))
-	if err := f.m.SetStock(f.ct, 501, "adj:k", sku, 31, 31); !errors.Is(err, ErrIdempotencyKeyReused) {
+	f.must(f.m.AdjustStock(f.ct, f.storeID, "adj:k", sku, 1))
+	if err := f.m.SetStock(f.ct, f.storeID, "adj:k", sku, 31, 31); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("a SET under an ADJUST key is rejected: %v", err)
 	}
 }
@@ -303,7 +303,7 @@ func TestConcurrentSameKeySetsOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			errs[i] = f.m.SetStock(f.ct, 501, "set:c", sku, 40, 10)
+			errs[i] = f.m.SetStock(f.ct, f.storeID, "set:c", sku, 40, 10)
 		}()
 	}
 	close(start)
@@ -334,7 +334,7 @@ func TestConcurrentSetStockWithTheSameExpectedValueLetsOneWin(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			errs[i] = f.m.SetStock(f.ct, 501, fmt.Sprintf("set:w%d", i), sku, int32(100+i), 10)
+			errs[i] = f.m.SetStock(f.ct, f.storeID, fmt.Sprintf("set:w%d", i), sku, int32(100+i), 10)
 		}()
 	}
 	close(start)
@@ -353,7 +353,7 @@ func TestConcurrentSetStockWithTheSameExpectedValueLetsOneWin(t *testing.T) {
 	if winners != 1 {
 		t.Fatalf("exactly one writer sees the value it expected, got %d", winners)
 	}
-	if got := f.count(`SELECT count(*) FROM catalog.stock_operations WHERE kind = 'SET' AND store_id = 501`); got != 1 {
+	if got := f.count(`SELECT count(*) FROM catalog.stock_operations WHERE kind = 'SET' AND store_id = $1`, f.storeID); got != 1 {
 		t.Fatalf("only the winner leaves an operation, got %d", got)
 	}
 }

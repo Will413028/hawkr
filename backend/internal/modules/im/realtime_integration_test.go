@@ -229,35 +229,36 @@ func TestHideAndRestoreNotifyOnlyAfterCommit(t *testing.T) {
 	}
 }
 
-// 身分隔離：buyer_id＝store_id＝5 互相收不到對方的對話；別人的對話 ID 作游標被忽略；偽造通知不會讓別人讀到內容。
 func TestPartyIdentityIsolation(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	f.run(t, f.m)
-	const five = int64(5)
-	x := f.say(t, f.buyerParty(five), 9, "buyer 5 to store 9").ConversationID
-	y := f.say(t, f.buyerParty(7), five, "buyer 7 to store 5").ConversationID
-	buyer5 := f.subscribe(t, f.m, f.buyerParty(five), map[uuid.UUID]int64{y: 0})
-	store5 := f.subscribe(t, f.m, f.storeParty(t, five), map[uuid.UUID]int64{x: 0})
-	for name, s := range map[string]*im.Subscription{"buyer 5": buyer5, "store 5": store5} {
+	const otherBuyer = int64(7)
+	sameID := f.s1
+	seedBuyers(t, f.db, []int64{sameID})
+	x := f.say(t, f.buyerParty(sameID), f.s2, "buyer to another store").ConversationID
+	y := f.say(t, f.buyerParty(otherBuyer), sameID, "another buyer to same id store").ConversationID
+	buyer := f.subscribe(t, f.m, f.buyerParty(sameID), map[uuid.UUID]int64{y: 0})
+	store := f.subscribe(t, f.m, f.storeParty(t, sameID), map[uuid.UUID]int64{x: 0})
+	for name, s := range map[string]*im.Subscription{"買家": buyer, "店家": store} {
 		before, _ := untilReady(t, s)
 		if len(before) != 0 {
 			t.Fatalf("%s：別人的對話 ID 作游標要被忽略，卻收到 %+v", name, before)
 		}
 	}
-	f.exec(t, "SELECT pg_notify('im_events', $1)", live.Message(y, five, 9, 1).Encode())
-	f.say(t, f.buyerParty(five), 9, "own 2")
-	f.say(t, f.buyerParty(7), five, "own 2")
-	evs := collectUntil(t, buyer5, messageSeq(x, 2))
+	f.exec(t, "SELECT pg_notify('im_events', $1)", live.Message(y, sameID, f.s2, 1).Encode())
+	f.say(t, f.buyerParty(sameID), f.s2, "buyer 2")
+	f.say(t, f.buyerParty(otherBuyer), sameID, "store 2")
+	evs := collectUntil(t, buyer, messageSeq(x, 2))
 	for _, m := range messages(evs, false) {
 		if m.ConversationID == y {
-			t.Fatalf("buyer 5 讀到店家 5 的對話：%+v", m)
+			t.Fatalf("buyer %d 讀到同 ID 店家的對話：%+v", sameID, m)
 		}
 	}
-	evs = collectUntil(t, store5, messageSeq(y, 2))
+	evs = collectUntil(t, store, messageSeq(y, 2))
 	for _, m := range messages(evs, false) {
 		if m.ConversationID == x {
-			t.Fatalf("store 5 讀到買家 5 的對話：%+v", m)
+			t.Fatalf("store %d 讀到同 ID 買家的對話：%+v", sameID, m)
 		}
 	}
 }

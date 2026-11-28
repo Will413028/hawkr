@@ -48,9 +48,9 @@ func (d takedowns) seed(t *testing.T, storeID int64, refs []seller.ContentRef) u
 
 func (d takedowns) create(t *testing.T, storeID int64, refs ...seller.ContentRef) uuid.UUID {
 	t.Helper()
+	d.f.jobs.reset()
 	created, err := d.f.sellerMod.CreateMeasure(context.Background(), d.input(t, storeID, refs))
 	must(t, err)
-	d.f.jobs.reset()
 	return created.Measure.ID
 }
 

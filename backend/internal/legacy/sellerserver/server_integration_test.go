@@ -227,6 +227,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	if !errors.As(err, &openingErr) || openingErr.Kind() != apperr.KindFailedPrecondition || openingErr.Reason != apperr.ReasonStoreOpeningSuspended {
 		t.Fatalf("apply during suspension: %v", err)
 	}
+	now = now.Add(time.Second)
 	if _, err := m.EndMeasure(ctx, seller.EndMeasureInput{AdminID: 7, MeasureID: inheritedMeasure.ID, ExpectedVersion: inheritedMeasure.Version}); err != nil {
 		t.Fatal(err)
 	}
