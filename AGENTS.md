@@ -62,5 +62,5 @@
 - **驗證**：完成前跑與 CI 相同的檢查並看結果；看 CI 時看每個 job 自己的結論，不只看 run 的整體狀態。沒有驗證到的部分明確說出來。mutation 驗收寫進 `mutation/`，由 `mutation` CI job 跑。
 
 - **推之前**：累積多個 commit 才推時，依各 workflow 的 `paths` 把觸發到的檢查全跑，不只跑單體。根目錄 pre-commit 會 stash 未暫存的改動、commit 後還原：背景測試還在讀工作區時不要 commit。
-- **註解**：不寫敘事型註解（日期、issue 編號、改動經過）；理由放 commit、PR 或設計文件。保留介面說明與他人既有註解。
+- **註解**：不寫任何註解；理由放 commit、PR 或設計文件。例外只有編譯指令（`//go:embed`、`//go:build`）與生成檔標頭。
 - **外部整合**：改 PayUni、7-ELEVEN、AMEGO 等整合前先讀 `backend/docs/第三方整合/` 的 API 總覽。
