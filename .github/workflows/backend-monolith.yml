@@ -181,7 +181,10 @@ jobs:
         if: always()
         env:
           RACE: ${{ (github.event_name != 'pull_request' || github.base_ref == 'main') && '-race' || '' }}
-        run: go test ${RACE:+"$RACE"} ./...
+          GODEBUG: gocachetest=1,gocachehash=0
+        run: |
+          go test -race ./... 2>&1 | tee "$RUNNER_TEMP/gotest.log" | grep -vE '^testcache: ' || true
+          grep -E '^testcache: ' "$RUNNER_TEMP/gotest.log" | sed -E 's/^testcache: [^:]+: //' | sed -E 's/[0-9a-f]{16,}/H/g' | sort | uniq -c | sort -rn | head -40
 
       - name: 讀取 buf 的版本
         if: always()
