@@ -180,9 +180,8 @@ const (
 	// 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
 	ErrorReason_COUPON_QUOTA_EXCEEDED ErrorReason = 48
 	// 規格（SKU）目前有貨，不接受補貨訂閱（搭配 failed_precondition）：BuyerAppService.SubscribeRestock。client 改提示直接購買。
-	ErrorReason_RESTOCK_SKU_IN_STOCK  ErrorReason = 49
-	ErrorReason_PRODUCT_NOT_PUBLISHED ErrorReason = 50
-	// 商品現在買家不能購買（搭配 failed_precondition）：商品沒上架、被平台下架或店家不可曝光（含停權）。扣庫存與結帳在提交點判斷。client 提示商品已無法購買，請買家把它從購物車移除。
+	ErrorReason_RESTOCK_SKU_IN_STOCK    ErrorReason = 49
+	ErrorReason_PRODUCT_NOT_PUBLISHED   ErrorReason = 50
 	ErrorReason_PRODUCT_NOT_PURCHASABLE ErrorReason = 51
 )
 

@@ -252,8 +252,6 @@ func (m *Module) RecordSales(ctx context.Context, orderNo string, items []SalesI
 	return m.counter.RecordSales(ctx, orderNo, items)
 }
 
-// DeductStock 以冪等鍵 key 扣減庫存，與呼叫方的 transaction 同進退（ctx 沒有 transaction 時自己開一個）。
-// 在呼叫方的 transaction 內失敗時，呼叫方必須讓整個 transaction 回滾，不能吞掉錯誤繼續。
 func (m *Module) DeductStock(ctx context.Context, key string, items []StockItem) error {
 	return m.stock.Deduct(ctx, key, items)
 }
@@ -277,7 +275,6 @@ func (m *Module) SetStock(ctx context.Context, storeID int64, key string, skuID 
 	return m.stock.SetQuantity(ctx, storeID, key, skuID, quantity, expected)
 }
 
-// ids 最多 MaxBatchIDs 個，超過或含零值回 *InvalidInputError。
 func (m *Module) ProductCards(ctx context.Context, at time.Time, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]ProductCard, error) {
 	return m.product.Cards(ctx, at, ids, includeInactive)
 }
@@ -291,7 +288,6 @@ func (m *Module) StoresWithPublicProducts(ctx context.Context, at time.Time) ([]
 	return m.product.StoresWithPublicProducts(ctx, at)
 }
 
-// CheckoutSnapshot 是結帳用的 SKU 快照（D20，不版本化：訂單自己保存當時讀到的內容）：不過濾狀態與刪除，已下架與已刪除的 SKU 也回。
 func (m *Module) CheckoutSnapshot(ctx context.Context, skuIDs []uuid.UUID) (map[uuid.UUID]SkuSnapshot, error) {
 	return m.product.SkuSnapshots(ctx, skuIDs)
 }

@@ -595,8 +595,6 @@ class ProductCard extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   $4.StoreCard ensureStore() => $_ensure(10);
 
-  /// 買家現在可以瀏覽這個商品。false（被平台下架、店家不可曝光或商品沒有上架過）時只有 id 與 visible，其他欄位不設，client 顯示「已無法瀏覽」且不可點；
-  /// 賣家自己下架的商品直接連結仍可瀏覽，是 true 並以 available 為 false 表示不可購買。商品已經刪除時只有 id 與 deleted。
   @$pb.TagNumber(12)
   $core.bool get visible => $_getBF(11);
   @$pb.TagNumber(12)

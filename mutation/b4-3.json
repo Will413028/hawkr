@@ -372,11 +372,11 @@
   {
    "id": "restock-ignores-store-exposure",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
-   "old": "AND EXISTS (SELECT 1 FROM catalog.buyer_visible_products($1::timestamptz) v WHERE v.id = p.id))::boolean AS purchasable",
-   "new": ")::boolean AS purchasable",
+   "file": "backend/internal/modules/catalog/db/migrations/20261128040548_catalog_buyer_visibility.sql",
+   "old": "      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(at) e)\n",
+   "new": "",
    "test": "internal/modules/catalog ^TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
-   "why": "補貨可買不看買家可見性（商品狀態、店家曝光、下架措施都不看）：不可曝光的店家補庫存也排 job，測試要紅。"
+   "why": "共用的可見性函式不再看店家曝光（狀態與下架措施仍看）：補貨路徑的商品狀態斷言仍綠，只有「店家不曝光時補庫存不排 job」的斷言變紅。"
   },
   {
    "id": "restock-job-skips-recheck",

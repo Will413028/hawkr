@@ -406,10 +406,8 @@ type ProductCard struct {
 	RestockSubscribed bool   `protobuf:"varint,9,opt,name=restock_subscribed,json=restockSubscribed,proto3" json:"restock_subscribed,omitempty"`
 	StoreId           string `protobuf:"bytes,10,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
 	// 商品所屬店家的卡片；不設表示這家店不顯示（從沒公開過或不存在）。
-	Store *v1alpha1.StoreCard `protobuf:"bytes,11,opt,name=store,proto3" json:"store,omitempty"`
-	// 買家現在可以瀏覽這個商品。false（被平台下架、店家不可曝光或商品沒有上架過）時只有 id 與 visible，其他欄位不設，client 顯示「已無法瀏覽」且不可點；
-	// 賣家自己下架的商品直接連結仍可瀏覽，是 true 並以 available 為 false 表示不可購買。商品已經刪除時只有 id 與 deleted。
-	Visible       bool `protobuf:"varint,12,opt,name=visible,proto3" json:"visible,omitempty"`
+	Store         *v1alpha1.StoreCard `protobuf:"bytes,11,opt,name=store,proto3" json:"store,omitempty"`
+	Visible       bool                `protobuf:"varint,12,opt,name=visible,proto3" json:"visible,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

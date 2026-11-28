@@ -801,8 +801,6 @@ class ContentKind extends $pb.ProtobufEnum {
   /// 店家對評價的回覆（ID 是評價的 ID）。
   static const ContentKind CONTENT_KIND_REVIEW_REPLY =
       ContentKind._(5, _omitEnumNames ? '' : 'CONTENT_KIND_REVIEW_REPLY');
-
-  /// 店家的商品（ID 是商品的 ID）；處分依據由商品的擁有模組保存，措施上沒有快照（snapshot_state 是 OWNER_HELD）。
   static const ContentKind CONTENT_KIND_PRODUCT =
       ContentKind._(6, _omitEnumNames ? '' : 'CONTENT_KIND_PRODUCT');
 
@@ -839,8 +837,6 @@ class ContentSnapshotState extends $pb.ProtobufEnum {
   static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_CLEARED =
       ContentSnapshotState._(
           2, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_CLEARED');
-
-  /// 處分依據由內容的擁有模組保存，措施上沒有快照；只有商品。沒有 excerpt、authored_time 與連結目標。
   static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_OWNER_HELD =
       ContentSnapshotState._(
           3, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_OWNER_HELD');

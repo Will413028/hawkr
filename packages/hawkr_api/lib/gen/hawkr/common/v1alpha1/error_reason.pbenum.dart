@@ -271,8 +271,6 @@ class ErrorReason extends $pb.ProtobufEnum {
       ErrorReason._(49, _omitEnumNames ? '' : 'RESTOCK_SKU_IN_STOCK');
   static const ErrorReason PRODUCT_NOT_PUBLISHED =
       ErrorReason._(50, _omitEnumNames ? '' : 'PRODUCT_NOT_PUBLISHED');
-
-  /// 商品現在買家不能購買（搭配 failed_precondition）：商品沒上架、被平台下架或店家不可曝光（含停權）。扣庫存與結帳在提交點判斷。client 提示商品已無法購買，請買家把它從購物車移除。
   static const ErrorReason PRODUCT_NOT_PURCHASABLE =
       ErrorReason._(51, _omitEnumNames ? '' : 'PRODUCT_NOT_PURCHASABLE');
 

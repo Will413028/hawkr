@@ -1139,8 +1139,7 @@ const (
 	ContentKind_CONTENT_KIND_CHAT_MESSAGE ContentKind = 4
 	// 店家對評價的回覆（ID 是評價的 ID）。
 	ContentKind_CONTENT_KIND_REVIEW_REPLY ContentKind = 5
-	// 店家的商品（ID 是商品的 ID）；處分依據由商品的擁有模組保存，措施上沒有快照（snapshot_state 是 OWNER_HELD）。
-	ContentKind_CONTENT_KIND_PRODUCT ContentKind = 6
+	ContentKind_CONTENT_KIND_PRODUCT      ContentKind = 6
 )
 
 // Enum value maps for ContentKind.
@@ -1200,8 +1199,7 @@ const (
 	// 快照在：excerpt、authored_time 與連結目標都有值。
 	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CAPTURED ContentSnapshotState = 1
 	// 快照已依保留期（措施撤銷後 184 天）或店家退場清空；沒有 excerpt、authored_time 與連結目標。
-	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CLEARED ContentSnapshotState = 2
-	// 處分依據由內容的擁有模組保存，措施上沒有快照；只有商品。沒有 excerpt、authored_time 與連結目標。
+	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_CLEARED    ContentSnapshotState = 2
 	ContentSnapshotState_CONTENT_SNAPSHOT_STATE_OWNER_HELD ContentSnapshotState = 3
 )
 

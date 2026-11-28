@@ -4237,8 +4237,6 @@ export enum ContentKind {
   REVIEW_REPLY = 5,
 
   /**
-   * 店家的商品（ID 是商品的 ID）；處分依據由商品的擁有模組保存，措施上沒有快照（snapshot_state 是 OWNER_HELD）。
-   *
    * @generated from enum value: CONTENT_KIND_PRODUCT = 6;
    */
   PRODUCT = 6,
@@ -4276,8 +4274,6 @@ export enum ContentSnapshotState {
   CLEARED = 2,
 
   /**
-   * 處分依據由內容的擁有模組保存，措施上沒有快照；只有商品。沒有 excerpt、authored_time 與連結目標。
-   *
    * @generated from enum value: CONTENT_SNAPSHOT_STATE_OWNER_HELD = 3;
    */
   OWNER_HELD = 3,

@@ -253,9 +253,6 @@ export type ProductCard = Message<"hawkr.buyer.v1alpha1.ProductCard"> & {
   store?: StoreCard | undefined;
 
   /**
-   * 買家現在可以瀏覽這個商品。false（被平台下架、店家不可曝光或商品沒有上架過）時只有 id 與 visible，其他欄位不設，client 顯示「已無法瀏覽」且不可點；
-   * 賣家自己下架的商品直接連結仍可瀏覽，是 true 並以 available 為 false 表示不可購買。商品已經刪除時只有 id 與 deleted。
-   *
    * @generated from field: bool visible = 12;
    */
   visible: boolean;
