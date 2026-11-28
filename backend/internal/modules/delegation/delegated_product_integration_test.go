@@ -650,7 +650,7 @@ func TestBatchUnpublishWithADraftWritesNothing(t *testing.T) {
 	if st, _ := f.productStatus(t, o.storeID, draft.ID); st != catalog.StatusDraft {
 		t.Fatalf("草稿 = %s，預期仍是 DRAFT", st)
 	}
-	if f.batchRows(t, sid) != 1 || f.failedRow(t, sid, "PRODUCT_BATCH_UNPUBLISH").n != 1 {
+	if f.batchRows(t, sid) != 0 || f.failedRow(t, sid, "PRODUCT_BATCH_UNPUBLISH").n != 1 {
 		t.Fatal("預期只有一列 FAILED 的批次稽核")
 	}
 }
