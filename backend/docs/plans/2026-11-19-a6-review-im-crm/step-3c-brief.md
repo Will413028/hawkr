@@ -34,7 +34,7 @@ review、im、crm 三份複本的必要條件**不成立**：它們只在查詢�
 ## 2. 現有機制為什麼存在
 
 - **social 買家複本**：ADR `docs/adr/2026-10-23-social-counts-in-stats-tables.md` 修訂二寫了必要條件：資料庫端存的旗標依賴別的模組的事實。這個條件**仍成立**。
-- **規則 2**（`backend/docs/開發規範/單體開發規範.md:17`）：要用下層的屬性過濾時 join `pub_*`；只有資料庫端旗標或計數依賴別的模組時才複製。
+- **規則 2**（`backend/docs/dev-guidelines/monolith-development-guidelines.md:17`）：要用下層的屬性過濾時 join `pub_*`；只有資料庫端旗標或計數依賴別的模組時才複製。
 - **review**：`inactive_authors` 只用在 `public.sql` 和 `own.sql` 的 `NOT EXISTS` 過濾【實測】。`LockAuthor` 的理由「Submit 沒有可鎖的列」不成立：buyer 已經提供 `LockActive`，它鎖的是買家列，social 正在用。
 - **im**（`im/CARRYOVER.md:35`）：理由一是避開跨模組鎖序；理由二是等待刪除的買家仍可傳訊息（W4），而 `LockActive` 只放行營運中的買家。兩者都是擁有者的 API 少一種形狀造成的。
 - **crm**（`crm/CARRYOVER.md:28`）：投影端取共享鎖、`Deactivate` 取獨占鎖。這是基準形狀，只是放錯了擁有者。

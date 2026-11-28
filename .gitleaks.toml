@@ -28,22 +28,27 @@ regexes = ['''NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:''']
 [[allowlists]]
 description = "設計書的範例：Idempotency-Key 是請求標頭範例值，不是機敏資料"
 condition = "AND"
-paths = ['''^backend/docs/詳細設計書/56-ADM''']
+paths = ['''^backend/docs/detailed-design/56-delegated-operations-detailed-design\.md$''']
 regexTarget = "line"
-regexes = ['''[Ii]dempotency-?[Kk]ey''']
-
-[[allowlists]]
-description = "設計書的文字說明 PEM 檔頭格式（BEGIN PRIVATE KEY），沒有金鑰本體"
-condition = "AND"
-paths = ['''^backend/docs/詳細設計書/05-支付服務''']
-regexTarget = "line"
-regexes = ['''PKCS#8|PKCS#1|BEGIN (RSA )?PRIVATE KEY''']
+regexes = ['''(?i)idempotency-?key''']
 
 [[allowlists]]
 description = "AMEGO 電子發票 API 文件的範例：廠商公開的測試帳號 AppKey（搭配測試統編 12345678），不是正式憑證"
 condition = "AND"
-paths = ['''^backend/docs/第三方整合/AMEGO 電子發票 API 總覽\.md$''']
+paths = ['''^backend/docs/third-party-integrations/amego-e-invoice-api-overview\.md$''']
 rules = ["generic-api-key"]
+
+[[allowlists]]
+description = "Historical secret-shaped examples in the pre-rename documentation commit"
+condition = "AND"
+commits = ["9f23df5894d87619e80d7f20af361e000f1ea417"]
+regexTarget = "line"
+regexes = [
+  '''(?i)idempotency-?key''',
+  '''PKCS#8|PKCS#1|BEGIN (RSA )?PRIVATE KEY''',
+  '''(?i)app_?key''',
+]
+rules = ["generic-api-key", "private-key"]
 
 [[allowlists]]
 description = "代行 BFF 測試的假 Idempotency-Key：固定的 UUIDv4 十六進位測試值，不是機敏資料"

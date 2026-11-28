@@ -206,7 +206,7 @@ public interface CouponInstanceMapper extends BaseMapper<CouponInstanceEntity> {
 
     /**
      * issue #1176 PR-4：掃描 UNUSED 且所屬 template 即將到期（(now, until] 窗口）的 instance，
-     * 游標分頁（instance_id > cursor）。回 record projection（非 Entity，遵 docs/開發規範/Java 微服務開發規範.md §9.2）。
+     * 游標分頁（instance_id > cursor）。回 record projection（非 Entity，遵 docs/dev-guidelines/java-microservices-development-guidelines.md §9.2）。
      */
     @Select("""
         SELECT ci.instance_id AS instanceId,

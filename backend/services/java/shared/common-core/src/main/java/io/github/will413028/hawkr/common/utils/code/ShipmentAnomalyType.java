@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 配送異常類型。由 shipping-service 之既有 scheduler 與 webhook consumer 偵測 shipments / seller_shipment_settings 既有狀態欄位（status / tcat_call_status / label_print_status / payuni_submit_status）異常時發布 `shipment.anomaly.detected` event 用。**異常本身的狀態仍以 shipments 既有欄位為唯一真實來源**，本 enum 僅標示「賣家收到通知時看到的異常分類」。詳見 [06 §5.21](../詳細設計書/06-物流微服務（Shipping%20Service）詳細設計書.md#521-配送異常賣家通知)。
+ * 配送異常類型。由 shipping-service 之既有 scheduler 與 webhook consumer 偵測 shipments / seller_shipment_settings 既有狀態欄位（status / tcat_call_status / label_print_status / payuni_submit_status）異常時發布 `shipment.anomaly.detected` event 用。**異常本身的狀態仍以 shipments 既有欄位為唯一真實來源**，本 enum 僅標示「賣家收到通知時看到的異常分類」。詳見 [06 §5.21](../detailed-design/06-shipping-service-detailed-design.md#521-配送異常賣家通知)。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum ShipmentAnomalyType implements CodeMeta {
 

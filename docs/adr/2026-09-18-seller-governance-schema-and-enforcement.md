@@ -8,7 +8,7 @@
 | 路徑基準 | `backend/` |
 
 規格本身見
-`docs/詳細設計書/32-商家治理與食安通報（Seller Governance & Food Safety）詳細設計書.md`。
+`docs/detailed-design/32-seller-governance-and-food-safety-detailed-design.md`。
 本檔只保存「為什麼選它、否決了什麼」。
 
 ## 為什麼存在這份 ADR

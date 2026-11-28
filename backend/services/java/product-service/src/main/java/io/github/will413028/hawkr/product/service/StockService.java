@@ -182,7 +182,7 @@ public class StockService {
     /**
      * 反正規化欄位 cascade（02 §3.2 / §5.8）：將 SKU 層級 stock_qty 變動同步到 product 層級。
      * <p>
-     * 按 productId ASC 排序避免多訂單併發死鎖（docs/開發規範/後端服務責任邊界規範.md §三）。
+     * 按 productId ASC 排序避免多訂單併發死鎖（docs/dev-guidelines/backend-service-responsibility-boundaries.md §三）。
      *
      * @param items SKU 變動清單（已按 skuId ASC 排序）
      * @param sign  +1（restore）或 -1（deduct）

@@ -19,7 +19,7 @@ import java.util.Set;
  *
  * <h2>🔴 {@code courier_imminent} 不是狀態，是 boolean 欄位</h2>
  * 官方在外送員距取貨／送達點 <b>1 分鐘</b>時把它設為 true
- * （{@code docs/第三方整合/Uber Direct API 總覽.md} §7.1 逐字）。
+ * （{@code docs/third-party-integrations/uber-direct-api-overview.md} §7.1 逐字）。
  * 把它當第 8 個狀態會同時造成兩個錯：多一個永不出現的狀態，
  * 且<b>漏讀「即將抵達」</b>——那正是買家最需要的推播。
  * ⇒ 本類別<b>不</b>把它收進 {@link #FORWARD}，讀取它的是 {@link #courierImminent}。

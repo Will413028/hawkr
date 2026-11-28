@@ -53,8 +53,8 @@ public class UberWebhookProviderCode {
         if (!isAvailable()) {
             throw new IllegalStateException(
                     "WebhookProvider CodeMeta 尚未新增 " + CODE + " —— Uber webhook 無法寫入 webhook_inbox。"
-                            + "修法：docs/代碼管理（CodeMeta）/內部技術碼.md 的 WebhookProvider 區塊加一列，"
-                            + "再跑 docs/代碼管理（CodeMeta）/scripts/generate.sh --all"
+                            + "修法：docs/codemeta/internal-technical-codes.md 的 WebhookProvider 區塊加一列，"
+                            + "再跑 docs/codemeta/scripts/generate.sh --all"
                             + "（見 65 §4.5.1 代價 ②、36 §3.5）");
         }
         return WebhookProvider.fromCode(CODE).value();

@@ -15,7 +15,7 @@ import java.util.Map;
  * 供 CreateProduct / UpdateProduct 在同事務內計算 {@code product.stock_qty} 與
  * {@code product.shipping_methods}，作為 {@link io.github.will413028.hawkr.product.entity.ProductEntity} 反正規化來源。
  *
- * 設計參考：docs/開發規範/Java 微服務開發規範.md §6 helper class 慣例、docs/開發規範/後端服務責任邊界規範.md §五 cascade 同事務原則。
+ * 設計參考：docs/dev-guidelines/java-microservices-development-guidelines.md §6 helper class 慣例、docs/dev-guidelines/backend-service-responsibility-boundaries.md §五 cascade 同事務原則。
  */
 public final class ProductAggregateRules {
 

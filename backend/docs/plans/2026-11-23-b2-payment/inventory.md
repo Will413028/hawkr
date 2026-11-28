@@ -450,24 +450,24 @@ PayUni client 還有 `offlineRefund`、`cancelOfflineRefund`（`PaymentClient.ja
 
 ## 8. CodeMeta 值域與錯誤碼
 
-計數：`rg -o -N 'common\.utils\.code\.\w+' $PS | sed 's/.*code\.//' | sort | uniq -c`（14 個值域型別，另外 GrpcResponseCode、CodeMetaValidator、helper 不算值域）；`rg -o -N --no-filename 'GrpcResponseCode\.\w+' $PS | sort -u | wc -l` → 31 個錯誤碼。定義在 `backend/docs/代碼管理（CodeMeta）/`，Java enum 在 `backend/services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/code/`。
+計數：`rg -o -N 'common\.utils\.code\.\w+' $PS | sed 's/.*code\.//' | sort | uniq -c`（14 個值域型別，另外 GrpcResponseCode、CodeMetaValidator、helper 不算值域）；`rg -o -N --no-filename 'GrpcResponseCode\.\w+' $PS | sort -u | wc -l` → 31 個錯誤碼。定義在 `backend/docs/codemeta/`，Java enum 在 `backend/services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/code/`。
 
 | 值域 | 定義 | 用途 | 提議 |
 |---|---|---|---|
-| PaymentMethod（2001 卡、2002 Apple Pay、2003 Google Pay、2004 ATM、2900 零元） | 業務類型碼.md:62 | payment_type、金額範圍 | 保留→Go：proto enum `PaymentMethod`（對外）＋模組 Go 型別＋CHECK；刪除 ATM（範圍「不做 ATM」）；Apple／Google Pay 不另列（Stripe 統一為 card，錢包是其屬性；預設，可推翻）；零元保留 |
-| PaymentTransactionStatus（0 INIT…6） | 業務狀態碼.md:73 | 交易狀態 | 保留→Go：Go 型別＋CHECK，重新定義（pending／succeeded／failed／canceled／expired）；刪除 CONFLICT、CLOSED_BY_SWITCH |
-| RefundStatus（0–3） | 業務狀態碼.md:226、內部技術碼.md | 退款狀態 | 保留→Go：Go 型別＋CHECK＋proto enum（aftersales 顯示） |
-| PaymentEventType | 內部技術碼.md:80 | outbox event_type | 刪除（Go 事件型別取代） |
-| PaymentRescueAction（8901/8902） | 內部技術碼.md:358 | rescue_action | 刪除 |
-| RescueReason | 內部技術碼.md:375 | rescue | 刪除 |
-| WebhookProcessStatus | 內部技術碼.md:104 | payment_webhooks | 刪除（inbox 平台） |
-| WebhookProvider | 內部技術碼.md:185 | 同上 | 刪除 |
-| PayUniAuditDirection | 內部技術碼.md:661 | payuni_audit_logs | 刪除 |
-| OutboxEventStatus | 內部技術碼.md:147 | outbox | 刪除 |
-| ClientType（MOBILE_APP/WEB_BROWSER） | 業務類型碼.md:26 | redirect_url 組法 | 刪除（Stripe 由 client 給 return_url） |
-| AppType（BUYER/SELLER） | 業務類型碼.md:44 | 同上 | 刪除 |
+| PaymentMethod（2001 卡、2002 Apple Pay、2003 Google Pay、2004 ATM、2900 零元） | business-type-codes.md:62 | payment_type、金額範圍 | 保留→Go：proto enum `PaymentMethod`（對外）＋模組 Go 型別＋CHECK；刪除 ATM（範圍「不做 ATM」）；Apple／Google Pay 不另列（Stripe 統一為 card，錢包是其屬性；預設，可推翻）；零元保留 |
+| PaymentTransactionStatus（0 INIT…6） | business-status-codes.md:73 | 交易狀態 | 保留→Go：Go 型別＋CHECK，重新定義（pending／succeeded／failed／canceled／expired）；刪除 CONFLICT、CLOSED_BY_SWITCH |
+| RefundStatus（0–3） | business-status-codes.md:226、內部技術碼.md | 退款狀態 | 保留→Go：Go 型別＋CHECK＋proto enum（aftersales 顯示） |
+| PaymentEventType | internal-technical-codes.md:80 | outbox event_type | 刪除（Go 事件型別取代） |
+| PaymentRescueAction（8901/8902） | internal-technical-codes.md:358 | rescue_action | 刪除 |
+| RescueReason | internal-technical-codes.md:375 | rescue | 刪除 |
+| WebhookProcessStatus | internal-technical-codes.md:104 | payment_webhooks | 刪除（inbox 平台） |
+| WebhookProvider | internal-technical-codes.md:185 | 同上 | 刪除 |
+| PayUniAuditDirection | internal-technical-codes.md:661 | payuni_audit_logs | 刪除 |
+| OutboxEventStatus | internal-technical-codes.md:147 | outbox | 刪除 |
+| ClientType（MOBILE_APP/WEB_BROWSER） | business-type-codes.md:26 | redirect_url 組法 | 刪除（Stripe 由 client 給 return_url） |
+| AppType（BUYER/SELLER） | business-type-codes.md:44 | 同上 | 刪除 |
 | AccountType | （common） | 呼叫者角色判斷 | 刪除（Connect session） |
-| OrderStatus | 業務狀態碼.md | 判斷可付款 | 刪除：不屬 payment；ordering 擁有 |
+| OrderStatus | business-status-codes.md | 判斷可付款 | 刪除：不屬 payment；ordering 擁有 |
 
 錯誤碼（GrpcResponseCode.java 行號）：
 

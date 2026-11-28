@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
  * <p>消費 seller-service 發布的 {@code seller.profile.changed}（exchange {@code hawkr.seller}），
  * 由 {@link io.github.will413028.hawkr.cart.mq.SellerProfileChangedConsumer} evict {@code seller:meta:{id}} 快取。
  *
- * <p>docs/開發規範/MQ 與事件管理規範.md §1.3：每個 {@code @RabbitListener} 對應 queue 必須有對應 {@code @Bean Queue} + Binding，
+ * <p>docs/dev-guidelines/mq-and-event-management-guidelines.md §1.3：每個 {@code @RabbitListener} 對應 queue 必須有對應 {@code @Bean Queue} + Binding，
  * 服務要能在全新 RabbitMQ 上自行啟動。{@code manualAckContainerFactory} 由 common-core
  * {@code RabbitMqAutoConfiguration} 於 {@code ConnectionFactory} 上 classpath（本服務已加 amqp 依賴）時自動提供。
  */

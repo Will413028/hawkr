@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * {@link UberWebhookCorrelation} 的欄位優先序。
  *
  * <h2>fixture 來源（硬性）</h2>
- * 欄名一律抄自 {@code docs/第三方整合/Uber Direct API 總覽.md}：
+ * 欄名一律抄自 {@code docs/third-party-integrations/uber-direct-api-overview.md}：
  * §7.2「回傳我方識別碼的兩個欄位：{@code external_id}、{@code manifest.reference}」、
  * §6.2「{@code meta.external_order_id}」。期望值硬寫字面值。
  */

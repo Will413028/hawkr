@@ -25,7 +25,7 @@
   - 【量】MeasureCreated 沒有「內容對象」欄位；social 訂閱後無法知道要隱藏哪篇，必須在事件或查詢上補對象。【推】
   - 【量】組裝點只訂閱 StoreSuspended 等給 legacy relay（B/cmd/hawkr/seller_events.go:29-40）；治理事件（含 Measure*）目前沒有任何訂閱者（sellerrelay 套件說明：「治理事件（A8 的 notification 訂閱）」，B/internal/legacy/sellerrelay/relay.go:12-14）。
 - 【量】申覆／解除請求：`SubmitAppeal`（governance.go:484）、`DecideAppeal`（:489）、`RequestRemediation`（:495，只限 basis=RISK，`measure_requests_remediation_basis_check` schema.sql:548）、`DecideRemediation`（:500）。每措施至多一次申覆（索引 schema.sql:559），同時至多一筆待處理（:560）。接受申覆 → 撤銷措施（同 tx 發 MeasureRevoked）。賣家端 `SellerAppService.SubmitAppeal`（API/seller/v1alpha1/seller.proto:138 附近）。【推】內容下架要「補正後解除」須放寬該 CHECK（目前補正只掛 RISK）。
-- 【量】術語表 `docs/共通規範/使用者面用語術語表.md:19`（措施：「種類有警告、停權、終止合作」）、:20-23（措施與申覆、警告、停權、終止合作）、:25-28（事由、認定、申覆、解除請求）。「內容下架」尚無條目（brief C9）。
+- 【量】術語表 `docs/conventions/user-facing-terminology-glossary.md:19`（措施：「種類有警告、停權、終止合作」）、:20-23（措施與申覆、警告、停權、終止合作）、:25-28（事由、認定、申覆、解除請求）。「內容下架」尚無條目（brief C9）。
 - 新增 kind「內容下架」會動到的地方（rg 與讀檔得出，【推】為判斷）：
   1. DB：`measures_kind_check`（schema.sql:406）＋新 migration（目前最新 `20261016120000_seller_governance_notes.sql`）；kind 相關 CHECK（:412,413,417-419,430-437）要逐條評估；內容對象欄位／表；索引與 queries（上列檔）；`sqlc` 重新生成 internal/store。
   2. Go：`model.MeasureKind` 常數與 `MeasureKindValues`（measure.go:9-23）、`Restrictive()`、`StateOf`、`measure/create.go:39,59,74,86-88,348-362` 的 kind 分支、`revoke.go:117,187,200,211`（TERMINATION 特例，內容下架撤銷需新分支）、`closing/*`、`stint/stint.go:108`、`devseed`、SL/governance.go:38-39,116-118,213-214、`B/internal/legacy/sellerreason/reason.go:37-70`（`m.Kind != seller.MeasureSuspension` 之類）。
@@ -74,7 +74,7 @@
   | `seller/internal/model/model.go`、`governance.go`、`seller.go`、`internal/measure/*` | 在飛 | A7-1 加 kind／事件欄位／系統建立措施 | 中高 |
   | `B/internal/arch/modules.go` | 只動 seller 內部圖（一行） | A7-1：social 拿掉 im/review、新增 moderation、notification 加 moderation | 低（不同行），但 rebase 時同檔 |
   | `uitext/catalog/*.json` 與生成物 | 本批沒動；後續 L′-3…L′-8 會動 | A7-4 新文案、C9「內容下架」 | 中：L′-3 起 Go 改用目錄，之後 catalog 變動頻繁 |
-  | `docs/共通規範/使用者面用語術語表.md` | 本批沒動 | A7-1 前要加「內容下架」 | 低，但歸 10e 擁有 |
+  | `docs/conventions/user-facing-terminology-glossary.md` | 本批沒動 | A7-1 前要加「內容下架」 | 低，但歸 10e 擁有 |
   | `seller-app/.../measure_display.dart`、website `measureDisplay.ts`、admin measures 頁 | seller-app、website 在飛 | A7-4 加 kind 顯示 | 中 |
   | `seller/db/schema.sql`、migrations | 本批不動；10e 3b–3d 尚未開工，3c 會加 `assessed_category`、`governance_notes`（已存在）等 | A7-1 改 `measures_kind_check`、加內容對象 | 中：3c／3d 的 schema 變更與 A7-1 同表（reports、measures）；migration 時間戳排序與 atlas.sum 會衝突 |
   | `B/gateway/internal/router/openapi_coverage_test.go` `maxRESTOperations`（現 489） | 10e 各刀會再降 | A7-4 刪 42 個 social operation | 誰後落地誰重算 |
@@ -124,6 +124,6 @@
 - `rg -n 'ListReviewQueue|ReviewQueue' api backend/internal admin/src`
 - `rg -n "measures_kind_check" backend/internal/modules/seller/db/schema.sql`
 - `git -C <10e worktree> status --short | wc -l`（69 修改 + 5 未追蹤）
-- `git -C <10e worktree> diff --stat -- backend/internal/modules/seller/db backend/internal/platform/uitext "docs/共通規範/使用者面用語術語表.md"`（空）
+- `git -C <10e worktree> diff --stat -- backend/internal/modules/seller/db backend/internal/platform/uitext "docs/conventions/user-facing-terminology-glossary.md"`（空）
 - `rg -n 'moderation' backend/internal/arch/modules.go`（無）
 - `ls backend/internal/legacy`（無 socialservice／socialrelay）

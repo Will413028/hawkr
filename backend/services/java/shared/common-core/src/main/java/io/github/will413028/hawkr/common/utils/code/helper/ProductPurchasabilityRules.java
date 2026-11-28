@@ -5,7 +5,7 @@ import io.github.will413028.hawkr.common.utils.code.CartItemUnavailableReason;
 /**
  * §8.5 商品可購買性判定 helper（跨 cart-service / order-service 共用）。
  * <p>
- * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/開發規範/Java 微服務開發規範.md §6）。
+ * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  * 本 helper 從 SKU 即時 is_active / stock_qty / 買家勾選量推導
  * {@link CartItemUnavailableReason}，供：
  * <ul>

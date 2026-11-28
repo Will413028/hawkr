@@ -64,7 +64,7 @@ func (h *Holder) SearchHashtags(c *gin.Context) {
 // 33-商品 Hashtag 模組詳細設計書 §5.2.5 / §6.2。
 type PopularHashtagItem struct {
 	Hashtag string `json:"hashtag"` // 區間內最多 ACTIVE 商品使用的原始大小寫版本
-	Count   string `json:"count"`   // 區間內 distinct ACTIVE 商品數（對外數字一律 string，見 docs/開發規範/Java 微服務開發規範.md §2）
+	Count   string `json:"count"`   // 區間內 distinct ACTIVE 商品數（對外數字一律 string，見 docs/dev-guidelines/java-microservices-development-guidelines.md §2）
 }
 
 // GetPopularHashtagsResponse 對應 /api/v1/public/hashtags/popular 回應 data。

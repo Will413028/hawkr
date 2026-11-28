@@ -69,7 +69,7 @@ public class AfterSaleLabelRetryService {
     /**
      * 自動重試（Worker 呼叫）：lease claim → 呼叫 shipping → 確認成功才消耗預算 + 記 audit log。
      *
-     * <p><b>issue #2294 L7：搶佔語意</b>（規範 {@code docs/開發規範/多副本排程搶佔規範.md}）
+     * <p><b>issue #2294 L7：搶佔語意</b>（規範 {@code docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md}）
      * <ul>
      *   <li><b>閘門</b>＝{@code AfterSaleCaseMapper.claimLabelRetry} 的 lease CAS
      *       （{@code label_retry_at} 推到未來），在 gRPC 副作用<b>之前</b>（規則 ①）。</li>

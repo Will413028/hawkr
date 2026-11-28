@@ -17,7 +17,7 @@ import io.github.will413028.hawkr.shipping.client.MediaGrpcClient;
  *
  * <h2>ref type 引用 CodeMeta 生成的 enum 常數，不硬寫號碼</h2>
  * {@code AssetReferenceType.DELIVERY_POD}（{@code 7121}）由 {@code generate.sh} 從
- * {@code docs/代碼管理（CodeMeta）/業務類型碼.md} 產出，碼表 description 逐字指定
+ * {@code docs/codemeta/business-type-codes.md} 產出，碼表 description 逐字指定
  * {@code secure/delivery_pod/} 前綴。
  *
  * <p>🔴 <b>直接引用常數而不是用字串反查</b>：該值若被移除或改名，

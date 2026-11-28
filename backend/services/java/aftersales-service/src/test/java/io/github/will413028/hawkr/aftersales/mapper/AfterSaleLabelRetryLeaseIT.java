@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
  * 「兩個 pod 同時打這句 UPDATE，只有一個拿到 1」。租約會不會過期回來、CAS 述詞會不會
  * 誤傷別人的租約，也只有真的跑一次 SQL 才知道。
  *
- * <p>對應規範 {@code docs/開發規範/多副本排程搶佔規範.md}：
+ * <p>對應規範 {@code docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md}：
  * §一 ①⑦（閘門在副作用前、述詞非純 PK）、§二 第 3–4 步（是 lease 不是永久旗標）、§二 第 6 步
  *（ops 救濟路徑收得到這個狀態）。
  */

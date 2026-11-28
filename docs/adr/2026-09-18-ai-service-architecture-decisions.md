@@ -5,7 +5,7 @@
 | 狀態 | accepted（D7／D8 已 superseded，見各節） |
 | 日期 | 2026-09-18（決策本身的落地日期見各列「日期」欄；D7／D8 於 2026-09-19 隨 #3519 刀 A 收斂） |
 | 影響範圍 | `services/ai-service`、gateway AI 路由、採購子系統（55／57） |
-| 規格 | [15 號 AI 微服務詳細設計書](/backend/docs/詳細設計書/15-AI%20微服務（AI%20Service）詳細設計書.md) |
+| 規格 | [15 號 AI 微服務詳細設計書](../../backend/docs/detailed-design/15-ai-service-detailed-design.md) |
 | 路徑基準 | `backend/` |
 
 > 本檔只收**有被否決的替代方案、且否決理由今天仍然成立**的決策。日期取自實際落地的
@@ -97,7 +97,7 @@ hop；更重要的是服務端不再有第二次解析，也就沒有第二處�
 default-deny 對整個 server 生效，豁免只剩 health 與 reflection（第二個否決方案——「免身分排除
 在管轄外或不登記」——仍然維持否決，`ActorNone` 依然是必須明確登記的合法狀態，不受這次收斂影響）。
 兩張表沒有機制保證同步、只能靠 invariant 測試鎖進 CI 這條代價，隨第二張表一併消失。
-規格見 [15 號 §6.2、§8.1](/backend/docs/詳細設計書/15-AI%20微服務（AI%20Service）詳細設計書.md)。
+規格見 [15 號 §6.2、§8.1](../../backend/docs/detailed-design/15-ai-service-detailed-design.md)。
 
 `superseded`｜2026-08-15｜2026-09-19 隨 #3519 刀 A 收斂，見上方更新
 
@@ -115,7 +115,7 @@ default-deny 對整個 server 生效，豁免只剩 health 與 reflection（第�
 額度三支的 `store_id` 除外——那是管理者指定操作目標，不是身分自報）。原本的代價（「納管會
 擋掉既有流量」）之所以不再成立，是因為前提改變了：功能**尚未正式上線**，可收緊契約、可
 fail-closed，不必再顧慮既有流量中斷。這不代表當時的判斷是錯的——在「已有既有流量」的前提下，
-維持現況、用測試釘住現況，仍然是對的取捨。規格見 [15 號 §1.3、§6.2、§8.1、§11](/backend/docs/詳細設計書/15-AI%20微服務（AI%20Service）詳細設計書.md)。
+維持現況、用測試釘住現況，仍然是對的取捨。規格見 [15 號 §1.3、§6.2、§8.1、§11](../../backend/docs/detailed-design/15-ai-service-detailed-design.md)。
 
 `superseded`｜2026-08-15｜2026-09-19 隨 #3519 刀 A 收斂，見上方更新
 

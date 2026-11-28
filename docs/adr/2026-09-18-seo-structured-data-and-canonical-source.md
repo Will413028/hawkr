@@ -38,4 +38,4 @@
 - **重新評估條件**：搜尋引擎改變對 structured data 完整性的評分方式，或框架提供了能安全剝除追蹤參數的 request URL 取得方式。
 
 現行規格（各 schema 的產生規則、`urls.ts` 的責任邊界）見
-`docs/詳細設計書/48-SEO 優化與現況（SEO Optimization）詳細設計書.md` §4、§7.3。
+`docs/detailed-design/48-seo-optimization-detailed-design.md` §4、§7.3。

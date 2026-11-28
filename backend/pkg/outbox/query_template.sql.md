@@ -4,7 +4,7 @@ Copy this into a new service's `db/queries/<name>_outbox.sql`, replacing
 `<table>` and `<Table>` (PascalCase for generated Go names) throughout. This
 is a template to copy, not shared code — sqlc compiles each service's SQL
 independently, and the claim predicate legitimately varies per service (see
-docs/開發規範/多副本排程搶佔規範.md rule ⑦: the predicate must be
+docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md rule ⑦: the predicate must be
 non-PK and must mirror each table's own candidate query).
 
 ```sql
@@ -103,7 +103,7 @@ without the alias, even though plain Postgres resolves them fine unaliased.
 
 `ClaimLease` must exceed the worst-case time to process one row (side effect
 + any downstream RPC timeouts) — see
-`docs/開發規範/多副本排程搶佔規範.md §三`. `MaxAttempts`/`BaseBackoff`/
+`docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md §三`. `MaxAttempts`/`BaseBackoff`/
 `MaxBackoff`/`FetchBatch` are workload judgment calls, not derived from a
 formula; a low-volume outbox can start with `MaxAttempts=5`,
 `BaseBackoff=1min`, `MaxBackoff=1hr`, `FetchBatch=50` as a reasonable

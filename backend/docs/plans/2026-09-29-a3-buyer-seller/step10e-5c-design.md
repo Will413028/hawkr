@@ -91,7 +91,7 @@ SSOT：計畫 10e 段（`2026-09-29-a3-buyer-seller.md:382`「範圍外另排一
 | 舊 gRPC 的 `AddressInfo.label` 與 Java 副本 | SELF-IMPOSED（我們的舊契約，副本可以改）；整份在階段 C 刪除，F9 因此不改它 | `2026-09-24-go-modular-monolith.md:290`；F9 |
 | 版面、UX 文案與流程的改動要先取得同意 | 授權規則（不是技術約束）；本刀沒有這類改動（§5），γ 才有 | 根 `AGENTS.md` 共通規則「UI 改動」 |
 | client 不得手寫兩端以上的 enum 文字表 | 已核准的規則（ADR `2026-10-17-multi-locale-architecture.md`），本刀不重開；F6 依它判定性別該進目錄 | 根 `AGENTS.md` 跨專案契約「共用文案目錄」列 |
-| α 刪欄位時 `reserved 2; reserved "label";` | SELF-IMPOSED：reserved 防的是已部署的 binary 或已存的資料把新欄位誤讀成舊欄位，上線前兩者都沒有（v1alpha1 不檢查 breaking），必要條件今天不成立；但成本近乎零、與既有 `reserved 5, 6, 7` 一致，也是 protobuf 的建議做法［外部］，**照做**。終點與觸發：**上線改名 v1 時一併清掉 v1alpha1 期間累積的 reserved**（v1 是新套件，沒有任何 client 見過 alpha 的欄號）；觸發是 buyer 套件從 `v1alpha1` 改名 `v1` 的那次變更 | `buyer.proto:189-190`；`API 設計規範（Connect）.md:17`；附錄 B #3 |
+| α 刪欄位時 `reserved 2; reserved "label";` | SELF-IMPOSED：reserved 防的是已部署的 binary 或已存的資料把新欄位誤讀成舊欄位，上線前兩者都沒有（v1alpha1 不檢查 breaking），必要條件今天不成立；但成本近乎零、與既有 `reserved 5, 6, 7` 一致，也是 protobuf 的建議做法［外部］，**照做**。終點與觸發：**上線改名 v1 時一併清掉 v1alpha1 期間累積的 reserved**（v1 是新套件，沒有任何 client 見過 alpha 的欄號）；觸發是 buyer 套件從 `v1alpha1` 改名 `v1` 的那次變更 | `buyer.proto:189-190`；`api-design-guidelines-connect.md:17`；附錄 B #3 |
 
 ---
 

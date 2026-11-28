@@ -11,7 +11,7 @@ import java.util.TreeSet;
  * 賣家當下已開通配送方式的過濾與指紋計算工具。
  *
  * <p>背景：賣家 `seller_shipment_settings.enabled` 為靜默單寫，
- * 不發 MQ event、不主動清下游 cache（06 §3.4 / docs/開發規範/後端服務責任邊界規範.md）。
+ * 不發 MQ event、不主動清下游 cache（06 §3.4 / docs/dev-guidelines/backend-service-responsibility-boundaries.md）。
  * 公開商品 read path（02 §2.7.2）與結帳 read path（03 §4.3）均需在 return 前
  * 呼叫 shipping-service `getSellerShippingConfig` 取當下狀態，
  * 配合本 utility 取交集剔除 dangling shipping options。

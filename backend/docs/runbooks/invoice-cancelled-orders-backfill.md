@@ -1,6 +1,6 @@
 # 存量已取消訂單回填 `invoice_cancelled_orders`（issue #2904）
 
-> 對應 [58-電子發票服務（Invoice Service）詳細設計書](../詳細設計書/58-電子發票服務（Invoice%20Service）詳細設計書.md) §5.1.9a／§6.1.3。
+> 對應 [58-電子發票服務（Invoice Service）詳細設計書](../detailed-design/58-invoice-service-detailed-design.md) §5.1.9a／§6.1.3。
 > **何時跑**：`invoice-service` 的 `order.cancelled` consumer（C3）**部署完成之後**，越快越好（理由見 §3）。
 > **兩個 DB**：來源 `hawkr_order`（`orders`）、目標 `hawkr_invoice`（`invoice_cancelled_orders`）。同一台 PostgreSQL、不同 database ⇒ 無法 JOIN，走 §4 的匯出／匯入。
 > **DB 連線**：bastion ＋ 1Password 取憑證（同 [food-safety runbook](./food-safety-incident-runbook.md) §2 慣例）；dev 與 prod 各跑一輪，**dev 先跑完整一輪再上 prod**。
@@ -22,7 +22,7 @@ invoice-service 的讀路徑看不到訂單狀態，所以 #2904 讓 `order.canc
 症狀與修復前一模一樣：零錯誤、零 log、畫面完全正常，只是那句話是假的。
 
 ⇒ 存量資料需要一次性回填，而它是**維運操作不是程式**：依
-[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)（CLAUDE.md §22），
+[後端服務責任邊界規範](../dev-guidelines/backend-service-responsibility-boundaries.md)（CLAUDE.md §22），
 一次性歷史資料清整走 migration SQL 或經審核的維運 SQL，**不得**在 application code 裡建
 backfill CLI／reconciliation job／drift scanner。本表沒有 status 欄、沒有排程欄、沒有任何
 worker 掃它，回填完就結束，沒有需要長期維護的東西。

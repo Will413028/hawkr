@@ -5,7 +5,7 @@
 - M = （主 checkout） (HEAD eb8594011)
 - S = W/backend/internal/modules/seller
 - P = W/backend/docs/plans/2026-09-29-a3-buyer-seller
-- D32 = W/backend/docs/詳細設計書/32-商家治理與食安通報（Seller Governance & Food Safety）詳細設計書.md
+- D32 = W/backend/docs/detailed-design/32-seller-governance-and-food-safety-detailed-design.md
 
 ## Summary
 1. Statuses PENDING → INVESTIGATING → VERIFIED | DISMISSED. VERIFIED only from INVESTIGATING. DISMISSED from PENDING (acknowledged or not) or INVESTIGATING. Acknowledged is a flag + severity while status stays PENDING. StartInvestigation requires acknowledgement. FDA referral has no status/ack precondition. Cooperation request allowed in every status except DISMISSED.

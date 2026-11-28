@@ -4,7 +4,7 @@
 #
 # Spring Boot layered jar 拆 4 層（dependencies / spring-boot-loader / snapshot-dependencies / application）
 # 每層獨立 Docker layer hash：deps 不變時 GHCR 不重 push，每 PR 通常只推 ~15 MB application 層（fat jar 是每次 ~100 MB）
-# 詳見 docs/基礎建設/CI_CD 自動化部署（K8s + Helm）.md §4.3。
+# 詳見 docs/infrastructure/ci-cd-automated-deployment-k8s-helm.md §4.3。
 
 # === Stage 1: 從 fat jar 拆出 layered 目錄 ===
 FROM eclipse-temurin:21-jre-alpine@sha256:974b08960c5d96694c780e65b2d5705268ab1e1ca1a0dd0caf4ba6c3fe34d699 AS extractor

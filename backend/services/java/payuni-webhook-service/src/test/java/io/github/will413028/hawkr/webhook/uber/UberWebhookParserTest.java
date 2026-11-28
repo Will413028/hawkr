@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link UberWebhookParser} 的值域與路由判定。
  *
  * <h2>fixture 來源</h2>
- * 欄名與 kind 值一律抄自 {@code docs/第三方整合/Uber Direct API 總覽.md}
+ * 欄名與 kind 值一律抄自 {@code docs/third-party-integrations/uber-direct-api-overview.md}
  * （§6.2 事件 payload、§6.3.2 訂閱決策、§7.1 DaaS status、§7.2 DaaS webhook payload 欄位），
  * <b>不從 66 號設計書轉抄</b>——那是二手，而本測試要盯的正是「實作有沒有跟上官方文件」。
  * 期望值一律硬寫字面值，不呼叫被測物。

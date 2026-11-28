@@ -14,7 +14,7 @@
 
 問題是：這份快取要不要在 pod 啟動時預熱、要不要用排程定期刷新。
 
-規格本身見 `docs/詳細設計書/21-運費計算模組（Shipping Fee Module）詳細設計書.md` §3.2。
+規格本身見 `docs/detailed-design/21-shipping-fee-module-detailed-design.md` §3.2。
 
 ## 考慮過的方案
 

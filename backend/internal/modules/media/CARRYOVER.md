@@ -61,7 +61,7 @@ ADR `2026-09-25-codemeta-retirement.md` 過渡第 3 步：media 的每組舊代�
 
 | 舊值 | 去向 | 依據 |
 |---|---|---|
-| `AssetReferenceType`（22 個 `ref_type`，7101 起） | 刪除：Go media 不記引用也不認識業務，擁有者以資產 ID 直接擁有資產（B1-D3）；`pkg/media/ref_type.go` 已隨 B1-5 刪除，剩下的值只服務 Java media 與還沒搬的舊 Go 服務（`業務類型碼.md` 的擁有者段） | `internal/modules/media/AGENTS.md`「不變量」 |
+| `AssetReferenceType`（22 個 `ref_type`，7101 起） | 刪除：Go media 不記引用也不認識業務，擁有者以資產 ID 直接擁有資產（B1-D3）；`pkg/media/ref_type.go` 已隨 B1-5 刪除，剩下的值只服務 Java media 與還沒搬的舊 Go 服務（`business-type-codes.md` 的擁有者段） | `internal/modules/media/AGENTS.md`「不變量」 |
 | `MediaUploadSessionStatus`（7001–7004） | proto enum `UploadState`（對外）、`media.staged_uploads.state` 與 `media.assets.state` 的 CHECK（儲存）；Java 的四個值隨 Java media 退場刪除 | `api/hawkr/media/v1alpha1/media.proto`；`db/schema.sql` 的 `staged_uploads_state_check`、`assets_state_check` |
 | `StagedTokenScope`（7201、7202，JWT claim） | 刪除：staged token 是不透明隨機字串、只存 SHA-256，公開與機敏由資產 visibility 區分，沒有 scope 這個維度（B1-D2） | `db/schema.sql` 的 `staged_uploads` |
 | 錯誤碼 9220 `MEDIA_OBJECT_KEY_REQUIRED` | 刪除：沒有任何呼叫端（只剩定義與生成檔），隨 CodeMeta 退場 | `rg -n 'MEDIA_OBJECT_KEY_REQUIRED\|MediaObjectKeyRequired' backend` 只命中 `pkg/errors/bizcode/bizcode.go`、`GrpcResponseCode.java` 與文件 |

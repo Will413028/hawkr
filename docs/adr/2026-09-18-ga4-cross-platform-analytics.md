@@ -5,7 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-07-12 |
 | 影響範圍 | `hawkr-website/lib/analytics`、`hawkr_buyer`／`hawkr_seller` 的 analytics 層、`services/java/order-service`（MP backstop） |
-| 對應規格 | `docs/詳細設計書/47-GA4 分析追蹤（GA4 Cross-Platform Analytics）詳細設計書.md` |
+| 對應規格 | `docs/detailed-design/47-ga4-cross-platform-analytics-detailed-design.md` |
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。

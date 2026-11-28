@@ -371,7 +371,7 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
      * 🔴 <b>present，但它不打任何 Uber API</b>。
      *
      * <p>實查兩份權威：66 §4.5.2 的端點表只有 E1~E7，
-     * {@code docs/第三方整合/Uber Direct API 總覽.md} 也<b>沒有</b>任何建店／組織端點。
+     * {@code docs/third-party-integrations/uber-direct-api-overview.md} 也<b>沒有</b>任何建店／組織端點。
      * Uber 的「開通」在我方是 {@code uber_store_mapping} 這一列
      * （賣家設定出貨門市 ⇒ S-U1／ADM ⇒ A-U4 ⇒ 建單 403 的 N6 事後反推）。
      *

@@ -3,7 +3,7 @@
 **Will 的決定（2026-10-17）：§7 的文案全照建議**（(a) 14 句伺服器原因句、(b) SellerRequirement 4 個名詞、(c) select 後備文字、(d) 停權期間句兩端保留）。設計由一個 subagent 起草、另一個審查、第三個依審查修訂。
 
 基準：worktree `<10e worktree>`，branch `local/10e`，HEAD `8f7f6ed11`。只讀調查，沒有改 repo。
-SSOT（Will 2026-10-17）：ADR `docs/adr/2026-10-17-multi-locale-architecture.md`（下稱 ADR）、`backend/docs/plans/2026-09-29-a3-buyer-seller/step10e-i18n-brief.md`（I2、I3、I4、I7）、`step10e-L-brief.md`（Q1、Q3–Q5 照建議，Q2 被 i18n 第 4 題取代，Q6／Q7 照 I7 表）、`step10e-labels-brief.md`（D-L1 c 被 b′ 取代；D-L2 不變）、`step10e-L0-copy.md`（D1–D7 全照建議，下稱 L0）、術語表 `docs/共通規範/使用者面用語術語表.md`。
+SSOT（Will 2026-10-17）：ADR `docs/adr/2026-10-17-multi-locale-architecture.md`（下稱 ADR）、`backend/docs/plans/2026-09-29-a3-buyer-seller/step10e-i18n-brief.md`（I2、I3、I4、I7）、`step10e-L-brief.md`（Q1、Q3–Q5 照建議，Q2 被 i18n 第 4 題取代，Q6／Q7 照 I7 表）、`step10e-labels-brief.md`（D-L1 c 被 b′ 取代；D-L2 不變）、`step10e-L0-copy.md`（D1–D7 全照建議，下稱 L0）、術語表 `docs/conventions/user-facing-terminology-glossary.md`。
 本文是實作者唯一要讀的文件：v1 與審查的結論都已併入，§11 是相對 v1 的變更紀錄。
 
 讀法：§0 現況，§1–§6 設計，§7 **待 Will 核可的文案**（L′-1 之前要定），§8 子 commit 計畫（實作者照這一節做），§9 已定的工程決定（原 v1 §8 的分流結果），§10 風險與 10d 協調，§11 變更紀錄。

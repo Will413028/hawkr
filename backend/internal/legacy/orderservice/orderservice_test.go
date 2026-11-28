@@ -122,7 +122,7 @@ func TestParsedMerchantSummaryAndSpendingRecords(t *testing.T) {
 }
 
 func TestOpenStatusesCoverCodeMetaOrderStatus(t *testing.T) {
-	md, err := os.ReadFile("../../../docs/代碼管理（CodeMeta）/業務狀態碼.md")
+	md, err := os.ReadFile("../../../docs/codemeta/business-status-codes.md")
 	if err != nil {
 		t.Fatal(err)
 	}

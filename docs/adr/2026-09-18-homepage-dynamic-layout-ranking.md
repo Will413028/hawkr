@@ -5,7 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-07-12 |
 | 影響範圍 | `services/content-service`、`hawkr-website/features/home`、`hawkr-admin` 首頁配置頁 |
-| 對應規格 | `docs/詳細設計書/45-首頁區塊動態排序與營運干預（Homepage Dynamic Layout & Merchandising）詳細設計書.md` |
+| 對應規格 | `docs/detailed-design/45-首頁區塊動態排序與營運干預（Homepage Dynamic Layout & Merchandising）詳細設計書.md` |
 | 路徑基準 | `backend/` |
 
 > 2026-09-26：45 號從未實作（content-service 沒有對應的表與 API），content 搬進單體時依遷移 ADR

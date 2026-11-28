@@ -19,7 +19,7 @@ import java.util.function.BiFunction;
  *     }
  * </pre>
  *
- * 設計與規範請見 docs/開發規範/Java gRPC 錯誤處理規範.md §7.6.3
+ * 設計與規範請見 docs/dev-guidelines/java-grpc-error-handling-guidelines.md §7.6.3
  */
 public final class GrpcClientErrorTranslator {
 

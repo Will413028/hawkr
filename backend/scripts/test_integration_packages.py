@@ -84,7 +84,7 @@ class IntegrationPackagesTest(unittest.TestCase):
 
     def test_unmapped_non_ascii_backend_path_keeps_all_integration_packages(self):
         self.assertEqual(
-            self.selected(["backend/docs/代碼管理（CodeMeta）/x.md"]),
+            self.selected(["backend/docs/codemeta/x.md"]),
             {CATALOG, SELLER},
         )
 

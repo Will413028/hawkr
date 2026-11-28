@@ -184,7 +184,7 @@ A7-1c 找到的三個問題都是**正確性**問題：`create.go` 的 `InReadSn
 
 - D4 否決「各開 transaction 再串 saga」，理由是四個實際缺口（ADR:175-180）。這是正確性證據，對「由上往下、不變量跨模組」的寫入成立。
 - `InTx` 已經可以重入：ctx 有 transaction 就直接加入【量】`platform/db/db.go:112-114`。`InReadSnapshot` 在 transaction 內回 `ErrSnapshotInTx`【量】`db.go:149-151`，失敗是大聲的。
-- PostgreSQL 設計規範 §十二已經規定冪等寫入用 `INSERT … ON CONFLICT`，撞 23505 之後不得在同一個 transaction 繼續下 SQL【量】`sed -n 287,310p "backend/docs/開發規範/PostgreSQL 設計規範與最佳實踐.md"`。
+- PostgreSQL 設計規範 §十二已經規定冪等寫入用 `INSERT … ON CONFLICT`，撞 23505 之後不得在同一個 transaction 繼續下 SQL【量】`sed -n 287,310p "backend/docs/dev-guidelines/postgresql-design-guidelines-and-best-practices.md"`。
 
 ### 暴露面逐一判定
 

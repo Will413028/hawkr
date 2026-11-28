@@ -13,7 +13,7 @@
     <description>
         Maven reactor 聚合 pom，用於跨服務一次性編譯。
         各服務仍各自繼承 spring-boot-starter-parent，本 pom 不影響服務 pom 的繼承鏈。
-        詳見 docs/基礎建設/CI_CD 自動化部署（K8s + Helm）.md §10。
+        詳見 docs/infrastructure/ci-cd-automated-deployment-k8s-helm.md §10。
     </description>
 
     <modules>

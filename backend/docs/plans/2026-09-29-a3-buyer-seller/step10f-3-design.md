@@ -2,7 +2,7 @@
 
 來源：`step10e-reports-brief.md` R7「信任與安全上線前那一刀做的」；計畫 10f 範圍確認（Will 2026-11-20）；`step10f-2-design.md` G1；盤點對照 dev `50d30a50`（2026-11-21）。決定 H1–H4（含 H1b、H1c、H2b）：Will 2026-11-21 全照建議。兩輪獨立審查已處理（第 1 輪 findings 11，blocking 1，全 fixed；第 2 輪 findings 5：fixed 4、rejected 1）。
 
-使用者面名稱是「我的檢舉」（`docs/共通規範/使用者面用語術語表.md` L48–49）；「通報」是後台用語。前提：系統未上線，刪 RPC 不需相容窗口，回滾就是 revert。
+使用者面名稱是「我的檢舉」（`docs/conventions/user-facing-terminology-glossary.md` L48–49）；「通報」是後台用語。前提：系統未上線，刪 RPC 不需相容窗口，回滾就是 revert。
 
 ## 現況（盤點）
 
@@ -43,7 +43,7 @@ UI 版面（清單項目、詳情頁、補充表單）在 10f-3b 開工前給 Wi
 ## 切分與檔案
 
 - **10f-3a backend 與契約**
-  - 修改：`api/hawkr/moderation/v1alpha1/moderation.proto`（項目形狀 H1b）、`api/hawkr/seller/v1alpha1/report.proto`（`MyReport` 改名 `StoreReport`，新增 `GetMyReport`、`AddReportSupplement`）、`backend/internal/httpapi/moderation/app.go`（組裝）、`backend/internal/httpapi/seller/reports.go`、`backend/internal/httpapi/effects.go`（加 `GetMyReport` 讀、`AddReportSupplement` 寫）、seller 模組的補充寫入與查詢、`docs/共通規範/使用者面用語術語表.md`「補充」列、`backend/internal/modules/seller/CARRYOVER.md:365`。
+  - 修改：`api/hawkr/moderation/v1alpha1/moderation.proto`（項目形狀 H1b）、`api/hawkr/seller/v1alpha1/report.proto`（`MyReport` 改名 `StoreReport`，新增 `GetMyReport`、`AddReportSupplement`）、`backend/internal/httpapi/moderation/app.go`（組裝）、`backend/internal/httpapi/seller/reports.go`、`backend/internal/httpapi/effects.go`（加 `GetMyReport` 讀、`AddReportSupplement` 寫）、seller 模組的補充寫入與查詢、`docs/conventions/user-facing-terminology-glossary.md`「補充」列、`backend/internal/modules/seller/CARRYOVER.md:365`。
   - 刪除：seller `SellerReportAppService.ListMyReports` RPC 與其 request／response、handler `backend/internal/httpapi/seller/reports.go` 的 `ListMyReports`（L143 起）與測試、`effects.go:127` 條目。
   - 生成：`make connect`（backend）、`pnpm --filter @hawkr/api gen:api`、`packages/hawkr_api` 的 `../../api/generate.sh buf.gen.yaml`。
 - **10f-3b buyer-app**：修改 `features/moderation/` 三支檔與測試，新增店家檢舉詳情與補充畫面；店家檢舉成功句加回。

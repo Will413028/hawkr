@@ -100,7 +100,7 @@
 
 - 「請款日」＝ PayUni 每日自動或賣方手動發動日；「付款日」＝ 買方完成付款日。
 - DB 另有 per-物流方式的 `settlement_days`（7-11=D+7、黑貓=D+15），用途是**對齊/顯示** PayUni 天期，**不是**系統自行延遲撥款的排程參數。
-- 出處：`PayUni 費用一覽.md`「撥款 UNi 帳戶」、`shipping V1__init 表 settlement_days`。
+- 出處：`payuni-fees.md`「撥款 UNi 帳戶」、`shipping V1__init 表 settlement_days`。
 - ⚠️ 這些天期是 **PayUni 第三方作業**，非 Hawkr 可保證；合約如需明列，應以 PayUni 合約/後台為準。
 
 ### 3.3 平台服務費（抽成）——**未定義／未實作**
@@ -125,7 +125,7 @@
 | 退款手續費 | 超商代碼/ATM 各 10 元 |
 | 提領匯款手續費 | 15 元（每月前 5 次免） |
 
-- 負擔方：賣家（自 UNi 帳戶扣）。出處：`PayUni 費用一覽.md`「金流服務費用」。
+- 負擔方：賣家（自 UNi 帳戶扣）。出處：`payuni-fees.md`「金流服務費用」。
 
 ### 3.5 物流代收手續費（貨到付款 COD，PayUni 收）
 
@@ -239,14 +239,14 @@
 ## 附錄：資料來源檔案（backend-payuni @ main）
 
 **設計書**
-- `backend/docs/詳細設計書/03-訂單微服務（Order Service）詳細設計書.md`——訂單狀態機、付款期限、自動完成、撥款觸發
+- `backend/docs/detailed-design/03-order-service-detailed-design.md`——訂單狀態機、付款期限、自動完成、撥款觸發
 - `05-支付服務（Payment Service）詳細設計書`（已刪除）——撥款、退款、發票（未實作）
-- `backend/docs/詳細設計書/09-售後微服務（AfterSales Service）詳細設計書.md`——出貨期限、售後全時效、退款金流
-- `backend/docs/詳細設計書/20-結帳模組（Checkout Module）詳細設計書.md`——運費收款主體、fee_payer、免運
-- `backend/docs/詳細設計書/21-運費計算模組（Shipping Fee Module）詳細設計書.md`——三維運費費率、代收手續費
-- `backend/docs/詳細設計書/24-節假日管理（Holiday Management）詳細設計書.md`——宅配出貨期限工作日順延
-- `backend/docs/詳細設計書/36-MQ 與事件總覽（MQ & Event Catalog）.md`——結算/撥款完成事件（待規劃）
-- `backend/docs/第三方整合/PayUni 費用一覽.md`——金流手續費、撥款入帳天期
+- `backend/docs/detailed-design/09-aftersales-service-detailed-design.md`——出貨期限、售後全時效、退款金流
+- `backend/docs/detailed-design/20-checkout-module-detailed-design.md`——運費收款主體、fee_payer、免運
+- `backend/docs/detailed-design/21-shipping-fee-module-detailed-design.md`——三維運費費率、代收手續費
+- `backend/docs/detailed-design/24-holiday-management-detailed-design.md`——宅配出貨期限工作日順延
+- `backend/docs/detailed-design/36-mq-and-event-catalog.md`——結算/撥款完成事件（待規劃）
+- `backend/docs/third-party-integrations/payuni-fees.md`——金流手續費、撥款入帳天期
 
 **程式碼 / 設定**
 - `services/java/order-service/.../config/OrderConfig.java`、`application.yml`——付款 24h、自動完成 60h、建單兜底

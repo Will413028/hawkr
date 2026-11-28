@@ -12,7 +12,7 @@ import (
 
 // CodeMeta〈業務類型碼〉的 AccountType 是這裡的投影：gateway 與舊服務以它解讀單體帶去的值。
 func TestLegacyAccountTypeMatchesCodeMeta(t *testing.T) {
-	md, err := os.ReadFile("../../../docs/代碼管理（CodeMeta）/業務類型碼.md")
+	md, err := os.ReadFile("../../../docs/codemeta/business-type-codes.md")
 	if err != nil {
 		t.Fatal(err)
 	}

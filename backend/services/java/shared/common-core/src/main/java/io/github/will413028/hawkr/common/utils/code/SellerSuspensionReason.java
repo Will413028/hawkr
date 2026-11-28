@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 賣家停權原因碼。Admin 手動停權（`SuspendSellerForAdmin`）時指定，賣家端可見（用於停權公告頁顯示原因）。**已定裁決三值，不含 FOOD_SAFETY**（食安通報走 32 號治理路徑，非本 admin 手動停權原因）。詳見 [46 §5.1](../詳細設計書/46-賣家能力權限層（Seller%20Capability%20Authorization）詳細設計書.md#51-sellersuspensionreason已定裁決三值不含-food_safety)。
+ * 賣家停權原因碼。Admin 手動停權（`SuspendSellerForAdmin`）時指定，賣家端可見（用於停權公告頁顯示原因）。**已定裁決三值，不含 FOOD_SAFETY**（食安通報走 32 號治理路徑，非本 admin 手動停權原因）。詳見 [46 §5.1](../detailed-design/46-seller-capability-authorization-detailed-design.md#51-sellersuspensionreason已定裁決三值不含-food_safety)。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum SellerSuspensionReason implements CodeMeta {
 

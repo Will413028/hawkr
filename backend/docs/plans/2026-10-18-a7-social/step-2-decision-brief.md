@@ -1,7 +1,7 @@
 # A7-2 對外 API 設計簡報（social＋moderation 的 Connect）
 
 證據標記：【量】＝讀檔或跑指令看到；【推】＝由讀到的內容推論；【猜】＝憑業界常識、未查證本 repo 外的來源。
-路徑相對 worktree `.worktrees/a7-2-external-api`；計畫檔簡稱「計畫」＝`backend/docs/plans/2026-10-18-a7-social.md`，API 規範簡稱「規範」＝`docs/共通規範/API 設計規範（Connect）.md`。
+路徑相對 worktree `.worktrees/a7-2-external-api`；計畫檔簡稱「計畫」＝`backend/docs/plans/2026-10-18-a7-social.md`，API 規範簡稱「規範」＝`docs/conventions/api-design-guidelines-connect.md`。
 
 ## 結論先講
 

@@ -5,7 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-06-30 |
 | 影響範圍 | `shipping-service`（`HolidayService`）、`monitoring/sql-exporter`、`monitoring/prometheus/rules` |
-| 規格 | [24-節假日管理](/backend/docs/詳細設計書/24-節假日管理（Holiday%20Management）詳細設計書.md) |
+| 規格 | [24-節假日管理](../../backend/docs/detailed-design/24-holiday-management-detailed-design.md) |
 
 ## 脈絡
 

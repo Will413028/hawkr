@@ -12,7 +12,7 @@
 買家關閉帳號或店家退場後，上層模組要做三件事：立即看不到其內容、擋新寫入與舊事件重放、抹除自己的資料。A6-1 到 A6-3 讓 review、im、crm 各自存一份 `inactive_*` 複本加 advisory lock，social 也有自己的一份。複本的唯一用途是過濾與串行化，不是資料庫端存的旗標。
 
 - 外部：Postgres 列鎖相容：`FOR KEY SHARE` 只和 `FOR UPDATE` 衝突，不和 `FOR NO KEY UPDATE` 衝突；多個交易同鎖一列會建 multixact。簡報依記憶寫，3c1 的 integration 在真實 Postgres 驗證。
-- 繼承：規則 2 要求跨模組篩選先 join 擁有者的 `pub_*`，只有「資料庫端存旗標且函式只能參照自己的表」才複製（`backend/docs/開發規範/單體開發規範.md`）。這個必要條件只對 social 成立，review、im、crm 不成立，所以它們的複本沒有理由。
+- 繼承：規則 2 要求跨模組篩選先 join 擁有者的 `pub_*`，只有「資料庫端存旗標且函式只能參照自己的表」才複製（`backend/docs/dev-guidelines/monolith-development-guidelines.md`）。這個必要條件只對 social 成立，review、im、crm 不成立，所以它們的複本沒有理由。
 - 繼承：跨模組鎖序由下往上，`platform/lockorder` 只機械檢查列鎖，不涵蓋 advisory lock；仍成立，是正確性要求。
 - 繼承：等待刪除的買家仍可用聊天（`2026-11-22-review-chat-crm-policy-in-monolith.md` D2），所以擁有者要提供「未關閉」而不只是「營運中」的守門。
 - 繼承：Java ordering 還沒搬，舊事件會在刪除後才到；它是我們自己的程式，不是外部約束，擁有者的狀態檢查在它搬之前一樣擋得住。

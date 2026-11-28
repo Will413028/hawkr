@@ -8,7 +8,7 @@ import io.grpc.Status;
  *
  * 對應規則參考 gRPC 官方規範：https://grpc.io/docs/guides/error/
  *
- * 設計與規範請見 docs/開發規範/Java gRPC 錯誤處理規範.md §7.6.2
+ * 設計與規範請見 docs/dev-guidelines/java-grpc-error-handling-guidelines.md §7.6.2
  */
 public final class GrpcStatusToResponseCode {
 

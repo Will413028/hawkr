@@ -1,0 +1,390 @@
+# 設計文件治理規範
+
+> **這份規範回答一個問題：一句話該寫進哪一份文件。**
+>
+> 它是本 repo 所有設計文件的 taxonomy SSOT。與任何 template、既有文件或個別設計書
+> 的慣例衝突時，以本檔為準。
+
+---
+
+## 0. 核心四句
+
+這四句是本規範的公理。本檔任何一節、任何 template 與它們衝突時，**以這四句為準**：
+
+```
+基本設計書  回答  WHAT / WHY / ARCHITECTURE
+詳細設計書  回答  CURRENT HOW EXACTLY
+ADR         保存  DECISION RATIONALE / ALTERNATIVES
+Git / PR / Issue / Review  保存  HISTORY / PROGRESS / EVIDENCE
+```
+
+**為什麼要分**：同一件事只有一個權威版本。一份同時寫著舊規格、新規格、以及
+「哪一輪把 A 改成 B」的文件，讀的人無法判斷哪一句是現在要實作的——照字面施工
+就會做出錯的東西。而這個錯誤**沒有任何編譯器、測試或 CI 攔得住**，它只會在
+實作完之後以返工的形式出現。
+
+---
+
+## 1. 文件 taxonomy
+
+| Artifact | 回答什麼 | 位置 | **不准**裝什麼 |
+|---|---|---|---|
+| **基本設計書** | 這個系統為什麼存在、邊界在哪、高階架構長什麼樣 | `backend/docs/basic-design/` | 欄位、端點簽章、狀態值域、實作陷阱（→ 詳細設計書） |
+| **詳細設計書** | **現在**要怎麼實作，精確到可驗收 | `backend/docs/detailed-design/` | 歷史、進度、ADR、review 證據、PR／輪次追蹤、roadmap、open questions |
+| **模組規格** | 單體模組**現在**的行為，精確到可驗收；是該模組行為規格的唯一來源，同名的舊詳細設計書依 §7「舊設計書的處置」：內容已被完整涵蓋且系統已不在運作就刪除，否則標成該服務的現行規格、搬進單體時刪除 | `backend/docs/modules/<模組>.md` | 與詳細設計書相同（§3 的 PURE SPEC 規則）；也不放改程式前的規則摘要（→ 模組 `AGENTS.md`） |
+| **ADR** | 為什麼選這個設計、否決了什麼、代價是什麼 | `docs/adr/` | 逐欄規格（→ 詳細設計書） |
+| **共通規範** | 四端共用的開發規則 | `docs/conventions/` | 只有單一子專案用的規則（→ 該子專案的 `docs/`，例如 `backend/docs/dev-guidelines/`） |
+| **Issue** | 還沒做的事、待裁決、缺口、追蹤 | GitHub | 規格本身（issue 是入口不是 SSOT） |
+| **PR** | 這次改了什麼、為什麼、驗證證據 | GitHub | 長期規格（PR 會沉底） |
+| **Review report** | 這一輪審查發現什麼、判定什麼 | **PR comment**（可分享）／`backend/docs/review/`（⚠️ gitignore，本機工作區） | 規格修訂（結論要回灌對應設計書） |
+| **Git history** | A 怎麼變成 B、誰改的、何時 | git | — |
+| **Postmortem** | 事故怎麼發生、學到什麼 | `backend/docs/postmortems/` | 規格（結論要回灌設計書或規範） |
+| **Runbook** | 出事了怎麼操作 | `backend/docs/runbooks/` | 設計理由 |
+
+根目錄 `docs/` 與子專案 `docs/` 的分界、路徑寫法見 `docs/README.md`。
+
+**判準一句話**：問「**這句話什麼時候會變成假的**」。
+
+- 永遠不會變假（現在的契約） → 詳細設計書
+- 會隨實作進度變假（做到哪了、誰在做） → **Issue / PR**
+- 已經是過去式（以前是 A） → **Git history**
+- 是一次性的判斷過程（那天查到什麼） → **Review report / PR**
+
+---
+
+## 2. 基本設計書責任
+
+**回答**：`WHAT` / `WHY` / `SYSTEM BOUNDARY` / `ARCHITECTURE` / `RESPONSIBILITY` /
+`HIGH-LEVEL DESIGN PRINCIPLE`。
+
+可以寫：系統目的、高階架構、responsibility boundary、architecture rationale、
+系統級取捨、capability boundary、Non-Goal、高階 failure strategy、高階資料流。
+
+公版章節與分際見 `backend/docs/basic-design/00-overview.md`（該檔是基本設計書的操作層規範，
+本節只定義它在 taxonomy 裡的位置）。
+
+⚠️ **架構理由的深度分工**：「為什麼這樣切」寫在基本設計書；
+「**考慮過哪些方案、為什麼否決**」寫 ADR。基本設計書只留結論與一句話理由，
+不展開 alternatives 比較表。
+
+---
+
+## 3. 詳細設計書責任（PURE SPEC 紅線）
+
+`backend/docs/detailed-design/**` 從現在起視為 **Current Executable Specification**。
+
+它**不是**歷史文件、工作日誌、review report、ADR、issue tracker、施工清單、
+PM decision log。
+
+### 3.1 ALLOWED（逐字）
+
+```
+current data model
+欄位語意
+API contract
+gRPC contract
+MQ contract
+業務條件
+validation
+business rule
+狀態機
+transition condition
+transaction boundary
+locking
+CAS
+concurrency
+idempotency
+retry
+timeout
+scheduler behavior
+worker behavior
+failure behavior
+runtime sequence
+error mapping
+authority / ownership
+current implementation invariant
+security / authorization requirement
+observability contract
+可直接驗證的 acceptance behavior
+```
+
+### 3.2 FORBIDDEN（逐字）
+
+```
+history            歷史描述、被取代的舊規格、原文引用
+ADR                設計理由、被否決方案、alternatives 比較
+review evidence    實查紀錄、grep 命中數、CI run、行號 forensic
+progress tracking  已完成／尚未完成／待辦／某日已落地
+Batch / WP / Rx    開發輪次與施工波次
+PR / PM / Gate     PR 編號、PM 裁決、PASS／FAIL／CHANGES REQUIRED
+changelog          變更紀錄、revision history
+roadmap            演進路線
+open questions     未決問題
+施工狀態            本輪／本波／下一輪／實作階段必辦／本設計階段不施作
+```
+
+### 3.3 不保存歷史（最常違反的一條）
+
+規格從 A 改成 B 時，**詳細設計書必須變成 B**：
+
+```
+✅ 正確            ❌ 錯誤
+B                 以前是 A。後來改成 B。現在是 B。
+```
+
+Git 已經保存 A → B。詳細設計書**不得建立第二套 history database**——
+第二套必然與 git 漂移，而漂移的那一份不會告訴讀者它漂了。
+
+⚠️ 具體形狀：**不要寫「某某敘述已失效」**。正確做法是把那段敘述**刪掉**，
+直接寫現在成立的規格。保留一句「它已失效」等於要求每個讀者自己做一次考證。
+
+### 3.4 不承擔 WHY
+
+詳細設計書只留**結果**，不留理由：
+
+```
+✅ 事件發布使用 transactional outbox。
+   INSERT business state 與 INSERT outbox event 必須位於同一個 DB transaction。
+
+❌ 我們之所以不用方案 A，是因為……
+❌ 為了避免以前的 X 問題，所以……
+❌ 本設計選擇 Outbox 而不是直接 publish，因為……
+```
+
+屬架構理由 → 基本設計書；需要保存 alternatives → ADR；
+詳細設計書可以寫 `參照 ADR-xxx`，但**不得複製 rationale**。
+
+⚠️ **例外（不是 WHY，不要誤刪）**：描述**runtime 行為成因**的句子是規格本身。
+「`rows=0` 時必須 rollback，因為單號與金額掛在這一列上」講的是**現在的失敗語意**，
+不是當初的選型理由。判準：拿掉這句，實作者會不會做錯？會 ⇒ 留。
+
+### 3.5 enablement gate（留）vs project chronology（刪）
+
+`Phase 0`／`P711-3`／`第 2 波` 這類標籤底下，**同時**住著兩種完全不同的東西：
+一種是**實作者不照著做就會出事的約束**，一種只是**當初怎麼排工的痕跡**。
+兩者的標籤長得一模一樣 ⇒ **只能逐處看內容判**，不可整批留也不可整批刪。
+
+#### 3.5.1 判準（對每一段各問一次；四問全部答不出 ⇒ 刪）
+
+| # | 問 | 答得出 ⇒ 屬哪一類（留） |
+|---|---|---|
+| 1 | 它有一個**查得出真假的 entry／exit predicate** 嗎？（一句 SQL、一個 flag 的值、一支腳本的輸出） | `machine-verifiable entry/exit predicate` |
+| 2 | 它描述的是**某個東西現在開著還是關著**嗎？（flag default、allowlist 內容、config 列的 `enabled`、擋門碼是否仍拋） | `runtime/deployment enablement state` |
+| 3 | 它是**新舊並存期間必須成立的不變式**嗎？（舊 client 仍會送、舊資料仍在、兩個碼值必須一致） | `compatibility invariant` |
+| 4 | 顛倒這個順序會**壞掉**嗎？（不是「比較亂」，是資料錯、服務起不來、選項靜默消失、前端收到未知值） | `safety-required migration order` |
+
+四問全答不出，它就只是 **project chronology** —— 典型形狀：
+「先做 A」「下一階段 B」「第 N 波」「Phase 1」「Phase 2」。
+⇒ **從詳細設計書刪除**。
+⚠️ **歸宿要走 §7.1 的 truth-first，不是一律開票**：先驗它現在還成不成立——
+已完成／已取代／已取消 ⇒ **不開票**，直接收斂成 current spec；
+確認仍 pending 才 reuse 既有 issue 或開一張。
+
+#### 3.5.2 內容合格 ≠ 標籤合格
+
+🔴 **四問答得出，只代表內容要留；`Phase N`／`P711-N` 這個標籤本身仍要換掉。**
+原因：它的意義**不住在這份文件裡** —— `N` 對應的是某張排程表，而那張表不在 repo
+也沒有人維護。讀者查不到 `Phase 1` 是什麼，就無從判斷自己有沒有違反它。
+
+⇒ 標籤一律改成**它所表達的那個條件的名字**：
+
+| 內容是 | 標籤改成 |
+|---|---|
+| 啟用前置（flag／allowlist／config 列的封鎖態） | `Production Enablement Gate` |
+| 外部書面確認、sandbox 憑證、真實樣本量測 | `External Verification Gate` |
+| 技術上不可顛倒的部署依賴 | `Deployment / Migration Order`；步驟編號只保留**依賴序**，不保留波次身分 |
+
+#### 3.5.3 正例／反例
+
+**正例（內容留、標籤改名）**
+
+```
+❌ ### 12.0 Phase 0：阻斷項
+✅ ### 12.0 阻斷前置（External Verification Gate）
+   底下四項是「台灣書面確認／sandbox 憑證／golden fixture／地址解析率量測」，
+   第 1 問答得出（每一項都查得出到位沒有）⇒ 內容全留，只換標籤。
+
+❌ | 階段       | 內容                            |
+   | **P711-2** | DB migration：擴 shipping_type  |
+✅ | 步         | 內容                            |
+   | **2**      | DB migration：擴 shipping_type  |
+   第 4 問答得出（碼值必須先於 CHECK 約束存在，顛倒則 migration 直接失敗）
+   ⇒ 依賴序留；「它是第二波」這個排程身分刪。
+```
+
+**反例（刪，或改寫成它真正要表達的約束）**
+
+```
+❌ 0-3／0-4 沒完成不得進 Phase 1
+   `Phase 1` 在該文件中沒有任何定義 ⇒ 這句話指不到任何東西，
+   實作者無從判斷自己是不是違反了它。四問全答不出。
+✅ golden fixture 與地址解析率量測完成之前，狀態映射表有三格 key 仍是推導值，
+   不得作為映射實作或驗收的依據。
+
+❌ 這一波先做開通，出貨留到下一波
+   純排程 ⇒ 刪，歸 Issue。
+✅ 出貨路徑依賴開通閘門與狀態閉環，兩者未就緒前 config 列的 enabled 必須維持 false。
+   （前提是這個依賴是真的；不是的話就只是排程。）
+```
+
+⚠️ **最常見的誤判方向是「看到標籤就整段刪」**：`Phase 0` 底下往往躺著整份 fail-closed
+契約（哪些 flag 預設關、allowlist 為什麼是空的、解除條件是什麼）。那些是 §3.1 ALLOWED
+的 `failure behavior` 與 `current implementation invariant`，
+**刪掉它們會讓實作者做出一個預設就開著的系統**。
+
+---
+
+## 4. ADR 責任
+
+**回答**：`WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
+
+位置 `docs/adr/`，檔名 `YYYY-MM-DD-<kebab-slug>.md`。
+
+裝：alternatives、tradeoff、architecture decision、decision rationale、
+被否決方案、長期必須保存的重大技術裁決。
+
+**什麼時候要開 ADR**：這個決策**被推翻的代價很高**，且未來會有人問「為什麼不那樣做」。
+只影響一次實作的小取捨不開 ADR（寫在 PR 裡即可）。
+
+ADR 一旦寫下就**不改結論**（決策是歷史事實）。決策被推翻時新增一份 ADR 並在舊檔標
+`superseded by <新檔名>`。
+
+---
+
+## 5. Issue / PR / Review / Git / Postmortem / Runbook 責任
+
+### 5.1 Issue
+還沒做的事、待裁決、已知缺口、跨團隊依賴。**設計書裡任何「還沒做」的內容都屬這裡。**
+Issue 是狀態的家：狀態會變，而會變的東西不能寫進規格。
+
+### 5.2 PR
+這次改了什麼、契約影響、migration／rollout 順序、驗證證據、已知未驗證項。
+
+### 5.3 Review report
+一輪審查的發現與判定。
+
+🔴 **`backend/docs/review/` 整個目錄在 gitignore（`.gitignore:190`，實查 0 個檔案進版控）** ——
+它是**本機工作區**，不是分享管道。寫在那裡的報告只有你自己讀得到，
+而檔案不會告訴下一個人「沒有人看得到我」。
+⇒ 要讓別人看到的審查結論，**落在 PR comment 或 issue comment**（內部 repo 直送）；
+`backend/docs/review/` 留給過程稿與本機留存。
+
+🔴 **review 的結論必須回灌**：審查發現「規格 A 其實已經是 B」時，
+正確動作是**把詳細設計書改成 B**，不是在詳細設計書裡加一段「審查發現 A 已失效」。
+後者正是本規範要消滅的污染來源。
+
+### 5.4 Git history
+`A → B` 的事實。不需要在任何文件裡重述。
+
+### 5.5 Postmortem
+`backend/docs/postmortems/`。事故經過與教訓。教訓若是通則，回灌對應規範或 `.claude/rules/`。
+
+### 5.6 Runbook
+`backend/docs/runbooks/`。故障時的操作步驟。不寫設計理由，只寫動作與判準。
+
+---
+
+## 6. Evidence boundary（證據分層，禁止跨層推論）
+
+四層證據互不蘊含：
+
+| 層 | 能支持的結論 | **不能**支持的結論 |
+|---|---|---|
+| **repository evidence** | 「code 裡寫的是 X」 | 「線上現在是 X」 |
+| **runtime evidence** | 「這個環境現在跑的是 X」 | 「另一個環境也是 X」 |
+| **live DB evidence** | 「這張表現在有 N 列」 | 「未來不會有」 |
+| **external provider evidence** | 「對方 API 現在回 X」 | 「對方文件寫的就是它的行為」 |
+
+**禁止的形狀**（各配一個真實反例）：
+
+```
+❌ repo 顯示 FEATURE_ENABLED 預設 false  ⇒  production 現在一定是 false
+   （預設值 ≠ 生效值。要 live effective config 才說得出後者。）
+
+❌ repo production caller = 0  ⇒  DB table 現在一定 0 rows
+   （歷史資料、維運 SQL、其他環境都造得出列。）
+
+❌ 某環境測不到  ⇒  這件事驗不了
+   （兩個環境是兩個獨立的可測性問題。「不可行」和「已通過」一樣需要證據。）
+```
+
+⚠️ **詳細設計書尤其禁止寫這種 forensic inference** ——
+它把「某天某人查到的東西」凍結成規格，而那句話隔天就可能變假。
+
+---
+
+## 7. 文件 relocation rule（發現污染時搬去哪）
+
+發現詳細設計書裡有不該在的內容時，**不要就地刪掉**，先判斷它的 owner：
+
+| 看到的內容 | 搬去哪 | 詳細設計書裡留什麼 |
+|---|---|---|
+| 舊規格 ＋「已失效」 | 什麼都不用搬（git 已有） | **只留新規格**，刪掉整段考古 |
+| 整份舊詳細設計書：內容已被新規格（`backend/docs/modules/<模組>.md` 或其他現行規格）完整涵蓋，且它描述的系統已不在運作 | 有理由要留的先搬進 ADR；其餘不搬（git 保存歷史） | 整份刪除（舊設計書沒有「只當歷史參考」的中間狀態） |
+| 整份舊詳細設計書：描述的服務仍在運作，或內容未被完整涵蓋 | 不搬 | 保留，檔頭標成「<服務名> 的現行規格」與單體模組規格的位置；該服務搬進單體時刪除 |
+| 「為什麼選 A 不選 B」 | ADR（或基本設計書一句話） | `參照 ADR-xxx` |
+| 「哪一輪做了什麼」 | PR／Issue | 刪除 |
+| 「還沒做」「待某波」 | Issue（**先驗現況**，見 §7.1） | 刪除；只有「現在還真的 pending」才需要票 |
+| 稽核證據（實查／命中數／CI run） | Review report／PR | 刪除；若結論改變了規格，把**規格**改掉 |
+| Roadmap／演進路線 | Issue / Milestone | 刪除 |
+| Open Questions | Issue（或 `decision` 流程） | 刪除；裁決後把**結果**寫進正確的 owner |
+| Changelog | git | 刪除 |
+
+### 7.1 `pending` / 「尚未完成」：truth-first，不是 ticket-first
+
+**不要看到「尚未完成」就開票。** 先去驗它現在還是不是真的。
+
+```
+看到 pending / 尚未完成 / 待某波
+        ↓
+① 重新驗 CURRENT TRUTH
+   （去看 code／DB／部署／端點，不要採信文件對自己的宣稱）
+        ↓
+② 現在還真的 pending 嗎？
+   │
+   ├─ YES ──→ 有既有 issue 嗎？
+   │           ├─ 有 → reuse，不要開新票
+   │           └─ 沒有 → 開一張
+   │          然後把 progress tracking 從詳細設計書移除
+   │
+   └─ NO ───→ 已完成 ／ 已被取代 ／ 已取消 ／ 已過時
+              → **不開任何新 issue**
+              → 直接把該節收斂成 current spec
+```
+
+⚠️ **為什麼是 truth-first**：設計書裡的「尚未完成」記錄的是**寫下那天**的狀態，
+而它從那天起就沒有人維護。清整時一律先開票，會為一堆早就做完或早就取消的東西
+建立大量**假 issue** —— 那不是歸宿，是把垃圾換個地方堆，而且每一張都會有人去追。
+
+⚠️ **反向的錯也要防**：確認「現在還真的 pending」之後才可以刪。
+沒有歸宿的刪除會讓真實缺口消失，那比留著污染更糟。
+
+⚠️ **「文件說它沒做」不是證據**（§6 evidence boundary）：那是 repo evidence 裡
+最容易過期的一種。要判定現況，去看 code／DB／部署，不是去看另一份文件。
+
+---
+
+## 8. Review / Acceptance checklist
+
+寫完或改完一份設計文件，逐項自問（答不出＝還沒完成）：
+
+**通用**
+- [ ] 這份文件的每一句話，都屬於它自己的 taxonomy 格子嗎？
+- [ ] 有沒有任何一句話，會因為「時間經過」而變成假的？
+- [ ] 有沒有任何一句話，是可以用一支腳本從 repo 生成出來的？（是 ⇒ 給連結，不要複述）
+
+**詳細設計書專用**
+- [ ] 一個沒跟過這個專案的實作者，照這份文件施工，做得出**現在要的東西**嗎？
+- [ ] 文件裡還有沒有「曾經／原本／已失效／某輪改成」這類考證？
+- [ ] 進度、PR、review 判定、輪次編號是不是都不在了？
+- [ ] 每一處「尚未完成」，是不是**先驗過現況**再決定歸宿？（§7.1 truth-first）
+- [ ] 確認仍 pending 的那些，是不是都有一張**真的存在**的 issue（優先 reuse 既有票）？
+- [ ] 已完成／已取代／已取消的那些，是不是**沒有**被開成新票，而是直接收斂成 current spec？
+- [ ] 有沒有 `Phase N`／`P711-N`／「第 N 批」「第 N 波」這類**排程標籤**？
+      逐處跑 **§3.5 四問**：答得出 ⇒ 內容留、標籤換成那個條件的名字；全答不出 ⇒ 移除。
+
+**基本設計書專用**
+- [ ] 有沒有複製詳細設計書的欄位／端點／狀態值域？（應該只指向）
+
+**ADR 專用**
+- [ ] alternatives 與否決理由寫清楚了嗎？結論有沒有被後來的決策推翻而沒標 superseded？

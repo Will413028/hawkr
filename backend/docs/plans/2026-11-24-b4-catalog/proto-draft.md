@@ -8,7 +8,7 @@
 
 ## 0. 依據與設計前提
 
-每條規則都標出處，縮寫：`計畫`＝`backend/docs/plans/2026-11-24-b4-catalog.md`；`簡報`＝`…/2026-11-24-b4-catalog/decision-brief.md`；`IF`＝`interface-inventory.md`；`CI`＝`client-inventory.md`；`規範`＝`docs/共通規範/API 設計規範（Connect）.md`。
+每條規則都標出處，縮寫：`計畫`＝`backend/docs/plans/2026-11-24-b4-catalog.md`；`簡報`＝`…/2026-11-24-b4-catalog/decision-brief.md`；`IF`＝`interface-inventory.md`；`CI`＝`client-inventory.md`；`規範`＝`docs/conventions/api-design-guidelines-connect.md`。
 
 - **三支 service**（計畫 B4-3 範圍「D4 的三支 service」、D4 已決）：`CatalogPublicService`（任何人）、`SellerCatalogAppService`（賣家）、`CatalogAdminService`（管理員）。代行的 `CatalogDelegatedService` 是 B4-5d（計畫 D9、B4-5d），本稿排除。
 - **檔案與 package**（規範 §一）：前台一個檔案 `api/hawkr/catalog/v1alpha1/catalog.proto`，Public 與賣家 App 兩個 service 共用此檔（既有檔頭寫明「服務與 RPC 隨後的步驟加入」【量】）；後台獨立 `api/hawkr/admin/catalog/v1alpha1/catalog.proto`，package `hawkr.admin.catalog.v1alpha1`。

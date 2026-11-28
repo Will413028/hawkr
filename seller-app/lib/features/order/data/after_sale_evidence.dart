@@ -27,7 +27,7 @@ library;
 /// `evidenceType` 合法值（CodeMeta `AfterSaleEvidenceType` 的 Value）。
 ///
 /// 值是數字碼字串，不是 `BUYER` / `SELLER` 這類角色字面值——
-/// 見 `backend/docs/代碼管理（CodeMeta）/內部技術碼.md#aftersaleevidencetype`。
+/// 見 `backend/docs/codemeta/internal-technical-codes.md#aftersaleevidencetype`。
 /// 該 enum 標記為「前端可見: Yes」但目前沒有 Flutter 端的 codegen 產物
 /// （`lib/core/codemeta/code_meta.dart` 不含它），所以只能在此宣告字面值。
 abstract final class AfterSaleEvidenceType {

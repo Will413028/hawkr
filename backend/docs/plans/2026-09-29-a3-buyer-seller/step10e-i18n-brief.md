@@ -235,7 +235,7 @@ L 是在「只有 zh-TW」下為消除四端手抄與條款用語漂移而設計
 | 台灣沒有日光節約時間 | REAL | — |
 | 物流單據用中文地址 | REAL（第三方） | — |
 | 分類在 Java product-service，步驟 B 才搬 | REAL（排定的搬遷） | 計畫 |
-| 商品檢索是 `searchable_text`＋`pg_trgm`，內容是中文 | REAL 到分類搬遷為止 | `backend/docs/詳細設計書/02-產品微服務（Product Service）詳細設計書.md:63` |
+| 商品檢索是 `searchable_text`＋`pg_trgm`，內容是中文 | REAL 到分類搬遷為止 | `backend/docs/detailed-design/02-product-service-detailed-design.md:63` |
 
 ### 建議（只依 REAL 調整）
 1. **時間**：四端業務時間一律台北時間。website 擴充 `taipei.ts`，加 en 的樣式表，不用 `Intl`。App 的約 49 處顯示用 `toLocal()` 改用 `taipei_time.dart`（加 `intl` 的 `DateFormat` 處理 en 月份名稱）；8 處時間差維持不變，或統一改成 `toUtc()` 避免誤讀。裝置或瀏覽器時區不是台北時，在 client 標「台北時間／Taipei time」。聊天訊息的時間也用台北時間：一致比「跟裝置走」重要，而且使用者幾乎都在台灣〔INFERENCE〕。

@@ -22,7 +22,7 @@ import java.io.IOException;
  * 來源: Order Service 確認收貨（買家主動或排程自動完成）後發布
  *
  * 收到事件後將 shipments.receipt_confirmed 標記為 TRUE
- * MANUAL ACK + DLQ：parse 失敗或 DB 異常 → NACK + DLQ（docs/開發規範/MQ 與事件管理規範.md §1.3，2026-05-20）
+ * MANUAL ACK + DLQ：parse 失敗或 DB 異常 → NACK + DLQ（docs/dev-guidelines/mq-and-event-management-guidelines.md §1.3，2026-05-20）
  */
 @Component
 public class OrderReceiptConfirmedConsumer {

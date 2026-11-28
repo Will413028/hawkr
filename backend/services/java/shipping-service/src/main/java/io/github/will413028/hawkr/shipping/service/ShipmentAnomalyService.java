@@ -28,7 +28,7 @@ import java.util.List;
  * <ul>
  *   <li>異常存在性由 shipments 既有欄位推導（{@link ShipmentAnomalyQueryMapper}），不存獨立狀態</li>
  *   <li>ack 表只記使用者操作；UNIQUE(shipment_id, anomaly_type) 變更走 UPDATE 同筆</li>
- *   <li>所有寫入點透過 CodeMetaValidator.requireValidValue 驗 Enum 合法性（docs/開發規範/Java 微服務開發規範.md §6.4）</li>
+ *   <li>所有寫入點透過 CodeMetaValidator.requireValidValue 驗 Enum 合法性（docs/dev-guidelines/java-microservices-development-guidelines.md §6.4）</li>
  *   <li>查 shipment 屬於該 seller 防 IDOR</li>
  * </ul>
  *

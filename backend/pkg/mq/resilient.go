@@ -450,7 +450,7 @@ func partitionConsumable(subs []Subscription, declare declareFunc) ([]Subscripti
 					"check that %s is declared in infra/mq/topology/topology.yaml and fix it via PR "+
 					"(CI applies; destructive changes need a manual run with allow_destructive=true). "+
 					"Do NOT delete the queue by hand on dev/prod - nothing will re-create it. "+
-					"SOP: docs/基礎建設/MQ Topology 管理（Terraform）.md",
+					"SOP: docs/infrastructure/mq-topology-management-terraform.md",
 					sub.Queue, err, DLXExchangeOf(sub.Queue), sub.Queue)
 				continue
 			}

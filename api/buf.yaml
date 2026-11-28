@@ -1,7 +1,7 @@
 # 對外 API 的契約（Protobuf＋Connect）。三個生成端各自用自己目錄的 buf.gen.yaml 生成：
 #   backend/buf.gen.connect.yaml、packages/hawkr-api-ts/buf.gen.yaml（website 與 admin 共用）、packages/hawkr_api/buf.gen.yaml
 # 外掛一律在本機執行，版本固定在各消費端的 go.mod、package.json、pubspec.yaml；buf CLI 的版本在 .buf-version。
-# 慣例：`docs/共通規範/API 設計規範（Connect）.md`；決策：docs/adr/2026-09-26-external-contract-protobuf-connect.md。
+# 慣例：`docs/conventions/api-design-guidelines-connect.md`；決策：docs/adr/2026-09-26-external-contract-protobuf-connect.md。
 version: v2
 # field_behavior（AIP-203）的註記。版本與消費端生成 google/rpc/error_details.proto 的 commit 相同，
 # 鎖在 buf.lock；API contract CI 檢查四處一致。
