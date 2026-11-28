@@ -140,6 +140,11 @@ func (f *Fake) Hold(ctx context.Context, assetIDs []uuid.UUID, source string, so
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, "hold "+source)
 	for _, id := range assetIDs {
+		if a, ok := f.confirmed[id]; ok && a.Visibility != VisibilitySecure {
+			return ErrNotSecure
+		}
+	}
+	for _, id := range assetIDs {
 		if f.deleted[id] {
 			return ErrAssetGone
 		}

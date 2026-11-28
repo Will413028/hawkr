@@ -6,7 +6,7 @@
    "file": "backend/internal/modules/media/internal/hold/hold.go",
    "old": "\tif err := q.InsertDeleteGate(ctx, store.InsertDeleteGateParams{AssetID: assetID, Now: now}); err != nil {\n\t\treturn false, fmt.Errorf(\"media：登記資產 %s 的刪除閘門：%w\", assetID, err)\n\t}\n",
    "new": "",
-   "test": "internal/modules/media ^TestWorkerSkipsAnUncommittedHoldWithoutWaitingOrDeleting$",
+   "test": "internal/modules/media ^(TestWorkerSkipsAnUncommittedHoldWithoutWaitingOrDeleting|TestClaimGateRefusesHeldAssetAndTakesFreeOne)$",
    "why": "worker 認領不再登記刪除閘門，也就不再與擁有者未提交的保全閘門搶同一個唯一鍵：撞不到、不逾時，把被保全的資產推進 DELETING，並行測試要紅。"
   },
   {
@@ -80,6 +80,33 @@
    "new": "\t\t_ = r\n",
    "test": "internal/modules/media ^TestHoldOnDeletingAssetReturnsAssetGone$",
    "why": "Hold 不再因資產不是 STAGED 回 ErrAssetGone：對刪除中的資產登記了保全，測試要紅。"
+  },
+  {
+   "id": "claim-skips-settle",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "\tif _, err := Settle(ctx, q, assetID, now); err != nil {\n\t\treturn false, err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/media ^TestClaimGateRefusesHeldAssetAndTakesFreeOne$",
+   "why": "認領刪除閘門前不再清到期與已解除的保全：保全到期後仍取不到刪除閘門、到期保全列沒被清掉，測試要紅。"
+  },
+  {
+   "id": "hold-accepts-public-asset",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "\tif secureOnly {\n",
+   "new": "\tif false && secureOnly {\n",
+   "test": "internal/modules/media ^TestHoldRejectsPublicAsset$",
+   "why": "對外的 Hold 不再拒絕公開資產：公開資產被登記保全與閘門，測試要紅。"
+  },
+  {
+   "id": "copy-completion-ignores-deleted-copy",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/copy_secure.go",
+   "old": "\t\tif model.AssetState(state) != model.AssetStaged {\n\t\t\tabandoned = true",
+   "new": "\t\tif false && model.AssetState(state) != model.AssetStaged {\n\t\t\tabandoned = true",
+   "test": "internal/modules/media ^TestCopyToSecureAbandonsWhenTheCopyIsDeletedMidCopy$",
+   "why": "複製完成的 transaction 不再檢查副本資產狀態：複製中被刪除的副本被記上段、物件留下，測試要紅。"
   }
  ]
 }

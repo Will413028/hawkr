@@ -8,7 +8,7 @@
 
 schema `media`（`db/schema.sql`）：`assets`（列上 `state` 只記物理生命週期 `STAGED → DELETING → DELETED`，`ACTIVE` 由認領與刪除請求推導）、`staged_uploads`（token 只存 SHA-256；`PENDING → UPLOADED → READY｜REJECTED → CONFIRMED`，`CONFIRMED` 由 settle 物化，GC 走 `DELETING → DELETED`）、`upload_claims`（Confirm 與 GC 搶的認領）、`asset_deletion_requests`（擁有者的刪除請求）；登記在 `cmd/hawkr/modules.go`。
 
-子領域：`internal/upload`（上傳、處理 job、機敏上傳與讀取）、`internal/image`（libvips 重新編碼）、`internal/secure`（STREAM AEAD、DEK 包裹、KEK 金鑰環）、`internal/storage`（`Store` port、R2 與 S3 相容 adapter、`Fake`）、`internal/reclaim`（刪除請求、套用 job、GC、實體刪除；見其 `AGENTS.md`）、`internal/model`（狀態、上限、期限的唯一定義）。讀取模型：無。
+子領域：`internal/upload`（上傳、處理 job、機敏上傳與讀取）、`internal/image`（libvips 重新編碼）、`internal/secure`（STREAM AEAD、DEK 包裹、KEK 金鑰環）、`internal/storage`（`Store` port、R2 與 S3 相容 adapter、`Fake`）、`internal/reclaim`（刪除請求、套用 job、GC、實體刪除、保全；見其 `AGENTS.md`）、`internal/model`（狀態、上限、期限的唯一定義）。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -31,9 +31,9 @@ schema `media`（`db/schema.sql`）：`assets`（列上 `state` 只記物理生�
 - GC 只刪過期未確認的暫存與其物件，已確認資產只由 `MarkDeleted` 刪；GC 絕不等擁有者未提交的認領（`lock_timeout`），細則見 `internal/reclaim/AGENTS.md`。守門：`TestGC_NeverDeletesConfirmedAssets`、`TestStorageIsNeverCalledInsideATransaction`。
 - 期限與上限只在 `internal/model` 定義一次（`UploadTTL`、`PresignTTL`、`StuckUploadGrace`、`Max*`）。守門：`TestStuckUploadGraceOutlastsEveryProcessAttempt`。
 - `public/` 的圖片一律經 libvips 重新編碼，細則見 `internal/image/AGENTS.md`。
-- 機敏檔只以密文落地：`PutSecureChunk` 逐段（`model.SecureChunkSize`）收，第 0 段依 magic bytes 辨認，每段核對長度、在記憶體加密後寫成新 key 的物件，無金鑰環不寫。守門：`TestCiphertextHoldsNoPlaintext`。
-- 機敏資產讀到的每一段都是推進成功那次請求寫的物件（B1-D17）：條件式推進，輸家刪自己的物件；密文 v2 的 AAD 綁資產、段序號、段總數；`object_key` 是前綴，各段在 `secure_chunks`，列數不等於 `chunk_count` 回 `secure.ErrCorrupt`。守門：`TestChunks_SwappedChunksFailToDecrypt`。
-- 保全（D34）只登記在 SECURE 證據副本：被保全的資產永不離開原狀態，其暫存列不留在 `DELETING`；與刪除搶 `asset_gates.asset_id` 唯一鍵，worker 帶 `lock_timeout` 撞上就跳過；`CopyToSecure` 兩段式。細則見 reclaim、upload 的 `AGENTS.md`。
+- 機敏檔只以密文落地：`PutSecureChunk` 逐段（`model.SecureChunkSize`）收，第 0 段依 magic bytes 辨認，每段核對長度、在記憶體加密後寫成新 key 的物件，沒有金鑰環就不寫。守門：`TestCiphertextHoldsNoPlaintext`、`TestSecureUpload_NoPlaintextInAnyPutOrStoredObject`（CI）。
+- 機敏資產讀到的每一段都是推進成功那次請求寫的物件（B1-D17）：條件式推進，輸家刪自己的物件；密文 v2 的 AAD 綁資產、段序號、段總數；`object_key` 是前綴，各段在 `secure_chunks`，列數不等於 `chunk_count` 回 `secure.ErrCorrupt`。守門：`TestChunks_SwappedChunksFailToDecrypt`、`TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObject`（CI）。
+- 保全（D34）與 `CopyToSecure` 的機制見 `internal/reclaim`、`internal/upload` 的 `AGENTS.md`。
 
 ## 不負責
 

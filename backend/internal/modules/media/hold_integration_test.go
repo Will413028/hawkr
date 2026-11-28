@@ -6,12 +6,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/hold"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -646,5 +649,66 @@ func TestHoldAfterTheDeletionGateCommitsReturnsAssetGoneEvenWhenStateLooksStaged
 	}
 	if n := holdsOf(t, f, a.ID); n != 0 {
 		t.Fatalf("不該留下保全列，有 %d 筆", n)
+	}
+}
+
+func TestHoldRejectsPublicAsset(t *testing.T) {
+	f := setup(t)
+	src, _ := publicSource(t, f)
+	err := holdInTx(f, src.ID, uuid.New(), f.clock.Now().Add(time.Hour))
+	if !errors.Is(err, media.ErrNotSecure) {
+		t.Fatalf("Hold 對公開資產 = %v，預期 ErrNotSecure", err)
+	}
+	if n := holdsOf(t, f, src.ID); n != 0 {
+		t.Fatalf("被拒的 Hold 留下 %d 筆保全列", n)
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.asset_gates WHERE asset_id = $1`, src.ID); n != 0 {
+		t.Fatalf("被拒的 Hold 留下 %d 個閘門", n)
+	}
+}
+
+func TestCopyToSecureAbandonsWhenTheCopyIsDeletedMidCopy(t *testing.T) {
+	f := setup(t)
+	src, _ := publicSource(t, f)
+	var copyID uuid.UUID
+	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
+		var err error
+		copyID, err = f.m.CopyToSecure(ctx, owner, src.ID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("CopyToSecure：%v", err)
+	}
+	prefix := storage.SecurePrefix(copyID)
+	var once sync.Once
+	f.store.setAfterPut(func(key string) {
+		if !strings.HasPrefix(key, prefix) {
+			return
+		}
+		once.Do(func() {
+			if err := markDeletedInTx(f, copyID); err != nil {
+				t.Error(err)
+			}
+			deleteAll(t, f)
+		})
+	})
+	if _, err := f.m.ProcessCopies(t.Context()); err != nil {
+		t.Fatalf("ProcessCopies：%v", err)
+	}
+	if got := physicalAssetState(t, f, copyID); got != "DELETED" {
+		t.Fatalf("複製中被刪除的副本狀態 = %s，預期 DELETED", got)
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.secure_chunks WHERE asset_id = $1`, copyID); n != 0 {
+		t.Fatalf("已刪除的副本被記了 %d 段", n)
+	}
+	keys, err := f.store.List(t.Context(), prefix)
+	if err != nil || len(keys) != 0 {
+		t.Fatalf("放棄後副本前綴下還有物件 %v，err=%v", keys, err)
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.asset_copy_requests WHERE asset_id = $1 AND failed_at IS NOT NULL AND completed_at IS NULL`, copyID); n != 1 {
+		t.Fatal("複製請求要標為失敗")
+	}
+	if n := holdsOf(t, f, src.ID); n != 0 {
+		t.Fatalf("放棄後原圖上的待複製保全要釋放，還有 %d 筆", n)
 	}
 }

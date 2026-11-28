@@ -37,7 +37,7 @@ func SetLockTimeout(ctx context.Context, c execer) error {
 	return nil
 }
 
-var ErrContended = errors.New("media：保全登記撞上資產整理，請重試")
+var ErrContended = errors.New("media：保全閘門一再被整理，請重試")
 
 func IsContention(err error) bool {
 	var pgErr *pgconn.PgError
@@ -50,7 +50,7 @@ func sortedIDs(assetIDs []uuid.UUID) []uuid.UUID {
 	return slices.Compact(ids)
 }
 
-func Place(ctx context.Context, q *store.Queries, assetIDs []uuid.UUID, source string, sourceID uuid.UUID, until, now time.Time) error {
+func Place(ctx context.Context, q *store.Queries, assetIDs []uuid.UUID, source string, sourceID uuid.UUID, until, now time.Time, secureOnly bool) error {
 	if source == "" {
 		return fmt.Errorf("media：保全的來源不得為空")
 	}
@@ -67,6 +67,13 @@ func Place(ctx context.Context, q *store.Queries, assetIDs []uuid.UUID, source s
 	}
 	if len(states) != len(ids) {
 		return model.ErrAssetNotFound
+	}
+	if secureOnly {
+		for _, r := range states {
+			if model.Visibility(r.Visibility) != model.VisibilitySecure {
+				return model.ErrNotSecure
+			}
+		}
 	}
 	for _, r := range states {
 		if model.AssetState(r.State) != model.AssetStaged {
@@ -92,7 +99,7 @@ func Place(ctx context.Context, q *store.Queries, assetIDs []uuid.UUID, source s
 		err = q.InsertHolds(ctx, store.InsertHoldsParams{Ids: ids, Source: source, SourceID: sourceID, Until: until, Now: now})
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
-			return ErrContended
+			return model.ErrAssetGone
 		}
 		if err != nil {
 			return fmt.Errorf("media：登記保全：%w", err)
@@ -113,7 +120,7 @@ func Extend(ctx context.Context, q *store.Queries, source string, sourceID uuid.
 	err = q.ExtendHolds(ctx, store.ExtendHoldsParams{Source: source, SourceID: sourceID, Until: until, Now: now})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
-		return ErrContended
+		return model.ErrAssetGone
 	}
 	if err != nil {
 		return fmt.Errorf("media：延長保全：%w", err)

@@ -528,12 +528,13 @@ func (q *Queries) ListAssetIDs(ctx context.Context) ([]uuid.UUID, error) {
 }
 
 const listAssetStates = `-- name: ListAssetStates :many
-SELECT id, state FROM media.assets WHERE id = ANY($1::uuid[]) ORDER BY id
+SELECT id, state, visibility FROM media.assets WHERE id = ANY($1::uuid[]) ORDER BY id
 `
 
 type ListAssetStatesRow struct {
-	ID    uuid.UUID
-	State string
+	ID         uuid.UUID
+	State      string
+	Visibility string
 }
 
 func (q *Queries) ListAssetStates(ctx context.Context, ids []uuid.UUID) ([]ListAssetStatesRow, error) {
@@ -545,7 +546,7 @@ func (q *Queries) ListAssetStates(ctx context.Context, ids []uuid.UUID) ([]ListA
 	items := []ListAssetStatesRow{}
 	for rows.Next() {
 		var i ListAssetStatesRow
-		if err := rows.Scan(&i.ID, &i.State); err != nil {
+		if err := rows.Scan(&i.ID, &i.State, &i.Visibility); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -765,6 +766,17 @@ func (q *Queries) ListPendingDeletionRequests(ctx context.Context, arg ListPendi
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockAssetStateShared = `-- name: LockAssetStateShared :one
+SELECT state FROM media.assets WHERE id = $1::uuid FOR SHARE
+`
+
+func (q *Queries) LockAssetStateShared(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, lockAssetStateShared, id)
+	var state string
+	err := row.Scan(&state)
+	return state, err
 }
 
 const lockDeletingAsset = `-- name: LockDeletingAsset :one

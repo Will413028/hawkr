@@ -57,7 +57,7 @@ func (s *Service) CopyToSecure(ctx context.Context, uploader model.Uploader, sou
 	}
 	count := secureChunkCount(src.SizeBytes)
 	prefix := storage.SecurePrefix(copyID)
-	if err := hold.Place(ctx, q, []uuid.UUID{sourceID}, model.CopySource, copyID, now.Add(model.CopyHoldTTL), now); err != nil {
+	if err := hold.Place(ctx, q, []uuid.UUID{sourceID}, model.CopySource, copyID, now.Add(model.CopyHoldTTL), now, false); err != nil {
 		if errors.Is(err, model.ErrAssetGone) || errors.Is(err, model.ErrAssetNotFound) {
 			return uuid.UUID{}, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 		}
@@ -162,12 +162,27 @@ func (s *Service) copyOne(ctx context.Context, r store.MediaAssetCopyRequest) er
 		}
 		keys = append(keys, key)
 	}
-	won := false
+	won, abandoned := false, false
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
 			return err
 		}
 		q := s.q(ctx)
+		state, err := q.LockAssetStateShared(ctx, r.AssetID)
+		if err != nil {
+			return fmt.Errorf("media：鎖定副本 %s 的狀態：%w", r.AssetID, err)
+		}
+		if model.AssetState(state) != model.AssetStaged {
+			abandoned = true
+			failedAt := s.d.Now()
+			if _, err := q.FailCopyRequest(ctx, store.FailCopyRequestParams{AssetID: r.AssetID, Now: &failedAt}); err != nil {
+				return fmt.Errorf("media：標記複製失敗：%w", err)
+			}
+			if err := hold.ReleaseSource(ctx, q, model.CopySource, r.AssetID); err != nil {
+				return fmt.Errorf("media：釋放待複製保全：%w", err)
+			}
+			return nil
+		}
 		now := s.d.Now()
 		n, err := q.CompleteCopyRequest(ctx, store.CompleteCopyRequestParams{AssetID: r.AssetID, Now: &now})
 		if err != nil {
@@ -189,6 +204,9 @@ func (s *Service) copyOne(ctx context.Context, r store.MediaAssetCopyRequest) er
 	})
 	if err != nil || !won {
 		s.deleteCopyObjects(ctx, keys)
+	}
+	if err == nil && abandoned {
+		s.d.Logger.WarnContext(ctx, "media：放棄複製請求", "asset_id", r.AssetID, "source_asset_id", r.SourceAssetID, "reason", "副本資產已在刪除")
 	}
 	return err
 }

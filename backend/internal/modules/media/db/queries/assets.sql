@@ -78,7 +78,10 @@ DELETE FROM media.upload_claims WHERE asset_id = sqlc.arg(asset_id)::uuid;
 DELETE FROM media.asset_deletion_requests WHERE asset_id = sqlc.arg(asset_id);
 
 -- name: ListAssetStates :many
-SELECT id, state FROM media.assets WHERE id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY id;
+SELECT id, state, visibility FROM media.assets WHERE id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY id;
+
+-- name: LockAssetStateShared :one
+SELECT state FROM media.assets WHERE id = sqlc.arg(id)::uuid FOR SHARE;
 
 -- name: InsertHoldGates :exec
 INSERT INTO media.asset_gates (asset_id, kind, created_at)

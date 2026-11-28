@@ -20,7 +20,7 @@ func (s *Service) Hold(ctx context.Context, assetIDs []uuid.UUID, source string,
 	if err := model.RequireTx(ctx); err != nil {
 		return err
 	}
-	return hold.Place(ctx, s.q(ctx), assetIDs, source, sourceID, until, s.d.Now())
+	return hold.Place(ctx, s.q(ctx), assetIDs, source, sourceID, until, s.d.Now(), true)
 }
 
 func (s *Service) ExtendHold(ctx context.Context, source string, sourceID uuid.UUID, until time.Time) error {
