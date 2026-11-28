@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 const testAccountID = int64(1001)
@@ -62,20 +63,10 @@ func newCatalogBuyerFixture(t *testing.T) *catalogBuyerFixture {
 func (f *catalogBuyerFixture) seedExposableStore() int64 {
 	f.t.Helper()
 	ctx := context.Background()
-	now := time.Now()
-	f.exec(ctx, `DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
-	f.exec(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $1, '測試店', 'logo/k', $3, '63000010', $2, $2)`, testAccountID, now, uuid.NewV7())
-	var storeID int64
-	if err := f.d.Pool().QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", testAccountID).Scan(&storeID); err != nil {
+	storeID, err := sellerfixture.ExposableStore(ctx, f.d, testAccountID, time.Now())
+	if err != nil {
 		f.t.Fatal(err)
 	}
-	f.exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, now, uuid.NewV7())
-	f.exec(ctx, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
 	return storeID
 }
 

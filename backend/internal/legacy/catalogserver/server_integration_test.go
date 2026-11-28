@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -32,16 +33,14 @@ type noopNotifier struct{}
 func (noopNotifier) NotifyRestocked(context.Context, catalog.RestockedSKU) error { return nil }
 func (noopNotifier) PurgeSKUSubscriptions(context.Context, []uuid.UUID) error    { return nil }
 
-const (
-	storeID   = int64(7001)
-	accountID = int64(1001)
-)
+const accountID = int64(1001)
 
 type fixture struct {
-	t   *testing.T
-	m   *catalog.Module
-	srv *Server
-	seq int
+	t       *testing.T
+	m       *catalog.Module
+	srv     *Server
+	seq     int
+	storeID int64
 }
 
 func setup(t *testing.T) (*fixture, context.Context) {
@@ -54,7 +53,12 @@ func setup(t *testing.T) (*fixture, context.Context) {
 	))
 	now := time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
 	m := catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return now }, Media: media.NewFake(), Events: events.NewBus(), Restock: noopNotifier{}})
-	return &fixture{t: t, m: m, srv: New(m, slog.New(slog.NewTextHandler(io.Discard, nil)))}, context.Background()
+	ctx := context.Background()
+	storeID, err := sellerfixture.ExposableStore(ctx, d, accountID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fixture{t: t, m: m, srv: New(m, slog.New(slog.NewTextHandler(io.Discard, nil))), storeID: storeID}, ctx
 }
 
 func (f *fixture) product(ctx context.Context, title string, stock int32, compare *int64) catalog.Product {
@@ -71,14 +75,14 @@ func (f *fixture) product(ctx context.Context, title string, stock int32, compar
 			break
 		}
 	}
-	p, err := f.m.CreateProduct(ctx, storeID, media.Uploader{ID: accountID}, uuid.NewV7(), catalog.ProductInput{
+	p, err := f.m.CreateProduct(ctx, f.storeID, media.Uploader{ID: accountID}, uuid.NewV7(), catalog.ProductInput{
 		Title: title, CategoryID: leaf, Gallery: []catalog.Image{{Token: fmt.Sprintf("img-%d", f.seq)}},
 		Skus: []catalog.SkuInput{{Price: 120, CompareAtPrice: compare, StockQty: stock}},
 	}, nil)
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if _, err := f.m.SetProductStatus(ctx, storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
+	if _, err := f.m.SetProductStatus(ctx, f.storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
 		f.t.Fatal(err)
 	}
 	return p
@@ -86,7 +90,7 @@ func (f *fixture) product(ctx context.Context, title string, stock int32, compar
 
 func (f *fixture) stock(ctx context.Context, sku uuid.UUID) int32 {
 	f.t.Helper()
-	s, err := f.m.OwnSku(ctx, storeID, sku)
+	s, err := f.m.OwnSku(ctx, f.storeID, sku)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -175,7 +179,7 @@ func TestSnapshotRpcsAgainstTheRealCatalog(t *testing.T) {
 		t.Fatalf("checkout info = %v", x)
 	}
 
-	if _, err := f.m.SetProductStatus(ctx, storeID, p.ID, mustVersion(t, f, ctx, p.ID), catalog.StatusArchived, nil); err != nil {
+	if _, err := f.m.SetProductStatus(ctx, f.storeID, p.ID, mustVersion(t, f, ctx, p.ID), catalog.StatusArchived, nil); err != nil {
 		t.Fatal(err)
 	}
 	checkout, _ = f.srv.BatchGetProductForCheckout(ctx, connect.NewRequest(&pb.BatchGetProductForCheckoutRequest{SkuIds: []string{sku.String()}}))
@@ -186,7 +190,7 @@ func TestSnapshotRpcsAgainstTheRealCatalog(t *testing.T) {
 
 func mustVersion(t *testing.T, f *fixture, ctx context.Context, id uuid.UUID) int64 {
 	t.Helper()
-	p, err := f.m.Product(ctx, storeID, id)
+	p, err := f.m.Product(ctx, f.storeID, id)
 	if err != nil {
 		t.Fatal(err)
 	}

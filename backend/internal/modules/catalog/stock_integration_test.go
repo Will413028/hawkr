@@ -14,24 +14,36 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
-var epoch = time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+var epoch = time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
+
+const (
+	stockStoreID      = int64(501)
+	stockAccountID    = int64(1001)
+	stockOtherStoreID = int64(502)
+	stockOtherAccount = int64(1002)
+)
 
 type fixture struct {
-	t  *testing.T
-	d  *db.DB
-	m  *Module
-	ct context.Context
-	rn *recordingNotifier
+	t        *testing.T
+	d        *db.DB
+	m        *Module
+	ct       context.Context
+	rn       *recordingNotifier
+	products *productFixture
 }
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	d := setup(t)
-	rn := &recordingNotifier{}
-	return &fixture{t: t, d: d, ct: context.Background(), rn: rn, m: New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }, Events: events.NewBus(), Restock: rn})}
+	products := newProductFixture(t)
+	for _, store := range []struct{ id, accountID int64 }{{stockStoreID, stockAccountID}, {stockOtherStoreID, stockOtherAccount}} {
+		if err := sellerfixture.ExposableStoreWithID(products.ct, products.d, store.id, store.accountID, epoch); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return &fixture{t: t, d: products.d, m: products.m, ct: products.ct, rn: products.rn, products: products}
 }
 
 func (f *fixture) exec(sql string, args ...any) error {
@@ -46,20 +58,13 @@ func (f *fixture) must(err error) {
 	}
 }
 
-func (f *fixture) leaf() uuid.UUID {
-	f.t.Helper()
-	var id uuid.UUID
-	f.must(f.d.Pool().QueryRow(f.ct, `SELECT id FROM catalog.categories WHERE parent_id IS NOT NULL ORDER BY id LIMIT 1`).Scan(&id))
-	return id
-}
-
 func (f *fixture) sku(qty int) uuid.UUID {
 	f.t.Helper()
-	pid, sid := uuid.NewV7(), uuid.NewV7()
-	f.must(f.exec(`INSERT INTO catalog.products (id, store_id, category_id, title, status, min_price, max_price, created_at, updated_at)
-		VALUES ($1, 501, $2, 'p', 'DRAFT', 100, 100, $3, $3)`, pid, f.leaf(), epoch))
-	f.must(f.exec(`INSERT INTO catalog.product_skus (id, product_id, price, stock_qty, created_at, updated_at) VALUES ($1, $2, 100, $3, $4, $4)`, sid, pid, qty, epoch))
-	return sid
+	in := f.products.input("庫存測試")
+	in.Skus[0].StockQty = int32(qty)
+	p := f.products.create(stockStoreID, stockAccountID, in)
+	f.products.activate(stockStoreID, p.ID)
+	return p.Skus[0].ID
 }
 
 func (f *fixture) stockOf(sku uuid.UUID) int {

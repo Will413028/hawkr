@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -28,12 +29,14 @@ type noopNotifier struct{}
 func (noopNotifier) NotifyRestocked(context.Context, catalog.RestockedSKU) error { return nil }
 func (noopNotifier) PurgeSKUSubscriptions(context.Context, []uuid.UUID) error    { return nil }
 
-const (
-	storeID   = int64(7001)
-	accountID = int64(1001)
-)
+const accountID = int64(1001)
 
-func setup(t *testing.T) (*catalog.Module, context.Context) {
+type fixture struct {
+	m       *catalog.Module
+	storeID int64
+}
+
+func setup(t *testing.T) (*fixture, context.Context) {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "media", Dir: media.Migrations()},
@@ -42,12 +45,17 @@ func setup(t *testing.T) (*catalog.Module, context.Context) {
 		migrate.Module{Name: "catalog", Dir: catalog.Migrations()},
 	))
 	now := time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
-	return catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return now }, Media: media.NewFake(), Events: events.NewBus(), Restock: noopNotifier{}}), context.Background()
+	ctx := context.Background()
+	storeID, err := sellerfixture.ExposableStore(ctx, d, accountID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fixture{m: catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return now }, Media: media.NewFake(), Events: events.NewBus(), Restock: noopNotifier{}}), storeID: storeID}, ctx
 }
 
-func product(t *testing.T, m *catalog.Module, ctx context.Context, stock int32) catalog.Product {
+func product(t *testing.T, f *fixture, ctx context.Context, stock int32) catalog.Product {
 	t.Helper()
-	cats, err := m.Categories(ctx)
+	cats, err := f.m.Categories(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,11 +66,14 @@ func product(t *testing.T, m *catalog.Module, ctx context.Context, stock int32) 
 			break
 		}
 	}
-	p, err := m.CreateProduct(ctx, storeID, media.Uploader{ID: accountID}, uuid.NewV7(), catalog.ProductInput{
+	p, err := f.m.CreateProduct(ctx, f.storeID, media.Uploader{ID: accountID}, uuid.NewV7(), catalog.ProductInput{
 		Title: "手工皂", CategoryID: leaf, Gallery: []catalog.Image{{Token: "img-" + uuid.NewV7().String()}},
 		Skus: []catalog.SkuInput{{Price: 120, StockQty: stock}},
 	}, nil)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.SetProductStatus(ctx, f.storeID, p.ID, p.Version, catalog.StatusActive, nil); err != nil {
 		t.Fatal(err)
 	}
 	return p
@@ -70,27 +81,27 @@ func product(t *testing.T, m *catalog.Module, ctx context.Context, stock int32) 
 
 func TestCancelledOrderRestoresStockOnceAgainstTheRealCatalog(t *testing.T) {
 	t.Parallel()
-	m, ctx := setup(t)
-	p := product(t, m, ctx, 10)
+	f, ctx := setup(t)
+	p := product(t, f, ctx, 10)
 	sku := p.Skus[0].ID
-	if err := m.DeductStock(ctx, "tx-1", []catalog.StockItem{{SkuID: sku, Quantity: 4}}); err != nil {
+	if err := f.m.DeductStock(ctx, "tx-1", []catalog.StockItem{{SkuID: sku, Quantity: 4}}); err != nil {
 		t.Fatal(err)
 	}
 	body := fmt.Appendf(nil, `{"order_no":"O1","stock_tx_id":"tx-1","items":[{"sku_id":%q,"quantity":"4"}]}`, sku.String())
-	c := Consumer{Catalog: m}
+	c := Consumer{Catalog: f.m}
 	for i := range 3 {
 		if err := c.OrderCancelled(ctx, body); err != nil {
 			t.Fatalf("delivery #%d: %v", i+1, err)
 		}
 	}
-	s, err := m.OwnSku(ctx, storeID, sku)
+	s, err := f.m.OwnSku(ctx, f.storeID, sku)
 	if err != nil || s.Sku.StockQty != 10 {
 		t.Fatalf("stock = %d (%v), want 10: a resent order.cancelled restores once", s.Sku.StockQty, err)
 	}
-	if err := m.RestoreStock(ctx, catalogserver.RestoreKey("tx-1"), "tx-1", []catalog.StockItem{{SkuID: sku, Quantity: 4}}); err != nil {
+	if err := f.m.RestoreStock(ctx, catalogserver.RestoreKey("tx-1"), "tx-1", []catalog.StockItem{{SkuID: sku, Quantity: 4}}); err != nil {
 		t.Fatal(err)
 	}
-	if s, _ := m.OwnSku(ctx, storeID, sku); s.Sku.StockQty != 10 {
+	if s, _ := f.m.OwnSku(ctx, f.storeID, sku); s.Sku.StockQty != 10 {
 		t.Fatalf("stock = %d, want 10: the gRPC path shares the restore key", s.Sku.StockQty)
 	}
 	none := fmt.Appendf(nil, `{"order_no":"O2","stock_tx_id":"never","items":[{"sku_id":%q,"quantity":"1"}]}`, sku.String())
@@ -101,9 +112,9 @@ func TestCancelledOrderRestoresStockOnceAgainstTheRealCatalog(t *testing.T) {
 
 func TestSalesAreRecordedOncePerOrderNoAgainstTheRealCatalog(t *testing.T) {
 	t.Parallel()
-	m, ctx := setup(t)
-	p := product(t, m, ctx, 1)
-	c := Consumer{Catalog: m}
+	f, ctx := setup(t)
+	p := product(t, f, ctx, 1)
+	c := Consumer{Catalog: f.m}
 	body := func(order string, qty int) []byte {
 		return fmt.Appendf(nil, `{"event_id":"e","order_no":%q,"items":[{"product_id":%q,"quantity":%d}]}`, order, p.ID.String(), qty)
 	}
@@ -112,14 +123,14 @@ func TestSalesAreRecordedOncePerOrderNoAgainstTheRealCatalog(t *testing.T) {
 			t.Fatalf("delivery #%d: %v", i+1, err)
 		}
 	}
-	got, err := m.AdminProduct(ctx, p.ID)
+	got, err := f.m.AdminProduct(ctx, p.ID)
 	if err != nil || got.SalesCount != 2 {
 		t.Fatalf("sales = %d (%v), want 2: the same order_no counts once", got.SalesCount, err)
 	}
 	if err := c.OrderSalesAccumulated(ctx, body("O2", 3)); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := m.AdminProduct(ctx, p.ID); got.SalesCount != 5 {
+	if got, _ := f.m.AdminProduct(ctx, p.ID); got.SalesCount != 5 {
 		t.Fatalf("sales = %d, want 5 after a second order", got.SalesCount)
 	}
 	unknown := fmt.Appendf(nil, `{"order_no":"O3","items":[{"product_id":%q,"quantity":1}]}`, uuid.NewV7().String())
@@ -129,7 +140,7 @@ func TestSalesAreRecordedOncePerOrderNoAgainstTheRealCatalog(t *testing.T) {
 	if err := c.OrderSalesAccumulated(ctx, body("O3", 1)); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := m.AdminProduct(ctx, p.ID); got.SalesCount != 6 {
+	if got, _ := f.m.AdminProduct(ctx, p.ID); got.SalesCount != 6 {
 		t.Fatalf("sales = %d, want 6: the failed order_no was not registered", got.SalesCount)
 	}
 }

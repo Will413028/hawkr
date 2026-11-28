@@ -62,6 +62,8 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 	if got := f.mustProduct(storeID, p.ID); got.Title != "山藥" || got.Version != p.Version {
 		t.Fatalf("a rejected write must leave the product alone: %+v", got)
 	}
+	f.activate(storeID, p.ID)
+	p = f.mustProduct(storeID, p.ID)
 
 	sku := p.Skus[0].ID
 	key := func(s string) string { return uuid.NewV7().String() + s }
@@ -83,20 +85,25 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 		t.Fatalf("an update leaves the stock alone: %d", updated.Skus[0].StockQty)
 	}
 
-	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusArchived, nil))
+	archived := f.mustProduct(storeID, p.ID)
+	if archived.Version != updated.Version+1 {
+		t.Fatalf("a status change bumps the version: %d -> %d", updated.Version, archived.Version)
+	}
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, archived.Version, StatusActive, nil))
 	active := f.mustProduct(storeID, p.ID)
-	if active.Version != updated.Version+1 {
-		t.Fatalf("a status change bumps the version: %d -> %d", updated.Version, active.Version)
+	if active.Version != archived.Version+1 {
+		t.Fatalf("a status change bumps the version: %d -> %d", archived.Version, active.Version)
 	}
 	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, active.Version, StatusActive, nil))
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a no-op status change must not bump the version: %d -> %d", active.Version, got.Version)
 	}
-	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive, nil))
+	f.mustStatus(f.m.SetProductStatus(f.ct, storeID, p.ID, archived.Version, StatusActive, nil))
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a retried status change must leave the etag alone: %d -> %d", active.Version, got.Version)
 	}
-	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusArchived, nil); !errors.Is(err, ErrVersionConflict) {
+	if _, err := f.m.SetProductStatus(f.ct, storeID, p.ID, archived.Version, StatusArchived, nil); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag with a different target is still a conflict: %v", err)
 	}
 }

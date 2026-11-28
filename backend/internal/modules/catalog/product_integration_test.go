@@ -24,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/hashtag"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 type productFixture struct {
@@ -103,14 +104,11 @@ func (f *productFixture) store() (storeID, accountID int64) {
 	f.t.Helper()
 	f.seq++
 	accountID = 1000 + f.seq
-	f.exec(`INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $1, '測試店', 'logo/k', $3, '63000010', $2, $2)`, accountID, f.clock(), uuid.NewV7())
-	if err := f.d.Pool().QueryRow(f.ct, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
+	var err error
+	storeID, err = sellerfixture.ExposableStore(f.ct, f.d, accountID, f.clock())
+	if err != nil {
 		f.t.Fatal(err)
 	}
-	f.exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
-	f.exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.clock())
 	return storeID, accountID
 }
 
@@ -787,6 +785,7 @@ func TestUpdateAndMultiSkuDeductDoNotDeadlock(t *testing.T) {
 	in.Axes = colorSize()
 	in.Skus = []SkuInput{{Option1: "紅", Option2: "S", Price: 100, StockQty: 1000}, {Option1: "藍", Option2: "M", Price: 200, StockQty: 1000}}
 	p := f.create(storeID, acct, in)
+	f.activate(storeID, p.ID)
 	a, b := p.Skus[0], p.Skus[1]
 	var wg sync.WaitGroup
 	for i := range 20 {
@@ -904,6 +903,7 @@ func TestDeleteProductMakesItsSkusUndeductibleButRestorable(t *testing.T) {
 	in := f.input("刪除庫存")
 	in.Skus = []SkuInput{{Price: 100, StockQty: 10}}
 	p := f.create(storeID, acct, in)
+	f.activate(storeID, p.ID)
 	sku := p.Skus[0].ID
 	if err := f.m.DeductStock(f.ct, "before-delete", items(sku, 3)); err != nil {
 		t.Fatal(err)
