@@ -50,7 +50,6 @@ Each project's README has its own setup and run commands:
 
 Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-
 ## License
 
 [MIT](LICENSE). Third-party assets keep their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
