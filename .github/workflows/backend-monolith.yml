@@ -54,9 +54,13 @@ env:
 
 jobs:
   lint:
-    name: golangci-lint（一般／integration）
+    name: golangci-lint（${{ matrix.tags == '' && '一般' || matrix.tags }}）
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        tags: ['', integration]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,14 +79,7 @@ jobs:
         with:
           version: ${{ steps.golangci.outputs.version }}
           working-directory: backend
-          args: --config=.golangci.monolith.yml ./cmd/... ./internal/...
-      - name: golangci-lint（integration tag）
-        if: always()
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: ${{ steps.golangci.outputs.version }}
-          working-directory: backend
-          args: --config=.golangci.monolith.yml --build-tags=integration ./cmd/... ./internal/...
+          args: --config=.golangci.monolith.yml --build-tags=${{ matrix.tags }} ./cmd/... ./internal/...
 
   integration:
     name: integration test（testcontainers）
@@ -98,18 +95,18 @@ jobs:
         with:
           go-version-file: backend/.go-version
           cache: false
-      # setup-go 內建快取的 key 只看 go.sum，go.sum 不變就永遠還原第一次存的 build cache；
-      # 這裡還原最近的一份，讓 -race 編譯只重編改到的 package。只有 main、dev 的 push 存新的一份
-      # （PR 共用 base 分支的快取），避免每個 PR commit 各佔一份 repo 的快取額度。
+      - name: 快取的週次
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          key: go-monolith-integration-${{ runner.os }}-${{ steps.week.outputs.week }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
-            go-monolith-integration-${{ runner.os }}-
+            go-monolith-integration-${{ runner.os }}-${{ steps.week.outputs.week }}-${{ hashFiles('backend/go.sum') }}-
+            go-monolith-integration-${{ runner.os }}-${{ steps.week.outputs.week }}-
       # 只跑加上 integration tag 後測試執行檔會改變的 package（自己或連結進來的依賴有 tag 檔，
       # 見 scripts/integration-packages.py）；其餘 package 的測試執行檔和 check job 的 go test 相同，不重跑。
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
@@ -131,7 +128,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          key: go-monolith-integration-${{ runner.os }}-${{ steps.week.outputs.week }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
 
   check:
     name: gofmt／vet／test／tidy
@@ -147,18 +144,18 @@ jobs:
         with:
           go-version-file: backend/.go-version
           cache: false
-      # setup-go 內建快取的 key 只看 go.sum，go.sum 不變就永遠還原第一次存的 build cache；
-      # 這裡還原最近的一份，讓 -race 編譯只重編改到的 package。只有 main、dev 的 push 存新的一份
-      # （PR 共用 base 分支的快取），避免每個 PR commit 各佔一份 repo 的快取額度。
+      - name: 快取的週次
+        id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          key: go-monolith-check-${{ runner.os }}-${{ steps.week.outputs.week }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
-            go-monolith-check-${{ runner.os }}-
+            go-monolith-check-${{ runner.os }}-${{ steps.week.outputs.week }}-${{ hashFiles('backend/go.sum') }}-
+            go-monolith-check-${{ runner.os }}-${{ steps.week.outputs.week }}-
 
       - name: gofmt -l
         run: |
@@ -262,4 +259,4 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
+          key: go-monolith-check-${{ runner.os }}-${{ steps.week.outputs.week }}-${{ hashFiles('backend/go.sum') }}-${{ github.sha }}
