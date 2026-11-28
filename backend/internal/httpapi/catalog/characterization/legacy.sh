@@ -1,5 +1,6 @@
 # shellcheck shell=bash
 
+MAVEN_PL=product-service
 JAVA_HTTP_PORT=19961
 JAVA_GRPC_PORT=19962
 PRODUCT_DB=product_characterization
@@ -7,14 +8,14 @@ PRODUCT_DB=product_characterization
 legacy_start() {
   local jar
   local jars
-  jars=$(find services/java/product-service/target -maxdepth 1 -name "product-service-*.jar" \
+  jars=$(find services/java/$MAVEN_PL/target -maxdepth 1 -name "$MAVEN_PL-*.jar" \
     ! -name "*-sources.jar" ! -name "*-javadoc.jar" ! -name "original-*" 2>/dev/null || true)
   if [ -z "$jars" ]; then
-    echo "找不到 product-service 的 jar，先建：(cd services/java && ./mvnw package -pl :product-service -am -DskipTests)" >&2
+    echo "找不到 $MAVEN_PL 的 jar，先建：(cd services/java && ./mvnw package -pl :$MAVEN_PL -am -DskipTests)" >&2
     exit 1
   fi
   if [ "$(printf '%s\n' "$jars" | wc -l | tr -d ' ')" != 1 ]; then
-    echo "product-service 的 jar 不只一個，清掉 target 重建：$jars" >&2
+    echo "$MAVEN_PL 的 jar 不只一個，清掉 target 重建：$jars" >&2
     exit 1
   fi
   jar=$jars

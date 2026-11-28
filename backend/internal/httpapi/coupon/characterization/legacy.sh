@@ -1,19 +1,20 @@
 # shellcheck shell=bash
 
+MAVEN_PL=coupon-service
 JAVA_HTTP_PORT=19951
 JAVA_GRPC_PORT=19952
 
 legacy_start() {
   local jar
   local jars
-  jars=$(find services/java/coupon-service/target -maxdepth 1 -name "coupon-service-*.jar" \
+  jars=$(find services/java/$MAVEN_PL/target -maxdepth 1 -name "$MAVEN_PL-*.jar" \
     ! -name "*-sources.jar" ! -name "*-javadoc.jar" ! -name "original-*" 2>/dev/null || true)
   if [ -z "$jars" ]; then
-    echo "找不到 coupon-service 的 jar，先建：(cd services/java && ./mvnw package -pl :coupon-service -am -DskipTests)" >&2
+    echo "找不到 $MAVEN_PL 的 jar，先建：(cd services/java && ./mvnw package -pl :$MAVEN_PL -am -DskipTests)" >&2
     exit 1
   fi
   if [ "$(printf '%s\n' "$jars" | wc -l | tr -d ' ')" != 1 ]; then
-    echo "coupon-service 的 jar 不只一個，清掉 target 重建：$jars" >&2
+    echo "$MAVEN_PL 的 jar 不只一個，清掉 target 重建：$jars" >&2
     exit 1
   fi
   jar=$jars
