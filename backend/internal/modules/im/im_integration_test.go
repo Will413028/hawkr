@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 const (
@@ -217,24 +216,10 @@ func TestConversationAuthorizationIsByIDAndSide(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	seedBuyers(t, f.db, []int64{f.s1})
-	for storeID := f.s2; storeID < b1; {
-		accountID, err := sellerfixture.NewAccount(ctx, f.db, f.clock())
-		if err != nil {
-			t.Fatal(err)
-		}
-		store, err := f.stores.owner.Apply(ctx, seller.ApplyInput{
-			AccountID: accountID, StoreName: "身分隔離測試店", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路一號",
-			AcceptedAgreements: seller.CurrentApplyAcceptances(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		storeID = store.StoreID
-	}
-	f.say(t, f.buyerParty(b1), f.s1, "hi")
-	conv := f.conversation(t, b1, f.s1)
-	wrong := []im.Party{f.buyerParty(b2), f.buyerParty(f.s1), f.storeParty(t, f.s2), f.storeParty(t, b1)}
+	seedBuyers(t, f.db, []int64{f.s1, f.s2})
+	f.say(t, f.buyerParty(f.s2), f.s1, "hi")
+	conv := f.conversation(t, f.s2, f.s1)
+	wrong := []im.Party{f.buyerParty(b2), f.buyerParty(f.s1), f.storeParty(t, f.s2)}
 	for i, p := range wrong {
 		if _, err := f.m.ListMessages(ctx, conv, p, 0, 10); kindOf(err) != apperr.KindNotFound {
 			t.Fatalf("案例 %d ListMessages：%v", i, err)
