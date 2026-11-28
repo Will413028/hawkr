@@ -104,8 +104,6 @@ jobs:
           restore-keys: |
             go-monolith-integration-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
             go-monolith-integration-${{ runner.os }}-
-      - name: 把還原的 build cache 時間設成很久以前
-        run: find ~/.cache/go-build -type f -exec touch -m -d 2000-01-01T00:00:00Z {} + 2>/dev/null || true
       # 只跑加上 integration tag 後測試執行檔會改變的 package（自己或連結進來的依賴有 tag 檔，
       # 見 scripts/integration-packages.py）；其餘 package 的測試執行檔和 check job 的 go test 相同，不重跑。
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
@@ -120,11 +118,11 @@ jobs:
           mapfile -t pkgs < "$RUNNER_TEMP/integration-packages"
           echo "integration packages: ${#pkgs[@]}"
           go test -race -timeout 15m -tags integration "${pkgs[@]}"
-      - name: 刪掉這次沒用到的 build cache
+      - name: 刪掉 7 天沒用到的 build cache
         if: always() && github.event_name == 'push'
         run: |
           du -sh ~/.cache/go-build
-          find ~/.cache/go-build -type f ! -newermt 2000-01-02T00:00:00Z -delete
+          find ~/.cache/go-build -type f -mtime +7 -delete
           du -sh ~/.cache/go-build
       - name: 存 Go 快取（只有 main、dev 的 push）
         if: always() && github.event_name == 'push'
@@ -158,8 +156,6 @@ jobs:
           restore-keys: |
             go-monolith-check-${{ runner.os }}-${{ hashFiles('backend/go.sum') }}-
             go-monolith-check-${{ runner.os }}-
-      - name: 把還原的 build cache 時間設成很久以前
-        run: find ~/.cache/go-build -type f -exec touch -m -d 2000-01-01T00:00:00Z {} + 2>/dev/null || true
 
       - name: gofmt -l
         run: |
@@ -177,11 +173,9 @@ jobs:
           go vet -tags integration ./...
           go vet -tags gateway ./internal/httpapi/...
 
-      - name: go test（含依賴方向檢查；-race 只在 push 與 dev→main PR）
+      - name: go test（含依賴方向檢查）
         if: always()
-        env:
-          RACE: ${{ (github.event_name != 'pull_request' || github.base_ref == 'main') && '-race' || '' }}
-        run: go test ${RACE:+"$RACE"} ./...
+        run: go test -race ./...
 
       - name: 讀取 buf 的版本
         if: always()
@@ -256,11 +250,11 @@ jobs:
             echo "::error::go mod tidy 產生了變更，請在本機跑 go mod tidy 後 commit"
             exit 1
           fi
-      - name: 刪掉這次沒用到的 build cache
+      - name: 刪掉 7 天沒用到的 build cache
         if: always() && github.event_name == 'push'
         run: |
           du -sh ~/.cache/go-build
-          find ~/.cache/go-build -type f ! -newermt 2000-01-02T00:00:00Z -delete
+          find ~/.cache/go-build -type f -mtime +7 -delete
           du -sh ~/.cache/go-build
       - name: 存 Go 快取（只有 main、dev 的 push）
         if: always() && github.event_name == 'push'
