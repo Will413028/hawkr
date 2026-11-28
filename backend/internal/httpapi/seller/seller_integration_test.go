@@ -695,8 +695,6 @@ func TestCloseMyStoreIsRejectedWhileTheStoreHasOpenOrders(t *testing.T) {
 	}
 }
 
-// 措施記在舊 stint、帳號目前的 stint 繼承停權時，GetMyStore 的 suspended 仍為真，停權的內容經 ListMyMeasures(state=ACTIVE)
-// 讀到（措施的效果是帳號範圍）。
 func TestGetMyStoreShowsASuspensionRecordedOnAnEarlierStint(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -710,20 +708,27 @@ func TestGetMyStoreShowsASuspensionRecordedOnAnEarlierStint(t *testing.T) {
 	if _, err := f.module.CloseCurrent(ctx, f.accountID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.module.Apply(ctx, seller.ApplyInput{
-		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: f.accountID, StoreName: "新店", TownCode: "63000050", AddressDetail: "測試路二號",
-	}); err != nil {
+	_, err = f.app.ApplyStore(ctx, connect.NewRequest(validApply()))
+	wantCode(t, err, connect.CodeFailedPrecondition, "STORE_OPENING_SUSPENDED")
+	if _, err := f.module.EndMeasure(ctx, seller.EndMeasureInput{MeasureID: record.ID, AdminID: 1, ExpectedVersion: record.Version}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.app.ApplyStore(ctx, connect.NewRequest(validApply())); err != nil {
 		t.Fatal(err)
 	}
 	if f.storeID(t) == old.StoreID {
 		t.Fatal("沒有新的 stint")
 	}
 	got := f.get(t)
-	if !got.GetSuspended() {
+	if got.GetSuspended() {
 		t.Fatalf("suspended=%v", got.GetSuspended())
 	}
 	active, err := f.app.ListMyMeasures(ctx, connect.NewRequest(&pb.ListMyMeasuresRequest{State: pb.MeasureState_MEASURE_STATE_ACTIVE}))
-	if err != nil || len(active.Msg.GetMeasures()) != 1 || active.Msg.GetMeasures()[0].GetId() != record.ID.String() {
+	if err != nil || len(active.Msg.GetMeasures()) != 0 {
 		t.Fatalf("active=%v err=%v", active, err)
+	}
+	ended, err := f.app.ListMyMeasures(ctx, connect.NewRequest(&pb.ListMyMeasuresRequest{State: pb.MeasureState_MEASURE_STATE_ENDED}))
+	if err != nil || len(ended.Msg.GetMeasures()) != 1 || ended.Msg.GetMeasures()[0].GetId() != record.ID.String() || ended.Msg.GetMeasures()[0].GetState() != pb.MeasureState_MEASURE_STATE_ENDED {
+		t.Fatalf("ended=%v err=%v", ended, err)
 	}
 }

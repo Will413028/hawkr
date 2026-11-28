@@ -52,6 +52,10 @@ func (registry) Lookup(context.Context, string) (gcis.Registration, bool, error)
 	return gcis.Registration{}, false, nil
 }
 
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
 func NewModule(d *db.DB, now func() time.Time) (*seller.Module, error) {
 	return NewModuleWithEvents(d, events.NewBus(), now)
 }
@@ -77,7 +81,7 @@ func newModule(d *db.DB, bus *events.Bus, now func() time.Time, storeCode func(t
 		bus = events.NewBus()
 	}
 	queue := enqueuer{}
-	identityModule := identity.New(identity.Deps{DB: d, Events: bus, Now: now})
+	identityModule := identity.New(identity.Deps{DB: d, Events: bus, Now: now, Logger: discardLogger()})
 	payments := payment.New(payment.Deps{DB: d, Events: bus, Jobs: queue, Audit: adminaudit.New(d, now), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	mac, err := seal.ParseMAC("fixture:" + base64.StdEncoding.EncodeToString([]byte(strings.Repeat("s", 32))))
 	if err != nil {
@@ -96,7 +100,7 @@ func ExposableStore(ctx context.Context, d *db.DB, accountID int64, now time.Tim
 
 func NewAccount(ctx context.Context, d *db.DB, now time.Time) (int64, error) {
 	bus := events.NewBus()
-	module := identity.New(identity.Deps{DB: d, Events: bus, Now: func() time.Time { return now }})
+	module := identity.New(identity.Deps{DB: d, Events: bus, Now: func() time.Time { return now }, Logger: discardLogger()})
 	var accountID int64
 	for range 2 {
 		subject := uuid.NewV7().String()
@@ -118,7 +122,7 @@ func ExposableStoreNamed(ctx context.Context, d *db.DB, accountID int64, now tim
 	if err != nil {
 		return 0, err
 	}
-	identityModule := identity.New(identity.Deps{DB: d, Events: events.NewBus(), Now: clock})
+	identityModule := identity.New(identity.Deps{DB: d, Events: events.NewBus(), Now: clock, Logger: discardLogger()})
 	_, ok, err := identityModule.ContactEmail(ctx, accountID)
 	if err != nil {
 		return 0, err

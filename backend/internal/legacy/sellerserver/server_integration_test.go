@@ -25,6 +25,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -189,14 +190,16 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	_, pending := open("剛開店")
 	suspendedAccount, suspended := exposable("被停權")
 	review := now.Add(7 * 24 * time.Hour)
-	riskSuspend := func(storeID int64, ground seller.RiskGround) {
+	riskSuspend := func(storeID int64, ground seller.RiskGround) seller.Measure {
 		t.Helper()
-		if _, err := m.CreateMeasure(ctx, seller.CreateMeasureInput{
+		created, err := m.CreateMeasure(ctx, seller.CreateMeasureInput{
 			AdminID: 7, StoreID: storeID, Kind: seller.MeasureSuspension, StatementToSeller: "風險", Note: "內部紀錄", ReviewBy: &review,
 			Risk: &seller.RiskBasis{Ground: ground},
-		}); err != nil {
+		})
+		if err != nil {
 			t.Fatal(err)
 		}
+		return created.Measure
 	}
 	riskSuspend(suspended.StoreID, seller.RiskFulfillment)
 	_, deleting := exposable("等待刪除")
@@ -213,8 +216,18 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	inheritedAccount, inheritedOld := exposable("舊店")
-	riskSuspend(inheritedOld.StoreID, seller.RiskSecurity)
+	inheritedMeasure := riskSuspend(inheritedOld.StoreID, seller.RiskSecurity)
 	if _, err := m.CloseCurrent(ctx, inheritedAccount); err != nil {
+		t.Fatal(err)
+	}
+	_, err := m.Apply(ctx, seller.ApplyInput{
+		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: inheritedAccount, StoreName: "新店", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路二號",
+	})
+	var openingErr *apperr.Error
+	if !errors.As(err, &openingErr) || openingErr.Kind() != apperr.KindFailedPrecondition || openingErr.Reason != apperr.ReasonStoreOpeningSuspended {
+		t.Fatalf("apply during suspension: %v", err)
+	}
+	if _, err := m.EndMeasure(ctx, seller.EndMeasureInput{AdminID: 7, MeasureID: inheritedMeasure.ID, ExpectedVersion: inheritedMeasure.Version}); err != nil {
 		t.Fatal(err)
 	}
 	inherited, err := m.Apply(ctx, seller.ApplyInput{
@@ -274,7 +287,7 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 		r, e = s.GetSeller(ctx, connect.NewRequest(&pb.GetSellerRequest{StoreId: inheritedNew}))
-		if e != nil || r.Msg.GetData().GetLifecycleStatus() != "suspended" || r.Msg.GetData().GetSuspensionReasonCode() != "9603" {
+		if e != nil || r.Msg.GetData().GetLifecycleStatus() != "active" || r.Msg.GetData().GetSuspensionReasonCode() != "" {
 			t.Fatalf("%v %v", r, e)
 		}
 	})

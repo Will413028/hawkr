@@ -54,6 +54,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -719,9 +720,7 @@ func (f *adminFixture) suspendWithRisk(t *testing.T, storeID int64) uuid.UUID {
 	return res.Measure.ID
 }
 
-// 措施記在舊 stint、帳號目前的 stint 繼承停權時，後台的 GetStore 仍帶出生效中的措施，ListStores 的 suspended 篩選與列上的
-// suspended 與它一致；措施被撤銷之後三者一起變。
-func TestGetStoreAndListStoresShowTheEffectiveMeasureRecordedOnAnEarlierStint(t *testing.T) {
+func TestGetStoreAndListStoresTreatAnEndedEarlierStintMeasureAsHistorical(t *testing.T) {
 	t.Parallel()
 	f := setupAdmin(t)
 	ctx := context.Background()
@@ -729,6 +728,20 @@ func TestGetStoreAndListStoresShowTheEffectiveMeasureRecordedOnAnEarlierStint(t 
 	_, bystander := f.newSeller(t, "旁人的店")
 	id := f.suspendWithRisk(t, old.StoreID)
 	if _, err := f.module.CloseCurrent(ctx, accountID); err != nil {
+		t.Fatal(err)
+	}
+	_, err := f.module.Apply(ctx, seller.ApplyInput{
+		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: accountID, StoreName: "新店", TownCode: "63000050", AddressDetail: "測試路一號",
+	})
+	var openErr *apperr.Error
+	if !errors.As(err, &openErr) || openErr.Kind() != apperr.KindFailedPrecondition || openErr.Reason != apperr.ReasonStoreOpeningSuspended {
+		t.Fatalf("apply during suspension: %v", err)
+	}
+	measure, err := f.module.Measure(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.module.EndMeasure(ctx, seller.EndMeasureInput{AdminID: f.adminID, MeasureID: id, ExpectedVersion: measure.Version}); err != nil {
 		t.Fatal(err)
 	}
 	newStore, err := f.module.Apply(ctx, seller.ApplyInput{
@@ -743,7 +756,7 @@ func TestGetStoreAndListStoresShowTheEffectiveMeasureRecordedOnAnEarlierStint(t 
 		t.Fatal(err)
 	}
 	measures := got.Msg.GetActiveMeasures()
-	if len(measures) != 1 || measures[0].GetId() != id.String() || measures[0].GetState() != pb.MeasureState_MEASURE_STATE_ACTIVE {
+	if len(measures) != 0 {
 		t.Fatalf("active_measures=%v", measures)
 	}
 	suspendedList := func(filter bool) []string {
@@ -761,14 +774,15 @@ func TestGetStoreAndListStoresShowTheEffectiveMeasureRecordedOnAnEarlierStint(t 
 		slices.Sort(ids)
 		return ids
 	}
-	if suspended := suspendedList(true); !slices.Contains(suspended, sid(newID)) || slices.Contains(suspended, sid(bystander.StoreID)) {
+	if suspended := suspendedList(true); slices.Contains(suspended, sid(newID)) || slices.Contains(suspended, sid(bystander.StoreID)) {
 		t.Fatalf("suspended=%v", suspended)
 	}
-	if free := suspendedList(false); slices.Contains(free, sid(newID)) || !slices.Contains(free, sid(bystander.StoreID)) {
+	if free := suspendedList(false); !slices.Contains(free, sid(newID)) || !slices.Contains(free, sid(bystander.StoreID)) {
 		t.Fatalf("not suspended=%v", free)
 	}
-	if _, err := f.module.RevokeMeasure(ctx, seller.RevokeMeasureInput{AdminID: f.adminID, MeasureID: id, ExpectedVersion: 1, Reason: seller.RevokeAdminCorrection}); err != nil {
-		t.Fatal(err)
+	historical, err := f.governance.GetMeasure(ctx, connect.NewRequest(&adminsellerpb.GetMeasureRequest{Id: id.String()}))
+	if err != nil || historical.Msg.GetMeasure().GetState() != pb.MeasureState_MEASURE_STATE_ENDED {
+		t.Fatalf("historical=%v err=%v", historical, err)
 	}
 	after, err := f.admin.GetStore(ctx, connect.NewRequest(&adminsellerpb.GetStoreRequest{Id: sid(newID)}))
 	if err != nil || len(after.Msg.GetActiveMeasures()) != 0 {

@@ -12,6 +12,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/catalogserver"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -29,16 +30,16 @@ type noopNotifier struct{}
 func (noopNotifier) NotifyRestocked(context.Context, catalog.RestockedSKU) error { return nil }
 func (noopNotifier) PurgeSKUSubscriptions(context.Context, []uuid.UUID) error    { return nil }
 
-const accountID = int64(1001)
-
 type fixture struct {
-	m       *catalog.Module
-	storeID int64
+	m         *catalog.Module
+	storeID   int64
+	accountID int64
 }
 
 func setup(t *testing.T) (*fixture, context.Context) {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
@@ -46,11 +47,15 @@ func setup(t *testing.T) (*fixture, context.Context) {
 	))
 	now := time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
 	ctx := context.Background()
+	accountID, err := sellerfixture.NewAccount(ctx, d, now)
+	if err != nil {
+		t.Fatal(err)
+	}
 	storeID, err := sellerfixture.ExposableStore(ctx, d, accountID, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &fixture{m: catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return now }, Media: media.NewFake(), Events: events.NewBus(), Restock: noopNotifier{}}), storeID: storeID}, ctx
+	return &fixture{m: catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return now }, Media: media.NewFake(), Events: events.NewBus(), Restock: noopNotifier{}}), storeID: storeID, accountID: accountID}, ctx
 }
 
 func product(t *testing.T, f *fixture, ctx context.Context, stock int32) catalog.Product {
@@ -66,7 +71,7 @@ func product(t *testing.T, f *fixture, ctx context.Context, stock int32) catalog
 			break
 		}
 	}
-	p, err := f.m.CreateProduct(ctx, f.storeID, media.Uploader{ID: accountID}, uuid.NewV7(), catalog.ProductInput{
+	p, err := f.m.CreateProduct(ctx, f.storeID, media.Uploader{ID: f.accountID}, uuid.NewV7(), catalog.ProductInput{
 		Title: "手工皂", CategoryID: leaf, Gallery: []catalog.Image{{Token: "img-" + uuid.NewV7().String()}},
 		Skus: []catalog.SkuInput{{Price: 120, StockQty: stock}},
 	}, nil)
