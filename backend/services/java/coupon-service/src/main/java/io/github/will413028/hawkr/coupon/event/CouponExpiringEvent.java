@@ -23,7 +23,7 @@ import java.util.UUID;
  *
  * <p>冪等：notification 端以 reference_id {@code expiring_{coupon_instance_id}_{date_key}}
  * （notifications UNIQUE，36 號 §7.5 策略 3）保證同券同日只推一次；本 job 每日重跑 / 多 pod 併發天然去重，
- * 不引入 dedup 表（docs/開發規範/後端服務責任邊界規範.md）。
+ * 不引入 dedup 表（docs/dev-guidelines/backend-service-responsibility-boundaries.md）。
  */
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record CouponExpiringEvent(

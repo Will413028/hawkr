@@ -48,7 +48,7 @@ web
 
 ## Evidence on Hand
 
-- 需求基線：Google Docs 上的 `Hawkr_Hawkr 幫找 Agent_詳細設計書_v6.0`（文件 ID `11dUv-sP1xgURWz6eVIqqvovDaFfNW8qQAG_PANq6To0`）。文件中的 TARGET／FIXTURE、分支 source、CI、DEV-LIVE 與 PROD-LIVE 標籤必須保留其證據邊界。
+- 需求基線：Google Docs 上的 `Hawkr_Hawkr 幫找 Agent_detailed-design_v6.0`（文件 ID `11dUv-sP1xgURWz6eVIqqvovDaFfNW8qQAG_PANq6To0`）。文件中的 TARGET／FIXTURE、分支 source、CI、DEV-LIVE 與 PROD-LIVE 標籤必須保留其證據邊界。
 - 現行品牌與介面規範：`DESIGN.md`、`styles/foundation/00-color-config.css`、`styles/foundation/01-tokens-theme.css`、`styles/components/ui-kit.css` 與 `components/ui/*`。
 - 現行訊息中心：`app/[locale]/(account)/account/messages/*`、`features/messages/*`、`features/account/screens/messages/*` 與 `styles/features/messages.css`。
 - 本 repo 只能證明 Buyer Web 程式與本地驗證；後端契約、PAYUNi、Email、KYC、CI、部署與正式環境需各自補證據。

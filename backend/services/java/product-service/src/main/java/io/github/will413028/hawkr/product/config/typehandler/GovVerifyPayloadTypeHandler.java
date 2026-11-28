@@ -16,7 +16,7 @@ import java.sql.SQLException;
 /**
  * {@code product_certification_application.gov_verify_payload} JSONB TypeHandler（19 §4.1／§8.3）。
  *
- * <p>依 Java 微服務開發規範：每個 JSONB 結構一個 TypeHandler、key 一律 camelCase、
+ * <p>依 Java 微服務dev-guidelines：每個 JSONB 結構一個 TypeHandler、key 一律 camelCase、
  * 使用裸 {@code new ObjectMapper()}（不套 SNAKE_CASE 命名策略），
  * 反序列化忽略未知欄位以便政府查驗結果 additive 擴充時舊列仍讀得回來。
  */

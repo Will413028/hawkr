@@ -21,7 +21,7 @@ on:
       - 'backend/internal/**'
       - 'backend/Makefile'
       - 'backend/scripts/gen-sqlc.sh'
-      - 'backend/docs/代碼管理（CodeMeta）/**'
+      - 'backend/docs/codemeta/**'
       - 'backend/pkg/media/ref_type.go'
       - 'website/lib/codemeta/generated.ts'
       - 'admin/src/lib/codemeta/generated.ts'
@@ -229,14 +229,14 @@ jobs:
       - name: CodeMeta 生成物 drift
         if: always()
         run: |
-          "./docs/代碼管理（CodeMeta）/scripts/generate.sh" --go --go-media --web --admin --flutter
+          "./docs/codemeta/scripts/generate.sh" --go --go-media --web --admin --flutter
           paths=(internal/platform/codemeta internal/modules/media pkg/media
             ../website/lib/codemeta/generated.ts ../admin/src/lib/codemeta/generated.ts
             ../buyer-app/lib/core/codemeta/code_meta.dart ../seller-app/lib/core/codemeta/code_meta.dart)
           if [ -n "$(git status --porcelain -- "${paths[@]}")" ]; then
             git status --short -- "${paths[@]}"
             git diff --stat -- "${paths[@]}"
-            echo "::error::CodeMeta 生成物與 docs/代碼管理（CodeMeta）不一致，請在本機跑 generate.sh --go --go-media --web --admin --flutter 後 commit"
+            echo "::error::CodeMeta 生成物與 docs/codemeta不一致，請在本機跑 generate.sh --go --go-media --web --admin --flutter 後 commit"
             exit 1
           fi
 

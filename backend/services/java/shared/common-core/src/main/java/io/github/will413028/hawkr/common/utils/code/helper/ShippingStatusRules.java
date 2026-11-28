@@ -5,7 +5,7 @@ import io.github.will413028.hawkr.common.utils.code.ShippingStatus;
 /**
  * §8.5 ShippingStatus 業務狀態規則 helper（跨 shipping + order 服務共用）。
  * <p>
- * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/開發規範/Java 微服務開發規範.md §6）。
+ * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  * 本 helper 將原本寫在 enum 內的 4 個 predicate 移到此處。放在 common-core
  * `utils/code/helper/` 子套件而非單一服務內，是因為 shipping-service 與
  * order-service 都需要同一份 predicate 邏輯，避免複製造成不一致。

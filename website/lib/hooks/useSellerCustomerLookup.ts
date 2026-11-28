@@ -16,7 +16,7 @@ export interface SellerCustomerProfile {
 /**
  * 訂單快照沒有買家暱稱時，補這位買家目前的暱稱與頭像（`GetCustomer`）。客戶只在首筆完成訂單時建立，
  * 所以還沒有完成訂單的買家是 not_found：回 null（呼叫端用自己的後備），不是錯誤。其他失敗（網路、權限）照常拋出，
- * query 進入錯誤狀態，這裡也回 null——這是顯示用的補充資料，不是列表。
+ * query 進入錯誤狀態，這裡也回 null——這是顯示用的supplementary，不是列表。
  */
 export function useSellerCustomerLookup(
 	buyerId: string | number | undefined,

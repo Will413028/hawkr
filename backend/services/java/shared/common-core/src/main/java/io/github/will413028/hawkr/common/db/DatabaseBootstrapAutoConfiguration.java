@@ -17,7 +17,7 @@ import org.springframework.core.env.Environment;
  * static @Bean 工廠方法 + BeanFactoryPostProcessor 介面，確保 DatabaseBootstrapInitializer
  * 在所有業務 bean（含 DataSource）建立之前執行。
  * <p>
- * 詳見 38-Flyway 自動同步與 DB 自動初始化詳細設計書 §3.4。
+ * 詳見 38-Flyway 自動同步與 DB 自動初始化detailed-design §3.4。
  */
 @AutoConfiguration(before = DataSourceAutoConfiguration.class)
 @EnableConfigurationProperties(DatabaseBootstrapProperties.class)

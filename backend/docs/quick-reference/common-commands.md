@@ -1,0 +1,102 @@
+# 專案啟動與執行流程
+
+本文整理本地開發的常用指令。本地環境的唯一入口是專案根目錄的 `./dev.sh`，容器只跑在 OrbStack。
+
+---
+
+## 1. 啟動 / 停止本地環境
+
+```bash
+./dev.sh up        # 基礎設施 + 全部微服務 + ngrok
+./dev.sh status    # 顯示所有服務健康狀態（有異常時 exit 1，可當閘門）
+./dev.sh down      # 停止全部服務
+./dev.sh help      # 完整指令說明
+```
+
+Gateway 監聽 `http://127.0.0.1:9900`，健康檢查：
+
+```bash
+curl -s http://127.0.0.1:9900/api/v1/health
+```
+
+⚠️ **不要在本機裸跑微服務**（`go run ./cmd/...`、`mvn spring-boot:run`）。同一個服務同時存在兩個實例時，RabbitMQ 會 round-robin 分派訊息，事件會無聲地跑進你沒在看的那個進程；Gateway 另外還會直接撞 9900 port（`./dev.sh up` 會偵測並提示）。
+
+---
+
+## 2. 改完程式碼怎麼生效
+
+| 服務類型 | 動作 |
+|---|---|
+| Go：gateway, account, buyer, seller, social, crm, ai, im, review, content, notification, pricebook | 存檔即生效（容器內 Air 熱重載），不需任何指令 |
+| Java：payment, media, product, order, cart, coupon, shipping, aftersales, payuni-webhook | `./dev.sh rebuild`（自動偵測有變更的服務）或指定服務：`./dev.sh rebuild payment shipping` |
+
+`./dev.sh rebuild` 用 `services/java` 的 mvnw reactor 帶 `-am` 一併編共用模組（common-core / observability-common / proto-common），不需要手動逐個 `mvn install`。
+
+只想單獨編共用模組時：
+
+```bash
+cd services/java && ./mvnw install -pl :common-core -am -DskipTests
+```
+
+重啟單一服務（改 configmap／Flyway migration 後看啟動 log）：
+
+```bash
+./dev.sh restart shipping gateway     # 支援簡寫，payment = payment-service
+```
+
+---
+
+## 3. 產生 Proto 程式碼
+
+改完 `api/proto/*.proto` 之後：
+
+```bash
+./scripts/gen-go-proto.sh      # Go：protoc 與 plugin 全部跑在 docker 內，本機不必裝 protoc
+./scripts/gen-java-proto.sh    # Java：同步到 java-proto 並 install proto-common
+```
+
+CI 有 `proto-generated-diff` gate，改了 proto 沒重新生成會擋 PR。規則見 [Proto 管理規範](../dev-guidelines/proto-management-guidelines.md)。
+
+---
+
+## 4. 測試用 session
+
+登入在單體的 identity 模組（ADR `2026-10-30-identity-self-hosted-federated-login.md`、`2026-09-27-identity-opaque-sessions.md`）。本機不走 Google、LINE（舊公司的 OAuth client 不能用），以 `make dev-token` 直接發一個 session：
+
+```bash
+cd backend
+make dev-token args='-account 2001'      # 既有的帳號（seed 的測試帳號）
+make dev-token                           # 建一個沒有登入身分的新帳號（ID 印到 stderr）
+make dev-token args='-admin -user dev_ops'   # 管理員（Access 形狀的 JWT）
+```
+
+顧客的 token 是 App 種類的 session，以 `Authorization: Bearer` 帶。打 API 一律經單體的入口（`:8080`；還沒搬的 REST 由單體轉給 gateway）：
+
+```bash
+curl -s http://localhost:8080/api/v1/app/sellers/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## 5. 測試資料與日誌
+
+```bash
+./dev.sh seed                        # 套用 Go 服務 Atlas migration + 匯入測試資料
+./dev.sh logs -e                     # 只看 ERROR/FATAL
+./dev.sh logs shipping -g "PayUni"   # 指定服務 + 關鍵字
+./dev.sh logs -n -t 200              # 最近 200 行，不即時追蹤
+```
+
+⚠️ `./dev.sh seed` 會 DROP 並重建所有 Go 服務的資料庫。DB 相關命令見 [資料庫管理命令速查表](database-management-command-reference.md)。
+
+---
+
+## 6. 建議順序（新機器）
+
+1. `cp .env.template .env` 並填入實際值（docker compose 會自動讀它）
+2. `./dev.sh up`
+3. `./dev.sh seed`
+4. `./dev.sh status` 確認全部 healthy
+
+Proto 生成檔（`pkg/proto/*.pb.go`）已在版控中，只有改了 `api/proto/*.proto` 才需要跑第 3 節的生成腳本。

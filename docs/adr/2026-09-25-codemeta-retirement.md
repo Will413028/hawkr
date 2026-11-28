@@ -4,7 +4,7 @@
 |---|---|
 | 狀態 | accepted |
 | 日期 | 2026-09-25 |
-| 影響範圍 | `docs/代碼管理（CodeMeta）/` 與生成器、`internal/platform/codemeta`、`api/`、各模組的 schema 與傳輸層、四個 client 的 CodeMeta 生成物；〈API 設計規範（Connect）〉§四、〈PostgreSQL 設計規範〉§五、根目錄與 `backend/` 的 `AGENTS.md`、遷移計畫 |
+| 影響範圍 | `docs/codemeta/` 與生成器、`internal/platform/codemeta`、`api/`、各模組的 schema 與傳輸層、四個 client 的 CodeMeta 生成物；〈API 設計規範（Connect）〉§四、〈PostgreSQL 設計規範〉§五、根目錄與 `backend/` 的 `AGENTS.md`、遷移計畫 |
 | 上層決策 | `2026-09-24-go-modular-monolith.md` D2、D3、D8；Connect 試點計畫 |
 | 相關 | `2026-09-25-api-error-model.md`（錯誤原因的形式） |
 | 路徑基準 | `backend/` |
@@ -37,7 +37,7 @@ CodeMeta 是公司時期為「22 個服務、Java 與 Go、五個 repo、沒有�
 - 繼承：舊服務並存（D8）：Java 服務、還沒搬的 Go 服務與 gateway 的 REST，在各自模組搬遷前仍用 CodeMeta 的 Value。仍成立到階段 C。
 - 繼承：buf lint 用 STANDARD：列舉值帶型別名前綴、零值是 `_UNSPECIFIED`。仍成立（錯誤原因的例外見錯誤模型 ADR）。
 - 繼承：只有 zh-TW 一個語系。仍成立：產品範圍沒變。
-- 拿掉，前提（多服務、多語言、多 repo）都已不存在：「CodeMeta 是所有共享值的唯一來源」、「前端在不同 repo，只能人工拷貝」、「外部契約傳數字的 Value」、「錯誤文案集中在錯誤碼.md」、〈PostgreSQL 設計規範〉§五的「CodeMeta 欄位只由應用層驗證、不綁 migration」。
+- 拿掉，前提（多服務、多語言、多 repo）都已不存在：「CodeMeta 是所有共享值的唯一來源」、「前端在不同 repo，只能人工拷貝」、「外部契約傳數字的 Value」、「錯誤文案集中在error-codes.md」、〈PostgreSQL 設計規範〉§五的「CodeMeta 欄位只由應用層驗證、不綁 migration」。
 
 ## 考慮過的方案
 
@@ -59,7 +59,7 @@ CodeMeta 凍結，只服務還沒搬走的舊契約，隨模組搬遷逐項退�
 - **D3 儲存的代碼**：擁有資料的模組以 Go 具名字串型別加常數定義；DB 欄位是 `text` 加 CHECK。**DB 的值＝Go 常數的值＝proto 值名去掉型別前綴**（UPPER_SNAKE），不再分配數字號段。兩道測試：CHECK 的值集合等於 Go 的 `Values()`；proto 與 Go 的轉換雙向完整（刻意不對外的值列白名單）。模組內部的技術碼留在模組的 `internal/`。不用 PostgreSQL 的 native enum：已有的值刪不掉、不能重排。
 - **D4 錯誤原因**：proto 的 `ErrorReason` 列舉，形式與規則在 `2026-09-25-api-error-model.md`。
 - **D5 顯示文字**：client 的呈現層，以生成的 enum 為 key。TS 用 `Record<Enum, string>`，少一個值就編譯失敗；Dart 用 map 加一支走訪 `values` 的測試。兩支 App 共用的放手寫的共用 Dart 套件，不放進生成目錄。伺服器產生的文字（推播、PDF、錯誤訊息）由產生它的模組擁有。
-- **D6 值的說明**（Markdown 的 Description）：搬到模組 Go 常數的註解與詳細設計書；proto 的註解只寫 client 需要知道的語意。
+- **D6 值的說明**（Markdown 的 Description）：搬到模組 Go 常數的註解與detailed-design；proto 的註解只寫 client 需要知道的語意。
 
 ## 過渡
 

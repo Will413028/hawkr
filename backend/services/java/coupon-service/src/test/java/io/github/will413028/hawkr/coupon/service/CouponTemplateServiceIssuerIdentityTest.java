@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
  * ADMIN 建立路徑必須寫 issuerAccountId、SELLER 建立路徑必須寫 issuerStoreId，
  * 兩者互斥（另一欄位維持 null）。V6 migration 這次只做 expand（見該 migration 檔頭
  * 註解），DB 層的 chk_tpl_issuer_identity CHECK constraint 依 expand-contract 規範
- * （docs/開發規範/DB Migration 相容性規範（expand-contract）.md §4）延後到 contract
+ * （docs/dev-guidelines/db-migration-compatibility-expand-contract.md §4）延後到 contract
  * release 才加，目前尚未存在——這裡驗證的應用層寫入路徑，是本 release 唯一把關互斥的地方。
  */
 @ExtendWith(MockitoExtension.class)

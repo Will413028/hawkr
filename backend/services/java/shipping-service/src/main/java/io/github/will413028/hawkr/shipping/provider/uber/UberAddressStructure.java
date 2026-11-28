@@ -46,7 +46,7 @@ import java.util.Set;
  * </ul>
  * ⇒ 真要送 zip，正解是讓它<b>跟著地址一起進到後端</b>（新增欄位或由呼叫端帶），
  * 不是在 shipping-service 內建一份表。
- * ⚠️ 官方文件（{@code docs/第三方整合/Uber Direct API 總覽.md} §2.1）只載
+ * ⚠️ 官方文件（{@code docs/third-party-integrations/uber-direct-api-overview.md} §2.1）只載
  * {@code pickup_address}／{@code dropoff_address} 為必填，<b>沒有逐欄列出結構</b>
  * ⇒「Uber 是否要求 zip_code」屬未查證，登記為 Enablement Blocker。
  *
@@ -85,7 +85,7 @@ public final class UberAddressStructure {
      * 🔴 <b>結構化地址的 wire 欄名，四個常數集中在這裡。</b>
      *
      * <p>值取自本 repo 的 66 §6.5 逐字「結構化物件（street／city／state／zip／country）」，
-     * <b>不是</b>取自我對 Uber API 的印象——{@code docs/第三方整合/Uber Direct API 總覽.md} §2.1
+     * <b>不是</b>取自我對 Uber API 的印象——{@code docs/third-party-integrations/uber-direct-api-overview.md} §2.1
      * 只載了 {@code pickup_address}／{@code dropoff_address} 為必填，<b>沒有逐欄列出結構</b>。
      *
      * <p>⚠️ ⇒「這四個欄名與 Uber 實際接受的形狀是否一致」屬<b>未查證的外部契約</b>，

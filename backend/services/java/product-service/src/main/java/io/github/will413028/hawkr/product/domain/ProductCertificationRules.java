@@ -12,7 +12,7 @@ import java.util.Set;
  * 商品認證申請的業務規則（19 號設計書《農業認證驗證》§5.1 狀態機、§8.5 自動核准適用範圍）。
  *
  * <p>純函式 helper。CodeMeta enum 是跨語言公共型別，<b>不得</b>承載業務輔助邏輯
- * （docs/開發規範/Java 微服務開發規範.md §6），所以「哪些轉移合法」「哪些類型可自動核准」
+ * （docs/dev-guidelines/java-microservices-development-guidelines.md §6），所以「哪些轉移合法」「哪些類型可自動核准」
  * 放在這裡而不是 {@link ProductCertificationStatus} 內。
  */
 public final class ProductCertificationRules {

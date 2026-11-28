@@ -2,7 +2,7 @@
 //
 // 這一層只做傳輸與畫面需要的讀取組裝，業務規則一律在模組裡。對外的 API 是根目錄 api/ 的
 // Protobuf＋Connect（ADR docs/adr/2026-09-26-external-contract-protobuf-connect.md），慣例見
-// `docs/共通規範/API 設計規範（Connect）.md`；共用的傳輸元件在 rpc，各模組的 handler 在同名的子套件。
+// `docs/conventions/api-design-guidelines-connect.md`；共用的傳輸元件在 rpc，各模組的 handler 在同名的子套件。
 package httpapi
 
 import (

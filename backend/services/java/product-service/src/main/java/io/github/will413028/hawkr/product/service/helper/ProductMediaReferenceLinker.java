@@ -14,7 +14,7 @@ import java.util.List;
  *
  * <p>封裝「從 gallery / description 收集 assetId」+「呼叫 Media {@code LinkImages} 建立引用」邏輯，
  * 由 {@code ProductService}（互動式建立 / 更新）使用，
- * 避免重複實作（docs/開發規範/Java 微服務開發規範.md §15）。
+ * 避免重複實作（docs/dev-guidelines/java-microservices-development-guidelines.md §15）。
  *
  * <p><b>失敗語意（重要）</b>：本元件的 {@code linkGallery} / {@code linkDescription} <b>不吞例外</b>，
  * 且**所有 caller 都必須讓它傳播** → {@code @Transactional} rollback。

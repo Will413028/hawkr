@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 購物車內單筆 SKU 「不可購買」的原因。由 `common-core/utils/code/helper/ProductPurchasabilityRules.evaluate(...)` 從 `is_active` / `stock_qty` / `requested_qty` 推導，供 cart-service `GetCart`、order-service `CheckoutValidate` / `CheckoutPreview` / `CheckoutConfirm` 統一回傳。詳見 [04 §5.2](../詳細設計書/04-購物車微服務（Cart%20Service）詳細設計書.md#52-查詢購物車-getcart---lazy-loading--grouping) 與 [20 §4.14](../詳細設計書/20-結帳模組（Checkout%20Module）詳細設計書.md)。
+ * 購物車內單筆 SKU 「不可購買」的原因。由 `common-core/utils/code/helper/ProductPurchasabilityRules.evaluate(...)` 從 `is_active` / `stock_qty` / `requested_qty` 推導，供 cart-service `GetCart`、order-service `CheckoutValidate` / `CheckoutPreview` / `CheckoutConfirm` 統一回傳。詳見 [04 §5.2](../detailed-design/04-cart-service-detailed-design.md#52-查詢購物車-getcart---lazy-loading--grouping) 與 [20 §4.14](../detailed-design/20-checkout-module-detailed-design.md)。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum CartItemUnavailableReason implements CodeMeta {
 

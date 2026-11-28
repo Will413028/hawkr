@@ -32,7 +32,7 @@ import java.util.Optional;
  * </ol>
  *
  * <p>⚠️ 所有回傳 {@code ProductCertificationApplicationEntity} 的查詢一律 {@code SELECT pca.*}
- * （Java 微服務開發規範 §9.2 partial projection 禁令）；需要商品名之類的外部欄位時由 Service
+ * （Java 微服務dev-guidelines §9.2 partial projection 禁令）；需要商品名之類的外部欄位時由 Service
  * 另行以 {@code ProductRepository.findPublicationBriefByIdsIncludingDeleted（ADM 路徑；不濾可見性，見該方法 javadoc）} 補齊，不在這裡 JOIN 進 Entity。
  * 自訂 SQL 皆帶 {@code @ResultMap}，否則 {@code gov_verify_payload} 的 TypeHandler 不會生效。
  */

@@ -1,0 +1,1633 @@
+# 業務類型碼
+
+相對固定的分類/類型值。新增或修改需通知前後端同步。
+
+---
+
+## AccountType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: gateway 與還沒搬進單體的舊服務（單體的入口以 `X-Account-Type` 帶給 gateway，legacy 的 AccountService 回傳）
+- **DB 儲存欄位**: 無（帳號的角色存在 identity 的 `account_roles`）
+- **說明**: 舊契約的帳號類型：角色的 bitmask，管理員是 4。擁有者是 identity（遷移計畫 A2；ADR `2026-09-25-codemeta-retirement.md` 過渡第 1 步），值由 `internal/legacy` 從角色換算，本表只是投影，不得單獨修改（`TestLegacyAccountTypeMatchesCodeMeta`）
+- **特殊方法**: 無（business helper 見 common-core `helper/AccountTypeRules`，依[pitfalls-and-change-history.md](./pitfalls-and-change-history.md) 教訓 2）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| BUYER | BUYER | 1 | 買家 | 一般消費者 |
+| SELLER | SELLER | 2 | 賣家 | 商家 |
+| SELLER_AND_BUYER | SELLER_AND_BUYER | 3 | 買賣雙重身份 | 同時擁有買家與賣家權限 |
+| ADMIN | ADMIN | 4 | 管理員 | 系統管理員 |
+
+---
+
+## AppType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: gateway, payment, aftersales
+- **DB 儲存欄位**: payment_transactions.app_type、refund_tasks.app_type（存 Value）
+- **說明**: 請求所屬的 App 身份，決定 PayUni 回調完成後 deep link / web URL 該指向買家版或賣家版。與 `AccountType` 為不同維度：`AccountType` 是 JWT 帳號權限類別（含 `SELLER_AND_BUYER`、`ADMIN`），`AppType` 是運行時這個請求是從哪個 App / 網頁發起的二元選擇。
+- **特殊方法**: 無（fallback 規則：proto 欄位為空字串時，service 端視為 `BUYER` 以維持向下相容）
+- **編碼選擇**: Value 採字串（同 OrderCancelByRole 慣例）。
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| BUYER | BUYER | BUYER | 買家 | 買家版 App / 買家版網頁 |
+| SELLER | SELLER | SELLER | 賣家 | 賣家版 App / 賣家版網頁 |
+
+---
+
+## PaymentMethod
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: payment, order
+- **DB 儲存欄位**: payment_transactions.payment_type（VARCHAR(4)，存 Value）、orders.payment_method（存 Value）
+- **說明**: 支付方式
+- **編碼區段**:
+  - `2001~2099`：PayUni 對應方式（與 PayUni `PaymentType` 參數對齊）
+  - `2900+`：內部方式（不呼叫 PayUni，例：零元訂單全額折抵）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| CREDIT_CARD | CREDIT_CARD | 2001 | 信用卡 | 信用卡一次付清 |
+| APPLE_PAY | APPLE_PAY | 2002 | Apple Pay | Apple 行動支付 |
+| GOOGLE_PAY | GOOGLE_PAY | 2003 | Google Pay | Google 行動支付 |
+| ZERO_AMOUNT | ZERO_AMOUNT | 2900 | 零元訂單 | 全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 05-支付服務設計書 §2A.1（已刪除）） |
+
+---
+
+## ShippingMethod
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: product, order, cart, shipping
+- **DB 儲存欄位**: orders.shipping_method（存 Value）、product_sku.shipping_method JSONB .type（存 Value）
+- **說明**: 運送方式
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| TAQBIN | TAQBIN | 3001 | 黑貓宅急便 | 宅配到府 |
+| SEVEN_ELEVEN_STORE_PICKUP | SEVEN_ELEVEN_STORE_PICKUP | 3002 | 7-11店到店 | 超商門市取貨 |
+| UBER_INSTANT | UBER_INSTANT | 3003 | Uber 即時配送 | 即時外送到府 |
+| MERCHANT_DELIVERY | MERCHANT_DELIVERY | 3005 | 商家自行配送 | RFQ 訂單的站外業者自行出貨，平台不安排物流，無外部 provider API |
+
+---
+
+## ShippingType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: shipping, order
+- **DB 儲存欄位**: seller_shipment_settings.shipping_type（存 Value）
+- **說明**: 物流大類分類。獨立於 ShippingMethod（後者為具體物流商）：本枚舉表達「超商 C2C / 宅配到府」這個上層分類，供 onboarding 設定與 PayUni 對接時的分流判斷使用。
+- **歷史背景**: 2026-04-08 從 `services/java/shipping-service/.../ShippingTypeCode.java` plain Java constant class 升級為 CodeMeta。原值（CVS_C2C / HOME_DELIVERY）為內部分類常數，雖字面與 PayUni 部分 API 一致，但屬於本系統內部分類，故統一數字化。號段 3651-3654（避開 OnboardingStatus 已佔的 3601-3605），其中 3653 空缺。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| CVS_C2C | CVS_C2C | 3651 | 超商店到店 | 超商 C2C 取貨流程 |
+| HOME_DELIVERY | HOME_DELIVERY | 3652 | 宅配到府 | 宅配 / 黑貓等到府配送 |
+| MERCHANT_DELIVERY | MERCHANT_DELIVERY | 3654 | 商家自送 | 商家自有配送流程，對應運送方式 3005（RFQ 訂單的站外業者自行出貨） |
+
+---
+
+## ShippingTemperature
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: product, order, cart, shipping
+- **DB 儲存欄位**: orders.delivery_temp（存 Value）、product_sku.shipping_method JSONB .temperature（存 Value）
+- **說明**: 運送溫層
+- **特殊方法**: 無（原 compatibleShippingTemps 為 0 caller 死碼，依[pitfalls-and-change-history.md](./pitfalls-and-change-history.md) 教訓 2 已刪除）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| AMBIENT | AMBIENT | 3201 | 常溫 | 常溫運送 |
+| CHILLED | CHILLED | 3202 | 冷藏 | 冷藏運送 |
+| FROZEN | FROZEN | 3203 | 冷凍 | 冷凍運送 |
+
+---
+
+## ShippingFeePayer
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: product, order, shipping
+- **DB 儲存欄位**: orders.shipping_fee_payer（存 Value）、product_sku.shipping_method JSONB .feePayer（存 Value）
+- **說明**: 運費負擔方
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| BUYER | BUYER | 3101 | 買方 | 由消費者支付 |
+| SELLER | SELLER | 3102 | 賣方 | 商家吸收運費 |
+
+---
+
+## ShippingArea
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order, shipping
+- **DB 儲存欄位**: orders.shipping_area（存 Value）
+- **說明**: 配送區域
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| MAIN_ISLAND | MAIN_ISLAND | 3401 | 本島 | 台灣本島 |
+| OFFSHORE_ISLAND | OFFSHORE_ISLAND | 3402 | 離島 | 離島地區 |
+
+---
+
+## ShippingRoute
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 結帳預覽回應 `shippingRoute` 直接送 Value 給前端（`gateway/internal/handler/checkout.go:41`；值來源 `CheckoutService.java:279` 的 `route.value()`）
+- **使用服務**: shipping
+- **DB 儲存欄位**: shipping_fee_configs.route（存 Value）
+- **說明**: 運費計算路線（依寄送/收件區域組合）
+- **特殊方法**: 無（路線解析見 common-core `helper/ShippingRouteRules`，依[pitfalls-and-change-history.md](./pitfalls-and-change-history.md) 教訓 2）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| DOMESTIC | DOMESTIC | 3501 | 本島互寄 | 本島 → 本島（標準費率） |
+| TO_OFFSHORE | TO_OFFSHORE | 3502 | 寄離島 | 本島 → 離島（加價） |
+| FROM_OFFSHORE | FROM_OFFSHORE | 3503 | 離島寄出 | 離島 → 本島（加價） |
+| OFFSHORE_TO_OFFSHORE | OFFSHORE_TO_OFFSHORE | 3504 | 離島互寄 | 離島 → 離島（加價） |
+
+---
+
+## WeightUnit
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: product, order, shipping
+- **DB 儲存欄位**: product_sku.unit（存 Value）
+- **說明**: 商品重量單位
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| KG | KG | 3301 | 公斤 | 千克 |
+| CATTY | CATTY | 3302 | 台斤 | 台斤=600公克 |
+| GRAM | GRAM | 3303 | 公克 | 公克 |
+
+---
+
+## CouponType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: coupon, order, cart
+- **DB 儲存欄位**: coupon_templates.type（存 Value）
+- **說明**: 優惠券折扣方式
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| CASH | CASH | 1 | 現金折扣 | 固定金額折抵 |
+| PERCENT | PERCENT | 2 | 百分比折扣 | 按百分比折抵 |
+
+---
+
+## IssuerType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: coupon
+- **DB 儲存欄位**: coupon_templates.issuer_type（存 Value）
+- **說明**: 優惠券發行者類型
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| ADMIN | ADMIN | 1 | 平台管理員 | 平台 Admin 發行 |
+| SELLER | SELLER | 2 | 賣家 | 賣家發行 |
+
+---
+
+## CouponTargetType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: coupon
+- **DB 儲存欄位**: coupon_templates.target_type（存 Value）
+- **說明**: 優惠券發放目標類型
+- **特殊方法**: 無（原 isSellerAllowed/requiresTargetAccounts 為 0 caller 死碼，依[pitfalls-and-change-history.md](./pitfalls-and-change-history.md) 教訓 2 已刪除）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| ALL | ALL | 1 | 全體買家 | 發券時已註冊的所有買家 |
+| MEMBER | MEMBER | 2 | 賣家會員 | 與賣家有完成交易紀錄的買家 |
+| DESIGNATED | DESIGNATED | 3 | 指定買家 | 賣家手動指定的買家名單 |
+| COMPENSATION | COMPENSATION | 4 | 補償券 | 售後/退款補償發放 |
+
+---
+
+## RefundReason
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order
+- **DB 儲存欄位**: refund_requests.reason（存 Value）
+- **說明**: 退款/退貨原因
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| DEFECTIVE | DEFECTIVE | 5001 | 商品瑕疵 | 商品本身問題 |
+| WRONG_ITEM | WRONG_ITEM | 5002 | 寄錯商品 | 出貨錯誤 |
+| NOT_AS_DESCRIBED | NOT_AS_DESCRIBED | 5003 | 與描述不符 | 與商品頁描述不同 |
+| CHANGE_OF_MIND | CHANGE_OF_MIND | 5004 | 改變心意 | 個人因素 |
+| OTHER | OTHER | 5005 | 其他原因 | 其他退款原因 |
+
+---
+
+## FinancialLogType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order
+- **DB 儲存欄位**: financial_logs.type（存 Value）
+- **說明**: 財務流水紀錄類型
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| RECEIPT | RECEIPT | 1 | 收款 | 訂單付款收入 |
+| REFUND_ORIGINAL | REFUND_ORIGINAL | 2 | 退款（原路） | 退款至原支付管道 |
+| REFUND_COUPON | REFUND_COUPON | 3 | 退款（優惠券） | 退款為優惠券 |
+
+---
+
+## AssetReferenceType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No
+- **使用服務**: media
+- **DB 儲存欄位**: media_asset.ref_type / asset_reference.ref_type（存 Value）
+- **說明**: 多媒體資產引用來源類型
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| PRODUCT | PRODUCT | 7101 | PRODUCT | 商品展示圖片引用 |
+| PRODUCT_DESC | PRODUCT_DESC | 7102 | PRODUCT_DESC | 商品描述圖片引用 |
+| SELLER_LOGO | SELLER_LOGO | 7103 | SELLER_LOGO | 賣家 logo 引用 |
+| SHIPPING | SHIPPING | 7104 | SHIPPING | 物流相關圖片引用 |
+| SELLER_COVER | SELLER_COVER | 7105 | SELLER_COVER | 賣家封面圖片引用 |
+| IDENTITY_VERIFICATION | IDENTITY_VERIFICATION | 7106 | IDENTITY_VERIFICATION | 使用者實名驗證圖片引用 |
+| CHAT_MESSAGE | CHAT_MESSAGE | 7107 | CHAT_MESSAGE | 聊天訊息圖片引用 |
+| POST | POST | 7108 | POST | 貼文圖片引用 |
+| BANNER | BANNER | 7109 | BANNER | Banner 圖片引用 |
+| AFTERSALE | AFTERSALE | 7110 | AFTERSALE | 售後證據照片引用 |
+| CERTIFICATION | CERTIFICATION | 7111 | CERTIFICATION | 商家認證文件引用 |
+| BUYER_AVATAR | BUYER_AVATAR | 7112 | BUYER_AVATAR | 買家頭像引用 |
+| ORDER_RECEIPT | ORDER_RECEIPT | 7113 | ORDER_RECEIPT | 買家確認收貨上傳照片引用 |
+| AI_STYLE | AI_STYLE | 7114 | AI_STYLE | AI 修圖風格縮圖引用 |
+| ORDER_REVIEW | ORDER_REVIEW | 7115 | ORDER_REVIEW | 訂單評論圖片引用 |
+| GOVERNANCE_EVIDENCE | GOVERNANCE_EVIDENCE | 7118 | GOVERNANCE_EVIDENCE | 商家治理檢舉/申訴佐證圖片引用（seller_violation_reports.evidence_asset_ids / seller_violations.appeal_evidence_asset_ids） |
+| RECIPE | RECIPE | 7119 | RECIPE | 食譜主圖引用 |
+| INVOICE_DOCUMENT | INVOICE_DOCUMENT | 7120 | INVOICE_DOCUMENT | 電子發票／折讓單 PDF 引用（invoice-service 經 media-service `ServerUploadSecureAndFinalize` 寫入 `secure/invoice_document/` 前綴，僅供三條 PDF 下載端點以 `GetSecureAssetInternal` 取用；58 §8.1） |
+| DELIVERY_POD | DELIVERY_POD | 7121 | DELIVERY_POD | 配送送達憑證（Uber POD 照片／簽名）；shipping-service 經 media-service `ServerUploadSecureAndFinalize` 寫入 `secure/delivery_pod/` 前綴，僅供授權端點以 `GetSecureAssetInternal` 取用（66 §7.8） |
+| SELLER_PROSPECT_LOGO | SELLER_PROSPECT_LOGO | 7122 | SELLER_PROSPECT_LOGO | 站外業者 logo 引用（seller_prospects.logo_key；與正式賣家的 SELLER_LOGO 分開，兩者的 owner 表與生命週期不同） |
+| SELLER_PROSPECT_COVER | SELLER_PROSPECT_COVER | 7123 | SELLER_PROSPECT_COVER | 站外業者封面圖片引用（seller_prospects.cover_key；同上，不與 SELLER_COVER 共用前綴） |
+| OTHER | OTHER | 7199 | OTHER | 未分類圖片引用 |
+
+> Media Service 的 `ref_type` 對外契約只允許傳 `Value`，例如 `7101`、`7103`、`7111`。
+>
+> ⚠️ **但本 enum 的 `Code` 不是純命名——它決定 R2 上的實體儲存路徑**，改 `Code` 等同於改儲存位置：
+>
+> ```
+> {public|secure}/{Code.toLowerCase()}/{accountId}/{yyyyMMdd}/{filename}
+> ```
+>
+> 產生點唯二：`AbstractStorageService.generateFinalObjectKey`（`AssetReferenceType.fromValue(refType).code().toLowerCase()`）與 `MediaAssetService`（同一行形狀）；08 號設計書 §4.1 的 `{category}` 段即指此。
+>
+> 因此改動任一列的 `Code` 前必須先確認：**新舊前綴會分岔**（舊物件留在舊前綴下、新物件寫到新前綴），DB 既有的 `objectKey` 值不會跟著變，且舊前綴下沒有 `asset_reference` 的物件是 media GC 的刪除目標。
+>
+> 這正是 #2199 的成因：`SELLER_LOGO`（7103）原先 `Code` 寫成 `USER_AVATAR`，賣家 logo 因而長期存進 `public/user_avatar/`。修正 `Code` 已止血（`4210d2c1f`），存量處置見該票。
+>
+> **擁有者（B1-5 之後）**：單體的 Go media（`internal/modules/media`）不使用 `ref_type`——擁有者模組以資產 ID 直接擁有資產，Go 的 `ref_type.go` 已隨 B1-5 刪除。這組值只剩舊契約（`pkg/media`、Java media-service）使用，凍結到對應呼叫端搬遷、Java media 退場時刪除：
+>
+> - 擁有者是 Java media（只有 Java 服務呼叫，沒有任何 Go 呼叫端）：`PRODUCT`（7101）、`PRODUCT_DESC`（7102）、`SHIPPING`（7104）、`AFTERSALE`（7110）、`BUYER_AVATAR`（7112）、`ORDER_RECEIPT`（7113）、`DELIVERY_POD`（7121）、`OTHER`（7199）。
+> - 舊 Go 服務仍帶它呼叫 Java media：`SELLER_LOGO`、`SELLER_COVER`、`IDENTITY_VERIFICATION`、`CERTIFICATION`、`GOVERNANCE_EVIDENCE`、`SELLER_PROSPECT_LOGO`、`SELLER_PROSPECT_COVER`（seller-service）、`CHAT_MESSAGE`（im-service）、`AI_STYLE`（ai-service）、`ORDER_REVIEW`（review-service）、`INVOICE_DOCUMENT`（invoice-service）；各服務搬進單體或改寫時退場。
+> - 沒有任何呼叫端：`POST`（7108）、`BANNER`（7109）、`RECIPE`（7119），隨 Java media 退場時刪。
+
+---
+
+## CertificationType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: product, gateway
+- **DB 儲存欄位**: `product_certification_application.certification_type`（INTEGER，存 Value；值域由 `ck_pca_cert_type` 約束為 `BETWEEN 3701 AND 3706`）；`product_certification_review_event.certification_type`（INTEGER，存 Value 快照）。⚠️ 2026-08 之前本欄為「無」——當時本值域只出現在查驗端點的請求參數與 `product.certifications` JSONB 的 `name` 欄，#2755 起才落成獨立欄位
+- **說明**: 農產品認證類型
+- **🔴 值域改動的連帶義務**: `ck_pca_cert_type` 是本值域**刻意的第二份拷貝**（範圍式 CHECK），而 `generate.sh` **不會碰 SQL**、也沒有任何 gate 守著它。新增認證類型時**必須在同一個 PR 內補一支 `V{N+1}__*.sql` 放寬該 CHECK 的上界**，否則新代碼寫入時 DB 直接以 `23514` 拒絕，而錯誤訊息不會告訴你是 CodeMeta 漂移。
+- **相關設計書**: [19 農業認證申請與審核](../detailed-design/19-certification-verification-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| ORGANIC | ORGANIC | 3701 | 有機農產品 | 有機農業認證 |
+| TAP | TAP | 3702 | 產銷履歷 | 產銷履歷追溯 |
+| CAS | CAS | 3703 | CAS 優良農產品 | CAS 認證 |
+| HACCP | HACCP | 3704 | HACCP 認證 | HACCP 食品安全認證 |
+| ISO | ISO | 3705 | ISO 認證 | ISO 國際認證 |
+| GMP | GMP | 3706 | GMP 認證 | GMP 良好製造規範 |
+
+> Product Service 的 `VerifyCertificationRequest.type` 對外契約只允許傳 `Value`，例如 `3701`、`3702`、`3703`。`Code` 僅供 enum 常數命名與文件閱讀。
+> 目前只有 `ORGANIC`、`TAP`、`CAS` 支援線上驗證；`HACCP`、`ISO`、`GMP` 會回傳「此認證類型暫不支援線上驗證」。
+
+---
+
+## StagedTokenScope
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: media
+- **DB 儲存欄位**: 無（JWT claim）
+- **說明**: 多媒體上傳 Staged Token 用途範圍
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| MEDIA_UPLOAD_SESSION | MEDIA_UPLOAD_SESSION | 7201 | MEDIA_UPLOAD_SESSION | 公開上傳會話 Token |
+| MEDIA_SECURE_UPLOAD | MEDIA_SECURE_UPLOAD | 7202 | MEDIA_SECURE_UPLOAD | 機敏上傳會話 Token |
+
+> **擁有者（B1-7）：已退場**。Go media 的 staged token 是不透明隨機字串，只存 SHA-256（`media.staged_uploads`），沒有 JWT scope；公開與機敏由資產的 visibility 區分，不需要 7201、7202。這組值只剩 Java media-service 使用，隨它退場時刪除。
+
+---
+
+## AfterSaleResolutionType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: aftersales
+- **DB 儲存欄位**: aftersale_resolutions.resolution_type（存 Value）
+- **說明**: 售後賣家決策處理方式
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| RETURN_REFUND | RETURN_REFUND | 1 | 同意退貨退款 | 買家退貨後退全額 |
+| PARTIAL_REFUND | PARTIAL_REFUND | 2 | 部分退款 | 賣家自訂退款金額 |
+| FULL_REFUND_NO_RETURN | FULL_REFUND_NO_RETURN | 3 | 全額退款（免退貨） | 免退貨直接全額退款 |
+| COUPON_COMPENSATION | COUPON_COMPENSATION | 4 | 發放補償優惠券 | 發放賣家補償優惠券 |
+| REJECT | REJECT | 5 | 拒絕售後 | 賣家拒絕售後申請 |
+| INSPECTION_DEDUCTION | INSPECTION_DEDUCTION | 6 | 驗貨扣款 | 賣家確認收貨時依驗貨結果調整退款金額（僅接續 RETURN_REFUND 使用） |
+
+---
+
+## AfterSaleRejectReason
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: aftersales
+- **DB 儲存欄位**: aftersale_resolutions.reject_reason（存 Value）
+- **說明**: 售後拒絕原因
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| IMPROPER_STORAGE | IMPROPER_STORAGE | 9101 | 買家保存不當 | 商品因買家保存不當導致問題 |
+| EXPIRED_CLAIM | EXPIRED_CLAIM | 9102 | 超過申訴時效 | 超過可申訴的時間限制 |
+| INSUFFICIENT_EVIDENCE | INSUFFICIENT_EVIDENCE | 9103 | 證據不足 | 提供的證據不足以證明問題 |
+| NORMAL_CONDITION | NORMAL_CONDITION | 9104 | 商品狀態正常 | 商品經確認狀態正常 |
+| SELLER_NO_RESPONSE | SELLER_NO_RESPONSE | 9105 | 賣家逾時未回應 | 賣家未在處理期限內回應，由 `CaseProcessTimeoutWorker` 在 `timeout-policy=AUTO_REJECT` 下系統代為拒絕（§5.10） |
+| OTHER | OTHER | 9199 | 其他原因 | 其他拒絕原因 |
+
+---
+
+## AfterSalePlatformDecisionOutcome
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: aftersales
+- **DB 儲存欄位**: aftersale_platform_decisions.outcome（存 Value）
+- **說明**: 平台申訴裁決結果（Phase 1 三種）；詳見設計書 §10.4.3
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| FULL_REFUND | FULL_REFUND | FULL_REFUND | 全額退款 | 平台裁定全額退款，不需退貨 |
+| PARTIAL_REFUND | PARTIAL_REFUND | PARTIAL_REFUND | 部分退款 | 平台裁定部分退款，金額由 Admin 指定 |
+| REJECT_APPEAL | REJECT_APPEAL | REJECT_APPEAL | 駁回申訴 | 平台駁回買家申訴，維持賣家原決策 |
+
+---
+
+## AfterSaleAppealEventType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: aftersales
+- **DB 儲存欄位**: aftersale_appeal_events.event_type（存 Value）
+- **說明**: 售後申訴事件類型（供 timeline 展示）；詳見設計書 §10.4.4
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| APPEAL_SUBMITTED | APPEAL_SUBMITTED | APPEAL_SUBMITTED | 申訴提交 | 買家提交申訴 |
+| DECISION_MADE | DECISION_MADE | DECISION_MADE | 平台裁決 | Admin 做出裁決 |
+| AUTO_ESCALATED | AUTO_ESCALATED | AUTO_ESCALATED | 系統自動升級 | 賣家處理逾時，系統自動升級至 admin 仲裁（CaseProcessTimeoutWorker，§5.10） |
+
+---
+
+## AfterSaleResolutionSource
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No
+- **使用服務**: aftersales
+- **DB 儲存欄位**: aftersale_resolutions.resolution_source（存 Value）
+- **說明**: 售後處置決策來源（區分賣家自行處置 vs 平台裁決）；詳見設計書 §10.4.2
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| SELLER | SELLER | SELLER | 賣家決策 | 賣家自行處置（既有路徑，預設值） |
+| PLATFORM | PLATFORM | PLATFORM | 平台裁決 | Admin 平台裁決產生的處置 |
+
+---
+
+## OrderCancelReason
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order, aftersales
+- **DB 儲存欄位**: orders.cancel_reason（存 Value）、seller_cancel_requests.reason（存 Value）
+- **說明**: 訂單取消原因。涵蓋系統 / 賣家 / 買家三種觸發來源，編碼前綴區分：91xx 系統觸發、92xx 賣家觸發、93xx 預留買家觸發。買家自願取消未付款訂單時不寫此欄位（NULL），僅以 OrderCancelByRole=BUYER 區分。
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| PAYMENT_TIMEOUT | PAYMENT_TIMEOUT | 9101 | 付款逾時自動取消 | 系統排程：訂單超過付款期限未付款 |
+| SHIPMENT_TIMEOUT | SHIPMENT_TIMEOUT | 9102 | 出貨逾時自動取消 | 系統排程：賣家未在 §5.9 處理期限內安排出貨 |
+| SHIPMENT_CREATE_TIMEOUT | SHIPMENT_CREATE_TIMEOUT | 9103 | 建單逾時自動取消 | 系統排程：付款後超過寬限期仍無法建立物流單，重試上限後自動取消並退款（見 03 §8.11） |
+| SELLER_SUSPENDED | SELLER_SUSPENDED | 9104 | 賣家停權 | 賣家被停權時系統批次取消其未付款訂單（連動 saga，見 46 §5） |
+| FORCE_MAJEURE | FORCE_MAJEURE | 9201 | 天災因素無法配送 | 天災或不可抗力因素 |
+| OUT_OF_STOCK | OUT_OF_STOCK | 9202 | 商品缺貨 | 庫存不足無法出貨 |
+| QUALITY_ISSUE | QUALITY_ISSUE | 9203 | 商品品質問題 | 商品有品質問題不宜出貨 |
+| SUGGEST_SPLIT | SUGGEST_SPLIT | 9204 | 建議買家拆單重下 | 建議買家拆成多張較小訂單重新下單（生鮮跨區常見場景）|
+| OTHER | OTHER | 9299 | 其他原因 | 賣家自填原因，搭配 cancel_remark 顯示 |
+
+---
+
+## OrderCancelByRole
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order
+- **DB 儲存欄位**: orders.cancel_by_role（存 Value）
+- **說明**: 訂單取消者角色。前端依此 role + cancel_reason 渲染差異化文案（見 [03 §5.3.3](../detailed-design/03-order-service-detailed-design.md#533-前端文案對照buyer-視角)）。Value 直接使用字串便於前端 switch case，與 AfterSaleAuditActor 的 numeric value 慣例不同（後者前端不可見）。
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| SYSTEM | SYSTEM | SYSTEM | 系統 | 系統排程自動取消（payment timeout / shipment timeout）|
+| SELLER | SELLER | SELLER | 賣家 | 賣家透過售後申請取消（aftersales SellerCancel） |
+| BUYER | BUYER | BUYER | 買家 | 買家自願取消未付款訂單 |
+
+---
+
+## ProductSort
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: gateway, product
+- **DB 儲存欄位**: 無（query string 參數）
+- **說明**: 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../detailed-design/35-product-sort-and-sales-count-detailed-design.md)。
+- **特殊方法**: 無（SQL ORDER BY 對應放在 `ProductRepository` MyBatis `<choose>` 區塊，不放 enum 內）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| LATEST | LATEST | LATEST | 最新上架 | 依 `created_at DESC`（不送 sort 也視為此值） |
+| PRICE_ASC | PRICE_ASC | PRICE_ASC | 價格低到高 | 依 `price_min ASC` |
+| PRICE_DESC | PRICE_DESC | PRICE_DESC | 價格高到低 | 依 `price_max DESC` |
+| RATING | RATING | RATING | 評分最高 | 依 `rating DESC NULLS LAST`，無評分商品排後 |
+| SALES | SALES | SALES | 銷量最高 | 依 `sales_count DESC`，付款成功時累計 |
+
+---
+
+## ShipmentAnomalyType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: shipping, notification, gateway
+- **DB 儲存欄位**: shipment_anomaly_acknowledgments.anomaly_type（VARCHAR(40)，存 Value）
+- **說明**: 配送異常類型。由 shipping-service 之既有 scheduler 與 webhook consumer 偵測 shipments / seller_shipment_settings 既有狀態欄位（status / tcat_call_status / label_print_status / payuni_submit_status）異常時發布 `shipment.anomaly.detected` event 用。**異常本身的狀態仍以 shipments 既有欄位為唯一真實來源**，本 enum 僅標示「賣家收到通知時看到的異常分類」。詳見 [06 §5.21](../detailed-design/06-shipping-service-detailed-design.md#521-配送異常賣家通知)。
+- **特殊方法**: 無（severity 對應規則放在 `common-core/utils/code/helper/ShipmentAnomalyRules`，跨服務共用，依[pitfalls-and-change-history.md](./pitfalls-and-change-history.md) 教訓 2）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| TCAT_CALL_FAILED | TCAT_CALL_FAILED | TCAT_CALL_FAILED | 黑貓叫件未完成 | 賣家呼叫黑貓後 24h 內 tcat_call_status 仍為 REQUESTED（4202） |
+| CVS_LABEL_UNPRINTED | CVS_LABEL_UNPRINTED | CVS_LABEL_UNPRINTED | 超商標籤未列印 | 賣家列印超商標籤後 48h 仍未交件（label_print_status 卡 4102） |
+| PROVIDER_STATUS_ABNORMAL | PROVIDER_STATUS_ABNORMAL | PROVIDER_STATUS_ABNORMAL | 物流商回報異常 | shipments.status=33（異常）。41 CANCELLED 為賣家自取消（不算物流商異常），44 走 PACKAGE_LOST |
+| PACKAGE_LOST | PACKAGE_LOST | PACKAGE_LOST | 包裹遺失（卡待取貨） | shipments.status 卡 32 待取貨超過 7 天 |
+| DELIVERY_OVERDUE | DELIVERY_OVERDUE | DELIVERY_OVERDUE | 配送逾期 | 超過 expected_delivery_date 且物流商超過 3 天無狀態更新（軌跡近期仍活躍視為仍在正常移動，不打異常） |
+| PAYUNI_LGS_NO_CODE | PAYUNI_LGS_NO_CODE | PAYUNI_LGS_NO_CODE | PayUni 回 SUCCESS 但無三段碼 | PayUni 列印 Webhook SUCCESS 但 partnerId / odno / validationNo 為空（B-143 重現） |
+| RETURN_STUCK | RETURN_STUCK | RETURN_STUCK | 退貨流程卡住 | aftersale_case 退貨流程超過 14 天無狀態進展 |
+| UBER_COURIER_UNASSIGNED | UBER_COURIER_UNASSIGNED | UBER_COURIER_UNASSIGNED | Uber 外送員未指派 | 建單成功後停在 UNPROCESSED(91) 超過 30 分鐘仍未指派外送員（66 §5.1.11） |
+| UBER_PICKUP_STUCK | UBER_PICKUP_STUCK | UBER_PICKUP_STUCK | Uber 取件停滯 | 停在 COURIER_ASSIGNED(933) 超過 45 分鐘仍未取件（66 §5.1.11） |
+| UBER_CREATE_UNKNOWN_UNRESOLVED | UBER_CREATE_UNKNOWN_UNRESOLVED | UBER_CREATE_UNKNOWN_UNRESOLVED | Uber 建單結果未知且未收斂 | CREATE_UNKNOWN(991) 超過回查窗仍未知（66 §5.1.11） |
+| UBER_POD_MISSING | UBER_POD_MISSING | UBER_POD_MISSING | Uber 送達憑證缺漏 | delivered 後 7 天內未取得任何 POD（66 §5.1.11／INV-U5） |
+
+> 🔴 **擴充本 enum ≠ 賣家會收到推播，兩者是各自獨立的兩份清單**：
+> 賣家 Dashboard 的「目前有異常」候選由 `ShipmentAnomalyRules.abnormalShipmentStatusValues()`
+> 這份**獨立的硬編碼集合**決定，實讀逐字 `Set.of(ShippingStatus.ABNORMAL.value(), ShippingStatus.PACKAGE_LOST.value())`（＝`{33,44}`），
+> 它錨在 `shipments.status` 而不是錨在本 enum。
+> Uber 的四個新異常最終都會讓 `shipments.status` 落在 `33`（ABNORMAL）⇒ **恰好已被涵蓋，因此本波不改該集合**。
+>
+> 🔴 **這是巧合不是設計**（66 §5.1.11 逐字）。日後若有任何 Uber／其他 provider 的異常**不落在 `33`／`44`**，
+> 這一格必須重判：新增一個 `ShipmentAnomalyType` 值**不會**讓它自動出現在 Dashboard 或推播裡，而且完全無聲。
+> 判準：新增值時問「它會讓 `shipments.status` 變成什麼？」答案不在 `{33,44}` 內 ⇒ 必須同時擴 `abnormalShipmentStatusValues()`。
+>
+> ⚠️ **severity 的第二份拷貝**：`ShipmentAnomalyRules.severityOf()` 的對應規則同時硬編在
+> shipping-service `ShipmentAnomalyQueryMapper` 的 `SEVERITY_HIGH_TYPES`／`SEVERITY_MEDIUM_TYPES`／`SEVERITY_LOW_TYPES`
+> 三個具名常數（組成 `CASE_SEVERITY` 這一段 SQL）。
+> ⚠️ 本節原本寫「`CASE_SEVERITY`／`CASE_SEVERITY_A` 兩個 SQL 片段」——**後者從來不存在**，
+> 那是文件與 javadoc 的集體幽靈引用，2026-09-12 實查後清除（跟著它找的人會找一個永遠找不到的東西，
+> 並誤以為「兩份都改了」）。
+> 🔴 **新增值只改 helper 不改 SQL ⇒ Dashboard 與推播兩邊靜默脫節**。兩處必須同批改。
+> ✅ **這件事現在由測試守著**：`ShipmentAnomalySeverityMappingTest` 對本 enum 逐值斷言
+> 「恰好落在三組其中一組」，漏同步 ⇒ build 紅。`CASE_SEVERITY` 也已改以 `ELSE 'HIGH'` 收尾——
+> 未知值**吵**而不是靜默降級。
+> ⚠️ 那支測試是被**變異證明過需要**才寫的：在它存在之前，同時注入「拿掉一個 HIGH 值」＋
+> 「`ELSE` 改回 `LOW`」兩個變異，shipping-service 的 375 支測試**全綠**。
+
+---
+
+## ShipmentAnomalySeverity
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: shipping, notification, gateway
+- **DB 儲存欄位**: 無（推導值，不落地）
+- **說明**: 配送異常嚴重度。由 `ShipmentAnomalyRules.severityOf(ShipmentAnomalyType)` 從 anomaly type 推導；HIGH 觸發即時 FCM、MEDIUM 早晚摘要、LOW 僅寫 inbox 不推 push（推送節奏由 notification-service 端策略決定）。
+- **特殊方法**: 無（推導規則放 shipping-service helper）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| LOW | LOW | LOW | 低 | 流程慢但非急迫（如 RETURN_STUCK） |
+| MEDIUM | MEDIUM | MEDIUM | 中 | 賣家需注意，早晚摘要推送 |
+| HIGH | HIGH | HIGH | 高 | 賣家需立即處理，即時推送 |
+
+---
+
+## ShipmentAnomalyAckAction
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: shipping, gateway
+- **DB 儲存欄位**: shipment_anomaly_acknowledgments.action（VARCHAR(16)，存 Value）
+- **說明**: 賣家對單一配送異常的處置動作。**僅紀錄使用者操作**，不參與資料一致性 — 異常本身狀態仍以 shipments 表欄位為唯一真實來源（見[後端服務責任邊界規範](../dev-guidelines/backend-service-responsibility-boundaries.md) §六）。Dashboard 查詢時 LEFT JOIN ack 表，已 ack 的隱藏。shipment 狀態恢復後 dashboard 自動不顯示（無需動 ack 表）。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| ACKNOWLEDGED | ACKNOWLEDGED | ACKNOWLEDGED | 已處理 | 賣家確認已採取處理動作（聯絡客戶 / 重列印 / 重叫件等） |
+| IGNORED | IGNORED | IGNORED | 已忽略 | 賣家確認不需 dashboard 提示，但異常仍存在（如已透過其他管道處理） |
+
+---
+
+## ProviderSource
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order, aftersales, gateway
+- **DB 儲存欄位**: 無（推導值，不落地；由 order-service `OrderGrpcService.resolveProviderSource(status)` 依訂單狀態推導，aftersales-service 依售後單所處階段直接指定）
+- **說明**: 訂單／售後單在「與第三方對帳」時，`providerStatus` / `providerMessage` 這組欄位究竟來自哪一個第三方環節（[09 §29 異常訂單](../detailed-design/09-aftersales-service-detailed-design.md)）。決定 ADM 異常訂單頁要把 provider 回應歸類到金流還是物流，以及要補哪些對帳細節欄位（`providerTradeNo` / `providerRefundNo` / `shipTradeNo`）。**空字串代表「該訂單目前沒有第三方環節可對帳」，不是本 enum 的成員**，前端不得為空字串準備標籤。
+- **特殊方法**: 無
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串（同 `ShipmentAnomalyAckAction` / `AppType` 慣例），不佔數字值段。
+- **為什麼是 `前端可見: Yes`**（會被拿來跟 `DelegationAuditAction` 比，所以寫清楚）：本值**真的會送到買賣家 App**——`gateway/internal/handler/order.go` 的訂單詳情與 `aftersales.go` 的售後詳情都在 `/app/*` 路徑下回傳 `providerContext.providerSource`。目前兩支 App 都還沒有消費點，但它已經在對外 wire 上，值域就該對前端公開。這與 `DelegationAuditAction`（標 `No`，只走 `--admin` allowlist）的差別是：後者**只存在於 ADM 治理路徑，從不出現在買賣家的任何回應裡**，把它翻成 `Yes` 等於平白外洩內部治理值域。判準是「這個值會不會出現在買賣家前端拿得到的回應中」，不是「哪個前端目前有在用」。
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| PAYMENT | PAYMENT | PAYMENT | 付款 | 付款收單環節（PayUni 交易建立 / 授權 / 入帳）。同時帶出 `providerTradeNo` |
+| PAYMENT_REFUND | PAYMENT_REFUND | PAYMENT_REFUND | 付款退款 | 金流退款環節（PayUni 退款請求與結果）。同時帶出 `providerRefundNo` |
+| SHIPPING | SHIPPING | SHIPPING | 物流 | 物流環節（建單 / 叫件 / 配送狀態回拋）。同時帶出 `shipTradeNo` |
+
+---
+
+## CartItemUnavailableReason
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: cart, order, gateway
+- **DB 儲存欄位**: 無（推導值，不落地；purchasability 由 product.status + sku.stock_qty + requested_qty 即時推導）
+- **說明**: 購物車內單筆 SKU 「不可購買」的原因。由 `common-core/utils/code/helper/ProductPurchasabilityRules.evaluate(...)` 從 `is_active` / `stock_qty` / `requested_qty` 推導，供 cart-service `GetCart`、order-service `CheckoutValidate` / `CheckoutPreview` / `CheckoutConfirm` 統一回傳。詳見 [04 §5.2](../detailed-design/04-cart-service-detailed-design.md#52-查詢購物車-getcart---lazy-loading--grouping) 與 [20 §4.14](../detailed-design/20-checkout-module-detailed-design.md)。
+- **特殊方法**: 無（推導規則放 `ProductPurchasabilityRules`，跨服務共用，依[pitfalls-and-change-history.md](./pitfalls-and-change-history.md) 教訓 2）
+- **編碼選擇**: Value 採字串（同 `AppType` / `AfterSalePlatformDecisionOutcome` 慣例），避免與 `GrpcResponseCode` 數字號段衝突，便於前端 `switch` 判斷與 query string round-trip。
+- **優先序兩義**（避免混淆）：
+  - **判定鏈執行順序**（程式碼層面，由 `ProductPurchasabilityRules.evaluate` 強制）：`LOOKUP_FAILED` → `DELISTED` → `OUT_OF_STOCK` → `INSUFFICIENT_STOCK`。`LOOKUP_FAILED` 必須第一個 check（lookup 失敗時其餘欄位無從判斷，避免 NPE）
+  - **業務嚴重度**（給 UX / 文案使用，「商品最終會不會回來」維度）：`DELISTED` > `OUT_OF_STOCK` > `INSUFFICIENT_STOCK` > `LOOKUP_FAILED`。`DELISTED` 最不可逆、`LOOKUP_FAILED` 通常重試即可恢復
+  - 同時成立時取「判定鏈先命中者」（即 LOOKUP_FAILED 失敗就先回，後續不檢查）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| DELISTED | DELISTED | DELISTED | 已下架 | 商品已被賣家下架或軟刪除（`product.status != ACTIVE` 或 `deleted_at IS NOT NULL`），不會自動恢復 |
+| OUT_OF_STOCK | OUT_OF_STOCK | OUT_OF_STOCK | 已售完 | SKU 即時 `stock_qty <= 0`，賣家補貨後下次查詢自動恢復 |
+| INSUFFICIENT_STOCK | INSUFFICIENT_STOCK | INSUFFICIENT_STOCK | 庫存不足 | `0 < stock_qty < requested_qty`（庫存有但不夠勾選量）；買家可手動調降數量重試 |
+| LOOKUP_FAILED | LOOKUP_FAILED | LOOKUP_FAILED | 暫時無法確認 | product-service 查詢失敗（cache miss + RPC timeout / SkuCartInfo 為 null）；前端文案應引導買家稍後再試而非「下架」 |
+
+---
+
+## DelegationReasonCode
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No（ADM 以 opaque id 規則驗證並原字串回音比對，中文標籤由 preflight 下發 reason.label，前端不寫死）
+- **使用服務**: account, gateway
+- **DB 儲存欄位**: admin_operation_sessions.reason_code（VARCHAR(50)，存 Value）
+- **說明**: 管理員建立代行工作階段時必選的事由。Value 是小寫 snake_case（不同於多數 CodeMeta enum 的 UPPER_SNAKE）：ADM 以 opaque id 規則驗證並原字串回音比對，值一旦大寫化就 502。caseReferenceRequired 不是本 enum 的欄位，由 delegation 模組的純函式決定後隨 preflight 下發；CodeMeta enum 內禁止放業務輔助邏輯。Label 是後端唯一來源（preflight 的 reason.label 與 admin_operation_sessions.reason_label 都取自這裡），改這一格即全站生效。詳見 [56 §6.5.3](../detailed-design/56-delegated-operations-detailed-design.md)。
+- **歷史背景**: 2026-08 新建，隨 56 號代行營運上線。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| SELLER_REQUEST | SELLER_REQUEST | seller_request | 賣家請求（管理員記錄） | 需附案件參考。本平台沒有工單系統、賣家也沒有向平台提出請求並留痕的管道，這個事由是管理員的自我宣告，措辭不得暗示它是委託證據 |
+| PLATFORM_MAINTENANCE | PLATFORM_MAINTENANCE | platform_maintenance | 平台維護 | 需附案件參考（#2749 起）。原本是三者中唯一的豁免，而全 repo 找不到任何理由；同一份設計在授權層對 `platform_policy` 並不豁免（`source_reference` 為 NOT NULL） |
+| CONTENT_GOVERNANCE | CONTENT_GOVERNANCE | content_governance | 內容治理 | 需附案件參考 |
+
+---
+
+## ProcurementArtifactType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: ai-service, gateway
+- **DB 儲存欄位**: `procurement_agent_run_artifacts.artifact_type`（存 Value；表尚未建立，doc 57 §6.2 Slice F）
+- **說明**: Hawkr Agent typed artifact 的種類（doc 57 §4.5）。每個值對應一份獨立、versioned 的 `data` payload 形狀；Track A／Track B **不得共用一個 generic schema**（例如 `RFQ_PUBLICATION_APPROVAL` 與 `CART_APPROVAL` 概念上都是「核准」，但欄位形狀必須各自獨立定義，不得抽出共用 `ApprovalData`）。對應的 Go 型別定義見 `services/ai-service/internal/procurement/domain/artifact.go`。
+- **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身（與 Code 相同），同 `ProcurementRunStatus`／`AppType` 慣例，非數字碼；不佔用 README「Value 分配建議」的號段。
+- **值域為 open（可加值，不可刪值、不可改字面值）**: 同 `ProcurementRunStatus`，理由同（AIP-216）。
+- **note**: 以 2026-08-20 「V6 artifact/event registry delta」留言為工作版本凍結（doc 57 §14 D3），**未經二次確認**；之後若有更新版本，以 additive 方式處理。Track B（`PURCHASE_PLAN`／`CART_APPROVAL`／`CART_RESULT`）與 Track A 的 `PRICING_PREVIEW`／`DEAL_TEMPERATURE`／`CONFIRMED_RFQ`／`RFQ_PUBLICATION_APPROVAL`／`RFQ_PUBLICATION_RESULT`／`SELLER_QUOTE_RESULT` 六型的 `data` payload 形狀尚未展開（doc 57 §5.7 明文「尚未展開細節」，其上游商務流程未設計），本次只凍結**型別名稱與共同 envelope**（`artifactId`／`type`／`version`／`checksum`／`status`／`freshness`／`ownerRef`），不預先發明未經業務設計驗證的欄位——同 `error-codes.md`「尚未登記的碼（刻意）」一節的理由：預先凍結沒有實作驗證過的形狀，只會產生永遠回不出來的死值。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| REQUEST_SNAPSHOT | REQUEST_SNAPSHOT | REQUEST_SNAPSHOT | 需求快照 | Track A。某一版 `procurement_request_revisions` 的公開投影（`slots`／`slotsHash`／`revisionNo`），`data` 形狀已可從既有 `domain.Slots` 推導 |
+| CLARIFICATION | CLARIFICATION | CLARIFICATION | 澄清問題 | Track A。承載 `domain.ClarifyQuestion` 的公開投影 |
+| CANDIDATE_RESULTS | CANDIDATE_RESULTS | CANDIDATE_RESULTS | 候選結果 | Track A。PLATFORM／EXTERNAL 兩條 lane 的候選清單，`data` 形狀已可從既有 `domain.CandidateLead` 欄位挑選層推導（不得含 email／phone／social／聯絡人，見 doc 57 §1.3） |
+| PRICING_PREVIEW | PRICING_PREVIEW | PRICING_PREVIEW | 定價預覽 | Track A。上游流程屬 #2403（doc 57 §5.7），`data` 形狀**尚未展開**——本次只凍結型別名稱與共同 envelope |
+| CONFIRMED_RFQ | CONFIRMED_RFQ | CONFIRMED_RFQ | 已確認詢價單 | Track A。#2403（doc 57 §5.7）的「不可變需求確認＝詢價單本體」，凍結 `snapshot`／`hash`／版本形狀時須讓商務線 CAS（`expectedRfqSnapshotHash`）用得上；`data` 形狀**尚未展開** |
+| RFQ_PUBLICATION_APPROVAL | RFQ_PUBLICATION_APPROVAL | RFQ_PUBLICATION_APPROVAL | 發布核准 | Track A。屬商務線 #2450，`data` 形狀**尚未展開**；核准不得走 generic resume（doc 57 §4.6） |
+| RFQ_PUBLICATION_RESULT | RFQ_PUBLICATION_RESULT | RFQ_PUBLICATION_RESULT | 發布結果 | Track A。屬商務線 #2450，`data` 形狀**尚未展開**；`PUBLISHED` 只表示 transaction 完成，Wish Pool indexed／Direct delivered／Seller viewed-quoted 需由 #2539 的 typed evidence 更新 |
+| SELLER_QUOTE_RESULT | SELLER_QUOTE_RESULT | SELLER_QUOTE_RESULT | 賣家報價結果 | Track A。屬商務線 #2538，`data` 形狀**尚未展開** |
+| ERROR_RECOVERY | ERROR_RECOVERY | ERROR_RECOVERY | 錯誤復原引導 | Track A。承載 `ProcurementErrorReason`／`ProcurementRunFailureReason` 的公開復原建議，`data` 形狀已可從既有錯誤碼登記推導 |
+| PURCHASE_PLAN | PURCHASE_PLAN | PURCHASE_PLAN | 採買計畫 | Track B。上游 Cart 流程未在 doc 57 展開，`data` 形狀**尚未展開** |
+| CART_APPROVAL | CART_APPROVAL | CART_APPROVAL | 購物車核准 | Track B。`data` 形狀**尚未展開**；不得與 `RFQ_PUBLICATION_APPROVAL` 共用 schema |
+| CART_RESULT | CART_RESULT | CART_RESULT | 購物車結果 | Track B。`data` 形狀**尚未展開** |
+
+---
+
+## ProcurementPublicationAudienceMode
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: ai-service, gateway
+- **DB 儲存欄位**: `procurement_rfq_publication_approvals.audience_mode`（存 Value；形狀矛盾由 `chk_prpa_direct_requires_candidate_set`／`chk_prpa_wish_pool_has_no_candidate_set` 兩條 CHECK 擋下）
+- **說明**: publication 的受眾種類（issue #2450 Scope 2）。兩支 pipeline **不共用完成定義**（doc 64 §4.2）：Wish Pool 的完成是「已建索引」，Direct 的完成是「已投遞給指定對象」。
+- **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身（與 Code 相同），同 `ProcurementArtifactType` 慣例。
+- **值域為 open（可加值，不可刪值、不可改字面值）**: 形式上 open，但**新增第三種必須先改 doc 64 §4.2 補上它的完成定義**——沒有完成定義的受眾種類等於一條永遠無法判斷是否送達的路徑。
+- **note**: `WISH_POOL` 不需要 `candidateSet`，**空 recipient list 不得冒充本模式**：DB 用 `candidate_set_id IS NULL` 而不是 0 或空陣列來表達「本模式沒有這個概念」。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| WISH_POOL | WISH_POOL | WISH_POOL | 許願池 | 公開池，不指定對象；不需要 `candidateSet`，空 recipient list 不得冒充本模式 |
+| DIRECT_RECIPIENTS | DIRECT_RECIPIENTS | DIRECT_RECIPIENTS | 指定對象 | 引用 `candidateSet` 與 ordered recipient 身分快照 |
+
+---
+
+## ProcurementPublicationState
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: ai-service, gateway
+- **DB 儲存欄位**: `procurement_rfq_publications.state`（存 Value）
+- **說明**: 一次 RFQ 發布的狀態。⛔ `PUBLISHED` **只代表 server transaction 完成**，不代表 Wish Pool 已建索引、也不代表賣家已收到或已看到（issue #2450 Scope 9、doc 64 §4.2）；投遞與索引的真相由 #2539 的 typed evidence 更新。
+- **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身（與 Code 相同），同 `ProcurementArtifactType` 慣例。
+- **值域為 open（可加值，不可刪值、不可改字面值）**: 同 `ProcurementRunStatus`。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| PUBLISHED | PUBLISHED | PUBLISHED | 已建立發布 | server transaction 完成；**不代表已投遞或已被看到** |
+| SUPERSEDED | SUPERSEDED | SUPERSEDED | 已被後續發布取代 | 同一 request 的新一次發布取代本次 |
+| CANCELLED | CANCELLED | CANCELLED | 已取消 | 買家撤回本次發布 |
+
+---
+
+## ProcurementWishPoolPolicy
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: ai-service, gateway
+- **DB 儲存欄位**: `procurement_rfq_publication_approvals.audience_policy_id`（存 Value）
+- **說明**: Wish Pool 的受眾政策身分。**v1 是常數不是資料表**：範圍就是「全站所有未停權的賣家」，沒有 category／region／tier 維度。刻意不預留 scope 欄位——防止 `audienceHash` preimage 破壞性變更的機制是 policy 版本本身：v2 引入篩選維度時 preimage 定義隨版本走，舊 publication 依它自己的版本解讀。預先放空欄位等於預先發明未經業務設計驗證的欄位（doc 57 §4.5 禁止）。
+- **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身（與 Code 相同），同 `ProcurementArtifactType` 慣例。
+- **值域為 open（可加值，不可刪值、不可改字面值）**: 政策演進一律是**新增值**（`..._V2`），不得改 v1 的字面值或語意——已核准的 publication 依它自己記下的 policy 值解讀受眾。
+- **note**: 對應的 policy 版號**不在本 enum**：generator 產出的 CodeMeta struct 只有 `Code`／`Value`／`Label`／`Description` 四欄，放不下數字版號。版號釘在消費端 `services/ai-service/internal/procurement/domain/publication_audience.go` 的 `WishPoolPolicyVersionV1`，並寫入 `audience_policy_version` 欄。
+- **note**: ⛔ 賣家的**停權狀態不屬於**這個 policy，也不進 `audienceHash`：那是會隨外部事件變動的狀態，凍進 hash 會讓任一賣家被停權就作廢所有 pending approval。停權在讀取端與回應端 recheck（#2539）。同理不複用 doc 46 的賣家能力權限層——doc 46 §1.3 的 Non-Goal 明文寫它「不跨服務、不對前端暴露、不進 CodeMeta」。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| ALL_ACTIVE_SELLERS_V1 | WISH_POOL_ALL_ACTIVE_SELLERS_V1 | WISH_POOL_ALL_ACTIVE_SELLERS_V1 | 全站未停權賣家 v1 | Wish Pool 受眾政策 v1：全站所有未停權的賣家，無分類、地區或分級限制 |
+
+---
+
+## ProcurementSellerResponseType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: ai-service, gateway
+- **DB 儲存欄位**: `procurement_seller_response_versions.response_type`（存 Value；`chk_prsrv_response_type` 擋值域）
+- **說明**: 賣家這一版回價的種類（issue #2538）。⛔ **兩個值的必填欄位完全相同**——「接受非價格條款」不是少填金額的捷徑，v6.0 逐字要求不論哪一種都必須建立含實際品相、unit basis、goods／shipping／tax／total 與 validUntil 的 immutable 版本。
+- **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身（與 Code 相同），同 `ProcurementArtifactType` 慣例。
+- **值域為 open（可加值，不可刪值、不可改字面值）**: 形式上 open，但新增第三種前要先回答「它的必填欄位跟這兩個有什麼不同」——若答案是「比較少」，那它就不該存在。
+- **note**: v6.0 Part III §4.2 的 JSON 範例寫 `SELLER_QUOTE`，**不採用**：同一節的表格才是值域定義，範例與表格自相矛盾。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| MANUAL_QUOTE | MANUAL_QUOTE | MANUAL_QUOTE | 自行報價 | 賣家提出自己的商務條件 |
+| ACCEPT_NON_PRICE_TERMS_WITH_QUOTE | ACCEPT_NON_PRICE_TERMS_WITH_QUOTE | ACCEPT_NON_PRICE_TERMS_WITH_QUOTE | 接受非價格條款並報價 | 接受買家的非價格條款，但仍須自行填齊品相與全部金額 |
+
+---
+
+## ProcurementTaxInclusionBasis
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: ai-service, gateway
+- **DB 儲存欄位**: `procurement_seller_response_versions.tax_inclusion_basis`（存 Value；`chk_prsrv_tax_inclusion_basis` 擋值域）
+- **說明**: 賣家報的 `totalAmount` 是否已含稅（#2538）。⛔ 這是**申報**不是計算依據：server 只驗 `total = goods + shipping + tax`，不依本欄反推或改寫任何金額。
+- **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身（與 Code 相同），同 `ProcurementArtifactType` 慣例。
+- **值域為 open（可加值，不可刪值、不可改字面值）**: 二值即窮盡，沒有第三種狀態可加。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| TAX_INCLUDED | TAX_INCLUDED | TAX_INCLUDED | 含稅 | `totalAmount` 已含 `taxAmount` |
+| TAX_EXCLUDED | TAX_EXCLUDED | TAX_EXCLUDED | 未稅 | `taxAmount` 另計，仍計入 `totalAmount` 的恆等式 |
+
+---
+
+## ProcurementSellerPartyType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: ai-service, gateway
+- **DB 儲存欄位**: 無（由 `procurement_seller_responses.lane` 推導；lane 值域是 `PLATFORM`／`EXTERNAL`，本 enum 是它的對外投影名）
+- **說明**: 買家比較清單上那一列回價來自哪一種賣家身分（#2538 wire 契約 §6.3）。
+- **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身（與 Code 相同），同 `ProcurementArtifactType` 慣例。
+- **值域為 open（可加值，不可刪值、不可改字面值）**: 新增第三種身分等於新增一條 lane，屬受眾 pipeline 的設計變更。
+- **note**: ⛔ `EXTERNAL_VENDOR` 的 `displayName` **恆為空字串**——站外業者的名稱住 seller 模組的 `seller.prospects`，ai-service 沒有安全可用的快照。看到空名稱不是缺漏，是「這裡沒有可公開的名字」；⛔ 不得改用 email 或聯絡方式頂替。
+- **特殊方法**: 無
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| PLATFORM_STORE | PLATFORM_STORE | PLATFORM_STORE | 平台賣家 | 有平台 store 身分，`storeCode` 可用於賣家頁連結 |
+| EXTERNAL_VENDOR | EXTERNAL_VENDOR | EXTERNAL_VENDOR | 站外業者 | 來自站外名單，無平台 store；`displayName`／`storeCode` 皆為空字串 |
+
+---
+
+## ReportTargetType
+
+> 擁有者：moderation（A6）；單體與新契約用 proto `ReportTargetKind`（`api/hawkr/moderation/v1alpha1/moderation.proto`；`REVIEW` → `REPORT_TARGET_KIND_REVIEW`、`CHAT_MESSAGE` → `REPORT_TARGET_KIND_CHAT_MESSAGE`，舊 `USER` 在新契約是 `REPORT_TARGET_KIND_BUYER`），本段只服務還沒搬進單體的舊契約，不得單獨修改。
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: social, gateway
+- **DB 儲存欄位**: `reports.target_type`（VARCHAR(30)，存 Value；值域由 `chk_reports_target_type` 約束）
+- **說明**: 被檢舉對象的類型，決定 social-service 要去哪張表取快照、處置時要下架哪一種內容（`internal/usecase/dispatcher.go` 依本值分派）。權威值域是 DB CHECK 而非 `api/proto/social/social.proto` 的註解。
+- **歷史背景**: 2026-08 隨 #2551 收斂；原本 ADM、買家 App 各持一份手抄表。
+- **特殊方法**: 無
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串（同 `ProviderSource` 慣例），不佔數字值段——直接寫進 VARCHAR 欄位並由 DB CHECK 逐字比對。
+- **為什麼是 `前端可見: Yes`**: 判準是「這個值會不會出現在買賣家前端拿得到的回應／請求中」。本值由買家 App 在 `POST /app/reports` 的 request body **主動送出**（送錯值會被 DB CHECK 擋掉），值域必須對前端公開。檢舉這一組四個 enum（本 enum ／ `ReportReasonCode` ／ `ReportStatus` ／ `ReportResolveAction`）**全部**是 `Yes`：前兩者由前端送出，後兩者由 `/app/reports` 與 `/app/reports/me` 的回應帶回。只有 `ModerationActionType`（內部技術碼）是 `No`——它只寫進後端 append-only 的稽核表，從不出現在任何對外回應裡。
+- **相關設計書**: [31 內容檢舉與封鎖](../detailed-design/31-content-reporting-and-block-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| REVIEW | REVIEW | REVIEW | 商品評論 | 商品評論（內容由 review 模組擁有，檢舉案件只持 target_id） |
+| POST | POST | POST | 貼文 | 賣家貼文 `cms_post` |
+| POST_COMMENT | POST_COMMENT | POST_COMMENT | 貼文留言 | 貼文底下的留言 `cms_comment` |
+| SELLER_FORUM | SELLER_FORUM | SELLER_FORUM | 討論區 | 賣家討論區內容 |
+| CHAT_MESSAGE | CHAT_MESSAGE | CHAT_MESSAGE | 聊天訊息 | IM 訊息（內容由 im 模組擁有，檢舉案件只持 target_id） |
+| USER | USER | USER | 使用者 | 檢舉對象是人而非單一則內容；此類不下架內容，只走警告／停權 |
+
+---
+
+## ReportReasonCode
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: social, gateway
+- **DB 儲存欄位**: `reports.reason_code`（VARCHAR(30)，存 Value；值域由 `chk_reports_reason_code` 約束）
+- **說明**: 檢舉原因。權威值域是 DB CHECK `chk_reports_reason_code`；`social.proto` 的註解曾列出 `HATE`／`ADULT` 兩個從未存在於 CHECK 的值，是「照抄 proto 註解就會抄到死值」的現成案例。哪些原因適用於哪種 `ReportTargetType` 是**業務規則不是碼表**（例如檢舉「使用者」時不提供食安疑慮），依 §8 放在呼叫端的 helper，不得寫進本 enum。
+- **歷史背景**: 2026-08 隨 #2551 收斂；原本 ADM（`src/lib/reportReasons.ts`）與買家 App 各持一份手抄表，且中文用字互不相同。Label 採買家 App 的用字為 canonical——那是消費者實際讀到的字，改動它的代價（App 送審）遠高於讓 ADM 表格跟著變長。
+- **特殊方法**: 無
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串，同 `ReportTargetType`。
+- **為什麼是 `前端可見: Yes`**: 買家 App 的檢舉表單直接渲染本值域供使用者挑選，並在 `POST /app/reports` 送回。
+- **相關設計書**: [31 內容檢舉與封鎖](../detailed-design/31-content-reporting-and-block-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| SPAM | SPAM | SPAM | 垃圾訊息 / 廣告 | 重複張貼、與內容無關的推銷 |
+| SEXUAL | SEXUAL | SEXUAL | 色情 / 不當內容 | 情色露骨或不適合公開展示的內容 |
+| FRAUD | FRAUD | FRAUD | 詐騙 | 假交易、假優惠、導向站外付款 |
+| HARASSMENT | HARASSMENT | HARASSMENT | 騷擾 / 仇恨言論 | 針對特定個人或群體的攻擊 |
+| FOOD_SAFETY | FOOD_SAFETY | FOOD_SAFETY | 食品安全疑慮 | 與食品衛生、標示、保存有關的疑慮；不適用於 `USER` 類檢舉 |
+| POLITICAL | POLITICAL | POLITICAL | 政治敏感 | 政治宣傳或爭議性動員 |
+| FAKE_NEWS | FAKE_NEWS | FAKE_NEWS | 不實資訊 | 可查證為假的內容 |
+| OTHER | OTHER | OTHER | 其他 | 不屬於上列任一類；前端可自行在標籤後附加「（請說明）」之類的表單提示，該提示是呈現層文案不是碼表的一部分 |
+
+---
+
+## ReportResolveAction
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: social, gateway
+- **DB 儲存欄位**: `reports.resolved_action`（VARCHAR(20)，存 Value；值域由 `chk_reports_resolved_action` 約束）
+- **說明**: 管理員對一張檢舉單的**裁決**動作，寫進 `reports.resolved_action` 並由 `internal/usecase/report.go` 的 `actionToStatus` 一對一映射到 `ReportStatus` 的四個終態。**與 `ModerationActionType`（內部技術碼）是兩件事**：本 enum 是「這張單怎麼判」、後者是「稽核 log 上發生過什麼」，後者多出 `AUTO_REJECT`（系統自動處置，沒有檢舉單）與 `REOPEN`（把單子打回申訴，不是終態裁決）。兩張表兩個值域，合成一個會讓 `resolved_action` 有機會寫進不是終態的值。
+- **歷史背景**: 2026-08 隨 #2551 收斂自 ADM 手抄的 `ACTION_LABELS`。
+- **特殊方法**: 無（`action → status` 的映射是業務規則，依 §8 留在 `report.go` 的 helper，不放進 enum）
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串，同 `ReportTargetType`。
+- **為什麼是 `前端可見: Yes`**: `GET /app/reports/me` 的每一列都帶 `resolvedAction`（`gateway/internal/handler/moderation.go` 的 `reportData`）⇒ 檢舉人看得到自己的案子被怎麼判。
+- **相關設計書**: [31 內容檢舉與封鎖](../detailed-design/31-content-reporting-and-block-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------------|-------------|
+| HIDE_TARGET | HIDE_TARGET | HIDE_TARGET | 隱藏內容 | 被檢舉內容下架（寫入 `hidden_at`），單子轉 `RESOLVED_HIDDEN` |
+| WARN_USER | WARN_USER | WARN_USER | 警告使用者 | 記錄警告、內容保留，單子轉 `RESOLVED_WARNED` |
+| BAN_USER | BAN_USER | BAN_USER | 停權使用者 | 停權被檢舉人帳號，單子轉 `RESOLVED_BANNED` |
+| DISMISS | DISMISS | DISMISS | 駁回檢舉 | 檢舉不成立、內容保留，單子轉 `DISMISSED` |
+
+---
+
+## InvoiceIssuerType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— ADM 手動開票（A11）以 radio 選 issuer 類型；買賣家端看到的是開票人名稱而不是類型
+- **使用服務**: invoice
+- **DB 儲存欄位**: `invoice_issuers.issuer_type`（存 Value；值域由 `chk_invoice_issuers_type` 約束）
+- **說明**: 開票主體的類型。通用 issuer→recipient 模型的一半。**兩個值 Phase 1 都可用**：SELLER 走自動線（訂單付款成功）與 ADM 手動；PLATFORM 走 ADM 手動開票（端點 57／畫面 A11），涵蓋平台代製收據、平台對賣家的服務費、平台對買家的訂閱費、平台對非會員的對外收費。PLATFORM 的自動線（週期結算／訂閱週期）為 Phase 2。
+- **相關設計書**: [58 §5.1.1](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SELLER | SELLER | SELLER | 賣家 | issuer_ref_id = sellers.store_id（store surrogate，非 account_id） |
+| PLATFORM | PLATFORM | PLATFORM | 平台 | issuer_ref_id 恆為 0。用於平台代製收據（PLATFORM_RECEIPT）**以及平台以自己名義開立的發票**（對賣家的服務費／對買家的訂閱費／對非會員的對外收費）；Phase 1 由 ADM 手動觸發 |
+
+## InvoiceRecipientType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— ADM 手動開票（A11）以 radio 三選一；買賣家發票中心用它區分「我開的」與「我收的」
+- **使用服務**: invoice
+- **DB 儲存欄位**: `invoice_documents.recipient_type`（存 Value；值域由 `chk_invdoc_recipient` 約束）
+- **說明**: 受票主體（買受人）的類型。通用 issuer→recipient 模型的另一半。`recipient_ref_id` 的語意隨本值改變，三者必須成對解讀。
+- **相關設計書**: [58 §5.1.5](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| BUYER | BUYER | BUYER | 買家 | recipient_ref_id = buyers.buyer_id（buyer surrogate，非 account_id） |
+| SELLER | SELLER | SELLER | 賣家 | recipient_ref_id = sellers.store_id。此時賣家是進項憑證持有人，不是開票人 |
+| EXTERNAL | EXTERNAL | EXTERNAL | 非平台會員 | recipient_ref_id 恆為 NULL；抬頭／統編／email 只存在於本文件的快照欄位 |
+
+---
+
+## InvoiceDocumentKind
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 買家 B04/B05 文件列表與詳情、賣家 S06、ADM A05 都以本值域標示文件種類
+- **使用服務**: invoice, order, gateway
+- **DB 儲存欄位**: `invoice_documents.document_kind`（存 Value）；`order_invoice_snapshots.invoice_kind`（order-service，**只用 B2C／B2B 兩值**，由 `chk_ois_kind` 約束）
+- **說明**: 稅務文件的種類。**三值，不多不少**（58 §5 `chk_invdoc_kind`）。
+- **相關設計書**: [58 §5.1.5](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| B2C | B2C | B2C | 二聯式（買受人為個人） | BuyerIdentifier 固定 10 個 0；TaxAmount 一律 0；DetailVat=1（含稅） |
+| B2B | B2B | B2B | 三聯式（買受人為營業人） | 買受人統編為 8 碼；DetailVat=1（含稅、明細與 B2C 同形），僅表頭拆稅——58 §5A.6.2 定版本設計永不送 DetailVat=0（未稅明細會讓 UnitPrice 變小數，與「金額一律整數元」正面衝突，且踩到一個官方未說明的捨入模式） |
+| RECEIPT | RECEIPT | RECEIPT | 收據 | 免用統一發票賣家的平台代製收據；不經 provider，無法定上傳期限 |
+
+---
+
+## InvoiceFulfillmentMode
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 買家訂單詳情、賣家 S06 發票紀錄、ADM A05 都用它回答「這張票由誰開」
+- **使用服務**: invoice, gateway
+- **DB 儲存欄位**: `invoice_documents.fulfillment_mode`（存 Value；值域由 `chk_invdoc_mode` 約束）
+- **說明**: 這張文件由誰、以什麼方式履行開立義務。在 order.paid 消費當下由決策樹判定一次並寫死，**不隨賣家後續狀態變動回溯改寫**。
+- **相關設計書**: [58 §7.1.3](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| AMEGO_AUTO | AMEGO_AUTO | AMEGO_AUTO | 平台自動開立 | 賣家已核定應開統一發票、provider 連線可用、且已過自動化切點 |
+| SELLER_SELF_ISSUE | SELLER_SELF_ISSUE | SELLER_SELF_ISSUE | 賣家自行開立 | 賣家已具結待審；document 恆為 NOT_APPLICABLE，回報號碼後轉 RESOLVED_EXTERNALLY |
+| PLATFORM_RECEIPT | PLATFORM_RECEIPT | PLATFORM_RECEIPT | 平台代製收據 | 免用統一發票賣家；本地產生 PDF，不打 AMEGO |
+| LEGACY_MANUAL | LEGACY_MANUAL | LEGACY_MANUAL | 切點前／未串接（人工） | 自動化切點前的訂單、或賣家資格未核准／連線不可用 |
+
+---
+
+## InvoiceLineType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 買家 B05 文件詳情逐行顯示；ADM 手動開票的品項輸入也用它
+- **使用服務**: invoice, gateway
+- **DB 儲存欄位**: `invoice_document_lines.line_type`（存 Value；值域由 `chk_invline_type` 約束）
+- **說明**: 發票品項行的種類。折扣以**負數品項行**表達而非調整單價（AMEGO 官方範例即以負數明細表示折抵），因此對每一行都成立同一條算式 net_amount = unit_price × quantity。
+- **相關設計書**: [58 §5.1.6](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| PRODUCT | PRODUCT | PRODUCT | 商品 | 對應 order_items 一列；net_amount >= 0 |
+| SHIPPING | SHIPPING | SHIPPING | 運費 | 併入同一張發票的銷售額；net_amount >= 0 |
+| DISCOUNT | DISCOUNT | DISCOUNT | 折抵 | 優惠券等折抵；net_amount < 0（由 chk_invline_sign 強制） |
+
+---
+
+## InvoiceTaxCategory
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 買家 B05 稅額拆解、ADM 手動開票的逐行稅別輸入
+- **使用服務**: invoice, gateway
+- **DB 儲存欄位**: `invoice_document_lines.tax_category`（smallint，**存 Value**）；`seller_tax_profiles.default_tax_category`（同上）
+- **說明**: 品項行的課稅別。Phase 1 每一行都複製賣家的 default_tax_category（唯一合法來源是 ADM 依核定函所填的單一稅別），因此一張文件內必然同值。
+- **編碼選擇**: **Code 與 Value 刻意不同**。Code 是對外契約值（HTTP／gRPC 傳 TAXABLE 等 UPPER_SNAKE），Value 是 AMEGO `ProductItem.TaxType` 的線上數字，同時也是 DB 存值。⇒ `InvoiceTaxCategoryFromCode("TAXABLE").Value` 直接就是要送給 AMEGO 的字元，不需要第二支對映表（enum 禁止承載業務輔助邏輯，見「pitfalls-and-change-history.md」）。Value 落在既有 0~99 段內，不需新增號段。
+- **相關設計書**: [58 §5.1.6](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| TAXABLE | TAXABLE | 1 | 應稅 | 稅率 5%；Phase 1 的預設值 |
+| ZERO_RATED | ZERO_RATED | 2 | 零稅率 | ⚠️ AMEGO 另需 CustomsClearanceMark／ZeroTaxRateReason，Phase 1 送出前一律斷言擋下（理由碼 ZERO_RATE_NOT_SUPPORTED） |
+| TAX_EXEMPT | TAX_EXEMPT | 3 | 免稅 | 需以主管稽徵機關核定為準，不得由系統依商品名稱自動判定 |
+
+---
+
+## InvoiceCarrierType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 買家 B02 發票方式選擇、B08 常用發票資料；ADM 手動開票的受票人輸入
+- **使用服務**: invoice, gateway
+- **DB 儲存欄位**: `buyer_invoice_preferences.preference_kind`（存 Value；值域由 `chk_bip_kind` 約束）
+- **說明**: 買家指定的發票歸戶方式。⚠️ **本值域不是 AMEGO 的 CarrierType**：AMEGO 的線上值（3J0002／CQ0001／amego）存在 `invoice_documents.carrier_type` 與 `buyer_invoice_preferences.carrier_type`，兩者的對映是純函式（invoice-service internal/domain/carrier.go），不放進本 enum。
+- **編碼選擇**: Value 採 UPPER_SNAKE 而非 AMEGO 字面值。理由：TAX_ID 與 DONATION 在 AMEGO 端**沒有對應的 CarrierType 字面值**（該欄為 NULL），而 Value 是必填欄，兩個空值寫不進去。
+- **相關設計書**: [58 §5.1.4](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| MOBILE_BARCODE | MOBILE_BARCODE | MOBILE_BARCODE | 手機條碼 | AMEGO CarrierType = 3J0002；載具值為憑證等級，密文儲存且不得落 log |
+| CITIZEN_CERT | CITIZEN_CERT | CITIZEN_CERT | 自然人憑證條碼 | AMEGO CarrierType = CQ0001；同上 |
+| TAX_ID | TAX_ID | TAX_ID | 打統編（三聯式） | AMEGO CarrierType 為空；需同時帶買方抬頭 |
+| DONATION | DONATION | DONATION | 捐贈 | AMEGO CarrierType 為空；捐贈碼 3~7 碼純數字 |
+
+---
+
+## InvoiceOperationType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 賣家 S08 與 ADM A05 的作業列表逐列顯示
+- **使用服務**: invoice, gateway
+- **DB 儲存欄位**: `invoice_operations.operation_type`（存 Value；值域由 `chk_invop_type` 約束）
+- **說明**: 對 provider 的一次操作的種類。六種共用同一套 InvoiceOperationStatus 值域。
+- **相關設計書**: [58 §7.3.0 規則 1](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| ISSUE | ISSUE | ISSUE | 開立 | AMEGO f0401；PLATFORM_RECEIPT 也走本類型（本地產生 PDF，不打 AMEGO） |
+| QUERY | QUERY | QUERY | 查詢對帳 | AMEGO invoice_query；只有兩個建立者：上傳狀態輪詢拿到 -1、以及收到 3040171 |
+| VOID | VOID | VOID | 作廢發票 | AMEGO f0501 |
+| ALLOWANCE | ALLOWANCE | ALLOWANCE | 開立折讓單 | AMEGO g0401 |
+| REISSUE | REISSUE | REISSUE | 作廢後重開 | 作廢成功後開立新發票 |
+| VOID_ALLOWANCE | VOID_ALLOWANCE | VOID_ALLOWANCE | 作廢折讓單 | AMEGO g0501 |
+
+---
+
+## InvoiceAdjustmentType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 買家看到的是折讓單本身（`invoice_adjustments` 的單號、日期與 PDF）與原發票的作廢狀態，不看本欄
+- **使用服務**: invoice
+- **DB 儲存欄位**: `invoice_adjustments.adjustment_type`（存 Value；值域由 `chk_invadj_type` 約束）
+- **說明**: 一次稅務調整事件的種類。VOID 不產生新文件（把原文件打成 VOIDED）；ALLOWANCE 產生一張獨立的法定憑證，**但那張憑證落在 `invoice_adjustments` 不是 `invoice_documents`**（58 §5 T-B04③；`chk_invdoc_kind` 沒有 `ALLOWANCE`）。
+- **相關設計書**: [58 §5.1.7](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| VOID | VOID | VOID | 作廢 | 不產生新文件；AMEGO f0501，非同步 |
+| ALLOWANCE | ALLOWANCE | ALLOWANCE | 折讓 | 產生一張獨立憑證（`invoice_adjustments` ＋ `invoice_adjustment_lines`）；AMEGO g0401。金額全部**未稅**，與開立端含稅語意相反——這正是它不併進 `invoice_documents` 的機械理由 |
+
+---
+
+## InvoiceCarrierSelectionMode
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 前端送的是發票資料本身，模式由 order-service 依輸入推導後寫入快照
+- **使用服務**: order, invoice
+- **DB 儲存欄位**: `order_invoice_snapshots.carrier_selection_mode`（order-service，存 Value；值域由 `chk_ois_mode` 約束）
+- **說明**: 結帳當下決定「這張訂單的發票歸戶方式從哪裡來」。**跨語言值域**：order-service（Java）寫入、invoice-service（Go）讀取並據以分支，兩端都必須用生成的常數而非字串字面值。USE_BUYER_DEFAULT 刻意不在結帳當下解析（那會在 hot path 多打一次 gRPC），由 invoice-service 在建立文件時解析，**只有兩步**：買家指定的預設（`isDefault=true`）→ 無載具發票。中間的 amego 載具兩步已於 D6／D7 移除（58 §6.1.2(b)）。
+- **相關設計書**: [58 §5.4.3](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| USE_BUYER_DEFAULT | USE_BUYER_DEFAULT | USE_BUYER_DEFAULT | 使用買家預設 | 由 invoice-service 於開票時解析，**只有兩步**：買家指定的預設（isDefault=true）→ 無載具發票。amego 載具兩步已於 D6／D7 移除（58 §6.1.2(b)），InvoiceCarrierType 也沒有能承載它的值 |
+| EXPLICIT_PREFERENCE | EXPLICIT_PREFERENCE | EXPLICIT_PREFERENCE | 指定常用資料 | 帶 buyer_invoice_preference_id；invoice-service 解析時**必驗歸屬**（IDOR） |
+| NONE | NONE | NONE | 無載具／打統編 | B2B 一律為此值 |
+| DONATION | DONATION | DONATION | 捐贈 | 帶 donation_code |
+
+---
+
+## InvoiceCorrectionRejectReason
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 買家在 B06 會看到被拒的具體理由（端點 12 回應的 `rejectReasonCode`）
+- **使用服務**: invoice
+- **DB 儲存欄位**: `invoice_correction_requests.reject_reason_code`（值域由 `chk_invcorr_reject_reason_code` 約束；`chk_invcorr_reject_reason` 另要求 `status=REJECTED` 時非空）
+- **說明**: 買家申請修改發票資料被婉拒的理由（58 §7.3.5 的 **R02** 與 **R05**）。兩條邊共用同一組值域，差別只在**發現的時點**——R02 是送出當下的預檢就擋掉，R05 是送出後 AMEGO 才回報。⚠️ **前三個值同時是 AMEGO `f0501` 三個回應碼的一一對映**：`3050123`→ALREADY_REPORTED、`3050126`→PAST_VOID_DEADLINE、`3050141`→ALLOWANCE_EXISTS，改動值域前先確認那個對映還成立。B06 顯示的是**後端給的具體理由**，不由前端拼字串。
+- **相關設計書**: [58 §7.3.5](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| ALREADY_REPORTED | ALREADY_REPORTED | ALREADY_REPORTED | 發票已申報 | 已隨期別申報，依規定不得作廢。🔴 **由 R02 的預檢寫入**（`ReportedStatus` 是純函式，我方自己算得出期別）——它**沒有**對應的 AMEGO 錯誤碼。2026-09-01（DEC-20260831-234750）前本欄誤記為對應 `3050123`，而該碼的官方語意是「已存在註銷」，已改對應 `PROVIDER_STATE_CONFLICT` |
+| PAST_VOID_DEADLINE | PAST_VOID_DEADLINE | PAST_VOID_DEADLINE | 已逾可作廢期限 | 超過法定可作廢期間；對應 AMEGO f0501 的 3050126 |
+| ALLOWANCE_EXISTS | ALLOWANCE_EXISTS | ALLOWANCE_EXISTS | 已存在折讓 | 該張發票已有折讓單，作廢會使折讓失去依據；對應 AMEGO f0501 的 3050141 |
+| TRACK_INSUFFICIENT | TRACK_INSUFFICIENT | TRACK_INSUFFICIENT | 字軌餘量不足 | 重開需要一個新號碼而目前配號不足；先確保可開再作廢，故在作廢前就擋下 |
+| CARRIER_INVALID | CARRIER_INVALID | CARRIER_INVALID | 載具無效 | 更正後的載具驗證不通過，重開會失敗 |
+| PROVIDER_UNAVAILABLE | PROVIDER_UNAVAILABLE | PROVIDER_UNAVAILABLE | 服務商暫時無法連線 | 電子發票服務商當下不可用；買家稍後可再申請一次（REJECTED 是終態且不佔 uq_invcorr_open_per_document 的名額） |
+| PROVIDER_STATE_CONFLICT | PROVIDER_STATE_CONFLICT | PROVIDER_STATE_CONFLICT | 發票狀態衝突，請聯繫客服 | AMEGO f0501 回 `3050123`「指定發票號碼**已存在註銷**」——那張發票在服務商端已有一筆註銷紀錄，我方的作廢因此走不下去。⚠️ 這**不是**「已申報」：註銷與作廢是兩種不同動作（AMEGO 另有 `3050122`「已存在開立作廢」，我方視為成功等價）。**買家手上的原發票不受影響**，只是內容改不了 |
+
+---
+
+## RefundSource
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 只在 MQ payload 與 invoice-service 的判定裡出現
+- **使用服務**: order, invoice
+- **DB 儲存欄位**: 無（`order.refund.finalized` 的 payload 欄）
+- **說明**: 訂單層權威退款事件的來源分類，供 invoice-service 判定應走作廢還是折讓。三個值對應 order-service 的三個發布點，全部在既有交易內落 order_outbox。
+- **相關設計書**: [58 §6.3.2.3](../detailed-design/58-invoice-service-detailed-design.md)／[36 §3.1](../detailed-design/36-mq-and-event-catalog.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| AFTERSALE_CASE | AFTERSALE_CASE | AFTERSALE_CASE | 售後案件退款 | AfterSalesRefundEventHandler.handleRefundCompleted（僅 duplicate == false 分支） |
+| SELLER_CANCEL | SELLER_CANCEL | SELLER_CANCEL | 賣家取消訂單 | AfterSalesEventConsumer.onCancelCompleted 新抽的 tx handler |
+| AUTO_REFUND | AUTO_REFUND | AUTO_REFUND | 系統自動退款 | AutoRefundTxHandler.completeAutoRefund |
+
+---
+
+## SellerTaxObligation
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 賣家 S02 申請表單的單選項；ADM A03 審核卡片顯示賣家的自述
+- **使用服務**: invoice, gateway
+- **DB 儲存欄位**: `seller_tax_profiles.claimed_obligation`（存 Value；值域由 `chk_stp_obligation` 約束）
+- **說明**: 賣家**自述**的開票義務。⚠️ 這是自述不是判定依據——判定結果在 review_status（APPROVED_INVOICE_REQUIRED／APPROVED_INVOICE_EXEMPT）。兩者不一致是正常的，ADM 審核時要看得到差異。
+- **相關設計書**: [58 §5.1.2](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| REQUIRED | REQUIRED | REQUIRED | 應開統一發票 | 賣家自述已辦稅籍登記且應開立統一發票 |
+| EXEMPT | EXEMPT | EXEMPT | 免用統一發票 | 賣家自述屬免用統一發票範圍 |
+| UNKNOWN | UNKNOWN | UNKNOWN | 尚未填答 | 預設值；DRAFT 階段尚未選擇 |
+
+---
+
+## SellerTaxEntityType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 賣家 S02 申請表單的單選項；ADM A02 佇列可依此篩選
+- **使用服務**: invoice, gateway
+- **DB 儲存欄位**: `seller_tax_profiles.entity_tax_type`（存 Value）
+- **說明**: 賣家的營業主體類型。⚠️ **正式值域待會計師／法務覆核**（需求書明標）；本表為 Phase 1 的最小可用集合，補值時只改本檔再 generate.sh，不動 schema（欄位為 varchar(32)，無 CHECK）。
+- **相關設計書**: [58 §5.1.2](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| FARMER | FARMER | FARMER | 農漁民／農戶 | 個人從事農林漁牧生產 |
+| SOLE_PROPRIETOR | SOLE_PROPRIETOR | SOLE_PROPRIETOR | 獨資商號 | 已辦商業登記的獨資事業 |
+| PARTNERSHIP | PARTNERSHIP | PARTNERSHIP | 合夥事業 | 已辦商業登記的合夥事業 |
+| COMPANY | COMPANY | COMPANY | 公司 | 依公司法設立 |
+| OTHER | OTHER | OTHER | 其他 | 上述以外；ADM 審核時必須在 review_note 註明實際型態 |
+
+---
+
+## SellerTaxReviewDecision
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— ADM A03 審核面板專用的命令值域（走 ADMIN_ENUMS 供應）
+- **使用服務**: invoice
+- **DB 儲存欄位**: `invoice_admin_audit_logs.action` 的一部分（ADM 請求 body 欄位 ＋ `decisionHistory[]` 逐筆落庫）。⚠️ **它確實會寫進 DB** ⇒ 必須進 `GO_REGISTRY_ENUMS`，否則 Go 側只能寫 `case "APPROVE_INVOICE_REQUIRED":` 這種字串字面值（紅線 6）。
+- **說明**: ADM 對賣家稅務資格的**決定（動詞）**。⚠️ 與 SellerTaxReviewStatus（狀態，名詞）刻意分開命名，兩者不收斂成同一個字（58 §7.3.3 末段）。**8 值定版**＝58 §7.3.3 的七值 ＋ 58 §6 原有的 `KEEP_UNDER_REVIEW`（58 §7.3.3 本輪已補 T16 承載它）。
+- **相關設計書**: [58 §7.3.3](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| APPROVE_INVOICE_REQUIRED | APPROVE_INVOICE_REQUIRED | APPROVE_INVOICE_REQUIRED | 核定應開統一發票 | 端點 40／58 §7 T07；來源狀態 UNDER_REVIEW／SELF_ISSUE_PENDING；需 expectedVersion CAS |
+| APPROVE_INVOICE_EXEMPT | APPROVE_INVOICE_EXEMPT | APPROVE_INVOICE_EXEMPT | 核定免用統一發票 | 端點 40／T08；另需已取得收據代製授權（S05），且 `confirmed=true` 二次確認 |
+| REQUEST_SUPPLEMENT | REQUEST_SUPPLEMENT | REQUEST_SUPPLEMENT | 要求補件 | 端點 40／T05；轉 SUPPLEMENT_REQUIRED；**不重置 60 天期限** |
+| KEEP_UNDER_REVIEW | KEEP_UNDER_REVIEW | KEEP_UNDER_REVIEW | 暫不裁決（留在佇列） | 端點 40／**T16**；狀態自轉移 UNDER_REVIEW → UNDER_REVIEW，**只寫稽核**，不動 `pending_valid_until` 與 `extension_count` |
+| REJECT | REJECT | REJECT | 駁回 | 端點 40／T09；必填理由；cooldown_until = now + 7 天 |
+| REVOKE | REVOKE | REVOKE | 撤銷已核定資格 | 端點 40／T14；雙人確認；來源狀態必為 APPROVED_* |
+| REOPEN_REVIEW | REOPEN_REVIEW | REOPEN_REVIEW | 發起複審／受理逾期補件 | 端點 40／T13／T15／T12；回到 UNDER_REVIEW；必填 recheck_reason；自 EXPIRED 進來免冷卻 |
+| EXTEND | EXTEND | EXTEND | 延長審核期限 | 🔴 **落點是端點 41 不是 40**（它需要 `extendDays`，守衛 `extension_count = 0`，失敗碼 9323）；58 §7 T11；狀態不變，就地改寫 pending_valid_until。**仍屬同一個 enum**——端點 41 成功時要往 `decisionHistory` 寫一筆 `decision = "EXTEND"` |
+
+---
+
+## InvoiceAdjustmentTrigger
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 只有 ADM **A13**（發票文件詳情）的折讓／作廢歷程用它篩選與顯示（走 ADMIN_ENUMS 供應，不受可見性過濾）。⚠️ **不是 A06**：`58A` 的畫面對照把 `InvoiceAdjustmentStatus`／`InvoiceAdjustmentType`／本 enum 三者一起掛在 **A13**，A06 是 job 詳情（端點 51）
+- **使用服務**: invoice
+- **DB 儲存欄位**: `invoice_adjustments.trigger_kind`（`varchar(24)`，存 Value；值域由 `chk_invadj_trigger` 約束）
+- **說明**: 一次稅務調整事件的**觸發來源**。它同時是冪等鍵的一段（58 §5.3.2），且與兩個配對 CHECK 綁死：`chk_invadj_refund_pair`（`ORDER_REFUND` ⇔ `refund_no` 非空）與 `chk_invadj_correction_pair`（`BUYER_CORRECTION` ⇔ `correction_request_id` 非空）。⇒ **加值必須同批改那兩條 CHECK**，否則新來源的配對欄位無人守。
+- **相關設計書**: [58 §5.1.7](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| ORDER_REFUND | ORDER_REFUND | ORDER_REFUND | 訂單退款 | 由 `order.refund.finalized` 觸發；`refund_no` 必填（＝權威退款單號） |
+| BUYER_CORRECTION | BUYER_CORRECTION | BUYER_CORRECTION | 買家更正發票資料 | 作廢重開鏈的作廢段，emitter ＝ 58 §7.3.6 **R04**（預檢通過且 document 已 `ISSUED` ⇒ 建 VOID operation，`adjustment_type=VOID`）；`correction_request_id` 必填 |
+| ADM_MANUAL | ADM_MANUAL | ADM_MANUAL | 管理員手動發起 | ADM 在異常工作台直接建立調整；兩個配對欄位皆為空 |
+
+---
+
+## InvoiceTaxRiskFlag
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 只有 ADM A02 佇列與 A03 審核卡片顯示（走 ADMIN_ENUMS 供應，不受可見性過濾）
+- **使用服務**: invoice
+- **DB 儲存欄位**: 無 —— **推導值**，由 invoice-service 在查詢時即時計算，不落庫（落庫會需要一支重算任務，而那是《後端服務責任邊界規範》禁止的漂移偵測基礎設施）
+- **說明**: ADM 審核賣家稅務資格時的風險提示。**封閉三值，沒有「其他」**——沒有定義的風險標記等於沒有標記（58 §6.1.12 逐字）。⚠️ 這些是**提示不是駁回理由**（`58A` §B-3.5 逐字：`TAX_ID_MISMATCH_KYC` 只是「提醒有差異」）。
+- **相關設計書**: [58 §6.1.12](../detailed-design/58-invoice-service-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| TAX_ID_MISMATCH_KYC | TAX_ID_MISMATCH_KYC | TAX_ID_MISMATCH_KYC | 統編與實名資料不符 | 申請填寫的統編與賣家 KYC 認證單上的統編不同；提示 ADM 追問，不是駁回理由 |
+| REPEAT_APPLICATION | REPEAT_APPLICATION | REPEAT_APPLICATION | 90 天內重複送審 | 90 天內第 3 次以上送審（與決策 C3 的 7 天冷卻是兩件事：冷卻擋的是頻率，本旗標提示的是模式） |
+| OPEN_COMPLAINTS | OPEN_COMPLAINTS | OPEN_COMPLAINTS | 有未結案發票申訴 | 該賣家有 `invoice_complaints.status ∈ {OPEN, OVERDUE, SELLER_RESPONDED, ESCALATED_TO_ADM}` 的案件 |
+
+---
+
+## ProductCertificationSource
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No（只出現在 ADM 詳情回應，賣家 DTO 不帶此欄；走 `ADMIN_ENUMS` 供應，不受可見性過濾）
+- **使用服務**: product, gateway
+- **DB 儲存欄位**: `product_certification_application.source`（VARCHAR(24)，存 Value）。**無 DB CHECK**——值域由 `CodeMetaValidator` 在寫入前把關（與 `status` / `gov_verify_state` 刻意不同，那兩個有 CHECK 拷貝）
+- **說明**: 一筆認證申請是從哪條寫入路徑產生的。19 §6.1 定義五條寫入路徑收斂到單一收斂點，本值域是那五條路徑在資料上留下的唯一區分——缺了它，事後查不出「這筆是賣家自己送的、還是 ADM 代行送的、還是 migration 造出來的」，而三者的追責對象完全不同。
+- **歷史背景**: 2026-08 隨 #2755 新建。
+- **特殊方法**: 無
+- **相關設計書**: [19 §6.1](../detailed-design/19-certification-verification-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SELLER | SELLER | SELLER | 賣家送出 | 賣家自行透過商品建立／編輯或專用申請端點送出 |
+| DELEGATED_ADMIN | DELEGATED_ADMIN | DELEGATED_ADMIN | 管理員代行 | ADM 在代行工作階段中代替賣家送出；`submitted_by_account_id` 是代行管理員本人 |
+| SEED | SEED | SEED | 種子資料 | `infra/seed-data/` 建立的測試資料，不代表任何真實賣家宣稱 |
+| LEGACY_MIGRATION | LEGACY_MIGRATION | LEGACY_MIGRATION | 存量遷移 | V18 migration 由既有 `product.certifications` JSONB 回填；`submitted_by_account_id` 必為 NULL（migration 沒有送出者，**不得**拿 `store_id` 頂替） |
+
+---
+
+## ProductCertificationGovVerifyState
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— `GET /app/products/{product_id}/certification_applications` 的每一列直接帶 `govVerifyState`（19 §9.1），賣家 web 用它區分「政府查驗中」與「等 ADM 人工審」
+- **使用服務**: product, gateway
+- **DB 儲存欄位**: `product_certification_application.gov_verify_state`（VARCHAR(16)，存 Value；值域由 `ck_pca_gov_state` 約束）
+- **說明**: 對政府開放資料平台查驗該證書編號的結果狀態。⚠️ 本值域是**查驗結果**，與審核狀態 `ProductCertificationStatus` 是兩件事：`VERIFIED` 不等於 `APPROVED`（3703 CAS 查得到只證明該工廠有資格、不證明這個商品是 CAS 產品，一律人工審），`NOT_FOUND` 也不等於 `REJECTED`（證書可能在申請之後才登記上政府資料庫，ADM 可按「重新查驗」）。⚠️ 也**不要**與 `ProductCertificationValidity` 合併：那張表是「政府資料判讀出的證書效力」（含 `TERMINATED` 已終止／`SUSPENDED` 暫時終止），本值域是「我方查驗流程走到哪」（含 `PENDING`／`UNSUPPORTED`／`UNAVAILABLE` 這三個與證書效力無關的流程態）；本值域的 `EXPIRED` 是那三個失效值**塌縮後**的結果，有損，ADM 要判斷處置一律讀 `govVerifyPayload.validity`。🔴 **`UNAVAILABLE` 與 `NOT_FOUND` 絕不可合併**：政府 API 金鑰失效時回 `{"RS":"ERROR"}` 且 HTTP 200 無 `Data` 欄，舊實作把它判成「查無此證書」⇒ 金鑰一出事全站所有編號都被判為假的且無任何錯誤訊號（19 §8.4 防線 1 實測）。
+- **歷史背景**: 2026-08 隨 #2755 新建。在此之前查驗結果只有 boolean（`verify()` 回 true/false、Redis 只存 `"1"/"0"`），結構上無法區分「查無」「已失效」「上游故障」三種完全不同的結論。
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串，與 `ck_pca_gov_state` 逐字比對。
+- **🔴 值域改動的連帶義務**: `ck_pca_gov_state` 是本值域**刻意的第二份拷貝**，`generate.sh` 不會碰 SQL、也沒有 gate 守著它。改本表值域時**必須在同一個 PR 內補一支 `V{N+1}__*.sql` 同步該 CHECK**，否則新代碼寫入時 DB 直接以 `23514` 拒絕。
+- **相關設計書**: [19 §8](../detailed-design/19-certification-verification-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| PENDING | PENDING | PENDING | 待查驗 | DB 預設值；背景查驗事件尚未處理完成 |
+| VERIFIED | VERIFIED | VERIFIED | 查驗通過 | 政府資料查得到且推導出的 `validity = VALID`。⚠️ 只有 3701 有機（有權威 `Status` 欄＋效期＋編號一對一）會據此自動核准 |
+| NOT_FOUND | NOT_FOUND | NOT_FOUND | 查無此編號 | 政府資料查無此編號。**不是**上游故障——上游故障一律落 `UNAVAILABLE` |
+| EXPIRED | EXPIRED | EXPIRED | 證書已失效 | 查得到但推導出 `EXPIRED`／`TERMINATED`／`SUSPENDED`；需人工審 |
+| UNSUPPORTED | UNSUPPORTED | UNSUPPORTED | 不支援線上查驗 | 3704 HACCP／3705 ISO／3706 GMP 無政府開放資料介面，永遠人工審，不排背景查驗 |
+| UNAVAILABLE | UNAVAILABLE | UNAVAILABLE | 查驗服務不可用 | 政府 API 逾時／連線失敗／回應的 `RS` 欄不是 OK／編號自我校驗失敗／斷路器命中。ADM 可稍後按「重新查驗」重試 |
+
+---
+
+## ProductCertificationValidity
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No（只出現在 ADM 詳情回應的 `govVerifyPayload.validity`（19 §9.2）；賣家與買家 DTO 都不帶此欄，賣家端拿到的是塌縮過的 `govVerifyState`。走 `ADMIN_ENUMS` 供應，不受可見性過濾）
+- **使用服務**: product, gateway
+- **DB 儲存欄位**: `product_certification_application.gov_verify_payload`（JSONB）的 `validity` key。**無 DB CHECK**——JSONB 內層的值域 DB 無從約束，唯一把關點是寫入前的 Java `GovCertificationService.Validity` enum。另 Redis 查驗結果快取的 JSON 也存同一值域的 `validity` 欄
+- **說明**: 從政府開放資料**判讀出來的證書效力**——這張證書現在還算不算數。⚠️ 與 `ProductCertificationGovVerifyState` 是**兩個不同的值域，不得合併**：本值域講的是**證書本身**（政府資料的判讀結論），`ProductCertificationGovVerifyState` 講的是**我方的查驗流程狀態**（`PENDING` 還沒查、`UNSUPPORTED` 這型根本不查、`UNAVAILABLE` 上游故障——這三個沒有任何一個在描述證書效力）。兩者是**多對一**且**有損**的：`toSnapshot` 把 `EXPIRED`／`TERMINATED`／`SUSPENDED` 三值一律塌成 `gov_verify_state = EXPIRED` ⇒ 只看 `govVerifyState` 的人分不出「已終止」（不可逆）與「暫時終止」（可能恢復），而這兩者的處置完全不同。ADM 判斷「這張證書到底能不能核准」的主要依據是本值域，不是塌縮後的那一個。
+- **歷史背景**: 2026-08 隨 #2755 建立在 Java 側（`GovCertificationService.Validity`），但當時沒有補 CodeMeta 表 ⇒ ADM 審核頁只能把 `TERMINATED`／`SUSPENDED` 這些英文碼原樣印給台灣的管理員看，而頁面若自行手寫一份中文對照表，正是 `codemeta-no-second-copy` 明令禁止的第二份碼表。2026-08-27 補齊。
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串，與 Java `Validity` enum 的常數名**逐字相同**——`Validity.valueOf()`（讀快取）與 `.name()`（寫 payload）兩個方向都直接用它，中間沒有轉換層，改名即破壞既有 JSONB 與快取內容的可讀性。
+- **相關設計書**: [19 §8.5](../detailed-design/19-certification-verification-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| VALID | VALID | VALID | 有效 | 政府資料查得到，且狀態與效期都通過。⚠️ 只有 3701 有機會據此自動核准（3703 查得到只證明該工廠有 CAS 資格） |
+| EXPIRED | EXPIRED | EXPIRED | 已過期 | 政府資料有這張證書，但效期已過。效期當日仍算有效；「今天」以台北時區換算，不用 UTC |
+| TERMINATED | TERMINATED | TERMINATED | 已終止 | 3701 的 `Status` 為「結束」或「終止」。⚠️ 與 `SUSPENDED` 的差別是**不可逆**——不會自己恢復，賣家要重新取得新證書 |
+| SUSPENDED | SUSPENDED | SUSPENDED | 暫時終止 | 3701 的 `Status` 為「暫終」。證書仍在、暫時停用，日後可能恢復 ⇒ 處置與 `TERMINATED` 不同（可請賣家補件或稍後重驗，不必要求換號） |
+| NOT_FOUND | NOT_FOUND | NOT_FOUND | 查無此編號 | 政府資料回應正常但查無此編號。**不是**上游故障——故障走例外路徑，落 `gov_verify_state = UNAVAILABLE`、不產生本值域的任何值 |
+| UNKNOWN | UNKNOWN | UNKNOWN | 無法判讀 | 查得到列但判讀不出結論：`Status` 欄缺漏或不在已知值域、效期字串無法解析。🔴 **這是故障不是結論**——一律不寫快取（把一次故障快取起來等於把它放大成一段時間的錯誤答案），ADM 應按「重新查驗」重試，不得據此駁回 |
+
+---
+
+## ProductCertificationReviewAction
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No（只出現在 ADM 的稽核歷程列表 `GET /admin/product_certification_applications/{id}/audit_logs`；走 `ADMIN_ENUMS` 供應，不受可見性過濾）
+- **使用服務**: product, gateway
+- **DB 儲存欄位**: `product_certification_review_event.action`（VARCHAR(16)，存 Value）
+- **說明**: 認證申請稽核事件（append-only）記錄的動作。⚠️ 本值域是**動作（動詞）**，狀態（名詞）是 `ProductCertificationStatus`，兩者刻意不收斂成同一個字——`APPROVE` 與 `AUTO_APPROVE` 都落到 `APPROVED` 狀態，但「誰放行的」正是自動核准路徑最需要事後可稽核的資訊，合併就查不出來了。
+- **歷史背景**: 2026-08 隨 #2755 新建。
+- **特殊方法**: 無
+- **相關設計書**: [19 §4.2](../detailed-design/19-certification-verification-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SUBMIT | SUBMIT | SUBMIT | 送出申請 | 建立事件，`from_status` 為 null、`to_status` 為 `SUBMITTED` |
+| AUTO_APPROVE | AUTO_APPROVE | AUTO_APPROVE | 系統自動核准 | `actor_role='SYSTEM'`、`actor_account_id` 為 null。**必須寫事件**：缺了它事後查不出「這張標章是誰放行的」 |
+| APPROVE | APPROVE | APPROVE | 管理員核准 | `actor_role='ADMIN'`，帶 `expectedVersion` |
+| REJECT | REJECT | REJECT | 管理員駁回 | `reason_code` 必填 |
+| WITHDRAW | WITHDRAW | WITHDRAW | 撤回宣稱 | 兩種來源：① 賣家主動撤回（`actor_role='SELLER'`，`actor_account_id` 是登入 principal）② **商品被軟刪的連帶撤回**（`actor_role='SYSTEM'`、`actor_account_id=null`，#2820）。②之所以不是 SELLER：賣家刪的是商品、不是撤回申請，撤回是平台施加的連帶結果，與 `SUPERSEDE` 同構；且 `DeleteProductRequest` 只帶 `store_id`，而 `SYSTEM` 明文「不得拿 store_id 頂替」 |
+| SUPERSEDE | SUPERSEDE | SUPERSEDE | 被新號碼取代 | `actor_role='SYSTEM'`，由核准新號碼的第一步連帶寫入 |
+| REVOKE | REVOKE | REVOKE | 管理員撤銷 | `reason_code` 必填；標章同時從公開投影移除 |
+
+---
+
+## ProductCertificationActorRole
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No（只出現在 ADM 稽核歷程 `GET /admin/product_certification_applications/{id}/audit_logs` 的 `actorRole`（19 §9.2 端點表）；賣家 DTO 不帶此欄。走 `ADMIN_ENUMS` 供應，不受可見性過濾）
+- **使用服務**: product, gateway
+- **DB 儲存欄位**: `product_certification_review_event.actor_role`（VARCHAR(8)，存 Value）。**無 DB CHECK**（與同表的 `action` 一致，V18 只在 `product_certification_application` 那三欄放了 CHECK 拷貝）——值域由 `ProductCertificationRules.ACTOR_*` 三個常數這個唯一產生點把關。⚠️ 欄寬只有 8 ⇒ 新增值不得超過 8 個字元，否則必須先補一支 `V{N+1}__*.sql` 放寬欄寬
+- **說明**: 認證申請稽核事件（append-only）的**動作發起者身分**。⚠️ 與 `ProductCertificationSource` 是兩件事、且**不是一對一**：source 記的是「這筆申請從哪條寫入路徑產生」，本值域記的是「這個事件是誰做的」。`actorRoleForSource` 把四種 source 收斂成兩種 role（`SELLER` → `SELLER`、`DELEGATED_ADMIN` → `ADMIN`、其餘一律 `SYSTEM`），而 `ADMIN` 還會由 approve／reject／revoke 這些**根本沒有 source 概念**的裁決動作產生 ⇒ 拿 source 反推 role 會漏掉全部人工裁決事件。與 `ProductCertificationReviewAction` 的關係是「誰（role）做了什麼（action）」，兩者必須並看：`AUTO_APPROVE` 恆為 `SYSTEM`、`APPROVE` 恆為 `ADMIN`，合併任一邊都會查不出「這張標章是誰放行的」。⚠️ **`WITHDRAW` 是唯一 role 不唯一的 action**：賣家主動撤回是 `SELLER`、商品軟刪的連帶撤回是 `SYSTEM`（#2820）⇒ 查「賣家撤回了哪些宣稱」必須同時篩 `action=WITHDRAW AND actor_role='SELLER'`，只篩 action 會把平台的連帶撤回也算進去。
+- **歷史背景**: 2026-08 隨 #2755 建立在 Java 側（`ProductCertificationRules.ACTOR_SYSTEM`／`ACTOR_SELLER`／`ACTOR_ADMIN` 三個字串常數），當時沒有補 CodeMeta 表 ⇒ ADM 稽核歷程只能把英文碼原樣印出。2026-08-27 補齊。
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串，與 `ProductCertificationRules.ACTOR_*` 逐字相同，也與 proto `ProductCertificationReviewEvent.actor_role` 註解列出的三值一致。
+- **相關設計書**: [19 §4.2](../detailed-design/19-certification-verification-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SYSTEM | SYSTEM | SYSTEM | 系統 | 背景查驗自動核准（`AUTO_APPROVE`）、被新號碼取代（`SUPERSEDE`），以及匯入／seed／存量遷移路徑送出的申請。`actor_account_id` 必為 null——沒有具體的人在按按鈕，不得拿 `store_id` 頂替 |
+| SELLER | SELLER | SELLER | 賣家 | 賣家本人送出（`SUBMIT`）或撤回（`WITHDRAW`）；`actor_account_id` 是賣家的登入 principal |
+| ADMIN | ADMIN | ADMIN | 管理員 | 管理員核准／駁回／撤銷，以及代行工作階段中代替賣家送出（`source = DELEGATED_ADMIN`）。`actor_account_id` 是**管理員本人**，不是被代行的賣家——這正是代行路徑事後追責的唯一依據 |
+
+---
+
+## ProductCertificationRejectReason
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— `GET /app/products/{product_id}/certification_applications` 的每一列直接帶 `reasonCode`（19 §9.1），賣家 web 的狀態徽章要顯示駁回原因
+- **使用服務**: product, gateway
+- **DB 儲存欄位**: `product_certification_application.reason_code`（VARCHAR(32)，存 Value）。另 `product_certification_review_event.reason_code` 存同一值域的快照
+- **說明**: ADM 駁回（`REJECTED`）或撤銷（`REVOKED`）認證申請時必填的結構化原因碼，兩個動作共用同一值域。⚠️ 與 `public_reason` 是兩件事：本值域是**可篩選、可統計、前端可自行翻譯**的碼，`public_reason` 是 ADM 自由填寫、直接展示給賣家的補充說明；只有後者不足以做治理分析，只有前者則說不清個案。缺 `reason_code` 時回 `3028 CERT_REVIEW_REASON_REQUIRED`。
+- **歷史背景**: 2026-08 隨 #2755 新建。19 §11 只在 request 範例中給出 `CERT_NOT_FOUND` 一個具體值、未窮舉值域，本表依 §8 的查驗結論與 §5.2 的治理理由補齊六值。
+- **編碼選擇**: Value 採 UPPER_SNAKE 字串（同 `ProductCertificationStatus` 慣例），不佔數字值段——本值直接寫進 VARCHAR 欄位。⚠️ **本表可擴充**：新增原因碼只需在本表加列＋重跑 `generate.sh`，`reason_code` 欄**沒有 DB CHECK**（值域由 `CodeMetaValidator` 把關），故不需要補 migration；但仍必須同步 `ADMIN_ENUMS` 的 digest 與四份前端拷貝。
+- **特殊方法**: 無
+- **相關設計書**: [19 §11](../detailed-design/19-certification-verification-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| CERT_NOT_FOUND | CERT_NOT_FOUND | CERT_NOT_FOUND | 查無此證書 | 政府資料庫查無此編號（`gov_verify_state = NOT_FOUND`），或 ADM 人工查證後確認不存在 |
+| CERT_EXPIRED | CERT_EXPIRED | CERT_EXPIRED | 證書已失效 | 證書已過期、終止或暫停（`gov_verify_state = EXPIRED`） |
+| CERT_PRODUCT_MISMATCH | CERT_PRODUCT_MISMATCH | CERT_PRODUCT_MISMATCH | 證書與商品不符 | 證書涵蓋的品項不含本商品。3703 CAS 的典型情境：`Emblem_ID` 是工廠標誌編號，查得到只證明該工廠有 CAS 資格 |
+| CERT_HOLDER_MISMATCH | CERT_HOLDER_MISMATCH | CERT_HOLDER_MISMATCH | 證書非本店所有 | 證書持有人不是本賣家。政府 API 只驗「號碼存在」不驗「歸屬」，這一類只能靠人工比對業者名 |
+| CERT_EVIDENCE_UNCLEAR | CERT_EVIDENCE_UNCLEAR | CERT_EVIDENCE_UNCLEAR | 資料不清 | 提供的編號或佐證資料不足以判定，需賣家補充後重送 |
+| OTHER | OTHER | OTHER | 其他原因 | 不屬於上列任一類；ADM 必須另填 `public_reason` 說明 |
+
+---
+
+## CommerceModel
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order, payment, shipping, settlement, invoice
+- **DB 儲存欄位**: `orders.commerce_model`（存 Value；值域由 `chk_orders_commerce_model` 約束）
+- **說明**: 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66 只引用。
+- **特殊方法**: 無
+- **相關設計書**: [65 §5.1／§0.6](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SELLER_DIRECT | SELLER_DIRECT | SELLER_DIRECT | 賣家直營 | 賣家為收款主體與開票人。**既有全部訂單皆為本值**，收款走 payment 模組（賣家的收款帳戶）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上 |
+| PLATFORM_CONSIGNMENT | PLATFORM_CONSIGNMENT | PLATFORM_CONSIGNMENT | 平台受託代銷 | 平台以代理商戶收款、對買家開票，再結算撥付賣家。**必須帶 `consignment_agreement_version`**（`chk_orders_consignment_agreement`），且 `collection_model` 必須是 PLATFORM_AGENT_MERCHANT |
+
+---
+
+## CollectionModel
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order, payment, settlement
+- **DB 儲存欄位**: `orders.collection_model`（存 Value；值域由 `chk_orders_collection_model` 約束）
+- **說明**: 收款模式——**款項實際經過誰的手**。訂單快照六欄之一。🔴 與 `commerce_model` 由 `chk_orders_policy_matrix` 綁成雙條件式（兩者必須同時是平台側或同時是賣家側），與 `invoice_model` 由 `chk_orders_invoice_collection` 綁死（收款主體與開票 issuer 必須一致）。**這是通用維度，不得把 provider 名稱寫進值域**——下一個 provider 代收會需要第四個值，而 provider 已由 `ShippingMethod` 承載。
+- **特殊方法**: 無
+- **相關設計書**: [65 §5.1.2／§5.1.3a](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SELLER_MERCHANT | SELLER_MERCHANT | SELLER_MERCHANT | 賣家子商店收款 | 款項直接進賣家的收款帳戶，收款走 payment 模組。**現況全部訂單皆為本值** |
+| PLATFORM_AGENT_MERCHANT | PLATFORM_AGENT_MERCHANT | PLATFORM_AGENT_MERCHANT | 平台代理商戶收款 | 平台代收目前沒有收款路徑。🔴 結帳由 `requireSupportedCollectionModel` 在**結帳當下 fail-closed**（PLATFORM_COLLECTION_NOT_CONFIGURED，9503 群），不得建單後才發現 |
+| PROVIDER_COLLECTED | PROVIDER_COLLECTED | PROVIDER_COLLECTED | 物流商代收 | 由物流商在交付時代收貨款（如超商取貨付款）。⚠️ 值域內但**尚無寫入路徑**——書面契約到位前由 flag 擋住，這是刻意的 |
+| EXTERNAL_PREPAID | EXTERNAL_PREPAID | EXTERNAL_PREPAID | 外部預付 | 款項在平台之外已完成收取。⚠️ 同上，值域內但尚無寫入路徑 |
+
+---
+
+## FulfillmentMode
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order, shipping
+- **DB 儲存欄位**: `orders.fulfillment_mode`（存 Value；值域由 `chk_orders_fulfillment_mode` 約束）
+- **說明**: 履約模式——**誰負責把貨送到**。訂單快照六欄之一。⚠️ 與 `ShippingMethod` **不完全正交**：`MERCHANT_DELIVERY`(3005) 必然是 `SELLER_MANAGED`，由 `chk_orders_fulfillment_mode_consistent` 保證兩欄一致，否則兩份真相必然漂移。
+- **特殊方法**: 無
+- **相關設計書**: [65 §5.1／§7.1.1.5](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SELLER_MANAGED | SELLER_MANAGED | SELLER_MANAGED | 賣家自行履約 | 賣家自己出貨或自行配送。3005 必然落在本值 |
+| PLATFORM_LOGISTICS | PLATFORM_LOGISTICS | PLATFORM_LOGISTICS | 平台物流履約 | 由平台安排的物流通道履約（3001／3002／3003） |
+
+---
+
+## InvoiceModel
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes
+- **使用服務**: order, invoice, settlement
+- **DB 儲存欄位**: `orders.invoice_model`（存 Value；值域由 `chk_orders_invoice_model` 約束）
+- **說明**: 買家發票開立模式——**誰對買家開票**。訂單快照六欄之一。**擴充 58 號既有 issuer→recipient 模型，不另立一套**。🔴 與 `collection_model` 由 `chk_orders_invoice_collection` 綁死：開票 issuer 必須與收款主體一致，否則收款證據與開票證據對不起來。
+- **特殊方法**: 無
+- **相關設計書**: [65 §5.1.2](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SELLER_TO_BUYER | SELLER_TO_BUYER | SELLER_TO_BUYER | 賣家對買家開立 | 賣家為開票人。**現況全部訂單皆為本值** |
+| PLATFORM_TO_BUYER | PLATFORM_TO_BUYER | PLATFORM_TO_BUYER | 平台對買家開立 | 平台為開票人（受託代銷）。必須搭配 `collection_model = PLATFORM_AGENT_MERCHANT` |
+
+---
+
+## FulfillmentAction
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— `allowedActions[].action` 是跨 repo 契約，四份前端拷貝皆適用
+- **使用服務**: shipping, order, gateway
+- **DB 儲存欄位**: 無（API 回應欄位 `allowedActions[].action` 的值域）
+- **說明**: **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
+- **特殊方法**: 無
+- **相關設計書**: [65 §4.4.1a／§4.4.1c](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| DISPATCH | DISPATCH | dispatch | 派車／叫件 | 配送推進群。3001 黑貓叫件、3003 Uber 建單即派車 |
+| HANDOVER | HANDOVER | handover | 回報交運 | 配送推進群。賣家確認出貨，`requiresProviderCall=false` |
+| CANCEL | CANCEL | cancel | 取消配送單 | 配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。 |
+| RESUBMIT | RESUBMIT | resubmit | 重新建單 | 配送推進群。只有 990 建單失敗的配送單可重建 |
+| UPDATE | UPDATE | update | 修改配送資料 | 配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled** |
+| PRINT_LABEL | PRINT_LABEL | print_label | 列印標籤 | 標籤群 |
+| REPRINT_LABEL | REPRINT_LABEL | reprint_label | 重印標籤 | 標籤群。🔴 不得整批重印 |
+| TRACK | TRACK | track | 查詢物流狀態 | 追蹤與證明群 |
+| VIEW_POD | VIEW_POD | view_pod | 檢視送達證明 | 追蹤與證明群。⚠️ 全值域統一 snake_case，不使用 camelCase |
+| REQUERY | REQUERY | requery | 重新查詢 | 追蹤與證明群。主動向 provider 回查 |
+| ARRANGE_RETURN | ARRANGE_RETURN | arrange_return | 安排退貨物流 | 逆向與門市群 |
+| ACCEPT_RETURN | ACCEPT_RETURN | accept_return | 接受退貨 | 逆向與門市群。🔴 冷凍逆向（3203）一律移除本動作 |
+| SELLER_PICKUP | SELLER_PICKUP | seller_pickup | 賣家領回 | 逆向與門市群 |
+| RESELECT_STORE | RESELECT_STORE | reselect_store | 重選門市 | 逆向與門市群。門市關轉（81）時使用 |
+| OPEN_CASE | OPEN_CASE | open_case | 建立異常案件 | ADM 群 |
+| CLAIM | CLAIM | claim | 受理理賠 | ADM 群。🔴 是**理賠**（993 CLAIM_PENDING），**不是案件認領**——ADM 文案必須寫「受理理賠」，寫「認領」會與不存在的認領動作混淆 |
+| ADMIN_RESOLVE | ADMIN_RESOLVE | admin_resolve | 處置提案 | ADM 群 |
+| ADMIN_CLOSE_CASE | ADMIN_CLOSE_CASE | admin_close_case | 關閉案件 | ADM 群 |
+| VIEW_ONLY | VIEW_ONLY | view_only | 僅檢視 | 兜底群。🔴 **唯一允許的 fallback 值** |
+
+---
+
+## LedgerOwnerType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 帳本是 ADM 專用視圖，買賣家前端不消費
+- **使用服務**: settlement
+- **DB 儲存欄位**: `ledger_entries.owner_type`（存 Value；值域由 `chk_ledgentry_owner` 約束）
+- **說明**: 雙分錄帳本的科目歸屬主體。🔴 **落地順序**：CodeMeta → `generate.sh --all` → DDL 的 CHECK → 程式碼；反過來做的話 `ledger_entries` 的 INSERT 會在 CHECK 上失敗，而症狀是「撥款流程 500」，不會有人聯想到是碼表沒生成。
+- **特殊方法**: 無
+- **相關設計書**: [65 §5.3](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| PLATFORM | PLATFORM | PLATFORM | 平台 | `owner_ref_id` 恆為 0 |
+| SELLER | SELLER | SELLER | 賣家 | `owner_ref_id` = `sellers.store_id`（store surrogate，非 account_id） |
+| PROVIDER | PROVIDER | PROVIDER | 物流商 | `owner_ref_id` = provider 識別；用於物流成本與對帳 |
+
+---
+
+## LedgerAccountCode
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 同 LedgerOwnerType
+- **使用服務**: settlement
+- **DB 儲存欄位**: `ledger_entries.account_code`（存 Value）
+- **說明**: 雙分錄帳本的科目代碼，18 值（2026-09-12 依 `ADR-010` 補上「應收」這一側的 5 值；原 13 值零 RECEIVABLE，兩個 PAYABLE 都是「平台欠別人」）。每一筆交易的借貸兩方各取本表一值；收斂點斷言 `SUM(debit) = SUM(credit)`，不平衡一律拒絕寫入。
+- **特殊方法**: 無
+- **相關設計書**: [65 §5.3](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| PLATFORM_COLLECTED_CASH | PLATFORM_COLLECTED_CASH | PLATFORM_COLLECTED_CASH | 平台代收現金 | 平台代理商戶實際收到的買家款 |
+| PLATFORM_PAYOUT_CASH | PLATFORM_PAYOUT_CASH | PLATFORM_PAYOUT_CASH | 平台撥出現金 | 撥款指示實際出款 |
+| PLATFORM_LOGISTICS_RECOVERY | PLATFORM_LOGISTICS_RECOVERY | PLATFORM_LOGISTICS_RECOVERY | 平台物流費回收 | 向賣家回收的可歸責物流成本 |
+| PLATFORM_DISCOUNT_SUBSIDY | PLATFORM_DISCOUNT_SUBSIDY | PLATFORM_DISCOUNT_SUBSIDY | 平台折扣補貼 | 平台負擔的折扣 |
+| PLATFORM_FEE_INCOME | PLATFORM_FEE_INCOME | PLATFORM_FEE_INCOME | 平台手續費收入 | 撥款指示費等 |
+| PLATFORM_SERVICE_FEE_INCOME | PLATFORM_SERVICE_FEE_INCOME | PLATFORM_SERVICE_FEE_INCOME | 平台服務費收入 | 合約平台服務費 |
+| PLATFORM_FEE_EXPENSE | PLATFORM_FEE_EXPENSE | PLATFORM_FEE_EXPENSE | 平台手續費支出 | 平台對外支付的費用 |
+| PLATFORM_LOGISTICS_COST | PLATFORM_LOGISTICS_COST | PLATFORM_LOGISTICS_COST | 平台物流成本 | 平台負擔的物流費用 |
+| SELLER_PAYABLE | SELLER_PAYABLE | SELLER_PAYABLE | 應付賣家 | 賣家淨額的主科目 |
+| SELLER_DISCOUNT_BORNE | SELLER_DISCOUNT_BORNE | SELLER_DISCOUNT_BORNE | 賣家負擔折扣 | 費基公式的減項 |
+| SELLER_HOLD | SELLER_HOLD | SELLER_HOLD | 賣家保留款 | 暫停撥款的保留金額 |
+| SELLER_MANUAL_ADJUSTMENT | SELLER_MANUAL_ADJUSTMENT | SELLER_MANUAL_ADJUSTMENT | 賣家可稽核調整 | 手動調整必須帶原因與依據 |
+| PROVIDER_PAYABLE | PROVIDER_PAYABLE | PROVIDER_PAYABLE | 應付物流商 | provider 對帳用 |
+| SELLER_LOGISTICS_RECEIVABLE | SELLER_LOGISTICS_RECEIVABLE | SELLER_LOGISTICS_RECEIVABLE | 賣家物流應收 | 借方增加＝應收成立；貸方增加＝收款完成／貸記沖抵。🔴 與 SELLER_LOGISTICS_CREDIT 是**兩個科目**不是一個科目的正負——兩者可同時存在（這期欠、上期多收），合成淨額會讓 ADR-008 第 1 條保證失效 |
+| PLATFORM_LOGISTICS_SERVICE_INCOME | PLATFORM_LOGISTICS_SERVICE_INCOME | PLATFORM_LOGISTICS_SERVICE_INCOME | 平台物流服務費收入 | 貸方增加＝平台向賣家收的物流服務費收入。🔴 不等於買家付的運費（那是 PLATFORM_LOGISTICS_RECOVERY），ADR-006 三條線互不推導 |
+| PLATFORM_COLLECTION_FEE_EXPENSE | PLATFORM_COLLECTION_FEE_EXPENSE | PLATFORM_COLLECTION_FEE_EXPENSE | 平台收款通道手續費 | 🔴 **僅限平台負擔的例外情況**（PLATFORM_CAUSED 的反向沖銷）。正常路徑**不 post 這一筆**——手續費由賣家負擔（ADR-005），對平台不是費用而是「應收未收足的原因」，多 post 一筆會把應收餘額沖平、讓 ADR-011 的結轉機制在帳上失效 |
+| SELLER_LOGISTICS_CREDIT | SELLER_LOGISTICS_CREDIT | SELLER_LOGISTICS_CREDIT | 賣家物流貸記 | 貸方增加＝貸記發生（**平台欠賣家**）；借方增加＝貸記動用。🔴 永不過期、不因賣家無後續交易而清零（ADR-008 第 2、3 條）⇒ 不得有任何排程把它歸零 |
+| PLATFORM_OPERATING_CASH | PLATFORM_OPERATING_CASH | PLATFORM_OPERATING_CASH | 平台自有現金 | 借方增加＝平台自有現金流入（收到賣家的物流費）；貸方增加＝流出（付給 provider）。🔴 SELLER_DIRECT 下平台**沒有代收** ⇒ PLATFORM_COLLECTED_CASH 在新商流無語意，付給 provider 的對手科目必須是本科目，否則 PROVIDER_SETTLEMENT 湊不出合法分錄而 trg_ledger_balanced 會在 COMMIT 當下擋下 |
+
+---
+
+## LedgerTxnType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 同 LedgerOwnerType
+- **使用服務**: settlement
+- **DB 儲存欄位**: `ledger_transactions.txn_type`（存 Value）
+- **說明**: 雙分錄帳本的交易類型，17 值（2026-09-12 依 `ADR-010` 新增 6 值承載 SELLER_DIRECT 的物流財務軸）。🔴 **`LOGISTICS_COST_ACCRUAL` 與 `PROVIDER_SETTLEMENT` 在兩個商流下是同名的兩種分錄**——科目對由 `ledger_transactions.commerce_model` 決定，不由 txn_type 單獨決定；逐條對照見 70 §3.8。⚠️ 退款沖銷**拆成商品與運費兩個值**：兩者的費基影響不同（商品退款進 `fee_base` 減項，運費不進），合成一個值會讓費基算出一個看起來合理但錯的數字。本 enum 為本波新建、無存量資料，故直接以拆分後的形式落地。
+- **特殊方法**: 無
+- **相關設計書**: [65 §5.3／§5A.1](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| ORDER_ACCRUAL | ORDER_ACCRUAL | ORDER_ACCRUAL | 訂單應計 | 訂單成立時的應計分錄 |
+| REFUND_REVERSAL_GOODS | REFUND_REVERSAL_GOODS | REFUND_REVERSAL_GOODS | 商品退款沖銷 | 🔴 進 `fee_base` 減項 |
+| REFUND_REVERSAL_SHIPPING | REFUND_REVERSAL_SHIPPING | REFUND_REVERSAL_SHIPPING | 運費退款沖銷 | 🔴 **不**進 `fee_base` |
+| PAYOUT_FEE | PAYOUT_FEE | PAYOUT_FEE | 撥款指示費 | 費率與費基於指示落地時快照，事後可重算 |
+| PLATFORM_SERVICE_FEE | PLATFORM_SERVICE_FEE | PLATFORM_SERVICE_FEE | 平台服務費 | 合約約定的服務費 |
+| HOLD_APPLY | HOLD_APPLY | HOLD_APPLY | 保留款設定 | 暫停撥款 |
+| HOLD_RELEASE | HOLD_RELEASE | HOLD_RELEASE | 保留款解除 | 解除暫停 |
+| PAYOUT_SETTLE | PAYOUT_SETTLE | PAYOUT_SETTLE | 撥款結清 | 撥款指示完成 |
+| MANUAL_ADJUSTMENT | MANUAL_ADJUSTMENT | MANUAL_ADJUSTMENT | 可稽核調整 | 必填原因與依據 |
+| LOGISTICS_COST_ACCRUAL | LOGISTICS_COST_ACCRUAL | LOGISTICS_COST_ACCRUAL | 物流成本應計 | 平台側物流成本 |
+| PROVIDER_SETTLEMENT | PROVIDER_SETTLEMENT | PROVIDER_SETTLEMENT | 物流商結算 | provider 帳單對帳 |
+| LOGISTICS_RECEIVABLE_ACCRUAL | LOGISTICS_RECEIVABLE_ACCRUAL | LOGISTICS_RECEIVABLE_ACCRUAL | 物流應收認列 | DEBIT SELLER_LOGISTICS_RECEIVABLE／CREDIT PLATFORM_LOGISTICS_SERVICE_INCOME。🔴 金額＝本期成本 − 平台補貼，**不含前期結轉**（結轉是前期已認列、尚未收足的餘額，再認列一次就是重複認列收入） |
+| LOGISTICS_COLLECTION_SETTLED | LOGISTICS_COLLECTION_SETTLED | LOGISTICS_COLLECTION_SETTLED | 物流收款入帳 | DEBIT PLATFORM_OPERATING_CASH／CREDIT SELLER_LOGISTICS_RECEIVABLE。🔴 金額＝`net_proceeds`（gross − actual_fee），**不是 gross**——手續費是 PayUni 從撥款裡扣掉的，平台從來沒收到那筆錢 |
+| LOGISTICS_TRUE_UP | LOGISTICS_TRUE_UP | LOGISTICS_TRUE_UP | 物流成本 true-up | 暫估 → 實際的**雙向**差額。實際 > 暫估：DEBIT 應收／CREDIT 收入；實際 < 暫估：**方向相反**，同一個 txn_type |
+| LOGISTICS_CREDIT_ISSUE | LOGISTICS_CREDIT_ISSUE | LOGISTICS_CREDIT_ISSUE | 物流貸記發生 | DEBIT PLATFORM_LOGISTICS_SERVICE_INCOME／CREDIT SELLER_LOGISTICS_CREDIT。⚠️ 借「收入」不是借「費用」：多收的那筆當初是貸記收入，現在要還 ⇒ **沖減當初認列的收入** |
+| LOGISTICS_CREDIT_APPLY | LOGISTICS_CREDIT_APPLY | LOGISTICS_CREDIT_APPLY | 物流貸記抵扣 | DEBIT SELLER_LOGISTICS_CREDIT／CREDIT SELLER_LOGISTICS_RECEIVABLE。貸記優先抵扣、現金返還為後備（抵扣不經通道 ⇒ 零通道成本），🔴 但不得因成本而拒絕返還 |
+| COLLECTION_FEE_ACCRUAL | COLLECTION_FEE_ACCRUAL | COLLECTION_FEE_ACCRUAL | 收款手續費（平台負擔例外） | DEBIT PLATFORM_COLLECTION_FEE_EXPENSE／CREDIT PLATFORM_OPERATING_CASH。🔴 **只在平台負擔手續費的例外情況** post，正常路徑不 post |
+
+---
+
+## ResponsibilityCause
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 賣家帳單要看得到「這筆調整算誰的」，ADM 對帳佇列也要篩它
+- **使用服務**: payment ⚠️ 2026-09-16 更正：原記「settlement」，而該服務已於 2026-09-12 隨 V9 併入 payment-service 並刪除
+- **DB 儲存欄位**: `logistics_adjustments.responsibility_cause`（存 Value）
+- **說明**: 物流額外成本的**責任成因**（承 `ADR-004`）。🔴 **依成因判定，不依費用名稱**——同一個「取消費」在賣家改地址與外送員失聯兩種情況下歸屬完全不同。
+- **🔴 值域刻意只有四個 resolved 值**：`RESPONSIBILITY_UNRESOLVED` **不屬於本碼表**，它是 [`FulfillmentExceptionCategory`](#fulfillmentexceptioncategory) 的一格（＝「還沒判定」這個**案件狀態**，不是一個成因）。`SYSTEM_CAUSED` **不存在**：平台／系統原因一律歸 `PLATFORM_CAUSED`（36 §3.3.1 逐字）。本碼表的四值同時被複製進 payment-service `V12`／`V13` 的兩道 CHECK，漂移由 `LogisticsSchemaContractTest` 逐字對拍守住 ⇒ **新增或改名任一值都必須同批改那兩道 CHECK**。
+- **⚠️ 舊的 fail-closed 出口已於 2026-09-17 廢除**：原描述寫「判定原料不足時一律落 `PROVIDER_CAUSED`（先進爭議）」。那條已被責任判定架構取代（65 §5.5.2 A／70 §3.6）——把「查不出來」記成「物流商的錯」等於**偷偷做了一個沒有證據的判定**，而下游（退款、receivable、KPI）會照著那個假判定全部動起來。**證據不足的正確落點是讓案件留在 `IN_PROGRESS` 繼續補證據**（case `category = RESPONSIBILITY_UNRESOLVED`），不是落一個看起來比較具體的成因。
+- **特殊方法**: 無（負擔方的推導規則見 70 §3.6 與 §6.2，屬業務規則不放 enum）
+- **相關設計書**: 70 §3.6（物流財務已刪除）
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| SELLER_CAUSED | SELLER_CAUSED | SELLER_CAUSED | 賣家原因 | 由賣家負擔（備貨逾時、地址填錯、商品不符等） |
+| BUYER_CAUSED | BUYER_CAUSED | BUYER_CAUSED | 買家原因 | 🔴 **仍歸賣家的物流成本**；平台**不得**向買家二次收款（買家已完成一次付款，ADR-004） |
+| PLATFORM_CAUSED | PLATFORM_CAUSED | PLATFORM_CAUSED | 平台或系統原因 | 🔴 平台負擔，**不得轉嫁賣家**。這一格是唯一會 post `COLLECTION_FEE_ACCRUAL` 的情況。⚠️ **系統原因也歸這一格**——`SYSTEM_CAUSED` 不存在，不得新增 |
+| PROVIDER_CAUSED | PROVIDER_CAUSED | PROVIDER_CAUSED | 物流商原因 | 🔴 **不得自動向賣家收**，先進爭議／對帳。⚠️ **不再是「判定原料不足」的 fail-closed 落點**（2026-09-17 廢除，見上方說明）——證據不足時案件留在 `IN_PROGRESS`，不落任何成因 |
+
+---
+
+## FulfillmentExceptionCategory
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 維運例外案件是 ADM 內部佇列分類，不下發買賣家前端
+- **使用服務**: payment
+- **DB 儲存欄位**: `fulfillment_exception_cases.category`（存 Value）
+- **說明**: 維運例外案件的分類。🔴 **`RESPONSIBILITY_UNRESOLVED` 這一格與其他格的性質不同**：它不只是分類，還是一組 DB 不變式的觸發條件——該 category 的案件受 lifetime uniqueness（`uq_exc_responsibility_subject`）拘束、**不得** `DISMISSED`、結案碼只能是四個 resolved 的 `ResponsibilityCause`（`chk_exc_responsibility_no_dismiss` 與 `chk_exc_responsibility_resolved_cause`，V12）。⚠️ **本 enum 的值同時被寫進 V12 的索引述詞與兩道 CHECK**（schema 事實的複製），漂移由 `LogisticsSchemaContractTest` 逐字對拍守住。⚠️ 本表**不含** 69 號預約的六個商家整合類 category——那是該書實作階段的範圍，此處不預先佔位。
+- **特殊方法**: 無（責任判定案件的 lifecycle 規則見 65 §5.5.2 E0.2，屬業務規則不放 enum）
+- **相關設計書**: [65 §5.5.2](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| RESPONSIBILITY_UNRESOLVED | RESPONSIBILITY_UNRESOLVED | RESPONSIBILITY_UNRESOLVED | 責任判定未決 | 🔴 配送失敗但成因證據不足，責任歸屬待 ADM 裁決。同一 fulfillment leg **終其一生只能有一張**；**不得** `DISMISSED`（責任判定沒有「不處理」這個結局——Order 正卡在 `35` 等它） |
+| LOGISTICS_STATEMENT_UNMATCHED | LOGISTICS_STATEMENT_UNMATCHED | LOGISTICS_STATEMENT_UNMATCHED | 帳單列對不到應收 | provider 帳單列找不到唯一對應的應收（0 筆或多筆），或應收已結清後才到的費用 |
+| LOGISTICS_PROVIDER_COST_DISPUTE | LOGISTICS_PROVIDER_COST_DISPUTE | LOGISTICS_PROVIDER_COST_DISPUTE | 物流商成本爭議 | `PROVIDER_CAUSED` 的超額成本 ⇒ 先進爭議，🔴 **不得自動向賣家收** |
+
+---
+
+## FulfillmentCaseResolutionType
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: No —— 例外案件的處置提案是 ADM 內部 maker-checker 流程
+- **使用服務**: payment
+- **DB 儲存欄位**: `fulfillment_case_resolutions.resolution_type`（存 Value）
+- **說明**: 維運例外案件的處置提案型別。🔴 **型別與案件 category 綁定**：`RESPONSIBILITY_ATTRIBUTE` 只能用在 `RESPONSIBILITY_UNRESOLVED` 的案件上，其餘六值只能用在非責任判定案件上——**雙向**（65 §5.5.2 E0.2 的「第二扇門」）。拿 `CLAIM_DISMISS` 去結一張責任案件，會讓案件進入 `RESOLVED` 而 finality 條件永遠不成立 ⇒ `N16` 永不發出 ⇒ Order 永遠停在 `35`，且每一步都「照規則成功」、沒有任何錯誤訊號。⚠️ `chk_fcr_review_required` 逐字 `requires_review = (resolution_type <> 'ANOMALY_RESUME')` ⇒ **新型別自動就是 `requires_review = true`**，不得為了省一個人而放行單人結案（`APPROVED` 的雙人保證正是靠它）。
+- **特殊方法**: 無（型別↔category 的綁定表見 `ResponsibilityCaseRules`，屬業務規則不放 enum）
+- **相關設計書**: [65 §5.5.2](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| RESPONSIBILITY_ATTRIBUTE | RESPONSIBILITY_ATTRIBUTE | RESPONSIBILITY_ATTRIBUTE | 責任歸屬判定 | 🔴 **唯一能結掉責任判定案件的型別**；`resolution_code` 必須是四個 resolved 的 `ResponsibilityCause` 之一（`RESPONSIBILITY_UNRESOLVED` 不是可結案的碼）。`APPROVED` ＋ 案件 `RESOLVED` 是 `fulfillment.responsibility.finalized` 的唯一產生點 |
+| CLAIM_SETTLE | CLAIM_SETTLE | CLAIM_SETTLE | 理賠結案 | 物流理賠成立，依核定金額結案 |
+| CLAIM_DISMISS | CLAIM_DISMISS | CLAIM_DISMISS | 理賠駁回 | 物流理賠不成立。🔴 **不得用於責任判定案件** |
+| SHIPMENT_CANCEL | SHIPMENT_CANCEL | SHIPMENT_CANCEL | 取消物流單 | 取消尚未取件的物流單 |
+| SHIPMENT_CANCEL_CONFIRM | SHIPMENT_CANCEL_CONFIRM | SHIPMENT_CANCEL_CONFIRM | 確認取消 | 取消需二次確認的情境 |
+| SHIPMENT_CANCEL_AND_REFUND | SHIPMENT_CANCEL_AND_REFUND | SHIPMENT_CANCEL_AND_REFUND | 取消並退款 | 取消物流單並觸發退款鏈 |
+| ANOMALY_RESUME | ANOMALY_RESUME | ANOMALY_RESUME | 異常恢復 | ⚠️ 六值中唯一 `requires_review = false`（單人即可結案）⇒ 🔴 **絕不可用於責任判定案件**，那會繞過雙人程序要件 |
+
+---
+
+## UberDeliveryOutcome
+
+- **類別**: 業務類型碼
+- **介面**: CodeMeta
+- **前端可見**: Yes —— 配送失敗原因需要在買賣家端顯示
+- **使用服務**: shipping, order
+- **DB 儲存欄位**: 無（事件 envelope 的 `outcome_reason` 欄值域）
+- **說明**: 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。
+- **特殊方法**: 無
+- **相關設計書**: [65 §4.6／附錄 C.2](../detailed-design/65-fulfillment-platform-detailed-design.md)
+
+| Name | Code | Value | Label | Description |
+|------|------|-------|-------|-------------|
+| PROVIDER_UNDELIVERABLE | PROVIDER_UNDELIVERABLE | PROVIDER_UNDELIVERABLE | 物流商無法送達 | provider 回報無法完成配送 |
+| PROVIDER_CANCELED | PROVIDER_CANCELED | PROVIDER_CANCELED | 物流商取消 | provider 側取消 |
+| SELLER_CANCELED | SELLER_CANCELED | SELLER_CANCELED | 賣家取消 | 賣家主動取消 |
+| ADMIN_CANCELED | ADMIN_CANCELED | ADMIN_CANCELED | 平台取消 | ADM 判定取消 |
+| CREATE_FAILED | CREATE_FAILED | CREATE_FAILED | 建單失敗 | 建單重試耗盡後確定失敗 |
+
+---
+

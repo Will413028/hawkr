@@ -54,7 +54,7 @@ BenchmarkSingleShot/Open-2        212   6633022 ns/op  3161.68 MB/s    98922 B/o
 
 - 現在的樹【量】：`*.tf`、wrangler 設定、lifecycle／CORS 的 JSON、shell、`.github/workflows`、compose、Java `application.yml` 都搜不到 lifecycle、CORS 或前綴規則。`backend/workers/image-gateway/wrangler.toml:12-14` 只有 R2 binding；`backend/infra/` 只剩 mq。本 repo 的歷史也沒有：`git log --all --diff-filter=D --name-only -- 'backend/infra/**'` 無輸出。
 - 公司時期 repo 的舊設定（已不在本 repo；只當線索）【量，讀自舊 repo 歷史】：dev 與 prod 的 lifecycle 相同——`tmp/` 前綴 30 天過期、整個 bucket 的未完成 multipart 7 天中止；沒有 `public/`、`secure/` 或 category 前綴的規則；CORS 是整個 bucket 一條。
-- 過期引用：詳細設計書 49 號 `:500` 仍寫 CORS 的唯一來源是 `infra/r2-cors/`，該路徑不存在。
+- 過期引用：detailed-design 49 號 `:500` 仍寫 CORS 的唯一來源是 `infra/r2-cors/`，該路徑不存在。
 - 對 B1 的含意：暫存前綴沿用 `tmp/`（Java `AbstractStorageService.java:29` 的 `tempPrefix` 預設值），線上若仍有舊規則才對得上；bucket 規則目前不在版控，B1-8「需要人做的事」要包含把 lifecycle 與 CORS 放回版控。
 
 ## (c) 在 CI 對 Java media 跑特性測試（給 B1-1、B1-D10）

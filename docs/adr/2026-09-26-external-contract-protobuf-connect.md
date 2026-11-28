@@ -115,4 +115,4 @@ D7 選了 OpenAPI spec-first，比較的對象只有 swag 與「proto 加 grpc-g
 
 ## 修訂：試點計畫已刪除（2026-11-15）
 
-試點計畫 `2026-09-25-connect-contract-pilot` 依「完成的計畫不留在 repo」的決定在 2026-11-15 分流後刪除，git 歷史是紀錄。上方「證據」與「來源」指向它的〈驗證結果〉與步驟，現在讀本檔：決策與理由在本檔 D1–D7，工具鏈與 breaking 政策在 D2，傳輸與 App 編碼（JSON 加 gzip）在 D3，量測數字在「後果」與「補充」，慣例在 `docs/共通規範/API 設計規範（Connect）.md`，etag 在 `docs/adr/2026-09-25-optimistic-concurrency-etag.md`，錯誤模型（含賣家停權 D10）在 `docs/adr/2026-09-25-api-error-model.md`，圖片在 `docs/adr/2026-09-25-api-image-uri-template.md`。試點專用的 `hawkr.pilot.v1alpha1` 與串流驗證程式在試點收尾時已刪除。
+試點計畫 `2026-09-25-connect-contract-pilot` 依「完成的計畫不留在 repo」的決定在 2026-11-15 分流後刪除，git 歷史是紀錄。上方「證據」與「來源」指向它的〈驗證結果〉與步驟，現在讀本檔：決策與理由在本檔 D1–D7，工具鏈與 breaking 政策在 D2，傳輸與 App 編碼（JSON 加 gzip）在 D3，量測數字在「後果」與「補充」，慣例在 `docs/conventions/api-design-guidelines-connect.md`，etag 在 `docs/adr/2026-09-25-optimistic-concurrency-etag.md`，錯誤模型（含賣家停權 D10）在 `docs/adr/2026-09-25-api-error-model.md`，圖片在 `docs/adr/2026-09-25-api-image-uri-template.md`。試點專用的 `hawkr.pilot.v1alpha1` 與串流驗證程式在試點收尾時已刪除。

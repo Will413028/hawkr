@@ -1,6 +1,6 @@
 -- issue #2294：多副本排程搶佔（Scheduler Claim）—— order 側
 --
--- 設計書：03 §8.10 / §8.11；規範：docs/開發規範/多副本排程搶佔規範.md
+-- 設計書：03 §8.10 / §8.11；規範：docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md
 --
 -- 本檔兩件事，都與 order-service 的排程正確性有關：
 --   1. H4：ShipmentCreationBackstopScheduler 的 give-up 分支新增**觀測欄**
@@ -35,7 +35,7 @@ COMMENT ON COLUMN orders.shipment_backstop_given_up_at IS
 --
 -- 值為 OutboxEventStatus 的 CodeMeta value：
 --   '8221'=PENDING / '8222'=SENT / '8223'=FAILED / '8224'=DEAD
--- （SSOT：docs/代碼管理（CodeMeta）/內部技術碼.md；SQL 只能寫 value，不能寫 enum 名）
+-- （SSOT：docs/codemeta/internal-technical-codes.md；SQL 只能寫 value，不能寫 enum 名）
 DROP INDEX IF EXISTS idx_order_outbox_dispatch;
 
 CREATE INDEX IF NOT EXISTS idx_order_outbox_dispatch

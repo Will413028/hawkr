@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)。
+ * 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../detailed-design/35-product-sort-and-sales-count-detailed-design.md)。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum ProductSort implements CodeMeta {
 

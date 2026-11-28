@@ -5,11 +5,11 @@
 | 狀態 | accepted；D1 的「存 Redis」與 D6 superseded by `2026-09-27-identity-opaque-sessions.md`（OTP 改存 Postgres、在寫入帳號的 transaction 內消耗；簡訊由 River job 以 `clientid` 冪等地重試）。遷移計畫 A2 落地前，現行程式仍依本檔運作 |
 | 日期 | 2026-07-21 |
 | 影響範圍 | `services/account-service`、`pkg/sms`、`serverless/egress-proxy`、buyer／seller App |
-| 對應規格 | `docs/詳細設計書/51-簡訊發送與手機 OTP（Mitake SMS & Phone OTP）詳細設計書.md` |
+| 對應規格 | `docs/detailed-design/51-簡訊發送與手機 OTP（Mitake SMS & Phone OTP）detailed-design.md` |
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> 端點簽章、Redis key 設計、防濫用計數順序、錯誤碼映射一律在 51 號詳細設計書，本檔不複製。
+> 端點簽章、Redis key 設計、防濫用計數順序、錯誤碼映射一律在 51 號detailed-design，本檔不複製。
 
 ---
 

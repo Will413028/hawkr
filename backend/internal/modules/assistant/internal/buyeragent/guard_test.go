@@ -118,7 +118,7 @@ func (namedTool) IsLongRunning() bool { return false }
 
 // TestStatusGuideListsExactlyTheOrderStatusCodesOfTheAuthoritativeSource 守住系統提示的狀態碼表與 CodeMeta〈業務狀態碼〉的 OrderStatus 一致。
 func TestStatusGuideListsExactlyTheOrderStatusCodesOfTheAuthoritativeSource(t *testing.T) {
-	raw, err := os.ReadFile("../../../../../docs/代碼管理（CodeMeta）/業務狀態碼.md")
+	raw, err := os.ReadFile("../../../../../docs/codemeta/business-status-codes.md")
 	if err != nil {
 		t.Fatal(err)
 	}

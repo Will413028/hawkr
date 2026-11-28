@@ -5,7 +5,7 @@ import io.github.will413028.hawkr.common.utils.code.AccountType;
 /**
  * §8.5 AccountType 業務規則 helper（跨 common-core / media / payment 服務共用）。
  * <p>
- * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/開發規範/Java 微服務開發規範.md §6）。
+ * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  * 本 helper 將 AccountType 內原有的 {@code covers()} 權限涵蓋判斷與
  * {@code fromValue/fromCode} 智慧解析移到此處。
  * <p>

@@ -15,7 +15,7 @@
 | I4 | TMS 與流程 | 現在不開 TMS 帳號；repo 裡的檔案都用 TMS 能直接匯入的格式。CI 擋：新增的硬寫中文、ICU 語法、各語系 key 與參數一致、每個 key 必須有說明、已發佈的語系覆蓋率必須 100%；開發版有 pseudo-locale。英文由 LLM 依術語表起草、Will 審 |
 | I5 | 格式與內容資料 | 時間一律以 Asia/Taipei 顯示，不隨語言或裝置時區改變；幣別永遠是 TWD、0 位小數，各端各有一個格式化 helper。UGC 不翻譯、標上 `lang`；平台撰寫的內容（分類、方案名、banner、食譜）用 `LocalizedText`，在各自的模組做 |
 | I6 | 法律文件 | 正本是中文 Markdown，英文是 `*.en.md` 參考譯本並標明它翻的是哪一版；兩份都寫「以中文版為準」條款；買家的四份手寫 TSX 改成走產生器；同意紀錄加 `displayed_locale` |
-| I7 | 刀 L 與計畫 | 先出 I0（ADR＋術語表）。L 改為 L′，一開始就是多語系形狀。基礎建設切成 I-server、I-account、I-web-0、I-app-0、I-CI，其中 website 的 `[locale]` 搬遷要和 10d 排開。字串抽取依區域分批，由 CI 的 ratchet 收斂。英文的**發佈**以「該介面看不到任何未翻譯文字」為門檻，實際上會落在相關模組搬進單體之後 |
+| I7 | 刀 L 與計畫 | 先出 I0（ADR＋術語表）。L 改為 L′，一開始就是多語系形狀。infrastructure切成 I-server、I-account、I-web-0、I-app-0、I-CI，其中 website 的 `[locale]` 搬遷要和 10d 排開。字串抽取依區域分批，由 CI 的 ratchet 收斂。英文的**發佈**以「該介面看不到任何未翻譯文字」為門檻，實際上會落在相關模組搬進單體之後 |
 
 ---
 

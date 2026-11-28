@@ -269,7 +269,7 @@ CREATE TABLE aftersale_audit_logs (
     cancel_id          BIGINT,
     actor_account_id   BIGINT,                     -- SYSTEM 操作時可為 NULL
     actor_type         VARCHAR(20)  NOT NULL, -- AfterSaleAuditActor value（8401=BUYER / 8402=SELLER / 8403=SYSTEM）
-    action             VARCHAR(50)  NOT NULL, -- AfterSaleAuditAction value（8501-8520，詳見內部技術碼.md）
+    action             VARCHAR(50)  NOT NULL, -- AfterSaleAuditAction value（8501-8520，詳見internal-technical-codes.md）
     detail             JSONB,
     created_at         TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );

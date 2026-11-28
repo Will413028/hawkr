@@ -5,7 +5,7 @@ import io.github.will413028.hawkr.common.utils.code.OnboardingStatus;
 /**
  * §8.5 OnboardingStatus 業務規則 helper。
  * <p>
- * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/開發規範/Java 微服務開發規範.md §6）。
+ * CodeMeta enum 為跨語言公共型別，禁止包含業務輔助邏輯（docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  * 本 helper 將 PayUni SetStatus 字串對應內部 OnboardingStatus 的解析邏輯，
  * 從 enum 內移到 shipping-service 內部（單一服務使用）。
  */

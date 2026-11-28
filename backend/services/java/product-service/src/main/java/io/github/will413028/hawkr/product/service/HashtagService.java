@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Hashtag 業務 Service（33-商品 Hashtag 模組詳細設計書 §3、§4、§5.1）。
+ * Hashtag 業務 Service（33-商品 Hashtag 模組detailed-design §3、§4、§5.1）。
  *
  * <p>本 Service 提供：
  * <ul>
@@ -167,7 +167,7 @@ public class HashtagService {
 
     /**
      * 詳情/列表用 hashtag 條目（name + display + 公開商品數）。
-     * <p>{@code productCount} 為字串型別，遵守 docs/開發規範/Java 微服務開發規範.md §2.1（對外數字一律 string）。
+     * <p>{@code productCount} 為字串型別，遵守 docs/dev-guidelines/java-microservices-development-guidelines.md §2.1（對外數字一律 string）。
      */
     public record HashtagDisplayItem(String canonicalName, String displayName, String productCount) {}
 

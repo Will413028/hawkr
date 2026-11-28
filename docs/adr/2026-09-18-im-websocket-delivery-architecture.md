@@ -5,11 +5,11 @@
 | 狀態 | superseded by 2026-11-22-im-realtime-delivery-connect-streaming.md |
 | 日期 | 2026-08-30 |
 | 影響範圍 | `services/im-service`、`gateway/internal/handler/chat.go`、`api/proto/im`、buyer／seller／web 三端 client |
-| 對應規格 | `docs/詳細設計書/14-即時通訊微服務（IM Service）詳細設計書.md` |
+| 對應規格 | `docs/detailed-design/14-im-service-detailed-design.md` |
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> frame 白名單、房間命名、停權 gating 判準、失敗處置表一律在 14 號詳細設計書，本檔不複製。
+> frame 白名單、房間命名、停權 gating 判準、失敗處置表一律在 14 號detailed-design，本檔不複製。
 
 ---
 

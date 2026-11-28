@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
  * <b>在那之前，第二個 JSON provider 進來時不得複製本類別</b> —— 複製就變成三份。
  *
  * <h2>欄名來源</h2>
- * 全部抄自 {@code docs/第三方整合/Uber Direct API 總覽.md}：
+ * 全部抄自 {@code docs/third-party-integrations/uber-direct-api-overview.md}：
  * <ul>
  *   <li>§7.2（DaaS／Direct，<b>我方用這組</b>）逐字：「回傳我方識別碼的兩個欄位：
  *       {@code external_id}（我方送出的配送識別碼）、{@code manifest.reference}

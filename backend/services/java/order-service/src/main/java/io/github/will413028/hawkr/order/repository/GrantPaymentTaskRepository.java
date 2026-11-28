@@ -17,7 +17,7 @@ import java.util.List;
  * <p>狀態欄位 {@code status} 一律存 {@link io.github.will413028.hawkr.common.utils.code.WorkerTaskStatus}
  * value（"0"/"10"/"20"/"30"/"40"/"50"），對齊 03 §3.11 / §2.1 INV-3 規格。
  * <p>所有 status 值透過 default method 由 {@code WorkerTaskStatus.*.value()} 注入，
- * SQL 內不寫字面狀態碼（docs/開發規範/Java 微服務開發規範.md §6.1 禁止硬編碼；CodeMeta 為唯一真實來源）。
+ * SQL 內不寫字面狀態碼（docs/dev-guidelines/java-microservices-development-guidelines.md §6.1 禁止硬編碼；CodeMeta 為唯一真實來源）。
  */
 public interface GrantPaymentTaskRepository extends BaseMapper<GrantPaymentTaskEntity> {
 

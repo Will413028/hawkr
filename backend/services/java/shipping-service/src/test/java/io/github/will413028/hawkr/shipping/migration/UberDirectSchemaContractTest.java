@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * {@code V13__add_uber_direct_tables.sql} 的 schema 契約釘樁（66 號詳細設計書 §5）。
+ * {@code V13__add_uber_direct_tables.sql} 的 schema 契約釘樁（66 號detailed-design §5）。
  *
  * <p><b>它證明什麼</b>：66 §5 逐字指定的表、欄、值域、UNIQUE 與 partial index 述詞
  * 確實出現在 migration 的 <b>DDL</b> 裡，且 66 明令<b>不要做</b>的幾件事沒有被做

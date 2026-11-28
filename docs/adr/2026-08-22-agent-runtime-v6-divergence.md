@@ -48,5 +48,5 @@
 
 ## 後果
 
-- 57 號詳細設計書是 runtime 的 canonical 規範；v6 摘錄只能當參考，且任何引用都必須先按本表校正。
+- 57 號detailed-design是 runtime 的 canonical 規範；v6 摘錄只能當參考，且任何引用都必須先按本表校正。
 - 本 ADR 的結論不改。若某一項日後被推翻，新增一份 ADR 並在此標 superseded。

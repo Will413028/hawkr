@@ -6,7 +6,7 @@ import { Dialog } from "@/components/ui/Dialog";
 
 /**
  * 「？」說明按鈕 + 發放規則彈窗。放在「折抵設定」標題旁，點開後以 FAQ 折疊樣式
- * 向賣家說明優惠券發放規則。規則內容對齊 backend-payuni 優惠券微服務詳細設計書
+ * 向賣家說明優惠券發放規則。規則內容對齊 backend-payuni 優惠券微服務detailed-design
  * （§2.7 賣家配額、§2.8 領券機制、§5.1 SellerCreateTemplate 參數驗證），與
  * CouponFormClient 的前端驗證為同一份規則，前端先擋、後端最終把關。
  */

@@ -100,7 +100,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Invoice Service — 電子發票（58 號詳細設計書）
+// Invoice Service — 電子發票（58 號detailed-design）
 //
 // 通用 issuer→recipient 模型：issuer ∈ {賣家, 平台}；recipient ∈ {買家, 賣家, 外部對象}；
 // 觸發 ∈ {訂單付款自動, ADM 手動}；品項來源 ∈ {訂單快照, ADM 手填}。
@@ -112,7 +112,7 @@ const (
 //   - 所有數字（ID/金額/數量/計數/版本/頁碼）一律 string；
 //     例外僅 Request 內由 Gateway 注入的身分欄位（buyer_id / store_id / actor_account_id）用 int64
 //   - 所有時間一律 string，ISO 8601 UTC 秒精度（YYYY-MM-DDTHH:mm:ssZ）
-//   - 狀態/類型碼一律 string，值域見 backend/docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼}.md
+//   - 狀態/類型碼一律 string，值域見 backend/docs/codemeta/{業務狀態碼,業務類型碼,內部技術碼}.md
 //   - 金額單位「元」的整數字串，禁止 double/decimal
 //   - 本服務不 import common/delegation.proto：發票是 ADM 代行禁區（56 §6.1.1）
 type InvoiceServiceClient interface {
@@ -1007,7 +1007,7 @@ func (c *invoiceServiceClient) ReplaceBusinessDayMirror(ctx context.Context, in 
 // All implementations must embed UnimplementedInvoiceServiceServer
 // for forward compatibility.
 //
-// Invoice Service — 電子發票（58 號詳細設計書）
+// Invoice Service — 電子發票（58 號detailed-design）
 //
 // 通用 issuer→recipient 模型：issuer ∈ {賣家, 平台}；recipient ∈ {買家, 賣家, 外部對象}；
 // 觸發 ∈ {訂單付款自動, ADM 手動}；品項來源 ∈ {訂單快照, ADM 手填}。
@@ -1019,7 +1019,7 @@ func (c *invoiceServiceClient) ReplaceBusinessDayMirror(ctx context.Context, in 
 //   - 所有數字（ID/金額/數量/計數/版本/頁碼）一律 string；
 //     例外僅 Request 內由 Gateway 注入的身分欄位（buyer_id / store_id / actor_account_id）用 int64
 //   - 所有時間一律 string，ISO 8601 UTC 秒精度（YYYY-MM-DDTHH:mm:ssZ）
-//   - 狀態/類型碼一律 string，值域見 backend/docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼}.md
+//   - 狀態/類型碼一律 string，值域見 backend/docs/codemeta/{業務狀態碼,業務類型碼,內部技術碼}.md
 //   - 金額單位「元」的整數字串，禁止 double/decimal
 //   - 本服務不 import common/delegation.proto：發票是 ADM 代行禁區（56 §6.1.1）
 type InvoiceServiceServer interface {

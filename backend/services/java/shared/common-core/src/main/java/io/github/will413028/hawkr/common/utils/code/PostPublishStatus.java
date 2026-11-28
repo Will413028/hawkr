@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 貼文的發布狀態。cms_post 原本只有 hidden_at 這個平台強制下架旗標、沒有發布狀態概念；代行營運要能建立草稿而不讓貼文當場進入買家 feed，故新增本欄。「已排程待發布」不是本 enum 的值，由 cms_post.schedule_state = pending 表達：publish_status 答「貼文現在對買家可不可見」、schedule_state 答「有沒有一個待執行的排程任務」，同一個事實不放兩個載體。碼段依據：4000~4399 已被 ProductStatus / LabelPrintStatus / TcatCallStatus / PayUniSubmitStatus 佔用，4400 起為最小的連續空段。詳見 [56 §6.5.3](../詳細設計書/56-ADM%20代行營運（Delegated%20Operations）詳細設計書.md)。
+ * 貼文的發布狀態。cms_post 原本只有 hidden_at 這個平台強制下架旗標、沒有發布狀態概念；代行營運要能建立草稿而不讓貼文當場進入買家 feed，故新增本欄。「已排程待發布」不是本 enum 的值，由 cms_post.schedule_state = pending 表達：publish_status 答「貼文現在對買家可不可見」、schedule_state 答「有沒有一個待執行的排程任務」，同一個事實不放兩個載體。碼段依據：4000~4399 已被 ProductStatus / LabelPrintStatus / TcatCallStatus / PayUniSubmitStatus 佔用，4400 起為最小的連續空段。詳見 [56 §6.5.3](../detailed-design/56-delegated-operations-detailed-design.md)。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum PostPublishStatus implements CodeMeta {
 

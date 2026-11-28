@@ -1,4 +1,4 @@
--- 禁運品／品類守門的 SKU 標記欄（66 號詳細設計書 §5.1.9 ②）。
+-- 禁運品／品類守門的 SKU 標記欄（66 號detailed-design §5.1.9 ②）。
 --
 -- 🔴 **為什麼「只做碼表與檢查、不做這個欄位」是最糟的組合**（66 §5.1.9 逐字）：
 --    結帳的第 6 道檢查（禁運品）會照跑，但每一筆讀到的都是空陣列 ⇒ **恆為通過**，
@@ -26,7 +26,7 @@
 --    任何寫入嘗試都會當場 23514（check_violation），訊息直接指向本檔。
 --
 -- 🔴 **UP-4 定案時要做的事（兩件，同一個 V{N+1} 內，缺一即回到「什麼都寫得進去」）**：
---    1. `docs/代碼管理（CodeMeta）/業務類型碼.md` 新增 RestrictedGoodsCategory 碼表
+--    1. `docs/codemeta/business-type-codes.md` 新增 RestrictedGoodsCategory 碼表
 --       ＋ `generate.sh --all` ＋ 四份前端拷貝。
 --    2. 在新的 migration 內**置換**（不是刪除）本檔的 CHECK：
 --       改成逐值列舉，例如

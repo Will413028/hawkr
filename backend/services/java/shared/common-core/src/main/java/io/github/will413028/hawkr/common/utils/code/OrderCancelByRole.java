@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 訂單取消者角色。前端依此 role + cancel_reason 渲染差異化文案（見 [03 §5.3.3](../詳細設計書/03-訂單微服務（Order%20Service）詳細設計書.md#533-前端文案對照buyer-視角)）。Value 直接使用字串便於前端 switch case，與 AfterSaleAuditActor 的 numeric value 慣例不同（後者前端不可見）。
+ * 訂單取消者角色。前端依此 role + cancel_reason 渲染差異化文案（見 [03 §5.3.3](../detailed-design/03-order-service-detailed-design.md#533-前端文案對照buyer-視角)）。Value 直接使用字串便於前端 switch case，與 AfterSaleAuditActor 的 numeric value 慣例不同（後者前端不可見）。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum OrderCancelByRole implements CodeMeta {
 

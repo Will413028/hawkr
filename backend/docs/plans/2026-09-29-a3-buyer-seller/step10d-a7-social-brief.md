@@ -126,7 +126,7 @@ A7 排在 A6 之後，是因為依賴表寫 social → im、review，從下往�
 
 **業界基準**（一般知識，沒有逐項查官方文件）：Google AIP、GitHub、YouTube 都依資源分 service，「你能做什麼」由伺服器針對這個資源判斷。YouTube 的頻道主和觀眾用同一個 `comments.insert`。反例是 Shopify 的 Storefront API 對 Admin API（ADR 10-07 引用），但那是兩組不同的資源，不是同一個留言動作依資源決定身分。
 
-**既有機制為什麼存在**：ADR 10-07 為了拿掉 `X-Active-Role`，寫成「服務名稱表示身分」；當時只有 buyer、seller 兩個模組碰到身分。專案的命名規則其實是「模組＋對象」：`<模組>AppService` 給登入的帳號用，買家賣家都算（`API 設計規範（Connect）.md:27`）【量】。
+**既有機制為什麼存在**：ADR 10-07 為了拿掉 `X-Active-Role`，寫成「服務名稱表示身分」；當時只有 buyer、seller 兩個模組碰到身分。專案的命名規則其實是「模組＋對象」：`<模組>AppService` 給登入的帳號用，買家賣家都算（`api-design-guidelines-connect.md:27`）【量】。
 
 | 選項 | 取捨 |
 |---|---|
@@ -139,7 +139,7 @@ A7 排在 A6 之後，是因為依賴表寫 social → im、review，從下往�
 | ADR 10-07「服務名稱表示身分」 | SELF-IMPOSED（可以修訂） | 否 |
 | 店家能力宣告只掛在 `SellerAppService` | SELF-IMPOSED（和既有做法一致） | 否：social 的方法照樣宣告「以店家身分時需要的能力」 |
 
-**建議 (a)**，在 A7 的 API 刀實作。要修訂的文件：ADR 10-17 的 I3 段、主計畫 A7 段、ADR 10-07 文末、`API 設計規範（Connect）.md` 第 34 行與 ADR `2026-09-29-seller-suspension-and-business-identity-in-monolith`（能力宣告可以掛在其他模組的 `AppService`，由擁有資料的模組推導身分後向 seller 檢查）。**文案**：無。
+**建議 (a)**，在 A7 的 API 刀實作。要修訂的文件：ADR 10-17 的 I3 段、主計畫 A7 段、ADR 10-07 文末、`api-design-guidelines-connect.md` 第 34 行與 ADR `2026-09-29-seller-suspension-and-business-identity-in-monolith`（能力宣告可以掛在其他模組的 `AppService`，由擁有資料的模組推導身分後向 seller 檢查）。**文案**：無。
 
 ---
 
@@ -310,7 +310,7 @@ ADR 10-17 改成：「停權的店以店家身分在自己的內容上不能留�
 
 ## 要核可的文案與畫面改動
 
-用語依 `使用者面用語術語表.md`。各端維持自己的「貼文／動態」用字。英文之後再補。
+用語依 `user-facing-terminology-glossary.md`。各端維持自己的「貼文／動態」用字。英文之後再補。
 
 | # | 位置 | 文字 | 性質 |
 |---|---|---|---|

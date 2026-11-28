@@ -55,7 +55,7 @@ abstract class ArbitrationData with _$ArbitrationData {
 }
 
 /// 仲裁狀態 enum — 值為 CodeMeta `AfterSaleAppealState` 的 Value。
-/// 出處：backend-payuni/docs/代碼管理（CodeMeta）/業務狀態碼.md#AfterSaleAppealState
+/// 出處：backend-payuni/docs/codemeta/business-status-codes.md#AfterSaleAppealState
 ///
 /// 後端 `ArbitrationData.state` 吐的是 Value（`aftersales.proto` 的
 /// `string state = 1; // AfterSaleAppealState value`），Name 不會出現在 wire 上。

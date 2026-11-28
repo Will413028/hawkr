@@ -5,7 +5,7 @@
 | 狀態 | accepted |
 | 日期 | 2026-09-18 |
 | 影響範圍 | gateway（`internal/sse`／`internal/realtime`／`internal/mq`）、hawkr-website、buyer／seller App |
-| 規格 | [41 號 Realtime SSE 推播平台詳細設計書](/backend/docs/詳細設計書/41-Realtime%20SSE%20推播平台（Realtime%20SSE%20Push%20Platform）詳細設計書.md) |
+| 規格 | [41 號 Realtime SSE 推播平台detailed-design](/backend/docs/detailed-design/41-realtime-sse-push-platform-detailed-design.md) |
 | 路徑基準 | `backend/` |
 
 ## 脈絡

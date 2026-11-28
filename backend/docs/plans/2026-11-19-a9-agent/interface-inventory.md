@@ -274,7 +274,7 @@ CSV 另有 6 列 pricebook（`GetForecastCurve` 等）：服務已刪（ADR 2026
 |---|---|
 | 覆蓋 ai／assistant／procurement 的 proto | **沒有 AI 或採購的 service**。`rg -l 'agent\|procurement' -i api/hawkr/buyer/v1alpha1/buyer.proto api/hawkr/seller/v1alpha1/seller.proto` 只命中 seller.proto（註解）。唯一相關的是 `api/hawkr/agent/v1alpha1/agent.proto`：`VendorPortalPublicService`（PreviewInvite、ExchangeInvite）與 `VendorPortalInviteeService`（GetSession、VerifySession），即 vendor portal 的**存取層**，不含 RFQ 讀取、草稿、回價（那些還是 gateway REST，§1.3 #36、#43–47）【量】 |
 | ErrorReason | `rg -n 'PROCUREMENT\|AGENT\|AI_' api/hawkr/common/v1alpha1/error_reason.proto` 無命中，即沒有 procurement／AI 的 reason【量】；gateway 的 procurement 錯誤用自己的 `reason` 字串（`S/internal/grpc/procurement_errors.go`、`procurement_error_reason_registry_test.go`、`G/procurement/wire.go`）；seller-app 有自己的 `procurement_error.dart` |
-| 舊 proto | `B/api/proto/ai/ai.proto`（1489 行，單一檔、5 個 service、package `hawkr.ai`，產出到 `B/pkg/proto/ai`）。A9 要新增 `api/hawkr/agent/v1alpha1`（或拆 `assistant`、`procurement`、`imaging`、`admin`）的 Connect 契約，依 `docs/共通規範/API 設計規範（Connect）.md` |
+| 舊 proto | `B/api/proto/ai/ai.proto`（1489 行，單一檔、5 個 service、package `hawkr.ai`，產出到 `B/pkg/proto/ai`）。A9 要新增 `api/hawkr/agent/v1alpha1`（或拆 `assistant`、`procurement`、`imaging`、`admin`）的 Connect 契約，依 `docs/conventions/api-design-guidelines-connect.md` |
 
 ## 7. 未決與要審查的點（每項附證據；去向欄只是建議）
 

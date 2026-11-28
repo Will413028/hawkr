@@ -13,7 +13,7 @@ import (
 // AppType 的擁有者仍是 CodeMeta（payment、aftersales 還在用），content 的 AppType 是同一個概念，
 // 值必須相同。
 func TestCodeMetaProjectionMatchesTheModule(t *testing.T) {
-	md, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "代碼管理（CodeMeta）", "業務類型碼.md"))
+	md, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "codemeta", "business-type-codes.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

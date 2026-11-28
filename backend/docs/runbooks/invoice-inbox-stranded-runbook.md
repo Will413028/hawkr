@@ -1,6 +1,6 @@
 # invoice_inbox_events 擱淺列處置（告警 `InvoiceInboxStranded` / 指標 M30）
 
-> 對應 [58-電子發票詳細設計書](../詳細設計書/58-電子發票服務（Invoice%20Service）詳細設計書.md) §7.2.5（inbox 的兩條推進路徑）與 §7.2.2（作廢／折讓 usecase）。
+> 對應 [58-電子發票detailed-design](../detailed-design/58-invoice-service-detailed-design.md) §7.2.5（inbox 的兩條推進路徑）與 §7.2.2（作廢／折讓 usecase）。
 > **這份 runbook 不是「跑一支腳本把數字歸零」**。M30 是 gauge，它說的是「這些列沒有任何自動執行者」——處置一律要先分辨**為什麼**沒有，四類的正解完全不同。
 > 🔴 **禁止**用 reconciliation job／backfill CLI／drift scanner 處理本表（CLAUDE.md §22、後端服務責任邊界規範）。歷史積壓走一次性維運 SQL，新增的靠把 §7.2.2 做完來排空。
 
@@ -148,7 +148,7 @@ SELECT count(*) FROM invoice_inbox_events r
 COMMIT;
 ```
 
-⚠️ **`disposition` 的值域是 CodeMeta `InvoiceInboxDisposition`**（`backend/docs/代碼管理（CodeMeta）/內部技術碼.md`），不要直接寫字面值進 DB。
+⚠️ **`disposition` 的值域是 CodeMeta `InvoiceInboxDisposition`**（`backend/docs/codemeta/internal-technical-codes.md`），不要直接寫字面值進 DB。
 本節用的 `IGNORED_PRE_CUTOVER` 就在那張表裡。
 ⚠️ 該區塊**在 #3073 之前並不存在**，而這句話當時就已經寫著「要先在 CodeMeta 登記」
 —— 照它施工的人會找不到地方登記，然後直接寫字面值。訂規範時要同時把它指向的東西做出來。

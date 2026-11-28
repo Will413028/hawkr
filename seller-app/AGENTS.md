@@ -42,4 +42,4 @@ lib/
 - **Feature 內部結構**: `presentation/` 下扁平化放置，大型 Feature 用前綴命名 (例: `order_list_screen.dart`)。
 - **代碼生成**: 修改 `Freezed` 模型或 `Riverpod` 提供者後，必須執行 `build_runner`。
 - **Icons 規範**: feature code 透過 `AppIcons`（`lib/shared/icons/app_icons.dart`）或 `HkIcon`／`HkIconName` 取圖示，底層是 Flutter 內建的 Material Icons，不放圖示檔；品牌 Logo 才用圖片。
-- **共通規範**: 跨專案規則見根目錄 `AGENTS.md`。
+- **conventions**: 跨專案規則見根目錄 `AGENTS.md`。

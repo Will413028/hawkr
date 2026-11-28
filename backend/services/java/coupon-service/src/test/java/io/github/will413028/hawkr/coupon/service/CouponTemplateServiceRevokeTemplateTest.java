@@ -21,7 +21,7 @@ import static org.mockito.Mockito.when;
  * migration 之後的新 code 寫入路徑保證：ADMIN 建立路徑寫 issuer_account_id、SELLER
  * 建立路徑寫 issuer_store_id），但 V6 這次只做 expand，DB 層的
  * {@code chk_tpl_issuer_identity} CHECK constraint 依 expand-contract 規範
- * （docs/開發規範/DB Migration 相容性規範（expand-contract）.md §4）延後到 contract
+ * （docs/dev-guidelines/db-migration-compatibility-expand-contract.md §4）延後到 contract
  * release 才加，目前尚未真的存在——巧合數值碰撞在「新 code 均已上線」前提下不會發生，
  * 但那是應用層寫入紀律撐住的，不是 DB 保證。保留 issuer_type 過濾是為了與同批方法呼叫
  * 慣例一致，並讓 WHERE 子句本身清楚表達「只收回本店家的模板」——在 CHECK constraint

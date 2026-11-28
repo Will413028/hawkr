@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum ProcurementLedgerEventType implements CodeMeta {
 
@@ -28,7 +28,7 @@ public enum ProcurementLedgerEventType implements CodeMeta {
     AGENT_ACTIVITY_SNAPSHOT("AGENT_ACTIVITY_SNAPSHOT", "AGENT_ACTIVITY_SNAPSHOT", "Activity 全量快照", "`CUSTOM name=activity`；刻意加 `AGENT_` 前綴避免與 AG-UI 原生 `ACTIVITY_SNAPSHOT` 同名不同義——後者已被 doc 57 §2.3 明確禁用（官方 adapter 只對 A2UI surface 與 MCP apps 特例處理，其餘一律 `break` 丟棄）"),
     AGENT_ACTIVITY_DELTA("AGENT_ACTIVITY_DELTA", "AGENT_ACTIVITY_DELTA", "Activity 增量更新", "同上，`CUSTOM name=activity`；避免與 AG-UI 原生 `ACTIVITY_DELTA` 同名不同義"),
     MESSAGE_COMPLETED("MESSAGE_COMPLETED", "MESSAGE_COMPLETED", "訊息完成", "wire carrier 為原生 `TEXT_MESSAGE_START`／`TEXT_MESSAGE_CONTENT`／`TEXT_MESSAGE_END`"),
-    ARTIFACT_UPSERTED("ARTIFACT_UPSERTED", "ARTIFACT_UPSERTED", "Artifact 已建立或更新", "`CUSTOM name=artifact`；型別值域見 `ProcurementArtifactType`（業務類型碼.md）"),
+    ARTIFACT_UPSERTED("ARTIFACT_UPSERTED", "ARTIFACT_UPSERTED", "Artifact 已建立或更新", "`CUSTOM name=artifact`；型別值域見 `ProcurementArtifactType`（business-type-codes.md）"),
     CONFIRMATION_REQUIRED("CONFIRMATION_REQUIRED", "CONFIRMATION_REQUIRED", "需要人類確認", "`CUSTOM name=confirmation`；對應 `ProcurementConfirmationStatus.PENDING`"),
     CONFIRMATION_RESOLVED("CONFIRMATION_RESOLVED", "CONFIRMATION_RESOLVED", "確認已解決", "同上，`CUSTOM name=confirmation`；對應 `ProcurementConfirmationStatus` 的非 `PENDING` 值");
 

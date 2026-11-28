@@ -29,21 +29,21 @@ regexes = ['''NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:''']
 [[allowlists]]
 description = "設計書的範例：Idempotency-Key 是請求標頭範例值，不是機敏資料"
 condition = "AND"
-paths = ['''^backend/docs/詳細設計書/56-ADM''']
+paths = ['''^backend/docs/detailed-design/56-ADM''']
 regexTarget = "line"
 regexes = ['''[Ii]dempotency-?[Kk]ey''']
 
 [[allowlists]]
 description = "設計書的文字說明 PEM 檔頭格式（BEGIN PRIVATE KEY），沒有金鑰本體"
 condition = "AND"
-paths = ['''^backend/docs/詳細設計書/05-支付服務''']
+paths = ['''^backend/docs/detailed-design/05-支付服務''']
 regexTarget = "line"
 regexes = ['''PKCS#8|PKCS#1|BEGIN (RSA )?PRIVATE KEY''']
 
 [[allowlists]]
 description = "AMEGO 電子發票 API 文件的範例：廠商公開的測試帳號 AppKey（搭配測試統編 12345678），不是正式憑證"
 condition = "AND"
-paths = ['''^backend/docs/第三方整合/AMEGO 電子發票 API 總覽\.md$''']
+paths = ['''^backend/docs/third-party-integrations/AMEGO 電子發票 API 總覽\.md$''']
 rules = ["generic-api-key"]
 
 [[allowlists]]

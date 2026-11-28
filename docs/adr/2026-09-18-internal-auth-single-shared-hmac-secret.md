@@ -52,4 +52,4 @@ Gateway 側不構成入口：Gateway 從零建 metadata、不轉發外部 `x-int
 - **重新評估條件**：團隊出現獨立 SRE 角色、或需要以 caller 身分做差異化授權時，重評 per-service key／mTLS。
 
 現行規格（協議、header、輪替步驟、NetworkPolicy 白名單）見
-`docs/詳細設計書/52-微服務間內部授權（Internal Service Authorization）詳細設計書.md`。
+`docs/detailed-design/52-internal-service-authorization-detailed-design.md`。

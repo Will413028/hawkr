@@ -21,14 +21,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * {@code ShippingEventType} ↔ {@code MqConstants} 的機械檢查。
  *
- * <p><b>它擋什麼</b>：CodeMeta「內部技術碼.md § ShippingEventType」的「機械檢查」欄逐字要求——
+ * <p><b>它擋什麼</b>：CodeMeta「internal-technical-codes.md § ShippingEventType」的「機械檢查」欄逐字要求——
  * 「必須有一支斷言『{@code MqConstants} 中所有以 {@code shipment.} 起頭的 routing key 常數，
  * 都在本 enum 的值域內』，缺一即紅」。沒有它，下一個人加常數時 enum 不會跟上，
  * 而症狀是<b>又一條字面值</b>——不會編譯錯、不會測試紅（禁硬編碼的規範靜默失效）。
  *
  * <p><b>兩邊的來源互相獨立，所以這不是自己跟自己對</b>：
  * {@code MqConstants} 是手工維護的 Java 常數；{@code ShippingEventType} 由
- * {@code docs/代碼管理（CodeMeta）/內部技術碼.md} 經 {@code generate.sh} 生成。
+ * {@code docs/codemeta/internal-technical-codes.md} 經 {@code generate.sh} 生成。
  * 兩份清單都以<b>反射</b>就地讀出，本檔<b>不手寫任何一條 routing key 當期望值</b>——
  * 手寫的話，新增常數時這支測試不會轉紅，等於沒有。
  *
@@ -50,7 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * routing key 與 event type 是兩個獨立參數，所以 enum 的 {@code value()} 對應
  * {@code ROUTING_KEY_SHIPMENT_*}、{@code code()} 對應 {@code EVENT_TYPE_SHIPMENT_*}，兩軸各驗一次。
  *
- * @see <a href="../../../../../../../../../../docs/詳細設計書/36-MQ 與事件總覽（MQ &amp; Event Catalog）.md">36 號 §3.3／§8.1</a>
+ * @see <a href="../../../../../../../../../../docs/detailed-design/36-MQ 與事件總覽（MQ &amp; Event Catalog）.md">36 號 §3.3／§8.1</a>
  */
 class ShippingEventTypeMqConstantsContractTest {
 
@@ -143,8 +143,8 @@ class ShippingEventTypeMqConstantsContractTest {
 
     /**
      * CodeMeta「機械檢查」欄逐字要求的那一條。
-     * <p>失敗的修法：改 {@code docs/代碼管理（CodeMeta）/內部技術碼.md} 的 ShippingEventType 表格，
-     * 再跑 {@code docs/代碼管理（CodeMeta）/scripts/generate.sh --all}（禁止手改生成檔）。
+     * <p>失敗的修法：改 {@code docs/codemeta/internal-technical-codes.md} 的 ShippingEventType 表格，
+     * 再跑 {@code docs/codemeta/scripts/generate.sh --all}（禁止手改生成檔）。
      */
     @Test
     @DisplayName("MqConstants 每一條 shipment.* routing key 都在 ShippingEventType 值域內")
@@ -158,7 +158,7 @@ class ShippingEventTypeMqConstantsContractTest {
         assertTrue(missing.isEmpty(),
                 "以下 MqConstants 常數不在 ShippingEventType 值域內 ⇒ 又一條字面值："
                         + missing
-                        + "。修法：改 內部技術碼.md 的 ShippingEventType 表格後跑 generate.sh --all，"
+                        + "。修法：改 internal-technical-codes.md 的 ShippingEventType 表格後跑 generate.sh --all，"
                         + "禁止手改生成檔。若該 key 真的不屬物流領域，理由要寫進本檔 javadoc 的值域邊界。");
     }
 

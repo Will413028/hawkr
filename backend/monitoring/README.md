@@ -84,7 +84,7 @@ cp .env.example .env
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_id/your_token
 ```
 
-完整設定教學（含建立 Discord Server/頻道/Webhook）見 `backend/docs/基礎建設/Discord 告警通知設定指南.md`。
+完整設定教學（含建立 Discord Server/頻道/Webhook）見 `backend/docs/infrastructure/discord-alert-notification-setup-guide.md`。
 
 測試階段 alertmanager 預設使用 `blackhole` receiver，僅 `env: dev` 或 `env: prod` 的告警才會發送到 Discord。
 

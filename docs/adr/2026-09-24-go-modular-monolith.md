@@ -276,7 +276,7 @@
     - **唯一失去的是憑證邊界**：AppKey 會和其他 provider 的憑證在同一個 process 裡，列為接受的代價。
 - **被強化**：`2026-09-11-logistics-finance-domain-ownership.md`。原本的「不得被結帳與退款路徑 import」只剩 package 邊界和人工檢查，現在由 finance 模組加上依賴表，交給編譯器與 arch test 強制。
 - **其餘 ADR**：預設仍然有效。每個模組搬遷時，逐一檢查與它相關的 ADR。
-- **`docs/開發規範/後端服務責任邊界規範.md` §七**：outbox 與 saga 的例外條款在單體內大多不再成立，於階段 0 改寫。
+- **`docs/dev-guidelines/backend-service-responsibility-boundaries.md` §七**：outbox 與 saga 的例外條款在單體內大多不再成立，於階段 0 改寫。
 
 ## 後果
 

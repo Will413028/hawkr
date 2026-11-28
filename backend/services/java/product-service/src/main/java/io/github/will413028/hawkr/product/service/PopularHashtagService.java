@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 區間熱門 Hashtag 查詢 Service（33-商品 Hashtag 模組詳細設計書 §5.2）。
+ * 區間熱門 Hashtag 查詢 Service（33-商品 Hashtag 模組detailed-design §5.2）。
  *
  * <p>處理：
  * <ul>
@@ -29,7 +29,7 @@ import java.util.List;
  *   <li>呼叫 {@link ProductHashtagRepository#selectPopularInRange} 查詢</li>
  * </ul>
  *
- * <p>純讀 Service，不引入快取、不引入 reconciliation（33 §11 / docs/開發規範/後端服務責任邊界規範.md）。
+ * <p>純讀 Service，不引入快取、不引入 reconciliation（33 §11 / docs/dev-guidelines/backend-service-responsibility-boundaries.md）。
  */
 @Service
 public class PopularHashtagService {

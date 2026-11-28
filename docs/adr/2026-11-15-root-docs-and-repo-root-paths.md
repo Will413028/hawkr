@@ -13,20 +13,20 @@
 
 約束：
 - 繼承：程式在 `backend/` 目錄執行時讀的路徑字串不能改（工具的實際執行路徑）；仍成立，只改註解與文件。
-- 繼承：ADR 寫下就不改結論（`設計文件治理規範.md` §4）；仍成立，搬家只改位置、路徑與表頭中繼資料。
+- 繼承：ADR 寫下就不改結論（`design-document-governance-guidelines.md` §4）；仍成立，搬家只改位置、路徑與表頭中繼資料。
 - 不再成立而拿掉：「進行中的 `payment-onboarding` 分支會大面積衝突」。PR #284 已在 2026-11-14 合併。
 - 系統從未上線，沒有相容性約束（根 `AGENTS.md`）。
 
 ## 決定
 
 1. **全部 ADR 搬到根目錄 `docs/adr/`，維持單一份決策紀錄**（D1）。ADR 已有「影響範圍」欄，不再依子專案分兩處。
-2. **四份跨專案規範放 `docs/共通規範/`**（D4），只有後端用的規範留在 `backend/docs/開發規範/`。
+2. **四份跨專案規範放 `docs/conventions/`**（D4），只有後端用的規範留在 `backend/docs/dev-guidelines/`。
 3. **新開的跨專案計畫放 `docs/plans/`，backend 專屬的留 `backend/docs/plans/`**（D5）。
 4. **文件與註解裡的路徑一律從 repo 根目錄起算**（D8）：`docs/adr/…`、`backend/docs/modules/…`；markdown 連結用 `/` 開頭。終點是只有一種解析規則。
-   - 過渡：將隨遷移刪除的檔（`backend/services/`、`backend/gateway/`、`backend/pkg/`、`backend/docs/詳細設計書/`）保留相對 backend 的舊寫法，列在 `docs/README.md` 的「遺留基準」清單並排除在檢查外；隨這些檔刪除，清單歸零。
+   - 過渡：將隨遷移刪除的檔（`backend/services/`、`backend/gateway/`、`backend/pkg/`、`backend/docs/detailed-design/`）保留相對 backend 的舊寫法，列在 `docs/README.md` 的「遺留基準」清單並排除在檢查外；隨這些檔刪除，清單歸零。
 5. **搬過去的 ADR 正文裡既有的相對 backend 路徑不改寫**（D2），在表頭加一列「路徑基準｜`backend/`」。新 ADR 一律從 repo 根目錄起算。
 6. **歷史計畫與舊設計書裡指向搬走檔案的路徑字串照第 4 條改，內容不動**（D3）。
-7. **路徑檢查只管搬家相關的前綴**（`docs/adr/`、`docs/共通規範/`、`docs/plans/`），從第一天零容忍，前綴寫成清單以便之後擴大（D7）。
+7. **路徑檢查只管搬家相關的前綴**（`docs/adr/`、`docs/conventions/`、`docs/plans/`），從第一天零容忍，前綴寫成清單以便之後擴大（D7）。
 8. **舊 gateway 的本機 `/docs` 檢視器不再顯示 ADR**（D6）。
 
 ## 考慮過的方案
@@ -39,7 +39,7 @@
 - **ADR 位置**：未採「只搬影響範圍含後端以外的」：113 份要逐份分類，之後每份新 ADR 都要先判斷放哪，ADR 互相引用還會跨兩個目錄。
 - **ADR 裡的舊路徑**：未採「全部改成從根目錄起算」（470 處、83 份）：不少路徑指向已刪除的舊服務，無法用「檔案存在」驗證改寫是否正確。
 - **歷史引用**：未採「不改，放舊路徑對照表」：歷史紀錄的連結會打不開，檢查也得為它們開例外。
-- **規範目錄名**：未採 `docs/開發規範/`：與 `backend/docs/開發規範/` 同名，搜尋與口頭指稱容易混淆。
+- **規範目錄名**：未採 `docs/dev-guidelines/`：與 `backend/docs/dev-guidelines/` 同名，搜尋與口頭指稱容易混淆。
 
 ## 後果
 

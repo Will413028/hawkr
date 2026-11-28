@@ -61,7 +61,7 @@ type AfterSaleCaseSummaryResponse struct {
 	ShippingAddress       string `json:"shippingAddress"`
 	ReturnShippingMethod  string `json:"returnShippingMethod"`
 	CaseNo                string `json:"caseNo"`
-	Status                string `json:"status"` // 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta 業務狀態碼.md 為準）
+	Status                string `json:"status"` // 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta business-status-codes.md 為準）
 	Reason                string `json:"reason"`
 	RefundableAmount      string `json:"refundableAmount"`
 	CreatedAt             string `json:"createdAt"`
@@ -81,7 +81,7 @@ type AfterSaleCaseDetailResponse struct {
 	ReturnShipmentNo      string `json:"returnShipmentNo"`
 	BuyerId               string `json:"buyerId"`
 	StoreId               string `json:"storeId"`
-	Status                string `json:"status"` // 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta 業務狀態碼.md 為準）
+	Status                string `json:"status"` // 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta business-status-codes.md 為準）
 	Reason                string `json:"reason"`
 	Description           string `json:"description"`
 	RefundableAmount      string `json:"refundableAmount"`
@@ -163,7 +163,7 @@ type ResolutionResponse struct {
 // ResolveResultResponse 決策結果回應
 type ResolveResultResponse struct {
 	CaseNo           string `json:"caseNo"`
-	Status           string `json:"status"`           // 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta 業務狀態碼.md 為準）
+	Status           string `json:"status"`           // 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta business-status-codes.md 為準）
 	ReturnShipmentNo string `json:"returnShipmentNo"` // 退貨物流單號（退貨退款時有值）
 }
 
@@ -353,7 +353,7 @@ func (h *Holder) CreateAfterSaleCase(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        page       query  string  false  "頁碼（預設 1）"
 // @Param        page_size  query  string  false  "每頁筆數（預設 10，最大 50）"
-// @Param        status     query  string  false  "狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta 業務狀態碼.md 為準）"
+// @Param        status     query  string  false  "狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta business-status-codes.md 為準）"
 // @Success      200  {object}  object{code=int,message=string,data=object{records=[]AfterSaleCaseSummaryResponse,total=string,page=string,pageSize=string}}
 // @Failure      401  {object}  object{code=int,message=string}
 // @Router       /app/after_sales [get]
@@ -533,7 +533,7 @@ func (h *Holder) CancelAfterSaleCase(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        page       query  string  false  "頁碼（預設 1）"
 // @Param        page_size  query  string  false  "每頁筆數（預設 10，最大 50）"
-// @Param        status     query  string  false  "狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta 業務狀態碼.md 為準）"
+// @Param        status     query  string  false  "狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta business-status-codes.md 為準）"
 // @Success      200  {object}  object{code=int,message=string,data=object{records=[]AfterSaleCaseSummaryResponse,total=string,page=string,pageSize=string}}
 // @Failure      401  {object}  object{code=int,message=string}
 // @Router       /app/seller/after_sales [get]

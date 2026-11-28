@@ -1,6 +1,6 @@
 -- issue #2294：多副本排程搶佔（Scheduler Claim）—— shipping 側新增兩個「租約欄」
 --
--- 設計書：06 §5.19.3.B / §5.19.3.C / §8.5；規範：docs/開發規範/多副本排程搶佔規範.md
+-- 設計書：06 §5.19.3.B / §5.19.3.C / §8.5；規範：docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md
 --
 -- 兩欄都是 **租約欄（lease）**，不是「已做過旗標」：
 --   值 = 目前持有者的租約到期時間；NULL 或已過期 = 可被重新搶佔。

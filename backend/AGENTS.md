@@ -12,7 +12,7 @@
 
 ## 單體的結構
 
-全文見 `backend/docs/開發規範/單體開發規範.md` §1。
+全文見 `backend/docs/dev-guidelines/monolith-development-guidelines.md` §1。
 
 - `cmd/hawkr`：唯一部署的 binary，也是組裝點，模組之間的接線只在這裡做。`cmd/new-module` 產生模組骨架（`make new-module`），不部署。
 - `internal/platform`：跨模組的基礎設施（`db`、`events`、`jobs`、`apperr`、`adminperm`、`twtime`、`uitext` 等），不得依賴任何模組。
@@ -55,24 +55,24 @@ make atlas-diff module=<名稱> name=<名>  # 改 schema.sql 後；objects.sql �
 
 營運子命令：`go run ./cmd/hawkr` 不帶參數列出全部（營運用的要 `DATABASE_URL`）。搬模組時的工具（`make new-module`、`make new-characterization`、`scripts/characterize.sh`）見遷移計畫。
 
-`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體開發規範 §3。
+`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體dev-guidelines §3。
 
 ## 契約規則（單體與舊服務都適用）
 
-- **SSOT 的優先序**：契約的唯一來源（`backend/docs/開發規範/`、根目錄 `api/` 與 `api/proto/`、DB schema，與舊契約的 CodeMeta）→ 對應的設計書（單體模組是 `backend/docs/modules/<模組>.md`，其餘 `backend/docs/詳細設計書/`）→ 現有實作 → issue、畫面、口頭建議。唯一來源互相矛盾時，先指出矛盾，不做會讓契約漂移的修改。
-- **對外 API**：根目錄 `api/` 的 proto 是唯一來源，慣例依 `docs/共通規範/API 設計規範（Connect）.md`；改 API 先改 proto，再 `make connect`。上線前的 package 是 `v1alpha1`，契約可以直接改；上線時改成 `v1`，之後 `buf breaking`（`WIRE_JSON`）生效。
-- **舊 gateway 的 REST**（`/api/v1`）：只維護到該模組搬進單體，慣例見 `backend/docs/開發規範/API 設計規範.md`。
+- **SSOT 的優先序**：契約的唯一來源（`backend/docs/dev-guidelines/`、根目錄 `api/` 與 `api/proto/`、DB schema，與舊契約的 CodeMeta）→ 對應的設計書（單體模組是 `backend/docs/modules/<模組>.md`，其餘 `backend/docs/detailed-design/`）→ 現有實作 → issue、畫面、口頭建議。唯一來源互相矛盾時，先指出矛盾，不做會讓契約漂移的修改。
+- **對外 API**：根目錄 `api/` 的 proto 是唯一來源，慣例依 `docs/conventions/api-design-guidelines-connect.md`；改 API 先改 proto，再 `make connect`。上線前的 package 是 `v1alpha1`，契約可以直接改；上線時改成 `v1`，之後 `buf breaking`（`WIRE_JSON`）生效。
+- **舊 gateway 的 REST**（`/api/v1`）：只維護到該模組搬進單體，慣例見 `backend/docs/dev-guidelines/api-design-guidelines.md`。
 - **現有 API 清單**：`api/openapi/openapi.yaml` 記錄舊 gateway 還在服務的 REST（ADR `docs/adr/2026-09-26-external-contract-protobuf-connect.md` D5）；改 gateway 輸出或刪路由時一起改它（`scripts/gateway-json-contract-check.py`、`gateway/internal/router/openapi_coverage_test.go`），swag 註解不維護。
 - **型別、金額與時間**：Connect 依〈API 設計規範（Connect）〉§四（proto3 JSON：`int64` 是字串、`int32` 是數字；ID 是不透明字串）；舊 REST 的 ID、金額、數量、計數用字串。內部用語意正確的原生型別，只在邊界轉換。金額是新台幣「元」的整數，禁止浮點。時間以 UTC 為準；測試注入 clock，不用 sleep 或本機時區。
 - **身分**：`account_id` 是登入 principal；`buyer_id`、`store_id` 是業務鍵，不可互換，業務表一律用業務鍵。
-- **CodeMeta**：凍結，只服務沒搬進單體的舊契約（ADR `docs/adr/2026-09-25-codemeta-retirement.md`）；新契約的列舉用 proto enum 加模組的 Go 型別與 CHECK，錯誤原因用 `api/` 的 `ErrorReason`。改舊契約的值照 `backend/docs/代碼管理（CodeMeta）/README.md`，不新增值域。
+- **CodeMeta**：凍結，只服務沒搬進單體的舊契約（ADR `docs/adr/2026-09-25-codemeta-retirement.md`）；新契約的列舉用 proto enum 加模組的 Go 型別與 CHECK，錯誤原因用 `api/` 的 `ErrorReason`。改舊契約的值照 `backend/docs/codemeta/README.md`，不新增值域。
 - **重複實作**：新增 helper、enum、validator、mapper 前先搜尋既有的擁有者，擴充它，不為單一呼叫方另建一份。
 - **設定與 secret**：secret 不進 repo、log、fixture 或 commit 訊息；timeout、retry、連線池與 shutdown 都要明確，沒有 deadline 的外部呼叫不允許。
 - **測試**：bugfix 先有會失敗的測試；fixture 要 deterministic、不含真實個資；不為過測試而放寬契約、關 assertion 或永久 skip。integration 測試的 schema 由 `pg.NewDB` 給，不在測試裡套 migration（`internal/platform/testdb`，§3）。
 
 ## 文件
 
-- `backend/docs/`：`modules/` 模組規格、`詳細設計書/`、`開發規範/`、`plans/`。ADR、共通規範與跨專案計畫在根目錄 `docs/`。
+- `backend/docs/`：`modules/` 模組規格、`detailed-design/`、`dev-guidelines/`、`plans/`。ADR、conventions與跨專案計畫在根目錄 `docs/`。
 - 模組 `AGENTS.md` 固定七節；模組成長時，單一子領域的不變量放進 `internal/<子領域>/AGENTS.md`（選用，上限 6,000 bytes），模組根只留跨子領域的規則與一行指向（ADR `docs/adr/2026-10-31-agents-md-layering-consolidated.md`）。
-- `backend/docs/開發規範/` 裡只適用舊服務或已不適用的規範，檔頭有「適用範圍」標註與退場時間。
+- `backend/docs/dev-guidelines/` 裡只適用舊服務或已不適用的規範，檔頭有「適用範圍」標註與退場時間。
 - 舊註解與文件裡的「`CLAUDE.md` §N」指已移除的公司時期指令檔；仍有效的規則已併入本檔。

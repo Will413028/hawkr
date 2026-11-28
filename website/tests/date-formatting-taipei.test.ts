@@ -324,7 +324,7 @@ const LOCAL_TIME_ALLOWLIST: Record<string, LocalTimeBudget> = {
 		count: 3,
 		reason:
 			"7-11 取號的 `shipDate`＝**本地的明天**，是送給後端／PayUni 的 wire 值不是畫面。" +
-			"台灣賣家無差異，人在國外的賣家會送出錯的出貨日。屬第三方整合，待裁決。",
+			"台灣賣家無差異，人在國外的賣家會送出錯的出貨日。屬third-party-integrations，待裁決。",
 	},
 };
 

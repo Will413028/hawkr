@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote
 
-CHECKED_DIRS = ("docs/adr/", "docs/共通規範/", "docs/plans/", "docs/modules/")
+CHECKED_DIRS = ("docs/adr/", "docs/conventions/", "docs/plans/", "docs/modules/")
 README = "docs/README.md"
 SELF = {"scripts/check-doc-paths.py", "scripts/test_check_doc_paths.py"}
 MAX_BYTES = 2_000_000

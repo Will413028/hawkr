@@ -3,7 +3,7 @@ package io.github.will413028.hawkr.common.utils.validation;
 /**
  * PayUni 物流欄位約束常數。
  *
- * <p>集中定義 PayUni 物流建單 API 各欄位的長度約束，避免散落硬編碼（docs/開發規範/Java 微服務開發規範.md §6.1）。
+ * <p>集中定義 PayUni 物流建單 API 各欄位的長度約束，避免散落硬編碼（docs/dev-guidelines/java-microservices-development-guidelines.md §6.1）。
  * 長度單位為「顯示長度」：英文字母/半形算 1 位、中文字/全形字符算 2 位，對齊 PayUni 計長規則，
  * 與 {@link InputValidator#displayLength(String)} 一致。
  *

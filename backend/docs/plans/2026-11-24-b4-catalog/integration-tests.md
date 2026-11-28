@@ -142,7 +142,7 @@
 | `T/migration/RestrictedCategoryCodesSchemaContractTest.java` | `不得有回填UPDATE`（`:145`） | 不回填既有列（66 §5.4 逐字：空陣列即為正確初值） |  | 刪：`restricted_category_codes` 不帶，受管制品類不放進分類（D8） |
 | `T/migration/RestrictedCategoryCodesSchemaContractTest.java` | `欄位有註解`（`:153`） | 欄位有 COMMENT，把『值域待 UP-4』留在 DB 裡而不只留在 repo 裡 |  | 刪：`restricted_category_codes` 不帶，受管制品類不放進分類（D8） |
 | `T/migration/RestrictedCategoryCodesSchemaContractTest.java` | `entity已接線`（`:163`） | entity 側真的接上了：欄位存在且指名對應的 TypeHandler |  | 刪：`restricted_category_codes` 不帶，受管制品類不放進分類（D8） |
-| `T/migration/RestrictedCategoryCodesSchemaContractTest.java` | `typeHandler未污染全域註冊表`（`:177`） | TypeHandler 不得標 @MappedTypes(List.class)（Java 微服務開發規範 §9.1） |  | 刪：`restricted_category_codes` 不帶，受管制品類不放進分類（D8） |
+| `T/migration/RestrictedCategoryCodesSchemaContractTest.java` | `typeHandler未污染全域註冊表`（`:177`） | TypeHandler 不得標 @MappedTypes(List.class)（Java 微服務dev-guidelines §9.1） |  | 刪：`restricted_category_codes` 不帶，受管制品類不放進分類（D8） |
 | `T/mq/CertificationVerifyConsumerTest.java` | `verifiedAndAutoApprovable_approves`（`:64`） | SUBMITTED ＋ 查驗有效 ＋ 免人工 → 回寫後自動核准並 ack | 刪 | 刪：範圍裁切（認證） |
 | `T/mq/CertificationVerifyConsumerTest.java` | `duplicateMessageAfterApproval_isNoOp`（`:86`） | 重複訊息（申請已核准）→ 不查驗、不核准、直接 ack | 刪 | 刪：範圍裁切（認證） |
 | `T/mq/CertificationVerifyConsumerTest.java` | `sameMessageTwice_approvesOnce`（`:100`） | 同一則訊息連投兩次 → 只核准一次 | 刪 | 刪：範圍裁切（認證） |

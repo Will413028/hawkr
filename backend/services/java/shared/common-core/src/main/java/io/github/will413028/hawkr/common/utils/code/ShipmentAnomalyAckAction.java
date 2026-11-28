@@ -4,11 +4,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 賣家對單一配送異常的處置動作。**僅紀錄使用者操作**，不參與資料一致性 — 異常本身狀態仍以 shipments 表欄位為唯一真實來源（見[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md) §六）。Dashboard 查詢時 LEFT JOIN ack 表，已 ack 的隱藏。shipment 狀態恢復後 dashboard 自動不顯示（無需動 ack 表）。
+ * 賣家對單一配送異常的處置動作。**僅紀錄使用者操作**，不參與資料一致性 — 異常本身狀態仍以 shipments 表欄位為唯一真實來源（見[後端服務責任邊界規範](../dev-guidelines/backend-service-responsibility-boundaries.md) §六）。Dashboard 查詢時 LEFT JOIN ack 表，已 ack 的隱藏。shipment 狀態恢復後 dashboard 自動不顯示（無需動 ack 表）。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum ShipmentAnomalyAckAction implements CodeMeta {
 

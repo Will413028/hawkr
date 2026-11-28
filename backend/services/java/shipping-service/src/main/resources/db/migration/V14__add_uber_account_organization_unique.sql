@@ -1,4 +1,4 @@
--- V14：uber_account／uber_organization 的唯一性約束（66 號詳細設計書 UP-20 結案）
+-- V14：uber_account／uber_organization 的唯一性約束（66 號detailed-design UP-20 結案）
 --
 -- 由架構裁決 DEC-20260912-184025 第 16 條定案：這是 Type A schema integrity，直接決定並實作。
 -- 🔴 裁決逐字：「不得讓 application-only check 代替 DB constraint」。

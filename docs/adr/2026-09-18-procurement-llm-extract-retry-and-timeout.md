@@ -8,7 +8,7 @@
 | 相關 issue | #2412 |
 | 路徑基準 | `backend/` |
 
-規格本身見 `docs/詳細設計書/55-Hawkr 幫找採購助手（Procurement Assistant）詳細設計書.md` §7.3。
+規格本身見 `docs/detailed-design/55-procurement-assistant-detailed-design.md` §7.3。
 
 ## 脈絡：原本的「不重試」是沒有數據的判斷
 

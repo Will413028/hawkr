@@ -114,8 +114,8 @@ class CheckDocPathsTest(unittest.TestCase):
         self.assertEqual(self.errors(), [])
 
     def test_code_span_keeps_spaces_and_fullwidth_parens(self):
-        self.write("docs/共通規範/API 設計規範（Connect）.md", "# x\n")
-        self.write("AGENTS.md", "`docs/共通規範/API 設計規範（Connect）.md` `docs/共通規範/API 不在（X）.md`\n")
+        self.write("docs/conventions/api-design-guidelines-connect.md", "# x\n")
+        self.write("AGENTS.md", "`docs/conventions/api-design-guidelines-connect.md` `docs/conventions/API 不在（X）.md`\n")
         self.assertEqual(len(self.errors()), 1)
 
     def test_relative_link_to_docs_is_not_read_from_root(self):

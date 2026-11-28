@@ -5,11 +5,11 @@
 | 狀態 | accepted；ADR-01 superseded by `2026-09-24-go-modular-monolith.md`（獨立服務改為獨立模組，憑證邊界列為接受的代價）。遷移計畫 A5 落地前，現行程式仍依本檔運作 |
 | 日期 | 2026-09-18 |
 | 影響範圍 | `services/invoice-service`、`api/proto/invoice`、order／payment／aftersales／shipping／notification 的介接面 |
-| 對應規格 | `docs/詳細設計書/58-電子發票服務（Invoice Service）詳細設計書.md` |
+| 對應規格 | `docs/detailed-design/58-invoice-service-detailed-design.md` |
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> **逐欄規格、端點簽章、狀態值域一律在 58 號詳細設計書**，本檔不複製。
+> **逐欄規格、端點簽章、狀態值域一律在 58 號detailed-design**，本檔不複製。
 > 58 號 §1.5 保留「決策編號 → 採用結論」的索引，`ADR-NN` 與 `D-NN` 的編號以該表為準。
 
 ---

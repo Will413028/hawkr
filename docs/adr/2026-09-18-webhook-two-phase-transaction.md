@@ -45,6 +45,6 @@ inbox 狀態更新並保持 atomic；`T2` 失敗一律 rethrow 讓 controller �
 - 接受的代價：**回收能力綁在 PayUni 的重送策略上**。若 PayUni 停止重送，卡在
   `RECEIVED` / `FAILED` 的 inbox 沒有其他回收路徑。
 - 由此衍生的硬性約束：**Gateway 對 PayUni 必須回 502 而不是 424**——回 4xx 等於告訴
-  PayUni 不要再送，replay 路徑就永遠等不到觸發。這一條寫在詳細設計書 §4.5.5，是規格不是背景。
+  PayUni 不要再送，replay 路徑就永遠等不到觸發。這一條寫在detailed-design §4.5.5，是規格不是背景。
 - **什麼條件下應該重新評估**：坐實 PayUni 的重送窗口有上界且該上界不足以覆蓋我方的
   故障恢復時間時，D 案（`OrphanInboxRecoveryScheduler`）應作為最後防線補上。

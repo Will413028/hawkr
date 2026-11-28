@@ -5,11 +5,11 @@
 | 狀態 | accepted |
 | 日期 | 2026-07-12 |
 | 影響範圍 | `hawkr-website/lib/analytics`、`hawkr_buyer`／`hawkr_seller` 的 analytics 層、`services/java/order-service`（MP backstop） |
-| 對應規格 | `docs/詳細設計書/47-GA4 分析追蹤（GA4 Cross-Platform Analytics）詳細設計書.md` |
+| 對應規格 | `docs/detailed-design/47-ga4-cross-platform-analytics-detailed-design.md` |
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> 事件目錄、參數契約、backstop 的逐欄規格一律在 47 號詳細設計書，本檔不複製。
+> 事件目錄、參數契約、backstop 的逐欄規格一律在 47 號detailed-design，本檔不複製。
 >
 > website repo 另有一份更早的 ADR 記錄同一組決策的 web 側脈絡：
 > `hawkr-website/decisions/2026-06-07-ga4-client-side-server-mp-deferred.md`。

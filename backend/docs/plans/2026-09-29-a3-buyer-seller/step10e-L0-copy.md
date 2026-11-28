@@ -1,6 +1,6 @@
 # L0 文案草稿（供 Will 核可）
 
-**Will 的決定（2026-10-17）：全照建議（D1–D7）。** 用語結果收進術語表 `docs/共通規範/使用者面用語術語表.md`；proto 與程式註解的三個詞在 L′ 與契約一起改。
+**Will 的決定（2026-10-17）：全照建議（D1–D7）。** 用語結果收進術語表 `docs/conventions/user-facing-terminology-glossary.md`；proto 與程式註解的三個詞在 L′ 與契約一起改。
 
 基準：`<10e worktree>` HEAD `fe68fab21`。只讀盤點，未改任何 repo 檔。
 規則：只在「漂移」或「Q5 用語」需要時改字；其餘文字原樣搬進目錄。測試檔、`gen/`、CodeMeta 生成檔（凍結）不計入「要改的字串」。

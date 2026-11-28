@@ -23,7 +23,7 @@ import java.util.List;
  * （{@link #CLAIM_LEASE_SEC} 秒），不是 {@code SET status=PROCESSING} 的永久旗標；
  * {@code status} 保留但降為可觀測資訊，候選述詞同步涵蓋 {@code PROCESSING}。零 migration。
  * 詳見 {@code AutoRefundTaskRepository.claimTask} 與
- * {@code docs/開發規範/多副本排程搶佔規範.md}。
+ * {@code docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md}。
  */
 @Component
 public class AutoRefundWorker {

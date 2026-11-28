@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
  * 透過 BeanFactoryPostProcessor 介面，於所有業務 bean（含 DataSource）建立之前執行。
  * 從 Environment 直接綁定 DatabaseBootstrapProperties，避免依賴尚未建立的 DataSource bean。
  * <p>
- * 詳見 38-Flyway 自動同步與 DB 自動初始化詳細設計書 §3.4。
+ * 詳見 38-Flyway 自動同步與 DB 自動初始化detailed-design §3.4。
  */
 @Slf4j
 public class DatabaseBootstrapInitializer implements BeanFactoryPostProcessor {

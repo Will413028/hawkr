@@ -69,7 +69,7 @@ SSOT：計畫 10e 段（`2026-09-29-a3-buyer-seller.md:382`「範圍外另排一
 | H3 | buyer-app 的往返：enum→「家／公司／其他」（`UNSPECIFIED` 也變「其他」），送出時 `_labelOf` 反解；修改時 `label` 一定非 null，一定進 mask | [量測] `B/data/address_repository.dart:34-38,46-53,137,150`；`address_management_screen.dart:101` |
 | H4 | website 兩個表單都不帶 `label`；`createAddress` 因此送 OTHER，`updateAddress` 的 mask 固定含 `label`、值是 OTHER，伺服器照 mask 覆寫 → buyer-app 建立的 HOME 在 website 改一次就變 OTHER | [量測，讀碼] `WS/features/account/screens/addresses/AddressFormClient.tsx:110-117`、`AddressesClient.tsx:441-448`、`WS/lib/addresses/repo.ts:100,122,131-137`；`H/app.go:413-416`、`backend/internal/httpapi/rpc/fieldmask.go:21-44`（mask 裡的欄位有值就設）。**沒有執行重現**；現有 `repo.unit.test.ts` 6 條通過，沒有一條斷言 label［量測：`pnpm exec vitest run --project unit lib/addresses/repo.unit.test.ts`］ |
 | H5 | 單體只存標籤，不讀：`model.Label` 只用在驗證、寫入、`changed` 比較與轉成 proto（Connect 與 legacy gRPC 兩處，後者見 H11）；沒有 pub view、事件或別的模組讀它 | [量測] `M/internal/address/address.go:38-39,173,214,232`、`H/app.go:128,180-204`；`M/db/schema.sql:44,53`；`rg -n "\.Label\b\|LabelValues" backend --type go` |
-| H6 | 設計書與開發規範沒有寫地址標籤這個功能 | [量測] `rg -n "地址標籤\|address.?label\|住家" backend/docs -g '*.md'`（只有計畫文件與 API 設計規範一處無關的「住家」） |
+| H6 | 設計書與dev-guidelines沒有寫地址標籤這個功能 | [量測] `rg -n "地址標籤\|address.?label\|住家" backend/docs -g '*.md'`（只有計畫文件與 API 設計規範一處無關的「住家」） |
 | H7 | 現有測試鎖住往返：`sentLabel('家')`→HOME 等、清單 enum→「家、公司、其他」、`addAddress(label: '家')` | [量測] `buyer-app/test/features/address/address_etag_contract_test.dart:147-196,286`；`fvm flutter test` 該檔 11 條通過 |
 | H8 | 守門：AddressLabel 在 manifest 是 `inCatalog: false`、`serverOwned: false`，buyer-app 的正向表只回報；`_labelOf` 不在 D1／D2 | [量測] `packages/hawkr_ui_text/tool/enum_manifest.g.json:11-15`、`tool/check_enum_text.dart:5-13`；盤點 §2 的 `--report` 輸出 |
 | H9 | 性別：proto `Gender` enum；兩端各自以英文字串當中間值，顯示文字兩端各寫一份，「未設定」的文字不同 | [量測] F6 的檔案與行號；`git log -S'enum Gender' -- api/hawkr/buyer/v1alpha1/buyer.proto` → `5315cda8d` |
@@ -91,7 +91,7 @@ SSOT：計畫 10e 段（`2026-09-29-a3-buyer-seller.md:382`「範圍外另排一
 | 舊 gRPC 的 `AddressInfo.label` 與 Java 副本 | SELF-IMPOSED（我們的舊契約，副本可以改）；整份在階段 C 刪除，F9 因此不改它 | `2026-09-24-go-modular-monolith.md:290`；F9 |
 | 版面、UX 文案與流程的改動要先取得同意 | 授權規則（不是技術約束）；本刀沒有這類改動（§5），γ 才有 | 根 `AGENTS.md` 共通規則「UI 改動」 |
 | client 不得手寫兩端以上的 enum 文字表 | 已核准的規則（ADR `2026-10-17-multi-locale-architecture.md`），本刀不重開；F6 依它判定性別該進目錄 | 根 `AGENTS.md` 跨專案契約「共用文案目錄」列 |
-| α 刪欄位時 `reserved 2; reserved "label";` | SELF-IMPOSED：reserved 防的是已部署的 binary 或已存的資料把新欄位誤讀成舊欄位，上線前兩者都沒有（v1alpha1 不檢查 breaking），必要條件今天不成立；但成本近乎零、與既有 `reserved 5, 6, 7` 一致，也是 protobuf 的建議做法［外部］，**照做**。終點與觸發：**上線改名 v1 時一併清掉 v1alpha1 期間累積的 reserved**（v1 是新套件，沒有任何 client 見過 alpha 的欄號）；觸發是 buyer 套件從 `v1alpha1` 改名 `v1` 的那次變更 | `buyer.proto:189-190`；`API 設計規範（Connect）.md:17`；附錄 B #3 |
+| α 刪欄位時 `reserved 2; reserved "label";` | SELF-IMPOSED：reserved 防的是已部署的 binary 或已存的資料把新欄位誤讀成舊欄位，上線前兩者都沒有（v1alpha1 不檢查 breaking），必要條件今天不成立；但成本近乎零、與既有 `reserved 5, 6, 7` 一致，也是 protobuf 的建議做法［外部］，**照做**。終點與觸發：**上線改名 v1 時一併清掉 v1alpha1 期間累積的 reserved**（v1 是新套件，沒有任何 client 見過 alpha 的欄號）；觸發是 buyer 套件從 `v1alpha1` 改名 `v1` 的那次變更 | `buyer.proto:189-190`；`api-design-guidelines-connect.md:17`；附錄 B #3 |
 
 ---
 

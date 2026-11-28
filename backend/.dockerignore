@@ -43,7 +43,7 @@
 **/*.md
 !README.md
 # 根 docs/ **不進 image**。此前 gateway/Dockerfile 的 `COPY docs ./docs` 會把整份內部文件
-# （詳細設計書、開發規範、docs/superpowers/ 的規劃文件，7.9 MB／158 檔）打進對外唯一入口的
+# （detailed-design、dev-guidelines、docs/superpowers/ 的規劃文件，7.9 MB／158 檔）打進對外唯一入口的
 # container，而那個檢視器只在 local/dev 註冊、prod 純粹是夾帶。
 # 本機開發不受影響：docker-compose-local.yml 用 `./docs:/app/docs` bind mount 供檔。
 

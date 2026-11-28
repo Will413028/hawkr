@@ -141,7 +141,7 @@
 **賣家端移除沒有消費端的欄位，列舉搬到擁有者**（Will 2026-11-13）：賣家端 `PaymentAccount` 刪除 `requirement_collection`、`transfers_active`、`requirements`，`CreatePaymentOnboardingSessionResponse` 刪除 `expire_time`（沒有 client 讀；後台的 message 不動），`PaymentAccount` 也刪除開通介面欄位（D58）。`PaymentAccountStatus`、`RequirementCollection` 與呼叫端宣告用的 `EmbeddedOnboardingRuntime` 定義在 payment 擁有的 proto package `hawkr.payment.v1alpha1`，seller 與 admin payment 的 message 都 import 它；共用文案目錄的鍵跟著搬到 `payment.PaymentAccountStatus.*`、`payment.RequirementCollection.*`。
 - 未採：只刪欄位、列舉搬家留到付款模組搬進來時；全部延後（計畫沒有寫理由）。
 
-**`v1alpha1` 不留 `reserved`**（Will 2026-11-13）：`api/hawkr/**/v1alpha1` 刪掉欄位或 enum 值時不留 `reserved`，欄位編號與 enum 值連續重編；`reserved` 防的是已發佈的 client 與已存的資料，系統未上線時沒有保護對象，改名 `v1` 之後才留，刪除的編號與名稱都要留。規則寫在 `API 設計規範（Connect）.md`。
+**`v1alpha1` 不留 `reserved`**（Will 2026-11-13）：`api/hawkr/**/v1alpha1` 刪掉欄位或 enum 值時不留 `reserved`，欄位編號與 enum 值連續重編；`reserved` 防的是已發佈的 client 與已存的資料，系統未上線時沒有保護對象，改名 `v1` 之後才留，刪除的編號與名稱都要留。規則寫在 `api-design-guidelines-connect.md`。
 - 未採：維持現況，在 API 設計規範寫明上線前也留。
 
 **文案歸屬**（Will 2026-11-05、2026-11-11）：任務標題與狀態句由 seller 模組的 `internal/text` 產生，隨回應以 `LocalizedMessage` 送出，client 與共用文案目錄都不寫；任務說明、面板文字與欄位標籤進共用文案目錄（`seller.OnboardingTaskId.*`、`payment.PaymentAccountStatus.*`）；純畫面文字留在各 client。分界見 `2026-10-17-multi-locale-architecture.md`。
@@ -278,7 +278,7 @@
 | D51 | Stripe 改用官方 `stripe-go/v87` v87.1.0 | 本檔「Stripe API 與官方 SDK」 |
 | D52 | 個資清理時先關閉外部帳戶、成功才刪本地對應 | 本檔「個資清理時關閉外部帳戶」 |
 | D53 | 開通 session 帶金流商與公開金鑰（`STRIPE_PUBLISHABLE_KEY`）；回應形狀被 D58 改為 `oneof` | 本檔「開通 session 帶金流商與公開金鑰」 |
-| D54 | `v1alpha1` 刪欄位或 enum 值不留 `reserved`，編號連續重編，改名 `v1` 之後才留 | 本檔「`v1alpha1` 不留 `reserved`」；`API 設計規範（Connect）.md` |
+| D54 | `v1alpha1` 刪欄位或 enum 值不留 `reserved`，編號連續重編，改名 `v1` 之後才留 | 本檔「`v1alpha1` 不留 `reserved`」；`api-design-guidelines-connect.md` |
 | D55 | 外部帳戶分兩步建立（只帶 `metadata` 建立，再更新寫入設定）；「兩步都成功才寫外部 ID」被 D59 推翻 | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
 | D56 | 進行中的收款任務 `action` 是 `NONE`，`OnboardingAction` 沒有重新整理；`RefreshMyPaymentAccount` 由 client 自動呼叫；第 2 項「到網頁完成」被 D58 推翻 | 本檔「收款帳戶的下一步」 |
 | D57 | 壓平後的 migration 對 `dev` 的任何合法資料都能套用，並有 `dev` schema 狀態的 migration 測試；`atlas migrate diff` 可在本機跑 | 本檔「分支內的 migration 在合併前壓平」 |

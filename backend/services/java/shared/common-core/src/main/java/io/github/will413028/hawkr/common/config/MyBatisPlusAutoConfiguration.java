@@ -30,7 +30,7 @@ public class MyBatisPlusAutoConfiguration {
      * MyBatis-Plus 全域 interceptor。
      * <p>順序依官方建議：樂觀鎖 → 分頁。樂觀鎖必須先於分頁，
      * 否則 pagination 改寫 SQL 後 OptimisticLocker 無法正確注入 version。
-     * <p>樂觀鎖規則見「Java 微服務開發規範 §10.5」。
+     * <p>樂觀鎖規則見「Java 微服務dev-guidelines §10.5」。
      */
     @Bean
     @ConditionalOnMissingBean

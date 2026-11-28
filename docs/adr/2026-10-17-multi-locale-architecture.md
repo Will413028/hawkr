@@ -7,7 +7,7 @@
 | 影響範圍 | website（買家頁、賣家中心）、buyer-app、seller-app、`packages/hawkr-api-ts`、`packages/hawkr_api`、`packages/hawkr_auth`、單體的 `internal/httpapi/rpc` 與各模組的伺服器文字、identity（`preferred_locale`）、notification（A8）、`website/docs/legal`、共用文案目錄（刀 L′） |
 | 詳細論證 | `docs/plans/2026-09-29-a3-buyer-seller/step10e-i18n-brief.md`（調查、業界基準、約束帳、未查證項；本 ADR 不複製） |
 | 修訂其他 ADR | `2026-09-25-codemeta-retirement.md`、`2026-09-25-api-error-model.md`、`2026-10-05-notification-module.md` D1（皆為文末修訂） |
-| 相關 | 術語表 `docs/共通規範/使用者面用語術語表.md`；`docs/plans/2026-09-29-a3-buyer-seller/step10e-labels-brief.md`、`step10e-L-brief.md` |
+| 相關 | 術語表 `docs/conventions/user-facing-terminology-glossary.md`；`docs/plans/2026-09-29-a3-buyer-seller/step10e-labels-brief.md`、`step10e-L-brief.md` |
 | 路徑基準 | `backend/` |
 
 ## 脈絡

@@ -3,7 +3,7 @@
 > **狀態**：v1.3。v1 經一輪獨立審查（附錄 A），v1.2 經開工前 design-review（F1-F7，重點是刀 1 契約；逐條對照程式查證後全部接受，對照見附錄 B；全文在 session scratchpad `enum-guard-design-review-start.md`，不入庫）。v1.1 的主要變更：規則 `E` 只算「確定等於某成員」的區域（K3）；目錄分界改在多語系 ADR D2 加文末修訂（K12，§4.1）；拆成契約、目錄與 client、守門三刀（§7）。**v1.3 的變更（Will 2026-10-22，§0.6）**：食品業者登錄不加可用性布林，改把 `open_food_registration` 拆成待審與被退回兩個欄位（Q4 改 (A)）；終止表單的契約只加依據的三態需求，不加 `requires_source_measure`，條件句寫進伺服器的 `TerminationOption.explanation`；admin 關聯帳號終止的說明句改由 `explanation` 提供，不進目錄。§5 #12-#16 的新句（zh-TW）Will 2026-10-22 已核可原文，**沒有待決項目**。
 
 v1.3 讀取的是 `local/10e` 的 `b10f015bc`（v1.2、計畫與 ADR D4 修訂已提交）；v1.1 以前讀的是 `0a3265c1f`。計畫行號（`:383,399,400`）照 v1.2 時的內容；本文不改 ADR 與計畫。
-SSOT：計畫 `2026-09-29-a3-buyer-seller.md:383,399`；ADR `docs/adr/2026-10-17-multi-locale-architecture.md`（D2 分界 `:77`）；`step10e-Lprime-design.md`（下稱 L′：§1.2 key、§1.3 `params`、§1.4 ICU 子集（禁止 `{arg, date}`）、§5.2 守門、O4 `:835`、§7(d) `:716-721`、R6 `:856`）；`step10e-5d-design.md` G10；`docs/共通規範/使用者面用語術語表.md`；根目錄與各 client 的 `AGENTS.md`；契約 `api/hawkr/admin/seller/v1alpha1/{measure,governance}.proto`、`api/hawkr/seller/v1alpha1/seller.proto`。
+SSOT：計畫 `2026-09-29-a3-buyer-seller.md:383,399`；ADR `docs/adr/2026-10-17-multi-locale-architecture.md`（D2 分界 `:77`）；`step10e-Lprime-design.md`（下稱 L′：§1.2 key、§1.3 `params`、§1.4 ICU 子集（禁止 `{arg, date}`）、§5.2 守門、O4 `:835`、§7(d) `:716-721`、R6 `:856`）；`step10e-5d-design.md` G10；`docs/conventions/user-facing-terminology-glossary.md`；根目錄與各 client 的 `AGENTS.md`；契約 `api/hawkr/admin/seller/v1alpha1/{measure,governance}.proto`、`api/hawkr/seller/v1alpha1/seller.proto`。
 路徑縮寫：`W` worktree 根、`DT`＝`W/packages/hawkr_ui_text`、`TT`＝`W/packages/hawkr-ui-text-ts`、`C`＝`W/backend/internal/platform/uitext/catalog`、`AD`＝`W/admin/src/app/admin`、`SA`＝`W/seller-app/lib`、`WS`＝`W/website`、`FR`＝`W/backend/internal/modules/seller/internal/foodreg/foodreg.go`、`SM`＝`W/backend/internal/modules/seller/internal`。
 標記：**[量測]** 讀碼或執行命令看到的；**[推論]** 由量測推出、沒有執行驗證；**[外部]** 業界做法。量測用的原型在 session scratchpad `eg/proto.mts`（TS，v1.1 的正向版）、`eg/proto-v1.mts`（v1 版）、`eg/dartproto/bin/proto.dart`（Dart，v1 版），輸出 `eg/ts-hits6.tsv`（v1.1）、`eg/ts-hits4.tsv`、`eg/dart-hits3.tsv`（v1）（不入庫）。
 
@@ -188,7 +188,7 @@ v1 列的 website `measureDisplay.ts:136`（期間句）、`violation-measure.ts
 - 規則：`SM/model/measure.go` 加 `func (g TerminationGround) ViolationRequirement() TerminationViolationRequirement`：`ContractOnly()`（NOTICE、LINKED_ACCOUNT）→ `FORBIDDEN`；`GroundMaterialBreach` → `REQUIRED`；其他 21.3 事由 → `OPTIONAL`。`create.go:147-156` 的兩個 case 改成依這個方法判斷（`FORBIDDEN` 而有 violation → 現有的錯誤；`REQUIRED` 而沒有引用 → 現有的錯誤），錯誤句不變。7 日仍在有狀態的檢查（H15），它的天數也由 `explanation` 的參數取自 `model.MaterialBreachCure`，同一個常數。
 - 等價測試 `TestTerminationViolationRequirementIsTheSameRuleAsCreateMeasure`（`SM/measure`，照 seller `AGENTS.md:70` 的先例）：每個事由 ×（沒有 violation／violation 只有新認定／violation 有引用）跑 CreateMeasure 的無狀態驗證，斷言「通過 ⇔ 需求允許這種輸入」。
 - 契約 `api/hawkr/admin/seller/v1alpha1/measure.proto`：
-  - `enum TerminationViolationRequirement { TERMINATION_VIOLATION_REQUIREMENT_UNSPECIFIED = 0; TERMINATION_VIOLATION_REQUIREMENT_REQUIRED = 1; TERMINATION_VIOLATION_REQUIREMENT_OPTIONAL = 2; TERMINATION_VIOLATION_REQUIREMENT_FORBIDDEN = 3; }`（型別前綴與零值照 `API 設計規範（Connect）.md:102`）。註解：「建立這個事由的終止時，TerminationInput.violation 的需求；與 CreateMeasure 的驗證是同一個規則（model.TerminationGround.ViolationRequirement）。REQUIRED 時要引用至少一筆認定，條件寫在 explanation。client 只依它顯示與檢查欄位，不顯示它的文字。」
+  - `enum TerminationViolationRequirement { TERMINATION_VIOLATION_REQUIREMENT_UNSPECIFIED = 0; TERMINATION_VIOLATION_REQUIREMENT_REQUIRED = 1; TERMINATION_VIOLATION_REQUIREMENT_OPTIONAL = 2; TERMINATION_VIOLATION_REQUIREMENT_FORBIDDEN = 3; }`（型別前綴與零值照 `api-design-guidelines-connect.md:102`）。註解：「建立這個事由的終止時，TerminationInput.violation 的需求；與 CreateMeasure 的驗證是同一個規則（model.TerminationGround.ViolationRequirement）。REQUIRED 時要引用至少一筆認定，條件寫在 explanation。client 只依它顯示與檢查欄位，不顯示它的文字。」
   - `TerminationOption` 加 `TerminationViolationRequirement violation_requirement = 4 [(google.api.field_behavior) = OUTPUT_ONLY];`（名稱對齊請求的 `termination.violation`）。`explanation`（3）的註解改成「生效時機與這個事由的建立條件（給員工）」。
 - 句子：`model.TerminationEffect.Message` 改成依（生效時機, 事由）回一則完整的訊息，不拼接（ADR D2 禁止拼接）：預告終止、一般立即生效沿用現有兩句；重大違約與關聯帳號各一則新句（§5 #12、#13），放在 `SM/text/zh-TW.json`（模組句子，`make uitext` 生成）。`TerminationEffect` 已帶 `Ground`，不必改呼叫端。
 - `toTerminationOption`（httpapi）設 `violation_requirement`。這個 enum 是 admin package 的新 enum，`make uitext` 會把它寫進 TS manifest（`inCatalog: false`、`serverOwned: false`，不受守門管；admin enum 不進 Dart manifest）［推論，開工前審查 F6］。
@@ -212,7 +212,7 @@ v1 列的 website `measureDisplay.ts:136`（期間句）、`violation-measure.ts
 
 `C/en.json` 加三個的 en（§5，Will 2026-10-22 已核可）。
 admin 關聯帳號終止的說明句不進目錄（§2 #6），所以 v1.2 的 `admin.seller` key 前綴風險不存在。
-術語表 `docs/共通規範/使用者面用語術語表.md` 加一列：「定期複審｜periodic review｜沒有固定結束時間的停權，由平台定期檢查是否繼續｜賣家端措施效果句、admin 複審期限」（H13；新詞先進術語表，en 句引用它）。
+術語表 `docs/conventions/user-facing-terminology-glossary.md` 加一列：「定期複審｜periodic review｜沒有固定結束時間的停權，由平台定期檢查是否繼續｜賣家端措施效果句、admin 複審期限」（H13；新詞先進術語表，en 句引用它）。
 
 ## 4. 文件
 
@@ -340,12 +340,12 @@ golden 自動含新 key 的 zh-TW 與 en，三端各自斷言。**突變**：手
 | 4 | §2.1：`Store` 加 `reserved 27; reserved "open_food_registration";` | 併進 `Store` 開頭既有的 `reserved` 兩行（編號與名稱），不另開兩個 `reserved` 敘述 | 同一個 message 的 reserved 寫在一處；語意相同 |
 | 5 | §2.1：client 讀兩個欄位 | seller-app `MyStore` 的 `openFoodRegistration` getter 換成 `pendingFoodRegistration` 與 `rejectedFoodRegistration`；website 直接讀兩個欄位。兩端的狀態行與撤回按鈕條件都是「欄位有沒有值」，不再 import `FoodRegistrationState`（seller-app 表單、website 元件）。測試的假伺服器（`wallet_screen_test.dart`）仍以一個 `foodRequest` 變數描述情境，由它依狀態放進兩個欄位，模擬伺服器的對應 | 設計 §2 #11 |
 | 6 | §2.1 與 §9：admin 的 `TerminationViolationRequirement` 只進 TS manifest（`inCatalog: false`、`serverOwned: false`） | `make uitext` 後只有 `packages/hawkr-ui-text-ts/src/enum-manifest.gen.json` 多一筆，Dart manifest 與 golden 沒有變；模組句子只有 `text/zh-TW.json` 與 `text_gen.go` 的變動 | §9 的推論已由生成結果確認 |
-| 7 | 刀 1 的文件 | 更新 seller 模組 `AGENTS.md` 的終止合作可用性段與食品業者登錄段、`CARRYOVER.md` 的 `TerminationOption` 列與食品登錄狀態模型列（記沿用盤點：client 自寫的條件改由伺服器推導）、詳細設計書 18 §10 的契約形狀句（`open_food_registration` 拆成兩個欄位） | 同一個變更內更新所有說到這個契約的文件 |
+| 7 | 刀 1 的文件 | 更新 seller 模組 `AGENTS.md` 的終止合作可用性段與食品業者登錄段、`CARRYOVER.md` 的 `TerminationOption` 列與食品登錄狀態模型列（記沿用盤點：client 自寫的條件改由伺服器推導）、detailed-design 18 §10 的契約形狀句（`open_food_registration` 拆成兩個欄位） | 同一個變更內更新所有說到這個契約的文件 |
 | 8 | §2.1：「7 日仍在有狀態的檢查」 | 加 `TerminationGround.CitedFindingMinAge()`（`REQUIRED` 的事由是 `MaterialBreachCure`，其他 0），與 `ViolationRequirement` 同一個規則的兩面；`checkTermination`、`TerminationEffect.Message` 的天數與兩則錯誤句（`create.go`，原寫死「七日」，現為「已存在 N 日以上」）都讀它，另有等價與天數測試 | 完成前 design-review：「引用的認定須存在多久」原本在三處各自以 `Ground == GroundMaterialBreach` 判斷，錯誤句的天數沒連到常數 |
 | 9 | 刀 1 未列：單元層級的需求值對照 | `model.TerminationViolationRequirementValues()`（經 seller 公開套件匯出）加 `TestTerminationViolationRequirementMatchesTheContract`（`rpc.EnumMismatches`，並確認每個事由的選項都不是 UNSPECIFIED） | code review：model 字串改名時 `EnumToProto` 靜默回 UNSPECIFIED，client 會隱藏欄位，原本只有 integration 測試抓得到 |
 | 10 | §2 #10：下拉的事由清單 | 刪 admin 的 `TERMINATION_GROUND_OPTIONS`：下拉照伺服器給的 `available_terminations` 的順序與內容，只丟掉沒有顯示文字的事由（`availableTerminationOptions`）。契約註解（admin `seller.proto` 的 `available_terminations`、`governance.proto` 的 `TerminationInput.violation`）不再重述規則，改指向 `violation_requirement` 與 `explanation`。`validateTermination` 回傳 `{ error } \| { form }`（通過時是已選到終止合作的輸入），對話框不再重複檢查「請選擇終止事由。」 | 該清單是伺服器規則（排序、排除 `LINKED_ACCOUNT`）在 client 的副本；契約同一條規則不該有三種寫法 |
 | 11 | 刀 1 未列：admin 契約 `Store.open_food_registration`（30） | 維持合併欄位，理由與重新評估的觸發記進 seller `CARRYOVER.md`：admin 把它顯示成一列、用目錄的狀態名詞當標籤，店家頁沒有對它的操作；觸發是「admin 店家頁要對待審或被退回的登錄提供操作時」 | design-review：原理由「admin 不在 §2 的命中裡」是守門的理由，不是設計的理由 |
-| 12 | 運維文件 | `seller-violation-management-runbook.md` 的終止事由表：停業、解散、破產、許可撤銷與其他 21.3 事由一樣是「依據的認定選填」。Will 的 controller 決定：契約與詳細設計書 32 是 SSOT（`OPTIONAL`），runbook 照改 | 刀 1 讓 admin 對這四個事由也出現選填欄位（§5 #11 已核可），runbook 原寫「契約條款（沒有認定）」與契約不符 |
+| 12 | 運維文件 | `seller-violation-management-runbook.md` 的終止事由表：停業、解散、破產、許可撤銷與其他 21.3 事由一樣是「依據的認定選填」。Will 的 controller 決定：契約與detailed-design 32 是 SSOT（`OPTIONAL`），runbook 照改 | 刀 1 讓 admin 對這四個事由也出現選填欄位（§5 #11 已核可），runbook 原寫「契約條款（沒有認定）」與契約不符 |
 
 ## 實作時的修訂（刀 2，2026-10-22）
 
@@ -456,7 +456,7 @@ v1 的 Q3 由 SSOT 回答（§2 #9），Q5（縮小規則）由 K3 的正向定�
 | F2 | Medium | `requires_source_measure` 多餘 | `available_terminations` 不含 LINKED（`admin/seller/v1alpha1/seller.proto:336-339`），LINKED 只在 `LinkedAccount.termination_option`（`measure.proto:229-231`）［量測］ | 接受（Will）：刪欄位；表單狀態記住選項來源，`sourceMeasureId` 只在 linked 時存在（§2 #10） |
 | F3 | Medium | 三態沒帶 7 日規則；選填路徑的文案沒有定 | `CreateTerminationDialog.tsx:199-206` 的 `noteText` 寫死 7 日；7 日在 `create.go:510-518`（H15、H16）［量測］ | 接受（Will）：條件寫進伺服器的 `explanation`（§5 #12、#13），client 不寫規則；表單三句（§5 #14-#16）。全部列 N 待核可 |
 | F4 | Medium | 關聯帳號說明句進目錄，與 `TerminationOption.explanation` 平行 | `terminationExplanation` 把伺服器句與 client 常數串在一起（`measure.ts:557-580`）；給員工的事由說明只有 `TerminationEffect.Message` 一個產生點（`termination_effect.go:44`）［量測］ | 接受（Will）：§2 #6 改由刀 1 的 `explanation`；§3 刪 key；§4.1 第一批拿掉；`admin.seller` 前綴風險消失 |
-| F5 | Medium | 刀 1 對實作者不夠明確 | 規則在 `create.go:147-156` 的 switch［量測］；`toStore` 有 12 個呼叫點［量測］，但 (A) 不需要在每條路徑推導能力 | 接受：§2.1 寫明 `ViolationRequirement` 方法、驗證與輸出共用、等價測試名、欄位編號（`TerminationOption` 4、`Store` 29／30，27 reserved）、enum 前綴（`API 設計規範（Connect）.md:102`）、命名對齊請求的 `violation`。F5.2（`Authorize` 與 `Conditions.Derived`）因 F1 採 (A) 不適用 |
+| F5 | Medium | 刀 1 對實作者不夠明確 | 規則在 `create.go:147-156` 的 switch［量測］；`toStore` 有 12 個呼叫點［量測］，但 (A) 不需要在每條路徑推導能力 | 接受：§2.1 寫明 `ViolationRequirement` 方法、驗證與輸出共用、等價測試名、欄位編號（`TerminationOption` 4、`Store` 29／30，27 reserved）、enum 前綴（`api-design-guidelines-connect.md:102`）、命名對齊請求的 `violation`。F5.2（`Authorize` 與 `Conditions.Derived`）因 F1 採 (A) 不適用 |
 | F6 | Medium | 新的 api enum 會讓 manifest 漂移 | manifest 收錄 schema 的所有 enum（審查量測 `manifest.go:29-45`）；刀 1 另有模組新句子 | 接受：刀 1 跑 `make -C backend uitext`，§7、§8 加 `ui-text-generated-diff.yml` |
 | F7 | Low | #11 的 client 修法要拆區域 | 兩端的 pending 區域同時有狀態行與撤回按鈕（`FoodRegSupplement.tsx:208-237`、`food_registration_form.dart:110-131,226`）［量測，審查］ | 接受：§2 #11 寫明只有按鈕改條件，狀態行留在原位置、條件改成同一個欄位有沒有值 |
 

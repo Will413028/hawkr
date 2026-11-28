@@ -57,7 +57,7 @@ The production backend endpoints and authorization policy for delegated operatio
 
 ## Evidence and references
 
-- Product specification: `Hawkr_ADM代行營運_詳細設計書_v2.0.docx` supplied through Google Docs.
+- Product specification: `Hawkr_ADM代行營運_detailed-design_v2.0.docx` supplied through Google Docs.
 - Implementation plan: removed from the repository once its decisions were recorded; the original (`docs/superpowers/plans/2026-08-06-adm-delegated-operations.md`) is in the private archive.
 - Public interaction references: Refero dashboard patterns for Harvest, Cal.com, and ClickUp. They inform hierarchy, density, and safety-state clarity only; Hawkr tokens and product boundaries remain authoritative.
 

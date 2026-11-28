@@ -64,7 +64,7 @@ class UberWebhookConsumerTest {
     }
 
     /**
-     * DaaS webhook body。欄名抄自 {@code Uber Direct API 總覽.md} §7.2
+     * DaaS webhook body。欄名抄自 {@code uber-direct-api-overview.md} §7.2
      * （{@code id}／{@code kind}／{@code delivery_id}／{@code data}／{@code external_id}）。
      * 刻意保留非標準空白與 JSON 逸出 —— 那是 re-serialize 會抹平的特徵。
      */

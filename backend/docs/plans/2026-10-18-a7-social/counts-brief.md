@@ -39,7 +39,7 @@
 | 沒有正式流量資料 | REAL（缺資料） | 不推離基準（基準本來就是存起來）；只影響何時改成分片或緩衝 | 系統從未上線 |
 | 可見性在讀取時以 `pub_*` 判斷（店家可曝光、買家已停用、內容下架） | SELF-IMPOSED（我們的決定，符合基準） | 只決定「誰會在 social 之外改變計入與否」，由 §4 第 6 點的重算路徑涵蓋 | ADR 2026-09-24 修訂段 |
 | 單體規則 2「讀取模型等量測觸發才建」 | SELF-IMPOSED；它講跨模組讀取，計數是模組自己的資料，不適用 | 無 | backend `AGENTS.md` |
-| 公司時期規範「對帳 job 不寫進後端」 | SELF-IMPOSED（我們的規範）；和基準（Discourse 定期對帳、Mastodon 手動重算）相反 | 不採，加每日對帳 | `backend/docs/開發規範/後端服務責任邊界規範.md` §三 |
+| 公司時期規範「對帳 job 不寫進後端」 | SELF-IMPOSED（我們的規範）；和基準（Discourse 定期對帳、Mastodon 手動重算）相反 | 不採，加每日對帳 | `backend/docs/dev-guidelines/backend-service-responsibility-boundaries.md` §三 |
 | 刪帳申請不能撤回 | 事實【量】：`accountdeletion` 只有 `Request` 與 `CompletePending` | 申請起就可以把買家的內容標成刪除 | `accountdeletion/accountdeletion.go:88-91` |
 
 沒有 REAL 約束推離基準。

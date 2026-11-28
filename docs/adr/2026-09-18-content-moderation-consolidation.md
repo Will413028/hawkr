@@ -6,7 +6,7 @@
 | 日期 | 2026-07-08 ~ 2026-07-10 |
 | 影響範圍 | `social-service`、`account-service`（`SuspendAccount`）、`hawkr-admin` |
 | 被取代 | D1、D3 由 `2026-10-29-account-suspension-and-moderation.md` 取代（處分紀錄歸執行效果的模組、停權單一入口與受限登入）；D2、D4 不變 |
-| 規格 | [31-內容審核（檢舉 · 封鎖 · 平台下架）](/backend/docs/詳細設計書/31-內容檢舉與封鎖（Content%20Reporting%20&%20Block）詳細設計書.md) |
+| 規格 | [31-內容審核（檢舉 · 封鎖 · 平台下架）](/backend/docs/detailed-design/31-content-reporting-and-block-detailed-design.md) |
 
 ## 脈絡
 

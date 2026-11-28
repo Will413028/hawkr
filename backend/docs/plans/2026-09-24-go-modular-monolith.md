@@ -156,7 +156,7 @@
   - 指令檔一律是 `AGENTS.md`，所有 `CLAUDE.md` 移除（2026-09-25 使用者決定）：backend、admin、website 的內容併入各自的 `AGENTS.md`；兩支 App 的 `CLAUDE.md` 改名為 `AGENTS.md`。website 保留 Next.js 管理的規則區塊，`next dev` 因此只更新 `AGENTS.md`、不會再建立 `CLAUDE.md`（已用 Next.js 自己的函式驗證）。
   - 根目錄 `AGENTS.md`：monorepo 地圖、與 CI 相同的檢查、跨專案契約、共通規則。原本分散在各子專案「跨 Repo 共識」裡仍然有效的規則集中到這裡；`dev` 分支、promote、跨 repo session 這些公司時期的流程移除。
   - `backend/AGENTS.md` 改寫：單體的結構與規則、指令、仍然有效的契約規則。舊程式註解引用的「`CLAUDE.md` §N」指向私人封存的 `backend/CLAUDE.md`。
-  - `backend/docs/開發規範/` 裡只適用舊服務或已不再適用的 9 份規範，檔頭加上適用範圍與退場時間；責任邊界規範 §七 加註單體內 saga 與 outbox 的例外已不成立。
+  - `backend/docs/dev-guidelines/` 裡只適用舊服務或已不再適用的 9 份規範，檔頭加上適用範圍與退場時間；責任邊界規範 §七 加註單體內 saga 與 outbox 的例外已不成立。
 - [x] **0.11 CI**：新增 `backend-monolith` workflow，涵蓋 build、vet、`test -race`、arch、SQL、Atlas、Connect 生成物 drift、D9 gate、盤點 gate、integration 測試（OpenAPI drift 於 2026-09-26 隨 Connect 定案移除）。
 
 **驗收**
@@ -291,7 +291,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - A7-1c 留給 A7-4 的兩項（觸發：A7-4 的賣家端與後台畫面）：後台的類別下拉（`ASSESSABLE_CATEGORIES`）沒有社群的 `SPAM`、`HARASSMENT`、`HATE`，伺服器已接受；店主讀自己的店（`OwnerPosts`、`ListOwnPosts`）仍看得到被下架的貼文且沒有標記。
   - 單體 revalidate 失敗沒有告警（River worker 的失敗與 discarded job；Loki 規則只看舊的 `revalidate.send.*`）。觸發：單體告警管道建立時或上線前。
   - #3513 SLA 告警（moderation 待辦列 72 小時期限，無主動告警；Will 2026-11-19 延後）。觸發：單體告警管道建立時或上線前，屆時以「逾期待辦數」指標加告警規則。
-  - 設計文件中 `social-service` 的殘留 166 筆、17 個檔（最多的是基本設計書 56 的 70 筆；41 號設計書 §7.1、§12.1、§13、§14、§15、§3.7 引用、bindings `comment.#`）。觸發：下次修改該設計書時，或 A10 文件整理。
+  - 設計文件中 `social-service` 的殘留 166 筆、17 個檔（最多的是basic-design 56 的 70 筆；41 號設計書 §7.1、§12.1、§13、§14、§15、§3.7 引用、bindings `comment.#`）。觸發：下次修改該設計書時，或 A10 文件整理。
   - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
   - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
   - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。
@@ -441,8 +441,8 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] 對外 API 的 package 從 `v1alpha1` 一次改名成 `v1`（ADR `2026-09-26-external-contract-protobuf-connect.md` D2）：proto 的 package 與目錄、單體的 `connectServices`、四端的生成物與引用；改名之後 `buf breaking`（`WIRE_JSON`）才開始擋破壞性變更。必須在後端 CD（第 4 步）第一次部署之前完成：上線後改名本身就是破壞性變更，也會換掉 CDN 的快取鍵。
 - [ ] 各模組上線前累積的 migration 壓成一個 baseline（Will 2026-09-25 決定）：系統還沒上線，已套用的只有本機與測試的 database，壓掉沒有成本；第一次部署之後才開始累積。必須在後端 CD（第 4 步）第一次部署之前完成。
   - identity 的 `20260927071536_clerk_identity.sql` 為了既有列把 `accounts.clerk_user_id` 與 `admins.clerk_user_id`（之後改名為 `access_subject`）填成 `unlinked:<id>`：壓成 baseline 時這兩句一起消失，兩個欄位直接是 NOT NULL，沒有佔位值（A2 C9 的 design-review）。
-- [ ] CodeMeta 生成器（`backend/docs/代碼管理（CodeMeta）/scripts/generate.sh`）的 Go 輸出改成先寫出、再交給 `gofmt`，不再自己計算對齊（Will 2026-09-25 決定）：自算對齊是為了在沒有 Go 的 runner 上重跑生成比對，monorepo 的 CI 跑生成器時都有 Go。
-- [ ] 刪除 CodeMeta：沒有任何值域的擁有者是 CodeMeta、也沒有舊的消費端時，刪除 `backend/docs/代碼管理（CodeMeta）/`、生成器、`internal/platform/codemeta`、`pkg/codemeta`、`pkg/errors/bizcode`、gateway 的鏡像與各 client 的 CodeMeta 生成物（ADR `2026-09-25-codemeta-retirement.md` 過渡第 4 步）。
+- [ ] CodeMeta 生成器（`backend/docs/codemeta/scripts/generate.sh`）的 Go 輸出改成先寫出、再交給 `gofmt`，不再自己計算對齊（Will 2026-09-25 決定）：自算對齊是為了在沒有 Go 的 runner 上重跑生成比對，monorepo 的 CI 跑生成器時都有 Go。
+- [ ] 刪除 CodeMeta：沒有任何值域的擁有者是 CodeMeta、也沒有舊的消費端時，刪除 `backend/docs/codemeta/`、生成器、`internal/platform/codemeta`、`pkg/codemeta`、`pkg/errors/bizcode`、gateway 的鏡像與各 client 的 CodeMeta 生成物（ADR `2026-09-25-codemeta-retirement.md` 過渡第 4 步）。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：CodeMeta 裡同時被 Java 用到、所以沒在該計畫刪的值域（`AssetReferenceType` 的食譜值、`ShippingTemperature`、`ProductCertification*`、Uber 的 `ShippingMethod` 3003 等；清單見上面 B1、B3、B4）。觸發：各值域隨最後一個 Java 消費者退場時刪；剩下沒有擁有者的值域，隨本項刪除 CodeMeta 一起消失。
 - [ ] 賣家入駐文件改版時的重新同意（`pending_agreements`、`AcceptSellerAgreements`）：上線之前，或版本第一次在有真實賣家之後改版時加上，處理已入駐的賣家與換申請主體的情況（ADR `2026-10-19-seller-kyc-payuni-consolidated.md`「入駐同意紀錄」）。
 - [ ] 賣家入駐文件上線前的條文工作（ADR `2026-10-19-seller-kyc-payuni-consolidated.md`「入駐同意紀錄」）：

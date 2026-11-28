@@ -1,7 +1,7 @@
 ---
 description: Regeneration rules after editing CodeMeta documents
 paths:
-  - "backend/docs/代碼管理（CodeMeta）/**"
+  - "backend/docs/codemeta/**"
 ---
 
 # CodeMeta

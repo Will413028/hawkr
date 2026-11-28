@@ -151,7 +151,7 @@ public class ProductCertificationApplicationService {
      *   <li><b>條件寫成只看旗標</b>（{@code if (!updateCertifications) return;}）⇒ 舊 App 送了
      *       認證但沒設旗標的請求直接 return ⇒ <b>賣家送出的認證靜默蒸發</b>。
      *       {@code api/proto/product/product.proto} 該欄註解明訂「相容期：未設但 certifications
-     *       非空仍視為要更新」，而 {@code api/proto/} 的契約優先序<b>高於</b>詳細設計書。</li>
+     *       非空仍視為要更新」，而 {@code api/proto/} 的契約優先序<b>高於</b>detailed-design。</li>
      * </ul>
      *
      * <p><b>交易傳播</b>：{@code REQUIRED} —— 投影重建必須與商品寫入原子。跳過某筆認證不拋例外，

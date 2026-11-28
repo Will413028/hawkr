@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  * <p>非 Jackson 自動綁定 DTO——來源 {@code SellerSuspendedEvent}/{@code SellerUnsuspendedEvent}
  * （{@code pkg/mq/events.go}）內嵌 Go {@code BaseEvent}（snake_case，如 {@code event_type}），而
  * {@code suspensionId}/{@code accountId}/{@code reasonCode} 為 camelCase 且以 JSON string
- * 序列化（TSID 精度，docs/開發規範/Java 微服務開發規範.md §2.1）；手動解析與既有 {@code product-service SellerDeletedConsumer}
+ * 序列化（TSID 精度，docs/dev-guidelines/java-microservices-development-guidelines.md §2.1）；手動解析與既有 {@code product-service SellerDeletedConsumer}
  * 慣例一致。
  *
  * <p>{@code storeId}（Plan C Phase 0 擴充）：JSON key 是 {@code store_id}（snake_case），

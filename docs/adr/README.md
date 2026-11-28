@@ -2,7 +2,7 @@
 
 > **ADR 回答的唯一問題：`WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。**
 >
-> 責任劃分 SSOT：`docs/共通規範/設計文件治理規範.md` §4。
+> 責任劃分 SSOT：`docs/conventions/design-document-governance-guidelines.md` §4。
 
 ## 這個資料夾裝什麼
 
@@ -16,8 +16,8 @@
 
 | 不裝 | 歸宿 |
 |---|---|
-| 逐欄規格、端點簽章、狀態值域 | 詳細設計書 |
-| 系統目的、高階架構、Non-Goal | 基本設計書 |
+| 逐欄規格、端點簽章、狀態值域 | detailed-design |
+| 系統目的、高階架構、Non-Goal | basic-design |
 | 做到哪了、誰在做 | Issue |
 | 這次改了什麼、驗證證據 | PR |
 
@@ -38,7 +38,7 @@ ADR，只是把雜訊搬到另一個資料夾。
   - **accepted**：**結論不改**（決策是已經發生的事實）。小幅調整在文末加 `## 修訂：<主題>（YYYY-MM-DD，誰決定）`，
     寫脈絡與新的決策，註明「原決策段保留歷史」；核心決定被推翻時**新增**一份 ADR，並在舊檔頂端標 `superseded by <新檔名>`。
   - 同一份 ADR 的修訂超過 3 段時，寫一份整合後的新 ADR 取代它（舊檔標 `superseded by`），讓讀者只讀一份就知道現況。
-- 詳細設計書可以寫 `參照 ADR-xxx`，但**不得複製 rationale**——
+- detailed-design可以寫 `參照 ADR-xxx`，但**不得複製 rationale**——
   複製必然漂移，而漂移的那一份不會告訴讀者它漂了。
 
 ## 建議骨架

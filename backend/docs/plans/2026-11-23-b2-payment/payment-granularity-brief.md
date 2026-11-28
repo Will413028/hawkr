@@ -61,7 +61,7 @@ v2 依獨立審查 `b2-design-brief-review.md` 修訂：B7 coupon 的事實、�
 
 ## D-D 後台異常結案 UI 與用語
 
-- **現況**：`ResolvePaymentAnomaly` 已經有 API（`api/hawkr/admin/payment/v1alpha1/payment.proto:58-60`），admin 端沒有呼叫的頁面（`rg ResolvePaymentAnomaly admin` 沒有結果）；術語表（`docs/共通規範/使用者面用語術語表.md`）沒有「撥款、轉帳、收回、補差額」，但 admin 的 `anomalies/page.tsx`、`PaymentAccountCard.tsx` 已經在用這些詞【實測】。
+- **現況**：`ResolvePaymentAnomaly` 已經有 API（`api/hawkr/admin/payment/v1alpha1/payment.proto:58-60`），admin 端沒有呼叫的頁面（`rg ResolvePaymentAnomaly admin` 沒有結果）；術語表（`docs/conventions/user-facing-terminology-glossary.md`）沒有「撥款、轉帳、收回、補差額」，但 admin 的 `anomalies/page.tsx`、`PaymentAccountCard.tsx` 已經在用這些詞【實測】。
 - **業界基準**：一個待處理異常的佇列，每筆核對證據後結案；用詞對齊 Stripe 的 Transfer、Reversal、Refund、Payout【推論】。ADR D68 本身就預設人工結案【文件】。
 - **建議**：步驟 6 之前補上結案頁；術語表加一節：轉帳＝transfer、收回＝reversal、補差額＝top-up transfer、撥款＝payout。不做的話，ANOMALY 會永遠佔著唯一索引，只能直接改 DB。
 

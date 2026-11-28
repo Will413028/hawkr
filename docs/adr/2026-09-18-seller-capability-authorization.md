@@ -5,7 +5,7 @@
 | 狀態 | D3、D4、D7 superseded by `2026-09-29-seller-suspension-and-business-identity-in-monolith.md`（A3，2026-09-29）；D1、D2、D9 沿用到單體的逐方法宣告。遷移計畫 A2（2026-09-27）起，account 的 blacklist 已刪除（帳號停權由 identity 在同一個 transaction 刪除 session，每個請求都查 identity），D3、D4 拿它當先例的部分只剩歷史意義；賣家停權（`seller:suspended`）與 gateway 的 capability gating 照舊，A3 搬遷時核對 |
 | 日期 | 2026-07-11 ~ 2026-08-02 |
 | 影響範圍 | `gateway/internal/authz/*`、`gateway/internal/router/*`、`seller-service`（status 傳播） |
-| 規格 | [46-賣家能力權限層](/backend/docs/詳細設計書/46-賣家能力權限層（Seller%20Capability%20Authorization）詳細設計書.md) |
+| 規格 | [46-賣家能力權限層](/backend/docs/detailed-design/46-seller-capability-authorization-detailed-design.md) |
 | 路徑基準 | `backend/` |
 
 ## 脈絡

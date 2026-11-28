@@ -5,11 +5,11 @@
 | 狀態 | accepted（ADR-08 superseded by `2026-09-25-api-image-uri-template.md`） |
 | 日期 | 2026-07-13（D8 於 2026-07-20 追加） |
 | 影響範圍 | `services/java/media-service`、`workers/image-gateway`、`pkg/mediaurl`、全平台圖片欄位與四個前端 repo |
-| 對應規格 | `docs/詳細設計書/49-多媒體儲存與圖片服務（Cloudflare R2 & Image Gateway）詳細設計書.md` |
+| 對應規格 | `docs/detailed-design/49-cloudflare-r2-and-image-gateway-detailed-design.md` |
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> preset 白名單、objectKey 規則、逐服務欄位落地清單、特例處置一律在 49 號詳細設計書，本檔不複製。
+> preset 白名單、objectKey 規則、逐服務欄位落地清單、特例處置一律在 49 號detailed-design，本檔不複製。
 
 ---
 

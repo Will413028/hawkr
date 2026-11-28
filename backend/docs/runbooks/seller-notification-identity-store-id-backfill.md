@@ -1,6 +1,6 @@
 # 賣家通知身分 store_id backfill：device_tokens + notification_preferences（issue #2707 C1/C2，task 8）
 
-> 對應 [13-通知模板引擎與收件箱（Notification Template）詳細設計書](../詳細設計書/13-通知模板引擎與收件箱（Notification%20Template）詳細設計書.md) §12.1.4「三張表身分空間治理模型」。
+> 對應 [13-通知模板引擎與收件箱（Notification Template）detailed-design](../detailed-design/13-notification-template-detailed-design.md) §12.1.4「三張表身分空間治理模型」。
 > **何時跑**：與整個 issue #2707 分支（Task 1～8，含 `send_push.go` 推播身分解耦）**同一個 deploy 窗口**內，**部署新 pod 之前**執行（理由見下方「部署順序」——這不是可有可無的建議，倒過來跑會讓這個 backfill transaction 本身有機會跟 code 部署後的新寫入撞鍵而整批失敗，見下）。
 > **兩張表**：`device_tokens`（FCM token 註冊）與 `notification_preferences`（推播偏好開關）都要 backfill，同一份 runbook、同一個窗口一起做——只做其中一張，另一張在 code 部署後會讓分歧帳號（`store_id <> account_id` 的賣家）在那張表上原地重演本 task 要修的那個 bug（漏做 device_tokens＝重演 C1，漏做 notification_preferences＝重演 C2），不會自動變好。
 > **兩個 DB**：`hawkr_seller`（`sellers` 表）與 `hawkr_notification`（`device_tokens`／`notification_preferences` 表）——跨 DB，無法在單一 migration 內完成，故走人工 gate，鏡像 [product-rekey-backfill-gate.md](./product-rekey-backfill-gate.md) §0 的「兩個 DB、無法 JOIN」處理方式。
@@ -37,7 +37,7 @@ Grandfathered 帳號（`store_id == account_id`，尚未 re-key 過）不受影�
 
 **結論**：先跑 SQL 才能保證 backfill 這個一次性操作本身穩定成功，不受「跟 code 部署後的新寫入賽跑」影響；先部署 code 則讓 backfill 暴露在撞鍵風險下，窗口越長風險越高，失敗的代價是整批 transaction 重來（且要先找出撞鍵的帳號、排除或另案處理才能重跑）。這才是先跑 SQL 的真正理由——不是「波及的賣家比較少」（兩種順序波及範圍相同，見上）。
 
-**不嘗試消除這段過渡窗口**：這是本 repo 對「app code 不建 reconciliation job / 一次性資料清整用人工審核 SQL」既定原則（`backend/docs/開發規範/後端服務責任邊界規範.md`）下的自然結果——SQL 由人工執行，deploy 由 CI/CD 執行，兩者天生無法做到單一原子事務。可接受的緩解方式是把間隔壓到最短（理想上排在同一次維運窗口、背靠背執行），不是搭建自動化補償機制。
+**不嘗試消除這段過渡窗口**：這是本 repo 對「app code 不建 reconciliation job / 一次性資料清整用人工審核 SQL」既定原則（`backend/docs/dev-guidelines/backend-service-responsibility-boundaries.md`）下的自然結果——SQL 由人工執行，deploy 由 CI/CD 執行，兩者天生無法做到單一原子事務。可接受的緩解方式是把間隔壓到最短（理想上排在同一次維運窗口、背靠背執行），不是搭建自動化補償機制。
 
 ## 1. 產生 UPDATE 語句（在 `hawkr_seller` 執行，唯讀）
 

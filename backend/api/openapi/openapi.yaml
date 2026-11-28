@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Hawkr API
   version: 1.0.0
-  description: 舊 gateway 還在服務的 REST 清單（ADR 2026-09-26-external-contract-protobuf-connect D5）：只准縮小，模組搬進單體時刪掉對應的端點；新的對外 API 是根目錄 api/ 的 Connect。JSON 回應一律是統一 envelope，規則見 backend/docs/開發規範/API 設計規範.md。
+  description: 舊 gateway 還在服務的 REST 清單（ADR 2026-09-26-external-contract-protobuf-connect D5）：只准縮小，模組搬進單體時刪掉對應的端點；新的對外 API 是根目錄 api/ 的 Connect。JSON 回應一律是統一 envelope，規則見 backend/docs/dev-guidelines/api-design-guidelines.md。
 servers:
 - url: /
 tags:
@@ -6300,7 +6300,7 @@ paths:
           type: string
       - name: status
         in: query
-        description: 狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta 業務狀態碼.md 為準）
+        description: 狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta business-status-codes.md 為準）
         schema:
           type: string
       responses:
@@ -10177,7 +10177,7 @@ paths:
           type: string
       - name: status
         in: query
-        description: 狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta 業務狀態碼.md 為準）
+        description: 狀態篩選（AfterSaleCaseStatus value，支援逗號分隔多值；合法值以 CodeMeta business-status-codes.md 為準）
         schema:
           type: string
       responses:
@@ -15419,7 +15419,7 @@ components:
           description: 付款期限（ISO 8601 UTC，僅 status=0 時有值）
         paymentMethod:
           type: string
-          description: 付款方式（PaymentMethod value；合法值以 CodeMeta 業務類型碼.md 為準，2001-2004；未付款為空字串）
+          description: 付款方式（PaymentMethod value；合法值以 CodeMeta business-type-codes.md 為準，2001-2004；未付款為空字串）
         pickupStoreName:
           type: string
         processingDeadline:
@@ -16025,7 +16025,7 @@ components:
             type: string
         status:
           type: string
-          description: 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta 業務狀態碼.md 為準）
+          description: 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta business-status-codes.md 為準）
         storeArrivedAt:
           type: string
           description: '2026-05-22 逆物流退貨政策修訂欄位'
@@ -16105,7 +16105,7 @@ components:
           type: string
         status:
           type: string
-          description: 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta 業務狀態碼.md 為準）
+          description: 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta business-status-codes.md 為準）
         storePickupDeadlineAt:
           type: string
           description: '2026-05-22 超商待取逾時截止（僅 status=26 RETURN_AT_STORE 有值，前端依此倒數 72h）'
@@ -19501,7 +19501,7 @@ components:
           description: 產地字串（如「台灣」「日本」）
         productCount:
           type: string
-          description: 該產地下 ACTIVE 商品數（對外數字一律 string，見 backend/docs/開發規範/Java 微服務開發規範.md §2）
+          description: 該產地下 ACTIVE 商品數（對外數字一律 string，見 backend/docs/dev-guidelines/java-microservices-development-guidelines.md §2）
     OriginsSummaryResponse:
       type: object
       properties:
@@ -19528,7 +19528,7 @@ components:
       properties:
         count:
           type: string
-          description: 區間內 distinct ACTIVE 商品數（對外數字一律 string，見 backend/docs/開發規範/Java 微服務開發規範.md §2）
+          description: 區間內 distinct ACTIVE 商品數（對外數字一律 string，見 backend/docs/dev-guidelines/java-microservices-development-guidelines.md §2）
         hashtag:
           type: string
           description: 區間內最多 ACTIVE 商品使用的原始大小寫版本
@@ -20422,7 +20422,7 @@ components:
           description: 退貨物流單號（退貨退款時有值）
         status:
           type: string
-          description: 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta 業務狀態碼.md 為準）
+          description: 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta business-status-codes.md 為準）
     RespondSellerInvoiceComplaintRequest:
       type: object
       properties:

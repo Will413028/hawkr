@@ -8,7 +8,7 @@
 | 路徑基準 | `backend/` |
 
 規格本身見
-`docs/詳細設計書/64-Hawkr Agent 商務線（RFQ Publication、Seller Quote、Buyer Acceptance）詳細設計書.md` §6。
+`docs/detailed-design/64-rfq-publication-seller-quote-buyer-acceptance-detailed-design.md` §6。
 
 ## 脈絡
 

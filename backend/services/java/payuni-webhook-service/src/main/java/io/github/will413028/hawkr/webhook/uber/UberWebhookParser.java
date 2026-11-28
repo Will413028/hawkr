@@ -16,7 +16,7 @@ import java.util.HexFormat;
  *（66 §6.3.1 陷阱 A2）。本類別回傳的是<b>抽出來的字串</b>，原始位元組由呼叫端原封不動往下傳。
  *
  * <h2>欄名來源</h2>
- * 全部抄自 {@code docs/第三方整合/Uber Direct API 總覽.md}：
+ * 全部抄自 {@code docs/third-party-integrations/uber-direct-api-overview.md}：
  * <ul>
  *   <li>§7.2 DaaS webhook 頂層：{@code id}／{@code kind}／{@code created}／{@code delivery_id}
  *       （🔴 我方整合的是 DaaS／Direct 家族）</li>

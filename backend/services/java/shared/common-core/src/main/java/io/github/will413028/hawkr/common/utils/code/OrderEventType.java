@@ -8,7 +8,7 @@ import java.util.stream.Collectors;
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class
- * （見 docs/開發規範/Java 微服務開發規範.md §6）。
+ * （見 docs/dev-guidelines/java-microservices-development-guidelines.md §6）。
  */
 public enum OrderEventType implements CodeMeta {
 
@@ -18,7 +18,7 @@ public enum OrderEventType implements CodeMeta {
     ORDER_CANCELLED("ORDER_CANCELLED", "order.cancelled", "訂單取消", "觸發 Product Service 非同步庫存歸還"),
     ORDER_DELIVERED("ORDER_DELIVERED", "order.delivered", "訂單已送達", "物流送達，通知前端/推播"),
     ORDER_RECEIPT_CONFIRMED("ORDER_RECEIPT_CONFIRMED", "order.receipt.confirmed", "確認收貨", "通知 Shipping Service 標記 receipt_confirmed"),
-    ORDER_SALES_ACCUMULATED("ORDER_SALES_ACCUMULATED", "order.sales.accumulated", "訂單銷量累計", "付款成功時發出，product-service 依 productId 累計 sales_count（見 [35 設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)）"),
+    ORDER_SALES_ACCUMULATED("ORDER_SALES_ACCUMULATED", "order.sales.accumulated", "訂單銷量累計", "付款成功時發出，product-service 依 productId 累計 sales_count（見 [35 設計書](../detailed-design/35-product-sort-and-sales-count-detailed-design.md)）"),
     ORDER_SHIPMENT_CREATE_REQUESTED("ORDER_SHIPMENT_CREATE_REQUESTED", "order.shipment.create_requested", "重試建立物流單", "Backstop 於付款後逾期仍無物流單時請 Shipping 冪等重建（見 03 §8.11）"),
     ORDER_SHIPMENT_CREATION_FAILED("ORDER_SHIPMENT_CREATION_FAILED", "order.shipment.creation_failed", "建單逾時取消", "Backstop 重試上限仍無物流單，請 AfterSales 系統取消 + 退款（見 03 §8.11）"),
     ORDER_REFUND_FINALIZED("ORDER_REFUND_FINALIZED", "order.refund.finalized", "訂單退款落定", "訂單層唯一權威退款事件，三個發布點皆在 order-service 交易內落 order_outbox；invoice-service 據此判定作廢／折讓（58 §6.3.2.3）");
