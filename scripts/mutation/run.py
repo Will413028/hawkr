@@ -398,6 +398,13 @@ def select(manifests: list[str], stack: str | None) -> list[Mutant]:
     return mutants
 
 
+def shard(mutants: list[Mutant], spec: str) -> list[Mutant]:
+    k, sep, n = spec.partition("/")
+    if not (sep and k.isdigit() and n.isdigit() and 1 <= int(k) <= int(n)):
+        raise ManifestError(f"--shard 要寫成 k/n 且 1 <= k <= n：{spec}")
+    return mutants[int(k) - 1::int(n)]
+
+
 def summarize(results: list[tuple[Mutant, str]]) -> str:
     lines = ["| 結果 | id | 檔案 | 測試 |", "|---|---|---|---|"]
     for m, r in results:
@@ -429,15 +436,20 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("manifests", nargs="+")
     ap.add_argument("--stack")
-    ap.add_argument("--list-stacks", action="store_true", help="印出清單用到的 stack（JSON 陣列）")
+    ap.add_argument("--stack-counts", action="store_true", help="印出每個 stack 的 mutant 數（JSON 物件）")
+    ap.add_argument("--shard", help="只跑第 k 份（k/n，依清單順序輪流分配）")
     ap.add_argument("--validate", action="store_true", help="只檢查格式、old 恰好一次與測試路徑，不執行")
     args = ap.parse_args(argv)
     try:
-        if args.list_stacks:
-            stacks = sorted({m.stack for m in select(args.manifests, None)})
-            print(json.dumps(stacks))
+        if args.stack_counts:
+            counts: dict[str, int] = {}
+            for m in select(args.manifests, None):
+                counts[m.stack] = counts.get(m.stack, 0) + 1
+            print(json.dumps(counts, sort_keys=True))
             return 0
         mutants = select(args.manifests, args.stack)
+        if args.shard:
+            mutants = shard(mutants, args.shard)
         if args.validate:
             bad = 0
             for m in mutants:
