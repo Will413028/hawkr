@@ -37,7 +37,13 @@ func SetLockTimeout(ctx context.Context, c execer) error {
 	return nil
 }
 
-var ErrContended = errors.New("media：保全閘門一再被整理，請重試")
+func classifyHoldInsert(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
+		return fmt.Errorf("%w：%w", model.ErrHoldContended, err)
+	}
+	return err
+}
 
 func IsContention(err error) bool {
 	var pgErr *pgconn.PgError
@@ -96,17 +102,12 @@ func Place(ctx context.Context, q *store.Queries, assetIDs []uuid.UUID, source s
 		if len(gates) != len(ids) {
 			continue
 		}
-		err = q.InsertHolds(ctx, store.InsertHoldsParams{Ids: ids, Source: source, SourceID: sourceID, Until: until, Now: now})
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
-			return model.ErrAssetGone
-		}
-		if err != nil {
+		if err := classifyHoldInsert(q.InsertHolds(ctx, store.InsertHoldsParams{Ids: ids, Source: source, SourceID: sourceID, Until: until, Now: now})); err != nil {
 			return fmt.Errorf("media：登記保全：%w", err)
 		}
 		return nil
 	}
-	return ErrContended
+	return model.ErrHoldContended
 }
 
 func Extend(ctx context.Context, q *store.Queries, source string, sourceID uuid.UUID, until, now time.Time) error {
@@ -117,12 +118,7 @@ func Extend(ctx context.Context, q *store.Queries, source string, sourceID uuid.
 	if !live {
 		return model.ErrHoldNotFound
 	}
-	err = q.ExtendHolds(ctx, store.ExtendHoldsParams{Source: source, SourceID: sourceID, Until: until, Now: now})
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
-		return model.ErrAssetGone
-	}
-	if err != nil {
+	if err := classifyHoldInsert(q.ExtendHolds(ctx, store.ExtendHoldsParams{Source: source, SourceID: sourceID, Until: until, Now: now})); err != nil {
 		return fmt.Errorf("media：延長保全：%w", err)
 	}
 	return nil

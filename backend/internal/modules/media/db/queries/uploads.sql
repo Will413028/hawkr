@@ -160,3 +160,17 @@ VALUES (
 -- name: InsertConfirmedClaim :exec
 INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
 VALUES (sqlc.arg(upload_id), 'CONFIRMED', sqlc.arg(asset_id), sqlc.arg(now));
+
+-- name: InsertOrphanObject :exec
+INSERT INTO media.orphan_objects (object_key, recorded_at)
+VALUES (sqlc.arg(object_key), sqlc.arg(now))
+ON CONFLICT (object_key) DO NOTHING;
+
+-- name: ListOrphanObjects :many
+SELECT object_key FROM media.orphan_objects
+WHERE object_key > sqlc.arg(after_key)
+ORDER BY object_key
+LIMIT sqlc.arg(max_rows);
+
+-- name: DeleteOrphanObject :exec
+DELETE FROM media.orphan_objects WHERE object_key = sqlc.arg(object_key);

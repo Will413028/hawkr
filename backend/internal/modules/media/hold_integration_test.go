@@ -712,3 +712,58 @@ func TestCopyToSecureAbandonsWhenTheCopyIsDeletedMidCopy(t *testing.T) {
 		t.Fatalf("放棄後原圖上的待複製保全要釋放，還有 %d 筆", n)
 	}
 }
+
+func TestCopyToSecureAbandonRecordsObjectsItCouldNotDeleteAndGCRetries(t *testing.T) {
+	f := setup(t)
+	src, _ := publicSource(t, f)
+	var copyID uuid.UUID
+	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
+		var err error
+		copyID, err = f.m.CopyToSecure(ctx, owner, src.ID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("CopyToSecure：%v", err)
+	}
+	prefix := storage.SecurePrefix(copyID)
+	var once sync.Once
+	var leaked string
+	f.store.setAfterPut(func(key string) {
+		if !strings.HasPrefix(key, prefix) {
+			return
+		}
+		once.Do(func() {
+			if err := markDeletedInTx(f, copyID); err != nil {
+				t.Error(err)
+			}
+			deleteAll(t, f)
+			leaked = key
+			if err := f.store.Fake.Put(t.Context(), storage.PutInput{Key: key, Body: bytes.NewReader([]byte("late")), Size: 4, ContentType: "application/octet-stream"}); err != nil {
+				t.Error(err)
+			}
+			f.store.setDeleteFailure(key, errors.New("object store down"))
+		})
+	})
+	if _, err := f.m.ProcessCopies(t.Context()); err != nil {
+		t.Fatalf("ProcessCopies：%v", err)
+	}
+	if got := physicalAssetState(t, f, copyID); got != "DELETED" {
+		t.Fatalf("副本狀態 = %s，預期 DELETED", got)
+	}
+	if !f.store.has(leaked) {
+		t.Fatal("測試前提：刪除失敗後物件應還在")
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.orphan_objects WHERE object_key = $1`, leaked); n != 1 {
+		t.Fatalf("刪不掉的物件要記入待刪清單，有 %d 筆", n)
+	}
+	f.store.setDeleteFailure(leaked, nil)
+	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
+		t.Fatalf("DeleteAssets：%v", err)
+	}
+	if f.store.has(leaked) {
+		t.Fatal("回收 job 要刪掉待刪清單裡的物件")
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.orphan_objects`); n != 0 {
+		t.Fatalf("刪除成功後待刪清單還有 %d 筆", n)
+	}
+}

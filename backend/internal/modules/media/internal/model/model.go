@@ -3,6 +3,8 @@ package model
 import (
 	"errors"
 	"time"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // ErrNotSecure 表示 ReadSecure 的資產不是機敏資產：呼叫方把它當成設定或資料的錯誤，不是「找不到」。
@@ -35,6 +37,8 @@ func (e *confirmedElsewhere) Is(target error) bool { return target == ErrUploadA
 func MarkConfirmedElsewhere(err error) error { return &confirmedElsewhere{err} }
 
 var ErrAssetGone = errors.New("media：資產已在刪除，來不及保全")
+
+var ErrHoldContended = apperr.Unavailable("media：保全撞上資產閘門的整理，請重試整個 transaction")
 
 var ErrAssetNotFound = errors.New("media：資產不存在")
 

@@ -71,6 +71,15 @@ func (q *Queries) DeleteClaimOfUpload(ctx context.Context, uploadID uuid.UUID) (
 	return result.RowsAffected(), nil
 }
 
+const deleteOrphanObject = `-- name: DeleteOrphanObject :exec
+DELETE FROM media.orphan_objects WHERE object_key = $1
+`
+
+func (q *Queries) DeleteOrphanObject(ctx context.Context, objectKey string) error {
+	_, err := q.db.Exec(ctx, deleteOrphanObject, objectKey)
+	return err
+}
+
 const deleteSecureChunks = `-- name: DeleteSecureChunks :exec
 DELETE FROM media.secure_chunks WHERE asset_id = $1
 `
@@ -314,6 +323,22 @@ func (q *Queries) InsertCopyUpload(ctx context.Context, arg InsertCopyUploadPara
 	return err
 }
 
+const insertOrphanObject = `-- name: InsertOrphanObject :exec
+INSERT INTO media.orphan_objects (object_key, recorded_at)
+VALUES ($1, $2)
+ON CONFLICT (object_key) DO NOTHING
+`
+
+type InsertOrphanObjectParams struct {
+	ObjectKey string
+	Now       time.Time
+}
+
+func (q *Queries) InsertOrphanObject(ctx context.Context, arg InsertOrphanObjectParams) error {
+	_, err := q.db.Exec(ctx, insertOrphanObject, arg.ObjectKey, arg.Now)
+	return err
+}
+
 const insertSecureChunk = `-- name: InsertSecureChunk :exec
 INSERT INTO media.secure_chunks (asset_id, idx, object_key)
 VALUES ($1, $2, $3)
@@ -453,6 +478,38 @@ func (q *Queries) ListDeletingUploads(ctx context.Context, arg ListDeletingUploa
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrphanObjects = `-- name: ListOrphanObjects :many
+SELECT object_key FROM media.orphan_objects
+WHERE object_key > $1
+ORDER BY object_key
+LIMIT $2
+`
+
+type ListOrphanObjectsParams struct {
+	AfterKey string
+	MaxRows  int32
+}
+
+func (q *Queries) ListOrphanObjects(ctx context.Context, arg ListOrphanObjectsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listOrphanObjects, arg.AfterKey, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

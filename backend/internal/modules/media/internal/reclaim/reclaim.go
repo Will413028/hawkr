@@ -321,7 +321,34 @@ func (s *Service) DeleteAssets(ctx context.Context) (int, error) {
 		}
 		after = rows[len(rows)-1].ID
 	}
+	if err := s.deleteOrphanObjects(ctx); err != nil {
+		errs = append(errs, err)
+	}
 	return total, errors.Join(errs...)
+}
+
+func (s *Service) deleteOrphanObjects(ctx context.Context) error {
+	var errs []error
+	after := ""
+	for {
+		keys, err := s.q(ctx).ListOrphanObjects(ctx, store.ListOrphanObjectsParams{AfterKey: after, MaxRows: batchSize})
+		if err != nil {
+			return errors.Join(append(errs, fmt.Errorf("media：列出待刪的遺留物件：%w", err))...)
+		}
+		for _, key := range keys {
+			if err := s.d.Store.Delete(ctx, key); err != nil {
+				errs = append(errs, fmt.Errorf("media：刪除遺留物件 %s：%w", key, err))
+				continue
+			}
+			if err := s.q(ctx).DeleteOrphanObject(ctx, key); err != nil {
+				errs = append(errs, fmt.Errorf("media：移除遺留物件 %s 的記錄：%w", key, err))
+			}
+		}
+		if len(keys) < batchSize {
+			return errors.Join(errs...)
+		}
+		after = keys[len(keys)-1]
+	}
 }
 
 func (s *Service) deleteSecureObjects(ctx context.Context, assetID uuid.UUID) error {

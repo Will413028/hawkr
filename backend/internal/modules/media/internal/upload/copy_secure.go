@@ -231,9 +231,15 @@ func (s *Service) deleteCopyObjects(ctx context.Context, keys []string) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()
 	for _, key := range keys {
-		if err := s.d.Store.Delete(ctx, key); err != nil {
-			s.d.Logger.WarnContext(ctx, "media：刪除沒記錄的副本段失敗，等資產刪除時移除", "key", key, "error", err)
+		err := s.d.Store.Delete(ctx, key)
+		if err == nil {
+			continue
 		}
+		if recordErr := s.q(ctx).InsertOrphanObject(ctx, store.InsertOrphanObjectParams{ObjectKey: key, Now: s.d.Now()}); recordErr != nil {
+			s.d.Logger.ErrorContext(ctx, "media：刪除沒記錄的副本段失敗，也沒能記入待刪清單，物件會遺留", "key", key, "error", err, "record_error", recordErr)
+			continue
+		}
+		s.d.Logger.WarnContext(ctx, "media：刪除沒記錄的副本段失敗，已記入待刪清單由回收 job 重試", "key", key, "error", err)
 	}
 }
 

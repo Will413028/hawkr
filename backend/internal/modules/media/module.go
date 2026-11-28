@@ -148,6 +148,8 @@ var (
 	// ErrNoTransaction：Confirm、MarkDeleted 必須在擁有者的 transaction 內呼叫。
 	ErrNoTransaction = model.ErrNoTransaction
 	ErrAssetGone     = model.ErrAssetGone
+	// ErrHoldContended：Hold、ExtendHold 的 INSERT 撞上閘門被刪除或撤掉（外鍵），擁有者的 transaction 已中止，分不出是資產刪除還是閘門只是被撤；分類是 Unavailable，擁有者重試整個 transaction：成功，或讀閘門時得到 ErrAssetGone。
+	ErrHoldContended = model.ErrHoldContended
 	ErrAssetNotFound = model.ErrAssetNotFound
 	ErrHoldNotFound  = model.ErrHoldNotFound
 )

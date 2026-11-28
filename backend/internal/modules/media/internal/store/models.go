@@ -60,6 +60,11 @@ type MediaAssetHoldRelease struct {
 	ReleasedAt time.Time
 }
 
+type MediaOrphanObject struct {
+	ObjectKey  string
+	RecordedAt time.Time
+}
+
 type MediaSecureChunk struct {
 	AssetID   uuid.UUID
 	Idx       int32

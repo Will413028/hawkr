@@ -1,3 +1,10 @@
+-- Create "orphan_objects" table
+CREATE TABLE "media"."orphan_objects" (
+  "object_key" text NOT NULL,
+  "recorded_at" timestamptz NOT NULL,
+  PRIMARY KEY ("object_key"),
+  CONSTRAINT "orphan_objects_object_key_check" CHECK (object_key ~~ 'secure/%'::text)
+);
 -- Create "asset_copy_requests" table
 CREATE TABLE "media"."asset_copy_requests" (
   "asset_id" uuid NOT NULL,

@@ -180,3 +180,9 @@ CREATE TABLE media.asset_copy_requests (
     CONSTRAINT asset_copy_requests_self_check CHECK (asset_id <> source_asset_id)
 );
 CREATE INDEX asset_copy_requests_pending ON media.asset_copy_requests (requested_at) WHERE completed_at IS NULL AND failed_at IS NULL;
+
+CREATE TABLE media.orphan_objects (
+    object_key  TEXT        PRIMARY KEY,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT orphan_objects_object_key_check CHECK (object_key LIKE 'secure/%')
+);

@@ -107,6 +107,42 @@
    "new": "\t\tif false && model.AssetState(state) != model.AssetStaged {\n\t\t\tabandoned = true",
    "test": "internal/modules/media ^TestCopyToSecureAbandonsWhenTheCopyIsDeletedMidCopy$",
    "why": "複製完成的 transaction 不再檢查副本資產狀態：複製中被刪除的副本被記上段、物件留下，測試要紅。"
+  },
+  {
+   "id": "hold-fk-maps-to-asset-gone",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "return fmt.Errorf(\"%w：%w\", model.ErrHoldContended, err)",
+   "new": "return fmt.Errorf(\"%w：%w\", model.ErrAssetGone, err)",
+   "test": "internal/modules/media/internal/hold ^TestClassifyHoldInsertMapsForeignKeyViolationToRetryableContention$",
+   "why": "保全 INSERT 的外鍵違反又被當成資產已刪：擁有者收到不可重試的 ErrAssetGone，單元測試要紅。"
+  },
+  {
+   "id": "copy-abandon-skips-orphan-record",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/copy_secure.go",
+   "old": "s.q(ctx).InsertOrphanObject(ctx, store.InsertOrphanObjectParams{ObjectKey: key, Now: s.d.Now()})",
+   "new": "error(nil)",
+   "test": "internal/modules/media ^TestCopyToSecureAbandonRecordsObjectsItCouldNotDeleteAndGCRetries$",
+   "why": "放棄複製時刪不掉的物件不記入遺留清單：物件永遠遺留，測試要紅。"
+  },
+  {
+   "id": "gc-skips-orphan-retry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "if err := s.deleteOrphanObjects(ctx); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/media ^TestCopyToSecureAbandonRecordsObjectsItCouldNotDeleteAndGCRetries$",
+   "why": "刪除 job 不再重試遺留清單：物件仍在，測試要紅。"
+  },
+  {
+   "id": "orphan-record-never-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "s.q(ctx).DeleteOrphanObject(ctx, key)",
+   "new": "error(nil)",
+   "test": "internal/modules/media ^TestCopyToSecureAbandonRecordsObjectsItCouldNotDeleteAndGCRetries$",
+   "why": "遺留物件刪除成功後不移除記錄：清單永遠不清，測試要紅。"
   }
  ]
 }
