@@ -69,7 +69,7 @@
    "file": "backend/internal/modules/delegation/delegated.go",
    "old": "SessionID: c.Session.ID, AdminID: c.Session.Actor.AdminID, StoreID: c.Session.Target.StoreID,",
    "new": "SessionID: c.Session.ID, AdminID: c.Session.Actor.AdminID, StoreID: c.Session.Actor.AdminID,",
-   "test": "internal/modules/delegation ^TestDelegatedProductWritesStayInTheSessionStore$|^TestEveryDelegatedProductWriteLeavesOneSucceededAuditRow$",
+   "test": "internal/modules/delegation ^TestDelegatedWriteActorStoreIsTheSessionTargetStoreNotTheAdminID$",
    "why": "代行者的店家不來自 session 的目標店家：稽核訂閱者核對店家時對不上（寫入全部失敗）或放過別家"
   },
   {
