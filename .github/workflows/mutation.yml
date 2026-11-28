@@ -75,6 +75,7 @@ jobs:
             if [[ "$EVENT_NAME" == "push" ]]; then base="$PUSH_BEFORE_SHA"; fi
             if [[ -z "$base" || "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
               # 新分支或查不到前一個 commit：沒有可比對的基準，全跑。
+              echo "no comparable base ($base), running every manifest"
               manifests=(mutation/*.json)
             else
               git diff --name-only "$base" HEAD > "$RUNNER_TEMP/changed"
@@ -122,12 +123,13 @@ jobs:
             echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          stacks="$(python3 scripts/mutation/run.py --list-stacks "${manifests[@]}")"
+          counts="$(python3 scripts/mutation/run.py --stack-counts "${manifests[@]}")"
           echo "manifests=${manifests[*]}" >> "$GITHUB_OUTPUT"
-          STACKS="$stacks" python3 - >> "$GITHUB_OUTPUT" <<'PY'
-          import json, os
+          COUNTS="$counts" python3 - >> "$GITHUB_OUTPUT" <<'PY'
+          import json, math, os
+          PER_SHARD = 60
           include = []
-          for s in json.loads(os.environ["STACKS"]):
+          for s, n in sorted(json.loads(os.environ["COUNTS"]).items()):
               if s.startswith("flutter:"):
                 kind, app, module = "flutter", s.removeprefix("flutter:"), ""
               elif s.startswith("dart-package:"):
@@ -135,15 +137,17 @@ jobs:
               elif s.startswith("ts-package:") or s in ("website", "admin"):
                 kind, app, module = "pnpm", "", ""
               else:
-                # go、go-integration 是 backend 單體；go:<dir>、go-integration:<dir> 是 <dir> 這個獨立模組。
                 kind, app = "go", ""
                 module = s.split(":", 1)[1] if ":" in s else "backend"
-              include.append({"stack": s, "kind": kind, "app": app, "module": module})
+              shards = math.ceil(n / PER_SHARD) if kind == "go" else 1
+              for k in range(1, shards + 1):
+                  shard = f"{k}/{shards}" if shards > 1 else ""
+                  include.append({"stack": s, "kind": kind, "app": app, "module": module, "shard": shard})
           print("matrix=" + json.dumps({"include": include}))
           PY
 
   mutate:
-    name: mutation (${{ matrix.stack }})
+    name: mutation (${{ matrix.stack }}${{ matrix.shard != '' && format(' {0}', matrix.shard) || '' }})
     needs: plan
     if: needs.plan.outputs.manifests != ''
     runs-on: ubuntu-latest
@@ -193,10 +197,11 @@ jobs:
         env:
           STACK: ${{ matrix.stack }}
           MANIFESTS: ${{ needs.plan.outputs.manifests }}
+          SHARD: ${{ matrix.shard }}
         run: |
           # MANIFESTS 刻意不加引號，讓多個路徑各自展開。
           # shellcheck disable=SC2086
-          python3 scripts/mutation/run.py --stack "$STACK" $MANIFESTS
+          python3 scripts/mutation/run.py --stack "$STACK" ${SHARD:+--shard "$SHARD"} $MANIFESTS
 
   gate:
     # 只要有一個 mutation job 沒有全部 KILLED 就失敗；plan 判定沒有清單要跑時 mutate 是 skipped，視為通過。

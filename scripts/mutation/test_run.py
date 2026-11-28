@@ -208,9 +208,28 @@ class ManifestTest(Base):
         self.assertEqual([m.id for m in run.select([str(p)], "website")], ["b"])
         self.assertEqual(len(run.select([str(p)], None)), 2)
 
+    def test_shards_partition_the_selection(self):
+        ids = [f"m{i}" for i in range(7)]
+        p = self.manifest({"mutants": [dict(self.good, id=i) for i in ids]})
+        shards = [[m.id for m in run.shard(run.select([str(p)], None), f"{k}/3")] for k in (1, 2, 3)]
+        self.assertEqual(sorted(sum(shards, [])), sorted(ids))
+        self.assertEqual([len(s) for s in shards], [3, 2, 2])
+
+    def test_bad_shard_is_a_manifest_error(self):
+        for spec in ("0/3", "4/3", "1/0", "x", "1/"):
+            with self.subTest(spec=spec), self.assertRaises(run.ManifestError):
+                run.shard([], spec)
+
+    def test_stack_counts(self):
+        p = self.manifest({"mutants": [self.good, dict(self.good, id="b"), dict(self.good, id="c", stack="website")]})
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(run.main([str(p), "--stack-counts"]), 0)
+        self.assertEqual(json.loads(out.getvalue()), {self.good["stack"]: 2, "website": 1})
+
     def test_main_exit_codes(self):
         p = self.manifest({"mutants": [self.good]})
-        self.assertEqual(run.main([str(p), "--list-stacks"]), 0)
+        self.assertEqual(run.main([str(p), "--stack-counts"]), 0)
         self.assertEqual(run.main([str(p), "--stack", "website"]), 1)
         bad = self.manifest({"mutants": []}, "bad.json")
         self.assertEqual(run.main([str(bad)]), 2)

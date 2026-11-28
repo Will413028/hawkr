@@ -85,8 +85,8 @@
       "id": "store-id-instead-of-store-code-e2e",
       "stack": "go-integration",
       "file": "backend/internal/modules/notification/internal/registry/content.go",
-      "old": "Loaded{StoreCode: codes[storeID(p)]}",
-      "new": "Loaded{StoreCode: storeID(p)}",
+      "old": "codes, err := src.StoreCodes(ctx, slices.Compact(ids))\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tout := make([]Loaded, len(ps))\n\t\tfor i, p := range ps {\n\t\t\tout[i] = Loaded{StoreCode: codes[storeID(p)]}\n\t\t}\n\t\treturn out, nil",
+      "new": "_, err := src.StoreCodes(ctx, slices.Compact(ids))\n\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tout := make([]Loaded, len(ps))\n\t\tfor i, p := range ps {\n\t\t\tout[i] = Loaded{StoreCode: storeID(p)}\n\t\t}\n\t\treturn out, nil",
       "test": "internal/modules/notification ^TestContentDeepLinkUsesTheStoreCodeAndLocalePrefix$",
       "why": "同上，整合層：收件匣的深連結要是 store_code 而不是 store_id"
     },
