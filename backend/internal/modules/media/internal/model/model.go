@@ -1,6 +1,11 @@
 package model
 
-import "errors"
+import (
+	"errors"
+	"time"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+)
 
 // ErrNotSecure 表示 ReadSecure 的資產不是機敏資產：呼叫方把它當成設定或資料的錯誤，不是「找不到」。
 var ErrNotSecure = errors.New("media：不是機敏資產")
@@ -30,3 +35,23 @@ func (e *confirmedElsewhere) Is(target error) bool { return target == ErrUploadA
 
 // MarkConfirmedElsewhere 讓 err（分類與訊息不變）也符合 errors.Is(err, ErrUploadAlreadyConfirmed)。
 func MarkConfirmedElsewhere(err error) error { return &confirmedElsewhere{err} }
+
+var ErrAssetGone = errors.New("media：資產已在刪除，來不及保全")
+
+var ErrHoldContended = apperr.Unavailable("media：保全撞上資產閘門的整理，請重試整個 transaction")
+
+var ErrAssetNotFound = errors.New("media：資產不存在")
+
+var ErrHoldNotFound = errors.New("media：找不到該來源的保全")
+
+type CopyStatus string
+
+const (
+	CopyPending   CopyStatus = "PENDING"
+	CopyCompleted CopyStatus = "COMPLETED"
+	CopyFailed    CopyStatus = "FAILED"
+)
+
+const CopySource = "media.copy_to_secure"
+
+const CopyHoldTTL = time.Hour

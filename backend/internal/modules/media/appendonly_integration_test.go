@@ -156,6 +156,37 @@ func TestOwnerTransactionIssuesOnlyAppendsAndReads(t *testing.T) {
 		}
 	})
 
+	t.Run("Hold、ExtendHold、ReleaseHold、CopyToSecure", func(t *testing.T) {
+		held, _ := secureConfirmed(t, f)
+		public, _ := publicSource(t, f)
+		sourceID := uuid.New()
+		until := f.clock.Now().Add(time.Hour)
+		rec.reset()
+		err := d.InTx(t.Context(), func(ctx context.Context) error {
+			if err := m.Hold(ctx, []uuid.UUID{held.ID, held.ID}, holdSource, sourceID, until); err != nil {
+				return err
+			}
+			if err := m.Hold(ctx, []uuid.UUID{held.ID}, holdSource, sourceID, until); err != nil {
+				return err
+			}
+			if err := m.ExtendHold(ctx, holdSource, sourceID, until.Add(time.Hour)); err != nil {
+				return err
+			}
+			if err := m.ReleaseHold(ctx, holdSource, sourceID); err != nil {
+				return err
+			}
+			if err := m.ReleaseHold(ctx, holdSource, sourceID); err != nil {
+				return err
+			}
+			_, err := m.CopyToSecure(ctx, owner, public.ID)
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertAppendOnly(t, rec, "Hold 與 CopyToSecure")
+	})
+
 	t.Run("ConfirmFields", func(t *testing.T) {
 		rec.reset()
 		err := d.InTx(t.Context(), func(ctx context.Context) error {

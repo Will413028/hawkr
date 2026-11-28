@@ -17,9 +17,9 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/hold"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
@@ -37,9 +37,9 @@ const ApplyInterval = 30 * time.Second
 
 // GCLockTimeout 是 GC 每個 transaction 的鎖等待上限：GC 絕不等擁有者還沒提交的認領（多 token 的擁有者 transaction 可能同時握著別的列），
 // 逾時就跳過那一列、留給下一輪，所以 GC 與擁有者之間不會死結、也不會被拖住。
-const GCLockTimeout = 100 * time.Millisecond
+const GCLockTimeout = hold.LockTimeout
 
-const lockNotAvailable = "55P03"
+var errUploadHeld = errors.New("media：暫存的資產有保全，或暫存列已被別處轉走，這一輪不回收")
 
 // Deps 是回收的依賴。
 type Deps struct {
@@ -107,20 +107,24 @@ func (s *Service) ApplyDeletions(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	total := 0
+	after := store.ListPendingDeletionRequestsParams{MaxRows: batchSize}
 	for {
-		var n int
-		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-			applied, err := s.q(ctx).ApplyDeletionRequests(ctx, store.ApplyDeletionRequestsParams{Now: s.d.Now(), MaxRows: batchSize})
-			n = len(applied)
-			return err
-		})
+		rows, err := s.q(ctx).ListPendingDeletionRequests(ctx, after)
 		if err != nil {
-			return total, fmt.Errorf("media：套用刪除請求：%w", err)
+			return total, fmt.Errorf("media：列出待套用的刪除請求：%w", err)
 		}
-		total += n
-		if n < batchSize {
+		for _, r := range rows {
+			n, err := s.applyRequest(ctx, r.AssetID)
+			if err != nil {
+				return total, err
+			}
+			total += n
+		}
+		if len(rows) < batchSize {
 			break
 		}
+		last := rows[len(rows)-1]
+		after.AfterRequestedAt, after.AfterID = last.RequestedAt, last.AssetID
 	}
 	for {
 		var n int64
@@ -137,6 +141,32 @@ func (s *Service) ApplyDeletions(ctx context.Context) (int, error) {
 		}
 	}
 	return total, nil
+}
+
+func (s *Service) applyRequest(ctx context.Context, assetID uuid.UUID) (int, error) {
+	applied := 0
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
+		}
+		q := s.q(ctx)
+		now := s.d.Now()
+		won, err := hold.Claim(ctx, q, assetID, now)
+		if err != nil || !won {
+			return err
+		}
+		n, err := q.ApplyDeletionRequest(ctx, store.ApplyDeletionRequestParams{AssetID: assetID, Now: now})
+		applied = int(n)
+		return err
+	})
+	if hold.IsContention(err) {
+		s.d.Logger.Info("media：套用刪除請求撞上擁有者未提交的保全，跳過", "asset_id", assetID)
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("media：套用資產 %s 的刪除請求：%w", assetID, err)
+	}
+	return applied, nil
 }
 
 // Result 是一輪回收的結果。
@@ -190,8 +220,8 @@ func (s *Service) CollectGarbage(ctx context.Context) (Result, error) {
 func (s *Service) reclaimUpload(ctx context.Context, id uuid.UUID, now, uploadedBefore time.Time) (bool, error) {
 	won := false
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		if _, err := s.d.DB.Conn(ctx).Exec(ctx, fmt.Sprintf("SET LOCAL lock_timeout = '%dms'", GCLockTimeout.Milliseconds())); err != nil {
-			return fmt.Errorf("media：設定 GC 鎖逾時：%w", err)
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
 		}
 		q := s.q(ctx)
 		if _, err := q.ReclaimUpload(ctx, store.ReclaimUploadParams{ID: id, Now: now, UploadedBefore: uploadedBefore}); err != nil {
@@ -200,21 +230,39 @@ func (s *Service) reclaimUpload(ctx context.Context, id uuid.UUID, now, uploaded
 			}
 			return err
 		}
-		assetID, err := q.MarkReclaimedUploadDeleting(ctx, store.MarkReclaimedUploadDeletingParams{ID: id, Now: now})
+		row, err := q.MarkReclaimedUploadDeleting(ctx, store.MarkReclaimedUploadDeletingParams{ID: id, Now: now})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errUploadHeld
+		}
 		if err != nil {
 			return fmt.Errorf("media：暫存 %s 轉 DELETING：%w", id, err)
 		}
-		if assetID != nil {
-			if _, err := q.ClaimAssetsOfUploads(ctx, store.ClaimAssetsOfUploadsParams{Ids: []uuid.UUID{*assetID}, Now: now}); err != nil {
+		var gated []uuid.UUID
+		for _, a := range []*uuid.UUID{row.AssetID, row.PlannedAssetID} {
+			if a != nil {
+				gated = append(gated, *a)
+			}
+		}
+		clear, err := hold.ClaimAll(ctx, q, gated, now)
+		if err != nil {
+			return err
+		}
+		if !clear {
+			return errUploadHeld
+		}
+		if row.AssetID != nil {
+			if _, err := q.ClaimAssetsOfUploads(ctx, store.ClaimAssetsOfUploadsParams{Ids: []uuid.UUID{*row.AssetID}, Now: now}); err != nil {
 				return fmt.Errorf("media：標記暫存的資產：%w", err)
 			}
 		}
 		won = true
 		return nil
 	})
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == lockNotAvailable {
-		s.d.Logger.Info("media：GC 撞上擁有者未提交的認領，跳過", "upload_id", id)
+	if errors.Is(err, errUploadHeld) {
+		return false, nil
+	}
+	if hold.IsContention(err) {
+		s.d.Logger.Info("media：GC 撞上擁有者未提交的認領或保全，跳過", "upload_id", id)
 		return false, nil
 	}
 	if err != nil {
@@ -238,11 +286,14 @@ func (s *Service) DeleteAssets(ctx context.Context) (int, error) {
 			return total, errors.Join(append(errs, fmt.Errorf("media：列出刪除中的暫存：%w", err))...)
 		}
 		for _, r := range rows {
-			if err := s.deleteUpload(ctx, r); err != nil {
+			deleted, err := s.deleteUpload(ctx, r)
+			if err != nil {
 				errs = append(errs, err)
 				continue
 			}
-			total++
+			if deleted {
+				total++
+			}
 		}
 		if len(rows) < batchSize {
 			break
@@ -256,18 +307,55 @@ func (s *Service) DeleteAssets(ctx context.Context) (int, error) {
 			return total, errors.Join(append(errs, fmt.Errorf("media：列出刪除中的資產：%w", err))...)
 		}
 		for _, r := range rows {
-			if err := s.deleteAsset(ctx, r); err != nil {
+			deleted, err := s.deleteAsset(ctx, r)
+			if err != nil {
 				errs = append(errs, err)
 				continue
 			}
-			total++
+			if deleted {
+				total++
+			}
 		}
 		if len(rows) < batchSize {
 			break
 		}
 		after = rows[len(rows)-1].ID
 	}
+	if err := s.deleteOrphanObjects(ctx); err != nil {
+		errs = append(errs, err)
+	}
 	return total, errors.Join(errs...)
+}
+
+func (s *Service) deleteOrphanObjects(ctx context.Context) error {
+	var errs []error
+	after := ""
+	for {
+		keys, err := s.q(ctx).ListOrphanObjects(ctx, store.ListOrphanObjectsParams{AfterKey: after, MaxRows: batchSize})
+		if err != nil {
+			return errors.Join(append(errs, fmt.Errorf("media：列出待刪的遺留物件：%w", err))...)
+		}
+		for _, key := range keys {
+			referenced, err := s.q(ctx).IsChunkObjectReferenced(ctx, key)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("media：查遺留物件 %s 有沒有被引用：%w", key, err))
+				continue
+			}
+			if !referenced {
+				if err := s.d.Store.Delete(ctx, key); err != nil {
+					errs = append(errs, fmt.Errorf("media：刪除遺留物件 %s：%w", key, err))
+					continue
+				}
+			}
+			if err := s.q(ctx).DeleteOrphanObject(ctx, key); err != nil {
+				errs = append(errs, fmt.Errorf("media：移除遺留物件 %s 的記錄：%w", key, err))
+			}
+		}
+		if len(keys) < batchSize {
+			return errors.Join(errs...)
+		}
+		after = keys[len(keys)-1]
+	}
 }
 
 func (s *Service) deleteSecureObjects(ctx context.Context, assetID uuid.UUID) error {
@@ -293,10 +381,14 @@ func (s *Service) deleteSecureObjects(ctx context.Context, assetID uuid.UUID) er
 	return nil
 }
 
-func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsRow) error {
+func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsRow) (bool, error) {
+	proceed, err := s.recheckUpload(ctx, r.ID)
+	if err != nil || !proceed {
+		return false, err
+	}
 	if r.PlannedAssetID != nil {
 		if err := s.deleteSecureObjects(ctx, *r.PlannedAssetID); err != nil {
-			return fmt.Errorf("media：刪除暫存 %s 的機敏物件：%w", r.ID, err)
+			return false, fmt.Errorf("media：刪除暫存 %s 的機敏物件：%w", r.ID, err)
 		}
 	}
 	var keys []string
@@ -308,10 +400,10 @@ func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsR
 	}
 	for _, k := range keys {
 		if err := s.d.Store.Delete(ctx, k); err != nil {
-			return fmt.Errorf("media：刪除暫存 %s 的物件 %s：%w", r.ID, k, err)
+			return false, fmt.Errorf("media：刪除暫存 %s 的物件 %s：%w", r.ID, k, err)
 		}
 	}
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		if _, err := s.q(ctx).MarkUploadDeleted(ctx, store.MarkUploadDeletedParams{ID: r.ID, Now: s.d.Now()}); err != nil {
 			return fmt.Errorf("media：標記暫存已刪：%w", err)
 		}
@@ -325,17 +417,70 @@ func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsR
 		}
 		return nil
 	})
+	return err == nil, err
 }
 
-func (s *Service) deleteAsset(ctx context.Context, r store.ListDeletingAssetsRow) error {
-	if model.Visibility(r.Visibility) == model.VisibilitySecure {
-		if err := s.deleteSecureObjects(ctx, r.ID); err != nil {
+func (s *Service) recheckUpload(ctx context.Context, id uuid.UUID) (bool, error) {
+	proceed := false
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
 			return err
 		}
-	} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {
-		return fmt.Errorf("media：刪除資產 %s 的物件：%w", r.ID, err)
+		q := s.q(ctx)
+		row, err := q.LockDeletingUpload(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("media：鎖定刪除中的暫存 %s：%w", id, err)
+		}
+		now := s.d.Now()
+		for _, assetID := range []*uuid.UUID{row.AssetID, row.PlannedAssetID} {
+			if assetID == nil {
+				continue
+			}
+			held, err := q.IsAssetHeld(ctx, store.IsAssetHeldParams{AssetID: *assetID, Now: now})
+			if err != nil {
+				return fmt.Errorf("media：查暫存 %s 的資產保全：%w", id, err)
+			}
+			if !held {
+				continue
+			}
+			n, err := q.RestoreHeldUpload(ctx, store.RestoreHeldUploadParams{ID: id, Now: now})
+			if err != nil {
+				return fmt.Errorf("media：退回有保全的暫存 %s：%w", id, err)
+			}
+			if n == 0 {
+				return fmt.Errorf("media：暫存 %s 的資產有保全，但無法判定退回哪個原狀態", id)
+			}
+			if _, err := q.DeleteClaimOfUpload(ctx, id); err != nil {
+				return fmt.Errorf("media：刪除暫存 %s 的認領：%w", id, err)
+			}
+			return nil
+		}
+		proceed = true
+		return nil
+	})
+	if hold.IsContention(err) {
+		s.d.Logger.Info("media：實體刪除撞上擁有者未提交的保全，跳過", "upload_id", id)
+		return false, nil
 	}
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	return proceed, err
+}
+
+func (s *Service) deleteAsset(ctx context.Context, r store.ListDeletingAssetsRow) (bool, error) {
+	proceed, err := s.recheckAsset(ctx, r.ID)
+	if err != nil || !proceed {
+		return false, err
+	}
+	if model.Visibility(r.Visibility) == model.VisibilitySecure {
+		if err := s.deleteSecureObjects(ctx, r.ID); err != nil {
+			return false, err
+		}
+	} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {
+		return false, fmt.Errorf("media：刪除資產 %s 的物件：%w", r.ID, err)
+	}
+	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if _, err := q.SettleDeletedAssetUploads(ctx, store.SettleDeletedAssetUploadsParams{AssetID: r.ID, Now: s.d.Now()}); err != nil {
 			return fmt.Errorf("media：轉換資產 %s 的暫存列：%w", r.ID, err)
@@ -356,6 +501,44 @@ func (s *Service) deleteAsset(ctx context.Context, r store.ListDeletingAssetsRow
 		}
 		return nil
 	})
+	return err == nil, err
+}
+
+func (s *Service) recheckAsset(ctx context.Context, id uuid.UUID) (bool, error) {
+	proceed := false
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
+		}
+		q := s.q(ctx)
+		if _, err := q.LockDeletingAsset(ctx, id); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return fmt.Errorf("media：鎖定刪除中的資產 %s：%w", id, err)
+		}
+		now := s.d.Now()
+		held, err := q.IsAssetHeld(ctx, store.IsAssetHeldParams{AssetID: id, Now: now})
+		if err != nil {
+			return fmt.Errorf("media：查資產 %s 的保全：%w", id, err)
+		}
+		if !held {
+			proceed = true
+			return nil
+		}
+		if _, err := q.RestoreHeldAsset(ctx, store.RestoreHeldAssetParams{ID: id, Now: now}); err != nil {
+			return fmt.Errorf("media：退回有保全的資產 %s：%w", id, err)
+		}
+		if _, err := q.ReopenDeletionRequest(ctx, id); err != nil {
+			return fmt.Errorf("media：重開資產 %s 的刪除請求：%w", id, err)
+		}
+		return nil
+	})
+	if hold.IsContention(err) {
+		s.d.Logger.Info("media：實體刪除撞上擁有者未提交的保全，跳過", "asset_id", id)
+		return false, nil
+	}
+	return proceed, err
 }
 
 type deleteWorker struct {
@@ -406,6 +589,7 @@ func (w *gcWorker) Timeout(*river.Job[GCArgs]) time.Duration { return 5 * time.M
 func AddWorkers(workers *river.Workers, s *Service) {
 	river.AddWorker(workers, &deleteWorker{svc: s})
 	river.AddWorker(workers, &gcWorker{svc: s})
+	river.AddWorker(workers, &expireHoldsWorker{svc: s})
 }
 
 // PeriodicJobs 回傳啟動即執行的排程：每 ApplyInterval 套用刪除請求並刪物件，每 SweepInterval 的 GC。
@@ -420,6 +604,11 @@ func PeriodicJobs() []*river.PeriodicJob {
 			river.PeriodicInterval(SweepInterval),
 			func() (river.JobArgs, *river.InsertOpts) { return GCArgs{}, nil },
 			&river.PeriodicJobOpts{ID: "media.gc_uploads", RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(ExpireHoldsInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return ExpireHoldsArgs{}, nil },
+			&river.PeriodicJobOpts{ID: "media.expire_holds", RunOnStart: true},
 		),
 	}
 }
