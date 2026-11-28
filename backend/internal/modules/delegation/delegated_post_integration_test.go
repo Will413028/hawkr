@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -42,7 +43,11 @@ func (f *fixture) newOperator(t *testing.T, tag string, caps ...Capability) oper
 	}
 	storeID := f.exposableStore(t)
 	admin := f.delegationAdmin(t, tag+"@hawkr.example", true)
-	f.grant(t, admin, storeID, append([]Capability{CapabilityProductsRead}, caps...)...)
+	granted := caps
+	if !slices.Contains(granted, CapabilityProductsRead) {
+		granted = append([]Capability{CapabilityProductsRead}, caps...)
+	}
+	f.grant(t, admin, storeID, granted...)
 	return operator{storeID: storeID, admin: admin, session: f.start(t, startInput(admin, storeID, "ik-"+tag, caps...))}
 }
 
