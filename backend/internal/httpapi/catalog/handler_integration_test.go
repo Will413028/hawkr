@@ -156,7 +156,6 @@ func TestSellerCannotReadOrWriteAnotherStoresProduct(t *testing.T) {
 	t.Parallel()
 	e := setup(t)
 	ctx := context.Background()
-	e.w.Store()
 	storeA, acctA := e.w.Store()
 	storeB, acctB := e.w.Store()
 	if storeA == storeB || acctA == acctB || storeA == acctA || storeA == acctB || storeB == acctA || storeB == acctB {

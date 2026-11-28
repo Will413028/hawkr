@@ -58,7 +58,9 @@ import (
 // Image 是單體統一的 Postgres 主版本：測試、Atlas 的 dev database、jet 的生成（cmd/jetgen）與本機 compose 都用它。
 const Image = "postgres:18-alpine"
 
-const templateFormat = "1"
+const templateFormat = "2"
+
+const sellerStoreIDSequenceStart int64 = 1_000_000_000_000
 
 const testPoolConns = 10
 
@@ -170,7 +172,11 @@ type Step struct {
 // Migrations 依序套用模組的 migration（migrate.Apply）。
 func Migrations(mods ...migrate.Module) Step {
 	h := sha256.New()
+	hasSeller := false
 	for _, m := range mods {
+		if m.Name == "seller" {
+			hasSeller = true
+		}
 		h.Write(fmt.Appendf(nil, "module %q\n", m.Name))
 		err := fs.WalkDir(m.Dir, ".", func(p string, e fs.DirEntry, err error) error {
 			if err != nil || e.IsDir() {
@@ -189,8 +195,19 @@ func Migrations(mods ...migrate.Module) Step {
 		}
 	}
 	return Step{
-		key:   "migrate " + hex.EncodeToString(h.Sum(nil)),
-		apply: func(ctx context.Context, d *db.DB) error { return migrate.Apply(ctx, d, mods) },
+		key: "migrate " + hex.EncodeToString(h.Sum(nil)),
+		apply: func(ctx context.Context, d *db.DB) error {
+			if err := migrate.Apply(ctx, d, mods); err != nil {
+				return err
+			}
+			if hasSeller {
+				query := fmt.Sprintf("ALTER SEQUENCE seller.stores_store_id_seq RESTART WITH %d", sellerStoreIDSequenceStart)
+				if _, err := d.Pool().Exec(ctx, query); err != nil {
+					return fmt.Errorf("testdb：移動 seller.stores identity sequence：%w", err)
+				}
+			}
+			return nil
+		},
 	}
 }
 

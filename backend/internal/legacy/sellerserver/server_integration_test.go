@@ -109,7 +109,7 @@ func (c *ratingCall) check(t *testing.T, what string) {
 	}
 }
 
-func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
+func TestEveryLegacySellerRPCReadsTheModuleAndShowsNoSuspensionAfterReapply(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "identity", Dir: identity.Migrations()},

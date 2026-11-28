@@ -267,31 +267,28 @@ func TestStoreCarriesTheEffectiveMeasuresOfTheSameRead(t *testing.T) {
 	}
 }
 
-// 措施記在舊 stint、帳號目前的 stint 繼承停權時，帶出的措施是帳號範圍的（本 stint 沒有措施紀錄）。
-func TestStoreFindsAMeasureRecordedOnAnEarlierStint(t *testing.T) {
+func TestClosedStintReadsItsSuspensionAndReapplyWaitsUntilItEnds(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, old := f.exposable(t)
-	record := f.suspend(t, old.StoreID)
+	measure := f.suspend(t, old.StoreID)
 	_, err := f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
-	var newID int64
-	must(t, f.db.Conn(ctx).QueryRow(ctx,
-		`INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES ($1, $2, '新店', $3, $3) RETURNING store_id`,
-		old.StoreCode+1, accountID, f.now).Scan(&newID))
-	for name, read := range map[string]func() (Store, error){
-		"current": func() (Store, error) { return f.module.CurrentStore(ctx, accountID) },
-		"by id":   func() (Store, error) { return f.module.Store(ctx, newID) },
-	} {
-		got, err := read()
-		must(t, err)
-		if got.StoreID != newID || !got.Suspended() || len(got.EffectiveMeasures()) != 1 || got.EffectiveMeasures()[0].MeasureID != record.ID {
-			t.Fatalf("%s: 繼承的停權要帶舊 stint 的措施：%+v", name, got)
-		}
+	closed, err := f.module.Store(ctx, old.StoreID)
+	must(t, err)
+	if closed.Status != Closed || !closed.Suspended() || len(closed.EffectiveMeasures()) != 1 || closed.EffectiveMeasures()[0].MeasureID != measure.ID {
+		t.Fatalf("closed=%+v", closed)
 	}
-	state, err := f.module.StoreWithActiveMeasures(ctx, newID)
-	if err != nil || !state.Store.Suspended() || len(state.Active) != 1 || state.Active[0].ID != record.ID || state.Active[0].StoreID != old.StoreID || state.Active[0].State != StateActive {
-		t.Fatalf("繼承的停權要在 StoreWithActiveMeasures 裡：err=%v %+v", err, state)
+	if _, err := f.module.Apply(ctx, validApply(accountID)); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("有生效停權時不能重新開店：%v", err)
+	}
+	if _, err := f.lift(ctx, measure); err != nil {
+		t.Fatal(err)
+	}
+	current, err := f.module.Apply(ctx, validApply(accountID))
+	must(t, err)
+	if current.StoreID == old.StoreID || current.Suspended() || len(current.EffectiveMeasures()) != 0 {
+		t.Fatalf("current=%+v", current)
 	}
 }

@@ -101,19 +101,15 @@ func ExposableStore(ctx context.Context, d *db.DB, accountID int64, now time.Tim
 func NewAccount(ctx context.Context, d *db.DB, now time.Time) (int64, error) {
 	bus := events.NewBus()
 	module := identity.New(identity.Deps{DB: d, Events: bus, Now: func() time.Time { return now }, Logger: discardLogger()})
-	var accountID int64
-	for range 2 {
-		subject := uuid.NewV7().String()
-		login, err := module.Login(ctx, identity.LoginInput{
-			Identity: identity.ProviderIdentity{Provider: identity.ProviderGoogle, Subject: subject, Name: subject},
-			Client:   identity.ClientApp,
-		})
-		if err != nil {
-			return 0, err
-		}
-		accountID = login.AccountID
+	subject := uuid.NewV7().String()
+	login, err := module.Login(ctx, identity.LoginInput{
+		Identity: identity.ProviderIdentity{Provider: identity.ProviderGoogle, Subject: subject, Name: subject},
+		Client:   identity.ClientApp,
+	})
+	if err != nil {
+		return 0, err
 	}
-	return accountID, nil
+	return login.AccountID, nil
 }
 
 func ExposableStoreNamed(ctx context.Context, d *db.DB, accountID int64, now time.Time, name string) (int64, error) {

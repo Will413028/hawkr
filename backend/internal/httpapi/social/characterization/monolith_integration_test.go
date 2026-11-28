@@ -118,9 +118,6 @@ func startMonolith(t *testing.T) *monolith {
 	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
-	if _, _, err := id.DevNewSession(context.Background()); err != nil {
-		t.Fatal(err)
-	}
 	fakeMedia := newMedia()
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: fakeMedia, Orders: noOrders{}, KYCMAC: sealtest.MAC(t),
