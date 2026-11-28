@@ -93,7 +93,7 @@
 ### 檢查二：分際自檢（機械，可直接跑）
 
 ```bash
-F="backend/docs/基本設計書/<這一本>.md"
+F="backend/docs/basic-design/<這一本>.md"
 echo "完整狀態值域: $(grep -c 'stateDiagram' "$F")"      # 必須 0
 echo "DDL/CHECK   : $(grep -cE 'CREATE TABLE|CHECK \(|varchar\(' "$F")"  # 必須 0
 echo "端點簽章    : $(grep -cE 'GET /|POST /|PUT /|DELETE /' "$F")"        # 必須 0

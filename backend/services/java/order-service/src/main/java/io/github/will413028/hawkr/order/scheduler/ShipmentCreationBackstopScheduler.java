@@ -29,7 +29,7 @@ import java.util.List;
  * 永久旗標：租約到期該列自動回到候選集合。{@code orders.shipment_backstop_given_up_at} 只是
  * <b>觀測欄</b>（供 sql_exporter 告警），不進候選述詞。詳見
  * {@code OrderRepository.bumpShipmentCreateAttempt} / {@code claimShipmentBackstopGiveUp}
- * 與 {@code docs/開發規範/多副本排程搶佔規範.md}。
+ * 與 {@code docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md}。
  *
  * <p><b>租約長度的上界（issue #2294 R4-P1-1，2026-08-08 修正）</b>：
  * give-up 租約原為獨立設定 {@code shipmentBackstopGiveUpLeaseMinutes = 1440}（1 天）。

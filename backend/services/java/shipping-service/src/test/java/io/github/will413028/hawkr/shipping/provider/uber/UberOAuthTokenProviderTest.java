@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <h2>🔴 為什麼快取是硬需求</h2>
  * 官方明載 token 發放速率 <b>100 requests / hour</b>、有效期 <b>30 天</b>
- * （{@code docs/第三方整合/Uber Direct API 總覽.md} §1.1）。
+ * （{@code docs/third-party-integrations/uber-direct-api-overview.md} §1.1）。
  * 每次請求重新取 token 會撞上 100/hr 上限，而撞上的症狀是「Uber 突然全面 401」
  * ——看起來完全像被停權。
  */

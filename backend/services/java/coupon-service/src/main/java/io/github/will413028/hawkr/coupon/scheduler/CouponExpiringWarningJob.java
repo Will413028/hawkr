@@ -23,7 +23,7 @@ import java.util.Map;
  * <p>每日掃描 UNUSED 且所屬 template 於預警窗口（預設 24h）內到期的 instance，per-instance
  * fan-out 發 {@code coupon.expiring} event（snake_case）。冪等由 notification 端 reference_id
  * {@code expiring_{coupon_instance_id}_{date_key}} 承擔（UNIQUE），本 job 重跑 / 多 pod 天然去重，
- * 不引入 dedup 表（docs/開發規範/後端服務責任邊界規範.md）。
+ * 不引入 dedup 表（docs/dev-guidelines/backend-service-responsibility-boundaries.md）。
  *
  * <p>buyer_id rekey Phase 5（2026-07-18）：{@code coupon_instances.owner_buyer_id} 是
  * stint-scoped buyer_id，notification-service 的 {@code device_tokens} 是登入 account_id

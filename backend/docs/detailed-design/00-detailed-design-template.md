@@ -70,7 +70,7 @@
 |---|---|
 | 負責人 | 這份規格的 owner（要改契約找誰） |
 | 對應程式碼 | 主要 package 路徑，例 `services/<svc>/internal/...`、`gateway/internal/handler/<x>.go` |
-| 基本設計書 | 連結到對應的 `docs/基本設計書/NN-...`（業務意圖的權威） |
+| 基本設計書 | 連結到對應的 `docs/basic-design/NN-...`（業務意圖的權威） |
 | 相關 ADR | `docs/adr/<...>`（設計理由與被否決方案的權威） |
 | Runbook | `docs/runbooks/<...>`（故障處理 SOP） |
 

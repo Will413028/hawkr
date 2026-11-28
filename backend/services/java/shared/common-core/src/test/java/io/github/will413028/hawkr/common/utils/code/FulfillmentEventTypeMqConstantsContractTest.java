@@ -120,7 +120,7 @@ class FulfillmentEventTypeMqConstantsContractTest {
 
 
     /**
-     * 失敗的修法：改 {@code docs/代碼管理（CodeMeta）/內部技術碼.md} 的 FulfillmentEventType 表格，
+     * 失敗的修法：改 {@code docs/codemeta/internal-technical-codes.md} 的 FulfillmentEventType 表格，
      * 再跑 {@code generate.sh --all}（禁止手改生成檔）。
      */
     @Test

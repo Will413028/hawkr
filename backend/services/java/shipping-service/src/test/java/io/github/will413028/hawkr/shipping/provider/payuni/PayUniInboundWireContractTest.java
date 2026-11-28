@@ -37,7 +37,7 @@ import static org.mockito.Mockito.mock;
  *
  * <h2>fixture 從哪裡來（刻意不手寫）</h2>
  * 欄名<b>解析自 repo 內的權威文件</b>
- * {@code docs/第三方整合/PayUni 物流官方 API 總覽.md} 的貨態欄位表。
+ * {@code docs/third-party-integrations/payuni-official-logistics-api-overview.md} 的貨態欄位表。
  * 手寫一份「我覺得 PayUni 會送成這樣」的 fixture ＝ 自己跟自己對，必然全綠
  * ——那正是上面那個 bug 活下來的原因。
  * ⚠️ 文件搬走或欄位表改名 ⇒ 本測試 <b>fail-loud</b>，不是靜默 skip。

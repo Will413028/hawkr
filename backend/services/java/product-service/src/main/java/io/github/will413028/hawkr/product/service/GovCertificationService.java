@@ -131,7 +131,7 @@ public class GovCertificationService {
     /**
      * 認證編號合法字元：英數 + 連字號 + 底線。
      *
-     * <p>農業部三支端點沒有公開的編號格式規範，{@code docs/開發規範/} 也沒有記載，因此取
+     * <p>農業部三支端點沒有公開的編號格式規範，{@code docs/dev-guidelines/} 也沒有記載，因此取
      * 保守通用集合。實際樣本（設計書 19 §3/§7.1 的 {@code 1-009-300022}、seed data 的
      * {@code 1-008-131005}／{@code TAP-2025-0032}／{@code CAS-2025-1234}）都落在這個集合內。
      *

@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  * PayUni 物流地址正規化。
  *
  * <p>PayUni（黑貓）宅配地址格式要求為「縣市＋鄉鎮市區＋路/街/段＋門牌號(＋樓)」，
- * <b>不接受「里/村」「鄰」資訊</b>（{@code docs/第三方整合/PayUni 物流官方 API 總覽.md}）。
+ * <b>不接受「里/村」「鄰」資訊</b>（{@code docs/third-party-integrations/payuni-official-logistics-api-overview.md}）。
  * 送出含里鄰的地址會被 PayUni 回 {@code DEF01003}，導致宅配建店 / 建單 / 退貨 / 約車失敗。
  *
  * <p>本 helper 負責兩件事：

@@ -126,7 +126,7 @@ CodeMeta 的目標是把跨服務、跨語言、跨介面的共享值集中定�
 ## 生成方式
 
 ```bash
-cd docs/代碼管理（CodeMeta）/scripts
+cd docs/codemeta/scripts
 
 # 生成全部（等同 --java --go --go-errors --go-media --go-labels --go-registry --flutter --web --admin；不含 --diff）
 ./generate.sh --all

@@ -11794,7 +11794,7 @@ COMMIT;
 
 ```bash
 # ① 改 Markdown（SSOT）—— 絕不先改生成檔
-#    docs/代碼管理（CodeMeta）/{業務狀態碼,業務類型碼,內部技術碼,錯誤碼}.md
+#    docs/codemeta/{business-status-codes,business-type-codes,internal-technical-codes,error-codes}.md
 #    docs/codemeta/scripts/generate.sh   ← 三張 allowlist（§C.5）
 #    README.md 的 Value 分配表不需要改（本領域不佔 Value 號段，§C.3）
 # ② 生成 —— 用 CI 的旗標組一次跑完

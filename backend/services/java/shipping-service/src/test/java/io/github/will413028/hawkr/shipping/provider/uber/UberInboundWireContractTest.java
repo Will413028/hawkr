@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <h2>fixture 從哪裡來（刻意不手寫）</h2>
  * 狀態值域<b>解析自 repo 內的權威文件</b>
- * {@code docs/第三方整合/Uber Direct API 總覽.md} §7.1 的 DaaS 狀態表。
+ * {@code docs/third-party-integrations/uber-direct-api-overview.md} §7.1 的 DaaS 狀態表。
  * 手寫一份「我覺得 Uber 會回這幾個值」的清單 ＝ 自己跟自己對，必然全綠。
  * ⚠️ 文件搬走或表格改名 ⇒ 本測試 <b>fail-loud</b>，不是靜默 skip。
  *

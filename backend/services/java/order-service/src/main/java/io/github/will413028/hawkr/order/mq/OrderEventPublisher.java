@@ -109,7 +109,7 @@ public class OrderEventPublisher {
      * </ul>
      *
      * best-effort：失敗僅記 error log，不中斷主流程；漏推由前端 {@code ready.bufferMiss} + REST 全刷兜底，
-     * 不引入 application-level outbox（docs/開發規範/後端服務責任邊界規範.md）。
+     * 不引入 application-level outbox（docs/dev-guidelines/backend-service-responsibility-boundaries.md）。
      *
      * @param storeId 賣家 store_id surrogate —— <b>原樣進 payload，不反解析</b>。gateway SSE 的
      *                訂閱端（notification_inbox.go 的 resolveNotificationUserID）自 2026-08-30 起

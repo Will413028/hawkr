@@ -107,7 +107,7 @@ public class ProductEventPublisher {
     /**
      * 實際送出。
      * <p>best-effort：失敗僅記 error log，不中斷主流程（不引入 application-level outbox，
-     * 見 docs/開發規範/後端服務責任邊界規範.md）。認證事件的可靠性由 MQ 的 retry／DLQ 與
+     * 見 docs/dev-guidelines/backend-service-responsibility-boundaries.md）。認證事件的可靠性由 MQ 的 retry／DLQ 與
      * ADM「重新查驗」端點提供。
      */
     private void doPublish(String routingKey, Object payload, String eventType,
@@ -152,7 +152,7 @@ public class ProductEventPublisher {
      * 直接發布 product.restock（02 §5.13b）。
      * <p>
      * best-effort：失敗僅記 error log，不中斷主流程；下次補貨 transition 自動補發，
-     * 不引入 application-level outbox（docs/開發規範/後端服務責任邊界規範.md）。
+     * 不引入 application-level outbox（docs/dev-guidelines/backend-service-responsibility-boundaries.md）。
      */
     private void publishRestock(ProductRestockPayload payload) {
         try {

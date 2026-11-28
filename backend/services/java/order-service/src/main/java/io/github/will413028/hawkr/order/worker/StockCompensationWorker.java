@@ -29,7 +29,7 @@ import java.util.List;
  * <b>lease on 既有的 {@code stock_tx_records.next_retry_time}</b> 閘門，
  * 都在副作用（{@code ProductGrpcClient.restoreStock}）之前。零 migration。
  * 詳見 {@code StockTxRecordRepository.claimForCompensation} 與
- * {@code docs/開發規範/多副本排程搶佔規範.md}。
+ * {@code docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md}。
  */
 @Component
 public class StockCompensationWorker {

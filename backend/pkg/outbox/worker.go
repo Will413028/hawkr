@@ -97,7 +97,7 @@ type Worker[T Row] struct {
 }
 
 // New constructs a Worker. repo and process are required; cfg should be
-// tuned per docs/開發規範/多副本排程搶佔規範.md; hooks is optional (its
+// tuned per docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md; hooks is optional (its
 // zero value disables all observability callbacks).
 func New[T Row](repo Repository[T], process ProcessFunc[T], cfg Config, hooks Hooks[T]) *Worker[T] {
 	return &Worker[T]{repo: repo, process: process, cfg: cfg, hooks: hooks}

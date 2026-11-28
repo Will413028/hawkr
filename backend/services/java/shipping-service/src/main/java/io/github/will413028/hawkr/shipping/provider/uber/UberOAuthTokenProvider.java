@@ -17,7 +17,7 @@ import java.util.Map;
  *
  * <h2>🔴 為什麼「快取」是硬需求而不是最佳化</h2>
  * 官方明載 token 發放速率 <b>100 requests / hour</b>
- * （{@code docs/第三方整合/Uber Direct API 總覽.md} §1.1），而 token 有效期是 <b>30 天</b>。
+ * （{@code docs/third-party-integrations/uber-direct-api-overview.md} §1.1），而 token 有效期是 <b>30 天</b>。
  * 每次請求重新取 token，光這一項就會撞上 100/hr 上限——而撞上的症狀是
  * 「Uber 突然全面 401」，看起來完全像被停權。
  *

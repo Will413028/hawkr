@@ -136,7 +136,7 @@
 - lint：`admin/package.json:10` 的 check-enum-text 本來就涵蓋整個 admin，不用改。
 
 **文件**
-- `backend/docs/詳細設計書/32-…md`
+- `backend/docs/detailed-design/32-…md`
   - `:130`：governance_notes 也掛通報
   - `:261`：「通報的後台 API 不變（`ListViolationReports` 等…）」已過時
   - `:300-330`：舊 UI 流程圖，每秒倒數、閃動

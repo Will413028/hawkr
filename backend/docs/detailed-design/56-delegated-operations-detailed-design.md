@@ -2738,7 +2738,7 @@ durationSeconds = EXTRACT(epoch FROM
 - **`enum` 的 Arg 是 CodeMeta enum 名**（如 `ProductStatus`／`PostPublishStatus`），**本設計書不複製 enum 表格**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [代碼管理（CodeMeta）](../codemeta/README.md)）
 - **`enum` 逐段解析 `、` 分隔的多值**，單值是它的退化情形（沒有分隔符＝一段）。這不是第八種 formatter，而是同一種：投影層仍舊只做「陣列 join 成純量」，formatter 仍舊只收純量。認不得的碼值原樣輸出（與單值行為一致），**不得**因為其中一段查不到就整格退成 `—` —— 那會讓一筆合法的認證宣稱在稽核上消失
 
-**`enum` 的 Label 從哪裡拿到（定版，二選一之中取①）。** 「一律查 CodeMeta」不是一個可施工的指示——**Go 側今天查不到**：`docs/代碼管理（CodeMeta）/scripts/output/go/code_meta.go` 所在目錄**沒有 `go.mod`、不在 `go.work` 的 `use` 清單內**，物理上 import 不到；而 `gateway/internal/codemeta/codemeta.go` 的檔頭本來就明文拒絕依賴 docs 路徑，全檔沒有任何 Label 欄位。
+**`enum` 的 Label 從哪裡拿到（定版，二選一之中取①）。** 「一律查 CodeMeta」不是一個可施工的指示——**Go 側今天查不到**：`docs/codemeta/scripts/output/go/code_meta.go` 所在目錄**沒有 `go.mod`、不在 `go.work` 的 `use` 清單內**，物理上 import 不到；而 `gateway/internal/codemeta/codemeta.go` 的檔頭本來就明文拒絕依賴 docs 路徑，全檔沒有任何 Label 欄位。
 
 > **定版：新增一個 targeted generator target，直寫 `pkg/codemeta/labels.go`。**
 > 樣板與前例就在同一支腳本裡：`docs/codemeta/scripts/generate.sh` 的 `generate_go_media`直寫 `pkg/media/ref_type.go`，存在的理由與本案完全相同——`generate_go_file` 只輸出「前端可見＝Yes」的 enum，而該腳本註解已寫明這麼做是為了「杜絕手維護副本 drift」。
