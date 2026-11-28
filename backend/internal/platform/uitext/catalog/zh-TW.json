@@ -718,7 +718,7 @@
     },
     "seller.ContentKind.CONTENT_KIND_PRODUCT": {
       "message": "商品",
-      "description": "店家的商品（ID 是商品的 ID）；處分依據由商品的擁有模組保存，措施上沒有快照（snapshot_state 是 OWNER_HELD）。"
+      "description": "ContentKind 是內容下架措施對象的種類，對應社群內容的三種寫入。（值 CONTENT_KIND_PRODUCT）"
     },
     "seller.ContentKind.CONTENT_KIND_REVIEW_REPLY": {
       "message": "評價回覆",
