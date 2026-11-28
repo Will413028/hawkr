@@ -801,6 +801,8 @@ class ContentKind extends $pb.ProtobufEnum {
   /// 店家對評價的回覆（ID 是評價的 ID）。
   static const ContentKind CONTENT_KIND_REVIEW_REPLY =
       ContentKind._(5, _omitEnumNames ? '' : 'CONTENT_KIND_REVIEW_REPLY');
+  static const ContentKind CONTENT_KIND_PRODUCT =
+      ContentKind._(6, _omitEnumNames ? '' : 'CONTENT_KIND_PRODUCT');
 
   static const $core.List<ContentKind> values = <ContentKind>[
     CONTENT_KIND_UNSPECIFIED,
@@ -809,10 +811,11 @@ class ContentKind extends $pb.ProtobufEnum {
     CONTENT_KIND_FORUM_ENTRY,
     CONTENT_KIND_CHAT_MESSAGE,
     CONTENT_KIND_REVIEW_REPLY,
+    CONTENT_KIND_PRODUCT,
   ];
 
   static final $core.List<ContentKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 5);
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
   static ContentKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -834,15 +837,19 @@ class ContentSnapshotState extends $pb.ProtobufEnum {
   static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_CLEARED =
       ContentSnapshotState._(
           2, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_CLEARED');
+  static const ContentSnapshotState CONTENT_SNAPSHOT_STATE_OWNER_HELD =
+      ContentSnapshotState._(
+          3, _omitEnumNames ? '' : 'CONTENT_SNAPSHOT_STATE_OWNER_HELD');
 
   static const $core.List<ContentSnapshotState> values = <ContentSnapshotState>[
     CONTENT_SNAPSHOT_STATE_UNSPECIFIED,
     CONTENT_SNAPSHOT_STATE_CAPTURED,
     CONTENT_SNAPSHOT_STATE_CLEARED,
+    CONTENT_SNAPSHOT_STATE_OWNER_HELD,
   ];
 
   static final $core.List<ContentSnapshotState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static ContentSnapshotState? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

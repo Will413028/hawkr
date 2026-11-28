@@ -21,7 +21,8 @@ var (
 	// ErrInvalidStockInput 表示輸入不合法：冪等鍵空白或過長、沒有品項、數量不是正數、同一個 SKU 出現兩次、品項過多。
 	ErrInvalidStockInput = errors.New("catalog: invalid stock input")
 	// ErrSkuNotFound 表示有 SKU 不存在，或扣減時已被刪除。
-	ErrSkuNotFound = errors.New("catalog: sku not found")
+	ErrSkuNotFound           = errors.New("catalog: sku not found")
+	ErrProductNotPurchasable = errors.New("catalog: product not purchasable")
 	// ErrIdempotencyKeyReused 表示同一個冪等鍵以不同的內容（種類、原扣減或品項）重送；重送要與第一次完全相同。
 	ErrIdempotencyKeyReused = errors.New("catalog: idempotency key reused with a different request")
 	// ErrDeductionNotFound 表示歸還指向的扣減不存在。

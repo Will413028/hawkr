@@ -5,7 +5,9 @@
 
 ## 結論先講
 
-1. **可見性只有一個定義**：catalog 在 `db/objects.sql` 新增 SQL 函式 `catalog.buyer_visible_products(at)`（「買家看得到的商品」＝賣家設 `ACTIVE` ∧ 店家可曝光 ∧ 沒有生效中的商品下架措施），所有買家面讀取改走它；`internal/arch` 加一條檢查，catalog 的 query 直接讀 `catalog.products` 卻不在白名單（賣家、後台、內部用）就讓 CI 失敗。盤點時找到兩個現有漏洞：**購物車／結帳快照與扣庫存都不看店家曝光**【量】，停權店家的商品今天仍可結帳。
+> 修訂（Will 2026-11-28 選 C）：§1 與 §3 的「`db/objects.sql` 的 SQL 函式」不採用。`catalog.buyer_visible_products`／`buyer_viewable_products` 回傳整列、參照別的 schema，違反單體規則 6（函式只參照自己的表、不回整列）與規則 2（catalog 的 migration 沒有 seller schema 就套不上、seller 日後不能 DROP 其 `pub_*`）。改為：標準可見性條件文字定義一次在 `internal/arch`，內嵌於每支買家面 query（查詢時引用 `seller.pub_exposable_stores(at)`、`seller.pub_content_takedowns()`），visible（ACTIVE）與 viewable（含 ARCHIVED）兩個版本，arch lint 逐字要求並檢查綁定到商品別名；catalog 沒有 `objects.sql`。下文凡提 `objects.sql`、函式、`Function Scan` 內聯函式處，以本註記為準。決策 D31，見計畫書。
+
+1. **可見性只有一個定義**（已改，見上方修訂：不用 SQL 函式）：catalog 在 `db/objects.sql` 新增 SQL 函式 `catalog.buyer_visible_products(at)`（「買家看得到的商品」＝賣家設 `ACTIVE` ∧ 店家可曝光 ∧ 沒有生效中的商品下架措施），所有買家面讀取改走它；`internal/arch` 加一條檢查，catalog 的 query 直接讀 `catalog.products` 卻不在白名單（賣家、後台、內部用）就讓 CI 失敗。盤點時找到兩個現有漏洞：**購物車／結帳快照與扣庫存都不看店家曝光**【量】，停權店家的商品今天仍可結帳。
 2. **法律保全（legal hold，「為了證據暫停刪除」）放在 media，只作用在 SECURE（加密、不公開）證據副本上**（Will 2026-11-28 選 (b)）：措施建立或來函凍結時，擁有者 catalog 用新的 media `CopyToSecure` 把商品圖複製成 SECURE 副本，保全只登記在副本上；**公開原圖照一般刪除流程處理**（公開網址失效＝停止公開存取）。新表 `media.asset_holds(asset_id, source, until)`；**每一條會把資產或暫存上傳推進 `DELETING`、或實際刪物件的路徑都要擋住被保全者**：SQL 認領處跳過，物件刪除前再檢查（§2 逐路徑盤點）。不用 S3 Object Lock 當唯一來源（要 bucket 開版本控制、只認單一版本、沒有到期日【量】）。
 3. **證據快照由擁有內容的模組寫**：catalog 收到 `MeasureCreated`（內容種類 PRODUCT）或新事件 `AuthorityOrderTargetsRecorded` 時，在同一個 transaction 寫一份不可改的快照（JSON 內容＋圖片的 SECURE 副本 asset 參照），並對副本登記保全。措施列不存快照 ID，以 `(來源種類, 來源 ID, 商品 ID)` 當鍵：由依賴規則決定（`internal/arch/modules.go:19,22`，catalog→seller【量】，seller 寫不到 catalog 回傳的 ID），不列為問題；這偏離 Will 原話「措施存快照 ID」，見 §3。
 4. **admin**：`admin/products` 拿掉直接切狀態（`handleToggleStatus`，打舊 REST `PUT /api/v1/admin/products/{id}/status`【量】）；強制下架改成重用 `ContentTakedownDialog` 的措施建立對話框，走 Connect `CreateMeasure`。欄位與文案見 §4（Will 2026-11-28 已同意；商品專屬違規類別清單在 B4-5e 開工前再與 Will 確認）。

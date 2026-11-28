@@ -248,6 +248,7 @@ const ProductCard$json = {
       '6': '.hawkr.common.v1alpha1.StoreCard',
       '10': 'store'
     },
+    {'1': 'visible', '3': 12, '4': 1, '5': 8, '10': 'visible'},
   ],
   '8': [
     {'1': '_rating'},
@@ -262,7 +263,8 @@ final $typed_data.Uint8List productCardDescriptor = $convert.base64Decode(
     'ljZRgGIAEoA1IIbWF4UHJpY2USGwoGcmF0aW5nGAcgASgCSABSBnJhdGluZ4gBARIcCglhdmFp'
     'bGFibGUYCCABKAhSCWF2YWlsYWJsZRItChJyZXN0b2NrX3N1YnNjcmliZWQYCSABKAhSEXJlc3'
     'RvY2tTdWJzY3JpYmVkEhkKCHN0b3JlX2lkGAogASgJUgdzdG9yZUlkEjYKBXN0b3JlGAsgASgL'
-    'MiAuaGF3a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmVCCQoHX3JhdGluZw==');
+    'MiAuaGF3a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmUSGAoHdmlzaWJsZRgMIA'
+    'EoCFIHdmlzaWJsZUIJCgdfcmF0aW5n');
 
 @$core.Deprecated('Use favoriteDescriptor instead')
 const Favorite$json = {

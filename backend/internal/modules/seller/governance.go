@@ -194,9 +194,11 @@ const (
 	MaxTakedownContents          = model.MaxTakedownContents
 	SnapshotCaptured             = model.SnapshotCaptured
 	SnapshotCleared              = model.SnapshotCleared
+	SnapshotOwnerHeld            = model.SnapshotOwnerHeld
 	ContentPost                  = model.ContentPost
 	ContentComment               = model.ContentComment
 	ContentForumEntry            = model.ContentForumEntry
+	ContentProduct               = model.ContentProduct
 	BasisViolation               = model.BasisViolation
 	BasisRisk                    = model.BasisRisk
 	BasisContract                = model.BasisContract

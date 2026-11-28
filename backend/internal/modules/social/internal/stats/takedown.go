@@ -43,8 +43,8 @@ func splitContents(cs []Content) (contentSet, error) {
 			out.comments = append(out.comments, c.ID)
 		case contentkind.ForumEntry:
 			out.entries = append(out.entries, c.ID)
-		case contentkind.ChatMessage, contentkind.ReviewReply:
-			return contentSet{}, fmt.Errorf("social：%s 不是社群內容，由 im、review 處理（%s）", c.Kind, c.ID)
+		case contentkind.ChatMessage, contentkind.ReviewReply, contentkind.Product:
+			return contentSet{}, fmt.Errorf("social：%s 不是社群內容，由擁有它的模組處理（%s）", c.Kind, c.ID)
 		default:
 			return contentSet{}, fmt.Errorf("social：不認得的內容下架種類 %q（%s）", c.Kind, c.ID)
 		}

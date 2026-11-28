@@ -1113,6 +1113,8 @@ func (t Text) SellerContentKind(v string) (string, bool) {
 		return "聊天訊息", true
 	case "REVIEW_REPLY":
 		return "評價回覆", true
+	case "PRODUCT":
+		return "商品", true
 	}
 	return "", false
 }

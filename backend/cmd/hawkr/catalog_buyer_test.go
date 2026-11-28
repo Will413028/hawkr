@@ -85,24 +85,35 @@ func TestPurgeSKUSubscriptionsPassesTheSKUs(t *testing.T) {
 }
 
 func TestProductInfoMapsTheCatalogCard(t *testing.T) {
-	card := catalog.ProductSummary{ID: uuid.NewV7(), StoreID: 9, Title: "蘋果", CoverKey: "public/apple", MinPrice: 10, MaxPrice: 30, Status: catalog.StatusActive, TotalStock: 4}
+	card := catalog.ProductCard{ProductSummary: catalog.ProductSummary{ID: uuid.NewV7(), StoreID: 9, Title: "蘋果", CoverKey: "public/apple", MinPrice: 10, MaxPrice: 30, Status: catalog.StatusActive, TotalStock: 4}, Visible: true}
 	got := productInfo(card)
-	if got.ID != card.ID || got.StoreID != 9 || got.Name != "蘋果" || got.ImageKey != "public/apple" || got.MinPrice != 10 || got.MaxPrice != 30 || !got.Available || got.Rating != nil {
+	if got.ID != card.ID || got.StoreID != 9 || got.Name != "蘋果" || got.ImageKey != "public/apple" || got.MinPrice != 10 || got.MaxPrice != 30 || !got.Available || !got.Visible || got.Rating != nil {
 		t.Fatalf("info=%+v", got)
 	}
 	card.ReviewCount, card.RatingAverage = 3, 4.5
 	if got = productInfo(card); got.Rating == nil || *got.Rating != 4.5 {
 		t.Fatalf("rating=%v", got.Rating)
 	}
-	for name, mutate := range map[string]func(*catalog.ProductSummary){
-		"sold out": func(c *catalog.ProductSummary) { c.TotalStock = 0 },
-		"archived": func(c *catalog.ProductSummary) { c.Status = catalog.StatusArchived },
-		"draft":    func(c *catalog.ProductSummary) { c.Status = catalog.StatusDraft },
+	for name, mutate := range map[string]func(*catalog.ProductCard){
+		"sold out": func(c *catalog.ProductCard) { c.TotalStock = 0 },
+		"archived": func(c *catalog.ProductCard) { c.Status = catalog.StatusArchived },
+		"draft":    func(c *catalog.ProductCard) { c.Status = catalog.StatusDraft },
 	} {
 		c := card
 		mutate(&c)
 		if productInfo(c).Available {
 			t.Fatalf("%s must not be available", name)
 		}
+	}
+}
+
+func TestProductInfoCarriesTheVisibleFlag(t *testing.T) {
+	card := catalog.ProductCard{ProductSummary: catalog.ProductSummary{ID: uuid.NewV7(), StoreID: 9, Status: catalog.StatusActive, TotalStock: 4}}
+	if productInfo(card).Visible {
+		t.Fatal("a card the catalog marks not visible must stay not visible")
+	}
+	card.Visible = true
+	if !productInfo(card).Visible {
+		t.Fatal("a visible card must map to a visible info")
 	}
 }

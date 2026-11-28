@@ -244,6 +244,8 @@ var ReasonRestockSKUInStock = newReason("RESTOCK_SKU_IN_STOCK")
 
 var ReasonProductNotPublished = newReason("PRODUCT_NOT_PUBLISHED")
 
+var ReasonProductNotPurchasable = newReason("PRODUCT_NOT_PURCHASABLE")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

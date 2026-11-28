@@ -187,6 +187,7 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"seller.ContentKind.CONTENT_KIND_FORUM_ENTRY": () => "討論區留言",
 	"seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE": () => "聊天訊息",
 	"seller.ContentKind.CONTENT_KIND_REVIEW_REPLY": () => "評價回覆",
+	"seller.ContentKind.CONTENT_KIND_PRODUCT": () => "商品",
 	"seller.InquiryKind.INQUIRY_KIND_RECORDS": () => "提供紀錄",
 	"seller.InquiryKind.INQUIRY_KIND_EXPLANATION": () => "請說明",
 	"seller.InquiryReplyChannel.INQUIRY_REPLY_CHANNEL_PHONE": () => "電話",

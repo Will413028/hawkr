@@ -1219,9 +1219,9 @@ INSERT INTO seller.measure_contents (
     link_post_id, link_store_id, link_thread_id
 )
 SELECT $1::uuid, ($2::text[])[i], ($3::uuid[])[i], ($4::text[])[i],
-       ($5::text[])[i],
-       ($6::timestamptz[])[i],
-       ($7::int[])[i],
+       CASE WHEN ($4::text[])[i] = 'OWNER_HELD' THEN NULL ELSE ($5::text[])[i] END,
+       CASE WHEN ($4::text[])[i] = 'OWNER_HELD' THEN NULL ELSE ($6::timestamptz[])[i] END,
+       CASE WHEN ($4::text[])[i] = 'OWNER_HELD' THEN NULL ELSE ($7::int[])[i] END,
        NULLIF(($8::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid),
        NULLIF(($9::bigint[])[i], 0::bigint),
        NULLIF(($10::uuid[])[i], '00000000-0000-0000-0000-000000000000'::uuid)

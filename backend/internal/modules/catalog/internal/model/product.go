@@ -306,6 +306,11 @@ type ProductSummary struct {
 	Version           int64
 }
 
+type ProductCard struct {
+	ProductSummary
+	Visible bool
+}
+
 // ListCursor 是 keyset 分頁的游標：Key 是排序鍵（賣家清單與後台是建立時間的微秒數，公開列表依 ProductSort 決定），同鍵依 ID 遞減。
 // 游標的編碼與跟請求參數的綁定在對外層。
 type ListCursor struct {

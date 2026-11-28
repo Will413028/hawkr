@@ -416,6 +416,7 @@ class ProductCard extends $pb.GeneratedMessage {
     $core.bool? restockSubscribed,
     $core.String? storeId,
     $4.StoreCard? store,
+    $core.bool? visible,
   }) {
     final result = ProductCard._();
     if (id != null) result.id = id;
@@ -429,6 +430,7 @@ class ProductCard extends $pb.GeneratedMessage {
     if (restockSubscribed != null) result.restockSubscribed = restockSubscribed;
     if (storeId != null) result.storeId = storeId;
     if (store != null) result.store = store;
+    if (visible != null) result.visible = visible;
     return result;
   }
 
@@ -459,6 +461,7 @@ class ProductCard extends $pb.GeneratedMessage {
     ..aOS(10, _omitFieldNames ? '' : 'storeId')
     ..aOM<$4.StoreCard>(11, _omitFieldNames ? '' : 'store',
         subBuilder: $4.StoreCard.$_createMessage)
+    ..aOB(12, _omitFieldNames ? '' : 'visible')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -591,6 +594,15 @@ class ProductCard extends $pb.GeneratedMessage {
   void clearStore() => $_clearField(11);
   @$pb.TagNumber(11)
   $4.StoreCard ensureStore() => $_ensure(10);
+
+  @$pb.TagNumber(12)
+  $core.bool get visible => $_getBF(11);
+  @$pb.TagNumber(12)
+  set visible($core.bool value) => $_setBool(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasVisible() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearVisible() => $_clearField(12);
 }
 
 /// Favorite 是收藏的商品。

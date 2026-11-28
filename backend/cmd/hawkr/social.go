@@ -51,7 +51,7 @@ func (a socialCards) Cards(ctx context.Context, ids []uuid.UUID, includeInactive
 		out[id] = httpsocial.ProductInfo{
 			ID: item.ID, StoreID: item.StoreID, Name: item.Title, ImageKey: item.CoverKey,
 			MinPrice: item.MinPrice, MaxPrice: item.MaxPrice,
-			Available: item.Status == catalog.StatusActive && item.TotalStock > 0,
+			Available: item.Visible && item.Status == catalog.StatusActive && item.TotalStock > 0,
 		}
 	}
 	return out, nil

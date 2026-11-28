@@ -63,6 +63,9 @@ CREATE INDEX products_public_new_idx ON catalog.products (first_published_at DES
 CREATE UNIQUE INDEX products_request_key ON catalog.products (store_id, request_id) WHERE request_id IS NOT NULL;
 CREATE INDEX products_search_idx ON catalog.products USING gin (searchable_text public.gin_trgm_ops) WHERE deleted_at IS NULL;
 CREATE INDEX products_public_sales_idx ON catalog.products (sales_count DESC, id DESC) WHERE deleted_at IS NULL AND status = 'ACTIVE';
+CREATE INDEX products_public_price_asc_idx ON catalog.products ((-min_price) DESC, id DESC) WHERE deleted_at IS NULL AND status = 'ACTIVE';
+CREATE INDEX products_public_price_desc_idx ON catalog.products (max_price DESC, id DESC) WHERE deleted_at IS NULL AND status = 'ACTIVE';
+CREATE INDEX products_public_rating_idx ON catalog.products ((round(rating_average * 1000)::bigint) DESC, id DESC) WHERE deleted_at IS NULL AND status = 'ACTIVE';
 
 CREATE TABLE catalog.product_option_axes (
     product_id UUID    NOT NULL REFERENCES catalog.products (id),

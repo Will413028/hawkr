@@ -180,8 +180,9 @@ const (
 	// 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
 	ErrorReason_COUPON_QUOTA_EXCEEDED ErrorReason = 48
 	// 規格（SKU）目前有貨，不接受補貨訂閱（搭配 failed_precondition）：BuyerAppService.SubscribeRestock。client 改提示直接購買。
-	ErrorReason_RESTOCK_SKU_IN_STOCK  ErrorReason = 49
-	ErrorReason_PRODUCT_NOT_PUBLISHED ErrorReason = 50
+	ErrorReason_RESTOCK_SKU_IN_STOCK    ErrorReason = 49
+	ErrorReason_PRODUCT_NOT_PUBLISHED   ErrorReason = 50
+	ErrorReason_PRODUCT_NOT_PURCHASABLE ErrorReason = 51
 )
 
 // Enum value maps for ErrorReason.
@@ -237,6 +238,7 @@ var (
 		48: "COUPON_QUOTA_EXCEEDED",
 		49: "RESTOCK_SKU_IN_STOCK",
 		50: "PRODUCT_NOT_PUBLISHED",
+		51: "PRODUCT_NOT_PURCHASABLE",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":     0,
@@ -289,6 +291,7 @@ var (
 		"COUPON_QUOTA_EXCEEDED":        48,
 		"RESTOCK_SKU_IN_STOCK":         49,
 		"PRODUCT_NOT_PUBLISHED":        50,
+		"PRODUCT_NOT_PURCHASABLE":      51,
 	}
 )
 
@@ -323,7 +326,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xde\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xfb\n" +
 	"\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
@@ -376,7 +379,8 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x1aCOUPON_ISSUE_LIMIT_REACHED\x10/\x12\x19\n" +
 	"\x15COUPON_QUOTA_EXCEEDED\x100\x12\x18\n" +
 	"\x14RESTOCK_SKU_IN_STOCK\x101\x12\x19\n" +
-	"\x15PRODUCT_NOT_PUBLISHED\x102\"\x04\b\"\x10\"*\x13RFQ_ALREADY_AWARDEDB\x82\x02\n" +
+	"\x15PRODUCT_NOT_PUBLISHED\x102\x12\x1b\n" +
+	"\x17PRODUCT_NOT_PURCHASABLE\x103\"\x04\b\"\x10\"*\x13RFQ_ALREADY_AWARDEDB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (
