@@ -3,7 +3,7 @@ name: mutation
 # 跑 mutation 清單（mutation/*.json，格式見 mutation/README.md）：在 CI 的拋棄式 checkout 裡把檔案的 old 換成 new，
 # 指定的測試必須變紅。取代以前「開暫存分支、貼 patch、改 workflow」的手動做法。
 # - 只在清單、runner 或本 workflow 變動時觸發；push／PR 只跑這次事件改到的清單，
-#   runner 或 workflow 改了就全跑（它們壞了會讓所有清單的結果失真）。
+#   runner 或 workflow 改了則各執行環境（kind）挑最小一份清單做煙霧驗證；全量回歸用 workflow_dispatch。
 # - 清單裡用到哪些 stack 就扇出哪些 job：Go integration 要 Docker（testcontainers，ubuntu-latest 內建）、
 #   go:<dir> 是 <dir> 這個獨立 Go 模組（Go 版本仍讀 backend/.go-version）、website、admin 與 ts-package 要 pnpm workspace、
 #   Flutter 與 dart-package 要對應的 fvm 版本。沒用到的 stack 不跑。
@@ -78,13 +78,37 @@ jobs:
               manifests=(mutation/*.json)
             else
               git diff --name-only "$base" HEAD > "$RUNNER_TEMP/changed"
+              manifests=()
+              while IFS= read -r f; do
+                if [[ "$f" =~ ^mutation/[^/]+\.json$ && -f "$f" ]]; then manifests+=("$f"); fi
+              done < "$RUNNER_TEMP/changed"
               if grep -qE '^(scripts/mutation/|\.github/workflows/mutation\.yml$)' "$RUNNER_TEMP/changed"; then
-                manifests=(mutation/*.json)
-              else
-                manifests=()
                 while IFS= read -r f; do
-                  if [[ "$f" =~ ^mutation/[^/]+\.json$ && -f "$f" ]]; then manifests+=("$f"); fi
-                done < "$RUNNER_TEMP/changed"
+                  manifests+=("$f")
+                done < <(python3 - <<'PY'
+          import glob, json
+          def kind_of(s):
+              if s.startswith("flutter:"):
+                  return "flutter"
+              if s.startswith("dart-package:"):
+                  return "dart"
+              if s.startswith("ts-package:") or s in ("website", "admin"):
+                  return "pnpm"
+              return "go-integration" if s.startswith("go-integration") else "go"
+          best = {}
+          for path in sorted(glob.glob("mutation/*.json")):
+              with open(path, encoding="utf-8") as fh:
+                  muts = json.load(fh).get("mutants", [])
+              for k in {kind_of(m["stack"]) for m in muts}:
+                  if k not in best or (len(muts), path) < best[k]:
+                      best[k] = (len(muts), path)
+          for _, path in sorted(set(best.values()), key=lambda x: x[1]):
+              print(path)
+          PY
+                )
+              fi
+              if [[ ${#manifests[@]} -gt 1 ]]; then
+                mapfile -t manifests < <(printf '%s\n' "${manifests[@]}" | awk '!seen[$0]++')
               fi
             fi
           fi
@@ -121,8 +145,7 @@ jobs:
   mutate:
     name: mutation (${{ matrix.stack }})
     needs: plan
-    # 開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
-    if: needs.plan.outputs.manifests != '' && (github.event_name != 'pull_request' || github.base_ref == 'main')
+    if: needs.plan.outputs.manifests != ''
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
