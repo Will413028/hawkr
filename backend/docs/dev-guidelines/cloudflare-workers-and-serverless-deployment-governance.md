@@ -21,7 +21,7 @@
 |---|---|---|
 | hawkr-website-dev / -prod | hawkr-website repo | 同 repo `deploy.yml` |
 | hawkr-website-tail-alerts | hawkr-website `cloudflare/tail-worker/` | 同 repo `deploy.yml`（website#347 納管） |
-| hawkr-website-canary-dev / -prod | hawkr-website `cloudflare/canary/` | 同 repo `deploy.yml`（`--env dev`/`production`；快取新鮮度探針＋SLO，cron 每 5 分鐘、無 route，website#339 M2；**＋失效後合成讀者（`WarmQueue` DO，backend#2269）**——收 `/warm` 通知後兩階段暖讀首頁，保證 `"max"` profile 條目有讀者觸發重生，見detailed-design 53 §4.5；觀測設施 continue-on-error 不改寫主站部署成敗） |
+| hawkr-website-canary-dev / -prod | hawkr-website `cloudflare/canary/` | 同 repo `deploy.yml`（`--env dev`/`production`；快取新鮮度探針＋SLO，cron 每 5 分鐘、無 route，website#339 M2；**＋失效後合成讀者（`WarmQueue` DO，backend#2269）**——收 `/warm` 通知後兩階段暖讀首頁，保證 `"max"` profile 條目有讀者觸發重生，見詳細設計書 53 §4.5；觀測設施 continue-on-error 不改寫主站部署成敗） |
 | hawkr-admin-dev / -prod | hawkr-admin repo | 同 repo `deploy.yml` |
 | image-gateway-dev / -production | backend `workers/image-gateway/` | backend `deploy-worker.yml` |
 | api-first-party-proxy | backend `workers/api-first-party-proxy/` | backend `deploy-worker.yml`（#1907 納管；單一 script，僅 main 部署） |

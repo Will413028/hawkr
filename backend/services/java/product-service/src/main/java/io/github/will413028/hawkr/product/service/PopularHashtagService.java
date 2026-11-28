@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 區間熱門 Hashtag 查詢 Service（33-商品 Hashtag 模組detailed-design §5.2）。
+ * 區間熱門 Hashtag 查詢 Service（33-商品 Hashtag 模組詳細設計書 §5.2）。
  *
  * <p>處理：
  * <ul>

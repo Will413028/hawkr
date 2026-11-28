@@ -1,4 +1,4 @@
-# 多媒體微服務 (Media Service) detailed-design
+# 多媒體微服務 (Media Service) 詳細設計書
 
 > 本文是 Java `media-service` 的現行規格；單體 `media` 模組（Go API 外殼與引用同步）的規格見 `docs/modules/media.md`。服務搬進單體時刪除本文。
 
@@ -759,7 +759,7 @@ sequenceDiagram
 
 #### 4.8.2 多副本搶佔語意
 
-本 GC 的多副本搶佔（哪些階段加租約、哪一段刻意不加、租約欄名與長度、迴圈終止性、行為退化、一致性邊界）**全部集中在 [§8 多副本排程搶佔語意](#8-多副本排程搶佔語意scheduler-claim)**，本節不重述任何數字與欄名，避免兩處漂移。規範全文見 [dev-guidelines／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。
+本 GC 的多副本搶佔（哪些階段加租約、哪一段刻意不加、租約欄名與長度、迴圈終止性、行為退化、一致性邊界）**全部集中在 [§8 多副本排程搶佔語意](#8-多副本排程搶佔語意scheduler-claim)**，本節不重述任何數字與欄名，避免兩處漂移。規範全文見 [開發規範／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。
 
 ### 4.9 原始檔名的保存與回退
 
@@ -994,7 +994,7 @@ hawkr:
 
 ## 8. 多副本排程搶佔語意（Scheduler Claim）
 
-**規範全文**：[dev-guidelines／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。本節只列 media-service 的套用結果。
+**規範全文**：[開發規範／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。本節只列 media-service 的套用結果。
 
 本服務只有一支排程：`MediaGarbageCollectionJob`（cron `0 0 3 * * ?`，每日一次）。它的副作用是**不可逆的外部儲存刪除**（`StorageService.deleteObject`）。
 

@@ -5,14 +5,14 @@
 | 狀態 | accepted |
 | 日期 | 2026-07-12 |
 | 影響範圍 | `services/content-service`、`hawkr-website/features/home`、`hawkr-admin` 首頁配置頁 |
-| 對應規格 | `docs/detailed-design/45-首頁區塊動態排序與營運干預（Homepage Dynamic Layout & Merchandising）detailed-design.md` |
+| 對應規格 | `docs/detailed-design/45-首頁區塊動態排序與營運干預（Homepage Dynamic Layout & Merchandising）詳細設計書.md` |
 | 路徑基準 | `backend/` |
 
 > 2026-09-26：45 號從未實作（content-service 沒有對應的表與 API），content 搬進單體時依遷移 ADR
 > `2026-09-24-go-modular-monolith.md` D8 不搬。實作時由單體的 content 模組承載，並先重新評估本檔。
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> 資料表、API 契約、融合公式與區塊清單一律在 45 號detailed-design，本檔不複製。
+> 資料表、API 契約、融合公式與區塊清單一律在 45 號詳細設計書，本檔不複製。
 
 ---
 

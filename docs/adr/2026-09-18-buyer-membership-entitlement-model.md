@@ -46,7 +46,7 @@ principal）與 `buyer_id`（stint-scoped 業務身份）是兩條不可互換�
 **決策**：(b)。可直接沿用 PayUni 自帶排程，不需要 buyer-service 自建扣款 cron。
 clamp 不回補漂移是刻意的——對齊主流訂閱制產品的既有慣例，行為可預期，
 不需要額外狀態追蹤漂移量。相關約束見
-[60-買家訂閱計費引擎](/backend/docs/detailed-design/60-買家訂閱計費引擎（Buyer%20Subscription%20Billing%20Engine）detailed-design.md)。
+[60-買家訂閱計費引擎](/backend/docs/detailed-design/60-買家訂閱計費引擎（Buyer%20Subscription%20Billing%20Engine）詳細設計書.md)。
 
 ## D3：57 號 §7.2 的契約異動方式
 

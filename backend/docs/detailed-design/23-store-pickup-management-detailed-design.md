@@ -1,4 +1,4 @@
-# 23　門市管理模組（Store Pickup Management）detailed-design
+# 23　門市管理模組（Store Pickup Management）詳細設計書
 
 > 🔴 **已退場（B3，2026-11-24）。** 買家的店到店門市地圖、門市選取與地址簿門市分頁隨物流商退場刪除。
 

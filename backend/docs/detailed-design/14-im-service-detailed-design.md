@@ -1,4 +1,4 @@
-# 即時通訊微服務 (IM Service) detailed-design
+# 即時通訊微服務 (IM Service) 詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 

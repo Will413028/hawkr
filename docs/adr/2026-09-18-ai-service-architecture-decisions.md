@@ -5,7 +5,7 @@
 | 狀態 | accepted（D7／D8 已 superseded，見各節） |
 | 日期 | 2026-09-18（決策本身的落地日期見各列「日期」欄；D7／D8 於 2026-09-19 隨 #3519 刀 A 收斂） |
 | 影響範圍 | `services/ai-service`、gateway AI 路由、採購子系統（55／57） |
-| 規格 | [15 號 AI 微服務detailed-design](/backend/docs/detailed-design/15-ai-service-detailed-design.md) |
+| 規格 | [15 號 AI 微服務詳細設計書](/backend/docs/detailed-design/15-ai-service-detailed-design.md) |
 | 路徑基準 | `backend/` |
 
 > 本檔只收**有被否決的替代方案、且否決理由今天仍然成立**的決策。日期取自實際落地的

@@ -1,4 +1,4 @@
-# 多媒體儲存與圖片服務（Cloudflare R2 & Image Gateway）detailed-design
+# 多媒體儲存與圖片服務（Cloudflare R2 & Image Gateway）詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 
@@ -233,7 +233,7 @@ Flyway `V{N+1}`（media：DROP url；shipping：DROP label_url；order：review 
 
 ### 6.2 gRPC（服務間）
 - **業務 proto 圖片欄位（§231 落地，覆蓋原「欄位名沿用」暫定）**：承載 objectKey 的欄位一律採 snake_case `xxx_key`／`xxx_keys` 命名（proto 欄位語意誠實化，隨全平台一次切，無相容雙軌）；業務微服務只填 key、**移除服務側 `BuildURL`**；`xxxUrl` 由 Gateway 於對外回應層組出（§6.1）。**逐服務 proto 欄位落地清單見 §6.6**——此清單即 §231「逐 proto 清單於實作 PR 附」的兌現，改為在本設計書定版，實作 PR 依此執行。
-- 破壞性 proto 型別/命名變更走一次切（系統未上線，§3 組織約束）；proto 同步流程依dev-guidelines §3（`api/proto/*` → `gen-go-proto.sh` → rsync java-proto → `mvn clean install`）。
+- 破壞性 proto 型別/命名變更走一次切（系統未上線，§3 組織約束）；proto 同步流程依開發規範 §3（`api/proto/*` → `gen-go-proto.sh` → rsync java-proto → `mvn clean install`）。
 
 ### 6.3 非同步事件 (MQ)
 
@@ -485,7 +485,7 @@ Worker：wrangler tail＋Cloudflare dashboard（請求數/快取命中率/4xx5xx
 R2 不可用：讀取面全掛（無 fallback，接受——與現況 OSS 掛等價）；上傳面 media-service 回錯誤碼（同現況）。Images 轉換失敗：degrade 直出原檔（§7.3）。Worker 部署壞版：`wrangler rollback` 秒級還原前一個部署。
 
 ### 8.4 一致性與冪等
-遷移工具冪等（manifest 記錄＋不覆蓋已成功項，`--force` 例外）；資料修正腳本冪等（值型態判別天然可重跑：已是 key 者不動）。**單一寫入路徑為唯一真實來源；不引入補償任務基礎設施**（dev-guidelines §22）：遷移／修正皆為一次性 ops 工具（`tools/`，完成後歸檔），不進 application code，不建 reconciliation job／backfill CLI／reflow 表。
+遷移工具冪等（manifest 記錄＋不覆蓋已成功項，`--force` 例外）；資料修正腳本冪等（值型態判別天然可重跑：已是 key 者不動）。**單一寫入路徑為唯一真實來源；不引入補償任務基礎設施**（開發規範 §22）：遷移／修正皆為一次性 ops 工具（`tools/`，完成後歸檔），不進 application code，不建 reconciliation job／backfill CLI／reflow 表。
 
 ### 8.5 設定與機密
 

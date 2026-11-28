@@ -2,7 +2,7 @@
 
 > **最後更新**：2026-09-14（Stage 8B Step 5P-0 Provider Contract Reconciliation）
 > **涵蓋範圍**：認證、Organizations、報價、建單、查狀態、取消、POD、webhook 驗簽與事件、Robocourier、Refund Submission
-> **消費者**：[66 號 Uber Direct 即時配送整合detailed-design](../detailed-design/66-Uber%20Direct%20即時配送整合detailed-design.md)
+> **消費者**：66 號 Uber Direct 即時配送整合詳細設計書
 
 ---
 

@@ -1,4 +1,4 @@
-# Java 微服務dev-guidelines
+# Java 微服務開發規範
 
 > **適用範圍（2026-09-24 起）**：只適用遷移期間仍在運作的 Java 服務，Java 服務全部改寫成 Go 後（遷移計畫階段 B）退場（`docs/adr/2026-09-24-go-modular-monolith.md` D1）。其中與語言無關的契約規則（型別、TSID、身分與授權、CodeMeta）已併入 `backend/AGENTS.md`。
 
@@ -118,9 +118,9 @@ TSID 初始化由 `TsidConfiguration`（common-core）自動完成，**禁止**�
 
 **禁止**：以特殊值（`accountId=0`、`null`）或 boolean flag（`isAdmin`）區分角色。
 
-### 4.2 內部微服務 gRPC 授權（HMAC 簽章，SSOT = detailed-design 52 號）
+### 4.2 內部微服務 gRPC 授權（HMAC 簽章，SSOT = 詳細設計書 52 號）
 
-微服務間 gRPC「內部身分」由 **HMAC-SHA256 簽章驗證**（issue #1366）——`x-internal-service` 字面值**不再是信任依據**（原「非空即信任」曾使任意同 ns pod 帶該 header 即取得 internal bypass、拉取全站訂單 PII）。完整協議見 **detailed-design 52 號《微服務間內部授權》**。
+微服務間 gRPC「內部身分」由 **HMAC-SHA256 簽章驗證**（issue #1366）——`x-internal-service` 字面值**不再是信任依據**（原「非空即信任」曾使任意同 ns pod 帶該 header 即取得 internal bypass、拉取全站訂單 PII）。完整協議見 **詳細設計書 52 號《微服務間內部授權》**。
 
 - 出站帶四 header：`x-internal-service`（caller 名，資訊用）+ `x-internal-ts` + `x-internal-nonce` + `x-internal-sig`（`base64(HMAC-SHA256(secret, serviceName\nts\nnonce\naccountIdOrEmpty))`）；由 `GrpcAuthClientInterceptor`（common-core）於 `GrpcStubFactory`/`GrpcChannelRegistry` 鏈上**自動加簽**，Client 透過 `GrpcStubFactory` 建立即可。
 - server 端 `GrpcAuthServerInterceptor` **只對帶 `x-internal-service` 的呼叫驗簽**；驗簽通過才 `GrpcAuthContext.isInternalCall()=true` → `requireAccountType()` 跳過。不帶 internal header 的呼叫（Gateway 使用者呼叫）維持 `requireAccountType` 使用者授權路徑、不被 HMAC 擋。
@@ -212,7 +212,7 @@ Java shipping-service 與 common-core 的運費輔助工具（區域判定、重
 |--------|------|
 | `ProtoConversionUtils` | Proto 與 Java 物件的轉換 |
 | `CodeMetaValidator` | Enum 合法值驗證（詳見 §6.4） |
-| `InputValidator` | 通用輸入驗證（尺寸/整數/金額/手機/地址），規範見 [26-輸入驗證模組（Java InputValidator）detailed-design](../detailed-design/26-java-inputvalidator-detailed-design.md) |
+| `InputValidator` | 通用輸入驗證（尺寸/整數/金額/手機/地址），規範見 [26-輸入驗證模組（Java InputValidator）詳細設計書](../detailed-design/26-java-inputvalidator-detailed-design.md) |
 | `DateTimeUtils` | UTC 時間工具 — `nowUtc()` / `formatIso8601()` / `toEpochMillis()` |
 
 ---
@@ -357,7 +357,7 @@ Code Review 必查：新增 / 修改任何 `@Select` 方法時，對照 SQL 與�
 
 流程：本地 `./dev.sh restart {service}` 看 Flyway log 確認 migrate 成功 → 測試 → push → CI/CD 自動對遠端 migrate。
 
-完整機制見 [38-Flyway 自動同步與 DB 自動初始化detailed-design](../detailed-design/38-flyway-auto-sync-and-db-auto-init-detailed-design.md)。
+完整機制見 [38-Flyway 自動同步與 DB 自動初始化詳細設計書](../detailed-design/38-flyway-auto-sync-and-db-auto-init-detailed-design.md)。
 
 ### 9.4 相容性：新增衍生欄位必須回填、危險變更必須拆兩段
 

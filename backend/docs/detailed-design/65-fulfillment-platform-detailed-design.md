@@ -1,4 +1,4 @@
-# 65　物流履約平台（Fulfillment Platform）detailed-design
+# 65　物流履約平台（Fulfillment Platform）詳細設計書
 
 > **現況（B3，ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 與其 2026-11-24 修訂）**：出貨只做賣家自寄。物流商的 provider adapter、配送單擴充、責任判定案件、帳本與物流商帳單已隨 Java shipping 與物流財務退場，本書只留 B8 之前仍存在於 Java order-service 的兩塊（§1 訂單政策快照、§2 收貨確認軸）；兩者在 B8 重新設計 ordering 時一併回答「沿用或重做」，本書不預先設計。
 >

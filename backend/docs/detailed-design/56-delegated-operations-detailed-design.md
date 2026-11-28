@@ -1,4 +1,4 @@
-# ADM 代行營運（Delegated Operations）detailed-design
+# ADM 代行營運（Delegated Operations）詳細設計書
 
 > 本文是仍在運作的代行服務的現行規格：gateway 的授權與路由、product-service／order-service／social-service 的代行讀寫、`pkg/delegation`，以及 admin 與 website 的代行畫面。單體 `delegation` 模組（工作階段、授權、操作稽核、管理員代行資格）的行為見 [`docs/modules/delegation.md`](../modules/delegation.md)，本文與它重疊處以它為準；gateway 經 `account.DelegationService`（`api/proto/account/delegation.proto`）呼叫單體在 legacy gRPC listener 提供的實作（`internal/legacy/delegationservice`）。gateway 的店家狀態重驗經單體的 legacy `SellerService.GetSeller`（`internal/legacy/sellerserver`）；店面的四條代行路由（`/admin/sellers/:store_id/storefront*`）固定回 503，不讀不寫（`DelegatedStorefrontUnavailable`）。本文在 gateway 的代行編排與各領域服務的代行讀寫併入單體或各自的模組規格時刪除。
 
@@ -47,13 +47,13 @@
 - **賣家本人的操作路徑**。賣家自己的 `/app/*` 路由、`requireSeller(cap)` 與 12 個賣家 capability 的語意完全不變，見 46 號。
 - **平台治理動作**。認證審核、停權、強制下架、異常訂單處置屬治理入口（32／29 號），本書明確把它們留在原處，不搬進代行工作區（見 §2.2）。
 
-### 1.1a 先讀basic-design
+### 1.1a 先讀基本設計書
 
 本書是**詳細設計**（實作契約：DDL、proto、端點簽章、capability 列舉、boot 斷言、狀態機轉移邊、實作陷阱），9,500 行、寫給拿到文件就要開始寫程式的人。
 
-要先看懂「這個功能在做什麼、誰會用到它、為什麼不直接發一把賣家鑰匙」，讀 **[56 ADM 代行營運 basic-design](../basic-design/56-delegated-operations-basic-design.md)**。
+要先看懂「這個功能在做什麼、誰會用到它、為什麼不直接發一把賣家鑰匙」，讀 **[56 ADM 代行營運 基本設計書](../basic-design/56-delegated-operations-basic-design.md)**。
 
-⚠️ **兩本書的分工是「外部設計 vs 內部設計」，不是「摘要 vs 全文」**：basic-design不重複本書的實作細節，本書也不重複它的業務全貌。同一件事只有一個權威版本。
+⚠️ **兩本書的分工是「外部設計 vs 內部設計」，不是「摘要 vs 全文」**：基本設計書不重複本書的實作細節，本書也不重複它的業務全貌。同一件事只有一個權威版本。
 
 ### 1.2 一句話定位
 
@@ -560,7 +560,7 @@ hawkr.common.DelegationContext delegation = 100;
 - **路徑用 `sellers` 不用 `merchants`**：admin BFF 自己的路徑是 `/api/admin/merchants/{storeId}/...`，但 gateway 側一律 `sellers`（`/api/v1/admin/sellers/{storeId}/delegated-operation/preflight`）。產品需求（ADM 代行營運 v2.0）與 admin design doc 只寫了 BFF 路徑，照抄會抄成 `merchants`。
 - **動作端點用 `/publish`、`/unpublish`，不用 `:publish`**（API 設計規範：`POST /{res}/{id}/{action}`）。
 - **時間一律 ISO 8601 UTC 帶 `Z` 且強制截到秒**（`2026-08-09T12:00:00Z`）。前端正則只收 0–3 位小數秒：Go `time.RFC3339` 安全但 `RFC3339Nano` 會炸；Java `ISO_OFFSET_DATE_TIME` ＋ `TIMESTAMPTZ` 微秒**必然輸出 6 位而炸**。序列化前一律 `.Truncate(time.Second)` / `.truncatedTo(ChronoUnit.SECONDS)`。
-- **數字欄位對外一律 string**（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2）：`storeId`／`sellerAccountId`／`adminId`／資源 `version` 全部 string，`revision`／`ttlSeconds`／`idleSeconds` 例外——前端已寫死要求前兩者是**安全整數**（`revision` ≥ 0、`ttlSeconds ∈ [1,1800]`），`idleSeconds` 與 `ttlSeconds` 同組同源；這三個是「計數／秒數」而非 TSID，不受 §4 的 TSID 失精動機約束，於 §6.1 登記為自覺偏離。
+- **數字欄位對外一律 string**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2）：`storeId`／`sellerAccountId`／`adminId`／資源 `version` 全部 string，`revision`／`ttlSeconds`／`idleSeconds` 例外——前端已寫死要求前兩者是**安全整數**（`revision` ≥ 0、`ttlSeconds ∈ [1,1800]`），`idleSeconds` 與 `ttlSeconds` 同組同源；這三個是「計數／秒數」而非 TSID，不受 §4 的 TSID 失精動機約束，於 §6.1 登記為自覺偏離。
 - **狀態值一律小寫**：`status ∈ {active, expired, revoked}`。**小寫這個形式**跟隨前端（`ACTIVE` 大寫會讓前端整包 502），屬編碼細節、前端有權威；**但值域本身由後端定版**（恰為三選一，推導規則見 `docs/modules/delegation.md` §3），且**不進 CodeMeta**——裁決與三個理由見 `docs/modules/delegation.md` §3 末段。
 - **`message` 一律不透傳給瀏覽器**：admin BFF 只保留 `code` 與 `traceId`。⇒ **每個失敗情境必須有唯一數字碼，禁止用 message 區分語意**（錯誤碼表見 §6.5.1）。
 
@@ -625,7 +625,7 @@ hawkr.common.DelegationContext delegation = 100;
 |---|
 | `services/java/order-service/src/main/java/io/github/will413028/hawkr/order/grpc/OrderGrpcService.java`：`getSellerOrders`與 `getSellerOrderDetail`兩處 `requireAccountType(AccountType.SELLER)` → `requireSellerOrDelegated(...)`（capability ＝ `orders.read`）。**不得放寬任何寫入 RPC**——訂單面只有 `orders.read`，出貨／取消／退款全在禁區；`*ForAdmin` 系列是 ADMIN 治理 RPC，**完全不動**；`getSellerOrderStatusCounts`是賣家儀表板統計，本案代行訂單面只給列表與明細，**同樣不動** |
 | 同檔 `getSellerOrderDetail`加分流：`GetSellerOrderDetailRequest.reveal_recipient_contact`（新增欄位，見 §6.2.3）為 `false`（含未帶 `delegation` 的賣家本人呼叫，proto3 bool 預設即 `false`）時，回應中的 `recipientName`／`recipientPhone`／`shippingAddress` 一律經遮罩再填。**只有 `recipient-contact` 端點會傳 `true`**，列表 RPC**永遠不揭露**——那支根本不吐聯絡欄位。<br/>⚠️ **同一支還要補一條 `Validate` 補不到的斷言**：`reveal_recipient_contact == true` 時，必須在 `requireSellerOrDelegated(...)` 之後**自行斷言 `delegation.audit_log_id` 非空**，為空即 9260。理由是這支的 capability 是 `orders.read`，落在 §6.2.4 **S1b** 的「不驗」側，而 PII 揭露卻是**必落稽核**的（§7.2.6）；`pkg/delegation.Validate` 看不到這個旗標，所以只能在這裡補（全案唯一一處，論證見 §6.2.4） |
-| `services/java/order-service/src/main/java/io/github/will413028/hawkr/order/util/MaskUtils.java`（遮罩 helper，與同目錄既有 `HashUtil.java`／`OrderShippingProgress.java` 同層。**簽章**：`public static String maskPhone(String phone)` ／ `public static String maskAddressToDistrict(String address)`，兩者皆為**純靜態函式、null-safe（傳 null 回 null）**。**落在 order-service 而非 common-core**：目前全 repo 只有這一個消費者，抽到共用模組會在沒有第二個使用者的情況下先付跨服務契約成本；出現第 2 個服務需要時再依 [Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §15 上抽。遮罩規則（手機留前 4 後 3、不足 8 碼全遮；地址止於 city+district）的**權威定義在 §8.1.5**，本檔不重列。**`orders` 表沒有分離的收件人 city／district 欄位**——`V1__init_order_tables.sql` 只有 `recipient_name`／`recipient_phone`／`shipping_address VARCHAR(255)`，`sender_city`／`sender_district` 是**出貨端**不是收件端，不可拿來充數 ⇒ `maskAddressToDistrict` 依 §8.1.5 走近似規則（取字串前綴至第一個「區／鄉／鎮／市」字元為止），**不得在 Java 側自造中文地址 parser**） |
+| `services/java/order-service/src/main/java/io/github/will413028/hawkr/order/util/MaskUtils.java`（遮罩 helper，與同目錄既有 `HashUtil.java`／`OrderShippingProgress.java` 同層。**簽章**：`public static String maskPhone(String phone)` ／ `public static String maskAddressToDistrict(String address)`，兩者皆為**純靜態函式、null-safe（傳 null 回 null）**。**落在 order-service 而非 common-core**：目前全 repo 只有這一個消費者，抽到共用模組會在沒有第二個使用者的情況下先付跨服務契約成本；出現第 2 個服務需要時再依 [Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §15 上抽。遮罩規則（手機留前 4 後 3、不足 8 碼全遮；地址止於 city+district）的**權威定義在 §8.1.5**，本檔不重列。**`orders` 表沒有分離的收件人 city／district 欄位**——`V1__init_order_tables.sql` 只有 `recipient_name`／`recipient_phone`／`shipping_address VARCHAR(255)`，`sender_city`／`sender_district` 是**出貨端**不是收件端，不可拿來充數 ⇒ `maskAddressToDistrict` 依 §8.1.5 走近似規則（取字串前綴至第一個「區／鄉／鎮／市」字元為止），**不得在 Java 側自造中文地址 parser**） |
 
 **common-core（Java 共用）**
 
@@ -1055,7 +1055,7 @@ UPDATE cms_post
 
 #### product-service（Flyway V16）— 樂觀鎖欄位
 
-`product.version` 由 `V16__add_product_version.sql` 建立。V1 永久凍結、append-only、**禁跳號**（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §9）。⚠️ 新增 migration 前一律以 `ls services/java/product-service/src/main/resources/db/migration/` 的實際最大號為準，不要照抄書上的數字。
+`product.version` 由 `V16__add_product_version.sql` 建立。V1 永久凍結、append-only、**禁跳號**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §9）。⚠️ 新增 migration 前一律以 `ls services/java/product-service/src/main/resources/db/migration/` 的實際最大號為準，不要照抄書上的數字。
 
 ```sql
 -- V16__add_product_version.sql
@@ -2193,10 +2193,10 @@ Query：`page`／`page_size`／`keyword`／`status`（snake_case，[API 設計�
 |---|---|---|---|---|
 | `skuId` | string | 僅 PATCH 更新既有 SKU 時 | `^\d{1,19}$` | `ProductSku.id` |
 | `spec` | string | ✔ | trim 後 1–**100** 字 | 對應 **`ProductSku.sku_name`**（`product_sku.sku_name VARCHAR(100)`）——**欄名不同，這是最容易接錯的一欄** |
-| `price` | string | ✔ | 數字字串，**> 0**，單位「元」（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2：金額一律 `BIGINT`／`Long`／string） | `ProductSku.price` |
+| `price` | string | ✔ | 數字字串，**> 0**，單位「元」（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2：金額一律 `BIGINT`／`Long`／string） | `ProductSku.price` |
 | `salePrice` | string | — | 數字字串；非空時必須 **> 0 且 < `price`**（DB CHECK `sale_price > 0 AND sale_price < price`） | `ProductSku.sale_price` |
 | `stockQty` | string | ✔ | 數字字串，**≥ 0** | `ProductSku.stock_qty` |
-| `unit` | string | ✔ | **必須是 `WeightUnit` 的合法 Value**（`product_sku.unit` 存的是 **Value** 不是 Code —— 見 CodeMeta 該表的「DB 儲存欄位」列，本書不複製碼表）。送中文「盒」「包」、送 Code（`KG`）或小寫皆**立即**被 product-service 擋下（`ProductService.java` 的 `CodeMetaValidator.requireValidValue`），回既有業務碼。⚠️ 真正危險的是繞過這道驗證落庫的髒值：它讓商品上架成功，**到結帳鏈才由 `WeightUnit.fromValue()` 拋例外**（`CheckoutService.java`；[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §13.4 的既有事故）。產品需求的編輯頁把單位畫成「盒」，**實作以本欄值域為準** | `ProductSku.unit` |
+| `unit` | string | ✔ | **必須是 `WeightUnit` 的合法 Value**（`product_sku.unit` 存的是 **Value** 不是 Code —— 見 CodeMeta 該表的「DB 儲存欄位」列，本書不複製碼表）。送中文「盒」「包」、送 Code（`KG`）或小寫皆**立即**被 product-service 擋下（`ProductService.java` 的 `CodeMetaValidator.requireValidValue`），回既有業務碼。⚠️ 真正危險的是繞過這道驗證落庫的髒值：它讓商品上架成功，**到結帳鏈才由 `WeightUnit.fromValue()` 拋例外**（`CheckoutService.java`；[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §13.4 的既有事故）。產品需求的編輯頁把單位畫成「盒」，**實作以本欄值域為準** | `ProductSku.unit` |
 | `weight` | string | — | 數字字串（小數 3 位以內） | `ProductSku.weight` |
 | `lengthCm`／`widthCm`／`heightCm` | string | — | 數字字串（小數 2 位以內） | 同名欄位 |
 | `shippingMethods` | array | — | 元素 `{type, temperature, freeThreshold, feePayer}`，值域沿用既有 `ShippingMethodDTO` | `ProductSku.shipping_method` |
@@ -2367,7 +2367,7 @@ Query（列表）：`page`／`page_size`（值域見 §6.1.0 的共通分頁參�
 >
 > ```bash
 > cd <repo root>
-> DOC='docs/detailed-design/56-delegated-operations-detailed-design.md'
+> DOC='docs/detailed-design/56-delegated-operations-詳細設計書.md'
 > awk '/^#### 6\.1\.9 /,/^#### 6\.1\.10 /' "$DOC" > /tmp/sec619
 > awk '/^type DelegatedPost(ListItem|Detail|Product) struct/,/^}/' \
 >   gateway/internal/handler/admin_delegated_post.go |
@@ -2727,15 +2727,15 @@ durationSeconds = EXTRACT(epoch FROM
 |---|---|---|---|---|
 | `plain` | — | 純量字串 | `梨山盛花園` | `—` |
 | `qty` | 單位字面（`件`／`項`／`張`） | 數字字串 | `36 件` | `0 件` |
-| `money` | — | 數字字串（單位「元」，[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2） | `NT$ 1,280` | `NT$ 0` |
+| `money` | — | 數字字串（單位「元」，[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2） | `NT$ 1,280` | `NT$ 0` |
 | `bool` | — | boolean | `是` / `否` | `否` |
 | `objectKey` | — | objectKey 字串 | `abc.jpg`（key 末段） | `—` |
 | `truncate` | 字數上限 `n` | 字串 | 前 n 字 ＋ `…` | `—` |
 | `enum` | CodeMeta enum 名 | 碼值字串；**多值以 `、` join**（投影層產生） | `已上架`（`ProductStatus` 的 `4004`，取自 CodeMeta 實際 Label）／`有機農產品、產銷履歷`（`CertificationType` 的 `3701、3702`） | `—` |
 
-- **`Arg` 一律是字面值，`qty` 沒有「取商品自己的計量單位」這種動態值**。曾考慮過一個 `@unit`（取快照的 `unit` 欄當單位），**否決**，兩個理由各自獨立成立：① `stockQty` 是**商品層聚合值**（由 SKU 聚合，見下方規則表），而計量單位是 **SKU 層**欄位（`skus[].unit`，§6.1.8），一個商品的多個 SKU 可以各用不同單位 ⇒ 聚合值配不出唯一正確的單位；② 該欄的值域是 `WeightUnit` 的 **Value**（`3301`／`3302`／`3303`，見 CodeMeta），直接當單位字面會印出數字碼，要印中文就得再過一次 label 對照 —— 為一個欄位在 formatter 層開泛型取值機制，代價遠大於顯示 `36 件`。⚠️ 產品需求的稽核抽屜寫的是「`0 盒 → 36 盒`」，**實作以本節為準**：「盒」不在 `WeightUnit` 值域內，把它當成資料送進 `product_sku.unit` 會讓 `WeightUnit.fromValue()` 在結帳鏈拋例外（§6.1.8、[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §13.4 的既有事故）
+- **`Arg` 一律是字面值，`qty` 沒有「取商品自己的計量單位」這種動態值**。曾考慮過一個 `@unit`（取快照的 `unit` 欄當單位），**否決**，兩個理由各自獨立成立：① `stockQty` 是**商品層聚合值**（由 SKU 聚合，見下方規則表），而計量單位是 **SKU 層**欄位（`skus[].unit`，§6.1.8），一個商品的多個 SKU 可以各用不同單位 ⇒ 聚合值配不出唯一正確的單位；② 該欄的值域是 `WeightUnit` 的 **Value**（`3301`／`3302`／`3303`，見 CodeMeta），直接當單位字面會印出數字碼，要印中文就得再過一次 label 對照 —— 為一個欄位在 formatter 層開泛型取值機制，代價遠大於顯示 `36 件`。⚠️ 產品需求的稽核抽屜寫的是「`0 盒 → 36 盒`」，**實作以本節為準**：「盒」不在 `WeightUnit` 值域內，把它當成資料送進 `product_sku.unit` 會讓 `WeightUnit.fromValue()` 在結帳鏈拋例外（§6.1.8、[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §13.4 的既有事故）
 - **`objectKey` 只取 key 末段當顯示值，且絕不組完整 URL**（49 號設計書、[多媒體與圖片 URL 規範](../dev-guidelines/media-and-image-url-guidelines.md)）。完整 key 保留在快照裡
-- **`enum` 的 Arg 是 CodeMeta enum 名**（如 `ProductStatus`／`PostPublishStatus`），**本設計書不複製 enum 表格**（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md)）
+- **`enum` 的 Arg 是 CodeMeta enum 名**（如 `ProductStatus`／`PostPublishStatus`），**本設計書不複製 enum 表格**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md)）
 - **`enum` 逐段解析 `、` 分隔的多值**，單值是它的退化情形（沒有分隔符＝一段）。這不是第八種 formatter，而是同一種：投影層仍舊只做「陣列 join 成純量」，formatter 仍舊只收純量。認不得的碼值原樣輸出（與單值行為一致），**不得**因為其中一段查不到就整格退成 `—` —— 那會讓一筆合法的認證宣稱在稽核上消失
 
 **`enum` 的 Label 從哪裡拿到（定版，二選一之中取①）。** 「一律查 CodeMeta」不是一個可施工的指示——**Go 側今天查不到**：`docs/codemeta/scripts/output/go/code_meta.go` 所在目錄**沒有 `go.mod`、不在 `go.work` 的 `use` 清單內**，物理上 import 不到；而 `gateway/internal/codemeta/codemeta.go` 的檔頭本來就明文拒絕依賴 docs 路徑，全檔沒有任何 Label 欄位。
@@ -3031,7 +3031,7 @@ func ScopeStorefrontCover() []string  // {coverKey}
 | ② | `PUT <uploadUrl>`（檔案位元組，直送 R2） | — |
 | ③ | `POST /api/v1/app/media/upload_sessions/{sessionId}/complete` | **`stagedToken`** ＋ `previewUrl` |
 
-這三步在 admin repo 已經是既有共用函式 `uploadImageToMedia(file)`（`src/services/media-upload.ts`，Banner 與 Recipe 編輯器共用），代行工作區**直接沿用，不另寫一份**（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §15）。完整規格見 **08 號《多媒體微服務》§3.1–§3.4**，本節只定義代行特有的部分。
+這三步在 admin repo 已經是既有共用函式 `uploadImageToMedia(file)`（`src/services/media-upload.ts`，Banner 與 Recipe 編輯器共用），代行工作區**直接沿用，不另寫一份**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §15）。完整規格見 **08 號《多媒體微服務》§3.1–§3.4**，本節只定義代行特有的部分。
 
 **為什麼不開 `POST /api/v1/admin/sellers/{storeId}/media/upload_sessions`**：upload session 不寫任何業務資料、不碰 target store（只在 media 自己的 `upload_session` 表插一列），**沒有可授權的對象**。開一支就得進 §6.1.1 端點總表、挑一個 capability、進 boot 斷言的掃描範圍、落一筆稽核 —— 全部是為了一個不改變任何店家狀態的動作付跨 repo 契約成本。真正需要授權的是「把這張圖掛到這家店的資源上」，那件事已經由那四支端點各自的 capability ＋ orchestrator 的兩階段稽核守住。
 
@@ -3197,14 +3197,14 @@ func ScopeStorefrontCover() []string  // {coverKey}
    稽核表寫不進，而稽核 intent 是所有代行寫入的**同步前置 gate**（§8.4 W4）⇒ 要跑到 `RecordAuditIntent`
    才以 **9279** 失敗，看起來像一個與 capability 完全無關的稽核故障；只改 ①② 而漏 ③ 的形狀一模一樣，
    而且更難查——錯誤訊息指向的是 `resource_type` 而不是新加的那個 capability
-5. **CodeMeta SSOT**（[《Java 微服務dev-guidelines》](../dev-guidelines/java-microservices-development-guidelines.md) §6）：capability token **本身不進 CodeMeta**（§4.4.1 的三條理由不變），
+5. **CodeMeta SSOT**（[《Java 微服務開發規範》](../dev-guidelines/java-microservices-development-guidelines.md) §6）：capability token **本身不進 CodeMeta**（§4.4.1 的三條理由不變），
    **但新 capability 必然帶來兩類必須進 CodeMeta 的值**——
    ① `DelegationAuditAction` 新值（`docs/codemeta/internal-technical-codes.md`，含**成功寫入類**與對應的
    **READ ＋ FAILED** 類，見 §6.5.3）＋ `DelegationActionRules.riskLevel(action)` 的新分支；
    ② 可能的新錯誤碼（`docs/codemeta/error-codes.md` 的 9260~9299 段，**9278 是空號不得填補**）。
    兩者一律 **先改 `.md` → `cd docs/codemeta/scripts && ./generate.sh --java`（Go 業務碼另跑 `--go-errors`）
    → markdown 與生成檔同一個 commit**。⚠️ **嚴禁直接改生成檔**（`GrpcResponseCode.java`、`pkg/codemeta/labels.go`、
-   `pkg/errors/bizcode/bizcode.go`）——下次 generate 會覆蓋，曾造成執行期 crash（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md)）
+   `pkg/errors/bizcode/bizcode.go`）——下次 generate 會覆蓋，曾造成執行期 crash（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md)）
 6. **§6.5.3 的 Label 表**加列 ⇒ `generate.sh` 的 `pkg/codemeta/labels.go` target 重跑
    （單體 delegation 的 `RecordAuditIntent` 與完成事件 payload 一律查它，禁止在 Go 側手寫第二份中文對照表）
 7. **proto**：對應的既有賣家 RPC 加 `hawkr.common.DelegationContext delegation = 100`（§4.4.3，統一欄位號）。
@@ -4463,7 +4463,7 @@ sequenceDiagram
 3. **逐項失敗不影響其他項**。④ 的服務端**不使用單一大交易包住全部**——一項版本衝突就整批回滾，會讓操作者面對「50 筆全滅、原因是第 37 筆」這種無從處理的結果。這與③⑤「單一交易」不矛盾：③⑤ 寫的是稽核（同一張表的 N 列，全成或全不成才是正確語意），④ 寫的是 N 個不同商品的業務狀態（必須逐項獨立）。**兩者的交易邊界不同，是刻意的。**
 4. **冪等鍵逐項導出**（`{header 原值}:{resourceId}`），因此整批重送時已成功的項會命中既有稽核列（`replayed=true`）而不重複寫入；這也是「批次可以安全重送」的依據。
 5. **`auditLogId` 由 Gateway 填進 ④ 的 `items`，領域服務原樣回音。** 不是領域服務產生、也不是它回寫——它拿不到那個值，因為稽核列在 單體 delegation、而 intent 由 Gateway 打。`BatchProductStatusItem` 因此**必須有 `audit_log_id` 欄位**（§6.2.3）：`BatchProductStatusResult.audit_log_id` 要回得出來，前提是它先被傳得進去。
-6. **③ 逐項 intent 失敗的處置：該項標 9279／`FAILED`，且不進入 ④ 的 `items`，其餘照跑。** 單筆路徑的規則是「intent 失敗 ⇒ 整個代行寫入中止」（§7.3.2），**批次版必須逐項化**——否則一列稽核寫不進去就炸掉整批 50 件，而那 49 件的 intent 明明是成功的。實作面：③ 在單一交易內逐項 INSERT 時**必須逐項 `SAVEPOINT`**——PostgreSQL 交易內任一句 SQL 失敗會讓整個交易 aborted（`25P02`），之後所有指令一律被拒，「某項失敗其餘照跑」在沒有 SAVEPOINT 的情況下**做不到**（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §9）。
+6. **③ 逐項 intent 失敗的處置：該項標 9279／`FAILED`，且不進入 ④ 的 `items`，其餘照跑。** 單筆路徑的規則是「intent 失敗 ⇒ 整個代行寫入中止」（§7.3.2），**批次版必須逐項化**——否則一列稽核寫不進去就炸掉整批 50 件，而那 49 件的 intent 明明是成功的。實作面：③ 在單一交易內逐項 INSERT 時**必須逐項 `SAVEPOINT`**——PostgreSQL 交易內任一句 SQL 失敗會讓整個交易 aborted（`25P02`），之後所有指令一律被拒，「某項失敗其餘照跑」在沒有 SAVEPOINT 的情況下**做不到**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §9）。
 7. **⑤ 是 all-or-nothing，因此 confirm 失敗的影響面是 N 列而不是 1 列。** 這是本形狀唯一的退步，**必須明講、不得靜默**——完整的寬度分析與「為什麼仍是淨改善」見 §7.3.3 視窗 A。
 8. **② 回的必須是完整 before 快照，不是只夠做狀態轉換判斷的那幾欄。** `before_snapshot` 是爭議時的舉證素材（§6.1.12），而批次正是「一次動很多件」的高風險操作——它的舉證素材**不得比單筆少**。⇒ `BatchProductSnapshot` 帶 `ProductDetail detail`，Gateway 對批次與單筆跑同一支投影函式。⚠️ **這與讀法 3「逐項獨立」及本節的跳數承諾都不衝突**：服務端逐項組 detail 是三次**本地**查詢（SKU／hashtag／分類階層），Gateway 這一跳仍然只有一次。反過來讓 Gateway 逐項打 `GetProduct` 才會破壞跳數承諾，而且那條路還會連帶付 N 次單體 seller 呼叫（`GetProduct` 內含 `buildSellerInfo`）。⚠️ 補齊 before **不放寬比較範圍**：`SnapshotFields` 仍是 `{status}`。
 
@@ -5552,7 +5552,7 @@ confirm 失敗時的處置：**同步有限重試**（3 次、指數退避、總
 是**商品／店面／貼文各自資料列**的樂觀鎖（每次成功寫入 +1）。
 
 註：兩者對外型別不一致（`revision` 為 number、資源 `version` 為 string）是**刻意的**：`revision` 的型別
-由前端封閉契約寫死（C7），而資源 `version` 是本期新增、由後端定義，因此遵循 [Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2「數字對外一律
+由前端封閉契約寫死（C7），而資源 `version` 是本期新增、由後端定義，因此遵循 [Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2「數字對外一律
 string」。實作時不要「統一」它們。
 
 ---
@@ -6269,7 +6269,7 @@ website 的對應測試在 `website/tests/delegated-*.test.ts`，例如 `delegat
 | **PENDING（稽核結果）** | 「曾經嘗試、結果未確認」。**是合法終態、是稽核事實本身**，不是待清理佇列。查詢時如實顯示、不計入成功數、不需要補償任務 |
 | **preflight** | 建立工作階段前的授權判定端點。唯讀、可安全重複呼叫（入口每 30 秒 stale ＋ focus 重抓 ＋ 每次 create 前再抓一次）。**拒絕一律以 `200 {allowed:false}` 表達**，不得用 404／503 |
 | **`revision`（session 版本）** | **Operation Session 這一列**的樂觀鎖版本。型別 **number**（前端要求 JS 安全整數，送 string 直接 502）。只在**真正的狀態轉換**時 +1，而狀態轉換**恰有兩種：結束與撤銷**（本設計沒有「capability 縮減」這個轉換——capability 建立當下快照凍結、存續期間不可變，見 `docs/modules/delegation.md` §2、§3）；讀取、輪詢、代行寫入**一律不 bump**——連續兩次 `GET current` 必須位元等價 |
-| **`version`（資源版本）** | **被代行的資源**（商品／店面／貼文）的樂觀鎖版本。型別 **string**（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2：數字對外一律 string）。每次成功寫入 +1，mutation 以 `expectedVersion` 帶入比對，不符即 409 |
+| **`version`（資源版本）** | **被代行的資源**（商品／店面／貼文）的樂觀鎖版本。型別 **string**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2：數字對外一律 string）。每次成功寫入 +1，mutation 以 `expectedVersion` 帶入比對，不符即 409 |
 | **`revision` vs `version`** | 兩者是**完全不同的東西**，只是名字相近。`revision` 描述「授權還是不是原來那個授權」，`version` 描述「資源內容改了幾次」。**型別刻意不同**（number vs string）正是為了讓混用在型別層就炸開。把 `revision` 拿去當 `expectedVersion` 會得到一個**永遠成功的樂觀鎖**——它比較的是一個在寫入時不會變的值，賣家的併發修改因此被靜默覆蓋。§13 unit 層有對應的負向測試 |
 
 ---

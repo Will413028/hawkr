@@ -230,7 +230,7 @@ cd docs/codemeta/scripts
 以下是目前 README 內沿用的值段慣例，新增時優先在既有段內延伸，避免衝突。
 
 ⚠️ 本表只管 CodeMeta enum 的 `Value`。`error-codes.md` 的 gRPC Response Code 是**另一個獨立編號空間**
-（號段見「error-codes.md」§錯誤碼範圍分配），兩者互不相干、數字重疊不算衝突——例如 `4001~4099` 在本表是
+（號段見「錯誤碼.md」§錯誤碼範圍分配），兩者互不相干、數字重疊不算衝突——例如 `4001~4099` 在本表是
 `ProductStatus` 的 Value 段，在錯誤碼那邊是 Order 業務碼段，各自獨立分配。
 
 | 範圍 | 用途 |

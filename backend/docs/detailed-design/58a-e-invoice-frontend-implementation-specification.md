@@ -1,6 +1,6 @@
 # 58A　電子發票前端實作規格（Buyer Web／Seller Web／ADM）
 
-> **對應主設計書**：58 號《電子發票服務（Invoice Service）detailed-design》。兩冊衝突時一律以 58 為準。
+> **對應主設計書**：58 號《電子發票服務（Invoice Service）詳細設計書》。兩冊衝突時一律以 58 為準。
 > **涵蓋**：三端共 31 個畫面——Buyer Web `B01–B08`、Seller Web `S01–S10`、ADM `A01–A13`。
 > **圖示慣例的時間點**：本文的圖示名稱（`IconlyIcon`、Lottie、ADM 的 `ri-*` Remix Icon class）是圖示系統改版前的實作紀錄。現行慣例：website 用 `components/shared/AppIcon.tsx`，admin 用 `@hawkr/icons` 的 `MaterialSymbol`；實作時以現行元件為準，圖示的語意與位置照本文。
 > **目錄**：monorepo `Will413028/hawkr` 的 `website/`（買家面與賣家面，同一 app 的兩個 route group）／`admin/`（ADM）。
@@ -581,7 +581,7 @@ if (preview.invoice.disclosure.required) {
 | 不使用載具 | 無（選它＝整包省略 `invoice`；它是前端常數，不是 CodeMeta 值） | — |
 | `MOBILE_BARCODE` | `<Input label="手機條碼" placeholder="/ABC+123" maxLength={8}>` | `^/[0-9A-Z+\-.]{7}$` |
 | `CITIZEN_CERT` | `<Input label="自然人憑證條碼" maxLength={16}>` | `^[A-Z]{2}[0-9]{14}$` |
-| `TAX_ID` | `<Input label="統一編號" maxLength={8} inputMode="numeric">` ＋ `<Input label="公司抬頭" maxLength={60}>` | 統編 `^\d{8}$`（**純 8 碼數字，不驗檢查碼**）、抬頭 1–60 字（**`utf8.RuneCountInString` 語意，不是 `checkDisplayLength`**）<br>⚠️ 兩者都以後端為準（`invoice-service/internal/usecase/checkout.go` 的 `domain.IsBusinessTaxID` 與 `identity.go` 的長度檢查）。前端若加檢查碼會比後端嚴 ⇒ **合法統編打不出發票且沒有可解釋的錯誤**；用 `checkDisplayLength`（中文算 2）會讓抬頭上限縮成 30 個中文字。58 號detailed-design優先（本文件 2026-08-30 依實作回灌修正） |
+| `TAX_ID` | `<Input label="統一編號" maxLength={8} inputMode="numeric">` ＋ `<Input label="公司抬頭" maxLength={60}>` | 統編 `^\d{8}$`（**純 8 碼數字，不驗檢查碼**）、抬頭 1–60 字（**`utf8.RuneCountInString` 語意，不是 `checkDisplayLength`**）<br>⚠️ 兩者都以後端為準（`invoice-service/internal/usecase/checkout.go` 的 `domain.IsBusinessTaxID` 與 `identity.go` 的長度檢查）。前端若加檢查碼會比後端嚴 ⇒ **合法統編打不出發票且沒有可解釋的錯誤**；用 `checkDisplayLength`（中文算 2）會讓抬頭上限縮成 30 個中文字。58 號詳細設計書優先（本文件 2026-08-30 依實作回灌修正） |
 | `DONATION` | `<Input label="捐贈碼" maxLength={7} inputMode="numeric">` | `^[0-9]{3,7}$` |
 
 前端只做形狀檢查，後端仍會驗；**絕不**因為「格式看起來對」就跳過後端錯誤的顯示。`maxLength` 取自 AMEGO 上限，上表正則比 AMEGO 更緊（財政部對這三種載具是固定長度）。

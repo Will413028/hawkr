@@ -28,7 +28,7 @@ impersonation 的替代代價（`requireSellerOrDelegated`）是**一個共用 h
 
 **否決 ①**：見上一節。
 **否決 ②**：賣家可觸及的寫入 RPC 有十餘支，複製一份等於把每一個業務規則變成兩份實作，
-兩份必然漂移（Java 微服務dev-guidelines的重複實作防護；MetaObjectHandler 曾有八份副本的教訓）。
+兩份必然漂移（Java 微服務開發規範的重複實作防護；MetaObjectHandler 曾有八份副本的教訓）。
 
 ③ 的代價是每支 RPC 的授權判斷要從 `requireAccountType(SELLER)` 換成
 `requireSellerOrDelegated(storeId, capability)`，但那是**一個共用 helper 的替換**。

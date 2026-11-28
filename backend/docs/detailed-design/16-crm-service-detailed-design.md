@@ -1,4 +1,4 @@
-# 顧客管理微服務 (CRM Service) detailed-design
+# 顧客管理微服務 (CRM Service) 詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 

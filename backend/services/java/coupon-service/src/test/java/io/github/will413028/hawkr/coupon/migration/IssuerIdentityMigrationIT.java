@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>本檔刻意*不*驗證「issuer_type 與非 null 欄位不匹配」會被拒絕——V6 這次只做
  * expand（加 nullable 欄位 + 放寬 NOT NULL + 回填），CHECK constraint
- * （{@code chk_tpl_issuer_identity}）依 docs/dev-guidelines/DB Migration 相容性規範
+ * （{@code chk_tpl_issuer_identity}）依 docs/開發規範/DB Migration 相容性規範
  * （expand-contract）.md §4 延後到 contract release 才加，此檔尚未真的用 DB 層擋
  * 互斥違規。等 contract release 補上 CHECK constraint 時，這裡要補回對應的
  * reject-path 測試。

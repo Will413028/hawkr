@@ -3,7 +3,7 @@
 --   L6 aftersale_cases.return_stuck_alerted_at
 --   L7 aftersale_cases.label_retry_at
 --
--- 設計書：09 §8.5「多副本排程搶佔語意」；規範：docs/dev-guidelines/multi-replica-scheduling-preemption-guidelines.md
+-- 設計書：09 §8.5「多副本排程搶佔語意」；規範：docs/開發規範/多副本排程搶佔規範.md
 --
 -- 三欄都是 **租約欄（lease）**，不是「已做過旗標」：
 --   值 = 目前持有者的租約到期時間；NULL 或已過期 = 可被重新搶佔。

@@ -1,4 +1,4 @@
-以下是 AI 實作版（Claude）《observability-common 內部 Library detailed-design v1.0》：
+以下是 AI 實作版（Claude）《observability-common 內部 Library 詳細設計書 v1.0》：
 特性：每個 public method 都有 pseudo-code、行為固定、幾乎不能偏離。
 （工程師/AI 僅需依本文實作；除非本文明確允許，否則不得自行補邏輯或新增功能。）
 

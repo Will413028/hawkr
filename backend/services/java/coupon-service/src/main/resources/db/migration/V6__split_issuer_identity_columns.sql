@@ -6,7 +6,7 @@
 -- store_id 的混合語意，靠 issuer_type 欄位當判別式。這次徹底拆成兩個各自誠實
 -- 的欄位。
 --
--- 本檔是 expand-contract 的 expand 階段（docs/dev-guidelines/DB Migration 相容性規範
+-- 本檔是 expand-contract 的 expand 階段（docs/開發規範/DB Migration 相容性規範
 -- （expand-contract）.md §4）：只加 nullable 欄位 + 放寬既有欄位的 NOT NULL +
 -- 回填，全部是舊 code 在新 schema 上仍能正常寫入/讀取的安全變更。刻意*不*在此檔加
 -- CHECK constraint（`issuer_type` 與非 NULL 欄位互斥的約束）——本 release 部署時，

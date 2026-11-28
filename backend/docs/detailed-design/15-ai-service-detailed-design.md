@@ -1,4 +1,4 @@
-# AI 微服務（AI Service）detailed-design
+# AI 微服務（AI Service）詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 

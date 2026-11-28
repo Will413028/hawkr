@@ -33,9 +33,9 @@
 
 **緊急 SOP**（不該發生但發生時要會處理，不算「常規」）：
 
-- **Flyway checksum mismatch**：平時不該發生（V1 凍結、V2+ append-only）。若發生通常代表有人改了 V1 或環境間 Flyway state 不一致，正解是把 history 表的 checksum 對齊回當前 SQL 檔案（`flyway/flyway` 官方 image 直接跑 `repair`，不執行任何 DDL、不碰業務 table、可重複執行；命令與各服務 DB 名對照見 [38-Flyway 自動同步detailed-design](../detailed-design/38-flyway-auto-sync-and-db-auto-init-detailed-design.md) §4 Step 3）。**不要改 V1 檔案讓 checksum 過**——那會破壞凍結、把問題推給下一個環境。
+- **Flyway checksum mismatch**：平時不該發生（V1 凍結、V2+ append-only）。若發生通常代表有人改了 V1 或環境間 Flyway state 不一致，正解是把 history 表的 checksum 對齊回當前 SQL 檔案（`flyway/flyway` 官方 image 直接跑 `repair`，不執行任何 DDL、不碰業務 table、可重複執行；命令與各服務 DB 名對照見 [38-Flyway 自動同步詳細設計書](../detailed-design/38-flyway-auto-sync-and-db-auto-init-detailed-design.md) §4 Step 3）。**不要改 V1 檔案讓 checksum 過**——那會破壞凍結、把問題推給下一個環境。
 
-> ⚠️ **DDL 不在這層**：自 2026-05-26 V1 凍結 + V2+ 自動同步後，**所有 schema 變更走 `V{N+1}__xxx.sql` 由 CI/CD Flyway 自動 apply 到 dev / stage**（詳見 [38-Flyway 自動同步detailed-design](../detailed-design/38-flyway-auto-sync-and-db-auto-init-detailed-design.md)）。**禁止**手動 SSH 進遠端 DB 跑 `ALTER` / `CREATE`，反而會破壞 Flyway 狀態。
+> ⚠️ **DDL 不在這層**：自 2026-05-26 V1 凍結 + V2+ 自動同步後，**所有 schema 變更走 `V{N+1}__xxx.sql` 由 CI/CD Flyway 自動 apply 到 dev / stage**（詳見 [38-Flyway 自動同步詳細設計書](../detailed-design/38-flyway-auto-sync-and-db-auto-init-detailed-design.md)）。**禁止**手動 SSH 進遠端 DB 跑 `ALTER` / `CREATE`，反而會破壞 Flyway 狀態。
 
 ## 二、判定關鍵字
 

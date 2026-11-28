@@ -4,7 +4,7 @@
 -- 用途：審計「正式商品從哪個 CSV 匯入轉正而來」
 --   - 一般 CreateProduct：兩欄寫 NULL
 --   - CreateProductFromImportInternal：兩欄帶 Import Service 傳入的 ID
--- 詳見：docs/detailed-design/02-product-service-detailed-design.md §9.4
+-- 詳見：docs/詳細設計書/02-產品微服務（Product Service）詳細設計書.md §9.4
 -- ============================================================================
 
 ALTER TABLE product

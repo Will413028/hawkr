@@ -1,4 +1,4 @@
-# 單體dev-guidelines
+# 單體開發規範
 
 Go modular monolith（`go.mod`、`cmd/`、`internal/`）的結構與規則全文。`backend/AGENTS.md` 的「單體的結構」與「單體規則」是本檔的摘要，編號相同；決策與理由見 ADR `docs/adr/2026-09-24-go-modular-monolith.md` 與 `docs/adr/2026-09-27-module-internal-structure.md`。
 

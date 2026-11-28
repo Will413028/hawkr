@@ -52,7 +52,7 @@ TSID (Time-Sorted ID) 是一個 64-bit 的時序唯一識別碼，用於替代�
 
 > `payuni-webhook-service` 與 Coupon 共用 500：該服務全表 BIGSERIAL，不生成任何 TSID，無衝突可能。
 >
-> 各服務的實際值以 `services/java/{service}/src/main/resources/application.yml` 的 `hawkr.tsid.node-id-base` 為準（新增服務時**必須**同時更新本表與 [Java 微服務dev-guidelines](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §3）。
+> 各服務的實際值以 `services/java/{service}/src/main/resources/application.yml` 的 `hawkr.tsid.node-id-base` 為準（新增服務時**必須**同時更新本表與 [Java 微服務開發規範](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §3）。
 
 **多實例部署時的 Node ID 計算**：
 ```
@@ -226,7 +226,7 @@ export POD_INDEX=1
 
 ##### Q4: TSID 與 Proto/gRPC 如何對應？
 
-Proto 的數字欄位（含 TSID 主鍵、金額、數量）**一律宣告成 `string`**，在 gRPC 邊界用 `parseLong()` / `formatLong()` 轉換；Java 內部一律 `Long`。理由與例外清單見 [Java 微服務dev-guidelines](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §2.1。
+Proto 的數字欄位（含 TSID 主鍵、金額、數量）**一律宣告成 `string`**，在 gRPC 邊界用 `parseLong()` / `formatLong()` 轉換；Java 內部一律 `Long`。理由與例外清單見 [Java 微服務開發規範](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §2.1。
 
 ```protobuf
 message PaymentTransaction {
@@ -263,14 +263,14 @@ message PaymentTransaction {
 - **Type Handlers**：JSONB 自訂類型轉換
 - **Validators**：通用驗證工具
 
-> 本節不逐一列舉。共用工具（運費輔助、`DateTimeUtils`、`CodeMetaValidator`、`InputValidator` 等）與共用配置（`ObsAutoConfiguration`、`TsidConfiguration`、`MyBatisPlusAutoConfiguration` 等）的完整表格在 [Java 微服務dev-guidelines](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §7 與 §10；新增共用工具前先查那兩節，禁止重複實作。
+> 本節不逐一列舉。共用工具（運費輔助、`DateTimeUtils`、`CodeMetaValidator`、`InputValidator` 等）與共用配置（`ObsAutoConfiguration`、`TsidConfiguration`、`MyBatisPlusAutoConfiguration` 等）的完整表格在 [Java 微服務開發規範](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §7 與 §10；新增共用工具前先查那兩節，禁止重複實作。
 
 ---
 
 ## 📚 參考資料
 
 - TSID Library: [f4b6a3/tsid-creator](https://github.com/f4b6a3/tsid-creator)
-- 專案規範：[Java 微服務dev-guidelines](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §3「主鍵與 TSID」（型別對應見同檔 §2）
+- 專案規範：[Java 微服務開發規範](../../../../docs/dev-guidelines/java-microservices-development-guidelines.md) §3「主鍵與 TSID」（型別對應見同檔 §2）
 - Migration SQL：各服務的 `src/main/resources/db/migration/V1__*.sql`（V1 已凍結，變更一律走 `V{N+1}`）
 
 ---

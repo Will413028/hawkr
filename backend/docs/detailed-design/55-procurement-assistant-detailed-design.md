@@ -1,4 +1,4 @@
-# Hawkr 幫找採購助手（Procurement Assistant）detailed-design
+# Hawkr 幫找採購助手（Procurement Assistant）詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 
@@ -6,7 +6,7 @@
 |---|---|
 | 維護者 | Will |
 | 對應程式碼 | `services/ai-service/internal/procurement/`、`services/ai-service/db/schema/procurement.sql`、`gateway/internal/handler/ai.go`、`gateway/internal/router/routes_ai.go`、`hawkr-website/features/procurement-assistant/` |
-| 相關 doc | [15 AI 微服務](15-ai-service-detailed-design.md)（本模組寄生於此服務）、[44 帳號與賣家買家身份模型](44-account-and-seller-buyer-identity-detailed-design.md)（`buyer_id` 語意來源）、[02 產品微服務](02-product-service-detailed-design.md)（平台候選來源）、[41 Realtime SSE 推播平台](41-realtime-sse-push-platform-detailed-design.md)（既有 SSE 分工）、產品端《Hawkr 幫找 Agent detailed-design v3.0》（2026-08-04，產品定義正本） |
+| 相關 doc | [15 AI 微服務](15-ai-service-detailed-design.md)（本模組寄生於此服務）、[44 帳號與賣家買家身份模型](44-account-and-seller-buyer-identity-detailed-design.md)（`buyer_id` 語意來源）、[02 產品微服務](02-product-service-detailed-design.md)（平台候選來源）、[41 Realtime SSE 推播平台](41-realtime-sse-push-platform-detailed-design.md)（既有 SSE 分工）、產品端《Hawkr 幫找 Agent 詳細設計書 v3.0》（2026-08-04，產品定義正本） |
 | 相關 ADR | [檢索用盡後的大品項／小品項選擇](/docs/adr/2026-09-13-procurement-category-fallback.md)（LLM 使用條件、分類與行情 ID 邊界、多階段續答、snapshot 的 `openConfirmation.question` 還原契約）<br/>[MVP-A 的六項架構決策](/docs/adr/2026-09-18-procurement-assistant-mvp-a-decisions.md)<br/>[LLM 抽取的重試與逾時](/docs/adr/2026-09-18-procurement-llm-extract-retry-and-timeout.md) |
 
 ---

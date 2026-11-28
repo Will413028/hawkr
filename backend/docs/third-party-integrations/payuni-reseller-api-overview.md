@@ -100,7 +100,7 @@
 | **MerID** | 合作商店的商店代號，格式為代理商前綴 + 數字，長度 ≤ 20。 | `HAWK2612345678` |
 | **AgentMerID** | 代理商商店代號。於代理商啟用商店提領時使用，可指定代理商出入帳之商店；未帶則依平台預設。 | 長度 20 |
 
-> Hawkr 的 MerID = `HAWK` + `store_code`（見 §12.2）。`merId` 是金流商家編號，僅限 PayUni 付款／退款／Webhook 情境使用，不得當作業務身分鍵，見[Java 微服務dev-guidelines §5.2](../dev-guidelines/java-microservices-development-guidelines.md)。
+> Hawkr 的 MerID = `HAWK` + `store_code`（見 §12.2）。`merId` 是金流商家編號，僅限 PayUni 付款／退款／Webhook 情境使用，不得當作業務身分鍵，見[Java 微服務開發規範 §5.2](../dev-guidelines/java-microservices-development-guidelines.md)。
 
 ### 1.8 共用代碼（多功能收付）
 
@@ -843,7 +843,7 @@ HashInfo = SHA256( HashKey + EncryptInfo + HashIV ).toUpperCase()
 ### 12.2 MerID 格式
 
 MerID = `HAWK` + `store_code`（例：`HAWK2612345678`）。
-由 `model.FormatMerID(storeCode int64) string`（`internal/modules/seller/internal/model/payuni.go`）產生，確定性計算。`merId` 僅限 PayUni 付款／退款／Webhook 情境使用，不得當作業務身分鍵，見[Java 微服務dev-guidelines §5.2](../dev-guidelines/java-microservices-development-guidelines.md)。
+由 `model.FormatMerID(storeCode int64) string`（`internal/modules/seller/internal/model/payuni.go`）產生，確定性計算。`merId` 僅限 PayUni 付款／退款／Webhook 情境使用，不得當作業務身分鍵，見[Java 微服務開發規範 §5.2](../dev-guidelines/java-microservices-development-guidelines.md)。
 
 ### 12.3 PAYUNi 註冊流程
 

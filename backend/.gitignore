@@ -148,7 +148,7 @@ tools/discord-bot/.env
 tools/discord-bot/.env.local
 tools/discord-bot/.env.*.local
 tools/discord-bot/audit.log
-common-commands.md
+常用指令.md
 
 # ===== Claude Code =====
 .claude/

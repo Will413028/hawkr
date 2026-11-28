@@ -5,7 +5,7 @@
 | 狀態 | superseded by `2026-11-15-fulfillment-seller-managed-shipping.md`（出貨改賣家自寄，物流商與其帳務、Uber 程式已於 B3 退場；本檔保留歷史）；原為 accepted |
 | 日期 | 2026-09-18（決策落地日期見各節） |
 | 影響範圍 | order-service `CheckoutService`、shipping-service、買家結帳前端 |
-| 規格 | [20 號 結帳模組detailed-design](/backend/docs/detailed-design/20-checkout-module-detailed-design.md) §4.7、§4.9、§4.12 |
+| 規格 | [20 號 結帳模組詳細設計書](/backend/docs/detailed-design/20-checkout-module-detailed-design.md) §4.7、§4.9、§4.12 |
 
 ## 決策一：門檻免運以「優惠券分攤後」的實付金額判定
 

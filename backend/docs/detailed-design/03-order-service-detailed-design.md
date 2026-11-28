@@ -1,4 +1,4 @@
-# 訂單微服務（Order Service）detailed-design
+# 訂單微服務（Order Service）詳細設計書
 
 > 🔴 **B3 退場說明（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂）**：Java shipping-service 與 `payuni-webhook-service` 已刪除，出貨改賣家自寄，出貨記錄（0..N 筆）與含出貨的訂單狀態機歸 B8 ordering 交付。本書中 `shipment.*` 事件、`ShippingEventConsumer`、`shipping_status` 與物流推進守門等段落描述 B3 之前的 Java 現況，B8 改寫 ordering 時由新設計取代；B3 到 B8 之間訂單停在已付款、結帳運費固定 0。
 
@@ -19,7 +19,7 @@
 
 Order Service 內部包含結帳模組（Checkout Module），位於 `checkout/` 子包，採用 Modular Monolith 架構。結帳模組負責「購物車 → 訂單」的轉換邏輯，提供 4 支結帳 API（Validate / ShippingFee / Preview / Confirm）。
 
-結帳模組的完整設計規格請參閱：**[結帳模組（Checkout Module）detailed-design](20-checkout-module-detailed-design.md)**
+結帳模組的完整設計規格請參閱：**[結帳模組（Checkout Module）詳細設計書](20-checkout-module-detailed-design.md)**
 
 ```
 order-service/
@@ -329,7 +329,7 @@ order-service/
 | 層 | 檔案 | 動作 |
 |---|---|---|
 | proto | `api/proto/order/order.proto` | 新增 `GetMyOrderStatusCounts` RPC + `OrderStatusCount` message（見 §4.2 買家端 RPC） |
-| order-service | `OrderRepository`（`GROUP BY status` projection query）+ `OrderService#getMyOrderStatusCounts` + `OrderGrpcService` | 新增；projection 依 [Java 微服務dev-guidelines §9](../dev-guidelines/java-microservices-development-guidelines.md) 回專用 record/DTO，不得部分填充 Entity |
+| order-service | `OrderRepository`（`GROUP BY status` projection query）+ `OrderService#getMyOrderStatusCounts` + `OrderGrpcService` | 新增；projection 依 [Java 微服務開發規範 §9](../dev-guidelines/java-microservices-development-guidelines.md) 回專用 record/DTO，不得部分填充 Entity |
 | gateway | `router/routes_order.go`（靜態路徑**必須先於** `:order_no` 註冊，比照 `/admin/orders/abnormal` 先例）+ `handler/order.go` + `grpc/order_client.go` | 新增 `GET /app/orders/status_counts`；handler 解析 `view` query param：`seller`/`selling` 回 400（訊息指向 dashboard 四桶），其餘值（含缺省）一律走買家；Swagger 註解同步；handler test mock 同步 |
 | 前端 | `hawkr-website`：`lib/hooks/useOrders.ts` `useOrderStatusCounts` | 7 發探測 → 1 發 rollup；賣家中心統計改吃 dashboard 四桶（見下節實作位置表既列前端項） |
 
@@ -1187,7 +1187,7 @@ message CancelOrderRequest { int64 buyer_id = 1; string order_no = 2; }
 message CancelOrderResponse { int32 code = 1; string message = 2; bool success = 3; }
 message GetMyOrdersRequest { int64 buyer_id = 1; string status_filter = 2; PageRequest page = 3; }
 message GetMyOrdersResponse { int32 code = 1; string message = 2; repeated OrderSummaryView orders = 3; PageMeta meta = 4; }
-message GetMyOrderStatusCountsRequest { int64 buyer_id = 1; }  // Gateway JWT 注入（[Java 微服務dev-guidelines §2](../dev-guidelines/java-microservices-development-guidelines.md) 型別對應例外：Gateway 注入的身分欄位）
+message GetMyOrderStatusCountsRequest { int64 buyer_id = 1; }  // Gateway JWT 注入（[Java 微服務開發規範 §2](../dev-guidelines/java-microservices-development-guidelines.md) 型別對應例外：Gateway 注入的身分欄位）
 message OrderStatusCount { string status = 1; string count = 2; }  // OrderStatus code / 筆數（皆數字字串）
 message GetMyOrderStatusCountsResponse { int32 code = 1; string message = 2; repeated OrderStatusCount counts = 3; string total = 4; }  // 0 筆狀態省略；total = 全部訂單數（order-service 加總，數字字串，0 訂單回 "0"）
 message GetOrderRequest { int64 buyer_id = 1; string order_no = 2; }
@@ -1347,7 +1347,7 @@ message GrantPaymentResponse {
 
 由 GrantPaymentWorker 非同步執行，確認收貨後觸發 PayUni 代理商撥款。
 
-**`grant_outcome` 欄位**：結構化撥款結果訊號，值域 `GRANTED` / `PROVIDER_TOOK_OVER`；`PROVIDER_TOOK_OVER` 走**正常 gRPC 回應**（非 error），Worker 據此收斂 task 為 `PROVIDER_AUTO`（[§3.11.2](#3112-撥款已由-payuni-接管的收斂worker-韌性)）。純微服務間 gRPC、不經 Gateway 暴露，型別依 [Java 微服務dev-guidelines §2](../dev-guidelines/java-microservices-development-guidelines.md) 例外規則第 3 項。**Proto 同步流程**：修改唯一位置 `api/proto/payment/payment.proto` → `scripts/gen-go-proto.sh` → rsync 至 `java-proto` → `mvn clean install` → 兩端（payment-service / order-service）編譯驗證（見 [Proto 管理規範](../dev-guidelines/proto-management-guidelines.md)）。
+**`grant_outcome` 欄位**：結構化撥款結果訊號，值域 `GRANTED` / `PROVIDER_TOOK_OVER`；`PROVIDER_TOOK_OVER` 走**正常 gRPC 回應**（非 error），Worker 據此收斂 task 為 `PROVIDER_AUTO`（[§3.11.2](#3112-撥款已由-payuni-接管的收斂worker-韌性)）。純微服務間 gRPC、不經 Gateway 暴露，型別依 [Java 微服務開發規範 §2](../dev-guidelines/java-microservices-development-guidelines.md) 例外規則第 3 項。**Proto 同步流程**：修改唯一位置 `api/proto/payment/payment.proto` → `scripts/gen-go-proto.sh` → rsync 至 `java-proto` → `mvn clean install` → 兩端（payment-service / order-service）編譯驗證（見 [Proto 管理規範](../dev-guidelines/proto-management-guidelines.md)）。
 
 #### Payment Service — 聚合 PayUni provider 狀態
 
@@ -2746,7 +2746,7 @@ UPDATE order_outbox
 
 ### 8.13 多副本排程搶佔語意（Scheduler Claim）
 
-**規範全文**：[dev-guidelines／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)（判準、六步機械檢查、租約長度算式、例外 A/B 條件皆在該檔；本節只列 order-service 的逐支套用結果）。
+**規範全文**：[開發規範／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)（判準、六步機械檢查、租約長度算式、例外 A/B 條件皆在該檔；本節只列 order-service 的逐支套用結果）。
 
 **背景**：order-service 在 prod 被 per-service overlay 覆寫成 **`replicas: 2`**（prod 預設為 `1`；副本數是本規範的判定輸入且會變，查證方式見[規範 §〇](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)）。凡是「批次讀候選 → 逐筆做副作用」的排程，沒有搶佔就是同一件事做兩次。而**有搶佔也不夠**——搶佔若 stamp 的是「已處理」的永久旗標，pod 在 claim 與副作用之間崩潰時該筆**永久卡死、無錯誤、無告警**，等於把 at-least-once 換成 at-most-once。
 

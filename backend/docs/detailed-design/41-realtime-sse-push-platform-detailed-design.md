@@ -1,4 +1,4 @@
-# 41 - Realtime SSE 推播平台（Realtime SSE Push Platform）detailed-design
+# 41 - Realtime SSE 推播平台（Realtime SSE Push Platform）詳細設計書
 
 > 本文件定義 Gateway 上的 Server-Sent Events（SSE）推播平台架構，包含通用 Hub、MQ Consumer、Channel 註冊契約、Topic 命名規約，以及目前註冊的 Channel（通知、賣家工作區、賣家生命週期）。
 >
@@ -1269,6 +1269,6 @@ SSE event comment.batch:
 - [14 IM Service](14-im-service-detailed-design.md) — WebSocket 比較
 - [36 MQ Catalog](36-mq-and-event-catalog.md) — event 登記
 - [CodeMeta 內部技術碼](../codemeta/internal-technical-codes.md) — EventType
-- [Java 微服務dev-guidelines §8](../dev-guidelines/java-microservices-development-guidelines.md) — Observability
+- [Java 微服務開發規範 §8](../dev-guidelines/java-microservices-development-guidelines.md) — Observability
 - [後端服務責任邊界規範](../dev-guidelines/backend-service-responsibility-boundaries.md) — 後端責任邊界
 - [MQ 與事件管理規範](../dev-guidelines/mq-and-event-management-guidelines.md)／[36-MQ 與事件總覽](36-mq-and-event-catalog.md) — MQ 集中管理

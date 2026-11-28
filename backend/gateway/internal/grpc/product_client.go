@@ -192,7 +192,7 @@ func (c *ProductClient) SearchHashtags(ctx context.Context, prefix string, mode 
 	})
 }
 
-// GetPopularHashtags 區間熱門 hashtag 查詢（33-商品 Hashtag 模組detailed-design §5.2）。
+// GetPopularHashtags 區間熱門 hashtag 查詢（33-商品 Hashtag 模組詳細設計書 §5.2）。
 func (c *ProductClient) GetPopularHashtags(ctx context.Context, startFrom, endTo string, limit int32) (*pb.GetPopularHashtagsResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

@@ -1,4 +1,4 @@
-# Web 前端快取架構與版本一致性detailed-design
+# Web 前端快取架構與版本一致性詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 

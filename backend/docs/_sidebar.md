@@ -1,15 +1,15 @@
 - [🏠 首頁](/)
 
-- basic-design
+- 基本設計書
   - [00 總覽](basic-design/00-overview.md)
   - [56 ADM 代行營運（Delegated Operations）](basic-design/56-delegated-operations-basic-design.md)
   - [58 電子發票服務（Invoice Service）](basic-design/58-invoice-service-basic-design.md)
   - [06 物流微服務（Shipping Service）](basic-design/06-shipping-service-basic-design.md)
   - [65 物流履約平台（Fulfillment Platform）](basic-design/65-fulfillment-platform-basic-design.md)
 
-- detailed-design
+- 詳細設計書
   - [00 總覽](detailed-design/00-overview.md)
-  - [00 detailed-design範本（Template）](detailed-design/00-detailed-design-template.md)
+  - [00 詳細設計書範本（Template）](detailed-design/00-detailed-design-template.md)
   - [01 閘道微服務（Gateway）](detailed-design/01-gateway-detailed-design.md)
   - [02 產品微服務（Product Service）](detailed-design/02-product-service-detailed-design.md)
   - [03 訂單微服務（Order Service）](detailed-design/03-order-service-detailed-design.md)
@@ -58,12 +58,12 @@
 
 - ADR（架構決策記錄）：在 repo 根目錄 `docs/adr/`，本機檢視器不提供
 
-- dev-guidelines
+- 開發規範
   - [★ API 設計規範](dev-guidelines/api-design-guidelines.md)
   - [API 設計規範（Connect，草稿）](../../docs/conventions/api-design-guidelines-connect.md)
   - [開發工作流程](dev-guidelines/development-workflow.md)
   - [★ 設計文件治理規範](../../docs/conventions/design-document-governance-guidelines.md)
-  - [Java 微服務dev-guidelines](dev-guidelines/java-microservices-development-guidelines.md)
+  - [Java 微服務開發規範](dev-guidelines/java-microservices-development-guidelines.md)
   - [Proto 管理規範](dev-guidelines/proto-management-guidelines.md)
   - [Java gRPC 錯誤處理規範](dev-guidelines/java-grpc-error-handling-guidelines.md)
   - [Go gRPC 錯誤處理規範](dev-guidelines/go-grpc-error-handling-guidelines.md)
@@ -82,7 +82,7 @@
   - [硬上限依賴接入治理規範（配額與容量）](dev-guidelines/hard-limit-dependency-governance-quota-and-capacity-guidelines.md)
   - [多副本排程搶佔規範](dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)
 
-- third-party-integrations
+- 第三方整合
   - [PayUni 金流官方 API 總覽](third-party-integrations/payuni-official-payment-api-overview.md)
   - [PayUni 逆向金流 API 總覽](third-party-integrations/payuni-reverse-payment-api-overview.md)
   - [PayUni 代理商專用 API 總覽](third-party-integrations/payuni-reseller-api-overview.md)
@@ -98,7 +98,7 @@
   - [內部技術碼](codemeta/internal-technical-codes.md)
   - [踩坑與變遷紀錄](codemeta/pitfalls-and-change-history.md)
 
-- infrastructure
+- 基礎建設
   - [系統架構與資料流向](infrastructure/system-architecture-and-data-flow.md)
   - [CI/CD 自動化部署（K8s + Helm）](infrastructure/ci-cd-automated-deployment-k8s-helm.md)
   - [系統監控架構（Monitoring）](infrastructure/monitoring.md)
@@ -125,5 +125,5 @@
   - [商品 re-key backfill gate](runbooks/product-rekey-backfill-gate.md)
   - [賣家通知身分 store_id backfill（device_tokens + notification_preferences）](runbooks/seller-notification-identity-store-id-backfill.md)
 
-- supplementary
+- 補充資料
   - [45 首頁動態區塊排序與營運干預提案（PM 版）](supplementary/45-homepage-dynamic-section-ordering-and-operations-intervention-proposal.md)

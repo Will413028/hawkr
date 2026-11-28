@@ -1,4 +1,4 @@
-# 64 — Hawkr Agent 商務線（RFQ Publication、Seller Quote、Buyer Acceptance）detailed-design
+# 64 — Hawkr Agent 商務線（RFQ Publication、Seller Quote、Buyer Acceptance）詳細設計書
 
 | 項目 | 內容 |
 |---|---|
@@ -26,7 +26,7 @@
 | `docs/dev-guidelines/*`、`api/proto/`、CodeMeta、36 號 MQ catalog、DB schema | **高於本文件**。本文件不重述，只引用 |
 | 57 號 §1.1（全域不變式）、§4.5（artifact type）、§5.7 | **本文件繼承，不重新解釋**。§5.7 已對本流程下的五條約束原封有效 |
 | 四張票的 Scope 段 | 敘述層來源。⚠️ 票上的現況敘述**不是現況**，動工前一律重新核對 code 與 DB |
-| 《Hawkr_Hawkr 幫找 Agent_detailed-design_v6.0》Part V／V.7 | 參考來源，不可直接實作（理由同 57 號 §0.2） |
+| 《Hawkr_Hawkr 幫找 Agent_詳細設計書_v6.0》Part V／V.7 | 參考來源，不可直接實作（理由同 57 號 §0.2） |
 
 ### 0.3 exact wire 住哪裡
 

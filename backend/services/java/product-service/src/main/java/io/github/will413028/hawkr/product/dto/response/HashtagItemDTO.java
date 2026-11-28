@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Hashtag 條目 DTO（33-商品 Hashtag 模組detailed-design §5.4）。
+ * Hashtag 條目 DTO（33-商品 Hashtag 模組詳細設計書 §5.4）。
  *
  * <ul>
  *   <li>{@code name}：canonical 名稱（lower），查詢與比對基準</li>

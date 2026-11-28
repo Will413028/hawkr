@@ -1,4 +1,4 @@
-# MQ 與事件總覽（MQ & Event Catalog）detailed-design
+# MQ 與事件總覽（MQ & Event Catalog）詳細設計書
 
 > 🔴 **B3 退場說明（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂）**：Java shipping-service 與 `payuni-webhook-service` 已刪除。`hawkr.shipping` exchange、`payuni.shipping.status` 與 shipping 的 consumer／queue 不再存在，order、aftersales、notification 中消費 `shipment.*` 的 consumer 隨各自模組搬進單體（B8、B9）時刪除或改寫；本書其餘提到它們的列描述 B3 之前的現況。
 
@@ -445,7 +445,7 @@ docker exec hawkr-rabbitmq rabbitmqctl list_queues name messages \
 **Java consumer 對應 EventType**（內部技術碼）：`BUYER_FAVORITE_ADDED` / `BUYER_FAVORITE_REMOVED`（見 §8.1 與 [CodeMeta 內部技術碼](../codemeta/internal-technical-codes.md)）。
 
 **設計參考**：
-- favorite 事件：`docs/modules/buyer.md` + [02-產品微服務（Product Service）detailed-design](02-product-service-detailed-design.md) §5.14。
+- favorite 事件：`docs/modules/buyer.md` + [02-產品微服務（Product Service）詳細設計書](02-product-service-detailed-design.md) §5.14。
 - `buyer.deleted` 的觸發：`docs/modules/buyer.md` 與 `docs/modules/accountdeletion.md`。
 - coupon-service 消費邏輯：[07 號設計書 §5.19](07-coupon-service-detailed-design.md#519-買家刪除自動作廢-unused-couponbuyerdeletedconsumer)。
 - coupon 作廢綁 `buyer.deleted`，不綁 `account.deleted`：`buyer.deleted` 在買家關閉時發（見 `docs/modules/buyer.md`）。同 pattern 見 §3.6f `seller.deleted`。
@@ -666,7 +666,7 @@ notification-service 在 `buyer_id` 缺漏或格式錯誤時 **fail-closed 不�
 **另一個 binding 不會誤打**：同 exchange 的 `buyer.product.restock` 綁的是**精確 key** `product.restock`，四個新 routing key 都不命中。
 
 **Producer 設計重點（一致性）**：
-- 四個事件一律走既有 obs-aware publisher（`ProductEventPublisher` ＋ `obsRabbitPublisher.publish`），**不新建 publisher class**（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §8）。
+- 四個事件一律走既有 obs-aware publisher（`ProductEventPublisher` ＋ `obsRabbitPublisher.publish`），**不新建 publisher class**（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §8）。
 - 三個決定事件在**核准／駁回／撤銷交易 commit 之後**才發（交易內完成「狀態轉移 ＋ 舊項 SUPERSEDED ＋ 重建 approved-only 投影 ＋ 寫 audit event」），沿用 `product.restock` 的 afterCommit hook 形狀。
 - `sellerAccountId` **必須 fail-closed 解析**：走會拋錯的單筆解析，**禁止**用失敗回空 Map 的批次版本——後者會發出缺收件人的 payload，通知靜默蒸發且事件已「成功」發出，重送救不回來（同 §3.6j P1-5 的教訓）。
 - 🔴 **不得為了救「事件遺失／consumer 失敗」而新增掃 `gov_verify_state='PENDING'` 的排程 job**：那會同時踩《[後端服務責任邊界規範](../dev-guidelines/backend-service-responsibility-boundaries.md)》（禁 reconciliation job）與《[多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)》。可靠性靠本 queue 既有的 retry/DLQ；historical（migration 建出的）列由 ADM 詳情頁的「重新查驗」按鈕人工觸發。
@@ -873,7 +873,7 @@ fan-out、查無訂閱者不產生任何錯誤或 log（2026-09-03 修復前即�
 > 1. **訂單層級評論快照**（`orders.review`，order-service）—— 屬「交易雙方對該筆訂單的評價紀錄」，most-recent-wins **凍結快照**，admin `HideReview`（內容審核）**不連動**訂單詳情視圖（隱藏只作用於公開商品評論頁與聚合，不抹除買賣雙方對自身交易的紀錄）。
 > 2. **聚合反正規化欄位**（product `rating` / `review_count`）—— 屬「對外公開展示的統計聚合」，必須反映**當前可見評論集合**。因此 `HideReview` 隱藏評論後，可見集合改變 → 必須重算聚合，由 review-service 發 `review.hidden`（攜帶排除 hidden 列後重算的 seller / product 統計），product-service full-recompute 覆寫。`review.created` / `review.hidden` 帶的統計均為 review-service 於同流程內查 `order_item_reviews`（`deleted_at IS NULL AND hidden_at IS NULL`）權威重算之值，consumer 直接覆寫，天然冪等。
 
-`review.created` 新增的 seller / product 統計與快照欄位皆為向後相容（JSON additive），既有 order / notification consumer 不受影響（order 只讀 `rating` / `content` 快照欄位、notification 只讀 `avgRating` / `totalCount` placeholder）。詳見 `03-訂單微服務（Order Service）detailed-design` §6.1 / §8.9 與 `02-產品微服務（Product Service）detailed-design` §5.14a。
+`review.created` 新增的 seller / product 統計與快照欄位皆為向後相容（JSON additive），既有 order / notification consumer 不受影響（order 只讀 `rating` / `content` 快照欄位、notification 只讀 `avgRating` / `totalCount` placeholder）。詳見 `03-訂單微服務（Order Service）詳細設計書` §6.1 / §8.9 與 `02-產品微服務（Product Service）詳細設計書` §5.14a。
 
 ---
 
@@ -1359,7 +1359,7 @@ flowchart TD
 
 ### 8.2 CodeMeta SSOT 流程
 
-依《[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md)》§6 與 [CodeMeta README](../codemeta/README.md)：
+依《[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md)》§6 與 [CodeMeta README](../codemeta/README.md)：
 1. 修改 `docs/codemeta/internal-technical-codes.md`
 2. 執行 `cd docs/codemeta/scripts && ./generate.sh --all`
    （🔴 **一律 `--all`**：CI 的 `CodeMeta drift diff` 跑的就是 `--all` 並逐位元對拍）
@@ -1402,7 +1402,7 @@ flowchart TD
    - Listener 用 `manualAckContainerFactory`
    - 加 idempotency 保護（若關鍵路徑）
    - 加 DLQ 配置（若關鍵路徑）
-6. **同步更新對應服務的detailed-design §事件章節**
+6. **同步更新對應服務的詳細設計書 §事件章節**
 7. **本地測試**：含模擬重複訊息驗證冪等性
 
 ### 10.2 修改 Event 標準流程
@@ -1429,7 +1429,7 @@ flowchart TD
 
 ### 11.1 強制使用
 
-依《[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md)》§8（Observability）：
+依《[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md)》§8（Observability）：
 - Publisher：`obsRabbitPublisher.publish(exchange, routingKey, payloadBytes, event)`
 - Consumer：`@RabbitListener` + ObsLogger（trace / correlation 自動注入）
 - **禁止**手寫 RabbitMQ headers

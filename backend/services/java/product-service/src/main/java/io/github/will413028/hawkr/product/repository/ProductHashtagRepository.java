@@ -77,7 +77,7 @@ List<ProductHashtagEntity> findByProductId(@Param("productId") Long productId);
             @Param("position") Short position);
 
     /**
-     * 區間熱門 hashtag 查詢（33-商品 Hashtag 模組detailed-design §5.2.3）。
+     * 區間熱門 hashtag 查詢（33-商品 Hashtag 模組詳細設計書 §5.2.3）。
      *
      * <p>三段 CTE：
      * <ol>

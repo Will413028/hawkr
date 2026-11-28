@@ -8,7 +8,7 @@
 |------|------|---------|
 | 1. 設計書 | 先寫 / 更新設計書（含 CodeMeta `.md`），使用者 review 確認後才動手 | 禁止跳過設計書直接寫程式碼 |
 | 1.5 Code Gen | 若涉及共享代碼值（錯誤碼 / 狀態碼 / 類型碼 / 技術碼），先改 `backend/docs/codemeta/*.md` 再執行 `generate.sh`（見 [CodeMeta README](../codemeta/README.md)） | 嚴禁手動修改生成檔案 |
-| 2. DB | Java：**V1 永久凍結**，變更一律新增 `V{N+1}__{verb}_{target}.sql`（見 [Java 微服務dev-guidelines §9.3](./java-microservices-development-guidelines.md)）。Go：改 `db/schema/schema.sql` → `atlas migrate hash` | 禁止修改既有 V1~V{N}；禁止 SSH 手跑 DDL 取代 migration |
+| 2. DB | Java：**V1 永久凍結**，變更一律新增 `V{N+1}__{verb}_{target}.sql`（見 [Java 微服務開發規範 §9.3](./java-microservices-development-guidelines.md)）。Go：改 `db/schema/schema.sql` → `atlas migrate hash` | 禁止修改既有 V1~V{N}；禁止 SSH 手跑 DDL 取代 migration |
 | 3. 程式碼 | Proto → common-core → Java 微服務 → Gateway | — |
 | 4. 測試 | 驗證功能正確 | — |
 
@@ -103,7 +103,7 @@ root cause 若是**可枚舉的 class**（一句 grep / SQL query 就掃得出�
 
 ### 5.1 本 repo 的 grep 陷阱
 
-因為[禁止硬編碼](./java-microservices-development-guidelines.md)（Java 微服務dev-guidelines §6），狀態碼 / 類型碼一律走 CodeMeta Enum 與 `#{param}` 注入，**SQL 與程式碼的字面上看不到那個值**。以「字面值」為錨的 grep 在這個 repo 會**系統性漏掉**——而且漏得很安靜：你會拿到一份看起來很乾淨的零命中結果。
+因為[禁止硬編碼](./java-microservices-development-guidelines.md)（Java 微服務開發規範 §6），狀態碼 / 類型碼一律走 CodeMeta Enum 與 `#{param}` 注入，**SQL 與程式碼的字面上看不到那個值**。以「字面值」為錨的 grep 在這個 repo 會**系統性漏掉**——而且漏得很安靜：你會拿到一份看起來很乾淨的零命中結果。
 
 正確做法：改用「**動詞 ＋ 常數符號**」為錨。例如要找「把某狀態改成 X 的所有寫入」，錨下在 `UPDATE <表名>`、`@Update`、`LambdaUpdateWrapper`、`.updateById(`、以及該 Enum 的**符號名**，而不是它的碼值。做窮舉掃描前先問一句：**我要找的東西，在這個 repo 的規範下會以什麼形式出現？**
 

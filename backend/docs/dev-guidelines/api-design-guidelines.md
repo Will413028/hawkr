@@ -268,7 +268,7 @@ SELLER\_AND\_BUYER (code=3) 同時涵蓋 BUYER 與 SELLER 權限：
 
 ~~**在上述前提成立時，SERVICE\_ONLY 類型方法可不實作 service identity 與 allowlist。**~~
 
-> ⚠️ **此豁免已不再適用（#1366，2026-07 執行）**：明文 `x-internal-service` 可被同 namespace 任意 pod 偽造，「網路層保證最小可達性」在 flip 前並不成立（`deny-cross-namespace` 以 `podSelector: {}` 放行全 ns）。service identity 已改由 **HMAC 簽章**強制實作、可達性由 **per-service NetworkPolicy** 收斂。詳見 **detailed-design 52 號《微服務間內部授權》**。
+> ⚠️ **此豁免已不再適用（#1366，2026-07 執行）**：明文 `x-internal-service` 可被同 namespace 任意 pod 偽造，「網路層保證最小可達性」在 flip 前並不成立（`deny-cross-namespace` 以 `podSelector: {}` 放行全 ns）。service identity 已改由 **HMAC 簽章**強制實作、可達性由 **per-service NetworkPolicy** 收斂。詳見 **詳細設計書 52 號《微服務間內部授權》**。
 
 #### **5.2.2 風險說明**
 
@@ -280,7 +280,7 @@ SELLER\_AND\_BUYER (code=3) 同時涵蓋 BUYER 與 SELLER 權限：
 * 服務間 direct call 且無最小可達性限制  
 * 第三方系統直接存取內部端點
 
-#### **5.2.3 觸發升級條件（✅ 已於 #1366 執行，見detailed-design 52 號）**
+#### **5.2.3 觸發升級條件（✅ 已於 #1366 執行，見詳細設計書 52 號）**
 
 原列升級條件已由 #1366 全面實作（不再是「若…則」的待辦，而是現行機制）：
 

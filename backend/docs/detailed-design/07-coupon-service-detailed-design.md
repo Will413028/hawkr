@@ -1,4 +1,4 @@
-# 優惠券微服務 (Coupon Service) detailed-design
+# 優惠券微服務 (Coupon Service) 詳細設計書
 
 ---
 
@@ -76,11 +76,11 @@ graph TD
 
 | 文件 | 說明 |
 |------|------|
-| `docs/dev-guidelines/` 各領域規範 | 全域技術規範（Java 微服務dev-guidelines、後端服務責任邊界規範、MQ 與事件管理規範等） |
+| `docs/dev-guidelines/` 各領域規範 | 全域技術規範（Java 微服務開發規範、後端服務責任邊界規範、MQ 與事件管理規範等） |
 | API 設計規範 | API Namespace、命名、回應格式 |
-| 20-結帳模組（Checkout Module）detailed-design | ValidateCoupon / ConsumeCoupon 呼叫介面 |
-| 03-訂單微服務（Order Service）detailed-design | orders.coupon_instance_id / discount_amount 欄位 |
-| 04-購物車微服務（Cart Service）detailed-design | Cart 不存券，僅在結帳時觸發 |
+| 20-結帳模組（Checkout Module）詳細設計書 | ValidateCoupon / ConsumeCoupon 呼叫介面 |
+| 03-訂單微服務（Order Service）詳細設計書 | orders.coupon_instance_id / discount_amount 欄位 |
+| 04-購物車微服務（Cart Service）詳細設計書 | Cart 不存券，僅在結帳時觸發 |
 
 ---
 
@@ -2115,7 +2115,7 @@ Gateway 注入 metadata：`x-trace-id`、`x-request-id`、`x-account-id`、`x-ac
 
 ### 7.5 多副本排程搶佔語意（Scheduler Claim）
 
-**規範全文**：[dev-guidelines／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。本節只列 coupon-service 的套用結果。
+**規範全文**：[開發規範／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。本節只列 coupon-service 的套用結果。
 
 **副本數前提**：`coupon-service` 在 prod 是**單副本**（各服務的現行副本數與查證方式見[規範 §〇](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)，本書不複述以免漂移）⇒ 下表的搶佔語意是[規範規則 ⑧](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)的**擴容前置條件**；單副本下唯一的雙 pod 窗口是 rolling update（chart 預設 `maxUnavailable: 0` / `maxSurge: 1`）。
 

@@ -12,8 +12,8 @@
 這四句是本規範的公理。本檔任何一節、任何 template 與它們衝突時，**以這四句為準**：
 
 ```
-basic-design  回答  WHAT / WHY / ARCHITECTURE
-detailed-design  回答  CURRENT HOW EXACTLY
+基本設計書  回答  WHAT / WHY / ARCHITECTURE
+詳細設計書  回答  CURRENT HOW EXACTLY
 ADR         保存  DECISION RATIONALE / ALTERNATIVES
 Git / PR / Issue / Review  保存  HISTORY / PROGRESS / EVIDENCE
 ```
@@ -29,10 +29,10 @@ Git / PR / Issue / Review  保存  HISTORY / PROGRESS / EVIDENCE
 
 | Artifact | 回答什麼 | 位置 | **不准**裝什麼 |
 |---|---|---|---|
-| **basic-design** | 這個系統為什麼存在、邊界在哪、高階架構長什麼樣 | `backend/docs/basic-design/` | 欄位、端點簽章、狀態值域、實作陷阱（→ detailed-design） |
-| **detailed-design** | **現在**要怎麼實作，精確到可驗收 | `backend/docs/detailed-design/` | 歷史、進度、ADR、review 證據、PR／輪次追蹤、roadmap、open questions |
-| **模組規格** | 單體模組**現在**的行為，精確到可驗收；是該模組行為規格的唯一來源，同名的舊detailed-design依 §7「舊設計書的處置」：內容已被完整涵蓋且系統已不在運作就刪除，否則標成該服務的現行規格、搬進單體時刪除 | `backend/docs/modules/<模組>.md` | 與detailed-design相同（§3 的 PURE SPEC 規則）；也不放改程式前的規則摘要（→ 模組 `AGENTS.md`） |
-| **ADR** | 為什麼選這個設計、否決了什麼、代價是什麼 | `docs/adr/` | 逐欄規格（→ detailed-design） |
+| **基本設計書** | 這個系統為什麼存在、邊界在哪、高階架構長什麼樣 | `backend/docs/basic-design/` | 欄位、端點簽章、狀態值域、實作陷阱（→ 詳細設計書） |
+| **詳細設計書** | **現在**要怎麼實作，精確到可驗收 | `backend/docs/detailed-design/` | 歷史、進度、ADR、review 證據、PR／輪次追蹤、roadmap、open questions |
+| **模組規格** | 單體模組**現在**的行為，精確到可驗收；是該模組行為規格的唯一來源，同名的舊詳細設計書依 §7「舊設計書的處置」：內容已被完整涵蓋且系統已不在運作就刪除，否則標成該服務的現行規格、搬進單體時刪除 | `backend/docs/modules/<模組>.md` | 與詳細設計書相同（§3 的 PURE SPEC 規則）；也不放改程式前的規則摘要（→ 模組 `AGENTS.md`） |
+| **ADR** | 為什麼選這個設計、否決了什麼、代價是什麼 | `docs/adr/` | 逐欄規格（→ 詳細設計書） |
 | **conventions** | 四端共用的開發規則 | `docs/conventions/` | 只有單一子專案用的規則（→ 該子專案的 `docs/`，例如 `backend/docs/dev-guidelines/`） |
 | **Issue** | 還沒做的事、待裁決、缺口、追蹤 | GitHub | 規格本身（issue 是入口不是 SSOT） |
 | **PR** | 這次改了什麼、為什麼、驗證證據 | GitHub | 長期規格（PR 會沉底） |
@@ -45,14 +45,14 @@ Git / PR / Issue / Review  保存  HISTORY / PROGRESS / EVIDENCE
 
 **判準一句話**：問「**這句話什麼時候會變成假的**」。
 
-- 永遠不會變假（現在的契約） → detailed-design
+- 永遠不會變假（現在的契約） → 詳細設計書
 - 會隨實作進度變假（做到哪了、誰在做） → **Issue / PR**
 - 已經是過去式（以前是 A） → **Git history**
 - 是一次性的判斷過程（那天查到什麼） → **Review report / PR**
 
 ---
 
-## 2. basic-design責任
+## 2. 基本設計書責任
 
 **回答**：`WHAT` / `WHY` / `SYSTEM BOUNDARY` / `ARCHITECTURE` / `RESPONSIBILITY` /
 `HIGH-LEVEL DESIGN PRINCIPLE`。
@@ -60,16 +60,16 @@ Git / PR / Issue / Review  保存  HISTORY / PROGRESS / EVIDENCE
 可以寫：系統目的、高階架構、responsibility boundary、architecture rationale、
 系統級取捨、capability boundary、Non-Goal、高階 failure strategy、高階資料流。
 
-公版章節與分際見 `backend/docs/basic-design/00-overview.md`（該檔是basic-design的操作層規範，
+公版章節與分際見 `backend/docs/basic-design/00-overview.md`（該檔是基本設計書的操作層規範，
 本節只定義它在 taxonomy 裡的位置）。
 
-⚠️ **架構理由的深度分工**：「為什麼這樣切」寫在basic-design；
-「**考慮過哪些方案、為什麼否決**」寫 ADR。basic-design只留結論與一句話理由，
+⚠️ **架構理由的深度分工**：「為什麼這樣切」寫在基本設計書；
+「**考慮過哪些方案、為什麼否決**」寫 ADR。基本設計書只留結論與一句話理由，
 不展開 alternatives 比較表。
 
 ---
 
-## 3. detailed-design責任（PURE SPEC 紅線）
+## 3. 詳細設計書責任（PURE SPEC 紅線）
 
 `backend/docs/detailed-design/**` 從現在起視為 **Current Executable Specification**。
 
@@ -125,14 +125,14 @@ open questions     未決問題
 
 ### 3.3 不保存歷史（最常違反的一條）
 
-規格從 A 改成 B 時，**detailed-design必須變成 B**：
+規格從 A 改成 B 時，**詳細設計書必須變成 B**：
 
 ```
 ✅ 正確            ❌ 錯誤
 B                 以前是 A。後來改成 B。現在是 B。
 ```
 
-Git 已經保存 A → B。detailed-design**不得建立第二套 history database**——
+Git 已經保存 A → B。詳細設計書**不得建立第二套 history database**——
 第二套必然與 git 漂移，而漂移的那一份不會告訴讀者它漂了。
 
 ⚠️ 具體形狀：**不要寫「某某敘述已失效」**。正確做法是把那段敘述**刪掉**，
@@ -140,7 +140,7 @@ Git 已經保存 A → B。detailed-design**不得建立第二套 history databa
 
 ### 3.4 不承擔 WHY
 
-detailed-design只留**結果**，不留理由：
+詳細設計書只留**結果**，不留理由：
 
 ```
 ✅ 事件發布使用 transactional outbox。
@@ -151,8 +151,8 @@ detailed-design只留**結果**，不留理由：
 ❌ 本設計選擇 Outbox 而不是直接 publish，因為……
 ```
 
-屬架構理由 → basic-design；需要保存 alternatives → ADR；
-detailed-design可以寫 `參照 ADR-xxx`，但**不得複製 rationale**。
+屬架構理由 → 基本設計書；需要保存 alternatives → ADR；
+詳細設計書可以寫 `參照 ADR-xxx`，但**不得複製 rationale**。
 
 ⚠️ **例外（不是 WHY，不要誤刪）**：描述**runtime 行為成因**的句子是規格本身。
 「`rows=0` 時必須 rollback，因為單號與金額掛在這一列上」講的是**現在的失敗語意**，
@@ -175,7 +175,7 @@ detailed-design可以寫 `參照 ADR-xxx`，但**不得複製 rationale**。
 
 四問全答不出，它就只是 **project chronology** —— 典型形狀：
 「先做 A」「下一階段 B」「第 N 波」「Phase 1」「Phase 2」。
-⇒ **從detailed-design刪除**。
+⇒ **從詳細設計書刪除**。
 ⚠️ **歸宿要走 §7.1 的 truth-first，不是一律開票**：先驗它現在還成不成立——
 已完成／已取代／已取消 ⇒ **不開票**，直接收斂成 current spec；
 確認仍 pending 才 reuse 既有 issue 或開一張。
@@ -270,7 +270,7 @@ Issue 是狀態的家：狀態會變，而會變的東西不能寫進規格。
 `backend/docs/review/` 留給過程稿與本機留存。
 
 🔴 **review 的結論必須回灌**：審查發現「規格 A 其實已經是 B」時，
-正確動作是**把detailed-design改成 B**，不是在detailed-design裡加一段「審查發現 A 已失效」。
+正確動作是**把詳細設計書改成 B**，不是在詳細設計書裡加一段「審查發現 A 已失效」。
 後者正是本規範要消滅的污染來源。
 
 ### 5.4 Git history
@@ -308,21 +308,21 @@ Issue 是狀態的家：狀態會變，而會變的東西不能寫進規格。
    （兩個環境是兩個獨立的可測性問題。「不可行」和「已通過」一樣需要證據。）
 ```
 
-⚠️ **detailed-design尤其禁止寫這種 forensic inference** ——
+⚠️ **詳細設計書尤其禁止寫這種 forensic inference** ——
 它把「某天某人查到的東西」凍結成規格，而那句話隔天就可能變假。
 
 ---
 
 ## 7. 文件 relocation rule（發現污染時搬去哪）
 
-發現detailed-design裡有不該在的內容時，**不要就地刪掉**，先判斷它的 owner：
+發現詳細設計書裡有不該在的內容時，**不要就地刪掉**，先判斷它的 owner：
 
-| 看到的內容 | 搬去哪 | detailed-design裡留什麼 |
+| 看到的內容 | 搬去哪 | 詳細設計書裡留什麼 |
 |---|---|---|
 | 舊規格 ＋「已失效」 | 什麼都不用搬（git 已有） | **只留新規格**，刪掉整段考古 |
-| 整份舊detailed-design：內容已被新規格（`backend/docs/modules/<模組>.md` 或其他現行規格）完整涵蓋，且它描述的系統已不在運作 | 有理由要留的先搬進 ADR；其餘不搬（git 保存歷史） | 整份刪除（舊設計書沒有「只當歷史參考」的中間狀態） |
-| 整份舊detailed-design：描述的服務仍在運作，或內容未被完整涵蓋 | 不搬 | 保留，檔頭標成「<服務名> 的現行規格」與單體模組規格的位置；該服務搬進單體時刪除 |
-| 「為什麼選 A 不選 B」 | ADR（或basic-design一句話） | `參照 ADR-xxx` |
+| 整份舊詳細設計書：內容已被新規格（`backend/docs/modules/<模組>.md` 或其他現行規格）完整涵蓋，且它描述的系統已不在運作 | 有理由要留的先搬進 ADR；其餘不搬（git 保存歷史） | 整份刪除（舊設計書沒有「只當歷史參考」的中間狀態） |
+| 整份舊詳細設計書：描述的服務仍在運作，或內容未被完整涵蓋 | 不搬 | 保留，檔頭標成「<服務名> 的現行規格」與單體模組規格的位置；該服務搬進單體時刪除 |
+| 「為什麼選 A 不選 B」 | ADR（或基本設計書一句話） | `參照 ADR-xxx` |
 | 「哪一輪做了什麼」 | PR／Issue | 刪除 |
 | 「還沒做」「待某波」 | Issue（**先驗現況**，見 §7.1） | 刪除；只有「現在還真的 pending」才需要票 |
 | 稽核證據（實查／命中數／CI run） | Review report／PR | 刪除；若結論改變了規格，把**規格**改掉 |
@@ -345,7 +345,7 @@ Issue 是狀態的家：狀態會變，而會變的東西不能寫進規格。
    ├─ YES ──→ 有既有 issue 嗎？
    │           ├─ 有 → reuse，不要開新票
    │           └─ 沒有 → 開一張
-   │          然後把 progress tracking 從detailed-design移除
+   │          然後把 progress tracking 從詳細設計書移除
    │
    └─ NO ───→ 已完成 ／ 已被取代 ／ 已取消 ／ 已過時
               → **不開任何新 issue**
@@ -373,7 +373,7 @@ Issue 是狀態的家：狀態會變，而會變的東西不能寫進規格。
 - [ ] 有沒有任何一句話，會因為「時間經過」而變成假的？
 - [ ] 有沒有任何一句話，是可以用一支腳本從 repo 生成出來的？（是 ⇒ 給連結，不要複述）
 
-**detailed-design專用**
+**詳細設計書專用**
 - [ ] 一個沒跟過這個專案的實作者，照這份文件施工，做得出**現在要的東西**嗎？
 - [ ] 文件裡還有沒有「曾經／原本／已失效／某輪改成」這類考證？
 - [ ] 進度、PR、review 判定、輪次編號是不是都不在了？
@@ -383,8 +383,8 @@ Issue 是狀態的家：狀態會變，而會變的東西不能寫進規格。
 - [ ] 有沒有 `Phase N`／`P711-N`／「第 N 批」「第 N 波」這類**排程標籤**？
       逐處跑 **§3.5 四問**：答得出 ⇒ 內容留、標籤換成那個條件的名字；全答不出 ⇒ 移除。
 
-**basic-design專用**
-- [ ] 有沒有複製detailed-design的欄位／端點／狀態值域？（應該只指向）
+**基本設計書專用**
+- [ ] 有沒有複製詳細設計書的欄位／端點／狀態值域？（應該只指向）
 
 **ADR 專用**
 - [ ] alternatives 與否決理由寫清楚了嗎？結論有沒有被後來的決策推翻而沒標 superseded？

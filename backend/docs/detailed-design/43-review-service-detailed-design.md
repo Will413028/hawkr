@@ -1,4 +1,4 @@
-# Review Service detailed-design
+# Review Service 詳細設計書
 
 > 對應程式碼：`services/review-service/`（Go：`internal/{grpc,usecase,domain,repository,client,mq,config}`、`db/{schema,queries,migrations}`）、`api/proto/review/review.proto`、`gateway/internal/{handler,grpc,router}` 的 review / order_review 檔
 > 對應 MQ 事件：見 [36-MQ 與事件總覽](36-mq-and-event-catalog.md) §`hawkr.review`
@@ -106,7 +106,7 @@ flowchart TB
 | `ReplyReview`（賣家回覆，#1174） | SELLER | Gateway 解析並注入現任 `store_id` + `requireSeller`（accountType 2/3）+ usecase 驗證 `review.store_id == 操作者的 store_id` | `/app/sellers/reviews/{id}/reply` |
 | `HideReview` | 內部服務 | `x-internal-service`（由 social-service AdminResolveReport 呼叫） | 無對外路由 |
 
-> 身分驗證僅在 Gateway 進行（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §5.1）。review-service 信任 Gateway 注入的 `buyer_id` / `store_id`，不自行驗證外部使用者。
+> 身分驗證僅在 Gateway 進行（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §5.1）。review-service 信任 Gateway 注入的 `buyer_id` / `store_id`，不自行驗證外部使用者。
 
 ---
 
@@ -265,7 +265,7 @@ DB：`hawkr_review`（PostgreSQL）。schema 由 Atlas 管理（`db/schema/schem
 
 > 表級 CHECK（#1174）：`CHECK ((reply_content IS NULL) = (replied_at IS NULL))` 保證回覆內容與時間同生同滅，杜絕「有時間沒內容」半套狀態。
 
-> 時間欄位 `TIMESTAMPTZ`，符合 [Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.3 / [PostgreSQL 設計規範與最佳實踐](../dev-guidelines/postgresql-design-guidelines-and-best-practices.md)。金額 `price` 用 `BIGINT`（元，整數），符合 [Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.2 金額規範。
+> 時間欄位 `TIMESTAMPTZ`，符合 [Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.3 / [PostgreSQL 設計規範與最佳實踐](../dev-guidelines/postgresql-design-guidelines-and-best-practices.md)。金額 `price` 用 `BIGINT`（元，整數），符合 [Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.2 金額規範。
 
 ### 3.2 索引
 
@@ -288,7 +288,7 @@ DB：`hawkr_review`（PostgreSQL）。schema 由 Atlas 管理（`db/schema/schem
 
 ## 4. 對外 / 對內介面定義
 
-> **型別合規（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.1：前端可控 request id 一律 string）**：經 Gateway 暴露給前端的 request body / path 業務 ID 為 **string**（TSID > 2^53）。涉及：`SubmitOrderReview`(`order_item_id`/`product_id`)、`GetProductReviews`/`GetReviewStats`(`product_id` path)、`GetReview`(`review_id` path)、`GetSellerOrderReviews`/`GetSellerOrderReviewStats`(`store_id`：admin path 前端可控；賣家自查時由 Gateway 以 JWT FormatInt 帶入)。`buyer_id` / `viewer_id` / `ReplyReviewRequest.store_id`（#1174）由 JWT 注入維持 int64（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.1 例外①）。review-service gRPC handler 邊界 ParseInt（DB bigint 不變）。前端 hawkr_buyer 評論提交 `order_item_id` 以 `.toString()` 送字串（Dart int 為 64-bit，本身不丟精度，但後端契約改 string 後須送字串 body）。
+> **型別合規（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.1：前端可控 request id 一律 string）**：經 Gateway 暴露給前端的 request body / path 業務 ID 為 **string**（TSID > 2^53）。涉及：`SubmitOrderReview`(`order_item_id`/`product_id`)、`GetProductReviews`/`GetReviewStats`(`product_id` path)、`GetReview`(`review_id` path)、`GetSellerOrderReviews`/`GetSellerOrderReviewStats`(`store_id`：admin path 前端可控；賣家自查時由 Gateway 以 JWT FormatInt 帶入)。`buyer_id` / `viewer_id` / `ReplyReviewRequest.store_id`（#1174）由 JWT 注入維持 int64（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.1 例外①）。review-service gRPC handler 邊界 ParseInt（DB bigint 不變）。前端 hawkr_buyer 評論提交 `order_item_id` 以 `.toString()` 送字串（Dart int 為 64-bit，本身不丟精度，但後端契約改 string 後須送字串 body）。
 
 ### 4.1 Gateway 對外 REST 映射
 
@@ -344,7 +344,7 @@ message OrderReviewInfo {
 }
 ```
 
-> 數字 / ID 欄位對外一律 `string`（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.1）；`rating` 為該節例外（Response `int32` 慣例沿用，避免破壞既有前端）。
+> 數字 / ID 欄位對外一律 `string`（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.1）；`rating` 為該節例外（Response `int32` 慣例沿用，避免破壞既有前端）。
 
 ### 4.3 依賴的外部 gRPC
 
@@ -379,7 +379,7 @@ message OrderReviewInfo {
 | `ErrReviewNotReplyable`（#1174） | Conflict | 409 | reply 目標評論已隱藏 / 軟刪除，不可回覆 |
 | （type 驗證） | InvalidInput | 400 | rating / content / token 數 / price 格式；reply content 空 / 超長 |
 
-> 錯誤碼以 [codemeta/error-codes.md](../codemeta/error-codes.md) 為唯一真實來源；`bizcode.ModerationRejected` 經 `generate.sh --go-errors` 生成（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md)）。
+> 錯誤碼以 [codemeta/error-codes.md](../codemeta/error-codes.md) 為唯一真實來源；`bizcode.ModerationRejected` 經 `generate.sh --go-errors` 生成（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md)）。
 
 ### 4.6 冪等與重試語意
 
@@ -634,7 +634,7 @@ sequenceDiagram
 |------|----|
 | gRPC Port | `GRPC_PORT`，預設 `10033` |
 | HTTP Port（health/metrics/pprof） | `HTTP_PORT`，預設 `10032` |
-| TSID | `pkg/tsid`（Go 服務無 Node ID Base，[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §3.3） |
+| TSID | `pkg/tsid`（Go 服務無 Node ID Base，[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §3.3） |
 
 ### 9.2 環境變數
 
@@ -651,7 +651,7 @@ sequenceDiagram
 | `RABBITMQ_URL` | `amqp://guest:guest@localhost:5672/` | MQ |
 | `REDIS_HOST/PORT/PASSWORD` | redis:6379 | 封鎖名單（B-135） |
 
-> Config 載入走 `pkg/config.GetEnvOrDefault` + `Validate()`（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §12）。fx DI：`config.Module`。
+> Config 載入走 `pkg/config.GetEnvOrDefault` + `Validate()`（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §12）。fx DI：`config.Module`。
 
 ### 9.3 SSR cache bust（後端服務責任邊界 §9.3）
 

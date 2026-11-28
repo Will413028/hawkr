@@ -1,4 +1,4 @@
-# 06　物流微服務（Shipping Service）detailed-design
+# 06　物流微服務（Shipping Service）詳細設計書
 
 > 🔴 **已退場（B3，2026-11-24）。** Java shipping-service 整個刪除（含配送單狀態機、物流商建單與標籤、貨態處理、配送異常、門市地圖與開通、運費規則與假日處理），不搬進單體，也沒有等價的模組。
 

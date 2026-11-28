@@ -826,7 +826,7 @@ ProcurementLaneStatus 砍 PARTIAL：部分成功由「run `SUCCEEDED` + 其中�
   issue #2446 對外契約凍結的一部分。
 - **傳輸值形態**: Value 即 UPPER_SNAKE 字串本身，同 `AppType` 慣例。
 
-### 為什麼放這裡而不是「error-codes.md」
+### 為什麼放這裡而不是「錯誤碼.md」
 
 `error-codes.md` 的模型是 `(Name, 數字 Code, Message)` 三元組，對應 gRPC Response Code
 與有數字業務碼的錯誤（4001、9266…）。procurement 對外的錯誤 envelope 形狀是

@@ -24,7 +24,7 @@
 content-service 是既有「站台營運可維護資料」的承載者（`site_contents`／banner／recipe
 皆有 admin CRUD，三層落點可直接照抄）。Gateway 無 DB；account／notification 域不符。
 
-**已登記的代價**：它因此成為每次 App 冷啟動的依賴（detailed-design §9.2）。
+**已登記的代價**：它因此成為每次 App 冷啟動的依賴（詳細設計書 §9.2）。
 
 ## D3 版本比較：semver 三段、後端獨佔
 
@@ -50,7 +50,7 @@ content-service 是既有「站台營運可維護資料」的承載者（`site_c
 
 1. App 非敵對環境，使用者不是攻擊者，只是還沒更新
 2. App 端「冷啟動 ＋ 前景恢復」兩檢查點已覆蓋含「放量當下正在使用」的場景
-3. 伺服端硬擋卡在**判別不出舊 App**（detailed-design §3.1 第 2 點），先做也擋不準
+3. 伺服端硬擋卡在**判別不出舊 App**（詳細設計書 §3.1 第 2 點），先做也擋不準
 
 🔴 **重新評估的前置條件**：組合判準（Origin allowlist ＋ path namespace ＋ header 缺席）
 的可行性必須先實測。沒有這一步不要重開 D5。
@@ -99,7 +99,7 @@ content-service 是既有「站台營運可維護資料」的承載者（`site_c
 |---|---|---|
 | 抽 shared package／monorepo 化 | 兩 repo 無 shared package、無 workspace，超出範圍 | ❌ |
 | **CI checksum 對拍** | 跨 repo CI 需要另一 repo 的 checkout 憑證與同步時序；且 Flutter 側 CI gate 只掛 `pull_request`、兩 App 走直接 push dev ⇒ **擋不到** | ❌ 已評估並否決 |
-| **各自實作一份** | 靠紀律對齊 | **✓** 以detailed-design為 SSOT ＋ §4.6 兩 repo 實作對照表 |
+| **各自實作一份** | 靠紀律對齊 | **✓** 以詳細設計書為 SSOT ＋ §4.6 兩 repo 實作對照表 |
 
 ⚠️ 這個決策把對齊責任交給了紀律。緩解手段是 §4.6 的對照表與 §4.6.2 的必測不變式，
 **不是**「CI 會抓到」。
@@ -111,7 +111,7 @@ content-service 是既有「站台營運可維護資料」的承載者（`site_c
 消費者是**可觀測性**：Gateway access log 記錄版本後，才答得出「線上各版本 App 的請求
 佔比」「新版放量後舊版是否歸零」。
 
-🔴 **價值不包含「單憑 header 缺席就能硬擋舊 App」**——見 D5 與detailed-design §3.1 第 2 點。
+🔴 **價值不包含「單憑 header 缺席就能硬擋舊 App」**——見 D5 與詳細設計書 §3.1 第 2 點。
 
 ## 修訂（2026-10-28）
 

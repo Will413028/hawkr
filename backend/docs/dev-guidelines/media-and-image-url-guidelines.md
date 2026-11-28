@@ -1,6 +1,6 @@
 # 多媒體與圖片 URL 規範
 
-> 依據：49 號detailed-design（多媒體儲存與圖片服務）。本檔為全平台強制規範，適用所有後端服務（Java/Go）、Gateway、前端（web/admin/buyer App/seller App）。
+> 依據：49 號詳細設計書（多媒體儲存與圖片服務）。本檔為全平台強制規範，適用所有後端服務（Java/Go）、Gateway、前端（web/admin/buyer App/seller App）。
 > 動機：2026-07 盤點實錘——9+ 個 DB 欄位寫入時把完整 URL 烤進庫、同欄位混存多達 5 種值型態（CDN URL／objectKey／過期 presigned／JWT／外部 URL）、URL 組裝分裂為 8 套實作。本規範防止修復後偏差重生。
 
 ## 1. 儲存層（DB / MQ / 快取）

@@ -2088,7 +2088,7 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     }
 
     /**
-     * 區間熱門 Hashtag 查詢（33-商品 Hashtag 模組detailed-design §5.2）。
+     * 區間熱門 Hashtag 查詢（33-商品 Hashtag 模組詳細設計書 §5.2）。
      * 匿名公開 API；依日期區間回傳被最多 ACTIVE 商品掛上的 hashtag 排行。
      */
     @Override

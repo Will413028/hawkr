@@ -1,4 +1,4 @@
-# 22　商品配送驗證（Product Shipping Validation）detailed-design
+# 22　商品配送驗證（Product Shipping Validation）詳細設計書
 
 > 🔴 **已退場（B3，2026-11-24）。** product 建立或更新 SKU 時呼叫 shipping 的 `ValidateProductShipping`（驗配送方式與材積限制）隨 Java shipping 刪除。
 

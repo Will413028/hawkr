@@ -1,6 +1,6 @@
 # 存量已取消訂單回填 `invoice_cancelled_orders`（issue #2904）
 
-> 對應 [58-電子發票服務（Invoice Service）detailed-design](../detailed-design/58-invoice-service-detailed-design.md) §5.1.9a／§6.1.3。
+> 對應 [58-電子發票服務（Invoice Service）詳細設計書](../detailed-design/58-invoice-service-detailed-design.md) §5.1.9a／§6.1.3。
 > **何時跑**：`invoice-service` 的 `order.cancelled` consumer（C3）**部署完成之後**，越快越好（理由見 §3）。
 > **兩個 DB**：來源 `hawkr_order`（`orders`）、目標 `hawkr_invoice`（`invoice_cancelled_orders`）。同一台 PostgreSQL、不同 database ⇒ 無法 JOIN，走 §4 的匯出／匯入。
 > **DB 連線**：bastion ＋ 1Password 取憑證（同 [food-safety runbook](./food-safety-incident-runbook.md) §2 慣例）；dev 與 prod 各跑一輪，**dev 先跑完整一輪再上 prod**。

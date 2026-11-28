@@ -1,4 +1,4 @@
-# 商品 Hashtag 模組（Product Hashtag）detailed-design
+# 商品 Hashtag 模組（Product Hashtag）詳細設計書
 
 > 對應程式碼：product-service `service/HashtagService`・`service/PopularHashtagService`・`repository/ProductHashtagRepository`・`grpc/ProductGrpcService`；`api/proto/product/product.proto`；gateway `internal/handler/product.go` 與 `internal/router`。
 > schema 在 product-service 的 Flyway migration（`hashtag` / `product_hashtag` 兩表）。
@@ -98,7 +98,7 @@
 | `idx_product_hashtag_created_at` | (created_at, hashtag_id) | 日期區間範圍掃描 + group by hashtag_id（§5.2 用） |
 | 隱含索引 | 複合主鍵 (product_id, hashtag_id) | product → hashtag 列表查詢 |
 
-> 兩表與上列索引皆定義於 `V1__init_product_schema.sql`。**V1 已永久凍結**（連空白都不得更動，否則破壞 Flyway checksum），本模組後續任何 schema 變更一律新增 `V{N+1}__*.sql`；禁止回頭改 V1、禁止 SSH 手動改遠端 `flyway_schema_history.checksum`。規則見 [《Java 微服務dev-guidelines》§9.3 Flyway](../dev-guidelines/java-microservices-development-guidelines.md) 與 [38 號設計書](38-flyway-auto-sync-and-db-auto-init-detailed-design.md)。
+> 兩表與上列索引皆定義於 `V1__init_product_schema.sql`。**V1 已永久凍結**（連空白都不得更動，否則破壞 Flyway checksum），本模組後續任何 schema 變更一律新增 `V{N+1}__*.sql`；禁止回頭改 V1、禁止 SSH 手動改遠端 `flyway_schema_history.checksum`。規則見 [《Java 微服務開發規範》§9.3 Flyway](../dev-guidelines/java-microservices-development-guidelines.md) 與 [38 號設計書](38-flyway-auto-sync-and-db-auto-init-detailed-design.md)。
 
 ### 2.3 寫入規則
 
@@ -269,7 +269,7 @@ SQL WHERE ph.created_at >= :sqlStart AND ph.created_at < :sqlEnd
 
 **「今天 / 1 個月 / 1 年」定義**：
 
-- 「今天」= `DateTimeUtils.todayUtc()`（基於 `nowUtc().toLocalDate()`，[《Java 微服務dev-guidelines》§2.3 時間欄位](../dev-guidelines/java-microservices-development-guidelines.md)）
+- 「今天」= `DateTimeUtils.todayUtc()`（基於 `nowUtc().toLocalDate()`，[《Java 微服務開發規範》§2.3 時間欄位](../dev-guidelines/java-microservices-development-guidelines.md)）
 - 「1 個月」= `LocalDate.minusMonths(1)` / `plusMonths(1)`（日曆月）
 - 「1 年」= `LocalDate.minusYears(1)` / `plusYears(1)`（日曆年）
 
@@ -277,7 +277,7 @@ SQL WHERE ph.created_at >= :sqlStart AND ph.created_at < :sqlEnd
 
 #### 5.2.3 查詢策略
 
-採三段 CTE 結構，`:activeStatus` 由 Java 端帶入 `ProductStatus.ACTIVE.value()`（CodeMeta enum 的存取器是 `value()`，不是 `getValue()`；**禁止**在 SQL 內硬編碼 `'4004'`，見 [《Java 微服務dev-guidelines》§6 Enum 與禁止硬編碼](../dev-guidelines/java-microservices-development-guidelines.md)）：
+採三段 CTE 結構，`:activeStatus` 由 Java 端帶入 `ProductStatus.ACTIVE.value()`（CodeMeta enum 的存取器是 `value()`，不是 `getValue()`；**禁止**在 SQL 內硬編碼 `'4004'`，見 [《Java 微服務開發規範》§6 Enum 與禁止硬編碼](../dev-guidelines/java-microservices-development-guidelines.md)）：
 
 ```sql
 -- ① 區間內 top-N hashtag + 計數（必走 idx_product_hashtag_created_at）
@@ -357,7 +357,7 @@ message GetPopularHashtagsResponse {
 
 message PopularHashtagItem {
     string hashtag = 1;  // 該區間內被最多 ACTIVE 商品使用的原始大小寫版本（§5.2.3 ②③）
-    string count   = 2;  // 該區間內掛上此 hashtag 的 distinct ACTIVE 商品數（數字字串，[《Java 微服務dev-guidelines》§2.1](../dev-guidelines/java-microservices-development-guidelines.md)）
+    string count   = 2;  // 該區間內掛上此 hashtag 的 distinct ACTIVE 商品數（數字字串，[《Java 微服務開發規範》§2.1](../dev-guidelines/java-microservices-development-guidelines.md)）
 }
 ```
 
@@ -365,7 +365,7 @@ message PopularHashtagItem {
 
 #### 5.2.6 Observability 契約
 
-依 [《Java 微服務dev-guidelines》§8 Observability](../dev-guidelines/java-microservices-development-guidelines.md)，必須使用 `ObsLogger`，event 命名 `ClassName.action.result`：
+依 [《Java 微服務開發規範》§8 Observability](../dev-guidelines/java-microservices-development-guidelines.md)，必須使用 `ObsLogger`，event 命名 `ClassName.action.result`：
 
 | Event 名稱 | 觸發點 | 內容 |
 |-----------|--------|------|
@@ -407,7 +407,7 @@ enum HashtagSearchMode {
 }
 ```
 
-> 🔴 **`HashtagItem.product_count` 的型別是 `string`**（[《Java 微服務dev-guidelines》§2.1 數字欄位](../dev-guidelines/java-microservices-development-guidelines.md)：對外數字一律 string）。product-service 構建 `HashtagItem` 時以 `String.valueOf(longValue)` 填入，Gateway DTO 對應欄位亦為 string。該欄位出現在三個 surface，三處必須一致：
+> 🔴 **`HashtagItem.product_count` 的型別是 `string`**（[《Java 微服務開發規範》§2.1 數字欄位](../dev-guidelines/java-microservices-development-guidelines.md)：對外數字一律 string）。product-service 構建 `HashtagItem` 時以 `String.valueOf(longValue)` 填入，Gateway DTO 對應欄位亦為 string。該欄位出現在三個 surface，三處必須一致：
 >
 > | RPC / message | 出現位置 |
 > |----------|---------|
@@ -520,7 +520,7 @@ type PopularHashtagData struct {
 
 type PopularHashtagItem struct {
     Hashtag string `json:"hashtag"`
-    Count   string `json:"count"` // 字串型別，[《Java 微服務dev-guidelines》§2.1](../dev-guidelines/java-microservices-development-guidelines.md)
+    Count   string `json:"count"` // 字串型別，[《Java 微服務開發規範》§2.1](../dev-guidelines/java-microservices-development-guidelines.md)
 }
 ```
 
@@ -611,7 +611,7 @@ flowchart TD
 | 項目 | 處理 |
 |------|------|
 | `hashtag.product_count` 維護 | §4 已述：寫入路徑同事務 row-lock，**不**做 reconciliation job |
-| `product_hashtag.created_at` | DB `DEFAULT NOW()` + MetaObjectHandler 雙保險（[《Java 微服務dev-guidelines》§11 時間戳管理](../dev-guidelines/java-microservices-development-guidelines.md)） |
+| `product_hashtag.created_at` | DB `DEFAULT NOW()` + MetaObjectHandler 雙保險（[《Java 微服務開發規範》§11 時間戳管理](../dev-guidelines/java-microservices-development-guidelines.md)） |
 | Popular 查詢一致性 | 即時讀，**不**快取，**不**預計算物化視圖 |
 | Popular 查詢 vs counter 寫入 | PG MVCC 下互不阻塞（§4.2） |
 
@@ -629,7 +629,7 @@ flowchart TD
 |--------|---------|
 | [02-產品微服務](02-product-service-detailed-design.md) §3.7–§3.9、§4 | 02 引用本設計書（hashtag 詳細規格） |
 | [API 設計規範](../dev-guidelines/api-design-guidelines.md) | 統一回應格式 / Envelope / namespace 規則 |
-| [Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) | 型別對應、TSID、`DateTimeUtils` |
+| [Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) | 型別對應、TSID、`DateTimeUtils` |
 | [Gateway Swagger 註解規範](../dev-guidelines/gateway-swagger-annotation-guidelines.md) | Gateway handler Swagger 註解 |
 | [PostgreSQL 設計規範](../dev-guidelines/postgresql-design-guidelines-and-best-practices.md) | TIMESTAMPTZ / 索引設計 |
 

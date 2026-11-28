@@ -215,14 +215,14 @@ gateway 由 CI 對齊 openapi（`router/openapi_coverage_test.go`），所以刪
 | `ShipmentAnomalySeverity`、`ShipmentAnomalyAckAction` | `business-type-codes.md:626、644` | 嚴重度與處置動作；`ShipmentAnomalyRules.severityOf` 在 `CC/utils/code/helper/` | 同上 | |
 | `UberDeliveryOutcome` | `business-type-codes.md:1687` | 5 值：`PROVIDER_UNDELIVERABLE`、`PROVIDER_CANCELED`、`SELLER_CANCELED`、`ADMIN_CANCELED`、`CREATE_FAILED` | 只有 CodeMeta 生成物（【量】buyer-app、seller-app、website、admin、Go、Java 共 6 個生成檔，無手寫使用） | |
 | `ShippingTemperature`（3201~3299） | `business-type-codes.md:139` | 3201 常溫、3202、3203 低溫 | `orders.delivery_temp`、SKU JSONB `.temperature`；website/admin/兩 App 生成檔 | |
-| 錯誤碼 9024 | `error-codes.md:485`（AfterSales 段 9001~9099） | `AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER`，Uber 即時配送訂單暫不支援退貨退款 | 計畫補充範圍：`pkg/errors/bizcode` 的 9024 | |
-| 同號段其他 | `error-codes.md:52-105`（Shipping 業務碼 5001~5099，49 筆，含 `SHIPMENT_*`、`SHIPPING_ONBOARDING_*`、`SHIPPING_GOODS_TYPE_INVALID` 等）、`:489-605`（物流履約業務碼 9500~9699，61 筆）、`:32-50` 內 4008、4010、4016 | B3 刪除或改寫時要核對哪些碼仍有主程式引用 | |
+| 錯誤碼 9024 | `錯誤碼.md:485`（AfterSales 段 9001~9099） | `AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER`，Uber 即時配送訂單暫不支援退貨退款 | 計畫補充範圍：`pkg/errors/bizcode` 的 9024 | |
+| 同號段其他 | `錯誤碼.md:52-105`（Shipping 業務碼 5001~5099，49 筆，含 `SHIPMENT_*`、`SHIPPING_ONBOARDING_*`、`SHIPPING_GOODS_TYPE_INVALID` 等）、`:489-605`（物流履約業務碼 9500~9699，61 筆）、`:32-50` 內 4008、4010、4016 | B3 刪除或改寫時要核對哪些碼仍有主程式引用 | |
 | 其他物流值域（計畫沒逐一列名） | `business-type-codes.md`：`ShippingType`（`:120`，3651~3654 超商／宅配）、`ShippingFeePayer`（`:157`，3101~3199）、`ShippingArea`（`:173`）、`ShippingRoute`（`:189`）、`ProviderSource`（`:661`）、`FulfillmentMode`（`:1445`）、`FulfillmentAction`（`:1481`）、`FulfillmentExceptionCategory`（`:1624`）、`FulfillmentCaseResolutionType`（`:1643`）、`ProviderFeeType`（`:1666`）、`CommerceModel`（`:1407`）；`business-status-codes.md`：`ShippingStatus`（`:319`）、`OnboardingStatus`（`:452`）、`LabelPrintStatus`（`:489`）、`TcatCallStatus`（`:508`）、`LogisticsReceivableStatus`（`:607`）；`internal-technical-codes.md`：`WebhookProvider`（`:185`）、`OnboardingLogAction`（`:392`）、`OnboardingLogResult`（`:409`）、`DeliveryZoneKey`（`:574`）、`ShippingEventType`（`:1009`）、`FulfillmentEventType`（`:1039`）、`LogisticsEventType`（`:1063`） | 計畫 B3 與 B10 只點名四個值域；`ShippingFeePayer`、`FulfillmentMode`、`CommerceModel` 在自寄主線**仍有用**（§1.3），其餘多數沒有消費者。逐值域的存續要決策 | |
 | 生成腳本與文件 | `D/codemeta/scripts/generate.sh`（admin 的 `ADMIN_ENUMS` allowlist）、`README.md:241-243` 號段表（3001、3101、3201、3601~3699 屬物流）、`pitfalls-and-change-history.md` | 刪值域時要同步 allowlist 與號段表 | |
 
 ## 6. 設計書 65–70
 
-【量】現況：66、68、69 於 `2c4928740`（2026-10-29）刪除，67 於 `a7d37b97e` 刪除，70 於 `d876df987`（2026-11-23）刪除；**目前 `backend/docs` 只剩 65**（基本、詳細各一）。計畫與 ADR 仍寫「設計書 69 `商家自有出貨` 已定義 `fulfillment_mode = SELLER_MANAGED`」，那份文件已不在工作樹，只能從 `git show 2c4928740^:'backend/docs/detailed-design/69-商家自有出貨（Merchant Self-Delivery）detailed-design.md'` 讀（1903 行；【量】已讀其目錄與 §0、§7.3、§7.4）。實際要改的設計書因此是 65、06、20、21、22、23，以及提到 Uber、物流事件的 03、09、36、29、58、10、12、02、05（字樣數見 §6.4）。
+【量】現況：66、68、69 於 `2c4928740`（2026-10-29）刪除，67 於 `a7d37b97e` 刪除，70 於 `d876df987`（2026-11-23）刪除；**目前 `backend/docs` 只剩 65**（基本、詳細各一）。計畫與 ADR 仍寫「設計書 69 `商家自有出貨` 已定義 `fulfillment_mode = SELLER_MANAGED`」，那份文件已不在工作樹，只能從 `git show 2c4928740^:'backend/docs/detailed-design/69-商家自有出貨（Merchant Self-Delivery）詳細設計書.md'` 讀（1903 行；【量】已讀其目錄與 §0、§7.3、§7.4）。實際要改的設計書因此是 65、06、20、21、22、23，以及提到 Uber、物流事件的 03、09、36、29、58、10、12、02、05（字樣數見 §6.4）。
 
 ### 6.1 設計書 69（已刪）內容摘要
 
@@ -232,11 +232,11 @@ gateway 由 CI 對齊 openapi（`router/openapi_coverage_test.go`），所以刪
 - 收貨 Gate（§7.4，核心規則）：賣家自稱送達、POD、驗簽 callback、承運商事件，**都不能單獨通過收貨 Gate**；只有買家確認或 ADM 裁決能。`DELIVERED` 只寫 C 軸 `11`、不碰 E 軸；60h `AUTO_CONFIRMED` 不算撥款資格。對作品集：這條在 B2 撥款改成 separate charges and transfers 後怎麼落（誰觸發轉帳、與 `auto_complete_at` 的關係）沒有任何文件寫（§8 Q3）。
 - 參數：`accept_sla_minutes` 預設 30、不得上修超過 120；POD 上傳窗口 24 小時（軟窗口，只通知）；失聯回查 24 小時；這些數字都屬 L1/L2 或撥款證據，ADR D1 的「逾期未出貨、逾期自動完成」要用的期限（目前 shipping 的 `processing_deadline`、order 的 `auto_complete_at`）在 69 沒有新定義。
 - 其他：§5 資料模型 380 餘行（job、事件序號、secret）、§6.2 對第三方公開的商家整合 API 契約（約 210 行）、§12 部署、§13 測試、附錄 C CodeMeta 新增清單、附錄 E 商家整合指南。
-- 結論（【推】）：69 實質可重用的是 L0 的狀態轉換與收貨 Gate 的語意；其餘 90% 以上是third-party-integrations，與 ADR 的 D3「物流 port＋模擬 adapter」不是同一件事（port 是平台呼叫物流商，69 的 L1/L2 是商家呼叫平台）。
+- 結論（【推】）：69 實質可重用的是 L0 的狀態轉換與收貨 Gate 的語意；其餘 90% 以上是第三方整合，與 ADR 的 D3「物流 port＋模擬 adapter」不是同一件事（port 是平台呼叫物流商，69 的 L1/L2 是商家呼叫平台）。
 
 ### 6.2 設計書 65（現存）
 
-detailed-design `65-fulfillment-platform-detailed-design.md`（429 行）：
+詳細設計書 `65-fulfillment-platform-detailed-design.md`（429 行）：
 
 | 章節 | 行 | 假設 | 備註 | 去向 |
 |---|---|---|---|---|
@@ -253,14 +253,14 @@ detailed-design `65-fulfillment-platform-detailed-design.md`（429 行）：
 | §7 帳本與 provider 帳單列 §7.1、§7.2 | 353-413 | 雙分錄帳本 | 程式已刪，**整節刪** | |
 | §8 錯誤碼 | 414-429 | 9501~9575 | 與 §5 §7 對應者刪 | |
 
-basic-design `65-…basic-design.md`（85 行）：§0（問題陳述）、§1（誰用）、§2 訂單政策快照、§3 收貨確認軸、§4 adapter 與兩層動作、§5 責任判定、§6 帳本與物流商帳單、§7 刻意不做。【推】§5、§6 刪，§7 補「平台代買標籤、超商、即時報價」。
+基本設計書 `65-…基本設計書.md`（85 行）：§0（問題陳述）、§1（誰用）、§2 訂單政策快照、§3 收貨確認軸、§4 adapter 與兩層動作、§5 責任判定、§6 帳本與物流商帳單、§7 刻意不做。【推】§5、§6 刪，§7 補「平台代買標籤、超商、即時報價」。
 
 ### 6.3 設計書 06（物流微服務）、20、21、22、23
 
 | 文件 | 範圍 | 去向（留空）備註 |
 |---|---|---|
-| `detailed-design/06-…detailed-design.md`（5605 行） | §1 概述 1-144；§2.1 狀態機 147、§2.2 PayUni 映射 207、§2.3 建店狀態機 238、§2.4 外部呼叫併發 290、§2.5 PayUni 欄位防護 567；§3 資料庫 628-1043（§3.1 `shipments`、§3.3 `shipping_webhook_dedup`、§3.4 `seller_shipment_settings`、§3.6 `holidays`、§3.7 `shipping_fee_tiers`、§3.8 `shipping_method_configs`、§3.9 `buyer_store_pickups`）；§4 介面 1044-1771（§4.1 REST 映射、§4.2 proto 1135-1643、§4.4 發佈事件、§4.5 消費事件）；§5 流程 1772-4533（§5.1 背景建單、§5.2 超商列印、§5.3 宅配取號、§5.4 呼叫黑貓、§5.5 webhook、§5.6 列印 notify、§5.7 按需查詢、§5.8 送達後自動完成、§5.9/5.10 建店、§5.13 賣家可用配送方式、§5.14 門市地圖、§5.15 `CvsPrintWaitingRegistry`、§5.16 退貨物流、§5.17 商品配送驗證、§5.18 webhook service 整合、§5.19 reconciliation、§5.20 賣家逾期自動取消、§5.21 配送異常通知、§5.22 排程搶佔）；§6-§8 MQ、時序、一致性 4534-5306；§9 環境 5307；§10 `payuni_audit_logs` 5472；附錄 A enum 5595 | 【推】幾乎全篇平台串接。**自寄仍相關**：§2.1 的狀態機思路、§3.1 `shipments`、§5.8（送達後訂單自動完成）、§5.13（賣家可用配送方式）、§5.20（逾期自動取消，K5）、§8.5 排程搶佔；其餘整體刪除或改寫為新模組的設計書 |
-| `basic-design/06-…basic-design.md`（410 行） | §0、§1、§2 核心模型 72、§3 賣家要先開通 115、§4 主要流程 148（§4.1 黑貓、§4.2 7-11、§4.3 退貨物流、§4.4 逾期自動取消）、§5 錢與發票 274（§5.1 買家付款線 A、§5.2 發票）、§6 狀態 318、§7 出事 351、§8 頁面地圖 368、§9 刻意不做 394、§10 外部相依 403 | 【推】§3、§4.1~4.3、§5、§8 的超商與門市頁面、§10 刪；§4.4、§6 改寫 |
+| `detailed-design/06-…詳細設計書.md`（5605 行） | §1 概述 1-144；§2.1 狀態機 147、§2.2 PayUni 映射 207、§2.3 建店狀態機 238、§2.4 外部呼叫併發 290、§2.5 PayUni 欄位防護 567；§3 資料庫 628-1043（§3.1 `shipments`、§3.3 `shipping_webhook_dedup`、§3.4 `seller_shipment_settings`、§3.6 `holidays`、§3.7 `shipping_fee_tiers`、§3.8 `shipping_method_configs`、§3.9 `buyer_store_pickups`）；§4 介面 1044-1771（§4.1 REST 映射、§4.2 proto 1135-1643、§4.4 發佈事件、§4.5 消費事件）；§5 流程 1772-4533（§5.1 背景建單、§5.2 超商列印、§5.3 宅配取號、§5.4 呼叫黑貓、§5.5 webhook、§5.6 列印 notify、§5.7 按需查詢、§5.8 送達後自動完成、§5.9/5.10 建店、§5.13 賣家可用配送方式、§5.14 門市地圖、§5.15 `CvsPrintWaitingRegistry`、§5.16 退貨物流、§5.17 商品配送驗證、§5.18 webhook service 整合、§5.19 reconciliation、§5.20 賣家逾期自動取消、§5.21 配送異常通知、§5.22 排程搶佔）；§6-§8 MQ、時序、一致性 4534-5306；§9 環境 5307；§10 `payuni_audit_logs` 5472；附錄 A enum 5595 | 【推】幾乎全篇平台串接。**自寄仍相關**：§2.1 的狀態機思路、§3.1 `shipments`、§5.8（送達後訂單自動完成）、§5.13（賣家可用配送方式）、§5.20（逾期自動取消，K5）、§8.5 排程搶佔；其餘整體刪除或改寫為新模組的設計書 |
+| `basic-design/06-…基本設計書.md`（410 行） | §0、§1、§2 核心模型 72、§3 賣家要先開通 115、§4 主要流程 148（§4.1 黑貓、§4.2 7-11、§4.3 退貨物流、§4.4 逾期自動取消）、§5 錢與發票 274（§5.1 買家付款線 A、§5.2 發票）、§6 狀態 318、§7 出事 351、§8 頁面地圖 368、§9 刻意不做 394、§10 外部相依 403 | 【推】§3、§4.1~4.3、§5、§8 的超商與門市頁面、§10 刪；§4.4、§6 改寫 |
 | `detailed-design/20-結帳模組…`（1242 行） | §1.5 範圍、§3.3 `CheckoutShippingFee` 275、§4.2 運費流程 581、§4.6 材積重量（最短邊堆疊法）697、§4.7 免運邏輯 723（規則保留，來源 ADR）、§4.8 溫層相容性驗證 818、§4.9 運費計算架構 828、§4.12 降級策略總覽 920、§4.13 和單與 `paymentMerId` 935、§7.2 `ShippingTemperature` 補充方法 1195、§7.3 `WeightUnit` 1207、§7.4 `ShippingAreaResolver` 1219、§7.5 Redis 快取鍵 1236 | 【推】§4.6、§4.8、§4.9、§4.12 的運費部分、§7.2~7.5 刪或改；§4.7 保留；§4.13 屬 B2 |
 | `detailed-design/21-運費計算模組…`（699 行） | §0 概覽、§1 配送區域 73-120（三區域、PayUni 離島、店到店）、§2 DB 表 121-239（`shipping_method_configs`、`shipping_fee_tiers`）、§3 快取 240-319（L1、L2、結構、查找、重整）、§4 gRPC 320-438、§5 結帳整合 439-499、§6 產品服務整合 500-527、§7 common-core 不得持有運費資料 528、§8 時序 542-659、附錄 A PayUni 最新費率表 660-699 | 【推】**整份以 PayUni 費率為前提**，與 ADR D2 衝突；除 §0.1 表中「買家被收多少」的語意外全部要重寫 |
 | `detailed-design/22-商品配送驗證…`（301 行） | §2 `ValidateProductShipping` RPC 27、§3 產品整合 214、§4 proto 契約落點 272 | 【推】尺寸重量對照的是 `shipping_method_configs` 限制；ADR 沒有限制表，B4 處理商品建立時是否仍驗 |

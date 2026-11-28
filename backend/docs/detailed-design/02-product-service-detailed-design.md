@@ -1,4 +1,4 @@
-# 產品微服務 (Product Service) detailed-design
+# 產品微服務 (Product Service) 詳細設計書
 
 ---
 
@@ -1444,7 +1444,7 @@ message ProductForCheckoutInfo {
 message HashtagItem {
     string name = 1;          // canonical 名稱（lower）；查詢與比對基準
     string display_name = 2;  // 顯示名稱（保留原大小寫）；auto-complete 場景填 ""，由前端決定顯示策略
-    string product_count = 3; // 引用數量（hashtag.product_count 即時值，字串型別，符合 [《Java 微服務dev-guidelines》§2.1](../dev-guidelines/java-microservices-development-guidelines.md)；見 33 §5.4）
+    string product_count = 3; // 引用數量（hashtag.product_count 即時值，字串型別，符合 [《Java 微服務開發規範》§2.1](../dev-guidelines/java-microservices-development-guidelines.md)；見 33 §5.4）
 }
 ```
 
@@ -1543,7 +1543,7 @@ message SearchHashtagsResponse {
 }
 ```
 
-**GetPopularHashtagsRequest / GetPopularHashtagsResponse / PopularHashtagItem**：詳見 [33-商品 Hashtag 模組detailed-design §5.2.5](33-product-hashtag-detailed-design.md#525-proto-定義)
+**GetPopularHashtagsRequest / GetPopularHashtagsResponse / PopularHashtagItem**：詳見 [33-商品 Hashtag 模組詳細設計書 §5.2.5](33-product-hashtag-detailed-design.md#525-proto-定義)
 
 #### 4.2.3 CategoryService RPC（共 7 個）
 
@@ -1618,7 +1618,7 @@ message ListSubscribedSellerIdsResponse {
 
 **錯誤碼**：單體 buyer 模組直接回 gRPC 標準（`INVALID_ARGUMENT` / `INTERNAL`）；product-service 收到任何非 OK 都翻成 `FAILED_PRECONDITION` 回 gateway → 503，不嘗試降級。
 
-> **欄位型別說明**：本 RPC 為「buyer → 內部」呼叫，沿用 buyer.proto 既有的 `int64` 風格以避免擴大範圍。[《Java 微服務dev-guidelines》§2.1 數字欄位](../dev-guidelines/java-microservices-development-guidelines.md)的例外清單第 3 項「純微服務間 gRPC 欄位」允許此例外。若未來 buyer.proto 進行全面 string 化重構，本 RPC 同步調整。
+> **欄位型別說明**：本 RPC 為「buyer → 內部」呼叫，沿用 buyer.proto 既有的 `int64` 風格以避免擴大範圍。[《Java 微服務開發規範》§2.1 數字欄位](../dev-guidelines/java-microservices-development-guidelines.md)的例外清單第 3 項「純微服務間 gRPC 欄位」允許此例外。若未來 buyer.proto 進行全面 string 化重構，本 RPC 同步調整。
 
 ### 4.3 MQ 訊息定義
 
@@ -2388,7 +2388,7 @@ favorites row 在任何情況下都不由系統自動刪除，僅使用者主動
    WHERE s.id IN (:skuIds)
    ```
    - **必須單一 query 拿一個 snapshot**：禁止「先查 SKU 再查 Product」兩階段 query，避免 PG READ COMMITTED 下兩 snapshot 不一致（並行 `UpdateProductStatus` / `DeductStock` race window）
-   - **回傳 record projection**（[《Java 微服務dev-guidelines》§9.2 Partial Projection 反模式禁令](../dev-guidelines/java-microservices-development-guidelines.md)）：不回 Entity 部分填充，定義 `SkuCartProjection(skuId, productId, stockQty, price, salePrice, shippingMethodJson, productStatus, productDeletedAt)`
+   - **回傳 record projection**（[《Java 微服務開發規範》§9.2 Partial Projection 反模式禁令](../dev-guidelines/java-microservices-development-guidelines.md)）：不回 Entity 部分填充，定義 `SkuCartProjection(skuId, productId, stockQty, price, salePrice, shippingMethodJson, productStatus, productDeletedAt)`
 3. **組裝 `SkuCartInfo`**：
    - `is_active = (productStatus == ACTIVE.value() && productDeletedAt == null)`
    - `price = sku.sale_price.isNotBlank() ? sku.sale_price : sku.price`（與 §5.5.2 對齊「effective price」）
@@ -2908,7 +2908,7 @@ product.setShippingMethods(result);
 
 #### 工具類抽出位置
 
-聚合邏輯抽到 `ProductAggregateRules` helper class（單一服務 helper，命名遵循 [《Java 微服務dev-guidelines》§6 Enum 與禁止硬編碼](../dev-guidelines/java-microservices-development-guidelines.md)的 helper class 慣例），供 §5.1 / §5.2 共用，避免散落。
+聚合邏輯抽到 `ProductAggregateRules` helper class（單一服務 helper，命名遵循 [《Java 微服務開發規範》§6 Enum 與禁止硬編碼](../dev-guidelines/java-microservices-development-guidelines.md)的 helper class 慣例），供 §5.1 / §5.2 共用，避免散落。
 
 位置：`services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/helper/ProductAggregateRules.java`
 
@@ -2996,7 +2996,7 @@ flowchart TD
 - **不引入「query 訂閱數」做 cheap filter** — consumer 端空 query return 即可，cycle 浪費可接受；publisher 端不反向 query buyer 模組
 - **不引入防抖 window** — one-shot (NOTIFIED) 由 subscription owner 端 UNIQUE partial index 天然解決重複轟炸；本端不引入 5–10 分鐘 debounce 表
 - **trigger 條件兩處一次到位** — 庫存 + 上下架兩條路徑同 detect 規則，禁分階段「先做庫存後做上下架」
-- **partial projection 禁令**（§11.3） — reflow 前查 `(stock_qty, status, name, image)` 必須用 `record SkuStockTransition(Long productId, Integer oldStock, String oldStatus, String productName, String imageKey)` 而非 Entity；參考 [《Java 微服務dev-guidelines》§9.2 Partial Projection 反模式禁令](../dev-guidelines/java-microservices-development-guidelines.md) 的教訓避免 NPE
+- **partial projection 禁令**（§11.3） — reflow 前查 `(stock_qty, status, name, image)` 必須用 `record SkuStockTransition(Long productId, Integer oldStock, String oldStatus, String productName, String imageKey)` 而非 Entity；參考 [《Java 微服務開發規範》§9.2 Partial Projection 反模式禁令](../dev-guidelines/java-microservices-development-guidelines.md) 的教訓避免 NPE
 
 ### 5.13c 有公開上架商品的店家集合 (ListStoreIDsWithPublicProductsInternal)
 
@@ -3162,7 +3162,7 @@ flowchart TD
 
 #### 5.14a.6 列表 / 詳情讀取路徑
 
-ProductListItem.rating / review_count、ProductDetail.rating / review_count 直接從 `product.rating` / `product.review_count` 反正規化欄位讀（數字字串，符合 [《Java 微服務dev-guidelines》§2 型別對應](../dev-guidelines/java-microservices-development-guidelines.md)，**維持 string，不改數字型別**）。**不得改用跨服務 RPC 即時讀**（那會造成列表 N+1）。
+ProductListItem.rating / review_count、ProductDetail.rating / review_count 直接從 `product.rating` / `product.review_count` 反正規化欄位讀（數字字串，符合 [《Java 微服務開發規範》§2 型別對應](../dev-guidelines/java-microservices-development-guidelines.md)，**維持 string，不改數字型別**）。**不得改用跨服務 RPC 即時讀**（那會造成列表 N+1）。
 
 ---
 

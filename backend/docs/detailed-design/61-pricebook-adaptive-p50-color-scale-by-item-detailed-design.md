@@ -1,4 +1,4 @@
-# Pricebook 各品項自適應 P50 色階detailed-design
+# Pricebook 各品項自適應 P50 色階詳細設計書
 
 ---
 

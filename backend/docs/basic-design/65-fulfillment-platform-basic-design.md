@@ -1,6 +1,6 @@
 # 65 · 物流履約平台（基本設計）
 
-> **這是外部設計。** 實作契約在 [detailed-design 65](../detailed-design/65-fulfillment-platform-detailed-design.md) 與 [21](../detailed-design/21-shipping-fee-module-detailed-design.md)。
+> **這是外部設計。** 實作契約在 [詳細設計書 65](../detailed-design/65-fulfillment-platform-detailed-design.md) 與 [21](../detailed-design/21-shipping-fee-module-detailed-design.md)。
 > 決策依據：ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`（含 2026-11-24 修訂）。
 
 > 🔴 **出貨只有一種方式：賣家自寄。** 物流商（平台代為建單、列印標籤、追蹤貨態）已退場；本書回答「自寄模型下，運費、出貨與收貨各歸誰」。

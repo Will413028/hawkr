@@ -1,4 +1,4 @@
-# PayUni Java Client SDK detailed-design
+# PayUni Java Client SDK 詳細設計書
 
 ---
 

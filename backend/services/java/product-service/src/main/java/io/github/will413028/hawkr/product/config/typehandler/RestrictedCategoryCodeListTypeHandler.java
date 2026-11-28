@@ -29,7 +29,7 @@ import java.util.List;
  * DB CHECK 則是繞過應用層時的最後一道。
  *
  * <p>⚠️ 刻意<b>不</b>標 {@code @MappedTypes(List.class)}
- * （《Java 微服務dev-guidelines》§9.1 明令禁止）：本服務已有兩個 {@code List} 的 JSONB handler，
+ * （《Java 微服務開發規範》§9.1 明令禁止）：本服務已有兩個 {@code List} 的 JSONB handler，
  * 再宣告一次只會讓 {@code TypeHandlerRegistry} 裡 {@code List + OTHER} 這一格再被覆寫一次。
  * 本 handler 一律由 {@code @TableField(typeHandler = ...)} 顯式指名使用，不依賴隱式查表。
  *

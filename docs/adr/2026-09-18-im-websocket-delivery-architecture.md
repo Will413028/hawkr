@@ -9,7 +9,7 @@
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> frame 白名單、房間命名、停權 gating 判準、失敗處置表一律在 14 號detailed-design，本檔不複製。
+> frame 白名單、房間命名、停權 gating 判準、失敗處置表一律在 14 號詳細設計書，本檔不複製。
 
 ---
 

@@ -15,7 +15,7 @@ func TestMessage_CoversRepresentativeCodes(t *testing.T) {
 		DelegationCapabilityDependencyIncomplete,
 	} {
 		if Message(code) == "" {
-			t.Errorf("Message(%d) 為空，error-codes.md 有登記訊息", code)
+			t.Errorf("Message(%d) 為空，錯誤碼.md 有登記訊息", code)
 		}
 	}
 }

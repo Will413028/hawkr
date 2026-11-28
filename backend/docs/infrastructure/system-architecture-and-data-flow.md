@@ -562,7 +562,7 @@ detect（Go/Java/Proto diff） → test（Go） → build（Java Maven Reactor +
 | CI/CD 細節 | `infrastructure/ci-cd-automated-deployment-k8s-helm.md` |
 | 告警 / Discord | `infrastructure/discord-monitoring-bot-design.md`、`discord-alert-notification-setup-guide.md` |
 | 回應格式 | `dev-guidelines/api-design-guidelines.md` |
-| PayUni webhook | `detailed-design/10-PayUni Webhook 服務detailed-design.md` |
+| PayUni webhook | `detailed-design/10-PayUni Webhook 服務詳細設計書.md` |
 | 媒體儲存 / Image Gateway | `detailed-design/49-cloudflare-r2-and-image-gateway-detailed-design.md` |
 | 網頁前端快取分層 / 版本一致性 | `detailed-design/53-web-frontend-cache-and-deployment-consistency-detailed-design.md` |
 

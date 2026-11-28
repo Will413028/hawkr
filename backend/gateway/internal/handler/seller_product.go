@@ -59,7 +59,7 @@ type SellerProductItem struct {
 }
 
 // HashtagItem 是 hashtag 條目（gateway 層共用結構，對應 proto HashtagItem）
-// productCount 為字串型別（33-商品 Hashtag 模組detailed-design §5.4；對外數字一律 string，
+// productCount 為字串型別（33-商品 Hashtag 模組詳細設計書 §5.4；對外數字一律 string，
 // 見 docs/dev-guidelines/java-microservices-development-guidelines.md §2）
 type HashtagItem struct {
 	Name         string `json:"name"`                  // canonical 名稱（lower）

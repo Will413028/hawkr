@@ -29,7 +29,7 @@
   收款通道實際手續費 ／ 平台補貼 ／ 賣家補貼 ／ **責任歸屬調整** ／ **對帳調整** ／
   賣家最終負擔，**互不推導**（2026-09-11 由六項擴充為十項：責任歸屬調整來自 `2026-09-11-responsibility-based-cost-attribution.md`、
   報價與實際成本的分離與雙向 true-up 來自 `2026-09-11-logistics-cost-true-up.md`；逐項定義見
-  [66 基設 §2.3](/backend/docs/basic-design/66-Uber%20Direct%20即時配送整合basic-design.md)）。
+  [66 基設 §2.3](/backend/docs/basic-design/66-Uber%20Direct%20即時配送整合基本設計書.md)）。
 - 🔴 **最終負擔是「算出來的結果」不是「存在某一欄的輸入」**：
   它由 `2026-09-11-logistics-cost-true-up.md` 的五項式合成，任何一項被省略都會讓另一項被迫吸收差額。
 - **代價**：欄位與帳務科目變多；平台補貼那一格**現況表達不出來**（見後果第 3 點）。
@@ -98,6 +98,6 @@
 
 ## 修訂：設計書 65A、66、68、69 已刪除（2026-10-29）
 
-物流履約前端實作規格（65A）、Uber Direct 整合（66）、7-ELEVEN 大宗寄倉（68）、商家自有出貨（69）的詳細與basic-design已刪除：65A、68、69 未實作且不在任何計畫內，66 的 Uber 已由 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4 決定刪除。本文中「65A」「66」「68」「69」號設計書與它們的章節編號指向已刪除的文件，內容見 git 歷史。設計書 65 只保留已實作的部分。
+物流履約前端實作規格（65A）、Uber Direct 整合（66）、7-ELEVEN 大宗寄倉（68）、商家自有出貨（69）的詳細與基本設計書已刪除：65A、68、69 未實作且不在任何計畫內，66 的 Uber 已由 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4 決定刪除。本文中「65A」「66」「68」「69」號設計書與它們的章節編號指向已刪除的文件，內容見 git 歷史。設計書 65 只保留已實作的部分。
 
 物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

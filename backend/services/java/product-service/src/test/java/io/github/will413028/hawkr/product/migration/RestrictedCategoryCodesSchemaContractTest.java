@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code V19__add_product_sku_restricted_category_codes.sql} 的 schema 契約釘樁
- * （66 號detailed-design §5.1.9 ②：禁運品／品類守門的 SKU 標記欄）。
+ * （66 號詳細設計書 §5.1.9 ②：禁運品／品類守門的 SKU 標記欄）。
  *
  * <p><b>它證明什麼</b>：那一欄、它的 {@code NOT NULL DEFAULT '[]'}、以及把「值域尚未定案」
  * 翻譯成 fail-closed 的那條 CHECK，確實出現在 migration 的 <b>DDL</b> 裡；
@@ -166,7 +166,7 @@ class RestrictedCategoryCodesSchemaContractTest {
     }
 
     @Test
-    @DisplayName("TypeHandler 不得標 @MappedTypes(List.class)（Java 微服務dev-guidelines §9.1）")
+    @DisplayName("TypeHandler 不得標 @MappedTypes(List.class)（Java 微服務開發規範 §9.1）")
     void typeHandler未污染全域註冊表() {
         assertFalse(RestrictedCategoryCodeListTypeHandler.class.isAnnotationPresent(MappedTypes.class),
                 "本 handler 由 @TableField(typeHandler = ...) 顯式指名使用，不需要也不得宣告 "

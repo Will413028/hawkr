@@ -1,6 +1,6 @@
 # invoice_inbox_events 擱淺列處置（告警 `InvoiceInboxStranded` / 指標 M30）
 
-> 對應 [58-電子發票detailed-design](../detailed-design/58-invoice-service-detailed-design.md) §7.2.5（inbox 的兩條推進路徑）與 §7.2.2（作廢／折讓 usecase）。
+> 對應 [58-電子發票詳細設計書](../detailed-design/58-invoice-service-detailed-design.md) §7.2.5（inbox 的兩條推進路徑）與 §7.2.2（作廢／折讓 usecase）。
 > **這份 runbook 不是「跑一支腳本把數字歸零」**。M30 是 gauge，它說的是「這些列沒有任何自動執行者」——處置一律要先分辨**為什麼**沒有，四類的正解完全不同。
 > 🔴 **禁止**用 reconciliation job／backfill CLI／drift scanner 處理本表（CLAUDE.md §22、後端服務責任邊界規範）。歷史積壓走一次性維運 SQL，新增的靠把 §7.2.2 做完來排空。
 

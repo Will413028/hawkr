@@ -1,4 +1,4 @@
-# 35-商品列表排序與銷量反正規化（Product Sort & Sales Count）detailed-design
+# 35-商品列表排序與銷量反正規化（Product Sort & Sales Count）詳細設計書
 
 ## 一、目標與範圍
 
@@ -96,7 +96,7 @@ CREATE INDEX idx_product_active_sales
 
 ### 3.3 Migration 落點
 
-`sales_count` 欄位與上述 5 個 partial index 已隨 `V1__init_product_schema.sql` 建立；非負 CHECK 走 `V5__add_nonneg_checks_hashtag_sales.sql`、消費冪等表走 `V11__add_sales_count_event_dedup.sql`。V1 已凍結為唯讀，後續任何 schema 變更一律新增 `V{N+1}`（見 [Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §9.3）。
+`sales_count` 欄位與上述 5 個 partial index 已隨 `V1__init_product_schema.sql` 建立；非負 CHECK 走 `V5__add_nonneg_checks_hashtag_sales.sql`、消費冪等表走 `V11__add_sales_count_event_dedup.sql`。V1 已凍結為唯讀，後續任何 schema 變更一律新增 `V{N+1}`（見 [Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §9.3）。
 
 ---
 

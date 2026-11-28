@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * DB Bootstrap 配置（部署即自動建立 DB 與 extension）
  * <p>
  * 由 DatabaseBootstrapAutoConfiguration 自動載入，於 Spring DataSource 初始化前執行。
- * 詳見 38-Flyway 自動同步與 DB 自動初始化detailed-design §3.4。
+ * 詳見 38-Flyway 自動同步與 DB 自動初始化詳細設計書 §3.4。
  */
 @ConfigurationProperties(prefix = "hawkr.db.bootstrap")
 public class DatabaseBootstrapProperties {

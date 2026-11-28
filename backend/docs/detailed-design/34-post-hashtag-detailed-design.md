@@ -1,4 +1,4 @@
-# 貼文 Hashtag 模組（Post Hashtag）detailed-design
+# 貼文 Hashtag 模組（Post Hashtag）詳細設計書
 
 ---
 
@@ -17,7 +17,7 @@
 | 所屬服務 | `services/social-service/`（Go） |
 | 所屬 DB | `hawkr_social`（PostgreSQL） |
 | Node ID Base | 250（social-service 命名空間，避開 product 的 200） |
-| 設計藍本 | [33-商品 Hashtag 模組detailed-design](33-product-hashtag-detailed-design.md) |
+| 設計藍本 | [33-商品 Hashtag 模組詳細設計書](33-product-hashtag-detailed-design.md) |
 | 共用元件 | 業務規則（normalize / validator）、錯誤碼 3015-3018、Trending 區間規則 |
 
 ### 1.2 職責範圍
@@ -199,7 +199,7 @@
 ## 5. RPC 規格
 
 > 所有新 RPC 加在 `api/proto/post/post.proto` 的 `PostService` 內。
-> 對外數字一律 string（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.1）。
+> 對外數字一律 string（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.1）。
 
 ### 5.1 SearchHashtags（auto-complete）
 

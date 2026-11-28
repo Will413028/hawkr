@@ -1,4 +1,4 @@
-# 24　節假日管理（Holiday Management）detailed-design
+# 24　節假日管理（Holiday Management）詳細設計書
 
 > 🔴 **已退場（B3，2026-11-24）。** Java shipping 的 `HolidayService` 與 `holidays` 表（宅配出貨日與配達日的工作天計算）隨 shipping 刪除。主計畫原列的 4 支假日匯入 RPC 在程式中不存在，沒有要刪的 RPC。
 

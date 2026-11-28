@@ -1,4 +1,4 @@
-# CI/CD 自動化部署 detailed-design
+# CI/CD 自動化部署 詳細設計書
 
 > Workflow：`.github/workflows/deploy-k8s.yml`
 > 基礎設施：K3s + Helm + GHCR

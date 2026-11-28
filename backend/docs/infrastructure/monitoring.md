@@ -1,4 +1,4 @@
-# 系統監控架構 (Monitoring Architecture) detailed-design
+# 系統監控架構 (Monitoring Architecture) 詳細設計書
 
 ## 1. 架構總覽
 

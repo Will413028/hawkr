@@ -1,4 +1,4 @@
-# 通知微服務（Notification Service）detailed-design
+# 通知微服務（Notification Service）詳細設計書
 
 > **已退場（2026-11-26，A8-8）。** 本文原本描述 notification-service 的服務邊界、gRPC 介面、RabbitMQ 消費者、FCM 推播與裝置 token；notification-service 已刪除，由單體的 `internal/modules/notification` 取代，原文隨之退場（歷史在 git）。
 

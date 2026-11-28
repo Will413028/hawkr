@@ -18,7 +18,7 @@ gateway 另存一份 30 秒 grace 的本機 last-known-good 正向副本，Redis
 本 ADR 記錄由此衍生的三個決策，它們共用同一個前提：
 **只有 `web_sessions` row 能證明 session 存在；快取只能加速，不能改變判決。**
 
-規格本身見 `docs/detailed-design/17-登入與帳號建立流程（Login & Account）detailed-design.md` §3。
+規格本身見 `docs/detailed-design/17-登入與帳號建立流程（Login & Account）詳細設計書.md` §3。
 
 ## 決策一：gateway 不保留 session 的本機正向副本，也不做跨 replica 撤銷事件
 

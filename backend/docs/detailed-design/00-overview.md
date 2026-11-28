@@ -1,18 +1,18 @@
-# detailed-design總覽
+# 詳細設計書總覽
 
-> 📘 **要先看懂「這個服務在做什麼、誰會看到它」，先讀 [basic-design](../basic-design/00-overview.md)。**
-> 兩者的分工是**外部設計 vs 內部設計**：basic-design講業務流程、畫面一覽與外部介面的用途；
+> 📘 **要先看懂「這個服務在做什麼、誰會看到它」，先讀 [基本設計書](../basic-design/00-overview.md)。**
+> 兩者的分工是**外部設計 vs 內部設計**：基本設計書講業務流程、畫面一覽與外部介面的用途；
 > 本系列講實作契約（DDL／proto／端點簽章／狀態機／陷阱）。同一件事只有一個權威版本，不互相摘要。
 
 
 > 本文件分成兩部分：
-> 1. 已編號detailed-design索引
+> 1. 已編號詳細設計書索引
 > 2. 目前代碼庫與部署設定的參考現況
 >
 > 說明：
-> - 本文件的主體仍是「已維護的detailed-design索引」
+> - 本文件的主體仍是「已維護的詳細設計書索引」
 > - 後半段的服務現況僅作為閱讀與定位程式碼的輔助參考
-> - detailed-design未覆蓋所有實際存在的服務屬正常情況；文件覆蓋範圍以目前已建立並持續使用的設計書為準
+> - 詳細設計書未覆蓋所有實際存在的服務屬正常情況；文件覆蓋範圍以目前已建立並持續使用的設計書為準
 
 ---
 
@@ -64,7 +64,7 @@
 | 58 | [電子發票服務（Invoice Service）](58-invoice-service-detailed-design.md) | `services/invoice-service/`（含 `internal/client/amego/`）、`api/proto/invoice/invoice.proto`、`gateway/internal/{router/routes_invoice.go,handler/invoice*.go,grpc/invoice_service_client.go,proxy/reverse_proxy.go}` | - | 10041 | 新服務（Go／fx／sqlc／Atlas）：代賣家向光貿 AMEGO 開立買家電子發票——付款成功當下鎖不可變發票快照，退款時自動判定作廢或折讓，對法定期限倒數並留存每次送件原文；**平台不是發票人**。本書為兩冊之首（後端與契約唯一 SSOT，含附錄 C CodeMeta 裁決與附錄 D 前端契約對照），前端規格見 58A；碼表已於設計階段直接寫入 `docs/codemeta/` 四份 `.md` 與 36 號 MQ Catalog，不另存材料分冊 |
 | 58A | [電子發票前端實作規格](58a-e-invoice-frontend-implementation-specification.md) | `hawkr-website/app/(account)/account/`、`hawkr-website/app/(seller)/seller-center/invoices/`、`hawkr-admin/src/app/admin/invoices/` | - | - | 58 號的**前端分冊**：三端共 34 個畫面的版面、元件、四態、文案與 a11y（Buyer `B01`–`B09`／Seller `S01`–`S12`／ADM `A01`–`A13`）。端點路徑、DTO 欄名、業務碼、狀態值一律沿用 58 §5／§6，本冊不自行改契約 |
 | 64 | [Hawkr Agent 商務線（RFQ Publication、Seller Quote、Buyer Acceptance）](64-rfq-publication-seller-quote-buyer-acceptance-detailed-design.md) | `services/ai-service/internal/procurement/`、`services/java/order-service/`、`services/java/payment-service/`、`api/proto/ai/ai.proto` | - | - | confirmed RFQ snapshot **之後**的一切：publication approval／execute、投遞與可證實送達、賣家 append-only 報價版本、買家 exact-version 接受、建單與付款接點、成交溫度計（#2450／#2539／#2538／#2537）。57 號 §12 明文把這條線排除在 A–I 之外，本書補上缺的契約 SSOT。⚠️ 兩個決策先行：擴大 `payload_hash` preimage（現行只含 4 欄，證明不了「賣家報價當時看到的那張詢價單」），以及接受／建單採 outbox ＋ 冪等命令而非分散式交易 |
-| 65 | [物流履約平台（Fulfillment Platform）](65-fulfillment-platform-detailed-design.md) | `services/java/order-service/`、`services/java/shipping-service/`、`services/java/payment-service/`、`gateway/internal/router/` | - | - | 訂單政策快照與收貨確認軸（order-service）、provider adapter 與動作可用性（shipping-service）、責任判定案件與事件、帳本與 provider 帳單列（payment-service）；65 是 06 號的擴充。basic-design見 `docs/basic-design/65-…` |
+| 65 | [物流履約平台（Fulfillment Platform）](65-fulfillment-platform-detailed-design.md) | `services/java/order-service/`、`services/java/shipping-service/`、`services/java/payment-service/`、`gateway/internal/router/` | - | - | 訂單政策快照與收貨確認軸（order-service）、provider adapter 與動作可用性（shipping-service）、責任判定案件與事件、帳本與 provider 帳單列（payment-service）；65 是 06 號的擴充。基本設計書見 `docs/basic-design/65-…` |
 
 ---
 
@@ -109,14 +109,14 @@
 
 ## 尚未對應獨立設計書的服務
 
-下列服務已存在於 repo 與 k8s values，但目前沒有對應的獨立編號detailed-design：
+下列服務已存在於 repo 與 k8s values，但目前沒有對應的獨立編號詳細設計書：
 
 | 服務 | 程式碼路徑 | 備註 |
 |------|-----------|------|
 | Social Service | `services/social-service/` | 關注、粉絲、社交資料；僅貼文 Hashtag 子模組有 34 號 |
 | Pricebook Service | `services/pricebook-service/` | 價格簿；主題型設計書見 61（自適應 P50 色階）、62（全市場品項行情），無服務級設計書 |
 
-這裡僅作索引補充，方便讀者理解 repo 現況；不代表這些服務必須補齊正式detailed-design。
+這裡僅作索引補充，方便讀者理解 repo 現況；不代表這些服務必須補齊正式詳細設計書。
 
 ---
 
@@ -130,7 +130,7 @@
 ### Go 微服務
 
 - 目前實際存在的 Go 服務共 11 個：account、ai、buyer、content、crm、im、notification、pricebook、review、seller、social（清單以 `go.work` 的 `use` 區塊為準，勿背誦本行）。
-- 這批服務的現況可優先參考 `k8s/values/*.yaml` 與各自 `internal/config`，但是否有對應detailed-design，仍以實際文件維護範圍為準。
+- 這批服務的現況可優先參考 `k8s/values/*.yaml` 與各自 `internal/config`，但是否有對應詳細設計書，仍以實際文件維護範圍為準。
 
 ### Java 微服務
 
@@ -145,12 +145,12 @@
 
 ---
 
-## 物流領域：basic-design ↔ detailed-design 一一對應
+## 物流領域：基本設計書 ↔ 詳細設計書 一一對應
 
 > 🔴 **編號一一對應，06 對 06、65 對 65、…、70 對 70。**
-> 每一本detailed-design都有編號相同的basic-design，不共用、不概括。
+> 每一本詳細設計書都有編號相同的基本設計書，不共用、不概括。
 
-| # | basic-design（外部設計：為什麼／誰在用／業務怎麼走／錢與發票怎麼流） | detailed-design（內部設計：怎麼做） |
+| # | 基本設計書（外部設計：為什麼／誰在用／業務怎麼走／錢與發票怎麼流） | 詳細設計書（內部設計：怎麼做） |
 |---|---|---|
 | 06 | [物流微服務（Shipping Service）](../basic-design/06-shipping-service-basic-design.md) | [06 詳設](06-shipping-service-detailed-design.md) |
 | 65 | [物流履約平台（Fulfillment Platform）](../basic-design/65-fulfillment-platform-basic-design.md)（**共用骨架**） | [65 詳設](65-fulfillment-platform-detailed-design.md) |

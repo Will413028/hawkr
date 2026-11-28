@@ -321,7 +321,7 @@ AI 圖片美化（`POST /app/image_transformations`）的失敗分類。碼段�
 
 ### 代行營運業務碼（9260~9299）
 
-對應 [56 號 ADM 代行營運detailed-design §6.5.1](../detailed-design/56-delegated-operations-detailed-design.md)。
+對應 [56 號 ADM 代行營運詳細設計書 §6.5.1](../detailed-design/56-delegated-operations-detailed-design.md)。
 `message` 一律不透傳給瀏覽器，前端依 `code` 決定文案；本欄供服務端 log 與 API 文件使用。
 
 > **擁有者：identity**（遷移計畫 A2 起；ADR `2026-09-25-codemeta-retirement.md` 過渡第 1 步）。單體替舊服務提供的 DelegationService（`internal/legacy/delegationservice`）以這些碼回應，本段是那張對照的投影，給 gateway 與後台的舊契約使用；`TestBusinessCodesMatchCodeMeta` 保證兩邊一致，不得只改本段。A10 的新契約不再下發這些碼。

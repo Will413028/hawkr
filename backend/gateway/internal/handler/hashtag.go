@@ -61,7 +61,7 @@ func (h *Holder) SearchHashtags(c *gin.Context) {
 }
 
 // PopularHashtagItem 對應 GetPopularHashtagsResponse.records 條目。
-// 33-商品 Hashtag 模組detailed-design §5.2.5 / §6.2。
+// 33-商品 Hashtag 模組詳細設計書 §5.2.5 / §6.2。
 type PopularHashtagItem struct {
 	Hashtag string `json:"hashtag"` // 區間內最多 ACTIVE 商品使用的原始大小寫版本
 	Count   string `json:"count"`   // 區間內 distinct ACTIVE 商品數（對外數字一律 string，見 docs/dev-guidelines/java-microservices-development-guidelines.md §2）
@@ -72,7 +72,7 @@ type GetPopularHashtagsResponse struct {
 	Records []PopularHashtagItem `json:"records"`
 }
 
-// GetPopularHashtags 區間熱門 hashtag 查詢（33-商品 Hashtag 模組detailed-design §5.2）。
+// GetPopularHashtags 區間熱門 hashtag 查詢（33-商品 Hashtag 模組詳細設計書 §5.2）。
 //
 // @Summary      取得區間熱門 Hashtag
 // @Description  依日期區間查詢熱門 hashtag 排行，依被掛上的 distinct ACTIVE 商品數降冪排序。

@@ -9,7 +9,7 @@
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> preset 白名單、objectKey 規則、逐服務欄位落地清單、特例處置一律在 49 號detailed-design，本檔不複製。
+> preset 白名單、objectKey 規則、逐服務欄位落地清單、特例處置一律在 49 號詳細設計書，本檔不複製。
 
 ---
 

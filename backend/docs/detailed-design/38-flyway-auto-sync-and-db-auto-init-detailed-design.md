@@ -1,7 +1,7 @@
 # Flyway 自動同步與 DB 自動初始化（Flyway Auto Sync & DB Auto Init）
 
 > **本文件為 DB schema 演進與環境初始化的最高規範**。新增/修改 Flyway migration 與 DB bootstrap 流程時，先在本文件對齊規則，確認後再實作程式碼。
-> 規範速查層見 [Java 微服務dev-guidelines §9.3](../dev-guidelines/java-microservices-development-guidelines.md)。
+> 規範速查層見 [Java 微服務開發規範 §9.3](../dev-guidelines/java-microservices-development-guidelines.md)。
 
 ---
 
@@ -265,7 +265,7 @@ docker compose -f docker-compose-local.yml down -v   # 清掉 postgres data volu
 | 風險 | 緩解 |
 |------|------|
 | **DatabaseBootstrapInitializer 早於 DataSource 拋例外導致服務啟動 race** | 設定為 `ApplicationContextInitializer` 階段執行，先於任何 DataSource bean；失敗立即 fail-fast |
-| **開發者修改已套用的 V1~V{N}** | 《Java 微服務dev-guidelines》§9.3 條文 ＋ 自我檢查清單條目；本設計書明示「修改已套用 migration 立即破壞所有環境」 |
+| **開發者修改已套用的 V1~V{N}** | 《Java 微服務開發規範》§9.3 條文 ＋ 自我檢查清單條目；本設計書明示「修改已套用 migration 立即破壞所有環境」 |
 | **破壞性 V{N} 誤刪資料** | PR 描述標紅 ＋ 強制 `pg_dump` 備份 ＋ Code Review 必檢 |
 | **seed 不小心被誤觸發到 dev** | 物理隔離：`infra/seed-data/` 與 `seed-test-data.sh` 完全不在 CI/CD pipeline 引用範圍；helm 不引用；k8s manifest 不引用 |
 | **DB admin credentials 外洩** | 本案維持與 app credentials 同源（superuser）。未來若降權，新增獨立 secret `DB_ADMIN_PASSWORD`，與 `DB_PASSWORD` 分開管理 |
@@ -298,7 +298,7 @@ docker compose -f docker-compose-local.yml down -v   # 清掉 postgres data volu
    2.1 ./dev.sh restart {service}
        （禁止改用本地 mvn spring-boot:run / IDE 裸跑：那會與容器內同名服務同時存在，
         RabbitMQ round-robin 會把訊息分流到兩個實例，測試結果不可信。
-        見《Java 微服務dev-guidelines》§13.1 服務實例唯一性）
+        見《Java 微服務開發規範》§13.1 服務實例唯一性）
    2.2 觀察 Flyway log 顯示 "Migrating schema 'public' to version {N+1}"
    2.3 docker exec hawkr-postgres psql -U dbadmin -d hawkr_{service} \
        -c "SELECT * FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 3;"

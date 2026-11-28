@@ -3,7 +3,7 @@
 -- 依據最新設計書定義（status 使用 varchar(4) 代碼值）
 -- pg_trgm extension 由 DatabaseBootstrapInitializer（k3s）或
 -- infra/postgres-init/01-create-databases.sh（本地）於 Flyway 之前安裝。
--- 詳見 38-Flyway 自動同步與 DB 自動初始化detailed-design §3.5
+-- 詳見 38-Flyway 自動同步與 DB 自動初始化詳細設計書 §3.5
 -- =====================================================
 
 -- 建立 updated_at 自動更新觸發器函數

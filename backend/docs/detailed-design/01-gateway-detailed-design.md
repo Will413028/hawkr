@@ -1,4 +1,4 @@
-# Gateway 微服務detailed-design
+# Gateway 微服務詳細設計書
 
 > **單體（遷移計畫 A2，2026-09-27 起）**：對外的入口移到單體（`internal/httpapi`）：認證（opaque session）、CORS、CSRF 與 Connect 的限流在單體，還沒搬的 REST、SSE 與 WebSocket 由單體轉給 gateway，gateway 信任單體帶的身分 header（契約見〈API 設計規範（Connect）〉§二）。本文件的 JWT 驗證、web session、CSRF、CORS、auth 路由與 demo 登入只描述舊的 gateway。
 

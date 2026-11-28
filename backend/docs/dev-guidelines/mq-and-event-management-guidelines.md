@@ -66,7 +66,7 @@
 | 步驟 | 操作 | 禁止事項 |
 |------|------|---------|
 | 1 | 在 36 號設計書 §三 對應領域新增事件條目（含 routing key / payload / producer / consumer / DLQ / idempotency） | 禁止跳過設計書 |
-| 2 | 同步更新對應服務的detailed-design（例：訂單事件 → 03 號訂單設計書 §事件章節） | 禁止只改 36 而不改服務設計書 |
+| 2 | 同步更新對應服務的詳細設計書（例：訂單事件 → 03 號訂單設計書 §事件章節） | 禁止只改 36 而不改服務設計書 |
 | 3 | 更新 `backend/docs/codemeta/internal-technical-codes.md` 對應 EventType enum（若新增 routing key） | 禁止直接改 Java Enum |
 | 4 | 執行 `cd docs/codemeta/scripts && ./generate.sh --java` | 嚴禁手動修改生成檔案 |
 | 5 | 更新 `MqConstants.java` 加入新的 Exchange / Queue / Routing Key 常數（若 generate.sh 未涵蓋） | 禁止字面值硬編碼 |
@@ -300,7 +300,7 @@ destroy → destructive gate `exit 1`），**那是預期行為**，它在等你
 - [ ] 關鍵路徑有 idempotency 保護（dedup 表或 DB 樂觀鎖）
 - [ ] 關鍵路徑有 DLQ 配置（`topology.yaml` 的 `dlq:` / `retry:` policy；Java 側另有 `@Bean DLQ` + DLX argument 作為意圖宣告）
 - [ ] Payload 為 typed class（避免 Map 動態 payload）
-- [ ] 對應服務的detailed-design §事件章節已更新
+- [ ] 對應服務的詳細設計書 §事件章節已更新
 - [ ] 跨團隊事件已與對方團隊對齊
 - [ ] 本地測試含重複訊息驗證
 

@@ -128,7 +128,7 @@ CREATE TRIGGER update_product_updated_at
 
 - 碼值要跨 Java / Go / Flutter / Web / proto / MQ 共享，**SSOT 在 `backend/docs/codemeta/`**，由 `backend/docs/codemeta/scripts/generate.sh` 生成各語言常數；DB type 若也持有一份定義就變成第二份真實來源，必然漂移。
 - PG native enum 新增值要跑 DDL（`ALTER TYPE ... ADD VALUE`），且無法在同一交易內立即使用；碼值增修應該只改 Markdown + 重新生成，不該綁 migration。
-- 合法值在**寫入前**由應用層守：Java `CodeMetaValidator.requireValidValue(XxxEnum.class, value, "field")`（選填欄位用 `validateValueIfPresent`；`services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/code/CodeMetaValidator.java`），詳見 [Java 微服務dev-guidelines](java-microservices-development-guidelines.md) §6。
+- 合法值在**寫入前**由應用層守：Java `CodeMetaValidator.requireValidValue(XxxEnum.class, value, "field")`（選填欄位用 `validateValueIfPresent`；`services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/code/CodeMetaValidator.java`），詳見 [Java 微服務開發規範](java-microservices-development-guidelines.md) §6。
 
 ---
 

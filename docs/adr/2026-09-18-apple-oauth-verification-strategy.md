@@ -6,7 +6,7 @@
 | 修訂 | 2026-10-08：刪帳號撤銷的保存與觸發在單體重做，見 `2026-09-27-identity-clerk.md` 文末〈修訂：Apple 授權由伺服器保存並在刪帳時撤銷〉 |
 | 日期 | 2026-06-25 |
 | 影響範圍 | `account-service`（`internal/client/apple/`、`internal/applerevoke/`）、Gateway `auth` handler |
-| 規格 | [30-Sign in with Apple 認證（Apple OAuth）](/backend/docs/detailed-design/30-Sign%20in%20with%20Apple%20認證（Apple%20OAuth）detailed-design.md) |
+| 規格 | [30-Sign in with Apple 認證（Apple OAuth）](/backend/docs/detailed-design/30-Sign%20in%20with%20Apple%20認證（Apple%20OAuth）詳細設計書.md) |
 | 路徑基準 | `backend/` |
 
 ## 脈絡

@@ -9,7 +9,7 @@
 | 路徑基準 | `backend/` |
 
 > 本檔保存 `WHY THIS DESIGN` / `WHY NOT THE ALTERNATIVES`。
-> 事件目錄、參數契約、backstop 的逐欄規格一律在 47 號detailed-design，本檔不複製。
+> 事件目錄、參數契約、backstop 的逐欄規格一律在 47 號詳細設計書，本檔不複製。
 >
 > website repo 另有一份更早的 ADR 記錄同一組決策的 web 側脈絡：
 > `hawkr-website/decisions/2026-06-07-ga4-client-side-server-mp-deferred.md`。

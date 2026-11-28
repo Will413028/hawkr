@@ -1,4 +1,4 @@
-# GA4 分析追蹤（GA4 Cross-Platform Analytics）detailed-design
+# GA4 分析追蹤（GA4 Cross-Platform Analytics）詳細設計書
 
 ---
 

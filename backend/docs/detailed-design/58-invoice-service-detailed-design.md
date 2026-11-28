@@ -1,4 +1,4 @@
-# 58　電子發票服務（Invoice Service）detailed-design
+# 58　電子發票服務（Invoice Service）詳細設計書
 
 > **服務定位**：invoice-service 是平台唯一的「開票人（issuer）→ 受票人（recipient）」憑證編排服務——付款成功當下為每筆訂單鎖定不可變的發票快照，代賣家向光貿 AMEGO 開立買家的電子發票，退款時自動判定並執行作廢或折讓，全程對法定期限倒數、對每次送件留存可稽核原文。**平台不是發票人，也不代替賣家承擔法定義務**；賣家不具代開資格時，正確行為是明示「平台不會代開」，而不是沉默地不開票。
 
@@ -102,13 +102,13 @@
 | 平台與上游供應商的月結對帳 | 第一階段只輸出月結明細、由財務在平台外處理；月結匯出功能本身已移出 Phase 1（D17） |
 | 賣家平台服務條款的法律定性 | 「居間／行紀／代理」取決於服務條款，不在本 repo。程式碼只能說明事實上的資金路徑（§3.2） |
 
-### 1.1a 先讀basic-design
+### 1.1a 先讀基本設計書
 
 本書是**詳細設計**（實作契約：DDL、proto、端點簽章、狀態機、陷阱），寫給拿到文件就要開始寫程式的人。
 
-要先看懂「這個服務在做什麼、誰會看到它」，讀 **[58 電子發票服務 basic-design](../basic-design/58-invoice-service-basic-design.md)**：四個開票方向、開票主鏈、憑證生命週期、三端頁面地圖，一頁看完，每一節指回本書對應章節。
+要先看懂「這個服務在做什麼、誰會看到它」，讀 **[58 電子發票服務 基本設計書](../basic-design/58-invoice-service-basic-design.md)**：四個開票方向、開票主鏈、憑證生命週期、三端頁面地圖，一頁看完，每一節指回本書對應章節。
 
-⚠️ **兩本書的分工是「外部設計 vs 內部設計」，不是「摘要 vs 全文」**：basic-design不重複本書的實作細節，本書也不重複basic-design的業務全貌。同一件事只有一個權威版本。
+⚠️ **兩本書的分工是「外部設計 vs 內部設計」，不是「摘要 vs 全文」**：基本設計書不重複本書的實作細節，本書也不重複基本設計書的業務全貌。同一件事只有一個權威版本。
 
 ### 1.2 設計目標 (Goals)
 
@@ -401,7 +401,7 @@ flowchart TD
 | # | 事實 | 對設計的約束 | 出處 |
 |---|---|---|---|
 | **M1** | 每個賣家在 PayUni 是以自己名義註冊的獨立合作商店（個人：姓名＋身分證字號；企業：公司名＋統編），買家付款帶的 `MerID = HAWK<store_code>` 就是賣家自己的商店代號，平台只是代理商（`AgentID=HAWK`） | **本平台不是「平台代收」**——在 PayUni 帳上這筆錢從一開始就掛在賣家名下。這比「平台代收」對「延後開票」的主張更不利 | `internal/platform/payuni/client.go`；`services/java/payment-service/src/main/resources/application.yml:108`；`docs/third-party-integrations/payuni-reseller-api-overview.md:97-99` |
-| **M2** | PayUni 是自動請款模式，授權成功即請款成功；我方從未呼叫任何 capture／請款 API（12 個端點無一是 capture，`/api/trade/close` 一律 `CloseType=2`＝退款） | 買家付款成功當下，該筆貨款在民法 §309 的意義上已對賣家發生清償效力 ⇒ 落入 L1 但書 ⇒ 開票時點＝付款成功 | `05-支付服務（Payment Service）detailed-design.md:3428-3429`；`services/java/shared/payuni-java-client/.../PayUniPaymentEndpoint.java` |
+| **M2** | PayUni 是自動請款模式，授權成功即請款成功；我方從未呼叫任何 capture／請款 API（12 個端點無一是 capture，`/api/trade/close` 一律 `CloseType=2`＝退款） | 買家付款成功當下，該筆貨款在民法 §309 的意義上已對賣家發生清償效力 ⇒ 落入 L1 但書 ⇒ 開票時點＝付款成功 | `05-支付服務（Payment Service）詳細設計書.md:3428-3429`；`services/java/shared/payuni-java-client/.../PayUniPaymentEndpoint.java` |
 | **M3** | `GrantExport=1` 控制的是「PayUni → 賣家 UNi 帳戶」的撥款，不是「買家 → PayUni」的請款；撥款發生在訂單 `COMPLETED(50)` 之後、PayUni 隔日入帳；平台銀行帳戶完全不經手，repo 內無任何平台銀行帳戶、金流帳本或餘額表 | 明確排除「綁 `granted_at` 開票」——它與稅法收款時點最少差 60 小時 ＋ 1 個工作日，遇售後凍結倒數還會無限延長 | `services/java/shared/payuni-java-client/.../PaymentClient.java:97,128,157,418`；`docs/third-party-integrations/payuni-reseller-api-overview.md:326-331` |
 | **M4** | 和單（`consolidated=true`）目前沒有收款路徑：平台代收不支援，結帳由 `requireSupportedCollectionModel` fail-closed，收款走 payment 模組。旗標由前端 request 帶入 | 若日後支援平台代收，平台就變成代收方、發票的三角關係整個改變（收款方是代理商、賣方是各自的 store），削弱 §3.1 法源前提 ⇒ checkout 加 **fail-closed**：賣家已進 `AMEGO_AUTO` 時拒絕 `consolidated=true`。風險有限：跨賣家結帳本來就被 `DIFFERENT_SELLER` 硬擋 | `api/proto/order/order.proto:716`；`.../order/checkout/CheckoutService.java`（`requireSupportedCollectionModel`） |
 | **M5** | 本平台目前沒有貨到付款（COD），付款方式僅信用卡／Apple Pay／Google Pay／ATM ＋ 零元訂單，且訂單必須先到 `PAID(10)` 才進 `PENDING_SHIPMENT(20)` ⇒ 付款恆早於出貨 | `shipping_method_configs` 已有 `commission_rate`／`commission_min` 兩欄（註解「代收手續費率」、已有初始資料）＝COD 預留位。一旦啟用 COD，發貨在前、收款在後，但書不觸發、開票時點必須落在**發貨時** ⇒ 這是 G1 要求判準寫成「取較早者」的原因 | `.../shipping/V1__init_shipping_tables.sql:269-270,292-293` |
@@ -424,7 +424,7 @@ flowchart TD
 | **U9** | `FULL_REFUND` 不等於「全額都退了」，`refund_total_amount` 也不可靠。`refundable_amount` 每次建案都取 `orders.total_actual_amount`、不扣已退金額；`orders.refund_total_amount` 只有 PARTIAL 路徑維護、FULL 路徑不維護（FULL 場景會是 0） | 直接拿 `FULL_REFUND` 當「作廢整張發票」的訊號 ⇒ 金額對不上、稅務錯誤（「先 PARTIAL 過一次再 FULL」時 `FULL_REFUND` 不是歸零）⇒ 發票端必須自己維護**累計折讓流水**，並用 DB CHECK 兜底「累計折讓 ≤ 已開票金額」 | `.../aftersales/service/AfterSaleCaseService.java:122`；`.../aftersales/V3__add_refund_outcome.sql:11-21` |
 | **U10** | 60h/72h 時間窗倒置，這是常規路徑不是例外。訂單自動完成＝`delivered_at + 60h`，申訴期 72h，且 `submitAppeal` 全段無訂單狀態守門 ⇒ 典型時序：送達 → 買家申請 → 賣家拒絕 → 訂單自動完成＋撥款 → 買家在剩餘申訴期提申訴 → Admin 裁決 → 真的退款 | 在「付款成功即開票」下不再是阻擋條件，但仍決定兩件事：① **開票後才發生退款是常規路徑**，作廢／折讓是主線不是 edge case；② 訂單完成後狀態仍會變（`applyFullRefund` 的 allowed-from 含 `COMPLETED(50)`／`PARTIALLY_REFUNDED(60)`）⇒ 發票端不得假設任何訂單狀態是終點 | `.../order/config/OrderConfig.java:23`；`.../order/application.yml:112`；`.../aftersales/config/AfterSalesProperties.java:76`。註：`aftersales.appeal.deadline-hours` 只有 class 預設、yml 與 env 皆未宣告 |
 | **U10a** | 售後參數有一處已知不一致：`application.yml` 寫 `aftersales.case.process-deadline-hours: 24`、class 預設 72 ⇒ **實際生效 72**。成因不是「yml 覆蓋 class」，而是**那行 yml 從未被綁定**：`@ConfigurationProperties("aftersales")` 的欄位名是 `caseConfig` ⇒ relaxed binding 期待 `aftersales.case-config.*`，而 yml 寫 `aftersales.case.*`，全服務 grep `case-config` 零命中、亦無 `@Value` 直讀 | 若任何發票邏輯用到售後時間窗，必須確認**實際生效值**而非文件值或 yml 上看得到的值。本設計刻意不依賴任何售後時間窗。結論來自靜態分析（欄位名 ↔ key 名比對 ＋ 零命中窮舉），未在 runtime 實測 | `.../aftersales/config/AfterSalesProperties.java:10,25`；`.../aftersales/application.yml:112-115` |
-| **U11** | `SHIPPING_ABNORMAL(35)` 只能靠物流商後續貨態事件恢復（→ 30/32/40），平台無任何手動介入 API（29 號明列「手動重試／取消／強制成功 API 不實作」） | 開票條件若掛在訂單狀態上，卡在 35 的訂單會永遠開不出票（售後前置要求 `DELIVERED(40)`，連售後都開不了）⇒ 這是「開票不看訂單狀態」的第二個理由。設計書明寫：**開票的唯一輸入是付款事實與發貨事實，訂單狀態不是輸入** | `03-訂單微服務…:124,134,138`；`29-admin-anomalous-order-management-api-detailed-design.md:53` |
+| **U11** | `SHIPPING_ABNORMAL(35)` 只能靠物流商後續貨態事件恢復（→ 30/32/40），平台無任何手動介入 API（29 號明列「手動重試／取消／強制成功 API 不實作」） | 開票條件若掛在訂單狀態上，卡在 35 的訂單會永遠開不出票（售後前置要求 `DELIVERED(40)`，連售後都開不了）⇒ 這是「開票不看訂單狀態」的第二個理由。設計書明寫：**開票的唯一輸入是付款事實與發貨事實，訂單狀態不是輸入** | `03-訂單微服務…:124,134,138`；`29-admin-anomalous-order-management-api-詳細設計書.md:53` |
 | **U12** | store-stint：關店重開會拿到新 `store_id`。`seller.stores` PK 是 `store_id`（永不變動），`account_id` 非唯一，同帳號關店後重新入駐產生新列；`stores_current_account` 唯一索引保證目前的 stint 至多一個。買家不同：一個帳號一生只有一個買家（`UNIQUE (account_id)`） | ① 發票文件永遠綁開票當下的 `store_id` 快照，不隨 incarnation 轉移；② 舊 incarnation 的未完成 job 由 ADM 工作台顯示並可續處理；③ 同統編跨 incarnation 的憑證指紋重複偵測要例外化（賣家統編通常不變）；④ 明寫「同一 account 的 store 是序列不是並存」 | `internal/modules/seller/db/schema.sql`（`seller.stores`）；44 號 §5.1 |
 | **U13** | 兩個既有自動刪除機制會吃掉發票憑證：① `media_asset` 無引用且建立超過 7 天 ⇒ 連同 R2 物件一起刪（`media.gc.orphan-asset-days:7`）；② 帳號關閉 T+30 清 PII 且**跨所有 stint** | 照現況實作，發票 PDF 與稅務證明 7 天後消失、買家關帳號後發票資料被清 ⇒ 發票類資產必須有 `asset_reference`；發票文件列為 PII 清理例外，帳號刪除不連帶刪除、僅關閉對外查詢（D10） | `.../media/scheduler/MediaGarbageCollectionJob.java:28,106-107` |
 | **U14** | 發票日期只能從 `payment_transactions` 取，兩個候選欄位各有陷阱：`provider_paid_at` 是 PayUni 認為的真實付款時間（卡片 `AuthDay+AuthTime`、ATM `PaymentDay`），**但 ATM webhook 常無時間欄位而為 NULL**；`pay_time` 是我方寫入當下的 UTC now（`COALESCE(pay_time, now at time zone 'utc')`＝只寫第一次），webhook 延遲會讓它晚於真實付款時間 | DB 一律存 UTC，而台灣期別是 **UTC+8 雙月制** ⇒ 跨月／跨期邊界會把發票開進錯的期別，錯誤只在每兩個月的邊界日出現、極難重現。取值規則見 D4 | `.../payment/V1__init_payment_tables.sql:39,56-57`；`.../payment/…/PaymentTransactionMapper.java:501` |
@@ -1136,10 +1136,10 @@ option java_package = "io.github.will413028.hawkr.invoice.grpc";
 
 | 候選 | 取捨 |
 |---|---|
-| `9290~9299` | ❌ **禁止**。`error-codes.md:329` 已明文把它留給代行營運擴段（「日後若需要第 5 個碼，把本段擴成 `9260~9299`」） |
+| `9290~9299` | ❌ **禁止**。`錯誤碼.md:329` 已明文把它留給代行營運擴段（「日後若需要第 5 個碼，把本段擴成 `9260~9299`」） |
 | **`9300~9399`（採用）** | 延續 2026-06 之後每個新領域接在 9xxx 尾段的慣例（IM 9201／Account 自助刪除 9203／內容審核 9210／Seller 媒體 9220／Seller 9230／賣家停權 9240／AI 修圖 9250／代行營運 9260）；段寬 99 符合「一領域一段」；避開 9290~9299 的保留區；與任何 CodeMeta Value 段不會在同一段文字裡並列 |
 
-同一個 PR 內必須把新段登記進 `error-codes.md` 的「錯誤碼範圍分配」表。**禁止預先登記沒有 emitter 的碼**（`error-codes.md:325,329`：死碼會讓前端寫出永遠不會執行的分支）——每個碼都要在同一波實作裡指得出 emitter 的 `檔案:行號`。
+同一個 PR 內必須把新段登記進 `error-codes.md` 的「錯誤碼範圍分配」表。**禁止預先登記沒有 emitter 的碼**（`錯誤碼.md:325,329`：死碼會讓前端寫出永遠不會執行的分支）——每個碼都要在同一波實作裡指得出 emitter 的 `檔案:行號`。
 
 兩張**不是 CodeMeta 生成**、最容易漏的表在 gateway（漏登記與登記錯的兩種失敗形狀見 §8.6 T-12／T-13）：`envelopeCodeToGRPC`（未登記的業務碼一律塌縮成 HTTP 409）與 `envelopeCodePreserveData`（要帶結構化 data 的業務碼必須登記進它，且兩張表的交集必須為空）。發票需要「查無發票 → 404」與「作廢失敗要帶回 provider 原始訊息」兩種分流，逐碼登記清單以 **§C.6.4** 為準。
 
@@ -9386,7 +9386,7 @@ message AdminInvoiceOperationView {
 
 **賣家視角介於兩者之間**：給 `classification` 與**我方定義的**理由碼（CodeMeta），不給 AMEGO 原始 code／msg。賣家需要知道「這是我要處理的（字軌不足）還是平台要處理的（系統異常）」，而 AMEGO 的七位數碼對他沒有意義，反而會出現在客服對話裡被當成我方的錯誤代號。
 
-**錯誤碼號段**：發票的業務碼取 `9300~9399`（現行最大碼 9288，代行段是 9260~9289，`error-codes.md:329` 已明文說 9289 之後擴段整段給代行）。同一 PR 內把新段登記進 `docs/codemeta/error-codes.md:405-428` 的分配表。**不預先登記沒有 emitter 的碼**（`error-codes.md:325`／`:329`）。
+**錯誤碼號段**：發票的業務碼取 `9300~9399`（現行最大碼 9288，代行段是 9260~9289，`錯誤碼.md:329` 已明文說 9289 之後擴段整段給代行）。同一 PR 內把新段登記進 `docs/codemeta/error-codes.md:405-428` 的分配表。**不預先登記沒有 emitter 的碼**（`錯誤碼.md:325`／`:329`）。
 
 **envelope guard 登記**：非零業務碼若需要非 409 的 HTTP status，必須逐碼登記進 `gateway/internal/grpc/envelope_guard_interceptor.go` 的 `envelopeCodeToGRPC`；**未登記的業務碼一律塌縮成 HTTP 409**，而那兩張表**不是 CodeMeta 生成的，最容易漏**。要登記哪些碼以 §6.1.0(13) 為準，本章不重抄：
 
@@ -12209,7 +12209,7 @@ A08 的建議卡「依建議建立措施」與右欄「建立措施」在同一�
 
 ### D.2 wire type 手寫同步
 
-**本案不會有任何工具幫忙把後端 DTO 變成前端型別**：後端 swagger 生成物不在版控、唯一消費者是 Apidog；WEB 端 wire types **手寫**；**同步機制：無**。codegen 方案仍是待決議狀態，本設計書**不把它列為前置條件**——那會讓發票被一個與它無關的infrastructure決策卡住。
+**本案不會有任何工具幫忙把後端 DTO 變成前端型別**：後端 swagger 生成物不在版控、唯一消費者是 Apidog；WEB 端 wire types **手寫**；**同步機制：無**。codegen 方案仍是待決議狀態，本設計書**不把它列為前置條件**——那會讓發票被一個與它無關的基礎建設決策卡住。
 
 **手寫的代價要講清楚**：TypeScript 攔不到「我以為的型別 ≠ 後端真的回的型別」。手寫型別與 gateway 實際回應不一致時，症狀是「佐證照片渲染成空框、金額印成字串 `"undefined"`」——沒有任何編譯器或測試會先攔下來。⇒ **本案的每一份 wire 型別檔都必須配一支「用實打回應釘住形狀」的契約測試。**
 

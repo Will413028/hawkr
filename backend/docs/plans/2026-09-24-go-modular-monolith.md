@@ -291,7 +291,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - A7-1c 留給 A7-4 的兩項（觸發：A7-4 的賣家端與後台畫面）：後台的類別下拉（`ASSESSABLE_CATEGORIES`）沒有社群的 `SPAM`、`HARASSMENT`、`HATE`，伺服器已接受；店主讀自己的店（`OwnerPosts`、`ListOwnPosts`）仍看得到被下架的貼文且沒有標記。
   - 單體 revalidate 失敗沒有告警（River worker 的失敗與 discarded job；Loki 規則只看舊的 `revalidate.send.*`）。觸發：單體告警管道建立時或上線前。
   - #3513 SLA 告警（moderation 待辦列 72 小時期限，無主動告警；Will 2026-11-19 延後）。觸發：單體告警管道建立時或上線前，屆時以「逾期待辦數」指標加告警規則。
-  - 設計文件中 `social-service` 的殘留 166 筆、17 個檔（最多的是basic-design 56 的 70 筆；41 號設計書 §7.1、§12.1、§13、§14、§15、§3.7 引用、bindings `comment.#`）。觸發：下次修改該設計書時，或 A10 文件整理。
+  - 設計文件中 `social-service` 的殘留 166 筆、17 個檔（最多的是基本設計書 56 的 70 筆；41 號設計書 §7.1、§12.1、§13、§14、§15、§3.7 引用、bindings `comment.#`）。觸發：下次修改該設計書時，或 A10 文件整理。
   - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
   - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
   - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。

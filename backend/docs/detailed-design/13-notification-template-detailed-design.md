@@ -1,4 +1,4 @@
-# 通知模板引擎與收件箱（Notification Template）detailed-design
+# 通知模板引擎與收件箱（Notification Template）詳細設計書
 
 > **已退場（2026-11-26，A8-8）。** 本文原本描述 資料驅動的 `notification_templates`（94 列模板）、模板渲染、收件箱表與 payload golden 契約；notification-service 已刪除，由單體的 `internal/modules/notification` 取代，原文隨之退場（歷史在 git）。
 

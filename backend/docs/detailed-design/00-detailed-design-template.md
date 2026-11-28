@@ -1,16 +1,16 @@
 <!--
-「後端服務／機能detailed-design」標準範本。
+「後端服務／機能詳細設計書」標準範本。
 複製本檔 → 改檔名為 `NN-<服務名>detailed-design.md` → 逐章替換內容。
 
 責任劃分的 SSOT：`docs/conventions/design-document-governance-guidelines.md`。
 機械檢查：`python3 scripts/check-design-doc-purity.py`
 -->
 
-# 〈服務名〉detailed-design（範本）
+# 〈服務名〉詳細設計書（範本）
 
 > **這份文件回答的唯一問題：`CURRENT HOW EXACTLY`。**
 >
-> detailed-design是 **Current Executable Specification** —— 它只描述**現在有效、
+> 詳細設計書是 **Current Executable Specification** —— 它只描述**現在有效、
 > 可直接拿來實作**的規格。一個沒跟過這個專案的實作者，照它施工就該做出對的東西。
 
 > **怎麼用這份範本**
@@ -19,7 +19,7 @@
 > - 圖一律用 mermaid（C4 元件圖 / 時序圖 / 狀態圖）。
 > - 語言繁中、team-facing，不留 AI 痕跡。
 
-> **🔴 什麼不准寫進detailed-design**
+> **🔴 什麼不准寫進詳細設計書**
 >
 > 每一段動筆前先問兩件事：
 >
@@ -70,7 +70,7 @@
 |---|---|
 | 負責人 | 這份規格的 owner（要改契約找誰） |
 | 對應程式碼 | 主要 package 路徑，例 `services/<svc>/internal/...`、`gateway/internal/handler/<x>.go` |
-| basic-design | 連結到對應的 `docs/basic-design/NN-...`（業務意圖的權威） |
+| 基本設計書 | 連結到對應的 `docs/basic-design/NN-...`（業務意圖的權威） |
 | 相關 ADR | `docs/adr/<...>`（設計理由與被否決方案的權威） |
 | Runbook | `docs/runbooks/<...>`（故障處理 SOP） |
 
@@ -80,10 +80,10 @@
 
 > **放什麼**：這個服務**現在**負責什麼、不負責什麼、誰負責被排除的那部分。
 > **何時可省略**：永不。
-> ⚠️ 「為什麼需要這個服務」「Goal／Non-Goal」屬**basic-design**，這裡只放一行指標。
+> ⚠️ 「為什麼需要這個服務」「Goal／Non-Goal」屬**基本設計書**，這裡只放一行指標。
 
 ### 1.1 文件定位
-（一句話：本文件描述什麼、不涵蓋什麼。業務意圖見basic-design §0。）
+（一句話：本文件描述什麼、不涵蓋什麼。業務意圖見基本設計書 §0。）
 
 ### 1.2 責任邊界
 

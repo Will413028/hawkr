@@ -1,4 +1,4 @@
-# 商家治理與食安通報（Seller Governance & Food Safety）detailed-design
+# 商家治理與食安通報（Seller Governance & Food Safety）詳細設計書
 
 > 本檔是 hawkr-admin（Next.js）商家治理畫面的現行規格。畫面背後的行為（通報與案件、措施與認定、停權推導、終止合作、主管機關來函、保存期限與排程）由單體的 seller 模組擁有，以 `docs/modules/seller.md` §5–§8、§11 為準，通報與案件的契約是 `api/hawkr/seller/v1alpha1/report.proto` 與 `api/hawkr/admin/seller/v1alpha1/`；資料表與 CHECK 的唯一來源是 `internal/modules/seller/db/schema.sql`。決策與理由見 ADR [`docs/adr/2026-10-18-seller-governance-consolidated.md`](/docs/adr/2026-10-18-seller-governance-consolidated.md)。
 

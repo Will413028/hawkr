@@ -1,4 +1,4 @@
-# 運費計算模組（Shipping Fee Module）detailed-design
+# 運費計算模組（Shipping Fee Module）詳細設計書
 
 > **文件定位**：賣家運費設定與報價的現行規格（B3，seller 模組）。決策依據 ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 的 2026-11-24 修訂：運費只用賣家自訂的固定規則，不做即時報價、不分區域與溫層。
 >

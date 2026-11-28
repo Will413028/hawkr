@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option java_package = "io.github.will413028.hawkr.invoice.grpc";
 option java_outer_classname = "InvoiceProto";
 
-// Invoice Service — 電子發票（58 號detailed-design）
+// Invoice Service — 電子發票（58 號詳細設計書）
 //
 // 通用 issuer→recipient 模型：issuer ∈ {賣家, 平台}；recipient ∈ {買家, 賣家, 外部對象}；
 // 觸發 ∈ {訂單付款自動, ADM 手動}；品項來源 ∈ {訂單快照, ADM 手填}。

@@ -1,4 +1,4 @@
-# 帳號與賣家買家身份模型（Account & Seller-Buyer Identity）detailed-design
+# 帳號與賣家買家身份模型（Account & Seller-Buyer Identity）詳細設計書
 
 > 本檔是 gateway 的買家與店家身份解析，以及跨角色自我操作守衛（im、social、cart、coupon、order）的現行規格；這些服務搬進單體時刪除。
 >

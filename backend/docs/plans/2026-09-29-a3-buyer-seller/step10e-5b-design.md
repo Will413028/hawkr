@@ -92,7 +92,7 @@ SSOT：計畫 10e 段（`2026-09-29-a3-buyer-seller.md:346-389`，其中 :381 �
 | C11 | `delegationBlockedLabel` 唯一的呼叫端是 `MD/page.tsx:110`，固定傳 `pendingReview:false, reviewRejected:false`；`StoreListItem.store.id` 一定有值 | [量測] `rg -n "delegationBlockedLabel\(" admin/src`（1 處）；`H/admin.go:74-76` |
 | C12 | 清單的代行判斷 `isActive && !isSuspended && Boolean(storeId)` 與 delegation 的 `CapStorefrontWrite`（ACTIVE、沒停權、不是等待刪除）結果相同；清單的店家已帶條件（`stint.WithConditions`），`Store.Can` 可以直接用 | [量測] `MD/page.tsx:99-103`；`DL/delegation.go:57-73`；`model/capability.go:78`；`M/internal/profile/admin.go:91-117` |
 | C13 | preflight：先管理員資格、再店家（已關閉與不存在都是 `Found=false` → 9265）、再讀授權、再 `!Operable` → 9272、再授權有效、再進行中；`StartDelegation` 的錯誤用 `pre.DeniedLabel` | [量測] `DL/internal/session/session.go:76,80-135,181`；`internal/legacy/delegationservice/server.go:60` |
-| C14 | 「停權中，無法代行」在設計書 56 出現四處（:2398 是 `deniedLabel` 範例「此店家目前停權中，無法代行」、:2459、:5813、:5858）；:5370 是 9272 的說明，沒有這句；`DeniedLabel` 的「此店家已停權或關閉，無法代行」也被 `admin/tests/delegated-operation-preflight-denial.test.ts` 當 fixture；CodeMeta `error-codes.md:345` 也有這句，但 CodeMeta 凍結（root `AGENTS.md`），不改 | [量測] `rg -n "停權中，無法代行\|已停權或關閉，無法代行" backend/docs` |
+| C14 | 「停權中，無法代行」在設計書 56 出現四處（:2398 是 `deniedLabel` 範例「此店家目前停權中，無法代行」、:2459、:5813、:5858）；:5370 是 9272 的說明，沒有這句；`DeniedLabel` 的「此店家已停權或關閉，無法代行」也被 `admin/tests/delegated-operation-preflight-denial.test.ts` 當 fixture；CodeMeta `錯誤碼.md:345` 也有這句，但 CodeMeta 凍結（root `AGENTS.md`），不改 | [量測] `rg -n "停權中，無法代行\|已停權或關閉，無法代行" backend/docs` |
 | C15 | 商家詳情頁的代行入口已經只走 preflight（`resolveEligibility`），沒有本地判準 | [量測] `MD/[id]/page.tsx:977-985` |
 | C16 | `ErrorReason` 沒有這些拒絕的值；本刀不新增（原因走回應欄位，錯誤只帶句子，同 `errActionUnavailable`） | [量測] `rg -n "WithReason" M/internal/kyc M/internal/measure`（這些路徑沒有命中）；`M/internal/measure/update.go:169-176` |
 | C17 | `RejectKycDialog` 在 `blocked`（`!reviewable.canReject`）時顯示 client 寫的「這份申請目前不能退回（已經不是待審核狀態，或店家已關閉）。…」；申請被別人處理之後就會成立 | [量測] `MD/[id]/RejectKycDialog.tsx:331-337`；`page.tsx:1538` |
@@ -428,7 +428,7 @@ design-review 兩次：Will 決定後、派 5b-0 之前一次；5b-2 之後看�
 | L1 | 三條 [推論] 讀碼就能定案 | 改。C8、C23、C24 改成量測並附 file:line；§2.1 刪「實作時先以整合測試確認」 |
 | L2 | §0.2 引錯 `stint.go:65`；`LockOpenAccountOf` 死碼 | 改。§0.2 改引 `stint.go:28-29`（`stint.Lock`）；`LockOpenAccountOf` 本刀刪（C22） |
 | L3 | 驗證命令寫錯 workflow | 改。§8 改成 `backend-monolith.yml` 的 golangci-lint、Connect drift、sqlc drift 各自的行號，註明兩個舊 workflow 不觸發 |
-| L4 | 設計書 56 只修一處 | 改。查證四處有這句（:2398、:2459、:5813、:5858）；:5370 是 9272 的說明、沒有這句，不改；CodeMeta `error-codes.md:345` 凍結，不改（C14、§7） |
+| L4 | 設計書 56 只修一處 | 改。查證四處有這句（:2398、:2459、:5813、:5858）；:5370 是 9272 的說明、沒有這句，不改；CodeMeta `錯誤碼.md:345` 凍結，不改（C14、§7） |
 | L5 | 共用 enum 的多數組合沒有意義，測試自相矛盾 | 改。保留一個 enum（理由重寫，承認 v1 的理由不成立），加 Go 的有效組合表；測試改成「表內有句子、表外回零值、推導只出現表內原因且依序」（F1、§2.1） |
 | L6 | 「建立措施被擋」有兩句話 | 改。案件與通報的原因句改回 N1（同一個函式），刪兩個 key；斷言三處同一句（F2、§6.1） |
 | L7 | 已關閉而且 PayUni 終止時，句子叫賣家「關閉店家」 | 改。N10 改寫成不叫賣家關店，已關閉與營運中都成立 |

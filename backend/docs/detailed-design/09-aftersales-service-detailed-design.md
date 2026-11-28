@@ -1,4 +1,4 @@
-# 售後微服務（AfterSales Service）detailed-design
+# 售後微服務（AfterSales Service）詳細設計書
 
 > 🔴 **B3 退場說明（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂）**：物流商（PayUni 物流等）已退場，退貨物流改為買家自寄並回填追蹤號碼，由 B9 aftersales 改寫時重新設計。本書中以 Shipping Service 建逆物流單、物流貨態事件、出貨便代碼與店到店待取為前提的段落描述 B3 之前的 Java 現況，B9 時由新設計取代。
 
@@ -235,7 +235,7 @@ PENDING(0) ──→ 買家於訂單頁「確認收貨」──→ CANCELLED_BY_
 
 #### 售後 active / terminal canonical 判定（`AfterSaleCaseStatusRules`，SSOT）
 
-售後「是否活躍 / 是否終態」散見多處用途（訂單倒數恢復 `countActiveCasesByOrder`、賣家工作台 Dashboard count、賣家售後列表預設過濾）。**語意一致者必須統一由 `common-core/.../utils/code/helper/AfterSaleCaseStatusRules.java` 提供**，禁止各處硬編碼第二套（[Java 微服務dev-guidelines §6](../dev-guidelines/java-microservices-development-guidelines.md)＋[CodeMeta README](../codemeta/README.md)）：
+售後「是否活躍 / 是否終態」散見多處用途（訂單倒數恢復 `countActiveCasesByOrder`、賣家工作台 Dashboard count、賣家售後列表預設過濾）。**語意一致者必須統一由 `common-core/.../utils/code/helper/AfterSaleCaseStatusRules.java` 提供**，禁止各處硬編碼第二套（[Java 微服務開發規範 §6](../dev-guidelines/java-microservices-development-guidelines.md)＋[CodeMeta README](../codemeta/README.md)）：
 
 | helper 方法 | 定義 | 用途 |
 |---|---|---|
@@ -289,7 +289,7 @@ PENDING(0) ──→ 買家於訂單頁「確認收貨」──→ CANCELLED_BY_
 | 項目 | 規格 |
 |---|---|
 | 適用範圍 | `publishCaseTransitionWithContext`、`publishPlatformDecisionMade`、`publishCaseAutoRejected`（→`REJECTED(60)`）、`publishCaseAutoEscalated`（→`APPEALED`）、`publishAppealSubmitted`（→`APPEALED`）、`publishRefundCompleted`（`REFUND_PROCESSING(40)` → `CLOSED(50)`） |
-| `storeId` 取得 | `publishRefundCompleted` 簽章帶 `Long storeId`；`RefundTaskEntity` 不帶 store，三個 caller（`RefundResultConsumer` / `RefundTaskWorker` / `RefundSyncWorker`）以 `AfterSaleCaseMapper.findStoreIdByCaseNo(caseNo)` scalar projection 查補（回 `Long`，遵守 [Java 微服務dev-guidelines §9 Partial Projection 反模式禁令](../dev-guidelines/java-microservices-development-guidelines.md)：不得回部分填充的 Entity） |
+| `storeId` 取得 | `publishRefundCompleted` 簽章帶 `Long storeId`；`RefundTaskEntity` 不帶 store，三個 caller（`RefundResultConsumer` / `RefundTaskWorker` / `RefundSyncWorker`）以 `AfterSaleCaseMapper.findStoreIdByCaseNo(caseNo)` scalar projection 查補（回 `Long`，遵守 [Java 微服務開發規範 §9 Partial Projection 反模式禁令](../dev-guidelines/java-microservices-development-guidelines.md)：不得回部分填充的 Entity） |
 | 退貨在途 | `handleInTransit`（`RETURN_PENDING(20)` → `RETURN_SHIPPING(25)`）走 `publishCaseTransitionWithContext(CASE_RETURN_IN_TRANSIT)`，一併取得 realtime emit ＋ notification（見 §5.3.4） |
 
 > `publishAwaitingBuyerRefundPage`（ATM 中間態，case 仍 40）與 `publishCancelCompleted`（訂單取消，無 caseNo）**不**屬 case 狀態變更，**不 emit**。
@@ -2680,7 +2680,7 @@ flowchart TD
 
 ##### 5.3.10.5 24h 預警的搶佔語意（例外 B）
 
-**規範全文**：[dev-guidelines／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。本節是 `ReturnTwentyFourHourWarnScheduler` 三個分支（超商待取／確認收貨／待寄回）的逐條套用結果。
+**規範全文**：[開發規範／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)。本節是 `ReturnTwentyFourHourWarnScheduler` 三個分支（超商待取／確認收貨／待寄回）的逐條套用結果。
 
 **結論：本排程走例外 B（C-none），不加任何 DB 搶佔。這是裁決，不是遺漏。**
 
@@ -3476,7 +3476,7 @@ AfterSales 發布 `aftersales.refund.completed` 事件，Order Service 消費後
 2. Admin 可見
    └─ Admin 異常售後清單（GET /api/v1/admin/aftersales_cases?status=REFUND_FAILED 等）
    └─ 查詢支援 filter：refund_task.payuni_status / case.status / 時間範圍
-   └─ 具體 Admin API 規格見 29-Admin 異常訂單管理 API detailed-design
+   └─ 具體 Admin API 規格見 29-Admin 異常訂單管理 API 詳細設計書
    
 3. 運營登入 PayUni 後台手動處理
    └─ 修正商戶設定 / 調整退款銀行資訊 / 重新撥款等
@@ -4407,7 +4407,7 @@ MQ 事件發布在 TX 外（best-effort）：若 MQ 發布失敗但 DB 已更新
 
 ### 8.5 多副本排程搶佔語意（Scheduler Claim）
 
-**規範全文**：[dev-guidelines／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)（判準、六步機械檢查、租約長度算式、例外 A/B 條件皆在該檔）。本節只列 aftersales-service 的逐支套用結果。
+**規範全文**：[開發規範／多副本排程搶佔規範](../dev-guidelines/multi-replica-scheduling-preemption-guidelines.md)（判準、六步機械檢查、租約長度算式、例外 A/B 條件皆在該檔）。本節只列 aftersales-service 的逐支套用結果。
 
 > ⚠️ **L 編號（L1、L5、L7…）是各服務各自的盤點序號，全 repo 不唯一。** coupon-service 有一個 `L7`（`CouponExpiringWarningJob`，見 [07 號](./07-coupon-service-detailed-design.md)），兩者無關。**追查排程時一律以「服務＋類名」為準，不要以 L 編號為準**；跨服務引用 L 編號時必須帶服務名。
 
@@ -4992,7 +4992,7 @@ Gateway middleware：既有 `admin` 路由群組已套用 `JWTAuth()` + `require
 | 單體 buyer／seller 模組失敗 | 對應欄位回空字串，不影響主資料回傳 |
 | Admin 列表（#16）| 同樣補 profile 欄位，批次查詢（`GetBuyerProfiles` / `GetSellerBatch`） |
 
-> 依 [Java 微服務dev-guidelines §4（gRPC RPC 角色分離）](../dev-guidelines/java-microservices-development-guidelines.md)，買 / 賣 / Admin 各自獨立 RPC（`GetArbitration` / `GetSellerArbitration` / `ListAppealsForAdmin`），禁止共用 + 條件分流。
+> 依 [Java 微服務開發規範 §4（gRPC RPC 角色分離）](../dev-guidelines/java-microservices-development-guidelines.md)，買 / 賣 / Admin 各自獨立 RPC（`GetArbitration` / `GetSellerArbitration` / `ListAppealsForAdmin`），禁止共用 + 條件分流。
 
 #### 10.6.4 Gateway 路由註冊
 
@@ -5277,7 +5277,7 @@ message AfterSaleCaseSummaryView {
 | `decision.decidedByAdminId` | ❌ | ❌ | ✅（僅 Admin console 內部） |
 | `auto_escalated`（升級觸發來源） | ❌ | ❌ | ✅（僅 Admin console 區分手動申訴 / 系統自動升級） |
 
-> 實作層用獨立 Request / 不同 RPC 區分，而非單一 RPC 條件輸出，符合 [Java 微服務dev-guidelines §4（gRPC RPC 角色分離）](../dev-guidelines/java-microservices-development-guidelines.md)。
+> 實作層用獨立 Request / 不同 RPC 區分，而非單一 RPC 條件輸出，符合 [Java 微服務開發規範 §4（gRPC RPC 角色分離）](../dev-guidelines/java-microservices-development-guidelines.md)。
 
 > **`auto_escalated = true` 語意**：表示案件係由 §5.10 `CaseProcessTimeoutWorker` 因賣家處理逾時自動升級至 admin 仲裁，**非**買家手動申訴；admin 端據此提供差異化處理 UI 與 SLA 標籤。對應 `aftersale_appeal_events.event_type = AUTO_ESCALATED`、`actor_type = SYSTEM`。
 

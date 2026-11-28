@@ -55,7 +55,7 @@ make atlas-diff module=<名稱> name=<名>  # 改 schema.sql 後；objects.sql �
 
 營運子命令：`go run ./cmd/hawkr` 不帶參數列出全部（營運用的要 `DATABASE_URL`）。搬模組時的工具（`make new-module`、`make new-characterization`、`scripts/characterize.sh`）見遷移計畫。
 
-`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體dev-guidelines §3。
+`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體開發規範 §3。
 
 ## 契約規則（單體與舊服務都適用）
 

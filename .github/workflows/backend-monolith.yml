@@ -261,7 +261,7 @@ jobs:
           if [ -n "$(git status --porcelain -- "${paths[@]}")" ]; then
             git status --short -- "${paths[@]}"
             git diff --stat -- "${paths[@]}"
-            echo "::error::CodeMeta 生成物與 docs/codemeta不一致，請在本機跑 generate.sh --go --go-media --web --admin --flutter 後 commit"
+            echo "::error::CodeMeta 生成物與 docs/codemeta/ 不一致，請在本機跑 generate.sh --go --go-media --web --admin --flutter 後 commit"
             exit 1
           fi
 

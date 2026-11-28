@@ -1,4 +1,4 @@
--- V13：Uber Direct 即時配送履約資料層（66 號detailed-design §5 資料設計）
+-- V13：Uber Direct 即時配送履約資料層（66 號詳細設計書 §5 資料設計）
 --
 -- 🔴 版本號說明：66 §5 開頭寫「65 已預約 V11 ⇒ 本書 DDL 落 V12」，那句話已過期——
 --    V11（65 Foundation）與 V12（provider_error 拆欄）都已落地，實查目前最高版號為 V12 ⇒ 本檔為 V13。

@@ -1,4 +1,4 @@
-# 購物車微服務（Cart Service）detailed-design
+# 購物車微服務（Cart Service）詳細設計書
 
 ---
 
@@ -616,7 +616,7 @@ Cart 業務碼（6001~6099）完整定義詳見 [錯誤碼](../codemeta/error-co
    - **Product Service 失敗（gRPC error / timeout）**：caller 降級回**空 map**（**禁止**把缺失 SKU 偽造成 `is_active=false`、`stock_qty=0`，那會誤導 UX 顯示假 DELISTED / OUT_OF_STOCK；應讓判定鏈走 `skuInfo==null → LOOKUP_FAILED`，含義是「暫時無法確認，請稍後重試」）
    - **Product Service 正常但 SKU key 在 response map 缺席**：對應「SKU 找不到」或「product orphan（sku.product_id 指向不存在 / 已硬刪 product，data integrity issue）」，由 product-service §5.5.3 主動排除，caller 同樣走 `skuInfo==null → LOOKUP_FAILED`
 5.5 **判定 `purchasable` 與 `unavailable_reason`**（每筆 NORMAL / LOCKED item 都判定）：
-   - 委派 `ProductPurchasabilityRules.evaluate(isActive, stockQty, requestedQty)`（`common-core/utils/code/helper/`，見 [Java 微服務dev-guidelines §6](../dev-guidelines/java-microservices-development-guidelines.md) 與 [CodeMeta 代碼管理](../codemeta/README.md)）— 確保 cart-service、order-service 三層攔截判定邏輯不漂移
+   - 委派 `ProductPurchasabilityRules.evaluate(isActive, stockQty, requestedQty)`（`common-core/utils/code/helper/`，見 [Java 微服務開發規範 §6](../dev-guidelines/java-microservices-development-guidelines.md) 與 [CodeMeta 代碼管理](../codemeta/README.md)）— 確保 cart-service、order-service 三層攔截判定邏輯不漂移
    - 判定鏈執行順序對應 `CartItemUnavailableReason`（值同名）：
      - `SkuCartInfo == null`（Product Service 降級 / SKU 找不到 / product orphan）→ `purchasable=false`、`reason=LOOKUP_FAILED`（先檢查，避免 NPE，**並區分 product missing 與 product inactive — 前者是 lookup 失敗或 data integrity，不是業務上的「下架」**）
      - `is_active == false`（product.status ≠ ACTIVE 或 product.deleted_at != null）→ `purchasable=false`、`reason=DELISTED`

@@ -1,4 +1,4 @@
-# Admin 異常訂單管理 API detailed-design
+# Admin 異常訂單管理 API 詳細設計書
 
 > 本文件定義運營後台（Admin）用的「PayUni 相關異常」查詢 API，跨 Payment / Shipping / AfterSales / Order 四個服務。
 >
@@ -47,8 +47,8 @@ PayUni 對外的錯誤回應（付款 / 退款 / 撥款 / 物流建單 / 建店�
 
 | 項目 | 歸屬 |
 |---|---|
-| `provider_status` / `provider_message` 欄位寫入邏輯 | 規範 §4 + 各服務detailed-design（05/06/09） |
-| 批次聚合 gRPC 的 proto 定義（`BatchGetProviderStatusByOrderIds` 等） | 06 物流 / 05 支付detailed-design（擁有者服務） |
+| `provider_status` / `provider_message` 欄位寫入邏輯 | 規範 §4 + 各服務詳細設計書（05/06/09） |
+| 批次聚合 gRPC 的 proto 定義（`BatchGetProviderStatusByOrderIds` 等） | 06 物流 / 05 支付詳細設計書（擁有者服務） |
 | schema 變更（V1 migration） | 05/06/09 各自在主改造 phase 完成 |
 | 手動重試 / 手動取消 / 強制成功 API | **不實作**。PayUni 後台為唯一權威入口 |
 | 前端 Admin UI | 前端團隊負責；本文件僅定義 API 契約 |
@@ -270,11 +270,11 @@ Gateway `message` 策略（強制）：成功固定 `"success"`；錯誤透傳�
 
 ### 5.6 時間欄位
 
-統一使用 ISO 8601 (UTC)：`YYYY-MM-DDTHH:mm:ssZ`（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.3）。
+統一使用 ISO 8601 (UTC)：`YYYY-MM-DDTHH:mm:ssZ`（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.3）。
 
 ### 5.7 數字欄位
 
-Proto `string`、Gateway HTTP JSON `string`（所有 ID、金額、狀態 code 值；[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §2.1）。
+Proto `string`、Gateway HTTP JSON `string`（所有 ID、金額、狀態 code 值；[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §2.1）。
 
 ### 5.8 Swagger 要求
 
@@ -1447,7 +1447,7 @@ message BatchGetRefundProviderStatusResponse {
 2. **missing key 語意**：某 `order_id` / `case_id` 無對應 row → response `entries` map **省略該 key**（不回空字串）。呼叫方（Order/AfterSales 聚合層）需 defensive 處理。
 3. **取最新一筆**：若一個 key 對應多筆記錄（如一個 order_id 有多次退款嘗試）→ 取 `ORDER BY created_at DESC LIMIT 1`。
 4. **效能**：單次 batch RPC 支援最多 100 筆（對齊 `page_size` 上限）。
-5. **權限**：內部 gRPC 呼叫，透過 `x-internal-service` metadata 自動跳過權限（[Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §4.2）。
+5. **權限**：內部 gRPC 呼叫，透過 `x-internal-service` metadata 自動跳過權限（[Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §4.2）。
 
 ---
 
@@ -1467,7 +1467,7 @@ message BatchGetRefundProviderStatusResponse {
 | §9 Order Admin API | `orders.status` 的 `*_FAILED` 狀態值 | 03 設計書 §2.1 |
 | §9.4 Order 詳情 | `OrderDetailView` 的 `provider_status` / `provider_message`（App / Admin 共用基本層） | 03 設計書（規範 §9.4） |
 
-**錯誤碼**：本設計書**不新增**錯誤碼，Admin API 走既有 `NOT_FOUND` / `INVALID_ARGUMENT` / `PERMISSION_DENIED`。若實作時確有需要，依 [Java 微服務dev-guidelines](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md) 流程新增。
+**錯誤碼**：本設計書**不新增**錯誤碼，Admin API 走既有 `NOT_FOUND` / `INVALID_ARGUMENT` / `PERMISSION_DENIED`。若實作時確有需要，依 [Java 微服務開發規範](../dev-guidelines/java-microservices-development-guidelines.md) §6 與 [codemeta](../codemeta/README.md) 流程新增。
 
 ---
 
@@ -1614,7 +1614,7 @@ cd services/java/shared/java-proto && mvn clean install
 |---|---|
 | §1 / §3 / §4 / §10 | `PayUni 錯誤回應收斂規範`（已刪除） |
 | §5 / §13 | `docs/dev-guidelines/api-design-guidelines.md` / `docs/dev-guidelines/gateway-swagger-annotation-guidelines.md` |
-| §6 | `05-支付服務（Payment Service）detailed-design`（已刪除） |
+| §6 | `05-支付服務（Payment Service）詳細設計書`（已刪除） |
 | §7 | `docs/detailed-design/06-shipping-service-detailed-design.md` |
 | §8 | `docs/detailed-design/09-aftersales-service-detailed-design.md` |
 | §9 | `docs/detailed-design/03-order-service-detailed-design.md` |

@@ -1,4 +1,4 @@
-# 買家會員分級與 Agent 額度方案（Buyer Membership & Entitlement）detailed-design
+# 買家會員分級與 Agent 額度方案（Buyer Membership & Entitlement）詳細設計書
 
 ---
 
@@ -9,7 +9,7 @@
 | 維護者 | Will |
 | 對應程式碼 | `backend/internal/modules/buyer/internal/membership/membership.go`（單體 buyer 模組）、`backend/internal/legacy/buyerserver/server.go`（給 ai-service 的 `GetBuyerEntitlement`）、`services/ai-service/internal/client/buyer/adapter.go`、`services/ai-service/internal/procurement/usecase/turn.go` |
 | 相關 ADR | [2026-09-18-buyer-membership-entitlement-model](/docs/adr/2026-09-18-buyer-membership-entitlement-model.md) |
-| 相關 doc | [57-Hawkr 幫找 Agent Runtime（Agent Runtime）detailed-design](./57-agent-runtime-detailed-design.md) §7（本設計的消費端） |
+| 相關 doc | [57-Hawkr 幫找 Agent Runtime（Agent Runtime）詳細設計書](./57-agent-runtime-detailed-design.md) §7（本設計的消費端） |
 
 ---
 

@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Hashtag 業務 Service（33-商品 Hashtag 模組detailed-design §3、§4、§5.1）。
+ * Hashtag 業務 Service（33-商品 Hashtag 模組詳細設計書 §3、§4、§5.1）。
  *
  * <p>本 Service 提供：
  * <ul>

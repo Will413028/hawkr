@@ -1,4 +1,4 @@
-# SEO 技術契約detailed-design
+# SEO 技術契約詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 

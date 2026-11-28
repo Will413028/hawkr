@@ -1,4 +1,4 @@
-# 微服務間內部授權（Internal Service Authorization）detailed-design
+# 微服務間內部授權（Internal Service Authorization）詳細設計書
 
 ## 0. 文件元資訊 (Metadata)
 
@@ -6,7 +6,7 @@
 |---|---|
 | 維護者 | 維護團隊 |
 | 對應程式碼 | `services/java/shared/common-core/.../grpc/InternalAuth{Config,Signer,Verifier}.java`、`GrpcAuth{ClientInterceptor,ServerInterceptor,Context,AutoConfiguration}.java`、`services/java/shared/observability-common/.../obs/grpc/GrpcChannelRegistry.java`、`pkg/middleware/grpc/interceptor/internal_auth.go`、各 Go 服務 `internal/grpc/di.go` server 組裝、`k8s/external-services/networkpolicy.yaml`、`k8s/values/*.yaml`、`docker-compose-local.yml` |
-| 相關 doc | 44（身份模型，account_id vs 營運鍵）、46（賣家能力權限層，Gateway 端授權）、dev-guidelines《Java 微服務dev-guidelines》§4.2/§5、《API 設計規範》§五、36（MQ 事件不受本層影響）、《後端服務責任邊界規範》 |
+| 相關 doc | 44（身份模型，account_id vs 營運鍵）、46（賣家能力權限層，Gateway 端授權）、開發規範《Java 微服務開發規範》§4.2/§5、《API 設計規範》§五、36（MQ 事件不受本層影響）、《後端服務責任邊界規範》 |
 | 相關 ADR | [單一共享 HMAC 密鑰](/docs/adr/2026-09-18-internal-auth-single-shared-hmac-secret.md) |
 
 ---

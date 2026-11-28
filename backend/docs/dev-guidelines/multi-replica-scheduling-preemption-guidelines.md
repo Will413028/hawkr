@@ -114,7 +114,7 @@ UPDATE <task_table> SET status = '10'
 
 而候選述詞是 `status IN ('0','30') AND (next_retry_time IS NULL OR next_retry_time <= NOW())`。
 
-> 🚨 **本檔所有 SQL 一律寫 CodeMeta value，不寫 enum 名。** 這些 `status` 欄存的是 CodeMeta 的 **value 字串**（`WorkerTaskStatus`：`0`/`10`/`20`/`30`…，見 [業務狀態碼](../codemeta/business-status-codes.md)；`OutboxEventStatus`：`8221`/`8222`/`8223`/`8224`，見 [內部技術碼](../codemeta/internal-technical-codes.md)）。把 enum 名當字面值寫進述詞 ⇒ **零命中、排程靜默停擺**（沒有錯誤、只是每輪撈到 0 筆）。設計書照抄規範，所以規範裡寫錯會擴散（[Java 微服務dev-guidelines](java-microservices-development-guidelines.md) §6「Enum 與禁止硬編碼」）。
+> 🚨 **本檔所有 SQL 一律寫 CodeMeta value，不寫 enum 名。** 這些 `status` 欄存的是 CodeMeta 的 **value 字串**（`WorkerTaskStatus`：`0`/`10`/`20`/`30`…，見 [業務狀態碼](../codemeta/business-status-codes.md)；`OutboxEventStatus`：`8221`/`8222`/`8223`/`8224`，見 [內部技術碼](../codemeta/internal-technical-codes.md)）。把 enum 名當字面值寫進述詞 ⇒ **零命中、排程靜默停擺**（沒有錯誤、只是每輪撈到 0 筆）。設計書照抄規範，所以規範裡寫錯會擴散（[Java 微服務開發規範](java-microservices-development-guidelines.md) §6「Enum 與禁止硬編碼」）。
 
 五支**完全符合 ①②⑦**（搶佔在副作用之前、用 CAS 不用 SKIP LOCKED、述詞非純 PK），命名還叫 `claimTask` —— **唯獨違反 ③**：`PROCESSING` 不在候選集合、沒有任何時間欄能讓它回來，pod 崩潰即永久卡死。
 
@@ -360,7 +360,7 @@ lease 的全部價值來自「租約到期 → row 回到候選集合 → 自動
 >
 > 因此：**下一個想寫 level-triggered reconcile 的人，第一題不是「怎麼寫得合格」，是「《後端服務責任邊界規範》§二 為什麼不禁止它」。** 答不出來就不要寫。真的答得出來（例如 SoT 在外部系統、補 webhook 漏收，如 `PendingPaymentReconcileScheduler`）再回頭談形狀。
 
-> ⚠️ §七 排在文件最後**不是因為它是附錄**，而是因為 §五／§六 的編號已被多份detailed-design逐字引用（`03`／`06`／`07`／`09`／`56`），插進 §四 之後會把那些引用全部指偏而且不會有任何錯誤。**閱讀順序上它接在這裡。**
+> ⚠️ §七 排在文件最後**不是因為它是附錄**，而是因為 §五／§六 的編號已被多份詳細設計書逐字引用（`03`／`06`／`07`／`09`／`56`），插進 §四 之後會把那些引用全部指偏而且不會有任何錯誤。**閱讀順序上它接在這裡。**
 
 ---
 
@@ -376,7 +376,7 @@ lease 的全部價值來自「租約到期 → row 回到候選集合 → 自動
    > **租約欄的欄名會騙人**：`*_alerted_at`／`*_next_at`／`*_reconciled_at` 讀起來像「已處理旗標」。設計書要逐條寫明「**這是冷卻租約不是已處理旗標**」，否則下一個人會照欄名把它當一次性旗標用，把 at-most-once 重新鑿回來。
 5. 走例外 A → **不遺失交給誰**（哪張 outbox、哪個 tx）。
 6. 走例外 B → **四條件逐條的證據**，含 consumer 冪等索引名與 `reference_id` 組成，以及**這筆的保證等級到底是什麼**；並回答「被移到 publish 之後的那一句是事後記錄嗎」（[§四 適用邊界](#-例外-b-的適用邊界被移到後面的那一句-sql必須是事後記錄)）。
-6a. 走**短 tx**（publish 拉進 CAS 的 `@Transactional`）→ 必須寫出：**tx 邊界落在哪個 bean 的哪個方法**（同 class 內 self-invocation 不經 proxy ⇒ `@Transactional` 失效，見 [Java 微服務dev-guidelines](java-microservices-development-guidelines.md)）、**publish 走的是會傳遞失敗的變體**、**rollback 之後那一列仍滿足候選述詞**（逐條比對候選 SQL 的每個條件），以及**殘餘窗口 = 一個 tick** 的誠實說明。
+6a. 走**短 tx**（publish 拉進 CAS 的 `@Transactional`）→ 必須寫出：**tx 邊界落在哪個 bean 的哪個方法**（同 class 內 self-invocation 不經 proxy ⇒ `@Transactional` 失效，見 [Java 微服務開發規範](java-microservices-development-guidelines.md)）、**publish 走的是會傳遞失敗的變體**、**rollback 之後那一列仍滿足候選述詞**（逐條比對候選 SQL 的每個條件），以及**殘餘窗口 = 一個 tick** 的誠實說明。
 7. **行為退化寫出來**：
    - pod 在 claim 與 publish 之間崩潰，該事件會**延後一個租約**才重送（現況是「下一 tick 就重來」）。這是真實退化，換來的是不重複；**at-least-once 契約不變**。
    - **租約不是鎖**：租約到期後原持有者若仍活著，可能與新持有者同時處理同一筆 → 回到「重複一次」。這是刻意取捨（at-least-once 優先），下游冪等仍是最終防線。租約長度取「大於單筆工作的最壞耗時」就是為了讓這件事罕見。

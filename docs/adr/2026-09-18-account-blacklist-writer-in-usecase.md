@@ -16,7 +16,7 @@ gateway 在 Redis 答不出來時會自己從 `accounts.status` 重新推導同�
 而 social-service 的 moderation dispatcher 在 RPC 回來之後才寫衍生值。
 admin 會員管理新增停權入口時，這個分工第一次出現第二個呼叫端。
 
-規格本身見 `docs/detailed-design/17-登入與帳號建立流程（Login & Account）detailed-design.md`
+規格本身見 `docs/detailed-design/17-登入與帳號建立流程（Login & Account）詳細設計書.md`
 §3「帳號停權與解除停權」。
 
 ## 考慮過的方案

@@ -4,25 +4,25 @@
 
 ---
 
-## basic-design
+## 基本設計書
 
 **外部設計**：這個功能為什麼存在、誰在用、業務怎麼運作、錢與發票怎麼流、有哪些畫面。
-先讀它再讀detailed-design。[完整總覽與公版章節](basic-design/00-overview.md)
+先讀它再讀詳細設計書。[完整總覽與公版章節](basic-design/00-overview.md)
 
-| 編號 | basic-design | 對應detailed-design |
+| 編號 | 基本設計書 | 對應詳細設計書 |
 |---|---|---|
 | 56 | [ADM 代行營運（Delegated Operations）](basic-design/56-delegated-operations-basic-design.md) | [56](detailed-design/56-delegated-operations-detailed-design.md) |
 | 58 | [電子發票服務（Invoice Service）](basic-design/58-invoice-service-basic-design.md) | [58](detailed-design/58-invoice-service-detailed-design.md)、[58A](detailed-design/58a-e-invoice-frontend-implementation-specification.md) |
 | 06 | [物流微服務（Shipping Service）](basic-design/06-shipping-service-basic-design.md) | [06](detailed-design/06-shipping-service-detailed-design.md) |
 | 65 | [物流履約平台（Fulfillment Platform）](basic-design/65-fulfillment-platform-basic-design.md)（共用骨架） | [65](detailed-design/65-fulfillment-platform-detailed-design.md) |
 
-🔴 **物流領域（06／65）編號一一對應basic-design。**
+🔴 **物流領域（06／65）編號一一對應基本設計書。**
 
 ---
 
-## detailed-design
+## 詳細設計書
 
-系統程式碼的設計規格文件。[完整總覽](detailed-design/00-overview.md)｜新增設計書請套用[detailed-design範本](detailed-design/00-detailed-design-template.md)
+系統程式碼的設計規格文件。[完整總覽](detailed-design/00-overview.md)｜新增設計書請套用[詳細設計書範本](detailed-design/00-detailed-design-template.md)
 
 ### 核心微服務（01-11）
 
@@ -89,14 +89,14 @@
 
 ---
 
-## dev-guidelines
+## 開發規範
 
 | 文件 | 說明 |
 |------|------|
 | [API 設計規範](dev-guidelines/api-design-guidelines.md) | **★ 最高優先級** — 所有 API 新增/修改必須以此為最高依據 |
 | [開發工作流程](dev-guidelines/development-workflow.md) | 設計書 → Code Gen → DB → 程式碼 → 測試 強制順序、設計書品質、環境變數配置流程 |
 | [Git 分支與交付路徑規範](../../docs/conventions/git-branch-and-delivery-path-guidelines.md) | 分支策略（PR base 一律 dev）、各 repo 交付路徑與把關者、Flutter 放行六條件、跨 repo 破壞性遷移判準 |
-| [Java 微服務dev-guidelines](dev-guidelines/java-microservices-development-guidelines.md) | Java 微服務通用dev-guidelines |
+| [Java 微服務開發規範](dev-guidelines/java-microservices-development-guidelines.md) | Java 微服務通用開發規範 |
 | [Proto 管理規範](dev-guidelines/proto-management-guidelines.md) | Protobuf 定義與同步流程 |
 | [Java gRPC 錯誤處理規範](dev-guidelines/java-grpc-error-handling-guidelines.md) | gRPC 錯誤碼與例外處理 |
 | [Go gRPC 錯誤處理規範](dev-guidelines/go-grpc-error-handling-guidelines.md) | Go 服務的 gRPC 錯誤碼與 usecase 錯誤轉譯 |
@@ -116,7 +116,7 @@
 
 ---
 
-## third-party-integrations
+## 第三方整合
 
 | 文件 | 說明 |
 |------|------|
@@ -141,7 +141,7 @@
 
 ---
 
-## infrastructure
+## 基礎建設
 
 | 文件 | 說明 |
 |------|------|
@@ -182,7 +182,7 @@
 
 ---
 
-## supplementary
+## 補充資料
 
 | 文件 | 說明 |
 |------|------|

@@ -2,7 +2,7 @@
 
 Hawkr 的後台管理平台，用於管理商戶、會員、商品、訂單、Banner、文案等業務資料。
 
-## 設計與 AI dev-guidelines
+## 設計與 AI 開發規範
 
 - [`DESIGN.md`](./DESIGN.md)：通用 UI、品牌、元件、響應式與無障礙的唯一設計規範。
 - [`AGENTS.md`](./AGENTS.md)：AI 實作優先級、工程契約與驗證要求。

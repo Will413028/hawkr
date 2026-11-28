@@ -1,4 +1,4 @@
-# 賣家能力權限層（Seller Capability Authorization）detailed-design
+# 賣家能力權限層（Seller Capability Authorization）詳細設計書
 
 > 本檔是 gateway 賣家面路由的能力檢查（`requireSeller`、豁免清單）、IM 與 social 的停權細分、停權連動 saga 的消費端與收斂點 backstop（order、product）的現行規格；這些服務搬進單體時刪除。
 >
@@ -11,7 +11,7 @@
 | 維護者 | 維護團隊 |
 | 對應程式碼 | gateway 解析：`gateway/internal/middleware/auth.go`；gateway 檢查：`gateway/internal/authz/*`（capability／registry）、`gateway/internal/router/seller_capability.go`（`requireSeller(cap)` 掛載）、`gateway/internal/router/seller_route_assert.go`（boot 斷言） |
 | 相關 ADR | [2026-09-18-seller-capability-authorization](/docs/adr/2026-09-18-seller-capability-authorization.md)、[2026-09-29-seller-suspension-and-business-identity-in-monolith](/docs/adr/2026-09-29-seller-suspension-and-business-identity-in-monolith.md) |
-| 相關 doc | 02（product 收斂點 backstop）、03（order 結帳收斂點）、20（結帳模組）、14（IM 訂單關聯細分）、36（MQ 事件）、44（gateway 身份解析與守衛）、56（ADM 代行營運，`AdminCapability` 的 owner）、58（發票 capability）、65（物流履約，`CAP_ORDER_FULFILL`／`CAP_PRODUCT_MANAGE` 的下游語意）、dev-guidelines《賣家能力權限層規範》 |
+| 相關 doc | 02（product 收斂點 backstop）、03（order 結帳收斂點）、20（結帳模組）、14（IM 訂單關聯細分）、36（MQ 事件）、44（gateway 身份解析與守衛）、56（ADM 代行營運，`AdminCapability` 的 owner）、58（發票 capability）、65（物流履約，`CAP_ORDER_FULFILL`／`CAP_PRODUCT_MANAGE` 的下游語意）、開發規範《賣家能力權限層規範》 |
 
 ---
 

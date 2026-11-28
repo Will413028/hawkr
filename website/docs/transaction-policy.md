@@ -3,7 +3,7 @@
 > **狀態**：本文件保留 2026-07-02 的後端查核結果，只用來辨識尚未完成的工程功能，不再作為費率、發票角色或簽約內容的權威來源。現行商務約定以 `docs/legal/hawkr-seller-platform-service-agreement-template.md` v1.2（三方案版本化）為準；三層發票流程以 `docs/planning/INVOICE_SETTLEMENT_DELIVERY_REFERENCE.md` 為準。
 > **禁止誤用**：下列「後端尚未定義 6%」或「發票尚未實作」是實作落差，不會推翻已確認的三方案成交服務費（Starter 6%／Growth 3%／Pro 0%，另收方案月費 0／990／2,990）、金流手續費另計，或「統一合作法人開給賣家、賣家開給消費者、Hawkr 開給統一合作法人」的營運規則。本快照撰寫時只有單一 6% 費率，任何以 6% 為唯一費率的敘述均已被 v1.2 方案表取代。
 > **用途**：作為產品與工程驗收的歷史事實依據。
-> **資料來源**：`<org>/backend-payuni` @ `main`——detailed-design + Java 程式碼常數 + 運行設定（`application.yml`）交叉驗證。
+> **資料來源**：`<org>/backend-payuni` @ `main`——詳細設計書 + Java 程式碼常數 + 運行設定（`application.yml`）交叉驗證。
 > **核對日期**：2026-07-02。
 > **驗收提醒**：後端幾乎所有時效數字都是 `${環境變數:預設值}` 形式，正式環境可能被環境變數覆寫。標「⚠️」者為文件與運行設定不一致或尚未實作的項目，發布前應由產品與工程以 production-like 測試自行確認。
 
@@ -240,7 +240,7 @@
 
 **設計書**
 - `backend/docs/detailed-design/03-order-service-detailed-design.md`——訂單狀態機、付款期限、自動完成、撥款觸發
-- `05-支付服務（Payment Service）detailed-design`（已刪除）——撥款、退款、發票（未實作）
+- `05-支付服務（Payment Service）詳細設計書`（已刪除）——撥款、退款、發票（未實作）
 - `backend/docs/detailed-design/09-aftersales-service-detailed-design.md`——出貨期限、售後全時效、退款金流
 - `backend/docs/detailed-design/20-checkout-module-detailed-design.md`——運費收款主體、fee_payer、免運
 - `backend/docs/detailed-design/21-shipping-fee-module-detailed-design.md`——三維運費費率、代收手續費

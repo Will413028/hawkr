@@ -1,4 +1,4 @@
-# 結帳模組（Checkout Module）detailed-design
+# 結帳模組（Checkout Module）詳細設計書
 
 > 🔴 **B3 退場說明（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂）**：Java shipping 已刪除，出貨改賣家自寄，每個賣家的運費設定（固定運費、免運門檻可空、處理天數 1–7 預設 3）歸 seller 模組，報價是 seller 的純函式（cart 預覽與 ordering 結帳共用，結帳把結果快照進訂單）。B3 到 B8 之間 Java 結帳的運費固定為 0；本書的配送方式、溫層、費率表、`ShippingFeeCacheClient`、運費路線與運費降級各節描述 B3 之前的現況，B8 改寫 ordering 時由新設計取代，對外契約不再帶配送方式。
 

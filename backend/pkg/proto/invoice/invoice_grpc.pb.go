@@ -100,7 +100,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Invoice Service — 電子發票（58 號detailed-design）
+// Invoice Service — 電子發票（58 號詳細設計書）
 //
 // 通用 issuer→recipient 模型：issuer ∈ {賣家, 平台}；recipient ∈ {買家, 賣家, 外部對象}；
 // 觸發 ∈ {訂單付款自動, ADM 手動}；品項來源 ∈ {訂單快照, ADM 手填}。
@@ -1007,7 +1007,7 @@ func (c *invoiceServiceClient) ReplaceBusinessDayMirror(ctx context.Context, in 
 // All implementations must embed UnimplementedInvoiceServiceServer
 // for forward compatibility.
 //
-// Invoice Service — 電子發票（58 號detailed-design）
+// Invoice Service — 電子發票（58 號詳細設計書）
 //
 // 通用 issuer→recipient 模型：issuer ∈ {賣家, 平台}；recipient ∈ {買家, 賣家, 外部對象}；
 // 觸發 ∈ {訂單付款自動, ADM 手動}；品項來源 ∈ {訂單快照, ADM 手填}。

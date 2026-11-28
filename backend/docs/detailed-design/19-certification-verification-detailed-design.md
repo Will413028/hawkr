@@ -640,7 +640,7 @@ if (request.getUpdateCertifications() || request.getCertificationsCount() > 0) {
 ```
 
 **本設計沿用這個既有語意，不推翻它。**
-⚠️ `api/proto/` 的契約優先序**高於**detailed-design——設計書若寫成
+⚠️ `api/proto/` 的契約優先序**高於**詳細設計書——設計書若寫成
 `if (!request.updateCertifications) return;`，等於單方面推翻一個更高優先序的契約，
 且會打壞一個真實情境：**舊 App 送 PUT 帶了 `certifications` 但沒設旗標 ⇒ 直接 return
 ⇒ 賣家送出的認證靜默蒸發**。那與本節要防的清空是同一類失效，只是方向相反。
