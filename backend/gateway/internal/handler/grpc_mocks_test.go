@@ -7,7 +7,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type mockProductServiceClient struct {
 	GetProductListFn               func(ctx context.Context, in *productpb.GetProductListRequest, opts ...grpc.CallOption) (*productpb.GetProductListResponse, error)
 	GetPublicProductFn             func(ctx context.Context, in *productpb.GetPublicProductRequest, opts ...grpc.CallOption) (*productpb.GetProductResponse, error)
@@ -146,7 +145,6 @@ func (m *mockProductServiceClient) GetPublicSellerCitiesSummary(ctx context.Cont
 func (m *mockProductServiceClient) ListStoreIDsWithPublicProductsInternal(ctx context.Context, in *productpb.ListStoreIDsWithPublicProductsInternalRequest, opts ...grpc.CallOption) (*productpb.ListStoreIDsWithPublicProductsInternalResponse, error) {
 	return nil, nil
 }
-
 
 func (m *mockProductServiceClient) SubmitProductCertification(ctx context.Context, in *productpb.SubmitProductCertificationRequest, opts ...grpc.CallOption) (*productpb.ProductCertificationApplicationResponse, error) {
 	return nil, nil

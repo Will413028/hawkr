@@ -100,7 +100,7 @@ func (m *Model) Golden() ([]GoldenCase, error) {
 
 type paramValue struct {
 	param Param
-	json any
+	json  any
 }
 
 func (m *Model) goldenValues(p Param, used map[string][]string) []paramValue {

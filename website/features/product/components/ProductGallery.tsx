@@ -53,7 +53,6 @@ export default function ProductGallery({
 
 	return (
 		<div className="flex flex-col" data-product-gallery>
-
 			<section
 				ref={gallerySize.ref}
 				className={`relative mb-4 aspect-[4/3] w-full overflow-hidden touch-pan-y outline-none focus-visible:ring-2 focus-visible:ring-hk-primary ${

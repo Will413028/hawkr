@@ -104,7 +104,6 @@ func baseInput() OrderPaidInput {
 
 var amegoIssueOK = amegoResult()
 
-
 func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 	exemptCat := int16(domain.TaxCategoryExempt)
 
@@ -114,11 +113,11 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 		account domain.ProviderAccount
 		mutate  func(*OrderPaidInput)
 
-		wantMode   string
-		wantKind   string
-		wantStatus string
-		wantNA     string
-		wantManual string
+		wantMode     string
+		wantKind     string
+		wantStatus   string
+		wantNA       string
+		wantManual   string
 		wantOpStatus string
 	}{
 		{
@@ -143,7 +142,7 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 				DefaultTaxCategory:  1,
 				ReceiptAuthorizedAt: &testNow,
 			},
-			account: activeAccount(),
+			account:      activeAccount(),
 			wantMode:     codemeta.InvoiceFulfillmentModePlatformReceipt.Value,
 			wantKind:     codemeta.InvoiceDocumentKindReceipt.Value,
 			wantStatus:   codemeta.InvoiceDocumentStatusPending.Value,
@@ -155,7 +154,7 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 				ReviewStatus:       codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value,
 				DefaultTaxCategory: 1,
 			},
-			account: activeAccount(),
+			account:      activeAccount(),
 			wantMode:     codemeta.InvoiceFulfillmentModePlatformReceipt.Value,
 			wantKind:     codemeta.InvoiceDocumentKindReceipt.Value,
 			wantStatus:   codemeta.InvoiceDocumentStatusAwaitingManual.Value,
@@ -218,11 +217,11 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 		{
 			leaf:    "AM-a 平台出資券",
 			profile: approvedProfile(1), account: activeAccount(),
-			mutate:     func(in *OrderPaidInput) { in.HasPlatformFundedDiscount = true },
-			wantMode:   codemeta.InvoiceFulfillmentModeAmegoAuto.Value,
-			wantKind:   codemeta.InvoiceDocumentKindB2c.Value,
-			wantStatus: codemeta.InvoiceDocumentStatusAwaitingManual.Value,
-			wantManual: codemeta.InvoiceManualReasonPlatformFundedDiscount.Value,
+			mutate:       func(in *OrderPaidInput) { in.HasPlatformFundedDiscount = true },
+			wantMode:     codemeta.InvoiceFulfillmentModeAmegoAuto.Value,
+			wantKind:     codemeta.InvoiceDocumentKindB2c.Value,
+			wantStatus:   codemeta.InvoiceDocumentStatusAwaitingManual.Value,
+			wantManual:   codemeta.InvoiceManualReasonPlatformFundedDiscount.Value,
 			wantOpStatus: "",
 		},
 		{
@@ -364,7 +363,6 @@ func TestPrepare_CoversEveryNotApplicableReason(t *testing.T) {
 	}
 }
 
-
 func TestPrepare_InvariantFailureGoesToAwaitingManualAndNeverSends(t *testing.T) {
 	h := newHarness(t, approvedProfile(1), activeAccount())
 	in := baseInput()
@@ -401,7 +399,6 @@ func TestPrepare_InvariantFailureGoesToAwaitingManualAndNeverSends(t *testing.T)
 	}
 }
 
-
 func TestPrepare_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 	h := newHarness(t, approvedProfile(1), activeAccount())
 	h.docs.notInserted = true
@@ -420,7 +417,6 @@ func TestPrepare_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 		t.Errorf("冪等命中仍建了 %d 個 operation", len(h.ops.created))
 	}
 }
-
 
 func TestPrepare_DerivedIdentifiers(t *testing.T) {
 	h := newHarness(t, approvedProfile(1), activeAccount())

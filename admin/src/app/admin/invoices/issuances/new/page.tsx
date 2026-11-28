@@ -57,7 +57,6 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 const ISSUANCES_ENDPOINT = "/api/v1/admin/invoices/issuances";
 
 /** 本波不可用的 `source.kind`（理由見檔頭）。 */
@@ -385,7 +384,6 @@ export default function ManualIssuancePage() {
 								</div>
 							</div>
 							<div>
-
 								<div className="invoice-field__label">開立工作狀態</div>
 								<div className="invoice-field__value">
 									<StatusBadge
@@ -753,7 +751,6 @@ export default function ManualIssuancePage() {
 														{net === null ? "—" : formatAmount(String(net))}
 													</td>
 													<td>
-
 														<button
 															type="button"
 															className="invoice-line-delete"
@@ -836,7 +833,6 @@ export default function ManualIssuancePage() {
 
 			{isManualLines ? (
 				<Card title="金額">
-
 					<dl className="invoice-amount-summary" aria-live="polite">
 						<div>
 							<dt>品項小計</dt>

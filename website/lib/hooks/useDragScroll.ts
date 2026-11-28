@@ -94,8 +94,7 @@ export function useDragScroll(ref: React.RefObject<HTMLElement | null>) {
 				try {
 					el.setPointerCapture(e.pointerId);
 					captured = true;
-				} catch {
-				}
+				} catch {}
 				committedDrag = true;
 				el.style.cursor = "grabbing";
 			}

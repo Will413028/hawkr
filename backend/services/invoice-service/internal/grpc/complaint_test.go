@@ -16,7 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 const (
 	xBuyerA int64 = 2623900520
 	xBuyerB int64 = 2688637900
@@ -173,7 +172,6 @@ func xRow(id, buyerID int64, status string, version int64) domain.Complaint {
 	}
 }
 
-
 // 🔴 這是本檔最重要的一支。三支動作端點都必須通過——比 code 相同是不夠的。
 func TestComplaintActionsForeignAndMissingAreByteIdentical(t *testing.T) {
 	const foreignID, missingID int64 = 6001, 6002
@@ -257,7 +255,6 @@ func TestCreateComplaintForeignOrderIsByteIdenticalToMissingOrder(t *testing.T) 
 	}
 }
 
-
 func TestCreateComplaintSuccessShape(t *testing.T) {
 	s := newComplaintServer()
 
@@ -323,7 +320,6 @@ func TestComplaintActionsReturnTransitionedRecord(t *testing.T) {
 		t.Fatalf("version = %s, want 5", resp.GetData().GetVersion())
 	}
 }
-
 
 func TestComplaintActionsRejectMalformedArguments(t *testing.T) {
 	s := newComplaintServer(xRow(6300, xBuyerA, codemeta.InvoiceComplaintStatusSellerResponded.Value, 0))

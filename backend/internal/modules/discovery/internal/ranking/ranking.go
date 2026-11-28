@@ -22,8 +22,8 @@ import (
 
 const (
 	// MaxLimit 是 Recommended 一次最多回傳的店家數。
-	MaxLimit = 50
-	pageSize = seller.MaxBatchSize
+	MaxLimit  = 50
+	pageSize  = seller.MaxBatchSize
 	scoresJob = "seller_scores"
 )
 

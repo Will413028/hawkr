@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-
 func (f *fixture) next() int64 {
 	f.nextID++
 	return f.nextID

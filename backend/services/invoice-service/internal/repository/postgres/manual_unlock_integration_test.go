@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const muEvidence = "致電光貿客服，確認 requestId 未產生任何發票"
 
 func newUnlock(opID, requester int64, now time.Time) domain.NewManualUnlock {
@@ -25,7 +24,6 @@ func newUnlock(opID, requester int64, now time.Time) domain.NewManualUnlock {
 		Now:                   now,
 	}
 }
-
 
 func TestIntegration_ManualUnlock_SameActorCannotApprove(t *testing.T) {
 	ctx := context.Background()
@@ -127,7 +125,6 @@ func TestIntegration_ManualUnlock_TwoPersonCheckRejectsDirectSQL(t *testing.T) {
 	}
 }
 
-
 func TestIntegration_ManualUnlock_DecidedPairIsBidirectional(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -206,7 +203,6 @@ func TestIntegration_ManualUnlock_EvidenceLengthBounds(t *testing.T) {
 		t.Fatalf("1000 字應合法：err=%v taken=%v", err, taken)
 	}
 }
-
 
 func TestIntegration_ManualUnlock_OnlyOneOpenRequestPerJob(t *testing.T) {
 	ctx := context.Background()
@@ -299,7 +295,6 @@ func TestIntegration_ManualUnlock_ExpiredCannotBeApproved(t *testing.T) {
 	}
 }
 
-
 func TestIntegration_Operation_AllowManualProcessGuards(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -337,7 +332,6 @@ func TestIntegration_Operation_AllowManualProcessGuards(t *testing.T) {
 		t.Fatalf("狀態應為 MANUAL_PROCESS_ALLOWED，實得 %q", after.Status)
 	}
 }
-
 
 func TestIntegration_ProviderCutover_OnlyOneOpenRowPerAccount(t *testing.T) {
 	ctx := context.Background()

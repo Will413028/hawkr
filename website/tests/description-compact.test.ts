@@ -5,7 +5,6 @@ import {
 	type ProductDescription,
 } from "../lib/products/seller-repo";
 
-
 test("keeps runs-only text blocks (inline-run model)", () => {
 	const doc: ProductDescription = {
 		version: "1.0",

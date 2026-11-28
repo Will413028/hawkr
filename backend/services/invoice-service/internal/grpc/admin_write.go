@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // RetryInvoiceJobForAdmin 是 ADM 安全重試（端點 52）。
 func (s *InvoiceServer) RetryInvoiceJobForAdmin(
 	ctx context.Context, req *pb.RetryInvoiceJobForAdminRequest,
@@ -152,9 +151,9 @@ func (s *InvoiceServer) jobMutation(
 		return nil, s.internal(ctx, event, err)
 	}
 	data := &pb.InvoiceJobMutationData{
-		JobId:   fmtInt64(res.JobID),
-		Status:  res.Status,
-		Version: fmtInt64(res.Version),
+		JobId:      fmtInt64(res.JobID),
+		Status:     res.Status,
+		Version:    fmtInt64(res.Version),
 		AuditLogId: fmtID(res.AuditLogID),
 	}
 	if res.Blocked {

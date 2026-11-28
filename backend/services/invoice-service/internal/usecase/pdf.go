@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
 	pdfBatch       = 20
 	pdfLease       = 120 * time.Second

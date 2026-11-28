@@ -131,7 +131,6 @@ func (d *Docs) Viewer(c *gin.Context) {
 	c.File(fullPath)
 }
 
-
 func (d *Docs) credentialsMatch(username, password string) bool {
 	userOK := subtle.ConstantTimeCompare([]byte(username), []byte(d.username)) == 1
 	passOK := subtle.ConstantTimeCompare([]byte(password), []byte(d.password)) == 1

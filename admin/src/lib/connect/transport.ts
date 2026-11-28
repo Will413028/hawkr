@@ -7,7 +7,6 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import { classifyError, factsFromError } from "@hawkr/api/connect/errors";
 import { retryInterceptor } from "@hawkr/api/connect/retry";
 
-
 /** 同 services/api.ts 的逾時。 */
 const TIMEOUT_MS = 10_000;
 

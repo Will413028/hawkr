@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 const sharedBankKind = "SHARED_BANK_ACCOUNT"
 
 func (f *fixture) sharedBankItems(t *testing.T) []reviewRow {

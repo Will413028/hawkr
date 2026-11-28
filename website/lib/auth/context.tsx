@@ -184,8 +184,7 @@ export function AuthProvider({
 			window.addEventListener("beforeunload", onBeforeUnload, { once: true });
 			try {
 				await teardownPrivateCache();
-			} catch {
-			}
+			} catch {}
 			if (to === null) window.location.reload();
 			else commitDocumentNavigation(to, replace);
 		},

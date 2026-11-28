@@ -13,22 +13,9 @@ import (
 )
 
 const deleteAllBusinessDays = `-- name: DeleteAllBusinessDays :execrows
-
 DELETE FROM invoice_business_day_mirror
 `
 
-// invoice_business_day_mirror｜台灣國定假日唯讀鏡像
-// SSOT：設計書 58 號 §5.1.14
-//
-// 這張表**不是行事曆的 owner，是本地快取**（owner ＝ 單體的 platform/bizcalendar）。
-// 單體在每次匯入成功後與每天一次的對帳呼叫 ReplaceBusinessDayMirror，帶入涵蓋區間與區間內的假日；
-// **同一交易內整段 DELETE + INSERT 並覆蓋涵蓋區間**，失敗即整段不覆蓋（本身即原子）。
-// 禁止人工寫入、禁止 ADM 編輯、禁止在本服務加 seed migration。這支推送隨 A5 搬遷刪除。
-//
-// 要鏡像而不是每次現打：K01 建案是買家的**同步 HTTP 路徑**，invoice_complaints.sla_due_at 是
-// NOT NULL、必須當場算出來 ⇒ 不能掛在單體的可用性上。
-// 推送連續失敗 ⇒ 鏡像變舊 ⇒ 未涵蓋日期一律視為假日（偏晚）＋ invoice_business_calendar_stale 告警。
-// 整段覆蓋的前半。必須與 InsertBusinessDay 在同一交易內。
 func (q *Queries) DeleteAllBusinessDays(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAllBusinessDays)
 	if err != nil {
@@ -47,7 +34,6 @@ type InsertBusinessDayParams struct {
 	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
 }
 
-// 整段覆蓋的後半。同一批的每一列 synced_at 相同。
 func (q *Queries) InsertBusinessDay(ctx context.Context, arg InsertBusinessDayParams) error {
 	_, err := q.db.Exec(ctx, insertBusinessDay, arg.HolidayDate, arg.SyncedAt)
 	return err
@@ -74,9 +60,6 @@ type SnapshotBusinessDayMirrorRow struct {
 	HolidayDate pgtype.Date `db:"holiday_date" json:"holiday_date"`
 }
 
-// 涵蓋區間（含新鮮度）與區間內的假日，一個陳述式讀完：單一陳述式在 READ COMMITTED 下
-// 也只看到同一份快照，不會拿到推送前後混合的結果。
-// 沒有涵蓋列（從未推送）仍回一列，三個涵蓋欄位為 NULL；區間內沒有假日時 holiday_date 為 NULL。
 func (q *Queries) SnapshotBusinessDayMirror(ctx context.Context, arg SnapshotBusinessDayMirrorParams) ([]SnapshotBusinessDayMirrorRow, error) {
 	rows, err := q.db.Query(ctx, snapshotBusinessDayMirror, arg.FromDate, arg.ToDate)
 	if err != nil {
@@ -117,7 +100,6 @@ type UpsertBusinessDayCoverageParams struct {
 	SyncedAt    pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
 }
 
-// 覆蓋涵蓋區間與推送時間。必須與 DeleteAllBusinessDays、InsertBusinessDay 在同一交易內。
 func (q *Queries) UpsertBusinessDayCoverage(ctx context.Context, arg UpsertBusinessDayCoverageParams) error {
 	_, err := q.db.Exec(ctx, upsertBusinessDayCoverage, arg.CoveredFrom, arg.CoveredTo, arg.SyncedAt)
 	return err

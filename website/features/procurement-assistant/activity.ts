@@ -1,6 +1,5 @@
 import type { ProcurementStepStatusValue } from "@/lib/codemeta/enums";
 
-
 /** 值域 SSOT 是 CodeMeta 生成的 `ProcurementStepStatus`（7 個值），不是手寫
  * union——`lib/codemeta/generated.ts` 由 backend 的 generate.sh 覆蓋，後端增刪值
  * 時這裡是編譯期連動的。steps.ts 的 `AgentStepStatus` 是 2026-08 手寫的舊做法，

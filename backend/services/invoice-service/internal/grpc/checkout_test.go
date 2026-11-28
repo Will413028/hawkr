@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 type stubIssuers struct{ domain.IssuerRepository }
 
 func (stubIssuers) GetByRef(context.Context, string, int64) (domain.Issuer, error) {
@@ -109,7 +108,6 @@ func validateReq() *pb.ValidateOrderInvoiceInputInternalRequest {
 	}
 }
 
-
 // TestResolveOrderInvoiceModeInternal_RejectsNonInternalCall 守 §5.2：
 // 這兩支只給服務間呼叫，使用者面（gateway 代理過來、不帶 x-internal-service）一律拒絕。
 //
@@ -154,7 +152,6 @@ func TestRequireInternalCall_AcceptsInternalCall(t *testing.T) {
 		t.Fatalf("內部呼叫不該被擋：%v", err)
 	}
 }
-
 
 func TestResolveOrderInvoiceModeInternal_Success(t *testing.T) {
 	s := newServer(approvedSeller())

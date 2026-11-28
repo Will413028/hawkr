@@ -16,12 +16,12 @@ var versionSegment = regexp.MustCompile(`^v[0-9]+((alpha|beta)[0-9]+)?$`)
 
 // Schema 是 buf image 的索引：package 的短名、型別、列舉與註解。
 type Schema struct {
-	files *protoregistry.Files
-	pkgShort map[string]string
-	shortPkg map[string]string
-	enums    []*EnumInfo
-	enumByFn map[protoreflect.FullName]*EnumInfo
-	serverOwned map[protoreflect.FullName]bool
+	files                  *protoregistry.Files
+	pkgShort               map[string]string
+	shortPkg               map[string]string
+	enums                  []*EnumInfo
+	enumByFn               map[protoreflect.FullName]*EnumInfo
+	serverOwned            map[protoreflect.FullName]bool
 	unavailableShapeErrors []string
 }
 

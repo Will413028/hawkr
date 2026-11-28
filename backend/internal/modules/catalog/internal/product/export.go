@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 )
 
-
 func checkBatch(ids []uuid.UUID) error {
 	if len(ids) > model.MaxBatchIDs {
 		return model.Invalid("IDs", model.ReasonTooMany)

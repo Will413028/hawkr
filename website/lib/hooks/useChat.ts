@@ -45,7 +45,6 @@ export function useChatSide(): ChatSide {
 /** 對方在線狀態的重新查詢間隔。 */
 export const PRESENCE_REFETCH_MS = 30_000;
 
-
 export function useConversations({
 	subscribeToSocket = true,
 }: {
@@ -93,7 +92,6 @@ export function useConversations({
 		},
 	};
 }
-
 
 export interface ThreadData {
 	messages: ChatMessage[];

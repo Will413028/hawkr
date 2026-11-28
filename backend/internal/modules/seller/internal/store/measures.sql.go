@@ -13,7 +13,6 @@ import (
 )
 
 const accountMeasures = `-- name: AccountMeasures :many
-
 SELECT m.id, m.account_id, m.store_id, m.kind, m.basis, m.risk_ground, m.lead_finding_id, m.review_by, m.statement_to_seller, m.starts_at, m.ends_at, m.termination_ground, m.source_measure_id, m.source_case_id, m.status, m.version, m.current_revision, m.request_id, m.request_hash, m.created_by_admin_id, m.created_at, m.updated_at, m.revoked_reason, m.revoked_by_admin_id, m.revoked_at, m.source_authority_order_id
 FROM seller.measures m
 WHERE m.account_id = $1
@@ -41,9 +40,6 @@ type AccountMeasuresParams struct {
 	PageSize     int32
 }
 
-// 措施列表的 state 篩選：ACTIVE 與 ENDED 用同一個交易取得的 EffectiveMeasures 結果（active_ids）；「生效中」的 SQL 定義是 seller.effective_measures(at)（EffectiveMeasures
-// 指定帳號、EffectiveMeasuresAll 全部帳號都讀它），與 model.StateOf 的一致由 TestEffectiveMeasuresPerAccountAllAccountsAndStateOfAgreeOnADataset 鎖住；ISSUED、REVOKED 只看儲存的欄位。
-// 賣家自己的措施：帳號所有 stint 上的（效果以帳號為單位），新到舊（keyset）；
 func (q *Queries) AccountMeasures(ctx context.Context, arg AccountMeasuresParams) ([]SellerMeasure, error) {
 	rows, err := q.db.Query(ctx, accountMeasures,
 		arg.AccountID,
@@ -110,7 +106,6 @@ type ActiveTakedownOfContentParams struct {
 	ContentID   uuid.UUID
 }
 
-// 內容目前生效中的內容下架措施（最多一個，measure_contents_one_enforced 保證）；沒有回 no rows。
 func (q *Queries) ActiveTakedownOfContent(ctx context.Context, arg ActiveTakedownOfContentParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, activeTakedownOfContent, arg.ContentKind, arg.ContentID)
 	var measure_id uuid.UUID
@@ -133,7 +128,6 @@ type ActiveTakedownOfContentsParams struct {
 	Kinds []string
 }
 
-// 一批內容裡任何一則已有生效中的內容下架措施時回 true（種類與 ID 是平行陣列）。
 func (q *Queries) ActiveTakedownOfContents(ctx context.Context, arg ActiveTakedownOfContentsParams) (bool, error) {
 	row := q.db.QueryRow(ctx, activeTakedownOfContents, arg.Ids, arg.Kinds)
 	var exists bool
@@ -197,9 +191,6 @@ type AdminMeasuresParams struct {
 	PageSize               int32
 }
 
-// admin 的措施列表，新到舊（keyset），篩選條件為 NULL 時不篩；request_state 篩選的是請求對外的狀態（model.Measure.EffectiveRequest：措施已不在
-// active_ids 而儲存為 PENDING 的解除請求算 CLOSED），所以 request_state 不為 NULL 時 active_ids 一定是 EffectiveMeasures 的結果；
-// 與推導的一致由 TestListMeasuresByRequestStateAgreesWithEffectiveRequest 鎖住。
 func (q *Queries) AdminMeasures(ctx context.Context, arg AdminMeasuresParams) ([]SellerMeasure, error) {
 	rows, err := q.db.Query(ctx, adminMeasures,
 		arg.StoreID,
@@ -319,8 +310,6 @@ type AdminMeasuresPendingRequestsRow struct {
 	SortAt        time.Time
 }
 
-// 待處理請求的收件匣（申覆與解除請求合在一條查詢）：依請求提出時間舊到新（等最久的在最前面）；sort_at 是 keyset 的位置。解除請求只在措施生效中
-// （active_ids，EffectiveMeasures 的結果）才算待處理，與 model.Measure.EffectiveRequest 同義。
 func (q *Queries) AdminMeasuresPendingRequests(ctx context.Context, arg AdminMeasuresPendingRequestsParams) ([]AdminMeasuresPendingRequestsRow, error) {
 	rows, err := q.db.Query(ctx, adminMeasuresPendingRequests,
 		arg.ActiveIds,
@@ -446,9 +435,6 @@ type AdminMeasuresReviewDueRow struct {
 	SortAt        *time.Time
 }
 
-// 複審到期的收件匣：成員只讀 seller.review_measure_review(now)（objects.sql，後台待辦的 MEASURE_REVIEW 也讀它）：RISK、生效中、
-// now 不早於 review_by 前 24 小時（3cd D′11）；依 review_by 舊到新。其餘篩選（店家、帳號、依據、請求、狀態）照列表的語意一併套用，
-// active_ids（EffectiveMeasures 的結果）只給請求與狀態篩選。
 func (q *Queries) AdminMeasuresReviewDue(ctx context.Context, arg AdminMeasuresReviewDueParams) ([]AdminMeasuresReviewDueRow, error) {
 	rows, err := q.db.Query(ctx, adminMeasuresReviewDue,
 		arg.Now,
@@ -536,7 +522,6 @@ type AdminViolationsParams struct {
 	PageSize       int32
 }
 
-// admin 的認定列表，新到舊（keyset），篩選條件為 NULL 時不篩。
 func (q *Queries) AdminViolations(ctx context.Context, arg AdminViolationsParams) ([]SellerViolation, error) {
 	rows, err := q.db.Query(ctx, adminViolations,
 		arg.StoreID,
@@ -635,9 +620,6 @@ type AdvanceMeasureRevisionRow struct {
 	SourceAuthorityOrderID *uuid.UUID
 }
 
-// 前進到下一版（版本不符或已撤銷時 0 列）：目前值（給賣家的理由、結束時間）寫進 measures，同一個語句把新一版的快照追加到
-// measure_revisions（current_revision 的外鍵延遲到 commit 才檢查）。呼叫方傳入完整的下一版內容，沒改的欄位也要帶原值。作者是管理員（admin_id），
-// 或系統（system_cause，沒有管理員：店家關閉時結束預告終止）；兩者剛好一個（measure_revisions_author_check）。
 func (q *Queries) AdvanceMeasureRevision(ctx context.Context, arg AdvanceMeasureRevisionParams) (AdvanceMeasureRevisionRow, error) {
 	row := q.db.QueryRow(ctx, advanceMeasureRevision,
 		arg.StatementToSeller,
@@ -699,7 +681,6 @@ type CascadeRevokeMeasuresParams struct {
 	Ids     []uuid.UUID
 }
 
-// 連帶撤銷的措施：依據的認定被撤銷（FINDING_REVOKED）或來源的終止被撤銷（SOURCE_REVOKED），原因由呼叫方給；不帶版本（呼叫方已鎖住帳號與這些措施）。
 func (q *Queries) CascadeRevokeMeasures(ctx context.Context, arg CascadeRevokeMeasuresParams) ([]SellerMeasure, error) {
 	rows, err := q.db.Query(ctx, cascadeRevokeMeasures,
 		arg.Reason,
@@ -771,7 +752,6 @@ type CaseNotesParams struct {
 	PageSize       int32
 }
 
-// 案件的內部註記，舊到新（keyset，AIP-158）；after_* 為 NULL 時從頭開始。
 func (q *Queries) CaseNotes(ctx context.Context, arg CaseNotesParams) ([]SellerGovernanceNote, error) {
 	rows, err := q.db.Query(ctx, caseNotes,
 		arg.CaseID,
@@ -814,7 +794,6 @@ FROM seller.measures m
 WHERE m.id = c.measure_id AND m.store_id = ANY($1::bigint[]) AND c.snapshot_state = 'CAPTURED'
 `
 
-// 店家退場（個資清理第二段）時清空這些店家全部措施留著的內容快照，不論措施是否撤銷。
 func (q *Queries) ClearContentSnapshotsOfStores(ctx context.Context, storeIds []int64) (int64, error) {
 	result, err := q.db.Exec(ctx, clearContentSnapshotsOfStores, storeIds)
 	if err != nil {
@@ -845,8 +824,6 @@ type ClearExpiredContentSnapshotsParams struct {
 	MaxRows int32
 }
 
-// 撤銷滿保留期的內容下架措施，清空它留著的內容快照（內容下架沒有結束時間，只從 revoked_at 起算；未撤銷的一直保留）。cutoff 是現在減保留期；
-// 一批最多 max_rows 列，鎖住（SKIP LOCKED）再更新，重跑冪等。
 func (q *Queries) ClearExpiredContentSnapshots(ctx context.Context, arg ClearExpiredContentSnapshotsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, clearExpiredContentSnapshots, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -866,8 +843,6 @@ WHERE m.id = r.measure_id AND r.measure_id = ANY($1::uuid[]) AND r.kind = 'REMED
 RETURNING r.id, r.measure_id, r.kind, r.state, r.reason, r.revision, r.submitted_at, r.decision_reason, r.decided_by_admin_id, r.decided_at, r.basis, r.close_cause
 `
 
-// 措施已結束而失去標的的待處理解除請求，以 CLOSED（ENDED）結案：系統結案沒有 admin，結案時間是措施的結束時間（不是現在），讓結案前後
-// model.Measure.EffectiveRequest 的輸出相同。
 func (q *Queries) CloseEndedRemediations(ctx context.Context, measureIds []uuid.UUID) ([]SellerMeasureRequest, error) {
 	rows, err := q.db.Query(ctx, closeEndedRemediations, measureIds)
 	if err != nil {
@@ -917,7 +892,6 @@ type CloseRequestsParams struct {
 	MeasureIds []uuid.UUID
 }
 
-// 措施撤銷時，把這些措施上待處理的請求結案（不帶理由，原因 REVOKED，帶執行撤銷的 admin）。
 func (q *Queries) CloseRequests(ctx context.Context, arg CloseRequestsParams) ([]SellerMeasureRequest, error) {
 	rows, err := q.db.Query(ctx, closeRequests, arg.AdminID, arg.Now, arg.MeasureIds)
 	if err != nil {
@@ -963,8 +937,6 @@ type CountRecentMediumViolationsParams struct {
 	Since     time.Time
 }
 
-// 升級規則的計數：帳號自 since 起未撤銷、原本是 MEDIUM 的認定（帳號所有 stint 一起算）。呼叫方已鎖住帳號的全部 stint，
-// 計數與新增之間不會插入別筆。
 func (q *Queries) CountRecentMediumViolations(ctx context.Context, arg CountRecentMediumViolationsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countRecentMediumViolations, arg.AccountID, arg.Since)
 	var count int64
@@ -990,7 +962,6 @@ type DecideRequestParams struct {
 	ID      uuid.UUID
 }
 
-// 裁定待處理的請求（接受或駁回，理由必填）；不是 PENDING 時 0 列。
 func (q *Queries) DecideRequest(ctx context.Context, arg DecideRequestParams) (SellerMeasureRequest, error) {
 	row := q.db.QueryRow(ctx, decideRequest,
 		arg.State,
@@ -1024,7 +995,6 @@ WHERE violation_id = ANY($1::uuid[])
 ORDER BY violation_id, report_id
 `
 
-// 一批認定的來源通報，依認定、通報 id 排序。
 func (q *Queries) FindingReportIDs(ctx context.Context, violationIds []uuid.UUID) ([]SellerFindingReport, error) {
 	rows, err := q.db.Query(ctx, findingReportIDs, violationIds)
 	if err != nil {
@@ -1055,7 +1025,6 @@ type InsertFindingModerationReportsParams struct {
 	ReportIds   []uuid.UUID
 }
 
-// 認定的來源 moderation 檢舉（不透明的外部參照，沒有 FK；與 InsertViolation 同一個 transaction）。
 func (q *Queries) InsertFindingModerationReports(ctx context.Context, arg InsertFindingModerationReportsParams) error {
 	_, err := q.db.Exec(ctx, insertFindingModerationReports, arg.ViolationID, arg.ReportIds)
 	return err
@@ -1071,7 +1040,6 @@ type InsertFindingReportsParams struct {
 	ReportIds   []uuid.UUID
 }
 
-// 認定的來源通報（與 InsertViolation 同一個 transaction；呼叫方已依 id 升序鎖住這些通報並驗證過）。
 func (q *Queries) InsertFindingReports(ctx context.Context, arg InsertFindingReportsParams) error {
 	_, err := q.db.Exec(ctx, insertFindingReports, arg.ViolationID, arg.ReportIds)
 	return err
@@ -1094,8 +1062,6 @@ type InsertGovernanceNoteParams struct {
 	Now          time.Time
 }
 
-// 措施或案件的內部註記（剛好一個，CHECK 保證）：只新增，沒有更新與刪除；不動 measures 與 cases，所以不改 version。措施或案件不存在時外鍵擋下（23503）。
-// 改案件嚴重度時寫的那則註記帶改前與改後（severity_from、severity_to）。RETURNING：回應用資料庫存下的值（timestamptz 只到微秒），與之後讀到的完全相同。
 func (q *Queries) InsertGovernanceNote(ctx context.Context, arg InsertGovernanceNoteParams) (SellerGovernanceNote, error) {
 	row := q.db.QueryRow(ctx, insertGovernanceNote,
 		arg.NoteID,
@@ -1193,10 +1159,6 @@ type InsertMeasureRow struct {
 	SourceAuthorityOrderID *uuid.UUID
 }
 
-// 新增措施：目前值寫進 measures，同一個語句追加第 1 版的歷史快照（SQL:2011 系統版本表：目前值與歷史由同一個寫入路徑維持一致）。
-// 依據與 current_revision 的外鍵延遲到 commit 才檢查（依據在同一個 transaction 稍後寫入）。starts_at 由呼叫方算（停權與立即生效的終止是 now，
-// 預告終止是 now 加 720 小時；CHECK 保證）。同一個 (管理員, request_id) 已存在時 0 列（DO NOTHING，不丟 23505）：呼叫方已鎖住目標帳號的 stint 並查過
-// request_id，所以只有目標不同帳號的並行請求會走到這裡，再讀既有那筆比對內容。
 func (q *Queries) InsertMeasure(ctx context.Context, arg InsertMeasureParams) (InsertMeasureRow, error) {
 	row := q.db.QueryRow(ctx, insertMeasure,
 		arg.ID,
@@ -1279,8 +1241,6 @@ type InsertMeasureContentsParams struct {
 	LinkThreadIds []uuid.UUID
 }
 
-// 內容下架措施的全部對象與處分依據的快照，一次寫入（與 InsertMeasure 同一個 transaction；呼叫方已驗證形狀，一個措施最多 20 筆）。參數是平行陣列，同一個索引是同一個對象。
-// 連結欄位依種類只填其中一組，沒填的是零值 UUID 或 0（形狀驗證不允許這些值當真的連結）。
 func (q *Queries) InsertMeasureContents(ctx context.Context, arg InsertMeasureContentsParams) error {
 	_, err := q.db.Exec(ctx, insertMeasureContents,
 		arg.MeasureID,
@@ -1329,7 +1289,6 @@ type InsertMeasureRequestParams struct {
 	MeasureID uuid.UUID
 }
 
-// basis 由措施帶入（複合外鍵 measure_requests_measure_basis_fkey 與 CHECK 保證解除請求只掛在風險措施上）。
 func (q *Queries) InsertMeasureRequest(ctx context.Context, arg InsertMeasureRequestParams) (SellerMeasureRequest, error) {
 	row := q.db.QueryRow(ctx, insertMeasureRequest,
 		arg.ID,
@@ -1403,7 +1362,6 @@ type InsertViolationParams struct {
 	Now             time.Time
 }
 
-// 認定只由建立措施的 transaction 寫入（origin_measure_id 是那個措施；與 measure_findings 的複合外鍵延遲到 commit 才檢查）。
 func (q *Queries) InsertViolation(ctx context.Context, arg InsertViolationParams) (SellerViolation, error) {
 	row := q.db.QueryRow(ctx, insertViolation,
 		arg.ID,
@@ -1443,7 +1401,6 @@ WHERE source_measure_id = ANY($1::uuid[]) AND status = 'ENFORCED'
 ORDER BY account_id
 `
 
-// 以這些措施為來源、仍未撤銷的關聯終止所在的帳號（撤銷來源之前先依 account_id 升序鎖住它們，不加鎖讀取；鎖住之後 LockLinkedMeasures 再讀一次）。
 func (q *Queries) LinkedMeasureAccounts(ctx context.Context, sourceIds []uuid.UUID) ([]int64, error) {
 	rows, err := q.db.Query(ctx, linkedMeasureAccounts, sourceIds)
 	if err != nil {
@@ -1476,7 +1433,6 @@ type LinkedMeasureExistsParams struct {
 	AccountID       int64
 }
 
-// 這個帳號是否已有以這筆措施為來源、仍生效的關聯終止（measures_linked_source 的檢查版；呼叫方已鎖住來源與目標帳號）。
 func (q *Queries) LinkedMeasureExists(ctx context.Context, arg LinkedMeasureExistsParams) (bool, error) {
 	row := q.db.QueryRow(ctx, linkedMeasureExists, arg.SourceMeasureID, arg.AccountID)
 	var exists bool
@@ -1495,7 +1451,6 @@ type LinkedMeasuresOfRow struct {
 	AccountID int64
 }
 
-// 以這筆措施為來源、仍未撤銷的關聯終止（admin 的關聯帳號區塊顯示 linked_measure_id）。
 func (q *Queries) LinkedMeasuresOf(ctx context.Context, sourceMeasureID *uuid.UUID) ([]LinkedMeasuresOfRow, error) {
 	rows, err := q.db.Query(ctx, linkedMeasuresOf, sourceMeasureID)
 	if err != nil {
@@ -1524,7 +1479,6 @@ ORDER BY id
 FOR UPDATE
 `
 
-// 以這些措施為來源、仍未撤銷的關聯終止，鎖住（呼叫方已鎖住這些帳號全部的 stint）；來源撤銷時連帶撤銷它們。
 func (q *Queries) LockLinkedMeasures(ctx context.Context, sourceIds []uuid.UUID) ([]SellerMeasure, error) {
 	rows, err := q.db.Query(ctx, lockLinkedMeasures, sourceIds)
 	if err != nil {
@@ -1664,7 +1618,6 @@ type MeasureByRequestParams struct {
 	RequestID *uuid.UUID
 }
 
-// 冪等重送的查詢：範圍是 (管理員, request_id)。
 func (q *Queries) MeasureByRequest(ctx context.Context, arg MeasureByRequestParams) (SellerMeasure, error) {
 	row := q.db.QueryRow(ctx, measureByRequest, arg.AdminID, arg.RequestID)
 	var i SellerMeasure
@@ -1712,7 +1665,6 @@ type MeasureContentBodiesRow struct {
 	Body        string
 }
 
-// 一批措施裡有快照的對象的本文全文（只給後台讀單筆措施）。
 func (q *Queries) MeasureContentBodies(ctx context.Context, measureIds []uuid.UUID) ([]MeasureContentBodiesRow, error) {
 	rows, err := q.db.Query(ctx, measureContentBodies, measureIds)
 	if err != nil {
@@ -1750,7 +1702,6 @@ type MeasureContentRefsRow struct {
 	ContentID   uuid.UUID
 }
 
-// 一個措施的內容下架對象（只有種類與 ID，給事件用），依種類、ID 排序。
 func (q *Queries) MeasureContentRefs(ctx context.Context, measureID uuid.UUID) ([]MeasureContentRefsRow, error) {
 	rows, err := q.db.Query(ctx, measureContentRefs, measureID)
 	if err != nil {
@@ -1800,8 +1751,6 @@ type MeasureContentsRow struct {
 	LinkThreadID       *uuid.UUID
 }
 
-// 一批措施的內容下架對象，依措施、種類、ID 排序（種類以位元組順序，不依 collation）。清單與摘要只讀本文的前 excerpt_runes 個字元與「是否更長」，不讀全文（全文見 MeasureContentBodies）；
-// left 與 char_length 都以字元計（資料庫編碼 UTF8），與 Go 以 rune 計一致。
 func (q *Queries) MeasureContents(ctx context.Context, arg MeasureContentsParams) ([]MeasureContentsRow, error) {
 	rows, err := q.db.Query(ctx, measureContents, arg.ExcerptRunes, arg.MeasureIds)
 	if err != nil {
@@ -1848,8 +1797,6 @@ type MeasureFindingsRow struct {
 	SellerViolation SellerViolation
 }
 
-// 一批措施的依據認定；每個措施的主要依據（lead_finding_id，建立時由規則決定：有新的認定是新的認定，否則是最嚴重、同嚴重度最新的引用認定）排第一，
-// 其餘依建立時間。
 func (q *Queries) MeasureFindings(ctx context.Context, measureIds []uuid.UUID) ([]MeasureFindingsRow, error) {
 	rows, err := q.db.Query(ctx, measureFindings, measureIds)
 	if err != nil {
@@ -1905,7 +1852,6 @@ type MeasureNotesParams struct {
 	PageSize       int32
 }
 
-// 內部註記，舊到新（keyset，AIP-158）；after_* 為 NULL 時從頭開始。
 func (q *Queries) MeasureNotes(ctx context.Context, arg MeasureNotesParams) ([]SellerGovernanceNote, error) {
 	rows, err := q.db.Query(ctx, measureNotes,
 		arg.MeasureID,
@@ -1947,7 +1893,6 @@ WHERE measure_id = $1
 ORDER BY revision
 `
 
-// 版本歷史（含目前那一版），舊到新。
 func (q *Queries) MeasureRevisions(ctx context.Context, measureID uuid.UUID) ([]SellerMeasureRevision, error) {
 	rows, err := q.db.Query(ctx, measureRevisions, measureID)
 	if err != nil {
@@ -1987,7 +1932,6 @@ type MeasureStoreNamesRow struct {
 	StoreName *string
 }
 
-// 一批措施的店名（store_id 去重後的批次讀取）；個資清理之後 store_name 是 NULL。
 func (q *Queries) MeasureStoreNames(ctx context.Context, storeIds []int64) ([]MeasureStoreNamesRow, error) {
 	rows, err := q.db.Query(ctx, measureStoreNames, storeIds)
 	if err != nil {
@@ -2075,7 +2019,6 @@ type MeasuresCitingFindingsParams struct {
 	ExceptID     uuid.UUID
 }
 
-// 引用這些認定、仍未撤銷的措施（撤銷認定時連帶撤銷它們）；排除發動的措施。
 func (q *Queries) MeasuresCitingFindings(ctx context.Context, arg MeasuresCitingFindingsParams) ([]SellerMeasure, error) {
 	rows, err := q.db.Query(ctx, measuresCitingFindings, arg.ViolationIds, arg.ExceptID)
 	if err != nil {
@@ -2137,9 +2080,6 @@ type MeasuresWithEndedRemediationParams struct {
 	AccountID *int64
 }
 
-// 已結束（停權措施、不在 active_ids）而仍有待處理解除請求的措施；active_ids 是同一個 transaction 內 EffectiveMeasures 的結果（「生效中」的
-// 定義只有那一處）；account_id 為 NULL 時不限帳號。解除請求只在措施生效中才有標的，措施的結案掃描與 SubmitAppeal 以外的路徑用它找到
-// 要結案的措施（時效，不是正確性：對外的狀態由 model.Measure.EffectiveRequest 推導，寫入路徑各自強制不變量）。
 func (q *Queries) MeasuresWithEndedRemediation(ctx context.Context, arg MeasuresWithEndedRemediationParams) ([]SellerMeasure, error) {
 	rows, err := q.db.Query(ctx, measuresWithEndedRemediation, arg.ActiveIds, arg.AccountID)
 	if err != nil {
@@ -2195,7 +2135,6 @@ ORDER BY id
 FOR UPDATE
 `
 
-// 帳號上未結束的預告終止（termination_ground = NOTICE，ENFORCED，尚未結束：SCHEDULED 或 ACTIVE）；店家關閉時結束它們（條款 21.2）。
 func (q *Queries) OpenNoticeTerminations(ctx context.Context, accountID int64) ([]SellerMeasure, error) {
 	rows, err := q.db.Query(ctx, openNoticeTerminations, accountID)
 	if err != nil {
@@ -2250,7 +2189,6 @@ WHERE origin_measure_id = $1 AND status = 'ENFORCED'
 ORDER BY created_at, id
 `
 
-// 措施自己建立、仍生效的認定（撤銷措施並要求撤銷依據時，撤銷的就是它們）。
 func (q *Queries) OriginFindings(ctx context.Context, originMeasureID uuid.UUID) ([]SellerViolation, error) {
 	rows, err := q.db.Query(ctx, originFindings, originMeasureID)
 	if err != nil {
@@ -2301,7 +2239,6 @@ type QualifyingCitedFindingsParams struct {
 	OlderThan time.Time
 }
 
-// MATERIAL_BREACH（條款 21.3 第 1 款）引用的認定中，未撤銷、屬於這個帳號、而且建立它的措施早於 older_than（至少已存在 7 日）的。
 func (q *Queries) QualifyingCitedFindings(ctx context.Context, arg QualifyingCitedFindingsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, qualifyingCitedFindings, arg.Ids, arg.AccountID, arg.OlderThan)
 	if err != nil {
@@ -2361,7 +2298,6 @@ WHERE measure_id = ANY($1::uuid[])
 ORDER BY measure_id, submitted_at DESC, id DESC
 `
 
-// 一批措施上的請求，新到舊。
 func (q *Queries) RequestsByMeasures(ctx context.Context, measureIds []uuid.UUID) ([]SellerMeasureRequest, error) {
 	rows, err := q.db.Query(ctx, requestsByMeasures, measureIds)
 	if err != nil {
@@ -2402,7 +2338,6 @@ WHERE request_id = ANY($1::uuid[])
 ORDER BY request_id, position
 `
 
-// 一批請求的佐證（讀取單筆措施時一次載入全部請求的佐證）。
 func (q *Queries) RequestsEvidence(ctx context.Context, requestIds []uuid.UUID) ([]SellerMeasureRequestEvidence, error) {
 	rows, err := q.db.Query(ctx, requestsEvidence, requestIds)
 	if err != nil {
@@ -2445,8 +2380,6 @@ type ReviewMeasureAppealByIDsRow struct {
 	DueAt     time.Time
 }
 
-// 這些措施請求（申覆）的裁定開始時間與期限（資源的 decide_deadline）。規則只有 seller.review_measure_appeal(at)（objects.sql）；不是待處理的請求沒有列。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 func (q *Queries) ReviewMeasureAppealByIDs(ctx context.Context, arg ReviewMeasureAppealByIDsParams) ([]ReviewMeasureAppealByIDsRow, error) {
 	rows, err := q.db.Query(ctx, reviewMeasureAppealByIDs, arg.At, arg.Ids)
 	if err != nil {
@@ -2484,9 +2417,6 @@ type ReviewMeasureLiftRequestByIDsRow struct {
 	DueAt     time.Time
 }
 
-// 這些措施請求（解除請求）的裁定開始時間與期限（資源的 decide_deadline）。規則只有 seller.review_measure_lift_request(at)（objects.sql）；
-// 不是待處理、或措施已不在生效中的請求沒有列。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 func (q *Queries) ReviewMeasureLiftRequestByIDs(ctx context.Context, arg ReviewMeasureLiftRequestByIDsParams) ([]ReviewMeasureLiftRequestByIDsRow, error) {
 	rows, err := q.db.Query(ctx, reviewMeasureLiftRequestByIDs, arg.At, arg.Ids)
 	if err != nil {
@@ -2524,9 +2454,6 @@ type ReviewMeasureReviewByIDsRow struct {
 	DueAt     time.Time
 }
 
-// 這些措施的複審開始時間與期限（資源的 review_deadline）。規則只有 seller.review_measure_review(at)（objects.sql）；不是風險類型、不在生效中、
-// 或還沒到 review_by 前 24 小時的措施沒有列。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 func (q *Queries) ReviewMeasureReviewByIDs(ctx context.Context, arg ReviewMeasureReviewByIDsParams) ([]ReviewMeasureReviewByIDsRow, error) {
 	rows, err := q.db.Query(ctx, reviewMeasureReviewByIDs, arg.At, arg.Ids)
 	if err != nil {
@@ -2567,7 +2494,6 @@ type RevokeMeasureParams struct {
 	ExpectedVersion int64
 }
 
-// ENFORCED → REVOKED（admin 撤銷或接受申覆）；版本不符或已撤銷時 0 列。
 func (q *Queries) RevokeMeasure(ctx context.Context, arg RevokeMeasureParams) (SellerMeasure, error) {
 	row := q.db.QueryRow(ctx, revokeMeasure,
 		arg.Reason,
@@ -2626,7 +2552,6 @@ type RevokeViolationsParams struct {
 	Ids     []uuid.UUID
 }
 
-// 撤銷一批認定（連同它們的措施撤銷時）；已撤銷的不動。
 func (q *Queries) RevokeViolations(ctx context.Context, arg RevokeViolationsParams) ([]SellerViolation, error) {
 	rows, err := q.db.Query(ctx, revokeViolations,
 		arg.Reason,
@@ -2683,7 +2608,6 @@ type SetMeasureReviewParams struct {
 	ExpectedVersion int64
 }
 
-// 重排複審期限（RISK）：後台版本加一，賣家的版本（current_revision）與目前值不變。
 func (q *Queries) SetMeasureReview(ctx context.Context, arg SetMeasureReviewParams) (SellerMeasure, error) {
 	row := q.db.QueryRow(ctx, setMeasureReview,
 		arg.ReviewBy,
@@ -2737,7 +2661,6 @@ type TouchMeasureParams struct {
 	ExpectedVersion int64
 }
 
-// 不改賣家看得到的版本、但後台看到的狀態改變時（請求提出或駁回）：後台版本加一。版本不符或已撤銷時 0 列。
 func (q *Queries) TouchMeasure(ctx context.Context, arg TouchMeasureParams) (SellerMeasure, error) {
 	row := q.db.QueryRow(ctx, touchMeasure, arg.Now, arg.ID, arg.ExpectedVersion)
 	var i SellerMeasure

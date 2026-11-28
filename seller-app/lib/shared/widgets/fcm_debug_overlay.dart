@@ -13,7 +13,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../app.dart';
 import '../../features/notification/data/push/manager.dart';
 
-
 class FcmDebugRecord {
   final DateTime receivedAt;
   final String? messageId;
@@ -50,7 +49,6 @@ class FcmDebugRecord {
     return const JsonEncoder.withIndent('  ').convert(map);
   }
 }
-
 
 class FcmDebugOverlay extends StatelessWidget {
   const FcmDebugOverlay({super.key});
@@ -129,7 +127,6 @@ class FcmDebugOverlay extends StatelessWidget {
     );
   }
 }
-
 
 class FcmDebugPanel extends StatefulWidget {
   const FcmDebugPanel({super.key});
@@ -341,7 +338,6 @@ class _FcmDebugPanelState extends State<FcmDebugPanel> {
     );
   }
 }
-
 
 class _FcmDebugItem extends StatelessWidget {
   final FcmDebugRecord record;

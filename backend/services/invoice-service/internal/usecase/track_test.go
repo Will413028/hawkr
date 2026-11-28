@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 func trk(layer, category int, start, end, now string, status, booklets int) amego.Track {
 	return amego.Track{
 		Layer: layer, Category: category,
@@ -80,9 +79,8 @@ func TestExhausted(t *testing.T) {
 	}
 }
 
-
 type fakeAccounts struct {
-	list []domain.ProviderAccount
+	list   []domain.ProviderAccount
 	failOn int64
 }
 
@@ -166,7 +164,6 @@ func TestTrack_RunOnce_Aggregates(t *testing.T) {
 		t.Errorf("nextPeriodInsufficient=%d want 1", obs.nextInsufficient)
 	}
 }
-
 
 type fakePromoter struct {
 	rows   map[int64]int64

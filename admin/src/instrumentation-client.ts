@@ -28,8 +28,7 @@ if (typeof window !== "undefined") {
 			);
 			if (last && Date.now() - last < RELOAD_DEBOUNCE_MS) return;
 			window.sessionStorage.setItem(RELOAD_STAMP_KEY, String(Date.now()));
-		} catch {
-		}
+		} catch {}
 		reloadedInThisRuntime = true;
 		window.location.reload();
 	};

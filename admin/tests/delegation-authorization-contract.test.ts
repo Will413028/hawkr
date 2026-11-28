@@ -427,7 +427,6 @@ test("錯誤分派以業務碼為準，未知碼退回呼叫端給的說法", ()
 	);
 });
 
-
 /** 授權面的新檔案。加檔案就要加到這裡，否則保證只覆蓋一半。 */
 const AUTHORIZATION_FILES = [
 	"src/features/delegated-operations/authorization.ts",

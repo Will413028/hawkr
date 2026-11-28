@@ -6,7 +6,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 )
 
-
 const complaintActorAdmin = "ADMIN"
 
 func toBuyerComplaintInfo(v usecase.ComplaintView) *pb.InvoiceComplaintInfo {

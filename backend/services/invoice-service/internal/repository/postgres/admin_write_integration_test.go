@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 func seedManualJob(ctx context.Context, t *testing.T, pool *pgxpool.Pool,
 	docStatus, opStatus string) (docID, opID int64) {
 	t.Helper()
@@ -317,7 +316,6 @@ func seedIssuedDocument(ctx context.Context, t *testing.T, pool *pgxpool.Pool) i
 		  WHERE id = $1`, docID)
 	return docID
 }
-
 
 func TestIntegration_NotificationResend_TenMinuteWindow(t *testing.T) {
 	ctx := context.Background()

@@ -245,7 +245,6 @@ export default function InvoiceDocumentDetailClient({
 							) : null}
 							{detail.issuerName ? (
 								<>
-
 									<dt className={DT_CLASS}>{T.fieldIssuer}</dt>
 									<dd className={DD_CLASS}>{detail.issuerName}</dd>
 								</>
@@ -333,7 +332,6 @@ export default function InvoiceDocumentDetailClient({
 						>
 							{INVOICE_ORDER_TEXT.shippingFeeNotice}
 						</p>
-
 
 						{summary.documentKind === "B2B" ? (
 							<p

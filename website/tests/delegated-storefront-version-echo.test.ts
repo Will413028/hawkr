@@ -29,7 +29,6 @@ function read(file: string): string {
 	return readFileSync(join(ROOT, file), "utf8");
 }
 
-
 /**
  * 這個 repo 沒有 DOM 測試環境（`vitest.config.ts` 是 `environment: "node"`，也沒有
  * jsdom／testing-library），連續兩次儲存無法真的點兩下驗證。所以接線這一段改用

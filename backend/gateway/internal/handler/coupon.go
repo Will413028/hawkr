@@ -153,7 +153,6 @@ type AdminUpdateCouponQuotaRequest struct {
 	MaxTemplateCount string `json:"maxTemplateCount" binding:"required"`
 }
 
-
 func getAccountType(c *gin.Context) int {
 	accountType, _ := c.Get("accountType")
 	code, _ := accountType.(int)
@@ -234,7 +233,6 @@ func mergeBuyerIDs(resolved, alreadyResolved []string) []string {
 	}
 	return merged
 }
-
 
 // GetCoupons 取得優惠券列表（根據 view 參數分流）
 // @Summary      取得優惠券列表
@@ -484,7 +482,6 @@ func (h *Holder) ClaimCoupon(c *gin.Context) {
 	})
 }
 
-
 // CreateCouponTemplate 賣家建立並發行優惠券
 // @Summary      建立並發行優惠券
 // @Description  賣家建立優惠券模板並立即發行給指定買家，需檢查配額上限
@@ -714,7 +711,6 @@ func (h *Holder) RevokeCouponTemplate(c *gin.Context) {
 
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
-
 
 // AdminCreateCouponTemplate 管理員建立優惠券模板
 // @Summary      管理員建立優惠券模板
@@ -978,9 +974,9 @@ func (h *Holder) AdminGrantCompensation(c *gin.Context) {
 	}
 
 	var req struct {
-		BuyerAccountId string `json:"buyerAccountId" binding:"required"`
-		Amount         string `json:"amount" binding:"required"`
-		RefOrderNo     string `json:"refOrderNo"`
+		BuyerAccountId    string `json:"buyerAccountId" binding:"required"`
+		Amount            string `json:"amount" binding:"required"`
+		RefOrderNo        string `json:"refOrderNo"`
 		ApplicableStoreId string `json:"applicableStoreId" binding:"required"`
 		Reason            string `json:"reason" binding:"required"`
 	}
@@ -1102,7 +1098,6 @@ func (h *Holder) AdminUpdateCouponQuota(c *gin.Context) {
 
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
-
 
 func templateInfoToMap(tpl *pb.TemplateInfo, mediaBase string) gin.H {
 	if tpl == nil {

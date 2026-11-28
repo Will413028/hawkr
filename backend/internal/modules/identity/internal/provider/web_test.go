@@ -23,12 +23,12 @@ import (
 var webNow = time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
 
 type fakeProvider struct {
-	t        *testing.T
-	srv      *httptest.Server
-	rsaKey   *rsa.PrivateKey
-	secret   string
-	code     string
-	verifier string
+	t           *testing.T
+	srv         *httptest.Server
+	rsaKey      *rsa.PrivateKey
+	secret      string
+	code        string
+	verifier    string
 	idToken     func() string
 	tokenStatus int
 	form        url.Values

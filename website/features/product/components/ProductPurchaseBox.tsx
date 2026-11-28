@@ -166,8 +166,7 @@ export default function ProductPurchaseBox({
 				if (page.records.some((r) => r.productId === String(productId))) {
 					setRestockOn(true);
 				}
-			} catch {
-			}
+			} catch {}
 		})();
 		return () => {
 			cancelled = true;
@@ -405,7 +404,6 @@ export default function ProductPurchaseBox({
 			</section>
 
 			<div className="grid grid-cols-2 gap-3.5 mt-1 max-sm:grid-cols-1">
-
 				{outOfStock ? (
 					<>
 						{purchaseAvailability.canSubscribeRestock && !previewMode ? (

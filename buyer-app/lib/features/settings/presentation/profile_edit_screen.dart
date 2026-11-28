@@ -136,7 +136,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _jobCtrl.text = job;
   }
 
-
   Future<void> _pickAvatar() async {
     final picker = ImagePicker();
     final x = await picker.pickImage(

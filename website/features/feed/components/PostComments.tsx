@@ -58,7 +58,6 @@ function formatTime(unixSeconds: number): string {
 	return formatTaipeiShortDate(ms);
 }
 
-
 /** Nearest scrollable ancestor — the surface that actually scrolls around this
  *  comments list (the viewer aside, the bottom sheet body, the seller modal).
  *  Used instead of `scrollIntoView`, which would walk the whole box chain and

@@ -379,7 +379,6 @@ class AddCouponScreen extends HookConsumerWidget {
   }
 }
 
-
 class _PreviewCard extends StatelessWidget {
   const _PreviewCard({
     required this.nameCtrl,

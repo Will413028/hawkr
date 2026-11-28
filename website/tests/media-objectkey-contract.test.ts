@@ -39,7 +39,6 @@ import { normalizeMemberCard } from "../lib/member-cards/repo";
 import { normalizeOrder } from "../lib/orders/repo";
 import { restockFromConnect } from "../lib/restock-subscriptions/repo";
 
-
 const LIVE_SELLER_ORDER = {
 	orderNo: "O578806254",
 	status: "50",
@@ -142,7 +141,6 @@ test("shipment / receipt photos come from the *Keys arrays", () => {
 	assert.deepEqual(order.shipping?.receiptPhotoUrls, ["public/shipment/b.png"]);
 });
 
-
 test("cart item image comes from imageKey; `image` stays a LOCAL-cache-only field", () => {
 	const [item] = flattenGroups([
 		{
@@ -187,7 +185,6 @@ test("cart item image comes from imageKey; `image` stays a LOCAL-cache-only fiel
 	]);
 	assert.equal(legacy.image, "public/product/legacy-local-cache.png");
 });
-
 
 test("after-sale evidence and items read imageKey", () => {
 	const detail = normalizeDetail({
@@ -244,7 +241,6 @@ test("after-sale ignores evidences/photos/photoUrls and url/previewUrl", () => {
 	assert.deepEqual(viaDeadField.photos, []);
 	assert.equal(viaDeadField.items[0].image, undefined);
 });
-
 
 test("member card cover/logo read the *Key members; `cover`/`banner` are gone", () => {
 	const card = normalizeMemberCard({
@@ -317,7 +313,6 @@ test("chat conversation avatar reads the buyer's Image, not an object key", () =
 		undefined,
 	);
 });
-
 
 const LIVE_PRODUCT_CARD = {
 	id: "871936508549696815",
@@ -472,7 +467,6 @@ test("PDP review photos come from the normalized imageUrls", () => {
 		"https://test-media.example.com/i/card/x.png",
 	]);
 });
-
 
 test("generated favorite without an Image has no product image", () => {
 	const fav = create(FavoriteSchema, { product: { id: "3" } });

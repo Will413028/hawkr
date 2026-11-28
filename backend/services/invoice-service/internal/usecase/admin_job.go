@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
 	adminReasonMaxRunes = 500
 
@@ -37,7 +36,7 @@ const (
 	jobAuditActionRetry        = "INVOICE_JOB_RETRY"
 	jobAuditActionCancel       = "INVOICE_JOB_CANCEL"
 	jobAuditActionManualResult = "INVOICE_JOB_MANUAL_RESULT"
-	docAuditActionResume = "INVOICE_DOCUMENT_RESUME"
+	docAuditActionResume       = "INVOICE_DOCUMENT_RESUME"
 
 	jobResourceType = "JOB"
 	docResourceType = "DOCUMENT"
@@ -88,18 +87,18 @@ type UnlockEvidenceFinalizer interface {
 }
 
 type AdminJob struct {
-	tx      database.TxManager
-	ops     domain.OperationRepository
-	docs    domain.DocumentRepository
-	issuers domain.IssuerRepository
-	audit   domain.AuditRepository
-	outbox  domain.OutboxRepository
-	unlocks domain.ManualUnlockRepository
+	tx             database.TxManager
+	ops            domain.OperationRepository
+	docs           domain.DocumentRepository
+	issuers        domain.IssuerRepository
+	audit          domain.AuditRepository
+	outbox         domain.OutboxRepository
+	unlocks        domain.ManualUnlockRepository
 	unlockEvidence UnlockEvidenceFinalizer
-	adjustments domain.AdjustmentRepository
-	corrections domain.CorrectionRequestRepository
-	issueCfg IssuanceConfig
-	newID func() int64
+	adjustments    domain.AdjustmentRepository
+	corrections    domain.CorrectionRequestRepository
+	issueCfg       IssuanceConfig
+	newID          func() int64
 
 	now func() time.Time
 	log *zap.Logger
@@ -153,7 +152,6 @@ type JobMutationResult struct {
 	ProviderRequestID   string
 	NextStep            string
 }
-
 
 // RetryJobInput 是端點 52 的輸入。
 type RetryJobInput struct {
@@ -399,7 +397,6 @@ func resumedDocumentStatus(doc domain.Document) string {
 	return doc.Status
 }
 
-
 // ErrDocumentResumeNotAllowed 是「這份文件現在不能送回自動線」的可分辨錯誤。
 //
 // 借 9341（不可安全重試）而不新增碼值：對 ADM 而言兩者是同一件事（「這個動作現在
@@ -570,7 +567,6 @@ func (u *AdminJob) ResumeDocumentFromManual(ctx context.Context, in ResumeDocume
 	return out, nil
 }
 
-
 // CancelJobInput 是端點 53 的輸入。
 type CancelJobInput struct {
 	ActorAccountID int64
@@ -661,7 +657,7 @@ func (u *AdminJob) Cancel(ctx context.Context, in CancelJobInput) (JobMutationRe
 			ResourceID:     op.ID,
 			Before:         jobAuditState(op.Status, nil),
 			After: jobAuditState(nextStatus, map[string]string{
-				"cancelReasonCode": reasonCode,
+				"cancelReasonCode":             reasonCode,
 				"allowManualAfterCancellation": strconv.FormatBool(in.AllowManualAfterCancellation),
 			}),
 			ReasonCode:     reasonCode,
@@ -687,7 +683,6 @@ func (u *AdminJob) Cancel(ctx context.Context, in CancelJobInput) (JobMutationRe
 	}
 	return out, nil
 }
-
 
 // ReportManualResultInput 是端點 56 的輸入。
 //
@@ -772,7 +767,7 @@ func (u *AdminJob) ReportManualResult(ctx context.Context, in ReportManualResult
 			ResourceID:     op.ID,
 			Before:         jobAuditState(op.Status, map[string]string{"documentStatus": doc.Status}),
 			After: jobAuditState(codemeta.InvoiceOperationStatusResolvedExternally.Value, map[string]string{
-				"documentStatus": codemeta.InvoiceDocumentStatusResolvedExternally.Value,
+				"documentStatus":      codemeta.InvoiceDocumentStatusResolvedExternally.Value,
 				"externalInvoiceNo":   invoiceNo,
 				"externalInvoiceDate": invoiceDate.Format(time.DateOnly),
 				"externalTotalAmount": strconv.FormatInt(totalAmount, 10),
@@ -973,18 +968,17 @@ func isIssuanceOperation(opType string) bool {
 var errExternalDocumentStateDrift = errors.New(
 	"invoice: operation is MANUAL_PROCESS_ALLOWED but its document rejected RESOLVED_EXTERNALLY")
 
-
 type adminAuditInput struct {
-	ActorAccountID int64
-	Action         string
-	ResourceType   string
-	ResourceID     int64
-	Before         json.RawMessage
-	After          json.RawMessage
-	ReasonCode     string
-	ReasonDetail   string
-	IdempotencyKey string
-	Now            time.Time
+	ActorAccountID         int64
+	Action                 string
+	ResourceType           string
+	ResourceID             int64
+	Before                 json.RawMessage
+	After                  json.RawMessage
+	ReasonCode             string
+	ReasonDetail           string
+	IdempotencyKey         string
+	Now                    time.Time
 	ApprovalActorAccountID *int64
 }
 

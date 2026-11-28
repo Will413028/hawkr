@@ -20,7 +20,6 @@ import { ApiClientError } from "@/services/api-error";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 const PROVIDER_ACCOUNTS_ENDPOINT = "/api/v1/admin/invoices/provider_accounts";
 const PAGE_SIZE = 20;
 
@@ -178,7 +177,6 @@ export default function ProviderCutoversPage() {
 										{item.createdByAccountId
 											? `管理員（${item.createdByAccountId}）`
 											: "未記錄操作者"}
-
 									</>
 								),
 								body: (

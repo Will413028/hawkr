@@ -112,7 +112,6 @@ interface CompactCategoryChipProps {
 function CompactCategoryChip({ item }: CompactCategoryChipProps) {
 	const body = (
 		<>
-
 			<span className="home-chip-icon grid size-9 place-items-center overflow-hidden rounded-hk-lg text-sm font-black text-hk-primary">
 				{item.categoryId ? (
 					<FoodCategoryIcon categoryId={item.categoryId} />

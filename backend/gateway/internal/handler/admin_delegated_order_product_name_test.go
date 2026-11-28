@@ -10,7 +10,6 @@ import (
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 )
 
-
 func TestFirstDelegatedProductName(t *testing.T) {
 	cases := []struct {
 		name   string

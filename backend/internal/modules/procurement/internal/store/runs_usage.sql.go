@@ -28,7 +28,6 @@ type ConsumeUsageParams struct {
 	QuotaLimit  int32
 }
 
-// 一列計數器加條件 UPDATE（A9-D9）：used 達上限就不更新、回 0 列（呼叫端拒絕）；沒有這一期的列時先建。
 func (q *Queries) ConsumeUsage(ctx context.Context, arg ConsumeUsageParams) (int32, error) {
 	row := q.db.QueryRow(ctx, consumeUsage,
 		arg.BuyerID,
@@ -136,7 +135,6 @@ type InsertRunParams struct {
 	Now              time.Time
 }
 
-// 建 run 的方法的冪等鍵放在 run 上（S4）；同一位買家的同一個 client_request_id 已有 run 時回 0 列。quota_period_start 只有扣額度的 run（TURN）有值。
 func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertRun,
 		arg.ID,
@@ -168,7 +166,6 @@ type InsertRunInputParams struct {
 	Now          time.Time
 }
 
-// 回答選項的 run 帶 option_id、buyer_message 為空字串；文字回答與一般訊息相反（CHECK agent_run_inputs_answer_check）。
 func (q *Queries) InsertRunInput(ctx context.Context, arg InsertRunInputParams) error {
 	_, err := q.db.Exec(ctx, insertRunInput,
 		arg.RunID,
@@ -191,7 +188,6 @@ type RefundUsageParams struct {
 	PeriodStart time.Time
 }
 
-// 外部呼叫失敗時退回一次；used 已是 0 時不動（不會變負）。
 func (q *Queries) RefundUsage(ctx context.Context, arg RefundUsageParams) (int64, error) {
 	result, err := q.db.Exec(ctx, refundUsage, arg.Now, arg.BuyerID, arg.PeriodStart)
 	if err != nil {

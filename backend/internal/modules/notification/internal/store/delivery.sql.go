@@ -16,7 +16,6 @@ const deleteDeviceTokensByAccount = `-- name: DeleteDeviceTokensByAccount :execr
 DELETE FROM notification.device_tokens WHERE account_id = $1
 `
 
-// 帳號停權或刪除時，同一個 transaction 刪掉它的全部 token（兩支 App 都刪）。
 func (q *Queries) DeleteDeviceTokensByAccount(ctx context.Context, accountID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteDeviceTokensByAccount, accountID)
 	if err != nil {
@@ -29,7 +28,6 @@ const deleteDeviceTokensByValue = `-- name: DeleteDeviceTokensByValue :execrows
 DELETE FROM notification.device_tokens WHERE token = ANY($1::text[])
 `
 
-// FCM 回 UNREGISTERED 或 SENDER_ID_MISMATCH 的 token：失效，直接刪（token 是主鍵，換帳號登入時由登入改綁，不留停用列）。
 func (q *Queries) DeleteDeviceTokensByValue(ctx context.Context, tokens []string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteDeviceTokensByValue, tokens)
 	if err != nil {
@@ -42,7 +40,6 @@ const deleteHardBounceSuppressions = `-- name: DeleteHardBounceSuppressions :exe
 DELETE FROM notification.email_suppressions WHERE address_hash = ANY($1::bytea[]) AND reason = 'HARD_BOUNCE'
 `
 
-// 只刪永久退信；投訴的列不在條件內，永遠刪不掉。
 func (q *Queries) DeleteHardBounceSuppressions(ctx context.Context, hashes [][]byte) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteHardBounceSuppressions, hashes)
 	if err != nil {
@@ -66,7 +63,6 @@ type DeleteStaleDeviceTokensParams struct {
 	MaxRows int32
 }
 
-// 每日清除：last_registered_at 早於 cutoff（App 超過 60 天沒有啟動註冊）的 token，依 last_registered_at 分批。
 func (q *Queries) DeleteStaleDeviceTokens(ctx context.Context, arg DeleteStaleDeviceTokensParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteStaleDeviceTokens, arg.Cutoff, arg.MaxRows)
 	if err != nil {
@@ -90,7 +86,6 @@ type DeliveryByIDRow struct {
 	Status    string
 }
 
-// 渠道 job 讀自己的投遞紀錄（不加鎖，用來知道收件人是誰；鎖收件人之後再以 DeliveryForUpdate 重讀狀態）。
 func (q *Queries) DeliveryByID(ctx context.Context, id uuid.UUID) (DeliveryByIDRow, error) {
 	row := q.db.QueryRow(ctx, deliveryByID, id)
 	var i DeliveryByIDRow
@@ -121,7 +116,6 @@ type DeliveryForUpdateRow struct {
 	Status    string
 }
 
-// 鎖收件人之後重讀並鎖住投遞紀錄（notification 的列在鎖順序最後）。
 func (q *Queries) DeliveryForUpdate(ctx context.Context, id uuid.UUID) (DeliveryForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, deliveryForUpdate, id)
 	var i DeliveryForUpdateRow
@@ -148,7 +142,6 @@ type DeviceTokensForRecipientParams struct {
 	App       string
 }
 
-// 推播目標：帳號在指定 App 的 token。BUYER 受眾只查 BUYER App、STORE 受眾只查 SELLER App（呼叫端依受眾決定 app），不跨 App。
 func (q *Queries) DeviceTokensForRecipient(ctx context.Context, arg DeviceTokensForRecipientParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, deviceTokensForRecipient, arg.AccountID, arg.App)
 	if err != nil {
@@ -173,7 +166,6 @@ const emailSuppressed = `-- name: EmailSuppressed :one
 SELECT EXISTS (SELECT 1 FROM notification.email_suppressions WHERE address_hash = ANY($1::bytea[])) AS suppressed
 `
 
-// hashes 是位址在目前與（輪替期間的）舊密鑰下的雜湊。
 func (q *Queries) EmailSuppressed(ctx context.Context, hashes [][]byte) (bool, error) {
 	row := q.db.QueryRow(ctx, emailSuppressed, hashes)
 	var suppressed bool
@@ -220,7 +212,6 @@ type InboxItemForDeliveryParams struct {
 	IntentID  uuid.UUID
 }
 
-// 推播 data 帶的 inbox_item_id：這筆投遞的收件人在這個意圖下的收件匣列（意圖連結，或公告自己的列）；沒有收件匣列（只推播的型別）回 0 列。
 func (q *Queries) InboxItemForDelivery(ctx context.Context, arg InboxItemForDeliveryParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, inboxItemForDelivery,
 		arg.AccountID,
@@ -246,7 +237,6 @@ type InsertEmailSuppressionParams struct {
 	Now         time.Time
 }
 
-// 已在名單內的位址保留最早的時間，webhook 重複處理無害；投訴會把永久退信升級成 COMPLAINT，COMPLAINT 不會被降級。
 func (q *Queries) InsertEmailSuppression(ctx context.Context, arg InsertEmailSuppressionParams) error {
 	_, err := q.db.Exec(ctx, insertEmailSuppression, arg.AddressHash, arg.Reason, arg.Now)
 	return err
@@ -264,7 +254,6 @@ type MarkDeliveryFailedParams struct {
 	ID     uuid.UUID
 }
 
-// 永久失敗：不寫任何送出文字；只改 PENDING 的列。
 func (q *Queries) MarkDeliveryFailed(ctx context.Context, arg MarkDeliveryFailedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markDeliveryFailed, arg.Reason, arg.Now, arg.ID)
 	if err != nil {
@@ -287,7 +276,6 @@ type MarkDeliverySentParams struct {
 	ID     uuid.UUID
 }
 
-// 記下實際送出的文字與語系（送出之後收件人才被刪除時三者為 NULL，不留文字）；只改 PENDING 的列，已是終態的不動（job 重複執行時回 0 列）。
 func (q *Queries) MarkDeliverySent(ctx context.Context, arg MarkDeliverySentParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markDeliverySent,
 		arg.Locale,

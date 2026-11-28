@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	redacted = "[REDACTED]"
+	redacted        = "[REDACTED]"
 	maxLogBodyBytes = 16 << 10
 )
 

@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type mockAftersalesSellerServiceClient struct {
 	aftersalespb.AfterSalesServiceClient
 	GetSellerAfterSaleCasesFn      func(ctx context.Context, in *aftersalespb.GetSellerAfterSaleCasesRequest, opts ...grpc.CallOption) (*aftersalespb.GetSellerAfterSaleCasesResponse, error)
@@ -202,7 +201,6 @@ func TestGetSellerArbitration_UsesResolvedSellerID(t *testing.T) {
 		t.Errorf("GetSellerArbitrationRequest.StoreId = %d, want resolved surrogate %d (not raw account_id 42)", gotStoreID, aftersalesSellerTestSurrogate)
 	}
 }
-
 
 func TestAftersalesSellerHandlers_NoCurrentSeller_Forbidden(t *testing.T) {
 	cases := []struct {

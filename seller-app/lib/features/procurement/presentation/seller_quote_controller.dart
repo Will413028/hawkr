@@ -150,7 +150,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
 
   void _set(SellerQuoteFormState next) => state = AsyncData(next);
 
-
   /// 換掉整份 payload（欄位 widget 的 onChanged 都走這裡）。
   ///
   /// 內容一變就把過期橫幅收起來——但**不代表**可以重送：`reloadRequired` 的橫幅
@@ -191,7 +190,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
       );
     });
   }
-
 
   /// 存草稿。可不限次改；不計正式一次，也不驗金額恆等式。
   ///
@@ -336,7 +334,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
       return false;
     }
   }
-
 
   void _afterCommandFailure(
     SellerQuoteFormState current,

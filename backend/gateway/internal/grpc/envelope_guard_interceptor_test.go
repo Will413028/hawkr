@@ -194,7 +194,6 @@ func TestEnvelopeGuard_KnownCodeMapping_PrefixedBizCode(t *testing.T) {
 	}
 }
 
-
 func carrierCtx(t *testing.T) (context.Context, *gin.Context) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)

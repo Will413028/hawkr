@@ -24,7 +24,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 const COMPLAINTS_ENDPOINT = "/api/v1/admin/invoices/complaints";
 const PAGE_SIZE = 20;
 
@@ -268,14 +267,12 @@ export default function InvoiceComplaintsPage() {
 											) : null}
 										</td>
 										<td>
-
 											<div className="cell-main">
 												{item.buyerMaskedName || "—"}
 											</div>
 											<div className="cell-sub">{item.orderNo || "—"}</div>
 										</td>
 										<td>
-
 											<div className="cell-main">{item.storeId}</div>
 										</td>
 										<td>

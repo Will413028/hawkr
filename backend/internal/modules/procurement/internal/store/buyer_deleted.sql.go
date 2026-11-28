@@ -37,7 +37,6 @@ const anonymizeBuyerCandidateSets = `-- name: AnonymizeBuyerCandidateSets :execr
 UPDATE procurement.candidate_sets SET buyer_id = NULL WHERE buyer_id = $1
 `
 
-// 留下來的候選集（被核准引用）buyer_id 設 NULL；候選列只有 store_id 與排序，沒有買家資料。
 func (q *Queries) AnonymizeBuyerCandidateSets(ctx context.Context, buyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, anonymizeBuyerCandidateSets, buyerID)
 	if err != nil {
@@ -62,7 +61,6 @@ const anonymizeBuyerRequests = `-- name: AnonymizeBuyerRequests :execrows
 UPDATE procurement.requests SET buyer_id = NULL WHERE buyer_id = $1
 `
 
-// 已發布的需求保留（賣家看得到的詢價依附在它上面），buyer_id 設 NULL。
 func (q *Queries) AnonymizeBuyerRequests(ctx context.Context, buyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, anonymizeBuyerRequests, buyerID)
 	if err != nil {
@@ -77,7 +75,6 @@ WHERE s.buyer_id = $1::bigint
   AND NOT EXISTS (SELECT 1 FROM procurement.rfq_publication_approvals a WHERE a.candidate_set_id = s.id)
 `
 
-// 被核准引用的候選集不刪（核准連到發布與賣家紀錄，FK 是 RESTRICT）；要在 DeleteUnpublishedBuyerRequests 之後執行，沒發布過的核准已先隨需求 CASCADE 刪除。
 func (q *Queries) DeleteBuyerCandidateSets(ctx context.Context, buyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBuyerCandidateSets, buyerID)
 	if err != nil {
@@ -87,12 +84,9 @@ func (q *Queries) DeleteBuyerCandidateSets(ctx context.Context, buyerID int64) (
 }
 
 const deleteBuyerConversations = `-- name: DeleteBuyerConversations :execrows
-
 DELETE FROM procurement.conversations WHERE buyer_id = $1
 `
 
-// 買家關閉（BuyerDeleted，S10）。買家資料刪除；賣家看得到的紀錄（已發布的詢價與其下游）保留並把 buyer_id 設 NULL（保留期跟詢價的生命週期）。
-// 順序：先清買家專屬的資料，再處理需求本身（候選集要排在未發布需求之後），最後清額度。
 func (q *Queries) DeleteBuyerConversations(ctx context.Context, buyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBuyerConversations, buyerID)
 	if err != nil {
@@ -143,7 +137,6 @@ WHERE r.buyer_id = $1
   AND NOT EXISTS (SELECT 1 FROM procurement.rfq_publications p WHERE p.request_id = r.id)
 `
 
-// 沒有發布過的需求整張刪除（連帶 revision、輪次、核准，都是 ON DELETE CASCADE）。
 func (q *Queries) DeleteUnpublishedBuyerRequests(ctx context.Context, buyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteUnpublishedBuyerRequests, buyerID)
 	if err != nil {

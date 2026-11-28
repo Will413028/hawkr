@@ -27,8 +27,7 @@ function Inner() {
 			await navigator.clipboard.writeText(orderNo);
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), 1600);
-		} catch {
-		}
+		} catch {}
 	};
 
 	return (

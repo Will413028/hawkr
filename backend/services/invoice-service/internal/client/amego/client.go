@@ -408,7 +408,6 @@ func truncateForLog(s string) string {
 	return s[:max] + "…(truncated)"
 }
 
-
 // IssueInvoice 開立發票。data 是**單一物件**（送陣列回 3040112）。
 func (c *HTTPClient) IssueInvoice(ctx context.Context, cred Credential, req IssueRequest) (*IssueResult, error) {
 	raw, err := c.do(ctx, cred, EndpointIssue, req, c.deadlines.Issue)
@@ -457,7 +456,6 @@ func (c *HTTPClient) VoidAllowance(ctx context.Context, cred Credential, req Voi
 	}
 	return &VoidAccepted{Accepted: true}, nil
 }
-
 
 type invoiceQueryRequest struct {
 	Type          string `json:"type"`
@@ -567,7 +565,6 @@ func (c *HTTPClient) FetchInvoiceFileURL(ctx context.Context, cred Credential, r
 	return data.FileURL, nil
 }
 
-
 // VerifyMobileBarcode 驗手機條碼。它是唯一的載具驗證端點，且只驗手機條碼。
 // 成功時回應沒有任何載具資訊 ⇒ 回傳值只有 error。
 func (c *HTTPClient) VerifyMobileBarcode(ctx context.Context, cred Credential, barcode string) error {
@@ -618,7 +615,6 @@ func (c *HTTPClient) QueryCompanyNames(ctx context.Context, cred Credential, ban
 	}
 	return out, nil
 }
-
 
 type trackRequest struct {
 	Year         int    `json:"Year"`
@@ -703,7 +699,6 @@ func (c *HTTPClient) ServerTime(ctx context.Context) (time.Time, error) {
 	}
 	return time.Unix(env.Timestamp, 0).UTC(), nil
 }
-
 
 // InvoiceUploadStatus 回填 provider_upload_status（status=99 才是「上傳完成」）。
 func (c *HTTPClient) InvoiceUploadStatus(ctx context.Context, cred Credential, number string) (*UploadStatus, error) {

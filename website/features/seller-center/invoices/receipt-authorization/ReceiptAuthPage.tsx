@@ -96,11 +96,9 @@ export function ReceiptAuthPage() {
 		>
 			<BackLink fallbackHref={OVERVIEW_HREF}>回發票與稅籍</BackLink>
 
-
 			{revokedOrExpired ? (
 				<GateBanner reason={authorization.ineligibleReason} />
 			) : null}
-
 
 			<section className="seller-card mt-4 p-5">
 				<div className="flex items-center gap-2 mb-3">
@@ -158,7 +156,6 @@ export function ReceiptAuthPage() {
 				</div>
 			</section>
 
-
 			<section className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground">
 					平台代製收據的意思
@@ -173,7 +170,6 @@ export function ReceiptAuthPage() {
 					<li>平台不會為這些交易開立統一發票。</li>
 				</ul>
 			</section>
-
 
 			{templateUrl ? (
 				<section className="seller-card mt-4 p-5">
@@ -191,7 +187,6 @@ export function ReceiptAuthPage() {
 					</a>
 				</section>
 			) : null}
-
 
 			<section className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground mb-3">授權</h2>

@@ -47,7 +47,6 @@ class PushNotificationManager {
   /// （init / requestPermission / getToken / onUserLoggedIn）全部 no-op。
   static bool e2eDisabled = false;
 
-
   /// 第一次使用時才取 [FirebaseMessaging.instance]：Firebase 沒有設定時它會拋
   /// `core/no-app`，所有入口先以 [isFirebaseInitialized] 擋掉。
   late final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -55,7 +54,6 @@ class PushNotificationManager {
   /// 以 Connect client 送出的裝置註冊（[injectContainer] 建立）；憑證由 transport 的 auth interceptor 帶。
   NotificationDeviceRegistrar? _registrar;
   ProviderContainer? _container;
-
 
   /// session 層通知的登入狀態（[onUserLoggedIn] / [onUserLoggedOut]）。manager 不持有 session token。
   bool _isUserLoggedIn = false;
@@ -107,11 +105,9 @@ class PushNotificationManager {
   /// UI 層（通知頁、訂單頁等）訂閱後可即時刷新列表。
   Stream<RemoteMessage> get onInboxMessage => _inboxController.stream;
 
-
   StreamSubscription<RemoteMessage>? _onMessageSub;
   StreamSubscription<RemoteMessage>? _onMessageOpenedSub;
   StreamSubscription<String>? _onTokenRefreshSub;
-
 
   /// 初始化推播通知，在 main.dart runApp() 之前呼叫
   Future<void> init({bool requestPermissionOnInit = true}) async {
@@ -155,7 +151,6 @@ class PushNotificationManager {
     }
   }
 
-
   void _setupListeners() {
     _onTokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
       HKLog.logI('[FCM] Token 已更新');
@@ -183,7 +178,6 @@ class PushNotificationManager {
     HKLog.logD('[FCM] 監聽器設置完成');
   }
 
-
   Future<void> _checkInitialLaunch() async {
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
@@ -193,7 +187,6 @@ class PushNotificationManager {
       });
     }
   }
-
 
   /// 請求通知權限
   Future<AuthorizationStatus> requestPermission({
@@ -242,7 +235,6 @@ class PushNotificationManager {
     }
   }
 
-
   /// 向後端註冊裝置 FCM Token
   ///
   /// 未登入時跳過，不拋出例外。
@@ -260,7 +252,6 @@ class PushNotificationManager {
       _lastRegisteredAt = DateTime.now();
     }
   }
-
 
   /// 前台訊息處理：顯示 Overlay Banner。標題、內文與圖片都是伺服器組好的（FCM `notification` 欄位），
   /// 不在這裡組字。
@@ -329,7 +320,6 @@ class PushNotificationManager {
     _onNotificationTapped(message.data, message.messageId);
   }
 
-
   /// 顯示 App 內前台通知 Banner（同時只顯示一張，舊的自動替換）
   void _showBanner({
     required String title,
@@ -377,7 +367,6 @@ class PushNotificationManager {
 
     Future.delayed(const Duration(seconds: 5), removeSafely);
   }
-
 
   /// 記錄訊息到 debug bus（僅非 prod，最多保留 50 條）
   void _recordDebugMessage(RemoteMessage message, {required String source}) {
@@ -516,7 +505,6 @@ class PushNotificationManager {
           ],
         ),
       );
-
 
   /// 用戶登入後呼叫：取得 Token 並向後端註冊裝置
   Future<void> onUserLoggedIn() async {

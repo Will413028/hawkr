@@ -218,7 +218,6 @@ export interface InvoiceDocumentDetail {
 	timeline: InvoiceTimelineItem[];
 }
 
-
 /**
  * 申訴案件歷程的一筆（gateway `ComplaintResponseItem`）。
  *

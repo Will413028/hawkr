@@ -29,7 +29,6 @@ import 'app_version_headers.dart';
 
 part 'connect_provider.g.dart';
 
-
 /// 所有 Connect transport 共用的 HTTP/2 連線。
 @Riverpod(keepAlive: true)
 HttpClient connectHttpClient(Ref ref) => apiHttpClient();

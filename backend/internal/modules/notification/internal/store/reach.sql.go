@@ -37,7 +37,6 @@ type CountRequeueableDeliveriesParams struct {
 	MaxRows   int32
 }
 
-// 與 RequeueFailedDeliveries 同一組條件，最多數到 max_rows 筆：dry run 與「還有沒有更多」用。
 func (q *Queries) CountRequeueableDeliveries(ctx context.Context, arg CountRequeueableDeliveriesParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countRequeueableDeliveries,
 		arg.Reasons,
@@ -70,8 +69,6 @@ type CountUnreachedNotificationsParams struct {
 	ExcludedReasons []string
 }
 
-// 未觸達：窗內（意圖建立時間 >= since）、型別在 types（交易必要）的意圖，某個收件人的所有投遞紀錄都是永久失敗，且沒有一筆的原因在 excluded_reasons
-// （刻意不送、收件人已刪除）。只看投遞紀錄：收件匣列不是觸達；還在待送的不算；沒有投遞紀錄的意圖不算。
 func (q *Queries) CountUnreachedNotifications(ctx context.Context, arg CountUnreachedNotificationsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countUnreachedNotifications, arg.Since, arg.Types, arg.ExcludedReasons)
 	var count int64
@@ -116,8 +113,6 @@ type ListUnreachedNotificationsRow struct {
 	Reasons         []string
 }
 
-// 與 CountUnreachedNotifications 同一組條件；新到舊（意圖建立時間，再依代表投遞 id），keyset 分頁，呼叫端要 limit + 1 筆來判斷有沒有下一頁。
-// ref_id 是該收件人這則通知的投遞 id 最小者（一個收件人一則通知最多兩列：推播與 email）。
 func (q *Queries) ListUnreachedNotifications(ctx context.Context, arg ListUnreachedNotificationsParams) ([]ListUnreachedNotificationsRow, error) {
 	rows, err := q.db.Query(ctx, listUnreachedNotifications,
 		arg.Since,
@@ -188,9 +183,6 @@ type RequeueFailedDeliveriesParams struct {
 	MaxRows   int32
 }
 
-// 重送：把永久失敗、原因在 reasons 內、失敗時間（updated_at）落在 [start, end) 的投遞改回待送，一次最多 max_rows 筆，依失敗時間由舊到新。
-// 只動 FAILED_PERMANENT 的列（SENT 與 PENDING 不會被選中，所以重複呼叫不會讓同一筆送出兩次）；SKIP LOCKED 讓並行的重送各拿不重疊的列。
-// failure_reason 清空以滿足 deliveries_failure_check；updated_at 改成 now，所以再失敗時一定晚於窗的終點。types 為 NULL 表示不限型別。
 func (q *Queries) RequeueFailedDeliveries(ctx context.Context, arg RequeueFailedDeliveriesParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, requeueFailedDeliveries,
 		arg.Now,

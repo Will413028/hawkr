@@ -125,7 +125,6 @@ export interface TaxReviewItem {
 	riskFlags: string[];
 }
 
-
 /**
  * 一份稅務證明文件。
  *
@@ -282,7 +281,6 @@ export interface TaxExtensionRequestInfo {
 	reason: string;
 }
 
-
 /**
  * 端點 42 的一列。
  *
@@ -366,7 +364,6 @@ export interface RevokeProviderAccountResultData {
 	pendingOrderCount: string;
 	auditLogId: string;
 }
-
 
 /** 與結帳 preview 同一個金額 DTO。金額一律字串。 */
 export interface InvoiceAmountBreakdown {
@@ -464,7 +461,6 @@ export interface AdminInvoiceJobDetail {
 	manualUnlock: ManualUnlockInfo;
 }
 
-
 /**
  * 一筆往來紀錄（買家申訴 → 賣家回覆 → ADM 動作）。
  *
@@ -517,7 +513,6 @@ export interface InvoiceComplaintInfo {
 	buyerReviewDueAt: string;
 	reopenAllowedAfter: string;
 }
-
 
 /**
  * 文件摘要（Gateway `InvoiceDocumentSummary`，列表與詳情共用）。
@@ -703,7 +698,6 @@ export interface AdminInvoiceDocumentDetail {
 	canResumeFromManual: boolean;
 }
 
-
 /**
  * 一筆自動開立切點（Gateway `ProviderCutoverItem`）。
  *
@@ -726,7 +720,6 @@ export interface ProviderCutoverItem {
 	createdAt: string;
 	reason: string;
 }
-
 
 /** 開票人。`kind === "SELLER"` 時 `storeId` 必填。 */
 export interface IssuanceIssuer {
@@ -791,7 +784,6 @@ export interface ManualIssuanceResultData {
 	status: string;
 	auditLogId: string;
 }
-
 
 /**
  * 端點 40／41 的回應（Gateway `DecideTaxReviewForAdminData`）。

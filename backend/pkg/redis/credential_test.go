@@ -9,7 +9,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-
 // The two axes answer with different authority, and this is the test that says
 // so. A missing blacklist key IS "not blocked" — its writers mirror `accounts`
 // and a web session dies at its row regardless. A missing credential key is

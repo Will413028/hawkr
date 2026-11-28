@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-
 func (f *fixture) authorFor(t *testing.T, c social.Caller, kind social.TargetKind, id [16]byte) social.ContentAuthor {
 	t.Helper()
 	got, err := f.module.ContentAuthorFor(context.Background(), c, social.Target{Kind: kind, ID: id})

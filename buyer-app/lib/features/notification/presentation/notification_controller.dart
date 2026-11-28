@@ -11,7 +11,6 @@ part 'notification_controller.g.dart';
 
 Duration? _disableNotificationAutomaticRetry(int _, Object __) => null;
 
-
 /// 通知列表狀態
 class NotificationListState {
   final List<pb.InboxItem> notifications;
@@ -49,7 +48,6 @@ class NotificationListState {
     );
   }
 }
-
 
 /// 通知列表 AsyncNotifier
 ///
@@ -166,8 +164,7 @@ class NotificationListController extends _$NotificationListController {
           unreadCount: (current.unreadCount - 1).clamp(0, 999),
         ),
       );
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   /// 刪除單筆通知（optimistic update）
@@ -194,8 +191,7 @@ class NotificationListController extends _$NotificationListController {
 
     try {
       await _repo.deleteItems([notificationId]);
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   /// 批次刪除通知（optimistic update）
@@ -238,7 +234,6 @@ class NotificationListController extends _$NotificationListController {
     }
   }
 }
-
 
 /// 通知偏好 AsyncNotifier：伺服器依買家受眾列出實際會送出的（分類、渠道）項目，畫面只呈現這些。
 @Riverpod(keepAlive: true)
@@ -295,7 +290,6 @@ class NotificationPreferencesController
     state = await AsyncValue.guard(() => _repo.preferences());
   }
 }
-
 
 /// 通知未讀數量（輕量，不加載完整列表）
 ///

@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 // CorrectionIntakeDeps 是組裝需要的五個讀取面。
 //
 // 刻意逐一列出而不是收一個大 Repository：介面越窄，「這一層會碰哪些東西」在型別上
@@ -207,10 +206,10 @@ func (u *CorrectionIntake) Submit(ctx context.Context, req SubmitCorrectionReque
 		Revised: domain.ReviseDocumentSnapshot{
 			ExpectedVersion: doc.Version,
 			RecipientType:   doc.RecipientType,
-			RecipientRefID: doc.RecipientRefID,
-			RecipientName:  req.NewInvoice.BuyerName,
-			RecipientTaxID: revisedTaxID,
-			RecipientEmail: req.NewInvoice.Email,
+			RecipientRefID:  doc.RecipientRefID,
+			RecipientName:   req.NewInvoice.BuyerName,
+			RecipientTaxID:  revisedTaxID,
+			RecipientEmail:  req.NewInvoice.Email,
 
 			CarrierType:  revisedCarrierType,
 			CarrierID1:   revisedCarrierValue,
@@ -226,8 +225,8 @@ func (u *CorrectionIntake) Submit(ctx context.Context, req SubmitCorrectionReque
 			StatutoryDeadline:  revisedDeadline,
 		},
 		OrderRevision: domain.ReviseSnapshotInput{
-			OrderNo:                 req.OrderNo,
-			ExpectedSnapshotVersion: int64(req.ExpectedSnapshotVersion),
+			OrderNo:                  req.OrderNo,
+			ExpectedSnapshotVersion:  int64(req.ExpectedSnapshotVersion),
 			InvoiceKind:              invoiceKindOf(id.BuyerTaxID),
 			CarrierSelectionMode:     id.SelectionMode,
 			BuyerInvoicePreferenceID: id.PreferenceID,

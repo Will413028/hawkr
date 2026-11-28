@@ -93,7 +93,6 @@ describe("買受人統編的可見性（#3012）", () => {
 	});
 });
 
-
 describe("shipmentStatusDisplay", () => {
 	it("降級與『還沒出貨』是兩種顯示，不得塌成同一格", () => {
 		expect(shipmentStatusDisplay("", true)).toEqual({ kind: "degraded" });

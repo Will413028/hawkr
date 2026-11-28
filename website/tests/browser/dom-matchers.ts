@@ -1,6 +1,5 @@
 import { expect } from "vitest";
 
-
 declare module "vitest" {
 	interface Assertion {
 		toBeVisibleSync(): void;

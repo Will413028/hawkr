@@ -80,7 +80,6 @@ const Dashboard: React.FC = () => {
 
 	return (
 		<div>
-
 			<div className="page-header">
 				<div>
 					<h1 className="page-title">平台總覽</h1>
@@ -103,7 +102,6 @@ const Dashboard: React.FC = () => {
 					</button>
 				</div>
 			</div>
-
 
 			<div className="stats-row-v2">
 				<button
@@ -155,7 +153,6 @@ const Dashboard: React.FC = () => {
 					/>
 				</button>
 			</div>
-
 
 			<div className="card">
 				<div className="card-header">

@@ -40,7 +40,6 @@ func registerProductRoutes(public *gin.RouterGroup, app *gin.RouterGroup, admin 
 		pubCategories.GET(CategoryChildren, h.GetCategoryChildren)
 	}
 
-
 	appProducts := app.Group(ProductsPath)
 	appProducts.Use(middleware.JWTAuth())
 	{
@@ -71,7 +70,6 @@ func registerProductRoutes(public *gin.RouterGroup, app *gin.RouterGroup, admin 
 	{
 		sellerHandle(appHashtags, "GET", "", authz.CapProductManage, h.SearchHashtags)
 	}
-
 
 	admin.GET(AdminProductsPath, h.SearchAdminProducts)
 	admin.DELETE(AdminProductCache, h.PurgeProductCache)

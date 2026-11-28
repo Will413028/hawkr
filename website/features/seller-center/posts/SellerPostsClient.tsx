@@ -342,7 +342,6 @@ export default function SellerPostsClient() {
 					<ul className="seller-posts__list">
 						{items.map((p) => (
 							<li key={p.id} className="seller-posts__row">
-
 								<button
 									type="button"
 									className="contents cursor-pointer border-0 bg-transparent p-0 text-left font-inherit text-inherit"
@@ -420,7 +419,6 @@ export default function SellerPostsClient() {
 
 								{!delegated && (
 									<div className="seller-posts__actions">
-
 										<PostPublishControl
 											publishStatus={p.publishStatus}
 											hidden={isPostHidden(p)}

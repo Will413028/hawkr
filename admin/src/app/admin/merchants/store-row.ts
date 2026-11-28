@@ -6,7 +6,6 @@ import {
 import { townByCode } from "@hawkr/twaddr/lookup";
 import { kycStatusText } from "@/lib/kyc-status";
 
-
 export type BadgeVariant = "success" | "warning" | "danger" | "gray";
 
 export interface RowState {

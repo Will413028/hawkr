@@ -291,7 +291,6 @@ export default function ProcurementClarifyChat({
 				);
 			})}
 
-
 			{pending && processing ? (
 				<li className="hawkr-agent-processing-row">{processing}</li>
 			) : pending ? (

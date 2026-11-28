@@ -24,15 +24,15 @@ import (
 )
 
 type fakeSecure struct {
-	chunkErr   error
-	chunkRead  int64
-	chunkWho   media.Uploader
-	chunkToken string
-	chunkIndex int
-	chunkLen   int64
-	previewWho media.Uploader
-	preview    string
-	previewErr error
+	chunkErr      error
+	chunkRead     int64
+	chunkWho      media.Uploader
+	chunkToken    string
+	chunkIndex    int
+	chunkLen      int64
+	previewWho    media.Uploader
+	preview       string
+	previewErr    error
 	previewReader io.Reader
 }
 

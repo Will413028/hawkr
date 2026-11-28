@@ -10,7 +10,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-
 // GetStoreMapParamsReq 取得門市地圖參數請求
 type GetStoreMapParamsReq struct {
 	AppType   string `json:"appType" binding:"required"`
@@ -35,7 +34,6 @@ type StoreMapResultResp struct {
 	InsularArea string `json:"insularArea"`
 	StoreType   string `json:"storeType"`
 }
-
 
 // GetStoreMapParams 取得超商門市地圖加密參數
 // @Summary      取得超商門市地圖參數

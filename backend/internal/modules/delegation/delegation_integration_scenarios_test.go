@@ -49,7 +49,6 @@ func fromCapabilities(caps []Capability) []string {
 	return out
 }
 
-
 const testStore = int64(2685914682)
 
 func (f *fixture) delegationAdmin(t *testing.T, email string, enabled bool) int64 {
@@ -670,7 +669,6 @@ func TestDisablingAdminEligibilityRevokesSessionsAtomically(t *testing.T) {
 	}
 }
 
-
 func intentInput(sessionID int64, key string) AuditIntentInput {
 	return AuditIntentInput{
 		SessionID: sessionID, Capability: CapabilityProductsWrite, Action: AuditProductUpdate, ResourceType: ResourceProduct,
@@ -1080,7 +1078,6 @@ func TestMissingRevokerDoesNotBreakSessionReads(t *testing.T) {
 		t.Fatalf("清單 = %+v, %v", page, err)
 	}
 }
-
 
 func (f *fixture) history(t *testing.T, admin, storeID int64) AuthorizationHistoryPage {
 	t.Helper()

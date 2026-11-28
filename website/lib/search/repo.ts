@@ -173,14 +173,12 @@ export async function fetchSuggestions(
 	return out;
 }
 
-
 export interface SearchHashtagHit {
 	name: string;
 	label?: string;
 	postCount: number;
 	latestPostAt?: number;
 }
-
 
 export interface PopularHashtagHit {
 	name: string;

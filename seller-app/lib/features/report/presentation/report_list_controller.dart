@@ -4,7 +4,6 @@ import '../data/store_block_repository.dart';
 
 part 'report_list_controller.g.dart';
 
-
 class BlockListState {
   const BlockListState({
     this.blocks = const [],
@@ -145,6 +144,7 @@ class BlockListController extends _$BlockListController {
         try {
           await silentRefresh();
         } on Exception {
+          // 重載失敗時沿用目前清單；原本的解除失敗會往上丟。
         }
       }
       rethrow;

@@ -143,7 +143,6 @@ func TestScheduler_WithoutInitialDelay_FirstTickWaitsFullInterval(t *testing.T) 
 	}
 }
 
-
 // Stop 必須等到 loop 的 goroutine 真的收尾才返回。
 //
 // 這支不靠時間長短判定，所以不隨 CPU 競爭飄：run 卡在一個由測試控制的 channel 上，

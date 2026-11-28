@@ -12,7 +12,6 @@ import (
 // 要人處理。
 var ErrFileMissing = model.ErrFileMissing
 
-
 // KYCStatus 是申請的狀態：只記人工決定。
 type KYCStatus = model.KYCStatus
 

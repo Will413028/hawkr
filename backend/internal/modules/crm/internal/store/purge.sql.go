@@ -48,7 +48,6 @@ func (q *Queries) DeleteCustomersByStore(ctx context.Context, arg DeleteCustomer
 }
 
 const deleteOrderNetsByBuyer = `-- name: DeleteOrderNetsByBuyer :execrows
-
 DELETE FROM crm.order_nets WHERE order_no IN (
     SELECT o.order_no FROM crm.order_nets AS o WHERE o.buyer_id = $1 ORDER BY o.order_no LIMIT $2
 )
@@ -59,7 +58,6 @@ type DeleteOrderNetsByBuyerParams struct {
 	MaxRows int32
 }
 
-// 刪帳與退場的抹除：每批一個 transaction，批次取值升序。ledger 隨 order_nets（ON DELETE CASCADE）、customer_tags 隨 customers 與 tags 一起刪。
 func (q *Queries) DeleteOrderNetsByBuyer(ctx context.Context, arg DeleteOrderNetsByBuyerParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteOrderNetsByBuyer, arg.BuyerID, arg.MaxRows)
 	if err != nil {
@@ -133,8 +131,6 @@ type ListInactivePartiesWithDataRow struct {
 	PartyID int64
 }
 
-// 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中 crm 仍有資料的身分，
-// 依 (kind, party_id) 的 keyset 分頁，最多 max_rows 個；第一頁的游標是 (”, 0)。
 func (q *Queries) ListInactivePartiesWithData(ctx context.Context, arg ListInactivePartiesWithDataParams) ([]ListInactivePartiesWithDataRow, error) {
 	rows, err := q.db.Query(ctx, listInactivePartiesWithData, arg.AfterKind, arg.AfterID, arg.MaxRows)
 	if err != nil {

@@ -111,11 +111,11 @@ func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 }
 
 type monolith struct {
-	db       *db.DB
-	identity *identity.Module
-	buyers   *buyer.Module
-	sellers  *seller.Module
-	srv      *httptest.Server
+	db         *db.DB
+	identity   *identity.Module
+	buyers     *buyer.Module
+	sellers    *seller.Module
+	srv        *httptest.Server
 	adminToken string
 }
 

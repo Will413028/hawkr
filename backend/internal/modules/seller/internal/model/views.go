@@ -7,7 +7,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-
 // ViewEventRetention 是已處理的原始瀏覽事件的保留期（依 occurred_at）；重算只涵蓋完整落在保留期內的台北日。
 const ViewEventRetention = 7 * 24 * time.Hour
 

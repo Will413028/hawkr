@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // GetSellerReceiptAuthorization 是端點 28。
 func (s *InvoiceServer) GetSellerReceiptAuthorization(
 	ctx context.Context, req *pb.GetSellerReceiptAuthorizationRequest,
@@ -70,8 +69,8 @@ func (s *InvoiceServer) ConfirmSellerReceiptAuthorization(
 
 func toReceiptAuthorizationData(v usecase.ReceiptAuthorizationView) *pb.SellerReceiptAuthorizationData {
 	return &pb.SellerReceiptAuthorizationData{
-		Eligible:         v.Eligible,
-		IneligibleReason: v.IneligibleReason,
+		Eligible:                       v.Eligible,
+		IneligibleReason:               v.IneligibleReason,
 		ApprovalBasisKey:               v.ApprovalBasisKey,
 		ApprovedAt:                     fmtTime(v.ApprovedAt),
 		ApprovalValidUntil:             fmtTime(v.ApprovalValidUntil),

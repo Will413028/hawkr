@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // ShipmentAnomalyRecordResp 賣家配送異常列表單筆
 // 資料來源：shipments LEFT JOIN shipment_anomaly_acknowledgments（SQL 推導，不寫第二份狀態表）
 type ShipmentAnomalyRecordResp struct {
@@ -78,7 +77,6 @@ type ListShipmentAnomaliesForAdminResponse struct {
 	Page     string                           `json:"page"`
 	PageSize string                           `json:"pageSize"`
 }
-
 
 // ListSellerShipmentAnomalies 列賣家配送異常 dashboard
 //

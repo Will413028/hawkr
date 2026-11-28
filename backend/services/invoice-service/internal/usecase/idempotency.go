@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 // 冪等作用域。**一個端點一個常數**，不要共用字串：
 // 共用會讓前端對整個頁面用同一把鍵時，A 端點的請求擋住 B 端點的。
 const (

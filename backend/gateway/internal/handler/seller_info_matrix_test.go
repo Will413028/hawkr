@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 const matrixMediaBase = "https://media.example.test"
 
 const (
@@ -57,7 +56,6 @@ func matrixWantFlat() map[string]interface{} {
 		"sellerLogoUrl": mediaurl.BuildURL(matrixMediaBase, matrixLogoKey),
 	}
 }
-
 
 func matrixListResponse() *productpb.GetProductListResponse {
 	return &productpb.GetProductListResponse{
@@ -144,12 +142,11 @@ func matrixFlatOf(rec map[string]interface{}) map[string]interface{} {
 	return out
 }
 
-
 type assembly struct {
 	endpoint string
-	seller map[string]interface{}
-	flat map[string]interface{}
-	hasFlat bool
+	seller   map[string]interface{}
+	flat     map[string]interface{}
+	hasFlat  bool
 }
 
 func matrixAssemblies(t *testing.T) []assembly {
@@ -209,7 +206,6 @@ func driveSellerProducts(t *testing.T) assembly {
 	rec := matrixFirstOf(t, data, "records")
 	return assembly{endpoint: "GET /public/sellers/:id/products", seller: matrixSellerOf(t, rec), flat: matrixFlatOf(rec), hasFlat: true}
 }
-
 
 // TestSellerInfoMatrix_NestedSellerIdenticalAcrossEndpoints 是本組的主斷言：
 // 同一份上游 SellerInfo 餵進五個端點，吐出的 seller 物件必須逐鍵逐值相同。

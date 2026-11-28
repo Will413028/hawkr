@@ -259,7 +259,6 @@ export default function AllAuditLogConsole() {
 								{records.length === 0 ? (
 									<tr>
 										<td colSpan={7} className="adm-audit-empty">
-
 											{auditQuery.isLoading
 												? "正在載入代行紀錄…"
 												: hasFilters

@@ -164,7 +164,6 @@ const rows = () =>
 		[...tr.querySelectorAll("td")].map((td) => td.textContent),
 	);
 
-
 test("清單：處理中分頁的欄位與請求（state OPEN）、指名的店家、期限用相對時間、文號連到詳情；頁首登記來函連到 /new", async () => {
 	const requests: Req[] = [];
 	await open(
@@ -287,7 +286,6 @@ test("清單：有下一頁才顯示分頁；下一頁帶 page token", async () 
 	assert.deepEqual(tokens, ["", "p2"]);
 	assert.ok(buttonByText("下一頁 ")?.disabled);
 });
-
 
 test("登記頁：期限一開始是空的，選種類也不預填；沒填就不帶 due_time（伺服器取預設），填了才送；成功導向詳情", async () => {
 	const created: Req[] = [];
@@ -462,7 +460,6 @@ test("登記頁：可以新增與移除對象（至少一列）；伺服器的�
 	assert.equal(created[0].requestId, created[1].requestId);
 	assert.deepEqual(navigation.pushed, []);
 });
-
 
 const PARAMS = { id: ORDER_ID };
 
@@ -1178,7 +1175,6 @@ test("沒有店家的來函（只有沒有店家資料的帳號）沒有建立�
 	assert.ok(buttonByText("建立措施") === undefined);
 	assert.ok(buttonByText("建立風險措施") === undefined);
 });
-
 
 test("清單：已撤銷登記分頁請求 REVOKED，欄位是撤銷時間（沒有保存到）", async () => {
 	const requests: Req[] = [];

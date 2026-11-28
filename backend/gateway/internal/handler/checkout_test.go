@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 func setupCheckoutRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	app := r.Group("/api/v1/app/checkout")
@@ -29,7 +28,6 @@ func setupCheckoutRouter(h *Holder) *gin.Engine {
 	}
 	return r
 }
-
 
 func TestCheckoutValidate_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -107,7 +105,6 @@ func TestCheckoutValidate_BadRequest(t *testing.T) {
 	resp := parseJSON(t, w.Body)
 	assertCode(t, resp, 400)
 }
-
 
 func TestCheckoutPreview_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -189,7 +186,6 @@ func TestCheckoutPreview_GrpcError(t *testing.T) {
 	resp := parseJSON(t, w.Body)
 	assertCode(t, resp, 500)
 }
-
 
 func TestCheckoutConfirm_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -276,7 +272,6 @@ func TestCheckoutConfirm_BadRequest(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-
 func TestCheckoutShippingFee_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
 		CheckoutShippingFeeFn: func(ctx context.Context, in *orderpb.CheckoutShippingFeeRequest, opts ...grpc.CallOption) (*orderpb.CheckoutShippingFeeResponse, error) {
@@ -316,7 +311,6 @@ func TestCheckoutShippingFee_Success(t *testing.T) {
 		t.Errorf("shippingFee = %v, want 150", data["shippingFee"])
 	}
 }
-
 
 func TestCheckoutValidate_UsesResolvedBuyerID(t *testing.T) {
 	var captured *orderpb.CheckoutValidateRequest

@@ -40,7 +40,6 @@ type CountDelegationAuthorizationsParams struct {
 	Now           time.Time
 }
 
-// 與 ListDelegationAuthorizations 相同的篩選。
 func (q *Queries) CountDelegationAuthorizations(ctx context.Context, arg CountDelegationAuthorizationsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countDelegationAuthorizations, arg.TargetStoreID, arg.Status, arg.Now)
 	var count int64
@@ -84,16 +83,12 @@ func (q *Queries) GetDelegationAuthorizationAuditLogByIdempotencyKey(ctx context
 }
 
 const getDelegationAuthorizationForStore = `-- name: GetDelegationAuthorizationForStore :one
-
 SELECT id, target_store_id, source, source_reference, granted_capabilities, effective_from, effective_until, approved_by_admin_id, approved_at, revoked_at, revoked_by_admin_id, revoke_reason, created_at, updated_at FROM delegation.seller_delegation_authorizations
 WHERE target_store_id = $1::bigint OR target_store_id IS NULL
 ORDER BY (target_store_id IS NULL)
 LIMIT 1
 `
 
-// 代行授權列與它的治理歷史。
-// 代行判定用（preflight、建立 session）：店家層級的列存在就用它（不論有沒有效），沒有才退回全域列。有效性由
-// 呼叫方判斷：寫進 WHERE 的話，一列已撤回的店家授權會讓查詢落到全域列上，逐店的撤回就被推翻了。
 func (q *Queries) GetDelegationAuthorizationForStore(ctx context.Context, targetStoreID int64) (DelegationSellerDelegationAuthorization, error) {
 	row := q.db.QueryRow(ctx, getDelegationAuthorizationForStore, targetStoreID)
 	var i DelegationSellerDelegationAuthorization
@@ -121,8 +116,6 @@ SELECT id, target_store_id, source, source_reference, granted_capabilities, effe
 WHERE target_store_id = $1::bigint
 `
 
-// 治理用的單店詳情：只看店家層級的那一列，不退回全域列（治理畫面不能把全域列當成這家店的設定）。管理員的顯示名
-// 是 email（admins 沒有名稱欄），讀取時解析（跟著改名）；撤回者沒有時是空字串。
 func (q *Queries) GetDelegationAuthorizationOfStore(ctx context.Context, targetStoreID int64) (DelegationSellerDelegationAuthorization, error) {
 	row := q.db.QueryRow(ctx, getDelegationAuthorizationOfStore, targetStoreID)
 	var i DelegationSellerDelegationAuthorization
@@ -183,10 +176,6 @@ type GrantDelegationAuthorizationParams struct {
 	ApprovedByAdminID   int64
 }
 
-// 首建與重新開通共用的單句 CAS。撞到有效的列時沒有列回傳（9285 或冪等重放，由呼叫方判斷），不是錯誤；不能改成
-// 先查再決定 INSERT 或 UPDATE（兩個管理員同時開通時一個會靜默覆蓋另一個），也不能接唯一鍵的錯誤（transaction
-// 會中止）。重新開通是一次全新的授權：生效時間、核准者一起重設，撤回的三欄清空。回傳的 id 等於送入的 id 就是
-// 首建（每店終生一列，重新開通時 id 不變）。
 func (q *Queries) GrantDelegationAuthorization(ctx context.Context, arg GrantDelegationAuthorizationParams) (DelegationSellerDelegationAuthorization, error) {
 	row := q.db.QueryRow(ctx, grantDelegationAuthorization,
 		arg.ID,
@@ -255,8 +244,6 @@ type InsertDelegationAuthorizationAuditLogParams struct {
 	Now                  time.Time
 }
 
-// 治理歷史唯一的寫入，與授權列同一個 transaction。同一列授權上同一把冪等鍵已經有紀錄時沒有列回傳（呼叫方回
-// 9267 並 rollback）；推斷子句指名 partial index，主鍵衝突仍然報錯。沒有冪等鍵的寫入不去重。
 func (q *Queries) InsertDelegationAuthorizationAuditLog(ctx context.Context, arg InsertDelegationAuthorizationAuditLogParams) (DelegationDelegationAuthorizationAuditLog, error) {
 	row := q.db.QueryRow(ctx, insertDelegationAuthorizationAuditLog,
 		arg.ID,
@@ -313,7 +300,6 @@ type ListDelegationAuthorizationAuditLogsParams struct {
 	RowLimit      int32
 }
 
-// 單店的治理歷史，新到舊；(created_at, id) 讓同一時刻的列在分頁邊界穩定。
 func (q *Queries) ListDelegationAuthorizationAuditLogs(ctx context.Context, arg ListDelegationAuthorizationAuditLogsParams) ([]DelegationDelegationAuthorizationAuditLog, error) {
 	rows, err := q.db.Query(ctx, listDelegationAuthorizationAuditLogs, arg.TargetStoreID, arg.RowOffset, arg.RowLimit)
 	if err != nil {
@@ -374,8 +360,6 @@ type ListDelegationAuthorizationsParams struct {
 	RowLimit      int32
 }
 
-// 治理總覽，新到舊，排除全域列。status 篩選寫成布林相等，effective 與 ineffective 在語法上就是互補的；有效的
-// 定義與 DelegationAuthorization.EffectiveAt 相同（沒有撤回、已經生效、還沒到期）。
 func (q *Queries) ListDelegationAuthorizations(ctx context.Context, arg ListDelegationAuthorizationsParams) ([]DelegationSellerDelegationAuthorization, error) {
 	rows, err := q.db.Query(ctx, listDelegationAuthorizations,
 		arg.TargetStoreID,
@@ -423,8 +407,6 @@ WHERE target_store_id = $1::bigint
 FOR UPDATE
 `
 
-// 寫入前鎖住變更前的狀態：只為了讓治理歷史的 before 是真的變更前，不參與判定（判定一律看 CAS 的列數）。
-// 列不存在時不鎖：兩個同時的首建都會走到 INSERT，一個成功、另一個的 DO UPDATE 述詞落空。
 func (q *Queries) LockDelegationAuthorizationOfStore(ctx context.Context, targetStoreID int64) (DelegationSellerDelegationAuthorization, error) {
 	row := q.db.QueryRow(ctx, lockDelegationAuthorizationOfStore, targetStoreID)
 	var i DelegationSellerDelegationAuthorization
@@ -464,7 +446,6 @@ type RevokeDelegationAuthorizationParams struct {
 	TargetStoreID    int64
 }
 
-// 撤回：三欄一起寫。沒有列表示已經撤回，呼叫方回既有的列，不覆蓋第一次的值、不補寫第二列歷史。
 func (q *Queries) RevokeDelegationAuthorization(ctx context.Context, arg RevokeDelegationAuthorizationParams) (DelegationSellerDelegationAuthorization, error) {
 	row := q.db.QueryRow(ctx, revokeDelegationAuthorization,
 		arg.Now,
@@ -512,8 +493,6 @@ type UpdateDelegationAuthorizationParams struct {
 	TargetStoreID       int64
 }
 
-// 調整有效授權的範圍、依據與期限（全量取代）。CAS 述詞與 Grant 相反：兩者分開，過時的畫面按「調整範圍」
-// 不會把已撤回的店靜默地重新開通。
 func (q *Queries) UpdateDelegationAuthorization(ctx context.Context, arg UpdateDelegationAuthorizationParams) (DelegationSellerDelegationAuthorization, error) {
 	row := q.db.QueryRow(ctx, updateDelegationAuthorization,
 		arg.Source,

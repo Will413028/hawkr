@@ -39,8 +39,6 @@ function walk(dir: string): string[] {
 	return out;
 }
 
-
-
 /**
  * 端點 36 `RespondSellerInvoiceComplaint` 的 RPC 已於 `internal/grpc/seller_write.go`
  * 實作（2026-09-01 從 gateway handler 的呼叫點反推查證）⇒ 本條**由「禁止渲染」
@@ -147,7 +145,6 @@ test("S07 渲染回報 CTA，且閘門是 canReportExternal 而不是停權旗�
 	);
 });
 
-
 test("停權放行類的 hook 一個 !isSuspended 都不准有", () => {
 	const source = stripComments(read(REMEDY_HOOKS));
 	assert.ok(
@@ -183,7 +180,6 @@ test("S09／S10 走放行類 hook，不走 BLOCK 類", () => {
 	}
 });
 
-
 test("賣家面不共用買家的 documentStatus 折疊表", () => {
 	for (const file of walk(SELLER_INVOICE_DIR)) {
 		const source = stripComments(read(file));
@@ -193,7 +189,6 @@ test("賣家面不共用買家的 documentStatus 折疊表", () => {
 		);
 	}
 });
-
 
 test("S09／S10 的期限一律走後端給的工作天，前端不自己算", () => {
 	for (const file of [APPEALS, APPEAL_DETAIL]) {

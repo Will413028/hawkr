@@ -14,8 +14,7 @@ export function testMediaHostname(
 	if (base) {
 		try {
 			return new URL(base).hostname.toLowerCase().replace(/\.+$/, "");
-		} catch {
-		}
+		} catch {}
 	}
 	return DEFAULT_TEST_MEDIA_HOSTNAME;
 }

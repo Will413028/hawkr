@@ -53,7 +53,6 @@ func inboxStatusOf(ctx context.Context, t *testing.T, repo *InboxRepository, id 
 	return status
 }
 
-
 // TestIntegration_Inbox_ClaimIsALeaseNotAPermanentFlag 一次守三件事：
 //
 //	① CAS 有效——第二次 claim 必須失敗（拿掉 `next_attempt_at <= claimable_before`

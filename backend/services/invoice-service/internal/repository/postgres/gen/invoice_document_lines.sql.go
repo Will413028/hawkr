@@ -25,12 +25,6 @@ type AddInvoiceDocumentLineAllowancedAmountParams struct {
 	ID          int64 `db:"id" json:"id"`
 }
 
-// 部分折讓時逐行累加已折讓額（含稅）。**單句 CAS**，理由同 AddInvoiceDocumentAllowanceTotal：
-// 先查再寫在兩筆折讓併發時會雙雙讀到舊值、雙雙通過上限。
-// chk_invline_allowanced_cap（0 ≤ allowanced_amount ≤ allowanceable_base）是 DB 側兜底；
-// 述詞裡的同一條比較是為了讓超額回 **rows=0**（可翻成業務碼）而不是 23514
-// （PostgreSQL 交易內任一句失敗即整個交易 aborted，之後每一句都被拒）。兩層都要。
-// DISCOUNT 行的 allowanceable_base 恆 0 ⇒ 對它累加任何正數都 rows=0，天然不需要另加述詞。
 func (q *Queries) AddInvoiceDocumentLineAllowancedAmount(ctx context.Context, arg AddInvoiceDocumentLineAllowancedAmountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addInvoiceDocumentLineAllowancedAmount, arg.DeltaAmount, arg.ID)
 	if err != nil {
@@ -67,10 +61,6 @@ WHERE document_id = $1
       AND d.status IN ('PENDING', 'AWAITING_MANUAL'))
 `
 
-// 買家付款後修改（M6 R03 UPDATED_BEFORE_ISSUE）要「重建 lines」⇒ 先刪後建，同一交易內。
-// 只允許在文件尚未送出時重建：述詞正面列出兩個狀態（子查詢讀 invoice_documents 的權威 status），
-// 少了它，一份已 ISSUED 的發票會被就地換掉明細而號碼不變 —— 稅務上那是偽造。
-// ⚠️ 本檔沒有、也不得新增任何 DELETE FROM invoice_documents（I-40）；刪明細行不等於刪文件。
 func (q *Queries) DeleteInvoiceDocumentLines(ctx context.Context, documentID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteInvoiceDocumentLines, documentID)
 	if err != nil {
@@ -142,23 +132,6 @@ type InsertInvoiceDocumentLineParams struct {
 	Now               pgtype.Timestamptz `db:"now" json:"now"`
 }
 
-// 開票時的行組裝落點（§5A.3）。三個 CHECK 決定呼叫端必須先算好才送：
-//
-//	chk_invline_amount          net_amount = unit_price × quantity
-//	chk_invline_sign            DISCOUNT 行 net_amount < 0，其餘 >= 0
-//	chk_invline_allowance_shape DISCOUNT 行三個折讓欄恆 0；其餘
-//	                            allowanceable_base = net_amount − allocated_discount
-//
-// ⇒ **allowanceable_base 不是可有可無的冗餘欄**：算錯當場 23514，不會靜默寫進去。
-//
-//	它同時是 I-65（Σ allowanceable_base 只計 PRODUCT ＋ SHIPPING 行 = document.total_amount）
-//	的被加數。
-//
-// line_seq 決定送 AMEGO 的 ProductItem 順序（1-based，上限 9999）；uq_invline_doc_seq
-//
-//	讓同一份文件的同一個序號只可能有一列。
-//
-// 單價語意是**含稅**（與 invoice_adjustment_lines 的未稅相反，不要照抄另一張表的欄名）。
 func (q *Queries) InsertInvoiceDocumentLine(ctx context.Context, arg InsertInvoiceDocumentLineParams) (InvoiceDocumentLine, error) {
 	row := q.db.QueryRow(ctx, insertInvoiceDocumentLine,
 		arg.DocumentID,
@@ -203,16 +176,11 @@ func (q *Queries) InsertInvoiceDocumentLine(ctx context.Context, arg InsertInvoi
 }
 
 const listInvoiceDocumentLines = `-- name: ListInvoiceDocumentLines :many
-
 SELECT id, document_id, line_seq, line_type, order_item_id, sku_id, description, unit, quantity, unit_price, net_amount, tax_category, tax_rate_bps, remark, allocated_discount, allowanceable_base, allowanced_amount, created_at FROM invoice_document_lines
 WHERE document_id = $1
 ORDER BY line_seq
 `
 
-// invoice_document_lines｜品項行
-// SSOT：設計書 58 號 §5.1.6
-// 本波只放骨架：開票時的行組裝與折讓分攤（allowanced_amount 累加）在本波範圍外。
-// ⚠️ 補 query 時：line_seq 決定送 AMEGO 的 ProductItem 順序，任何列表一律 ORDER BY line_seq。
 func (q *Queries) ListInvoiceDocumentLines(ctx context.Context, documentID int64) ([]InvoiceDocumentLine, error) {
 	rows, err := q.db.Query(ctx, listInvoiceDocumentLines, documentID)
 	if err != nil {

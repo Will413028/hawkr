@@ -15,7 +15,6 @@ import {
 	normalizeDetail,
 } from "../lib/after-sales/normalize";
 
-
 test("normalizeCase reads snake_case wire fields and coerces values to strings", () => {
 	const c = normalizeCase({
 		case_no: "AS001",
@@ -87,7 +86,6 @@ test("normalizeCase surfaces appeal_state from the list summary so rows can fold
 	assert.equal(none.appealState, "0");
 });
 
-
 test("normalizeDetail surfaces appeal_state — the arbitration lock the UI gates on", () => {
 	const snake = normalizeDetail({
 		case_no: "AS001",
@@ -125,7 +123,6 @@ test("normalizeDetail coerces canAppeal/autoEscalated from string and numeric bo
 	assert.equal(d.autoEscalated, false);
 });
 
-
 test("normalizeDetail reads refund progress from flat camel and snake fields", () => {
 	const d = normalizeDetail({
 		case_no: "AS001",
@@ -156,7 +153,6 @@ test("normalizeDetail merges a nested refundProgress block over flat fields", ()
 	assert.equal(d.refundProgress?.refundTaskStatus, "30");
 	assert.equal(d.refundProgress?.refundFailureMessage, "卡號錯誤");
 });
-
 
 /**
  * Contract fixture — captured from the dev Gateway response for case
@@ -401,7 +397,6 @@ test("normalizeDetail maps compensation coupon and inspection deduction resoluti
 	assert.equal(d.resolutions[1].deductionReason, "商品已拆封");
 	assert.equal(d.resolutions[1].inspectionNote, "外盒破損，內容物正常");
 });
-
 
 test("normalizeArbitration maps state, decision and snake_case timeline events", () => {
 	const arb = normalizeArbitration({

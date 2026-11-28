@@ -618,7 +618,6 @@ test("關聯終止：事由固定且不能改、顯示來源措施、請求帶�
 	await d.unmount();
 });
 
-
 function detail(measure: unknown) {
 	const linked: Array<[string, string]> = [];
 	const m = mount(
@@ -761,7 +760,6 @@ test("措施詳情頁：沒有命中不顯示區塊；來源措施不能建立�
 	assert.equal(source?.getAttribute("href"), "/admin/measures/m0");
 	await child.unmount();
 });
-
 
 test("預定終止：以帳號與 state=SCHEDULED 讀 ListMeasures，顯示最早的生效時間；沒有預定終止時不渲染", async () => {
 	let seen: { accountId?: string; state?: number } = {};

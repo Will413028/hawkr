@@ -2,7 +2,6 @@ package usecase
 
 import "testing"
 
-
 func TestMaskEmail(t *testing.T) {
 	cases := []struct{ name, in, want string }{
 		{"設計書範例：local part ≥ 4", "acmestore@example.com", "acme***@example.com"},

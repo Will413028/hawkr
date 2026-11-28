@@ -55,9 +55,9 @@ type StoreNames interface {
 
 // Admin 實作 ReviewQueueAdminService。授權（reviewqueue.items.list）由 adminauth 的 interceptor 檢查；種類的權限在這裡與請求的 kinds 取交集。
 type Admin struct {
-	m     Lister
-	names StoreNames
-	now   func() time.Time
+	m      Lister
+	names  StoreNames
+	now    func() time.Time
 	allows func(identity.Principal, adminperm.Permission) bool
 }
 

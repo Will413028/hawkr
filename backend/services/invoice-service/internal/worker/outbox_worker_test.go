@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type fakeOutboxRepo struct {
 	domain.OutboxRepository
 
@@ -116,7 +115,6 @@ func testOutboxCfg() outbox.Config {
 	}
 }
 
-
 // TestOutboxWorker_PublishFailureLeavesRowPending 是**變異④的靶心**。
 //
 // 把 process 改成「先 MarkDone 再 publish」之後，publish 失敗那一列仍會變成 done
@@ -167,7 +165,6 @@ func TestOutboxWorker_PublishSuccessMarksDone(t *testing.T) {
 		t.Errorf("routing key = %q", got)
 	}
 }
-
 
 func TestOutboxWorker_ResolvesSellerAccountAtDispatch(t *testing.T) {
 	repo := newFakeOutboxRepo(testOutboxEvent(1, map[string]any{
@@ -231,7 +228,6 @@ func TestOutboxWorker_DoesNotOverwriteExistingNotifyField(t *testing.T) {
 	}
 }
 
-
 func decodePublished(t *testing.T, pub *fakePublisher) map[string]any {
 	t.Helper()
 	if len(pub.calls) == 0 {
@@ -243,7 +239,6 @@ func decodePublished(t *testing.T, pub *fakePublisher) map[string]any {
 	}
 	return out
 }
-
 
 // TestOutboxWorker_RetryExhaustionParksInsteadOfFlaggingTerminal 是「永久旗標 ＋
 // 告警方向相反」那個缺陷的行為層證據。

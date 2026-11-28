@@ -44,12 +44,12 @@ func Migrations() fs.FS {
 }
 
 const (
-	maxAttempts = 8
+	maxAttempts     = 8
 	dispatchTimeout = 30 * time.Second
-	sweepGrace = 5 * time.Minute
-	sweepInterval = 15 * time.Minute
-	deadAfter = 7 * 24 * time.Hour
-	batch = 500
+	sweepGrace      = 5 * time.Minute
+	sweepInterval   = 15 * time.Minute
+	deadAfter       = 7 * 24 * time.Hour
+	batch           = 500
 )
 
 var providerPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)

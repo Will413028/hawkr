@@ -26,7 +26,6 @@ import {
 } from "./kyc-application";
 import { addressText } from "./store-detail";
 
-
 /** 一個欄位列：標籤與值（沿用 info-field 的樣式）。 */
 function FieldRow({
 	label,
@@ -44,7 +43,6 @@ function FieldRow({
 		</div>
 	);
 }
-
 
 /**
  * 基本資料：店家欄位（GetStore）與申請的欄位。公司型申請在同一張卡的下半部把申請內容與商業登記（GCIS）逐列並列：名稱、統編、
@@ -197,7 +195,6 @@ function GcisRowCells({
 	);
 }
 
-
 /** 檔案端點的 HTTP 狀態對應的錯誤碼，文字走目錄的預設文字（沒有收到回應視為暫時不可用）。 */
 function fileFailure(status: number | undefined): ConnectError {
 	switch (status) {
@@ -323,7 +320,6 @@ export function KycDocumentsCard({
 	);
 }
 
-
 export function KycOtherInfoCard({
 	store,
 	application,
@@ -368,7 +364,6 @@ export function KycOtherInfoCard({
 		</div>
 	);
 }
-
 
 /** 一份問題清單（欄位、原因、說明；指定文件時註明）。 */
 function IssueList({

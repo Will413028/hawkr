@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	requestKeyMax = 128
+	requestKeyMax  = 128
 	failedProvider = "provider_failed"
 )
 

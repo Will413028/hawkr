@@ -118,7 +118,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-
   Widget _buildHeader() {
     return Row(
       children: [
@@ -224,7 +223,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       ),
     );
   }
-
 
   Widget _buildDetailContent(BuildContext context, AfterSaleCase c) {
     final shipTradeNo = _text(c.shipTradeNo);

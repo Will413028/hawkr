@@ -184,7 +184,6 @@ export default function SessionListConsole() {
 					</p>
 				</div>
 				<div className="adm-audit-header-actions">
-
 					<Link
 						className="adm-audit-detail-trigger"
 						href="/admin/delegated-operations/audit-logs"
@@ -317,7 +316,6 @@ export default function SessionListConsole() {
 						<div>{filterError}</div>
 					</div>
 				)}
-
 
 				<p className="adm-audit-summary-note">
 					時間區間比對工作階段的<strong>開始時間</strong>。

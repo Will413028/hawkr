@@ -125,8 +125,7 @@ async function copyText(value: string): Promise<boolean> {
 			await navigator.clipboard.writeText(value);
 			return true;
 		}
-	} catch {
-	}
+	} catch {}
 
 	const textarea = document.createElement("textarea");
 	try {

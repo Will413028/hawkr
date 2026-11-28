@@ -15,8 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$CartItem {
 
- int get id;@JsonKey(name: 'skuId') int get skuId; int get count; int get price;// PayUni #758: 加入購物車當下的原價快照（刪除線用），缺欄位時為 null。
-@JsonKey(name: 'listPrice') int? get listPrice; String? get title; String? get image;@JsonKey(name: 'sellerId') int? get sellerId;@JsonKey(name: 'merchantName') String? get merchantName;@JsonKey(name: 'specName') String? get specName; bool? get check;@JsonKey(name: 'userId') String? get userId;@JsonKey(name: 'userKey') String? get userKey;// issue #1127 後端 row 級可購買性
+ int get id;@JsonKey(name: 'skuId') int get skuId; int get count; int get price;// 加入購物車時的原價快照（刪除線用），缺欄位時為 null。
+@JsonKey(name: 'listPrice') int? get listPrice; String? get title; String? get image;@JsonKey(name: 'sellerId') int? get sellerId;@JsonKey(name: 'merchantName') String? get merchantName;@JsonKey(name: 'specName') String? get specName; bool? get check;@JsonKey(name: 'userId') String? get userId;@JsonKey(name: 'userKey') String? get userKey;// 每個商品列的可購買狀態與庫存由後端回傳。
 @JsonKey(name: 'stockQty') String? get stockQty;@JsonKey(name: 'purchasable') bool get purchasable;@JsonKey(name: 'unavailableReason') String? get unavailableReason;
 /// Create a copy of CartItem
 /// with the given fields replaced by the non-null parameter values.
@@ -233,7 +233,7 @@ class _CartItem implements CartItem {
 @override@JsonKey(name: 'skuId') final  int skuId;
 @override final  int count;
 @override final  int price;
-// PayUni #758: 加入購物車當下的原價快照（刪除線用），缺欄位時為 null。
+// 加入購物車時的原價快照（刪除線用），缺欄位時為 null。
 @override@JsonKey(name: 'listPrice') final  int? listPrice;
 @override final  String? title;
 @override final  String? image;
@@ -243,7 +243,7 @@ class _CartItem implements CartItem {
 @override final  bool? check;
 @override@JsonKey(name: 'userId') final  String? userId;
 @override@JsonKey(name: 'userKey') final  String? userKey;
-// issue #1127 後端 row 級可購買性
+// 每個商品列的可購買狀態與庫存由後端回傳。
 @override@JsonKey(name: 'stockQty') final  String? stockQty;
 @override@JsonKey(name: 'purchasable') final  bool purchasable;
 @override@JsonKey(name: 'unavailableReason') final  String? unavailableReason;

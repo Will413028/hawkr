@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 var resendNow = time.Date(2026, 8, 30, 6, 0, 0, 0, time.UTC)
 
 const (
@@ -188,7 +187,6 @@ func TestResend_ExternalIssuanceUsesExternalNumber(t *testing.T) {
 		t.Fatalf("應取 external_invoice_no，實得 %v", payload["invoice_no"])
 	}
 }
-
 
 func TestNextResendAvailableAt(t *testing.T) {
 	justNow := resendNow.Add(-3 * time.Minute)

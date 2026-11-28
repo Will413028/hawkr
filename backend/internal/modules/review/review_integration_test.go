@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-
 func hide(t *testing.T, f *fixture, id uuid.UUID) review.Hide {
 	t.Helper()
 	return must[review.Hide](t)(f.module.Hide(context.Background(), review.HideInput{ReviewID: id, Category: "SPAM", Text: "廣告", SourceRef: "case-1", AdminID: 1}))

@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-
 func partyOf(kind social.ActorKind, id int64) registry.Party {
 	switch kind {
 	case social.ActorBuyer:

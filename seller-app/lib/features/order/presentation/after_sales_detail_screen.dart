@@ -535,7 +535,6 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
   }
 }
 
-
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.child});
   final Widget child;

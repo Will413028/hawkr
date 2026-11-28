@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-
 type (
 	// AuthorityOrderKind 是來函要平台做的事（限制或移除商品、調取資料、暫停帳號、其他）。
 	AuthorityOrderKind = model.AuthorityOrderKind

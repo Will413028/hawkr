@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-
 var i7Exempt = map[string]string{
 	"idempotency.go:ClaimIdempotency": "invoice_idempotency_keys 不是 chk_invhist_subject 的七個 aggregate 之一；" +
 		"它是冪等鍵的租約，不是業務狀態",

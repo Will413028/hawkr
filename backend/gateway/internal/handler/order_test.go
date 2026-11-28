@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 func setupOrderRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	app := r.Group("/api/v1/app")
@@ -37,7 +36,6 @@ func setupAdminSearchOrdersRouter(h *Holder) *gin.Engine {
 	r.GET("/api/v1/admin/orders", h.SearchOrders)
 	return r
 }
-
 
 func TestGetMyOrders_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -102,7 +100,6 @@ func TestGetMyOrders_Success(t *testing.T) {
 		t.Errorf("logoUrl = %v, want a non-empty built URL", got)
 	}
 }
-
 
 func TestGetMyOrderStatusCounts_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -211,7 +208,6 @@ func TestGetMyOrders_Unauthorized(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusUnauthorized)
 }
 
-
 func TestGetOrder_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
 		GetOrderFn: func(ctx context.Context, in *orderpb.GetOrderRequest, opts ...grpc.CallOption) (*orderpb.GetOrderResponse, error) {
@@ -303,7 +299,6 @@ func TestGetOrderDetail_SellerLogoURLField(t *testing.T) {
 	}
 }
 
-
 func TestCancelOrder_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
 		CancelOrderFn: func(ctx context.Context, in *orderpb.CancelOrderRequest, opts ...grpc.CallOption) (*orderpb.CancelOrderResponse, error) {
@@ -357,7 +352,6 @@ func TestCancelOrder_GrpcError(t *testing.T) {
 
 	assertHTTPStatus(t, w, http.StatusServiceUnavailable)
 }
-
 
 func TestConfirmReceipt_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -521,7 +515,6 @@ func TestGetOrder_SellerView_NoCurrentSeller403(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusForbidden)
 	assertCode(t, parseJSON(t, w.Body), 403)
 }
-
 
 func TestCreateOrder_UsesResolvedBuyerID(t *testing.T) {
 	var captured *orderpb.CreateOrderRequest

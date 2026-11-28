@@ -30,20 +30,20 @@ import (
 type connectDriver struct {
 	clients map[ch.Caller]*connectClients
 
-	mu      sync.Mutex
-	etag    map[string]string
-	postOf  map[string]string
-	parent  map[string]string
-	storeOf map[string]string
+	mu          sync.Mutex
+	etag        map[string]string
+	postOf      map[string]string
+	parent      map[string]string
+	storeOf     map[string]string
 	measureOf   map[string]string
 	measureEtag map[string]string
 }
 
 type connectClients struct {
-	public socialv1alpha1connect.SocialPublicServiceClient
-	app    socialv1alpha1connect.SocialAppServiceClient
-	buyer  buyerconnect.BuyerAppServiceClient
-	seller sellerconnect.SellerAppServiceClient
+	public     socialv1alpha1connect.SocialPublicServiceClient
+	app        socialv1alpha1connect.SocialAppServiceClient
+	buyer      buyerconnect.BuyerAppServiceClient
+	seller     sellerconnect.SellerAppServiceClient
 	governance adminsellerconnect.SellerGovernanceAdminServiceClient
 }
 

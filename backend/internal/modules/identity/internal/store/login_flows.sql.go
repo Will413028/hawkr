@@ -14,7 +14,6 @@ const consumeLoginFlow = `-- name: ConsumeLoginFlow :one
 DELETE FROM identity.login_flows WHERE state_hash = $1 RETURNING state_hash, provider, code_verifier, nonce, return_path, binding_hash, link_account_id, created_at, expires_at
 `
 
-// 單次使用：取出同時刪除；之後的比對（逾時、provider、登入前 cookie）失敗也不會留下這一列。
 func (q *Queries) ConsumeLoginFlow(ctx context.Context, stateHash []byte) (IdentityLoginFlow, error) {
 	row := q.db.QueryRow(ctx, consumeLoginFlow, stateHash)
 	var i IdentityLoginFlow

@@ -303,7 +303,6 @@ export default function InvoiceAuditConsole({
 				) : (
 					<div className="adm-audit-table-wrap">
 						<table className="adm-audit-table">
-
 							<caption className="sr-only">
 								發票操作稽核紀錄，共 {total} 筆，依操作發生時間由新到舊排列
 							</caption>
@@ -325,7 +324,6 @@ export default function InvoiceAuditConsole({
 								{records.length === 0 ? (
 									<tr>
 										<td colSpan={6} className="adm-audit-empty">
-
 											{isLoading
 												? "正在載入發票稽核紀錄…"
 												: hasFilters
@@ -343,7 +341,6 @@ export default function InvoiceAuditConsole({
 										>
 											<td>{formatDateTime(entry.occurredAt)}</td>
 											<td>
-
 												<strong>
 													{codeLabel(
 														INVOICE_OPERATION_TYPE_LABEL,

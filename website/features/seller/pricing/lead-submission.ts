@@ -50,6 +50,5 @@ export async function submitSellerLeadRequest(
 			billingCycle: submission.billingCycle,
 			serviceInterest: submission.serviceInterest,
 		});
-	} catch {
-	}
+	} catch {}
 }

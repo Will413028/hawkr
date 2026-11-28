@@ -10,8 +10,6 @@ import { StoreStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { formatAddress } from "@hawkr/twaddr/lookup";
 
-
-
 export const SUSPEND_WARNING_TEXT =
 	"停權後買家看不到這家店與它的商品，未付款訂單會被取消，優惠券會停用。";
 /** 實作者補：建立風險措施成功後的頁首提示；後半句沿用 D4 第 2 點停權成功的原文。 */
@@ -47,7 +45,6 @@ export function deletionOutcome(
 	}
 }
 
-
 /** 結束措施後的成功訊息：重讀後帳號仍有生效中的措施就照實說；沒有時用 D4 第 2 點的原文。 */
 export const END_SUCCESS_STILL_SUSPENDED_TEXT =
 	"已結束這個措施。帳號仍有其他生效中的措施，要全部結束或撤銷後才會恢復公開。";
@@ -60,7 +57,6 @@ export function endSuccessText(remaining: readonly Measure[]): string {
 		? END_SUCCESS_STILL_SUSPENDED_TEXT
 		: LIFT_SUCCESS_TEXT;
 }
-
 
 /** 列表與詳情頁共用的生命週期徽章；營運中不另外顯示。 */
 export function lifecycleBadge(
@@ -97,7 +93,6 @@ export function addressText(address: PostalAddress | undefined): string {
 	return formatAddress(address.townCode, address.addressDetail) || "-";
 }
 
-
 export const REASON_MAX_LENGTH = 1000;
 
 /** 刪帳號與顯示全文的理由：必填（去掉前後空白後非空），最多 1000 字。回傳錯誤文字，沒有錯誤回 undefined。 */
@@ -112,7 +107,6 @@ export function validateReason(
 	}
 	return undefined;
 }
-
 
 /**
  * 登入信箱（IdentityAdminService.GetAccount）的讀取狀態。notFound 是帳號不存在或已刪除；ready 且 email 為空字串時，

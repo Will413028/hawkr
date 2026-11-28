@@ -291,7 +291,6 @@ class CouponEditorScreen extends HookConsumerWidget {
 
     formVersion.value;
 
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
       child: Scaffold(
@@ -482,7 +481,6 @@ class CouponEditorScreen extends HookConsumerWidget {
       ),
     );
   }
-
 
   static String _initialDiscountRule(Coupon? c) {
     if (c == null) return '現金折抵';

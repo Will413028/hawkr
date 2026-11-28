@@ -19,8 +19,6 @@ ORDER BY i.account_id
 LIMIT 2
 `
 
-// 自動連結的候選：存活帳號上符合自動連結資格的 Google 身分（email 已驗證、gmail.com 或帶 hd）裡，email 等於 email 的帳號，
-// 最多回 2 筆，讓呼叫方分辨「唯一」與「不唯一」。墓碑身分的 email 已清、帳號也已刪，不會被比對到；accounts.email 不參與。
 func (q *Queries) FindAutoLinkAccountIDsByEmail(ctx context.Context, email string) ([]int64, error) {
 	rows, err := q.db.Query(ctx, findAutoLinkAccountIDsByEmail, email)
 	if err != nil {
@@ -83,7 +81,6 @@ type InsertIdentityParams struct {
 	Now              time.Time
 }
 
-// 同一個 (provider, subject) 並發連結時只有一個成功：沒有列回傳表示它已存在，呼叫方放棄這個 transaction 重來。
 func (q *Queries) InsertIdentity(ctx context.Context, arg InsertIdentityParams) (int64, error) {
 	row := q.db.QueryRow(ctx, insertIdentity,
 		arg.Provider,
@@ -110,8 +107,6 @@ type ListIdentitiesOfAccountRow struct {
 	CreatedAt time.Time
 }
 
-// 帳號已連結的登入身分，只取 provider 與連結時間（不取 subject、email）。同一 provider 可有多列（schema 沒有 (account_id, provider) 唯一約束）。
-// 墓碑身分屬於已刪除的帳號，呼叫者是存活帳號，不會列到；account_id 條件是唯一的範圍限制。
 func (q *Queries) ListIdentitiesOfAccount(ctx context.Context, accountID int64) ([]ListIdentitiesOfAccountRow, error) {
 	rows, err := q.db.Query(ctx, listIdentitiesOfAccount, accountID)
 	if err != nil {
@@ -143,7 +138,6 @@ type ScrubIdentitiesOfAccountParams struct {
 	AccountID int64
 }
 
-// 帳號刪除時身分列留作墓碑（保留 provider 與 subject，同一個登入身分不會再建一個帳號），清掉 email。
 func (q *Queries) ScrubIdentitiesOfAccount(ctx context.Context, arg ScrubIdentitiesOfAccountParams) error {
 	_, err := q.db.Exec(ctx, scrubIdentitiesOfAccount, arg.Now, arg.AccountID)
 	return err
@@ -164,7 +158,6 @@ type UpdateIdentityClaimsParams struct {
 	Subject          string
 }
 
-// 每次登入以 provider 最近回報的 email 更新。
 func (q *Queries) UpdateIdentityClaims(ctx context.Context, arg UpdateIdentityClaimsParams) error {
 	_, err := q.db.Exec(ctx, updateIdentityClaims,
 		arg.Email,

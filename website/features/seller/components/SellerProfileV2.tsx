@@ -227,7 +227,6 @@ export default function SellerProfileV2({
 				</div>
 
 				<div className="hkui-seller-profile__title">
-
 					<div className="hkui-seller-profile__name-row">
 						<p className="hkui-seller-profile__name">{name}</p>
 						{prize && (

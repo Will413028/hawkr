@@ -25,7 +25,6 @@ type BumpSellerResponseVersionParams struct {
 	ExpectedVersion int32
 }
 
-// 已鎖住身分列；latest_version 當 CAS，沒更新到列代表鎖沒有守住（不應發生）。
 func (q *Queries) BumpSellerResponseVersion(ctx context.Context, arg BumpSellerResponseVersionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, bumpSellerResponseVersion,
 		arg.Version,
@@ -51,7 +50,6 @@ type DeclineSellerResponseParams struct {
 	ID         uuid.UUID
 }
 
-// 目標狀態：已婉拒的列不動（保留第一次的時間與原因）。
 func (q *Queries) DeclineSellerResponse(ctx context.Context, arg DeclineSellerResponseParams) (int64, error) {
 	result, err := q.db.Exec(ctx, declineSellerResponse, arg.Now, arg.ReasonCode, arg.ID)
 	if err != nil {
@@ -76,7 +74,6 @@ type EnsureSellerResponseParams struct {
 	StoreID       int64
 }
 
-// 第一次寫入時建立身分列；只有被邀請的店會插入（SELECT 從邀請列出發），併發的第二個寫入者撞唯一鍵時什麼都不做。
 func (q *Queries) EnsureSellerResponse(ctx context.Context, arg EnsureSellerResponseParams) error {
 	_, err := q.db.Exec(ctx, ensureSellerResponse,
 		arg.ID,
@@ -105,7 +102,6 @@ func (q *Queries) GetSellerDraft(ctx context.Context, sellerResponseID uuid.UUID
 }
 
 const getSellerPublicationView = `-- name: GetSellerPublicationView :one
-
 SELECT p.id, p.version, p.buyer_id, p.request_id, p.request_revision_id, p.approval_id, p.approval_version, p.state, p.schema_version, p.client_request_id, p.published_at, p.created_at, p.updated_at, a.id, a.version, a.buyer_id, a.request_id, a.request_revision_id, a.range_lower_amount, a.range_upper_amount, a.buyer_note, a.candidate_set_id, a.response_deadline, a.state, a.schema_version, a.client_request_id, a.generated_at, a.expires_at, a.created_at, a.updated_at, rev.id, rev.request_id, rev.revision_no, rev.parent_revision_id, rev.status, rev.item, rev.item_resolution_kind, rev.item_resolution_label, rev.item_resolution_category_id, rev.quantity, rev.unit, rev.packaging, rev.budget_per_unit, rev.delivery_city, rev.delivery_date, rev.exact_match_required, rev.created_at
 FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
@@ -125,9 +121,6 @@ type GetSellerPublicationViewRow struct {
 	ProcurementRequestRevision        ProcurementRequestRevision
 }
 
-// 賣家端的讀寫。賣家可見性的唯一依據是邀請列的 (publication_id, store_id)（A9-D44(2)）：下面的讀取都從邀請列出發，
-// 不帶 buyer_id，買家刪除後（buyer_id 為 NULL）被邀請的店照常讀得到；沒有邀請列的店一列都查不到。
-// 一筆發給這家店的詢價，連同組出賣家可見內容要用的核准與需求版本（組法在 rfq.SellerFacingOf）。沒有列就是不存在或不是發給這家店。
 func (q *Queries) GetSellerPublicationView(ctx context.Context, arg GetSellerPublicationViewParams) (GetSellerPublicationViewRow, error) {
 	row := q.db.QueryRow(ctx, getSellerPublicationView, arg.PublicationID, arg.StoreID)
 	var i GetSellerPublicationViewRow
@@ -229,7 +222,6 @@ const hasActiveAcceptance = `-- name: HasActiveAcceptance :one
 SELECT EXISTS (SELECT 1 FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND state = 'ACTIVE') AS active
 `
 
-// 這張需求有沒有進行中的成交（ACTIVE 的接受單；建單失敗解除鎖後不算）。不帶 buyer_id：買家刪除後接受單的 buyer_id 是 NULL。
 func (q *Queries) HasActiveAcceptance(ctx context.Context, requestID uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasActiveAcceptance, requestID)
 	var active bool
@@ -250,7 +242,6 @@ type InsertSellerDraftParams struct {
 	Now              time.Time
 }
 
-// 建立第一版；已有草稿時沒有列回來（呼叫端回版本衝突）。
 func (q *Queries) InsertSellerDraft(ctx context.Context, arg InsertSellerDraftParams) (ProcurementSellerResponseDraft, error) {
 	row := q.db.QueryRow(ctx, insertSellerDraft, arg.SellerResponseID, arg.Payload, arg.Now)
 	var i ProcurementSellerResponseDraft
@@ -388,8 +379,6 @@ type ListSellerPublicationViewsRow struct {
 	ProcurementRequestRevision        ProcurementRequestRevision
 }
 
-// 發給這家店的詢價，依 (published_at DESC, id DESC) keyset；游標是上一頁最後一列的 (published_at, id)，沒有游標時 after_id 為 NULL。
-// 一次 join 取核准與需求版本，不逐列再查。不過濾已成交或買家已刪的詢價（賣家讀得到自己收過的詢價）。
 func (q *Queries) ListSellerPublicationViews(ctx context.Context, arg ListSellerPublicationViewsParams) ([]ListSellerPublicationViewsRow, error) {
 	rows, err := q.db.Query(ctx, listSellerPublicationViews,
 		arg.StoreID,
@@ -484,7 +473,6 @@ type ListSellerResponseStatesRow struct {
 	HasDraft         bool
 }
 
-// 這家店對一批詢價的回價狀態：目前版本的有效期限（推導 latest_response_status 用）與有沒有草稿。只回已經有身分列的詢價。
 func (q *Queries) ListSellerResponseStates(ctx context.Context, arg ListSellerResponseStatesParams) ([]ListSellerResponseStatesRow, error) {
 	rows, err := q.db.Query(ctx, listSellerResponseStates, arg.StoreID, arg.PublicationIds)
 	if err != nil {
@@ -515,7 +503,6 @@ const lockPublicationBuyer = `-- name: LockPublicationBuyer :one
 SELECT buyer_id FROM procurement.rfq_publications WHERE id = $1 FOR SHARE
 `
 
-// 賣家寫入用：以 FOR SHARE 鎖發布列並回目前的 buyer_id（NULL 是買家已刪除）。BuyerDeleted 的 UPDATE 要等寫入提交，所以檢查與寫入之間不會插進買家刪除。鎖順序：店家列、回價身分列、發布列。
 func (q *Queries) LockPublicationBuyer(ctx context.Context, id uuid.UUID) (*int64, error) {
 	row := q.db.QueryRow(ctx, lockPublicationBuyer, id)
 	var buyer_id *int64
@@ -532,7 +519,6 @@ type LockSellerResponseForStoreParams struct {
 	StoreID       int64
 }
 
-// 賣家寫入用：鎖這家店對這筆詢價的身分列（與買家的 AcceptSellerQuote 鎖同一列，兩邊串行）。沒有列回 ErrNoRows。
 func (q *Queries) LockSellerResponseForStore(ctx context.Context, arg LockSellerResponseForStoreParams) (ProcurementSellerResponse, error) {
 	row := q.db.QueryRow(ctx, lockSellerResponseForStore, arg.PublicationID, arg.StoreID)
 	var i ProcurementSellerResponse
@@ -568,7 +554,6 @@ type UpdateSellerDraftParams struct {
 	ExpectedVersion  int32
 }
 
-// 整份覆寫；版本不符沒有列回來（呼叫端回版本衝突）。
 func (q *Queries) UpdateSellerDraft(ctx context.Context, arg UpdateSellerDraftParams) (ProcurementSellerResponseDraft, error) {
 	row := q.db.QueryRow(ctx, updateSellerDraft,
 		arg.Payload,

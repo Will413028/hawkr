@@ -16,7 +16,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const profileLabelMaxRunes = 30
 
 // Preference 是買家常用發票資料的寫入 usecase。
@@ -26,7 +25,7 @@ const profileLabelMaxRunes = 30
 type Preference struct {
 	tx    database.TxManager
 	prefs domain.BuyerPreferenceRepository
-	idem domain.IdempotencyRepository
+	idem  domain.IdempotencyRepository
 
 	barcode MobileBarcodeVerifier
 
@@ -352,7 +351,6 @@ func (u *Preference) ClearDefault(ctx context.Context, buyerID int64) error {
 	_, err := u.prefs.ClearDefault(ctx, buyerID, u.now())
 	return err
 }
-
 
 func validateProfileFields(kind codemeta.InvoiceCarrierType, value, taxID, buyerName string) int32 {
 	id := checkoutIdentity{CarrierType: kind.Value}

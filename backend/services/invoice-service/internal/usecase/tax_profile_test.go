@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
 	tStoreA  int64 = 2685914682
 	tStoreB  int64 = 2632049831
@@ -28,7 +27,6 @@ const (
 )
 
 var tNow = time.Date(2026, 3, 2, 6, 0, 0, 0, time.UTC)
-
 
 type tIssuers struct {
 	domain.IssuerRepository
@@ -72,9 +70,9 @@ func (r *tIssuers) UpdateDisplayName(_ context.Context, _ int64, name string, _ 
 
 type tProfiles struct {
 	domain.SellerTaxProfileRepository
-	byIssuer map[int64]domain.SellerTaxProfile
-	created  int
-	casFails bool
+	byIssuer    map[int64]domain.SellerTaxProfile
+	created     int
+	casFails    bool
 	submitCalls int
 	resetCalls  int
 }
@@ -137,8 +135,8 @@ func (r *tProfiles) Create(_ context.Context, id, issuerID int64, now time.Time)
 	r.created++
 	row := domain.SellerTaxProfile{
 		ID: id, IssuerID: issuerID,
-		ReviewStatus:      codemeta.SellerTaxReviewStatusDraft.Value,
-		ClaimedObligation: codemeta.SellerTaxObligationUnknown.Value,
+		ReviewStatus:            codemeta.SellerTaxReviewStatusDraft.Value,
+		ClaimedObligation:       codemeta.SellerTaxObligationUnknown.Value,
 		EvidenceObjectKeys:      json.RawMessage(`[]`),
 		DefaultTaxCategory:      1,
 		PendingOrderLimitCount:  50,
@@ -388,7 +386,6 @@ func snil(s string) *string {
 	return &s
 }
 
-
 type tEnv struct {
 	uc       *TaxProfile
 	issuers  *tIssuers
@@ -441,7 +438,6 @@ func wantBiz(t *testing.T, err error, code int32) {
 		t.Fatalf("預期業務碼 %d，實際 %v", code, err)
 	}
 }
-
 
 // 陽性：全新賣家（沒有 issuer、沒有 profile）存草稿 ⇒ 兩列都建起來，狀態 DRAFT。
 //
@@ -547,7 +543,6 @@ func TestTaxProfile_SaveDraft_FinalizeFailureWritesNothing(t *testing.T) {
 	}
 }
 
-
 func TestTaxProfile_Submit_DraftToSubmitted(t *testing.T) {
 	e := newTaxEnv(t, profileAt("DRAFT"))
 
@@ -646,7 +641,6 @@ func TestTaxProfile_Submit_ForeignStoreIsNotFound(t *testing.T) {
 	_, err := e.uc.Submit(context.Background(), SubmitTaxProfileInput{StoreID: tStoreB, AcceptedTerms: true})
 	wantBiz(t, err, bizcode.SellerTaxProfileNotFound)
 }
-
 
 // 陽性：勾了條款送審 ⇒ 狀態、兩個時鐘欄、條款兩欄**一起**落庫。
 //
@@ -960,7 +954,6 @@ func TestTaxProfile_RequestExtension_RequiresReason(t *testing.T) {
 	}
 }
 
-
 func TestTaxProfile_AcceptAttestation_SubmittedToSelfIssuePending(t *testing.T) {
 	e := newTaxEnv(t, profileAt("SUBMITTED"))
 	before := e.profiles.byIssuer[tIssuerA]
@@ -1013,7 +1006,6 @@ func TestTaxProfile_AcceptAttestation_RejectsUnaccepted(t *testing.T) {
 		t.Fatalf("預期 ErrTaxTermsVersionInvalid，實際 %v", err)
 	}
 }
-
 
 // 相容表逐格驗：每一列必須逐字等於 §7.3.3 對應轉移的來源狀態欄。
 // 多一個值 ⇒ CAS rows=0 靜默失敗；少一個值 ⇒ 合法決策被 9348 擋掉。
@@ -1277,7 +1269,6 @@ func TestTaxProfile_Decide_VersionConflict(t *testing.T) {
 	}
 }
 
-
 // 陽性：APPROVE 就地改寫 pending_valid_until ＋ extension_count = 1，**狀態不變**。
 // 基準是**原到期日**不是 now：以 now 起算會讓快到期的案子被延成完整的 30 天。
 func TestTaxProfile_DecideExtension_Approve(t *testing.T) {
@@ -1368,7 +1359,6 @@ func TestTaxProfile_DecideExtension_InvalidDays(t *testing.T) {
 	}
 }
 
-
 // TestTaxProfile_Decide_CASRowsZeroIsNotSuccess 守住「rows=0 不得當成功」。
 //
 // 🔴 Go 端的相容表是**第一道**防線，它在正常路徑上就把不相容的決策擋掉 ⇒ CAS 的
@@ -1437,7 +1427,6 @@ func TestSubmit_RecordsAttestedByAccountID(t *testing.T) {
 	}
 }
 
-
 // B 組第 4 項：賣家自填統編零格式驗證（chk_stp_tax_id）。
 //
 // 買家側的同型欄位一直都走 domain.IsBusinessTaxID ⇒ 兩側標準不一致，
@@ -1505,7 +1494,6 @@ func TestTaxProfile_Decide_ApproveExemptWithTaxIDIsBusinessError(t *testing.T) {
 		t.Fatalf("被擋下後狀態仍被改動：%s", got)
 	}
 }
-
 
 // #3089 稽核 A-4：22001（欄位超長）與 CodeMeta 值域的守衛。
 //

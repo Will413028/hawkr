@@ -2,7 +2,6 @@ import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_cate
 import { commonPolicyCategory } from "@hawkr/ui-text/keys";
 import { staffTextOrUnknown } from "@/lib/ui-text";
 
-
 /**
  * 店家治理的平台判定類別與認定可用的類別：全部除了 OTHER 與社群內容的類別（OTHER 只給檢舉人選，理由要指到條款）。伺服器的 `Assessable` 另外收社群內容的
  * SPAM、HARASSMENT、HATE、SEXUAL_CONTENT（內容下架的認定用）；這份下拉是子集，內容下架用 `CONTENT_TAKEDOWN_CATEGORIES`。

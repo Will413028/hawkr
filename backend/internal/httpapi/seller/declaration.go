@@ -19,9 +19,9 @@ import (
 )
 
 type declaration struct {
-	capability model.Capability
+	capability   model.Capability
 	exemptReason string
-	limit *accountLimit
+	limit        *accountLimit
 }
 
 type accountLimit struct {
@@ -53,16 +53,16 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceUnblockBuyerProcedure:      requires(model.CapContentContract),
 	sellerv1alpha1connect.SellerAppServiceListBlockedBuyersProcedure: requires(model.CapContentContract),
 
-	sellerv1alpha1connect.SellerAppServiceSaveKYCDraftProcedure: requires(model.CapStorefrontWrite),
-	sellerv1alpha1connect.SellerAppServiceGetMyKYCProcedure:     requires(model.CapAccountSelfRead),
-	sellerv1alpha1connect.SellerAppServiceCancelKYCProcedure:    requires(model.CapStorefrontWrite),
-	sellerv1alpha1connect.SellerAppServiceGetMyPaymentAccountProcedure: requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceSaveKYCDraftProcedure:                   requires(model.CapStorefrontWrite),
+	sellerv1alpha1connect.SellerAppServiceGetMyKYCProcedure:                       requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceCancelKYCProcedure:                      requires(model.CapStorefrontWrite),
+	sellerv1alpha1connect.SellerAppServiceGetMyPaymentAccountProcedure:            requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceListMyEarningsProcedure:                 requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceGetMyOrderEarningsProcedure:             requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceCreatePaymentOnboardingSessionProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceRefreshMyPaymentAccountProcedure:        requires(model.CapStorefrontWrite),
-	sellerv1alpha1connect.SellerAppServiceSubmitKYCProcedure: requires(model.CapStorefrontWrite).limitedTo(5, time.Hour),
-	sellerv1alpha1connect.SellerAppServiceLookupBusinessRegistrationProcedure: requires(model.CapStorefrontWrite).limitedTo(10, time.Minute),
+	sellerv1alpha1connect.SellerAppServiceSubmitKYCProcedure:                      requires(model.CapStorefrontWrite).limitedTo(5, time.Hour),
+	sellerv1alpha1connect.SellerAppServiceLookupBusinessRegistrationProcedure:     requires(model.CapStorefrontWrite).limitedTo(10, time.Minute),
 
 	sellerv1alpha1connect.SellerAppServiceListMyMeasuresProcedure: exempt(appealReason),
 	sellerv1alpha1connect.SellerAppServiceGetMyMeasureProcedure:   exempt(appealReason),

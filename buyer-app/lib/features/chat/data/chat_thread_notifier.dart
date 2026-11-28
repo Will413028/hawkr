@@ -269,7 +269,6 @@ class ChatThread extends _$ChatThread {
     );
   }
 
-
   void _onEvent(pb.ChatEvent event) {
     switch (event.whichEvent()) {
       case pb.ChatEvent_Event.message:
@@ -391,7 +390,6 @@ class ChatThread extends _$ChatThread {
     ref.read(chatRealtimeProvider).noteSeq(id, state.maxSeq);
     _markReadIfNeeded();
   }
-
 
   /// 下拉重新整理：補到最新，不丟掉已載入的舊訊息；失敗丟出。
   Future<void> refresh() async {

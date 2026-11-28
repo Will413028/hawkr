@@ -318,6 +318,7 @@ void main() {
       try {
         await dio.post<dynamic>('/app/favorites');
       } on DioException {
+        // 結果由下面檢查。
       }
       await Future<void>.delayed(Duration.zero);
 
@@ -462,6 +463,7 @@ void main() {
       try {
         await dio.request<dynamic>(path, options: Options(method: method));
       } on DioException {
+        // 結果由各測試檢查。
       }
       await Future<void>.delayed(Duration.zero);
     }
@@ -524,6 +526,7 @@ void main() {
             options: Options(responseType: type),
           );
         } on DioException {
+          // 結果由下面檢查。
         }
         await Future<void>.delayed(Duration.zero);
 

@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const receiptBasisKey = "invoice/tax/2685914682/approval-2026.pdf"
 
 func exemptProfile(mutate func(*domain.SellerTaxProfile)) domain.SellerTaxProfile {
@@ -30,7 +29,6 @@ func exemptProfile(mutate func(*domain.SellerTaxProfile)) domain.SellerTaxProfil
 	}
 	return p
 }
-
 
 func TestReceiptAuth_Eligibility(t *testing.T) {
 	revokedStatus := codemeta.SellerTaxReviewStatusRevoked.Value
@@ -61,7 +59,6 @@ func TestReceiptAuth_Eligibility(t *testing.T) {
 		})
 	}
 }
-
 
 func TestReceiptAuth_ApprovalBasisThreeStates(t *testing.T) {
 	assetID := int64(778899)
@@ -122,7 +119,6 @@ func TestReceiptAuth_ApprovalBasisThreeStates(t *testing.T) {
 		}
 	})
 }
-
 
 func TestReceiptAuth_Confirm(t *testing.T) {
 	e := newTaxEnv(t, exemptProfile(nil))
@@ -238,7 +234,6 @@ func TestReceiptAuth_RevokeDoesNotRequireConsentVersion(t *testing.T) {
 	}
 }
 
-
 func underReviewProfile() domain.SellerTaxProfile {
 	p := exemptProfile(nil)
 	p.ReviewStatus = codemeta.SellerTaxReviewStatusUnderReview.Value
@@ -279,7 +274,7 @@ func TestReceiptBasis_Rejected(t *testing.T) {
 		decision string
 		key      string
 		assetID  string
-		want error
+		want     error
 	}{
 		"只給 key":     {codemeta.SellerTaxReviewDecisionApproveInvoiceExempt.Value, receiptBasisKey, "", ErrTaxApprovalBasisIncomplete},
 		"只給 assetId": {codemeta.SellerTaxReviewDecisionApproveInvoiceExempt.Value, "", "778899", ErrTaxApprovalBasisIncomplete},

@@ -114,7 +114,6 @@ function issue(patch: Partial<KycIssueDraft> = {}): KycIssueDraft {
 	};
 }
 
-
 test("原因碼的文字窮舉 KYCIssueCode：每個非 UNSPECIFIED 的值都有文字，下拉選項與 enum 完全相同，新增 enum 值時這裡會失敗", () => {
 	const all = Object.values(KYCIssueCode).filter(
 		(v): v is KYCIssueCode => typeof v === "number",
@@ -136,7 +135,6 @@ test("原因碼的文字窮舉 KYCIssueCode：每個非 UNSPECIFIED 的值都有
 	);
 	assert.equal(kycIssueCodeLabel(9999 as KYCIssueCode), "未知");
 });
-
 
 test("可以指出問題的欄位由伺服器給（issuable_fields）：選項照它的順序，只加上呈現文字與「是不是文件」；UNSPECIFIED 不列", () => {
 	const ind = issuableFieldOptions(individual());
@@ -168,7 +166,6 @@ test("可以指出問題的欄位由伺服器給（issuable_fields）：選項�
 	);
 });
 
-
 test("可以指定的文件取自申請上的文件：asset_id 來自 KYCDocument，沒有 asset_id 的不列，補充文件依順序編號", () => {
 	assert.deepEqual(documentChoices(individual()), [], "沒有文件：不能指定");
 	const choices = documentChoices(
@@ -186,7 +183,6 @@ test("可以指定的文件取自申請上的文件：asset_id 來自 KYCDocumen
 		{ field: COMPANY, assetId: "a-c1", label: "補充文件 2" },
 	]);
 });
-
 
 const BIZ_OPTIONS = issuableFieldOptions(business());
 const CHOICES: DocumentChoice[] = [
@@ -423,7 +419,6 @@ test("文件類欄位依原因碼（與伺服器同一條規則）：看不清�
 	);
 });
 
-
 function draft(patch: Partial<ReviewDraft> = {}): ReviewDraft {
 	return {
 		issues: [issue()],
@@ -526,7 +521,6 @@ test("RejectKYC 的請求：帶讀到的 etag、依加入順序的 issues（欄�
 	);
 });
 
-
 function renderDialog(patch: Record<string, unknown> = {}): string {
 	return render(dialogModule.default, {
 		draft: draft(),
@@ -589,7 +583,6 @@ test("退回對話框：沒有問題時說還沒有；沒有可指定的文件�
 	const open = renderDialog();
 	assert.doesNotMatch(open, /type="submit"[^>]*disabled/u);
 });
-
 
 const SERVER_ISSUES = [
 	{

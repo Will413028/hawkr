@@ -421,8 +421,7 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
           .getProductReviewStats(productId);
       if (!hasReviewCount) item['reviewCount'] = summary.count;
       if (!hasRating) item['rating'] = summary.average;
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   /// 追蹤店家卡片的顯示資料，全部來自 API 回的店家卡片。

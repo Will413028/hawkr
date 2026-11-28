@@ -154,7 +154,6 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 					</Button>
 				}
 			>
-
 				<section className="bg-content1 border border-divider p-[18px] mb-4 shadow-hk-card">
 					<header className="flex items-center justify-between gap-3 mb-3">
 						<h2 className="text-base font-bold text-foreground">訂單摘要</h2>
@@ -208,7 +207,6 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 					</div>
 				</section>
 
-
 				<section className="bg-content1 border border-divider p-[18px] mb-4 shadow-hk-card">
 					<h2 className="text-base font-bold text-foreground mb-4">問題描述</h2>
 					<ul className="list-none m-0 p-0 flex flex-col gap-2 mb-4">
@@ -261,7 +259,6 @@ export default function ReturnClient({ orderNo }: { orderNo: string }) {
 						</span>
 					</div>
 				</section>
-
 
 				<section className="bg-content1 border border-divider p-[18px] mb-4 shadow-hk-card">
 					<h2 className="text-base font-bold text-foreground mb-1">照片證據</h2>

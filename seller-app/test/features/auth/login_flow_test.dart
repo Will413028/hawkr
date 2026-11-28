@@ -258,10 +258,7 @@ void main() {
       final session = container.read(sessionProvider);
       expect(session.isLoggedIn, isTrue);
       expect(session.accountId, 'acc-1');
-      expect(
-        container.read(sellerStoreIdProvider),
-        kSellerId.toString(),
-      );
+      expect(container.read(sellerStoreIdProvider), kSellerId.toString());
       expect(container.read(needsOnboardingProvider), isFalse);
       expect(redirectFrom(container, AuthRoutes.auth), MainRoutes.dashboard);
     },

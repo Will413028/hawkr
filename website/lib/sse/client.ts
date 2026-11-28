@@ -259,8 +259,7 @@ export class SseClient {
 		if (dataRaw) {
 			try {
 				parsed = JSON.parse(dataRaw);
-			} catch {
-			}
+			} catch {}
 		}
 		if (id) this.lastEventId = id;
 
@@ -331,8 +330,7 @@ export class SseClient {
 		if (this.abortController) {
 			try {
 				this.abortController.abort();
-			} catch {
-			}
+			} catch {}
 			this.abortController = null;
 		}
 	}

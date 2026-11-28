@@ -13,7 +13,6 @@ import (
 )
 
 const closeOpenProviderCutover = `-- name: CloseOpenProviderCutover :execrows
-
 UPDATE invoice_provider_cutovers
 SET deactivated_at = $1
 WHERE provider_account_id = $2
@@ -25,18 +24,6 @@ type CloseOpenProviderCutoverParams struct {
 	ProviderAccountID int64      `db:"provider_account_id" json:"provider_account_id"`
 }
 
-// invoice_provider_cutovers｜自動開立切點歷史（端點 46）
-// SSOT：設計書 58 號 §5.1.15
-//
-// 寫入只有兩個路徑，且都必須與 invoice_provider_accounts 的那一句 CAS 同一交易：
-//
-//	端點 26（賣家設定切點）  ⇒ CloseOpenProviderCutover ＋ InsertProviderCutover
-//	端點 67（ADM 撤銷連線）  ⇒ CloseOpenProviderCutover（不新增列，§5.1.15）
-//
-// 分兩個交易寫的後果是歷史與現值不一致，而端點 46 是唯一會讀到它的地方 ——
-// 沒有任何東西會發現。
-// 關掉目前有效的那一列。冪等：沒有開著的列時 rows=0，呼叫端不得視為錯誤
-// （第一次設定切點時本來就沒有前一列）。
 func (q *Queries) CloseOpenProviderCutover(ctx context.Context, arg CloseOpenProviderCutoverParams) (int64, error) {
 	result, err := q.db.Exec(ctx, closeOpenProviderCutover, arg.Now, arg.ProviderAccountID)
 	if err != nil {
@@ -78,8 +65,6 @@ type InsertProviderCutoverParams struct {
 	Now                pgtype.Timestamptz `db:"now" json:"now"`
 }
 
-// account_version 存的是**設定之後**的版本（SetProviderAutomationCutover 已 +1）：
-// ProviderCutoverItem.version 要能讓 ADM 對回 invoice_provider_accounts 當時那一版。
 func (q *Queries) InsertProviderCutover(ctx context.Context, arg InsertProviderCutoverParams) (InvoiceProviderCutover, error) {
 	row := q.db.QueryRow(ctx, insertProviderCutover,
 		arg.ProviderAccountID,
@@ -119,9 +104,6 @@ type ListProviderCutoversForAdminParams struct {
 	RowLimit          int32 `db:"row_limit" json:"row_limit"`
 }
 
-// 端點 46。以 provider_account_id 過濾（呼叫端先用 store_id 解析出帳戶，查無回 9330）。
-// 排序取 created_at DESC 並補 id DESC 當穩定第二鍵：同一交易內關舊列＋插新列會讓
-// 兩列的時間戳相同，只用時間排序的分頁會在頁界重複或漏列。
 func (q *Queries) ListProviderCutoversForAdmin(ctx context.Context, arg ListProviderCutoversForAdminParams) ([]InvoiceProviderCutover, error) {
 	rows, err := q.db.Query(ctx, listProviderCutoversForAdmin, arg.ProviderAccountID, arg.RowOffset, arg.RowLimit)
 	if err != nil {

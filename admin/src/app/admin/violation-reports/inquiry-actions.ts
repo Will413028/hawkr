@@ -11,7 +11,6 @@ import type {
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { fromLocalInput } from "@/app/admin/merchants/[id]/measure";
 
-
 /** 詢問、記下回覆、撤回失敗（網路層，J15）：沒有寫入。 */
 export const INQUIRY_FAILED_TEXT =
 	"記下失敗，沒有寫入；請確認網路狀態後再試一次。";
@@ -35,7 +34,6 @@ export const INQUIRY_LATE_REPLY_TEXT =
 /** I17：結案對話框在等賣家時的提示（不擋送出）。 */
 export const CLOSE_WITH_OPEN_INQUIRY_TEXT =
 	"還有一筆詢問在等賣家回覆；結案會撤回它。";
-
 
 export interface InquiryForm {
 	kind: CaseInquiryKind;
@@ -82,7 +80,6 @@ export function buildCreateInquiry(
 		...(due ? { dueTime: timestampFromDate(due) } : {}),
 	};
 }
-
 
 export interface InquiryReplyForm {
 	channel: CaseInquiryReplyChannel;

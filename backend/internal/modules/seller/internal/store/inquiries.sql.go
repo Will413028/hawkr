@@ -39,7 +39,6 @@ type AccountCaseInquiriesParams struct {
 	PageSize       int32
 }
 
-// 賣家帳號全部店家上的詢問，新到舊（keyset）。state 篩選此刻的狀態（OPEN／REPLIED／WITHDRAWN，與 model.CaseInquiry.State 同一個定義），NULL 不篩。
 func (q *Queries) AccountCaseInquiries(ctx context.Context, arg AccountCaseInquiriesParams) ([]SellerCaseInquiry, error) {
 	rows, err := q.db.Query(ctx, accountCaseInquiries,
 		arg.AccountID,
@@ -105,7 +104,6 @@ type CaseInquiriesParams struct {
 	PageSize       int32
 }
 
-// 案件的詢問，舊到新（keyset）。
 func (q *Queries) CaseInquiries(ctx context.Context, arg CaseInquiriesParams) ([]SellerCaseInquiry, error) {
 	rows, err := q.db.Query(ctx, caseInquiries,
 		arg.CaseID,
@@ -195,7 +193,6 @@ type CaseInquiryByRequestParams struct {
 	RequestID *uuid.UUID
 }
 
-// 冪等重送的查詢：範圍是 (管理員, request_id)。
 func (q *Queries) CaseInquiryByRequest(ctx context.Context, arg CaseInquiryByRequestParams) (SellerCaseInquiry, error) {
 	row := q.db.QueryRow(ctx, caseInquiryByRequest, arg.AdminID, arg.RequestID)
 	var i SellerCaseInquiry
@@ -230,7 +227,6 @@ WHERE inquiry_id = ANY($1::uuid[])
 ORDER BY inquiry_id, position
 `
 
-// 一批詢問回覆的附件，依詢問與位置。
 func (q *Queries) CaseInquiryEvidence(ctx context.Context, inquiryIds []uuid.UUID) ([]SellerCaseInquiryReplyEvidence, error) {
 	rows, err := q.db.Query(ctx, caseInquiryEvidence, inquiryIds)
 	if err != nil {
@@ -263,7 +259,6 @@ JOIN seller.stores s ON s.store_id = i.store_id
 WHERE s.account_id = $1 AND i.reply_received_at IS NULL AND i.withdrawn_at IS NULL
 `
 
-// 賣家帳號待回覆的詢問數（還沒回覆也沒撤回；逾期仍算）。
 func (q *Queries) CountAccountOpenCaseInquiries(ctx context.Context, accountID int64) (int32, error) {
 	row := q.db.QueryRow(ctx, countAccountOpenCaseInquiries, accountID)
 	var column_1 int32
@@ -291,8 +286,6 @@ type InsertCaseInquiryParams struct {
 	RequestHash []byte
 }
 
-// 發一筆詢問：同一位管理員的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一筆）。case_inquiries_one_open 只是保底：
-// 呼叫方已鎖住店家列與案件列並以 Availability 擋下，撞到它整筆失敗。
 func (q *Queries) InsertCaseInquiry(ctx context.Context, arg InsertCaseInquiryParams) (SellerCaseInquiry, error) {
 	row := q.db.QueryRow(ctx, insertCaseInquiry,
 		arg.ID,
@@ -366,7 +359,6 @@ type InsertInquiryEvidenceAccessParams struct {
 	Now       time.Time
 }
 
-// 詢問回覆附件的讀取紀錄：在讀取之前寫入，以 (inquiry_id, position) 指向那一張附件。
 func (q *Queries) InsertInquiryEvidenceAccess(ctx context.Context, arg InsertInquiryEvidenceAccessParams) error {
 	_, err := q.db.Exec(ctx, insertInquiryEvidenceAccess,
 		arg.AccessID,
@@ -385,7 +377,6 @@ WHERE id = $1
 FOR UPDATE
 `
 
-// 鎖順序：店家列、通報列、案件列、詢問列、措施列。
 func (q *Queries) LockCaseInquiry(ctx context.Context, id uuid.UUID) (SellerCaseInquiry, error) {
 	row := q.db.QueryRow(ctx, lockCaseInquiry, id)
 	var i SellerCaseInquiry
@@ -424,7 +415,6 @@ type OpenCaseInquiriesRow struct {
 	ID     uuid.UUID
 }
 
-// 一批案件還沒結束的詢問（每個案件最多一筆：case_inquiries_one_open）。「等賣家」的定義（還沒回覆也沒撤回）與 model.CaseInquiry.Open 同一個。
 func (q *Queries) OpenCaseInquiries(ctx context.Context, caseIds []uuid.UUID) ([]OpenCaseInquiriesRow, error) {
 	rows, err := q.db.Query(ctx, openCaseInquiries, caseIds)
 	if err != nil {
@@ -465,7 +455,6 @@ type RecordCaseInquiryReplyParams struct {
 	ID         uuid.UUID
 }
 
-// 記下回覆；只在還沒結束時寫入，否則 0 列。
 func (q *Queries) RecordCaseInquiryReply(ctx context.Context, arg RecordCaseInquiryReplyParams) (SellerCaseInquiry, error) {
 	row := q.db.QueryRow(ctx, recordCaseInquiryReply,
 		arg.Body,
@@ -518,7 +507,6 @@ type ReplyCaseInquiryBySellerParams struct {
 	ID        uuid.UUID
 }
 
-// 賣家在賣家中心回覆；只在還沒結束時寫入，否則 0 列。收到與記下是同一個時刻。
 func (q *Queries) ReplyCaseInquiryBySeller(ctx context.Context, arg ReplyCaseInquiryBySellerParams) (SellerCaseInquiry, error) {
 	row := q.db.QueryRow(ctx, replyCaseInquiryBySeller,
 		arg.Body,
@@ -566,7 +554,6 @@ type WithdrawCaseInquiryParams struct {
 	ID      uuid.UUID
 }
 
-// 管理員撤回；只在還沒結束時寫入，否則 0 列。
 func (q *Queries) WithdrawCaseInquiry(ctx context.Context, arg WithdrawCaseInquiryParams) (SellerCaseInquiry, error) {
 	row := q.db.QueryRow(ctx, withdrawCaseInquiry, arg.Now, arg.AdminID, arg.ID)
 	var i SellerCaseInquiry
@@ -609,7 +596,6 @@ type WithdrawOpenCaseInquiryParams struct {
 	CaseID  uuid.UUID
 }
 
-// 案件結案（決定，或通報都移走）時，系統撤回案件還沒結束的詢問（最多一筆）；作者是結案的管理員。呼叫方已鎖住案件列。
 func (q *Queries) WithdrawOpenCaseInquiry(ctx context.Context, arg WithdrawOpenCaseInquiryParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, withdrawOpenCaseInquiry, arg.Now, arg.AdminID, arg.CaseID)
 	if err != nil {

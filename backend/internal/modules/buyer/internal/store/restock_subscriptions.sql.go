@@ -22,7 +22,6 @@ type BatchRestockParams struct {
 	Column2 []uuid.UUID
 }
 
-// 回傳輸入清單中至少有一個 SKU 已訂閱補貨的商品 ID。
 func (q *Queries) BatchRestock(ctx context.Context, arg BatchRestockParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, batchRestock, arg.BuyerID, arg.Column2)
 	if err != nil {
@@ -47,7 +46,6 @@ const cancelRestock = `-- name: CancelRestock :exec
 DELETE FROM buyer.restock_subscriptions WHERE buyer_id = $1
 `
 
-// 關閉 stint 時刪除全部訂閱。
 func (q *Queries) CancelRestock(ctx context.Context, buyerID int64) error {
 	_, err := q.db.Exec(ctx, cancelRestock, buyerID)
 	return err
@@ -72,7 +70,6 @@ type FanOutParams struct {
 	BatchLimit int32
 }
 
-// 有界鎖定並刪除某個 SKU 的待通知關聯，回傳買家與 SKU 所屬商品；事件與刪除同 transaction。
 func (q *Queries) FanOut(ctx context.Context, arg FanOutParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, fanOut, arg.SkuID, arg.BatchLimit)
 	if err != nil {
@@ -97,7 +94,6 @@ const hasRestock = `-- name: HasRestock :one
 SELECT EXISTS (SELECT 1 FROM buyer.restock_subscriptions WHERE sku_id = $1)
 `
 
-// 檢查 SKU 是否仍有待通知關聯。
 func (q *Queries) HasRestock(ctx context.Context, skuID uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasRestock, skuID)
 	var exists bool
@@ -120,7 +116,6 @@ type ListRestockParams struct {
 	PageLimit int32
 }
 
-// 以時間與 SKU ID 分頁列出待通知關聯。
 func (q *Queries) ListRestock(ctx context.Context, arg ListRestockParams) ([]BuyerRestockSubscription, error) {
 	rows, err := q.db.Query(ctx, listRestock,
 		arg.BuyerID,
@@ -156,7 +151,6 @@ const purgeRestockSKUs = `-- name: PurgeRestockSKUs :exec
 DELETE FROM buyer.restock_subscriptions WHERE sku_id = ANY($1::uuid[])
 `
 
-// 刪除這些 SKU 的全部訂閱（商品或 SKU 刪除後）；沒有訂閱的 SKU 是 no-op，可重複呼叫。
 func (q *Queries) PurgeRestockSKUs(ctx context.Context, skuIds []uuid.UUID) error {
 	_, err := q.db.Exec(ctx, purgeRestockSKUs, skuIds)
 	return err
@@ -175,7 +169,6 @@ type SubscribeRestockParams struct {
 	CreatedAt time.Time
 }
 
-// 建立待通知關聯，同組（買家、SKU）訂閱冪等。
 func (q *Queries) SubscribeRestock(ctx context.Context, arg SubscribeRestockParams) error {
 	_, err := q.db.Exec(ctx, subscribeRestock,
 		arg.BuyerID,
@@ -196,7 +189,6 @@ type UnsubscribeRestockParams struct {
 	SkuID   uuid.UUID
 }
 
-// 刪除指定 SKU 的訂閱。
 func (q *Queries) UnsubscribeRestock(ctx context.Context, arg UnsubscribeRestockParams) error {
 	_, err := q.db.Exec(ctx, unsubscribeRestock, arg.BuyerID, arg.SkuID)
 	return err

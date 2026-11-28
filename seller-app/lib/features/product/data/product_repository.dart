@@ -13,7 +13,6 @@ class ProductRepository with ApiRequestHelper {
   @override
   Dio get dio => _dio;
 
-
   Future<Map<String, dynamic>> getMyProducts({
     int page = 1,
     int size = 20,
@@ -29,7 +28,6 @@ class ProductRepository with ApiRequestHelper {
       },
     );
   }
-
 
   Future<Map<String, dynamic>> createProduct({
     required String idempotencyKey,
@@ -122,11 +120,9 @@ class ProductRepository with ApiRequestHelper {
     );
   }
 
-
   Future<Map<String, dynamic>> getProductSkus(dynamic productId) async {
     return apiGet('/api/v1/app/products/$productId/skus');
   }
-
 
   /// 取得賣家可用的配送方式（含 onboarding 狀態）
   /// GET /app/shipping_methods
@@ -165,7 +161,6 @@ class ProductRepository with ApiRequestHelper {
     );
   }
 
-
   /// 取得超商門市地圖參數（PayUni Form POST）
   /// POST /app/store_map_sessions
   Future<Map<String, dynamic>?> getStoreMapSession() async {
@@ -182,7 +177,6 @@ class ProductRepository with ApiRequestHelper {
   Future<Map<String, dynamic>> getProductDetail(dynamic productId) {
     return apiGet('/api/v1/app/products/$productId');
   }
-
 
   Future<List<Map<String, dynamic>>> fetchCategories({
     bool forceRefresh = false,
@@ -248,7 +242,6 @@ class ProductRepository with ApiRequestHelper {
     }
     return [];
   }
-
 
   Future<List<Map<String, dynamic>>> getSellerProducts(String sellerId) async {
     final result = await getMyProducts();

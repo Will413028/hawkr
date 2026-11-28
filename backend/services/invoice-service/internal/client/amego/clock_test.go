@@ -11,8 +11,8 @@ import (
 )
 
 type fakeTimeSource struct {
-	unix atomic.Int64
-	err  error
+	unix  atomic.Int64
+	err   error
 	calls atomic.Int64
 }
 

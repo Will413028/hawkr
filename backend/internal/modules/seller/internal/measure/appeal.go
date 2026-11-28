@@ -44,10 +44,10 @@ func (s *Service) SubmitAppeal(ctx context.Context, in model.SubmitAppealInput) 
 }
 
 type requestSpec struct {
-	kind        model.RequestKind
-	reasonLabel string
-	allowed     func(model.Measure) bool
-	unavailable func(uitext.Locale, model.Measure) error
+	kind              model.RequestKind
+	reasonLabel       string
+	allowed           func(model.Measure) bool
+	unavailable       func(uitext.Locale, model.Measure) error
 	retiredMeansEnded bool
 }
 

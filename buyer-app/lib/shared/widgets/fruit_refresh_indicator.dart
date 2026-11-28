@@ -72,7 +72,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
 
   _RefreshPhase _phase = _RefreshPhase.idle;
 
-
   late final AnimationController _pullAnim = AnimationController(vsync: this);
 
   late final AnimationController _spinCtrl = AnimationController(
@@ -92,7 +91,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     _currentColor = _fruitColors[_random.nextInt(_fruitColors.length)];
   }
 
-
   Future<void> _handleRefresh() async {
     setState(() => _phase = _RefreshPhase.refreshing);
     if (!_spinCtrl.isAnimating) _spinCtrl.repeat();
@@ -111,7 +109,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     if (mounted) setState(() => _phase = _RefreshPhase.idle);
   }
 
-
   void _startCanceling() {
     if (_phase != _RefreshPhase.dragging) return;
     setState(() => _phase = _RefreshPhase.canceling);
@@ -127,7 +124,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
           if (mounted) setState(() => _phase = _RefreshPhase.idle);
         });
   }
-
 
   bool _handleScrollNotification(ScrollNotification n) {
     if (n is ScrollEndNotification) {
@@ -164,7 +160,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     return false;
   }
 
-
   @override
   Widget build(BuildContext context) {
     return NotificationListener<ScrollNotification>(
@@ -193,7 +188,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
       ),
     );
   }
-
 
   Widget _buildFruit(double progress) {
     final scale = progress.clamp(0.0, 1.0);
@@ -242,7 +236,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     );
   }
 }
-
 
 class FruitRefreshListView extends StatelessWidget {
   const FruitRefreshListView({

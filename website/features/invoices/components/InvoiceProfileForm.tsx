@@ -256,7 +256,6 @@ export function InvoiceProfileForm({
 				onChange={(event) => setLabel(event.target.value)}
 			/>
 
-
 			{editing ? null : (
 				<label className="inline-flex items-start gap-2 text-sm text-foreground-muted cursor-pointer select-none">
 					<input

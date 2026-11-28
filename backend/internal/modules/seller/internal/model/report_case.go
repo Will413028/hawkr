@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 // Outcome 是一筆通報的結果；值與 DB 的 reports_outcome_check、契約的 ReportOutcome 一致。
 type Outcome string
 

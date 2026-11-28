@@ -79,14 +79,14 @@ type Products interface {
 }
 
 type presenter struct {
-	buyers    Buyers
-	stores    Stores
-	images    rpc.Images
-	webOrigin rpc.WebOrigin
-	products  Products
-	ownerView bool
-	liked func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
-	log   *slog.Logger
+	buyers         Buyers
+	stores         Stores
+	images         rpc.Images
+	webOrigin      rpc.WebOrigin
+	products       Products
+	ownerView      bool
+	liked          func(ctx context.Context, buyerID int64, postIDs []uuid.UUID) (map[uuid.UUID]bool, error)
+	log            *slog.Logger
 	productTimeout time.Duration
 }
 
@@ -572,10 +572,10 @@ func (h *presenter) buyerDisplays(ctx context.Context, buyerIDs []int64) (map[in
 }
 
 type postStores struct {
-	cards    map[int64]seller.StoreCard
-	blocking map[int64]bool
-	liked    map[uuid.UUID]bool
-	products map[uuid.UUID]ProductInfo
+	cards        map[int64]seller.StoreCard
+	blocking     map[int64]bool
+	liked        map[uuid.UUID]bool
+	products     map[uuid.UUID]ProductInfo
 	buyerDisplay map[int64]buyer.Display
 }
 

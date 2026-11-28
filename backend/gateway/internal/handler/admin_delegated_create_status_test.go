@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type capturingCreateProductStub struct {
 	productpb.ProductServiceClient
 	last *productpb.CreateProductRequest

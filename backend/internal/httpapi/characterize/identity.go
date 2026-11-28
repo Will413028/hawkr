@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-
 // Auth 是直接打單體的測試要裝進 identity 的 dev 驗證，與各呼叫者的 token。
 type Auth struct {
 	// Providers 放進 identity.Deps.Providers。

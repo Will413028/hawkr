@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 type inboxRow struct{ ev domain.InboxEvent }
 
 func (r inboxRow) OutboxID() int64         { return r.ev.ID }
@@ -40,7 +39,7 @@ type InboxRefundReprocessor interface {
 }
 
 type deadlineInboxRepo struct {
-	repo domain.InboxRepository
+	repo         domain.InboxRepository
 	parkInterval time.Duration
 	log          *zap.Logger
 }
@@ -136,12 +135,12 @@ func (r *deadlineInboxRepo) UpdateAttempt(ctx context.Context, id int64, attempt
 
 // DeadlineWorker 是 INV.dl 的整支。
 type DeadlineWorker struct {
-	w      *outbox.Worker[inboxRow]
-	uc     InboxOrderPaidReprocessor
-	refund InboxRefundReprocessor
-	log    *zap.Logger
-	obs    *outbox.Metrics
-	overdue OverdueComplaintSweeper
+	w         *outbox.Worker[inboxRow]
+	uc        InboxOrderPaidReprocessor
+	refund    InboxRefundReprocessor
+	log       *zap.Logger
+	obs       *outbox.Metrics
+	overdue   OverdueComplaintSweeper
 	statutory StatutoryDeadlineSweeper
 }
 

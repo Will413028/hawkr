@@ -27,7 +27,6 @@ type AnomalyRefundTopupParams struct {
 	ID     uuid.UUID
 }
 
-// 補差額與 provider 不符、前置條件不成立或查回連續失敗：SENDING 進 ANOMALY（補掃不再重試），原因記在 topup_reason。
 func (q *Queries) AnomalyRefundTopup(ctx context.Context, arg AnomalyRefundTopupParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, anomalyRefundTopup, arg.Reason, arg.Now, arg.ID)
 	var i PaymentRefund
@@ -76,7 +75,6 @@ type ApplyRefundTopupParams struct {
 	ID              uuid.UUID
 }
 
-// 補差額成功：SENDING → DONE 並記 provider 的轉帳 ID。
 func (q *Queries) ApplyRefundTopup(ctx context.Context, arg ApplyRefundTopupParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, applyRefundTopup, arg.TopupExternalID, arg.Now, arg.ID)
 	var i PaymentRefund
@@ -147,7 +145,6 @@ SET transfer_deducted = false
 WHERE payment_order_id = $1 AND transfer_deducted
 `
 
-// 轉帳終局失敗（沒有搬錢）：沒有任何退款算進一筆有效轉帳的金額。呼叫端已鎖付款列、訂單應收列與轉帳列。
 func (q *Queries) ClearRefundsDeducted(ctx context.Context, paymentOrderID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, clearRefundsDeducted, paymentOrderID)
 	return err
@@ -166,7 +163,6 @@ type MarkRefundTopupCalledParams struct {
 	ID  uuid.UUID
 }
 
-// 補差額 provider 之前先記「已呼叫」的時刻（這把鍵已記過的保留最早的）。只有 SENDING 的列寫。
 func (q *Queries) MarkRefundTopupCalled(ctx context.Context, arg MarkRefundTopupCalledParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, markRefundTopupCalled, arg.Now, arg.ID)
 	var i PaymentRefund
@@ -206,7 +202,6 @@ SET transfer_deducted = (status <> 'FAILED')
 WHERE payment_order_id = $1 AND transfer_deducted <> (status <> 'FAILED')
 `
 
-// 轉帳 claim 算定金額時（呼叫端已鎖付款列、訂單應收列與轉帳列）依當下的退款重寫「已算進轉帳金額」：非 FAILED 的退款為真，FAILED 的為假（算定時它已不在金額裡，不必補）。
 func (q *Queries) MarkRefundsDeducted(ctx context.Context, paymentOrderID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, markRefundsDeducted, paymentOrderID)
 	return err
@@ -228,7 +223,6 @@ type ReleaseRefundTopupParams struct {
 	FromStatuses []string
 }
 
-// 不補了：WAITING（轉帳失敗，或重新算定的金額已不含這筆退款）或 SENDING（補差額永久被拒絕）進 RELEASED，原因記在 topup_reason。
 func (q *Queries) ReleaseRefundTopup(ctx context.Context, arg ReleaseRefundTopupParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, releaseRefundTopup,
 		arg.Reason,
@@ -285,7 +279,6 @@ type ResolveRefundTopupDoneParams struct {
 	ID              uuid.UUID
 }
 
-// 後台人工結案（補差額的 ANOMALY）：provider 確實建立了補差額轉帳（topup_external_id 是證據），進 DONE。
 func (q *Queries) ResolveRefundTopupDone(ctx context.Context, arg ResolveRefundTopupDoneParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, resolveRefundTopupDone, arg.TopupExternalID, arg.Now, arg.ID)
 	var i PaymentRefund
@@ -334,7 +327,6 @@ type ResolveRefundTopupReleasedParams struct {
 	ID     uuid.UUID
 }
 
-// 後台人工結案（補差額的 ANOMALY）：確認 provider 沒有補差額轉帳，不補了（人工另行處理）。
 func (q *Queries) ResolveRefundTopupReleased(ctx context.Context, arg ResolveRefundTopupReleasedParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, resolveRefundTopupReleased, arg.Reason, arg.Now, arg.ID)
 	var i PaymentRefund
@@ -384,7 +376,6 @@ type RotateRefundTopupKeyParams struct {
 	OldKey uuid.UUID
 }
 
-// 補差額被 provider 已知拒絕（可重試、沒有執行），或查回證明上一次不存在又過了最短等待：換新的冪等鍵（也是新的嘗試 ID），清掉呼叫時刻與查回失敗次數，不計任何期限。
 func (q *Queries) RotateRefundTopupKey(ctx context.Context, arg RotateRefundTopupKeyParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, rotateRefundTopupKey, arg.Now, arg.ID, arg.OldKey)
 	var i PaymentRefund
@@ -432,7 +423,6 @@ type SendingTopupRefundIDsParams struct {
 	Batch      int32
 }
 
-// 週期掃描：補差額 SENDING、閒置超過門檻的退款（ANOMALY 不在內，partial index refunds_topup_sending）。
 func (q *Queries) SendingTopupRefundIDs(ctx context.Context, arg SendingTopupRefundIDsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, sendingTopupRefundIDs, arg.IdleBefore, arg.AfterID, arg.Batch)
 	if err != nil {
@@ -466,7 +456,6 @@ type StartRefundTopupParams struct {
 	ID  uuid.UUID
 }
 
-// 開始補差額：WAITING → SENDING（只有已失敗的退款才有 WAITING，schema 的 refunds_topup_only_failed_check 也守）。
 func (q *Queries) StartRefundTopup(ctx context.Context, arg StartRefundTopupParams) (PaymentRefund, error) {
 	row := q.db.QueryRow(ctx, startRefundTopup, arg.Now, arg.ID)
 	var i PaymentRefund
@@ -508,7 +497,6 @@ ORDER BY id
 FOR UPDATE
 `
 
-// 訂單應收底下補差額在 WAITING 的退款（已失敗、轉帳金額含它），依 ID 升序鎖。呼叫端已鎖付款列、訂單應收列與轉帳列。
 func (q *Queries) WaitingTopups(ctx context.Context, paymentOrderID uuid.UUID) ([]PaymentRefund, error) {
 	rows, err := q.db.Query(ctx, waitingTopups, paymentOrderID)
 	if err != nil {

@@ -1202,7 +1202,6 @@ func (h *Holder) PurgeProductCache(c *gin.Context) {
 	})
 }
 
-
 // VerifyCertificationResponse 認證驗證回應
 type VerifyCertificationResponse struct {
 	Exists bool `json:"exists" example:"true"` // 認證編號是否存在
@@ -1217,7 +1216,6 @@ var verifiableCertTypes = map[string]struct{}{
 	"3702": {},
 	"3703": {},
 }
-
 
 // CertificationWarningOutput 認證未被採用的提示（每筆對應一個被剔除或被跳過的認證輸入）。
 //

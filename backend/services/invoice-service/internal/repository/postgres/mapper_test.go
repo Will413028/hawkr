@@ -33,7 +33,6 @@ func newCipher(t *testing.T, secret string) *crypto.Cipher {
 	return c
 }
 
-
 func TestEncryptCredential_EmptyPlaintextIsHardError(t *testing.T) {
 	enc := newCipher(t, "unit-test-master-key")
 
@@ -50,7 +49,6 @@ func TestEncryptCredential_EmptyPlaintextIsHardError(t *testing.T) {
 		t.Fatal("deriveCredential 收到全空白 app_key 時必須硬錯")
 	}
 }
-
 
 func TestDecryptCredential_WrongKeyIsHardErrorAndLeaksNothing(t *testing.T) {
 	plaintext := randomSecret(t)
@@ -126,7 +124,6 @@ func TestRepositoryPackageDoesNotLog(t *testing.T) {
 	}
 }
 
-
 func TestCredentialFingerprint_BindsTaxIDAndAppKey(t *testing.T) {
 	const secret = "lookup-hmac-key"
 	appKey := randomSecret(t)
@@ -196,7 +193,6 @@ func TestDeriveCredential_AllThreeDerivativesComeFromTheSameNormalizedPlaintext(
 	}
 }
 
-
 func TestKeyRing_CipherForSelectsByVersionAndNeverFallsBack(t *testing.T) {
 	cur := newCipher(t, "master-key-new")
 	prev := newCipher(t, "master-key-old")
@@ -234,7 +230,6 @@ func TestKeyRing_CipherForSelectsByVersionAndNeverFallsBack(t *testing.T) {
 		t.Fatal("指向已移除 key 版本的殘列必須硬錯")
 	}
 }
-
 
 func TestProviderAccountProjection_CarriesNoCredentialMaterial(t *testing.T) {
 	row := gen.InvoiceProviderAccount{
@@ -288,7 +283,6 @@ func dumpStrings(v reflect.Value) string {
 	walk(v)
 	return sb.String()
 }
-
 
 func TestToDocumentLine_UnknownTaxCategoryIsHardError(t *testing.T) {
 	for _, tc := range []int16{1, 2, 3} {

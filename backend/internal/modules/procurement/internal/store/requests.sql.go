@@ -56,7 +56,6 @@ type GetConversationByRequestParams struct {
 	BuyerID   int64
 }
 
-// 一個需求最多一個對話（conversations_request 唯一）；已刪除的對話不回（呼叫端回 NOT_FOUND）。
 func (q *Queries) GetConversationByRequest(ctx context.Context, arg GetConversationByRequestParams) (ProcurementConversation, error) {
 	row := q.db.QueryRow(ctx, getConversationByRequest, arg.RequestID, arg.BuyerID)
 	var i ProcurementConversation
@@ -109,7 +108,6 @@ type GetConversationIncludingDeletedParams struct {
 	BuyerID int64
 }
 
-// 只用來分辨「自己的、已刪除」與「不存在或不是自己的」：刪除重送回成功，後者回 NOT_FOUND。
 func (q *Queries) GetConversationIncludingDeleted(ctx context.Context, arg GetConversationIncludingDeletedParams) (ProcurementConversation, error) {
 	row := q.db.QueryRow(ctx, getConversationIncludingDeleted, arg.ID, arg.BuyerID)
 	var i ProcurementConversation
@@ -136,7 +134,6 @@ type GetLatestTurnByRequestParams struct {
 	BuyerID   int64
 }
 
-// 上一輪的選填進度（optional_streak、skipped_slots）從這裡讀；沒有輪次回 ErrNoRows（新需求）。
 func (q *Queries) GetLatestTurnByRequest(ctx context.Context, arg GetLatestTurnByRequestParams) (ProcurementTurn, error) {
 	row := q.db.QueryRow(ctx, getLatestTurnByRequest, arg.RequestID, arg.BuyerID)
 	var i ProcurementTurn
@@ -170,7 +167,6 @@ type GetRequestForBuyerParams struct {
 	BuyerID *int64
 }
 
-// 不屬於呼叫者的需求與不存在的回同一個沒有列（呼叫端回 NOT_FOUND）。
 func (q *Queries) GetRequestForBuyer(ctx context.Context, arg GetRequestForBuyerParams) (ProcurementRequest, error) {
 	row := q.db.QueryRow(ctx, getRequestForBuyer, arg.ID, arg.BuyerID)
 	var i ProcurementRequest
@@ -324,7 +320,6 @@ type InsertRevisionParams struct {
 	BuyerID                  *int64
 }
 
-// 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。
 func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertRevision,
 		arg.ID,
@@ -380,7 +375,6 @@ type InsertTurnParams struct {
 	Now              time.Time
 }
 
-// 冪等鍵在實體上（S4）：同一位買家的同一個 client_request_id 已有輪次時回 0 列，呼叫端改讀既有的輪次。
 func (q *Queries) InsertTurn(ctx context.Context, arg InsertTurnParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertTurn,
 		arg.ID,
@@ -462,7 +456,6 @@ type ListConversationsAfterParams struct {
 	PageSize       int32
 }
 
-// 第一頁之後的頁：keyset (updated_at DESC, id DESC)，走索引 conversations_buyer_active；游標是上一頁最後一列的 (updated_at, id)。
 func (q *Queries) ListConversationsAfter(ctx context.Context, arg ListConversationsAfterParams) ([]ProcurementConversation, error) {
 	rows, err := q.db.Query(ctx, listConversationsAfter,
 		arg.BuyerID,
@@ -604,7 +597,6 @@ type LockActiveRevisionParams struct {
 	BuyerID   *int64
 }
 
-// 鎖需求的現行版本列：候選搜尋的提交在 run 之後、需求列之前鎖它，與 TURN 的版本寫入（取代現行版本）串行；等鎖期間現行版本被取代時沒有列。
 func (q *Queries) LockActiveRevision(ctx context.Context, arg LockActiveRevisionParams) (ProcurementRequestRevision, error) {
 	row := q.db.QueryRow(ctx, lockActiveRevision, arg.RequestID, arg.BuyerID)
 	var i ProcurementRequestRevision
@@ -639,7 +631,6 @@ type LockRequestForBuyerParams struct {
 	BuyerID *int64
 }
 
-// 鎖需求列（在現行版本之後鎖）：不經 run 的寫入（SubmitAnswer、Rewind、ToggleSelection）與搜尋提交、TURN 提交串行。
 func (q *Queries) LockRequestForBuyer(ctx context.Context, arg LockRequestForBuyerParams) (ProcurementRequest, error) {
 	row := q.db.QueryRow(ctx, lockRequestForBuyer, arg.ID, arg.BuyerID)
 	var i ProcurementRequest
@@ -666,7 +657,6 @@ type NextRevisionNoParams struct {
 	BuyerID   *int64
 }
 
-// 從需求出發：需求不屬於 buyer_id（或不存在）時沒有列（ErrNoRows），不會被聚合函數補成一列。
 func (q *Queries) NextRevisionNo(ctx context.Context, arg NextRevisionNoParams) (int32, error) {
 	row := q.db.QueryRow(ctx, nextRevisionNo, arg.RequestID, arg.BuyerID)
 	var next_no int32
@@ -686,7 +676,6 @@ type RenameConversationParams struct {
 	BuyerID int64
 }
 
-// 目標狀態的方法（S4）：重送結果相同，不建收據。
 func (q *Queries) RenameConversation(ctx context.Context, arg RenameConversationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, renameConversation,
 		arg.Title,
@@ -712,7 +701,6 @@ type SetConversationAutoTitleParams struct {
 	BuyerID int64
 }
 
-// 自動標題只在買家沒改過標題（title_source = 'AUTO'）時更新；買家改名之後不覆寫。
 func (q *Queries) SetConversationAutoTitle(ctx context.Context, arg SetConversationAutoTitleParams) error {
 	_, err := q.db.Exec(ctx, setConversationAutoTitle,
 		arg.Title,
@@ -758,7 +746,6 @@ type SetRequestStatusParams struct {
 	FromStatus string
 }
 
-// 條件式轉移（S2：requests 沒有 version）：只有目前狀態是 from_status 時才改。
 func (q *Queries) SetRequestStatus(ctx context.Context, arg SetRequestStatusParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setRequestStatus,
 		arg.Status,
@@ -786,7 +773,6 @@ type SetRequestStatusFromAnyParams struct {
 	FromStatuses []string
 }
 
-// 條件式轉移到 to：目前狀態在 from_statuses 之內才改（搜尋成功時來源可以是 REQUIREMENT_READY 或 MATCHING）。
 func (q *Queries) SetRequestStatusFromAny(ctx context.Context, arg SetRequestStatusFromAnyParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setRequestStatusFromAny,
 		arg.ToStatus,
@@ -812,7 +798,6 @@ type SoftDeleteConversationParams struct {
 	BuyerID int64
 }
 
-// 目標狀態的方法（S4）：已刪除的不再更新時間，重送結果相同。
 func (q *Queries) SoftDeleteConversation(ctx context.Context, arg SoftDeleteConversationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, softDeleteConversation, arg.Now, arg.ID, arg.BuyerID)
 	if err != nil {
@@ -832,7 +817,6 @@ type SupersedeActiveRevisionParams struct {
 	BuyerID   *int64
 }
 
-// 新版本寫入前先把現行版本轉成 SUPERSEDED（partial unique 擋雙頭）。
 func (q *Queries) SupersedeActiveRevision(ctx context.Context, arg SupersedeActiveRevisionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, supersedeActiveRevision, arg.RequestID, arg.BuyerID)
 	if err != nil {

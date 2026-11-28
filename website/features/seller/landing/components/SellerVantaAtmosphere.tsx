@@ -62,8 +62,7 @@ export default function SellerVantaAtmosphere() {
 							zoom: 0.72,
 						}) as VantaEffect;
 					})
-					.catch(() => {
-					});
+					.catch(() => {});
 			},
 			{ rootMargin: "240px 0px" },
 		);

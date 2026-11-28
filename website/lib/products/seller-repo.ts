@@ -452,8 +452,7 @@ export async function fetchSellerSalesCounts(
 			const sales = num(r.salesCount) ?? num(r.sales_count);
 			if (id && sales != null) map.set(id, sales);
 		}
-	} catch {
-	}
+	} catch {}
 	return map;
 }
 
@@ -683,8 +682,7 @@ export function parseDescription(
 				if (parsed?.version === "1.0" && Array.isArray(parsed.blocks)) {
 					return parsed;
 				}
-			} catch {
-			}
+			} catch {}
 		}
 		return {
 			version: "1.0",
@@ -719,7 +717,6 @@ export function compactDescription(
 		}),
 	};
 }
-
 
 export interface CategoryNode {
 	id: string | number;
@@ -864,7 +861,6 @@ export function upsertCategoryNode(
 	return foundParent ? next : tree;
 }
 
-
 /** One carrier option the backend says fits a given package. Mirrors
  *  `handler.ShippingOptionItem` (camelCase, all-string). */
 export interface ShippingQuoteOption {
@@ -931,7 +927,6 @@ export async function fetchShippingQuotes(
 			.filter((o) => o.shippingMethod),
 	};
 }
-
 
 /** camelCase SKU exactly as `handler.CreateSkuInput` wants it on the wire. */
 export interface SkuWriteInput {

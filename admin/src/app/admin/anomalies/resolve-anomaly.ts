@@ -17,7 +17,6 @@ import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { paymentPaymentAnomalyResolutionReason } from "@hawkr/ui-text/keys";
 import { staffTextOrUnknown } from "@/lib/ui-text";
 
-
 /** 列上可結案的位置；稱呼用 `TARGET_NOUN[slot]`，不從 enum 成員選文字（這個 enum 的文字不在共用目錄）。 */
 export type ResolveSlot =
 	| "payment"

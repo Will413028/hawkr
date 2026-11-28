@@ -34,8 +34,7 @@ export default function PurchaseTracker({
 				try {
 					const order = await fetchOrder(orderNo);
 					trackPurchase(order);
-				} catch {
-				}
+				} catch {}
 			}
 			clearPendingPurchase();
 		})();

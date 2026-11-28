@@ -223,7 +223,6 @@ export default function OperationPreflightDialog({
 					</div>
 
 					<fieldset className="adm-operation-reasons">
-
 						<legend>這次為什麼需要代行？（必選）</legend>
 						<p>請選擇伺服器核准的原因；原因會和後續操作一起寫入稽核紀錄。</p>
 						<div className="adm-operation-reason-grid">
@@ -258,7 +257,6 @@ export default function OperationPreflightDialog({
 					</fieldset>
 
 					<div className="adm-operation-field adm-operation-field--wide">
-
 						<label htmlFor="adm-operation-case">
 							案件或工單編號
 							{selectedReason ? (caseRequired ? "（必填）" : "（選填）") : ""}

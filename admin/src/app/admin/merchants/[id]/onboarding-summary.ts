@@ -3,7 +3,6 @@ import { OnboardingTaskState } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller
 import type { MaterialSymbolName } from "@hawkr/icons/material-symbol";
 import type { BadgeVariant } from "@/components/UI";
 
-
 export type OnboardingSummaryState =
 	| { state: "loading" }
 	| { state: "error"; error?: unknown }

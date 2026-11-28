@@ -139,7 +139,6 @@ export default function RecentClient() {
 									key={String(it.id)}
 									className="relative bg-content1 border border-divider rounded-hkui-lg transition-[border-color] duration-200 ease-[var(--hkui-ease)] hover:border-hkui-primary-200"
 								>
-
 									<Link
 										href={`/products/${it.productId}?from=recent`}
 										aria-label={it.productName || `商品 #${it.productId}`}

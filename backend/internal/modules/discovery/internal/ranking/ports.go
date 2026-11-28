@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 // Orders 是訂單統計的 port。
 type Orders interface {
 	// StoreOrderStats 回傳近 days 天每家有成交或賣家取消的店的統計；沒有出現的店代表兩者都是 0。

@@ -10,7 +10,6 @@ import type { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_
 import { sellerReportOutcome } from "@hawkr/ui-text/keys";
 import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,
 	value: E,

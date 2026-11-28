@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/visibility"
 )
 
-
 // PostDriftRow 是一篇貼文的計數被覆寫前後的值。
 type PostDriftRow struct {
 	ID         uuid.UUID `db:"id"`

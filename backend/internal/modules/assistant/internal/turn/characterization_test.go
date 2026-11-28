@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 const fixtureDir = "../../../../../docs/plans/2026-11-19-a9-agent/fixtures/assistant"
 
 type fixture struct {

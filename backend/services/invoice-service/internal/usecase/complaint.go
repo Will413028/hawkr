@@ -19,7 +19,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
 	complaintTextMaxRunes = 500
 
@@ -44,13 +43,13 @@ var (
 // 它持有 TxManager（約束③）與 outbox（K01 要通知賣家），而 Query 兩者都沒有——
 // 那正是兩者分開的理由：把寫入掛進 Query，「唯讀查詢面」這句話就變成假的。
 type Complaint struct {
-	tx         database.TxManager
-	complaints domain.ComplaintRepository
-	documents  domain.DocumentRepository
+	tx          database.TxManager
+	complaints  domain.ComplaintRepository
+	documents   domain.DocumentRepository
 	issuers     domain.IssuerRepository
 	outbox      domain.OutboxRepository
 	businessDay domain.BusinessDayRepository
-	audit domain.AuditRepository
+	audit       domain.AuditRepository
 
 	newID func() int64
 	now   func() time.Time
@@ -212,8 +211,8 @@ func (u *Complaint) File(ctx context.Context, in FileComplaintInput) (FileCompla
 		}
 
 		event, err := u.complaints.AppendEvent(ctx, domain.NewComplaintEvent{
-			ComplaintID: row.ID,
-			EventType:   codemeta.InvoiceComplaintEventTypeCreated.Value,
+			ComplaintID:    row.ID,
+			EventType:      codemeta.InvoiceComplaintEventTypeCreated.Value,
 			ActorType:      complaintActorBuyer,
 			ActorAccountID: in.BuyerID,
 			Message:        in.Description,
@@ -369,7 +368,6 @@ func (u *Complaint) transition(ctx context.Context, in ComplaintActionInput, t c
 	return out, nil
 }
 
-
 func (u *Complaint) calendarAround(ctx context.Context, now time.Time) (domain.BusinessCalendar, error) {
 	return loadBusinessCalendar(ctx, u.businessDay,
 		now.AddDate(0, 0, -complaintCalendarLookbehind),
@@ -414,7 +412,6 @@ func (u *Complaint) logger() *zap.Logger {
 	}
 	return u.log
 }
-
 
 const complaintActorBuyer = "BUYER"
 
@@ -500,7 +497,6 @@ func complaintCreatedPayload(issuer domain.Issuer, c domain.Complaint, doc domai
 		OccurredAt:        timeutil.FormatISO8601(now),
 	})
 }
-
 
 type complaintOverdueEvent struct {
 	NotificationRefID string            `json:"notification_ref_id"`

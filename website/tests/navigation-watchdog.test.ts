@@ -12,7 +12,6 @@ import {
 	navigateDocument,
 } from "../lib/navigation/observability";
 
-
 const realSetTimeout = globalThis.setTimeout;
 const realClearTimeout = globalThis.clearTimeout;
 

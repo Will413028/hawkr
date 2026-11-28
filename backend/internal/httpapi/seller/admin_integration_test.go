@@ -91,8 +91,8 @@ func (o *adminOrders) HasOpenStoreOrders(_ context.Context, storeID int64) (bool
 }
 
 type adminFixture struct {
-	admin adminsellerconnect.SellerAdminServiceClient
-	governance adminsellerconnect.SellerGovernanceAdminServiceClient
+	admin             adminsellerconnect.SellerAdminServiceClient
+	governance        adminsellerconnect.SellerGovernanceAdminServiceClient
 	prospects         adminsellerconnect.SellerProspectAdminServiceClient
 	prospectsCustomer adminsellerconnect.SellerProspectAdminServiceClient
 	prospectsAnon     adminsellerconnect.SellerProspectAdminServiceClient
@@ -115,10 +115,10 @@ type adminFixture struct {
 	server            *httptest.Server
 	adminToken        string
 	customerToken     string
-	otherAdminToken string
-	media *stagedMedia
-	registry *moduleRegistry
-	skew atomic.Int64
+	otherAdminToken   string
+	media             *stagedMedia
+	registry          *moduleRegistry
+	skew              atomic.Int64
 }
 
 func (f *adminFixture) now() time.Time { return time.Now().Add(time.Duration(f.skew.Load())) }

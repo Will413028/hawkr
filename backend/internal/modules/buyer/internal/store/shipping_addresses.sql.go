@@ -26,7 +26,6 @@ type AddAddressParams struct {
 	CreatedAt     time.Time
 }
 
-// 建立地址及預設標記。
 func (q *Queries) AddAddress(ctx context.Context, arg AddAddressParams) (BuyerShippingAddress, error) {
 	row := q.db.QueryRow(ctx, addAddress,
 		arg.BuyerID,
@@ -64,7 +63,6 @@ type AddressParams struct {
 	AddressID int64
 }
 
-// 以買家歸屬查單筆地址。
 func (q *Queries) Address(ctx context.Context, arg AddressParams) (BuyerShippingAddress, error) {
 	row := q.db.QueryRow(ctx, address, arg.BuyerID, arg.AddressID)
 	var i BuyerShippingAddress
@@ -102,7 +100,6 @@ type AddressesParams struct {
 	PageLimit     int32
 }
 
-// 預設地址優先，接著以更新時間與 ID 降冪分頁。
 func (q *Queries) Addresses(ctx context.Context, arg AddressesParams) ([]BuyerShippingAddress, error) {
 	rows, err := q.db.Query(ctx, addresses,
 		arg.BuyerID,
@@ -146,7 +143,6 @@ SELECT address_id, buyer_id, receiver_name, receiver_phone, town_code, address_d
 ORDER BY is_default DESC, updated_at DESC, address_id DESC
 `
 
-// 寫入預設地址時檢查買家的現有地址。
 func (q *Queries) AllAddresses(ctx context.Context, buyerID int64) ([]BuyerShippingAddress, error) {
 	rows, err := q.db.Query(ctx, allAddresses, buyerID)
 	if err != nil {
@@ -192,7 +188,6 @@ type ClearDefaultParams struct {
 	UpdatedAt time.Time
 }
 
-// 移除現有預設標記，呼叫方隨後指定新預設。
 func (q *Queries) ClearDefault(ctx context.Context, arg ClearDefaultParams) error {
 	_, err := q.db.Exec(ctx, clearDefault, arg.BuyerID, arg.AddressID, arg.UpdatedAt)
 	return err
@@ -212,7 +207,6 @@ type DeleteAddressParams struct {
 	ExpectedVersion int64
 }
 
-// 永久刪除買家擁有的地址。
 func (q *Queries) DeleteAddress(ctx context.Context, arg DeleteAddressParams) (int64, error) {
 	row := q.db.QueryRow(ctx, deleteAddress,
 		arg.BuyerID,
@@ -231,7 +225,6 @@ FROM buyer.shipping_addresses
 WHERE buyer_id = $1
 `
 
-// 關閉 stint 時永久刪除全部地址。
 func (q *Queries) DeleteAddresses(ctx context.Context, buyerID int64) error {
 	_, err := q.db.Exec(ctx, deleteAddresses, buyerID)
 	return err
@@ -256,7 +249,6 @@ type PromoteDefaultParams struct {
 	UpdatedAt time.Time
 }
 
-// 沒有預設地址時，以最近更新的剩餘地址遞補。
 func (q *Queries) PromoteDefault(ctx context.Context, arg PromoteDefaultParams) error {
 	_, err := q.db.Exec(ctx, promoteDefault, arg.BuyerID, arg.UpdatedAt)
 	return err
@@ -287,7 +279,6 @@ type UpdateAddressParams struct {
 	Version       int64
 }
 
-// 修改買家擁有的地址。
 func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (BuyerShippingAddress, error) {
 	row := q.db.QueryRow(ctx, updateAddress,
 		arg.BuyerID,

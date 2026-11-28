@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 )
 
-
 type alertmanagerPayload struct {
 	Status string  `json:"status"`
 	Alerts []alert `json:"alerts"`

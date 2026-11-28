@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-
 // OnStoreSuspended 訂閱 seller.StoreSuspended。
 func (s *Service) OnStoreSuspended(ctx context.Context, e seller.StoreSuspended) error {
 	return s.Accept(ctx, "store_suspended", registry.StoreSuspendedParams{StoreID: e.StoreID, PeriodID: e.PeriodID, OccurredAt: e.OccurredAt})

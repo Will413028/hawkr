@@ -18,8 +18,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
-
 type qAdjustments struct {
 	domain.AdjustmentRepository
 	byDoc map[int64][]domain.Adjustment
@@ -31,7 +29,7 @@ func (q qAdjustments) ListByDocument(_ context.Context, docID int64) ([]domain.A
 
 type qCorrections struct {
 	domain.CorrectionRequestRepository
-	rows []domain.CorrectionRequest
+	rows     []domain.CorrectionRequest
 	docBuyer map[int64]int64
 	docOrder map[int64]string
 }
@@ -82,7 +80,6 @@ func (q qOverview) SellerCounts(context.Context, domain.SellerOverviewCountsQuer
 func (q qOverview) AdminCounts(context.Context, domain.AdminOverviewCountsQuery) (domain.AdminOverviewCounts, error) {
 	return q.admin, nil
 }
-
 
 const (
 	rIssuerA = int64(9101)
@@ -247,7 +244,7 @@ func issuerOfStore(storeID int64) int64 {
 
 type rOps struct {
 	domain.OperationRepository
-	views map[int64]domain.OperationView
+	views   map[int64]domain.OperationView
 	storeOf map[int64]int64
 	byDoc   map[int64][]domain.Operation
 }
@@ -343,7 +340,6 @@ func (r *rAudit) AppendAdminAuditLog(_ context.Context, in domain.NewAdminAuditL
 func (r *rAudit) ListStatusHistory(context.Context, string, int64) ([]domain.StatusHistoryEntry, error) {
 	return nil, nil
 }
-
 
 const (
 	rDocOldID = int64(7001)
@@ -452,7 +448,6 @@ func newReadServerWithCorrections(t *testing.T, corrs qCorrections, mut func(*rF
 	}
 	return fx
 }
-
 
 // TestGetOrderInvoice_ReturnsEveryDocumentInTheReissueChain 釘住
 // ListOrderDocumentsForBuyer 被寫成 :many 的那個理由。
@@ -566,7 +561,6 @@ func TestGetOrderInvoice_TierA_ForeignBuyerSeesAwaitingPayment(t *testing.T) {
 	}
 }
 
-
 // TestListBuyerInvoiceDocuments_TotalComesFromCountNotPageLength 釘住 total 的來源。
 //
 // fake 的 Count 刻意比 List 的母體多 3（模擬「第 2 頁只有 3 列但總數是 23」）：
@@ -632,7 +626,6 @@ func TestListBuyerInvoiceDocuments_PagesCoverTheWholeSetExactlyOnce(t *testing.T
 		}
 	}
 }
-
 
 // TestGetSellerInvoiceDocument_MasksBuyerCarrier 是 §8.1.3(b)「載具識別碼：
 // 賣家視角遮罩」的 handler 層斷言。
@@ -716,7 +709,6 @@ func TestGetSellerInvoiceJob_TierA_ForeignStoreIsIndistinguishable(t *testing.T)
 	}
 }
 
-
 // TestListOrderExternalIssuances_DoesNotLeakOtherJobs 釘住 §6.1.10 對 62R 的測試要求
 // （逐字：「要斷言同一張訂單有一筆 FAILED_PERMANENT 的 operation 時，它不出現在回應裡」）。
 //
@@ -760,7 +752,6 @@ func TestListOrderExternalIssuances_ForeignStoreGetsEmptyNot404(t *testing.T) {
 	}
 }
 
-
 // TestGetInvoiceOverviewForAdmin_SuspendedSellersIsUnavailableNotZero 釘住
 // §6.1.11a 對 suspended_sellers 的逐字要求。
 //
@@ -797,7 +788,6 @@ func TestGetInvoiceOverviewForAdmin_SuspendedSellersIsUnavailableNotZero(t *test
 		t.Fatalf("definition 必須說出權威在哪，實得 %q", suspended.GetDefinition())
 	}
 }
-
 
 // TestListRPCs_RejectContractViolations 把四類契約違規一次釘住。
 //
@@ -977,7 +967,6 @@ func TestGetSellerInvoiceCapabilitySimple_RequiresInternalCallAndSharesTheOvervi
 			resp.GetData().GetInvoiceMode())
 	}
 }
-
 
 type rSellerNames struct {
 	got  []int64

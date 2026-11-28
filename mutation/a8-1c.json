@@ -58,8 +58,8 @@
    "id": "store-retired-purge-deletes-preferences",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/purge/recipient.go",
-   "old": "if a.StoreID > 0 {\n\t\treturn nil\n\t}\n\terr := store.New",
-   "new": "if a.StoreID < 0 {\n\t\treturn nil\n\t}\n\terr := store.New",
+   "old": "if a.StoreID > 0 {\n\t\treturn nil\n\t}",
+   "new": "if a.StoreID < 0 {\n\t\treturn nil\n\t}",
    "test": "internal/modules/notification ^TestPurgeAfterEachDeletionEvent$/^StoreRetired$",
    "why": "The StoreRetired purge deletes the account's whole STORE preference set, wiping the preferences of a store the seller reopened."
   },

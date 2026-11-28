@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 func resumeDoc(manualReason string) domain.Document {
 	d := docAt(codemeta.InvoiceDocumentStatusAwaitingManual.Value, manualReason)
 	d.IssueAttemptSeq = 1

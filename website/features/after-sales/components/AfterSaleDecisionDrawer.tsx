@@ -358,7 +358,6 @@ export function AfterSaleDecisionDrawer({
 			>
 				{!summary ? null : (
 					<div className="flex flex-col gap-4">
-
 						<div className="flex items-start justify-between gap-3">
 							<div className="min-w-0">
 								<p className="text-sm font-bold text-foreground break-all">
@@ -399,7 +398,6 @@ export function AfterSaleDecisionDrawer({
 							</section>
 						) : null}
 
-
 						<section>
 							<h3 className="text-sm font-semibold text-foreground mb-2">
 								買家申請
@@ -427,7 +425,6 @@ export function AfterSaleDecisionDrawer({
 							) : null}
 						</section>
 
-
 						{detail?.sellerPhotos && detail.sellerPhotos.length > 0 ? (
 							<section>
 								<h3 className="text-sm font-semibold text-foreground mb-2">
@@ -436,7 +433,6 @@ export function AfterSaleDecisionDrawer({
 								<AfterSaleEvidenceGrid photos={detail.sellerPhotos} />
 							</section>
 						) : null}
-
 
 						{detail?.items && detail.items.length > 0 ? (
 							<section>
@@ -487,7 +483,6 @@ export function AfterSaleDecisionDrawer({
 								{result}
 							</div>
 						) : null}
-
 
 						{loading ? (
 							<p className="text-sm text-foreground-soft">載入中…</p>
@@ -540,7 +535,6 @@ export function AfterSaleDecisionDrawer({
 										);
 									})}
 								</div>
-
 
 								<AnimateHeight className="mt-2">
 									{selected === AfterSaleResolutionType.RETURN_REFUND ? (

@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // OrderDetailResponse 訂單詳情回應
 type OrderDetailResponse struct {
 	OrderNo             string `json:"orderNo,omitempty"`
@@ -255,7 +254,6 @@ type SuccessResponse struct {
 	Success bool `json:"success"`
 }
 
-
 func convertOrderDetail(d *pb.OrderDetailView, mediaBase string) *OrderDetailResponse {
 	if d == nil {
 		return nil
@@ -466,7 +464,6 @@ func convertAdminOrderDetail(d *pb.AdminOrderDetailData, mediaBase string) *Admi
 	}
 	return r
 }
-
 
 // CreateOrder 建立訂單
 // @Summary      建立訂單
@@ -846,7 +843,6 @@ func (h *Holder) ConfirmReceipt(c *gin.Context) {
 
 	response.GrpcResult(c, resp.Code, resp.Message, map[string]bool{"success": resp.Success})
 }
-
 
 // SearchOrders 後台搜尋訂單
 // @Summary      後台搜尋訂單

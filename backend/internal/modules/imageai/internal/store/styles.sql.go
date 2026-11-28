@@ -24,7 +24,6 @@ type ClearDefaultStyleParams struct {
 	ExcludeID uuid.UUID
 }
 
-// 把用途目前的預設風格（exclude_id 以外）取消預設；換預設時先清舊的再標新的（部分唯一索引逐列檢查）。
 func (q *Queries) ClearDefaultStyle(ctx context.Context, arg ClearDefaultStyleParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, clearDefaultStyle, arg.Now, arg.Category, arg.ExcludeID)
 	if err != nil {
@@ -102,7 +101,6 @@ type InsertStyleParams struct {
 	Now              time.Time
 }
 
-// 新增的風格都不是預設（換預設只有 SetDefaultAiStyle）。
 func (q *Queries) InsertStyle(ctx context.Context, arg InsertStyleParams) (ImageaiStyle, error) {
 	row := q.db.QueryRow(ctx, insertStyle,
 		arg.ID,
@@ -152,7 +150,6 @@ type ListEnabledStylesRow struct {
 	IsDefault    bool
 }
 
-// 一個用途的啟用中風格，含預設風格（呼叫端把 is_default 那列分出來）；單一語句，預設風格與清單來自同一個快照。依顯示順序，同值依名稱。
 func (q *Queries) ListEnabledStyles(ctx context.Context, category string) ([]ListEnabledStylesRow, error) {
 	rows, err := q.db.Query(ctx, listEnabledStyles, category)
 	if err != nil {
@@ -187,7 +184,6 @@ WHERE $1::text = '' OR category = $1::text
 ORDER BY display_order, name, id
 `
 
-// 後台的清單（含停用的）：category 空字串是全部用途；依顯示順序，同值依名稱、id。
 func (q *Queries) ListStylesForAdmin(ctx context.Context, category string) ([]ImageaiStyle, error) {
 	rows, err := q.db.Query(ctx, listStylesForAdmin, category)
 	if err != nil {
@@ -226,7 +222,6 @@ const lockCategoryStyles = `-- name: LockCategoryStyles :many
 SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at FROM imageai.styles WHERE category = $1 ORDER BY id FOR UPDATE
 `
 
-// 鎖住一個用途的全部風格列（依 id 排序，固定鎖順序）：換預設的兩個 SetDefault 因此串行，不會撞部分唯一索引；等鎖之後讀到的是最新的列。
 func (q *Queries) LockCategoryStyles(ctx context.Context, category string) ([]ImageaiStyle, error) {
 	rows, err := q.db.Query(ctx, lockCategoryStyles, category)
 	if err != nil {
@@ -265,7 +260,6 @@ const lockStyle = `-- name: LockStyle :one
 SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at FROM imageai.styles WHERE id = $1 FOR UPDATE
 `
 
-// 鎖住風格列（更新與刪除先鎖，版本與預設的判斷讀同一個快照）。
 func (q *Queries) LockStyle(ctx context.Context, id uuid.UUID) (ImageaiStyle, error) {
 	row := q.db.QueryRow(ctx, lockStyle, id)
 	var i ImageaiStyle
@@ -291,7 +285,6 @@ const lockStyleThumbnailAsset = `-- name: LockStyleThumbnailAsset :one
 SELECT thumbnail_asset_id FROM imageai.styles WHERE id = $1 FOR UPDATE
 `
 
-// 鎖住風格並回傳目前的縮圖資產（沒有縮圖是 NULL；換圖與刪除要把被換掉的標記刪除）。
 func (q *Queries) LockStyleThumbnailAsset(ctx context.Context, id uuid.UUID) (*uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, lockStyleThumbnailAsset, id)
 	var thumbnail_asset_id *uuid.UUID
@@ -310,7 +303,6 @@ type MarkStyleDefaultParams struct {
 	ID  uuid.UUID
 }
 
-// 把風格標成預設（呼叫端已鎖住用途的全部列並清掉舊的）。
 func (q *Queries) MarkStyleDefault(ctx context.Context, arg MarkStyleDefaultParams) (ImageaiStyle, error) {
 	row := q.db.QueryRow(ctx, markStyleDefault, arg.Now, arg.ID)
 	var i ImageaiStyle
@@ -353,7 +345,6 @@ type UpdateStyleParams struct {
 	ExpectedVersion  int64
 }
 
-// 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）；沿用目前的縮圖時 thumbnail_key 傳目前的值、thumbnail_asset_id 傳 NULL。
 func (q *Queries) UpdateStyle(ctx context.Context, arg UpdateStyleParams) (ImageaiStyle, error) {
 	row := q.db.QueryRow(ctx, updateStyle,
 		arg.Label,

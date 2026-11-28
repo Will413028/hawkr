@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 var (
 	listKYCPaths    = rpc.FieldPaths{"Status": "status"}
 	approveKYCPaths = rpc.FieldPaths{"ExpectedVersion": "etag", "Comment": "comment"}

@@ -105,7 +105,6 @@ const AXES: Record<ComposerAxis, AxisOps> = {
 	},
 };
 
-
 /**
  * A one-line box cannot show an overflowing draft, so when the composer is
  * left alone it walks through it instead — a stride at a time, with long

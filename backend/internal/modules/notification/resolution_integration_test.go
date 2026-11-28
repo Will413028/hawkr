@@ -83,7 +83,7 @@ type postParams struct {
 	EventID string    `json:"event_id"`
 	StoreID int64     `json:"store_id"`
 	At      time.Time `json:"at"`
-	Skip []int64 `json:"skip"`
+	Skip    []int64   `json:"skip"`
 }
 
 type followerItemParams struct {

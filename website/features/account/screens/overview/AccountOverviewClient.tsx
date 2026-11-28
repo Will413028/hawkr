@@ -479,7 +479,6 @@ export default function AccountOverviewClient() {
 						</div>
 					</div>
 
-
 					{orders.total > orders.orders.length ? (
 						<p className="mt-2 mx-1 mb-0 text-xs text-foreground-soft">
 							分析最近 {orders.orders.length.toLocaleString()} 筆訂單（共{" "}

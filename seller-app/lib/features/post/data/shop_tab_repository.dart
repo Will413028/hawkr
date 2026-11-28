@@ -35,8 +35,7 @@ class RemoteShopTabRepository implements ShopTabRepository {
     final products = await _productRepository.getSellerProducts(sellerId);
     try {
       await _localService.writeProducts(sellerId, products);
-    } catch (_) {
-    }
+    } catch (_) {}
     return _freezeProducts(products);
   }
 

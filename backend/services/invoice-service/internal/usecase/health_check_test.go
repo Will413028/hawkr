@@ -122,8 +122,8 @@ func TestDecideHealthOutcome(t *testing.T) {
 func TestDecideHealthOutcome_NilBreakerOpenedAtCountsAsHalfOpen(t *testing.T) {
 	at := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	acct := domain.ProviderAccount{
-		ID:     9,
-		Status: codemeta.InvoiceProviderAccountStatusDegraded.Value,
+		ID:                  9,
+		Status:              codemeta.InvoiceProviderAccountStatusDegraded.Value,
 		BreakerProbeSuccess: 2,
 	}
 	got := decideHealthOutcome(acct, at, nil)

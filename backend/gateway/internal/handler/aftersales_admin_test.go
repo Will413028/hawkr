@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type mockAftersalesAppealsAdminClient struct {
 	aftersalespb.AfterSalesServiceClient
 	ListAppealsForAdminFn func(ctx context.Context, in *aftersalespb.ListAppealsForAdminRequest, opts ...grpc.CallOption) (*aftersalespb.ListAppealsForAdminResponse, error)

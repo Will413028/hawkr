@@ -211,7 +211,7 @@ func foodSafetyReport() model.AdminReport {
 	r := model.Report{
 		ID: uuid.NewV7(), StoreID: 12, Category: policy.FoodSafety, Description: "吃了不舒服", Version: 4,
 		ReporterBuyerID: 500, CreatedAt: governanceNow, UpdatedAt: governanceNow,
-		Evidence: []model.Evidence{{AssetID: secretAssets[0], ObjectKey: "secure/governance/k1"}, {AssetID: secretAssets[1], ObjectKey: "secure/governance/k2"}},
+		Evidence:       []model.Evidence{{AssetID: secretAssets[0], ObjectKey: "secure/governance/k1"}, {AssetID: secretAssets[1], ObjectKey: "secure/governance/k2"}},
 		TriageDeadline: &model.Deadline{Start: governanceNow, Due: governanceNow.Add(4 * time.Hour)},
 	}
 	return model.AdminReport{Report: r, Availability: model.ReportFacts{Report: r}.Availability()}

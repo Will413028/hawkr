@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 func startFakeUpstream(t *testing.T, serviceName string) func() *http.Request {
 	t.Helper()
 

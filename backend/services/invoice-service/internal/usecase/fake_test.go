@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type directTx struct{}
 
 func (directTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) error { return fn(ctx) }
@@ -294,7 +293,7 @@ type fakeOpRepo struct {
 	exhaust  int
 	seller   int
 
-	casFails bool
+	casFails           bool
 	failOpen           []domain.FailOpenOperationsForIssuer
 	openCount          int64
 	sellerViews        [][2]int64
@@ -387,7 +386,7 @@ func (f *fakeOpRepo) MarkSellerActionRequired(context.Context, domain.MarkOperat
 type fakeOutbox struct {
 	domain.OutboxRepository
 	inserted []domain.NewOutboxEvent
-	err error
+	err      error
 }
 
 func (f *fakeOutbox) Insert(_ context.Context, in domain.NewOutboxEvent) (domain.OutboxEvent, error) {
@@ -435,8 +434,8 @@ type fakeProvider struct {
 	result           *amego.IssueResult
 	err              error
 	verify           fakeProviderVerify
-	voidFn          func(amego.VoidRequest) (*amego.VoidAccepted, error)
-	queryByNumberFn func(string) (*amego.InvoiceDetail, error)
+	voidFn           func(amego.VoidRequest) (*amego.VoidAccepted, error)
+	queryByNumberFn  func(string) (*amego.InvoiceDetail, error)
 
 	barcodeErr   error
 	barcodeCalls []string
@@ -506,7 +505,6 @@ func amegoResult() amego.IssueResult {
 
 var _ = errors.New
 var _ = notFoundErr
-
 
 func (f *fakeIssuerRepo) GetByID(context.Context, int64) (domain.Issuer, error) {
 	return f.issuer, f.err
@@ -764,7 +762,6 @@ func (f *fakeBizDays) Snapshot(context.Context, time.Time, time.Time) ([]time.Ti
 	base := *f.synced
 	return nil, &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
 }
-
 
 type providerCall struct {
 	ID      int64
@@ -1063,15 +1060,15 @@ func (f *fakeUnlockRepo) Create(_ context.Context, in domain.NewManualUnlock) (d
 		return domain.ManualUnlock{}, true, nil
 	}
 	row := domain.ManualUnlock{
-		ID:                    in.ID,
-		OperationID:           in.OperationID,
-		Status:                domain.ManualUnlockAwaitingSecondApproval,
-		RequestedByAccountID:  in.RequestedByAccountID,
-		RequestReason:         in.RequestReason,
-		ProviderCheckEvidence: in.ProviderCheckEvidence,
-		ProviderCheckedAt:     in.ProviderCheckedAt,
-		RequestedAt:           in.Now,
-		ExpiresAt:             in.ExpiresAt,
+		ID:                      in.ID,
+		OperationID:             in.OperationID,
+		Status:                  domain.ManualUnlockAwaitingSecondApproval,
+		RequestedByAccountID:    in.RequestedByAccountID,
+		RequestReason:           in.RequestReason,
+		ProviderCheckEvidence:   in.ProviderCheckEvidence,
+		ProviderCheckedAt:       in.ProviderCheckedAt,
+		RequestedAt:             in.Now,
+		ExpiresAt:               in.ExpiresAt,
 		CancelEvidenceKind:      in.CancelEvidenceKind,
 		CancelEvidenceObjectKey: in.CancelEvidenceObjectKey,
 	}
@@ -1233,8 +1230,8 @@ func (f *fakeProvider) QueryInvoiceByNumber(_ context.Context, _ amego.Credentia
 }
 
 type fakeCorrections struct {
-	openByDoc   map[int64]domain.CorrectionRequest
-	failedByDoc map[int64]domain.CorrectionRequest
+	openByDoc     map[int64]domain.CorrectionRequest
+	failedByDoc   map[int64]domain.CorrectionRequest
 	latestByOrder map[string]domain.CorrectionRequest
 	completed     []int64
 	reissueFail   []int64
@@ -1306,7 +1303,6 @@ func (f *fakeCorrections) Complete(_ context.Context, id, _ int64, _ time.Time) 
 	f.completed = append(f.completed, id)
 	return f.completeOK, f.failErr
 }
-
 
 type fakeReceiptRenderer struct {
 	in    domain.ReceiptData

@@ -21,7 +21,6 @@ func noBuyerResolverForTest() *buyerid.Resolver {
 	}))
 }
 
-
 func setupResolveBuyerProbe(h *Holder) *gin.Engine {
 	r := gin.New()
 	r.GET("/probe", fakeJWTAuth(), func(c *gin.Context) {
@@ -82,7 +81,6 @@ func TestResolveBuyerID_MissingIdentity401(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/probe", nil))
 	assertHTTPStatus(t, w, http.StatusUnauthorized)
 }
-
 
 func setupResolveBuyerFilterProbe(h *Holder) *gin.Engine {
 	r := gin.New()

@@ -330,7 +330,6 @@ export default function RejectKycDialog({
 				</span>
 			</div>
 
-
 			<GovernanceNoticeBanner
 				notice={
 					blocked

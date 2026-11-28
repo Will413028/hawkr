@@ -576,7 +576,6 @@ export default function ConversationSidebar({
 				}
 				aria-busy={showAgentList ? agentLoading : loading}
 			>
-
 				{showAgentList && onNewAgentChat ? (
 					<button
 						type="button"
@@ -591,7 +590,6 @@ export default function ConversationSidebar({
 						<span className="chat-sidebar__new-chat-label">開新對話</span>
 					</button>
 				) : null}
-
 
 				{showAgentList && visibleAgentRows.length === 0 ? (
 					agentLoading ? (
@@ -811,7 +809,6 @@ export default function ConversationSidebar({
 					</ul>
 				)}
 			</div>
-
 
 			{rangeLabel ? <p className="chat-sidebar__range">{rangeLabel}</p> : null}
 		</aside>

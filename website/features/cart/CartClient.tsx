@@ -101,8 +101,7 @@ export default function CartClient() {
 		const hydrateBrowserState = async () => {
 			try {
 				await useCartUiStore.persist.rehydrate();
-			} catch {
-			}
+			} catch {}
 			if (!active) return;
 			setSaved(getSavedItems());
 			setMounted(true);
@@ -196,7 +195,6 @@ export default function CartClient() {
 		{},
 	);
 
-
 	React.useEffect(() => {
 		const onChange = () => setSaved(getSavedItems());
 		window.addEventListener("storage", onChange);
@@ -217,8 +215,6 @@ export default function CartClient() {
 		selectionInitializedRef.current = true;
 		if (!sameSelection(prev, next)) setSelected(next);
 	}, [cart.items, cart.loading, mounted, setSelected]);
-
-
 
 	const activeSellerKey = React.useMemo<string | null>(() => {
 		for (const it of cart.items) {
@@ -254,7 +250,6 @@ export default function CartClient() {
 		(s, it) => s + it.quantity,
 		0,
 	);
-
 
 	const checkoutItems = React.useMemo(
 		() =>
@@ -328,7 +323,6 @@ export default function CartClient() {
 		itemsSubtotal,
 	);
 
-
 	React.useEffect(() => {
 		if (
 			selectedAddressId != null &&
@@ -375,7 +369,6 @@ export default function CartClient() {
 		() => storePickups.pickups.find((p) => p.id === selectedPickupId) ?? null,
 		[storePickups.pickups, selectedPickupId],
 	);
-
 
 	const baseShippingFee = selectedShipping?.fee ?? 0;
 	const shippingFee = React.useMemo(() => {
@@ -436,8 +429,7 @@ export default function CartClient() {
 				if (cancelled) return;
 				setPreciseShippingFee(r.shippingFee);
 			})
-			.catch(() => {
-			})
+			.catch(() => {})
 			.finally(() => {
 				if (!cancelled) setShippingFeeLoading(false);
 			});
@@ -454,7 +446,6 @@ export default function CartClient() {
 		setPreciseShippingFee,
 		setShippingFeeLoading,
 	]);
-
 
 	const reportedErrorRef = React.useRef<string>("");
 	React.useEffect(() => {
@@ -503,7 +494,6 @@ export default function CartClient() {
 		void cart.refresh();
 	}, [shippingState.errorCode, cart.refresh]);
 
-
 	const cartCoupons = useCartCoupons({
 		storeId: activeSellerKey,
 		orderAmount: itemsSubtotal,
@@ -551,7 +541,6 @@ export default function CartClient() {
 				: shippingFee !== 0
 					? ntFormat(shippingFee)
 					: "免運";
-
 
 	const selectionIsBusy = () =>
 		clearCartPendingRef.current ||
@@ -731,7 +720,6 @@ export default function CartClient() {
 
 	const handleClearCoupon = () => clearCoupon();
 
-
 	const checkoutHref = signedIn ? "/checkout" : "/login?redirect=/checkout";
 	const addressReady = isShippingDestinationReady(shippingMethod, {
 		hasAddress: selectedAddress != null,
@@ -884,7 +872,6 @@ export default function CartClient() {
 			});
 		}
 	};
-
 
 	if (!mounted || authStatus === "unknown") {
 		return (

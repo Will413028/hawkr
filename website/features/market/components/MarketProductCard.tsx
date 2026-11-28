@@ -108,8 +108,7 @@ function MarketProductCard({
 					if (event.defaultPrevented || !listContext) return;
 					try {
 						trackSelectItem(product, listContext, index);
-					} catch {
-					}
+					} catch {}
 				}}
 			>
 				<span className="sr-only">查看商品：{product.name}</span>
@@ -166,7 +165,6 @@ function MarketProductCard({
 				) : null}
 			</div>
 			<div className="market-product-card__body p-[0_16px_16px] max-[840px]:p-[0_8px_10px]">
-
 				<h2 className="[font-family:var(--font-primary)] m-[12px_0_6px] text-hk-heading text-base leading-[1.45] tracking-normal max-[840px]:m-[8px_0_4px] max-[840px]:text-sm max-[840px]:leading-[1.3] line-clamp-2 min-h-[2.6em] max-[840px]:min-h-[2.6em]">
 					{product.name}
 				</h2>
@@ -244,7 +242,6 @@ function MarketProductCard({
 					) : null}
 				</div>
 				<div className="market-product-card__buy-row mt-3 flex items-center gap-2 max-[840px]:mt-1.5">
-					
 					{soldOut && !previewMode ? (
 						<div className="market-product-card__qty m-0 inline-flex h-10 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-hk-pill border border-hk-border-soft bg-hk-surface-glass p-0 text-base font-extrabold text-hk-muted shadow-[inset_0_1px_0_rgb(255_255_255_/_0.28)]">
 							已售完

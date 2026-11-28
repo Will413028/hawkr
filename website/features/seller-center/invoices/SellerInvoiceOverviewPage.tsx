@@ -375,7 +375,6 @@ function RecentDocumentsCard({
 											</Chip>
 										</td>
 										<td data-label="操作">
-
 											<Link
 												href={`${DOCUMENTS_HREF}?document=${encodeURIComponent(doc.documentId)}`}
 												className="text-sm underline"

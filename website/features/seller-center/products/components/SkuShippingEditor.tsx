@@ -188,7 +188,6 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 			</summary>
 
 			<div className="mt-2 flex flex-col gap-3">
-
 				<div className="grid grid-cols-3 gap-2 items-end">
 					<DimField
 						label="長 (cm)"
@@ -219,7 +218,6 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 						onChange={(v) => onUpdate(index, { unit: v })}
 					/>
 				</div>
-
 
 				{state === "idle" && (
 					<p className="text-xs text-hk-muted m-0">

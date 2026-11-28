@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type createProductStub struct {
 	productpb.ProductServiceClient
 }

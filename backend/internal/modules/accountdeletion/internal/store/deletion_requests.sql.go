@@ -18,7 +18,6 @@ WHERE account_id = ANY($1::bigint[]) AND status = 'PENDING_ORDERS'
 ORDER BY account_id
 `
 
-// 給唯讀的 Reader（本機種子的前提檢查）：這些帳號之中有還沒完成的申請的。
 func (q *Queries) AccountsWithOpenRequest(ctx context.Context, accountIds []int64) ([]int64, error) {
 	rows, err := q.db.Query(ctx, accountsWithOpenRequest, accountIds)
 	if err != nil {
@@ -174,8 +173,6 @@ SELECT id, account_id, status, requested_at, completed_at FROM accountdeletion.d
 WHERE account_id = $1 AND status = 'PENDING_ORDERS'
 `
 
-// 一般讀取，不鎖列：活帳號的路徑已先鎖 identity 帳號列，同帳號的申請都被它序列化；已刪除帳號的路徑沒有帳號列可鎖，
-// 並行完成同一筆申請由 CompleteRequest 的 Go 呼叫端以「0 列＝已完成」處理（單體規則 4：不在買家、店家之前鎖自己的申請列）。
 func (q *Queries) PendingRequest(ctx context.Context, accountID int64) (AccountdeletionDeletionRequest, error) {
 	row := q.db.QueryRow(ctx, pendingRequest, accountID)
 	var i AccountdeletionDeletionRequest
@@ -222,7 +219,6 @@ type UpsertPendingRequestParams struct {
 	RequestedAt time.Time
 }
 
-// partial UNIQUE 序列化並行申請；申請明細另存 append-only attempts。
 func (q *Queries) UpsertPendingRequest(ctx context.Context, arg UpsertPendingRequestParams) (AccountdeletionDeletionRequest, error) {
 	row := q.db.QueryRow(ctx, upsertPendingRequest, arg.ID, arg.AccountID, arg.RequestedAt)
 	var i AccountdeletionDeletionRequest

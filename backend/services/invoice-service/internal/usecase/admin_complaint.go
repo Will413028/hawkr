@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
 	complaintActionRemindSeller        = "REMIND_SELLER"
 	complaintActionRequestRework       = "REQUEST_REWORK"
@@ -25,9 +24,9 @@ const (
 
 const (
 	complaintViolationWindowDays = 90
-	complaintViolationThreshold = 3
-	complaintSuspendDays = 14
-	complaintReopenCooldown = 24 * time.Hour
+	complaintViolationThreshold  = 3
+	complaintSuspendDays         = 14
+	complaintReopenCooldown      = 24 * time.Hour
 
 	complaintResolutionNoViolation = "NO_VIOLATION"
 	complaintResolutionViolation   = "VIOLATION"
@@ -160,7 +159,6 @@ func (u *AdminComplaint) Act(ctx context.Context, in ComplaintActionInputAdmin) 
 			return err
 		}
 
-
 		rec, err := u.recommendationFor(ctx, in, c, now)
 		if err != nil {
 			return err
@@ -269,7 +267,7 @@ func (u *AdminComplaint) appendTimeline(
 		return nil
 	}
 	_, err := u.complaints.AppendEvent(ctx, domain.NewComplaintEvent{
-		ComplaintID: c.ID,
+		ComplaintID:    c.ID,
 		EventType:      codemeta.InvoiceComplaintEventTypePlatformDecision.Value,
 		Action:         action,
 		ActorType:      complaintActorAdmin,

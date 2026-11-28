@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 const kindTransferTopup = "payment.transfer_topup"
 
 var errRefundDeclined = fmt.Errorf("%w：卡片已失效", ErrChargePermanent)

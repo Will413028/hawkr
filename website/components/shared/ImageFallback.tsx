@@ -55,7 +55,6 @@ export default function ImageFallback({
 				className,
 			)}
 		>
-
 			<AppIcon name="image" size={iconSize} />
 			{showCaption ? (
 				<span className="px-2 text-center text-xs leading-tight">{label}</span>

@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type fakeRecheckOps struct {
 	RecheckOperationStore
 
@@ -186,7 +185,6 @@ func TestRecheck_ClaimTransition_RejectsEdgeNotInM2(t *testing.T) {
 		t.Fatalf("不合法的邊不得留痕，實得 %d 列", len(audit.entries))
 	}
 }
-
 
 type rcReconcileOps struct {
 	RecheckOperationStore

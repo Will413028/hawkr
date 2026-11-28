@@ -68,10 +68,10 @@ const (
 )
 
 type categoryDef struct {
-	category PrefCategory
-	class    CategoryClass
-	audiences []Audience
-	locked []Channel
+	category    PrefCategory
+	class       CategoryClass
+	audiences   []Audience
+	locked      []Channel
 	undelivered []Channel
 }
 

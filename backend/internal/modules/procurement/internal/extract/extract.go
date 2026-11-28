@@ -73,8 +73,8 @@ type Extractor struct {
 	shape     Shape
 
 	attemptTimeout, totalBudget, backoff time.Duration
-	sleep  func(ctx context.Context, d time.Duration) error
-	jitter func() float64
+	sleep                                func(ctx context.Context, d time.Duration) error
+	jitter                               func() float64
 }
 
 // New 建立 Extractor。

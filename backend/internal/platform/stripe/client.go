@@ -120,8 +120,8 @@ func New(cfg Config) (*Client, error) {
 }
 
 const (
-	metaStoreID   = "store_id"
-	metaNamespace = "hawkr_namespace"
+	metaStoreID     = "store_id"
+	metaNamespace   = "hawkr_namespace"
 	maxNamespaceLen = 40
 )
 
@@ -595,7 +595,7 @@ func (c *Client) retrieveRaw(ctx context.Context, accountID string) (*sdk.V2Core
 
 const (
 	bankAccountsPageLimit = 100
-	maxBankAccountPages = 20
+	maxBankAccountPages   = 20
 )
 
 // ListBankAccountFingerprints 讀連線帳戶目前掛著的外部銀行帳號的 fingerprint（v1 external_accounts，只列 bank_account），翻頁讀完；

@@ -280,8 +280,8 @@ func TestRequireDelegatedRechecksStoreState(t *testing.T) {
 		wantRevoke bool
 	}{
 		{
-			name:   "active 放行",
-			stores: &stubStoreState{resp: operableStore("active")},
+			name:     "active 放行",
+			stores:   &stubStoreState{resp: operableStore("active")},
 			wantHTTP: http.StatusOK, wantCode: 0,
 		},
 		{
@@ -438,11 +438,11 @@ func TestRequireDelegatedRecordsQ2Q3Denial(t *testing.T) {
 	operable := func() *stubStoreState { return &stubStoreState{resp: operableStore("active")} }
 
 	cases := []struct {
-		name      string
-		resp      *accountpb.GetCurrentSessionResponse
-		stores    *stubStoreState
-		wantCode  int32
-		wantAudit bool
+		name           string
+		resp           *accountpb.GetCurrentSessionResponse
+		stores         *stubStoreState
+		wantCode       int32
+		wantAudit      bool
 		wantCapability string
 	}{
 		{
@@ -667,7 +667,6 @@ func TestStripDelegationReservedHeaders(t *testing.T) {
 		t.Fatalf("保留 header 未被刪除：%v", seen)
 	}
 }
-
 
 type responseWriteOrderRecorder struct {
 	http.ResponseWriter

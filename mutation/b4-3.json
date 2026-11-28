@@ -139,8 +139,8 @@
    "id": "create-loser-skips-readback-after-token-confirmed-elsewhere",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\tif errors.Is(err, media.ErrUploadAlreadyConfirmed) {\n\t\tid, found, rerr",
-   "new": "\tif false && errors.Is(err, media.ErrUploadAlreadyConfirmed) {\n\t\tid, found, rerr",
+   "old": "if errors.Is(err, media.ErrUploadAlreadyConfirmed) {",
+   "new": "if false && errors.Is(err, media.ErrUploadAlreadyConfirmed) {",
    "test": "internal/modules/catalog ^TestCreateLoserReadsBackTheWinnerWhenItsImageTokenWasConfirmedElsewhere$",
    "why": "輸家的圖片 token 已被贏家確認時不讀回贏家的商品：回的是圖片已使用的錯誤，不是同一個商品，測試要紅。"
   },

@@ -247,7 +247,6 @@ class PageShopTabState extends ConsumerState<PageShopTab>
   }
 }
 
-
 @visibleForTesting
 Widget buildSellerProductManagementCardForTest({
   required Map<String, dynamic> product,

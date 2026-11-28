@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 type uploaded struct {
 	field string
 	token string

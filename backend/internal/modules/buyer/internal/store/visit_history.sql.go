@@ -25,7 +25,6 @@ type AddVisitParams struct {
 	VisitedAt time.Time
 }
 
-// 新增或更新最近瀏覽時間。
 func (q *Queries) AddVisit(ctx context.Context, arg AddVisitParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addVisit, arg.BuyerID, arg.ProductID, arg.VisitedAt)
 	if err != nil {
@@ -41,7 +40,6 @@ WHERE buyer_id = $1
 RETURNING product_id
 `
 
-// 清空指定買家的瀏覽紀錄。
 func (q *Queries) ClearVisit(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, clearVisit, buyerID)
 	if err != nil {
@@ -78,7 +76,6 @@ type ListVisitParams struct {
 	PageLimit int32
 }
 
-// 以瀏覽時間及商品 ID 分頁。
 func (q *Queries) ListVisit(ctx context.Context, arg ListVisitParams) ([]BuyerVisitHistory, error) {
 	rows, err := q.db.Query(ctx, listVisit,
 		arg.BuyerID,

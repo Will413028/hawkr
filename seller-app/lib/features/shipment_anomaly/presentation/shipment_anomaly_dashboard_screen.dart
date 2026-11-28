@@ -362,7 +362,6 @@ class ShipmentAnomalyDashboardScreen extends ConsumerWidget {
   }
 }
 
-
 sealed class _Item {
   const _Item();
 }
@@ -376,7 +375,6 @@ class _AnomalyRow extends _Item {
   final ShipmentAnomaly anomaly;
   const _AnomalyRow(this.anomaly);
 }
-
 
 class _AnomalyCard extends StatelessWidget {
   const _AnomalyCard({

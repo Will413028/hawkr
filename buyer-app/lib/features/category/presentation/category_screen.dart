@@ -87,7 +87,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
 
   final ScrollController _productScrollCtrl = ScrollController();
 
-
   @override
   void initState() {
     super.initState();
@@ -134,12 +133,10 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     super.dispose();
   }
 
-
   @override
   PreferredSizeWidget buildTopBar(BuildContext context) {
     return buildMainTopBar(context);
   }
-
 
   Future<void> _loadCategories() async {
     try {
@@ -499,7 +496,6 @@ class _CategoryScreenState extends ConsumerState<CategoryScreen>
     }
     if (selected.sort != null) _setSort(selected.sort!);
   }
-
 
   @override
   Widget build(BuildContext context) {

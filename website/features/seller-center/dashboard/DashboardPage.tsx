@@ -164,8 +164,6 @@ export default function DashboardPage() {
 				</Button>
 			</header>
 
-
-
 			{paymentBanner?.badge && (
 				<div className="seller-banner">
 					<div className="seller-banner__text">
@@ -340,8 +338,6 @@ export default function DashboardPage() {
 	);
 }
 
-
-
 type ActionRow =
 	| { kind: "order"; order: Order }
 	| { kind: "aftersale"; case: AfterSaleCase };
@@ -398,7 +394,6 @@ function PendingOrderTable({
 
 	return (
 		<>
-
 			<div className="seller-table-wrap seller-mobile-disclosure-desktop">
 				<table className="seller-table">
 					<thead>
@@ -560,7 +555,6 @@ function toDisplayRow(row: ActionRow): DisplayRow {
 		actionLabel: "處理出貨",
 	};
 }
-
 
 /**
  * 賣家儀表板抬頭的「今天」。以**台北**牆上時間計算，不是裝置時區：這是台灣商家

@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
 	ocOrderNo   = "O320270909"
 	ocBuyerID   = int64(2623900520)

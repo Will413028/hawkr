@@ -105,8 +105,7 @@ function readGatewayHost(flavor: Flavor): string {
 		if (!value) continue;
 		try {
 			return new URL(value).origin;
-		} catch {
-		}
+		} catch {}
 	}
 	return "";
 }

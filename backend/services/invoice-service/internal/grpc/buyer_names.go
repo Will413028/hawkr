@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // BuyerNameResolver 是買家顯示名的出向面（實作在 client/buyer）。
 //
 // 介面宣告在消費端：本層只需要「給我一批 buyer_id、還我顯示名與註銷旗標」。

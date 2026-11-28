@@ -723,7 +723,6 @@ export default function PostComposeClient({
 								</small>
 							</section>
 
-
 							{delegated ? (
 								<section className="post-compose__card">
 									<header className="post-compose__card-head">
@@ -843,7 +842,6 @@ export default function PostComposeClient({
 								)}
 							</section>
 
-
 							{delegated && canPublishPosts && !isEdit ? (
 								<section className="post-compose__card">
 									<header className="post-compose__card-head">
@@ -889,7 +887,6 @@ export default function PostComposeClient({
 							) : null}
 						</div>
 
-
 						{delegated ? (
 							<aside className="adm-post-preview" aria-label="商店動態預覽">
 								<header className="adm-post-preview__head">
@@ -905,7 +902,6 @@ export default function PostComposeClient({
 											{(sellerName || "店").slice(0, 1)}
 										</span>
 										<span>
-
 											<strong>{sellerName || "本店"}</strong>
 											<small>剛剛</small>
 										</span>
@@ -992,7 +988,6 @@ export default function PostComposeClient({
 						</label>
 					</span>
 					<span className="adm-post-compose__bar-actions">
-
 						{canPublishPosts || isEdit ? null : (
 							<span className="adm-post-compose__bar-note">
 								本次工作階段沒有「貼文發布」授權，只能建立未發布的貼文；要讓買家看到，請由賣家自行發布。

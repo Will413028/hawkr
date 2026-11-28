@@ -21,7 +21,6 @@ const SECTION = "features/invoices/components/InvoiceComplaintSection.tsx";
 const CREATE_DIALOG = "features/invoices/screens/InvoiceComplaintDialog.tsx";
 const ORDER_SECTION = "features/invoices/order/OrderInvoiceSection.tsx";
 
-
 test("63／64／65 三支都送 expectedVersion", () => {
 	const source = stripComments(read(REPO));
 	for (const fn of [
@@ -52,7 +51,6 @@ test("expectedVersion 的來源只有 complaint.version，不得用推導值頂�
 	assert.doesNotMatch(source, /responses\.length,/);
 });
 
-
 test("建案 Dialog 的送出鍵不因說明空白而 disable", () => {
 	const source = stripComments(read(CREATE_DIALOG));
 	assert.doesNotMatch(
@@ -61,7 +59,6 @@ test("建案 Dialog 的送出鍵不因說明空白而 disable", () => {
 		"建案的 description 是選填，送出鍵不得因空白而 disable（§B-1.0.9 B18t）",
 	);
 });
-
 
 test("不得出現「確認已解決」按鈕——Phase 1 沒有那支端點", () => {
 	for (const file of [SECTION, ORDER_SECTION]) {
@@ -81,7 +78,6 @@ test("9310 走業務碼分流，不看 HTTP status", () => {
 	assert.doesNotMatch(source, /\.status === 200/);
 });
 
-
 test("申訴區塊零輪詢、不另開第二條 SSE", () => {
 	for (const file of [SECTION, "lib/hooks/useInvoiceComplaint.ts"]) {
 		const source = stripComments(read(file));
@@ -97,7 +93,6 @@ test("申訴區塊零輪詢、不另開第二條 SSE", () => {
 		}
 	}
 });
-
 
 /**
  * 本條原本斷言「不得渲染修改發票資料」——更正執行面 R02–R04 當時尚未實作
@@ -133,7 +128,6 @@ test("B04 的動作列同時接上申訴入口與修改發票資料，且後者�
 		"B06 送了實體軸的 issueAttemptSeq——那會在作廢重開後誤判成衝突",
 	);
 });
-
 
 test("倒數不自己算工作天，也不換算日曆天", () => {
 	for (const file of [

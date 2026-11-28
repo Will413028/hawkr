@@ -22,7 +22,6 @@ type AddFollowParams struct {
 	CreatedAt time.Time
 }
 
-// 插入追蹤關聯，重複追蹤不產生新列。
 func (q *Queries) AddFollow(ctx context.Context, arg AddFollowParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addFollow, arg.BuyerID, arg.StoreID, arg.CreatedAt)
 	if err != nil {
@@ -42,7 +41,6 @@ type BatchFollowParams struct {
 	Column2 []int64
 }
 
-// 回傳輸入清單中已追蹤的店家 ID。
 func (q *Queries) BatchFollow(ctx context.Context, arg BatchFollowParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, batchFollow, arg.BuyerID, arg.Column2)
 	if err != nil {
@@ -74,7 +72,6 @@ type CheckFollowParams struct {
 	StoreID int64
 }
 
-// 查詢是否追蹤指定店家。
 func (q *Queries) CheckFollow(ctx context.Context, arg CheckFollowParams) (bool, error) {
 	row := q.db.QueryRow(ctx, checkFollow, arg.BuyerID, arg.StoreID)
 	var exists bool
@@ -89,7 +86,6 @@ WHERE buyer_id = $1
 RETURNING store_id
 `
 
-// 刪除買家的全部追蹤關聯。
 func (q *Queries) ClearFollow(ctx context.Context, buyerID int64) ([]int64, error) {
 	rows, err := q.db.Query(ctx, clearFollow, buyerID)
 	if err != nil {
@@ -114,7 +110,6 @@ const followCount = `-- name: FollowCount :one
 SELECT count(*)::bigint FROM buyer.seller_subscriptions WHERE buyer_id = $1
 `
 
-// 計算買家追蹤的店家數。
 func (q *Queries) FollowCount(ctx context.Context, buyerID int64) (int64, error) {
 	row := q.db.QueryRow(ctx, followCount, buyerID)
 	var column_1 int64
@@ -129,7 +124,6 @@ WHERE buyer_id = $1
 ORDER BY store_id
 `
 
-// 列出買家追蹤的店家 ID。
 func (q *Queries) FollowIDs(ctx context.Context, buyerID int64) ([]int64, error) {
 	rows, err := q.db.Query(ctx, followIDs, buyerID)
 	if err != nil {
@@ -166,7 +160,6 @@ type ListFollowParams struct {
 	PageLimit int32
 }
 
-// 以時間及店家 ID 進行追蹤 keyset 分頁。
 func (q *Queries) ListFollow(ctx context.Context, arg ListFollowParams) ([]BuyerSellerSubscription, error) {
 	rows, err := q.db.Query(ctx, listFollow,
 		arg.BuyerID,
@@ -214,7 +207,6 @@ type ListLiveFollowerAccountsRow struct {
 	AccountID int64
 }
 
-// 追蹤店家的買家中尚未關閉（營運中與刪除中）、追蹤時間不晚於 followed_by 的 (buyer_id, account_id)，依 buyer_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知的追蹤者 fan-out）。
 func (q *Queries) ListLiveFollowerAccounts(ctx context.Context, arg ListLiveFollowerAccountsParams) ([]ListLiveFollowerAccountsRow, error) {
 	rows, err := q.db.Query(ctx, listLiveFollowerAccounts,
 		arg.StoreID,
@@ -251,7 +243,6 @@ type RemoveFollowParams struct {
 	StoreID int64
 }
 
-// 移除指定追蹤關聯。
 func (q *Queries) RemoveFollow(ctx context.Context, arg RemoveFollowParams) (int64, error) {
 	result, err := q.db.Exec(ctx, removeFollow, arg.BuyerID, arg.StoreID)
 	if err != nil {
@@ -271,7 +262,6 @@ type SubscriberCountsRow struct {
 	Count   int64
 }
 
-// 批次計算店家的粉絲數。
 func (q *Queries) SubscriberCounts(ctx context.Context, dollar_1 []int64) ([]SubscriberCountsRow, error) {
 	rows, err := q.db.Query(ctx, subscriberCounts, dollar_1)
 	if err != nil {
@@ -316,8 +306,6 @@ type SubscriberStatsRow struct {
 	NewCount    int64
 }
 
-// 店家的粉絲總數，以及每個時間窗 [window_start, window_end) 內新增的追蹤數（以追蹤時間計）。一句查詢：總數與各窗來自同一個
-// snapshot，結果依窗的順序（window_index 從 1 起）。
 func (q *Queries) SubscriberStats(ctx context.Context, arg SubscriberStatsParams) ([]SubscriberStatsRow, error) {
 	rows, err := q.db.Query(ctx, subscriberStats, arg.WindowStarts, arg.WindowEnds, arg.StoreID)
 	if err != nil {
@@ -354,7 +342,6 @@ type SubscribersParams struct {
 	PageLimit int32
 }
 
-// 以追蹤時間及買家 ID 分頁列出粉絲。
 func (q *Queries) Subscribers(ctx context.Context, arg SubscribersParams) ([]BuyerSellerSubscription, error) {
 	rows, err := q.db.Query(ctx, subscribers,
 		arg.StoreID,

@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-
 func (f *fixture) beginDeletion(t *testing.T, accountID, storeID int64) {
 	t.Helper()
 	ctx := context.Background()

@@ -68,8 +68,7 @@ export function createHomePostDetailViewerResource(
 		peek: () => loaded,
 		load,
 		prewarm: () => {
-			void load().catch(() => {
-			});
+			void load().catch(() => {});
 		},
 	};
 }

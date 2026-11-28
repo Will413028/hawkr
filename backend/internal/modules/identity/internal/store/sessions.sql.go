@@ -27,7 +27,6 @@ type DeleteExpiredSessionsOfAccountParams struct {
 	AppIdleBefore time.Time
 }
 
-// 登入時順手清掉這個帳號已逾時的 session：絕對逾時，或閒置逾時（web 與 App 的期限不同，由呼叫方傳入）。
 func (q *Queries) DeleteExpiredSessionsOfAccount(ctx context.Context, arg DeleteExpiredSessionsOfAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredSessionsOfAccount,
 		arg.AccountID,
@@ -62,7 +61,6 @@ type DeleteSessionOfAccountParams struct {
 	AccountID int64
 }
 
-// 帳號只能終止自己的 session。
 func (q *Queries) DeleteSessionOfAccount(ctx context.Context, arg DeleteSessionOfAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteSessionOfAccount, arg.ID, arg.AccountID)
 	if err != nil {
@@ -133,7 +131,6 @@ type InsertSessionParams struct {
 	AbsoluteExpiresAt time.Time
 }
 
-// 建立時 last_used_at 與 auth_time 都是建立時間（登入就是剛以 provider 驗證過）。
 func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, insertSession,
 		arg.TokenHash,
@@ -204,7 +201,6 @@ type RenewSessionParams struct {
 	RenewBefore time.Time
 }
 
-// 續期：last_used_at 不晚於 renew_before（一天前）才寫，並發的請求只有一個寫入。
 func (q *Queries) RenewSession(ctx context.Context, arg RenewSessionParams) (int64, error) {
 	result, err := q.db.Exec(ctx, renewSession, arg.Now, arg.ID, arg.RenewBefore)
 	if err != nil {
@@ -233,7 +229,6 @@ type ResolveSessionRow struct {
 	Roles             []string
 }
 
-// 認證：token 雜湊對應的 session，連同帳號的停權、刪除狀態與目前的角色（依字母排序）。逾時的判斷在呼叫方（注入 clock）。
 func (q *Queries) ResolveSession(ctx context.Context, tokenHash []byte) (ResolveSessionRow, error) {
 	row := q.db.QueryRow(ctx, resolveSession, tokenHash)
 	var i ResolveSessionRow

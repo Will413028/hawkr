@@ -89,19 +89,19 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 }
 
 type adminStack struct {
-	db         *db.DB
-	identity   *identity.Module
-	buyers     *buyer.Module
-	social     *social.Module
-	sellers    *seller.Reader
-	sellerMod  *seller.Module
-	moderation *moderation.Module
+	db              *db.DB
+	identity        *identity.Module
+	buyers          *buyer.Module
+	social          *social.Module
+	sellers         *seller.Reader
+	sellerMod       *seller.Module
+	moderation      *moderation.Module
 	customerAccount int64
 	app             appconnect.ModerationAppServiceClient
 	admin           moderationv1alpha1connect.ModerationAdminServiceClient
-	noRole moderationv1alpha1connect.ModerationAdminServiceClient
-	customer moderationv1alpha1connect.ModerationAdminServiceClient
-	visitor  moderationv1alpha1connect.ModerationAdminServiceClient
+	noRole          moderationv1alpha1connect.ModerationAdminServiceClient
+	customer        moderationv1alpha1connect.ModerationAdminServiceClient
+	visitor         moderationv1alpha1connect.ModerationAdminServiceClient
 }
 
 func bearer(token string) connect.ClientOption {

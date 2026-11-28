@@ -244,8 +244,7 @@ export async function fetchTrendingPosts(
 export async function recordPostView(postId: string): Promise<void> {
 	try {
 		await socialViewerClient().recordPostView({ postId });
-	} catch {
-	}
+	} catch {}
 }
 
 /** 對貼文按讚或取消：兩個明確的方法，呼叫端要先知道目前的狀態。 */

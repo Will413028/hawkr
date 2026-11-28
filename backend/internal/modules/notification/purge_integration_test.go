@@ -19,7 +19,7 @@ type recipient struct {
 	account  int64
 	audience string
 	storeID  int64
-	intents []string
+	intents  []string
 }
 
 func (r recipient) inbox(t *testing.T, f *fixture) int {
@@ -108,9 +108,9 @@ func seedRecipients(t *testing.T, f *fixture) (a, b int64, rs map[string]recipie
 // 其他帳號、同帳號的另一個受眾、同帳號的另一間店都不動。
 func TestPurgeAfterEachDeletionEvent(t *testing.T) {
 	type scenario struct {
-		name string
-		publish func(t *testing.T, f *fixture, a int64) purge.RecipientArgs
-		gone    []string
+		name      string
+		publish   func(t *testing.T, f *fixture, a int64) purge.RecipientArgs
+		gone      []string
 		prefsGone []string
 	}
 	scenarios := []scenario{

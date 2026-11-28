@@ -12,7 +12,7 @@ import (
 
 const (
 	drainTimeout = 5 * time.Second
-	ackMargin = time.Second
+	ackMargin    = time.Second
 	closeTimeout = 5 * time.Second
 )
 

@@ -47,7 +47,6 @@ func (c *ProductClient) Close() error {
 	return nil
 }
 
-
 // GetProductList 取得商品列表
 func (c *ProductClient) GetProductList(ctx context.Context, categoryID string, keyword string, page, pageSize string, sort, status string, ownerID int64) (*pb.GetProductListResponse, error) {
 	return c.GetProductListWithHashtags(ctx, categoryID, keyword, page, pageSize, sort, status, ownerID, nil, false)
@@ -143,13 +142,13 @@ func (c *ProductClient) GetPublicProductListFiltered(ctx context.Context, f Publ
 	defer cancel()
 
 	req := &pb.GetProductListRequest{
-		CategoryId:       f.CategoryIDs,
-		Keyword:          f.Keyword,
-		Page:             f.Page,
-		PageSize:         f.PageSize,
-		Sort:             f.Sort,
-		Hashtags:         f.Hashtags,
-		HashtagMatchMode: hashtagMatchMode(f.MatchAll),
+		CategoryId:          f.CategoryIDs,
+		Keyword:             f.Keyword,
+		Page:                f.Page,
+		PageSize:            f.PageSize,
+		Sort:                f.Sort,
+		Hashtags:            f.Hashtags,
+		HashtagMatchMode:    hashtagMatchMode(f.MatchAll),
 		OwnerStoreId:        0,
 		ViewerBuyerId:       f.ViewerBuyerID,
 		DeliveryTempFilter:  f.DeliveryTemp,
@@ -285,7 +284,6 @@ func (c *ProductClient) GetPublicSellerProducts(ctx context.Context, ownerID int
 	return c.client.GetProductList(ctx, req)
 }
 
-
 // ListSellerProducts 取得商家的商品列表
 // 透過 GetProductList 並傳入 ownerID 實現
 // 無呼叫端（dead code）；ownerID 未必已解析（同 SearchAdminProducts 家族），
@@ -327,7 +325,6 @@ func (c *ProductClient) DeleteProduct(ctx context.Context, productID string, sto
 		StoreId:   int64(storeID),
 	})
 }
-
 
 // GetProductForAdmin 管理員取得商品詳情（不檢查擁有者，不限狀態）
 func (c *ProductClient) GetProductForAdmin(ctx context.Context, productID string) (*pb.GetProductResponse, error) {
@@ -378,7 +375,6 @@ func (c *ProductClient) UpdateSellerProductStatus(ctx context.Context, productID
 	return c.client.UpdateSellerProductStatus(ctx, req)
 }
 
-
 // CalculateShippingOptions 計算可用配送選項與運費（依溫層分組）
 func (c *ProductClient) CalculateShippingOptions(ctx context.Context, req *pb.CalculateShippingOptionsRequest) (*pb.CalculateShippingOptionsResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -386,7 +382,6 @@ func (c *ProductClient) CalculateShippingOptions(ctx context.Context, req *pb.Ca
 
 	return c.client.CalculateShippingOptions(ctx, req)
 }
-
 
 // GetRelatedProducts 取得相關商品（同分類、排除自身、僅 ACTIVE、上限 8 筆）
 func (c *ProductClient) GetRelatedProducts(ctx context.Context, productID string) (*pb.GetRelatedProductsResponse, error) {
@@ -397,7 +392,6 @@ func (c *ProductClient) GetRelatedProducts(ctx context.Context, productID string
 		ProductId: productID,
 	})
 }
-
 
 // VerifyCertification 驗證認證編號是否存在於政府開放資料平台
 func (c *ProductClient) VerifyCertification(ctx context.Context, certNo, certType string) (*pb.VerifyCertificationResponse, error) {
@@ -410,7 +404,6 @@ func (c *ProductClient) VerifyCertification(ctx context.Context, certNo, certTyp
 	})
 }
 
-
 // ListProducts 兼容舊 API（內部調用 GetProductList）
 func (c *ProductClient) ListProducts(ctx context.Context, categoryID string, keyword string, page, pageSize string) (*pb.GetProductListResponse, error) {
 	return c.GetProductList(ctx, categoryID, keyword, page, pageSize, "", "", 0)
@@ -422,7 +415,6 @@ func (c *ProductClient) ListProducts(ctx context.Context, categoryID string, key
 func (c *ProductClient) GetProductDetail(ctx context.Context, productID string) (*pb.GetProductResponse, error) {
 	return c.GetProduct(ctx, productID, 0)
 }
-
 
 // PurgeProductCache 清除商品快取
 // scope: all（全部）、detail（商品詳情）、list（列表）
@@ -474,7 +466,6 @@ func (c *ProductClient) BatchChangeProductCategoryForAdmin(
 
 	return c.client.BatchChangeProductCategoryForAdmin(ctx, req)
 }
-
 
 // SubmitProductCertification 賣家送出一筆認證申請。
 func (c *ProductClient) SubmitProductCertification(ctx context.Context, req *pb.SubmitProductCertificationRequest) (*pb.ProductCertificationApplicationResponse, error) {

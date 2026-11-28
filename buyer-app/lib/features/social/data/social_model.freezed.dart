@@ -283,10 +283,10 @@ mixin _$Post {
  int get id; String get content;// 發文店家的不透明 ID（封鎖、比對用）；沒有店家時空字串。
  String get storeId;// 店面網址的路徑段；空字串代表沒有可進的店面。
  String get storeCode; String? get merchantName; String? get merchantAvatar; String get imageUrl; int get likeCount; int get commentCount; int get shareCount; int get viewCount; bool get liked;// 第一次發布的時間，epoch 秒；沒有時 null。
- int? get createdAt;// 商品卡片要的 id、name、image、price（最低價）。
- PostProduct? get product;// 觀看者此刻能不能留言（伺服器算的顯示用提示）。
- bool get viewerCanComment;// 觀看者留言時的身分；訪客 null。
- pb.Actor? get viewerActor;// 單篇網址（絕對網址，伺服器組，分享用）；沒有時空字串。
+ int? get createdAt;// 商品卡片欄位：id、名稱、圖片與最低價。
+ PostProduct? get product;// 伺服器判斷觀看者此刻能否留言。
+ bool get viewerCanComment;// 留言時的觀看者身分；訪客為 null。
+ pb.Actor? get viewerActor;// 分享用的絕對網址；沒有時空字串。
  String get shareUrl;
 /// Create a copy of Post
 /// with the given fields replaced by the non-null parameter values.
@@ -526,13 +526,13 @@ class _Post implements Post {
 @override@JsonKey() final  bool liked;
 // 第一次發布的時間，epoch 秒；沒有時 null。
 @override final  int? createdAt;
-// 商品卡片要的 id、name、image、price（最低價）。
+// 商品卡片欄位：id、名稱、圖片與最低價。
 @override final  PostProduct? product;
-// 觀看者此刻能不能留言（伺服器算的顯示用提示）。
+// 伺服器判斷觀看者此刻能否留言。
 @override@JsonKey() final  bool viewerCanComment;
-// 觀看者留言時的身分；訪客 null。
+// 留言時的觀看者身分；訪客為 null。
 @override final  pb.Actor? viewerActor;
-// 單篇網址（絕對網址，伺服器組，分享用）；沒有時空字串。
+// 分享用的絕對網址；沒有時空字串。
 @override@JsonKey() final  String shareUrl;
 
 /// Create a copy of Post

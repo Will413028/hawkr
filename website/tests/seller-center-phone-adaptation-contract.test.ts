@@ -28,10 +28,21 @@ test("order records use dedicated phone work cards and explicit selection mode",
 	assert.match(afterSales, /seller-orders__mobile-view--aftersale/);
 	assert.match(afterSales, /seller-orders__mobile-card--aftersale/);
 
-	const phoneStyles = css.slice(
-		css.indexOf("/* Dedicated order work cards"),
-		css.indexOf("/* List tables opt in explicitly"),
+	const orderMobileMarker = css.indexOf(".seller-orders__desktop-view,");
+	const phoneStylesStart = css.lastIndexOf(
+		"@media (max-width: 767px) {",
+		orderMobileMarker,
 	);
+	const listTableMobileMarker = css.indexOf(
+		".seller-products__card .seller-orders__table-wrap,",
+		orderMobileMarker,
+	);
+	const listTableMobileStart = css.lastIndexOf(
+		"@media (max-width: 767px) {",
+		listTableMobileMarker,
+	);
+	assert.ok(phoneStylesStart >= 0 && listTableMobileStart > phoneStylesStart);
+	const phoneStyles = css.slice(phoneStylesStart, listTableMobileStart);
 	assert.match(phoneStyles, /@media \(max-width: 767px\)/);
 	assert.match(
 		phoneStyles,
@@ -60,7 +71,11 @@ test("seller list tables opt into phone cards with visible field labels", () => 
 		assert.match(source(file), /data-label=/, file);
 	}
 
-	const cardStyles = css.slice(css.indexOf("/* List tables opt in explicitly"));
+	const cardStyles = css.slice(
+		css.indexOf(
+			"@media (max-width: 767px) {\n\t.seller-products__card .seller-orders__table-wrap,",
+		),
+	);
 	assert.match(cardStyles, /table\[data-mobile-layout="cards"\]/);
 	assert.match(cardStyles, /content:\s*attr\(data-label\)/);
 	assert.match(cardStyles, /grid-template-columns:\s*minmax\(5\.75rem, 36%\)/);
@@ -69,7 +84,9 @@ test("seller list tables opt into phone cards with visible field labels", () => 
 
 test("shared phone controls stay single-line and meet the touch target", () => {
 	const adaptation = css.slice(
-		css.indexOf("Seller workspace phone adaptation"),
+		css.indexOf(
+			"@media (max-width: 960px) {\n\t.seller-shell {\n\t\tmax-width: 100%",
+		),
 	);
 	assert.match(adaptation, /\.seller-shell__menu-btn,[\s\S]*width:\s*44px/);
 	assert.match(adaptation, /\.seller-sidebar__close,[\s\S]*height:\s*44px/);
@@ -133,7 +150,7 @@ test("product and profile fixed actions stay usable at 320px", () => {
 
 	const productStart = css.indexOf(".product-form__title-row,");
 	const productEnd = css.indexOf(
-		"Seller Orders — full table view",
+		"@media (max-width: 960px) {\n\t.seller-shell {\n\t\t--seller-page-header-cta-width",
 		productStart,
 	);
 	assert.ok(productStart >= 0 && productEnd > productStart);
@@ -153,13 +170,10 @@ test("product and profile fixed actions stay usable at 320px", () => {
 	);
 
 	const profileStart = css.indexOf(
-		"@media (max-width: 540px)",
+		"@media (max-width: 540px) {\n\t.seller-profile__save-bar {",
 		css.indexOf(".seller-profile__save-bar"),
 	);
-	const profileEnd = css.indexOf(
-		"/* ============================================================",
-		profileStart,
-	);
+	const profileEnd = css.indexOf("\n}\n", profileStart);
 	assert.ok(profileStart >= 0 && profileEnd > profileStart);
 	const profilePhoneStyles = css.slice(profileStart, profileEnd);
 	assert.match(
@@ -183,7 +197,9 @@ test("seller portal drawers and certification flows keep phone-safe controls", (
 	);
 	const sellerProfileStyles = source("styles/features/seller-profile.css");
 	const adaptation = css.slice(
-		css.indexOf("Seller workspace phone adaptation"),
+		css.indexOf(
+			"@media (max-width: 960px) {\n\t.seller-shell {\n\t\tmax-width: 100%",
+		),
 	);
 
 	assert.match(dialog, /data-hk-overlay-panel/);

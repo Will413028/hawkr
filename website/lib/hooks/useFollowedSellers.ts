@@ -85,8 +85,7 @@ export function useIsFollowedSeller(
 			for (const key of Object.keys(localStorage)) {
 				if (key.startsWith(LEGACY_FLAG_PREFIX)) localStorage.removeItem(key);
 			}
-		} catch {
-		}
+		} catch {}
 	}, []);
 	const query = useQuery({
 		queryKey: queryKeys.buyer.subscription(identity, id),

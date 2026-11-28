@@ -406,8 +406,7 @@ export default function ProductDetailLayout({
 								</div>
 							</div>
 							{sellerStoreId
-								?
-									(sellerIntroSlot ?? (
+								? (sellerIntroSlot ?? (
 										<ProductSellerIntro
 											sellerId={sellerStoreId}
 											seller={seller}

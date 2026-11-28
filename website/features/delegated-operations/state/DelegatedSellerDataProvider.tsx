@@ -59,8 +59,7 @@ export default function DelegatedSellerDataProvider({
 		() =>
 			summary
 				? delegatedIdentityOf(summary)
-				:
-					{ adminId: "", storeId, issuedAt: "", revision: 0 },
+				: { adminId: "", storeId, issuedAt: "", revision: 0 },
 		[storeId, summary],
 	);
 

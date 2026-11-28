@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-
 // Severity 是嚴重度。
 type Severity = model.Severity
 

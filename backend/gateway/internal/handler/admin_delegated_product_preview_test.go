@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 type previewProductStub struct {
 	productpb.ProductServiceClient
 	detail *productpb.ProductDetail

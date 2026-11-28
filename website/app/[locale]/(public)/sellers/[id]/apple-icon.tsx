@@ -5,7 +5,6 @@ import { isConfiguredMediaUrl, resolveCdnUrl } from "@/lib/media/cdn";
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-
 type SellerLike = {
 	logo_url?: string;
 } | null;

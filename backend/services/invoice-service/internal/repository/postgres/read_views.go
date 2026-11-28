@@ -13,8 +13,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres/gen"
 )
 
-
-
 func optInt64(v *int64) (bool, int64) {
 	if v == nil {
 		return false, 0
@@ -35,7 +33,6 @@ func derefString(v *string) string {
 	}
 	return *v
 }
-
 
 type operationViewRow struct {
 	operation                gen.InvoiceOperation
@@ -70,7 +67,6 @@ func toOperationViews(rows []operationViewRow) []domain.OperationView {
 	}
 	return out
 }
-
 
 // ListOrderDocumentsForBuyer 回一張訂單底下**全部**屬於這位買家的文件。
 //
@@ -138,7 +134,6 @@ func (r *DocumentRepository) CountForBuyer(ctx context.Context, in domain.BuyerD
 		DocumentKindFilter: in.DocumentKind,
 	})
 }
-
 
 // GetForSeller 是端點 31／32 的授權讀取，一併帶出 latestJobId。
 func (r *DocumentRepository) GetForSeller(ctx context.Context, id, storeID int64) (domain.SellerDocumentItem, error) {
@@ -264,7 +259,6 @@ func (r *DocumentRepository) CountReceivedForSeller(ctx context.Context, in doma
 	})
 }
 
-
 // ListForAdmin 是端點 47（A12）的列表。StoreID 為 nil ＝ 全平台。
 func (r *DocumentRepository) ListForAdmin(ctx context.Context, in domain.AdminDocumentQuery) ([]domain.AdminDocumentItem, error) {
 	hasStore, storeID := optInt64(in.StoreID)
@@ -319,7 +313,6 @@ func (r *DocumentRepository) CountForAdmin(ctx context.Context, in domain.AdminD
 		DateTo:       to,
 	})
 }
-
 
 // GetViewForSeller 是端點 33（S08）。store_id 是述詞的一部分 ⇒ 越權與不存在同回 9340。
 func (r *OperationRepository) GetViewForSeller(ctx context.Context, id, storeID int64) (domain.OperationView, error) {
@@ -493,7 +486,6 @@ func (r *OperationRepository) ListPriorityViewsForAdmin(ctx context.Context, in 
 	return toOperationViews(views), nil
 }
 
-
 // GetForSeller 是端點 35／36 的授權讀取（經 invoice_issuers 解析 store_id）。
 func (r *ComplaintRepository) GetForSeller(ctx context.Context, id, storeID int64) (domain.Complaint, error) {
 	row, err := r.q(ctx).GetSellerInvoiceComplaintByID(ctx, gen.GetSellerInvoiceComplaintByIDParams{
@@ -596,7 +588,6 @@ func (r *ComplaintRepository) CountForAdmin(ctx context.Context, in domain.Admin
 	})
 }
 
-
 // GetForBuyer 是端點 12 的授權讀取。三段述詞全在 SQL 裡。
 func (r *CorrectionRequestRepository) GetForBuyer(ctx context.Context, id, buyerID int64, sourceRef string) (domain.CorrectionRequest, error) {
 	row, err := r.q(ctx).GetInvoiceCorrectionRequestForBuyer(ctx, gen.GetInvoiceCorrectionRequestForBuyerParams{
@@ -609,7 +600,6 @@ func (r *CorrectionRequestRepository) GetForBuyer(ctx context.Context, id, buyer
 	}
 	return toCorrectionRequest(row), nil
 }
-
 
 // GetByStoreID 經 invoice_issuers 解析 store_id。
 func (r *SellerTaxProfileRepository) GetByStoreID(ctx context.Context, storeID int64) (domain.SellerTaxProfile, error) {
@@ -656,7 +646,6 @@ func (r *SellerTaxProfileRepository) CountReviewsForAdmin(ctx context.Context, i
 		Keyword:            in.Keyword,
 	})
 }
-
 
 // GetByStoreID 經 invoice_issuers 解析 store_id。查無列 ⇒ 9330。
 func (r *ProviderAccountRepository) GetByStoreID(ctx context.Context, storeID int64, provider string) (domain.ProviderAccount, error) {
@@ -722,7 +711,6 @@ func (r *ProviderAccountRepository) CountForAdmin(ctx context.Context, in domain
 		Keyword:         in.Keyword,
 	})
 }
-
 
 func adminAuditLogParams(in domain.AdminAuditLogQuery) (hasActor bool, actorID int64, hasStore bool, storeID int64, hasDoc bool, docID int64, hasJob bool, jobID int64, hasFrom bool, from pgtype.Timestamptz, hasTo bool, to pgtype.Timestamptz) {
 	hasActor, actorID = optInt64(in.TargetActorAccountID)
@@ -802,7 +790,6 @@ func (r *AuditRepository) CountAdminAuditLogsForAdmin(ctx context.Context, in do
 		DateTo:                      to,
 	})
 }
-
 
 // OverviewRepository 服務兩支總覽端點的計數。
 //

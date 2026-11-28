@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	topupTransferFailed = "transfer_failed"
+	topupTransferFailed     = "transfer_failed"
 	topupCountedInNewAmount = "counted_in_new_amount"
 )
 

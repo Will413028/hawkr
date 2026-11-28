@@ -248,7 +248,6 @@ export function SellerMenuLoader({
 		>
 			{isError ? (
 				<>
-
 					<span role="alert" className="sr-only">
 						賣家選單載入失敗
 					</span>

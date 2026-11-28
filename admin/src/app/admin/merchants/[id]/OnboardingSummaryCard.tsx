@@ -11,7 +11,6 @@ import {
 	onboardingTaskPresentation,
 } from "./onboarding-summary";
 
-
 const SHELL = {
 	titleId: "onboarding-summary-title",
 	icon: "checklist",

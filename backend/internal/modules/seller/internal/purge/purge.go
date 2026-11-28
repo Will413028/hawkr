@@ -54,7 +54,7 @@ type Payment interface {
 
 // Service 執行個資清理。
 type Service struct {
-	d Deps
+	d     Deps
 	hooks hooks
 }
 

@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const correctionHoldLease = 60 * time.Second
 
 // OrderSnapshotReviser 是本 usecase 需要的 ORD 出向面。
@@ -32,10 +31,10 @@ type Correction struct {
 	documents   domain.DocumentRepository
 	adjustments domain.AdjustmentRepository
 	orders      OrderSnapshotReviser
-	audit domain.AuditRepository
-	log   *zap.Logger
-	now   func() time.Time
-	newID func() int64
+	audit       domain.AuditRepository
+	log         *zap.Logger
+	now         func() time.Time
+	newID       func() int64
 	maxAttempts int32
 }
 
@@ -244,7 +243,7 @@ func (u *Correction) reject(ctx context.Context, correctionID int64, reason stri
 }
 
 var (
-	errCorrectionStateDrift = errors.New("invoice: correction state drift (rows=0)")
+	errCorrectionStateDrift    = errors.New("invoice: correction state drift (rows=0)")
 	errCorrectionDocumentDrift = errors.New("invoice: correction document drift (rows=0)")
 )
 
@@ -565,10 +564,10 @@ func buildReissueDocument(
 		RecipientName:  revised.RecipientName,
 		RecipientTaxID: revised.RecipientTaxID,
 		RecipientEmail: revised.RecipientEmail,
-		CarrierID1:   revised.CarrierID1,
-		CarrierID2:   revised.CarrierID2,
-		CarrierType:  carrierType,
-		DonationCode: donationCode,
+		CarrierID1:     revised.CarrierID1,
+		CarrierID2:     revised.CarrierID2,
+		CarrierType:    carrierType,
+		DonationCode:   donationCode,
 
 		DocumentKind:    kind,
 		FulfillmentMode: orig.FulfillmentMode,
@@ -591,9 +590,9 @@ func buildReissueDocument(
 		ProviderRequestNo: domain.ProviderRequestNoForOrder(orderNo, orig.SnapshotVersion, nextSeq),
 
 		InvoiceDateTaipei: &invoiceDate,
-		TaxPeriodCode: taxPeriodFor(kind, invoiceDate),
+		TaxPeriodCode:     taxPeriodFor(kind, invoiceDate),
 
-		IssueNotBefore: now,
+		IssueNotBefore:      now,
 		PaidAt:              orig.PaidAt,
 		StatutoryDeadlineAt: deadline,
 		SourceSnapshot:      orig.SourceSnapshot,

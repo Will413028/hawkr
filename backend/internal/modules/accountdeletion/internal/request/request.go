@@ -99,7 +99,7 @@ func (s *Service) lockAccount(ctx context.Context, accountID int64) error {
 type snapshot struct {
 	deleted, seller bool
 	buyerID         int64
-	store *seller.Store
+	store           *seller.Store
 }
 
 func (s *Service) snapshot(ctx context.Context, accountID int64) (snapshot, error) {

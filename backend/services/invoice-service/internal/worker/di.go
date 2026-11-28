@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	outboxNameIssue  = "invoice_issue"
-	outboxNameOutbox = "invoice_outbox"
+	outboxNameIssue    = "invoice_issue"
+	outboxNameOutbox   = "invoice_outbox"
 	outboxNameDeadline = "invoice_deadline"
 )
 
@@ -91,10 +91,10 @@ func newSellerAccountResolver(c *seller.Client) SellerAccountResolver { return c
 type issueWorkerDeps struct {
 	fx.In
 
-	Ops  domain.OperationRepository
-	Docs domain.DocumentRepository
-	UC   *usecase.Issuance
-	Void *usecase.Voiding
+	Ops       domain.OperationRepository
+	Docs      domain.DocumentRepository
+	UC        *usecase.Issuance
+	Void      *usecase.Voiding
 	Allowance *usecase.Allowance
 	Cfg       *config.Config
 	Metrics   *Metrics
@@ -145,10 +145,10 @@ func outboxLeaseFor(cfg *config.Config) time.Duration {
 type deadlineWorkerDeps struct {
 	fx.In
 
-	Inbox domain.InboxRepository
-	UC    InboxOrderPaidReprocessor
-	Refund InboxRefundReprocessor
-	Overdue OverdueComplaintSweeper
+	Inbox     domain.InboxRepository
+	UC        InboxOrderPaidReprocessor
+	Refund    InboxRefundReprocessor
+	Overdue   OverdueComplaintSweeper
 	Statutory StatutoryDeadlineSweeper
 	Obs       *outbox.Metrics `name:"obs_deadline"`
 	Log       *zap.Logger

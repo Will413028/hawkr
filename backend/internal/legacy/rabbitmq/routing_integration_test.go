@@ -12,7 +12,6 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-
 func TestPublishedRoutesReachTopologyQueues(t *testing.T) {
 	doc := loadTopologyDoc(t)
 	rows := publishRoutes(t)

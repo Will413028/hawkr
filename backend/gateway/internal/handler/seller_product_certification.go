@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // SellerProductCertificationApplicationItem 是賣家看到的一筆認證申請。
 //
 // 時間與原因欄位用 *string：19 §9.1 的回應範例明寫 "reasonCode": null，而空字串與 null

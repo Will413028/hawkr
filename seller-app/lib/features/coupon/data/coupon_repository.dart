@@ -18,7 +18,6 @@ class CouponRepository {
 
   static const _basePath = '/api/v1/app/coupon_templates';
 
-
   /// GET /app/coupon_templates — 取得賣家優惠券模板列表
   Future<List<Coupon>> getSellerCoupons() async {
     try {
@@ -44,7 +43,6 @@ class CouponRepository {
       throw AppException.fromDioException(e);
     }
   }
-
 
   /// GET /app/coupon_templates/{template_id} — 取得優惠券模板詳情
   ///
@@ -78,7 +76,6 @@ class CouponRepository {
       throw AppException.fromDioException(e);
     }
   }
-
 
   /// POST /app/coupon_templates — 建立並發行優惠券
   ///
@@ -122,7 +119,6 @@ class CouponRepository {
     return AppException.fromDioException(e);
   }
 
-
   /// POST /app/coupon_templates/{id}/revoke — 撤銷優惠券模板
   ///
   /// [reason] 為可選參數，不傳則不附帶 reason 欄位。
@@ -152,7 +148,6 @@ class CouponRepository {
       throw AppException.fromDioException(e);
     }
   }
-
 
   /// Parse API response (CouponTemplateResponse) into [Coupon].
   ///

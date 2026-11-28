@@ -9,7 +9,6 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-
 var pubSchemaPath = regexp.MustCompile(`^\.\./\.\./([a-z]+)/db/pub\.sql$`)
 
 type sqlcConfig struct {

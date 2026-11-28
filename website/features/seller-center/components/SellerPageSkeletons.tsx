@@ -268,7 +268,6 @@ export function SellerInvoiceDocumentsSkeletonRows({ rows = 8 }: RowsProps) {
 	);
 }
 
-
 interface PostsSkeletonProps {
 	count?: number;
 	delegated?: boolean;

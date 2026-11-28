@@ -16,7 +16,7 @@ import (
 type tier int
 
 const (
-	tierExempt   tier = iota
+	tierExempt tier = iota
 	tierModerate
 	tierDefault
 )

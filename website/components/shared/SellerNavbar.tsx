@@ -347,7 +347,6 @@ function SellerAccountMenu({ setupIncomplete }: { setupIncomplete: boolean }) {
 						{sellerMenuItems.map((item) =>
 							setupIncomplete ? (
 								<li key={item.href}>
-
 									<button
 										type="button"
 										{...menu.menuItemProps}

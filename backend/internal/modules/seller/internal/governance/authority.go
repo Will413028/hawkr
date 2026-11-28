@@ -25,7 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 // Accounts 是登記來函時驗證被指名的帳號存在需要的 identity 公開 API（含已刪除的墓碑：帳號存在過，來函照樣要登記與回覆）。
 type Accounts interface {
 	Account(context.Context, int64) (identity.Account, error)

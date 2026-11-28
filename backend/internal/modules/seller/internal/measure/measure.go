@@ -52,7 +52,7 @@ type Deps struct {
 
 // Service 是措施的 use case。
 type Service struct {
-	d Deps
+	d     Deps
 	hooks requestHooks
 }
 

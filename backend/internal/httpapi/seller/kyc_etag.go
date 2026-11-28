@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 func kycAdminEtag(version, checkSeq int64) string {
 	return strconv.FormatInt(version, 10) + "." + strconv.FormatInt(checkSeq, 10)
 }

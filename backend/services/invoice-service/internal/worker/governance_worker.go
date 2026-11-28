@@ -9,7 +9,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-
 const (
 	govDailyHourUTC   = 16
 	govDailyMinuteUTC = 0

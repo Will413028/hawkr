@@ -100,7 +100,6 @@ String friendlyShipmentMessage(Object e) {
   return '操作失敗，請稍後再試';
 }
 
-
 const _shipmentCooldownDuration = Duration(seconds: 30);
 const _shipmentBackendStuckThreshold = 3;
 final Map<String, DateTime> _shipmentCreatedAt = {};
@@ -127,7 +126,6 @@ int shipmentCooldownRemainingSeconds(String orderNo) {
 void markShipmentCreated(String orderNo) {
   _shipmentCreatedAt[orderNo] = DateTime.now();
 }
-
 
 final Map<String, ({String odno, String validationNo})> _localOdnoOverrides =
     {};

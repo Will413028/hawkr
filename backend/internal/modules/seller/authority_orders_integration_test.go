@@ -19,7 +19,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-
 const (
 	authorityRegistrar = 31
 	authorityCompleter = 32

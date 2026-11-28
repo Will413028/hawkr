@@ -79,7 +79,6 @@ const cards = requireFromTest(
 const render = (component: unknown, props: Record<string, unknown>): string =>
 	renderToStaticMarkup(createElement(component, props));
 
-
 const COMPANY = KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS;
 
 function application(
@@ -156,7 +155,6 @@ const noop = () => {};
 
 /** 判斷「查詢是否超過期限」用的固定現在時間（早於 deadline）。 */
 const NOW = new Date("2026-10-11T04:31:00Z");
-
 
 const U = StoreActionUnavailableReason;
 const why = (reason: StoreActionUnavailableReason, message?: string) =>
@@ -303,7 +301,6 @@ test("重新查詢只讀 can_requery_registration：公司型審核中的申請�
 	);
 });
 
-
 /** 一份填到一半的退回草稿。 */
 function aDraft(): ReviewDraft {
 	return {
@@ -430,7 +427,6 @@ test("成功才清空草稿", async () => {
 	assert.equal(draftAfter(aDraft(), result), EMPTY_REVIEW_DRAFT);
 });
 
-
 test("退回欄位的文字窮舉 KYCField：每個非 UNSPECIFIED 的值都有文字，新增 enum 值時這裡會失敗", () => {
 	const fields = Object.values(KYCField).filter(
 		(v): v is KYCField => typeof v === "number",
@@ -464,7 +460,6 @@ test("文件類的欄位只有補充文件：申請上的文件與退回的問�
 	assert.equal(isDocumentField(KYCField.KYC_FIELD_BUSINESS_TAX_ID), false);
 	assert.equal(isDocumentField(KYCField.KYC_FIELD_UNSPECIFIED), false);
 });
-
 
 test("補充文件：初次 render 只列文件與「查看原圖」按鈕，不含任何 view_uri 的網址或 <img>（讀取才會留紀錄）", () => {
 	const app = businessApplication();
@@ -549,7 +544,6 @@ test("補充文件的 view_uri 不合法：該位置顯示「無法檢視」，�
 	assert.doesNotMatch(html, /gateway\.example\.com|<img/u);
 	assert.match(html, /無法檢視/u);
 });
-
 
 const STORE = create(StoreSchema, {
 	id: "100",
@@ -875,7 +869,6 @@ test("進行中的查詢依伺服器的期限退避輪詢：間隔隨已等待�
 	);
 });
 
-
 test("申請的讀取狀態：沒有摘要不發請求；not_found 是沒有申請；成功卻沒有申請是錯誤", () => {
 	assert.deepEqual(
 		kycApplicationOf(undefined, { error: null, data: undefined }),
@@ -921,7 +914,6 @@ test("評分卡：只顯示讀到且大於 0 的平均分；讀不到、沒有�
 	assert.equal(ratingText(undefined), undefined);
 	assert.equal(ratingText({ ratingAverage: Number.NaN }), undefined);
 });
-
 
 test("核准鈕上方的小字與核准成功的提示是同一句新文案，不再提 PayUni", async () => {
 	const copy = "核准後系統會建立收款帳戶，賣家再到金流商完成收款設定";
@@ -971,7 +963,6 @@ test("聯絡人姓名與手機顯示在基本資料卡；沒有值時照卡片�
 		"併進基本資料卡，沒有另外的卡片",
 	);
 });
-
 
 test("接線：核准與退回帶 etag；重新查詢走自己的方法；評分讀公開的 GetStore", async () => {
 	const { readFile } = await import("node:fs/promises");

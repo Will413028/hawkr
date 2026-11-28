@@ -9,7 +9,6 @@ import {
 } from "./receiptFraming";
 
 describe("receiptFraming（backend#3066 裁決 B）", () => {
-
 	it("RECEIPT 走收據措辭", () => {
 		expect(isReceiptKind("RECEIPT")).toBe(true);
 		expect(docNoun("RECEIPT")).toBe("收據");

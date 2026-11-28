@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
 
-
 import {
 	cleanup,
 	fireEvent,
@@ -183,8 +182,6 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		expect(screen.queryByRole("radiogroup")).toBeNull();
 	});
 
-
-
 	it("送出候選集與候選 id", async () => {
 		const onPreviewRfqPublication = vi.fn(
 			async () =>
@@ -235,7 +232,6 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		});
 		expect(screen.queryByText(/已發布|已送出|已通知/)).toBeNull();
 	});
-
 
 	it("顯示事實變更會使確認失效的警示", async () => {
 		await renderAtReconfirm(preview());

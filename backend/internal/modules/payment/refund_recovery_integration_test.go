@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 type duringTransfer struct {
 	ChargeProvider
 	during func()

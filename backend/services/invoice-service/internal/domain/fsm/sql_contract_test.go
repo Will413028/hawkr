@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-
 var sqlEdgesNotInFSM = map[string]string{
 	"FailOpenInvoiceOperationsForIssuer": "需要新的 J 代號（P14／P16 的批次 fail-open，16 個來源狀態），代號由設計書 §7.3.2 定版",
 }

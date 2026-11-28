@@ -20,7 +20,6 @@ import {
 } from "@/lib/policy-category";
 import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,
 	value: E,

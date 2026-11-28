@@ -31,7 +31,6 @@ type GrantAccountRoleParams struct {
 	Now       time.Time
 }
 
-// 授予角色；已經有這個角色時不變。
 func (q *Queries) GrantAccountRole(ctx context.Context, arg GrantAccountRoleParams) error {
 	_, err := q.db.Exec(ctx, grantAccountRole, arg.AccountID, arg.Role, arg.Now)
 	return err

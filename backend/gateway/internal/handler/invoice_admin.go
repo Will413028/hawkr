@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // GetInvoiceOverviewForAdmin ADM 發票營運總覽
 // @Summary      ADM 發票營運總覽
 // @Description  ADM 發票營運總覽（58 號設計書 §6.1 端點 37）
@@ -775,10 +774,10 @@ func (h *Holder) ListInvoiceJobsForAdmin(c *gin.Context) {
 		StoreId:        c.Query("store_id"),
 		OrderNo:        c.Query("order_no"),
 		OperationType:  c.Query("operation_type"),
-		UploadStatus: c.Query("upload_status"),
-		ManualReason: c.Query("manual_reason"),
-		Page:         page,
-		PageSize:     pageSize,
+		UploadStatus:   c.Query("upload_status"),
+		ManualReason:   c.Query("manual_reason"),
+		Page:           page,
+		PageSize:       pageSize,
 	})
 	if err != nil {
 		response.GrpcErr(c, "invoice", err)

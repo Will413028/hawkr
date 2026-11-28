@@ -28,7 +28,6 @@ type BatchDisplayRow struct {
 	Deleted       bool
 }
 
-// 回傳原始 nullable 個資與 Deleted；模組對已關閉 stint 隱藏個資。
 func (q *Queries) BatchDisplay(ctx context.Context, dollar_1 []int64) ([]BatchDisplayRow, error) {
 	rows, err := q.db.Query(ctx, batchDisplay, dollar_1)
 	if err != nil {
@@ -62,7 +61,6 @@ WHERE buyer_id = ANY($1::bigint[]) AND status <> 'CLOSED' AND pii_cleared_at IS 
 ORDER BY buyer_id
 `
 
-// 批次讀取未關閉且未清除個資的 profile。
 func (q *Queries) BatchProfiles(ctx context.Context, dollar_1 []int64) ([]BuyerBuyer, error) {
 	rows, err := q.db.Query(ctx, batchProfiles, dollar_1)
 	if err != nil {
@@ -107,7 +105,6 @@ WHERE account_id = $1
 ORDER BY buyer_id
 `
 
-// 列出帳號所有歷史與目前 stint。
 func (q *Queries) BuyerIDs(ctx context.Context, accountID int64) ([]int64, error) {
 	rows, err := q.db.Query(ctx, buyerIDs, accountID)
 	if err != nil {
@@ -134,7 +131,6 @@ FROM buyer.buyers
 WHERE buyer_id = $1
 `
 
-// 讀取指定 stint，包含已關閉資料。
 func (q *Queries) ByID(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, byID, buyerID)
 	var i BuyerBuyer
@@ -173,7 +169,6 @@ type CleanupBatchParams struct {
 	Limit     int32
 }
 
-// 按 buyer_id 鎖定已關閉超過保留期限的個資批次。
 func (q *Queries) CleanupBatch(ctx context.Context, arg CleanupBatchParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, cleanupBatch, arg.DeletedAt, arg.Limit)
 	if err != nil {
@@ -215,7 +210,6 @@ type ClearPIIParams struct {
 	PiiClearedAt *time.Time
 }
 
-// 只清理指定 closed stint 的個資。
 func (q *Queries) ClearPII(ctx context.Context, arg ClearPIIParams) error {
 	_, err := q.db.Exec(ctx, clearPII, arg.BuyerID, arg.PiiClearedAt)
 	return err
@@ -235,7 +229,6 @@ type CloseParams struct {
 	DeletedAt *time.Time
 }
 
-// 關閉 stint 並釋放 current 位置。
 func (q *Queries) Close(ctx context.Context, arg CloseParams) error {
 	_, err := q.db.Exec(ctx, close, arg.BuyerID, arg.DeletedAt)
 	return err
@@ -253,7 +246,6 @@ type CreateBuyerParams struct {
 	CreatedAt   time.Time
 }
 
-// 建帳時建立帳號唯一的買家；同一帳號再建立違反 buyers_account，視為不變量被破壞。
 func (q *Queries) CreateBuyer(ctx context.Context, arg CreateBuyerParams) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, createBuyer, arg.AccountID, arg.DisplayName, arg.CreatedAt)
 	var i BuyerBuyer
@@ -284,7 +276,6 @@ FROM buyer.buyers
 WHERE account_id = $1 AND status <> 'CLOSED'
 `
 
-// 讀取帳號目前存活的買家 stint。
 func (q *Queries) Current(ctx context.Context, accountID int64) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, current, accountID)
 	var i BuyerBuyer
@@ -340,7 +331,6 @@ type ListLiveAccountsRow struct {
 	AccountID int64
 }
 
-// 尚未關閉的買家（營運中與刪除中）的 (buyer_id, account_id)，依 buyer_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知公告）。
 func (q *Queries) ListLiveAccounts(ctx context.Context, arg ListLiveAccountsParams) ([]ListLiveAccountsRow, error) {
 	rows, err := q.db.Query(ctx, listLiveAccounts, arg.AfterBuyerID, arg.PageSize)
 	if err != nil {
@@ -368,8 +358,6 @@ WHERE buyer_id = $1
 FOR NO KEY UPDATE
 `
 
-// 鎖定指定 stint，序列化其業務寫入（FOR NO KEY UPDATE）：與別的業務寫入互斥，與 LockBuyerShared 的 FOR KEY SHARE 不互斥。
-// 只能搭配不改 buyers 的唯一鍵欄位（buyer_id、account_id）的更新使用；狀態轉換與刪帳用 LockBuyerForTransition。
 func (q *Queries) LockBuyer(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, lockBuyer, buyerID)
 	var i BuyerBuyer
@@ -401,7 +389,6 @@ WHERE buyer_id = $1
 FOR UPDATE
 `
 
-// 鎖定指定 stint 以做狀態轉換或刪除（FOR UPDATE）：與 LockBuyerShared 的 FOR KEY SHARE 互斥，其他模組的買家寫入守門因此要等它。
 func (q *Queries) LockBuyerForTransition(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, lockBuyerForTransition, buyerID)
 	var i BuyerBuyer
@@ -433,8 +420,6 @@ WHERE buyer_id = $1
 FOR KEY SHARE
 `
 
-// 以 FOR KEY SHARE 讀取指定 stint：與 BeginDeletion 等狀態轉換的 FOR UPDATE 互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
-// 其他模組的買家寫入用它與刪帳序列化；它只擋「買家列被刪或轉換狀態」，不擋業務欄位的更新。
 func (q *Queries) LockBuyerShared(ctx context.Context, buyerID int64) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, lockBuyerShared, buyerID)
 	var i BuyerBuyer
@@ -471,8 +456,6 @@ type LockBuyerSharedByAccountRow struct {
 	PiiClearedAt *time.Time
 }
 
-// 以 FOR KEY SHARE 讀取帳號唯一的買家列（一個帳號一生一個買家）：只與狀態轉換、刪帳的 FOR UPDATE 互斥（同 LockBuyerShared），不擋業務寫入的
-// FOR NO KEY UPDATE，持有到呼叫方的 transaction 結束。給只需要「買家在寫入完成前沒有關閉」的讀者（例如 notification 把通知寫給收件買家）。
 func (q *Queries) LockBuyerSharedByAccount(ctx context.Context, accountID int64) (LockBuyerSharedByAccountRow, error) {
 	row := q.db.QueryRow(ctx, lockBuyerSharedByAccount, accountID)
 	var i LockBuyerSharedByAccountRow
@@ -493,7 +476,6 @@ type PendingParams struct {
 	UpdatedAt time.Time
 }
 
-// 將買家標記為等待訂單結束。
 func (q *Queries) Pending(ctx context.Context, arg PendingParams) error {
 	_, err := q.db.Exec(ctx, pending, arg.BuyerID, arg.UpdatedAt)
 	return err
@@ -511,7 +493,6 @@ type PrincipalsRow struct {
 	AccountID int64
 }
 
-// 只解析存活的 stint；未回傳的 ID 由呼叫方列為 unresolved。
 func (q *Queries) Principals(ctx context.Context, dollar_1 []int64) ([]PrincipalsRow, error) {
 	rows, err := q.db.Query(ctx, principals, dollar_1)
 	if err != nil {
@@ -538,7 +519,6 @@ FROM buyer.buyers
 WHERE status <> 'CLOSED'
 `
 
-// 計算目前存活的買家數量。
 func (q *Queries) Stats(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, stats)
 	var count int64
@@ -564,7 +544,6 @@ type UpdateAvatarParams struct {
 	Version       int64
 }
 
-// 寫入已轉正的頭像 object key。
 func (q *Queries) UpdateAvatar(ctx context.Context, arg UpdateAvatarParams) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, updateAvatar,
 		arg.Avatar,
@@ -621,7 +600,6 @@ type UpdateProfileParams struct {
 	Version     int64
 }
 
-// 寫入已在列鎖內合併的 profile 欄位。
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (BuyerBuyer, error) {
 	row := q.db.QueryRow(ctx, updateProfile,
 		arg.BuyerID,

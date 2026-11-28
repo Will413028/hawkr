@@ -422,8 +422,7 @@ export default class DescriptionImageTool implements BlockTool {
 		this.releasePreview();
 		try {
 			this.previewUrl = URL.createObjectURL(file);
-		} catch {
-		}
+		} catch {}
 		this.updateView();
 		try {
 			const uploaded = await this.config.upload(file, (progress) => {

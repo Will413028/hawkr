@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../icons/app_icons.dart';
 
-
 /// 20 種水果對應的圖示與主題色（30% 透明度圓形底色）
 const _fruitData = <({IconData icon, Color color})>[
   (icon: AppIcons.ecoOutlined, color: Color(0x4DFF3B30)),
@@ -28,7 +27,6 @@ const _fruitData = <({IconData icon, Color color})>[
   (icon: AppIcons.yardOutlined, color: Color(0x4DFF375F)),
 ];
 
-
 /// 水果圓形容器的直徑（px）
 const _kCircleSize = 45.0;
 
@@ -46,7 +44,6 @@ const _kOverpull = 45.0;
 
 enum _RefreshPhase { idle, dragging, triggered, refreshing, canceling, closing }
 
-
 class FruitRefreshIndicator extends StatefulWidget {
   const FruitRefreshIndicator({
     super.key,
@@ -62,8 +59,7 @@ class FruitRefreshIndicator extends StatefulWidget {
 }
 
 class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
-        with
-        TickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _random = Random();
 
   IconData _currentFruit = _fruitData[0].icon;
@@ -71,7 +67,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
   Color _currentColor = _fruitData[0].color;
 
   _RefreshPhase _phase = _RefreshPhase.idle;
-
 
   late final AnimationController _pullAnim = AnimationController(vsync: this);
 
@@ -101,7 +96,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     _currentColor = pick.color;
   }
 
-
   /// 以 easeOutCubic 曲線在 400ms 內將下拉進度動畫至 [target]。
   /// 回傳 Future，可用 await 等待動畫完成。
   Future<void> _animatePullTo(double target) {
@@ -117,7 +111,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
 
     return _snapCtrl.forward();
   }
-
 
   /// 由 RefreshIndicator 在使用者放手且 progress ≥ 1.0 時觸發。
   /// 執行順序：切換到 refreshing 態 → 呼叫 onRefresh → 動畫收起 → 回到 idle
@@ -140,7 +133,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     if (mounted) setState(() => _phase = _RefreshPhase.idle);
   }
 
-
   /// 使用者在 progress < 1.0 時放手，水果以動畫回彈歸零。
   /// 只在 dragging 階段有效，防止其他階段誤觸。
   void _startCanceling() {
@@ -154,7 +146,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
       if (mounted) setState(() => _phase = _RefreshPhase.idle);
     });
   }
-
 
   /// 監聽滾動通知，將捲軸位移轉換為水果動畫進度。
   bool _handleScrollNotification(ScrollNotification n) {
@@ -177,7 +168,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
         _pullAnim.value = progress;
       }
 
-
       if (_phase == _RefreshPhase.idle && -pixels > 5) {
         setState(() {
           _phase = _RefreshPhase.dragging;
@@ -194,7 +184,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
 
     return false;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -234,10 +223,8 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     );
   }
 
-
   /// 根據當前下拉進度 [progress] 建構水果圓形圖示。
   Widget _buildFruit(double progress) {
-
     final maxProgress = 1.0 + _kOverpull / _kThreshold;
 
     final clampedProgress = progress.clamp(0.0, maxProgress);
@@ -249,7 +236,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     final opacity = clampedProgress.clamp(0.0, 1.0);
 
     final topPos = pulledPx / 2 - _kCircleSize / 2;
-
 
     return Positioned(
       top: topPos,

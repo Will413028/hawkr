@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // AdminProductCertificationSummary 是同類型現行有效那筆的精簡投影（currentApproved）。
 //
 // 首次申請時整個物件是 null（proto3 message 未設）——ADM 據此知道「核准這一筆不會換掉
@@ -283,7 +282,7 @@ func (h *Holder) reviewAdminCertification(
 		ReasonCode:      req.ReasonCode,
 		PublicReason:    req.PublicReason,
 		InternalNote:    req.InternalNote,
-		AccountId: accountID,
+		AccountId:       accountID,
 	})
 	respondAdminCertificationApplication(c, resp, err)
 }

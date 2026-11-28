@@ -229,10 +229,10 @@ func validateConfig(c *Config) error {
 }
 
 type builder struct {
-	m     *Model
-	errs  *errList
-	funcs map[string]*Func
-	decls map[string]VariantDecl
+	m      *Model
+	errs   *errList
+	funcs  map[string]*Func
+	decls  map[string]VariantDecl
 	broken map[string]bool
 }
 

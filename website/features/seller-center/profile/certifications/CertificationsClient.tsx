@@ -143,7 +143,6 @@ import { storeAddressInputError } from "@/lib/seller/store-form";
 import { PaymentAccountSection } from "./PaymentAccountSection";
 import { PlatformReviewSection } from "./PlatformReviewSection";
 
-
 /** 店家地址（寫到店家，不是 KYC 申請的欄位）。 */
 interface StoreAddressState {
 	countyCode: string;
@@ -215,7 +214,6 @@ const KYC_AGREEMENT_KINDS = [AgreementKind.KYC_PRIVACY_NOTICE] as const;
 
 const VERSION_CONFLICT_NOTICE = versionConflictNotice("申請資料");
 const STORE_VERSION_CONFLICT_NOTICE = versionConflictNotice("店家資料");
-
 
 export default function CertificationsClient() {
 	const defaults = useDefaultErrorText();
@@ -369,7 +367,6 @@ export default function CertificationsClient() {
 			router.replace("/seller-center/wallet");
 		}
 	}, [certified, hydrated, router]);
-
 
 	const draftRequest = React.useCallback(
 		(nextForm: KycForm, nextDocs: KycDocs) =>
@@ -558,8 +555,7 @@ export default function CertificationsClient() {
 					const fresh = await fetchMyKyc();
 					latestAppRef.current = fresh;
 					setMyKyc(fresh);
-				} catch {
-				}
+				} catch {}
 				return true;
 			}
 			case "conflict":
@@ -647,7 +643,6 @@ export default function CertificationsClient() {
 			setError(e instanceof Error ? e.message : "載入最新版本失敗");
 		}
 	}, [setMyKyc]);
-
 
 	const startDraft = React.useCallback(
 		async (sellerType: SellerType) => {
@@ -797,7 +792,6 @@ export default function CertificationsClient() {
 			companyDocuments: prev.companyDocuments.filter((_, i) => i !== idx),
 		}));
 	};
-
 
 	const localContactErrors = storeContactErrors(storeContact);
 	const contactErrors: StoreContactErrors =
@@ -1026,7 +1020,6 @@ export default function CertificationsClient() {
 		},
 		[],
 	);
-
 
 	if (!hydrated) {
 		return (
@@ -1393,7 +1386,6 @@ export default function CertificationsClient() {
 	);
 }
 
-
 function TypePicker({
 	value,
 	onChange,
@@ -1740,7 +1732,6 @@ function SectionDocuments({
 		</section>
 	);
 }
-
 
 function ContactEmailField({
 	contact,

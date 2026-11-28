@@ -20,7 +20,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-
 const (
 	checkoutCodeUnavailable   int32 = 4001
 	checkoutCodePriceChanged  int32 = 4091
@@ -144,7 +143,6 @@ func dataObj(t *testing.T, body map[string]any) map[string]any {
 	return d
 }
 
-
 func TestCheckoutPreview_4001_UnavailableItemsSurviveTheGrpcBoundary(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
 		preview: &orderpb.CheckoutPreviewResponse{
@@ -193,7 +191,6 @@ func TestCheckoutConfirm_4001_UnavailableItemsSurviveTheGrpcBoundary(t *testing.
 	}
 }
 
-
 func TestCheckoutConfirm_4091_PriceChangedDetailSurvives(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
 		confirm: &orderpb.CheckoutConfirmResponse{
@@ -228,7 +225,6 @@ func TestCheckoutConfirm_4091_PriceChangedDetailSurvives(t *testing.T) {
 	}
 }
 
-
 func TestCheckoutConfirm_4092_MessageCarriesOrderNoAndStaysHTTP200(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
 		confirm: &orderpb.CheckoutConfirmResponse{
@@ -246,7 +242,6 @@ func TestCheckoutConfirm_4092_MessageCarriesOrderNoAndStaysHTTP200(t *testing.T)
 	}
 }
 
-
 func TestCheckoutPreview_4001_WithoutItemsFallsToGrpcResultShape(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
 		preview: &orderpb.CheckoutPreviewResponse{
@@ -263,7 +258,6 @@ func TestCheckoutPreview_4001_WithoutItemsFallsToGrpcResultShape(t *testing.T) {
 		t.Errorf("GrpcResult 的非零分支不該帶 data（既有行為），得到 %v", body["data"])
 	}
 }
-
 
 func TestCheckoutPreview_SuccessUnchangedByCarrier(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
@@ -311,7 +305,6 @@ func TestCheckoutConfirm_SuccessUnchangedByCarrier(t *testing.T) {
 		t.Errorf("成功回應的 orderNos 被動到了：%v", d["orderNos"])
 	}
 }
-
 
 func bizcarrierCounterSum(t *testing.T, name string) float64 {
 	t.Helper()

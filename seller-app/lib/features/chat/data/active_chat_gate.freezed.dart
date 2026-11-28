@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ActiveChat {
 
- String? get peerId;// seller 側 = buyer/customer accountId
+ String? get peerId;// seller 側是 buyer/customer accountId。
  String? get conversationId;
 /// Create a copy of ActiveChat
 /// with the given fields replaced by the non-null parameter values.
@@ -212,7 +212,7 @@ class _ActiveChat implements ActiveChat {
   
 
 @override final  String? peerId;
-// seller 側 = buyer/customer accountId
+// seller 側是 buyer/customer accountId。
 @override final  String? conversationId;
 
 /// Create a copy of ActiveChat

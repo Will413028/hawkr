@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // ResendInvoiceNotification 是端點 32（賣家重新寄送）。
 func (s *InvoiceServer) ResendInvoiceNotification(
 	ctx context.Context, req *pb.ResendInvoiceNotificationRequest,
@@ -80,8 +79,8 @@ func (s *InvoiceServer) resendResponse(
 	return &pb.ResendInvoiceNotificationResponse{
 		Code: 0, Message: msgSuccess,
 		Data: &pb.ResendInvoiceNotificationData{
-			Resent: res.Resent,
-			SentAt: fmtTimeValue(res.SentAt),
+			Resent:   res.Resent,
+			SentAt:   fmtTimeValue(res.SentAt),
 			ToMasked: res.ToMasked,
 		},
 	}, nil

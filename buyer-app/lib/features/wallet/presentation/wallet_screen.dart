@@ -33,7 +33,6 @@ import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_skeleton_shimmer.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_placeholder.dart';
 
-
 class _SkeletonBar extends StatelessWidget {
   const _SkeletonBar({
     required this.width,
@@ -304,7 +303,6 @@ class _CouponSkeletonList extends StatelessWidget {
     );
   }
 }
-
 
 /// Wallet 入口：上方搜尋列、Tab（My wallet / My coupon）、底部導覽
 class WalletScreen extends ConsumerStatefulWidget {

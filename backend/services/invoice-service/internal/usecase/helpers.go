@@ -358,7 +358,6 @@ func truncateRunes(s string, n int) string {
 	return string(r[:n])
 }
 
-
 func taxPeriodFor(documentKind string, invoiceDate time.Time) string {
 	if documentKind == codemeta.InvoiceDocumentKindReceipt.Value {
 		return ""

@@ -49,11 +49,11 @@ type SecureChunkResult struct {
 }
 
 const (
-	sniffBytes     = 512
-	pdfContentType = "application/pdf"
-	secureObjectType = "application/octet-stream"
+	sniffBytes           = 512
+	pdfContentType       = "application/pdf"
+	secureObjectType     = "application/octet-stream"
 	secureBusyRetryAfter = 5 * time.Second
-	metaNextIndex = "next_index"
+	metaNextIndex        = "next_index"
 )
 
 var errTooLarge = errors.New("media：上傳超過大小上限")

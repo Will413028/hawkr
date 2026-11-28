@@ -9,7 +9,6 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/authority_order_pb";
 import { unknownText } from "@/lib/ui-text";
 
-
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,
 	value: E,

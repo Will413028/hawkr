@@ -47,8 +47,7 @@ export function markAppEntry(): void {
 	try {
 		if (store.getItem(ENTRY_INDEX_KEY) !== null) return;
 		store.setItem(ENTRY_INDEX_KEY, String(window.history.length));
-	} catch {
-	}
+	} catch {}
 }
 
 /** Records the route the app is on, keeping the one before it as `previous`. */
@@ -60,8 +59,7 @@ export function recordPathname(pathname: string): void {
 		if (current === pathname) return;
 		if (current) store.setItem(PREVIOUS_PATH_KEY, current);
 		store.setItem(CURRENT_PATH_KEY, pathname);
-	} catch {
-	}
+	} catch {}
 }
 
 export function isBouncePathname(pathname: string | null): boolean {

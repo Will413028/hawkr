@@ -157,7 +157,6 @@ export default function HomeCompactSearchExperience({
 						query.trim() ? "md:grid-cols-[1.05fr_0.95fr]" : ""
 					}`}
 				>
-
 					{query.trim() ? (
 						<div className="flex min-h-0 flex-col gap-3 border-hk-border-subtle p-4 max-md:border-b md:border-r">
 							<div className="flex items-baseline justify-between gap-2">
@@ -268,7 +267,6 @@ export default function HomeCompactSearchExperience({
 							)}
 						</div>
 					) : null}
-
 
 					<div className="flex min-h-0 flex-col gap-3 p-4">
 						{query.trim() ? (

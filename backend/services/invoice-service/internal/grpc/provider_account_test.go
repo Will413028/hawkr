@@ -20,7 +20,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 const (
 	pxStoreA    int64 = 2685914682
 	pxStoreB    int64 = 2632049831
@@ -156,7 +155,6 @@ func newProviderServer(exists bool, status string) (*InvoiceServer, *pxAccounts)
 	return NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil), accounts
 }
 
-
 // TestProviderWritesForeignAndMissingAreByteIdentical 是本檔最重要的一支。
 //
 // pxStoreB 是一家**真的存在**的店（測試常數表裡的賣家 B），但它沒有 issuer 列；
@@ -236,7 +234,6 @@ func TestAdminProviderWritesForeignAndMissingAreByteIdentical(t *testing.T) {
 	}
 }
 
-
 // TestPutCredentialsResponseNeverCarriesAppKey 掃**序列化後的 wire bytes**。
 //
 // 🔴 為什麼不是逐欄比對：proto 的 reserved 90 已經讓「加回 app_key 欄位」變成 buf build
@@ -291,7 +288,6 @@ func TestVerifyResponseNeverCarriesAppKey(t *testing.T) {
 		t.Fatalf("驗證回應的 wire bytes 洩漏 AppKey")
 	}
 }
-
 
 func TestProviderWritesRejectMalformedInput(t *testing.T) {
 	s, _ := newProviderServer(true, codemeta.InvoiceProviderAccountStatusActive.Value)

@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$OrderItem {
 
- String get name; String get price;// PayUni #758: 新欄位（成交單價 / 原價快照 / 折抵 / 實付）
+ String get name; String get price;// 成交單價、原價快照、折抵與實付金額。
  String get unitPrice; String get listPrice; String get shareDiscount; String get actualPayAmount; int get quantity;/// 商品圖 **objectKey**（49 §6.1 的 SSOT）。顯示 URL 一律交給
 /// [OptimizedNetworkImage] / [buildImageUrl] 這個唯一組裝入口，模型層不存 URL。
  String get imageKey; String get skuId; String get spuId;
@@ -223,7 +223,7 @@ class _OrderItem extends OrderItem {
 
 @override final  String name;
 @override final  String price;
-// PayUni #758: 新欄位（成交單價 / 原價快照 / 折抵 / 實付）
+// 成交單價、原價快照、折抵與實付金額。
 @override@JsonKey() final  String unitPrice;
 @override@JsonKey() final  String listPrice;
 @override@JsonKey() final  String shareDiscount;

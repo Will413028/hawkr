@@ -13,7 +13,6 @@ import (
 	"testing"
 )
 
-
 type wireAxis struct {
 	Tag      string
 	Type     string

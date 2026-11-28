@@ -40,7 +40,6 @@ function jsxOf(path: string): string {
 		.replace(/^\s*\/\/.*$/gmu, "");
 }
 
-
 test("四個 query 鍵逐字固定：tab / store_id / order_no / status", () => {
 	const url = new URL(
 		delegatedAnomalyUrl(ADM, {
@@ -93,7 +92,6 @@ test("值一律編碼，不得直接串進 query", () => {
 	);
 });
 
-
 test("訂單抽屜渲染平台異常處置的出口，且是 <a href> 不是按鈕", () => {
 	const text = source(PANEL);
 	assert.match(
@@ -133,7 +131,6 @@ test("按鈕字面不得承諾「建立」 —— 目的地沒有那個動作", 
 	);
 });
 
-
 test("訂單頁的固定告知文案逐字等於 §6.7", () => {
 	assert.ok(
 		jsxOf(LIST).includes(
@@ -142,7 +139,6 @@ test("訂單頁的固定告知文案逐字等於 §6.7", () => {
 		"文案被砍成「僅可查看訂單」⇒ 畫面上不再有任何線索說異常有出口",
 	);
 });
-
 
 test("訂單抽屜不得出現「通知賣家」CTA，也不得做成 disabled 的假鈕", () => {
 	assert.ok(
@@ -155,7 +151,6 @@ test("訂單抽屜不得出現「通知賣家」CTA，也不得做成 disabled �
 		].join(""),
 	);
 });
-
 
 test("jsxOf 真的剝掉了註解，也真的沒有把 JSX 文字一起剝掉", () => {
 	const raw = source(PANEL);

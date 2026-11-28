@@ -10,7 +10,6 @@ import (
 	"github.com/go-pdf/fpdf"
 )
 
-
 // ReceiptLayoutVersion 是收據版面的版本。改版面就改它。
 //
 // 它與 SelfIssueTermsVersion 是兩件事：後者是賣家簽的授權條款版本，這個是紙面長相。

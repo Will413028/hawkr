@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // CreateInvoiceComplaint 建立一件申訴（端點 13 ＝ K01）。
 func (s *InvoiceServer) CreateInvoiceComplaint(
 	ctx context.Context, req *pb.CreateInvoiceComplaintRequest,

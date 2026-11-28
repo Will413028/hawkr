@@ -43,11 +43,10 @@ type fixture struct {
 	storeFn      func(id int64) (seller.Store, error)
 	social       Social
 	realSocial   *social.Module
-	// catalog 只在 setupWithSocial 有值（商品的代行寫入）。
-	catalog *catalog.Module
-	media   *media.Fake
-	sellers *seller.Reader
-	nextID  int64
+	catalog      *catalog.Module
+	media        *media.Fake
+	sellers      *seller.Reader
+	nextID       int64
 }
 
 type noSchedules struct{}

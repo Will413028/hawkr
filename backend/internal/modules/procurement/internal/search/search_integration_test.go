@@ -48,20 +48,20 @@ func (j *jobs) CancelJob(context.Context, int64) (rivertype.JobState, bool, erro
 }
 
 type fakes struct {
-	t        *testing.T
-	d        *db.DB
-	pages    map[int]candidate.Page
-	pageErr  error
-	queries  []candidate.Query
-	closed   map[int64]struct{}
-	blocked  map[int64]struct{}
-	blockErr error
-	notLeaf  bool
-	leafErr error
-	onLeaf  func()
-	onPage  func()
+	t         *testing.T
+	d         *db.DB
+	pages     map[int]candidate.Page
+	pageErr   error
+	queries   []candidate.Query
+	closed    map[int64]struct{}
+	blocked   map[int64]struct{}
+	blockErr  error
+	notLeaf   bool
+	leafErr   error
+	onLeaf    func()
+	onPage    func()
 	notBefore time.Time
-	heldPIDs []int32
+	heldPIDs  []int32
 }
 
 func (f *fakes) noTx() {

@@ -62,7 +62,6 @@ type GetMessageForRelayRow struct {
 	ReceiverInactive bool
 }
 
-// relay 讀單則訊息與它的對話：不套可見性，Hidden、erased_at 與收件人是否已刪除讓呼叫端決定要不要送。
 func (q *Queries) GetMessageForRelay(ctx context.Context, id uuid.UUID) (GetMessageForRelayRow, error) {
 	row := q.db.QueryRow(ctx, getMessageForRelay, id)
 	var i GetMessageForRelayRow
@@ -86,7 +85,6 @@ func (q *Queries) GetMessageForRelay(ctx context.Context, id uuid.UUID) (GetMess
 }
 
 const insertMessage = `-- name: InsertMessage :one
-
 INSERT INTO im.messages (id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at, erased_at
@@ -105,8 +103,6 @@ type InsertMessageParams struct {
 	Now            time.Time
 }
 
-// 訊息列：寫入、讀取、抹除。
-// 呼叫端已持有 LockSendRequest 的鎖並做過重送判定，所以不會撞 (對話, 寄件方, request_id) 的唯一鍵；唯一鍵留作最後防線，撞到回錯誤（Internal）。
 func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (ImMessage, error) {
 	row := q.db.QueryRow(ctx, insertMessage,
 		arg.ID,
@@ -165,7 +161,6 @@ type ListInactivePartiesWithMessagesRow struct {
 	PartyID int64
 }
 
-// 抹除的保底掃描：已關閉的買家（buyer.pub_closed_buyers()）與已退場的店家（seller.pub_retired_stores()）中，仍有未抹除訊息的身分，依 (kind, party_id) 的 keyset 分頁，最多 max_rows 個；第一頁的游標是 (”, 0)。
 func (q *Queries) ListInactivePartiesWithMessages(ctx context.Context, arg ListInactivePartiesWithMessagesParams) ([]ListInactivePartiesWithMessagesRow, error) {
 	rows, err := q.db.Query(ctx, listInactivePartiesWithMessages, arg.AfterKind, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -216,7 +211,6 @@ type ListMessagesAfterRow struct {
 	Hidden         bool
 }
 
-// 斷線補洞：seq 大於 after_seq 的訊息，舊的在前。
 func (q *Queries) ListMessagesAfter(ctx context.Context, arg ListMessagesAfterParams) ([]ListMessagesAfterRow, error) {
 	rows, err := q.db.Query(ctx, listMessagesAfter, arg.ConversationID, arg.AfterSeq, arg.MaxRows)
 	if err != nil {
@@ -280,7 +274,6 @@ type ListMessagesBeforeRow struct {
 	Hidden         bool
 }
 
-// 以 seq 做 keyset（新的在前）；before_seq 為 0 表示從最新開始。隱藏的以 hidden 標出，內容由呼叫端換成墓碑。
 func (q *Queries) ListMessagesBefore(ctx context.Context, arg ListMessagesBeforeParams) ([]ListMessagesBeforeRow, error) {
 	rows, err := q.db.Query(ctx, listMessagesBefore, arg.ConversationID, arg.BeforeSeq, arg.MaxRows)
 	if err != nil {
@@ -332,7 +325,6 @@ type LockBuyerMessageBatchRow struct {
 	ImageAssetID *uuid.UUID
 }
 
-// 抹除的一批：依 id 升序鎖住這個買家身分寄出、還沒抹除的訊息（重跑時只剩沒抹的）。
 func (q *Queries) LockBuyerMessageBatch(ctx context.Context, arg LockBuyerMessageBatchParams) ([]LockBuyerMessageBatchRow, error) {
 	rows, err := q.db.Query(ctx, lockBuyerMessageBatch, arg.BuyerID, arg.MaxRows)
 	if err != nil {
@@ -364,7 +356,6 @@ type LockSendRequestParams struct {
 	RequestID  uuid.UUID
 }
 
-// 同一個 (買家, 店家, 寄件方, request_id) 的送出在這裡排隊（交易級 advisory lock，不鎖業務列，不在鎖序裡）：取得之後的 MessageByRequest 看得到前一個交易已提交的訊息。
 func (q *Queries) LockSendRequest(ctx context.Context, arg LockSendRequestParams) error {
 	_, err := q.db.Exec(ctx, lockSendRequest,
 		arg.BuyerID,
@@ -445,7 +436,6 @@ type MessageByRequestRow struct {
 	Hidden         bool
 }
 
-// 送出冪等的重送判定：這個對話、這一方、這個 request_id 第一次寫入的訊息；對話還不存在或沒有這個 request_id 時沒有列。隱藏的以 hidden 標出（同列表查詢的述詞），內容由呼叫端換成墓碑；不鎖列。
 func (q *Queries) MessageByRequest(ctx context.Context, arg MessageByRequestParams) (MessageByRequestRow, error) {
 	row := q.db.QueryRow(ctx, messageByRequest,
 		arg.BuyerID,
@@ -482,7 +472,6 @@ type MessagePartiesRow struct {
 	StoreID        int64
 }
 
-// 訊息所屬對話的雙方（歸屬）：不套可見性（隱藏、抹除的訊息照樣回），不鎖列。
 func (q *Queries) MessageParties(ctx context.Context, messageID uuid.UUID) (MessagePartiesRow, error) {
 	row := q.db.QueryRow(ctx, messageParties, messageID)
 	var i MessagePartiesRow
@@ -524,8 +513,6 @@ type MessagesForReportRow struct {
 	Hidden         bool
 }
 
-// 檢舉用的證據讀取：被檢舉的訊息與同一對話 seq 前後各 window 則，一句 SQL 保證同一時點；不鎖列。is_target 標出被檢舉的那則，授權（呼叫者是對話的一方）與
-// 「被檢舉的訊息已隱藏或已抹除」由呼叫端依回來的列判斷。隱藏的以 hidden 標出，內容由呼叫端換成墓碑。
 func (q *Queries) MessagesForReport(ctx context.Context, arg MessagesForReportParams) ([]MessagesForReportRow, error) {
 	rows, err := q.db.Query(ctx, messagesForReport, arg.MessageID, arg.Radius)
 	if err != nil {
@@ -572,7 +559,6 @@ type PartyInactiveParams struct {
 	PartyID int64
 }
 
-// 一方是否已關閉（買家）或已退場（店家）：不取鎖的讀取（G4 的提早檢查與在線狀態）。Send 的正確性由 transaction 內的 LockNotClosed、LockNotRetired 保證。
 func (q *Queries) PartyInactive(ctx context.Context, arg PartyInactiveParams) (bool, error) {
 	row := q.db.QueryRow(ctx, partyInactive, arg.Kind, arg.PartyID)
 	var inactive bool

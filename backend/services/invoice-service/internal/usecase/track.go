@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const numbersPerBooklet = 50
 
 // TrackScanner 是 INV.trk 需要的出站面。用窄介面讓測試不必架整個 amego client。

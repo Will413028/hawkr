@@ -62,7 +62,7 @@ type Deps struct {
 
 // Service 是寫入路徑的 use case。
 type Service struct {
-	d Deps
+	d        Deps
 	inactive func(ctx context.Context, kind model.PartyKind, id int64) (bool, error)
 }
 

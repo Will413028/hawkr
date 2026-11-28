@@ -11,7 +11,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 // OwnDocumentRoute 是賣家讀自己補充文件端點的 ServeMux 樣式。
 const OwnDocumentRoute = "GET /api/files/seller/kyc/{document}"
 

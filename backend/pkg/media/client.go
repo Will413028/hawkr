@@ -15,11 +15,11 @@ type AssetInfo struct {
 }
 
 const (
-	finalizeTimeout = 10 * time.Second
-	linkTimeout = 5 * time.Second
-	linkMaxAttempts = 3
+	finalizeTimeout  = 10 * time.Second
+	linkTimeout      = 5 * time.Second
+	linkMaxAttempts  = 3
 	linkRetryBackoff = 200 * time.Millisecond
-	releaseTimeout = 5 * time.Second
+	releaseTimeout   = 5 * time.Second
 )
 
 // FinalizeAndLink 將 staged token 轉換為正式資產，並建立 asset_reference（防止 GC 清除）。

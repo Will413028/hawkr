@@ -19,7 +19,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-
 var nextBuyer atomic.Int64
 
 func (f *fixture) reportBy(t *testing.T, storeID int64, category policy.Category) Report {

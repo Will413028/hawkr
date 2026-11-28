@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$SessionModel {
 
-// 帳號 ID，不透明的字串。
+// 帳號 ID 是不透明字串。
  String get userId; String? get nickname;
 /// Create a copy of SessionModel
 /// with the given fields replaced by the non-null parameter values.
@@ -211,7 +211,7 @@ class _SessionModel implements SessionModel {
   const _SessionModel({required this.userId, this.nickname});
   
 
-// 帳號 ID，不透明的字串。
+// 帳號 ID 是不透明字串。
 @override final  String userId;
 @override final  String? nickname;
 

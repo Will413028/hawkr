@@ -9,7 +9,6 @@ import (
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 )
 
-
 func denialSession() *accountpb.OperationSessionSummary {
 	return &accountpb.OperationSessionSummary{SessionId: "2701445588392017"}
 }

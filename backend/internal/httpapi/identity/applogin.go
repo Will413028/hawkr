@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 // AppVerifier 驗證一家 provider 的原生 SDK 簽發給 App 的 ID token；*identity.AppLogin 滿足它。
 type AppVerifier interface {
 	Provider() identity.Provider

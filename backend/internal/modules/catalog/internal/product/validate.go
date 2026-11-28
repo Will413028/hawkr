@@ -22,7 +22,7 @@ type prepared struct {
 	skus       []model.SkuInput
 	tags       []hashtag.Tag
 	lowStock   *int32
-	confirmed map[uuid.UUID]bool
+	confirmed  map[uuid.UUID]bool
 }
 
 func prepare(in model.ProductInput) (prepared, error) {

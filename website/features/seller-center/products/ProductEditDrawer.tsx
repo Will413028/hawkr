@@ -209,7 +209,6 @@ export default function ProductEditDrawer({
 	);
 }
 
-
 function ProductSummary({
 	draft,
 	busy,
@@ -249,7 +248,6 @@ function ProductSummary({
 		</div>
 	);
 }
-
 
 function QuickSkuFields({ form }: { form: ReturnType<typeof useProductForm> }) {
 	const skus = form.draft.skus ?? [];
@@ -297,7 +295,6 @@ function QuickSkuFields({ form }: { form: ReturnType<typeof useProductForm> }) {
 		</div>
 	);
 }
-
 
 /**
  * Wraps the editable area; when `locked` (商品上架中) the content is blurred and

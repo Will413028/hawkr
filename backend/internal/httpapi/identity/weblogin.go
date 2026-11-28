@@ -16,16 +16,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 const (
 	// AuthPathPrefix 是所有 web 登入路由的前綴。
 	AuthPathPrefix = "/api/auth/"
 
 	// LoginCookie 是 start 設的短效登入前 cookie（防 login CSRF）：值是登入流程的 binding，callback 比對它與暫存列的雜湊。
-	LoginCookie = "__Host-hk_login"
+	LoginCookie       = "__Host-hk_login"
 	loginCookieMaxAge = 10 * time.Minute
 
-	loginPagePath = "/login"
+	loginPagePath   = "/login"
 	providerTimeout = 20 * time.Second
 )
 

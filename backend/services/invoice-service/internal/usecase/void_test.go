@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type voidDocs struct {
 	domain.DocumentRepository
 	byID         map[int64]domain.Document
@@ -70,12 +69,12 @@ func (f *voidDocs) CancelBeforeIssue(_ context.Context, id int64, _, _ string, _
 
 type voidOps struct {
 	domain.OperationRepository
-	byID      map[int64]domain.Operation
-	byDoc     map[int64][]domain.Operation
-	claimOK   bool
-	failCalls int
-	waitCalls int
-	doneCalls int
+	byID             map[int64]domain.Operation
+	byDoc            map[int64][]domain.Operation
+	claimOK          bool
+	failCalls        int
+	waitCalls        int
+	doneCalls        int
 	recheckDoneCalls int
 	cancelCalls      []int64
 	promoted         []int64
@@ -84,7 +83,7 @@ type voidOps struct {
 	exhaustCalls     int
 	unresolved       []string
 	order            *[]string
-	gotProviderCode string
+	gotProviderCode  string
 }
 
 func (f *voidOps) GetByID(_ context.Context, id int64) (domain.Operation, error) {
@@ -350,7 +349,6 @@ func newVoidHarness(t *testing.T) *voidHarness {
 	return &voidHarness{uc: uc, adjs: adjs, docs: docs, ops: ops, corrs: corrs, prov: prov, outbox: outbox, calls: seq}
 }
 
-
 // 受理（f0501 回 code:0）⇒ operation 進 WAITING_CONFIRMATION，document **留在 VOIDING**。
 //
 // 🔴 受理不等於已作廢：f0501 回 0 之後 invoice_query 的 invoice_type 仍是 C0401，
@@ -464,7 +462,6 @@ func TestSubmitVoid_RejectedCancelsPendingReissue(t *testing.T) {
 		t.Errorf("REISSUE operation 沒被取消：%v", h.ops.cancelCalls)
 	}
 }
-
 
 // invoice_type 還是 C0401 ⇒ 還在 wait[] 佇列裡，這是**正常**的中間狀態。
 func TestConfirmVoid_StillPendingReschedules(t *testing.T) {
@@ -686,7 +683,6 @@ func TestConfirmVoid_WithinWindowKeepsWaiting(t *testing.T) {
 	}
 }
 
-
 // TestVoidAxis_AdvancesAdjustmentAlongsideOperation 守「作廢軸要推進 adjustment」。
 //
 // 🔴 這一段在 #3073 之前**整個不存在**，而症狀完全無聲：dev 上 12 筆 VOID adjustment
@@ -755,7 +751,6 @@ func TestVoidAxis_AdjustmentNoRowsIsNotAnError(t *testing.T) {
 		t.Fatal("claim 回 false —— rows=0 不該影響 operation 的搶佔結果")
 	}
 }
-
 
 // 作廢確認過（VOIDED）之後又被重開票取代（SUPERSEDED），而這個 operation 因為某種
 // 原因回到 recheck ⇒ MarkVoided 的 allowed-from 只有 VOIDING ⇒ rows=0。

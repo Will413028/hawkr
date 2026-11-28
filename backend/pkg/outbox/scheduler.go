@@ -17,7 +17,7 @@ type Scheduler struct {
 	hasInitialDelay bool
 	initialDelay    time.Duration
 	cancel          context.CancelFunc
-	done chan struct{}
+	done            chan struct{}
 }
 
 // Option configures optional Scheduler behavior beyond the required

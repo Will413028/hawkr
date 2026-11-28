@@ -86,7 +86,6 @@ func seedIssuer(ctx context.Context, t *testing.T, pool *pgxpool.Pool, refID int
 	return id
 }
 
-
 func TestIntegration_ProviderAccount_FingerprintUniquenessIsEnforcedByDB(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -157,7 +156,6 @@ func newAccount(id, issuerID int64, taxID, appKey string) domain.NewProviderAcco
 		HealthCheckNextAt: time.Now().UTC(),
 	}
 }
-
 
 func TestIntegration_ProviderAccount_RotationKeepsCurrentCredentialUsable(t *testing.T) {
 	ctx := context.Background()
@@ -248,7 +246,6 @@ func TestIntegration_ProviderAccount_RotationKeepsCurrentCredentialUsable(t *tes
 	}
 }
 
-
 func TestIntegration_ProviderAccount_ClaimDoesNotTouchLastHealthCheckedAt(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -309,7 +306,6 @@ func TestIntegration_ProviderAccount_ClaimDoesNotTouchLastHealthCheckedAt(t *tes
 		t.Fatal("RecordHealthCheckResult 之後 last_health_checked_at 仍為 NULL")
 	}
 }
-
 
 func TestIntegration_ProviderAccount_CredentialTimestampMovesOnlyWithCredential(t *testing.T) {
 	ctx := context.Background()
@@ -390,7 +386,6 @@ func TestIntegration_ProviderAccount_CredentialTimestampMovesOnlyWithCredential(
 	}
 }
 
-
 func TestIntegration_Outbox_HonoursCallerTransaction(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -434,7 +429,6 @@ func TestIntegration_Outbox_HonoursCallerTransaction(t *testing.T) {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM invoice_outbox_events WHERE routing_key=$1`, routingKey)
 	})
 }
-
 
 func TestIntegration_Inbox_DedupesOnBothUniqueKeysWithoutAbortingTx(t *testing.T) {
 	ctx := context.Background()
@@ -486,7 +480,6 @@ func TestIntegration_Inbox_DedupesOnBothUniqueKeysWithoutAbortingTx(t *testing.T
 		t.Fatalf("%v", err)
 	}
 }
-
 
 func TestIntegration_Inbox_ReturnedIDCanAdvanceRowToProcessed(t *testing.T) {
 	ctx := context.Background()
@@ -545,7 +538,6 @@ func TestIntegration_Inbox_ReturnedIDCanAdvanceRowToProcessed(t *testing.T) {
 		}
 	}
 }
-
 
 func TestIntegration_BusinessDay_NeverPushedReturnsNil(t *testing.T) {
 	ctx := context.Background()

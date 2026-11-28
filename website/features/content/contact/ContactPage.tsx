@@ -150,8 +150,7 @@ export default function ContactPage() {
 					body: formData,
 					mode: "no-cors",
 				});
-			} catch {
-			}
+			} catch {}
 
 			setSubmitted(true);
 			setContact({ name: "", email: "", phone: "", subject: "", message: "" });
@@ -171,7 +170,6 @@ export default function ContactPage() {
 					<h1 className="sr-only">聯絡我們</h1>
 
 					<div className="mx-auto grid w-full max-w-[1040px] grid-cols-1 items-start gap-[var(--hkui-space-10)] px-[var(--hkui-space-5)] py-[var(--hkui-space-4)] sm:px-[var(--hkui-space-6)] sm:py-[var(--hkui-space-6)] lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-[var(--hkui-space-8)] lg:px-[var(--hkui-space-8)] lg:py-0">
-
 						<div className="flex flex-col gap-[var(--hkui-space-6)] lg:pt-[var(--hkui-space-4)]">
 							<div className="flex flex-col gap-[var(--hkui-space-3)]">
 								<span className="text-[length:var(--text-sm)] font-bold uppercase tracking-[4px] text-[var(--color-primary)]">
@@ -223,7 +221,6 @@ export default function ContactPage() {
 								))}
 							</ul>
 						</div>
-
 
 						<form
 							id="contact-form"
@@ -306,7 +303,6 @@ export default function ContactPage() {
 					</div>
 				</div>
 			</section>
-
 
 			{submitted && (
 				<div

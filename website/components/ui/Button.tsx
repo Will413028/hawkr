@@ -143,7 +143,6 @@ export function ButtonLoadingContent({
 			aria-atomic={announce ? "true" : undefined}
 		>
 			<span className="inline-flex shrink-0" aria-hidden="true">
-
 				{indicator ?? (
 					<BrandLogoLoader
 						size={buttonLoadingIndicatorSize[size]}

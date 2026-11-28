@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 // AuthorityOrderKind 是來函要平台做的事；值與 DB 的 authority_orders_kind_check、契約的 AuthorityOrderKind 一致。
 type AuthorityOrderKind string
 

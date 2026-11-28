@@ -23,25 +23,25 @@ import (
 )
 
 type dashSources struct {
-	sales       []SalesStats
-	salesErr    error
-	salesHangs  bool
-	salesWindow []SalesWindow
-	salesStore  int64
-	counts      OrderStatusCounts
-	countsErr   error
-	countsHangs bool
+	sales           []SalesStats
+	salesErr        error
+	salesHangs      bool
+	salesWindow     []SalesWindow
+	salesStore      int64
+	counts          OrderStatusCounts
+	countsErr       error
+	countsHangs     bool
 	followers       buyer.SubscriberStats
 	followersErr    error
 	followersHangs  bool
 	followerWindows []buyer.TimeWindow
 	followerStore   int64
 	followerCalls   int
-	viewsCurrent int64
-	viewsPrev    int64
-	viewsErr     error
-	viewsHangs   bool
-	viewRanges   [][2]time.Time
+	viewsCurrent    int64
+	viewsPrev       int64
+	viewsErr        error
+	viewsHangs      bool
+	viewRanges      [][2]time.Time
 }
 
 func hang(ctx context.Context) error {

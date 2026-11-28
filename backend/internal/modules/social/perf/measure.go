@@ -88,12 +88,12 @@ func loadQueries(dir string) (map[string]namedQuery, error) {
 }
 
 type scenario struct {
-	label string
-	query string
-	build func() (string, []any)
-	anon     func() (string, []any)
-	keyset   bool
-	rollback bool
+	label        string
+	query        string
+	build        func() (string, []any)
+	anon         func() (string, []any)
+	keyset       bool
+	rollback     bool
 	exposureOnce bool
 }
 

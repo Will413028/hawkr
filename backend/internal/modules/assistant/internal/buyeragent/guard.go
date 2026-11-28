@@ -25,9 +25,9 @@ const (
 )
 
 const (
-	noteNoPackages = "no_packages_in_transit"
+	noteNoPackages              = "no_packages_in_transit"
 	noteSomePackagesUnavailable = "some_packages_unavailable"
-	noteMorePackagesNotShown = "more_packages_not_shown"
+	noteMorePackagesNotShown    = "more_packages_not_shown"
 )
 
 type toolError struct {

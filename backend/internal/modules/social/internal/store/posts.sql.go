@@ -25,7 +25,6 @@ type BumpPostVersionParams struct {
 	ExpectedVersion int64
 }
 
-// 只遞增版本（排程與取消排程改變貼文的狀態組合，舊的 etag 隨之失效）。版本不符回 0 列。
 func (q *Queries) BumpPostVersion(ctx context.Context, arg BumpPostVersionParams) (SocialPost, error) {
 	row := q.db.QueryRow(ctx, bumpPostVersion, arg.Now, arg.ID, arg.ExpectedVersion)
 	var i SocialPost
@@ -59,7 +58,6 @@ type BumpPostVersionsParams struct {
 	Ids []uuid.UUID
 }
 
-// 系統取消排程時遞增這些貼文的版本（不比對版本；呼叫方已鎖貼文列）。已軟刪或不存在的不動。
 func (q *Queries) BumpPostVersions(ctx context.Context, arg BumpPostVersionsParams) error {
 	_, err := q.db.Exec(ctx, bumpPostVersions, arg.Now, arg.Ids)
 	return err
@@ -74,7 +72,6 @@ type CountStorePostsByStatusRow struct {
 	Posts  int64
 }
 
-// 店家的貼文依狀態的篇數（不含已刪除）；沒有貼文的狀態沒有列，呼叫方補 0。
 func (q *Queries) CountStorePostsByStatus(ctx context.Context, storeID int64) ([]CountStorePostsByStatusRow, error) {
 	rows, err := q.db.Query(ctx, countStorePostsByStatus, storeID)
 	if err != nil {
@@ -99,7 +96,6 @@ const deletePostHashtags = `-- name: DeletePostHashtags :exec
 DELETE FROM social.post_hashtags WHERE post_id = $1
 `
 
-// 整批替換貼文的標籤（值的集合）：先刪再寫（兩個語句，同一個 transaction）。
 func (q *Queries) DeletePostHashtags(ctx context.Context, postID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deletePostHashtags, postID)
 	return err
@@ -117,7 +113,6 @@ type GetPostRow struct {
 	SocialPostStat SocialPostStat
 }
 
-// 任何狀態、沒有刪除的貼文與它的計數（店主與模組內部用；公開讀取走 GetPublicPost）。
 func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error) {
 	row := q.db.QueryRow(ctx, getPost, id)
 	var i GetPostRow
@@ -146,7 +141,6 @@ func (q *Queries) GetPost(ctx context.Context, id uuid.UUID) (GetPostRow, error)
 }
 
 const insertPost = `-- name: InsertPost :one
-
 INSERT INTO social.posts (id, store_id, body, image_key, image_asset_id, product_id, status, published_at, created_at, updated_at, request_id, request_hash)
 VALUES (
     $1, $2, $3, $4, $5, $6,
@@ -170,9 +164,6 @@ type InsertPostParams struct {
 	RequestHash  []byte
 }
 
-// 貼文的寫入與店主的讀取。帶「公開可讀」規則的讀取（單篇、動態牆、店家頁、標籤、熱門、建議）是 go-jet 建的，在 internal/reads，規則在
-// internal/visibility。
-// 同一家店的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一篇）。
 func (q *Queries) InsertPost(ctx context.Context, arg InsertPostParams) (SocialPost, error) {
 	row := q.db.QueryRow(ctx, insertPost,
 		arg.ID,
@@ -252,7 +243,6 @@ type ListAdminPostsRow struct {
 	SocialPostStat SocialPostStat
 }
 
-// 後台看貼文（不含草稿與刪除）：最新建立的在前。taken_down 為真只列有內容下架複本的貼文，為假不篩選。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListAdminPosts(ctx context.Context, arg ListAdminPostsParams) ([]ListAdminPostsRow, error) {
 	rows, err := q.db.Query(ctx, listAdminPosts,
 		arg.TakenDown,
@@ -361,7 +351,6 @@ type ListOwnPostsRow struct {
 	SocialPostStat SocialPostStat
 }
 
-// 店主看自己的貼文（含草稿與下架，不含刪除）：最新建立的在前。status 空字串不篩選。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListOwnPosts(ctx context.Context, arg ListOwnPostsParams) ([]ListOwnPostsRow, error) {
 	rows, err := q.db.Query(ctx, listOwnPosts,
 		arg.StoreID,
@@ -412,7 +401,6 @@ const lockPost = `-- name: LockPost :one
 SELECT id, store_id, body, image_key, image_asset_id, product_id, status, published_at, version, created_at, updated_at, deleted_at, request_id, request_hash FROM social.posts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
 `
 
-// 鎖住貼文並回傳目前的狀態與圖（換圖、刪除與狀態轉移要依它判斷）；已刪除的貼文不回。
 func (q *Queries) LockPost(ctx context.Context, id uuid.UUID) (SocialPost, error) {
 	row := q.db.QueryRow(ctx, lockPost, id)
 	var i SocialPost
@@ -444,7 +432,6 @@ type PostByRequestParams struct {
 	RequestID *uuid.UUID
 }
 
-// 冪等重送的查詢：範圍是 (店家, request_id)；含已刪除的貼文（request_id 仍占著）。
 func (q *Queries) PostByRequest(ctx context.Context, arg PostByRequestParams) (SocialPost, error) {
 	row := q.db.QueryRow(ctx, postByRequest, arg.StoreID, arg.RequestID)
 	var i SocialPost
@@ -484,8 +471,6 @@ type SetPostStatusParams struct {
 	ExpectedVersion int64
 }
 
-// published_at 固定在第一次發布：轉成 PUBLISHED 時只在它還是 NULL 時設成現在，下架再發布沿用原值（動態牆的順序不能靠下架再發布來洗）；
-// 其他轉移不動它。已經是 PUBLISHED 時再發布是 Go 端的 no-op，不會呼叫這支。
 func (q *Queries) SetPostStatus(ctx context.Context, arg SetPostStatusParams) (SocialPost, error) {
 	row := q.db.QueryRow(ctx, setPostStatus,
 		arg.Status,
@@ -525,7 +510,6 @@ type SoftDeletePostParams struct {
 	ExpectedVersion int64
 }
 
-// 軟刪；已經刪除的 0 列（呼叫方不做副作用）。expected_version 為 0 表示不檢查版本。
 func (q *Queries) SoftDeletePost(ctx context.Context, arg SoftDeletePostParams) (int64, error) {
 	result, err := q.db.Exec(ctx, softDeletePost, arg.Now, arg.ID, arg.ExpectedVersion)
 	if err != nil {
@@ -557,7 +541,6 @@ type UpdatePostParams struct {
 	ExpectedVersion int64
 }
 
-// 版本不符回 0 列。圖：換新（new_image_key、new_image_asset_id 有值）、清掉（clear_image）或沿用。
 func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (SocialPost, error) {
 	row := q.db.QueryRow(ctx, updatePost,
 		arg.Body,

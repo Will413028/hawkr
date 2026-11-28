@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 type issuanceFixture struct {
 	uc       *AdminIssuance
 	docs     *fakeDocRepo

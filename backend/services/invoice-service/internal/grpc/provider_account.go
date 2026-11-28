@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 // PutSellerProviderCredentials 是端點 24（憑證寫入，write-only）。
 func (s *InvoiceServer) PutSellerProviderCredentials(
 	ctx context.Context, req *pb.PutSellerProviderCredentialsRequest,

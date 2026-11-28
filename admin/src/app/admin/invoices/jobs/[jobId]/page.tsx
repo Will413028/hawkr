@@ -50,7 +50,6 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 /**
  * 這一頁六個對話框的識別。
  *
@@ -696,7 +695,6 @@ export default function InvoiceJobDetailPage() {
 											<span className="invoice-code">{unlock?.unlockId}</span>
 										</Field>
 										<Field label="狀態">
-
 											{MANUAL_UNLOCK_STATUS_LABEL[unlock?.status ?? ""] ??
 												unlock?.status ??
 												"—"}
@@ -727,7 +725,6 @@ export default function InvoiceJobDetailPage() {
 										) : null}
 										{unlock?.cancelEvidenceObjectKey ? (
 											<Field label="證據檔案">
-
 												<a
 													href={`/api/v1${JOBS_ENDPOINT}/${encodeURIComponent(jobId)}/manual_unlocks/${encodeURIComponent(unlock.unlockId)}/evidence/content?disposition=inline`}
 													target="_blank"

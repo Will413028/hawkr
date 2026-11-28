@@ -5,7 +5,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-
 var amegoOutcomes = []string{
 	outcomeOK,
 	outcomeBizError,

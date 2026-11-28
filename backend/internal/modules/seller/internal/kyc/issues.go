@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 func issueField(i int, name string) string { return fmt.Sprintf("Issues[%d].%s", i, name) }
 
 func validateIssues(in []model.KYCIssue) ([]model.KYCIssue, error) {

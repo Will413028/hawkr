@@ -178,7 +178,6 @@ class _SellerQuoteFormBody extends HookConsumerWidget {
   }
 }
 
-
 class _NoticeBanner extends StatelessWidget {
   const _NoticeBanner({
     required this.notice,
@@ -236,7 +235,6 @@ class _NoticeBanner extends StatelessWidget {
     );
   }
 }
-
 
 class _PublicationContextCard extends StatelessWidget {
   const _PublicationContextCard({required this.payload});
@@ -303,7 +301,6 @@ class _BuyerNoteBlock extends StatelessWidget {
     );
   }
 }
-
 
 class _ResponseTypeCard extends StatelessWidget {
   const _ResponseTypeCard({
@@ -384,7 +381,6 @@ class _RadioTile extends StatelessWidget {
   }
 }
 
-
 class _SpecNoteCard extends StatelessWidget {
   const _SpecNoteCard({required this.value, required this.onChanged});
 
@@ -416,7 +412,6 @@ class _SpecNoteCard extends StatelessWidget {
     );
   }
 }
-
 
 typedef _QuoteEdit =
     void Function(SellerQuotePayload Function(SellerQuotePayload));
@@ -490,7 +485,6 @@ class _QuantityCard extends StatelessWidget {
     );
   }
 }
-
 
 class _AmountCard extends StatelessWidget {
   const _AmountCard({
@@ -590,7 +584,6 @@ class _AmountCard extends StatelessWidget {
   }
 }
 
-
 class _ScheduleCard extends StatelessWidget {
   const _ScheduleCard({
     required this.quote,
@@ -638,7 +631,6 @@ class _ScheduleCard extends StatelessWidget {
   }
 }
 
-
 class _NotesCard extends StatelessWidget {
   const _NotesCard({required this.quote, required this.onChanged});
 
@@ -673,7 +665,6 @@ class _NotesCard extends StatelessWidget {
     );
   }
 }
-
 
 class _ActionBar extends StatelessWidget {
   const _ActionBar({required this.state, required this.notifier});
@@ -764,7 +755,6 @@ class _ActionBar extends StatelessWidget {
     if (agreed == true) await onConfirm();
   }
 }
-
 
 class _QuoteTextField extends HookWidget {
   const _QuoteTextField({

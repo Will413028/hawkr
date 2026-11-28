@@ -704,7 +704,6 @@ export default function DelegatedProductCreatePage() {
 					操作行為仍為 ADM；所有寫入將綁定本次 Operation Session
 				</span>
 				<span className="adm-product-edit__bar-actions">
-
 					{canPublish ? null : (
 						<span className="adm-product-edit__bar-note">
 							本次工作階段沒有「商品上架」授權，只能建立未上架的商品；要讓買家看到，請由賣家自行上架。

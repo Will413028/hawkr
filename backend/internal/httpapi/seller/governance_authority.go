@@ -14,7 +14,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 var (
 	createAuthorityOrderPaths = rpc.FieldPaths{
 		"Agency": "agency", "DocumentNo": "document_no", "ReceivedAt": "receive_time", "Kind": "kind", "Summary": "summary", "Targets": "targets",

@@ -52,8 +52,7 @@ class PageScreen extends ConsumerStatefulWidget {
 class _PageScreenState extends ConsumerState<PageScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
-  int _lastHandledTabIndex =
-      1;
+  int _lastHandledTabIndex = 1;
   final _shopTabKey = GlobalKey<PageShopTabState>();
   static const Color _pageBackgroundColor = AppColors.bgPrimary;
 
@@ -87,11 +86,7 @@ class _PageScreenState extends ConsumerState<PageScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tabController = TabController(
-      length: 3,
-      vsync: this,
-      initialIndex: 1,
-    );
+    _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
     _tabController.addListener(_handleTabChanged);
     _refreshStore();
   }

@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 // OnAccountDeleted 訂閱 identity.AccountDeleted：清除帳號的全部受眾。
 func (s *Service) OnAccountDeleted(ctx context.Context, e identity.AccountDeleted) error {
 	return s.enqueue(ctx, RecipientArgs{AccountID: e.AccountID})

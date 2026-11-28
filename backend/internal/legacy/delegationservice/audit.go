@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 )
 
-
 func toIntentInput(m *pb.RecordAuditIntentRequest) (delegation.AuditIntentInput, bool) {
 	sessionID, ok := parseID(m.GetSessionId())
 	if !ok {

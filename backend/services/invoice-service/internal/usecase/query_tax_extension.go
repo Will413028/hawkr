@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 // TaxExtensionRequest 是一筆尚未被裁決的展延申請。
 type TaxExtensionRequest struct {
 	RequestedAt time.Time

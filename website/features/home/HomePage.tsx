@@ -92,7 +92,6 @@ function HomeContent({ initialSnapshot }: HomeContentProps) {
 
 	return (
 		<>
-
 			<span data-hk-initial-content-ready="home" hidden />
 			<HomeCompactCategoryNav />
 			<HomeCompactMarketStage
@@ -162,7 +161,6 @@ export default function HomePage({ snapshot }: HomePageProps) {
 		<div
 			className={`hkh-page home-page ${zenMaruGothic.variable} ${openhuninn.variable}`}
 		>
-
 			<h1 className="sr-only">Hawkr — 在地小農與職人的生鮮市集</h1>
 
 			<HomeMemberMobileSearch />

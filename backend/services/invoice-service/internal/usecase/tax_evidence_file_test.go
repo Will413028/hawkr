@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type taxEvidenceIssuers struct {
 	domain.IssuerRepository
 	issuerByStore map[int64]int64
@@ -47,7 +46,7 @@ type taxEvidenceAudit struct {
 	domain.AuditRepository
 	entries []domain.NewAdminAuditLogEntry
 	err     error
-	order *[]string
+	order   *[]string
 }
 
 func (f *taxEvidenceAudit) AppendAdminAuditLog(_ context.Context, in domain.NewAdminAuditLogEntry) (int64, error) {
@@ -62,7 +61,7 @@ func (f *taxEvidenceAudit) AppendAdminAuditLog(_ context.Context, in domain.NewA
 }
 
 type taxEvidenceMedia struct {
-	order *[]string
+	order   *[]string
 	allowed map[string]bool
 	calls   []string
 	err     error

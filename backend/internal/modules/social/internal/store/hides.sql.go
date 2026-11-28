@@ -16,7 +16,6 @@ const availableLinkPosts = `-- name: AvailableLinkPosts :many
 SELECT id FROM social.posts WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL
 `
 
-// 一批貼文裡賣家此刻點得進去的：沒有軟刪就算（下架不擋，賣家中心讀自己的貼文看得到下架的）；措施快照的連結只對這些顯示（A7-D29）。唯讀，不鎖。
 func (q *Queries) AvailableLinkPosts(ctx context.Context, postIds []uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, availableLinkPosts, postIds)
 	if err != nil {
@@ -52,7 +51,6 @@ type GetCommentSnapshotRow struct {
 	ExistsNow  bool
 }
 
-// 給 moderation 凍結檢舉當下的留言內容（唯讀，不鎖）；body 在作者刪帳清除後是 NULL。
 func (q *Queries) GetCommentSnapshot(ctx context.Context, id uuid.UUID) (GetCommentSnapshotRow, error) {
 	row := q.db.QueryRow(ctx, getCommentSnapshot, id)
 	var i GetCommentSnapshotRow
@@ -82,7 +80,6 @@ type GetForumEntrySnapshotRow struct {
 	ExistsNow  bool
 }
 
-// 給 moderation 凍結檢舉當下的討論區留言內容（唯讀，不鎖）。
 func (q *Queries) GetForumEntrySnapshot(ctx context.Context, id uuid.UUID) (GetForumEntrySnapshotRow, error) {
 	row := q.db.QueryRow(ctx, getForumEntrySnapshot, id)
 	var i GetForumEntrySnapshotRow
@@ -111,7 +108,6 @@ type GetPostSnapshotRow struct {
 	ExistsNow    bool
 }
 
-// 給 moderation 凍結檢舉當下的貼文內容：本文與圖片參照（唯讀，不鎖）。
 func (q *Queries) GetPostSnapshot(ctx context.Context, id uuid.UUID) (GetPostSnapshotRow, error) {
 	row := q.db.QueryRow(ctx, getPostSnapshot, id)
 	var i GetPostSnapshotRow
@@ -148,7 +144,6 @@ func (q *Queries) HasActiveForumEntryHide(ctx context.Context, forumEntryID *uui
 }
 
 const insertCommentHide = `-- name: InsertCommentHide :one
-
 INSERT INTO social.hides (id, comment_id, reason_category, reason_text, source_ref, admin_id, hidden_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (comment_id) WHERE restored_at IS NULL AND comment_id IS NOT NULL
@@ -166,8 +161,6 @@ type InsertCommentHideParams struct {
 	Now            time.Time
 }
 
-// 買家寫的留言與討論區留言的隱藏紀錄，與買家的社群處分紀錄。計數由 hides 的 trigger 維護。
-// 同一則留言已經有未還原的隱藏時回既有的那一列（冪等）；回傳的 id 等於傳入的 id 才是新增。
 func (q *Queries) InsertCommentHide(ctx context.Context, arg InsertCommentHideParams) (SocialHide, error) {
 	row := q.db.QueryRow(ctx, insertCommentHide,
 		arg.ID,
@@ -320,9 +313,6 @@ type ListHiddenContentOfRow struct {
 	HiddenAt       time.Time
 }
 
-// 買家自己被隱藏（未還原）的留言與討論區留言與理由：作者讀得到理由與自己的內容，別人讀不到。不含已刪除的內容（body 為 NULL 的列一定已刪除，
-// comments_scrubbed_check，所以這裡的 COALESCE 不會產生空字串）。
-// 新的在前，keyset：(hidden_at, id) 由大到小。留言沒有 store_id（0）、討論區留言沒有 post_id（零值 UUID）：sqlc 以第一段的型別推導欄位，不能用 NULL。
 func (q *Queries) ListHiddenContentOf(ctx context.Context, arg ListHiddenContentOfParams) ([]ListHiddenContentOfRow, error) {
 	rows, err := q.db.Query(ctx, listHiddenContentOf,
 		arg.MaxRows,
@@ -374,7 +364,6 @@ type ListSanctionsParams struct {
 	MaxRows      int32
 }
 
-// 買家自己的處分紀錄，新的在前。keyset：(created_at, id) 由大到小。
 func (q *Queries) ListSanctions(ctx context.Context, arg ListSanctionsParams) ([]SocialSanction, error) {
 	rows, err := q.db.Query(ctx, listSanctions,
 		arg.BuyerID,
@@ -424,7 +413,6 @@ type RestoreCommentHideParams struct {
 	SourceRef *string
 }
 
-// 還原留言目前未還原的隱藏（留列不刪，之後可以再隱藏）；沒有未還原的隱藏沒有列。
 func (q *Queries) RestoreCommentHide(ctx context.Context, arg RestoreCommentHideParams) (SocialHide, error) {
 	row := q.db.QueryRow(ctx, restoreCommentHide,
 		arg.Now,

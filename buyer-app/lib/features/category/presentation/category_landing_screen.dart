@@ -153,8 +153,7 @@ class _CategoryLandingScreenState extends ConsumerState<CategoryLandingScreen>
       setState(() {
         _couponCount = list is List ? list.length : 0;
       });
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   void _animateMarketplaceTo(double target) {
@@ -281,7 +280,6 @@ class _TopBar extends StatelessWidget {
     );
   }
 }
-
 
 class _AddressBar extends ConsumerStatefulWidget {
   const _AddressBar();
@@ -1005,7 +1003,6 @@ class _ProductCard extends StatelessWidget {
     );
   }
 }
-
 
 class _ProductCardSkeleton extends StatelessWidget {
   const _ProductCardSkeleton();

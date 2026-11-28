@@ -11,19 +11,19 @@ import (
 )
 
 type envelopeMapping struct {
-	grpcCode codes.Code
+	grpcCode        codes.Code
 	preserveBizCode bool
 }
 
 var envelopeCodeToGRPC = map[int32]envelopeMapping{
-	400: {grpcCode: codes.InvalidArgument},
-	401: {grpcCode: codes.Unauthenticated},
-	403: {grpcCode: codes.PermissionDenied},
-	404: {grpcCode: codes.NotFound},
-	409: {grpcCode: codes.AlreadyExists},
-	412: {grpcCode: codes.FailedPrecondition},
-	500: {grpcCode: codes.Internal},
-	503: {grpcCode: codes.Unavailable},
+	400:  {grpcCode: codes.InvalidArgument},
+	401:  {grpcCode: codes.Unauthenticated},
+	403:  {grpcCode: codes.PermissionDenied},
+	404:  {grpcCode: codes.NotFound},
+	409:  {grpcCode: codes.AlreadyExists},
+	412:  {grpcCode: codes.FailedPrecondition},
+	500:  {grpcCode: codes.Internal},
+	503:  {grpcCode: codes.Unavailable},
 	3021: {grpcCode: codes.NotFound, preserveBizCode: true},
 	3022: {grpcCode: codes.NotFound, preserveBizCode: true},
 	3023: {grpcCode: codes.NotFound, preserveBizCode: true},

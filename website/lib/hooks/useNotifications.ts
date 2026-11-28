@@ -38,7 +38,6 @@ import { useQueryIdentity } from "./useQueryIdentity";
  * The route role picks the inbox audience and scopes cache keys.
  */
 
-
 interface UseNotificationListOptions {
 	pageSize?: number;
 	category?: NotificationCategory;

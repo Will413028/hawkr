@@ -48,7 +48,6 @@ function scriptedFetcher(responses: unknown[]) {
 	return { sent, fetcher };
 }
 
-
 test("商品：連續兩次上下架時，第二次可以帶著第一次回應的版本送出", async () => {
 	const { sent, fetcher } = scriptedFetcher([
 		{ auditLogId: "9101", version: "13", resource: { version: "13" } },
@@ -97,7 +96,6 @@ test("賣家自助路徑：請求形狀與回傳語意都不因為新簽章而�
 	]);
 	assert.equal(written.version, undefined);
 });
-
 
 /**
  * 這個 repo 沒有 DOM 測試環境（`vitest.config.ts` 是 `environment: "node"`，也沒有

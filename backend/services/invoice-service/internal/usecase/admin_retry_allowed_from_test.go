@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-
 func allowedFromInSQL(t *testing.T, queryName string) map[string]bool {
 	t.Helper()
 	path := filepath.Join("..", "..", "db", "queries", "invoice_operations.sql")

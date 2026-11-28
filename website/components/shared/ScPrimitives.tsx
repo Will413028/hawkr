@@ -4,7 +4,6 @@ import * as React from "react";
 import { useDragScroll } from "@/lib/hooks/useDragScroll";
 import { cn } from "@/lib/utils/cn";
 
-
 interface ScFiltersProps {
 	className?: string;
 	children: React.ReactNode;
@@ -86,7 +85,6 @@ export function ScFilters({
 	);
 }
 
-
 interface ScPillBaseProps {
 	active?: boolean;
 	className?: string;
@@ -151,7 +149,6 @@ export function ScPill({ active, className, children, ...rest }: ScPillProps) {
 	);
 }
 
-
 interface ScPillCountProps {
 	active?: boolean;
 	children: React.ReactNode;
@@ -175,7 +172,6 @@ export function ScPillCount({ active, children }: ScPillCountProps) {
 		</span>
 	);
 }
-
 
 interface ScEmptyProps {
 	className?: string;
@@ -201,7 +197,6 @@ export function ScEmpty({ className, children }: ScEmptyProps) {
 	);
 }
 
-
 interface ScEmptyTitleProps {
 	children: React.ReactNode;
 }
@@ -218,7 +213,6 @@ export function ScEmptyTitle({ children }: ScEmptyTitleProps) {
 	);
 }
 
-
 interface ScEmptyDescProps {
 	children: React.ReactNode;
 }
@@ -234,7 +228,6 @@ export function ScEmptyDesc({ children }: ScEmptyDescProps) {
 		</p>
 	);
 }
-
 
 interface ScSectionProps {
 	className?: string;

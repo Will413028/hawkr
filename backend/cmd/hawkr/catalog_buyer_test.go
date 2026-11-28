@@ -12,8 +12,8 @@ import (
 )
 
 type fakeRestockBuyers struct {
-	inputs []buyer.FanOutInput
-	more   []bool
+	inputs   []buyer.FanOutInput
+	more     []bool
 	notified []int
 	err      error
 	purged   [][]uuid.UUID

@@ -37,9 +37,9 @@ type Module interface {
 
 // App 是 BuyerAppService 的 handler。
 type App struct {
-	m      Module
-	images rpc.Images
-	ports  Ports
+	m        Module
+	images   rpc.Images
+	ports    Ports
 	stats    *httpseller.StatsSource
 	blocking blocks.Sources
 }

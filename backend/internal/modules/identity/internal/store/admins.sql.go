@@ -69,7 +69,6 @@ type InsertAdminParams struct {
 	Now           time.Time
 }
 
-// 第一次看到 Access subject 時建立。同一位管理員同時的第一個請求由 UNIQUE 收斂：沒有列回傳時呼叫方重讀。
 func (q *Queries) InsertAdmin(ctx context.Context, arg InsertAdminParams) (int64, error) {
 	row := q.db.QueryRow(ctx, insertAdmin, arg.AccessSubject, arg.Email, arg.Now)
 	var id int64
@@ -89,7 +88,6 @@ type ResolveAdminRow struct {
 	Roles []string
 }
 
-// 認證：Access subject 對應的管理員與目前的角色（依字母排序）；每個請求都讀，角色不快取。
 func (q *Queries) ResolveAdmin(ctx context.Context, accessSubject string) (ResolveAdminRow, error) {
 	row := q.db.QueryRow(ctx, resolveAdmin, accessSubject)
 	var i ResolveAdminRow

@@ -156,7 +156,6 @@ export interface DelegationAuthorizationHistoryPage {
 	pageSize: number;
 }
 
-
 /**
  * 能力機器名。**刻意不比對 `policy.ts` 的封閉九值**：那份清單是為 preflight 寫的，
  * 拿它當授權面的白名單，等於後端新增一個能力時 ADM 這一側直接把整份目錄判成契約錯，
@@ -435,7 +434,6 @@ export function parseDelegationAuthorizationHistoryPage(
 	return { records, total, page, pageSize };
 }
 
-
 function directDependencies(
 	catalog: DelegationCapabilityCatalog,
 ): Map<string, string[]> {
@@ -576,7 +574,6 @@ export function unknownDelegationCapabilities(
 	return [...new Set(selected)].filter((value) => !known.has(value)).sort();
 }
 
-
 /**
  * `<input type="datetime-local">` 給的是本地時間、無時區；gateway 只收
  * `YYYY-MM-DDTHH:mm:ssZ`（秒精度，帶毫秒會被 `delegationEffectiveUntilRE` 擋掉）。
@@ -613,7 +610,6 @@ export function isDelegationOperationReason(value: string): boolean {
 	const length = [...value.trim()].length;
 	return length >= 1 && length <= DELEGATION_REASON_MAX_LENGTH;
 }
-
 
 /**
  * 業務碼 → 下一步。**一律以碼分派，不看 HTTP status**：9286（找不到授權設定）就是

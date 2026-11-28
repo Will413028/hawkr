@@ -50,10 +50,10 @@ type ids struct {
 }
 
 type loaded struct {
-	run     store.ProcurementAgentRun
-	buyerID *int64
-	message string
-	optionID string
+	run            store.ProcurementAgentRun
+	buyerID        *int64
+	message        string
+	optionID       string
 	source         string
 	locale         uitext.Locale
 	conversationID uuid.UUID

@@ -18,7 +18,6 @@ export default async function Page(props: Props) {
 	const name = seller?.name ?? "商家";
 	return (
 		<>
-
 			<h1 className="sr-only">{name}</h1>
 			<SellerPostsPage params={props.params} />
 		</>

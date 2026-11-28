@@ -155,8 +155,7 @@ export async function settleReplyFailure(
 		try {
 			const latest = await reload(inquiryId);
 			if (!latest.canReply) return { kind: "closed", latest };
-		} catch {
-		}
+		} catch {}
 	}
 	if (failure.kind === "fields") {
 		return {

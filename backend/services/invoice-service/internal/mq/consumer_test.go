@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 )
 
-
 type fakeInbox struct {
 	byEventID map[string]bool
 	byBizKey  map[string]bool
@@ -197,9 +196,9 @@ func (f *fakePreparer) Prepare(context.Context, usecase.OrderPaidInput) (usecase
 }
 
 type fakeOrderFacts struct {
-	calls int
-	facts OrderFacts
-	err   error
+	calls      int
+	facts      OrderFacts
+	err        error
 	gotBuyerID int64
 }
 
@@ -221,7 +220,7 @@ func (f *fakePayFacts) GetPaymentFacts(context.Context, string) (PaymentFacts, e
 type fakeApplier struct {
 	calls int
 	err   error
-	skip *RefundDisposition
+	skip  *RefundDisposition
 }
 
 func (f *fakeApplier) ApplyRefund(
@@ -245,7 +244,6 @@ func (f *recordingApplier) ApplyRefund(
 	f.last = in
 	return f.skip, f.err
 }
-
 
 func orderPaidBody(t *testing.T, eventID, orderNo, occurredAt string) []byte {
 	t.Helper()
@@ -391,7 +389,6 @@ func TestOrderPaid_ReclaimsDeferredRefund(t *testing.T) {
 		t.Fatalf("兩列都應被推進 PROCESSED，want %v 實際 %v", want, inbox.processed)
 	}
 }
-
 
 func producerShapedRefundBody(t *testing.T, overrides map[string]any) []byte {
 	t.Helper()
@@ -608,7 +605,6 @@ func TestRefund_ApplierFailureIsNotAcked(t *testing.T) {
 		t.Fatalf("MarkFailed 被呼叫 %d 次，want 1（失敗的歸宿是 inbox 的 FAILED，不是 DLQ）", len(inbox.failed))
 	}
 }
-
 
 // TestOrderPaid_InsertReservesLeaseWhileHandlerRuns 守 handlerLease。
 //

@@ -252,7 +252,6 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 				</label>
 			</div>
 
-
 			<div
 				className="absolute inset-0 z-10 grid place-items-center rounded-[24px] bg-hk-surface-card/55 backdrop-blur-[1.5px] dark:bg-[#14140f]/45"
 				role="note"
@@ -280,7 +279,6 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 
 	return (
 		<>
-
 			<div className="flex flex-col gap-5 min-w-0">
 				{basicSection}
 				{imagesSection}
@@ -291,12 +289,10 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 				{errorBlock}
 			</div>
 
-
 			<aside className="flex flex-col gap-5 min-w-0">{advancedSection}</aside>
 		</>
 	);
 }
-
 
 /**
  * Applied to the editable surface (form / fields) while a product is 上架中:

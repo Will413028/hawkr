@@ -71,7 +71,6 @@ export default function FaqPage() {
 	return (
 		<section className="section relative overflow-hidden">
 			<div className="content-container">
-
 				<h1 className="sr-only">常見問題</h1>
 
 				<div className="flex flex-col items-center gap-3 mb-9 text-center">
@@ -88,10 +87,8 @@ export default function FaqPage() {
 				</div>
 
 				<div className="grid grid-cols-[308px_1fr] gap-[60px] items-start max-[1024px]:grid-cols-1 max-[1024px]:gap-6">
-
 					<div className="self-start sticky top-[88px] max-[1024px]:static">
 						<aside className="p-6 rounded-[30px] flex flex-col gap-3 glass-card glass-card--solid max-[1024px]:flex-row max-[1024px]:flex-wrap max-[1024px]:rounded-[20px] max-[1024px]:p-4 max-[1024px]:gap-2">
-
 							<div
 								className="flex gap-1 p-1 rounded-[14px] border border-hk-border-soft max-[1024px]:w-full"
 								role="tablist"
@@ -149,7 +146,6 @@ export default function FaqPage() {
 							</div>
 						</aside>
 					</div>
-
 
 					<div ref={contentRef} className="flex flex-col gap-9">
 						{visibleCategories.map((cat) => {

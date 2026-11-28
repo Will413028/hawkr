@@ -23,7 +23,6 @@ type DeleteShortlistEntryParams struct {
 	SellerResponseID uuid.UUID
 }
 
-// 目標狀態的方法：不在清單時沒有列回來，結果相同。擁有者由呼叫端先以 GetRequestForBuyer 確認。
 func (q *Queries) DeleteShortlistEntry(ctx context.Context, arg DeleteShortlistEntryParams) (int32, error) {
 	row := q.db.QueryRow(ctx, deleteShortlistEntry, arg.RequestID, arg.SellerResponseID)
 	var seller_response_version int32
@@ -43,7 +42,6 @@ type GetSellerResponseForBuyerParams struct {
 	BuyerID   *int64
 }
 
-// 不鎖的讀取，給入圍清單用：回價屬於這位買家的這張需求（經發布的 buyer_id）才有列。
 func (q *Queries) GetSellerResponseForBuyer(ctx context.Context, arg GetSellerResponseForBuyerParams) (ProcurementSellerResponse, error) {
 	row := q.db.QueryRow(ctx, getSellerResponseForBuyer, arg.ID, arg.RequestID, arg.BuyerID)
 	var i ProcurementSellerResponse
@@ -136,9 +134,6 @@ type ListCurrentSellerResponsesRow struct {
 	Shortlisted                      bool
 }
 
-// 一次發布收到的賣家回價，每位賣家只列目前版本（latest_version > 0），依回價身分列的建立時間由新到舊、同時間依回價 ID 由大到小（keyset (created_at DESC, id DESC)；身分列不可變，賣家改版不會讓列換位置）。
-// 回價身分列沒有 buyer_id，擁有者由發布推出（p.buyer_id）：不是這位買家的發布、或發布不屬於這張需求，一列都不回。
-// 游標是上一頁最後一列的 (created_at, id)；沒有游標時 after_id 為 NULL。shortlisted 只在入圍清單掛的就是這個版本時為 true。
 func (q *Queries) ListCurrentSellerResponses(ctx context.Context, arg ListCurrentSellerResponsesParams) ([]ListCurrentSellerResponsesRow, error) {
 	rows, err := q.db.Query(ctx, listCurrentSellerResponses,
 		arg.RequestID,
@@ -219,7 +214,6 @@ type LockSellerResponseForBuyerParams struct {
 	BuyerID   *int64
 }
 
-// 接受報價用：鎖回價身分列（與賣家改版、撤回、婉拒串行），不屬於這位買家的這張需求沒有列。
 func (q *Queries) LockSellerResponseForBuyer(ctx context.Context, arg LockSellerResponseForBuyerParams) (ProcurementSellerResponse, error) {
 	row := q.db.QueryRow(ctx, lockSellerResponseForBuyer, arg.ID, arg.RequestID, arg.BuyerID)
 	var i ProcurementSellerResponse
@@ -256,7 +250,6 @@ type PutShortlistEntryParams struct {
 	Now                   time.Time
 }
 
-// 同一則回價只會有一個版本在清單（唯一鍵 (request_id, seller_response_id)）：已在清單時換成新的版本（A9-D31 Q12）。
 func (q *Queries) PutShortlistEntry(ctx context.Context, arg PutShortlistEntryParams) (ProcurementBuyerShortlistEntry, error) {
 	row := q.db.QueryRow(ctx, putShortlistEntry,
 		arg.ID,

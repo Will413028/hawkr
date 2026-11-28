@@ -139,8 +139,7 @@ export default function MerchantOperationEntry({
 					title:
 						error instanceof DelegatedOperationClientError &&
 						error.status === 403
-							?
-								"目前無法開始代行"
+							? "目前無法開始代行"
 							: error instanceof DelegatedOperationClientError &&
 									(error.status === 404 || error.status === 503)
 								? "代行營運目前未啟用"

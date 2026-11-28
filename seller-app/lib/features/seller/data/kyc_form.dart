@@ -198,7 +198,6 @@ KycForm baselineAfterSave(
   );
 }
 
-
 bool _docChanged(KycDoc? next, KycDoc? base) {
   if (next == null || base == null) return next != base;
   return next.stagedToken.isNotEmpty || next.assetId != base.assetId;
@@ -331,7 +330,6 @@ SaveKYCDraftRequest? buildSaveKycDraftRequest({
   );
 }
 
-
 T _keep<T>(T current, T oldBaseline, T latest) =>
     current != oldBaseline ? current : latest;
 
@@ -402,7 +400,6 @@ KycDocs adoptSavedDocs(KycDocs current, KycDocs sent, KycDocs saved) {
   );
 }
 
-
 /// 表單可以編輯：沒有申請（要建立），或申請是草稿、已退回（審核中與已核准的申請不能改）。
 bool kycEditable(KYCApplication? app) =>
     app == null ||
@@ -412,7 +409,6 @@ bool kycEditable(KYCApplication? app) =>
 /// 可以捨棄草稿（`CancelKYC`）：還是草稿。
 bool kycCanDiscard(KYCApplication? app) =>
     app != null && app.status == KYCStatus.KYC_STATUS_DRAFT;
-
 
 /// `YYYY-MM-DD` 轉成民國年 `YYY/MM/DD`；不是有效日期回空字串。
 String rocDateOfIso(String iso) {

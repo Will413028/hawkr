@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
-
 // ListBuyerInvoiceDocuments 是 B09 買家發票中心（端點 68）。
 func (s *InvoiceServer) ListBuyerInvoiceDocuments(
 	ctx context.Context, req *pb.ListBuyerInvoiceDocumentsRequest,
@@ -50,7 +48,7 @@ func (s *InvoiceServer) ListBuyerInvoiceDocuments(
 	records := make([]*pb.BuyerInvoiceDocumentItem, 0, len(out.Records))
 	for _, item := range out.Records {
 		records = append(records, &pb.BuyerInvoiceDocumentItem{
-			Summary: s.toSummary(item.Document, item.RecipientNote),
+			Summary:    s.toSummary(item.Document, item.RecipientNote),
 			IssuerName: item.Document.IssuerNameSnapshot,
 		})
 	}
@@ -114,7 +112,6 @@ func (s *InvoiceServer) GetInvoiceDocument(
 	return &pb.GetInvoiceDocumentResponse{Code: 0, Message: msgSuccess, Data: s.toDetail(view)}, nil
 }
 
-
 // GetOrderInvoice 回一張訂單的發票現況（B04，端點 8）。
 //
 // 🔴 **documents 是 repeated 且必須全帶**：一張訂單在 VOID_AND_REISSUE 之後會有多份
@@ -159,14 +156,13 @@ func (s *InvoiceServer) GetOrderInvoice(
 			CanFileComplaint:     view.CanFileComplaint,
 			ComplaintOpensAt:     fmtTime(view.ComplaintOpensAt),
 			ExistingComplaintId:  fmtID(view.ExistingComplaintID),
-			LatestCorrectionId:  fmtID(view.LatestCorrectionID),
-			NotifiedEmailMasked: view.NotifiedEmailMasked,
-			SnapshotVersion:     fmtInt32(view.SnapshotVersion),
-			ShippingFeeNotice: usecase.ShippingFeeNoticeFor(latestKind),
+			LatestCorrectionId:   fmtID(view.LatestCorrectionID),
+			NotifiedEmailMasked:  view.NotifiedEmailMasked,
+			SnapshotVersion:      fmtInt32(view.SnapshotVersion),
+			ShippingFeeNotice:    usecase.ShippingFeeNoticeFor(latestKind),
 		},
 	}, nil
 }
-
 
 // GetInvoiceCorrection 回買家自己的一件修改申請（端點 12）。
 func (s *InvoiceServer) GetInvoiceCorrection(
@@ -196,11 +192,11 @@ func (s *InvoiceServer) GetInvoiceCorrection(
 
 func toCorrectionData(r domain.CorrectionRequest) *pb.InvoiceCorrectionData {
 	return &pb.InvoiceCorrectionData{
-		CorrectionId: fmtID(r.ID),
-		HandlingMode: str(r.HandlingMode),
-		Status:       r.Status,
-		CreatedAt:    fmtTimeValue(r.CreatedAt),
-		StatusNotice: usecase.CorrectionStatusNotices[r.Status],
+		CorrectionId:     fmtID(r.ID),
+		HandlingMode:     str(r.HandlingMode),
+		Status:           r.Status,
+		CreatedAt:        fmtTimeValue(r.CreatedAt),
+		StatusNotice:     usecase.CorrectionStatusNotices[r.Status],
 		RejectReasonCode: str(r.RejectReasonCode),
 	}
 }
@@ -254,7 +250,6 @@ func (s *InvoiceServer) complaintListResponse(
 	}
 }
 
-
 // GetSellerInvoiceOverview 是 S01 發票與稅籍總覽（端點 16）。
 //
 // 🔴 **沒有任何業務碼**：賣家還沒有 issuer／稅務資格／provider 帳號都是正常狀態
@@ -298,7 +293,6 @@ func (s *InvoiceServer) GetSellerInvoiceOverview(
 		},
 	}, nil
 }
-
 
 // ListSellerInvoiceDocuments 是 S06 賣家銷項紀錄（端點 30）。
 func (s *InvoiceServer) ListSellerInvoiceDocuments(
@@ -365,13 +359,13 @@ func (s *InvoiceServer) toSellerDocumentItems(
 			orderNo = str(doc.SourceRef)
 		}
 		out = append(out, &pb.SellerInvoiceDocumentItem{
-			Summary:     s.toSummary(doc, ""),
-			OrderNo:     orderNo,
-			BuyerKind:   buyerKindOf(doc),
-			InvoiceMode: doc.FulfillmentMode,
-			UpdatedAt:   fmtTimeValue(doc.UpdatedAt),
-			LatestJobId: fmtID(item.LatestOperationID),
-			PaidAt: fmtTime(doc.PaidAt),
+			Summary:        s.toSummary(doc, ""),
+			OrderNo:        orderNo,
+			BuyerKind:      buyerKindOf(doc),
+			InvoiceMode:    doc.FulfillmentMode,
+			UpdatedAt:      fmtTimeValue(doc.UpdatedAt),
+			LatestJobId:    fmtID(item.LatestOperationID),
+			PaidAt:         fmtTime(doc.PaidAt),
 			ShipmentStatus: shipments[orderNo],
 		})
 	}
@@ -414,12 +408,12 @@ func (s *InvoiceServer) GetSellerInvoiceDocument(
 	return &pb.GetSellerInvoiceDocumentResponse{
 		Code: 0, Message: msgSuccess,
 		Data: &pb.SellerInvoiceDocumentDetail{
-			Detail: s.toDetail(view.Detail),
-			FundedBy: fundedByUndetermined,
-			CutoverVersion:    fmtIDPtr(doc.ProviderAccountVersion),
-			ProviderRequestId: str(doc.ProviderRequestNo),
-			ManualReasonCode:  str(doc.ManualReasonCode),
-			LatestJobId:       fmtID(view.Detail.LatestOperationID),
+			Detail:                s.toDetail(view.Detail),
+			FundedBy:              fundedByUndetermined,
+			CutoverVersion:        fmtIDPtr(doc.ProviderAccountVersion),
+			ProviderRequestId:     str(doc.ProviderRequestNo),
+			ManualReasonCode:      str(doc.ManualReasonCode),
+			LatestJobId:           fmtID(view.Detail.LatestOperationID),
 			NextResendAvailableAt: fmtTime(view.NextResendAvailableAt),
 		},
 	}, nil
@@ -460,8 +454,8 @@ func (s *InvoiceServer) ListSellerReceivedInvoiceDocuments(
 	records := make([]*pb.SellerReceivedInvoiceItem, 0, len(out.Records))
 	for _, item := range out.Records {
 		records = append(records, &pb.SellerReceivedInvoiceItem{
-			Summary:    s.toSummary(item.Document, ""),
-			IssuerName: item.Document.IssuerNameSnapshot,
+			Summary:       s.toSummary(item.Document, ""),
+			IssuerName:    item.Document.IssuerNameSnapshot,
 			RecipientNote: item.RecipientNote,
 		})
 	}
@@ -473,7 +467,6 @@ func (s *InvoiceServer) ListSellerReceivedInvoiceDocuments(
 		},
 	}, nil
 }
-
 
 // GetSellerInvoiceJob 是 S08 賣家異常詳情（端點 33）。
 func (s *InvoiceServer) GetSellerInvoiceJob(
@@ -534,7 +527,6 @@ func (s *InvoiceServer) ListOrderExternalIssuances(
 	}, nil
 }
 
-
 const sellerComplaintSortCreatedDesc = "created_at_desc"
 
 // ListSellerInvoiceComplaints 是 S09 賣家申訴列表（端點 34）。
@@ -554,8 +546,8 @@ func (s *InvoiceServer) ListSellerInvoiceComplaints(
 	}
 
 	out, err := s.query.ListSellerComplaints(ctx, usecase.SellerComplaintsInput{
-		StoreID: storeID,
-		View:    req.GetStatus(),
+		StoreID:   storeID,
+		View:      req.GetStatus(),
 		SortByDue: req.GetSort() != sellerComplaintSortCreatedDesc,
 		Page:      page,
 		PageSize:  pageSize,
@@ -597,7 +589,6 @@ func (s *InvoiceServer) GetSellerInvoiceComplaint(
 	return &pb.InvoiceComplaintResponse{Code: 0, Message: msgSuccess, Data: info}, nil
 }
 
-
 // GetInvoiceOverviewForAdmin 是 A01 營運總覽（端點 37）。
 //
 // 🔴 8 個 KPI 是**封閉列舉**，每一個都帶著自己的口徑（definition）出去：沒有口徑的
@@ -624,7 +615,7 @@ func (s *InvoiceServer) GetInvoiceOverviewForAdmin(
 	kpis := make([]*pb.InvoiceKpiItem, 0, len(view.KPIs))
 	for _, k := range view.KPIs {
 		kpis = append(kpis, &pb.InvoiceKpiItem{
-			Key: k.Key,
+			Key:         k.Key,
 			Value:       kpiValueOf(k),
 			WindowLabel: k.WindowLabel,
 			Definition:  k.Definition,
@@ -645,7 +636,6 @@ func kpiValueOf(k usecase.KpiItem) string {
 	}
 	return fmtInt64(k.Value)
 }
-
 
 // ListTaxReviewsForAdmin 是 A02 稅務身分審核佇列（端點 38）。
 //
@@ -699,14 +689,14 @@ func (s *InvoiceServer) ListTaxReviewsForAdmin(
 func (s *InvoiceServer) toTaxReviewItem(v usecase.TaxReviewItemView) *pb.TaxReviewItem {
 	p := v.Item.Profile
 	out := &pb.TaxReviewItem{
-		StoreId:       fmtID(v.Item.StoreID),
-		EntityType:    str(p.EntityTaxType),
-		ClaimedStatus: p.ClaimedObligation,
-		ReviewStatus:  p.ReviewStatus,
-		SubmittedAt:   fmtTime(p.SubmittedAt),
-		DeadlineAt:    fmtTime(p.PendingValidUntil),
-		RemainingDays:  fmtOptInt64(v.RemainingDays),
-		ExtensionCount: fmtInt64(int64(p.ExtensionCount)),
+		StoreId:           fmtID(v.Item.StoreID),
+		EntityType:        str(p.EntityTaxType),
+		ClaimedStatus:     p.ClaimedObligation,
+		ReviewStatus:      p.ReviewStatus,
+		SubmittedAt:       fmtTime(p.SubmittedAt),
+		DeadlineAt:        fmtTime(p.PendingValidUntil),
+		RemainingDays:     fmtOptInt64(v.RemainingDays),
+		ExtensionCount:    fmtInt64(int64(p.ExtensionCount)),
 		SelfIssueAccepted: p.AttestedAt != nil,
 		ReceiptAuthorized: p.ReceiptAuthorizedAt != nil,
 	}
@@ -724,7 +714,6 @@ func fmtOptInt64(v *int64) string {
 	}
 	return strconv.FormatInt(*v, 10)
 }
-
 
 // ListProviderAccountsForAdmin 是 A04 AMEGO 串接監控（端點 42）。
 //
@@ -761,8 +750,8 @@ func (s *InvoiceServer) ListProviderAccountsForAdmin(
 	records := make([]*pb.ProviderAccountItem, 0, len(out.Records))
 	for _, item := range out.Records {
 		row := &pb.ProviderAccountItem{
-			StoreId: fmtID(item.StoreID),
-			Status:  item.Status,
+			StoreId:   fmtID(item.StoreID),
+			Status:    item.Status,
 			StoreName: names[item.StoreID],
 		}
 		if a := item.Account; a != nil {
@@ -781,7 +770,6 @@ func (s *InvoiceServer) ListProviderAccountsForAdmin(
 		},
 	}, nil
 }
-
 
 // ListInvoiceDocumentsForAdmin 是 A12 全平台發票文件（端點 47）。
 //
@@ -869,7 +857,6 @@ func (s *InvoiceServer) ListInvoiceJobsForAdmin(
 		},
 	}, nil
 }
-
 
 // ListInvoiceComplaintsForAdmin 是 A07 申訴處理佇列（端點 58）。
 //
@@ -987,7 +974,6 @@ func (s *InvoiceServer) ListInvoiceAuditLogsForAdmin(
 	}, nil
 }
 
-
 func (s *InvoiceServer) toSummary(doc domain.Document, _ string) *pb.InvoiceDocumentSummary {
 	summary, carrierType := carrierSummaryFallback(doc)
 	return s.toSummaryWithCarrier(doc, summary, carrierType)
@@ -1086,18 +1072,17 @@ func (s *InvoiceServer) toJobInfoView(v domain.OperationView) *pb.InvoiceJobInfo
 		ShipmentUnaffectedNotice: noticeForKind(v.DocumentKind),
 		ProviderRequestId:        op.ProviderRequestNo,
 		Version:                  fmtInt64(op.Version),
-		CanRetry:            usecase.CanRetryOperation(op.Status),
-		CanCancel:           usecase.CanCancelOperation(op.Status),
-		ManualReasonCode:    v.DocumentManualReasonCode,
-		ExternalInvoiceNo:   v.ExternalInvoiceNo,
-		ExternalInvoiceDate: fmtDate(v.ExternalInvoiceDate),
-		ReportedAt:          fmtTime(v.ExternalReportedAt),
-		CanReportExternal:   op.Status == operationStatusManualProcessAllowed,
-		DocumentKind: v.DocumentKind,
-		NeedsFundingDecision: usecase.NeedsFundingDecision(v.DocumentStatus, v.DocumentManualReasonCode),
+		CanRetry:                 usecase.CanRetryOperation(op.Status),
+		CanCancel:                usecase.CanCancelOperation(op.Status),
+		ManualReasonCode:         v.DocumentManualReasonCode,
+		ExternalInvoiceNo:        v.ExternalInvoiceNo,
+		ExternalInvoiceDate:      fmtDate(v.ExternalInvoiceDate),
+		ReportedAt:               fmtTime(v.ExternalReportedAt),
+		CanReportExternal:        op.Status == operationStatusManualProcessAllowed,
+		DocumentKind:             v.DocumentKind,
+		NeedsFundingDecision:     usecase.NeedsFundingDecision(v.DocumentStatus, v.DocumentManualReasonCode),
 	}
 }
-
 
 func parseListPaging(page, pageSize string) (int32, int32, error) {
 	p, ps, err := parsePaging(page, pageSize)
@@ -1137,7 +1122,6 @@ func invalidViewError(err error, field string) error {
 	return status.Errorf(codes.InvalidArgument, "%s: %v", field, err)
 }
 
-
 // GetSellerInvoiceCapabilitySimple 回這位賣家目前有沒有開票能力。
 //
 // 🔴 它與 S01 總覽（端點 16）**讀同一份投影**，不另算一次：兩份實作漂移的症狀是
@@ -1167,16 +1151,15 @@ func (s *InvoiceServer) GetSellerInvoiceCapabilitySimple(
 	return &pb.GetSellerInvoiceCapabilitySimpleResponse{
 		Code: 0, Message: msgSuccess,
 		Data: &pb.GetSellerInvoiceCapabilitySimpleData{
-			StoreId:         fmtID(storeID),
-			TaxReviewStatus: view.TaxReviewStatus,
-			InvoiceMode:     view.InvoiceMode,
-			ProviderStatus:  view.ProviderStatus,
+			StoreId:               fmtID(storeID),
+			TaxReviewStatus:       view.TaxReviewStatus,
+			InvoiceMode:           view.InvoiceMode,
+			ProviderStatus:        view.ProviderStatus,
 			CanIssueAutomatically: view.CanIssueAutomatically(),
 			IntakeLimit:           toIntakeLimit(view.IntakeLimit),
 		},
 	}, nil
 }
-
 
 // WithCalendarMirror 掛上行事曆鏡像的 usecase；用 setter 是因為 NewInvoiceServer 已有 19 個位置參數。
 func (s *InvoiceServer) WithCalendarMirror(m *usecase.BusinessCalendarMirror) *InvoiceServer {

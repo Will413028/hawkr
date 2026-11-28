@@ -490,7 +490,6 @@ function resolveProps(
 	return out;
 }
 
-
 type JsxNode = {
 	/** 標籤名；fragment（`<>`）為空字串。元件（`Button`）保留原樣。 */
 	tag: string;
@@ -519,12 +518,10 @@ function stripCssComments(css: string): string {
 }
 
 function stripJsxComments(source: string): string {
-	return (
-		source
-			.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/gu, "")
-			.replace(/\/\*[\s\S]*?\*\//gu, "")
-			.replace(/^[ \t]*\/\/.*$/gmu, "")
-	);
+	return source
+		.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/gu, "")
+		.replace(/\/\*[\s\S]*?\*\//gu, "")
+		.replace(/^[ \t]*\/\/.*$/gmu, "");
 }
 
 function classNameOf(attrs: string): string {

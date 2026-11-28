@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 const rcInterval = 60 * time.Second
 
 type rcRunner interface {

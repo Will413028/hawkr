@@ -1503,7 +1503,6 @@ export function ImageCropDialog({
 										aria-valuemax={100}
 										aria-valuenow={Math.round((processingProgress ?? 0) * 100)}
 									>
-
 										<div
 											className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-200 ease-out motion-reduce:transition-none"
 											style={{
@@ -2115,7 +2114,6 @@ export function ImageCropDialog({
 									className="relative isolate overflow-hidden rounded-[22px] border border-hk-border-soft bg-hk-surface-muted [box-shadow:var(--page-crop-lens-shell-shadow)]"
 									data-avatar-fit-mode={avatarFitMode}
 								>
-
 									<span
 										aria-hidden="true"
 										data-avatar-fit-indicator="true"

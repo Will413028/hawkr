@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	reversalDeducted = "deducted_from_transfer"
-	reversalTransferFailed = "transfer_failed"
-	reversalNothingLeft = "no_reversible_amount"
+	reversalDeducted         = "deducted_from_transfer"
+	reversalTransferFailed   = "transfer_failed"
+	reversalNothingLeft      = "no_reversible_amount"
 	reversalExceedsRemaining = "reversal_exceeds_remaining"
 )
 

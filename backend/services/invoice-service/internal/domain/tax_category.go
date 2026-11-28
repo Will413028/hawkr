@@ -53,7 +53,6 @@ func TaxCategoryFromDB(v int16) (codemeta.InvoiceTaxCategory, bool) {
 	return codemeta.InvoiceTaxCategoryFromValue(strconv.Itoa(int(v)))
 }
 
-
 // TaxCategoryToAmego 回傳送給 AMEGO 的 ProductItem.TaxType 字元。
 func TaxCategoryToAmego(tc TaxCategory) (string, error) {
 	meta, ok := TaxCategoryFromDB(int16(tc))

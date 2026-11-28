@@ -10,11 +10,11 @@ import (
 )
 
 type streamConfig struct {
-	HeartbeatEvery time.Duration
-	RecheckEvery time.Duration
-	MaxLifetime time.Duration
-	LifetimeJitter float64
-	WriteTimeout time.Duration
+	HeartbeatEvery   time.Duration
+	RecheckEvery     time.Duration
+	MaxLifetime      time.Duration
+	LifetimeJitter   float64
+	WriteTimeout     time.Duration
 	MaxGuardFailures int
 }
 
@@ -47,16 +47,16 @@ func realClock() streamClock {
 }
 
 type streamSpec[E any] struct {
-	Config streamConfig
-	Clock  streamClock
-	Jitter func() float64
-	Next func(ctx context.Context) (E, error)
-	Write     func(E, streamInfo) error
-	Heartbeat func() error
-	Guard func(ctx context.Context) error
+	Config           streamConfig
+	Clock            streamClock
+	Jitter           func() float64
+	Next             func(ctx context.Context) (E, error)
+	Write            func(E, streamInfo) error
+	Heartbeat        func() error
+	Guard            func(ctx context.Context) error
 	SetWriteDeadline func(time.Time) error
-	Close func()
-	Classify func(error) (error, bool)
+	Close            func()
+	Classify         func(error) (error, bool)
 }
 
 type streamInfo struct {

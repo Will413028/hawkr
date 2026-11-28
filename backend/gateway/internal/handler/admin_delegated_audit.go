@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // DelegatedAuditActor / Target are repeated on every audit row rather than derived
 // from the session summary. Two independent reasons: ① the names on an audit row are
 // the snapshot AT INTENT TIME while the session's are from creation time — a rename
@@ -189,7 +188,6 @@ type DelegatedOperationSessionRecord struct {
 	RevokeReason              *string `json:"revokeReason"`
 }
 
-
 // ListDelegatedAuditLogs handles GET /api/v1/admin/delegated-operations/:session_id/audit-logs.
 // Mounted with requireAdmin(): this is a governance query over any session, and the
 // ADM session is its identity (9261 on failure, never 9274).
@@ -315,7 +313,6 @@ func delegatedAuditEntryDTO(e *accountpb.AuditLogEntry) DelegatedAuditLogEntry {
 	return out
 }
 
-
 // GetDelegatedSessionSummary handles GET .../{sessionId}/summary (requireAdmin).
 // It stays a governance query over ANY session and must NOT be widened to also accept
 // a credential: one endpoint belongs to one identity group, and merging them would
@@ -329,7 +326,6 @@ func (h *Holder) GetDelegatedSessionSummary(c *gin.Context) {
 	}
 	h.respondSessionSummary(c, sessionID)
 }
-
 
 // GetCurrentDelegatedSessionSummary handles GET .../current/summary.
 //
@@ -443,7 +439,6 @@ func (h *Holder) respondSessionSummary(c *gin.Context, sessionID string) {
 	}
 	response.OK(c, out)
 }
-
 
 // ListDelegatedOperations 列出代行工作階段（跨工作階段治理查詢）
 // GET /api/v1/admin/delegated-operations
@@ -669,7 +664,6 @@ func delegatedSessionRecordDTO(r *accountpb.DelegatedOperationSessionRecord) Del
 	}
 	return out
 }
-
 
 func auditFilterValue(c *gin.Context, name string, valid func(string) bool) (string, bool) {
 	raw := c.Query(name)

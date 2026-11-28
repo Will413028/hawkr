@@ -47,7 +47,6 @@ const (
 	peerAppKey = "peer-e2e-app-key"
 )
 
-
 type peerOrderServer struct {
 	orderpb.UnimplementedOrderServiceServer
 	resp  *orderpb.GetOrderInvoiceSnapshotInternalResponse
@@ -113,7 +112,6 @@ func newPeerAmego(t *testing.T) *peerAmego {
 	t.Cleanup(f.srv.Close)
 	return f
 }
-
 
 type peerEnv struct {
 	pool     *pgxpool.Pool
@@ -289,7 +287,7 @@ func peerPaidBody(t *testing.T, env *peerEnv, eventID string) []byte {
 		"buyer_id":            env.buyerID,
 		"store_id":            env.storeID,
 		"total_actual_amount": 300,
-		"occurred_at": time.Now().UTC().Format("2006-01-02T15:04:05.999999999"),
+		"occurred_at":         time.Now().UTC().Format("2006-01-02T15:04:05.999999999"),
 	})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -305,7 +303,6 @@ func peerCount(t *testing.T, env *peerEnv, q string, args ...any) int {
 	}
 	return n
 }
-
 
 func TestIntegration_PeerClients_PaidToOutbox(t *testing.T) {
 	ctx := context.Background()
@@ -377,7 +374,6 @@ func TestIntegration_PeerClients_PaidToOutbox(t *testing.T) {
 	}
 }
 
-
 func TestIntegration_PeerClients_PreferenceOwnershipMismatch(t *testing.T) {
 	ctx := context.Background()
 	env := setupPeerE2E(t, func(buyerID int64) int64 { return buyerID + 1 })
@@ -412,7 +408,6 @@ func TestIntegration_PeerClients_PreferenceOwnershipMismatch(t *testing.T) {
 		t.Fatalf("AMEGO 收到 %d 次請求，want 0", n)
 	}
 }
-
 
 func TestIntegration_PeerClients_OrderEnvelopeErrorFailsLoud(t *testing.T) {
 	ctx := context.Background()

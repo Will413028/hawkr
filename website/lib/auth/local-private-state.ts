@@ -81,8 +81,7 @@ function notifyCleared(key: string): void {
 		window.dispatchEvent(
 			new StorageEvent("storage", { key, oldValue: null, newValue: null }),
 		);
-	} catch {
-	}
+	} catch {}
 }
 
 function storageFor(area: "local" | "session"): Storage | null {
@@ -100,13 +99,11 @@ function storageFor(area: "local" | "session"): Storage | null {
 function clearRegisteredKey(spec: LocalPrivateKeySpec): void {
 	try {
 		runLocalPrivateReset(spec.key);
-	} catch {
-	}
+	} catch {}
 	for (const area of spec.in) {
 		try {
 			storageFor(area)?.removeItem(spec.key);
-		} catch {
-		}
+		} catch {}
 	}
 	notifyCleared(spec.key);
 }

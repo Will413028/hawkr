@@ -70,8 +70,7 @@ function dispatchSafely(
 ): void {
 	try {
 		dispatch(eventName, params);
-	} catch {
-	}
+	} catch {}
 }
 
 /** Denominator observation for `entry_prompt_submit_rate`. */

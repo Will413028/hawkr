@@ -3,7 +3,6 @@
 /// 只放真正的 const——分享連結、OSS CDN base 等。
 /// Flavor-dependent 的設定（URL、timeout 等）請用 [F.appFlavor.<getter>]。
 abstract final class AppConstants {
-
   /// 網頁公開網址：`--dart-define=PUBLIC_SITE_ORIGIN=https://...`。
   /// 沒有提供時，伺服器沒給分享連結的情況下不開分享面板。
   static const String publicSiteOrigin = String.fromEnvironment(
@@ -19,5 +18,4 @@ abstract final class AppConstants {
     if (base.isEmpty) return null;
     return '$base$path';
   }
-
 }

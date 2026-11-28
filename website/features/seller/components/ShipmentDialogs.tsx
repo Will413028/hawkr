@@ -38,7 +38,6 @@ export const SHIPMENT_PHOTO_TILE_STYLE = {
 
 const CloseIcon = () => <AppIcon name="close" />;
 
-
 type ShippingBrand = "tcat" | "711";
 
 const BRAND_LOGO: Record<ShippingBrand, { text: string; alt: string }> = {
@@ -149,7 +148,6 @@ function DialogShell({
 	);
 }
 
-
 interface PhotoPickerProps {
 	preview: string | null;
 	uploading: boolean;
@@ -182,7 +180,6 @@ function PhotoPicker({
 		/>
 	);
 }
-
 
 export interface TcatReservationResult {
 	/** yyyyMMdd e.g. "20260512" */
@@ -412,7 +409,6 @@ export function TcatReservationDialog({
 	);
 }
 
-
 export interface CallTcatParams {
 	isContact: "Y" | "N";
 	isTrolley: "Y" | "N";
@@ -517,7 +513,6 @@ export function CallTcatDialog({ open, onClose, onSubmit }: CallTcatProps) {
 		</DialogShell>
 	);
 }
-
 
 export interface SevenElevenShipResult {
 	stagedToken?: string;

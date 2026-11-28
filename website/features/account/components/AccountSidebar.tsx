@@ -72,7 +72,6 @@ export default function AccountSidebar() {
 						{displayName}
 					</strong>
 					<small className="text-xs text-foreground-soft dark:text-hk-ink-100/60">
-
 						{"會員中心"}
 					</small>
 				</div>

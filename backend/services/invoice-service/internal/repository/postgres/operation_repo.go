@@ -134,11 +134,11 @@ func (r *OperationRepository) ClaimRecheck(ctx context.Context, id int64, now, l
 // 「查不到」是 J25 不是 FAILED_PERMANENT：判成永久失敗會讓一張補得回來的發票停在終態。
 func (r *OperationRepository) MarkRecheckResolved(ctx context.Context, in domain.MarkRecheckResult) (bool, error) {
 	rows, err := r.q(ctx).MarkInvoiceRecheckResolved(ctx, gen.MarkInvoiceRecheckResolvedParams{
-		NextStatus:      in.NextStatus,
-		NextAttemptAt:   ts(in.NextAttemptAt),
-		ProviderCode:    in.ProviderCode,
-		ProviderMessage: in.ProviderMessage,
-		CompletedAt:     in.CompletedAt,
+		NextStatus:         in.NextStatus,
+		NextAttemptAt:      ts(in.NextAttemptAt),
+		ProviderCode:       in.ProviderCode,
+		ProviderMessage:    in.ProviderMessage,
+		CompletedAt:        in.CompletedAt,
 		CancelEvidenceKind: in.CancelEvidenceKind,
 		CancelConfirmedAt:  in.CancelConfirmedAt,
 		Now:                ts(in.Now),
@@ -246,7 +246,6 @@ func (r *OperationRepository) PromoteSellerActionRequired(ctx context.Context, i
 	return r.q(ctx).PromoteSellerActionRequiredOperations(ctx,
 		gen.PromoteSellerActionRequiredOperationsParams{Now: ts(now), IssuerID: issuerID})
 }
-
 
 // Create 建立一列 operation。inserted=false 有兩種意義（見 domain 介面註解），
 // 呼叫端必須用 GetByKey 分辨，不是猜。
@@ -395,7 +394,6 @@ func (r *OperationRepository) ListByDocument(ctx context.Context, documentID int
 	}
 	return out, nil
 }
-
 
 // AdminRetryAfterFix 是 J18 FAILED_PERMANENT → READY（ADM 修正資料後重試）。
 //

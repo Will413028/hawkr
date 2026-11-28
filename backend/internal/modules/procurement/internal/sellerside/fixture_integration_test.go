@@ -33,7 +33,7 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 var start = time.Date(2026, 11, 23, 3, 0, 0, 0, time.UTC)
 
 const (
-	buyerID int64 = 1
+	buyerID           int64 = 1
 	invitedStore      int64 = 10
 	otherInvitedStore int64 = 11
 	outsider          int64 = 99

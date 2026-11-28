@@ -260,7 +260,6 @@ export async function revokeDelegatedSession(input: {
 	return parsed;
 }
 
-
 /**
  * 授權面錯誤 → 給人看的一句話。
  *

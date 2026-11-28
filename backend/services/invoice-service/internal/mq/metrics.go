@@ -6,7 +6,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-
 var eventDroppedReasons = []string{
 	"unmarshal_failed",
 	"empty_order_no",

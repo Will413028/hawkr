@@ -14,7 +14,6 @@ import (
 	"uuid"
 )
 
-
 func (f *fixture) hitAccounts(t *testing.T, measureID uuid.UUID, exceptAccount int64, at time.Time) []int64 {
 	t.Helper()
 	ctx := context.Background()

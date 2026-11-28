@@ -903,7 +903,6 @@ func (m Measure) RejectionCooldown() time.Duration {
 	return CooldownAfterRejections(n + 1)
 }
 
-
 // MeasureActionUnavailableReason 是 admin 此刻不能修改措施（改理由、延長、縮短）或撤銷的原因。
 type MeasureActionUnavailableReason string
 

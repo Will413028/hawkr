@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // ReceiptRenderer 把一份收據資料畫成 PDF bytes。
 //
 // 介面放在 usecase 而不是 domain：domain 那一側是 `NewReceiptRenderer` 這個具體實作
@@ -188,8 +187,8 @@ func buildReceiptData(
 		IssuedAt:  issuedAt,
 		Seller: domain.ReceiptSeller{
 			LegalName: *profile.LegalName,
-			TaxID:   derefString(profile.TaxID),
-			Address: derefString(profile.BusinessAddress),
+			TaxID:     derefString(profile.TaxID),
+			Address:   derefString(profile.BusinessAddress),
 		},
 		TotalAmount: doc.TotalAmount,
 	}

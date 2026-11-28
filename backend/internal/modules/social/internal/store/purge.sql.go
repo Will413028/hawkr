@@ -75,7 +75,6 @@ type ListActorCommentLikeBatchRow struct {
 	PostID    uuid.UUID
 }
 
-// 互動者（買家或店家）的留言讚；帶回留言的所屬貼文，給快取失效。
 func (q *Queries) ListActorCommentLikeBatch(ctx context.Context, arg ListActorCommentLikeBatchParams) ([]ListActorCommentLikeBatchRow, error) {
 	rows, err := q.db.Query(ctx, listActorCommentLikeBatch, arg.ActorKind, arg.ActorID, arg.MaxRows)
 	if err != nil {
@@ -105,7 +104,6 @@ type ListBuyerLikedPostBatchParams struct {
 	MaxRows int32
 }
 
-// 先列出再刪除：清除 job 要先依固定順序鎖 stats 列，才能開始刪（counts-brief.md §4.6）。
 func (q *Queries) ListBuyerLikedPostBatch(ctx context.Context, arg ListBuyerLikedPostBatchParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, listBuyerLikedPostBatch, arg.BuyerID, arg.MaxRows)
 	if err != nil {
@@ -174,8 +172,6 @@ type ListInactiveBuyersWithSocialContentParams struct {
 	MaxRows int32
 }
 
-// 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但清除 job 還有活要做（述詞與 PurgeBuyer 找工作的相同：未刪除的留言與討論區留言、貼文讚、分享、留言讚，
-// 以及已刪除但內文還在的留言與討論區留言），依 buyer_id 的 keyset 由小到大，最多 max_rows 位；第一頁的游標是 0。
 func (q *Queries) ListInactiveBuyersWithSocialContent(ctx context.Context, arg ListInactiveBuyersWithSocialContentParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, listInactiveBuyersWithSocialContent, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -214,8 +210,6 @@ type ListRetiredStoresWithSocialContentParams struct {
 	MaxRows int32
 }
 
-// 清除的保底掃描：店家已退場（seller.pub_retired_stores()）但清除 job 還有活要做（述詞與 PurgeStore 找工作的相同：未刪除或圖片引用還在的貼文、
-// 未刪除的店家身分留言、討論區留言、店家身分的留言讚），依 store_id 的 keyset 由小到大，最多 max_rows 家；第一頁的游標是 0。
 func (q *Queries) ListRetiredStoresWithSocialContent(ctx context.Context, arg ListRetiredStoresWithSocialContentParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, listRetiredStoresWithSocialContent, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -237,7 +231,6 @@ func (q *Queries) ListRetiredStoresWithSocialContent(ctx context.Context, arg Li
 }
 
 const lockBuyerCommentBatch = `-- name: LockBuyerCommentBatch :many
-
 SELECT id, post_id, parent_id FROM social.comments
 WHERE actor_kind = 'BUYER' AND actor_id = $1 AND deleted_at IS NULL
 ORDER BY id
@@ -256,8 +249,6 @@ type LockBuyerCommentBatchRow struct {
 	ParentID *uuid.UUID
 }
 
-// 買家刪帳與店家退場的清除 job 用的批次寫入。可見性在 job 跑之前已經由 pub_* 在讀取時擋住；這裡是實體清除，冪等：以「還沒刪除」與
-// 「還存在」為述詞，重跑只處理剩下的。
 func (q *Queries) LockBuyerCommentBatch(ctx context.Context, arg LockBuyerCommentBatchParams) ([]LockBuyerCommentBatchRow, error) {
 	rows, err := q.db.Query(ctx, lockBuyerCommentBatch, arg.BuyerID, arg.MaxRows)
 	if err != nil {
@@ -336,7 +327,6 @@ type LockStoreCommentBatchRow struct {
 	ParentID *uuid.UUID
 }
 
-// 店家身分寫的留言。店家身分只會出現在它自己的貼文下（actor.ForWrite），所以也等於它的貼文底下店家寫的留言；以作者條件找，不依賴這個寫入規則。
 func (q *Queries) LockStoreCommentBatch(ctx context.Context, arg LockStoreCommentBatchParams) ([]LockStoreCommentBatchRow, error) {
 	rows, err := q.db.Query(ctx, lockStoreCommentBatch, arg.StoreID, arg.MaxRows)
 	if err != nil {
@@ -376,7 +366,6 @@ type LockStoreForumEntryBatchRow struct {
 	ParentID *uuid.UUID
 }
 
-// 討論區的容器是店家：該店討論區的全部留言（含買家寫的）。店家身分的留言也只會在自己的討論區，作者條件是不依賴寫入規則的後備。
 func (q *Queries) LockStoreForumEntryBatch(ctx context.Context, arg LockStoreForumEntryBatchParams) ([]LockStoreForumEntryBatchRow, error) {
 	rows, err := q.db.Query(ctx, lockStoreForumEntryBatch, arg.StoreID, arg.MaxRows)
 	if err != nil {
@@ -415,7 +404,6 @@ type LockStorePostBatchRow struct {
 	ImageAssetID *uuid.UUID
 }
 
-// 店家的貼文：還沒刪除的，或已經軟刪但圖片引用還在的（軟刪保留引用，退場時一起釋放）。
 func (q *Queries) LockStorePostBatch(ctx context.Context, arg LockStorePostBatchParams) ([]LockStorePostBatchRow, error) {
 	rows, err := q.db.Query(ctx, lockStorePostBatch, arg.StoreID, arg.MaxRows)
 	if err != nil {
@@ -448,7 +436,6 @@ type PurgePostBatchParams struct {
 	Ids []uuid.UUID
 }
 
-// 軟刪（已經刪除的保留原時間）並清掉圖片欄位（引用由同步 job 釋放）。
 func (q *Queries) PurgePostBatch(ctx context.Context, arg PurgePostBatchParams) error {
 	_, err := q.db.Exec(ctx, purgePostBatch, arg.Now, arg.Ids)
 	return err
@@ -470,8 +457,6 @@ type ScrubBuyerCommentBodyBatchParams struct {
 	MaxRows int32
 }
 
-// 買家刪帳的清除：把他已刪除的留言的內文設為 NULL（保留列，討論串結構與佔位項目還在；comments_scrubbed_check 保證 NULL 只出現在已刪除的列）。
-// 冪等：只處理還有內文的列，重跑只處理剩下的。不動 updated_at（不是使用者的修改），版本加一（內容變了）。request_id 與 request_hash 一併清掉（未加鹽的內文雜湊可以字典還原內文）。
 func (q *Queries) ScrubBuyerCommentBodyBatch(ctx context.Context, arg ScrubBuyerCommentBodyBatchParams) (int64, error) {
 	result, err := q.db.Exec(ctx, scrubBuyerCommentBodyBatch, arg.BuyerID, arg.MaxRows)
 	if err != nil {

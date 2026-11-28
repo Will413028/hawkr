@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-
 func ownsInquiry(storeAccountID, accountID int64) bool {
 	return accountID > 0 && storeAccountID == accountID
 }

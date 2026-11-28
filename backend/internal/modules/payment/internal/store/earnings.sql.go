@@ -23,7 +23,6 @@ type SellerHasOrderPaymentParams struct {
 	OrderNo string
 }
 
-// 這個店家有沒有這張訂單的訂單應收（有付款才有；別家店的訂單與不存在的訂單都是 false）。
 func (q *Queries) SellerHasOrderPayment(ctx context.Context, arg SellerHasOrderPaymentParams) (bool, error) {
 	row := q.db.QueryRow(ctx, sellerHasOrderPayment, arg.StoreID, arg.OrderNo)
 	var found bool
@@ -75,9 +74,6 @@ type SellerListEarningsRow struct {
 	CreatedAt time.Time
 }
 
-// 賣家入帳帳本，新的在前（keyset：id < after_id；各列的 ID 都是 UUIDv7，依 ID 由大到小就是記錄時間由新到舊）。店家以訂單應收的 store_id 判定，
-// 三種列都經訂單應收：轉帳（金額為正）、收回（撤回列，金額為負，RELEASED 是沒有收回，不列）、補差額（退款列的 topup_*，金額為退款額，
-// NONE 與 RELEASED 沒有補，不列）。order_no 空字串不篩，from_time 含、to_time 不含，NULL 不限。
 func (q *Queries) SellerListEarnings(ctx context.Context, arg SellerListEarningsParams) ([]SellerListEarningsRow, error) {
 	rows, err := q.db.Query(ctx, sellerListEarnings,
 		arg.StoreID,

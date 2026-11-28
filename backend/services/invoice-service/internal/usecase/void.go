@@ -19,7 +19,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // Voiding 是作廢軸的 usecase。
 type Voiding struct {
 	tx          database.TxManager
@@ -29,8 +28,8 @@ type Voiding struct {
 	accounts    domain.ProviderAccountRepository
 	audit       domain.AuditRepository
 	provider    ProviderClient
-	outbox  domain.OutboxRepository
-	issuers domain.IssuerRepository
+	outbox      domain.OutboxRepository
+	issuers     domain.IssuerRepository
 	adjustments domain.AdjustmentRepository
 
 	now func() time.Time
@@ -79,7 +78,6 @@ func orNop(l *zap.Logger) *zap.Logger {
 	return l
 }
 
-
 // ClaimForVoidAt 在**單一事務**內做兩件必須同時成立的事：
 //
 //	① operation READY／RETRY_SCHEDULED／SENDING → SENDING（CAS，租約推到 now+120s）
@@ -120,7 +118,6 @@ func (u *Voiding) ClaimForVoidAt(ctx context.Context, operationID int64, now, le
 	})
 	return claimed, err
 }
-
 
 // ErrVoidMissingInvoiceNumber 是「要作廢的 document 沒有發票號碼」。
 //
@@ -182,7 +179,7 @@ func (u *Voiding) SubmitVoid(ctx context.Context, operationID int64) error {
 }
 
 const (
-	voidReasonCorrection = "買方資料更正"
+	voidReasonCorrection  = "買方資料更正"
 	voidReasonOrderRefund = "訂單退款"
 )
 
@@ -201,7 +198,6 @@ func (u *Voiding) cancelReasonFor(ctx context.Context, op domain.Operation) stri
 	}
 	return voidReasonCorrection
 }
-
 
 func voidRejectReasonOf(providerCode string) string {
 	switch providerCode {
@@ -481,7 +477,6 @@ func (u *Voiding) cancelPendingReissue(
 		zap.String("provider_code", providerCode))
 	return nil
 }
-
 
 // ConfirmVoid 對一筆 WAITING_CONFIRMATION 的 VOID operation 打**一次** invoice_query，
 // 確認 invoice_type 是否已經變成 C0501。

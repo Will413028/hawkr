@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-
 type fakeClock struct {
 	mu sync.Mutex
 	t  time.Time

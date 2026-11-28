@@ -35,7 +35,6 @@ type FirstSellerScoresRow struct {
 	PublishedAt      time.Time
 }
 
-// 排行的第一頁：分數由大到小，同分時最近才可曝光的在前，再以 store_id 由大到小定序。
 func (q *Queries) FirstSellerScores(ctx context.Context, pageSize int32) ([]FirstSellerScoresRow, error) {
 	rows, err := q.db.Query(ctx, firstSellerScores, pageSize)
 	if err != nil {
@@ -78,7 +77,6 @@ FROM jsonb_to_recordset($1::jsonb) AS r(
 )
 `
 
-// rows 是 JSON 陣列，每個元素一列（rating_average 可以是 null）；一句話寫入整份快照。
 func (q *Queries) InsertSellerScores(ctx context.Context, rows []byte) error {
 	_, err := q.db.Exec(ctx, insertSellerScores, rows)
 	return err
@@ -108,7 +106,6 @@ type NextSellerScoresRow struct {
 	PublishedAt      time.Time
 }
 
-// 接在游標（上一頁最後一列的排序鍵）之後的下一頁。三個鍵都是由大到小，所以列比較用 <。
 func (q *Queries) NextSellerScores(ctx context.Context, arg NextSellerScoresParams) ([]NextSellerScoresRow, error) {
 	rows, err := q.db.Query(ctx, nextSellerScores,
 		arg.AfterScore,

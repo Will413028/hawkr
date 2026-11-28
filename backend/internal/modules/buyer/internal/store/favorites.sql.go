@@ -24,7 +24,6 @@ type AddFavoriteParams struct {
 	CreatedAt time.Time
 }
 
-// 僅插入不存在的收藏，回傳受影響列數供事件判定。
 func (q *Queries) AddFavorite(ctx context.Context, arg AddFavoriteParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addFavorite, arg.BuyerID, arg.ProductID, arg.CreatedAt)
 	if err != nil {
@@ -44,7 +43,6 @@ type BatchFavoriteParams struct {
 	Column2 []uuid.UUID
 }
 
-// 回傳輸入清單中已收藏的商品 ID。
 func (q *Queries) BatchFavorite(ctx context.Context, arg BatchFavoriteParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, batchFavorite, arg.BuyerID, arg.Column2)
 	if err != nil {
@@ -76,7 +74,6 @@ type CheckFavoriteParams struct {
 	ProductID uuid.UUID
 }
 
-// 查詢單一商品的收藏狀態。
 func (q *Queries) CheckFavorite(ctx context.Context, arg CheckFavoriteParams) (bool, error) {
 	row := q.db.QueryRow(ctx, checkFavorite, arg.BuyerID, arg.ProductID)
 	var exists bool
@@ -91,7 +88,6 @@ WHERE buyer_id = $1
 RETURNING product_id
 `
 
-// 刪除全部收藏並回傳商品 ID 供事件發布。
 func (q *Queries) ClearFavorite(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, clearFavorite, buyerID)
 	if err != nil {
@@ -118,7 +114,6 @@ FROM buyer.favorites
 WHERE buyer_id = $1
 `
 
-// 計算買家收藏數量。
 func (q *Queries) CountFavorite(ctx context.Context, buyerID int64) (int64, error) {
 	row := q.db.QueryRow(ctx, countFavorite, buyerID)
 	var count int64
@@ -133,7 +128,6 @@ WHERE buyer_id = $1
 ORDER BY product_id
 `
 
-// 列出買家的全部收藏商品 ID。
 func (q *Queries) FavoriteIDs(ctx context.Context, buyerID int64) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, favoriteIDs, buyerID)
 	if err != nil {
@@ -170,7 +164,6 @@ type ListFavoriteParams struct {
 	PageLimit int32
 }
 
-// 以建立時間及商品 ID 進行收藏 keyset 分頁。
 func (q *Queries) ListFavorite(ctx context.Context, arg ListFavoriteParams) ([]BuyerFavorite, error) {
 	rows, err := q.db.Query(ctx, listFavorite,
 		arg.BuyerID,
@@ -208,7 +201,6 @@ type RemoveFavoriteParams struct {
 	ProductID uuid.UUID
 }
 
-// 僅實際刪除收藏時回傳一列。
 func (q *Queries) RemoveFavorite(ctx context.Context, arg RemoveFavoriteParams) (int64, error) {
 	result, err := q.db.Exec(ctx, removeFavorite, arg.BuyerID, arg.ProductID)
 	if err != nil {

@@ -136,8 +136,7 @@ export function writeCheckoutDraft(draft: CheckoutDraft) {
 		} else {
 			window.sessionStorage.removeItem(CHECKOUT_DRAFT_PII_KEY);
 		}
-	} catch {
-	}
+	} catch {}
 }
 
 export function clearCheckoutDraft() {
@@ -145,6 +144,5 @@ export function clearCheckoutDraft() {
 	window.localStorage.removeItem(CHECKOUT_DRAFT_STORAGE_KEY);
 	try {
 		window.sessionStorage.removeItem(CHECKOUT_DRAFT_PII_KEY);
-	} catch {
-	}
+	} catch {}
 }

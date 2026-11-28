@@ -9,11 +9,10 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type fakeHistoryAudit struct {
 	domain.AuditRepository
-	rows []domain.StatusHistoryEntry
-	err  error
+	rows           []domain.StatusHistoryEntry
+	err            error
 	gotSubjectType string
 	gotSubjectID   int64
 }

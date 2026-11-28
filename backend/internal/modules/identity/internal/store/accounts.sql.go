@@ -26,7 +26,6 @@ type CountAccountsParams struct {
 	Email     string
 }
 
-// 與 ListAccounts 相同的篩選，給後台顯示頁數。
 func (q *Queries) CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countAccounts,
 		arg.Role,
@@ -51,7 +50,6 @@ type DeleteAccountParams struct {
 	ID  int64
 }
 
-// 留下沒有個資的墓碑（accounts_deleted_check）。已經刪除時沒有列被更新（冪等）。
 func (q *Queries) DeleteAccount(ctx context.Context, arg DeleteAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAccount, arg.Now, arg.ID)
 	if err != nil {
@@ -64,7 +62,6 @@ const getAccount = `-- name: GetAccount :one
 SELECT id, email, self_entered_email, suspended_at, deleted_at, deletion_pending_at, preferred_locale, created_at, updated_at FROM identity.accounts WHERE id = $1
 `
 
-// 含已刪除的帳號（墓碑）：舊服務要查得到「已刪除」。
 func (q *Queries) GetAccount(ctx context.Context, id int64) (IdentityAccount, error) {
 	row := q.db.QueryRow(ctx, getAccount, id)
 	var i IdentityAccount
@@ -127,7 +124,6 @@ type InsertFederatedAccountParams struct {
 	Now   time.Time
 }
 
-// 聯合登入的新帳號。email 是 provider 回報的已驗證 email（沒有時 NULL）。
 func (q *Queries) InsertFederatedAccount(ctx context.Context, arg InsertFederatedAccountParams) (int64, error) {
 	row := q.db.QueryRow(ctx, insertFederatedAccount, arg.Email, arg.Now)
 	var id int64
@@ -159,10 +155,6 @@ type ListAccountsParams struct {
 	MaxRows      int32
 }
 
-// 後台的帳號清單：存活的帳號，新到舊。role 空字串不篩選角色；pattern 空字串不篩選，否則比對 email 包含這段文字
-// （呼叫方已跳脫 % 與 _），或帳號 ID 等於 account_id（搜尋的文字不是數字時是 0，不會命中）；email 空字串不篩選，否則
-// 要 lower(email) 等於它（呼叫方已去空白並轉小寫）。keyset 分頁：
-// has_cursor 時從 (after_created, after_id) 之後開始。
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]IdentityAccount, error) {
 	rows, err := q.db.Query(ctx, listAccounts,
 		arg.Role,
@@ -206,7 +198,6 @@ const lockLiveAccount = `-- name: LockLiveAccount :one
 SELECT id, email, self_entered_email, suspended_at, deleted_at, deletion_pending_at, preferred_locale, created_at, updated_at FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE
 `
 
-// 鎖住存活的帳號，讓同一個帳號的角色變更、停權與刪除依序執行。
 func (q *Queries) LockLiveAccount(ctx context.Context, id int64) (IdentityAccount, error) {
 	row := q.db.QueryRow(ctx, lockLiveAccount, id)
 	var i IdentityAccount
@@ -235,7 +226,6 @@ type MarkDeletionPendingParams struct {
 	ID  int64
 }
 
-// 帳號進入等待刪除；已經在等待時沒有列被更新（冪等）。
 func (q *Queries) MarkDeletionPending(ctx context.Context, arg MarkDeletionPendingParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markDeletionPending, arg.Now, arg.ID)
 	if err != nil {
@@ -256,7 +246,6 @@ type SetPreferredLocaleParams struct {
 	ID     int64
 }
 
-// 語系與目前的值不同時才寫（相同是 no-op，不動 updated_at、不留下列鎖）；墓碑不更新。受影響列數 1 表示有改。
 func (q *Queries) SetPreferredLocale(ctx context.Context, arg SetPreferredLocaleParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setPreferredLocale, arg.Locale, arg.Now, arg.ID)
 	if err != nil {
@@ -277,8 +266,6 @@ type SetSelfEnteredEmailParams struct {
 	ID               int64
 }
 
-// 自填聯絡信箱：呼叫方已在同一個 transaction 內鎖住帳號列（LockLiveAccount）並以 Go 的 validEmail 確認沒有可用的已驗證 email；
-// 「可用」的規則只在 Go（emailaddr.Normalize），SQL 不重述它。依 id 寫入存活的帳號，受影響列數必為 1（相同值也寫入，不是 no-op）。
 func (q *Queries) SetSelfEnteredEmail(ctx context.Context, arg SetSelfEnteredEmailParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setSelfEnteredEmail, arg.SelfEnteredEmail, arg.Now, arg.ID)
 	if err != nil {
@@ -291,7 +278,6 @@ const shareLockLiveAccount = `-- name: ShareLockLiveAccount :one
 SELECT id FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR SHARE
 `
 
-// 共享鎖住存活的帳號：只要求帳號列在 transaction commit 之前不被刪除或改動，不擋其他讀者的共享鎖（給只讀取帳號狀態、不改帳號的呼叫者）。
 func (q *Queries) ShareLockLiveAccount(ctx context.Context, id int64) (int64, error) {
 	row := q.db.QueryRow(ctx, shareLockLiveAccount, id)
 	var id_2 int64
@@ -310,7 +296,6 @@ type SuspendAccountParams struct {
 	ID  int64
 }
 
-// 已經停權時沒有列被更新（冪等）。
 func (q *Queries) SuspendAccount(ctx context.Context, arg SuspendAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, suspendAccount, arg.Now, arg.ID)
 	if err != nil {
@@ -330,7 +315,6 @@ type UnsuspendAccountParams struct {
 	ID  int64
 }
 
-// 沒有停權時沒有列被更新（冪等）。
 func (q *Queries) UnsuspendAccount(ctx context.Context, arg UnsuspendAccountParams) (int64, error) {
 	result, err := q.db.Exec(ctx, unsuspendAccount, arg.Now, arg.ID)
 	if err != nil {
@@ -351,7 +335,6 @@ type UpdateAccountEmailParams struct {
 	ID    int64
 }
 
-// 登入時以已驗證 email 更新寄件地址（ADR 2026-10-30-identity-self-hosted-federated-login D4）；墓碑不更新。
 func (q *Queries) UpdateAccountEmail(ctx context.Context, arg UpdateAccountEmailParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateAccountEmail, arg.Email, arg.Now, arg.ID)
 	if err != nil {

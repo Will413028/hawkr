@@ -16,7 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 func newDelegationTestContext(t *testing.T, method, target, body string) (*httptest.ResponseRecorder, *gin.Context) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)

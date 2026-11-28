@@ -135,7 +135,6 @@ export function providerVerifyResultOf(status: string): ProviderVerifyResult {
 	}
 }
 
-
 /** 端點 44（重新測試）不渲染的狀態：除這三個外恆在。 */
 export const HEALTH_CHECK_HIDDEN_STATUSES = new Set<string>([
 	InvoiceProviderAccountStatus.NOT_STARTED,

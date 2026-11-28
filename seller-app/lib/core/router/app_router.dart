@@ -83,7 +83,6 @@ import 'route_payload.dart';
 import 'session_listenable.dart';
 import 'tab_refresh_provider.dart';
 
-
 /// 認證相關路徑
 class AuthRoutes {
   static const welcome = '/welcome';
@@ -247,7 +246,6 @@ class ProcurementRoutes {
   static const sellerQuote = '/procurement/seller-quote';
 }
 
-
 /// 根導航鍵 — 與 MyApp.navigatorKey 共用，保持 Toast Overlay 正常運作
 final rootNavigatorKey = MyApp.navigatorKey;
 
@@ -388,7 +386,6 @@ class _CouponDetailRoute extends ConsumerWidget {
   }
 }
 
-
 /// Navigator observers are injectable so hermetic app tests can exercise the
 /// production router without booting the Firebase native plugin.
 final appRouterObserversProvider = Provider<List<NavigatorObserver>>(
@@ -508,7 +505,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-
 
       GoRoute(
         path: SettingsRoutes.profile,
@@ -1106,7 +1102,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
 
 /// 主導航 Shell Scaffold — 取代原本的 MainNavigationScreen
 class _MainShellScaffold extends ConsumerStatefulWidget {

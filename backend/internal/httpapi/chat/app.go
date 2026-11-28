@@ -17,17 +17,17 @@ import (
 
 // App 實作 ChatAppService。
 type App struct {
-	reads  Reads
-	writes Writes
-	buyers Buyers
-	stores Stores
-	images rpc.Images
-	log    *slog.Logger
-	streams Streams
-	auth    Reauthenticator
-	stream streamConfig
-	clock  streamClock
-	jitter func() float64
+	reads    Reads
+	writes   Writes
+	buyers   Buyers
+	stores   Stores
+	images   rpc.Images
+	log      *slog.Logger
+	streams  Streams
+	auth     Reauthenticator
+	stream   streamConfig
+	clock    streamClock
+	jitter   func() float64
 	reasonOf func(error) im.Reason
 }
 

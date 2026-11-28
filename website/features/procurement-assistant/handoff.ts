@@ -98,8 +98,7 @@ export function writeHawkrAgentHandoff(
 	memoryHandoff = handoff;
 	try {
 		storage?.setItem(HAWKR_AGENT_HANDOFF_STORAGE_KEY, JSON.stringify(handoff));
-	} catch {
-	}
+	} catch {}
 	return true;
 }
 
@@ -114,8 +113,7 @@ export function consumeHawkrAgentHandoff(
 			now,
 		);
 		storage?.removeItem(HAWKR_AGENT_HANDOFF_STORAGE_KEY);
-	} catch {
-	}
+	} catch {}
 	const handoff = stored ?? memoryHandoff;
 	memoryHandoff = null;
 	if (!handoff) return null;

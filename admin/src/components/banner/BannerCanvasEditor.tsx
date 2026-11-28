@@ -93,7 +93,6 @@ const BannerCanvasEditor: React.FC<BannerCanvasEditorProps> = ({
 
 	return (
 		<div className="flex flex-col h-full font-['Roboto','Noto_Sans_JP',sans-serif]">
-
 			<div className="h-[48px] border-b border-[var(--border-color)] flex items-center justify-between px-[16px] shrink-0 bg-white">
 				<button
 					type="button"
@@ -189,9 +188,7 @@ const BannerCanvasEditor: React.FC<BannerCanvasEditorProps> = ({
 			</div>
 
 			<div className="flex flex-1 min-h-0">
-
 				<div className="w-[220px] bg-[#2b2b2b] shrink-0 flex flex-col overflow-y-auto">
-
 					<div className="flex border-b border-[#444]">
 						<TabBtn
 							icon={<ShapeTabIcon />}
@@ -274,7 +271,6 @@ const BannerCanvasEditor: React.FC<BannerCanvasEditorProps> = ({
 
 						{activeTab === "color" && (
 							<>
-
 								{hasSelection && (
 									<>
 										<SectionLabel>物件填色（已選取）</SectionLabel>
@@ -333,7 +329,6 @@ const BannerCanvasEditor: React.FC<BannerCanvasEditorProps> = ({
 					</div>
 				</div>
 
-
 				<div
 					ref={containerRef}
 					className="flex-1 flex items-center justify-center bg-[#e0e0e0] overflow-hidden"
@@ -354,7 +349,6 @@ const BannerCanvasEditor: React.FC<BannerCanvasEditorProps> = ({
 				</div>
 			</div>
 
-
 			<input
 				ref={fileInputRef}
 				type="file"
@@ -369,7 +363,6 @@ const BannerCanvasEditor: React.FC<BannerCanvasEditorProps> = ({
 		</div>
 	);
 };
-
 
 function TabBtn({
 	icon,
@@ -451,7 +444,6 @@ function DarkBtn({
 		</button>
 	);
 }
-
 
 function ShapeTabIcon() {
 	return (

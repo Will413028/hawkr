@@ -84,7 +84,6 @@ function cursorListControls(
 	};
 }
 
-
 interface CouponState {
 	my: MyCouponItem[];
 	available: CouponItem[];
@@ -138,7 +137,6 @@ export function useCoupons() {
 		},
 	};
 }
-
 
 export function useFavorites(options: { enabled?: boolean } = {}) {
 	const { identity, status, scope } = useBuyerQueryScope();
@@ -194,7 +192,6 @@ export function useFavorites(options: { enabled?: boolean } = {}) {
 		remove,
 	};
 }
-
 
 export function useFollowing(options: { enabled?: boolean } = {}) {
 	const { identity, status, scope } = useBuyerQueryScope();
@@ -252,7 +249,6 @@ export function useFollowing(options: { enabled?: boolean } = {}) {
 	};
 }
 
-
 export function useHistory() {
 	const { identity, status, scope } = useBuyerQueryScope();
 	const signedIn = status === "signedIn";
@@ -307,7 +303,6 @@ export function useHistory() {
 	};
 }
 
-
 export function useMemberCards() {
 	const { identity, status, scope } = useBuyerQueryScope();
 	const signedIn = status === "signedIn";
@@ -333,7 +328,6 @@ export function useMemberCards() {
 		error: errorMessage(query.error, "載入會員卡失敗"),
 	};
 }
-
 
 /**
  * `enabled` lets a caller that doesn't always need the buyer profile skip the

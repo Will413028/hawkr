@@ -15,7 +15,6 @@ import { parseDate } from "@hawkr/api/proto/date";
 import { trimGoSpace } from "@hawkr/api/text/server-text";
 import { fromLocalInput } from "@/app/admin/merchants/[id]/measure";
 
-
 /** 來函的版本衝突（L21）。 */
 export const AUTHORITY_CONFLICT_TEXT =
 	"這筆來函剛被更新，頁面已重新載入；請確認最新狀態後再操作。";
@@ -28,7 +27,6 @@ export const TARGET_NOTICE_REQUIRED_TEXT = "請為每個指名的對象選擇告
 /** 登記頁對象列的操作（已核准）。 */
 export const ADD_TARGET_TEXT = "新增對象";
 export const REMOVE_TARGET_TEXT = "移除";
-
 
 export interface TargetRowForm {
 	/** 列的穩定鍵（只給畫面用，不送出）。 */
@@ -103,7 +101,6 @@ export function buildCreateAuthorityOrder(
 	};
 }
 
-
 export interface NoticeForm {
 	/** UNSPECIFIED＝還沒選。 */
 	kind: AuthorityTargetNoticeKind;
@@ -147,7 +144,6 @@ export function buildNotice(
 			return { kind: form.kind };
 	}
 }
-
 
 export interface CompleteForm {
 	resolutionSummary: string;
@@ -195,7 +191,6 @@ export function buildComplete(
 	};
 }
 
-
 export interface ExtendForm {
 	/** 新的保存期限，`datetime-local`（台北）。 */
 	holdUntil: string;
@@ -229,7 +224,6 @@ export function buildRecordNotice(
 		notice: buildNotice(form),
 	};
 }
-
 
 /** 撤銷登記的請求：原因去掉前後空白（長度由伺服器判斷並回已核准的句子 authority_order.revoke_reason_length）。 */
 export function buildRevoke(

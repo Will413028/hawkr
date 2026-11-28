@@ -25,8 +25,6 @@ type AdvanceSecureUploadParams struct {
 	ChunkIndex  int32
 }
 
-// 推進一段：只有 next_index 等於這段的序號、仍在 UPLOADING 且未過期的會話才推進（輸給並行的同一段、過期或已被拒就 0 列）。
-// 第 0 段同時記下辨認出的型別。
 func (q *Queries) AdvanceSecureUpload(ctx context.Context, arg AdvanceSecureUploadParams) (int64, error) {
 	result, err := q.db.Exec(ctx, advanceSecureUpload,
 		arg.ContentType,
@@ -54,8 +52,6 @@ type ClaimUploadParams struct {
 	ID  uuid.UUID
 }
 
-// 擁有者確認（B1-D25）：READY 且未過期的暫存列認領為 CONFIRMED，只新增一列、不更新任何既有列。與 GC 的 ReclaimUpload 搶同一個唯一鍵 upload_id，
-// 輸的一方沒有列（pgx.ErrNoRows）；ON CONFLICT 不指定目標：upload_id 與 asset_id 兩個唯一鍵都要吸收，並行確認同一個 token 才不會撞 upload_claims_asset_key 而回 23505；同一個鍵被另一個還沒提交的 transaction 插入時會等它結束。回傳認領的資產 ID。
 func (q *Queries) ClaimUpload(ctx context.Context, arg ClaimUploadParams) (*uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, claimUpload, arg.Now, arg.ID)
 	var asset_id *uuid.UUID
@@ -67,7 +63,6 @@ const deleteClaimOfUpload = `-- name: DeleteClaimOfUpload :execrows
 DELETE FROM media.upload_claims WHERE upload_id = $1 AND kind = 'RECLAIMED'
 `
 
-// 暫存列物理刪除完成：它的 RECLAIMED 認領一併刪（state 已是 DELETED，不再需要認領來擋 Confirm）。
 func (q *Queries) DeleteClaimOfUpload(ctx context.Context, uploadID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteClaimOfUpload, uploadID)
 	if err != nil {
@@ -80,7 +75,6 @@ const deleteSecureChunks = `-- name: DeleteSecureChunks :exec
 DELETE FROM media.secure_chunks WHERE asset_id = $1
 `
 
-// 回收：資產（或暫存列預配的資產）標為 DELETED 的同一個 transaction 刪掉它的段記錄；物件已在 transaction 外刪完。
 func (q *Queries) DeleteSecureChunks(ctx context.Context, assetID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteSecureChunks, assetID)
 	return err
@@ -98,7 +92,6 @@ type GetClaimRow struct {
 	Here     bool
 }
 
-// 暫存列的認領；here 表示是目前這個 transaction 寫的（Confirm 重入只在同一個 transaction 內冪等，B1-D23）。
 func (q *Queries) GetClaim(ctx context.Context, uploadID uuid.UUID) (GetClaimRow, error) {
 	row := q.db.QueryRow(ctx, getClaim, uploadID)
 	var i GetClaimRow
@@ -227,7 +220,6 @@ type GetUploadViewRow struct {
 	Confirmed           bool
 }
 
-// 暫存列加它是否有 CONFIRMED 認領（推導出的 CONFIRMED，不論列上的 state 是 READY 還是已物化的 CONFIRMED）。
 func (q *Queries) GetUploadView(ctx context.Context, id uuid.UUID) (GetUploadViewRow, error) {
 	row := q.db.QueryRow(ctx, getUploadView, id)
 	var i GetUploadViewRow
@@ -300,8 +292,6 @@ type InsertSecureUploadParams struct {
 	Now              time.Time
 }
 
-// 機敏分段上傳：以 UPLOADING 建列（沒有預簽，tmp_key、declared_md5、declared_content_type 與 final_key 是 NULL），
-// 預配資產 ID、段總數、next_index 0 與包好的 DEK。
 func (q *Queries) InsertSecureUpload(ctx context.Context, arg InsertSecureUploadParams) error {
 	_, err := q.db.Exec(ctx, insertSecureUpload,
 		arg.ID,
@@ -430,8 +420,6 @@ type ListReclaimableUploadsRow struct {
 	ExpiresAt time.Time
 }
 
-// GC 階段一的候選：過期且未確認（PENDING、UPLOADING、READY、REJECTED）的列，以及過期超過寬限仍停在 UPLOADED 的列（處理 job 已不會再來），
-// 而且還沒有任何認領。純 SELECT、不鎖列；(expires_at, id) 是 keyset，被跳過的列不會讓迴圈原地打轉。
 func (q *Queries) ListReclaimableUploads(ctx context.Context, arg ListReclaimableUploadsParams) ([]ListReclaimableUploadsRow, error) {
 	rows, err := q.db.Query(ctx, listReclaimableUploads,
 		arg.Now,
@@ -507,7 +495,6 @@ type ListUploadsToRewrapRow struct {
 	WrappedDek     []byte
 }
 
-// 換 KEK 後重新包裹用：還在上傳中、kek_id 不是 primary 的機敏暫存列（資產列建立前，DEK 只在這裡）。
 func (q *Queries) ListUploadsToRewrap(ctx context.Context, arg ListUploadsToRewrapParams) ([]ListUploadsToRewrapRow, error) {
 	rows, err := q.db.Query(ctx, listUploadsToRewrap, arg.PrimaryKekID, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -545,7 +532,6 @@ type MarkReclaimedUploadDeletingParams struct {
 	ID  uuid.UUID
 }
 
-// 贏得 RECLAIMED 認領的暫存列轉 DELETING，回傳它指著的資產（可能沒有）；物件隨後在 transaction 外刪。
 func (q *Queries) MarkReclaimedUploadDeleting(ctx context.Context, arg MarkReclaimedUploadDeletingParams) (*uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, markReclaimedUploadDeleting, arg.Now, arg.ID)
 	var asset_id *uuid.UUID
@@ -565,7 +551,6 @@ type MarkSecureUploadReadyParams struct {
 	ID       uuid.UUID
 }
 
-// 最後一段推進後（同一個 transaction，資產列已建）：UPLOADING → READY，記資產與前綴。
 func (q *Queries) MarkSecureUploadReady(ctx context.Context, arg MarkSecureUploadReadyParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markSecureUploadReady, arg.FinalKey, arg.Now, arg.ID)
 	if err != nil {
@@ -604,7 +589,6 @@ type MarkUploadReadyParams struct {
 	ID      uuid.UUID
 }
 
-// UPLOADED → READY；列已過期就不轉（處理 job 隨後刪掉剛寫的正式物件）。
 func (q *Queries) MarkUploadReady(ctx context.Context, arg MarkUploadReadyParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markUploadReady, arg.AssetID, arg.Now, arg.ID)
 	if err != nil {
@@ -625,7 +609,6 @@ type MarkUploadRejectedParams struct {
 	ID     uuid.UUID
 }
 
-// UPLOADED → REJECTED，記原因代碼。
 func (q *Queries) MarkUploadRejected(ctx context.Context, arg MarkUploadRejectedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markUploadRejected, arg.Reason, arg.Now, arg.ID)
 	if err != nil {
@@ -646,7 +629,6 @@ type MarkUploadUploadedParams struct {
 	ID       uuid.UUID
 }
 
-// PENDING → UPLOADED；列已過期就不轉。
 func (q *Queries) MarkUploadUploaded(ctx context.Context, arg MarkUploadUploadedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markUploadUploaded, arg.FinalKey, arg.Now, arg.ID)
 	if err != nil {
@@ -672,8 +654,6 @@ type ReclaimUploadParams struct {
 	UploadedBefore time.Time
 }
 
-// GC 階段一：以 RECLAIMED 認領一筆過期的暫存列。條件與 ListReclaimableUploads 相同，在插入時重新檢查；輸給 Confirm（或已被認領）沒有列。
-// 呼叫端先 SET LOCAL lock_timeout：同一個鍵被擁有者還沒提交的認領佔著時不等它，跳過這一列。
 func (q *Queries) ReclaimUpload(ctx context.Context, arg ReclaimUploadParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, reclaimUpload, arg.Now, arg.ID, arg.UploadedBefore)
 	var upload_id uuid.UUID
@@ -693,7 +673,6 @@ type RejectSecureUploadAtFirstChunkParams struct {
 	ID     uuid.UUID
 }
 
-// 第 0 段辨認不出：只在還沒收任何段（next_index = 0）的 UPLOADING 會話轉 REJECTED。
 func (q *Queries) RejectSecureUploadAtFirstChunk(ctx context.Context, arg RejectSecureUploadAtFirstChunkParams) (int64, error) {
 	result, err := q.db.Exec(ctx, rejectSecureUploadAtFirstChunk, arg.Reason, arg.Now, arg.ID)
 	if err != nil {
@@ -715,7 +694,6 @@ type RewrapUploadParams struct {
 	OldKekID      *string
 }
 
-// 與 RewrapAsset 同理：kek_id 仍是取出時的舊值且還在 UPLOADING 才更新；最後一段的推進會鎖同一列，所以搬到資產列的一定是當時最新的值。
 func (q *Queries) RewrapUpload(ctx context.Context, arg RewrapUploadParams) (int64, error) {
 	result, err := q.db.Exec(ctx, rewrapUpload,
 		arg.NewKekID,
@@ -747,7 +725,6 @@ type SettleConfirmedUploadsParams struct {
 	MaxRows int32
 }
 
-// settle：把已有 CONFIRMED 認領的 READY 暫存列物化成 CONFIRMED，讓 staged_uploads_gc 索引不累積已確認的列。推導不依賴它。
 func (q *Queries) SettleConfirmedUploads(ctx context.Context, arg SettleConfirmedUploadsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, settleConfirmedUploads, arg.Now, arg.MaxRows)
 	if err != nil {

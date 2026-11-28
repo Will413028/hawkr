@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 func setupSearchRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
@@ -23,7 +22,6 @@ func setupSearchRouter(h *Holder) *gin.Engine {
 	}
 	return r
 }
-
 
 // TestSearchProductsViaES_SellerLogoURLField proves the nested seller object
 // in /public/search/products responses exposes the seller logo as the canonical

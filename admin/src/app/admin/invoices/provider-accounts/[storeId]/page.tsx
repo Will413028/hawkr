@@ -44,7 +44,6 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 type OpenDialog = "deactivate" | "reactivate" | "revoke" | null;
 
 /** 已完成的治理動作（端點 45／67 共用一個形狀，時間欄各自不同）。 */
@@ -410,7 +409,6 @@ export default function ProviderAccountDetailPage() {
 					</div>
 				</div>
 				<div className="header-actions">
-
 					{canHealthCheck ? (
 						<Button
 							variant="outline"
@@ -484,7 +482,6 @@ export default function ProviderAccountDetailPage() {
 				</section>
 			) : (
 				<>
-
 					{completion ? (
 						<section className="invoice-scope-notice" role="status">
 							<MaterialSymbol name="check_circle" />

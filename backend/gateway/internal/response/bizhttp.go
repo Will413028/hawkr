@@ -32,8 +32,8 @@ var bizHTTPStatus = map[int32]int{
 	bizcode.DelegationAdminNotAllowlisted:            http.StatusForbidden,
 
 	bizcode.DelegationInternalContractMismatch: http.StatusFailedDependency,
-	bizcode.DelegationResourceAlreadyInState: http.StatusConflict,
-	bizcode.DelegationFeatureDisabled: http.StatusForbidden,
+	bizcode.DelegationResourceAlreadyInState:   http.StatusConflict,
+	bizcode.DelegationFeatureDisabled:          http.StatusForbidden,
 
 	bizcode.CertApplicationNotFound:         http.StatusNotFound,
 	bizcode.CertApplicationVersionConflict:  http.StatusConflict,
@@ -48,7 +48,6 @@ var bizHTTPStatus = map[int32]int{
 	bizcode.PayuniMerchantProfileVersionConflict:      http.StatusPreconditionFailed,
 	bizcode.PayuniMerchantProfileIdempotencyKeyReused: http.StatusConflict,
 	bizcode.PayuniMerchantProfileNotActive:            http.StatusConflict,
-
 
 	bizcode.SellerInvoiceObligationNotFound: http.StatusNotFound,
 	bizcode.SettlementNotFound:              http.StatusNotFound,

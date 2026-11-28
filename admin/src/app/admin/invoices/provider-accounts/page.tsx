@@ -22,7 +22,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-
 const PROVIDER_ACCOUNTS_ENDPOINT = "/api/v1/admin/invoices/provider_accounts";
 const PAGE_SIZE = 20;
 
@@ -167,7 +166,6 @@ export default function ProviderAccountsPage() {
 
 									<td>{item.sellerTaxId || "—"}</td>
 									<td>
-
 										<StatusBadge
 											variant={
 												PROVIDER_ACCOUNT_STATUS_BADGE_VARIANT[item.status] ??

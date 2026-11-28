@@ -669,8 +669,7 @@ async function applySnapshotToEditor(
 		const total = editor.blocks.getBlocksCount();
 		try {
 			editor.caret.setToBlock(Math.min(firstChanged, total - 1), "end");
-		} catch {
-		}
+		} catch {}
 	}
 }
 
@@ -1580,8 +1579,7 @@ export function DescriptionEditorCanvas({
 										checkpointHistory(fromEditorData(data));
 										forceNextHistoryCheckpointRef.current = true;
 									})
-									.catch(() => {
-									});
+									.catch(() => {});
 						}
 					}
 				}
@@ -1775,15 +1773,13 @@ export function DescriptionEditorCanvas({
 			if (destroyed) return;
 			try {
 				detachDrag = attachBlockDragReorder(editor, holderRef.current);
-			} catch {
-			}
+			} catch {}
 			try {
 				detachMobileToolbar = attachMobileBlockToolbarAlignment(
 					editor,
 					holderRef.current,
 				);
-			} catch {
-			}
+			} catch {}
 			setReady(true);
 
 			const holder = holderRef.current;
@@ -1997,8 +1993,7 @@ export function DescriptionEditorCanvas({
 										false,
 									);
 									uploaded += 1;
-								} catch {
-								}
+								} catch {}
 							}
 							if (uploaded === imageFiles.length) {
 								toast.success(
@@ -2190,8 +2185,7 @@ export function DescriptionEditorCanvas({
 		renderChainRef.current = renderChainRef.current
 			.then(() => editor.isReady)
 			.then(() => editor.render(toEditorData(value)))
-			.catch(() => {
-			});
+			.catch(() => {});
 	}, [value]);
 
 	const captureToolbarSelection = React.useCallback(() => {
@@ -2751,7 +2745,6 @@ export function DescriptionEditorCanvas({
 		</dialog>
 	);
 }
-
 
 type EditorFormatState = {
 	block: string;

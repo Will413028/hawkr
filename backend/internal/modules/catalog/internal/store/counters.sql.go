@@ -24,7 +24,6 @@ type AddProductSalesParams struct {
 	ID       uuid.UUID
 }
 
-// 同 transaction 內以資料庫端的加法累計（不先讀再寫）；上限夾在 INTEGER 最大值。
 func (q *Queries) AddProductSales(ctx context.Context, arg AddProductSalesParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addProductSales, arg.Quantity, arg.Now, arg.ID)
 	if err != nil {
@@ -43,7 +42,6 @@ type ClaimSalesOrderParams struct {
 	Now     time.Time
 }
 
-// 銷量去重：同一個 order_no 只有第一次插入成功（回 1 列），重送回 0 列，呼叫端不再累計。
 func (q *Queries) ClaimSalesOrder(ctx context.Context, arg ClaimSalesOrderParams) (int64, error) {
 	result, err := q.db.Exec(ctx, claimSalesOrder, arg.OrderNo, arg.Now)
 	if err != nil {
@@ -62,7 +60,6 @@ type LockProductRow struct {
 	ReviewCount   int32
 }
 
-// 在呼叫方的 transaction 內鎖商品列（FOR NO KEY UPDATE）並回目前的評分與則數，不看 deleted_at（已刪除的商品仍收評分）；沒有列是商品不存在。
 func (q *Queries) LockProduct(ctx context.Context, id uuid.UUID) (LockProductRow, error) {
 	row := q.db.QueryRow(ctx, lockProduct, id)
 	var i LockProductRow
@@ -71,7 +68,6 @@ func (q *Queries) LockProduct(ctx context.Context, id uuid.UUID) (LockProductRow
 }
 
 const setProductRating = `-- name: SetProductRating :execrows
-
 UPDATE catalog.products
 SET rating_average = $1, review_count = $2, updated_at = $3
 WHERE id = $4
@@ -84,8 +80,6 @@ type SetProductRatingParams struct {
 	ID            uuid.UUID
 }
 
-// 衍生計數：由事實擁有者在自己的 transaction 內傳入，不用 ±1（D3、D26）。不改 content_version（etag 只涵蓋賣家可編輯的內容）。
-// 評分與則數的絕對值；商品刪除後評價仍在，計數仍要更新，所以不看 deleted_at。products_rating_check 是後備。
 func (q *Queries) SetProductRating(ctx context.Context, arg SetProductRatingParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setProductRating,
 		arg.RatingAverage,

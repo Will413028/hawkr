@@ -89,7 +89,6 @@ export default function OperationEndDialog({
 
 				{summary ? <SafetyCard summary={summary} /> : null}
 
-
 				<p className="text-center text-[0.75rem] text-foreground-soft">
 					結束後將清除本機暫存的商店資料並返回 ADM 商家詳情。
 				</p>

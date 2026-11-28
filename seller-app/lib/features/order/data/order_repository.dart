@@ -19,7 +19,6 @@ class OrderRepository with ApiRequestHelper {
   @override
   Dio get dio => _dio;
 
-
   Future<List<OrderSummary>> fetchMatchedOrders({
     int page = 1,
     int pageSize = 10,
@@ -77,7 +76,6 @@ class OrderRepository with ApiRequestHelper {
     );
     return _parseOrderList(resp);
   }
-
 
   Future<OrderSummary> fetchMatchedOrderDetails({
     required String orderSn,
@@ -155,7 +153,6 @@ class OrderRepository with ApiRequestHelper {
     }
   }
 
-
   /// 取得明日起 7 個工作天（排除週日與國定假日）
   /// GET /app/shipping_business_days
   Future<List<BusinessDay>> fetchShippingBusinessDays() async {
@@ -175,7 +172,6 @@ class OrderRepository with ApiRequestHelper {
     }
     return const [];
   }
-
 
   /// 超商確認出貨
   /// POST /app/shipments/{order_no}/confirm
@@ -355,7 +351,6 @@ class OrderRepository with ApiRequestHelper {
     if (code == 400) throw Exception('400 bad request');
     throw Exception('Server code $code: ${msg ?? 'Unknown error'}');
   }
-
 
   static List<OrderSummary> _parseOrderList(Map<String, dynamic> resp) {
     final data = resp['data'];

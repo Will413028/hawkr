@@ -23,8 +23,8 @@ import (
 )
 
 type identityConfig struct {
-	providers identity.Providers
-	webLogin map[identity.Provider]webClient
+	providers        identity.Providers
+	webLogin         map[identity.Provider]webClient
 	googleAppClients []string
 }
 

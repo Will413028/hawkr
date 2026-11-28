@@ -325,7 +325,6 @@ export function SellerProfileBranding({
 				}`}
 				data-view-mode={viewMode}
 			>
-
 				{canWrite && (
 					<>
 						<input
@@ -353,7 +352,6 @@ export function SellerProfileBranding({
 					</>
 				)}
 
-
 				{viewMode === "mobile" && (
 					<>
 						<div className="relative w-[250px] max-w-full aspect-[9/19.5] min-h-[540px] flex-shrink-0">
@@ -364,7 +362,6 @@ export function SellerProfileBranding({
 
 							<div className="absolute inset-0 rounded-[46px] p-[11px] bg-gradient-to-br from-[#2a2a2c] via-[#050505] to-[#1c1c1e] shadow-[0_30px_60px_-30px_rgb(var(--color-ink-950-rgb)/0.55),0_8px_16px_-8px_rgba(0,0,0,0.4),inset_0_0_0_1.5px_rgba(255,255,255,0.08),inset_0_0_0_4px_#0a0a0a] dark:shadow-[0_32px_72px_-34px_rgba(0,0,0,0.88),0_10px_22px_-10px_rgba(0,0,0,0.74),inset_0_0_0_1.5px_rgba(245,222,165,0.06),inset_0_0_0_4px_#050807]">
 								<div className="relative w-full h-full rounded-[35px] overflow-hidden bg-hk-cream text-[#1a1a1a] text-xs leading-[1.4] flex flex-col dark:bg-hk-ink-950 dark:text-[#f5e9c3]">
-
 									<div
 										className={`relative block w-full aspect-[4/1] text-hk-primary-strong bg-hk-ink-100 overflow-hidden dark:bg-hk-ink-850 dark:text-[#f1cd70] ${
 											coverPreviewUrl ? "text-hk-cream" : ""
@@ -500,7 +497,6 @@ export function SellerProfileBranding({
 					</>
 				)}
 
-
 				{viewMode === "web" && (
 					<div className="relative w-full max-w-[420px]">
 						<WebPreview
@@ -548,7 +544,6 @@ export function SellerProfileBranding({
 		</aside>
 	);
 }
-
 
 function EditCallout({
 	target,
@@ -665,7 +660,6 @@ function EditCallout({
 		</button>
 	);
 }
-
 
 function StatusBar() {
 	return (
@@ -919,7 +913,6 @@ function PreviewSkeletonSurface({
 	);
 }
 
-
 interface WebPreviewProps {
 	coverPreviewUrl: string;
 	logoPreviewUrl: string;
@@ -952,7 +945,6 @@ function WebPreview({
 			className="flex flex-col w-full h-[540px] bg-content1 border border-divider rounded-[14px] shadow-[0_8px_24px_rgb(var(--color-ink-950-rgb)/0.08),0_2px_6px_rgb(var(--color-ink-950-rgb)/0.04)] overflow-hidden animate-seller-web-in dark:bg-hk-ink-900/92 dark:border-[rgba(245,222,165,0.18)] dark:shadow-[0_28px_70px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(245,222,165,0.1)]"
 			aria-hidden="true"
 		>
-
 			<div className="flex items-center gap-1.5 flex-none p-2 px-3 bg-content2 border-b border-divider dark:bg-hk-ink-850/94 dark:border-b-[rgba(245,222,165,0.18)]">
 				<span className="w-2 h-2 rounded-full inline-block bg-[#ff5f56]" />
 				<span className="w-2 h-2 rounded-full inline-block bg-[#ffbd2e]" />
@@ -987,7 +979,6 @@ function WebPreview({
 						</span>
 					)}
 				</div>
-
 
 				<div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start flex-none h-[126px] gap-4 p-[0_32px_14px] -mt-5">
 					<div className="relative w-[78px] h-[78px] rounded-full bg-content1 text-foreground-muted border-2 border-[color:var(--color-neutral-panel)] shadow-[inset_0_1px_0_rgba(255,255,255,0.84),0_14px_30px_rgb(var(--color-ink-850-rgb)/0.14)] overflow-hidden grid place-items-center flex-shrink-0 dark:bg-hk-ink-850/95 dark:border-[rgba(245,222,165,0.28)] dark:shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
@@ -1115,7 +1106,6 @@ function PlusMiniIcon() {
 	return <AppIcon name="plus" />;
 }
 
-
 function CoverPattern() {
 	return (
 		<svg
@@ -1142,7 +1132,6 @@ function CoverPattern() {
 function ChevronIcon() {
 	return <AppIcon name="chevron-left" />;
 }
-
 
 /** Buyer app `HkIconName.back` (`AppIcons.arrowBack`, Material arrow_back). */
 function MerchantBackIcon() {

@@ -55,6 +55,7 @@ abstract class OrderItem with _$OrderItem {
     @Default('') String skuId,
     @Default('') String skuName,
     @Default('') String quantity,
+    // 成交單價與原價快照。
     @Default('') String unitPrice,
     @Default('') String listPrice,
 
@@ -152,6 +153,7 @@ abstract class Order with _$Order {
     @Default('') String odno,
     @Default('') String validationNo,
     @Default('') String paymentMethod,
+    // 付款期限（ISO 8601 UTC），僅未付款訂單有值；逾時後端會自動取消。
     @Default('') String paymentDeadline,
     @Default('') String itemCount,
     @Default('') String sellerName,

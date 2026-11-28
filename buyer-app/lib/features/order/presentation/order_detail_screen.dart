@@ -1082,7 +1082,6 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
-
 class _CopyableInfoRow extends StatelessWidget {
   const _CopyableInfoRow({required this.label, required this.value});
 
@@ -1178,14 +1177,12 @@ class _SimpleInfoCard extends StatelessWidget {
   }
 }
 
-
 BoxDecoration _cardDecoration() => BoxDecoration(
   color: AppColors.bgCard.withValues(alpha: 0.94),
   borderRadius: BorderRadius.circular(HkRadius.lg),
   border: Border.all(color: AppColors.cardBorder),
   boxShadow: HkShadows.card,
 );
-
 
 TextStyle _sectionTitleStyle() => AppTypography.sectionTitle;
 
@@ -1317,7 +1314,6 @@ extension _OrderDetailStringX on String {
   String ifEmpty(String fallback) => trim().isEmpty ? fallback : this;
 }
 
-
 class _OrderInfoCard extends StatelessWidget {
   const _OrderInfoCard({required this.order});
   final Order order;
@@ -1373,7 +1369,6 @@ class _OrderInfoCard extends StatelessWidget {
     );
   }
 }
-
 
 class _ItemsCard extends StatelessWidget {
   const _ItemsCard({required this.order});
@@ -1585,7 +1580,6 @@ String _itemRefundStatusLabel(String raw) {
     _ => '退款狀態更新中',
   };
 }
-
 
 class _PaymentDetailsCard extends StatelessWidget {
   const _PaymentDetailsCard({required this.order});
@@ -1861,7 +1855,6 @@ class _PaymentRow extends StatelessWidget {
   }
 }
 
-
 class _NoteCard extends StatelessWidget {
   const _NoteCard({required this.remark});
   final String remark;
@@ -1891,7 +1884,6 @@ String _paymentMethodText(String value) =>
     PaymentMethod.fromCode(value.toUpperCase())?.label ??
     (value.isEmpty ? '付款方式未指定' : value);
 
-
 class _OrderReviewCard extends ConsumerStatefulWidget {
   const _OrderReviewCard({required this.order});
   final Order order;
@@ -1911,8 +1903,7 @@ class _OrderReviewCardState extends ConsumerState<_OrderReviewCard> {
 
   Future<_ReviewData?> _loadReview() async {
     if (widget.order.reviewRating > 0 &&
-        widget.order.reviewContent.isNotEmpty) {
-    }
+        widget.order.reviewContent.isNotEmpty) {}
     try {
       final orderItemIds = widget.order.items
           .map((i) => i.id)

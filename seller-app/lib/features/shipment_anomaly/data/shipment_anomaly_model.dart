@@ -7,7 +7,6 @@ part 'shipment_anomaly_model.g.dart';
 int _parseInt(dynamic value) =>
     value is int ? value : int.tryParse(value?.toString() ?? '') ?? 0;
 
-
 /// ⚠️ 這裡**不再**有手抄的 `ShipmentAnomalyType`。
 ///
 /// 它曾經停在 7 個值而 CodeMeta 有 11 個（4 個新值缺席），`labelOf` 對認不得的
@@ -37,7 +36,6 @@ class ShipmentAnomalyAckAction {
   static const String ignored = 'IGNORED';
 }
 
-
 @freezed
 abstract class ShipmentAnomaly with _$ShipmentAnomaly {
   const factory ShipmentAnomaly({
@@ -51,6 +49,7 @@ abstract class ShipmentAnomaly with _$ShipmentAnomaly {
     @Default('') String shipmentStatus,
     @Default('') String detectedAt,
     @Default('') String ackAction,
+    // Gateway 欄位名稱為 actedAt。
     @Default('') String actedAt,
   }) = _ShipmentAnomaly;
 
@@ -73,6 +72,7 @@ abstract class ShipmentAnomalyListResult with _$ShipmentAnomalyListResult {
 abstract class ShipmentAnomalyStats with _$ShipmentAnomalyStats {
   const factory ShipmentAnomalyStats({
     @Default(0) @JsonKey(fromJson: _parseInt) int total,
+    // Gateway 回傳 highSeverityCount、mediumSeverityCount 與 lowSeverityCount。
     @Default(0)
     @JsonKey(name: 'highSeverityCount', fromJson: _parseInt)
     int highCount,

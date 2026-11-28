@@ -920,7 +920,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
   }
 }
 
-
 /// 弧形連接線畫筆：從父引導線彎曲連接到最後回覆頭像
 class _CurveConnectorPainter extends CustomPainter {
   final double parentLineX;

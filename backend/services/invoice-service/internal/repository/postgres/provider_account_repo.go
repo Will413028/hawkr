@@ -268,7 +268,6 @@ func (r *ProviderAccountRepository) WithDecryptedCredential(ctx context.Context,
 	return fn(row.ProviderTaxID, appKey)
 }
 
-
 // ResubmitCredential 是端點 24 的覆寫分支。
 //
 // taken=true 的唯一成因是 uq_ipa_fingerprint：這組（統編, AppKey）已被另一個**同時有效**

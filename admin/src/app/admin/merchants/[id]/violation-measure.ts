@@ -19,7 +19,6 @@ import {
 	toLocalInput,
 } from "./measure";
 
-
 /** 一個新認定最多的來源通報數（NewFinding.source_report_ids 的上限）。 */
 export const SOURCE_REPORTS_MAX = 20;
 

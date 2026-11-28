@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 const (
 	// ChunkRoute 是段上傳端點的 ServeMux 樣式。
 	ChunkRoute = "PUT /api/files/secure_uploads/{token}/chunks/{index}"
@@ -52,7 +51,7 @@ type SecureUploads struct {
 	m           SecureFiles
 	log         *slog.Logger
 	readTimeout time.Duration
-	sessions DelegationAccess
+	sessions    DelegationAccess
 }
 
 // DelegationAccess 是代行路由需要的 delegation 公開 API（*delegation.Module）：憑證解析與授權（httpdelegation.Sessions），加上店家可代行的檢查（DelegatedRead）。

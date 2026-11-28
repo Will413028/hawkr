@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-
 func (f *fixture) sellerReply(t *testing.T, accountID int64, inquiryID uuid.UUID, body string, names ...string) (SellerInquiry, error) {
 	t.Helper()
 	return f.module.ReplyToInquiry(context.Background(), ReplyToInquiryInput{

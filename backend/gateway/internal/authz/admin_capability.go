@@ -79,7 +79,6 @@ func IsKnownAdmin(cap AdminCapability) bool {
 	return false
 }
 
-
 var adminCapabilityDependencies = map[AdminCapability][]AdminCapability{
 	AdminCapStorefrontRead:  {},
 	AdminCapStorefrontWrite: {AdminCapStorefrontRead},

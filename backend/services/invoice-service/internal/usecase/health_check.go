@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const healthCheckInterval = 15 * time.Minute
 
 const healthCheckLease = 120 * time.Second

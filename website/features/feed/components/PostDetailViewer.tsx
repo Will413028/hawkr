@@ -273,16 +273,14 @@ function PostPage({
 					url: shareUrl,
 				});
 				return;
-			} catch {
-			}
+			} catch {}
 		}
 		if (typeof navigator !== "undefined" && navigator.clipboard && shareUrl) {
 			try {
 				await navigator.clipboard.writeText(shareUrl);
 				setNotice("連結已複製，可貼到任何聊天室分享");
 				return;
-			} catch {
-			}
+			} catch {}
 		}
 		setNotice("分享連結尚未支援，請手動複製網址列");
 	};
@@ -304,7 +302,6 @@ function PostPage({
 			{isActive ? <PostViewTracker postId={String(post.id)} /> : null}
 			{hasMedia && (
 				<div className="post-viewer__media">
-
 					{/* biome-ignore lint/performance/noImgElement: shares the foreground image's cached URL; next/image would request a second derivative. */}
 					<img
 						className="post-viewer__media-ambient"
@@ -383,7 +380,6 @@ function PostPage({
 					)}
 				</div>
 			)}
-
 
 			{captionExpanded && (
 				<button
@@ -493,7 +489,6 @@ function PostPage({
 						aria-expanded={captionExpanded}
 						aria-controls={`post-viewer-caption-${post.id}`}
 					>
-
 						<span>{captionExpanded ? "收合說明" : "查看更多"}</span>
 						<AppIcon
 							name={captionExpanded ? "chevron-down" : "chevron-up"}
@@ -503,7 +498,6 @@ function PostPage({
 				) : null}
 
 				<footer className="post-viewer__actions">
-
 					{readOnly ? (
 						<>
 							<div className={`post-viewer__action${liked ? " is-liked" : ""}`}>
@@ -864,8 +858,7 @@ export default function PostDetailViewer({
 				return;
 			}
 			sessionStorage.setItem("post-viewer-scroll-hint-seen", "1");
-		} catch {
-		}
+		} catch {}
 		setShowHint(true);
 		const t = window.setTimeout(() => setShowHint(false), 6000);
 		return () => window.clearTimeout(t);
@@ -941,8 +934,7 @@ export default function PostDetailViewer({
 			setIsDragging(true);
 			try {
 				e.currentTarget.setPointerCapture(g.pointerId);
-			} catch {
-			}
+			} catch {}
 		}
 
 		const now = performance.now();
@@ -991,8 +983,7 @@ export default function PostDetailViewer({
 			if (e.currentTarget.hasPointerCapture(g.pointerId)) {
 				e.currentTarget.releasePointerCapture(g.pointerId);
 			}
-		} catch {
-		}
+		} catch {}
 		setIsDragging(false);
 		if (!g.pagerEngaged) {
 			setDragOffset(0);
@@ -1159,7 +1150,6 @@ export default function PostDetailViewer({
 							className="post-viewer__page-wrap"
 							aria-hidden={idx !== activeIndex}
 						>
-
 							{Math.abs(idx - activeIndex) <= 1 ? (
 								<PostPage
 									post={post}

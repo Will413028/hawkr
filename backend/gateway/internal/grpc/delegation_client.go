@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 func withDeadline(ctx context.Context, deadlineMs int) (context.Context, context.CancelFunc) {
 	if deadlineMs <= 0 {
 		return ctx, func() {}
@@ -35,7 +34,6 @@ func requireCapability(d *commonpb.DelegationContext, rpc string, want pkgdelega
 	return status.Error(codes.PermissionDenied, fmt.Sprintf("[%d] delegation capability mismatch: %s requires %q but the context carries %q",
 		bizcode.DelegationInternalContractMismatch, rpc, want, got))
 }
-
 
 // RecordAuditIntent writes the PENDING audit row that every delegated mutation must
 // have before it touches any domain state. Failure is fail-closed (9279): the caller
@@ -104,7 +102,6 @@ func (c *AccountClient) ListAllDelegationAuditLogs(ctx context.Context, req *acc
 	return c.delegation.ListAllAuditLogs(ctx, req)
 }
 
-
 // ListDelegationAuthorizations backs GET .../delegated-operations/authorizations.
 func (c *AccountClient) ListDelegationAuthorizations(ctx context.Context, req *accountpb.ListDelegationAuthorizationsRequest, deadlineMs int) (*accountpb.ListDelegationAuthorizationsResponse, error) {
 	ctx, cancel := withDeadline(ctx, deadlineMs)
@@ -151,7 +148,6 @@ func (c *AccountClient) ListDelegationAuthorizationHistory(ctx context.Context, 
 	return c.delegation.ListDelegationAuthorizationHistory(ctx, req)
 }
 
-
 // GetStoreStateForGuard reads the target store's lifecycle state for 授權鏈第 8 項
 // (§8.1.3 第 8 項) — "can this store still be operated on behalf of right now".
 //
@@ -172,7 +168,6 @@ func (c *SellerClient) GetStoreStateForGuard(ctx context.Context, storeID int64,
 	defer cancel()
 	return c.client.GetSeller(ctx, &sellerpb.GetSellerRequest{StoreId: storeID})
 }
-
 
 func (c *ProductClient) GetProductListForDelegation(ctx context.Context, req *productpb.GetProductListRequest, deadlineMs int) (*productpb.GetProductListResponse, error) {
 	if err := requireCapability(req.GetDelegation(), "ProductService.GetProductList", pkgdelegation.CapProductsRead); err != nil {
@@ -241,7 +236,6 @@ func (c *ProductClient) BatchUpdateSellerProductStatusForDelegation(ctx context.
 	defer cancel()
 	return c.client.BatchUpdateSellerProductStatus(ctx, req)
 }
-
 
 func (c *OrderClient) GetSellerOrdersForDelegation(ctx context.Context, req *orderpb.GetSellerOrdersRequest, deadlineMs int) (*orderpb.GetSellerOrdersResponse, error) {
 	if err := requireCapability(req.GetDelegation(), "OrderService.GetSellerOrders", pkgdelegation.CapOrdersRead); err != nil {

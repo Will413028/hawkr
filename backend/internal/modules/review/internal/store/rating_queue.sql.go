@@ -37,7 +37,6 @@ type ClaimRatingRecomputeRow struct {
 	Attempts  int32
 }
 
-// worker 認領到期、沒被認領（或租約已過）的列：SKIP LOCKED 讓多個 worker 分開，寫租約 lease_until，先 priority 後 due_at，回認領當下的 seq 與 attempts；claim_token 是這次認領的憑證。
 func (q *Queries) ClaimRatingRecompute(ctx context.Context, arg ClaimRatingRecomputeParams) ([]ClaimRatingRecomputeRow, error) {
 	rows, err := q.db.Query(ctx, claimRatingRecompute,
 		arg.LeaseUntil,
@@ -77,7 +76,6 @@ type FailRatingRecomputeParams struct {
 	ClaimToken uuid.UUID
 }
 
-// 處理失敗：同一列次數加一、退避到 due_at、放掉租約並記錯誤；failed_at 有給就停手（超過上限）。只在 seq 沒變且 claim_token 還是自己的時；回 0 表示處理中有新請求或租約已被接手，呼叫方改用 Rearm 分辨。
 func (q *Queries) FailRatingRecompute(ctx context.Context, arg FailRatingRecomputeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, failRatingRecompute,
 		arg.DueAt,
@@ -103,7 +101,6 @@ type FinishRatingRecomputeParams struct {
 	ClaimToken uuid.UUID
 }
 
-// 處理完：只在 seq 還是認領時讀到的值、且 claim_token 還是自己的才刪；回 0 表示處理中又有新請求（seq 變了）或租約已被別人接手，呼叫方改用 Rearm 分辨。
 func (q *Queries) FinishRatingRecompute(ctx context.Context, arg FinishRatingRecomputeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, finishRatingRecompute, arg.ProductID, arg.Seq, arg.ClaimToken)
 	if err != nil {
@@ -123,8 +120,6 @@ type RearmRatingRecomputeParams struct {
 	ClaimToken uuid.UUID
 }
 
-// 處理中來了新請求：放掉租約與憑證、立即到期，下一輪再處理；失敗次數與最後錯誤保留（新請求不代表失敗原因消失，持續失敗的商品仍會在上限停手）。
-// 只動 claim_token 還是自己的列；回 0 表示租約已被別人接手或列已不在，呼叫方什麼都不做。
 func (q *Queries) RearmRatingRecompute(ctx context.Context, arg RearmRatingRecomputeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, rearmRatingRecompute, arg.DueAt, arg.ProductID, arg.ClaimToken)
 	if err != nil {
@@ -134,7 +129,6 @@ func (q *Queries) RearmRatingRecompute(ctx context.Context, arg RearmRatingRecom
 }
 
 const requestRatingRecompute = `-- name: RequestRatingRecompute :exec
-
 INSERT INTO review.rating_recompute_queue AS q (product_id, due_at, priority)
 SELECT p, $1::timestamptz, 0 FROM (SELECT DISTINCT unnest($2::uuid[]) AS p ORDER BY p) AS ids
 ON CONFLICT (product_id) DO UPDATE SET
@@ -151,9 +145,6 @@ type RequestRatingRecomputeParams struct {
 	ProductIds []uuid.UUID
 }
 
-// 商品評分的待重算佇列（D3）：登記在評價集合改變的 transaction 內，worker 認領、完成、失敗與重排都同時以 seq 與 claim_token 比對。
-// 登記一批商品（呼叫方的 transaction 內，依商品 ID 升序加鎖避免與其他批次互鎖）。沒有列就新增；有列就 seq 加一（處理中的 worker 完成時看到序號變了就重排），
-// 到期時間取較早的；已停手的列（failed_at 非空）被新請求重置成全新的一列。
 func (q *Queries) RequestRatingRecompute(ctx context.Context, arg RequestRatingRecomputeParams) error {
 	_, err := q.db.Exec(ctx, requestRatingRecompute, arg.Now, arg.ProductIds)
 	return err
@@ -182,8 +173,6 @@ type RequestRatingReconcileBatchParams struct {
 	Now     time.Time
 }
 
-// 定期全量對帳的一批：評價表裡 product_id 大於游標的商品（升序，最多 max_rows 個）各登記一次（priority 1，排在即時請求之後），回這一批挑到的商品 ID（下一批的游標取其中最大的，不依賴寫入的列數）。
-// 與即時請求不同：已停手的列（failed_at 非空）不動，只有即時請求能重置它；其他列 seq 加一、到期時間取較早的、priority 取較小的。
 func (q *Queries) RequestRatingReconcileBatch(ctx context.Context, arg RequestRatingReconcileBatchParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, requestRatingReconcileBatch, arg.AfterID, arg.MaxRows, arg.Now)
 	if err != nil {

@@ -29,14 +29,11 @@ void main() {
   testWidgets('unsupported 配送方式被 _groupOptions 濾掉，supported 的仍在', (
     tester,
   ) async {
-    await _pump(
-      tester,
-      const [
-        {'shippingMethod': '3001', 'label': '黑貓宅配', 'fee': 100},
-        {'shippingMethod': '3003', 'label': 'UberInstant', 'fee': 150},
-        {'shippingMethod': '3005', 'label': 'MerchantSelf', 'fee': 0},
-      ],
-    );
+    await _pump(tester, const [
+      {'shippingMethod': '3001', 'label': '黑貓宅配', 'fee': 100},
+      {'shippingMethod': '3003', 'label': 'UberInstant', 'fee': 150},
+      {'shippingMethod': '3005', 'label': 'MerchantSelf', 'fee': 0},
+    ]);
 
     expect(find.textContaining('黑貓宅配'), findsWidgets);
 

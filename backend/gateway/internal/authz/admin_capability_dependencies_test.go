@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-
 func parseDependencyGolden(t *testing.T) [][2]string {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/admin_capability_dependencies.golden")

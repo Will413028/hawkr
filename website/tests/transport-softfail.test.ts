@@ -5,7 +5,6 @@ import { __setFlavorForTest } from "../lib/config/flavor";
 
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-
 const realFetch = globalThis.fetch;
 let lastInit: RequestInit & { next?: unknown };
 let respond: () => Response | Promise<Response>;

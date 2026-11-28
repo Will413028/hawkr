@@ -47,7 +47,6 @@ type GetLatestSucceededSearchSetParams struct {
 	BuyerID   int64
 }
 
-// 需求最新一筆成功的候選搜尋所產生的候選集 ID（有效的候選集＝需求在 MATCHING 時的這一個，A9-D29(4)）；沒有成功過的搜尋沒有列。
 func (q *Queries) GetLatestSucceededSearchSet(ctx context.Context, arg GetLatestSucceededSearchSetParams) (*uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, getLatestSucceededSearchSet, arg.RequestID, arg.BuyerID)
 	var candidate_set_id *uuid.UUID
@@ -69,7 +68,6 @@ type InsertCandidateParams struct {
 	Now            time.Time
 }
 
-// 沒有店名欄位（S9）；呼叫端只給 OPEN 的店。
 func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams) error {
 	_, err := q.db.Exec(ctx, insertCandidate,
 		arg.ID,
@@ -95,7 +93,6 @@ type InsertCandidateSetParams struct {
 	Now               time.Time
 }
 
-// 一次搜尋一列（S1）；冪等鍵在 run（A9-D29），重送由呼叫端以 run 的冪等鍵擋下，不會走到這裡。
 func (q *Queries) InsertCandidateSet(ctx context.Context, arg InsertCandidateSetParams) error {
 	_, err := q.db.Exec(ctx, insertCandidateSet,
 		arg.ID,
@@ -164,7 +161,6 @@ type SetCandidateSelectedParams struct {
 	BuyerID        int64
 }
 
-// 目標狀態的方法（契約的 ToggleSelection 指明目標狀態）。
 func (q *Queries) SetCandidateSelected(ctx context.Context, arg SetCandidateSelectedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setCandidateSelected,
 		arg.Selected,

@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-
 func queriesFile(t *testing.T, name string) string {
 	t.Helper()
 	path := filepath.Join("..", "..", "..", "db", "queries", name)

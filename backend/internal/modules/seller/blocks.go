@@ -6,7 +6,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-
 // BlockedBuyerCursor 是店家封鎖名單的 keyset 位置。
 type BlockedBuyerCursor = model.BlockedBuyerCursor
 

@@ -153,8 +153,8 @@ test("the eager drawer boundary mirrors final thread geometry and room paint", (
 
 test("small cross-route Agent styles stay identical to their compatibility source", () => {
 	const mainSidebarStart = procurementCss.indexOf(".chat-sidebar__agent {");
-	const mainMarkComment = procurementCss.indexOf(
-		"/* Hawkr Agent 識別記號",
+	const mainAgentMarkStart = procurementCss.indexOf(
+		".assistant-mark {",
 		mainSidebarStart,
 	);
 	const sidebarMediaPrelude =
@@ -164,7 +164,7 @@ test("small cross-route Agent styles stay identical to their compatibility sourc
 		sidebarMediaPrelude,
 		firstCopyMedia + sidebarMediaPrelude.length,
 	);
-	assert.ok(mainSidebarStart >= 0 && mainMarkComment > mainSidebarStart);
+	assert.ok(mainSidebarStart >= 0 && mainAgentMarkStart > mainSidebarStart);
 	assert.ok(firstCopyMedia >= 0 && secondCopyMedia > firstCopyMedia);
 	assert.equal(
 		normalizeCss(
@@ -173,7 +173,7 @@ test("small cross-route Agent styles stay identical to their compatibility sourc
 				secondCopyMedia,
 			),
 		),
-		normalizeCss(procurementCss.slice(mainSidebarStart, mainMarkComment)),
+		normalizeCss(procurementCss.slice(mainSidebarStart, mainAgentMarkStart)),
 	);
 	assert.equal(
 		normalizeCss(cssBlock(sidebarCss, sidebarMediaPrelude, 1)),
@@ -194,7 +194,7 @@ test("small cross-route Agent styles stay identical to their compatibility sourc
 		".search-page:has([data-search-empty] [data-hawkr-agent-entry])";
 	const mainSearchStart = procurementCss.indexOf(searchSelector);
 	const mainSearchEnd = procurementCss.indexOf(
-		"/* Workspace shell",
+		"\n\n.assistant-route-state.thread-page {",
 		mainSearchStart,
 	);
 	assert.ok(mainSearchStart >= 0 && mainSearchEnd > mainSearchStart);

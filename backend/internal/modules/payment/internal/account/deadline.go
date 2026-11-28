@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	deadlineWindow  = 7 * 24 * time.Hour
-	deadlineLastDay = 24 * time.Hour
-	deadlineBatch   = 200
+	deadlineWindow       = 7 * 24 * time.Hour
+	deadlineLastDay      = 24 * time.Hour
+	deadlineBatch        = 200
 	deadlineScanInterval = time.Hour
 )
 

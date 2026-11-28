@@ -162,8 +162,7 @@ function installProductionMediaDomObserver({
 				if (seen.has(signature)) continue;
 				seen.add(signature);
 				target.__hkForbiddenMediaDomReferences?.push(reference);
-			} catch {
-			}
+			} catch {}
 		}
 	};
 	const inspectElement = (element: Element) => {
@@ -310,8 +309,7 @@ async function installLayoutShiftObserver(page: Page) {
 					}
 				}
 			}).observe({ type: "layout-shift", buffered: true });
-		} catch {
-		}
+		} catch {}
 	});
 }
 
@@ -556,8 +554,7 @@ async function inspectInitialImageScheduling(page: Page) {
 				if (!candidate) continue;
 				try {
 					urls.push(new URL(candidate, document.baseURI).href);
-				} catch {
-				}
+				} catch {}
 			}
 			return urls;
 		};

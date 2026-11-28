@@ -30,7 +30,7 @@ func (v Violation) String() string {
 type layer int
 
 const (
-	layerExternal   layer = iota
+	layerExternal layer = iota
 	layerCmd
 	layerPlatform
 	layerModuleAPI

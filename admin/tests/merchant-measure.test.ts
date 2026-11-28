@@ -310,7 +310,6 @@ test("組請求時時間解析不出來就丟例外，不送缺值的請求", ()
 	);
 });
 
-
 test("request_id：同一份內容重送沿用同一個；內容改過換新的；去掉前後空白不算改過", () => {
 	let n = 0;
 	const generate = () => `id-${++n}`;
@@ -354,7 +353,6 @@ test("request_id：重新開啟（沒有上一個 slot）一定是新的", () =>
 	const b = requestIdFor(null, key, generate);
 	assert.notEqual(a.id, b.id);
 });
-
 
 function versionConflict(): ConnectError {
 	return new ConnectError("etag mismatch", Code.Aborted, undefined, [
@@ -576,7 +574,6 @@ test("同一份內容的重送不再用現在的時間擋：結束時間、複�
 	assert.equal(isResend({ key, id: "r1" }, key), true);
 	assert.equal(isResend({ key: "other", id: "r1" }, key), false);
 });
-
 
 test("sourceCaseField：沒有案件（沒給或空字串）時請求不帶這個欄位，有就帶", () => {
 	assert.deepEqual(sourceCaseField(undefined), {});

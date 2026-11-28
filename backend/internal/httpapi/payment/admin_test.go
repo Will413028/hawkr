@@ -24,24 +24,24 @@ import (
 )
 
 type paymentAdminModule struct {
-	paymentFilter  payment.PaymentFilter
-	refundFilter   payment.RefundFilter
-	transferFilter payment.TransferFilter
-	gotAfter       *payment.RecordCursor
-	gotSize        int32
-	payments       payment.PaymentRecordPage
-	transfers      payment.TransferRecordPage
-	refunds        payment.RefundRecordPage
-	resolved       []resolveCall
-	account        payment.Account
+	paymentFilter    payment.PaymentFilter
+	refundFilter     payment.RefundFilter
+	transferFilter   payment.TransferFilter
+	gotAfter         *payment.RecordCursor
+	gotSize          int32
+	payments         payment.PaymentRecordPage
+	transfers        payment.TransferRecordPage
+	refunds          payment.RefundRecordPage
+	resolved         []resolveCall
+	account          payment.Account
 	refreshedAccount payment.Account
 	refreshed        int64
 	retried          int64
 	retriedAck       bool
 	purgeRetried     int64
 	mappingDeleted   int64
-	actors []payment.AdminActor
-	err    error
+	actors           []payment.AdminActor
+	err              error
 }
 
 func (m *paymentAdminModule) RetryAccountPurge(_ context.Context, actor payment.AdminActor, id int64) (payment.Account, error) {

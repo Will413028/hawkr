@@ -62,7 +62,6 @@ export function CheckoutInvoiceSection({
 				<InvoiceModeBadge mode={invoiceMode} />
 			</div>
 
-
 			{disclosure && disclosure.required ? (
 				<div
 					className="mb-3 p-[12px_14px] rounded-hkui-lg border border-warning-200 bg-warning-50"
@@ -76,7 +75,6 @@ export function CheckoutInvoiceSection({
 					</p>
 				</div>
 			) : null}
-
 
 			<div className="flex items-center gap-3 p-[12px_14px] bg-content2 border border-divider rounded-hkui-lg">
 				<div className="flex-1 min-w-0 flex flex-col gap-[2px]">
@@ -107,7 +105,6 @@ export function CheckoutInvoiceSection({
 				) : null}
 			</div>
 
-
 			{amount ? (
 				<details className="mt-3 group">
 					<summary className="cursor-pointer text-[0.6875rem] font-extrabold text-hk-accent list-none select-none">
@@ -130,7 +127,6 @@ export function CheckoutInvoiceSection({
 			<p className="mt-3 text-[0.625rem] leading-relaxed text-foreground/55">
 				發票將於付款完成後開立，並寄送至你的電子信箱。
 			</p>
-
 
 			{intakeLimit?.blocked ? (
 				<div

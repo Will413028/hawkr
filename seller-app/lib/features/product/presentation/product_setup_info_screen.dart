@@ -43,8 +43,7 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
   final String? initialCategory;
   final String? initialSubCategory;
   final int? initialCatalogId;
-  final bool
-  isCandidateCategory;
+  final bool isCandidateCategory;
   final int? l1Id;
   final String? l1Name;
   final int? l2Id;
@@ -1350,9 +1349,7 @@ class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
                           horizontal: 8.w,
                           vertical: 4.h,
                         ),
-                        itemCount:
-                            _filteredCategories.length +
-                            1,
+                        itemCount: _filteredCategories.length + 1,
                         itemBuilder: (context, index) {
                           if (index == _filteredCategories.length) {
                             _itemKeys[-1] ??= GlobalKey();

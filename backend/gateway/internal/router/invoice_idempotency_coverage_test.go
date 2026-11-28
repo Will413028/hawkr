@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-
 const idempotencyMiddlewareIdent = "RequireIdempotencyKey"
 
 const invoiceWriteRoutePin = 37

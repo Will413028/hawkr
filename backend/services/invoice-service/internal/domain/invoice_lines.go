@@ -188,12 +188,12 @@ func BuildLines(snap OrderSnapshot, resolver TaxCategoryResolver) ([]Line, error
 
 	if snap.ShippingFee > 0 {
 		lines = append(lines, Line{
-			LineSeq:     int32(len(lines) + 1),
-			LineType:    lineTypeShipping,
-			Description: ShippingDescription,
-			Quantity:    1,
-			UnitPrice:   snap.ShippingFee,
-			NetAmount:   snap.ShippingFee,
+			LineSeq:           int32(len(lines) + 1),
+			LineType:          lineTypeShipping,
+			Description:       ShippingDescription,
+			Quantity:          1,
+			UnitPrice:         snap.ShippingFee,
+			NetAmount:         snap.ShippingFee,
 			TaxCategory:       TaxCategoryTaxable,
 			AllocatedDiscount: shippingDiscount,
 			AllowanceableBase: snap.ShippingFee - shippingDiscount,
@@ -241,13 +241,13 @@ func BuildLines(snap OrderSnapshot, resolver TaxCategoryResolver) ([]Line, error
 	for _, c := range cats {
 		amount := discountByCategory[c]
 		lines = append(lines, Line{
-			LineSeq:     int32(len(lines) + 1),
-			LineType:    lineTypeDiscount,
-			Description: DiscountDescription,
-			Quantity:    1,
-			UnitPrice:   -amount,
-			NetAmount:   -amount,
-			TaxCategory: c,
+			LineSeq:           int32(len(lines) + 1),
+			LineType:          lineTypeDiscount,
+			Description:       DiscountDescription,
+			Quantity:          1,
+			UnitPrice:         -amount,
+			NetAmount:         -amount,
+			TaxCategory:       c,
 			AllocatedDiscount: 0,
 			AllowanceableBase: 0,
 		})

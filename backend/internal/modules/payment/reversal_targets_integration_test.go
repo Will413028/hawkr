@@ -15,7 +15,6 @@ import (
 	. "github.com/Will413028/hawkr/backend/internal/modules/payment"
 )
 
-
 func (f *chargeFixture) topupDone(t *testing.T, orderNo string) (PaymentTransfer, PaymentRefund) {
 	t.Helper()
 	tr, r := f.topupSending(t, orderNo)

@@ -18,11 +18,11 @@ mixin _$AfterSaleCase {
  String get caseNo; String get orderNo; String get buyerId; String get storeId; String get status; String get reason; String get description; String get refundableAmount; String get returnShipmentNo; String get returnShippingMethod;/// 寄件交易單號（退貨物流拋單後後端回填，顯示於退貨物流 timeline）
  String get shipTradeNo; String get createdAt; String get closedAt; List<AfterSaleItem> get items; List<String> get shipmentPhotoUrls; List<AfterSaleEvidence> get evidence; List<AfterSaleResolution> get resolutions;/// 申訴狀態（'0'=未申訴，其他值見後端 AppealState codemeta）
  String get appealState;/// 是否可以發起申訴（賣家拒絕後買家可於期限內申訴）
- bool get canAppeal;// B-130 / backend issue #568：賣家處理時限與平台接手狀態
- String get processDeadline; bool get autoEscalated; int get processDeadlineHours;// B-125 / B-114 退款進度（對齊 backend issue #568 規格）
+ bool get canAppeal;// 賣家處理時限與平台接手狀態。
+ String get processDeadline; bool get autoEscalated; int get processDeadlineHours;// 退款任務進度。
 /// 退款任務狀態（[RefundTaskStatus]）：後端 WorkerTaskStatus，保留舊數字碼相容。
  String get refundTaskStatus;/// 退款失敗訊息（後端已依狀態收斂，前台可直接顯示）
- String get refundFailureMessage; String get providerStatus; String get providerMessage; String get appealDeadline;// B-93 7-11 出貨便代碼（三段碼，買家寄退時憑此到 ibon 列印託運單）
+ String get refundFailureMessage; String get providerStatus; String get providerMessage; String get appealDeadline;// 7-11 出貨便代碼，退貨寄件時用於列印託運單。
 /// 母代碼（3 碼）— 顯示條件：resolutionType=1 + returnShippingMethod=3002 + status≥20
  String get partnerId;/// 出貨單編號（8 碼）
  String get odno;/// C2C 驗證碼（4 碼）
@@ -305,11 +305,11 @@ class _AfterSaleCase implements AfterSaleCase {
 @override@JsonKey() final  String appealState;
 /// 是否可以發起申訴（賣家拒絕後買家可於期限內申訴）
 @override@JsonKey() final  bool canAppeal;
-// B-130 / backend issue #568：賣家處理時限與平台接手狀態
+// 賣家處理時限與平台接手狀態。
 @override@JsonKey() final  String processDeadline;
 @override@JsonKey() final  bool autoEscalated;
 @override@JsonKey() final  int processDeadlineHours;
-// B-125 / B-114 退款進度（對齊 backend issue #568 規格）
+// 退款任務進度。
 /// 退款任務狀態（[RefundTaskStatus]）：後端 WorkerTaskStatus，保留舊數字碼相容。
 @override@JsonKey() final  String refundTaskStatus;
 /// 退款失敗訊息（後端已依狀態收斂，前台可直接顯示）
@@ -317,7 +317,7 @@ class _AfterSaleCase implements AfterSaleCase {
 @override@JsonKey() final  String providerStatus;
 @override@JsonKey() final  String providerMessage;
 @override@JsonKey() final  String appealDeadline;
-// B-93 7-11 出貨便代碼（三段碼，買家寄退時憑此到 ibon 列印託運單）
+// 7-11 出貨便代碼，退貨寄件時用於列印託運單。
 /// 母代碼（3 碼）— 顯示條件：resolutionType=1 + returnShippingMethod=3002 + status≥20
 @override@JsonKey() final  String partnerId;
 /// 出貨單編號（8 碼）
@@ -699,7 +699,7 @@ as String,
 /// @nodoc
 mixin _$AfterSaleItem {
 
- String get orderItemId; String get skuId; String get skuName; String get quantity;// PayUni #758: 新欄位（成交單價 / 原價）
+ String get orderItemId; String get skuId; String get skuName; String get quantity;// 成交單價與原價快照。
  String get unitPrice; String get listPrice;/// Deprecated: 舊欄位 fallback。
  String get originalPrice; String get actualPayAmount; String get shareDiscount; String get imageUrl;
 /// Create a copy of AfterSaleItem
@@ -911,7 +911,7 @@ class _AfterSaleItem implements AfterSaleItem {
 @override@JsonKey() final  String skuId;
 @override@JsonKey() final  String skuName;
 @override@JsonKey() final  String quantity;
-// PayUni #758: 新欄位（成交單價 / 原價）
+// 成交單價與原價快照。
 @override@JsonKey() final  String unitPrice;
 @override@JsonKey() final  String listPrice;
 /// Deprecated: 舊欄位 fallback。
@@ -993,7 +993,7 @@ as String,
 /// @nodoc
 mixin _$AfterSaleResolution {
 
- String get resolutionType; String get refundAmount; String get couponAmount; String get couponMinSpend; String get couponMessage; String get rejectReason; String get rejectMessage; String get negotiationReason; String get createdAt;// B-96 驗貨扣款（resolutionType=6 INSPECTION_DEDUCTION）
+ String get resolutionType; String get refundAmount; String get couponAmount; String get couponMinSpend; String get couponMessage; String get rejectReason; String get rejectMessage; String get negotiationReason; String get createdAt;// 驗貨扣款原因（resolutionType=6）。
 /// 扣款原因（賣家驗貨後填寫，部分退款場景）
  String get deductionReason;/// 驗貨備註（賣家私註）
  String get inspectionNote;
@@ -1212,7 +1212,7 @@ class _AfterSaleResolution implements AfterSaleResolution {
 @override@JsonKey() final  String rejectMessage;
 @override@JsonKey() final  String negotiationReason;
 @override@JsonKey() final  String createdAt;
-// B-96 驗貨扣款（resolutionType=6 INSPECTION_DEDUCTION）
+// 驗貨扣款原因（resolutionType=6）。
 /// 扣款原因（賣家驗貨後填寫，部分退款場景）
 @override@JsonKey() final  String deductionReason;
 /// 驗貨備註（賣家私註）

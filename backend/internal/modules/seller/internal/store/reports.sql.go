@@ -58,9 +58,6 @@ type AdminReportsRow struct {
 	LatestSupplementAt  interface{}
 }
 
-// admin 的通報清單：新到舊（keyset），篩選條件為 NULL 時不篩。state 是處理狀態（與 model.Report.State 同一個定義，由資料集測試鎖住）；
-// category 是生效的類別（案件裡的是平台判定類別，其他是檢舉人選的）；citable_as_source 只留此刻可以當認定來源的通報（店家沒有關閉、結果沒有否定它；
-// 與 model.ReportFacts.Availability 的 CiteAsSource 同一個定義，由資料集測試鎖住）。
 func (q *Queries) AdminReports(ctx context.Context, arg AdminReportsParams) ([]AdminReportsRow, error) {
 	rows, err := q.db.Query(ctx, adminReports,
 		arg.State,
@@ -161,7 +158,6 @@ type AdminReportsQueueRow struct {
 	LatestSupplementAt  interface{}
 }
 
-// 同 AdminReports，但舊到新（keyset）：待分案與案件成員的處理順序（等最久的在最前面）。
 func (q *Queries) AdminReportsQueue(ctx context.Context, arg AdminReportsQueueParams) ([]AdminReportsQueueRow, error) {
 	rows, err := q.db.Query(ctx, adminReportsQueue,
 		arg.State,
@@ -228,7 +224,6 @@ type BumpReportVersionParams struct {
 	ID  uuid.UUID
 }
 
-// 補充存下之後讓通報的版本前進：之前讀到這筆通報的分案、設定結果與移動會撞版本，後台重讀才看得到補充。
 func (q *Queries) BumpReportVersion(ctx context.Context, arg BumpReportVersionParams) error {
 	_, err := q.db.Exec(ctx, bumpReportVersion, arg.Now, arg.ID)
 	return err
@@ -253,7 +248,6 @@ type BuyerReportsParams struct {
 	PageSize       int32
 }
 
-// 登入的檢舉人自己的通報，新到舊（keyset）。
 func (q *Queries) BuyerReports(ctx context.Context, arg BuyerReportsParams) ([]SellerReport, error) {
 	rows, err := q.db.Query(ctx, buyerReports,
 		arg.BuyerID,
@@ -313,7 +307,6 @@ type DuplicateBuyerReportParams struct {
 	Now      time.Time
 }
 
-// 登入的檢舉人在同一個台北日對同一個店家、同一個類別已有、還沒有結果的通報（與 reports_buyer_daily 同一個條件）。
 func (q *Queries) DuplicateBuyerReport(ctx context.Context, arg DuplicateBuyerReportParams) (SellerReport, error) {
 	row := q.db.QueryRow(ctx, duplicateBuyerReport,
 		arg.BuyerID,
@@ -361,7 +354,6 @@ type InsertEvidenceAccessParams struct {
 	Now           time.Time
 }
 
-// 佐證的讀取紀錄：在讀取之前寫入；report_id 與 request_id 剛好一個，連同 position（通報的另加 submission_seq）指向那一張佐證。
 func (q *Queries) InsertEvidenceAccess(ctx context.Context, arg InsertEvidenceAccessParams) error {
 	_, err := q.db.Exec(ctx, insertEvidenceAccess,
 		arg.AccessID,
@@ -400,7 +392,6 @@ type InsertReportParams struct {
 	Now             time.Time
 }
 
-// 新增通報；違反任一個去重的 UNIQUE（只比對還沒有結果的通報）時不寫入、回 0 列（不讓 transaction 失效），由呼叫方讀出既有的那一筆。
 func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (SellerReport, error) {
 	row := q.db.QueryRow(ctx, insertReport,
 		arg.ID,
@@ -451,7 +442,6 @@ type InsertReportEvidenceParams struct {
 	ObjectKey     string
 }
 
-// 一次送出的第 position 張佐證（submission_seq 0 是原通報、1..10 是補充；position 0..4，DB 保證每次送出最多 5 張）。
 func (q *Queries) InsertReportEvidence(ctx context.Context, arg InsertReportEvidenceParams) error {
 	_, err := q.db.Exec(ctx, insertReportEvidence,
 		arg.ReportID,
@@ -478,7 +468,6 @@ type InsertReportSupplementParams struct {
 	Now         time.Time
 }
 
-// 補充：去重期間內同一位檢舉人的重複送出併入原通報（呼叫方已鎖住通報並確認沒有結果、沒有超過上限）。
 func (q *Queries) InsertReportSupplement(ctx context.Context, arg InsertReportSupplementParams) (SellerReportSupplement, error) {
 	row := q.db.QueryRow(ctx, insertReportSupplement,
 		arg.ID,
@@ -505,7 +494,6 @@ WHERE id = $1
 FOR UPDATE
 `
 
-// 鎖定通報，序列化 admin 對它的處理與補充。
 func (q *Queries) LockReport(ctx context.Context, id uuid.UUID) (SellerReport, error) {
 	row := q.db.QueryRow(ctx, lockReport, id)
 	var i SellerReport
@@ -541,7 +529,6 @@ ORDER BY id
 FOR UPDATE
 `
 
-// 依 id 升序鎖定一批通報（鎖順序：店家列、通報列、案件列、措施列；多筆通報依 id 升序）。
 func (q *Queries) LockReports(ctx context.Context, ids []uuid.UUID) ([]SellerReport, error) {
 	rows, err := q.db.Query(ctx, lockReports, ids)
 	if err != nil {
@@ -590,9 +577,6 @@ WHERE r.id = $1 AND r.outcome IS NULL
 RETURNING id, store_id, product_id, order_no, category, description, reporter_buyer_id, case_id, assessed_category, triaged_at, triaged_by_admin_id, outcome, resolved_at, resolved_by_admin_id, resolution_note, supplements_seen_seq, version, created_at, updated_at
 `
 
-// 記下管理員看過這筆通報此刻的全部補充（把 supplements_seen_seq 設成最新一則的編號）；呼叫方已鎖住通報並比對過版本。**不改 version 與 updated_at**
-// （已讀標記不讓 etag 前進，不會讓別處讀到的 etag 過時）。只在還沒有結果、而且存在編號大於已看過的補充時寫入，否則 0 列（冪等）；
-// 條件與 model.Report.HasUnseenSupplements 同一個定義。
 func (q *Queries) MarkReportSupplementsSeen(ctx context.Context, id uuid.UUID) (SellerReport, error) {
 	row := q.db.QueryRow(ctx, markReportSupplementsSeen, id)
 	var i SellerReport
@@ -639,7 +623,6 @@ type MoveReportParams struct {
 	ExpectedVersion int64
 }
 
-// 移到其他案件（改平台判定類別）：分案的時間與人不變；只在進行中的案件裡、還沒有結果、版本相符時寫入，否則 0 列。
 func (q *Queries) MoveReport(ctx context.Context, arg MoveReportParams) (SellerReport, error) {
 	row := q.db.QueryRow(ctx, moveReport,
 		arg.CaseID,
@@ -728,7 +711,6 @@ type ReportDetailsRow struct {
 	LatestSupplementAt  interface{}
 }
 
-// 一批通報加上讀取時要的店家與補充摘要（單筆讀取、命令的回應與匯出用）：店名（個資清理之後是 NULL）、店家是否已關閉、補充數、最新補充的編號（latest_supplement_seq，「有新的補充」比它與 supplements_seen_seq）與最新補充的時間。
 func (q *Queries) ReportDetails(ctx context.Context, ids []uuid.UUID) ([]ReportDetailsRow, error) {
 	rows, err := q.db.Query(ctx, reportDetails, ids)
 	if err != nil {
@@ -781,7 +763,6 @@ WHERE report_id = $1
 ORDER BY submission_seq, position
 `
 
-// 一筆通報的佐證，依送出的順序、次內位置；API 的「第 n 張」就是這個順序。
 func (q *Queries) ReportEvidence(ctx context.Context, reportID uuid.UUID) ([]SellerReportEvidence, error) {
 	rows, err := q.db.Query(ctx, reportEvidence, reportID)
 	if err != nil {
@@ -816,7 +797,6 @@ WHERE report_id = ANY($1::uuid[])
 ORDER BY report_id, submission_seq, position
 `
 
-// 一批通報的佐證，依通報、送出的順序、次內位置。
 func (q *Queries) ReportEvidenceOf(ctx context.Context, reportIds []uuid.UUID) ([]SellerReportEvidence, error) {
 	rows, err := q.db.Query(ctx, reportEvidenceOf, reportIds)
 	if err != nil {
@@ -850,7 +830,6 @@ FROM seller.finding_reports
 WHERE report_id = ANY($1::uuid[])
 `
 
-// 這些通報裡，哪些是某個認定的來源（finding_reports）：認定的來源通報不能移到其他案件。
 func (q *Queries) ReportFindingSources(ctx context.Context, reportIds []uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, reportFindingSources, reportIds)
 	if err != nil {
@@ -878,7 +857,6 @@ WHERE report_id = ANY($1::uuid[])
 ORDER BY report_id, seq
 `
 
-// 一批通報的補充，依通報、編號（seq，鎖住通報後遞增，不依賴時鐘）舊到新。
 func (q *Queries) ReportSupplements(ctx context.Context, reportIds []uuid.UUID) ([]SellerReportSupplement, error) {
 	rows, err := q.db.Query(ctx, reportSupplements, reportIds)
 	if err != nil {
@@ -931,7 +909,6 @@ type ResolveCaseReportsRow struct {
 	ReporterBuyerID int64
 }
 
-// 案件結案時，還沒有結果的成員全部帶入預設結果與說明；回傳帶入的通報（發 ReportResolved 用）。呼叫方已鎖住案件與全部成員。
 func (q *Queries) ResolveCaseReports(ctx context.Context, arg ResolveCaseReportsParams) ([]ResolveCaseReportsRow, error) {
 	rows, err := q.db.Query(ctx, resolveCaseReports,
 		arg.Outcome,
@@ -979,7 +956,6 @@ type ResolveReportParams struct {
 	ExpectedVersion int64
 }
 
-// 設定結果；只在還沒有結果、版本相符時寫入，否則 0 列。有了結果的通報不再提醒補充（Report.HasUnseenSupplements），所以不記 supplements_seen_seq。
 func (q *Queries) ResolveReport(ctx context.Context, arg ResolveReportParams) (SellerReport, error) {
 	row := q.db.QueryRow(ctx, resolveReport,
 		arg.Outcome,
@@ -1031,9 +1007,6 @@ type ReviewReportTriageByIDsRow struct {
 	DueAt    time.Time
 }
 
-// 這些通報的「待分案」開始時間與期限（資源的 triage_deadline）。規則只有 seller.review_report_triage(at)（objects.sql），這裡只選它的結果；
-// 不是待分案的通報沒有列。函式內聯後 `report_id = ANY` 成為 reports 主鍵的 Index Cond（TestReviewDeadlinePushdown 鎖住）。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 func (q *Queries) ReviewReportTriageByIDs(ctx context.Context, arg ReviewReportTriageByIDsParams) ([]ReviewReportTriageByIDsRow, error) {
 	rows, err := q.db.Query(ctx, reviewReportTriageByIDs, arg.At, arg.Ids)
 	if err != nil {
@@ -1079,7 +1052,6 @@ type SupplementCountsRow struct {
 	SupplementCount int32
 }
 
-// 這些通報各有幾則補充（沒有補充的通報不出現在結果）；檢舉人的清單用它補上每筆的補充數。
 func (q *Queries) SupplementCounts(ctx context.Context, reportIds []uuid.UUID) ([]SupplementCountsRow, error) {
 	rows, err := q.db.Query(ctx, supplementCounts, reportIds)
 	if err != nil {
@@ -1122,7 +1094,6 @@ type TriageReportParams struct {
 	ExpectedVersion int64
 }
 
-// 分案：掛到案件並記下平台判定類別與分案的人、時間；只在還沒有案件也沒有結果、版本相符時寫入，否則 0 列。
 func (q *Queries) TriageReport(ctx context.Context, arg TriageReportParams) (SellerReport, error) {
 	row := q.db.QueryRow(ctx, triageReport,
 		arg.CaseID,

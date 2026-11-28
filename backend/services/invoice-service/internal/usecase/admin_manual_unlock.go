@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 const (
 	unlockEvidenceMaxRunes = 1000
 
@@ -172,14 +171,14 @@ func (u *AdminJob) RequestManualUnlock(ctx context.Context, in RequestManualUnlo
 		}
 
 		created, taken, err := u.unlocks.Create(ctx, domain.NewManualUnlock{
-			ID:                    u.newID(),
-			OperationID:           op.ID,
-			RequestedByAccountID:  in.ActorAccountID,
-			RequestReason:         in.Reason,
-			ProviderCheckEvidence: in.ProviderCheckEvidence,
-			ProviderCheckedAt:     in.ProviderCheckedAt,
-			ExpiresAt:             now.Add(domain.ManualUnlockExpiry),
-			Now:                   now,
+			ID:                      u.newID(),
+			OperationID:             op.ID,
+			RequestedByAccountID:    in.ActorAccountID,
+			RequestReason:           in.Reason,
+			ProviderCheckEvidence:   in.ProviderCheckEvidence,
+			ProviderCheckedAt:       in.ProviderCheckedAt,
+			ExpiresAt:               now.Add(domain.ManualUnlockExpiry),
+			Now:                     now,
 			CancelEvidenceKind:      nilIfBlank(in.CancelEvidenceKind),
 			CancelEvidenceObjectKey: nilIfBlank(evidenceKey),
 		})
@@ -361,10 +360,10 @@ func (u *AdminJob) ApproveManualUnlock(ctx context.Context, in ApproveManualUnlo
 				"manualUnlock": nextUnlockStatus,
 				"unlockId":     strconv.FormatInt(unlock.ID, 10),
 			}),
-			ReasonCode:     reasonCode,
-			ReasonDetail:   in.Reason,
-			IdempotencyKey: in.IdempotencyKey,
-			Now:            now,
+			ReasonCode:             reasonCode,
+			ReasonDetail:           in.Reason,
+			IdempotencyKey:         in.IdempotencyKey,
+			Now:                    now,
 			ApprovalActorAccountID: &unlock.RequestedByAccountID,
 		}); err != nil {
 			return err

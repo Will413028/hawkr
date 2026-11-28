@@ -104,8 +104,7 @@ export async function GET(request: Request) {
 				merged.push(recordToHit(p));
 				if (merged.length >= RELATED_CAP) break;
 			}
-		} catch {
-		}
+		} catch {}
 	}
 
 	return Response.json(

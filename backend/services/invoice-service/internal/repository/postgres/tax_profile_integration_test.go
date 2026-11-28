@@ -606,7 +606,6 @@ func TestIntegration_Issuer_CreateAndDisplayName(t *testing.T) {
 	}
 }
 
-
 // 🔴 資格守衛必須在 CAS 的 WHERE：allowed-from 之外 ⇒ rows=0（可回 9335），
 // 而不是靠 CHECK（那會回 23514 ＝ 一句 500），也不是靠應用層的 if（擋不住併發）。
 //

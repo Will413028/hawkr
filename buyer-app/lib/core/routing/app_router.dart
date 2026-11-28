@@ -199,10 +199,7 @@ GoRouter appRouter(Ref ref) {
           );
         },
       ),
-      GoRoute(
-        path: '/orders/matched',
-        redirect: (_, __) => '/?tab=3',
-      ),
+      GoRoute(path: '/orders/matched', redirect: (_, __) => '/?tab=3'),
       GoRoute(
         path: '/orders/order-dispute',
         redirect: (_, __) => '/settings/after-sale',
@@ -513,26 +510,17 @@ GoRouter appRouter(Ref ref) {
             path: '/wallet/coupon-detail',
             redirect: (_, __) => '/wallet/coupons',
           ),
-          GoRoute(
-            path: '/orders/reserve',
-            redirect: (_, __) => '/?tab=1',
-          ),
+          GoRoute(path: '/orders/reserve', redirect: (_, __) => '/?tab=1'),
           GoRoute(
             path: '/orders/payment-details',
             redirect: (_, __) => '/?tab=3',
           ),
-          GoRoute(
-            path: '/orders/tracking',
-            redirect: (_, __) => '/?tab=3',
-          ),
+          GoRoute(path: '/orders/tracking', redirect: (_, __) => '/?tab=3'),
           GoRoute(
             path: '/orders/dispute',
             redirect: (_, __) => '/settings/after-sale',
           ),
-          GoRoute(
-            path: '/orders/payment',
-            redirect: (_, __) => '/?tab=3',
-          ),
+          GoRoute(path: '/orders/payment', redirect: (_, __) => '/?tab=3'),
         ],
       ),
     ],

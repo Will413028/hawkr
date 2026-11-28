@@ -35,7 +35,6 @@ SELECT EXISTS (
       AND NOT EXISTS (SELECT 1 FROM catalog.categories ch WHERE ch.parent_id = c.id))
 `
 
-// 葉節點：存在、不是頂層分組（有 parent）、沒有子節點。商品只能掛葉節點。
 func (q *Queries) IsLeafCategory(ctx context.Context, id uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, isLeafCategory, id)
 	var exists bool
@@ -44,11 +43,9 @@ func (q *Queries) IsLeafCategory(ctx context.Context, id uuid.UUID) (bool, error
 }
 
 const listCategories = `-- name: ListCategories :many
-
 SELECT id, parent_id, name, shopify_taxonomy_id, position FROM catalog.categories ORDER BY parent_id NULLS FIRST, position, id
 `
 
-// 平台分類樹：唯讀（種子在 migration）。
 func (q *Queries) ListCategories(ctx context.Context) ([]CatalogCategory, error) {
 	rows, err := q.db.Query(ctx, listCategories)
 	if err != nil {

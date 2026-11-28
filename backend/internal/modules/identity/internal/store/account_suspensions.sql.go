@@ -14,7 +14,6 @@ const currentAccountSuspension = `-- name: CurrentAccountSuspension :one
 SELECT id, account_id, kind, reason_category, reason_text, source_ref, suspended_at, released_at, release_reason FROM identity.account_suspensions WHERE account_id = $1 AND released_at IS NULL
 `
 
-// 帳號目前未解除的停權紀錄；沒有時沒有列（pgx.ErrNoRows）。
 func (q *Queries) CurrentAccountSuspension(ctx context.Context, accountID int64) (IdentityAccountSuspension, error) {
 	row := q.db.QueryRow(ctx, currentAccountSuspension, accountID)
 	var i IdentityAccountSuspension
@@ -46,7 +45,6 @@ type InsertAccountSuspensionParams struct {
 	Now            time.Time
 }
 
-// 與 accounts.suspended_at 在同一個 transaction 寫入；同一帳號未解除的紀錄由 uidx_account_suspensions_active 保證最多一筆。
 func (q *Queries) InsertAccountSuspension(ctx context.Context, arg InsertAccountSuspensionParams) (IdentityAccountSuspension, error) {
 	row := q.db.QueryRow(ctx, insertAccountSuspension,
 		arg.AccountID,
@@ -83,7 +81,6 @@ type ReleaseAccountSuspensionParams struct {
 	AccountID     int64
 }
 
-// 解除帳號目前未解除的紀錄；沒有未解除的紀錄時沒有列（pgx.ErrNoRows）。
 func (q *Queries) ReleaseAccountSuspension(ctx context.Context, arg ReleaseAccountSuspensionParams) (IdentityAccountSuspension, error) {
 	row := q.db.QueryRow(ctx, releaseAccountSuspension, arg.Now, arg.ReleaseReason, arg.AccountID)
 	var i IdentityAccountSuspension

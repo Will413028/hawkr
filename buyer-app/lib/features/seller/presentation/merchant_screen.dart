@@ -42,8 +42,7 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
   late final TabController _tabController;
 
   bool _isLoading = true;
-  bool _merchantNotFound =
-      false;
+  bool _merchantNotFound = false;
   String? _loadError;
   String _merchantName = '';
   String _merchantBannerUrl = '';

@@ -57,9 +57,9 @@ func (p *pagedCommunity) MyReports(_ context.Context, buyerID int64, after *mode
 }
 
 type pagedStores struct {
-	rows   []sellermod.Report
-	calls  []*sellermod.ReportCursor
-	buyers []int64
+	rows    []sellermod.Report
+	calls   []*sellermod.ReportCursor
+	buyers  []int64
 	current *sellermod.Store
 }
 

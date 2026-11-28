@@ -79,7 +79,6 @@ export function InvoiceCorrectionDialog({
 					</div>
 				}
 			>
-
 				<p className="text-xs leading-relaxed text-foreground">
 					{resultNotice}
 				</p>

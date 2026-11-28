@@ -17,7 +17,6 @@ func banDirectJSON(m dsl.Matcher) {
 		Report(`direct gin JSON emitter banned; use response.* helpers (see response/response.go)`)
 }
 
-
 func banDirectProtoPayload(m dsl.Matcher) {
 	m.Match(
 		`response.OK($c, $payload)`,

@@ -35,13 +35,7 @@ class AfterSaleScreen extends ConsumerStatefulWidget {
 
 class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
   static const _reasons = ['商品有瑕疵', '收到錯誤商品', '與描述不符', '改變心意', '其他原因'];
-  static const _reasonCodes = [
-    '5001',
-    '5002',
-    '5003',
-    '5004',
-    '5005',
-  ];
+  static const _reasonCodes = ['5001', '5002', '5003', '5004', '5005'];
 
   int? _selectedReason;
   final _descController = TextEditingController();
@@ -133,8 +127,7 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
             final result = await mediaRepo.uploadImage(file: file);
             photoTokens.add(result.stagedToken);
           }
-        } catch (_) {
-        }
+        } catch (_) {}
       }
 
       final reasonCode = _reasonCodes[_selectedReason!];

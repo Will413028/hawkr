@@ -267,7 +267,7 @@ func mapSnapshot(d *pb.OrderInvoiceSnapshotData) (invoicemq.OrderFacts, error) {
 			DiscountFunding:     funding,
 			Items:               items,
 		},
-		NotifyEmail: d.GetNotifyEmail(),
+		NotifyEmail:               d.GetNotifyEmail(),
 		HasPlatformFundedDiscount: discount > 0 && funding != domain.DiscountFundingSeller,
 		IsConsolidatedOrder:       d.GetIsConsolidatedOrder(),
 	}, nil

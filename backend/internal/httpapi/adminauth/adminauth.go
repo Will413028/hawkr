@@ -42,7 +42,7 @@ const (
 )
 
 type declaration struct {
-	permission adminperm.Permission
+	permission   adminperm.Permission
 	exemptReason string
 	audit        auditMode
 }

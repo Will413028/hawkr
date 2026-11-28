@@ -163,7 +163,6 @@ const CategoryAudit: React.FC = () => {
 				</div>
 			</div>
 
-
 			<div className="category-stats-row">
 				<button
 					type="button"
@@ -253,7 +252,6 @@ const CategoryAudit: React.FC = () => {
 				</button>
 			</div>
 
-
 			<div
 				style={{
 					display: "flex",
@@ -298,7 +296,6 @@ const CategoryAudit: React.FC = () => {
 					</div>
 				)}
 			</div>
-
 
 			<div className="category-table-container">
 				<div style={{ overflowX: "auto" }}>
@@ -438,7 +435,6 @@ const CategoryAudit: React.FC = () => {
 						</tbody>
 					</table>
 				</div>
-
 
 				{totalPages > 1 && (
 					<div className="category-pagination">

@@ -54,9 +54,9 @@ func (s *InvoiceServer) CreateInvoiceCorrection(
 	return &pb.InvoiceCorrectionResponse{
 		Code: 0, Message: msgSuccess,
 		Data: &pb.InvoiceCorrectionData{
-			CorrectionId: fmtID(out.CorrectionID),
-			HandlingMode: out.HandlingMode,
-			Status:       out.Status,
+			CorrectionId:     fmtID(out.CorrectionID),
+			HandlingMode:     out.HandlingMode,
+			Status:           out.Status,
 			StatusNotice:     usecase.CorrectionStatusNotices[out.Status],
 			RejectReasonCode: out.RejectReason,
 		},

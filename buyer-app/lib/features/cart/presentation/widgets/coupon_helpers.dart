@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-
 /// 取得優惠券的唯一識別 ID（嘗試多個欄位名）。
 String couponIdentifier(Map<String, dynamic> coupon) {
   final candidates = [

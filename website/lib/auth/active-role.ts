@@ -62,6 +62,5 @@ export function setStoredActiveRole(role: RoleSlot | null): void {
 	try {
 		if (role) localStorage.setItem(ACTIVE_ROLE_STORAGE_KEY, role);
 		else localStorage.removeItem(ACTIVE_ROLE_STORAGE_KEY);
-	} catch {
-	}
+	} catch {}
 }

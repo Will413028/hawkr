@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // AdminAfterSaleCaseSummaryResp 售後異常列表單筆
 type AdminAfterSaleCaseSummaryResp struct {
 	CaseNo           string `json:"caseNo"`
@@ -112,7 +111,6 @@ func (h *Holder) ListAfterSaleCasesForAdmin(c *gin.Context) {
 		PageSize: d.GetPageSize(),
 	})
 }
-
 
 // AdminForceConfirmReceiptRequest Admin 強制確認收貨請求
 type AdminForceConfirmReceiptRequest struct {

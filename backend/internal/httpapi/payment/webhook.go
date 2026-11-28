@@ -20,7 +20,7 @@ const ChargeWebhookRoute = "POST /webhooks/stripe-payments"
 
 const (
 	maxAccountWebhookBytes = 64 << 10
-	maxChargeWebhookBytes = 256 << 10
+	maxChargeWebhookBytes  = 256 << 10
 )
 
 // Webhook 是一個 webhook 入口的設定：label 是 log 裡的名稱（區分哪個 destination），maxBytes 是本文上限。

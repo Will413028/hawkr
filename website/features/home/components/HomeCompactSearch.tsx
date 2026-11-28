@@ -90,8 +90,7 @@ export default function HomeCompactSearch({
 				setOpen(restored.open);
 				if (restored.open) inputRef.current?.focus({ preventScroll: true });
 			}
-		} catch {
-		}
+		} catch {}
 		const checkpoint = () => {
 			try {
 				saveSearchDraftForTechnicalReload(
@@ -101,8 +100,7 @@ export default function HomeCompactSearch({
 					Date.now(),
 					recoveryScope,
 				);
-			} catch {
-			}
+			} catch {}
 		};
 		window.addEventListener("pagehide", checkpoint);
 		return () => {

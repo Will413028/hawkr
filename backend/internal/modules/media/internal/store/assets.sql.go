@@ -33,7 +33,6 @@ type ApplyDeletionRequestsParams struct {
 	MaxRows int32
 }
 
-// 套用 job：把還沒套用的請求所指的資產標為 DELETING，並記 applied_at。冪等：資產只從 STAGED 轉，applied_at 只寫一次，兩個 worker 由 SKIP LOCKED 分開。
 func (q *Queries) ApplyDeletionRequests(ctx context.Context, arg ApplyDeletionRequestsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, applyDeletionRequests, arg.Now, arg.MaxRows)
 	if err != nil {
@@ -64,7 +63,6 @@ type ClaimAssetsOfUploadsParams struct {
 	Ids []uuid.UUID
 }
 
-// GC 階段一的另一半：贏得 RECLAIMED 認領的暫存列所指的資產（還是 STAGED）一起轉 DELETING。
 func (q *Queries) ClaimAssetsOfUploads(ctx context.Context, arg ClaimAssetsOfUploadsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, claimAssetsOfUploads, arg.Now, arg.Ids)
 	if err != nil {
@@ -120,7 +118,6 @@ type GetAssetViewRow struct {
 	DeleteRequested bool
 }
 
-// 資產加推導狀態需要的兩個事實（B1-D25）：有沒有 CONFIRMED 認領、有沒有刪除請求；model.DeriveAssetState 由它們與 state 推導。
 func (q *Queries) GetAssetView(ctx context.Context, id uuid.UUID) (GetAssetViewRow, error) {
 	row := q.db.QueryRow(ctx, getAssetView, id)
 	var i GetAssetViewRow
@@ -188,8 +185,6 @@ type InsertSecureAssetFromUploadParams struct {
 	UploadID  uuid.UUID
 }
 
-// 最後一段推進後建機敏資產列：預配 ID、型別、大小、段總數、kek_id 與包好的 DEK 都從（已被這個 transaction 鎖住的）暫存列搬過來，
-// 所以搬到的一定是當時最新的 DEK 包裹；物件位置是前綴 secure/<資產 ID>/。
 func (q *Queries) InsertSecureAssetFromUpload(ctx context.Context, arg InsertSecureAssetFromUploadParams) error {
 	_, err := q.db.Exec(ctx, insertSecureAssetFromUpload, arg.ObjectKey, arg.Now, arg.UploadID)
 	return err
@@ -199,7 +194,6 @@ const listAssetIDs = `-- name: ListAssetIDs :many
 SELECT id FROM media.assets ORDER BY id
 `
 
-// 診斷與測試：列出所有資產 ID（狀態由 GetAssetView 推導，不在這裡重寫謂詞）。
 func (q *Queries) ListAssetIDs(ctx context.Context) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, listAssetIDs)
 	if err != nil {
@@ -239,7 +233,6 @@ type ListAssetsToRewrapRow struct {
 	WrappedDek []byte
 }
 
-// 換 KEK 後重新包裹用：keyset 分頁取 kek_id 不是 primary 的機敏資產（DELETED 除外，物件已刪、不需要再讀）。
 func (q *Queries) ListAssetsToRewrap(ctx context.Context, arg ListAssetsToRewrapParams) ([]ListAssetsToRewrapRow, error) {
 	rows, err := q.db.Query(ctx, listAssetsToRewrap, arg.PrimaryKekID, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -330,7 +323,6 @@ type RequestDeletionsParams struct {
 	Ids []uuid.UUID
 }
 
-// 擁有者的刪除指令（B1-D25）：只對已確認的資產 INSERT 請求列，不更新任何既有列；未確認、不存在的 ID 被濾掉，已請求過的冪等。
 func (q *Queries) RequestDeletions(ctx context.Context, arg RequestDeletionsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, requestDeletions, arg.Now, arg.Ids)
 	if err != nil {
@@ -364,7 +356,6 @@ type RewrapAssetParams struct {
 	OldKekID      *string
 }
 
-// 只在列上的 kek_id 仍是取出時的舊值才更新：兩個 RewrapDEKs 同時跑、或擁有者並行讀取時只有一方生效，輸的視為已處理。
 func (q *Queries) RewrapAsset(ctx context.Context, arg RewrapAssetParams) (int64, error) {
 	result, err := q.db.Exec(ctx, rewrapAsset,
 		arg.NewKekID,
@@ -390,7 +381,6 @@ type SettleDeletedAssetUploadsParams struct {
 	AssetID uuid.UUID
 }
 
-// 資產物理刪除完成：認領它的暫存列（擁有者確認的那一筆）轉 DELETED，之後它的 CONFIRMED 認領可以刪。
 func (q *Queries) SettleDeletedAssetUploads(ctx context.Context, arg SettleDeletedAssetUploadsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, settleDeletedAssetUploads, arg.Now, arg.AssetID)
 	if err != nil {

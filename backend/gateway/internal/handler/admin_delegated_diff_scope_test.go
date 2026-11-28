@@ -23,12 +23,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 const (
 	scopeTestStoreID   = "2685914682"
 	scopeTestProductID = "7494590641851072512"
 )
-
 
 type scopeAuditStub struct {
 	accountpb.DelegationServiceClient
@@ -141,7 +139,6 @@ func (s *scopeProductStub) BatchUpdateSellerProductStatus(ctx context.Context, i
 	return resp, nil
 }
 
-
 func newDelegatedScopeRouter(t *testing.T) (*gin.Engine, *scopeAuditStub) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -172,7 +169,6 @@ func newDelegatedScopeRouter(t *testing.T) (*gin.Engine, *scopeAuditStub) {
 	return r, audit
 }
 
-
 // TestDelegatedAudit_ChangedFieldsStayInsideTheMutationScope 是本案的機械判準：
 // 對每一支寫入端點跑一次完整的 orchestrate，斷言 changed_fields 的欄位集合恰好等於
 // 該 action 動得到的欄位。
@@ -186,7 +182,7 @@ func TestDelegatedAudit_ChangedFieldsStayInsideTheMutationScope(t *testing.T) {
 		method string
 		path   string
 		body   string
-		want []string
+		want   []string
 	}{
 		{
 			action: "PRODUCT_PUBLISH",
@@ -281,7 +277,6 @@ func TestDelegatedAudit_CreateActionsRecordTheWholeProjection(t *testing.T) {
 	}
 }
 
-
 // SnapshotFields 漏填 = 選了全表 = 稽核可能虛報，而它不編譯失敗、不轉紅、回應完全
 // 正常。上面那張表守的是「已知的 12 個 action」，這一支守的是**第 13 個之後**：任何
 // 新的 Orchestrate／OrchestrateBatch 呼叫點都必須明寫 SnapshotFields（要全表就寫
@@ -357,7 +352,6 @@ func compositeLitHasKey(lit *ast.CompositeLit, key string) bool {
 	return false
 }
 
-
 func doDelegatedScopeRequest(r *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, "/api/v1/admin/sellers/"+scopeTestStoreID+path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -389,7 +383,6 @@ func equalStringSets(got, want []string) bool {
 	}
 	return true
 }
-
 
 // TestDelegatedAudit_BatchBeforeSnapshotMatchesSinglePath 鎖住批次與單筆的 before
 // 快照對稱。

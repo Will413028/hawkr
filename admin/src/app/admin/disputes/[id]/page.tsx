@@ -331,7 +331,6 @@ export default function DisputeDetail() {
 
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
 			<div style={headerCardStyle}>
 				<div style={{ display: "flex", alignItems: "center", gap: 24 }}>
 					<button
@@ -405,9 +404,7 @@ export default function DisputeDetail() {
 					alignItems: "start",
 				}}
 			>
-
 				<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
 					<div style={cardStyle}>
 						<div style={cardHeaderStyle}>
 							<MaterialSymbol name="person" style={{ fontSize: 22 }} />
@@ -432,7 +429,6 @@ export default function DisputeDetail() {
 						</div>
 					</div>
 
-
 					{(caseDetail?.items?.length ?? 0) > 0 && (
 						<div style={cardStyle}>
 							<div style={cardHeaderStyle}>
@@ -455,7 +451,6 @@ export default function DisputeDetail() {
 										}}
 									>
 										<div>
-
 											<div style={{ fontWeight: 600, color: "#101828" }}>
 												{item.skuName || "（未命名規格）"}
 											</div>
@@ -480,7 +475,6 @@ export default function DisputeDetail() {
 							</div>
 						</div>
 					)}
-
 
 					<div style={cardStyle}>
 						<div style={cardHeaderStyle}>
@@ -545,7 +539,6 @@ export default function DisputeDetail() {
 							</div>
 						</div>
 					</div>
-
 
 					<div style={cardStyle}>
 						<div style={cardHeaderStyle}>
@@ -624,7 +617,6 @@ export default function DisputeDetail() {
 						</div>
 					</div>
 
-
 					{photoKeys.buyerAppeal.length > 0 && (
 						<div style={cardStyle}>
 							<div style={cardHeaderStyle}>
@@ -636,7 +628,6 @@ export default function DisputeDetail() {
 							</div>
 						</div>
 					)}
-
 
 					{(arbitration?.timeline?.length ?? 0) > 0 && (
 						<div style={cardStyle}>
@@ -721,7 +712,6 @@ export default function DisputeDetail() {
 						</div>
 					)}
 
-
 					{arbitration?.decision && (
 						<div style={{ ...cardStyle, border: "2px solid #9ca3af" }}>
 							<div style={{ ...cardHeaderStyle, background: "#f3f4f6" }}>
@@ -782,7 +772,6 @@ export default function DisputeDetail() {
 						</div>
 					)}
 				</div>
-
 
 				<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 					<div style={cardStyle}>
@@ -864,7 +853,6 @@ export default function DisputeDetail() {
 				</div>
 			</div>
 
-
 			{modalType === "support_seller" && (
 				<RulingModal
 					title="確認駁回申訴？"
@@ -930,7 +918,6 @@ export default function DisputeDetail() {
 								gap: 4,
 							}}
 						>
-
 							<span style={{ color: "#6a7282", fontSize: 16 }}>NT$</span>
 							<input
 								type="number"

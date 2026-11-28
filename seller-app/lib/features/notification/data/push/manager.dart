@@ -61,11 +61,9 @@ class PushNotificationManager {
     );
   }
 
-
   /// 第一次使用時才取 [FirebaseMessaging.instance]：Firebase 沒有設定時它會拋
   /// `core/no-app`，所有入口先以 [isFirebaseInitialized] 擋掉。
   late final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-
 
   String? _fcmToken;
   DeviceRegistrationCoordinator? _registration;
@@ -128,11 +126,9 @@ class PushNotificationManager {
     const [],
   );
 
-
   StreamSubscription<RemoteMessage>? _onMessageSub;
   StreamSubscription<RemoteMessage>? _onMessageOpenedSub;
   StreamSubscription<String>? _onTokenRefreshSub;
-
 
   /// 初始化推播通知，在 main.dart runApp() 之前呼叫
   Future<void> init({bool requestPermissionOnInit = true}) async {
@@ -175,7 +171,6 @@ class PushNotificationManager {
     }
   }
 
-
   void _setupListeners() {
     _onTokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
       HKLog.logI('[FCM] Token 已更新');
@@ -201,7 +196,6 @@ class PushNotificationManager {
     HKLog.logD('[FCM] 監聽器設置完成');
   }
 
-
   Future<void> _checkInitialLaunch() async {
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
@@ -211,7 +205,6 @@ class PushNotificationManager {
       });
     }
   }
-
 
   /// 請求通知權限
   Future<AuthorizationStatus> requestPermission({
@@ -257,7 +250,6 @@ class PushNotificationManager {
     }
   }
 
-
   /// 向後端註冊裝置 FCM Token
   ///
   /// 未登入時跳過，不拋出例外。相同 token 的並行呼叫由 coordinator 合併，
@@ -274,7 +266,6 @@ class PushNotificationManager {
     }
     return registration.register(fcmToken);
   }
-
 
   /// 前台訊息處理：顯示 Overlay Banner。文字、圖片與深連結都是伺服器給的；沒有 `notification` 欄位的訊息不顯示。
   void _handleForegroundMessage(RemoteMessage message) {
@@ -340,7 +331,6 @@ class PushNotificationManager {
     NotificationDeepLink.parse(message.data['deep_link']?.toString()).open();
   }
 
-
   /// 顯示 App 內前台通知 Banner（同時只顯示一張，舊的自動替換）
   void _showBanner({
     required String title,
@@ -385,7 +375,6 @@ class PushNotificationManager {
 
     Future.delayed(const Duration(seconds: 5), removeSafely);
   }
-
 
   /// 記錄訊息到 debug bus（僅非 prod，最多保留 50 條）
   void _recordDebugMessage(RemoteMessage message, {required String source}) {
@@ -524,7 +513,6 @@ class PushNotificationManager {
           ],
         ),
       );
-
 
   /// 用戶登入後呼叫：取得 Token 並向後端註冊裝置
   Future<void> onUserLoggedIn() async {

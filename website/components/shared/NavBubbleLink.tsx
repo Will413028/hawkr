@@ -113,7 +113,6 @@ export default function NavBubbleLink({
 					onPointerDown?.(event);
 				}}
 			>
-
 				<small className="sr-only" data-nav-bubble-name="">
 					{accessibleName}
 				</small>

@@ -85,7 +85,6 @@ export default function AgentTaskPanel({
 				</>
 			) : (
 				<div className="hawkr-agent-processing__waiting" aria-hidden="true">
-
 					<HawkrAgentSprite
 						state="SUBMITTING"
 						className="hawkr-agent-rail__sprite"

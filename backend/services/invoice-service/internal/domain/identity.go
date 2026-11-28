@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-
 // ProviderRequestNoForOrder 組出 ORDER 來源的 AMEGO OrderId（＝ provider_request_no）。
 //
 // 長度上界：order_no ＝ "O" + %09d ＝ 10 字，加 "-999-999" ＝ 18 字 ≪ 40

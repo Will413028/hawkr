@@ -369,8 +369,7 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
   /// 每隔 5~14 秒重抽一次風向 / 強度，平滑漸變過去模擬陣風
   void _scheduleNextGust() {
     _gustCooldownFrames = 300 + _random.nextDouble() * 540;
-    final strength =
-        (0.0003 + _random.nextDouble() * 0.0008);
+    final strength = (0.0003 + _random.nextDouble() * 0.0008);
     _windTargetX = strength * (_random.nextBool() ? 1 : -1);
   }
 

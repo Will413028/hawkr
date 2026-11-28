@@ -223,7 +223,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 				}
 			>
 				<div className="flex flex-col gap-4 min-w-0">
-
 					<section className="bg-content1 border border-divider rounded-hkui-lg p-5">
 						<AfterSaleProgress
 							status={status}
@@ -234,7 +233,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 							{afterSaleNarrative(status)}
 						</p>
 					</section>
-
 
 					<AfterSaleRefundBanner progress={detail.refundProgress} />
 
@@ -367,7 +365,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</p>
 					) : null}
 
-
 					<Card title="申請內容">
 						<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
 							<dt className="text-hk-muted">申請原因</dt>
@@ -392,7 +389,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 							</div>
 						) : null}
 					</Card>
-
 
 					{detail.items.length > 0 ? (
 						<Card title="商品">
@@ -436,7 +432,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</Card>
 					) : null}
 
-
 					{detail.returnLogistics ? (
 						<Card title="退貨資訊">
 							<ReturnLogistics
@@ -446,7 +441,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 							/>
 						</Card>
 					) : null}
-
 
 					{detail.refundProgress?.refundTaskStatus ? (
 						<Card title="退款進度">
@@ -461,13 +455,11 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</Card>
 					) : null}
 
-
 					{detail.sellerPhotos.length > 0 ? (
 						<Card title="賣家驗貨照片">
 							<AfterSaleEvidenceGrid photos={detail.sellerPhotos} />
 						</Card>
 					) : null}
-
 
 					{detail.resolutions.length > 0 ? (
 						<Card title="處理紀錄">
@@ -481,7 +473,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 							</ul>
 						</Card>
 					) : null}
-
 
 					{canCancel ? (
 						<section className="flex gap-2 flex-wrap justify-end">

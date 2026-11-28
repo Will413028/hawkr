@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // SellerSkuListResponse 商品 SKU 列表回應
 type SellerSkuListResponse struct {
 	Skus  []SellerSkuResponse `json:"skus"`
@@ -30,7 +29,6 @@ type SellerSkuResponse struct {
 	WidthCm   string `json:"widthCm"`
 	HeightCm  string `json:"heightCm"`
 }
-
 
 // ListSellerSkus lists all SKUs for a product (public route：viewer identity
 // only, never an owner claim — anonymous/buyer  只用來讓

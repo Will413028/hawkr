@@ -2641,7 +2641,7 @@ body .page-content:has(.seller-shell) {
 		align-items: center;
 	}
 
-	
+
 
 	.product-form__mobile-toolbar {
 		box-sizing: border-box;
@@ -12142,11 +12142,11 @@ html[data-theme="dark"] body .seller-shell .seller-sidebar {
 		scroll-snap-align: start;
 	}
 
-	
 
-	
 
-	
+
+
+
 }
 
 @media (min-width: 768px) and (max-width: 960px) {

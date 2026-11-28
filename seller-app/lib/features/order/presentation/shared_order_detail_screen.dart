@@ -1260,7 +1260,6 @@ String _itemLineTotal(OrderItem item) {
   return total.toStringAsFixed(2);
 }
 
-
 class _OrderRatingCard extends ConsumerStatefulWidget {
   const _OrderRatingCard({
     required this.fallbackRating,

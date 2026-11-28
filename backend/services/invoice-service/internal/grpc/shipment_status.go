@@ -6,7 +6,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // ShipmentStatusResolver 是出貨狀態的出向面（實作在 client/shipping）。
 //
 // 介面宣告在消費端：本層只需要「給我一批 order_no、還我狀態碼」，

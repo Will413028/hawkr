@@ -12,7 +12,7 @@ import (
 )
 
 type declaration struct {
-	capability seller.Capability
+	capability   seller.Capability
 	exemptReason string
 }
 

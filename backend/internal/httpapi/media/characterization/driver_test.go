@@ -6,7 +6,6 @@
 // （照 content 的 TestScenariosCatchWrongData 寫）。情境的 Variant 分支記錄與舊實作刻意的差異。
 package characterization
 
-
 import (
 	"context"
 

@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-
 const descKeyTestMediaBase = "https://test-media.example.com"
 
 func setupSellerProductDescRouter(h *Holder) *gin.Engine {

@@ -59,7 +59,6 @@ function measure(patch: MessageInitShape<typeof MeasureSchema> = {}): Measure {
 	});
 }
 
-
 test("生命週期徽章：已關閉、等待刪除有徽章，營運中沒有", () => {
 	assert.deepEqual(lifecycleBadge(StoreStatus.CLOSED), {
 		label: "已關閉",
@@ -100,7 +99,6 @@ test("地址：縣市＋鄉鎮市區＋明細；沒有地址回 -", () => {
 	assert.equal(addressText(undefined), "-");
 	assert.equal(addressText(create(PostalAddressSchema, {})), "-");
 });
-
 
 test("關店與刪帳號的理由：去掉空白後必填，上限 1000 字", () => {
 	assert.equal(validateReason("   ", "請填寫關店理由。"), "請填寫關店理由。");

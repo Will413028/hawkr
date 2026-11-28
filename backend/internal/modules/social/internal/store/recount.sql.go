@@ -120,13 +120,9 @@ func (q *Queries) LockForumEntryStatsRange(ctx context.Context, arg LockForumEnt
 }
 
 const lockPostStats = `-- name: LockPostStats :one
-
 SELECT post_id, like_count, comment_count, view_count, share_count FROM social.post_stats WHERE post_id = $1 FOR UPDATE
 `
 
-// 計數重算的鎖與分頁（counts-brief.md §4 第 8 點）：先 SELECT ... FOR UPDATE 鎖 stats 列，再用 internal/reads 的批次重算語句（go-jet，「計入」的
-// 定義在 internal/visibility）計數覆寫，不蓋掉並行的加減。瀏覽數是只增的事件計數，沒有可重算的來源，不在這裡。
-// 單一對象的 Lock* 給清除 job 在多個對象之間固定鎖順序用；全量重算用 *Range（一批一個語句，依 ID 由小到大鎖）。
 func (q *Queries) LockPostStats(ctx context.Context, postID uuid.UUID) (SocialPostStat, error) {
 	row := q.db.QueryRow(ctx, lockPostStats, postID)
 	var i SocialPostStat
@@ -149,7 +145,6 @@ type LockPostStatsRangeParams struct {
 	UpperID uuid.UUID
 }
 
-// 鎖住 (after_id, upper_id] 範圍內的貼文 stats，依 post_id 由小到大（批次重算的第一步）。
 func (q *Queries) LockPostStatsRange(ctx context.Context, arg LockPostStatsRangeParams) error {
 	_, err := q.db.Exec(ctx, lockPostStatsRange, arg.AfterID, arg.UpperID)
 	return err
@@ -164,7 +159,6 @@ type PostStatsPageParams struct {
 	MaxRows int32
 }
 
-// 全量重算的分頁：依 post_id 的 keyset。
 func (q *Queries) PostStatsPage(ctx context.Context, arg PostStatsPageParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, postStatsPage, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -189,7 +183,6 @@ const reevaluateComments = `-- name: ReevaluateComments :one
 SELECT social.reevaluate_comments($1::uuid[])
 `
 
-// 讓這批留言重新求值「是否計入」（db/objects.sql 的 reevaluate_comments）：鎖與求值都在函式裡，回傳旗標改變的筆數。
 func (q *Queries) ReevaluateComments(ctx context.Context, ids []uuid.UUID) (int32, error) {
 	row := q.db.QueryRow(ctx, reevaluateComments, ids)
 	var reevaluate_comments int32

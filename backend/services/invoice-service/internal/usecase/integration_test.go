@@ -102,8 +102,8 @@ func newFakeAmego(t *testing.T) *fakeAmego {
 func (f *fakeAmego) client(t *testing.T) amego.Client {
 	t.Helper()
 	c, err := amego.New(amego.Options{
-		BaseURL:    f.srv.URL,
-		HTTPClient: f.srv.Client(),
+		BaseURL:          f.srv.URL,
+		HTTPClient:       f.srv.Client(),
 		AllowRealInvoice: false,
 		TestInvoice:      itTaxID,
 		RateLimitQPS:     50,
@@ -172,7 +172,6 @@ func setupEnv(t *testing.T, reviewStatus string, taxCategory int16) *itEnv {
 		t.Fatalf("activate provider account: %v", err)
 	}
 
-
 	fa := newFakeAmego(t)
 	docs := postgres.NewDocumentRepository(pool, ring)
 	ops := postgres.NewOperationRepository(pool)
@@ -218,7 +217,6 @@ func mustStoreID(env *itEnv) int64 {
 	}
 	return v
 }
-
 
 func TestIntegration_Issuance_HappyPath(t *testing.T) {
 	ctx := context.Background()
@@ -278,7 +276,6 @@ func TestIntegration_Issuance_HappyPath(t *testing.T) {
 		t.Fatalf("outbox = %d 列 routing_key=%q", nOutbox, routingKey)
 	}
 }
-
 
 func TestIntegration_Issuance_OutboxIsInsideTheBusinessTransaction(t *testing.T) {
 	ctx := context.Background()
@@ -350,7 +347,6 @@ func TestIntegration_Issuance_OutboxRollsBackWhenDocumentTransitionFails(t *test
 	}
 }
 
-
 func TestIntegration_Issuance_RetryableSchedulesBackoff(t *testing.T) {
 	ctx := context.Background()
 	env := setupEnv(t, codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value, 1)
@@ -396,7 +392,6 @@ func TestIntegration_Issuance_RetryableSchedulesBackoff(t *testing.T) {
 	}
 }
 
-
 func TestIntegration_Issuance_InvariantFailureNeverReachesProvider(t *testing.T) {
 	ctx := context.Background()
 	env := setupEnv(t, codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value, 1)
@@ -439,7 +434,6 @@ func TestIntegration_Issuance_InvariantFailureNeverReachesProvider(t *testing.T)
 	}
 }
 
-
 func TestIntegration_Issuance_DuplicateOrderPaidCreatesOneDocument(t *testing.T) {
 	ctx := context.Background()
 	env := setupEnv(t, codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value, 1)
@@ -465,7 +459,6 @@ func TestIntegration_Issuance_DuplicateOrderPaidCreatesOneDocument(t *testing.T)
 		t.Fatalf("建了 %d 張發票，want 1（document_id=%d）", n, first.DocumentID)
 	}
 }
-
 
 func TestIntegration_Issuance_ReceiptGetsReceiptNoAndNoDeadline(t *testing.T) {
 	ctx := context.Background()

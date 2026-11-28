@@ -15,11 +15,9 @@ import (
 	"go.uber.org/zap"
 )
 
-
 var sellerNow = time.Date(2026, 8, 30, 7, 0, 0, 0, time.UTC)
 
 const sellerStoreID int64 = 2685914682
-
 
 type sellerComplaintFixture struct {
 	uc         *SellerComplaint
@@ -219,7 +217,6 @@ func TestSellerComplaint_Respond_EventPayloadHasNoFreeText(t *testing.T) {
 		t.Fatalf("notification_ref_id 應帶 :responded，實得 %q", decoded.NotificationRefID)
 	}
 }
-
 
 type sellerJobFixture struct {
 	uc     *SellerJob

@@ -1285,7 +1285,6 @@ class _ProductSourceImage extends StatelessWidget {
   }
 }
 
-
 /// 商品預覽媒體：置中的原圖疊在同圖模糊背景上，維持不同商品比例時的沉浸感。
 class _ProductImageSection extends StatelessWidget {
   const _ProductImageSection({

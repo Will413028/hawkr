@@ -25,7 +25,6 @@ import { getEnv } from "@/lib/config/env";
 import { activeLocale } from "@/lib/intl/active-locale";
 import type { AppLocale } from "@/lib/intl/locales";
 
-
 /**
  * 瀏覽器打 Connect 的第一方路徑，每個環境都一樣：瀏覽器只跟自己的 origin 說話（lib/config/env.ts 的
  * readApiBase；〈系統架構與資料流向〉§2.4）。Connect 的路徑 `/{service}/{method}` 在單體的根目錄，不在
@@ -490,7 +489,6 @@ function sentryCapture(
 					},
 				});
 			})
-			.catch(() => {
-			});
+			.catch(() => {});
 	};
 }

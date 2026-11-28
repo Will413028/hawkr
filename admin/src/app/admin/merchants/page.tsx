@@ -93,10 +93,8 @@ export default function MerchantManagement() {
 				: undefined;
 
 		let btnClass = "btn-action gray";
-		if (isPending)
-			btnClass = "btn-action warning";
-		else if (isRejected)
-			btnClass = "btn-action danger";
+		if (isPending) btnClass = "btn-action warning";
+		else if (isRejected) btnClass = "btn-action danger";
 		else if (isActive) btnClass = "btn-action success";
 
 		return (
@@ -156,7 +154,6 @@ export default function MerchantManagement() {
 
 	return (
 		<div className="merchant-management">
-
 			<div className="page-header">
 				<div>
 					<h1 className="page-title">賣家管理</h1>
@@ -181,7 +178,6 @@ export default function MerchantManagement() {
 					訂單履約與出貨仍由賣家操作
 				</span>
 			</aside>
-
 
 			<div className="stats-row-v2 merchant-stats-grid">
 				<button
@@ -242,7 +238,6 @@ export default function MerchantManagement() {
 				</div>
 			</div>
 
-
 			<div className="merchant-toolbar">
 				<div className="merchant-search-input">
 					<MaterialSymbol name="search" size={18} className="search-icon" />
@@ -269,9 +264,7 @@ export default function MerchantManagement() {
 				</div>
 			</div>
 
-
 			<div className="merchant-table-container">
-
 				<table className="merchant-table">
 					<thead>
 						<tr>
@@ -314,7 +307,6 @@ export default function MerchantManagement() {
 											setSelectedId(selectedId === storeId ? null : storeId);
 										}}
 									>
-
 										<td>
 											<div className="merchant-info-cell">
 												<div className="merchant-avatar">
@@ -339,7 +331,6 @@ export default function MerchantManagement() {
 													</span>
 												</div>
 												<div className="merchant-details">
-
 													<div className="merchant-name" title={shopName}>
 														{shopName}
 													</div>
@@ -380,7 +371,6 @@ export default function MerchantManagement() {
 					</tbody>
 				</table>
 			</div>
-
 
 			{(page > 1 || list.nextPageToken) && (
 				<div className="merchant-pagination">

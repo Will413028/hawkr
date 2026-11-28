@@ -66,7 +66,6 @@ const deleteOldPostViews = `-- name: DeleteOldPostViews :execrows
 DELETE FROM social.post_views WHERE view_day < $1
 `
 
-// 去重只需要當日與前一日；刪除不扣瀏覽數（trigger 只在新增時加）。
 func (q *Queries) DeleteOldPostViews(ctx context.Context, beforeDay time.Time) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteOldPostViews, beforeDay)
 	if err != nil {
@@ -142,7 +141,6 @@ func (q *Queries) InsertCommentLike(ctx context.Context, arg InsertCommentLikePa
 }
 
 const insertPostLike = `-- name: InsertPostLike :execrows
-
 INSERT INTO social.post_likes (post_id, buyer_id, created_at)
 VALUES ($1, $2, $3)
 ON CONFLICT (post_id, buyer_id) DO NOTHING
@@ -154,7 +152,6 @@ type InsertPostLikeParams struct {
 	Now     time.Time
 }
 
-// 讚、瀏覽與分享。計數由 trigger 依實際新增或刪除的列加減（objects.sql），這裡只寫集合的列。
 func (q *Queries) InsertPostLike(ctx context.Context, arg InsertPostLikeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertPostLike, arg.PostID, arg.BuyerID, arg.Now)
 	if err != nil {
@@ -195,7 +192,6 @@ type InsertPostViewParams struct {
 	ViewerKey []byte
 }
 
-// 瀏覽的去重：(貼文, 台北日, 觀看者鍵) 已經有就 0 列。瀏覽數由 trigger 在新增時加一。
 func (q *Queries) InsertPostView(ctx context.Context, arg InsertPostViewParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertPostView, arg.PostID, arg.ViewDay, arg.ViewerKey)
 	if err != nil {
@@ -214,7 +210,6 @@ type InsertViewSaltParams struct {
 	Salt    []byte
 }
 
-// 當日的 salt：第一次需要時寫入，已經有就不動（跨實例一致，寫完讀回）。
 func (q *Queries) InsertViewSalt(ctx context.Context, arg InsertViewSaltParams) error {
 	_, err := q.db.Exec(ctx, insertViewSalt, arg.ViewDay, arg.Salt)
 	return err

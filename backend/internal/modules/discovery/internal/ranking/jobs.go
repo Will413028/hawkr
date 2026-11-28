@@ -13,7 +13,7 @@ const (
 	recomputeID = "discovery.recompute_seller_scores"
 	// RecomputeInterval 是重算的間隔：榜單最多落後這麼久（website 的快取是 900 秒，同一個量級）。
 	RecomputeInterval = 15 * time.Minute
-	recomputeTimeout = 10 * time.Minute
+	recomputeTimeout  = 10 * time.Minute
 	recomputeAttempts = 3
 )
 

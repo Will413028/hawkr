@@ -5,7 +5,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-
 var platformCredentialIncomplete = promauto.NewGauge(prometheus.GaugeOpts{
 	Name: "invoice_platform_credential_incomplete",
 	Help: "1 when AMEGO platform credential is half-configured (invoice set, app key missing) and the mobile-barcode verifier is silently disabled",

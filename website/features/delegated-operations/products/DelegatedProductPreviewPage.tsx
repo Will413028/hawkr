@@ -98,8 +98,7 @@ export default function DelegatedProductPreviewPage({
 			try {
 				const self = await scope.repos.storefront.fetchMyStore();
 				if (!cancelled) setStorefront(self);
-			} catch {
-			}
+			} catch {}
 		})();
 		return () => {
 			cancelled = true;
@@ -184,7 +183,6 @@ export default function DelegatedProductPreviewPage({
 				</Link>
 			}
 		>
-
 			<p className="adm-panel__hint" role="note">
 				{
 					"這是依商品目前已儲存的內容算出來的買家視角。買家實際看得到這一頁，要等商品上架之後；評價與評分來自買家端，預覽一律顯示「尚無評價」。"
@@ -272,7 +270,6 @@ function PreviewSellerCard({ seller }: { seller: PreviewSellerView | null }) {
 					/>
 				</div>
 			</div>
-
 		</aside>
 	);
 }

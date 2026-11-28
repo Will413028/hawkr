@@ -535,7 +535,6 @@ function NotificationGroup({
 					aria-label={`展開 ${items.length} 則同類通知`}
 					className="relative block w-full cursor-pointer appearance-none border-0 bg-transparent p-0 text-left"
 				>
-
 					{Array.from({ length: peekLayers }).map((_, i) => (
 						<span
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed 0–1 decorative layers

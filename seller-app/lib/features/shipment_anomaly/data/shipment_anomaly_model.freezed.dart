@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ShipmentAnomaly {
 
- String get shipmentId; String get orderNo; String get anomalyType; String get anomalyTypeLabel; String get severity; String get severityLabel; String get shippingMethod; String get shipmentStatus; String get detectedAt; String get ackAction;// Backend Gateway 回的欄位是 `actedAt`（非 ackedAt），對齊 gateway/internal/handler/shipment_anomaly.go
+ String get shipmentId; String get orderNo; String get anomalyType; String get anomalyTypeLabel; String get severity; String get severityLabel; String get shippingMethod; String get shipmentStatus; String get detectedAt; String get ackAction;// Gateway 欄位名稱為 actedAt。
  String get actedAt;
 /// Create a copy of ShipmentAnomaly
 /// with the given fields replaced by the non-null parameter values.
@@ -233,7 +233,7 @@ class _ShipmentAnomaly implements ShipmentAnomaly {
 @override@JsonKey() final  String shipmentStatus;
 @override@JsonKey() final  String detectedAt;
 @override@JsonKey() final  String ackAction;
-// Backend Gateway 回的欄位是 `actedAt`（非 ackedAt），對齊 gateway/internal/handler/shipment_anomaly.go
+// Gateway 欄位名稱為 actedAt。
 @override@JsonKey() final  String actedAt;
 
 /// Create a copy of ShipmentAnomaly
@@ -582,8 +582,7 @@ as int,
 /// @nodoc
 mixin _$ShipmentAnomalyStats {
 
-@JsonKey(fromJson: _parseInt) int get total;// Backend Gateway 實際回的欄位是 highSeverityCount / mediumSeverityCount / lowSeverityCount
-// (gateway/internal/handler/shipment_anomaly.go DTO + shipping-service proto)
+@JsonKey(fromJson: _parseInt) int get total;// Gateway 回傳 highSeverityCount、mediumSeverityCount 與 lowSeverityCount。
 @JsonKey(name: 'highSeverityCount', fromJson: _parseInt) int get highCount;@JsonKey(name: 'mediumSeverityCount', fromJson: _parseInt) int get mediumCount;@JsonKey(name: 'lowSeverityCount', fromJson: _parseInt) int get lowCount;
 /// Create a copy of ShipmentAnomalyStats
 /// with the given fields replaced by the non-null parameter values.
@@ -785,8 +784,7 @@ class _ShipmentAnomalyStats implements ShipmentAnomalyStats {
   factory _ShipmentAnomalyStats.fromJson(Map<String, dynamic> json) => _$ShipmentAnomalyStatsFromJson(json);
 
 @override@JsonKey(fromJson: _parseInt) final  int total;
-// Backend Gateway 實際回的欄位是 highSeverityCount / mediumSeverityCount / lowSeverityCount
-// (gateway/internal/handler/shipment_anomaly.go DTO + shipping-service proto)
+// Gateway 回傳 highSeverityCount、mediumSeverityCount 與 lowSeverityCount。
 @override@JsonKey(name: 'highSeverityCount', fromJson: _parseInt) final  int highCount;
 @override@JsonKey(name: 'mediumSeverityCount', fromJson: _parseInt) final  int mediumCount;
 @override@JsonKey(name: 'lowSeverityCount', fromJson: _parseInt) final  int lowCount;

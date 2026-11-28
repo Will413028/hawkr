@@ -5,7 +5,6 @@ import (
 	"unicode/utf8"
 )
 
-
 const maskFill = "••••"
 
 // MaskEmail 遮罩發票通知 email（P 類，非資料主體視角）。

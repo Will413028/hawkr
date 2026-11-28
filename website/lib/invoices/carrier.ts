@@ -40,7 +40,6 @@ export function isKnownCarrierType(
 	return carrierType in INVOICE_CARRIER_TYPE_LABEL;
 }
 
-
 const MOBILE_BARCODE_RE = /^\/[0-9A-Z+\-.]{7}$/;
 const CITIZEN_CERT_RE = /^[A-Z]{2}[0-9]{14}$/;
 const DONATION_RE = /^[0-9]{3,7}$/;

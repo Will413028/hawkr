@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // RefundAdjustmentInput 是套用一則退款所需的全部輸入。
 //
 // 刻意不吃 mq 的型別：usecase 不得依賴 mq（方向相反，會循環），轉換由 mq 側的
@@ -43,8 +42,8 @@ const (
 )
 
 type refundPlan struct {
-	Kind   refundPlanKind
-	Reason string
+	Kind        refundPlanKind
+	Reason      string
 	Disposition string
 }
 
@@ -133,7 +132,6 @@ func planRefundAdjustment(f refundFacts) refundPlan {
 }
 
 const amegoUploadCompleted int16 = 99
-
 
 // RefundAdjustmentAdjustments 是本 usecase 需要的 adjustment 面。
 type RefundAdjustmentAdjustments interface {

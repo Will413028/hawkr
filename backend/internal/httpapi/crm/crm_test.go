@@ -70,15 +70,15 @@ func (f *fakeReads) ListTags(_ context.Context, storeID int64) ([]crm.Tag, error
 }
 
 type fakeWrites struct {
-	err     error
-	calls   []string
-	storeID int64
-	buyerID int64
-	typ     crm.CustomerType
-	tagID   uuid.UUID
-	name    string
-	names   []string
-	created crm.Tag
+	err      error
+	calls    []string
+	storeID  int64
+	buyerID  int64
+	typ      crm.CustomerType
+	tagID    uuid.UUID
+	name     string
+	names    []string
+	created  crm.Tag
 	customer crm.Customer
 	renamed  crm.Tag
 }

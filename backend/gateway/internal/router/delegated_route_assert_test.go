@@ -165,7 +165,6 @@ func regsFrom(entries []string) []authz.RegisteredAdminRoute {
 	return out
 }
 
-
 func TestBootCheckD_CapabilityDeclared(t *testing.T) {
 	clean := make([]authz.RegisteredAdminRoute, 0, 2)
 	clean = append(clean, authz.RegisteredAdminRoute{Method: "GET", Path: adminPrefix + "/sellers/:store_id/products", Cap: authz.AdminCapProductsRead})

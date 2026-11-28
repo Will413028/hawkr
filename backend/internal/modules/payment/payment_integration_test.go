@@ -57,13 +57,13 @@ var (
 )
 
 type queue struct {
-	mu   sync.Mutex
-	args []river.JobArgs
-	opts []river.InsertOpts
-	out  []bool
+	mu       sync.Mutex
+	args     []river.JobArgs
+	opts     []river.InsertOpts
+	out      []bool
 	failKind string
 	fail     error
-	before func(args river.JobArgs)
+	before   func(args river.JobArgs)
 }
 
 func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error {

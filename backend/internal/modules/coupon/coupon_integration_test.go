@@ -41,7 +41,7 @@ const (
 type fakeStores struct {
 	mu        sync.Mutex
 	suspended map[int64]bool
-	calls atomic.Int64
+	calls     atomic.Int64
 }
 
 func (f *fakeStores) StoreSuspended(_ context.Context, id int64) (bool, error) {

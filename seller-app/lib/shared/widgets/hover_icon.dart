@@ -163,7 +163,6 @@ class HoverIconState extends State<HoverIcon>
     }
   }
 
-
   Widget _slideThrough(Widget child) {
     final t = _ctrl.value;
     final double dx;
@@ -185,7 +184,6 @@ class HoverIconState extends State<HoverIcon>
       child: Opacity(opacity: opacity.clamp(0.0, 1.0), child: child),
     );
   }
-
 
   Widget _launch(Widget child) {
     final t = _ctrl.value;
@@ -211,7 +209,6 @@ class HoverIconState extends State<HoverIcon>
     );
   }
 
-
   Widget _pulse(Widget child) {
     final t = _ctrl.value;
     final double scale;
@@ -227,13 +224,11 @@ class HoverIconState extends State<HoverIcon>
     return Transform.scale(scale: scale, child: child);
   }
 
-
   Widget _roll(Widget child) {
     final t = _ctrl.value;
     final dx = 10.0 * math.sin(t * math.pi);
     return Transform.translate(offset: Offset(dx, 0), child: child);
   }
-
 
   Widget _swing(Widget child) {
     final t = _ctrl.value;
@@ -256,7 +251,6 @@ class HoverIconState extends State<HoverIcon>
     );
   }
 
-
   Widget _bounce(Widget child) {
     final t = _ctrl.value;
     final double dy;
@@ -271,7 +265,6 @@ class HoverIconState extends State<HoverIcon>
     }
     return Transform.translate(offset: Offset(0, dy), child: child);
   }
-
 
   Widget _spin(Widget child) {
     final angle = Curves.easeInOut.transform(_ctrl.value) * 2 * math.pi;

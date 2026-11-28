@@ -62,10 +62,10 @@ import (
 )
 
 const (
-	webOrigin     = "https://web.example"
-	lineSecret    = "line-channel-secret-0123456789ab"
-	googleClient  = "google-web-client"
-	lineChannelID = "line-channel"
+	webOrigin       = "https://web.example"
+	lineSecret      = "line-channel-secret-0123456789ab"
+	googleClient    = "google-web-client"
+	lineChannelID   = "line-channel"
 	googleAppClient = "android-client"
 )
 

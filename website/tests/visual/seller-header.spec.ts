@@ -89,8 +89,7 @@ async function gotoSellerHeader(
 				localStorage.setItem(themeKey, themeVal);
 				localStorage.setItem(roleKey, roleVal);
 				sessionStorage.setItem(loaderKey, "1");
-			} catch {
-			}
+			} catch {}
 		},
 		[
 			THEME_STORAGE_KEY,

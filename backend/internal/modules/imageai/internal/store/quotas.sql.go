@@ -65,7 +65,6 @@ type InsertQuotaParams struct {
 	Now         time.Time
 }
 
-// 沒有個別設定時建立；已經有列（有人先建立）時沒有列被寫入（pgx.ErrNoRows）。
 func (q *Queries) InsertQuota(ctx context.Context, arg InsertQuotaParams) (ImageaiQuota, error) {
 	row := q.db.QueryRow(ctx, insertQuota,
 		arg.StoreID,
@@ -117,7 +116,6 @@ type UpdateQuotaParams struct {
 	ExpectedVersion int64
 }
 
-// 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）。
 func (q *Queries) UpdateQuota(ctx context.Context, arg UpdateQuotaParams) (ImageaiQuota, error) {
 	row := q.db.QueryRow(ctx, updateQuota,
 		arg.WeeklyLimit,

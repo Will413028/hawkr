@@ -222,7 +222,6 @@ export function SellerAmegoSetupPage() {
 				</p>
 			) : null}
 
-
 			<section id="amego-1" className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground">
 					確認商家統一編號
@@ -242,7 +241,6 @@ export function SellerAmegoSetupPage() {
 					重新送審。
 				</p>
 			</section>
-
 
 			<section id="amego-2" className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground mb-3">
@@ -300,7 +298,6 @@ export function SellerAmegoSetupPage() {
 				</p>
 			</section>
 
-
 			<section id="amego-3" className="seller-card mt-4 p-5">
 				<div className="flex items-center gap-3 flex-wrap">
 					<h2 className="text-sm font-extrabold text-foreground flex-1">
@@ -318,7 +315,6 @@ export function SellerAmegoSetupPage() {
 						className="mt-2 text-[0.6875rem] leading-relaxed text-danger-700"
 						role="alert"
 					>
-
 						{invoiceErrorMessage(actions.verifyError) || verifyCopy.title}
 						{verifyCopy.description ? ` ${verifyCopy.description}` : ""}
 					</p>
@@ -334,7 +330,6 @@ export function SellerAmegoSetupPage() {
 					</details>
 				) : null}
 			</section>
-
 
 			<section id="amego-4" className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground mb-3">
@@ -372,7 +367,6 @@ export function SellerAmegoSetupPage() {
 				) : null}
 			</section>
 
-
 			{state.activated && account?.automationCutoverAt ? (
 				<section id="amego-5" className="seller-card mt-4 p-5">
 					<h2 className="text-sm font-extrabold text-foreground">
@@ -391,7 +385,6 @@ export function SellerAmegoSetupPage() {
 			) : (
 				<div id="amego-5" />
 			)}
-
 
 			<div className="mt-5 flex justify-end gap-2 flex-wrap">
 				<Button
@@ -436,7 +429,6 @@ export function SellerAmegoSetupPage() {
 					</div>
 				}
 			>
-
 				<p className="text-xs leading-relaxed text-foreground">
 					自 <strong>{cutoverLocal.replace("T", " ")}</strong>{" "}
 					起付款的訂單，將由這條 AMEGO

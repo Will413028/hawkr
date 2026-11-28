@@ -18,7 +18,6 @@ import {
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { unknownText } from "./ui-text";
 
-
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,
 	value: E,
@@ -137,7 +136,6 @@ export const STATUS_FILTER_OPTIONS: readonly ProspectStatus[] = [
 ];
 export const DEFAULT_STATUS_FILTER = ProspectStatus.ACTIVE;
 
-
 /** enum 值在網址的寫法：enum 名稱的小寫（`active`、`not_contacted`）。 */
 export function filterParam(
 	enumObject: Record<number, string>,
@@ -230,7 +228,6 @@ export function listProspectsFields(
 		keyword: filters.keyword,
 	};
 }
-
 
 export const MAX_CONTACTS = 50;
 const CONTACT_VALUE_MAX: Record<
@@ -374,7 +371,6 @@ export function primaryContactValue(
 ): string {
 	return contacts.find((c) => c.kind === kind && c.primary)?.value ?? "";
 }
-
 
 export interface ProspectForm {
 	displayName: string;
@@ -617,7 +613,6 @@ export function previewRequest(
 		contacts: contacts.ok ? contacts.contacts : [],
 	};
 }
-
 
 /** 十進位字串的 ID 以數值比較（字串比大小會讓 "9" 排在 "10" 後面）；回傳負數表示 a 較小。 */
 export function compareIds(a: string, b: string): number {

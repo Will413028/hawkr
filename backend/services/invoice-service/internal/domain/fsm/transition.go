@@ -1,6 +1,5 @@
 package fsm
 
-
 import "fmt"
 
 // TransitionKind 是 CheckOperation／CheckDocument 的判定結果。

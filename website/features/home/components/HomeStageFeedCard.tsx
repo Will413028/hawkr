@@ -120,7 +120,6 @@ export default function HomeStageFeedCard({
 
 	return (
 		<>
-
 			<AuthGateWaitModal open={authWaiting} />
 
 			{/* biome-ignore lint/a11y/useSemanticElements: card nests a seller link + like button, so a native <button> would create invalid interactive nesting. */}
@@ -152,7 +151,6 @@ export default function HomeStageFeedCard({
 				}}
 				className="group relative grid h-full cursor-pointer grid-cols-[minmax(0,min(48%,380px))_minmax(0,1fr)] overflow-hidden rounded-[22px] border border-hk-border-soft bg-hk-surface-card text-inherit no-underline max-[720px]:grid-cols-1"
 			>
-
 				{imageSrc ? (
 					<div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none">
 						<div className="absolute inset-0">
@@ -196,7 +194,6 @@ export default function HomeStageFeedCard({
 					)}
 				</div>
 				<div className="relative flex min-w-0 flex-col px-6 py-5">
-
 					{sellerHref ? (
 						<Link
 							href={sellerHref}

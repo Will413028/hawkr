@@ -320,7 +320,6 @@ class _PaginationErrorRetry extends ConsumerWidget {
   }
 }
 
-
 class _NotificationCard extends ConsumerStatefulWidget {
   final pb.InboxItem notification;
   final bool isDeleteMode;
@@ -564,7 +563,6 @@ class _NotificationSenderAvatar extends StatelessWidget {
   }
 }
 
-
 class _MarkAllReadDialog extends StatelessWidget {
   const _MarkAllReadDialog();
 
@@ -639,7 +637,6 @@ class _MarkAllReadDialog extends StatelessWidget {
     );
   }
 }
-
 
 class _DeleteBottomBar extends StatelessWidget {
   final int count;

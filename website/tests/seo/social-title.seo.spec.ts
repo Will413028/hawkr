@@ -34,9 +34,7 @@ const BRAND_SUFFIX = ` | ${SITE_NAME}`;
  * that legitimately are the site. Named individually, never by prefix: a
  * directory-wide exemption is how the 84 hid in the first place.
  */
-const ROOT_TITLE_IS_CORRECT = new Set<string>([
-	"/",
-]);
+const ROOT_TITLE_IS_CORRECT = new Set<string>(["/"]);
 
 const ROUTES = [
 	"/",

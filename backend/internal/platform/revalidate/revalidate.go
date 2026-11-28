@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	timeout = 5 * time.Second
+	timeout     = 5 * time.Second
 	maxAttempts = 5
 )
 

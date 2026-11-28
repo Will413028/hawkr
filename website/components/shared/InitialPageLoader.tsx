@@ -278,7 +278,6 @@ export default function InitialPageLoader() {
 			aria-label="Hawkr 載入中"
 		>
 			<div className="initial-loader__mark" aria-hidden="true">
-
 				<BrandLogoLoader />
 			</div>
 

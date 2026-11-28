@@ -141,7 +141,7 @@ func TestDocumentStatusCoverageHasNoSilentTerminal(t *testing.T) {
 		"CANCELLED_BEFORE_ISSUE": "ADM 雙人確認本單不需開立，invoice_admin_audit_logs 留有理由",
 		"NOT_APPLICABLE":         "合法的「不開票」路徑（零元／免用發票賣家／切點前訂單），not_applicable_reason 必填",
 		"RESOLVED_EXTERNALLY":    "賣家已自行開立並回報號碼，平台不再有開立義務",
-		"VOIDING": "由驅動它的 VOID operation 在 M6 上代表；前提已於 #3073 重驗成立（見上方註解）",
+		"VOIDING":                "由驅動它的 VOID operation 在 M6 上代表；前提已於 #3073 重驗成立（見上方註解）",
 	}
 
 	var uncovered []string

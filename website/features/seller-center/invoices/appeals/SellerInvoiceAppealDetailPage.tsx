@@ -179,7 +179,6 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 
 	return (
 		<div className="flex flex-col gap-[var(--hkui-space-4)]">
-
 			<section
 				role="status"
 				className={[
@@ -205,7 +204,6 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 					/>
 				)}
 			</section>
-
 
 			{closed ? null : (
 				<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
@@ -235,7 +233,6 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 				error={respond.error}
 				onSubmit={(args) => respond.respond(args)}
 			/>
-
 
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<div className="flex flex-wrap items-center justify-between gap-2">
@@ -294,7 +291,6 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 				) : null}
 			</section>
 
-
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<h2 className="m-0 text-sm font-bold">處理紀錄</h2>
 				{complaint.responses.length === 0 ? (
@@ -323,7 +319,6 @@ function ResponseRow({ item }: { item: SellerInvoiceComplaintResponse }) {
 					{ACTOR_LABEL[item.actor] ?? dash(item.actor)}
 				</strong>
 				<span className="text-sm">
-
 					{INVOICE_COMPLAINT_ACTION_LABEL[item.action] ?? dash(item.action)}
 				</span>
 				{item.occurredAt ? (

@@ -9,7 +9,6 @@ import {
 } from "../gen/google/rpc/error_details_pb";
 import { ErrorReason } from "../gen/hawkr/common/v1alpha1/error_reason_pb";
 
-
 /** ErrorInfo 的 domain：只有這個 domain 的 reason 是我們的 ErrorReason。 */
 export const ERROR_DOMAIN = "hawkr";
 

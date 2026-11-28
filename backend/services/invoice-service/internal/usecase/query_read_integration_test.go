@@ -27,7 +27,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres"
 )
 
-
 // TestIntegration_QueryRead_ThreeFacesOfTheSameCarrier 是本波最重要的一支。
 //
 // 它把 §8.1.3 的三格一次驗完，而且**必須是同一支測試**：
@@ -158,7 +157,6 @@ func TestIntegration_QueryRead_AdminRevealFailsClosedWhenAuditFails(t *testing.T
 	}
 }
 
-
 // TestIntegration_QueryRead_TierA_SellerDocumentOwnerIsInSQLPredicate 是
 // 「把 `AND i.issuer_ref_id = $2` 從 GetSellerInvoiceDocumentByID 拿掉」這個變異的
 // 唯一偵測點。fake repository 會忠實照述詞回答，所以只有真 DB 抓得到。
@@ -216,7 +214,6 @@ func TestIntegration_QueryRead_TierA_BuyerDocumentListIsOwnerScoped(t *testing.T
 	}
 }
 
-
 // TestIntegration_QueryRead_TotalEqualsSumOfPages 是分頁的鑑別力測試。
 //
 // 判準有三層，缺一都會讓一種真實的失敗溜過去：
@@ -267,7 +264,6 @@ func TestIntegration_QueryRead_TotalEqualsSumOfPages(t *testing.T) {
 		}
 	}
 }
-
 
 // TestIntegration_QueryRead_OrderInvoiceReturnsWholeReissueChain 是
 // 「ListOrderInvoiceDocumentsForBuyer 必須是 :many」那條註解的偵測點。
@@ -347,7 +343,6 @@ func qitSeedDocumentWithVersion(t *testing.T, env *qitEnv, docID, buyerID int64,
 	}
 	return doc
 }
-
 
 // TestIntegration_QueryRead_ReceivedNoteIsDerivedFromLines 釘住 proto 對
 // recipient_note 的定案（不加 DB 欄、由 invoice_document_lines 推導）。

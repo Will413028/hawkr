@@ -6,7 +6,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // SellerNameResolver 是店名的出向面（實作在 client/seller）。
 //
 // 介面宣告在消費端：本層只需要「給我一批 store_id、還我店名」，

@@ -79,7 +79,6 @@ export default function AuditDetailDialog({
 				<h3>變更內容（系統紀錄）</h3>
 				{entry.changedFields.length === 0 ? (
 					<p className="adm-audit-detail-placeholder">
-
 						{entry.result === "FAILED"
 							? "這次操作未寫入，因此沒有欄位差異。"
 							: entry.result === "PENDING"
@@ -98,7 +97,6 @@ export default function AuditDetailDialog({
 						<tbody>
 							{entry.changedFields.map((field) => (
 								<tr key={field.field}>
-
 									<th scope="row">{field.label}</th>
 									<td>{field.before || "—"}</td>
 									<td>{field.after || "—"}</td>
@@ -121,7 +119,6 @@ export default function AuditDetailDialog({
 				</span>
 				{entry.result === "FAILED" && entry.bizCode !== 0 && (
 					<>
-
 						{entry.bizCodeLabel && (
 							<span className="adm-audit-detail-sub">{entry.bizCodeLabel}</span>
 						)}
@@ -185,14 +182,12 @@ export default function AuditDetailDialog({
 				<CopyableValue value={entry.idempotencyKey} label="冪等鍵" />
 			</DetailRow>
 			<DetailRow label="裝置">
-
 				<span className="adm-audit-detail-ua">{entry.userAgent || "—"}</span>
 				<span className="adm-audit-detail-sub">來源 · {entry.origin}</span>
 			</DetailRow>
 			<DetailRow label="賣家通知狀態">
 				{entry.notifiedAt ? (
 					<>
-
 						<span className="adm-audit-notify">
 							<MaterialSymbol name="notifications_active" />
 							已透過站內訊息通知賣家
@@ -213,7 +208,6 @@ export default function AuditDetailDialog({
 				</span>
 			</DetailRow>
 			<DetailRow label="紀錄時間">
-
 				<span>{formatClockTime(entry.createdAt)}</span>
 				<span className="adm-audit-detail-sub">
 					確認時間 ·{" "}

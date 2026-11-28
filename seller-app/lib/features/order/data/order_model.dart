@@ -11,6 +11,7 @@ abstract class OrderItem with _$OrderItem {
   const factory OrderItem({
     required String name,
     required String price,
+    // 成交單價、原價快照、折抵與實付金額。
     @Default('') String unitPrice,
     @Default('') String listPrice,
     @Default('') String shareDiscount,

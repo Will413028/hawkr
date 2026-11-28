@@ -57,8 +57,7 @@ async function gotoWithTheme(
 		([key, value]) => {
 			try {
 				localStorage.setItem(key, value);
-			} catch {
-			}
+			} catch {}
 		},
 		[THEME_STORAGE_KEY, theme] as const,
 	);

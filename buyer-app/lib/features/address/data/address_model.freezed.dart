@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Address {
 
- int get id; String get etag; String get receiverName; String get receiverPhone;// 內政部 8 碼鄉鎮市區代碼與其後的明細（postal_address）；縣市、郵遞區號、名稱由 hawkr_twaddr 依代碼取得。
+ int get id; String get etag; String get receiverName; String get receiverPhone;// 鄉鎮市區代碼與地址明細；縣市、郵遞區號及名稱由 hawkr_twaddr 依代碼取得。
  String get townCode; String get addressDetail; bool get isDefault;
 /// Create a copy of Address
 /// with the given fields replaced by the non-null parameter values.
@@ -220,7 +220,7 @@ class _Address implements Address {
 @override final  String etag;
 @override final  String receiverName;
 @override final  String receiverPhone;
-// 內政部 8 碼鄉鎮市區代碼與其後的明細（postal_address）；縣市、郵遞區號、名稱由 hawkr_twaddr 依代碼取得。
+// 鄉鎮市區代碼與地址明細；縣市、郵遞區號及名稱由 hawkr_twaddr 依代碼取得。
 @override@JsonKey() final  String townCode;
 @override@JsonKey() final  String addressDetail;
 @override@JsonKey() final  bool isDefault;

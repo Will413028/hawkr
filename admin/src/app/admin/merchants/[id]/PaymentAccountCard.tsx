@@ -37,7 +37,6 @@ import {
 } from "./payment-account";
 import type { usePaymentAccount } from "./use-store-detail";
 
-
 /** 錨點：審核待辦 PAYMENT_ACCOUNT_CREATE_FAILED 與 PAYMENT_ACCOUNT_PURGE_STUCK 的連結帶這個 hash（queue-item.ts）。 */
 export const PAYMENT_ACCOUNT_ANCHOR = "payment-account";
 
@@ -206,7 +205,6 @@ export function PaymentAccountCard({
 				</details>
 			)}
 			<div className="payment-account-actions">
-
 				{paymentAccountCreated(account) && !blockedTime && !closingTime && (
 					<Button
 						variant="outline"

@@ -133,17 +133,16 @@ class SpecData {
 
   final String grade;
   final int price;
+
   /// PayUni #758: SKU 特價（0 或 null = 無特價，編輯時不送 = 後端清空）
   final int? salePrice;
   final int stock;
   final double? weight;
-  final String
-  unit;
+  final String unit;
   final double? lengthCm;
   final double? widthCm;
   final double? heightCm;
-  final List<Map<String, dynamic>>
-  shippingMethods;
+  final List<Map<String, dynamic>> shippingMethods;
 
   SpecData({
     this.skuId,

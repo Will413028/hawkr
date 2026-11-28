@@ -18,7 +18,7 @@ const (
 )
 
 type fakePrefs struct {
-	rows map[int64]domain.BuyerPreference
+	rows      map[int64]domain.BuyerPreference
 	defaultOf map[int64]int64
 	plaintext map[int64]string
 
@@ -87,7 +87,6 @@ func newPrefs(rows ...domain.BuyerPreference) *fakePrefs {
 	}
 	return f
 }
-
 
 func TestResolveCarrier_None(t *testing.T) {
 	prefs := newPrefs()

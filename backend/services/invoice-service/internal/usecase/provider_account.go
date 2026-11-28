@@ -19,7 +19,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 const (
 	providerHealthCheckInterval = 15 * time.Minute
 
@@ -78,15 +77,15 @@ var (
 // 它與 Query 分開的理由同 Complaint／TaxProfile：只有它需要 TxManager、稽核與 ProviderClient。
 // 把寫入掛進 Query，「唯讀查詢面」那句話就變成假的。
 type ProviderAccount struct {
-	tx       database.TxManager
-	issuers  domain.IssuerRepository
-	profiles domain.SellerTaxProfileRepository
-	accounts domain.ProviderAccountRepository
-	ops      domain.OperationRepository
+	tx          database.TxManager
+	issuers     domain.IssuerRepository
+	profiles    domain.SellerTaxProfileRepository
+	accounts    domain.ProviderAccountRepository
+	ops         domain.OperationRepository
 	adjustments domain.AdjustmentRepository
 	audit       domain.AuditRepository
-	cutovers domain.ProviderCutoverRepository
-	provider ProviderClient
+	cutovers    domain.ProviderCutoverRepository
+	provider    ProviderClient
 
 	newID func() int64
 	now   func() time.Time
@@ -136,7 +135,6 @@ type ProviderAdminActionResult struct {
 	AuditLogID        int64
 	AffectedScope     string
 }
-
 
 // PutProviderCredentialsInput 是端點 24 的輸入。
 //
@@ -232,11 +230,11 @@ func (u *ProviderAccount) PutCredentials(ctx context.Context, in PutProviderCred
 			}
 			id := u.newID()
 			if cerr := u.accounts.Create(ctx, domain.NewProviderAccount{
-				ID:            id,
-				IssuerID:      issuer.ID,
-				Provider:      providerAMEGO,
-				ProviderTaxID: in.SellerTaxID,
-				AppKey:        in.AppKey,
+				ID:                id,
+				IssuerID:          issuer.ID,
+				Provider:          providerAMEGO,
+				ProviderTaxID:     in.SellerTaxID,
+				AppKey:            in.AppKey,
 				Status:            codemeta.InvoiceProviderAccountStatusCredentialVerifying.Value,
 				HealthCheckNextAt: now,
 			}); cerr != nil {
@@ -260,7 +258,6 @@ func (u *ProviderAccount) PutCredentials(ctx context.Context, in PutProviderCred
 	}
 	return out, nil
 }
-
 
 // VerifyProviderAccountInput 是端點 25 的輸入。
 type VerifyProviderAccountInput struct {
@@ -287,7 +284,7 @@ func (u *ProviderAccount) Verify(ctx context.Context, in VerifyProviderAccountIn
 		ExpectedVersion: in.ExpectedVersion,
 		ActorType:       providerActorSeller,
 		ActorAccountID:  in.StoreID,
-		AuditAction: "",
+		AuditAction:     "",
 	})
 }
 
@@ -348,21 +345,21 @@ func (u *ProviderAccount) ReactivateForAdmin(ctx context.Context, in AdminProvid
 	return u.verifyFlow(ctx, providerVerifyRequest{
 		StoreID:         in.StoreID,
 		ExpectedVersion: in.ExpectedVersion,
-		RequireStatus:  codemeta.InvoiceProviderAccountStatusSuspended.Value,
-		ActorType:      providerActorAdmin,
-		ActorAccountID: in.ActorAccountID,
-		AuditAction:    providerAuditActionReactivate,
-		AuditReason:    in.Reason,
-		HistoryReason:  providerReasonAdminReactivate,
-		IdempotencyKey: in.IdempotencyKey,
+		RequireStatus:   codemeta.InvoiceProviderAccountStatusSuspended.Value,
+		ActorType:       providerActorAdmin,
+		ActorAccountID:  in.ActorAccountID,
+		AuditAction:     providerAuditActionReactivate,
+		AuditReason:     in.Reason,
+		HistoryReason:   providerReasonAdminReactivate,
+		IdempotencyKey:  in.IdempotencyKey,
 	})
 }
 
 type providerVerifyRequest struct {
 	StoreID         int64
 	ExpectedVersion int64
-	UseCurrent bool
-	RequireStatus string
+	UseCurrent      bool
+	RequireStatus   string
 
 	ActorType      string
 	ActorAccountID int64
@@ -434,12 +431,12 @@ func (u *ProviderAccount) verifyFlow(ctx context.Context, req providerVerifyRequ
 				Action:         req.AuditAction,
 				ResourceType:   providerResourceType,
 				ResourceID:     account.ID,
-				BeforeState:  jobAuditState(account.Status, nil),
-				AfterState:   jobAuditState(outcome.NextStatus, map[string]string{"providerCode": outcome.ProviderCode}),
-				ReasonCode:   req.AuditAction,
-				ReasonDetail: firstNonEmpty(req.AuditReason, "ADM 連線檢查"),
-				RequestID:    nilIfEmpty(req.IdempotencyKey),
-				Now:          landedAt,
+				BeforeState:    jobAuditState(account.Status, nil),
+				AfterState:     jobAuditState(outcome.NextStatus, map[string]string{"providerCode": outcome.ProviderCode}),
+				ReasonCode:     req.AuditAction,
+				ReasonDetail:   firstNonEmpty(req.AuditReason, "ADM 連線檢查"),
+				RequestID:      nilIfEmpty(req.IdempotencyKey),
+				Now:            landedAt,
 			}); aerr != nil {
 				return aerr
 			}
@@ -531,7 +528,6 @@ func providerIsLive(status string) bool {
 	}
 }
 
-
 // ActivateProviderAccountInput 是端點 26 的輸入。
 type ActivateProviderAccountInput struct {
 	StoreID         int64
@@ -586,10 +582,10 @@ func (u *ProviderAccount) Activate(ctx context.Context, in ActivateProviderAccou
 			return cerr
 		}
 		if _, cerr := u.cutovers.Create(ctx, domain.NewProviderCutover{
-			ProviderAccountID: account.ID,
-			IssuerID:          account.IssuerID,
-			AccountVersion: in.ExpectedVersion + 1,
-			CutoverAt:      in.CutoverAt,
+			ProviderAccountID:  account.ID,
+			IssuerID:           account.IssuerID,
+			AccountVersion:     in.ExpectedVersion + 1,
+			CutoverAt:          in.CutoverAt,
 			CreatedByAccountID: in.StoreID,
 			Reason:             providerReasonCutoverSet,
 			Now:                now,
@@ -605,7 +601,6 @@ func (u *ProviderAccount) Activate(ctx context.Context, in ActivateProviderAccou
 	}
 	return out, nil
 }
-
 
 // RotateProviderCredentialsInput 是端點 27 的輸入。
 type RotateProviderCredentialsInput struct {
@@ -713,7 +708,6 @@ func (u *ProviderAccount) RotateCredentials(ctx context.Context, in RotateProvid
 	}
 	return out, nil
 }
-
 
 // DeactivateForAdmin 停用 provider 連線（端點 45 ＝ P14）。可逆。
 //
@@ -849,7 +843,7 @@ func (u *ProviderAccount) adminLifecycle(
 			Action:         spec.AuditAction,
 			ResourceType:   providerResourceType,
 			ResourceID:     account.ID,
-			BeforeState: jobAuditState(account.Status, nil),
+			BeforeState:    jobAuditState(account.Status, nil),
 			AfterState: jobAuditState(spec.NextStatus, map[string]string{
 				"pendingOrderCount": strconv.FormatInt(pending, 10),
 			}),
@@ -877,7 +871,6 @@ func (u *ProviderAccount) adminLifecycle(
 	}
 	return out, nil
 }
-
 
 type providerVerifyOutcome struct {
 	NextStatus      string
@@ -1000,7 +993,6 @@ func providerManualReason(apiErr *amego.APIError) string {
 	return fmt.Sprintf("電子發票服務商回報：%s（代碼 %s）。重試不會改善，請依訊息處理或聯繫光貿", msg, apiErr.Code)
 }
 
-
 func (u *ProviderAccount) loadAccount(ctx context.Context, storeID int64) (domain.Issuer, domain.ProviderAccount, error) {
 	issuer, err := u.sellerIssuer(ctx, storeID)
 	if err != nil {
@@ -1043,11 +1035,11 @@ func (u *ProviderAccount) appendHistory(
 	actorAccountID int64, now time.Time,
 ) error {
 	return u.audit.AppendStatusHistory(ctx, domain.NewStatusHistoryEntry{
-		SubjectType: providerSubjectType,
-		SubjectID:   accountID,
-		FromStatus:  nilIfEmpty(from),
-		ToStatus:    to,
-		ReasonCode:  nilIfEmpty(reasonCode),
+		SubjectType:    providerSubjectType,
+		SubjectID:      accountID,
+		FromStatus:     nilIfEmpty(from),
+		ToStatus:       to,
+		ReasonCode:     nilIfEmpty(reasonCode),
 		ReasonDetail:   nilIfEmpty(truncateRunes(reasonDetail, providerReasonMaxRunes)),
 		ActorType:      actorType,
 		ActorAccountID: &actorAccountID,

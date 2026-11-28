@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 type fakePrefRepo struct {
 	domain.BuyerPreferenceRepository
 
@@ -83,7 +82,6 @@ func assertLeaf(t *testing.T, got ResolveModeOutput, wantMode, wantKind, wantNA 
 		t.Errorf("not_applicable_reason = %q, want %q", got.NotApplicableReason, wantNA)
 	}
 }
-
 
 func TestResolveMode_LeafNA1_ZeroAmount(t *testing.T) {
 	h := newCheckoutHarness(t, approvedProfile(1), activeAccount())
@@ -211,7 +209,6 @@ func TestResolveMode_LeafB2B_AmegoAuto(t *testing.T) {
 	}
 }
 
-
 func TestResolveMode_LeafAMa_PlatformFundedDiscountKeepsAmegoAuto(t *testing.T) {
 	assertPreviewMatchesPrepare(t, approvedProfile(1), activeAccount(),
 		func(in *OrderPaidInput) { in.HasPlatformFundedDiscount = true })
@@ -245,7 +242,6 @@ func taxIDPreference() domain.BuyerPreference {
 		UpdatedAt:        testNow,
 	}
 }
-
 
 func TestResolveMode_PreviewExpiresAtComesFromBackend(t *testing.T) {
 	h := newCheckoutHarness(t, approvedProfile(1), activeAccount())
@@ -357,7 +353,6 @@ func blockedPendingProfile() domain.SellerTaxProfile {
 		PendingOrderAmount:      100000,
 	}
 }
-
 
 func baseValidateInput() ValidateInvoiceInput {
 	return ValidateInvoiceInput{

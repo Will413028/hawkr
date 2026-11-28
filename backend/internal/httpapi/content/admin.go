@@ -26,7 +26,6 @@ func NewAdmin(m *content.Module, images rpc.Images) *Admin {
 	return &Admin{m: m, images: images}
 }
 
-
 func (h *Admin) ListBanners(ctx context.Context, req *connect.Request[adminpb.ListBannersRequest]) (*connect.Response[adminpb.ListBannersResponse], error) {
 	scope := contentv1alpha1connect.ContentAdminServiceListBannersProcedure
 	after, err := decodeBannerCursor(scope, req.Msg.GetPageToken())
@@ -150,7 +149,6 @@ func bannerInput(msg *adminpb.Banner) content.BannerInput {
 		EndsAt:            fromTimestampPB(msg.GetEndTime()),
 	}
 }
-
 
 func (h *Admin) ListAppVersionGates(ctx context.Context, _ *connect.Request[adminpb.ListAppVersionGatesRequest]) (*connect.Response[adminpb.ListAppVersionGatesResponse], error) {
 	gates, err := h.m.ListAppVersionGates(ctx)

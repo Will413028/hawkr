@@ -22,7 +22,6 @@ type AddBlockedBuyerParams struct {
 	CreatedAt      time.Time
 }
 
-// 買家封鎖買家，重複封鎖不產生新列（回 0）。
 func (q *Queries) AddBlockedBuyer(ctx context.Context, arg AddBlockedBuyerParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addBlockedBuyer, arg.BlockerBuyerID, arg.BlockedBuyerID, arg.CreatedAt)
 	if err != nil {
@@ -43,7 +42,6 @@ type AddBlockedStoreParams struct {
 	CreatedAt      time.Time
 }
 
-// 買家封鎖店，重複封鎖不產生新列（回 0）。
 func (q *Queries) AddBlockedStore(ctx context.Context, arg AddBlockedStoreParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addBlockedStore, arg.BlockerBuyerID, arg.StoreID, arg.CreatedAt)
 	if err != nil {
@@ -58,7 +56,6 @@ FROM buyer.blocked_buyers
 WHERE blocker_buyer_id = $1 OR blocked_buyer_id = $1
 `
 
-// 買家刪帳：刪除他發起的買家封鎖買家，以及以他為對象的列。
 func (q *Queries) ClearBlockedBuyers(ctx context.Context, blockerBuyerID int64) error {
 	_, err := q.db.Exec(ctx, clearBlockedBuyers, blockerBuyerID)
 	return err
@@ -70,7 +67,6 @@ FROM buyer.blocked_stores
 WHERE blocker_buyer_id = $1
 `
 
-// 買家刪帳：刪除他發起的買家封鎖店。
 func (q *Queries) ClearBlockedStores(ctx context.Context, blockerBuyerID int64) error {
 	_, err := q.db.Exec(ctx, clearBlockedStores, blockerBuyerID)
 	return err
@@ -87,7 +83,6 @@ type IsBlockedBetweenBuyersParams struct {
 	BuyerB int64
 }
 
-// 兩位買家之間任一方向是否有封鎖。
 func (q *Queries) IsBlockedBetweenBuyers(ctx context.Context, arg IsBlockedBetweenBuyersParams) (bool, error) {
 	row := q.db.QueryRow(ctx, isBlockedBetweenBuyers, arg.BuyerA, arg.BuyerB)
 	var exists bool
@@ -106,7 +101,6 @@ type IsBlockingStoreParams struct {
 	StoreID        int64
 }
 
-// 買家是否封鎖了指定的店。
 func (q *Queries) IsBlockingStore(ctx context.Context, arg IsBlockingStoreParams) (bool, error) {
 	row := q.db.QueryRow(ctx, isBlockingStore, arg.BlockerBuyerID, arg.StoreID)
 	var exists bool
@@ -136,7 +130,6 @@ type ListBlockedBuyersRow struct {
 	CreatedAt      time.Time
 }
 
-// 以時間與被封鎖的買家 ID 進行封鎖名單 keyset 分頁（降冪）。
 func (q *Queries) ListBlockedBuyers(ctx context.Context, arg ListBlockedBuyersParams) ([]ListBlockedBuyersRow, error) {
 	rows, err := q.db.Query(ctx, listBlockedBuyers,
 		arg.BlockerBuyerID,
@@ -185,7 +178,6 @@ type ListBlockedStoresRow struct {
 	CreatedAt time.Time
 }
 
-// 以時間與店家 ID 進行封鎖名單 keyset 分頁（降冪）。
 func (q *Queries) ListBlockedStores(ctx context.Context, arg ListBlockedStoresParams) ([]ListBlockedStoresRow, error) {
 	rows, err := q.db.Query(ctx, listBlockedStores,
 		arg.BlockerBuyerID,
@@ -223,7 +215,6 @@ type RemoveBlockedBuyerParams struct {
 	BlockedBuyerID int64
 }
 
-// 解除買家封鎖買家，沒有這個封鎖時回 0。
 func (q *Queries) RemoveBlockedBuyer(ctx context.Context, arg RemoveBlockedBuyerParams) (int64, error) {
 	result, err := q.db.Exec(ctx, removeBlockedBuyer, arg.BlockerBuyerID, arg.BlockedBuyerID)
 	if err != nil {
@@ -243,7 +234,6 @@ type RemoveBlockedStoreParams struct {
 	StoreID        int64
 }
 
-// 解除買家封鎖店，沒有這個封鎖時回 0。
 func (q *Queries) RemoveBlockedStore(ctx context.Context, arg RemoveBlockedStoreParams) (int64, error) {
 	result, err := q.db.Exec(ctx, removeBlockedStore, arg.BlockerBuyerID, arg.StoreID)
 	if err != nil {

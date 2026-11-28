@@ -17,7 +17,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-
 var muNow = time.Date(2026, 8, 30, 6, 0, 0, 0, time.UTC)
 
 const (
@@ -27,7 +26,6 @@ const (
 	muApprover  = int64(4202)
 	muCanceller = int64(4203)
 )
-
 
 type muOps struct {
 	domain.OperationRepository
@@ -145,7 +143,6 @@ func muRequestReq() *pb.RequestManualUnlockForAdminRequest {
 	}
 }
 
-
 func TestRequestManualUnlock_Success(t *testing.T) {
 	s, _ := muServer(muCancelledOp(), &muUnlocks{})
 
@@ -234,7 +231,6 @@ func TestRequestManualUnlock_RejectsBadInput(t *testing.T) {
 		})
 	}
 }
-
 
 func muApproveReq(actor int64, approved bool) *pb.ApproveManualUnlockForAdminRequest {
 	return &pb.ApproveManualUnlockForAdminRequest{

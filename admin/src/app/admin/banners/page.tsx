@@ -161,7 +161,6 @@ const BannerList: React.FC = () => {
 
 	return (
 		<div className="flex flex-col gap-[16px] font-['Roboto','Noto_Sans_JP',sans-serif]">
-
 			<div className="flex items-center justify-between mb-[8px]">
 				<div>
 					<h2 className="text-[28px] font-bold text-black leading-[36px]">
@@ -179,7 +178,6 @@ const BannerList: React.FC = () => {
 					onClick={() => router.push("/admin/banners/editor")}
 					className="inline-flex items-center gap-[6px] px-[12px] py-[12px] bg-[var(--color)] hover:opacity-90 text-white rounded-[8px] text-[18px] font-bold transition-opacity"
 				>
-
 					<svg
 						aria-hidden="true"
 						className="w-[24px] h-[24px]"
@@ -198,17 +196,14 @@ const BannerList: React.FC = () => {
 				</button>
 			</div>
 
-
 			<div
 				className="rounded-[14px] border border-[var(--border-color)] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.1)] p-[20px] flex flex-col gap-[16px]"
 				style={{
 					background: "linear-gradient(to right, var(--bgapp), var(--white))",
 				}}
 			>
-
 				<div className="flex flex-col gap-[8px]">
 					<div className="flex items-center gap-[8px]">
-
 						<svg
 							aria-hidden="true"
 							className="w-[20px] h-[20px] text-[var(--brand-primary-gray1)]"
@@ -246,7 +241,6 @@ const BannerList: React.FC = () => {
 					</p>
 				</div>
 
-
 				<div className="flex gap-[16px] pb-[4px] overflow-x-auto">
 					{liveBanners.length > 0
 						? liveBanners.map((banner, index) => {
@@ -262,7 +256,6 @@ const BannerList: React.FC = () => {
 											animation: `bannerFadeIn 0.6s ease-out ${index * 0.15}s both`,
 										}}
 									>
-
 										{imgUrl ? (
 											<Image
 												src={imgUrl}
@@ -282,7 +275,6 @@ const BannerList: React.FC = () => {
 											/>
 										)}
 
-
 										<div
 											className="absolute inset-0"
 											style={{
@@ -291,9 +283,7 @@ const BannerList: React.FC = () => {
 											}}
 										/>
 
-
 										<div className="absolute left-[25px] bottom-[16px] right-[16px]">
-
 											<p className="font-bold text-[18px] text-white leading-[28px] tracking-[-0.44px] mb-[0px]">
 												{banner.title}
 											</p>
@@ -332,8 +322,7 @@ const BannerList: React.FC = () => {
 									</div>
 								);
 							})
-						:
-							[1, 2, 3].map((index) => (
+						: [1, 2, 3].map((index) => (
 								<div
 									key={index}
 									className="relative rounded-[15px] overflow-hidden bg-[#f5f5f5] border border-dashed border-[var(--border-color)] flex flex-col items-center justify-center flex-shrink-0"
@@ -367,7 +356,6 @@ const BannerList: React.FC = () => {
 							))}
 				</div>
 			</div>
-
 
 			<div className="bg-white rounded-[15px] border border-[var(--border-color)] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.1)] overflow-hidden">
 				<table className="w-full border-collapse">
@@ -426,7 +414,6 @@ const BannerList: React.FC = () => {
 										key={banner.id}
 										className="bg-white hover:bg-gray-50 transition-colors h-[100px]"
 									>
-
 										<td className="px-[18px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center justify-center">
 												<span className="inline-flex items-center gap-[4px] px-[8px] py-[4px] rounded-[8px] bg-[var(--color-11)] text-[var(--brand-gray1-100)] cursor-grab hover:brightness-95 transition-all">
@@ -445,7 +432,6 @@ const BannerList: React.FC = () => {
 												</span>
 											</div>
 										</td>
-
 
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center justify-center">
@@ -481,7 +467,6 @@ const BannerList: React.FC = () => {
 											</div>
 										</td>
 
-
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex flex-col gap-[6px]">
 												<span className="text-[18px] font-bold text-black leading-[1.23]">
@@ -496,7 +481,6 @@ const BannerList: React.FC = () => {
 												)}
 											</div>
 										</td>
-
 
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex flex-col gap-[6px]">
@@ -520,7 +504,6 @@ const BannerList: React.FC = () => {
 												)}
 											</div>
 										</td>
-
 
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center gap-[12px]">
@@ -546,7 +529,6 @@ const BannerList: React.FC = () => {
 												</span>
 											</div>
 										</td>
-
 
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center gap-[13px]">

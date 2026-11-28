@@ -13,7 +13,6 @@ import {
 import { formatDateTimeShort } from "@/lib/format";
 import { policyCategoryText } from "@/lib/policy-category";
 
-
 /** 時間的顯示（台北時間，到分鐘）；沒有時間是「-」。 */
 export function timeText(value: Timestamp | undefined): string {
 	return value ? formatDateTimeShort(timestampDate(value)) : "-";

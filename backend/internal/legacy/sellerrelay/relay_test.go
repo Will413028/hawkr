@@ -43,8 +43,8 @@ func riskStore(ground seller.RiskGround) seller.Store {
 }
 
 var (
-	eventID    = uuid.MustParse("01990000-0000-7000-8000-000000000001")
-	occurredAt = time.Date(2026, 10, 5, 9, 30, 15, 123456789, time.FixedZone("TST", 8*3600))
+	eventID       = uuid.MustParse("01990000-0000-7000-8000-000000000001")
+	occurredAt    = time.Date(2026, 10, 5, 9, 30, 15, 123456789, time.FixedZone("TST", 8*3600))
 	wireTimestamp = "2026-10-05T01:30:15.123456789Z"
 )
 

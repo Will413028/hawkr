@@ -147,7 +147,6 @@ export default function AgentEntryPanel({
 			data-assistant-view="entry"
 		>
 			<div className="hawkr-agent-entry__hero">
-
 				<span
 					className="hawkr-agent-entry__sprite hawkr-agent-sprite"
 					aria-hidden="true"

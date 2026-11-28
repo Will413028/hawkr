@@ -26,7 +26,6 @@ export default function AiSparkleIcon({
 			aria-hidden={ariaLabel ? undefined : true}
 			{...rest}
 		>
-
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"

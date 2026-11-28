@@ -7,7 +7,6 @@ import {
 	toEditorData,
 } from "../lib/products/descriptionEditorJs";
 
-
 test("fromEditorData maps the align tune to style.textAlign", () => {
 	const saved = fromEditorData({
 		blocks: [

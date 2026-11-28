@@ -26,7 +26,6 @@ import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../../address/data/address_model.dart';
 import '../../data/cart_model.dart';
 
-
 /// 結帳付款彈窗的配置參數。
 class CheckoutParams {
   const CheckoutParams({
@@ -121,7 +120,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     _appliedCouponId = widget.params.appliedCouponId;
     _loadPreview();
   }
-
 
   Future<void> _loadPreview() async {
     if (_previewRequested) return;
@@ -249,7 +247,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
         coupon['templateId']?.toString() ??
         '';
   }
-
 
   Future<void> _doConfirm() async {
     if (_isConfirming) return;
@@ -520,7 +517,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     cb.onInvalidateCartCount();
     cb.onNavigateToOrders();
   }
-
 
   /// 付款明細行：icon + label + amount。
   Widget _paymentRow(HkIconName icon, String label, String amount) {

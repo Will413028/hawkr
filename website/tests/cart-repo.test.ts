@@ -62,7 +62,6 @@ afterEach(() => {
 	delete (globalThis as Record<string, unknown>).localStorage;
 });
 
-
 test("fetchCart GETs /public/carts and returns the normalized summary", async () => {
 	const { fetchCart } = await import("../lib/cart/repo");
 	respond = () =>
@@ -119,7 +118,6 @@ test("fetchCart surfaces 401 as UnauthorizedError", async () => {
 	});
 });
 
-
 test("addCartItem POSTs OpenAPI string quantity and coerces totalItems to number", async () => {
 	const { addCartItem } = await import("../lib/cart/repo");
 	respond = () => jsonResponse({ code: 0, data: { totalItems: "5" } });
@@ -172,7 +170,6 @@ test("addCartItem throws ApiClientError carrying the backend envelope code", asy
 	);
 });
 
-
 test("setCartItemQuantity PUTs string quantity to the encoded sku path", async () => {
 	const { setCartItemQuantity } = await import("../lib/cart/repo");
 	respond = () => jsonResponse({ code: 0, data: { totalItems: 7 } });
@@ -199,7 +196,6 @@ test("setCartItemQuantity coerces a string totalItems from the wire", async () =
 
 	assert.deepEqual(result, { totalItems: 12 });
 });
-
 
 test("removeCartItem DELETEs the encoded sku path and returns totalItems", async () => {
 	const { removeCartItem } = await import("../lib/cart/repo");

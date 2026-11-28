@@ -10,7 +10,6 @@ import {
 	tsvToGrid,
 } from "../lib/products/clipboardGrid";
 
-
 test("tsvToGrid parses 2x2 tab-separated text", () => {
 	assert.deepEqual(tsvToGrid("品名\t產地\n愛文\t台南"), [
 		["品名", "產地"],

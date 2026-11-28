@@ -13,7 +13,6 @@ import (
 	"testing"
 )
 
-
 var delegatedForbiddenFields = []string{
 	"shipmentno", "labelkey", "labelurl", "labelexpireat",
 	"odno", "validationno", "partnerid", "pickupstorename",
@@ -42,8 +41,8 @@ func delegatedResponseDTOs() map[string]any {
 		"DelegatedOperationSessionRecord": DelegatedOperationSessionRecord{},
 		"DelegatedBatchUnpublishData":     DelegatedBatchUnpublishData{},
 		"DelegatedRecipientContactData":   DelegatedRecipientContactData{},
-		"delegatedMutationData": delegatedMutationData{},
-		"delegatedProductMutationData": delegatedProductMutationData{},
+		"delegatedMutationData":           delegatedMutationData{},
+		"delegatedProductMutationData":    delegatedProductMutationData{},
 	}
 }
 

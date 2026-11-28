@@ -39,8 +39,7 @@ export async function seedStoredActiveRole(
 				if (sessionStorage.getItem(seededKey) === "1") return;
 				localStorage.setItem(key, value);
 				sessionStorage.setItem(seededKey, "1");
-			} catch {
-			}
+			} catch {}
 		},
 		[ACTIVE_ROLE_STORAGE_KEY, role] as const,
 	);

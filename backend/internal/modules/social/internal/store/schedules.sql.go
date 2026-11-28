@@ -25,7 +25,6 @@ type CancelPendingSchedulesOfPostsParams struct {
 	PostIds []uuid.UUID
 }
 
-// 呼叫方已鎖這些貼文列。回傳被取消的排程。
 func (q *Queries) CancelPendingSchedulesOfPosts(ctx context.Context, arg CancelPendingSchedulesOfPostsParams) ([]SocialPostSchedule, error) {
 	rows, err := q.db.Query(ctx, cancelPendingSchedulesOfPosts, arg.Reason, arg.Now, arg.PostIds)
 	if err != nil {
@@ -72,7 +71,6 @@ type CancelPendingSchedulesOfSchedulerParams struct {
 	Refs    []string
 }
 
-// 呼叫方已鎖 post_ids 的貼文列；只取消仍是 PENDING 而且屬於該發起者的排程。
 func (q *Queries) CancelPendingSchedulesOfScheduler(ctx context.Context, arg CancelPendingSchedulesOfSchedulerParams) ([]SocialPostSchedule, error) {
 	rows, err := q.db.Query(ctx, cancelPendingSchedulesOfScheduler,
 		arg.Reason,
@@ -125,7 +123,6 @@ type CancelPendingSchedulesOfStoreByKindParams struct {
 	Kind    string
 }
 
-// 呼叫方已鎖 post_ids 的貼文列。
 func (q *Queries) CancelPendingSchedulesOfStoreByKind(ctx context.Context, arg CancelPendingSchedulesOfStoreByKindParams) ([]SocialPostSchedule, error) {
 	rows, err := q.db.Query(ctx, cancelPendingSchedulesOfStoreByKind,
 		arg.Reason,
@@ -167,7 +164,6 @@ const countPendingSchedulesOfStore = `-- name: CountPendingSchedulesOfStore :one
 SELECT count(*)::bigint FROM social.post_schedules WHERE store_id = $1 AND state = 'PENDING'
 `
 
-// 店家有待發布排程的貼文篇數（一篇貼文最多一個 PENDING）。
 func (q *Queries) CountPendingSchedulesOfStore(ctx context.Context, storeID int64) (int64, error) {
 	row := q.db.QueryRow(ctx, countPendingSchedulesOfStore, storeID)
 	var column_1 int64
@@ -201,7 +197,6 @@ const getSchedule = `-- name: GetSchedule :one
 SELECT id, post_id, store_id, publish_at, scheduled_by_kind, scheduled_by_ref, state, cancel_reason, created_at, resolved_at FROM social.post_schedules WHERE id = $1
 `
 
-// 不鎖的讀取：worker 用它取得 post_id，再依「貼文列 → 排程列」的順序加鎖。
 func (q *Queries) GetSchedule(ctx context.Context, id uuid.UUID) (SocialPostSchedule, error) {
 	row := q.db.QueryRow(ctx, getSchedule, id)
 	var i SocialPostSchedule
@@ -236,7 +231,6 @@ type InsertScheduleParams struct {
 	Now             time.Time
 }
 
-// 新排程（PENDING）。同一篇貼文已有 PENDING 時撞 post_schedules_post_pending；呼叫方已鎖貼文列並先把舊的轉 REPLACED。
 func (q *Queries) InsertSchedule(ctx context.Context, arg InsertScheduleParams) (SocialPostSchedule, error) {
 	row := q.db.QueryRow(ctx, insertSchedule,
 		arg.ID,
@@ -278,7 +272,6 @@ type ListPendingSchedulesOfStoreParams struct {
 	MaxRows        int32
 }
 
-// 店家待發布的排程：發布時間早的在前。keyset：(publish_at, id) 由小到大。
 func (q *Queries) ListPendingSchedulesOfStore(ctx context.Context, arg ListPendingSchedulesOfStoreParams) ([]SocialPostSchedule, error) {
 	rows, err := q.db.Query(ctx, listPendingSchedulesOfStore,
 		arg.StoreID,
@@ -324,7 +317,6 @@ type LockPostsByIDRow struct {
 	StoreID int64
 }
 
-// 依 ID 由小到大鎖貼文列（含已軟刪的）：多篇貼文的取消照這個順序加鎖。
 func (q *Queries) LockPostsByID(ctx context.Context, ids []uuid.UUID) ([]LockPostsByIDRow, error) {
 	rows, err := q.db.Query(ctx, lockPostsByID, ids)
 	if err != nil {
@@ -378,7 +370,6 @@ type PendingPostIDsOfSchedulerParams struct {
 	Refs []string
 }
 
-// 不鎖的讀取：某個發起者（種類加一批 ref）待發布的排程所在的貼文，ID 由小到大。
 func (q *Queries) PendingPostIDsOfScheduler(ctx context.Context, arg PendingPostIDsOfSchedulerParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, pendingPostIDsOfScheduler, arg.Kind, arg.Refs)
 	if err != nil {
@@ -410,7 +401,6 @@ type PendingPostIDsOfStoreByKindParams struct {
 	Kind    string
 }
 
-// 不鎖的讀取：某家店某種發起者待發布的排程所在的貼文，ID 由小到大。
 func (q *Queries) PendingPostIDsOfStoreByKind(ctx context.Context, arg PendingPostIDsOfStoreByKindParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, pendingPostIDsOfStoreByKind, arg.StoreID, arg.Kind)
 	if err != nil {
@@ -437,7 +427,6 @@ WHERE scheduled_by_kind = $1 AND state = 'PENDING'
 ORDER BY scheduled_by_ref
 `
 
-// 某種發起者目前有待發布排程的 ref（去重）：筆數以待發布的排程為界，不隨發起者的歷史增長。
 func (q *Queries) PendingSchedulerRefs(ctx context.Context, kind string) ([]string, error) {
 	rows, err := q.db.Query(ctx, pendingSchedulerRefs, kind)
 	if err != nil {
@@ -462,7 +451,6 @@ const postIsTakenDown = `-- name: PostIsTakenDown :one
 SELECT EXISTS (SELECT 1 FROM social.content_takedowns WHERE post_id = $1)
 `
 
-// 貼文有沒有被內容下架措施下架（複本 content_takedowns）。
 func (q *Queries) PostIsTakenDown(ctx context.Context, postID *uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, postIsTakenDown, postID)
 	var exists bool
@@ -484,7 +472,6 @@ type ResolveScheduleParams struct {
 	ID           uuid.UUID
 }
 
-// 把 PENDING 的排程轉成終態（PUBLISHED 或 CANCELED）；已經不是 PENDING 回 0 列。
 func (q *Queries) ResolveSchedule(ctx context.Context, arg ResolveScheduleParams) (SocialPostSchedule, error) {
 	row := q.db.QueryRow(ctx, resolveSchedule,
 		arg.State,

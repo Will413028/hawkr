@@ -48,7 +48,6 @@ export default function AppDownloadModal({
 			bodyClassName="flex flex-col items-center gap-[var(--hkui-space-3)] text-center"
 		>
 			<div className="inline-flex items-center justify-center rounded-[var(--hkui-radius-lg)] bg-[var(--color-neutral-cream)] p-[var(--hkui-space-4)] shadow-[0_8px_24px_rgb(15_33_15_/_0.12),0_1px_0_rgb(255_255_255_/_0.9)_inset] [&_svg]:block [&_svg]:size-[192px] max-[640px]:[&_svg]:size-[168px]">
-
 				<QRCodeSVG
 					value={APP_STORE_URL}
 					size={192}
@@ -58,7 +57,6 @@ export default function AppDownloadModal({
 					fgColor="var(--color-ink-900)"
 				/>
 			</div>
-
 
 			<fieldset
 				aria-label="App 商店連結"

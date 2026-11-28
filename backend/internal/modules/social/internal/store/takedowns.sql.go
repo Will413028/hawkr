@@ -26,7 +26,6 @@ type DeleteTakedownContentsParams struct {
 	ForumEntryIds []uuid.UUID
 }
 
-// 對帳刪除多出來的列：一個措施底下的指定內容。
 func (q *Queries) DeleteTakedownContents(ctx context.Context, arg DeleteTakedownContentsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteTakedownContents,
 		arg.MeasureID,
@@ -63,7 +62,6 @@ WHERE NOT EXISTS (
 ORDER BY c.measure_id, c.post_id, c.comment_id, c.forum_entry_id
 `
 
-// 複本有、seller 此刻沒有生效中的內容下架（撤銷時訂閱者漏了）：每日對帳刪除。
 func (q *Queries) ExtraTakedowns(ctx context.Context) ([]SocialContentTakedown, error) {
 	rows, err := q.db.Query(ctx, extraTakedowns)
 	if err != nil {
@@ -112,7 +110,6 @@ type GoneTakedownContentsRow struct {
 	ContentID   uuid.UUID
 }
 
-// 通過歸屬核對的內容裡已軟刪或列已清除的：沒有公開可見的東西要隱藏，不寫複本（也無列可供外鍵）。
 func (q *Queries) GoneTakedownContents(ctx context.Context, arg GoneTakedownContentsParams) ([]GoneTakedownContentsRow, error) {
 	rows, err := q.db.Query(ctx, goneTakedownContents, arg.PostIds, arg.CommentIds, arg.ForumEntryIds)
 	if err != nil {
@@ -160,7 +157,6 @@ type InsertActiveTakedownsRow struct {
 	ForumEntryID *uuid.UUID
 }
 
-// 對帳補漏：只寫此刻仍生效的列（LockActiveTakedownsOfMeasure 已鎖住措施，撤銷的 transaction 要嘛先提交而這裡讀不到，要嘛等補漏提交之後再刪這些列）。冪等：已有的列略過；回傳實際寫入的列。
 func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTakedownsParams) ([]InsertActiveTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, insertActiveTakedowns,
 		arg.MeasureID,
@@ -187,7 +183,6 @@ func (q *Queries) InsertActiveTakedowns(ctx context.Context, arg InsertActiveTak
 }
 
 const insertTakedowns = `-- name: InsertTakedowns :many
-
 INSERT INTO social.content_takedowns (measure_id, post_id, comment_id, forum_entry_id)
 SELECT $1::uuid, p, NULL::uuid, NULL::uuid FROM unnest($2::uuid[]) AS p
 UNION ALL
@@ -211,8 +206,6 @@ type InsertTakedownsRow struct {
 	ForumEntryID *uuid.UUID
 }
 
-// 內容下架的複本（schema.sql 的 content_takedowns）：訂閱者在 seller 建立與撤銷內容下架措施的同一個 transaction 寫入，每日對帳雙向核對 seller.pub_content_takedowns()，補漏經 seller.pub_lock_content_takedowns 與撤銷序列化。
-// 冪等：(措施, 內容) 已經有的列略過。內容不存在時外鍵失敗，措施的建立跟著回滾。回傳實際寫入的列（呼叫方只對這些貼文取消排程）。
 func (q *Queries) InsertTakedowns(ctx context.Context, arg InsertTakedownsParams) ([]InsertTakedownsRow, error) {
 	rows, err := q.db.Query(ctx, insertTakedowns,
 		arg.MeasureID,
@@ -262,7 +255,6 @@ type InvalidTakedownContentsRow struct {
 	ContentID   uuid.UUID
 }
 
-// 內容下架的歸屬核對（建立措施的同一個 transaction，留言與討論區留言的列已經鎖住）：回傳存在（含已軟刪）但不是該店家自己寫的內容。列已經清除的內容不在此列：它的歸屬由 moderation 以案件快照核對，再呼叫 seller。貼文的作者是它所屬的店家。
 func (q *Queries) InvalidTakedownContents(ctx context.Context, arg InvalidTakedownContentsParams) ([]InvalidTakedownContentsRow, error) {
 	rows, err := q.db.Query(ctx, invalidTakedownContents,
 		arg.PostIds,
@@ -297,7 +289,6 @@ type LockActiveTakedownsOfMeasureRow struct {
 	ContentID   uuid.UUID
 }
 
-// 對帳補漏的第一句（在鎖 social 自己的列之前，seller 先於 social）：鎖住 seller 措施此刻生效中的對象，撤銷尚未提交時等它、提交後不回傳已撤銷的列；鎖持有到 transaction 結束，補漏寫複本期間撤銷不能進行。
 func (q *Queries) LockActiveTakedownsOfMeasure(ctx context.Context, measureID uuid.UUID) ([]LockActiveTakedownsOfMeasureRow, error) {
 	rows, err := q.db.Query(ctx, lockActiveTakedownsOfMeasure, measureID)
 	if err != nil {
@@ -322,7 +313,6 @@ const lockCommentsByID = `-- name: LockCommentsByID :many
 SELECT id FROM social.comments WHERE id = ANY($1::uuid[]) ORDER BY id FOR NO KEY UPDATE
 `
 
-// 依 ID 由小到大鎖住內容列（FOR NO KEY UPDATE 在排序之後依序取鎖），之後才改複本與求值。
 func (q *Queries) LockCommentsByID(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, lockCommentsByID, ids)
 	if err != nil {
@@ -381,7 +371,6 @@ WHERE NOT EXISTS (
 ORDER BY t.measure_id, t.content_kind, t.content_id
 `
 
-// seller 發布的「此刻生效中的內容下架」裡，複本還沒有、而且內容在 social 存在的（漂移）：每日對帳補上。內容不存在的略過（插入會違反外鍵）。
 func (q *Queries) MissingTakedowns(ctx context.Context) ([]SellerPubContentTakedown, error) {
 	rows, err := q.db.Query(ctx, missingTakedowns)
 	if err != nil {
@@ -437,7 +426,6 @@ type TakedownMeasuresOfPostsRow struct {
 	MeasureID uuid.UUID
 }
 
-// 貼文被哪個內容下架措施下架（店主讀自己的貼文用）：content_takedowns_post 唯一索引保證一篇貼文至多一列。
 func (q *Queries) TakedownMeasuresOfPosts(ctx context.Context, postIds []uuid.UUID) ([]TakedownMeasuresOfPostsRow, error) {
 	rows, err := q.db.Query(ctx, takedownMeasuresOfPosts, postIds)
 	if err != nil {
@@ -475,7 +463,6 @@ type TakedownPostStoresRow struct {
 	StoreID int64
 }
 
-// 受影響的貼文與它們的店家：直接下架的貼文，加上被下架的留言所屬的貼文（留言的快取在貼文頁）。
 func (q *Queries) TakedownPostStores(ctx context.Context, arg TakedownPostStoresParams) ([]TakedownPostStoresRow, error) {
 	rows, err := q.db.Query(ctx, takedownPostStores, arg.PostIds, arg.CommentIds)
 	if err != nil {

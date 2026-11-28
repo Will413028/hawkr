@@ -54,20 +54,16 @@ test("error-triggered replay stays at full sampling", () => {
 	);
 });
 
-test("the quota rationale stays next to the value", () => {
+test("both replay rates stay explicit on the replay integration", () => {
 	const config = clientConfig();
-	const preamble = config.slice(0, config.indexOf("replaysSessionSampleRate"));
+	const integration = config.match(
+		/Sentry\.replayIntegration\(\{([\s\S]*?)\}\)/,
+	)?.[1];
 
-	assert.match(
-		preamble,
-		/reserved\s*=\s*\*\*50/,
-		"The measured cap must stay documented beside the setting — a bare 0 " +
-			"reads as an arbitrary choice and invites someone to 'fix' it.",
-	);
-	assert.match(
-		preamble,
-		/organization/,
-		"The org-wide scope is the reason dev's rate can blind prod; without it " +
-			"the setting looks like a dev-only concern.",
-	);
+	assert.ok(integration, "the replay integration must remain configured");
+	assert.match(integration, /maskAllText:\s*true/);
+	assert.match(integration, /maskAllInputs:\s*true/);
+	assert.match(integration, /blockAllMedia:\s*true/);
+	assert.match(config, /replaysSessionSampleRate:\s*0/);
+	assert.match(config, /replaysOnErrorSampleRate:\s*1\.0/);
 });

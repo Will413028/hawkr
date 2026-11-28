@@ -26,7 +26,6 @@ function q(search: string): URLSearchParams {
 	return new URLSearchParams(search);
 }
 
-
 test("四個鍵逐字讀進來", () => {
 	assert.deepEqual(
 		parseAnomalyHandoff(
@@ -75,7 +74,6 @@ test("空白字串與純空白一律當成沒帶", () => {
 	assert.equal(parsed.storeId, null);
 	assert.equal(parsed.orderNo, null);
 });
-
 
 test("異常監控頁把交接參數接進 tab、查詢與畫面", () => {
 	const text = source(PAGE);

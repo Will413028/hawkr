@@ -160,7 +160,6 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 
 	return (
 		<div className="flex flex-col gap-[var(--hkui-space-4)]">
-
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<div className="flex flex-wrap items-center justify-between gap-2">
 					<h2 className="m-0 text-base font-bold">{dash(job.summary)}</h2>
@@ -201,7 +200,6 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 				</p>
 			</section>
 
-
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<h2 className="m-0 text-sm font-bold">訂單資訊</h2>
 				<dl className="seller-order-detail__info">
@@ -229,12 +227,9 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 
 			<RetryProgressCard job={job} />
 
-
 			{resolvedExternally ? <ReportedCard job={job} /> : null}
 
-
 			{job.canReportExternal ? <ReportExternalCard job={job} /> : null}
-
 
 			{job.providerRequestId ? (
 				<section className="seller-card p-[var(--hkui-space-4)]">
@@ -255,7 +250,6 @@ function JobBody({ job }: { job: InvoiceJobInfo }) {
 					</details>
 				</section>
 			) : null}
-
 
 			<footer className="flex flex-wrap items-center gap-[var(--hkui-space-3)]">
 				<Link href={SUPPORT_FALLBACK_HREF} className="text-sm underline">
@@ -317,7 +311,6 @@ function RetryProgressCard({ job }: { job: InvoiceJobInfo }) {
 			<h2 className="m-0 text-sm font-bold">系統重試進度</h2>
 			<dl className="seller-order-detail__info">
 				<div>
-
 					<dt>已重試</dt>
 					<dd>{`${dash(job.attemptCount)} / ${dash(job.maxAttempts)} 次`}</dd>
 				</div>

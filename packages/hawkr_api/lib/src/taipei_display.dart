@@ -74,7 +74,6 @@ class TaipeiDisplay {
   String labeled(String formatted) =>
       withTaipeiLabelAtOffset(formatted, label, _offset);
 
-
   /// [timestamp] 為 null 時空字串。proto3 訊息欄位沒設時讀到 epoch，呼叫端先用 `has*()` 確認。
   static String plainTimestamp(Timestamp? timestamp) =>
       _formatTaipeiTimestamp(timestamp);
@@ -109,7 +108,6 @@ class TaipeiDisplay {
       wall.day,
     ).isBefore(DateTime.utc(today.year, today.month, today.day));
   }
-
 
   /// `2026/07/30 15:05`，必要時附標籤；[timestamp] 為 null 時空字串。
   String timestamp(Timestamp? timestamp) => labeled(plainTimestamp(timestamp));

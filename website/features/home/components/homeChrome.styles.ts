@@ -1,4 +1,3 @@
-
 export function eyebrowClasses(onDark = false): string {
 	return [
 		"inline-flex items-center gap-2.5 rounded-full px-4 py-2",

@@ -79,7 +79,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       return null;
     }, [snapshot.caseNo, lookupAsync]);
 
-
     return Column(
       children: [
         Padding(
@@ -129,7 +128,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       ],
     );
   }
-
 
   Widget _buildHeader() {
     return Row(
@@ -251,7 +249,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       ),
     );
   }
-
 
   Widget _buildDetailContent(
     BuildContext context,
@@ -429,7 +426,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-
   Widget _buildBasicInfo(BuildContext context, AfterSaleCase c) {
     final hasRefund =
         c.refundableAmount.isNotEmpty && c.refundableAmount != '0';
@@ -523,7 +519,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       ),
     );
   }
-
 
   Widget _buildReasonSection(AfterSaleCase c) {
     return Column(
@@ -671,7 +666,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-
   /// 物流進度 currentStep 對應（對齊賣家 退貨物流進度 `_returnLogisticsStatus`）：
   /// - status 50 已結案 → 3 驗貨完成
   /// - status 40 退款處理中 → 3 驗貨完成（賣家驗貨完成才會推進到 40）
@@ -803,7 +797,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       },
     );
   }
-
 
   Widget _buildActionButtons(
     BuildContext context,

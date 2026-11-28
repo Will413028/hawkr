@@ -126,7 +126,6 @@ export function SellerReceivedInvoicesPanel({
 					</Button>
 				</div>
 				<ScrollableTableRegion label="進項發票表格">
-
 					<table className="hidden seller-table md:table">
 						<caption className="sr-only">進項發票</caption>
 						<thead>
@@ -259,7 +258,6 @@ function ReceivedRow({ item }: { item: SellerReceivedInvoiceItem }) {
 		<tr>
 			<td>{dash(formatTaipeiDate(item.summary.issuedAt))}</td>
 			<td className="tabular-nums">
-
 				<Link href={detailHref(item.summary.documentId)} className="underline">
 					{dash(item.summary.invoiceNumber)}
 				</Link>

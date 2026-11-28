@@ -19,7 +19,6 @@ JOIN seller.measures m ON m.id = mi.measure_id
 ORDER BY m.account_id
 `
 
-// 還有身分快照的帳號（對帳時逐一清理；措施結束就刪快照，所以只是生效中的措施，加上到期 job 遺失的少數）。
 func (q *Queries) AccountsWithMeasureSnapshots(ctx context.Context) ([]int64, error) {
 	rows, err := q.db.Query(ctx, accountsWithMeasureSnapshots)
 	if err != nil {
@@ -74,9 +73,6 @@ type AdminKYCApplicationsRow struct {
 	StoreName            *string
 }
 
-// admin 審核佇列的「新到舊」：依送出時間（不是草稿的建立時間）。只列送出過的申請（不含草稿，也不含沒送出就取消的），
-// 狀態篩選；query_pattern 是店名、公司名稱或統編的子字串（ILIKE，呼叫方已跳脫 % _ \）。篩選審核中的佇列走
-// AdminKYCApplicationsOldestFirst（兩支的條件必須一致）。
 func (q *Queries) AdminKYCApplications(ctx context.Context, arg AdminKYCApplicationsParams) ([]AdminKYCApplicationsRow, error) {
 	rows, err := q.db.Query(ctx, adminKYCApplications,
 		arg.Status,
@@ -159,7 +155,6 @@ type AdminKYCApplicationsOldestFirstRow struct {
 	StoreName            *string
 }
 
-// admin 審核佇列的「舊到新」（篩選審核中時：等最久的在最前面），條件同 AdminKYCApplications，只有排序與 keyset 方向相反。
 func (q *Queries) AdminKYCApplicationsOldestFirst(ctx context.Context, arg AdminKYCApplicationsOldestFirstParams) ([]AdminKYCApplicationsOldestFirstRow, error) {
 	rows, err := q.db.Query(ctx, adminKYCApplicationsOldestFirst,
 		arg.Status,
@@ -225,7 +220,6 @@ type BankFingerprintHitExistsParams struct {
 	AccountID int64
 }
 
-// 這一對（措施、帳號）在 at 是銀行帳號 fingerprint 命中的關聯帳號（被處分的帳號本身不算）：標為已檢視前的存在性檢查，與處分頁的關聯帳號是同一份命中定義。
 func (q *Queries) BankFingerprintHitExists(ctx context.Context, arg BankFingerprintHitExistsParams) (bool, error) {
 	row := q.db.QueryRow(ctx, bankFingerprintHitExists, arg.MeasureID, arg.At, arg.AccountID)
 	var column_1 bool
@@ -239,7 +233,6 @@ FROM seller.kyc_applications
 WHERE store_id = $1 AND status <> 'CANCELLED'
 `
 
-// 店家目前那一筆還沒取消的申請（kyc_applications_open 保證最多一筆）。
 func (q *Queries) CurrentKYCApplication(ctx context.Context, storeID int64) (SellerKycApplication, error) {
 	row := q.db.QueryRow(ctx, currentKYCApplication, storeID)
 	var i SellerKycApplication
@@ -278,7 +271,6 @@ type CurrentKYCStatusesRow struct {
 	Status  string
 }
 
-// 批次讀取各店家目前那一筆還沒取消的申請的 cert 狀態（kyc_applications_open 保證每店最多一筆）；沒有申請的店家沒有列。
 func (q *Queries) CurrentKYCStatuses(ctx context.Context, storeIds []int64) ([]CurrentKYCStatusesRow, error) {
 	rows, err := q.db.Query(ctx, currentKYCStatuses, storeIds)
 	if err != nil {
@@ -311,8 +303,6 @@ type DeleteIdentitiesOutsideParams struct {
 	Keep      []uuid.UUID
 }
 
-// 刪除帳號的措施快照中，不屬於「生效中的措施」的列。keep 是 EffectiveMeasures 的結果（呼叫方已鎖住帳號全部的 stint，所以
-// 這之間不會有新的措施建立）；生效中的定義只有那一支查詢，這裡不再寫第二份。
 func (q *Queries) DeleteIdentitiesOutside(ctx context.Context, arg DeleteIdentitiesOutsideParams) error {
 	_, err := q.db.Exec(ctx, deleteIdentitiesOutside, arg.AccountID, arg.Keep)
 	return err
@@ -343,7 +333,6 @@ type InsertAccountIdentityHashParams struct {
 	StoreID   int64
 }
 
-// 防詐保存的比對 hash（隨申請寫入的同一個 transaction、同一個呼叫點寫入）；帳號取自來源 stint；已存在的略過（補金鑰可重跑）。
 func (q *Queries) InsertAccountIdentityHash(ctx context.Context, arg InsertAccountIdentityHashParams) error {
 	_, err := q.db.Exec(ctx, insertAccountIdentityHash,
 		arg.Field,
@@ -388,7 +377,6 @@ type InsertKYCApplicationParams struct {
 	Now                  time.Time
 }
 
-// 建立草稿；店家已有還沒取消的申請時違反 kyc_applications_open（呼叫方鎖住店家列後先檢查，所以只在不變量被破壞時發生）。
 func (q *Queries) InsertKYCApplication(ctx context.Context, arg InsertKYCApplicationParams) (SellerKycApplication, error) {
 	row := q.db.QueryRow(ctx, insertKYCApplication,
 		arg.ApplicationID,
@@ -466,7 +454,6 @@ type InsertKYCDocumentAccessParams struct {
 	Now           time.Time
 }
 
-// 補充文件的讀取紀錄只有這一支寫入（append-only）：記實際送出的 asset_id 與讀的管理員，不含內容。
 func (q *Queries) InsertKYCDocumentAccess(ctx context.Context, arg InsertKYCDocumentAccessParams) (SellerKycDocumentAccess, error) {
 	row := q.db.QueryRow(ctx, insertKYCDocumentAccess,
 		arg.AccessID,
@@ -506,7 +493,6 @@ type InsertKYCReviewParams struct {
 	RegistrationCheckID *uuid.UUID
 }
 
-// 審核紀錄只有這一支寫入（append-only）。registration_check_id 只在核准、退回時帶（kyc_reviews_registration_check_check）。
 func (q *Queries) InsertKYCReview(ctx context.Context, arg InsertKYCReviewParams) (SellerKycReview, error) {
 	row := q.db.QueryRow(ctx, insertKYCReview,
 		arg.ReviewID,
@@ -547,7 +533,6 @@ type InsertKYCReviewIssueParams struct {
 	Message         string
 }
 
-// 退回的逐項問題，與退回的審核紀錄在同一個 transaction 寫入；resolved_at 一開始是 NULL。
 func (q *Queries) InsertKYCReviewIssue(ctx context.Context, arg InsertKYCReviewIssueParams) error {
 	_, err := q.db.Exec(ctx, insertKYCReviewIssue,
 		arg.IssueID,
@@ -620,8 +605,6 @@ type KYCApplicationsMissingHashKeyParams struct {
 	BatchLimit   int32
 }
 
-// 缺這把金鑰的防詐保存 hash 的店家，連同它所有還有統編的申請（個資清理過的沒有統編，不在其中）：換鑰之後補算用。以店家為單位收斂：一批取 batch_limit 個店家
-// （依 store_id，after_store_id 是上一批最後一個店家），店家的申請整批一起回來，同一店家不會被批次邊界切開，所以同店不同統編的申請都補得到。鎖住申請列，與草稿寫入互斥。
 func (q *Queries) KYCApplicationsMissingHashKey(ctx context.Context, arg KYCApplicationsMissingHashKeyParams) ([]SellerKycApplication, error) {
 	rows, err := q.db.Query(ctx, kYCApplicationsMissingHashKey, arg.AfterStoreID, arg.KeyID, arg.BatchLimit)
 	if err != nil {
@@ -702,7 +685,6 @@ WHERE r.application_id = $1
 ORDER BY r.decided_at, r.review_id, i.position
 `
 
-// 一筆申請全部審核紀錄的逐項問題，依審核紀錄的順序（同 KYCReviews）再依 position。
 func (q *Queries) KYCReviewIssues(ctx context.Context, applicationID uuid.UUID) ([]SellerKycReviewIssue, error) {
 	rows, err := q.db.Query(ctx, kYCReviewIssues, applicationID)
 	if err != nil {
@@ -789,10 +771,6 @@ type LinkedAccountHitsRow struct {
 	Field     string
 }
 
-// 與這筆措施的身分相同的其他帳號（W9）：防詐保存的 account_identity_hashes（跨 stint，個資清理之後仍在）裡，統編（TAX_ID）對措施的 TAX_ID、
-// provider 回報的銀行帳號 fingerprint（BANK_FINGERPRINT）對措施的 BANK_ACCOUNT；措施的身分是快照加上被處分帳號目前的 hash，措施在 at 不生效或不帶身分效果時沒有命中（收款開通 ADR D4、D42：銀行帳號命中只列出；能不能據以建立關聯終止由
-// model.LinkedIdentity.CountsAsGround 決定，不在這裡）。命中的定義只有 seller.measure_identity_hits(at) 那一份（以 (key_id, hash) 索引等值連接，不解密）；帳號取自來源 stint。
-// account_id 不為 NULL 時只看那個帳號。
 func (q *Queries) LinkedAccountHits(ctx context.Context, arg LinkedAccountHitsParams) ([]LinkedAccountHitsRow, error) {
 	rows, err := q.db.Query(ctx, linkedAccountHits,
 		arg.At,
@@ -845,7 +823,6 @@ type ListKYCDocumentAccessesRow struct {
 	AccessedAt time.Time
 }
 
-// 一筆申請的補充文件讀取紀錄，新到舊的 keyset（accessed_at, access_id）。
 func (q *Queries) ListKYCDocumentAccesses(ctx context.Context, arg ListKYCDocumentAccessesParams) ([]ListKYCDocumentAccessesRow, error) {
 	rows, err := q.db.Query(ctx, listKYCDocumentAccesses,
 		arg.ApplicationID,
@@ -884,7 +861,6 @@ WHERE application_id = $1
 FOR UPDATE
 `
 
-// 鎖定申請序列化它的寫入（鎖順序：店家列先於申請列）。
 func (q *Queries) LockKYCApplication(ctx context.Context, applicationID uuid.UUID) (SellerKycApplication, error) {
 	row := q.db.QueryRow(ctx, lockKYCApplication, applicationID)
 	var i SellerKycApplication
@@ -925,7 +901,6 @@ type MarkLinkedAccountReviewedParams struct {
 	AdminID   int64
 }
 
-// 把這一對標為已檢視；已標過的不改（保留原來的時間與管理員），所以重複標記冪等。
 func (q *Queries) MarkLinkedAccountReviewed(ctx context.Context, arg MarkLinkedAccountReviewedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markLinkedAccountReviewed,
 		arg.MeasureID,
@@ -957,9 +932,6 @@ type MeasureIdentityMatchesRow struct {
 	Kind      string
 }
 
-// 別的帳號在 at 生效而且帶身分效果的措施，其身分來源（快照加上帳號目前的 hash）裡與這些 hash 相同的列。「生效」與「帶身分效果」都只由
-// seller.measure_identity_sources 那一份決定，呼叫方不再判斷。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位）。
 func (q *Queries) MeasureIdentityMatches(ctx context.Context, arg MeasureIdentityMatchesParams) ([]MeasureIdentityMatchesRow, error) {
 	rows, err := q.db.Query(ctx, measureIdentityMatches, arg.At, arg.Hashes, arg.AccountID)
 	if err != nil {
@@ -992,7 +964,6 @@ type MeasureLinkedReviewsRow struct {
 	ReviewedAt time.Time
 }
 
-// 這筆措施的關聯帳號已檢視的紀錄（處分頁顯示已檢視的時間）。
 func (q *Queries) MeasureLinkedReviews(ctx context.Context, measureID uuid.UUID) ([]MeasureLinkedReviewsRow, error) {
 	rows, err := q.db.Query(ctx, measureLinkedReviews, measureID)
 	if err != nil {
@@ -1024,9 +995,6 @@ type PruneAccountIdentityHashesParams struct {
 	Keep    [][]byte
 }
 
-// 統編被改掉或清掉之後，修剪這個 stint 已沒有任何申請持有的統編 hash（草稿裡改掉的值不是送出的事實，不保存）：keep 是 stint 目前持有的統編在金鑰環每一把金鑰算的 hash，
-// 不在其中的 TAX_ID 列刪除，在其中的保留（還有別的申請，例如同一個 stint 的已取消申請，持有同一個值）。只在 stint 還有未清理的申請時呼叫：清理之後申請不能再編輯，
-// 這張表的列由 DeleteExpiredAccountIdentityHashes 刪。
 func (q *Queries) PruneAccountIdentityHashes(ctx context.Context, arg PruneAccountIdentityHashesParams) error {
 	_, err := q.db.Exec(ctx, pruneAccountIdentityHashes, arg.StoreID, arg.Keep)
 	return err
@@ -1047,7 +1015,6 @@ type ReferencedKeyIDsRow struct {
 	KeyID string
 }
 
-// 資料庫裡被參照的每一把 HMAC 金鑰 ID（啟動檢查用）：防詐保存的 hash 與處分的身分快照。
 func (q *Queries) ReferencedKeyIDs(ctx context.Context) ([]ReferencedKeyIDsRow, error) {
 	rows, err := q.db.Query(ctx, referencedKeyIDs)
 	if err != nil {
@@ -1079,7 +1046,6 @@ type ResolveKYCReviewIssuesParams struct {
 	IssueIds []uuid.UUID
 }
 
-// 標成已處理（只填還沒有時間的，重複標不改變第一次的時間）。
 func (q *Queries) ResolveKYCReviewIssues(ctx context.Context, arg ResolveKYCReviewIssuesParams) error {
 	_, err := q.db.Exec(ctx, resolveKYCReviewIssues, arg.Now, arg.IssueIds)
 	return err
@@ -1102,8 +1068,6 @@ type ReviewKYCApplicationByIDsRow struct {
 	DueAt            time.Time
 }
 
-// 這些商家認證申請的審核開始時間與期限（資源的 decide_deadline）。規則只有 seller.review_kyc_application(at)（objects.sql）；不是審核中的申請沒有列。
-// 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 func (q *Queries) ReviewKYCApplicationByIDs(ctx context.Context, arg ReviewKYCApplicationByIDsParams) ([]ReviewKYCApplicationByIDsRow, error) {
 	rows, err := q.db.Query(ctx, reviewKYCApplicationByIDs, arg.At, arg.Ids)
 	if err != nil {
@@ -1138,7 +1102,6 @@ type SharedBankAccountPendingAccountsParams struct {
 	MeasureID uuid.UUID
 }
 
-// 這筆措施在 at 的待辦 SHARED_BANK_ACCOUNT 裡的帳號：處分頁的關聯帳號要不要出現「標為已檢視」。成員的定義只有 seller.review_shared_bank_account 那一份，這裡不重寫。
 func (q *Queries) SharedBankAccountPendingAccounts(ctx context.Context, arg SharedBankAccountPendingAccountsParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, sharedBankAccountPendingAccounts, arg.At, arg.MeasureID)
 	if err != nil {
@@ -1175,11 +1138,6 @@ type SnapshotMeasureIdentitiesParams struct {
 	AccountID int64
 }
 
-// 措施建立時，若它帶身分效果（seller.identity_effect_measures 那一份定義：停權與非預告的終止合作），複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
-// 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：
-// 申請的統編在 stint 的個資清理之後仍在這裡，所以舊 stint 清理之後才建立的處分取得到它。統編（TAX_ID）的種類是 TAX_ID；provider 回報的銀行帳號
-// fingerprint（BANK_FINGERPRINT）的種類是 BANK_ACCOUNT（收款開通 ADR D38：身分證號、負責人身分證號與平台自收的銀行帳號已不存在）。
-// 不帶身分效果的措施（預告終止、其他種類）一列都不寫；呼叫方不判斷。
 func (q *Queries) SnapshotMeasureIdentities(ctx context.Context, arg SnapshotMeasureIdentitiesParams) error {
 	_, err := q.db.Exec(ctx, snapshotMeasureIdentities, arg.MeasureID, arg.AccountID)
 	return err
@@ -1191,7 +1149,6 @@ FROM seller.kyc_applications
 WHERE store_id = $1 AND tax_id IS NOT NULL
 `
 
-// 這個 stint 所有申請（含已取消的）目前持有的統編：修剪防詐保存的統編 hash 時，保留這些值的 hash（呼叫方在申請寫入之後的同一個 transaction 讀）。
 func (q *Queries) StoreKYCTaxIDs(ctx context.Context, storeID int64) ([]string, error) {
 	rows, err := q.db.Query(ctx, storeKYCTaxIDs, storeID)
 	if err != nil {
@@ -1234,8 +1191,6 @@ type TransitionKYCApplicationParams struct {
 	FromStatus      string
 }
 
-// 人工決定的狀態轉移：以目前的狀態與版本為條件（只有持有列鎖、確認過狀態的呼叫方會走到這裡，條件是保底）；0 列表示
-// 狀態或版本已變。轉成 SUBMITTED 時 submission_seq 加一（登記資料查詢以它辨識這一輪送件）。
 func (q *Queries) TransitionKYCApplication(ctx context.Context, arg TransitionKYCApplicationParams) (SellerKycApplication, error) {
 	row := q.db.QueryRow(ctx, transitionKYCApplication,
 		arg.ToStatus,
@@ -1284,7 +1239,6 @@ type UnresolvedKYCReviewIssuesRow struct {
 	DocumentAssetID *uuid.UUID
 }
 
-// 一筆申請還沒標成已處理的問題：寫入申請的 transaction 用它和新舊值比對（呼叫方已鎖住申請列）。
 func (q *Queries) UnresolvedKYCReviewIssues(ctx context.Context, applicationID uuid.UUID) ([]UnresolvedKYCReviewIssuesRow, error) {
 	rows, err := q.db.Query(ctx, unresolvedKYCReviewIssues, applicationID)
 	if err != nil {
@@ -1339,9 +1293,6 @@ type UpdateKYCDraftParams struct {
 	ExpectedVersion      int64
 }
 
-// 寫入已在列鎖內合併的草稿欄位，並讓被退回的申請回到 DRAFT；版本不符、或狀態不是 DRAFT／REJECTED 時 0 列
-// （審核中與已核准的申請不能編輯，規則在 model.CanEditKYC）。
-// submitted_at 保留（歷史）。
 func (q *Queries) UpdateKYCDraft(ctx context.Context, arg UpdateKYCDraftParams) (SellerKycApplication, error) {
 	row := q.db.QueryRow(ctx, updateKYCDraft,
 		arg.SellerType,

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
-
 const realFetch = globalThis.fetch;
 
 let fetchCalls = 0;

@@ -75,7 +75,6 @@ func (f *flexString) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-
 type stdEnvelope struct {
 	Code providerCode    `json:"code"`
 	Msg  string          `json:"msg"`
@@ -107,7 +106,6 @@ type timeEnvelope struct {
 	Timestamp int64  `json:"timestamp"`
 	Text      string `json:"text"`
 }
-
 
 // IssueProductItem 是 f0401 的明細行。UnitPrice／Amount 預設含稅（DetailVat=1）。
 type IssueProductItem struct {
@@ -210,7 +208,6 @@ type FileRequest struct {
 	InvoiceNumber string `json:"invoice_number,omitempty"`
 	DownloadStyle int    `json:"download_style"`
 }
-
 
 // IssueResult 是 f0401 成功後的業務結果。
 type IssueResult struct {

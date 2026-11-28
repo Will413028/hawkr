@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 // GetSellerInvoiceOverview 賣家發票總覽
 // @Summary      賣家發票總覽
 // @Description  賣家發票總覽（58 號設計書 §6.1 端點 16）

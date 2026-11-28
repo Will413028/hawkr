@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-
 // FileActorKind 是三個合法讀者面。值域刻意封閉：新增第四個讀者要回來改這裡，
 // 而不是在某個 handler 裡多寫一個 if。
 type FileActorKind int

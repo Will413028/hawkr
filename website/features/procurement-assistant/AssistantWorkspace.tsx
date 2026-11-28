@@ -622,7 +622,6 @@ export default function AssistantWorkspace({
 						</li>
 					) : null}
 
-
 					{session.stage === "ready" &&
 					!session.question &&
 					!isProcessing &&
@@ -658,7 +657,6 @@ export default function AssistantWorkspace({
 							) : null}
 						</li>
 					) : null}
-
 
 					{session.error ? (
 						<li

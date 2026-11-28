@@ -44,7 +44,6 @@ func (c *AftersalesClient) Close() error {
 	return nil
 }
 
-
 // CreateAfterSaleCase 申請售後
 func (c *AftersalesClient) CreateAfterSaleCase(ctx context.Context, req *pb.CreateAfterSaleCaseRequest) (*pb.CreateAfterSaleCaseResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -79,7 +78,6 @@ func (c *AftersalesClient) CancelAfterSaleCase(ctx context.Context, req *pb.Canc
 	defer cancel()
 	return c.client.CancelAfterSaleCase(ctx, req)
 }
-
 
 // GetSellerAfterSaleCases 賣家售後列表
 func (c *AftersalesClient) GetSellerAfterSaleCases(ctx context.Context, req *pb.GetSellerAfterSaleCasesRequest) (*pb.GetSellerAfterSaleCasesResponse, error) {
@@ -122,7 +120,6 @@ func (c *AftersalesClient) RetryPrintReturnLabel(ctx context.Context, req *pb.Re
 	defer cancel()
 	return c.client.RetryPrintReturnLabel(ctx, req)
 }
-
 
 // SubmitAppeal 買家提交申訴
 func (c *AftersalesClient) SubmitAppeal(ctx context.Context, req *pb.SubmitAppealRequest) (*pb.SubmitAppealResponse, error) {

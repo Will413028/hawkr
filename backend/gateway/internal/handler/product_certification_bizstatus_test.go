@@ -19,11 +19,10 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-
 type certBizStatusServer struct {
 	productpb.UnimplementedProductServiceServer
-	code int32
-	msg  string
+	code         int32
+	msg          string
 	transportErr error
 }
 

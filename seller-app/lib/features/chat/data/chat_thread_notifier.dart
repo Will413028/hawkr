@@ -149,7 +149,6 @@ class ChatThread extends _$ChatThread {
 
   String? get conversationId => state.value?.conversationId;
 
-
   void _onEvent(ChatStreamEvent e) {
     final data = state.value;
     final conv = data?.conversationId;
@@ -210,6 +209,7 @@ class ChatThread extends _$ChatThread {
       _session.client.noteSeq(found.id, m.seq);
       _checkGap(m);
     } on Object {
+      // 認不出來就維持空對話；之後的事件會再試。
     } finally {
       _adopting = false;
     }
@@ -241,6 +241,7 @@ class ChatThread extends _$ChatThread {
       }
       _session.client.noteSeq(conv, state.value?.contiguousLastSeq ?? 0);
     } on Object {
+      // 補洞失敗不蓋掉畫面上已有的訊息；下一次事件或重連會再補。
     } finally {
       _fillingGap = false;
     }
@@ -270,7 +271,6 @@ class ChatThread extends _$ChatThread {
     final local = list.where((m) => m.seq == 0).toList();
     return [...sent, ...local];
   }
-
 
   /// 重新載入（錯誤畫面的「重試」）。
   Future<void> reload() async {

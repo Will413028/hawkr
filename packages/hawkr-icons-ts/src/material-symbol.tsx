@@ -39,7 +39,6 @@ export function MaterialSymbol({
 			aria-label={title}
 			aria-hidden={title ? undefined : true}
 		>
-
 			<path
 				d={fill ? glyph.filled : glyph.outlined}
 				fill="currentColor"

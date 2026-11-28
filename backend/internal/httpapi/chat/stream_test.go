@@ -36,8 +36,8 @@ type streamHarness struct {
 	log       *callLog
 	guardRuns chan struct{}
 	done      chan error
-	finished chan struct{}
-	cancel   context.CancelFunc
+	finished  chan struct{}
+	cancel    context.CancelFunc
 }
 
 type callLog struct {

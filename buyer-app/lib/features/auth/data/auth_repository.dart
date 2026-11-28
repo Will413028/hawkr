@@ -44,7 +44,6 @@ class AuthRepository {
     required DefaultErrorText defaults,
   }) : _defaults = defaults;
 
-
   /// 目前登入的帳號（GetSession）：帳號 ID 與停權狀態。登入之後呼叫：第一次登入的使用者，伺服器在這時建立帳號。
   /// 錯誤轉成 [AppException]：文字取自伺服器的 LocalizedMessage。
   Future<AccountSnapshot> currentAccount() async {
@@ -117,7 +116,6 @@ class AuthRepository {
       throw ServerException(message);
     }
   }
-
 
   Future<T> _writeWithEtag<T>(Future<T> Function() write) async {
     try {

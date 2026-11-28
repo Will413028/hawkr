@@ -63,12 +63,11 @@ const (
 )
 
 var actionRoute = map[routeKey]routeTarget{
-	{"dispatch", providerTaqbin}: {"POST", "/api/v1/app/shipments/{order_no}/call_tcat"},
+	{"dispatch", providerTaqbin}:    {"POST", "/api/v1/app/shipments/{order_no}/call_tcat"},
 	{"print_label", providerTaqbin}: {"POST", "/api/v1/app/shipments/{order_no}/generate_home_label"},
 
 	{"handover", providerCvs}:    {"POST", "/api/v1/app/shipments/{order_no}/confirm"},
 	{"print_label", providerCvs}: {"POST", "/api/v1/app/shipments/{order_no}/print_cvs_label"},
-
 }
 
 var viewerScopedRoute = map[routeKey]map[string]routeTarget{
@@ -133,7 +132,7 @@ func BuildAllowedActions(orderNo, provider, viewer string, availability []Action
 			Method:             target.method,
 			Enabled:            a.Enabled,
 			DisabledReasonCode: a.DisabledReasonCode,
-			Actor: viewer,
+			Actor:              viewer,
 		})
 	}
 	return actions, dropped

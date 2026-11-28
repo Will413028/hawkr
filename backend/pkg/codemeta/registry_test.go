@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-
 var codePattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 
 type registryEntry struct{ code, value, label string }
@@ -89,7 +88,6 @@ func TestProcurementRegistryLookupsAgree(t *testing.T) {
 		}
 	})
 }
-
 
 // approval 的狀態機值域。順序照 doc 64 §4.1 的生命週期敘述，不是字母序——
 // 這份切片會被拿去產 DB CHECK 與前端顯示順序。

@@ -11,7 +11,6 @@ import {
 	previousPage,
 } from "../src/lib/keyset-pages";
 
-
 test("第一頁的 token 是空字串", () => {
 	const tokens = firstPage();
 	assert.equal(currentPage(tokens), 1);

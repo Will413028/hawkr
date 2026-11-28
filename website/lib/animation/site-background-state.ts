@@ -30,14 +30,12 @@ export function hydrateSiteBackgroundState() {
 			sessionStorage.getItem(STORAGE_KEY) ??
 			sessionStorage.getItem("hk:home-grainient-paused");
 		update({ ...state, paused: saved === "1" });
-	} catch {
-	}
+	} catch {}
 }
 export function toggleSiteBackgroundPaused() {
 	const paused = !state.paused;
 	update({ ...state, paused });
 	try {
 		sessionStorage.setItem(STORAGE_KEY, paused ? "1" : "0");
-	} catch {
-	}
+	} catch {}
 }

@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-
 func storeResolverForTest(surrogate int64) *storeid.Resolver {
 	return storeid.New(storeid.GetterFunc(func(_ context.Context, accountID int64) (int64, error) {
 		return surrogate, nil
@@ -60,7 +59,6 @@ func buyerGrandfatherResolverForTest() *buyerid.Resolver {
 		}, nil
 	}))
 }
-
 
 func setupResolveProbe(h *Holder) *gin.Engine {
 	r := gin.New()

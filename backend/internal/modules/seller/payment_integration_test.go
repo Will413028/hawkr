@@ -14,11 +14,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-
 const kindPaymentEnsure = "payment.account_ensure"
 
 var (
-	enabledSnapshot = payment.Snapshot{Transfers: payment.CapabilityActive, PayoutsActive: true}
+	enabledSnapshot     = payment.Snapshot{Transfers: payment.CapabilityActive, PayoutsActive: true}
 	needsSellerSnapshot = payment.Snapshot{Transfers: payment.CapabilityRestricted, Details: []payment.StatusDetail{{Resolution: payment.ResolutionSellerAction, Reason: "routine_onboarding"}}}
 	rejectedSnapshot    = payment.Snapshot{Transfers: payment.CapabilityRejected, Details: []payment.StatusDetail{{Resolution: payment.ResolutionPlatformAction, Reason: "rejected.fraud"}}}
 )

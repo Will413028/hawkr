@@ -307,7 +307,6 @@ function SellerRow({
 						{group.candidates.length} 項符合的商品
 					</span>
 				</span>
-
 			</td>
 
 			<td className="assistant-candidate-row__actions">
@@ -430,7 +429,6 @@ function CandidatePanel({
 		<div className="assistant-lane">
 			<div className="assistant-lane__intro">
 				<div>
-
 					<strong>
 						{grouped
 							? `${grouped.groups.length + grouped.ungrouped.length} 家商家`
@@ -538,7 +536,6 @@ export default function CandidateBrowser({
 				<div className="assistant-invalidated" role="alert">
 					<AppIcon name="danger" size={20} aria-hidden="true" />
 					<div>
-
 						<strong>
 							{optionalText(
 								ut,

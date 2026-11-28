@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-
 var reviewKinds = []struct{ kind, fn string }{
 	{"REPORT_TRIAGE", "review_report_triage"},
 	{"CASE_DECISION", "review_case_decision"},

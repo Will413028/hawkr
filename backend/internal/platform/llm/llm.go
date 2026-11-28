@@ -77,8 +77,8 @@ var ErrDisabled = apperr.Unavailable("AI 助理尚未開通，請稍後再試")
 type modelSpec struct {
 	provider Provider
 	baseURL  string
-	image bool
-	options func() []option.RequestOption
+	image    bool
+	options  func() []option.RequestOption
 }
 
 func deepSeekOptions() []option.RequestOption {

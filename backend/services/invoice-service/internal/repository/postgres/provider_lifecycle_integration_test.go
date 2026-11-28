@@ -65,7 +65,6 @@ func seedProviderAccount(ctx context.Context, t *testing.T, pool *pgxpool.Pool, 
 
 func uniqueAppKey() string { return fmt.Sprintf("AK%d", time.Now().UnixNano()) }
 
-
 // TestIntegration_SetAutomationCutover_OnlyFromActive 驗 I-61 的 allowed-from。
 //
 // 🔴 這一支是單元測試的鏡像不了的那一半：fake 的 cutoverOK 旗標是測試自己設的，
@@ -163,7 +162,6 @@ func TestIntegration_LandVerification_NilVerifiedAtBreaksCutoverCheck(t *testing
 	}
 }
 
-
 func TestIntegration_StartVerification_AllowedFrom(t *testing.T) {
 	ctx := context.Background()
 	pool := testPool(t)
@@ -199,7 +197,6 @@ func TestIntegration_StartVerification_AllowedFrom(t *testing.T) {
 		})
 	}
 }
-
 
 func TestIntegration_SuspendAndRevoke_AllowedFrom(t *testing.T) {
 	ctx := context.Background()
@@ -292,7 +289,6 @@ func TestIntegration_Revoke_KeepsCutoverAndReleasesFingerprint(t *testing.T) {
 		t.Fatalf("撤銷之後同一組憑證應可被新 issuer 綁定（uq_ipa_fingerprint 的述詞不含 REVOKED）：%v", err)
 	}
 }
-
 
 // TestIntegration_RotationLifecycle 驗 P11 → P12／P13 的三個落點都滿足
 // chk_ipa_rotation（(status='ROTATION_PENDING') = (pending_ciphertext IS NOT NULL)）

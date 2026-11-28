@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-
 const shippingMethodCvsPickup = "3002"
 
 var cvsStoreCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
@@ -40,7 +39,6 @@ func resolveCvsStore(c *gin.Context, shippingMethod, cvsStoreCode, cvsStoreName,
 	}
 	return code, name, true
 }
-
 
 // CheckoutValidateDataResponse 結帳驗證回應
 type CheckoutValidateDataResponse struct {
@@ -335,7 +333,6 @@ type CheckoutItemRequest struct {
 	ProductID string `json:"productId" binding:"required"`
 }
 
-
 func convertCheckoutInvoice(in *CheckoutInvoiceRequest) *pb.CheckoutInvoiceRequest {
 	if in == nil {
 		return nil
@@ -424,7 +421,7 @@ func convertCheckoutPreviewData(d *pb.CheckoutPreviewData) *CheckoutPreviewDataR
 		TotalShippingFee:    d.TotalShippingFee,
 		TotalDiscount:       d.TotalDiscount,
 		TotalActualAmount:   d.TotalActualAmount,
-		Invoice: convertCheckoutInvoicePreview(d.GetInvoice()),
+		Invoice:             convertCheckoutInvoicePreview(d.GetInvoice()),
 	}
 	r.OrderGroups = make([]OrderGroupPreviewResponse, 0, len(d.OrderGroups))
 	for _, g := range d.OrderGroups {
@@ -510,7 +507,6 @@ func convertCheckoutItems(items []CheckoutItemRequest) []*pb.CheckoutItem {
 	}
 	return result
 }
-
 
 // CheckoutValidate 結帳即時驗證
 // @Summary      結帳即時驗證
@@ -718,22 +714,22 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 	}
 
 	var req struct {
-		CheckoutID       string                `json:"checkoutId" binding:"required"`
-		ShippingMethod   string                `json:"shippingMethod" binding:"required"`
-		DeliveryTemp     string                `json:"deliveryTemp" binding:"required"`
-		ReceiverZipCode  string                `json:"receiverZipCode"`
-		RecipientName    string                `json:"recipientName" binding:"required"`
-		RecipientPhone   string                `json:"recipientPhone" binding:"required"`
-		ShippingAddress  string                `json:"shippingAddress"`
-		ShippingNote     string                `json:"shippingNote"`
-		OrderRemark      string                `json:"orderRemark"`
-		CvsStoreCode     string                `json:"cvsStoreCode"`
-		CvsStoreName     string                `json:"cvsStoreName"`
-		StoreID          string                `json:"storeId"`
-		StoreName        string                `json:"storeName"`
-		CouponTemplateID string                `json:"couponTemplateId"`
-		Items            []CheckoutItemRequest `json:"items" binding:"required"`
-		Invoice *CheckoutInvoiceRequest `json:"invoice,omitempty"`
+		CheckoutID       string                  `json:"checkoutId" binding:"required"`
+		ShippingMethod   string                  `json:"shippingMethod" binding:"required"`
+		DeliveryTemp     string                  `json:"deliveryTemp" binding:"required"`
+		ReceiverZipCode  string                  `json:"receiverZipCode"`
+		RecipientName    string                  `json:"recipientName" binding:"required"`
+		RecipientPhone   string                  `json:"recipientPhone" binding:"required"`
+		ShippingAddress  string                  `json:"shippingAddress"`
+		ShippingNote     string                  `json:"shippingNote"`
+		OrderRemark      string                  `json:"orderRemark"`
+		CvsStoreCode     string                  `json:"cvsStoreCode"`
+		CvsStoreName     string                  `json:"cvsStoreName"`
+		StoreID          string                  `json:"storeId"`
+		StoreName        string                  `json:"storeName"`
+		CouponTemplateID string                  `json:"couponTemplateId"`
+		Items            []CheckoutItemRequest   `json:"items" binding:"required"`
+		Invoice          *CheckoutInvoiceRequest `json:"invoice,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "invalid request body")
@@ -760,7 +756,7 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 		CvsStoreId:       cvsStoreCode,
 		CvsStoreName:     cvsStoreName,
 		CouponTemplateId: req.CouponTemplateID,
-		Invoice: convertCheckoutInvoice(req.Invoice),
+		Invoice:          convertCheckoutInvoice(req.Invoice),
 	})
 	if err != nil {
 		response.GrpcErr(c, "order", err)

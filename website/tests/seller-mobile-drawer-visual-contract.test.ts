@@ -58,8 +58,14 @@ test("賣家通知分類的選取 tab 不再沿用共用亮綠 pill", () => {
 });
 
 test("手機側欄是明確的 elevated panel 而不是讓內容穿透的玻璃", () => {
-	const drawerCommentAt = css.indexOf("/* ---- Off-canvas drawer ---- */");
-	const drawerAt = css.indexOf(".seller-sidebar {", drawerCommentAt);
+	const mobileDarkSidebarRule = css.indexOf(
+		'@media (max-width: 960px) {\n\thtml[data-theme="dark"] body .seller-shell .seller-sidebar {',
+	);
+	assert.notEqual(mobileDarkSidebarRule, -1);
+	const drawerAt = css.indexOf(
+		'html[data-theme="dark"] body .seller-shell .seller-sidebar {',
+		mobileDarkSidebarRule,
+	);
 	const drawer = blockAt(css, drawerAt, "mobile seller drawer");
 
 	assert.match(drawer, /background:\s*var\(--theme-surface-elevated\)/);
@@ -89,8 +95,10 @@ test("打開手機側欄時使用主題遮罩並保留可辨識的關閉控制",
 });
 
 test("手機側欄關閉鍵與導覽列右側數字使用同一條靠右軸線", () => {
-	const drawerCommentAt = css.indexOf("/* ---- Off-canvas drawer ---- */");
-	const closeAt = css.indexOf(".seller-sidebar__close {", drawerCommentAt);
+	const mobileChromeDefaults = css.indexOf(".seller-shell__mobile-bar,");
+	const mobileDrawerAt = css.indexOf(".seller-sidebar {", mobileChromeDefaults);
+	const closeAt = css.indexOf(".seller-sidebar__close {", mobileDrawerAt);
+	assert.ok(mobileChromeDefaults >= 0 && mobileDrawerAt > mobileChromeDefaults);
 	const close = blockAt(css, closeAt, "mobile seller drawer close button");
 
 	assert.match(close, /margin-left:\s*auto/);

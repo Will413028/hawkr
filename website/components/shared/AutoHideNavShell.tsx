@@ -72,7 +72,6 @@ export default function AutoHideNavShell({
 
 	return (
 		<NavPinContext.Provider value={ctx}>
-
 			{/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only wrapper keeps the shared navbar visible while pointer users traverse mega-menu content. */}
 			<div
 				ref={wrapperRef}

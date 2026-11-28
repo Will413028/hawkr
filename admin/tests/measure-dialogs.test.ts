@@ -198,7 +198,6 @@ function measure(
 	});
 }
 
-
 function updateElement(
 	m: ReturnType<typeof measure>,
 	onConfirm: (
@@ -370,7 +369,6 @@ test("修改措施：版本衝突後換上新的措施重送，update_mask 只�
 	assert.equal(request.measure?.statement, undefined);
 	assert.equal(request.measure?.etag, "e2");
 });
-
 
 function openDecide(
 	kind: "appeal" | "remediation",
@@ -548,7 +546,6 @@ test("裁定：送出的內容帶結果、理由與一併撤銷的勾選；失�
 	await click("確認裁定");
 	assert.equal(sent.length, 2);
 });
-
 
 test("內部註記：標題、說明、placeholder、按鈕；沒有註記時顯示「還沒有註記」", async () => {
 	const m = mount(

@@ -12,7 +12,6 @@ const hook = readFileSync(
 );
 const keys = readFileSync(path.join(root, "lib/query/keys.ts"), "utf8");
 
-
 test("stepIcon 未知碼降級 clock；stepLabel 只使用固定公開字串表", () => {
 	assert.equal(stepIcon("NOT_A_CODE"), "clock");
 	assert.equal(stepIcon("SEARCH_PLATFORM"), "search");
@@ -55,7 +54,6 @@ test("stepLabel 用 safeArgs 產生動態文案，只限 EXTRACT_SLOTS／PICK_NE
 		"核對條件合不合理",
 	);
 });
-
 
 test("query key 走 identity-scoped factory；用 placeholderData 而非 initialData", () => {
 	assert.match(hook, /queryKeys\.assistant\.conversations\(queryIdentity\)/);

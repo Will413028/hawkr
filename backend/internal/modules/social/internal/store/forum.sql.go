@@ -23,7 +23,6 @@ type ForumEntryByRequestParams struct {
 	RequestID *uuid.UUID
 }
 
-// 冪等重送的查詢：範圍是 (互動者, request_id)。
 func (q *Queries) ForumEntryByRequest(ctx context.Context, arg ForumEntryByRequestParams) (SocialForumEntry, error) {
 	row := q.db.QueryRow(ctx, forumEntryByRequest, arg.ActorKind, arg.ActorID, arg.RequestID)
 	var i SocialForumEntry
@@ -86,7 +85,6 @@ func (q *Queries) GetForumEntryReplyCount(ctx context.Context, id uuid.UUID) (in
 }
 
 const insertForumEntry = `-- name: InsertForumEntry :one
-
 INSERT INTO social.forum_entries (id, store_id, parent_id, reply_to_id, actor_kind, actor_id, body, created_at, updated_at, request_id, request_hash)
 VALUES (
     $1, $2, $3, $4, $5, $6,
@@ -109,8 +107,6 @@ type InsertForumEntryParams struct {
 	RequestHash []byte
 }
 
-// 店家的討論區留言的寫入與作者自己的讀取。帶「公開可讀、可見」規則的讀取在 internal/reads（go-jet），規則在 internal/visibility。
-// 同一個互動者的同一個 request_id 已經有時不寫入、回 0 列（不讓 transaction 失效，呼叫方接著讀原本那一則）。
 func (q *Queries) InsertForumEntry(ctx context.Context, arg InsertForumEntryParams) (SocialForumEntry, error) {
 	row := q.db.QueryRow(ctx, insertForumEntry,
 		arg.ID,
@@ -202,7 +198,6 @@ type UpdateForumEntryBodyParams struct {
 	ID   uuid.UUID
 }
 
-// 呼叫方已在列鎖之下檢查版本與隱藏。
 func (q *Queries) UpdateForumEntryBody(ctx context.Context, arg UpdateForumEntryBodyParams) (SocialForumEntry, error) {
 	row := q.db.QueryRow(ctx, updateForumEntryBody, arg.Body, arg.Now, arg.ID)
 	var i SocialForumEntry

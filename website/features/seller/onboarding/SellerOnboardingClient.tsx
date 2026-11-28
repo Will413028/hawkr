@@ -325,7 +325,6 @@ export default function SellerOnboardingClient() {
 				</Card>
 			)}
 
-
 			<section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_64px_-32px_rgb(var(--color-ink-700-rgb)/0.18)] sm:rounded-[36px] sm:p-10 dark:border-white/10 dark:bg-[rgb(var(--color-ink-900-rgb)/0.92)] dark:shadow-[0_24px_64px_-32px_rgba(0,0,0,0.5)]">
 				{step === "store" && (
 					<form

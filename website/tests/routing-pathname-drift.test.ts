@@ -20,7 +20,10 @@ function rewriteTarget(path: string): string {
 		headers: { host: "localhost:3000" },
 	});
 	const rewrite = intl(request).headers.get("x-middleware-rewrite");
-	return new URL(rewrite ?? request.url).pathname;
+	const pathname = new URL(rewrite ?? request.url).pathname;
+	const routed = routingPathname(pathname);
+	assert.ok(routed, `next-intl produced invalid pathname ${pathname}`);
+	return routed;
 }
 
 /** What next-intl should route the request to, from `routingPathname`: the default locale is rewritten to /zh-TW. */
@@ -49,7 +52,7 @@ test("routingPathname is the path next-intl rewrites: unprefixed (default locale
 		"/en/products/1",
 		"/account/orders/%44F-1",
 	]) {
-		const expected = new URL(expectedTarget(path), "http://localhost").pathname;
+		const expected = expectedTarget(path);
 		assert.equal(rewriteTarget(path), expected, path);
 	}
 });

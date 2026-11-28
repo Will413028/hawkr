@@ -107,6 +107,8 @@ class CartController extends _$CartController {
         selectedAddressId: selectedAddressId,
       );
     } on Object {
+      // Guest carts and temporarily unavailable address services must not
+      // replace a successfully loaded cart.
     }
 
     try {
@@ -124,6 +126,7 @@ class CartController extends _$CartController {
         selectedStorePickupId: selectedStoreId,
       );
     } on Object {
+      // Store pickup is optional until checkout; preserve the cart snapshot.
     }
     return next;
   }

@@ -157,8 +157,6 @@ export function SellerTaxStatusPage() {
 						</section>
 					) : null}
 
-
-
 					{gate.visible ? <TaxIdentityForm profile={profile} /> : null}
 
 					{gate.visible ? (
@@ -170,7 +168,6 @@ export function SellerTaxStatusPage() {
 							onSubmit={submit}
 						/>
 					) : null}
-
 
 					{reviewStatus === SellerTaxReviewStatus.SUBMITTED ? (
 						<section className="seller-card flex flex-col gap-2 p-5">
@@ -193,7 +190,6 @@ export function SellerTaxStatusPage() {
 							</div>
 						</section>
 					) : null}
-
 
 					{profile ? <TaxExtensionSection profile={profile} /> : null}
 
@@ -288,7 +284,6 @@ function DocumentRow({ document }: { document: SellerTaxDocument }) {
 	return (
 		<li className="flex items-center justify-between gap-3 text-[0.8125rem]">
 			<span className="flex min-w-0 flex-col gap-0.5">
-
 				<span className="truncate text-[var(--hkui-foreground)]">
 					{document.fileName || document.documentId}
 				</span>

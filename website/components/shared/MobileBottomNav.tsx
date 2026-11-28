@@ -395,7 +395,6 @@ export default function MobileBottomNav() {
 			onPointerCancel={handlePointerCancel}
 			onClickCapture={handleClickCapture}
 		>
-
 			{target ? (
 				<span
 					aria-hidden="true"

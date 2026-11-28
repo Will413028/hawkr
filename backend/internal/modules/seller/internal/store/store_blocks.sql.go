@@ -22,7 +22,6 @@ type AddStoreBlockParams struct {
 	CreatedAt time.Time
 }
 
-// 店家封鎖買家，重複封鎖不產生新列（回 0）。
 func (q *Queries) AddStoreBlock(ctx context.Context, arg AddStoreBlockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addStoreBlock, arg.StoreID, arg.BuyerID, arg.CreatedAt)
 	if err != nil {
@@ -43,7 +42,6 @@ type BuyersBlockedByStoreParams struct {
 	Column2 []int64
 }
 
-// 輸入的買家中被指定店家封鎖的 buyer_id。
 func (q *Queries) BuyersBlockedByStore(ctx context.Context, arg BuyersBlockedByStoreParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, buyersBlockedByStore, arg.StoreID, arg.Column2)
 	if err != nil {
@@ -70,7 +68,6 @@ FROM seller.store_blocks
 WHERE buyer_id = $1
 `
 
-// 買家刪帳：刪除各店對這位買家的封鎖。
 func (q *Queries) ClearStoreBlocksAgainstBuyer(ctx context.Context, buyerID int64) error {
 	_, err := q.db.Exec(ctx, clearStoreBlocksAgainstBuyer, buyerID)
 	return err
@@ -98,7 +95,6 @@ type ListStoreBlocksRow struct {
 	CreatedAt time.Time
 }
 
-// 以時間與買家 ID 進行某店的封鎖名單 keyset 分頁（降冪）。
 func (q *Queries) ListStoreBlocks(ctx context.Context, arg ListStoreBlocksParams) ([]ListStoreBlocksRow, error) {
 	rows, err := q.db.Query(ctx, listStoreBlocks,
 		arg.StoreID,
@@ -136,7 +132,6 @@ type RemoveStoreBlockParams struct {
 	BuyerID int64
 }
 
-// 店家解除封鎖，沒有這個封鎖時回 0。
 func (q *Queries) RemoveStoreBlock(ctx context.Context, arg RemoveStoreBlockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, removeStoreBlock, arg.StoreID, arg.BuyerID)
 	if err != nil {
@@ -156,7 +151,6 @@ type StoreBlocksBuyerParams struct {
 	BuyerID int64
 }
 
-// 店家是否封鎖了指定買家。
 func (q *Queries) StoreBlocksBuyer(ctx context.Context, arg StoreBlocksBuyerParams) (bool, error) {
 	row := q.db.QueryRow(ctx, storeBlocksBuyer, arg.StoreID, arg.BuyerID)
 	var exists bool
@@ -168,7 +162,6 @@ const storeExists = `-- name: StoreExists :one
 SELECT EXISTS(SELECT 1 FROM seller.stores WHERE store_id = $1)
 `
 
-// 店家是否存在（封鎖寫入前確認，不存在回 NotFound 而不是外鍵錯誤）。
 func (q *Queries) StoreExists(ctx context.Context, storeID int64) (bool, error) {
 	row := q.db.QueryRow(ctx, storeExists, storeID)
 	var exists bool
@@ -188,7 +181,6 @@ type StoresBlockingBuyerParams struct {
 	Column2 []int64
 }
 
-// 輸入的店家中封鎖了指定買家的 store_id。
 func (q *Queries) StoresBlockingBuyer(ctx context.Context, arg StoresBlockingBuyerParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, storesBlockingBuyer, arg.BuyerID, arg.Column2)
 	if err != nil {

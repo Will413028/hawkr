@@ -220,8 +220,7 @@ export function createGrainientRenderer(
 	const safely = (operation: () => void) => {
 		try {
 			operation();
-		} catch {
-		}
+		} catch {}
 	};
 
 	const releaseResources = () => {
@@ -286,8 +285,7 @@ export function createGrainientRenderer(
 		destroyInternal();
 		try {
 			options.onError();
-		} catch {
-		}
+		} catch {}
 	};
 
 	function handleContextLost() {

@@ -39,7 +39,7 @@ test("shared overlays own symmetric placement-aware motion", () => {
 });
 
 test("reduced motion keeps only a short opacity acknowledgement", () => {
-	const overlayMotionStart = uiKit.indexOf("Shared Dialog / Sheet motion");
+	const overlayMotionStart = uiKit.indexOf("[data-hk-overlay-root] {");
 	const reducedMotionStart = uiKit.indexOf(
 		"@media (prefers-reduced-motion: reduce)",
 		overlayMotionStart,

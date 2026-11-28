@@ -250,9 +250,7 @@ export default function HomeProcessCards() {
 			className="relative bg-transparent h-[clamp(2450px,330vh,3200px)] mt-0 max-[640px]:h-auto max-[640px]:mt-[18px] max-[640px]:mx-3 max-[640px]:px-4 max-[640px]:pt-9 max-[640px]:pb-[118px]"
 			id="story"
 		>
-
 			<div className="sticky top-0 w-full h-screen overflow-hidden max-[640px]:relative max-[640px]:top-auto max-[640px]:h-auto max-[640px]:overflow-visible">
-
 				<div className="absolute top-[6vh] left-0 right-0 flex justify-center z-[4] pointer-events-none max-[640px]:relative max-[640px]:top-auto">
 					<div
 						ref={stageHeadRef}

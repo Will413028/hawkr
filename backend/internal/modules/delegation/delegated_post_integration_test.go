@@ -19,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-
 var (
 	methodRead      = DelegatedMethod{Capability: CapabilityPostsRead, Action: AuditPostRead, Resource: ResourcePost}
 	methodCreate    = DelegatedMethod{Capability: CapabilityPostsWrite, Action: AuditPostCreate, Resource: ResourcePost}

@@ -1,6 +1,5 @@
 //go:build !integration
 
-
 package usecase
 
 import (
@@ -13,7 +12,6 @@ import (
 
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
-
 
 func TestCanReportExternalIssuance(t *testing.T) {
 	selfIssue := codemeta.InvoiceFulfillmentModeSellerSelfIssue.Value

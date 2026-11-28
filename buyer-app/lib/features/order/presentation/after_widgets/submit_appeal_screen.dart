@@ -88,8 +88,7 @@ class _SubmitAppealScreenState extends ConsumerState<SubmitAppealScreen> {
           try {
             final result = await mediaRepo.uploadImage(file: file);
             tokens.add(result.stagedToken);
-          } catch (_) {
-          }
+          } catch (_) {}
         }
       }
 

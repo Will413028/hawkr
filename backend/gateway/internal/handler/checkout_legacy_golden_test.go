@@ -22,8 +22,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-
-
 var legacyPreserveData = map[int32]bool{4001: true, 4091: true, 4092: true}
 
 func legacyEnvelopeGuard() gogrpc.UnaryClientInterceptor {
@@ -48,12 +46,11 @@ func legacyEnvelopeGuard() gogrpc.UnaryClientInterceptor {
 	}
 }
 
-
 type checkoutScript struct {
-	preview     *orderpb.CheckoutPreviewResponse
-	confirm     *orderpb.CheckoutConfirmResponse
-	validate    *orderpb.CheckoutValidateResponse
-	shippingFee *orderpb.CheckoutShippingFeeResponse
+	preview      *orderpb.CheckoutPreviewResponse
+	confirm      *orderpb.CheckoutConfirmResponse
+	validate     *orderpb.CheckoutValidateResponse
+	shippingFee  *orderpb.CheckoutShippingFeeResponse
 	byCheckoutID map[string]*orderpb.CheckoutConfirmResponse
 }
 
@@ -86,7 +83,7 @@ func (g *checkoutGoldenServer) CheckoutShippingFee(context.Context, *orderpb.Che
 type stackMode int
 
 const (
-	stackLegacy    stackMode = iota
+	stackLegacy stackMode = iota
 	stackCurrent
 	stackNoCarrier
 )
@@ -158,7 +155,6 @@ func assertReachedHandler(t *testing.T, w *httptest.ResponseRecorder, who string
 	}
 }
 
-
 func goldenUnavailable() []*orderpb.UnavailableItem {
 	return []*orderpb.UnavailableItem{
 		{SkuId: "510", SkuName: "有機高麗菜", Reason: "INSUFFICIENT_STOCK", RequestedQty: "5", AvailableQty: "2"},
@@ -210,7 +206,6 @@ func goldenConfirmReq(checkoutID string) map[string]any {
 		"items":           []map[string]any{{"skuId": "510", "quantity": "5", "productId": "875563677398107445"}},
 	}
 }
-
 
 type goldenCase struct {
 	name   string

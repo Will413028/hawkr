@@ -7,7 +7,6 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-
 var invoiceCodeToGRPCExpected = map[int32]codes.Code{
 	9301: codes.NotFound,
 	9302: codes.NotFound,

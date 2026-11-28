@@ -9,8 +9,7 @@ import { clientBeforeSend } from "@/lib/sentry/client-before-send";
 function runNavigationHookSafely(callback: () => void): void {
 	try {
 		callback();
-	} catch {
-	}
+	} catch {}
 }
 
 export function onRouterTransitionStart(
@@ -79,8 +78,7 @@ if (typeof window !== "undefined") {
 				STALE_CHUNK_RELOAD_MARKER_KEY,
 				String(Date.now()),
 			);
-		} catch {
-		}
+		} catch {}
 		reloadedInThisRuntime = true;
 		window.location.reload();
 	};

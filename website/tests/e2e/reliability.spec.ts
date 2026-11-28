@@ -135,7 +135,6 @@ async function expectHealthyPage(
 	).toEqual([]);
 }
 
-
 const STATIC_ROUTES = [
 	"/",
 	"/feed",
@@ -253,7 +252,6 @@ test.describe("PPR stream integrity", { tag: ["@ui", "@live"] }, () => {
 		}
 	});
 });
-
 
 test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 	test.describe.configure({ retries: 0 });
@@ -610,7 +608,6 @@ test.describe("interaction flows", { tag: ["@ui", "@live"] }, () => {
 		).toEqual([]);
 	});
 });
-
 
 async function firstProductId(
 	request: import("@playwright/test").APIRequestContext,

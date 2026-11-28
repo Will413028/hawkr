@@ -13,7 +13,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-
 var (
 	inquiryListPaths  = rpc.FieldPaths{"State": "state"}
 	inquiryReplyPaths = rpc.FieldPaths{"InquiryID": "inquiry_id", "Body": "body", "EvidenceTokens[]": "evidence_staged_tokens[]"}

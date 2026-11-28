@@ -79,17 +79,6 @@ type InsertInvoiceAdjustmentLineParams struct {
 	Now                 pgtype.Timestamptz `db:"now" json:"now"`
 }
 
-// g0401 逐行回填原發票資訊。**金額語意與 invoice_document_lines 相反**：本表是未稅
-// （unit_price_ex_tax／net_amount_ex_tax），開立端 DetailVat=1 是含稅 ——
-// 照抄另一張表的欄名會得到一張金額全錯但每一條 CHECK 都通過的折讓單。
-// chk_invadjline_amount：net_amount_ex_tax = unit_price_ex_tax × quantity（呼叫端先算好）。
-// tax_amount 必須是整數（AMEGO 4040139），拆分尾差由 §5A.9.3 的最大餘數法吸收；
-//
-//	I-9 要求 Σ lines.tax_amount = header.tax_amount，那條只有測試守得住（跨列）。
-//
-// original_invoice_no／original_invoice_date／original_description 三欄 NOT NULL：
-//
-//	AMEGO g0401 要求**逐行**回填原發票資訊，不是表頭帶一次就好。
 func (q *Queries) InsertInvoiceAdjustmentLine(ctx context.Context, arg InsertInvoiceAdjustmentLineParams) (InvoiceAdjustmentLine, error) {
 	row := q.db.QueryRow(ctx, insertInvoiceAdjustmentLine,
 		arg.AdjustmentID,
@@ -125,18 +114,11 @@ func (q *Queries) InsertInvoiceAdjustmentLine(ctx context.Context, arg InsertInv
 }
 
 const listInvoiceAdjustmentLines = `-- name: ListInvoiceAdjustmentLines :many
-
 SELECT id, adjustment_id, line_seq, source_line_id, original_invoice_no, original_invoice_date, original_description, quantity, unit_price_ex_tax, net_amount_ex_tax, tax_amount, tax_category, created_at FROM invoice_adjustment_lines
 WHERE adjustment_id = $1
 ORDER BY line_seq
 `
 
-// invoice_adjustment_lines｜折讓明細行
-// SSOT：設計書 58 號 §5.1.7
-// 本波只放骨架：g0401 逐行回填原發票資訊的組裝在本波範圍外。
-// ⚠️ 金額語意與 invoice_document_lines **相反**（本表是未稅：unit_price_ex_tax／net_amount_ex_tax），
-//
-//	補 query 時不要照抄另一張表的欄名。
 func (q *Queries) ListInvoiceAdjustmentLines(ctx context.Context, adjustmentID int64) ([]InvoiceAdjustmentLine, error) {
 	rows, err := q.db.Query(ctx, listInvoiceAdjustmentLines, adjustmentID)
 	if err != nil {

@@ -86,6 +86,7 @@ class ProductRepository {
         }
       }
     } on DioException {
+      // fall through
     }
     return [];
   }
@@ -145,6 +146,7 @@ class ProductRepository {
             .toString();
       }
     } on DioException {
+      // fall through
     }
     return null;
   }
@@ -158,6 +160,7 @@ class ProductRepository {
         return data['data'] as Map<String, dynamic>? ?? data;
       }
     } on DioException {
+      // fall through
     }
     return {};
   }
@@ -172,6 +175,7 @@ class ProductRepository {
         return data['data'] as Map<String, dynamic>? ?? data;
       }
     } on DioException {
+      // fall through
     }
     return {};
   }
@@ -194,7 +198,6 @@ class ProductRepository {
       throw const NetworkException();
     }
   }
-
 
   Future<bool> addFavoriteProduct({required String productId}) async {
     try {
@@ -228,10 +231,8 @@ class ProductRepository {
     if (int.tryParse(productId) == null) return;
     try {
       await _buyer.recordVisit(buyer.RecordVisitRequest(productId: productId));
-    } catch (_) {
-    }
+    } catch (_) {}
   }
-
 
   /// 訂閱規格（SKU）的補貨通知。後端冪等：已訂閱再呼叫直接回成功；規格目前有貨時後端拒絕。
   Future<bool> subscribeRestock(String productId, String skuId) async {

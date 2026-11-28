@@ -261,7 +261,6 @@ export default function SessionAuditConsole({
 			)}
 
 			<section className="adm-audit-summary-cards" aria-label="工作階段摘要">
-
 				<StatCard
 					label="工作階段代號"
 					value={report?.displayCode ?? "—"}
@@ -292,7 +291,6 @@ export default function SessionAuditConsole({
 				/>
 			</section>
 
-
 			<p className="adm-audit-summary-note">
 				這兩個計數只含<strong>已成功</strong>
 				的紀錄；失敗與結果未確認不計入，見下方「操作結果」。
@@ -302,7 +300,6 @@ export default function SessionAuditConsole({
 				<section className="adm-audit-close-summary" aria-label="結束摘要">
 					<h2>工作階段摘要</h2>
 					<ul className="adm-audit-close-rows">
-
 						<li className="adm-audit-close-rows__wide">
 							<MaterialSymbol name="tag" />
 							<span>工作階段 ID</span>
@@ -610,7 +607,6 @@ export default function SessionAuditConsole({
 
 				{auditPage && auditPage.total > 0 && (
 					<div className="adm-audit-pagination">
-
 						<span>
 							顯示第 {(auditPage.page - 1) * auditPage.pageSize + 1} 至{" "}
 							{Math.min(auditPage.page * auditPage.pageSize, auditPage.total)}{" "}

@@ -162,10 +162,6 @@ test("layout and CSS keep independent loader hard-stop paths wired", async () =>
 	assert.doesNotMatch(styles, /hk-initial-loader-terminal-error/);
 	assert.match(styles, /\.hk-initial-loader-timeout \.initial-loader/);
 	assert.match(styles, /\.hk-skip-initial-loader \.initial-loader/);
-	assert.match(
-		styles,
-		/The splash is visual feedback, never an interaction lock/,
-	);
 	assert.match(styles, /initial-loader-hard-timeout 1ms linear 6s forwards/);
 	assert.match(layout, /className="root-nav-layout-reservation"/);
 	assert.match(

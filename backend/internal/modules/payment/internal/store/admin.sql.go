@@ -29,7 +29,6 @@ type AdminListPaymentsParams struct {
 	MaxRows int32
 }
 
-// 後台列付款，新的在前（主鍵是 UUIDv7，依 id 由大到小就是建立時間由新到舊；keyset：id < after_id）；status、order_no 空字串不篩。
 func (q *Queries) AdminListPayments(ctx context.Context, arg AdminListPaymentsParams) ([]PaymentPayment, error) {
 	rows, err := q.db.Query(ctx, adminListPayments,
 		arg.Status,
@@ -111,8 +110,6 @@ type AdminListRefundsRow struct {
 	CreatedAt        time.Time
 }
 
-// 後台列退款，新的在前（keyset 同 AdminListPayments）；order_no 是所屬訂單應收的訂單編號；status 篩退款本身的狀態，
-// anomaly_only 為真時只列退款、收回或補差額任一個在 ANOMALY 的退款（收回與補差額的人工結案要從這裡找到列）。
 func (q *Queries) AdminListRefunds(ctx context.Context, arg AdminListRefundsParams) ([]AdminListRefundsRow, error) {
 	rows, err := q.db.Query(ctx, adminListRefunds,
 		arg.Status,
@@ -186,7 +183,6 @@ type AdminListTransfersRow struct {
 	CreatedAt          time.Time
 }
 
-// 後台列轉帳，新的在前（keyset 同 AdminListPayments）；order_no 是所屬訂單應收的訂單編號，status、order_no 空字串不篩。
 func (q *Queries) AdminListTransfers(ctx context.Context, arg AdminListTransfersParams) ([]AdminListTransfersRow, error) {
 	rows, err := q.db.Query(ctx, adminListTransfers,
 		arg.Status,
@@ -239,7 +235,6 @@ type AdminPaymentOrdersRow struct {
 	Amount    int64
 }
 
-// 一頁付款的全部訂單應收（後台付款列表一筆付款對 N 張訂單），依付款再依 ID 升序。
 func (q *Queries) AdminPaymentOrders(ctx context.Context, paymentIds []uuid.UUID) ([]AdminPaymentOrdersRow, error) {
 	rows, err := q.db.Query(ctx, adminPaymentOrders, paymentIds)
 	if err != nil {
@@ -284,7 +279,6 @@ type AdminRefundReversalsRow struct {
 	CreatedAt  time.Time
 }
 
-// 一頁退款的全部撤回列（後台人工結案撤回要用撤回列 ID）。
 func (q *Queries) AdminRefundReversals(ctx context.Context, refundIds []uuid.UUID) ([]AdminRefundReversalsRow, error) {
 	rows, err := q.db.Query(ctx, adminRefundReversals, refundIds)
 	if err != nil {

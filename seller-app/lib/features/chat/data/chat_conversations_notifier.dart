@@ -98,6 +98,7 @@ class ChatConversations extends _$ChatConversations {
         ),
       );
     } on Object {
+      // 背景更新失敗不蓋掉已有的列表。
     }
   }
 

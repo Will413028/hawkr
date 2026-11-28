@@ -85,7 +85,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     setState(() => _expanded = !_expanded);
   }
 
-
   @override
   Widget build(BuildContext context) {
     final cardBorderSide = BorderSide(width: 1, color: AppColors.cardBorder);
@@ -461,7 +460,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     );
   }
 
-
   Widget _buildExpandedContent() {
     final snapshot = ref
         .watch(afterSaleOrderLookupProvider)
@@ -471,7 +469,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     }
     return OrderExpandedSection(order: order);
   }
-
 
   Future<void> _fetchOrderDetail() async {
     try {
