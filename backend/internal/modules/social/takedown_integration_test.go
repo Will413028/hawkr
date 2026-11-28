@@ -21,7 +21,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 type takedowns struct {
@@ -32,45 +34,66 @@ func (f *fixture) takedowns(t *testing.T) takedowns {
 	t.Helper()
 	events.Subscribe(f.bus, f.module.OnMeasureCreated)
 	events.Subscribe(f.bus, f.module.OnMeasureRevoked)
-	f.exec(t, `DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid IN ('seller.measures'::regclass, 'seller.measure_contents'::regclass) AND contype IN ('c', 'f') AND conname <> 'measure_contents_measure_status_fkey'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return takedowns{f: f}
 }
 
 func (d takedowns) seed(t *testing.T, storeID int64, refs []seller.ContentRef) uuid.UUID {
 	t.Helper()
-	return d.seedAt(t, storeID, refs, uuid.NewV7(), d.f.clock())
-}
-
-func (d takedowns) seedAt(t *testing.T, storeID int64, refs []seller.ContentRef, id uuid.UUID, createdAt time.Time) uuid.UUID {
-	t.Helper()
-	d.f.exec(t, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, statement_to_seller, starts_at, status, current_revision, created_by_admin_id, created_at, updated_at)
-		SELECT $1, account_id, store_id, 'CONTENT_TAKEDOWN', 'VIOLATION', '下架', $3, 'ENFORCED', 1, 9, $3, $3 FROM seller.stores WHERE store_id = $2`, id, storeID, createdAt)
-	for _, r := range refs {
-		d.f.exec(t, "INSERT INTO seller.measure_contents (measure_id, content_kind, content_id, snapshot_state) VALUES ($1, $2, $3, 'CLEARED')", id, string(r.Kind), r.ID)
-	}
-	return id
+	module, err := sellerfixture.NewModuleWithEvents(d.f.db, events.NewBus(), d.f.clock)
+	must(t, err)
+	created, err := module.CreateMeasure(context.Background(), d.input(t, storeID, refs))
+	must(t, err)
+	return created.Measure.ID
 }
 
 func (d takedowns) create(t *testing.T, storeID int64, refs ...seller.ContentRef) uuid.UUID {
 	t.Helper()
-	id := d.seed(t, storeID, refs)
+	created, err := d.f.sellerMod.CreateMeasure(context.Background(), d.input(t, storeID, refs))
+	must(t, err)
 	d.f.jobs.reset()
-	must(t, d.f.db.InTx(context.Background(), func(ctx context.Context) error {
-		return events.Publish(ctx, d.f.bus, seller.MeasureCreated{MeasureID: id, StoreID: storeID, OccurredAt: d.f.clock(), Contents: refs})
-	}))
-	return id
+	return created.Measure.ID
 }
 
 func (d takedowns) revoke(t *testing.T, storeID int64, id uuid.UUID, refs ...seller.ContentRef) {
 	t.Helper()
-	d.f.exec(t, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id)
+	current, err := d.f.sellerMod.CurrentMeasure(context.Background(), id)
+	must(t, err)
+	_, err = d.f.sellerMod.RevokeMeasure(context.Background(), seller.RevokeMeasureInput{
+		MeasureID: id, ExpectedVersion: current.Version, AdminID: 9, Reason: seller.RevokeAdminCorrection,
+	})
+	must(t, err)
 	d.f.jobs.reset()
-	must(t, d.f.db.InTx(context.Background(), func(ctx context.Context) error {
-		return events.Publish(ctx, d.f.bus, seller.MeasureRevoked{MeasureID: id, StoreID: storeID, OccurredAt: d.f.clock(), Contents: refs})
-	}))
+}
+
+func (d takedowns) revokeWithoutEvent(t *testing.T, id uuid.UUID) {
+	t.Helper()
+	module, err := sellerfixture.NewModuleWithEvents(d.f.db, events.NewBus(), d.f.clock)
+	must(t, err)
+	current, err := module.CurrentMeasure(context.Background(), id)
+	must(t, err)
+	_, err = module.RevokeMeasure(context.Background(), seller.RevokeMeasureInput{
+		MeasureID: id, ExpectedVersion: current.Version, AdminID: 9, Reason: seller.RevokeAdminCorrection,
+	})
+	must(t, err)
+}
+
+func (d takedowns) input(t *testing.T, storeID int64, refs []seller.ContentRef) seller.CreateMeasureInput {
+	t.Helper()
+	contents := make([]seller.TakedownContent, len(refs))
+	for i, r := range refs {
+		content, err := d.f.module.ContentSnapshot(context.Background(), social.Target{Kind: social.TargetKind(r.Kind), ID: r.ID})
+		must(t, err)
+		if !content.Exists {
+			t.Fatalf("內容 %s %s 不存在", r.Kind, r.ID)
+		}
+		snapshot := seller.NewContentSnapshot(r.Kind, content.Body, content.AuthoredAt, len(content.MediaRefs), content.StoreID, content.PostID, content.ThreadID)
+		contents[i] = seller.TakedownContent{ContentRef: r, Snapshot: &snapshot}
+	}
+	return seller.CreateMeasureInput{
+		AdminID: 9, StoreID: storeID, Kind: seller.MeasureContentTakedown, StatementToSeller: "下架", Note: "測試處置",
+		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.Spam, Severity: seller.SeverityLow}},
+		Takedown:  &seller.ContentTakedown{Contents: contents},
+	}
 }
 
 func ref(kind seller.ContentKind, id uuid.UUID) seller.ContentRef {
@@ -204,13 +227,8 @@ func TestTakedownCopyRollsBackWithTheCallersTransaction(t *testing.T) {
 	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID), ref(seller.ContentComment, w.comment.ID)}
 	errRollback := context.Canceled
 	err := f.db.InTx(ctx, func(ctx context.Context) error {
-		id := uuid.NewV7()
-		if _, e := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, statement_to_seller, starts_at, status, current_revision, created_by_admin_id, created_at, updated_at)
-			SELECT $1, account_id, store_id, 'CONTENT_TAKEDOWN', 'VIOLATION', '下架', $3, 'ENFORCED', 1, 9, $3, $3 FROM seller.stores WHERE store_id = $2`, id, w.storeID, f.clock()); e != nil {
-			return e
-		}
-		if e := events.Publish(ctx, f.bus, seller.MeasureCreated{MeasureID: id, StoreID: w.storeID, OccurredAt: f.clock(), Contents: refs}); e != nil {
-			return e
+		if _, err := f.sellerMod.CreateMeasureInTx(ctx, td.input(t, w.storeID, refs)); err != nil {
+			return err
 		}
 		return errRollback
 	})
@@ -282,7 +300,7 @@ func TestReconcileRemovesTheTakedownsTheSubscriberMissedRevoking(t *testing.T) {
 	w := f.takedownWorld(t)
 	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID), ref(seller.ContentComment, w.comment.ID), ref(seller.ContentForumEntry, w.entry.ID)}
 	id := td.create(t, w.storeID, refs...)
-	f.exec(t, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id)
+	td.revokeWithoutEvent(t, id)
 	if get, _, _, _ := f.postVisible(t, w.post.ID); get {
 		t.Fatal("前提：沒有撤銷事件，複本還在")
 	}
@@ -434,7 +452,7 @@ func TestReconcileInsertRechecksThatTheMeasureIsStillActive(t *testing.T) {
 	w := f.takedownWorld(t)
 	refs := []seller.ContentRef{ref(seller.ContentPost, w.post.ID), ref(seller.ContentComment, w.comment.ID)}
 	id := td.seed(t, w.storeID, refs)
-	f.exec(t, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id)
+	td.revokeWithoutEvent(t, id)
 	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cache: readcache.Cache{Jobs: f.jobs, Stores: f.sellers}, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
 	stale := []stats.Content{{Kind: contentkind.Post, ID: w.post.ID}, {Kind: contentkind.Comment, ID: w.comment.ID}}
 	must(t, svc.ApplyMissingTakedowns(ctx, id, f.clock(), stale))
@@ -456,7 +474,7 @@ func TestReconcileInsertCancelsOnlyTheSchedulesOfInsertedTakedowns(t *testing.T)
 	p := f.draft(t, storeID)
 	s := f.schedule(t, storeID, p, time.Hour, f.owner())
 	id := td.seed(t, storeID, []seller.ContentRef{ref(seller.ContentPost, p.ID)})
-	f.exec(t, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id)
+	td.revokeWithoutEvent(t, id)
 	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cache: readcache.Cache{Jobs: f.jobs, Stores: f.sellers}, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
 	must(t, svc.ApplyMissingTakedowns(ctx, id, f.clock(), []stats.Content{{Kind: contentkind.Post, ID: p.ID}}))
 	f.wantSchedule(t, s.ID, "PENDING", "")
@@ -500,12 +518,18 @@ func TestReconcileInsertWaitsForAnUncommittedRevokeAndWritesNothing(t *testing.T
 	w := f.takedownWorld(t)
 	id := td.seed(t, w.storeID, []seller.ContentRef{ref(seller.ContentPost, w.post.ID)})
 	svc := stats.New(stats.Deps{DB: f.db, Logger: slog.New(slog.DiscardHandler), Now: f.clock, Cache: readcache.Cache{Jobs: f.jobs, Stores: f.sellers}, Cancel: schedule.Canceler{DB: f.db, Events: f.bus}})
+	revoker, err := sellerfixture.NewModuleWithEvents(f.db, events.NewBus(), f.clock)
+	must(t, err)
+	current, err := revoker.CurrentMeasure(ctx, id)
+	must(t, err)
 
 	revoking, release := make(chan struct{}), make(chan struct{})
 	revokeDone := make(chan error, 1)
 	go func() {
 		revokeDone <- f.db.InTx(ctx, func(ctx context.Context) error {
-			if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.measures SET status = 'REVOKED' WHERE id = $1", id); err != nil {
+			if _, err := revoker.RevokeMeasure(ctx, seller.RevokeMeasureInput{
+				MeasureID: id, ExpectedVersion: current.Version, AdminID: 9, Reason: seller.RevokeAdminCorrection,
+			}); err != nil {
 				return err
 			}
 			close(revoking)

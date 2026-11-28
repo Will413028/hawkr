@@ -217,11 +217,13 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	if _, err := m.CloseCurrent(ctx, inheritedAccount); err != nil {
 		t.Fatal(err)
 	}
-	var inheritedNew int64
-	if err := d.Conn(ctx).QueryRow(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES ($1, $2, '新店', $3, $3) RETURNING store_id`,
-		inheritedOld.StoreCode+1, inheritedAccount, now).Scan(&inheritedNew); err != nil {
+	inherited, err := m.Apply(ctx, seller.ApplyInput{
+		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: inheritedAccount, StoreName: "新店", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路二號",
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
+	inheritedNew := inherited.StoreID
 	_, governance := exposable("違規停權")
 	ends := now.Add(30 * 24 * time.Hour)
 	if _, err := m.CreateMeasure(ctx, seller.CreateMeasureInput{

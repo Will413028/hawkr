@@ -12,9 +12,6 @@ import (
 )
 
 const (
-	storeA = int64(10)
-	storeB = int64(11)
-	storeC = int64(12)
 	buyer1 = int64(100)
 	buyer2 = int64(101)
 )
@@ -23,36 +20,36 @@ const (
 func TestReplayIsIdempotent(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 1000)
-	if ok, err := f.order("evt-1", "O1", storeA, buyer1, 1000); err != nil || ok {
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 1000)
+	if ok, err := f.order("evt-1", "O1", f.storeA, buyer1, 1000); err != nil || ok {
 		t.Fatalf("重放的 order.completed：recorded=%v err=%v，預期 false、nil", ok, err)
 	}
-	if ok, err := f.partial("REF-1", "O1", storeA, buyer1, 300); err != nil || !ok {
+	if ok, err := f.partial("REF-1", "O1", f.storeA, buyer1, 300); err != nil || !ok {
 		t.Fatalf("第一次部分退款：recorded=%v err=%v", ok, err)
 	}
 	for i := 0; i < 3; i++ {
-		if ok, err := f.partial("REF-1", "O1", storeA, buyer1, 300); err != nil || ok {
+		if ok, err := f.partial("REF-1", "O1", f.storeA, buyer1, 300); err != nil || ok {
 			t.Fatalf("重放的部分退款：recorded=%v err=%v，預期 false、nil", ok, err)
 		}
 	}
-	if spent, orders, _ := f.customer(storeA, buyer1); spent != 700 || orders != 1 {
+	if spent, orders, _ := f.customer(f.storeA, buyer1); spent != 700 || orders != 1 {
 		t.Fatalf("total_spent=%d order_count=%d，預期 700、1", spent, orders)
 	}
 	if n := f.count("crm.ledger"); n != 2 {
 		t.Fatalf("ledger %d 列，預期 2（一筆訂單、一筆退款）", n)
 	}
-	f.assertInvariant(storeA, buyer1)
+	f.assertInvariant(f.storeA, buyer1)
 }
 
 // 退款的冪等鍵與 order.completed 的 event_id 在不同命名空間：同一個字串不會互相擋掉。
 func TestOrderAndRefundKeysDoNotCollide(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("same-key", "O1", storeA, buyer1, 500)
-	if ok, err := f.partial("same-key", "O1", storeA, buyer1, 100); err != nil || !ok {
+	f.mustOrder("same-key", "O1", f.storeA, buyer1, 500)
+	if ok, err := f.partial("same-key", "O1", f.storeA, buyer1, 100); err != nil || !ok {
 		t.Fatalf("與 order.completed 同字串的退款鍵被擋：recorded=%v err=%v", ok, err)
 	}
-	if spent, _, _ := f.customer(storeA, buyer1); spent != 400 {
+	if spent, _, _ := f.customer(f.storeA, buyer1); spent != 400 {
 		t.Fatalf("total_spent=%d，預期 400", spent)
 	}
 }
@@ -61,11 +58,11 @@ func TestOrderAndRefundKeysDoNotCollide(t *testing.T) {
 func TestSecondOrderCompletedWithNewEventIDDoesNotDoubleCount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 1000)
-	if _, err := f.order("evt-2", "O1", storeA, buyer1, 1000); err != nil {
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 1000)
+	if _, err := f.order("evt-2", "O1", f.storeA, buyer1, 1000); err != nil {
 		t.Fatal(err)
 	}
-	if spent, orders, _ := f.customer(storeA, buyer1); spent != 1000 || orders != 1 {
+	if spent, orders, _ := f.customer(f.storeA, buyer1); spent != 1000 || orders != 1 {
 		t.Fatalf("total_spent=%d order_count=%d，預期 1000、1", spent, orders)
 	}
 }
@@ -100,21 +97,21 @@ func TestEventOrderingTable(t *testing.T) {
 				var err error
 				switch e.kind {
 				case "order":
-					_, err = f.order(fmt.Sprintf("evt-%d", j), "O1", storeA, buyer, e.amount)
+					_, err = f.order(fmt.Sprintf("evt-%d", j), "O1", f.storeA, buyer, e.amount)
 				case "partial":
-					_, err = f.partial(fmt.Sprintf("REF-%d", j), "O1", storeA, buyer, e.amount)
+					_, err = f.partial(fmt.Sprintf("REF-%d", j), "O1", f.storeA, buyer, e.amount)
 				case "full":
-					_, err = f.full(fmt.Sprintf("REF-%d", j), "O1", storeA, buyer)
+					_, err = f.full(fmt.Sprintf("REF-%d", j), "O1", f.storeA, buyer)
 				}
 				if err != nil {
 					t.Fatalf("第 %d 個事件 %s：%v", j, e.kind, err)
 				}
 			}
-			spent, orders, ok := f.customer(storeA, buyer)
+			spent, orders, ok := f.customer(f.storeA, buyer)
 			if ok != tc.wantRow || spent != tc.wantSpent || orders != tc.wantOrders {
 				t.Fatalf("row=%v total_spent=%d order_count=%d，預期 %v、%d、%d", ok, spent, orders, tc.wantRow, tc.wantSpent, tc.wantOrders)
 			}
-			f.assertInvariant(storeA, buyer)
+			f.assertInvariant(f.storeA, buyer)
 		})
 	}
 }
@@ -123,10 +120,10 @@ func TestEventOrderingTable(t *testing.T) {
 func TestRefundBeforeOrderDoesNotCreateCustomer(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	if _, err := f.partial("REF-1", "O1", storeA, buyer1, 300); err != nil {
+	if _, err := f.partial("REF-1", "O1", f.storeA, buyer1, 300); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.full("REF-2", "O2", storeA, buyer1); err != nil {
+	if _, err := f.full("REF-2", "O2", f.storeA, buyer1); err != nil {
 		t.Fatal(err)
 	}
 	if n := f.count("crm.customers"); n != 0 {
@@ -146,34 +143,34 @@ func TestConcurrentOrderAndRefundOnSameOrder(t *testing.T) {
 		o := fmt.Sprintf("OF%d", i/2)
 		buyer := buyer1 + int64(i/2)
 		if i%2 == 0 {
-			_, err := f.order("evt-"+o, o, storeA, buyer, 1000)
+			_, err := f.order("evt-"+o, o, f.storeA, buyer, 1000)
 			return err
 		}
-		_, err := f.full("REF-"+o, o, storeA, buyer)
+		_, err := f.full("REF-"+o, o, f.storeA, buyer)
 		return err
 	})
 	noErrors(t, errs)
 	for i := 0; i < n; i++ {
-		spent, orders, ok := f.customer(storeA, buyer1+int64(i))
+		spent, orders, ok := f.customer(f.storeA, buyer1+int64(i))
 		if !ok || spent != 0 || orders != 1 {
 			t.Fatalf("OF%d：row=%v total_spent=%d order_count=%d，預期 0、1", i, ok, spent, orders)
 		}
-		f.assertInvariant(storeA, buyer1+int64(i))
+		f.assertInvariant(f.storeA, buyer1+int64(i))
 	}
 	seedBuyers(t, f.db, buyer2+1000, buyer2+1000+int64(n)-1)
 	errs = parallel(2*n, func(i int) error {
 		o := fmt.Sprintf("OP%d", i/2)
 		buyer := buyer2 + 1000 + int64(i/2)
 		if i%2 == 0 {
-			_, err := f.order("evt-"+o, o, storeB, buyer, 1000)
+			_, err := f.order("evt-"+o, o, f.storeB, buyer, 1000)
 			return err
 		}
-		_, err := f.partial("REF-"+o, o, storeB, buyer, 300)
+		_, err := f.partial("REF-"+o, o, f.storeB, buyer, 300)
 		return err
 	})
 	noErrors(t, errs)
 	for i := 0; i < n; i++ {
-		if spent, _, _ := f.customer(storeB, buyer2+1000+int64(i)); spent != 700 {
+		if spent, _, _ := f.customer(f.storeB, buyer2+1000+int64(i)); spent != 700 {
 			t.Fatalf("OP%d：total_spent=%d，預期 700", i, spent)
 		}
 	}
@@ -200,21 +197,21 @@ func TestConcurrentOrdersOfOneCustomer(t *testing.T) {
 		o := fmt.Sprintf("C%d", k)
 		amount := int64(100 + k*7)
 		if i%2 == 0 {
-			_, err := f.order("evt-"+o, o, storeA, buyer1, amount)
+			_, err := f.order("evt-"+o, o, f.storeA, buyer1, amount)
 			return err
 		}
 		if k%3 != 0 {
 			return nil
 		}
-		_, err := f.partial("REF-"+o, o, storeA, buyer1, amount/4)
+		_, err := f.partial("REF-"+o, o, f.storeA, buyer1, amount/4)
 		return err
 	})
 	noErrors(t, errs)
-	spent, count, ok := f.customer(storeA, buyer1)
+	spent, count, ok := f.customer(f.storeA, buyer1)
 	if !ok || spent != want || count != orders {
 		t.Fatalf("row=%v total_spent=%d（期望 %d）order_count=%d（期望 %d）", ok, spent, want, count, orders)
 	}
-	f.assertInvariant(storeA, buyer1)
+	f.assertInvariant(f.storeA, buyer1)
 }
 
 // 驗證層：不合法的事件回 ErrInvalidEvent，什麼都不寫。
@@ -227,15 +224,15 @@ func TestInvalidEventsAreRejectedWithoutWrites(t *testing.T) {
 		long[i] = 'k'
 	}
 	bad := []func() error{
-		func() error { _, err := f.order("", "O1", storeA, buyer1, 10); return err },
-		func() error { _, err := f.order(string(long), "O1", storeA, buyer1, 10); return err },
-		func() error { _, err := f.order("e", "", storeA, buyer1, 10); return err },
+		func() error { _, err := f.order("", "O1", f.storeA, buyer1, 10); return err },
+		func() error { _, err := f.order(string(long), "O1", f.storeA, buyer1, 10); return err },
+		func() error { _, err := f.order("e", "", f.storeA, buyer1, 10); return err },
 		func() error { _, err := f.order("e", "O1", 0, buyer1, 10); return err },
-		func() error { _, err := f.order("e", "O1", storeA, -1, 10); return err },
-		func() error { _, err := f.order("e", "O1", storeA, buyer1, -10); return err },
-		func() error { _, err := f.partial("k", "O1", storeA, buyer1, 0); return err },
+		func() error { _, err := f.order("e", "O1", f.storeA, -1, 10); return err },
+		func() error { _, err := f.order("e", "O1", f.storeA, buyer1, -10); return err },
+		func() error { _, err := f.partial("k", "O1", f.storeA, buyer1, 0); return err },
 		func() error {
-			_, err := f.m.RecordRefund(ctx, crm.Refund{Key: "k", OrderNo: "O1", StoreID: storeA, BuyerID: buyer1, Outcome: "WHATEVER"})
+			_, err := f.m.RecordRefund(ctx, crm.Refund{Key: "k", OrderNo: "O1", StoreID: f.storeA, BuyerID: buyer1, Outcome: "WHATEVER"})
 			return err
 		},
 	}
@@ -253,11 +250,11 @@ func TestInvalidEventsAreRejectedWithoutWrites(t *testing.T) {
 func TestPartiesMismatchIsRejected(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 1000)
-	if _, err := f.partial("REF-1", "O1", storeA, buyer2, 100); !errors.Is(err, crm.ErrPartiesMismatch) {
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 1000)
+	if _, err := f.partial("REF-1", "O1", f.storeA, buyer2, 100); !errors.Is(err, crm.ErrPartiesMismatch) {
 		t.Fatalf("err=%v，預期 ErrPartiesMismatch", err)
 	}
-	if spent, _, _ := f.customer(storeA, buyer1); spent != 1000 {
+	if spent, _, _ := f.customer(f.storeA, buyer1); spent != 1000 {
 		t.Fatalf("total_spent=%d", spent)
 	}
 	if n := f.count("crm.ledger"); n != 1 {

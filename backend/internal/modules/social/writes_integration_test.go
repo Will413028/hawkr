@@ -364,7 +364,7 @@ func TestStoreWritesAreGatedByCapabilities(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
-	storeID, _ := f.exposableStore(t)
+	storeID, accountID := f.exposableStore(t)
 	live := f.store(t, storeID)
 	p := f.publishedPost(t, storeID, "貼文")
 	b := f.newBuyer(t)
@@ -395,7 +395,7 @@ func TestStoreWritesAreGatedByCapabilities(t *testing.T) {
 	if _, err := f.module.UnpublishPost(ctx, suspended, p.ID, p.Version, nil); err != nil {
 		t.Fatalf("停權時仍可下架自己的貼文：%v", err)
 	}
-	f.exec(t, "UPDATE seller.stores SET status = 'PENDING_DELETION' WHERE store_id = $1", storeID)
+	f.beginAccountDeletion(t, accountID)
 	if _, err := f.module.CreatePost(ctx, f.store(t, storeID), social.CreatePostInput{Body: "x"}, nil); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("等待刪除的店不能建立貼文：%v", err)
 	}

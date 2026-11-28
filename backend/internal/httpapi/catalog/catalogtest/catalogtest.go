@@ -1,5 +1,5 @@
-// Package catalogtest 是 catalog Connect handler 與買家「追蹤中」動態的 integration 測試共用的世界：真的 catalog 模組與資料庫，
-// 以及最小的 seller 資料（直接寫表），讓「店家可不可曝光」走真實的 seller.pub_exposable_stores。只給測試用。
+//go:build integration
+
 package catalogtest
 
 import (
@@ -12,16 +12,15 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
-
-// FirstStoreID 是第一家店的 store_id：與帳號 ID（從 1001 起）刻意拉開，誤把帳號 ID 當店家 ID 的實作會讀到別人的資料或找不到店。
-const FirstStoreID = 7000
 
 // Notifier 是測試用的補貨通知替身：job 不在這些測試執行（只有排入），兩個呼叫都是 no-op。
 type Notifier struct{}
@@ -48,6 +47,7 @@ type World struct {
 func New(t *testing.T, pg *testdb.Server) *World {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
@@ -55,11 +55,6 @@ func New(t *testing.T, pg *testdb.Server) *World {
 	))
 	w := &World{T: t, DB: d, Media: media.NewFake(), Bus: events.NewBus(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
 	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media, Events: w.Bus, Restock: Notifier{}})
-	w.Exec(`DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
-	w.Exec(fmt.Sprintf(`ALTER TABLE seller.stores ALTER COLUMN store_id RESTART WITH %d`, FirstStoreID))
 	return w
 }
 
@@ -81,29 +76,25 @@ func (w *World) Exec(sql string, args ...any) {
 // Store 建一家可以公開曝光的店（直接寫 seller 的表，最小的列），回傳 store_id 與帳號 ID。
 func (w *World) Store() (storeID, accountID int64) {
 	w.T.Helper()
+	ctx := context.Background()
 	w.mu.Lock()
 	w.seq++
-	accountID = 1000 + w.seq
 	w.mu.Unlock()
-	w.Exec(`INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $1, '測試店', 'logo/k', $3, '63000010', $2, $2)`, accountID, w.Now(), uuid.NewV7())
-	if err := w.DB.Pool().QueryRow(context.Background(), "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
+	var err error
+	if accountID, err = sellerfixture.NewAccount(ctx, w.DB, w.Now()); err != nil {
 		w.T.Fatal(err)
 	}
-	w.Exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, w.Now(), uuid.NewV7())
-	w.Exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, w.Now())
+	if storeID, err = sellerfixture.ExposableStoreNamed(ctx, w.DB, accountID, w.Now(), "測試店"); err != nil {
+		w.T.Fatal(err)
+	}
 	return storeID, accountID
 }
 
-// SetExposable 讓店家回到可曝光（true）或不可曝光（false，KYC 退回）。
 func (w *World) SetExposable(storeID int64, ok bool) {
 	w.T.Helper()
-	status := "APPROVED"
-	if !ok {
-		status = "REJECTED"
+	if err := sellerfixture.SetPayoutCapability(context.Background(), w.DB, storeID, w.Now(), ok); err != nil {
+		w.T.Fatal(err)
 	}
-	w.Exec("UPDATE seller.kyc_applications SET status = $2 WHERE store_id = $1", storeID, status)
 }
 
 // Leaf 是一個葉節點分類。

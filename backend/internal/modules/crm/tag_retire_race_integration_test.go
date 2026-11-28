@@ -31,13 +31,13 @@ func TestTagWriteInFlightAcrossStoreRetirementLeavesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer blocker.Rollback(ctx) //nolint:errcheck
-	if _, err := blocker.Exec(ctx, "INSERT INTO crm.tags (id, store_id, name, created_at, updated_at) VALUES ($1, $2, '卡住', $3, $3)", uuid.New(), storeB, epoch); err != nil {
+	if _, err := blocker.Exec(ctx, "INSERT INTO crm.tags (id, store_id, name, created_at, updated_at) VALUES ($1, $2, '卡住', $3, $3)", uuid.New(), f.storeB, epoch); err != nil {
 		t.Fatal(err)
 	}
 
 	written := make(chan error, 1)
 	go func() {
-		_, err := f.m.CreateTag(ctx, storeB, "卡住")
+		_, err := f.m.CreateTag(ctx, f.storeB, "卡住")
 		written <- err
 	}()
 	deadline := time.Now().Add(10 * time.Second)
@@ -57,10 +57,10 @@ func TestTagWriteInFlightAcrossStoreRetirementLeavesNothing(t *testing.T) {
 	waitUntil("寫入沒有卡在標籤的唯一鍵上", func() bool { return f.lockWaiters() >= 1 })
 
 	retired := make(chan error, 1)
-	go func() { retired <- f.retireStoreErr(storeB) }()
+	go func() { retired <- f.retireStoreErr(f.storeB) }()
 	erased := false
 	erase := func() {
-		if err := f.m.ErasePartyData(ctx, "STORE", storeB); err != nil {
+		if err := f.m.ErasePartyData(ctx, "STORE", f.storeB); err != nil {
 			t.Error(err)
 		}
 		erased = true
@@ -96,7 +96,7 @@ release:
 	if !erased {
 		erase()
 	}
-	if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1", storeB); n != 0 {
+	if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1", f.storeB); n != 0 {
 		t.Fatalf("店家退場並抹除之後還留下 %d 個標籤", n)
 	}
 }

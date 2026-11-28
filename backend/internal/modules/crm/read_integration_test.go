@@ -16,16 +16,16 @@ func (f *fixture) seedKeysetStore(base int64, n int) {
 	f.t.Helper()
 	for i := 0; i < n; i++ {
 		buyer := base + int64(i)
-		f.mustOrder(fmt.Sprintf("evt-%d-a", buyer), fmt.Sprintf("K%d-a", buyer), storeA, buyer, int64(100*(i%3+1)))
+		f.mustOrder(fmt.Sprintf("evt-%d-a", buyer), fmt.Sprintf("K%d-a", buyer), f.storeA, buyer, int64(100*(i%3+1)))
 		if i%2 == 0 {
-			f.mustOrder(fmt.Sprintf("evt-%d-b", buyer), fmt.Sprintf("K%d-b", buyer), storeA, buyer, 0)
+			f.mustOrder(fmt.Sprintf("evt-%d-b", buyer), fmt.Sprintf("K%d-b", buyer), f.storeA, buyer, 0)
 		}
 	}
 }
 
 func (f *fixture) allCustomers(in crm.CustomerListInput) []crm.Customer {
 	f.t.Helper()
-	in.StoreID = storeA
+	in.StoreID = f.storeA
 	in.Size = 4
 	var out []crm.Customer
 	for pages := 0; ; pages++ {
@@ -116,13 +116,13 @@ func TestListCustomersFilters(t *testing.T) {
 	ctx := context.Background()
 	f.seedKeysetStore(buyer1, 10)
 	for _, b := range []int64{buyer1, buyer1 + 3, buyer1 + 7} {
-		if _, err := f.m.SetCustomerType(ctx, storeA, b, crm.TypeVIP); err != nil {
+		if _, err := f.m.SetCustomerType(ctx, f.storeA, b, crm.TypeVIP); err != nil {
 			t.Fatal(err)
 		}
 	}
-	f.mustAddTags(storeA, buyer1+3, "常客")
-	f.mustAddTags(storeA, buyer1+4, "常客", "團購")
-	tags, _ := f.m.ListTags(ctx, storeA)
+	f.mustAddTags(f.storeA, buyer1+3, "常客")
+	f.mustAddTags(f.storeA, buyer1+4, "常客", "團購")
+	tags, _ := f.m.ListTags(ctx, f.storeA)
 	var regular crm.Tag
 	for _, tg := range tags {
 		if tg.Name == "常客" {
@@ -151,10 +151,10 @@ func TestListCustomersFilters(t *testing.T) {
 			t.Fatalf("買家 %d 的標籤 %+v", c.BuyerID, c.Tags)
 		}
 	}
-	if _, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeA, Type: ptr(crm.CustomerType("BLOCKLIST"))}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: f.storeA, Type: ptr(crm.CustomerType("BLOCKLIST"))}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("未知分類：err=%v，預期 InvalidInput", err)
 	}
-	other, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeB})
+	other, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: f.storeB})
 	if err != nil || len(other.Customers) != 0 || other.Next != nil {
 		t.Fatalf("店 B：%+v err=%v", other, err)
 	}
@@ -176,40 +176,40 @@ func TestSetCustomerType(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+	wantKind(t, errOnly(f.m.SetCustomerType(ctx, f.storeA, buyer1, crm.TypeVIP)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
 	for _, bad := range []crm.CustomerType{"BLOCKLIST", "blocklist", "", "vip", "ADMIN"} {
-		if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, bad); apperr.KindOf(err) != apperr.KindInvalidInput {
+		if _, err := f.m.SetCustomerType(ctx, f.storeA, buyer1, bad); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%q：err=%v，預期 InvalidInput", bad, err)
 		}
 	}
 	if _, err := f.db.Pool().Exec(ctx, "UPDATE crm.customers SET customer_type = 'BLOCKLIST'"); err == nil {
 		t.Fatal("DB 接受了 BLOCKLIST")
 	}
-	if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
+	if _, err := f.m.SetCustomerType(ctx, f.storeA, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
-	c, err := f.m.GetCustomer(ctx, storeA, buyer1)
+	c, err := f.m.GetCustomer(ctx, f.storeA, buyer1)
 	if err != nil || c.Type != crm.TypeVIP {
 		t.Fatalf("customer=%+v err=%v", c, err)
 	}
-	wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeVIP)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+	wantKind(t, errOnly(f.m.SetCustomerType(ctx, f.storeB, buyer1, crm.TypeVIP)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 }
 
 func TestGetCustomer(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, err := f.m.GetCustomer(ctx, storeA, buyer1)
+	_, err := f.m.GetCustomer(ctx, f.storeA, buyer1)
 	wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 800)
-	f.mustOrder("evt-2", "O2", storeA, buyer1, 200)
-	f.mustAddTags(storeA, buyer1, "乙", "甲")
-	c, err := f.m.GetCustomer(ctx, storeA, buyer1)
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 800)
+	f.mustOrder("evt-2", "O2", f.storeA, buyer1, 200)
+	f.mustAddTags(f.storeA, buyer1, "乙", "甲")
+	c, err := f.m.GetCustomer(ctx, f.storeA, buyer1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.StoreID != storeA || c.BuyerID != buyer1 || c.Type != crm.TypeNormal || c.TotalSpent != 1000 || c.OrderCount != 2 || c.FirstOrderAt.IsZero() {
+	if c.StoreID != f.storeA || c.BuyerID != buyer1 || c.Type != crm.TypeNormal || c.TotalSpent != 1000 || c.OrderCount != 2 || c.FirstOrderAt.IsZero() {
 		t.Fatalf("customer = %+v", c)
 	}
 	if len(c.Tags) != 2 || c.Tags[0].Name != "乙" && c.Tags[0].Name != "甲" {
@@ -226,31 +226,31 @@ func TestCustomersAmong(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	f.mustOrder("evt-2", "O2", storeB, buyer2, 100)
-	got, err := f.m.CustomersAmong(ctx, storeA, []int64{buyer1, buyer2, buyer1})
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	f.mustOrder("evt-2", "O2", f.storeB, buyer2, 100)
+	got, err := f.m.CustomersAmong(ctx, f.storeA, []int64{buyer1, buyer2, buyer1})
 	if err != nil || len(got) != 1 || !got[buyer1] {
 		t.Fatalf("got %v err=%v，預期只有 buyer1", got, err)
 	}
-	if got, err := f.m.CustomersAmong(ctx, storeA, nil); err != nil || got == nil || len(got) != 0 {
+	if got, err := f.m.CustomersAmong(ctx, f.storeA, nil); err != nil || got == nil || len(got) != 0 {
 		t.Fatalf("空清單：%v %v", got, err)
 	}
 	var tooMany []int64
 	for i := int64(1); i <= crm.MaxBuyerIDs+1; i++ {
 		tooMany = append(tooMany, i)
 	}
-	if _, err := f.m.CustomersAmong(ctx, storeA, tooMany); err == nil {
+	if _, err := f.m.CustomersAmong(ctx, f.storeA, tooMany); err == nil {
 		t.Fatal("超過上限要失敗")
 	}
-	if _, err := f.m.CustomersAmong(ctx, storeA, []int64{buyer1, 0}); err == nil {
+	if _, err := f.m.CustomersAmong(ctx, f.storeA, []int64{buyer1, 0}); err == nil {
 		t.Fatal("非正整數要失敗")
 	}
 	f.markInactive("BUYER", buyer1)
-	if got, err := f.m.CustomersAmong(ctx, storeA, []int64{buyer1}); err != nil || len(got) != 0 {
+	if got, err := f.m.CustomersAmong(ctx, f.storeA, []int64{buyer1}); err != nil || len(got) != 0 {
 		t.Fatalf("已關閉的買家：%v %v", got, err)
 	}
-	f.markInactive("STORE", storeB)
-	wantKind(t, errOnly(f.m.CustomersAmong(ctx, storeB, []int64{buyer2})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+	f.markInactive("STORE", f.storeB)
+	wantKind(t, errOnly(f.m.CustomersAmong(ctx, f.storeB, []int64{buyer2})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 }
 
 // VIPStatuses：混合有無客戶列的店；每個請求的店家都有一筆。
@@ -258,21 +258,21 @@ func TestVIPStatuses(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
-	f.mustOrder("evt-2", "O2", storeB, buyer1, 100)
-	f.mustOrder("evt-3", "O3", storeA, buyer2, 100)
-	if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
+	f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+	f.mustOrder("evt-2", "O2", f.storeB, buyer1, 100)
+	f.mustOrder("evt-3", "O3", f.storeA, buyer2, 100)
+	if _, err := f.m.SetCustomerType(ctx, f.storeA, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.SetCustomerType(ctx, storeA, buyer2, crm.TypeVIP); err != nil {
+	if _, err := f.m.SetCustomerType(ctx, f.storeA, buyer2, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
-	got, err := f.m.VIPStatuses(ctx, buyer1, []int64{storeA, storeB, storeC, storeA})
+	got, err := f.m.VIPStatuses(ctx, buyer1, []int64{f.storeA, f.storeB, f.storeC, f.storeA})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[int64]bool{storeA: true, storeB: false, storeC: false}
-	if len(got) != len(want) || got[storeA] != true || got[storeB] != false || got[storeC] != false {
+	want := map[int64]bool{f.storeA: true, f.storeB: false, f.storeC: false}
+	if len(got) != len(want) || got[f.storeA] != true || got[f.storeB] != false || got[f.storeC] != false {
 		t.Fatalf("got %v，預期 %v", got, want)
 	}
 	if got, err := f.m.VIPStatuses(ctx, buyer1, nil); err != nil || got == nil || len(got) != 0 {
@@ -285,7 +285,7 @@ func TestVIPStatuses(t *testing.T) {
 	if _, err := f.m.VIPStatuses(ctx, buyer1, tooMany); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("超過上限：err=%v", err)
 	}
-	if _, err := f.m.VIPStatuses(ctx, buyer1, []int64{storeA, 0}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.m.VIPStatuses(ctx, buyer1, []int64{f.storeA, 0}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("非正整數：err=%v", err)
 	}
 }

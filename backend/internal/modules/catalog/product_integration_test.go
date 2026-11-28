@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -43,6 +44,7 @@ type productFixture struct {
 func newProductFixture(t *testing.T) *productFixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
@@ -52,10 +54,6 @@ func newProductFixture(t *testing.T) *productFixture {
 	f.rn = &recordingNotifier{}
 	f.bus = events.NewBus()
 	f.m = New(f.deps(d, f.media))
-	f.exec(`DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
 }
 
@@ -103,8 +101,11 @@ func (f *productFixture) leaf() uuid.UUID {
 func (f *productFixture) store() (storeID, accountID int64) {
 	f.t.Helper()
 	f.seq++
-	accountID = 1000 + f.seq
 	var err error
+	accountID, err = sellerfixture.NewAccount(f.ct, f.d, f.clock())
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	storeID, err = sellerfixture.ExposableStore(f.ct, f.d, accountID, f.clock())
 	if err != nil {
 		f.t.Fatal(err)
@@ -114,11 +115,9 @@ func (f *productFixture) store() (storeID, accountID int64) {
 
 func (f *productFixture) setExposable(storeID int64, ok bool) {
 	f.t.Helper()
-	status := "APPROVED"
-	if !ok {
-		status = "REJECTED"
+	if err := sellerfixture.SetPayoutCapability(f.ct, f.d, storeID, f.clock(), ok); err != nil {
+		f.t.Fatal(err)
 	}
-	f.exec("UPDATE seller.kyc_applications SET status = $2 WHERE store_id = $1", storeID, status)
 }
 
 func (f *productFixture) input(title string) ProductInput {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 func (f *fixture) blockBuyer(t *testing.T, blocker, target buyerP) {
@@ -39,7 +40,9 @@ func (f *fixture) unblockStore(t *testing.T, blocker buyerP, storeID int64) {
 
 func (f *fixture) storeBlocksBuyer(t *testing.T, storeID int64, b buyerP) {
 	t.Helper()
-	f.exec(t, "INSERT INTO seller.store_blocks (store_id, buyer_id, created_at) VALUES ($1, $2, $3)", storeID, b.BuyerID, f.clock())
+	if err := sellerfixture.BlockBuyer(context.Background(), f.db, storeID, b.BuyerID, f.clock()); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func commentIDs(p social.CommentPage) []uuid.UUID {

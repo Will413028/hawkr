@@ -106,12 +106,6 @@ func build(t *testing.T, withSocial bool) *fixture {
 		})
 		f.social = f.realSocial
 		f.catalog = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return f.now }, Media: f.media, Events: f.bus, Restock: noRestock{}})
-		if _, err := d.Conn(context.Background()).Exec(context.Background(), `DO $$ DECLARE r record; BEGIN
-			FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-			         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-			LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`); err != nil {
-			t.Fatal(err)
-		}
 	}
 	f.m = f.newDelegation()
 	events.Subscribe(f.bus, f.m.OnAdminRoleRevoked)

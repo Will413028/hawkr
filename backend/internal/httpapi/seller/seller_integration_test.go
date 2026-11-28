@@ -48,7 +48,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
-	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -711,10 +710,8 @@ func TestGetMyStoreShowsASuspensionRecordedOnAnEarlierStint(t *testing.T) {
 	if _, err := f.module.CloseCurrent(ctx, f.accountID); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.inTx(ctx, func(ctx context.Context) error {
-		tx, _ := db.TxFrom(ctx)
-		_, err := tx.Exec(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES ($1, $2, '新店', now(), now())`, old.StoreCode+1, f.accountID)
-		return err
+	if _, err := f.module.Apply(ctx, seller.ApplyInput{
+		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: f.accountID, StoreName: "新店", TownCode: "63000050", AddressDetail: "測試路二號",
 	}); err != nil {
 		t.Fatal(err)
 	}

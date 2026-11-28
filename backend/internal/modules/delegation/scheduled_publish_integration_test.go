@@ -15,6 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 func (f *fixture) next() int64 {
@@ -31,16 +32,14 @@ func (f *fixture) exec(t *testing.T, sql string, args ...any) {
 
 func (f *fixture) exposableStore(t *testing.T) int64 {
 	t.Helper()
-	account := f.next() + 5000
-	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $2, '測試店', 'logo/k', uuidv7(), '63000010', $3, $3)`, account, account, f.now)
-	var storeID int64
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT store_id FROM seller.stores WHERE account_id = $1", account).Scan(&storeID); err != nil {
+	account, err := sellerfixture.NewAccount(context.Background(), f.db, f.now)
+	if err != nil {
 		t.Fatal(err)
 	}
-	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.now, uuid.NewV7())
-	f.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.now)
+	storeID, err := sellerfixture.ExposableStoreNamed(context.Background(), f.db, account, f.now, fmt.Sprintf("測試店 %d", f.next()))
+	if err != nil {
+		t.Fatal(err)
+	}
 	return storeID
 }
 

@@ -483,8 +483,10 @@ func TestRetiredStoreCannotSubmitAsReporter(t *testing.T) {
 	if _, err := f.seller.CloseCurrent(ctx, storeAccount); err != nil {
 		t.Fatalf("關店：%v", err)
 	}
-	f.exec(t, `UPDATE seller.stores SET retired_at = $2, description = NULL, prize = NULL, website_url = NULL,
-		logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, storeID, f.clock())
+	f.advance(seller.StoreRetention + time.Second)
+	if _, err := f.seller.PurgePII(ctx); err != nil {
+		t.Fatal(err)
+	}
 	counts := func() (reports, requests, submitted int) {
 		reports = f.count(t, "SELECT count(*) FROM moderation.reports WHERE reporter_store_id = $1", storeID)
 		requests = f.count(t, "SELECT count(*) FROM moderation.report_requests WHERE reporter_store_id = $1", storeID)

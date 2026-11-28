@@ -19,31 +19,42 @@ import (
 
 var epoch = time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
 
-const (
-	stockStoreID      = int64(501)
-	stockAccountID    = int64(1001)
-	stockOtherStoreID = int64(502)
-	stockOtherAccount = int64(1002)
-)
-
 type fixture struct {
-	t        *testing.T
-	d        *db.DB
-	m        *Module
-	ct       context.Context
-	rn       *recordingNotifier
-	products *productFixture
+	t              *testing.T
+	d              *db.DB
+	m              *Module
+	ct             context.Context
+	rn             *recordingNotifier
+	products       *productFixture
+	storeID        int64
+	accountID      int64
+	otherStoreID   int64
+	otherAccountID int64
 }
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	products := newProductFixture(t)
-	for _, store := range []struct{ id, accountID int64 }{{stockStoreID, stockAccountID}, {stockOtherStoreID, stockOtherAccount}} {
-		if err := sellerfixture.ExposableStoreWithID(products.ct, products.d, store.id, store.accountID, epoch); err != nil {
-			t.Fatal(err)
-		}
+	accountID, err := sellerfixture.NewAccount(products.ct, products.d, epoch)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return &fixture{t: t, d: products.d, m: products.m, ct: products.ct, rn: products.rn, products: products}
+	storeID, err := sellerfixture.ExposableStore(products.ct, products.d, accountID, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherAccountID, err := sellerfixture.NewAccount(products.ct, products.d, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherStoreID, err := sellerfixture.ExposableStore(products.ct, products.d, otherAccountID, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fixture{
+		t: t, d: products.d, m: products.m, ct: products.ct, rn: products.rn, products: products,
+		storeID: storeID, accountID: accountID, otherStoreID: otherStoreID, otherAccountID: otherAccountID,
+	}
 }
 
 func (f *fixture) exec(sql string, args ...any) error {
@@ -62,8 +73,8 @@ func (f *fixture) sku(qty int) uuid.UUID {
 	f.t.Helper()
 	in := f.products.input("庫存測試")
 	in.Skus[0].StockQty = int32(qty)
-	p := f.products.create(stockStoreID, stockAccountID, in)
-	f.products.activate(stockStoreID, p.ID)
+	p := f.products.create(f.storeID, f.accountID, in)
+	f.products.activate(f.storeID, p.ID)
 	return p.Skus[0].ID
 }
 

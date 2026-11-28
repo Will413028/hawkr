@@ -27,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 type visibilityFixture struct {
@@ -63,10 +64,6 @@ func newVisibilityFixture(t *testing.T) *visibilityFixture {
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, clock), Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	f.catalog = catalog.New(catalog.Deps{DB: d, Events: bus, NewID: uuid.NewV7, Now: clock, Media: media.NewFake(), Restock: catalogRestock{buyer: buyers}})
-	f.exec(`DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
 }
 
@@ -80,18 +77,13 @@ func (f *visibilityFixture) exec(sql string, args ...any) {
 func (f *visibilityFixture) store() (storeID, accountID int64) {
 	f.t.Helper()
 	ctx := context.Background()
-	if err := f.d.Pool().QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
+	var err error
+	if accountID, err = sellerfixture.NewAccount(ctx, f.d, f.now); err != nil {
 		f.t.Fatal(err)
 	}
-	f.exec(`INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $1, '測試店', 'logo/k', $3, '63000010', $2, $2)`, accountID, f.now, uuid.NewV7())
-	if err := f.d.Pool().QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
+	if storeID, err = sellerfixture.ExposableStore(ctx, f.d, accountID, f.now); err != nil {
 		f.t.Fatal(err)
 	}
-	f.exec(`INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
-	f.exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.now, uuid.NewV7())
-	f.exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.now)
 	return storeID, accountID
 }
 

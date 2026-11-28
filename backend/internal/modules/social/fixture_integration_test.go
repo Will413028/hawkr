@@ -19,6 +19,7 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -31,6 +32,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -210,23 +212,30 @@ func (e *eventLog) canceledEvents() []social.PostScheduleCanceled {
 }
 
 type fixture struct {
-	db       *db.DB
-	module   *social.Module
-	buyers   *buyer.Module
-	sellers  *seller.Reader
-	bus      *events.Bus
-	jobs     *queue
-	media    *media.Module
-	posts    *autoMedia
-	products *products
-	deleg    *scheduleAuth
-	events   *eventLog
+	db        *db.DB
+	module    *social.Module
+	deletion  *accountdeletion.Module
+	sellerMod *seller.Module
+	buyers    *buyer.Module
+	sellers   *seller.Reader
+	bus       *events.Bus
+	jobs      *queue
+	media     *media.Module
+	posts     *autoMedia
+	products  *products
+	deleg     *scheduleAuth
+	events    *eventLog
 
 	mu   sync.Mutex
 	now  time.Time
 	ids  atomic.Int64
 	logs syncBuffer
 }
+
+type pendingStoreOrders struct{}
+
+func (pendingStoreOrders) HasOpenOrders(context.Context, int64) (bool, error)      { return false, nil }
+func (pendingStoreOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return true, nil }
 
 type syncBuffer struct {
 	mu sync.Mutex
@@ -260,9 +269,11 @@ func (f *fixture) advance(d time.Duration) {
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
+		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()},
 		migrate.Module{Name: "social", Dir: social.Migrations()},
 	))
 	f := &fixture{
@@ -279,6 +290,10 @@ func setup(t *testing.T) *fixture {
 	f.posts = &autoMedia{Module: f.media, tokens: map[string]string{}}
 	f.buyers = buyer.New(buyer.Deps{DB: database, Events: f.bus, Media: f.media, Now: f.clock, Logger: logger})
 	f.sellers = seller.NewReader(database, f.clock)
+	f.sellerMod, err = sellerfixture.NewModuleWithEvents(database, f.bus, f.clock)
+	if err != nil {
+		t.Fatal(err)
+	}
 	f.module = social.New(social.Deps{
 		DB: database, Events: f.bus, Media: f.posts, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, StoreBlocks: storeBlocksFromTable{database}, Products: f.products,
 		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: f.deleg},
@@ -290,6 +305,10 @@ func setup(t *testing.T) *fixture {
 		f.events.published = append(f.events.published, e)
 		return nil
 	})
+	f.deletion = accountdeletion.New(accountdeletion.Deps{
+		DB: database, Identity: identity.New(identity.Deps{DB: database, Events: f.bus, Now: f.clock}),
+		Buyer: f.buyers, Seller: f.sellerMod, Orders: pendingStoreOrders{}, Now: f.clock,
+	})
 	events.Subscribe(f.bus, func(_ context.Context, e social.PostScheduleCanceled) error {
 		f.events.mu.Lock()
 		defer f.events.mu.Unlock()
@@ -299,10 +318,6 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(f.bus, f.module.OnBuyerDeletionRequested)
 	events.Subscribe(f.bus, f.module.OnBuyerDeleted)
 	events.Subscribe(f.bus, f.module.OnStoreRetired)
-	f.exec(t, `DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
 }
 
@@ -326,23 +341,34 @@ func (f *fixture) next() int64 { return f.ids.Add(1) + 100 }
 
 func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
-	accountID = f.next()
-	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $2, '測試店', 'logo/k', $4, '63000010', $3, $3)`, accountID, accountID, f.clock(), uuid.NewV7())
-	storeID = f.scalar(t, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID)
-	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
-	f.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.clock())
+	ctx := context.Background()
+	var err error
+	if accountID, err = sellerfixture.NewAccount(ctx, f.db, f.clock()); err != nil {
+		t.Fatal(err)
+	}
+	if storeID, err = sellerfixture.ExposableStore(ctx, f.db, accountID, f.clock()); err != nil {
+		t.Fatal(err)
+	}
 	return storeID, accountID
 }
 
 func (f *fixture) setExposable(t *testing.T, storeID int64, ok bool) {
 	t.Helper()
-	status := "APPROVED"
-	if !ok {
-		status = "REJECTED"
+	if err := sellerfixture.SetPayoutCapability(context.Background(), f.db, storeID, f.clock(), ok); err != nil {
+		t.Fatal(err)
 	}
-	f.exec(t, "UPDATE seller.kyc_applications SET status = $2 WHERE store_id = $1", storeID, status)
+}
+
+func (f *fixture) beginAccountDeletion(t *testing.T, accountID int64) {
+	t.Helper()
+	ctx := context.Background()
+	if err := f.buyers.OnAccountCreated(ctx, identity.AccountCreated{AccountID: accountID, Name: "店家"}); err != nil {
+		t.Fatal(err)
+	}
+	state, err := f.deletion.Request(ctx, accountdeletion.RequestInput{AccountID: accountID, Requester: accountdeletion.AccountOwner})
+	if err != nil || state != accountdeletion.PendingOrders {
+		t.Fatalf("刪帳申請 state=%s err=%v，預期等待未完成訂單", state, err)
+	}
 }
 
 func (f *fixture) store(t *testing.T, storeID int64) seller.Store {

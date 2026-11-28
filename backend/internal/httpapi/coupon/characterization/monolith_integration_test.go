@@ -47,6 +47,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -83,28 +84,9 @@ func newMedia() *media.Fake { return media.NewFake() }
 
 func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	t.Helper()
-	ctx := context.Background()
-	exec := func(sql string, args ...any) {
-		t.Helper()
-		if _, err := d.Conn(ctx).Exec(ctx, sql, args...); err != nil {
-			t.Fatalf("%v\n%s", err, sql)
-		}
-	}
-	now := time.Now()
-	exec(`DO $$ DECLARE r record; BEGIN
-		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
-		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
-		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
-	exec(`INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $2, '測試店', 'logo/k', uuidv7(), '63000010', $3, $3)`, accountID, accountID, now)
-	var storeID int64
-	if err := d.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
+	if _, err := sellerfixture.ExposableStore(context.Background(), d, accountID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	exec(`INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
-	exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
-		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, now, uuid.NewV7())
-	exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
 }
 
 type sellerStores struct{ sellers *seller.Module }
