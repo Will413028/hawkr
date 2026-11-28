@@ -13,5 +13,5 @@ if [[ -z "$from" || "$from" =~ ^0+$ ]]; then
 fi
 range="${from:+$from..}$to"
 
-exec gitleaks git --config .gitleaks.toml --baseline-path .gitleaks-baseline.json \
+exec gitleaks git --config .gitleaks.toml \
   --redact --no-banner --log-opts="$range --not --remotes=origin" .
