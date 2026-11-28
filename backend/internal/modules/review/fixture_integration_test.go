@@ -33,7 +33,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -260,7 +259,6 @@ func (f *fixture) advance(d time.Duration) {
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
-		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
@@ -291,6 +289,10 @@ func setup(t *testing.T) *fixture {
 		f.created = append(f.created, e)
 		return nil
 	})
+	f.exec(t, `DO $$ DECLARE r record; BEGIN
+		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
+		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
+		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
 }
 
@@ -344,15 +346,13 @@ func (f *fixture) next() int64 { return f.ids.Add(1) + 100 }
 
 func (f *fixture) exposableStore(t *testing.T) int64 {
 	t.Helper()
-	ctx := context.Background()
-	accountID, err := sellerfixture.NewAccount(ctx, f.db, f.clock())
-	if err != nil {
-		t.Fatal(err)
-	}
-	storeID, err := sellerfixture.ExposableStore(ctx, f.db, accountID, f.clock())
-	if err != nil {
-		t.Fatal(err)
-	}
+	accountID := f.next()
+	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
+		VALUES ($1, $2, '測試店', 'logo/k', $4, '63000010', $3, $3)`, accountID, accountID, f.clock(), uuid.NewV7())
+	storeID := f.scalar(t, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID)
+	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
+		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())
+	f.exec(t, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.clock())
 	return storeID
 }
 

@@ -24,7 +24,7 @@ func TestCustomerWriteWaitsForBuyerClosureAndWritesNothing(t *testing.T) {
 		{
 			"SetCustomerType",
 			func(f *fixture) error {
-				return errOnly(f.m.SetCustomerType(context.Background(), f.storeA, buyer1, crm.TypeVIP))
+				return errOnly(f.m.SetCustomerType(context.Background(), storeA, buyer1, crm.TypeVIP))
 			},
 			func(f *fixture) bool {
 				return f.scalar("SELECT count(*) FROM crm.customers WHERE customer_type <> 'NORMAL'") == 0
@@ -33,7 +33,7 @@ func TestCustomerWriteWaitsForBuyerClosureAndWritesNothing(t *testing.T) {
 		{
 			"AddCustomerTags",
 			func(f *fixture) error {
-				return errOnly(f.m.AddCustomerTags(context.Background(), f.storeA, buyer1, []string{"晚到"}))
+				return errOnly(f.m.AddCustomerTags(context.Background(), storeA, buyer1, []string{"晚到"}))
 			},
 			func(f *fixture) bool {
 				return f.count("crm.tags") == 0 && f.count("crm.customer_tags") == 0
@@ -44,7 +44,7 @@ func TestCustomerWriteWaitsForBuyerClosureAndWritesNothing(t *testing.T) {
 			t.Parallel()
 			f := setup(t)
 			ctx := context.Background()
-			f.mustOrder("evt-1", "O1", f.storeA, buyer1, 100)
+			f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
 
 			closer, err := f.db.Pool().Begin(ctx)
 			if err != nil {

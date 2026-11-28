@@ -26,6 +26,8 @@ import (
 const (
 	b1 = int64(11)
 	b2 = int64(12)
+	s1 = int64(22)
+	s2 = int64(23)
 )
 
 // seq：兩個 goroutine 對同一個（還不存在的）對話並行送 50 則，seq 是 1..100 且不重複，對話只有一列；結束時寄件人各自那一方的游標等於
@@ -51,8 +53,8 @@ func TestSeqIsConsecutiveUnderConcurrentFirstSends(t *testing.T) {
 		}
 	}
 	wg.Add(2)
-	go send(f.buyerParty(b1), f.s1)
-	go send(f.storeParty(t, f.s1), b1)
+	go send(f.buyerParty(b1), s1)
+	go send(f.storeParty(t, s1), b1)
 	wg.Wait()
 	if t.Failed() {
 		return
@@ -83,10 +85,10 @@ func TestUnreadEquationAndMarkRead(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	for i := range 3 {
-		f.say(t, f.buyerParty(b1), f.s1, fmt.Sprintf("m%d", i))
+		f.say(t, f.buyerParty(b1), s1, fmt.Sprintf("m%d", i))
 	}
-	conv := f.conversation(t, b1, f.s1)
-	store := f.storeParty(t, f.s1)
+	conv := f.conversation(t, b1, s1)
+	store := f.storeParty(t, s1)
 	buyerP := f.buyerParty(b1)
 	unread := func(p im.Party) int64 {
 		n, err := f.m.UnreadTotal(ctx, p)
@@ -125,7 +127,7 @@ func TestUnreadEquationAndMarkRead(t *testing.T) {
 			t.Fatalf("CHECK 要擋下：%s", sql)
 		}
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "again")
+	f.say(t, f.buyerParty(b1), s1, "again")
 	if err := f.m.MarkAllRead(ctx, store); err != nil {
 		t.Fatal(err)
 	}
@@ -139,15 +141,15 @@ func TestReadsDoNotMoveTheReadCursors(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "a")
-	f.say(t, f.storeParty(t, f.s1), b1, "b")
-	f.say(t, f.buyerParty(b1), f.s1, "c")
-	conv := f.conversation(t, b1, f.s1)
+	f.say(t, f.buyerParty(b1), s1, "a")
+	f.say(t, f.storeParty(t, s1), b1, "b")
+	f.say(t, f.buyerParty(b1), s1, "c")
+	conv := f.conversation(t, b1, s1)
 	cursors := func() [2]int64 {
 		return [2]int64{f.scalar(t, "SELECT buyer_last_read_seq FROM im.conversations"), f.scalar(t, "SELECT store_last_read_seq FROM im.conversations")}
 	}
 	before := cursors()
-	for _, p := range []im.Party{f.buyerParty(b1), f.storeParty(t, f.s1)} {
+	for _, p := range []im.Party{f.buyerParty(b1), f.storeParty(t, s1)} {
 		if _, err := f.m.ListMessages(ctx, conv, p, 0, 10); err != nil {
 			t.Fatal(err)
 		}
@@ -172,9 +174,9 @@ func TestListMessagesKeysetPagesAreStable(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	for i := range 25 {
-		f.say(t, f.buyerParty(b1), f.s1, fmt.Sprintf("m%d", i))
+		f.say(t, f.buyerParty(b1), s1, fmt.Sprintf("m%d", i))
 	}
-	conv := f.conversation(t, b1, f.s1)
+	conv := f.conversation(t, b1, s1)
 	p := f.buyerParty(b1)
 	var seen []int64
 	var before int64
@@ -194,7 +196,7 @@ func TestListMessagesKeysetPagesAreStable(t *testing.T) {
 		}
 		before = got.Items[len(got.Items)-1].Seq
 		if page == 0 {
-			f.say(t, f.buyerParty(b1), f.s1, "inserted between pages")
+			f.say(t, f.buyerParty(b1), s1, "inserted between pages")
 		}
 	}
 	if len(seen) != 25 {
@@ -216,9 +218,9 @@ func TestConversationAuthorizationIsByIDAndSide(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "hi")
-	conv := f.conversation(t, b1, f.s1)
-	wrong := []im.Party{f.buyerParty(b2), f.buyerParty(f.s1), f.storeParty(t, f.s2), f.storeParty(t, b1)}
+	f.say(t, f.buyerParty(b1), s1, "hi")
+	conv := f.conversation(t, b1, s1)
+	wrong := []im.Party{f.buyerParty(b2), f.buyerParty(s1), f.storeParty(t, s2), f.storeParty(t, b1)}
 	for i, p := range wrong {
 		if _, err := f.m.ListMessages(ctx, conv, p, 0, 10); kindOf(err) != apperr.KindNotFound {
 			t.Fatalf("案例 %d ListMessages：%v", i, err)
@@ -253,7 +255,7 @@ func TestSendFailsClosedAndWritesNothing(t *testing.T) {
 	t.Run("store lookup fails", func(t *testing.T) {
 		f := setup(t)
 		f.stores.err = fmt.Errorf("seller down")
-		_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "hi"})
+		_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "hi"})
 		if kindOf(err) != apperr.KindUnavailable {
 			t.Fatalf("err = %v", err)
 		}
@@ -265,7 +267,7 @@ func TestSendFailsClosedAndWritesNothing(t *testing.T) {
 		f := setup(t)
 		f.buyers.blocking = true
 		f.orders.err = fmt.Errorf("order-service down")
-		_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "hi"})
+		_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "hi"})
 		if kindOf(err) != apperr.KindUnavailable {
 			t.Fatalf("err = %v", err)
 		}
@@ -277,7 +279,7 @@ func TestSendFailsClosedAndWritesNothing(t *testing.T) {
 		f := setup(t)
 		f.stores.block = true
 		f.orders.open = true
-		f.say(t, f.storeParty(t, f.s1), b1, "about your order")
+		f.say(t, f.storeParty(t, s1), b1, "about your order")
 	})
 }
 
@@ -286,8 +288,8 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "first")
-	last := f.say(t, f.buyerParty(b1), f.s1, "秘密內容")
+	f.say(t, f.buyerParty(b1), s1, "first")
+	last := f.say(t, f.buyerParty(b1), s1, "秘密內容")
 	p := f.buyerParty(b1)
 	preview := func() im.Preview {
 		page, err := f.m.ListConversations(ctx, p, nil, 10)
@@ -309,7 +311,7 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	if pv := preview(); !pv.Hidden || pv.Text != nil {
 		t.Fatalf("隱藏後的預覽洩漏內容：%+v", pv)
 	}
-	msgs, err := f.m.ListMessages(ctx, f.conversation(t, b1, f.s1), p, 0, 10)
+	msgs, err := f.m.ListMessages(ctx, f.conversation(t, b1, s1), p, 0, 10)
 	if err != nil || !msgs.Items[0].Hidden || msgs.Items[0].Text != nil {
 		t.Fatalf("隱藏的訊息要回墓碑：%+v %v", msgs, err)
 	}
@@ -326,7 +328,7 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	if err := f.m.ErasePartyMessages(ctx, im.PartyBuyer, b1); err != nil {
 		t.Fatal(err)
 	}
-	p = f.storeParty(t, f.s1)
+	p = f.storeParty(t, s1)
 	if pv := preview(); !pv.Erased || pv.Text != nil {
 		t.Fatalf("抹除後的預覽：%+v", pv)
 	}
@@ -340,18 +342,16 @@ func (f *fixture) buyerDeleted(t *testing.T, buyerID int64) {
 	}
 }
 
-func (f *fixture) storeRetired(t *testing.T, storeID int64) {
+func (f *fixture) storeRetired(t *testing.T, storeID, accountID int64) {
 	t.Helper()
 	ctx := context.Background()
-	store, err := f.stores.owner.Store(ctx, storeID)
+	err := f.db.InTx(ctx, func(ctx context.Context) error {
+		if err := closeStoreRows(ctx, f.db, storeID); err != nil {
+			return err
+		}
+		return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), OccurredAt: f.clock(), StoreID: storeID, AccountID: accountID})
+	})
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.stores.owner.CloseCurrent(ctx, store.AccountID); err != nil {
-		t.Fatal(err)
-	}
-	f.advance(seller.StoreRetention + time.Second)
-	if _, err := f.stores.owner.PurgePII(ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -368,11 +368,11 @@ func TestErasureIsPerIdentity(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.buyers.accounts[b1] = 5000
-	f.stores.byID[f.s1] = activeStore(f.s1, 5000)
-	f.say(t, f.buyerParty(b1), f.s2, "buyer identity message")
-	f.say(t, f.storeParty(t, f.s1), b2, "store identity message")
-	f.say(t, f.buyerParty(b2), f.s1, "other buyer")
-	f.say(t, f.storeParty(t, f.s2), b1, "other store")
+	f.stores.byID[s1] = activeStore(s1, 5000)
+	f.say(t, f.buyerParty(b1), s2, "buyer identity message")
+	f.say(t, f.storeParty(t, s1), b2, "store identity message")
+	f.say(t, f.buyerParty(b2), s1, "other buyer")
+	f.say(t, f.storeParty(t, s2), b1, "other store")
 
 	f.buyerDeleted(t, b1)
 	if err := f.m.ErasePartyMessages(ctx, im.PartyBuyer, b1); err != nil {
@@ -381,15 +381,15 @@ func TestErasureIsPerIdentity(t *testing.T) {
 	if got := f.scalar(t, "SELECT count(*) FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id WHERE c.buyer_id = $1 AND m.sender_kind = 'BUYER' AND m.erased_at IS NOT NULL", b1); got != 1 {
 		t.Fatalf("買家 11 寄的訊息要被抹除：%d", got)
 	}
-	if got := f.scalar(t, "SELECT count(*) FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id WHERE c.store_id = $1 AND m.sender_kind = 'STORE' AND m.erased_at IS NULL", f.s1); got != 1 {
+	if got := f.scalar(t, "SELECT count(*) FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id WHERE c.store_id = $1 AND m.sender_kind = 'STORE' AND m.erased_at IS NULL", s1); got != 1 {
 		t.Fatalf("同一個帳號的店家身分寄的訊息要還在：%d", got)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM im.messages WHERE erased_at IS NOT NULL"); n != 1 {
 		t.Fatalf("只該抹一則：%d", n)
 	}
 
-	f.storeRetired(t, f.s1)
-	if err := f.m.ErasePartyMessages(ctx, im.PartyStore, f.s1); err != nil {
+	f.storeRetired(t, s1, 5000)
+	if err := f.m.ErasePartyMessages(ctx, im.PartyStore, s1); err != nil {
 		t.Fatal(err)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM im.messages WHERE erased_at IS NOT NULL"); n != 2 {
@@ -409,8 +409,8 @@ func TestPartiesCannotSendOrReceiveAfterClosedOrRetired(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "hi")
-	f.say(t, f.buyerParty(b2), f.s2, "to the store that will retire")
+	f.say(t, f.buyerParty(b1), s1, "hi")
+	f.say(t, f.buyerParty(b2), s2, "to the store that will retire")
 	var relayID uuid.UUID
 	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT m.id FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id WHERE c.buyer_id = $1 AND m.sender_kind = 'BUYER'", b2).Scan(&relayID); err != nil {
 		t.Fatal(err)
@@ -420,20 +420,20 @@ func TestPartiesCannotSendOrReceiveAfterClosedOrRetired(t *testing.T) {
 	}
 
 	f.buyerDeleted(t, b1)
-	if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "again"}); kindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "again"}); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("已關閉的寄件人：%v", err)
 	}
-	_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.storeParty(t, f.s1), CounterpartID: b1, Type: im.TypeText, Text: "anyone there"})
+	_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.storeParty(t, s1), CounterpartID: b1, Type: im.TypeText, Text: "anyone there"})
 	if kindOf(err) != apperr.KindFailedPrecondition || im.ReasonOf(err) != im.ReasonReceiverDeleted {
 		t.Fatalf("寄給已關閉者：%v", err)
 	}
 
-	f.storeRetired(t, f.s2)
-	_, err = f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b2), CounterpartID: f.s2, Type: im.TypeText, Text: "to retired"})
+	f.storeRetired(t, s2, 2000+s2)
+	_, err = f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b2), CounterpartID: s2, Type: im.TypeText, Text: "to retired"})
 	if kindOf(err) != apperr.KindFailedPrecondition || im.ReasonOf(err) != im.ReasonReceiverDeleted {
 		t.Fatalf("寄給已退場的店：%v", err)
 	}
-	_, err = f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.storeParty(t, f.s2), CounterpartID: b2, Type: im.TypeText, Text: "from retired"})
+	_, err = f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.storeParty(t, s2), CounterpartID: b2, Type: im.TypeText, Text: "from retired"})
 	if kindOf(err) != apperr.KindFailedPrecondition || im.ReasonOf(err) == im.ReasonReceiverDeleted {
 		t.Fatalf("已退場的寄件人要是寄件人已停用，不是 RECEIVER_DELETED：%v", err)
 	}
@@ -464,12 +464,12 @@ func TestPendingDeletionBuyerCanStillSend(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "before")
+	f.say(t, f.buyerParty(b1), s1, "before")
 	if err := f.buyers.owner.BeginDeletion(ctx, b1); err != nil {
 		t.Fatal(err)
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "buyer while pending")
-	f.say(t, f.storeParty(t, f.s1), b1, "store to pending buyer")
+	f.say(t, f.buyerParty(b1), s1, "buyer while pending")
+	f.say(t, f.storeParty(t, s1), b1, "store to pending buyer")
 	if n := f.jobs.count("im.erase_party"); n != 0 {
 		t.Fatalf("刪除申請不排抹除 job：%d", n)
 	}
@@ -480,7 +480,7 @@ func TestPendingDeletionBuyerCanStillSend(t *testing.T) {
 	if n := f.jobs.count("im.erase_party"); n != 1 {
 		t.Fatalf("關閉之後才排抹除 job：%d", n)
 	}
-	if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "after"}); kindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "after"}); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("關閉之後被擋：%v", err)
 	}
 }
@@ -491,7 +491,7 @@ func TestSendCallsOrdersOutsideTheWriteTransaction(t *testing.T) {
 	f := setup(t)
 	f.stores.block = true
 	f.orders.open = true
-	f.say(t, f.buyerParty(b1), f.s1, "blocked but open order")
+	f.say(t, f.buyerParty(b1), s1, "blocked but open order")
 	f.orders.mu.Lock()
 	defer f.orders.mu.Unlock()
 	if f.orders.calls == 0 {
@@ -506,7 +506,7 @@ func TestSendCallsOrdersOutsideTheWriteTransaction(t *testing.T) {
 func TestSubscriberEnqueuesTheEraseJob(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.say(t, f.buyerParty(b1), f.s1, "hi")
+	f.say(t, f.buyerParty(b1), s1, "hi")
 	f.buyerDeleted(t, b1)
 	if n := f.jobs.count("im.erase_party"); n != 1 {
 		t.Fatalf("抹除 job %d 個", n)
@@ -521,8 +521,8 @@ func TestEraseJobBatchesAndIsRerunnable(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "seed")
-	conv := f.conversation(t, b1, f.s1)
+	f.say(t, f.buyerParty(b1), s1, "seed")
+	conv := f.conversation(t, b1, s1)
 	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
 		SELECT uuidv7(), $1, 1 + g, 'BUYER', 'TEXT', 'bulk ' || g, now(), gen_random_uuid() FROM generate_series(1, 450) AS g`, conv)
 	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
@@ -559,7 +559,7 @@ func TestSweepRequeuesDroppedEraseJobs(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "hi")
+	f.say(t, f.buyerParty(b1), s1, "hi")
 	f.buyerDeleted(t, b1)
 	f.jobs.reset()
 	n, err := f.m.SweepErase(ctx)
@@ -620,7 +620,7 @@ func TestImageMessageConfirmsTheAssetAndEraseMarksItDeleted(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	token, asset := f.stage(t, 1000+b1)
-	m, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeImage, StagedToken: token})
+	m, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token})
 	if err != nil || m.Image == nil || m.Image.AssetID != asset {
 		t.Fatalf("%+v %v", m, err)
 	}
@@ -652,7 +652,7 @@ func TestRolledBackImageSendLeavesTheAssetStaged(t *testing.T) {
 		}
 		return nil
 	})
-	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeImage, StagedToken: token}
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token}
 	if _, err := f.m.Send(ctx, in); err == nil {
 		t.Fatal("訂閱者失敗應讓送出回滾")
 	}
@@ -673,7 +673,7 @@ func TestImageSendRefusesATokenStagedByAnotherAccount(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	token, asset := f.stage(t, 1000+b2)
-	if _, err := f.m.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeImage, StagedToken: token}); err == nil {
+	if _, err := f.m.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token}); err == nil {
 		t.Fatal("別的帳號的 token 應被拒絕")
 	}
 	if got := f.assetState(t, asset); got != "STAGED" {
@@ -693,7 +693,7 @@ func (f *fixture) holdSend(t *testing.T) (release func(), done <-chan error) {
 	}
 	res := make(chan error, 1)
 	go func() {
-		_, err := f.m.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "持鎖中"})
+		_, err := f.m.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "持鎖中"})
 		res <- err
 	}()
 	select {
@@ -745,7 +745,7 @@ func TestSendWaitsForClosingAndIsRejected(t *testing.T) {
 	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 1 {
 		t.Fatalf("關閉之前提交的訊息要在：%d", n)
 	}
-	if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "晚到的"}); kindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "晚到的"}); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("關閉之後要被擋：%v", err)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 1 {
@@ -760,7 +760,7 @@ func TestRetireSkipsAStoreHeldByASend(t *testing.T) {
 	ctx := context.Background()
 	release, sent := f.holdSend(t)
 	pick := func() int {
-		rows, err := f.db.Pool().Query(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE SKIP LOCKED", f.s1)
+		rows, err := f.db.Pool().Query(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE SKIP LOCKED", s1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -789,8 +789,8 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "first")
-	last := f.say(t, f.buyerParty(b1), f.s1, "內容")
+	f.say(t, f.buyerParty(b1), s1, "first")
+	last := f.say(t, f.buyerParty(b1), s1, "內容")
 	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-1"}); kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "沒有被隱藏") {
 		t.Fatalf("沒有隱藏：%v", err)
 	}
@@ -801,7 +801,7 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 	if kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "不是由這個案件造成") {
 		t.Fatalf("來源不符：%v", err)
 	}
-	msgs, err := f.m.ListMessages(ctx, f.conversation(t, b1, f.s1), f.buyerParty(b1), 0, 10)
+	msgs, err := f.m.ListMessages(ctx, f.conversation(t, b1, s1), f.buyerParty(b1), 0, 10)
 	stillHidden := false
 	for _, m := range msgs.Items {
 		if m.Seq == last.Seq {
@@ -822,25 +822,25 @@ func TestMessageForReportReturnsTombstonesForHiddenContext(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	buyerSide := f.buyerParty(b1)
-	visibleText := f.say(t, buyerSide, f.s1, "可見的文字")
-	hiddenText := f.say(t, buyerSide, f.s1, "被隱藏的文字")
+	visibleText := f.say(t, buyerSide, s1, "可見的文字")
+	hiddenText := f.say(t, buyerSide, s1, "被隱藏的文字")
 	hidToken, _ := f.stage(t, 1000+b1)
-	hiddenImage, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: buyerSide, CounterpartID: f.s1, Type: im.TypeImage, StagedToken: hidToken})
+	hiddenImage, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: hidToken})
 	if err != nil {
 		t.Fatal(err)
 	}
 	visToken, visAsset := f.stage(t, 1000+b1)
-	visibleImage, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: buyerSide, CounterpartID: f.s1, Type: im.TypeImage, StagedToken: visToken})
+	visibleImage, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: visToken})
 	if err != nil {
 		t.Fatal(err)
 	}
-	target := f.say(t, buyerSide, f.s1, "被檢舉的訊息")
+	target := f.say(t, buyerSide, s1, "被檢舉的訊息")
 	for _, id := range []uuid.UUID{hiddenText.ID, hiddenImage.ID} {
 		if _, err := f.m.Hide(ctx, f.hideInput(id)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	got, err := f.m.MessageForReport(ctx, target.ID, f.storeParty(t, f.s1), 4)
+	got, err := f.m.MessageForReport(ctx, target.ID, f.storeParty(t, s1), 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -870,23 +870,23 @@ func TestStoreConversationByBuyerIsScopedToTheCallersStore(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.say(t, f.buyerParty(b1), f.s1, "hi")
-	f.say(t, f.buyerParty(b2), f.s2, "other store")
+	f.say(t, f.buyerParty(b1), s1, "hi")
+	f.say(t, f.buyerParty(b2), s2, "other store")
 
-	c, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, f.s1), b1)
+	c, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, s1), b1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ID != f.conversation(t, b1, f.s1) || c.BuyerID != b1 || c.StoreID != f.s1 || c.Unread != 1 || c.LastSeq != 1 {
+	if c.ID != f.conversation(t, b1, s1) || c.BuyerID != b1 || c.StoreID != s1 || c.Unread != 1 || c.LastSeq != 1 {
 		t.Fatalf("對話：%+v", c)
 	}
-	page, err := f.m.ListConversations(ctx, f.storeParty(t, f.s1), nil, 10)
+	page, err := f.m.ListConversations(ctx, f.storeParty(t, s1), nil, 10)
 	if err != nil || len(page.Items) != 1 || !reflect.DeepEqual(page.Items[0], c) {
 		t.Fatalf("與列表同形：%+v %v", page, err)
 	}
 	for name, call := range map[string]func() error{
-		"別家店的買家": func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, f.s1), b2); return err },
-		"不存在的買家": func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, f.s1), 999); return err },
+		"別家店的買家": func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, s1), b2); return err },
+		"不存在的買家": func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, s1), 999); return err },
 		"買家方":    func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.buyerParty(b1), b1); return err },
 	} {
 		if err := call(); kindOf(err) != apperr.KindNotFound {

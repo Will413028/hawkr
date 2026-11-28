@@ -26,7 +26,7 @@ func TestNotifyIsDeliveredOnlyAfterCommit(t *testing.T) {
 	ctx := context.Background()
 	raw := f.listenRaw(t)
 	err := f.db.InTx(ctx, func(ctx context.Context) error {
-		if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "rolled back"}); err != nil {
+		if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "rolled back"}); err != nil {
 			return err
 		}
 		return errRollback
@@ -38,15 +38,15 @@ func TestNotifyIsDeliveredOnlyAfterCommit(t *testing.T) {
 		t.Fatalf("回滾後有 %d 則訊息", got)
 	}
 	if err := f.db.InTx(ctx, func(ctx context.Context) error {
-		_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "committed"})
+		_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "committed"})
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "sentinel")
+	f.say(t, f.buyerParty(b1), s1, "sentinel")
 	got := raw.waitFor(t, f, 2)
-	conv := f.conversation(t, b1, f.s1)
-	want := []live.Payload{live.Message(conv, b1, f.s1, 1), live.Message(conv, b1, f.s1, 2)}
+	conv := f.conversation(t, b1, s1)
+	want := []live.Payload{live.Message(conv, b1, s1, 1), live.Message(conv, b1, s1, 2)}
 	if !slices.Equal(got, want) {
 		t.Fatalf("回滾的送出不該發通知、commit 的各恰好一個且欄位正確：%+v，預期 %+v", got, want)
 	}
@@ -59,9 +59,9 @@ func TestSubscriberOnAnotherModuleReceivesTheMessage(t *testing.T) {
 	other := f.newModule(im.LiveConfig{})
 	f.run(t, f.m)
 	f.run(t, other)
-	sub := f.subscribe(t, other, f.storeParty(t, f.s1), nil)
+	sub := f.subscribe(t, other, f.storeParty(t, s1), nil)
 	untilReady(t, sub)
-	sent := f.say(t, f.buyerParty(b1), f.s1, "across processes")
+	sent := f.say(t, f.buyerParty(b1), s1, "across processes")
 	evs := collectUntil(t, sub, messageSeq(sent.ConversationID, 1))
 	if m := messages(evs, false); len(m) != 1 || m[0].ID != sent.ID {
 		t.Fatalf("B 應收到 A 送出的那一則：%+v", m)
@@ -86,14 +86,14 @@ func TestListenerReconnectBackfillsDeliveredConversations(t *testing.T) {
 	}
 	m := f.newModule(cfg)
 	f.run(t, m)
-	first := f.say(t, f.buyerParty(b1), f.s1, "m1")
+	first := f.say(t, f.buyerParty(b1), s1, "m1")
 	conv := first.ConversationID
-	sub := f.subscribe(t, m, f.storeParty(t, f.s1), map[uuid.UUID]int64{conv: 0})
+	sub := f.subscribe(t, m, f.storeParty(t, s1), map[uuid.UUID]int64{conv: 0})
 	untilReady(t, sub)
 	f.exec(t, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND query LIKE 'SELECT now()%'`)
 	<-slept
 	for i := 2; i <= 4; i++ {
-		f.say(t, f.buyerParty(b1), f.s1, fmt.Sprintf("m%d", i))
+		f.say(t, f.buyerParty(b1), s1, fmt.Sprintf("m%d", i))
 	}
 	close(gate)
 	evs := collectUntil(t, sub, messageSeq(conv, 4))
@@ -101,7 +101,7 @@ func TestListenerReconnectBackfillsDeliveredConversations(t *testing.T) {
 	for _, e := range messages(evs, false) {
 		seqs = append(seqs, e.Seq)
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "sentinel")
+	f.say(t, f.buyerParty(b1), s1, "sentinel")
 	more := collectUntil(t, sub, messageSeq(conv, 5))
 	for _, e := range messages(more, false) {
 		seqs = append(seqs, e.Seq)
@@ -128,18 +128,18 @@ func TestListenerReconnectResyncsOnlyActiveUnknownConversations(t *testing.T) {
 		}
 	}
 	m := f.newModule(cfg)
-	a := f.say(t, f.buyerParty(b1), f.s1, "a0").ConversationID
-	f.say(t, f.buyerParty(b2), f.s1, "b0")
+	a := f.say(t, f.buyerParty(b1), s1, "a0").ConversationID
+	f.say(t, f.buyerParty(b2), s1, "b0")
 	f.run(t, m)
 	var subs []*im.Subscription
 	for range 10 {
-		s := f.subscribe(t, m, f.storeParty(t, f.s1), nil)
+		s := f.subscribe(t, m, f.storeParty(t, s1), nil)
 		untilReady(t, s)
 		subs = append(subs, s)
 	}
 	f.exec(t, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND query LIKE 'SELECT now()%'`)
 	<-slept
-	f.say(t, f.buyerParty(b1), f.s1, "a1")
+	f.say(t, f.buyerParty(b1), s1, "a1")
 	close(gate)
 	for i, s := range subs {
 		evs := collectUntil(t, s, func(e im.Event) bool { return e.Kind == im.EventResync })
@@ -155,15 +155,15 @@ func TestRegisterPrecedesBackfill(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	f.run(t, f.m)
-	conv := f.say(t, f.buyerParty(b1), f.s1, "m1").ConversationID
+	conv := f.say(t, f.buyerParty(b1), s1, "m1").ConversationID
 	im.SetLiveHooks(f.m,
-		func() { f.say(t, f.buyerParty(b1), f.s1, "before backfill") },
-		func() { f.say(t, f.buyerParty(b1), f.s1, "after backfill") },
+		func() { f.say(t, f.buyerParty(b1), s1, "before backfill") },
+		func() { f.say(t, f.buyerParty(b1), s1, "after backfill") },
 	)
-	sub := f.subscribe(t, f.m, f.storeParty(t, f.s1), map[uuid.UUID]int64{conv: 1})
+	sub := f.subscribe(t, f.m, f.storeParty(t, s1), map[uuid.UUID]int64{conv: 1})
 	evs := collectUntil(t, sub, messageSeq(conv, 3))
 	im.SetLiveHooks(f.m, nil, nil)
-	f.say(t, f.buyerParty(b1), f.s1, "sentinel")
+	f.say(t, f.buyerParty(b1), s1, "sentinel")
 	evs = append(evs, collectUntil(t, sub, messageSeq(conv, 4))...)
 	var seqs []int64
 	for _, m := range messages(evs, false) {
@@ -185,10 +185,10 @@ func TestHideAndRestoreNotifyOnlyAfterCommit(t *testing.T) {
 	ctx := context.Background()
 	f.run(t, f.m)
 	buyerSub := f.subscribe(t, f.m, f.buyerParty(b1), nil)
-	storeSub := f.subscribe(t, f.m, f.storeParty(t, f.s1), nil)
+	storeSub := f.subscribe(t, f.m, f.storeParty(t, s1), nil)
 	untilReady(t, buyerSub)
 	untilReady(t, storeSub)
-	sent := f.say(t, f.buyerParty(b1), f.s1, "to be hidden")
+	sent := f.say(t, f.buyerParty(b1), s1, "to be hidden")
 	conv := sent.ConversationID
 	for _, s := range []*im.Subscription{buyerSub, storeSub} {
 		collectUntil(t, s, messageSeq(conv, 1))
@@ -201,7 +201,7 @@ func TestHideAndRestoreNotifyOnlyAfterCommit(t *testing.T) {
 	}); !errors.Is(err, errRollback) {
 		t.Fatal(err)
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "sentinel")
+	f.say(t, f.buyerParty(b1), s1, "sentinel")
 	for name, s := range map[string]*im.Subscription{"買家": buyerSub, "店家": storeSub} {
 		if n := len(messages(collectUntil(t, s, messageSeq(conv, 2)), true)); n != 0 {
 			t.Fatalf("%s：回滾的隱藏不該有更新，得到 %d", name, n)
@@ -271,16 +271,16 @@ func TestStalledSubscriberDoesNotBlockSendAndResyncsOnResume(t *testing.T) {
 	for i := range 600 {
 		buyerIDs = append(buyerIDs, int64(100+i))
 	}
-	seedBuyers(t, f.db, buyerIDs)
+	seedParties(t, f.db, buyerIDs, nil)
 	f.run(t, m)
-	sub := f.subscribe(t, m, f.storeParty(t, f.s1), nil)
+	sub := f.subscribe(t, m, f.storeParty(t, s1), nil)
 	untilReady(t, sub)
 	before := im.LiveReceived(m)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for i := range 1000 {
-			f.say(t, f.buyerParty(int64(100+i%600)), f.s1, "x")
+			f.say(t, f.buyerParty(int64(100+i%600)), s1, "x")
 		}
 	}()
 	select {
@@ -301,10 +301,10 @@ func TestRevalidateEndsOnClosedStoreButNotOnSuspension(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.run(t, f.m)
-	active := f.storeParty(t, f.s1)
+	active := f.storeParty(t, s1)
 	sub := f.subscribe(t, f.m, active, nil)
 	untilReady(t, sub)
-	closed := f.storeParty(t, f.s1)
+	closed := f.storeParty(t, s1)
 	st := *closed.Store
 	st.Status, st.Conditions.Active = seller.Closed, false
 	closed.Store = &st
@@ -318,14 +318,14 @@ func TestRevalidateEndsOnClosedStoreButNotOnSuspension(t *testing.T) {
 
 	sub2 := f.subscribe(t, f.m, active, nil)
 	untilReady(t, sub2)
-	suspended := f.storeParty(t, f.s1)
+	suspended := f.storeParty(t, s1)
 	st2 := *suspended.Store
 	st2.Sanctions = seller.SanctionedBy(seller.EffectiveMeasure{MeasureID: uuid.NewV7(), Kind: seller.MeasureSuspension})
 	suspended.Store = &st2
 	if err := sub2.Revalidate(ctx, suspended); err != nil {
 		t.Fatalf("停權不結束串流：%v", err)
 	}
-	sent := f.say(t, f.buyerParty(b1), f.s1, "after suspension")
+	sent := f.say(t, f.buyerParty(b1), s1, "after suspension")
 	collectUntil(t, sub2, messageSeq(sent.ConversationID, 1))
 }
 
@@ -339,7 +339,7 @@ func TestRunShutdownEndsEverySubscriptionAndDeletesRows(t *testing.T) {
 	f := setup(t)
 	stop := f.run(t, f.m)
 	a := f.subscribe(t, f.m, f.buyerParty(b1), nil)
-	b := f.subscribe(t, f.m, f.storeParty(t, f.s1), nil)
+	b := f.subscribe(t, f.m, f.storeParty(t, s1), nil)
 	if got := f.scalar(t, "SELECT count(*) FROM im.presence_streams"); got != 2 {
 		t.Fatalf("存活標記 %d，預期 2", got)
 	}
@@ -363,7 +363,7 @@ func TestUnreadEvents(t *testing.T) {
 	ctx := context.Background()
 	m := f.newModule(im.LiveConfig{})
 	f.run(t, m)
-	store := f.storeParty(t, f.s1)
+	store := f.storeParty(t, s1)
 	sub := f.subscribe(t, m, store, nil)
 	second := f.subscribe(t, m, store, nil)
 	untilReady(t, sub)
@@ -371,7 +371,7 @@ func TestUnreadEvents(t *testing.T) {
 	received := im.LiveReceived(m)
 	var conv uuid.UUID
 	for i := range 3 {
-		conv = f.say(t, f.buyerParty(b1), f.s1, fmt.Sprintf("u%d", i)).ConversationID
+		conv = f.say(t, f.buyerParty(b1), s1, fmt.Sprintf("u%d", i)).ConversationID
 	}
 	f.eventually(t, "三則通知抵達", func() bool { return im.LiveReceived(m)-received >= 3 })
 	evs := collectUntil(t, sub, func(e im.Event) bool { return e.Kind == im.EventUnread })
@@ -383,7 +383,7 @@ func TestUnreadEvents(t *testing.T) {
 		t.Fatalf("Unread %d，UnreadTotal %d（%v），預期都是 3", evs[len(evs)-1].Unread, total, err)
 	}
 	collectUntil(t, second, func(e im.Event) bool { return e.Kind == im.EventUnread })
-	f.say(t, f.buyerParty(b1), f.s1, "fourth")
+	f.say(t, f.buyerParty(b1), s1, "fourth")
 
 	if err := f.m.MarkRead(ctx, conv, store, 4); err != nil {
 		t.Fatal(err)
@@ -396,13 +396,13 @@ func TestUnreadEvents(t *testing.T) {
 	}
 
 	raw := f.listenRaw(t)
-	f.say(t, f.buyerParty(b1), f.s1, "again")
-	f.say(t, f.buyerParty(b2), f.s1, "other conversation")
+	f.say(t, f.buyerParty(b1), s1, "again")
+	f.say(t, f.buyerParty(b2), s1, "other conversation")
 	raw.waitFor(t, f, 2)
 	if err := f.m.MarkAllRead(ctx, store); err != nil {
 		t.Fatal(err)
 	}
-	f.say(t, f.buyerParty(b2), f.s1, "tail")
+	f.say(t, f.buyerParty(b2), s1, "tail")
 	all := raw.waitFor(t, f, 4)
 	var batch int
 	var reads int
@@ -427,8 +427,8 @@ func TestPeerReadOnlyWhenTheCursorAdvances(t *testing.T) {
 	f.run(t, f.m)
 	buyerSub := f.subscribe(t, f.m, f.buyerParty(b1), nil)
 	untilReady(t, buyerSub)
-	conv := f.say(t, f.buyerParty(b1), f.s1, "hello").ConversationID
-	store := f.storeParty(t, f.s1)
+	conv := f.say(t, f.buyerParty(b1), s1, "hello").ConversationID
+	store := f.storeParty(t, s1)
 	raw := f.listenRaw(t)
 	if err := f.m.MarkRead(ctx, conv, store, 1); err != nil {
 		t.Fatal(err)
@@ -436,7 +436,7 @@ func TestPeerReadOnlyWhenTheCursorAdvances(t *testing.T) {
 	if err := f.m.MarkRead(ctx, conv, store, 1); err != nil {
 		t.Fatal(err)
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "second")
+	f.say(t, f.buyerParty(b1), s1, "second")
 	got := raw.waitFor(t, f, 2)
 	if len(got) != 2 || got[0].Kind != live.KindRead || got[0].Seq != 1 || got[0].Side != live.SideStore || got[1].Kind != live.KindMessage {
 		t.Fatalf("游標沒前進不發通知：%+v", got)
@@ -459,7 +459,7 @@ func TestPeerReadOnlyWhenTheCursorAdvances(t *testing.T) {
 	if err := f.m.MarkAllRead(ctx, store); err != nil {
 		t.Fatal(err)
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "third")
+	f.say(t, f.buyerParty(b1), s1, "third")
 	evs = collectUntil(t, buyerSub, messageSeq(conv, 3))
 	if n := count(evs, im.EventPeerRead); n != 0 {
 		t.Fatalf("MarkAllRead 不產生 PeerRead，得到 %d", n)
@@ -483,7 +483,7 @@ func TestPresence(t *testing.T) {
 	}
 	m := f.newModule(cfg)
 	f.run(t, m)
-	conv := f.say(t, f.buyerParty(b1), f.s1, "hi").ConversationID
+	conv := f.say(t, f.buyerParty(b1), s1, "hi").ConversationID
 	buyerP := f.buyerParty(b1)
 	online := func() bool {
 		st, err := f.m.Presence(ctx, buyerP, []uuid.UUID{conv})
@@ -495,7 +495,7 @@ func TestPresence(t *testing.T) {
 	if online() {
 		t.Fatal("沒有串流時對方離線")
 	}
-	sub := f.subscribe(t, m, f.storeParty(t, f.s1), nil)
+	sub := f.subscribe(t, m, f.storeParty(t, s1), nil)
 	if !online() {
 		t.Fatal("對方開了串流要在線")
 	}
@@ -512,13 +512,13 @@ func TestPresence(t *testing.T) {
 	if !online() {
 		t.Fatal("未過期要在線")
 	}
-	if _, err := f.buyers.owner.BlockStore(ctx, b1, f.s1); err != nil {
+	if _, err := f.buyers.owner.BlockStore(ctx, b1, s1); err != nil {
 		t.Fatal(err)
 	}
 	if online() {
 		t.Fatal("買家封鎖店家要離線")
 	}
-	if _, err := f.buyers.owner.UnblockStore(ctx, b1, f.s1); err != nil {
+	if _, err := f.buyers.owner.UnblockStore(ctx, b1, s1); err != nil {
 		t.Fatal(err)
 	}
 	if !online() {
@@ -537,29 +537,19 @@ func TestPresence(t *testing.T) {
 	if _, err := f.m.Presence(ctx, f.buyerParty(b2), []uuid.UUID{conv}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("非共有對話要 NotFound：%v", err)
 	}
-	sub.Close()
-	if online() {
-		t.Fatal("Close 之後要離線")
-	}
-	sub = f.subscribe(t, m, f.storeParty(t, f.s1), nil)
-	if !online() {
-		t.Fatal("重開串流後要在線")
-	}
-	store, err := f.stores.owner.Store(ctx, f.s1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.stores.owner.CloseCurrent(ctx, store.AccountID); err != nil {
-		t.Fatal(err)
-	}
-	f.advance(seller.StoreRetireAfter + time.Second)
-	if _, err := f.stores.owner.PurgePII(ctx); err != nil {
+	if err := f.db.InTx(ctx, func(ctx context.Context) error { return closeStoreRows(ctx, f.db, s1) }); err != nil {
 		t.Fatal(err)
 	}
 	if online() {
 		t.Fatal("對方在 seller.pub_retired_stores() 要離線")
 	}
+	if err := f.db.InTx(ctx, func(ctx context.Context) error { return reopenStoreRows(ctx, f.db, s1) }); err != nil {
+		t.Fatal(err)
+	}
 	sub.Close()
+	if online() {
+		t.Fatal("Close 之後要離線")
+	}
 	over := make([]uuid.UUID, im.MaxPresenceConversations+1)
 	if _, err := f.m.Presence(ctx, buyerP, over); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("超過上限要 InvalidInput：%v", err)
@@ -573,10 +563,10 @@ func TestPresenceStoreCallerAndBatch(t *testing.T) {
 	ctx := context.Background()
 	m := f.newModule(im.LiveConfig{})
 	f.run(t, m)
-	c1 := f.say(t, f.buyerParty(b1), f.s1, "hi").ConversationID
-	c2 := f.say(t, f.buyerParty(b2), f.s1, "hi").ConversationID
-	other := f.say(t, f.buyerParty(b1), f.s2, "hi").ConversationID
-	storeP := f.storeParty(t, f.s1)
+	c1 := f.say(t, f.buyerParty(b1), s1, "hi").ConversationID
+	c2 := f.say(t, f.buyerParty(b2), s1, "hi").ConversationID
+	other := f.say(t, f.buyerParty(b1), s2, "hi").ConversationID
+	storeP := f.storeParty(t, s1)
 	states := func(ids ...uuid.UUID) []bool {
 		st, err := f.m.Presence(ctx, storeP, ids)
 		if err != nil || len(st) != len(ids) {
@@ -609,7 +599,7 @@ func TestPresenceStoreCallerAndBatch(t *testing.T) {
 	if got := states(c1); !got[0] {
 		t.Fatalf("沒有封鎖要在線：%v", got)
 	}
-	if _, err := f.buyers.owner.BlockStore(ctx, b1, f.s1); err != nil {
+	if _, err := f.buyers.owner.BlockStore(ctx, b1, s1); err != nil {
 		t.Fatal(err)
 	}
 	if got := states(c1, c2); got[0] || got[1] {
@@ -634,7 +624,7 @@ func TestSubscribeLimitsAndAuthorization(t *testing.T) {
 	m1, m2 := f.newModule(im.LiveConfig{}), f.newModule(im.LiveConfig{})
 	p := f.buyerParty(b1)
 
-	closed := f.storeParty(t, f.s1)
+	closed := f.storeParty(t, s1)
 	st := *closed.Store
 	st.Status, st.Conditions.Active = seller.Closed, false
 	closed.Store = &st
@@ -701,7 +691,7 @@ func TestSubscribeLimitsAndAuthorization(t *testing.T) {
 		t.Fatalf("並行 Subscribe：成功 %d、被拒 %d，預期 10 與 2", ok, exhausted)
 	}
 
-	seedBuyers(t, f.db, []int64{99})
+	seedParties(t, f.db, []int64{99}, nil)
 	f.exec(t, "ALTER TABLE im.presence_streams RENAME TO presence_streams_gone")
 	_, err = m1.Subscribe(ctx, f.buyerParty(99), nil)
 	if err == nil || kindOf(err) == apperr.KindResourceExhausted {
@@ -725,15 +715,15 @@ func TestConcurrentSendsAreDeliveredInSeqOrder(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	f.run(t, f.m)
-	conv := f.say(t, f.buyerParty(b1), f.s1, "first").ConversationID
-	sub := f.subscribe(t, f.m, f.storeParty(t, f.s1), map[uuid.UUID]int64{conv: 1})
+	conv := f.say(t, f.buyerParty(b1), s1, "first").ConversationID
+	sub := f.subscribe(t, f.m, f.storeParty(t, s1), map[uuid.UUID]int64{conv: 1})
 	untilReady(t, sub)
 	var wg sync.WaitGroup
 	for i := range 50 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			f.say(t, f.buyerParty(b1), f.s1, fmt.Sprintf("c%d", i))
+			f.say(t, f.buyerParty(b1), s1, fmt.Sprintf("c%d", i))
 		}()
 	}
 	wg.Wait()
@@ -771,7 +761,7 @@ func TestListenerReconnectResyncsDeliveredConversationsWithHiddenAndReadChanges(
 	}
 	m := f.newModule(cfg)
 	f.run(t, m)
-	sent := f.say(t, f.buyerParty(b1), f.s1, "m1")
+	sent := f.say(t, f.buyerParty(b1), s1, "m1")
 	conv := sent.ConversationID
 	sub := f.subscribe(t, m, f.buyerParty(b1), map[uuid.UUID]int64{conv: 1})
 	untilReady(t, sub)
@@ -780,7 +770,7 @@ func TestListenerReconnectResyncsDeliveredConversationsWithHiddenAndReadChanges(
 	if _, err := f.m.Hide(ctx, f.hideInput(sent.ID)); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.m.MarkRead(ctx, conv, f.storeParty(t, f.s1), 1); err != nil {
+	if err := f.m.MarkRead(ctx, conv, f.storeParty(t, s1), 1); err != nil {
 		t.Fatal(err)
 	}
 	close(gate)
@@ -794,7 +784,7 @@ func TestListenerReconnectResyncsDeliveredConversationsWithHiddenAndReadChanges(
 func TestStreamOpenedBeforeTheFirstListenReceivesLaterCommits(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	conv := f.say(t, f.buyerParty(b1), f.s1, "m1").ConversationID
+	conv := f.say(t, f.buyerParty(b1), s1, "m1").ConversationID
 	m := f.newModule(fastBackoff())
 	dialing := make(chan struct{}, 1)
 	gate := make(chan struct{})
@@ -812,9 +802,9 @@ func TestStreamOpenedBeforeTheFirstListenReceivesLaterCommits(t *testing.T) {
 	case <-time.After(guard):
 		t.Fatal("等不到第一次撥號")
 	}
-	sub := f.subscribe(t, m, f.storeParty(t, f.s1), map[uuid.UUID]int64{conv: 1})
+	sub := f.subscribe(t, m, f.storeParty(t, s1), map[uuid.UUID]int64{conv: 1})
 	untilReady(t, sub)
-	f.say(t, f.buyerParty(b1), f.s1, "m2")
+	f.say(t, f.buyerParty(b1), s1, "m2")
 	close(gate)
 	collectUntil(t, sub, messageSeq(conv, 2))
 }
@@ -853,8 +843,8 @@ func TestConcurrentMarkReadNotifiesOnce(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	conv := f.say(t, f.buyerParty(b1), f.s1, "hello").ConversationID
-	store := f.storeParty(t, f.s1)
+	conv := f.say(t, f.buyerParty(b1), s1, "hello").ConversationID
+	store := f.storeParty(t, s1)
 	raw := f.listenRaw(t)
 	first := make(chan struct{})
 	release := make(chan struct{})
@@ -882,7 +872,7 @@ func TestConcurrentMarkReadNotifiesOnce(t *testing.T) {
 	if err := <-second; err != nil {
 		t.Fatal(err)
 	}
-	f.say(t, f.buyerParty(b1), f.s1, "sentinel")
+	f.say(t, f.buyerParty(b1), s1, "sentinel")
 	got := raw.waitFor(t, f, 2)
 	reads := 0
 	for _, p := range got {
@@ -899,8 +889,8 @@ func TestConcurrentMarkReadNotifiesOnce(t *testing.T) {
 func TestMessageTimeIsTheConversationLastMessageTime(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.say(t, f.buyerParty(b1), f.s1, "first")
-	f.say(t, f.buyerParty(b1), f.s1, "second")
+	f.say(t, f.buyerParty(b1), s1, "first")
+	f.say(t, f.buyerParty(b1), s1, "second")
 	n := f.scalar(t, `SELECT count(*) FROM im.messages m JOIN im.conversations c ON c.id = m.conversation_id AND c.last_seq = m.seq WHERE m.created_at = c.last_message_at`)
 	if n != 1 {
 		t.Fatalf("最後一則訊息的 created_at 應等於 last_message_at，符合的對話 %d", n)

@@ -32,7 +32,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -118,18 +117,14 @@ func (l *logSink) levels() []string {
 }
 
 type fixture struct {
-	t      *testing.T
-	db     *db.DB
-	m      *crm.Module
-	q      *queue
-	owner  *buyer.Module
-	bus    *events.Bus
-	logs   *logSink
-	gate   *suspendable
-	tick   *atomic.Int64
-	storeA int64
-	storeB int64
-	storeC int64
+	t     *testing.T
+	db    *db.DB
+	m     *crm.Module
+	q     *queue
+	owner *buyer.Module
+	bus   *events.Bus
+	logs  *logSink
+	gate  *suspendable
 }
 
 type suspendable struct {
@@ -149,6 +144,14 @@ func seedBuyers(t *testing.T, d *db.DB, lo, hi int64) {
 	t.Helper()
 	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
 		OVERRIDING SYSTEM VALUE SELECT g, 1000000 + g, 'b', now(), now() FROM generate_series($1::bigint, $2::bigint) AS g`, lo, hi); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func seedStores(t *testing.T, d *db.DB, lo, hi int64) {
+	t.Helper()
+	if _, err := d.Pool().Exec(context.Background(), `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE SELECT g, g, 2000000 + g, 's', now(), now() FROM generate_series($1::bigint, $2::bigint) AS g`, lo, hi); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -173,7 +176,6 @@ func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
-		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "crm", Dir: crm.Migrations()},
 	))
@@ -187,24 +189,13 @@ func setup(t *testing.T) *fixture {
 	sl := seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: now, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, now), Events: bus, Jobs: q, Now: now, Logger: log})})
 	gate := &suspendable{Module: sl}
-	storeIDs := make([]int64, 3)
-	for i, name := range []string{"店 A", "店 B", "店 C"} {
-		accountID, err := sellerfixture.NewAccount(context.Background(), d, epoch)
-		if err != nil {
-			t.Fatal(err)
-		}
-		storeID, err := sellerfixture.ExposableStoreNamed(context.Background(), d, accountID, epoch, name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		storeIDs[i] = storeID
-	}
+	seedStores(t, d, storeA, storeC)
 	seedBuyers(t, d, buyer1, buyer1+99)
 	logs := &logSink{}
 	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: owner, Stores: gate, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewJSONHandler(logs, nil))})
 	events.Subscribe(bus, m.OnBuyerDeleted)
 	events.Subscribe(bus, m.OnStoreRetired)
-	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus, logs: logs, gate: gate, tick: &tick, storeA: storeIDs[0], storeB: storeIDs[1], storeC: storeIDs[2]}
+	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus, logs: logs, gate: gate}
 }
 
 func (f *fixture) exec(sql string, args ...any) {

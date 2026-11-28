@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var contentBase = time.Date(2026, 11, 23, 4, 30, 0, 0, time.UTC)
@@ -392,26 +391,11 @@ func TestAnInboxRowWithAnInvalidStoreIDDoesNotFailThePage(t *testing.T) {
 // 正式的 NewStoreCodes 接真的 seller：曾經公開過的店回 store_code，從沒公開過的店不在結果裡。
 func TestNewStoreCodesReadsStoreCodesFromTheRealSeller(t *testing.T) {
 	f := setupContent(t, nil)
-	ctx := context.Background()
-	owner, err := sellerfixture.NewAccount(ctx, f.db, contentBase)
-	if err != nil {
-		t.Fatal(err)
-	}
-	exposed, err := sellerfixture.ExposableStore(ctx, f.db, owner, contentBase)
-	if err != nil {
-		t.Fatal(err)
-	}
-	other, err := sellerfixture.NewAccount(ctx, f.db, contentBase)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hiddenStore, err := f.sellerMod.Apply(ctx, seller.ApplyInput{
-		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: other, StoreName: "未公開測試店", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路一號",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	hidden := hiddenStore.StoreID
+	owner, _ := f.newBuyer(t)
+	exposed := f.openStore(t, owner)
+	other, _ := f.newBuyer(t)
+	hidden := f.openStore(t, other)
+	f.mustExec(t, `UPDATE seller.stores SET first_exposed_at = $2 WHERE store_id = $1`, exposed, contentBase)
 	var code int64
 	if err := f.db.Pool().QueryRow(context.Background(), `SELECT store_code FROM seller.stores WHERE store_id = $1`, exposed).Scan(&code); err != nil {
 		t.Fatal(err)

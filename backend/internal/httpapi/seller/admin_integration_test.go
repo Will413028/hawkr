@@ -731,13 +731,14 @@ func TestGetStoreAndListStoresShowTheEffectiveMeasureRecordedOnAnEarlierStint(t 
 	if _, err := f.module.CloseCurrent(ctx, accountID); err != nil {
 		t.Fatal(err)
 	}
-	newStore, err := f.module.Apply(ctx, seller.ApplyInput{
-		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: accountID, StoreName: "新店", TownCode: "63000050", AddressDetail: "測試路一號",
-	})
-	if err != nil {
+	var newID int64
+	if err := f.db.Conn(ctx).QueryRow(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES ($1, $2, '新店', now(), now()) RETURNING store_id`,
+		old.StoreCode+1, accountID).Scan(&newID); err != nil {
 		t.Fatal(err)
 	}
-	newID := newStore.StoreID
+	if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_exposures (store_id) VALUES ($1)", newID); err != nil {
+		t.Fatal(err)
+	}
 	got, err := f.admin.GetStore(ctx, connect.NewRequest(&adminsellerpb.GetStoreRequest{Id: sid(newID)}))
 	if err != nil {
 		t.Fatal(err)

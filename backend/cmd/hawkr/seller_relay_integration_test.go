@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 type sellerRelayFixture struct {
@@ -51,8 +50,8 @@ func newSellerRelayFixture(t *testing.T) *sellerRelayFixture {
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})
 	subscribeSellerRelay(bus, queue)
-	account, err := sellerfixture.NewAccount(ctx, d, now)
-	if err != nil {
+	var account int64
+	if err := d.Conn(ctx).QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&account); err != nil {
 		t.Fatal(err)
 	}
 	store, err := sellers.Apply(ctx, seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: account, StoreName: "範例小農", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路一號"})
@@ -168,15 +167,10 @@ func TestReconcileExposureAnnouncementIsRelayed(t *testing.T) {
 func TestRejectingAKYCApplicationEnqueuesNoLegacyRelayJob(t *testing.T) {
 	ctx := context.Background()
 	f := newSellerRelayFixture(t)
-	contactName, contactMobile, supportEmail := "王小明", "0912345678", "owner@example.com"
-	if _, err := f.sellers.UpdateProfile(ctx, seller.UpdateProfileInput{
-		StoreID: f.store.StoreID, ExpectedVersion: f.store.Version, UploaderID: f.account,
-		ContactName: &contactName, ContactMobile: &contactMobile, SupportEmail: &supportEmail,
-	}); err != nil {
+	if _, err := f.d.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET contact_name = '王小明', contact_mobile = '0912345678', support_email = 'owner@example.com' WHERE store_id = $1", f.store.StoreID); err != nil {
 		t.Fatal(err)
 	}
-	accounts := identity.New(identity.Deps{DB: f.d, Events: events.NewBus(), Now: func() time.Time { return *f.now }})
-	if _, err := accounts.SetSelfEnteredEmail(ctx, f.account, "seller@example.com"); err != nil {
+	if _, err := f.d.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET self_entered_email = 'seller@example.com' WHERE id = $1", f.account); err != nil {
 		t.Fatal(err)
 	}
 	individual := seller.KYCIndividual

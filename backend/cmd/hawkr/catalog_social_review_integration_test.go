@@ -25,7 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 type testSocialSellers struct {
@@ -170,17 +169,30 @@ func newCatalogSocialReviewFixture(t *testing.T) *catalogSocialReviewFixture {
 		NewID: uuid.NewV7, Now: clock, Logger: logger,
 	})
 
+	if _, err := d.Pool().Exec(context.Background(), `DO $$ DECLARE r record; BEGIN
+		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
+		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
+		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`); err != nil {
+		t.Fatal(err)
+	}
 	return f
 }
 
-func (f *catalogSocialReviewFixture) seedStore(ctx context.Context, suffix int64) int64 {
+func (f *catalogSocialReviewFixture) seedStore(ctx context.Context, accountID int64) int64 {
 	f.t.Helper()
-	accountID, err := sellerfixture.NewAccount(ctx, f.d, f.now)
-	if err != nil {
+	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
+		VALUES ($1, $1, $2, 'logo/k', $3, '63000010', $4, $4)`, accountID, fmt.Sprintf("店%d", accountID), uuid.NewV7(), f.now); err != nil {
 		f.t.Fatal(err)
 	}
-	storeID, err := sellerfixture.ExposableStoreNamed(ctx, f.d, accountID, f.now, fmt.Sprintf("店%d", suffix))
-	if err != nil {
+	var storeID int64
+	if err := f.d.Pool().QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
+		f.t.Fatal(err)
+	}
+	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
+		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.now, uuid.NewV7()); err != nil {
+		f.t.Fatal(err)
+	}
+	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, f.now); err != nil {
 		f.t.Fatal(err)
 	}
 	return storeID

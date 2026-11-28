@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	goimage "image"
 	"image/png"
 	"log/slog"
@@ -33,7 +32,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 var pg *testdb.Server
@@ -99,13 +97,40 @@ type buyers struct {
 	owner    *buyer.Module
 }
 
-func seedBuyers(t *testing.T, d *db.DB, buyerIDs []int64) {
+func seedParties(t *testing.T, d *db.DB, buyerIDs, storeIDs []int64) {
 	t.Helper()
 	ctx := context.Background()
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO buyer.buyers (buyer_id, account_id, display_name, created_at, updated_at)
 		OVERRIDING SYSTEM VALUE SELECT g, 1000 + g, 'b', now(), now() FROM unnest($1::bigint[]) AS g`, buyerIDs); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.stores (store_id, store_code, account_id, store_name, created_at, updated_at)
+		OVERRIDING SYSTEM VALUE SELECT g, g, 2000 + g, 's', now(), now() FROM unnest($1::bigint[]) AS g`, storeIDs); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func closeStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("closeStoreRows 必須在 transaction 內呼叫")
+	}
+	if _, err := d.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, now(), 'ACCOUNT_OWNER')", storeID); err != nil {
+		return err
+	}
+	_, err := d.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now(),
+		logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, storeID)
+	return err
+}
+
+func reopenStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("reopenStoreRows 必須在 transaction 內呼叫")
+	}
+	if _, err := d.Conn(ctx).Exec(ctx, "UPDATE seller.store_closures SET reopened_at = now() WHERE store_id = $1 AND reopened_at IS NULL", storeID); err != nil {
+		return err
+	}
+	_, err := d.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET status = 'ACTIVE', current_closed_at = NULL, retired_at = NULL WHERE store_id = $1", storeID)
+	return err
 }
 
 func (b *buyers) LockNotClosed(ctx context.Context, id int64) error {
@@ -141,7 +166,7 @@ type stores struct {
 	afterLock func()
 }
 
-func (s *stores) Store(ctx context.Context, id int64) (seller.Store, error) {
+func (s *stores) Store(_ context.Context, id int64) (seller.Store, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err != nil {
@@ -150,7 +175,7 @@ func (s *stores) Store(ctx context.Context, id int64) (seller.Store, error) {
 	if st, ok := s.byID[id]; ok {
 		return st, nil
 	}
-	return s.owner.Store(ctx, id)
+	return activeStore(id, 2000+id), nil
 }
 
 // LockNotRetired 委派給真正的 seller 模組（守門的查詢與鎖由它擁有），取到鎖之後呼叫 afterLock。
@@ -228,8 +253,6 @@ type fixture struct {
 
 	clockMu sync.Mutex
 	now     time.Time
-	s1      int64
-	s2      int64
 	sent    []im.MessageSent
 }
 
@@ -240,18 +263,11 @@ func (f *fixture) clock() time.Time {
 	return f.now
 }
 
-func (f *fixture) advance(d time.Duration) {
-	f.clockMu.Lock()
-	defer f.clockMu.Unlock()
-	f.now = f.now.Add(d)
-}
-
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
-		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "im", Dir: im.Migrations()},
 	))
@@ -270,25 +286,7 @@ func setup(t *testing.T) *fixture {
 	identityModule := identity.New(identity.Deps{DB: database, Events: bus, Now: f.clock, Logger: logger})
 	f.stores.owner = seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: database, Events: bus, Jobs: f.jobs, Identity: identityModule, Media: f.media, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: f.clock, Logger: logger,
 		Payment: payment.New(payment.Deps{DB: database, Audit: adminaudit.New(database, f.clock), Events: bus, Jobs: f.jobs, Now: f.clock, Logger: logger})})
-	seedBuyers(t, database, []int64{b1, b2, 5, 7})
-	for i := range 2 {
-		accountID, err := sellerfixture.NewAccount(context.Background(), database, f.clock())
-		if err != nil {
-			t.Fatal(err)
-		}
-		store, err := f.stores.owner.Apply(context.Background(), seller.ApplyInput{
-			AccountID: accountID, StoreName: fmt.Sprintf("測試店 %d", i+1), ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路一號",
-			AcceptedAgreements: seller.CurrentApplyAcceptances(),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if i == 0 {
-			f.s1 = store.StoreID
-		} else {
-			f.s2 = store.StoreID
-		}
-	}
+	seedParties(t, database, []int64{b1, b2, 5, 7}, []int64{s1, s2, 5, 9})
 	f.buyers.owner = buyer.New(buyer.Deps{DB: database, Events: f.bus, Media: f.media, Now: f.clock, Logger: logger})
 	f.m = im.New(im.Deps{
 		DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Buyers: f.buyers, Stores: f.stores, Orders: f.orders,

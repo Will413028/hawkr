@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -411,10 +410,14 @@ func TestSweepPurgeEnqueuesOnlyRetiredStoresWithContentLeft(t *testing.T) {
 		f.publishedPost(t, id, "貼文")
 	}
 	retire := func(id int64) {
-		store := mustV[seller.Store](t)(f.sellerMod.Store(ctx, id))
-		mustV[seller.Store](t)(f.sellerMod.CloseCurrent(ctx, store.AccountID))
-		f.advance(seller.StoreRetention + time.Second)
-		mustV[int](t)(f.sellerMod.PurgePII(ctx))
+		must(t, f.db.InTx(ctx, func(ctx context.Context) error {
+			if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, now(), 'ACCOUNT_OWNER')", id); err != nil {
+				return err
+			}
+			_, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now(),
+				logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, id)
+			return err
+		}))
 	}
 	retire(stuck)
 	retire(drained)

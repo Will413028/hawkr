@@ -4,15 +4,19 @@ package crm_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 func (f *fixture) seedBuyerEverywhere(buyerID int64) {
 	f.t.Helper()
-	for i, store := range []int64{f.storeA, f.storeB} {
+	for i, store := range []int64{storeA, storeB} {
 		o := "ORD-" + sn(int(buyerID)) + "-" + sn(i)
 		f.mustOrder("evt-"+o, o, store, buyerID, 1000)
 		if _, err := f.partial("REF-"+o, o, store, buyerID, 100); err != nil {
@@ -41,18 +45,31 @@ func (f *fixture) retireStore(storeID int64) {
 
 func (f *fixture) retireStoreErr(storeID int64) error {
 	ctx := context.Background()
-	store, err := f.gate.Store(ctx, storeID)
-	if err != nil {
+	return f.db.InTx(ctx, func(ctx context.Context) error {
+		var id int64
+		if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE store_id = $1 FOR UPDATE", storeID).Scan(&id); err != nil {
+			return err
+		}
+		return f.retireLocked(ctx, storeID)
+	})
+}
+
+func (f *fixture) retireLocked(ctx context.Context, storeID int64) error {
+	if err := closeStoreRows(ctx, f.db, storeID); err != nil {
 		return err
 	}
-	if _, err := f.gate.CloseCurrent(ctx, store.AccountID); err != nil {
+	return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), StoreID: storeID, OccurredAt: epoch})
+}
+
+func closeStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return errors.New("closeStoreRows 必須在 transaction 內呼叫")
+	}
+	if _, err := d.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, now(), 'ACCOUNT_OWNER')", storeID); err != nil {
 		return err
 	}
-	f.tick.Add(int64((seller.StoreRetention + time.Second) / time.Second))
-	if _, err := f.gate.PurgePII(ctx); err != nil {
-		return err
-	}
-	return nil
+	_, err := d.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now() WHERE store_id = $1", storeID)
+	return err
 }
 
 func (f *fixture) rowsOfBuyer(buyerID int64) int64 {
@@ -100,7 +117,7 @@ func TestReplayAfterBuyerDeletionDoesNotRecreateRows(t *testing.T) {
 	f.deleteBuyer(buyer1)
 	o := "ORD-" + sn(int(buyer1)) + "-0"
 	before := f.rowsOfBuyer(buyer1)
-	if ok, err := f.order("evt-early", o, f.storeA, buyer1, 1000); err != nil || ok {
+	if ok, err := f.order("evt-early", o, storeA, buyer1, 1000); err != nil || ok {
 		t.Fatalf("抹除前重放 order.completed：recorded=%v err=%v，預期 false、nil", ok, err)
 	}
 	if after := f.rowsOfBuyer(buyer1); after != before {
@@ -109,13 +126,13 @@ func TestReplayAfterBuyerDeletionDoesNotRecreateRows(t *testing.T) {
 	if err := f.m.ErasePartyData(context.Background(), "BUYER", buyer1); err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := f.order("evt-"+o, o, f.storeA, buyer1, 1000); err != nil || ok {
+	if ok, err := f.order("evt-"+o, o, storeA, buyer1, 1000); err != nil || ok {
 		t.Fatalf("重放 order.completed：recorded=%v err=%v，預期 false、nil", ok, err)
 	}
-	if ok, err := f.partial("REF-"+o, o, f.storeA, buyer1, 100); err != nil || ok {
+	if ok, err := f.partial("REF-"+o, o, storeA, buyer1, 100); err != nil || ok {
 		t.Fatalf("重放部分退款：recorded=%v err=%v", ok, err)
 	}
-	if ok, err := f.full("REF-FULL", o, f.storeA, buyer1); err != nil || ok {
+	if ok, err := f.full("REF-FULL", o, storeA, buyer1); err != nil || ok {
 		t.Fatalf("重放全額退款：recorded=%v err=%v", ok, err)
 	}
 	if f.count("crm.customers")+f.count("crm.order_nets")+f.count("crm.ledger") != 0 {
@@ -129,25 +146,25 @@ func TestStoreRetirementErasesTheStore(t *testing.T) {
 	f := setup(t)
 	f.seedBuyerEverywhere(buyer1)
 	f.seedBuyerEverywhere(buyer2)
-	f.retireStore(f.storeA)
-	if err := f.m.ErasePartyData(context.Background(), "STORE", f.storeA); err != nil {
+	f.retireStore(storeA)
+	if err := f.m.ErasePartyData(context.Background(), "STORE", storeA); err != nil {
 		t.Fatal(err)
 	}
 	for _, table := range []string{"crm.customers", "crm.order_nets", "crm.tags", "crm.customer_tags"} {
-		if n := f.scalar("SELECT count(*) FROM "+table+" WHERE store_id = $1", f.storeA); n != 0 {
+		if n := f.scalar("SELECT count(*) FROM "+table+" WHERE store_id = $1", storeA); n != 0 {
 			t.Errorf("%s 還有店 A 的 %d 列", table, n)
 		}
 	}
-	if n := f.scalar("SELECT count(*) FROM crm.customers WHERE store_id = $1", f.storeB); n != 2 {
+	if n := f.scalar("SELECT count(*) FROM crm.customers WHERE store_id = $1", storeB); n != 2 {
 		t.Fatalf("店 B 的客戶 %d，預期 2", n)
 	}
-	if n := f.scalar("SELECT count(*) FROM crm.ledger l JOIN crm.order_nets o USING (order_no) WHERE o.store_id = $1", f.storeB); n != 4 {
+	if n := f.scalar("SELECT count(*) FROM crm.ledger l JOIN crm.order_nets o USING (order_no) WHERE o.store_id = $1", storeB); n != 4 {
 		t.Fatalf("店 B 的 ledger %d，預期 4", n)
 	}
-	if ok, err := f.order("evt-again", "ORD-new", f.storeA, buyer1, 500); err != nil || ok {
+	if ok, err := f.order("evt-again", "ORD-new", storeA, buyer1, 500); err != nil || ok {
 		t.Fatalf("退場店家的重放：recorded=%v err=%v", ok, err)
 	}
-	if n := f.scalar("SELECT count(*) FROM crm.customers WHERE store_id = $1", f.storeA); n != 0 {
+	if n := f.scalar("SELECT count(*) FROM crm.customers WHERE store_id = $1", storeA); n != 0 {
 		t.Fatalf("退場後重建了 %d 個客戶", n)
 	}
 }
@@ -200,7 +217,7 @@ func TestProjectionWaitsForConcurrentClosing(t *testing.T) {
 	}
 	res := make(chan result, 1)
 	go func() {
-		ok, err := f.order("evt-1", "O1", f.storeA, buyer1, 1000)
+		ok, err := f.order("evt-1", "O1", storeA, buyer1, 1000)
 		res <- result{ok, err}
 	}()
 	deadline := time.Now().Add(10 * time.Second)

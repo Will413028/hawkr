@@ -38,13 +38,13 @@ func TestResendReturnsTheFirstMessageWithoutSideEffects(t *testing.T) {
 	f := setup(t)
 	raw := f.listenRaw(t)
 	buyer := f.buyerParty(b1)
-	in := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: f.s1, Type: im.TypeText, Text: "  你好  "}
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "  你好  "}
 	first, err := f.sendWith(t, in)
 	if err != nil {
 		t.Fatal(err)
 	}
 	conv := first.ConversationID
-	unread := f.unread(t, f.storeParty(t, f.s1))
+	unread := f.unread(t, f.storeParty(t, s1))
 	events := len(f.sent)
 	for _, again := range []im.SendInput{
 		in,
@@ -61,14 +61,14 @@ func TestResendReturnsTheFirstMessageWithoutSideEffects(t *testing.T) {
 	if n := f.scalar(t, "SELECT last_seq FROM im.conversations WHERE id = $1", conv); n != 1 {
 		t.Fatalf("last_seq = %d", n)
 	}
-	if got := f.unread(t, f.storeParty(t, f.s1)); got != unread {
+	if got := f.unread(t, f.storeParty(t, s1)); got != unread {
 		t.Fatalf("未讀數 %d → %d", unread, got)
 	}
 	if len(f.sent) != events {
 		t.Fatalf("重送不該再發 MessageSent：%d → %d", events, len(f.sent))
 	}
-	f.say(t, buyer, f.s1, "sentinel")
-	want := []live.Payload{live.Message(conv, b1, f.s1, 1), live.Message(conv, b1, f.s1, 2)}
+	f.say(t, buyer, s1, "sentinel")
+	want := []live.Payload{live.Message(conv, b1, s1, 1), live.Message(conv, b1, s1, 2)}
 	if got := raw.waitFor(t, f, 2); !slices.Equal(got, want) {
 		t.Fatalf("重送不該 NOTIFY：%+v，預期 %+v", got, want)
 	}
@@ -78,7 +78,7 @@ func TestResendReturnsTheFirstMessageWithoutSideEffects(t *testing.T) {
 func TestResendSucceedsAfterALaterBlock(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "先送出"}
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "先送出"}
 	first, err := f.sendWith(t, in)
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +100,7 @@ func TestResendWithDifferentContentIsRejected(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	buyer := f.buyerParty(b1)
-	in := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: f.s1, Type: im.TypeText, Text: "原文"}
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "原文"}
 	if _, err := f.sendWith(t, in); err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestResendWithDifferentContentIsRejected(t *testing.T) {
 		}
 	}
 	tokenA, _ := f.stage(t, 1000+b1)
-	img := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: f.s1, Type: im.TypeImage, StagedToken: tokenA}
+	img := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeImage, StagedToken: tokenA}
 	first, err := f.sendWith(t, img)
 	if err != nil {
 		t.Fatal(err)
@@ -133,11 +133,11 @@ func TestSameRequestIDFromBothSidesCreatesTwoMessages(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	id := uuid.NewV4()
-	b, err := f.sendWith(t, im.SendInput{RequestID: id, Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "買家"})
+	b, err := f.sendWith(t, im.SendInput{RequestID: id, Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "買家"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := f.sendWith(t, im.SendInput{RequestID: id, Sender: f.storeParty(t, f.s1), CounterpartID: b1, Type: im.TypeText, Text: "店家"})
+	s, err := f.sendWith(t, im.SendInput{RequestID: id, Sender: f.storeParty(t, s1), CounterpartID: b1, Type: im.TypeText, Text: "店家"})
 	if err != nil || s.ID == b.ID || s.Seq != 2 {
 		t.Fatalf("店家 %+v %v", s, err)
 	}
@@ -164,7 +164,7 @@ func TestConcurrentSameRequestIDWritesOnce(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				m, err := f.m.Send(context.Background(), im.SendInput{RequestID: ids[i], Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeText, Text: "並行" + string(rune('A'+i))})
+				m, err := f.m.Send(context.Background(), im.SendInput{RequestID: ids[i], Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "並行" + string(rune('A'+i))})
 				out <- result{i, m, err}
 			}()
 		}
@@ -197,8 +197,8 @@ func TestPartiesReadsOwnershipOnly(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	m := f.say(t, f.buyerParty(b1), f.s1, "歸屬")
-	want := im.ConversationParties{ConversationID: m.ConversationID, BuyerID: b1, StoreID: f.s1}
+	m := f.say(t, f.buyerParty(b1), s1, "歸屬")
+	want := im.ConversationParties{ConversationID: m.ConversationID, BuyerID: b1, StoreID: s1}
 	if got, err := f.m.ConversationParties(ctx, m.ConversationID); err != nil || got != want {
 		t.Fatalf("ConversationParties = %+v %v，預期 %+v", got, err, want)
 	}
@@ -231,7 +231,7 @@ func TestResendOfAHiddenOrErasedMessageReturnsATombstone(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	buyer := f.buyerParty(b1)
-	in := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: f.s1, Type: im.TypeText, Text: "之後被隱藏"}
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "之後被隱藏"}
 	first, err := f.sendWith(t, in)
 	if err != nil {
 		t.Fatal(err)
@@ -270,7 +270,7 @@ func TestConcurrentSameRequestIDImageSendsConfirmOneAsset(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			m, err := f.m.Send(context.Background(), im.SendInput{RequestID: rid, Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeImage, StagedToken: token})
+			m, err := f.m.Send(context.Background(), im.SendInput{RequestID: rid, Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token})
 			out <- result{m, err}
 		}()
 	}
@@ -310,7 +310,7 @@ func TestSecondSendOfTheSameRequestWaitsOnTheEntryLock(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	token, asset := f.stage(t, 1000+b1)
-	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: f.s1, Type: im.TypeImage, StagedToken: token}
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token}
 	held, rel := make(chan struct{}), make(chan struct{})
 	var releaseOnce sync.Once
 	release := func() { releaseOnce.Do(func() { close(rel) }) }

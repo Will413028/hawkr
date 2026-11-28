@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 func hide(t *testing.T, f *fixture, id uuid.UUID) review.Hide {
@@ -68,9 +67,7 @@ func TestRD1ViewerBlocksFilterBeforeThePageIsCut(t *testing.T) {
 	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(product))); st.Count != 5 {
 		t.Fatalf("統計不過濾：%+v", st)
 	}
-	if err := sellerfixture.BlockBuyer(ctx, f.db, storeID, buyersList[0], f.clock()); err != nil {
-		t.Fatal(err)
-	}
+	f.exec(t, "INSERT INTO seller.store_blocks (store_id, buyer_id, created_at) VALUES ($1, $2, $3)", storeID, buyersList[0], f.clock())
 	again := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), viewer.BuyerID, review.Filter{}, nil, 50))
 	if !sameIDs(ids(again), r3.ID, r2.ID, r1.ID) {
 		t.Fatalf("店家封鎖買家不影響可見性：%v", ids(again))

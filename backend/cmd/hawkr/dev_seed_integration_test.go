@@ -16,20 +16,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
-	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/policy"
-	"github.com/Will413028/hawkr/backend/internal/testkit/sellerfixture"
 )
 
 func setSellerEnv(t *testing.T) {
@@ -78,89 +68,6 @@ func count(t *testing.T, d *db.DB, query string, args ...any) int {
 		t.Fatal(err)
 	}
 	return n
-}
-
-type pendingDeletionOrders struct{}
-
-func (pendingDeletionOrders) HasOpenOrders(context.Context, int64) (bool, error) { return true, nil }
-func (pendingDeletionOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) {
-	return true, nil
-}
-
-func requestPendingDeletion(t *testing.T, d *db.DB, accountID int64) {
-	t.Helper()
-	ctx := context.Background()
-	bus := events.NewBus()
-	clock := time.Now
-	identityModule := identity.New(identity.Deps{DB: d, Events: bus, Now: clock})
-	buyerModule := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: clock})
-	if err := buyerModule.OnAccountCreated(ctx, identity.AccountCreated{AccountID: accountID, Name: "測試帳號"}); err != nil {
-		t.Fatal(err)
-	}
-	sellerModule, err := sellerfixture.NewModule(d, clock)
-	if err != nil {
-		t.Fatal(err)
-	}
-	deletion := accountdeletion.New(accountdeletion.Deps{
-		DB: d, Identity: identityModule, Buyer: buyerModule, Seller: sellerModule, Orders: pendingDeletionOrders{}, Now: clock,
-	})
-	state, err := deletion.Request(ctx, accountdeletion.RequestInput{AccountID: accountID, Requester: accountdeletion.AccountOwner})
-	if err != nil || state != accountdeletion.PendingOrders {
-		t.Fatalf("刪帳申請 state=%s err=%v，預期等待未完成訂單", state, err)
-	}
-}
-
-type seedRestock struct{}
-
-func (seedRestock) NotifyRestocked(context.Context, catalog.RestockedSKU) error { return nil }
-func (seedRestock) PurgeSKUSubscriptions(context.Context, []uuid.UUID) error    { return nil }
-
-func recordSeedProductView(t *testing.T, d *db.DB, storeID int64) {
-	t.Helper()
-	ctx := context.Background()
-	var categoryID uuid.UUID
-	if err := d.Pool().QueryRow(ctx, `SELECT id FROM catalog.categories WHERE parent_id IS NOT NULL ORDER BY id LIMIT 1`).Scan(&categoryID); err != nil {
-		t.Fatal(err)
-	}
-	bus := events.NewBus()
-	events.Subscribe(bus, func(context.Context, catalog.ProductCreated) error { return nil })
-	products := catalog.New(catalog.Deps{
-		DB: d, NewID: uuid.NewV7, Now: time.Now, Media: media.NewFake(), Events: bus, Restock: seedRestock{},
-	})
-	product, err := products.CreateProduct(ctx, storeID, media.Uploader{ID: 9}, uuid.NewV7(), catalog.ProductInput{
-		Title: "瀏覽測試商品", CategoryID: categoryID, Skus: []catalog.SkuInput{{Price: 100}}, Gallery: []catalog.Image{{Token: uuid.NewV7().String()}},
-	}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sellerModule, closeFn, err := openSellerCommand(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer closeFn()
-	if err := sellerModule.RecordProductView(ctx, product.ID); err != nil {
-		t.Fatal(err)
-	}
-	if n, err := sellerModule.RollupProductViews(ctx); err != nil || n != 1 {
-		t.Fatalf("處理商品瀏覽 %d 筆：%v", n, err)
-	}
-}
-
-func updateSeedProfile(t *testing.T, d *db.DB, storeID int64, name, townCode, prize string) {
-	t.Helper()
-	module, err := sellerfixture.NewModule(d, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store, err := module.Store(context.Background(), storeID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := module.UpdateProfile(context.Background(), seller.UpdateProfileInput{
-		StoreID: storeID, ExpectedVersion: store.Version, StoreName: &name, TownCode: &townCode, Prize: &prize,
-	}); err != nil {
-		t.Fatal(err)
-	}
 }
 
 // 種子的店家全部在 seller 模組的可曝光集合裡（模組自己的規則判斷，不是 SQL 重寫一份），資料庫參照的金鑰都在執行中的金鑰環裡。種子以 payment 的 fake 同步收款帳戶時，seller 的訂閱者在轉帳能力啟用時公告一次（version 1），全量重新公告之後是 version 2、可曝光。
@@ -348,7 +255,9 @@ func TestDevSeedRerunLeavesNoOrphanedViewRows(t *testing.T) {
 		t.Fatalf("dev-seed：%v", err)
 	}
 	storeID := devSeedStores()[0].StoreID
-	recordSeedProductView(t, d, storeID)
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.product_views_daily (store_id, day, views) VALUES ($1, CURRENT_DATE, 3)`, storeID); err != nil {
+		t.Fatal(err)
+	}
 	if err := runDevSeed(ctx, nil, new(bytes.Buffer)); err != nil {
 		t.Fatalf("第二次 dev-seed：%v", err)
 	}
@@ -416,13 +325,20 @@ func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.
 	d := devSeedEnv(t)
 	fixture := devSeedStores()
 	ids := []int64{fixture[0].StoreID, fixture[1].StoreID}
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := d.Pool().Exec(ctx, query, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := runDevSeed(ctx, nil, new(bytes.Buffer)); err != nil {
 		t.Fatalf("dev-seed：%v", err)
 	}
 	newAccount(t, d, 50001)
 	userStore := openStore(t, 50001, "使用者的店")
 	insertRiskSuspension(t, d, ids[0], true)
-	updateSeedProfile(t, d, ids[1], "被改過", "63000050", "獎")
+	exec(`INSERT INTO seller.suspension_periods (store_id, started_at, ended_at) VALUES ($1, now() - interval '2 hours', now() - interval '1 hour')`, ids[0])
+	exec(`UPDATE seller.stores SET store_name = '被改過', town_code = '63000050', prize = '獎', version = version + 1 WHERE store_id = $1`, ids[1])
 	if err := runReannounceExposures(ctx, nil, new(bytes.Buffer)); err != nil {
 		t.Fatal(err)
 	}
@@ -533,15 +449,8 @@ func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err == nil || !strings.Contains(err.Error(), "店家 "+strconv.FormatInt(buyerStore, 10)) {
 		t.Fatalf("種子買家帳號名下的店家應該被擋下：%v", err)
 	}
-	closeSeedStore(t, d, buyerStore)
-	newAccount(t, d, 60000)
-	module, err := sellerfixture.NewModuleWithStoreCode(d, time.Now, func(time.Time) (int64, error) { return 9, nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := module.Apply(ctx, seller.ApplyInput{
-		AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: 60000, StoreName: "佔用種子店碼", ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路一號",
-	}); err != nil {
+	closeStoreRow(t, d, buyerStore)
+	if _, err := d.Pool().Exec(ctx, `UPDATE seller.stores SET account_id = 60000, store_code = 9 WHERE store_id = $1`, other); err != nil {
 		t.Fatal(err)
 	}
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err == nil || !strings.Contains(err.Error(), "store_code 9") {
@@ -585,87 +494,59 @@ func mustExec(t *testing.T, d *db.DB, query string, args ...any) {
 
 func insertRiskSuspension(t *testing.T, d *db.DB, storeID int64, revoked bool) {
 	t.Helper()
-	module, err := sellerfixture.NewModule(d, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	reviewBy := time.Now().Add(7 * 24 * time.Hour)
-	created, err := module.CreateMeasure(context.Background(), seller.CreateMeasureInput{
-		AdminID: 1, StoreID: storeID, Kind: seller.MeasureSuspension, StatementToSeller: "s", Note: "n", ReviewBy: &reviewBy,
-		Risk: &seller.RiskBasis{Ground: seller.RiskFraud},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	status := "ENFORCED"
 	if revoked {
-		if _, err := module.RevokeMeasure(context.Background(), seller.RevokeMeasureInput{
-			MeasureID: created.Measure.ID, AdminID: 1, ExpectedVersion: created.Measure.Version, Reason: seller.RevokeAdminCorrection,
-		}); err != nil {
-			t.Fatal(err)
-		}
+		status = "REVOKED"
 	}
-}
-
-func insertExpiredRiskSuspension(t *testing.T, d *db.DB, storeID int64) {
-	t.Helper()
-	startedAt := time.Now().UTC().Add(-48 * time.Hour)
-	endsAt := startedAt.Add(24 * time.Hour)
-	module, err := sellerfixture.NewModule(d, func() time.Time { return startedAt })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := module.CreateMeasure(context.Background(), seller.CreateMeasureInput{
-		AdminID: 1, StoreID: storeID, Kind: seller.MeasureSuspension, StatementToSeller: "s", Note: "n", EndsAt: &endsAt,
-		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.Fraud, Severity: seller.SeverityLow}},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	mustExec(t, d, `WITH m AS (
+			INSERT INTO seller.measures (id, account_id, store_id, kind, basis, risk_ground, review_by, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at, status, revoked_reason, revoked_by_admin_id, revoked_at)
+			SELECT gen_random_uuid(), account_id, store_id, 'SUSPENSION', 'RISK', 'FRAUD', now() + interval '7 days', 's', 1, 1, now() - interval '2 hours', now() - interval '2 hours', now() - interval '2 hours', $2::text,
+				CASE WHEN $2::text = 'REVOKED' THEN 'OTHER' END, CASE WHEN $2::text = 'REVOKED' THEN 1::bigint END, CASE WHEN $2::text = 'REVOKED' THEN now() - interval '1 hour' END
+			FROM seller.stores WHERE store_id = $1 RETURNING id)
+		INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, admin_id, created_at)
+		SELECT id, 1, 's', 1, now() - interval '2 hours' FROM m`, storeID, status)
 }
 
 func insertTermination(t *testing.T, d *db.DB, storeID int64) {
 	t.Helper()
-	module, err := sellerfixture.NewModule(d, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := module.CreateMeasure(context.Background(), seller.CreateMeasureInput{
-		AdminID: 1, StoreID: storeID, Kind: seller.MeasureTermination, StatementToSeller: "s", Note: "n",
-		Termination: &seller.TerminationBasis{Ground: seller.GroundCeasedBusiness},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	mustExec(t, d, `WITH m AS (
+			INSERT INTO seller.measures (id, account_id, store_id, kind, basis, termination_ground, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
+			SELECT gen_random_uuid(), account_id, store_id, 'TERMINATION', 'CONTRACT', 'CEASED_BUSINESS', 's', 1, 1, now() - interval '2 hours', now() - interval '2 hours', now() - interval '2 hours'
+			FROM seller.stores WHERE store_id = $1 RETURNING id)
+		INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, admin_id, created_at)
+		SELECT id, 1, 's', 1, now() - interval '2 hours' FROM m`, storeID)
 }
 
 func insertViolationMeasure(t *testing.T, d *db.DB, storeID int64, id, kind string, withAppeal bool) {
 	t.Helper()
 	ctx := context.Background()
-	module, err := sellerfixture.NewModule(d, time.Now)
+	tx, err := d.Pool().Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var endsAt *time.Time
-	if kind == string(seller.MeasureSuspension) {
-		ends := time.Now().Add(24 * time.Hour)
-		endsAt = &ends
+	defer func() { _ = tx.Rollback(ctx) }()
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := tx.Exec(ctx, query, args...); err != nil {
+			t.Fatalf("%s：%v", query, err)
+		}
 	}
-	created, err := module.CreateMeasure(ctx, seller.CreateMeasureInput{
-		AdminID: 1, StoreID: storeID, Kind: seller.MeasureKind(kind), StatementToSeller: "s", Note: "n", EndsAt: endsAt,
-		Violation: &seller.ViolationBasis{Finding: &seller.NewFinding{Category: policy.Fraud, Severity: seller.SeverityLow}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	exec(`SET CONSTRAINTS ALL DEFERRED`)
+	exec(`INSERT INTO seller.violations (id, store_id, account_id, category, severity, origin_measure_id, created_by_admin_id, created_at, updated_at)
+		SELECT $2::uuid, store_id, account_id, 'FRAUD', 'LOW', $2::uuid, 1, now(), now() FROM seller.stores WHERE store_id = $1`, storeID, id)
+	exec(`INSERT INTO seller.measures (id, account_id, store_id, kind, basis, lead_finding_id, statement_to_seller, ends_at, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
+		SELECT $2::uuid, account_id, store_id, $3::text, 'VIOLATION', $2::uuid, 's', CASE WHEN $3::text = 'SUSPENSION' THEN now() + interval '1 day' END, 1, 1, now() - interval '1 hour', now() - interval '1 hour', now() - interval '1 hour' FROM seller.stores WHERE store_id = $1`, storeID, id, kind)
+	exec(`INSERT INTO seller.measure_findings (measure_id, violation_id) VALUES ($1, $1)`, id)
+	exec(`INSERT INTO seller.measure_revisions (measure_id, revision, statement_to_seller, ends_at, admin_id, created_at)
+		VALUES ($1, 1, 's', CASE WHEN $2::text = 'SUSPENSION' THEN now() + interval '1 day' END, 1, now() - interval '1 hour')`, id, kind)
+	exec(`INSERT INTO seller.governance_notes (note_id, measure_id, admin_id, body, created_at) VALUES (gen_random_uuid(), $1, 1, 'n', now())`, id)
 	if withAppeal {
-		store, err := module.Store(ctx, storeID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := module.SubmitAppeal(ctx, seller.SubmitAppealInput{
-			AccountID: store.AccountID, MeasureID: created.Measure.ID, ExpectedVersion: created.Measure.SellerVersion(),
-			Reason: "r", EvidenceTokens: []string{"dev-seed-appeal-evidence"},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		exec(`INSERT INTO seller.measure_requests (id, measure_id, kind, state, reason, revision, submitted_at, basis)
+			SELECT $1::uuid, $1::uuid, 'APPEAL', 'PENDING', 'r', 1, now(), basis FROM seller.measures WHERE id = $1`, id)
+		exec(`INSERT INTO seller.measure_request_evidence (request_id, position, asset_id, object_key) VALUES ($1, 0, '00000000-0000-7000-8000-0000000000c1', 'secure/a1')`, id)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -689,19 +570,19 @@ func TestDevSeedRefusesLifecycleStateItWouldHaveToRevert(t *testing.T) {
 			insertTermination(t, d, ids[0])
 		}, []string{"種子帳號 9", "生效中的終止合作措施", "RevokeMeasure"}},
 		{"進行中的停權期間", func(t *testing.T, d *db.DB) {
-			insertExpiredRiskSuspension(t, d, ids[0])
+			mustExec(t, d, `INSERT INTO seller.suspension_periods (store_id, started_at) VALUES ($1, now())`, ids[0])
 		}, []string{"種子帳號名下的店家 1009", "進行中的停權期間"}},
 		{"等待刪除", func(t *testing.T, d *db.DB) {
-			requestPendingDeletion(t, d, 4)
+			mustExec(t, d, `UPDATE seller.stores SET status = 'PENDING_DELETION' WHERE store_id = $1`, ids[1])
 		}, []string{"種子帳號名下的店家 1004", "店家狀態 PENDING_DELETION", "重建本機資料庫"}},
 		{"已關閉", func(t *testing.T, d *db.DB) {
-			closeSeedStore(t, d, ids[0])
+			closeStoreRow(t, d, ids[0])
 		}, []string{"種子帳號名下的店家 1009", "店家狀態 CLOSED"}},
 		{"進行中的刪帳申請", func(t *testing.T, d *db.DB) {
-			requestPendingDeletion(t, d, 4)
+			mustExec(t, d, `INSERT INTO accountdeletion.deletion_requests (id, account_id, status, requested_at) VALUES (gen_random_uuid(), 4, 'PENDING_ORDERS', now())`)
 		}, []string{"帳號 [4]", "刪帳申請"}},
 		{"種子買家帳號有進行中的刪帳申請", func(t *testing.T, d *db.DB) {
-			requestPendingDeletion(t, d, 2001)
+			mustExec(t, d, `INSERT INTO accountdeletion.deletion_requests (id, account_id, status, requested_at) VALUES (gen_random_uuid(), 2001, 'PENDING_ORDERS', now())`)
 		}, []string{"帳號 [2001]", "刪帳申請"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -731,30 +612,29 @@ func TestDevSeedRefusesLifecycleStateItWouldHaveToRevert(t *testing.T) {
 // mutation：把 lifecycleStatesSQL 兩段的 `OR ... account_id = ANY($3)` 拿掉，兩個子測試失敗。
 func TestDevSeedRefusesSanctionOnAnotherStintOfASeedAccount(t *testing.T) {
 	ctx := context.Background()
-	for _, tc := range []struct {
-		name    string
-		expired bool
-		want    string
-	}{
-		{"停權", false, "生效中的停權措施（RISK）"},
-		{"停權期間", true, "進行中的停權期間"},
+	for _, tc := range []struct{ name, insert, want string }{
+		{"停權", "", "生效中的停權措施（RISK）"},
+		{"停權期間", `INSERT INTO seller.suspension_periods (store_id, started_at) VALUES ($1, now())`, "進行中的停權期間"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := devSeedEnv(t)
-			old := openStore(t, 9, "舊任期")
-			if tc.expired {
-				insertExpiredRiskSuspension(t, d, old)
-			} else {
+			seedOK(t)
+			newAccount(t, d, 3005)
+			old := openStore(t, 3005, "舊任期")
+			closeStoreRow(t, d, old)
+			mustExec(t, d, `UPDATE seller.stores SET account_id = 9 WHERE store_id = $1`, old)
+			if tc.insert == "" {
 				insertRiskSuspension(t, d, old, false)
+			} else {
+				mustExec(t, d, tc.insert, old)
 			}
-			closeSeedStore(t, d, old)
 			for _, args := range [][]string{{"-check"}, nil} {
 				err := runDevSeed(ctx, args, new(bytes.Buffer))
 				if err == nil {
 					t.Fatalf("dev-seed %v 應該拒絕", args)
 				}
 				who := "種子帳號名下的店家 " + strconv.FormatInt(old, 10)
-				if !tc.expired {
+				if tc.insert == "" {
 					who = "種子帳號 9"
 				}
 				for _, w := range []string{who, tc.want} {
@@ -767,19 +647,12 @@ func TestDevSeedRefusesSanctionOnAnotherStintOfASeedAccount(t *testing.T) {
 	}
 }
 
-func closeSeedStore(t *testing.T, d *db.DB, storeID int64) {
+func closeStoreRow(t *testing.T, d *db.DB, storeID int64) {
 	t.Helper()
-	module, err := sellerfixture.NewModule(d, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store, err := module.Store(context.Background(), storeID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := module.CloseCurrent(context.Background(), store.AccountID); err != nil {
-		t.Fatal(err)
-	}
+	mustExec(t, d, `WITH c AS (INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, '2026-01-01T00:00:00Z', 'ACCOUNT_OWNER') RETURNING closed_at)
+		UPDATE seller.stores SET status = 'CLOSED', current_closed_at = (SELECT closed_at FROM c), logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL
+		WHERE store_id = $1`, storeID)
+	mustExec(t, d, `DELETE FROM identity.account_roles WHERE account_id = (SELECT account_id FROM seller.stores WHERE store_id = $1)`, storeID)
 }
 
 // 種子帳號名下的「已關閉」非種子店家不擋前提檢查（角色已移除，種子動不到它）；種子照常執行、已關閉的店家原封不動。
@@ -787,7 +660,7 @@ func TestDevSeedCheckAllowsAClosedStoreOfASeedAccount(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
 	closed := openStore(t, 9, "開過又關掉的店")
-	closeSeedStore(t, d, closed)
+	closeStoreRow(t, d, closed)
 	if err := runDevSeed(ctx, []string{"-check"}, new(bytes.Buffer)); err != nil {
 		t.Fatalf("已關閉的非種子店家不該擋前提檢查：%v", err)
 	}
@@ -817,7 +690,7 @@ func TestDevSeedPublishesTheProfileChangedEventWhenItRestoresTheProfile(t *testi
 	if got := profileChangedEvents(t, d, a); got != baseA {
 		t.Errorf("profile 沒變的重跑不該發事件：1009 的事件 %d → %d", baseA, got)
 	}
-	updateSeedProfile(t, d, a, "被改過", "63000010", "獎")
+	mustExec(t, d, `UPDATE seller.stores SET store_name = '被改過', prize = '獎' WHERE store_id = $1`, a)
 	seedOK(t)
 	if got := profileChangedEvents(t, d, a); got != baseA+1 {
 		t.Errorf("還原 profile 要發一個 StoreProfileChanged：1009 的事件 %d → %d，want %d", baseA, got, baseA+1)
@@ -832,21 +705,12 @@ func TestDevSeedPublishesTheProfileChangedEventWhenItRestoresTheProfile(t *testi
 func TestDevSeedDeletesTheEvidenceRowsItOwns(t *testing.T) {
 	d := devSeedEnv(t)
 	seedOK(t)
-	if err := runReannounceExposures(context.Background(), nil, new(bytes.Buffer)); err != nil {
-		t.Fatal(err)
-	}
 	id := devSeedStores()[0].StoreID
 	app := rowJSON(t, d, `SELECT application_id::text FROM seller.kyc_applications WHERE store_id = $1`, id)
 	mustExec(t, d, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ($1, 0, '00000000-0000-7000-8000-0000000000c2', 'secure/k1')`, app)
-	module, err := sellerfixture.NewModule(d, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := module.SubmitReport(context.Background(), seller.SubmitReportInput{
-		StoreID: id, ReporterBuyerID: 7, AccountID: 4, Category: policy.Fraud, Description: "d", EvidenceTokens: []string{"dev-seed-report-evidence"},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	mustExec(t, d, `INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at)
+		VALUES ('00000000-0000-7000-8000-0000000000a1', $1, 'OTHER', 'd', 7, now(), now())`, id)
+	mustExec(t, d, `INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('00000000-0000-7000-8000-0000000000a1', 0, 0, '00000000-0000-7000-8000-0000000000c3', 'secure/r1')`)
 	insertViolationMeasure(t, d, id, "00000000-0000-7000-8000-0000000000b1", "WARNING", true)
 	seedOK(t)
 	if n := count(t, d, `SELECT (SELECT count(*) FROM seller.kyc_documents WHERE asset_id IN ('00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-0000000000c2', '00000000-0000-7000-8000-0000000000c3'))
