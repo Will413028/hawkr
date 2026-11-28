@@ -93,25 +93,43 @@ func (s *Service) ProcessCopies(ctx context.Context) (int, error) {
 	}
 	var errs []error
 	total := 0
+	after := store.ListPendingCopyRequestsParams{MaxRows: rewrapBatch}
 	for {
-		rows, err := s.q(ctx).ListPendingCopyRequests(ctx, rewrapBatch)
+		rows, err := s.q(ctx).ListPendingCopyRequests(ctx, after)
 		if err != nil {
 			return total, errors.Join(append(errs, fmt.Errorf("media：列出待複製的請求：%w", err))...)
 		}
-		progress := 0
 		for _, r := range rows {
 			if err := s.copyOne(ctx, r); err != nil {
 				errs = append(errs, err)
 				continue
 			}
-			progress++
+			total++
 		}
-		total += progress
-		if progress == 0 || len(rows) < rewrapBatch {
+		if len(rows) < rewrapBatch {
 			break
 		}
+		last := rows[len(rows)-1]
+		after.AfterRequestedAt, after.AfterID = last.RequestedAt, last.AssetID
 	}
 	return total, errors.Join(errs...)
+}
+
+func (s *Service) CopyStatus(ctx context.Context, copyID uuid.UUID) (model.CopyStatus, error) {
+	r, err := s.q(ctx).GetCopyRequest(ctx, copyID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", model.ErrAssetNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("media：讀取複製請求 %s：%w", copyID, err)
+	}
+	switch {
+	case r.CompletedAt != nil:
+		return model.CopyCompleted, nil
+	case r.FailedAt != nil:
+		return model.CopyFailed, nil
+	}
+	return model.CopyPending, nil
 }
 
 func (s *Service) copyOne(ctx context.Context, r store.MediaAssetCopyRequest) error {
@@ -162,8 +180,9 @@ func (s *Service) copyOne(ctx context.Context, r store.MediaAssetCopyRequest) er
 		}
 		keys = append(keys, key)
 	}
-	won, abandoned := false, false
-	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	won, abandoned, callbackDone := false, false, false
+	err = s.d.DB.InTx(ctx, func(ctx context.Context) (txErr error) {
+		defer func() { callbackDone = txErr == nil }()
 		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
 			return err
 		}
@@ -202,7 +221,10 @@ func (s *Service) copyOne(ctx context.Context, r store.MediaAssetCopyRequest) er
 		won = true
 		return nil
 	})
-	if err != nil || !won {
+	switch {
+	case err != nil && callbackDone && won:
+		s.recordOrphanObjects(ctx, keys, err)
+	case err != nil || !won:
 		s.deleteCopyObjects(ctx, keys)
 	}
 	if err == nil && abandoned {
@@ -225,6 +247,17 @@ func (s *Service) putCopyChunk(ctx context.Context, assetID uuid.UUID, dek, data
 		return "", fmt.Errorf("media：寫入副本 %s 的第 %d 段：%w", assetID, index, err)
 	}
 	return key, nil
+}
+
+func (s *Service) recordOrphanObjects(ctx context.Context, keys []string, cause error) {
+	ctx = context.WithoutCancel(ctx)
+	for _, key := range keys {
+		if err := s.q(ctx).InsertOrphanObject(ctx, store.InsertOrphanObjectParams{ObjectKey: key, Now: s.d.Now()}); err != nil {
+			s.d.Logger.ErrorContext(ctx, "media：提交結果不明的副本段沒能記入待刪清單，物件可能遺留", "key", key, "error", cause, "record_error", err)
+			continue
+		}
+		s.d.Logger.WarnContext(ctx, "media：提交結果不明，副本段記入待刪清單，回收 job 會先確認沒有被引用才刪", "key", key, "error", cause)
+	}
 }
 
 func (s *Service) deleteCopyObjects(ctx context.Context, keys []string) {
@@ -255,6 +288,9 @@ func (s *Service) failCopy(ctx context.Context, r store.MediaAssetCopyRequest, r
 		}
 		if err := hold.ReleaseSource(ctx, q, model.CopySource, r.AssetID); err != nil {
 			return fmt.Errorf("media：釋放待複製保全：%w", err)
+		}
+		if _, err := q.RequestDeletions(ctx, store.RequestDeletionsParams{Ids: []uuid.UUID{r.AssetID}, Now: failedAt}); err != nil {
+			return fmt.Errorf("media：請求刪除放棄的副本資產：%w", err)
 		}
 		return nil
 	})

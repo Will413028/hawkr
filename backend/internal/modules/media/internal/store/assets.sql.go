@@ -528,13 +528,16 @@ func (q *Queries) ListAssetIDs(ctx context.Context) ([]uuid.UUID, error) {
 }
 
 const listAssetStates = `-- name: ListAssetStates :many
-SELECT id, state, visibility FROM media.assets WHERE id = ANY($1::uuid[]) ORDER BY id
+SELECT a.id, a.state, a.visibility,
+    EXISTS (SELECT 1 FROM media.upload_claims AS c WHERE c.asset_id = a.id AND c.kind = 'CONFIRMED')::boolean AS confirmed
+FROM media.assets AS a WHERE a.id = ANY($1::uuid[]) ORDER BY a.id
 `
 
 type ListAssetStatesRow struct {
 	ID         uuid.UUID
 	State      string
 	Visibility string
+	Confirmed  bool
 }
 
 func (q *Queries) ListAssetStates(ctx context.Context, ids []uuid.UUID) ([]ListAssetStatesRow, error) {
@@ -546,7 +549,12 @@ func (q *Queries) ListAssetStates(ctx context.Context, ids []uuid.UUID) ([]ListA
 	items := []ListAssetStatesRow{}
 	for rows.Next() {
 		var i ListAssetStatesRow
-		if err := rows.Scan(&i.ID, &i.State, &i.Visibility); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.State,
+			&i.Visibility,
+			&i.Confirmed,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -700,12 +708,19 @@ func (q *Queries) ListDeletingAssets(ctx context.Context, arg ListDeletingAssets
 const listPendingCopyRequests = `-- name: ListPendingCopyRequests :many
 SELECT asset_id, source_asset_id, requested_at, completed_at, failed_at FROM media.asset_copy_requests
 WHERE completed_at IS NULL AND failed_at IS NULL
+  AND (requested_at, asset_id) > ($1::timestamptz, $2::uuid)
 ORDER BY requested_at, asset_id
-LIMIT $1
+LIMIT $3
 `
 
-func (q *Queries) ListPendingCopyRequests(ctx context.Context, maxRows int32) ([]MediaAssetCopyRequest, error) {
-	rows, err := q.db.Query(ctx, listPendingCopyRequests, maxRows)
+type ListPendingCopyRequestsParams struct {
+	AfterRequestedAt time.Time
+	AfterID          uuid.UUID
+	MaxRows          int32
+}
+
+func (q *Queries) ListPendingCopyRequests(ctx context.Context, arg ListPendingCopyRequestsParams) ([]MediaAssetCopyRequest, error) {
+	rows, err := q.db.Query(ctx, listPendingCopyRequests, arg.AfterRequestedAt, arg.AfterID, arg.MaxRows)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +795,7 @@ func (q *Queries) LockAssetStateShared(ctx context.Context, id uuid.UUID) (strin
 }
 
 const lockDeletingAsset = `-- name: LockDeletingAsset :one
-SELECT id FROM media.assets WHERE id = $1 AND state = 'DELETING' FOR UPDATE
+SELECT id FROM media.assets WHERE id = $1 AND state = 'DELETING' FOR NO KEY UPDATE
 `
 
 func (q *Queries) LockDeletingAsset(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {

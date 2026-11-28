@@ -142,7 +142,7 @@ WHERE u.id IN (
   AND u.state = 'READY';
 
 -- name: LockDeletingUpload :one
-SELECT id, asset_id, planned_asset_id FROM media.staged_uploads WHERE id = sqlc.arg(id) AND state = 'DELETING' FOR UPDATE;
+SELECT id, asset_id, planned_asset_id FROM media.staged_uploads WHERE id = sqlc.arg(id) AND state = 'DELETING' FOR NO KEY UPDATE;
 
 -- name: RestoreHeldUpload :execrows
 UPDATE media.staged_uploads SET state = 'READY', updated_at = sqlc.arg(now)
@@ -171,6 +171,9 @@ SELECT object_key FROM media.orphan_objects
 WHERE object_key > sqlc.arg(after_key)
 ORDER BY object_key
 LIMIT sqlc.arg(max_rows);
+
+-- name: IsChunkObjectReferenced :one
+SELECT EXISTS (SELECT 1 FROM media.secure_chunks WHERE object_key = sqlc.arg(object_key))::boolean;
 
 -- name: DeleteOrphanObject :exec
 DELETE FROM media.orphan_objects WHERE object_key = sqlc.arg(object_key);

@@ -21,6 +21,8 @@ const (
 
 	lockNotAvailable    = "55P03"
 	foreignKeyViolation = "23503"
+	holdGateFKey        = "asset_holds_gate_fkey"
+	holdReleaseFKey     = "asset_hold_releases_hold_fkey"
 	gateAttempts        = 3
 )
 
@@ -37,9 +39,13 @@ func SetLockTimeout(ctx context.Context, c execer) error {
 	return nil
 }
 
-func classifyHoldInsert(err error) error {
+func isHoldForeignKey(err error) bool {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
+	return errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation && (pgErr.ConstraintName == holdGateFKey || pgErr.ConstraintName == holdReleaseFKey)
+}
+
+func classifyHoldInsert(err error) error {
+	if isHoldForeignKey(err) {
 		return fmt.Errorf("%w：%w", model.ErrHoldContended, err)
 	}
 	return err
@@ -47,7 +53,7 @@ func classifyHoldInsert(err error) error {
 
 func IsContention(err error) bool {
 	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && (pgErr.Code == lockNotAvailable || pgErr.Code == foreignKeyViolation)
+	return errors.As(err, &pgErr) && pgErr.Code == lockNotAvailable || isHoldForeignKey(err)
 }
 
 func sortedIDs(assetIDs []uuid.UUID) []uuid.UUID {
@@ -73,6 +79,11 @@ func Place(ctx context.Context, q *store.Queries, assetIDs []uuid.UUID, source s
 	}
 	if len(states) != len(ids) {
 		return model.ErrAssetNotFound
+	}
+	for _, r := range states {
+		if !r.Confirmed {
+			return model.ErrAssetNotFound
+		}
 	}
 	if secureOnly {
 		for _, r := range states {
@@ -125,7 +136,7 @@ func Extend(ctx context.Context, q *store.Queries, source string, sourceID uuid.
 }
 
 func Release(ctx context.Context, q *store.Queries, source string, sourceID uuid.UUID, now time.Time) error {
-	if err := q.ReleaseHolds(ctx, store.ReleaseHoldsParams{Source: source, SourceID: sourceID, Now: now}); err != nil {
+	if err := classifyHoldInsert(q.ReleaseHolds(ctx, store.ReleaseHoldsParams{Source: source, SourceID: sourceID, Now: now})); err != nil {
 		return fmt.Errorf("media：解除保全：%w", err)
 	}
 	return nil

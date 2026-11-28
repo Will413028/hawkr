@@ -439,6 +439,17 @@ func (q *Queries) InsertUpload(ctx context.Context, arg InsertUploadParams) erro
 	return err
 }
 
+const isChunkObjectReferenced = `-- name: IsChunkObjectReferenced :one
+SELECT EXISTS (SELECT 1 FROM media.secure_chunks WHERE object_key = $1)::boolean
+`
+
+func (q *Queries) IsChunkObjectReferenced(ctx context.Context, objectKey string) (bool, error) {
+	row := q.db.QueryRow(ctx, isChunkObjectReferenced, objectKey)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const listDeletingUploads = `-- name: ListDeletingUploads :many
 SELECT id, tmp_key, final_key, asset_id, planned_asset_id FROM media.staged_uploads
 WHERE state = 'DELETING' AND id > $1
@@ -641,7 +652,7 @@ func (q *Queries) ListUploadsToRewrap(ctx context.Context, arg ListUploadsToRewr
 }
 
 const lockDeletingUpload = `-- name: LockDeletingUpload :one
-SELECT id, asset_id, planned_asset_id FROM media.staged_uploads WHERE id = $1 AND state = 'DELETING' FOR UPDATE
+SELECT id, asset_id, planned_asset_id FROM media.staged_uploads WHERE id = $1 AND state = 'DELETING' FOR NO KEY UPDATE
 `
 
 type LockDeletingUploadRow struct {

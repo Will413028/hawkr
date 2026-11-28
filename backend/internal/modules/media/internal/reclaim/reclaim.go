@@ -336,9 +336,16 @@ func (s *Service) deleteOrphanObjects(ctx context.Context) error {
 			return errors.Join(append(errs, fmt.Errorf("media：列出待刪的遺留物件：%w", err))...)
 		}
 		for _, key := range keys {
-			if err := s.d.Store.Delete(ctx, key); err != nil {
-				errs = append(errs, fmt.Errorf("media：刪除遺留物件 %s：%w", key, err))
+			referenced, err := s.q(ctx).IsChunkObjectReferenced(ctx, key)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("media：查遺留物件 %s 有沒有被引用：%w", key, err))
 				continue
+			}
+			if !referenced {
+				if err := s.d.Store.Delete(ctx, key); err != nil {
+					errs = append(errs, fmt.Errorf("media：刪除遺留物件 %s：%w", key, err))
+					continue
+				}
 			}
 			if err := s.q(ctx).DeleteOrphanObject(ctx, key); err != nil {
 				errs = append(errs, fmt.Errorf("media：移除遺留物件 %s 的記錄：%w", key, err))
@@ -416,6 +423,9 @@ func (s *Service) deleteUpload(ctx context.Context, r store.ListDeletingUploadsR
 func (s *Service) recheckUpload(ctx context.Context, id uuid.UUID) (bool, error) {
 	proceed := false
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
+		}
 		q := s.q(ctx)
 		row, err := q.LockDeletingUpload(ctx, id)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -451,6 +461,10 @@ func (s *Service) recheckUpload(ctx context.Context, id uuid.UUID) (bool, error)
 		proceed = true
 		return nil
 	})
+	if hold.IsContention(err) {
+		s.d.Logger.Info("media：實體刪除撞上擁有者未提交的保全，跳過", "upload_id", id)
+		return false, nil
+	}
 	return proceed, err
 }
 
@@ -493,6 +507,9 @@ func (s *Service) deleteAsset(ctx context.Context, r store.ListDeletingAssetsRow
 func (s *Service) recheckAsset(ctx context.Context, id uuid.UUID) (bool, error) {
 	proceed := false
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
+		}
 		q := s.q(ctx)
 		if _, err := q.LockDeletingAsset(ctx, id); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -517,6 +534,10 @@ func (s *Service) recheckAsset(ctx context.Context, id uuid.UUID) (bool, error) 
 		}
 		return nil
 	})
+	if hold.IsContention(err) {
+		s.d.Logger.Info("media：實體刪除撞上擁有者未提交的保全，跳過", "asset_id", id)
+		return false, nil
+	}
 	return proceed, err
 }
 

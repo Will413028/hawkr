@@ -44,6 +44,14 @@ var ErrAssetNotFound = errors.New("media：資產不存在")
 
 var ErrHoldNotFound = errors.New("media：找不到該來源的保全")
 
+type CopyStatus string
+
+const (
+	CopyPending   CopyStatus = "PENDING"
+	CopyCompleted CopyStatus = "COMPLETED"
+	CopyFailed    CopyStatus = "FAILED"
+)
+
 const CopySource = "media.copy_to_secure"
 
 const CopyHoldTTL = time.Hour

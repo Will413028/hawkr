@@ -439,8 +439,14 @@ func TestCopyToSecureProducesIndependentSecureCopy(t *testing.T) {
 	if _, _, err := f.m.ReadSecure(t.Context(), copyID); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("複製完成前讀副本 = %v，預期 NotFound", err)
 	}
+	if got, err := f.m.CopyStatus(t.Context(), copyID); err != nil || got != media.CopyPending {
+		t.Fatalf("複製前 CopyStatus = %q, %v，預期 PENDING", got, err)
+	}
 	if n, err := f.m.ProcessCopies(t.Context()); err != nil || n != 1 {
 		t.Fatalf("ProcessCopies = %d, %v", n, err)
+	}
+	if got, err := f.m.CopyStatus(t.Context(), copyID); err != nil || got != media.CopyCompleted {
+		t.Fatalf("複製後 CopyStatus = %q, %v，預期 COMPLETED", got, err)
 	}
 	rc, ct, err := f.m.ReadSecure(t.Context(), copyID)
 	if err != nil {
@@ -524,6 +530,129 @@ func TestCopyToSecureAbandonsTheRequestWhenTheOriginalIsGone(t *testing.T) {
 	}
 	if n := count(t, f, `SELECT count(*) FROM media.asset_copy_requests WHERE asset_id = $1 AND failed_at IS NOT NULL`, copyID); n != 1 {
 		t.Fatal("複製請求要標為失敗")
+	}
+	if got, err := f.m.CopyStatus(t.Context(), copyID); err != nil || got != media.CopyFailed {
+		t.Fatalf("放棄後 CopyStatus = %q, %v，預期 FAILED", got, err)
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.asset_deletion_requests WHERE asset_id = $1`, copyID); n != 1 {
+		t.Fatalf("放棄的副本資產沒有被請求刪除，刪除請求 %d 筆", n)
+	}
+	if got := assetState(t, f, copyID); got == "ACTIVE" {
+		t.Fatalf("放棄的副本資產仍是 %s", got)
+	}
+	deleteAll(t, f)
+	if got := physicalAssetState(t, f, copyID); got != "DELETED" {
+		t.Fatalf("放棄的副本資產走完刪除流程後 = %s，預期 DELETED", got)
+	}
+}
+
+func TestCopyStatusOfUnknownCopyIsAssetNotFound(t *testing.T) {
+	f := setup(t)
+	if _, err := f.m.CopyStatus(t.Context(), uuid.New()); !errors.Is(err, media.ErrAssetNotFound) {
+		t.Fatalf("不存在的副本 CopyStatus = %v，預期 ErrAssetNotFound", err)
+	}
+}
+
+func TestProcessCopiesReachesALaterRequestPastAFailingHead(t *testing.T) {
+	f := setup(t)
+	src, _ := publicSource(t, f)
+	now := f.clock.Now()
+	if _, err := f.d.Pool().Exec(t.Context(), `WITH a AS (
+			INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at)
+			SELECT gen_random_uuid(), 'SECURE', 'secure/crafted-' || g || '/', 'application/pdf', $1, 'STAGED', 'no-such-kek', '\x01'::bytea, 1, $2, $2
+			FROM generate_series(1, 100) AS g RETURNING id)
+		INSERT INTO media.asset_copy_requests (asset_id, source_asset_id, requested_at) SELECT id, $3, $2 - interval '1 hour' FROM a`,
+		src.SizeBytes, now, src.ID); err != nil {
+		t.Fatal(err)
+	}
+	copyID := requestCopy(t, f, src.ID, now.Add(24*time.Hour))
+	n, err := f.m.ProcessCopies(t.Context())
+	if n != 1 || err == nil {
+		t.Fatalf("ProcessCopies = %d, %v，預期完成排在後面的 1 筆並回報前面失敗的錯誤", n, err)
+	}
+	if got, err := f.m.CopyStatus(t.Context(), copyID); err != nil || got != media.CopyCompleted {
+		t.Fatalf("排在後面的請求 CopyStatus = %q, %v，預期 COMPLETED", got, err)
+	}
+}
+
+func TestHoldRejectsUnconfirmedSecureAsset(t *testing.T) {
+	f := setup(t)
+	id := uuid.New()
+	if _, err := f.d.Pool().Exec(t.Context(), `INSERT INTO media.assets (id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at)
+		VALUES ($1, 'SECURE', $2, 'application/pdf', 10, 'STAGED', 'k1', '\x01'::bytea, 1, $3, $3)`, id, "secure/"+id.String()+"/", f.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	err := holdInTx(f, id, uuid.New(), f.clock.Now().Add(time.Hour))
+	if !errors.Is(err, media.ErrAssetNotFound) {
+		t.Fatalf("Hold 對未確認的機敏資產 = %v，預期 ErrAssetNotFound", err)
+	}
+	if n := holdsOf(t, f, id); n != 0 {
+		t.Fatalf("被拒的 Hold 留下 %d 筆保全列", n)
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.asset_gates WHERE asset_id = $1`, id); n != 0 {
+		t.Fatalf("被拒的 Hold 留下 %d 個閘門", n)
+	}
+}
+
+func TestOrphanRecordForAReferencedChunkIsDroppedWithoutDeletingTheObject(t *testing.T) {
+	f := setup(t)
+	src, _ := publicSource(t, f)
+	copyID := requestCopy(t, f, src.ID, f.clock.Now().Add(24*time.Hour))
+	if n, err := f.m.ProcessCopies(t.Context()); err != nil || n != 1 {
+		t.Fatalf("ProcessCopies = %d, %v", n, err)
+	}
+	keys := chunkKeys(t, f, copyID)
+	if len(keys) == 0 || !hasAll(f, keys) {
+		t.Fatal("測試前提：副本的段物件要在")
+	}
+	if _, err := f.d.Pool().Exec(t.Context(), `INSERT INTO media.orphan_objects (object_key, recorded_at) VALUES ($1, $2)`, keys[0], f.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if !hasAll(f, keys) {
+		t.Fatal("已被 secure_chunks 引用的物件被待刪清單刪掉了")
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.orphan_objects`); n != 0 {
+		t.Fatalf("被引用的物件的待刪記錄要移除，還有 %d 筆", n)
+	}
+	if _, _, err := f.m.ReadSecure(t.Context(), copyID); err != nil {
+		t.Fatalf("副本讀不到：%v", err)
+	}
+}
+
+func TestDeleteAssetSkipsARowLockedByAnotherTransactionWithoutWaiting(t *testing.T) {
+	f := setup(t)
+	a, keys := secureConfirmed(t, f)
+	if err := markDeletedInTx(f, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	applyDeletions(t, f)
+	tx, err := f.d.Pool().Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback(context.WithoutCancel(t.Context())) })
+	if _, err := tx.Exec(t.Context(), `SELECT id FROM media.assets WHERE id = $1 FOR NO KEY UPDATE`, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	n, err := f.m.DeleteAssets(t.Context())
+	if elapsed := time.Since(start); err != nil || n != 0 || elapsed > 10*time.Second {
+		t.Fatalf("資產列被別的 transaction 鎖住時 DeleteAssets = %d, %v，耗時 %v，預期跳過且不被拖住", n, err, elapsed)
+	}
+	if !hasAll(f, keys) {
+		t.Fatal("跳過的資產物件被刪了")
+	}
+	if err := tx.Rollback(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := physicalAssetState(t, f, a.ID); got != "DELETED" {
+		t.Fatalf("鎖釋放後資產 = %s，預期 DELETED", got)
 	}
 }
 

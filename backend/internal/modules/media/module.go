@@ -37,6 +37,7 @@ func Migrations() fs.FS {
 type (
 	// Visibility 是資產的可見性。
 	Visibility = model.Visibility
+	CopyStatus = model.CopyStatus
 	// UploadState 是暫存上傳的狀態。
 	UploadState = model.UploadState
 	// RejectReason 是暫存上傳被拒絕的原因代碼。
@@ -81,6 +82,10 @@ const (
 	AssetActive   = model.AssetActive
 	AssetDeleting = model.AssetDeleting
 	AssetDeleted  = model.AssetDeleted
+
+	CopyPending   = model.CopyPending
+	CopyCompleted = model.CopyCompleted
+	CopyFailed    = model.CopyFailed
 
 	UploadPending   = model.StatePending
 	UploadUploading = model.StateUploading
@@ -148,7 +153,6 @@ var (
 	// ErrNoTransaction：Confirm、MarkDeleted 必須在擁有者的 transaction 內呼叫。
 	ErrNoTransaction = model.ErrNoTransaction
 	ErrAssetGone     = model.ErrAssetGone
-	// ErrHoldContended：Hold、ExtendHold 的 INSERT 撞上閘門被刪除或撤掉（外鍵），擁有者的 transaction 已中止，分不出是資產刪除還是閘門只是被撤；分類是 Unavailable，擁有者重試整個 transaction：成功，或讀閘門時得到 ErrAssetGone。
 	ErrHoldContended = model.ErrHoldContended
 	ErrAssetNotFound = model.ErrAssetNotFound
 	ErrHoldNotFound  = model.ErrHoldNotFound
@@ -289,6 +293,10 @@ func (m *Module) CopyToSecure(ctx context.Context, uploader Uploader, sourceID u
 	return m.upload.CopyToSecure(ctx, uploader, sourceID)
 }
 
+func (m *Module) CopyStatus(ctx context.Context, copyID uuid.UUID) (CopyStatus, error) {
+	return m.upload.CopyStatus(ctx, copyID)
+}
+
 func (m *Module) ProcessCopies(ctx context.Context) (int, error) { return m.upload.ProcessCopies(ctx) }
 
 // ProcessUpload 是 media.process_upload job 的內容，給 worker 與測試呼叫。
@@ -331,7 +339,6 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	reclaim.AddWorkers(workers, m.reclaim)
 }
 
-// PeriodicJobs 回傳暫存 GC、保全到期整理與副本複製的排程。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	return append(reclaim.PeriodicJobs(), upload.PeriodicJobs()...)
 }

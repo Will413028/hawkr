@@ -78,7 +78,9 @@ DELETE FROM media.upload_claims WHERE asset_id = sqlc.arg(asset_id)::uuid;
 DELETE FROM media.asset_deletion_requests WHERE asset_id = sqlc.arg(asset_id);
 
 -- name: ListAssetStates :many
-SELECT id, state, visibility FROM media.assets WHERE id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY id;
+SELECT a.id, a.state, a.visibility,
+    EXISTS (SELECT 1 FROM media.upload_claims AS c WHERE c.asset_id = a.id AND c.kind = 'CONFIRMED')::boolean AS confirmed
+FROM media.assets AS a WHERE a.id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY a.id;
 
 -- name: LockAssetStateShared :one
 SELECT state FROM media.assets WHERE id = sqlc.arg(id)::uuid FOR SHARE;
@@ -171,7 +173,7 @@ LIMIT sqlc.arg(max_rows);
 SELECT DISTINCT asset_id FROM media.asset_holds WHERE source = sqlc.arg(source) AND source_id = sqlc.arg(source_id)::uuid ORDER BY asset_id;
 
 -- name: LockDeletingAsset :one
-SELECT id FROM media.assets WHERE id = sqlc.arg(id) AND state = 'DELETING' FOR UPDATE;
+SELECT id FROM media.assets WHERE id = sqlc.arg(id) AND state = 'DELETING' FOR NO KEY UPDATE;
 
 -- name: IsAssetHeld :one
 SELECT EXISTS (
@@ -201,6 +203,7 @@ SELECT * FROM media.asset_copy_requests WHERE asset_id = sqlc.arg(asset_id);
 -- name: ListPendingCopyRequests :many
 SELECT * FROM media.asset_copy_requests
 WHERE completed_at IS NULL AND failed_at IS NULL
+  AND (requested_at, asset_id) > (sqlc.arg(after_requested_at)::timestamptz, sqlc.arg(after_id)::uuid)
 ORDER BY requested_at, asset_id
 LIMIT sqlc.arg(max_rows);
 

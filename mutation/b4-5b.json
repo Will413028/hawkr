@@ -121,8 +121,8 @@
    "id": "copy-abandon-skips-orphan-record",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/copy_secure.go",
-   "old": "s.q(ctx).InsertOrphanObject(ctx, store.InsertOrphanObjectParams{ObjectKey: key, Now: s.d.Now()})",
-   "new": "error(nil)",
+   "old": "if recordErr := s.q(ctx).InsertOrphanObject(ctx, store.InsertOrphanObjectParams{ObjectKey: key, Now: s.d.Now()}); recordErr != nil {",
+   "new": "if recordErr := error(nil); recordErr != nil {",
    "test": "internal/modules/media ^TestCopyToSecureAbandonRecordsObjectsItCouldNotDeleteAndGCRetries$",
    "why": "放棄複製時刪不掉的物件不記入遺留清單：物件永遠遺留，測試要紅。"
   },
@@ -143,6 +143,96 @@
    "new": "error(nil)",
    "test": "internal/modules/media ^TestCopyToSecureAbandonRecordsObjectsItCouldNotDeleteAndGCRetries$",
    "why": "遺留物件刪除成功後不移除記錄：清單永遠不清，測試要紅。"
+  },
+  {
+   "id": "release-not-classified",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "classifyHoldInsert(q.ReleaseHolds(ctx, store.ReleaseHoldsParams{Source: source, SourceID: sourceID, Now: now}))",
+   "new": "q.ReleaseHolds(ctx, store.ReleaseHoldsParams{Source: source, SourceID: sourceID, Now: now})",
+   "test": "internal/modules/media/internal/hold ^TestReleaseMapsAConcurrentlyDeletedHoldToContention$",
+   "why": "ReleaseHold 的外鍵違反不再分類為 ErrHoldContended：worker 並行刪掉保全列時擁有者收到 Internal，單元測試要紅。"
+  },
+  {
+   "id": "any-foreign-key-is-contention",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "pgErr.Code == foreignKeyViolation && (pgErr.ConstraintName == holdGateFKey || pgErr.ConstraintName == holdReleaseFKey)",
+   "new": "pgErr.Code == foreignKeyViolation",
+   "test": "internal/modules/media/internal/hold ^TestOtherForeignKeyViolationsAreNotContention$",
+   "why": "任何外鍵違反都被當成保全競爭：其他外鍵錯誤被吞成可重試，單元測試要紅。"
+  },
+  {
+   "id": "hold-accepts-unconfirmed-asset",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "\t\tif !r.Confirmed {\n",
+   "new": "\t\tif false && !r.Confirmed {\n",
+   "test": "internal/modules/media ^TestHoldRejectsUnconfirmedSecureAsset$",
+   "why": "Hold 不再要求已確認的認領：未確認的機敏資產被登記保全與閘門，測試要紅。"
+  },
+  {
+   "id": "copy-requests-restart-from-head",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/copy_secure.go",
+   "old": "\t\tif len(rows) < rewrapBatch {\n",
+   "new": "\t\tif len(rows) < rewrapBatch*2 {\n",
+   "test": "internal/modules/media ^TestProcessCopiesReachesALaterRequestPastAFailingHead$",
+   "why": "ProcessCopies 只處理第一頁：排在一整頁持續失敗的請求之後的請求餓死，測試要紅。"
+  },
+  {
+   "id": "fail-copy-skips-deletion-request",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/copy_secure.go",
+   "old": "if _, err := q.RequestDeletions(ctx, store.RequestDeletionsParams{Ids: []uuid.UUID{r.AssetID}, Now: failedAt}); err != nil {",
+   "new": "if _, err := error(nil), error(nil); err != nil {",
+   "test": "internal/modules/media ^TestCopyToSecureAbandonsTheRequestWhenTheOriginalIsGone$",
+   "why": "放棄的複製不請求刪除副本資產：副本資產永遠停在 STAGED 且算 ACTIVE，測試要紅。"
+  },
+  {
+   "id": "copy-status-failed-reads-completed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/copy_secure.go",
+   "old": "\tcase r.FailedAt != nil:\n\t\treturn model.CopyFailed, nil",
+   "new": "\tcase r.FailedAt != nil:\n\t\treturn model.CopyCompleted, nil",
+   "test": "internal/modules/media ^TestCopyToSecureAbandonsTheRequestWhenTheOriginalIsGone$",
+   "why": "CopyStatus 把失敗的複製報成完成，測試要紅。"
+  },
+  {
+   "id": "orphan-retry-deletes-referenced-chunk",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "\t\t\tif !referenced {\n",
+   "new": "\t\t\tif !referenced || referenced {\n",
+   "test": "internal/modules/media ^TestOrphanRecordForAReferencedChunkIsDroppedWithoutDeletingTheObject$",
+   "why": "遺留清單重試不先確認段是否被引用：已完成副本的段物件被刪，測試要紅。"
+  },
+  {
+   "id": "recheck-asset-lock-contention-fails",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "\"media：實體刪除撞上擁有者未提交的保全，跳過\", \"asset_id\", id)\n\t\treturn false, nil",
+   "new": "\"media：實體刪除撞上擁有者未提交的保全，跳過\", \"asset_id\", id)\n\t\treturn false, err",
+   "test": "internal/modules/media ^TestDeleteAssetSkipsARowLockedByAnotherTransactionWithoutWaiting$",
+   "why": "鎖列再檢查撞上鎖時回錯而不是跳過，測試要紅。"
+  },
+  {
+   "id": "fake-hold-ignores-expired-until",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/fake.go",
+   "old": "if now := f.now(); !until.After(now) {",
+   "new": "if now := f.now(); false && !until.After(now) {",
+   "test": "internal/modules/media ^TestFakeHoldRejectsWhatTheRealModuleRejects$",
+   "why": "Fake.Hold 不再拒絕已過期的期限，測試要紅。"
+  },
+  {
+   "id": "fake-is-held-ignores-expiry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/fake.go",
+   "old": "if k.asset == assetID && until.After(now) {",
+   "new": "if k.asset == assetID && (until.After(now) || true) {",
+   "test": "internal/modules/media ^TestFakeHoldExpiryDrivesIsHeldAndExtendHold$",
+   "why": "Fake.IsHeld 不看到期，測試要紅。"
   }
  ]
 }
