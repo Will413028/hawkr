@@ -27,40 +27,60 @@ func (s *Service) ExtendHold(ctx context.Context, source string, sourceID uuid.U
 	if err := model.RequireTx(ctx); err != nil {
 		return err
 	}
-	n, err := s.q(ctx).ExtendHolds(ctx, store.ExtendHoldsParams{Source: source, SourceID: sourceID, Until: until})
-	if err != nil {
-		return fmt.Errorf("media：延長保全：%w", err)
-	}
-	if n == 0 {
-		return model.ErrHoldNotFound
-	}
-	return nil
+	return hold.Extend(ctx, s.q(ctx), source, sourceID, until, s.d.Now())
 }
 
 func (s *Service) ReleaseHold(ctx context.Context, source string, sourceID uuid.UUID) error {
 	if err := model.RequireTx(ctx); err != nil {
 		return err
 	}
-	if _, err := s.q(ctx).ReleaseHolds(ctx, store.ReleaseHoldsParams{Source: source, SourceID: sourceID}); err != nil {
-		return fmt.Errorf("media：解除保全：%w", err)
-	}
-	return nil
+	return hold.Release(ctx, s.q(ctx), source, sourceID, s.d.Now())
 }
 
 func (s *Service) ExpireHolds(ctx context.Context) (int, error) {
 	if err := model.RequireNoTx(ctx); err != nil {
 		return 0, err
 	}
-	var n int64
+	total := 0
+	after := uuid.UUID{}
+	for {
+		now := s.d.Now()
+		ids, err := s.q(ctx).ListAssetsWithDeadHolds(ctx, store.ListAssetsWithDeadHoldsParams{AfterID: after, Now: now, MaxRows: batchSize})
+		if err != nil {
+			return total, fmt.Errorf("media：列出有到期保全的資產：%w", err)
+		}
+		for _, id := range ids {
+			n, err := s.settleHolds(ctx, id, now)
+			if err != nil {
+				return total, err
+			}
+			total += n
+		}
+		if len(ids) < batchSize {
+			return total, nil
+		}
+		after = ids[len(ids)-1]
+	}
+}
+
+func (s *Service) settleHolds(ctx context.Context, assetID uuid.UUID, now time.Time) (int, error) {
+	n := 0
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
+		}
 		var err error
-		n, err = s.q(ctx).DeleteExpiredHolds(ctx, s.d.Now())
+		n, err = hold.Settle(ctx, s.q(ctx), assetID, now)
 		return err
 	})
-	if err != nil {
-		return 0, fmt.Errorf("media：整理到期的保全：%w", err)
+	if hold.IsContention(err) {
+		s.d.Logger.Info("media：整理保全撞上擁有者未提交的保全，跳過", "asset_id", assetID)
+		return 0, nil
 	}
-	return int(n), nil
+	if err != nil {
+		return 0, fmt.Errorf("media：整理資產 %s 的保全：%w", assetID, err)
+	}
+	return n, nil
 }
 
 type ExpireHoldsArgs struct{}

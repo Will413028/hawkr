@@ -39,12 +39,25 @@ type MediaAssetDeletionRequest struct {
 	AppliedAt   *time.Time
 }
 
-type MediaAssetHold struct {
+type MediaAssetGate struct {
 	AssetID   uuid.UUID
+	Kind      string
+	CreatedAt time.Time
+}
+
+type MediaAssetHold struct {
+	HoldID    uuid.UUID
+	AssetID   uuid.UUID
+	GateKind  string
 	Source    string
 	SourceID  uuid.UUID
 	Until     time.Time
 	CreatedAt time.Time
+}
+
+type MediaAssetHoldRelease struct {
+	HoldID     uuid.UUID
+	ReleasedAt time.Time
 }
 
 type MediaSecureChunk struct {

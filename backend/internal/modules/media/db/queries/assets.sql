@@ -28,26 +28,23 @@ ORDER BY c.asset_id
 ON CONFLICT (asset_id) DO NOTHING
 RETURNING asset_id;
 
--- name: ApplyDeletionRequests :many
-WITH picked AS (
-    SELECT r.asset_id FROM media.asset_deletion_requests AS r
-    WHERE r.applied_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = r.asset_id AND h.until > sqlc.arg(now)::timestamptz)
-    ORDER BY r.requested_at, r.asset_id
-    LIMIT sqlc.arg(max_rows)
-    FOR UPDATE SKIP LOCKED),
-marked AS (
-    UPDATE media.assets AS a SET state = 'DELETING', updated_at = sqlc.arg(now)::timestamptz
-    FROM picked AS p WHERE a.id = p.asset_id AND a.state = 'STAGED'
-    RETURNING a.id)
-UPDATE media.asset_deletion_requests AS r SET applied_at = sqlc.arg(now)::timestamptz
-FROM picked AS p WHERE r.asset_id = p.asset_id
-RETURNING r.asset_id;
+-- name: ListPendingDeletionRequests :many
+SELECT asset_id, requested_at FROM media.asset_deletion_requests
+WHERE applied_at IS NULL AND (requested_at, asset_id) > (sqlc.arg(after_requested_at)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY requested_at, asset_id
+LIMIT sqlc.arg(max_rows);
+
+-- name: ApplyDeletionRequest :execrows
+WITH marked AS (
+    UPDATE media.assets SET state = 'DELETING', updated_at = sqlc.arg(now)::timestamptz
+    WHERE id = sqlc.arg(asset_id)::uuid AND state = 'STAGED'
+    RETURNING id)
+UPDATE media.asset_deletion_requests SET applied_at = sqlc.arg(now)::timestamptz
+WHERE asset_id = sqlc.arg(asset_id)::uuid AND applied_at IS NULL;
 
 -- name: ClaimAssetsOfUploads :execrows
-UPDATE media.assets AS a SET state = 'DELETING', updated_at = sqlc.arg(now)
-WHERE a.id = ANY(sqlc.arg(ids)::uuid[]) AND a.state = 'STAGED'
-  AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = a.id AND h.until > sqlc.arg(now)::timestamptz);
+UPDATE media.assets SET state = 'DELETING', updated_at = sqlc.arg(now)
+WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND state = 'STAGED';
 
 -- name: ListDeletingAssets :many
 SELECT id, object_key, visibility FROM media.assets
@@ -80,29 +77,104 @@ DELETE FROM media.upload_claims WHERE asset_id = sqlc.arg(asset_id)::uuid;
 -- name: DeleteRequestOfAsset :execrows
 DELETE FROM media.asset_deletion_requests WHERE asset_id = sqlc.arg(asset_id);
 
--- name: LockAssetsForHold :many
-SELECT id, state FROM media.assets WHERE id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY id FOR SHARE;
+-- name: ListAssetStates :many
+SELECT id, state FROM media.assets WHERE id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY id;
 
--- name: UpsertHolds :exec
-INSERT INTO media.asset_holds (asset_id, source, source_id, until, created_at)
-SELECT unnest(sqlc.arg(ids)::uuid[]), sqlc.arg(source), sqlc.arg(source_id)::uuid, sqlc.arg(until)::timestamptz, sqlc.arg(now)::timestamptz
-ON CONFLICT (asset_id, source, source_id) DO UPDATE SET until = GREATEST(media.asset_holds.until, EXCLUDED.until);
+-- name: InsertHoldGates :exec
+INSERT INTO media.asset_gates (asset_id, kind, created_at)
+SELECT unnest(sqlc.arg(ids)::uuid[]), 'HOLD', sqlc.arg(now)::timestamptz
+ON CONFLICT (asset_id) DO NOTHING;
 
--- name: ExtendHolds :execrows
-UPDATE media.asset_holds SET until = GREATEST(until, sqlc.arg(until)::timestamptz)
-WHERE source = sqlc.arg(source) AND source_id = sqlc.arg(source_id);
+-- name: ListAssetGates :many
+SELECT asset_id, kind FROM media.asset_gates WHERE asset_id = ANY(sqlc.arg(ids)::uuid[]) ORDER BY asset_id;
 
--- name: ReleaseHolds :execrows
-DELETE FROM media.asset_holds WHERE source = sqlc.arg(source) AND source_id = sqlc.arg(source_id);
+-- name: InsertHolds :exec
+INSERT INTO media.asset_holds (hold_id, asset_id, source, source_id, until, created_at)
+SELECT gen_random_uuid(), t.id, sqlc.arg(source), sqlc.arg(source_id)::uuid, sqlc.arg(until)::timestamptz, sqlc.arg(now)::timestamptz
+FROM unnest(sqlc.arg(ids)::uuid[]) AS t(id)
+WHERE NOT EXISTS (
+    SELECT 1 FROM media.asset_holds AS h
+    WHERE h.asset_id = t.id AND h.source = sqlc.arg(source) AND h.source_id = sqlc.arg(source_id)::uuid
+      AND h.until >= sqlc.arg(until)::timestamptz
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id));
 
--- name: DeleteExpiredHolds :execrows
-DELETE FROM media.asset_holds WHERE until <= sqlc.arg(now);
+-- name: IsHoldSourceLive :one
+SELECT EXISTS (
+    SELECT 1 FROM media.asset_holds AS h
+    WHERE h.source = sqlc.arg(source) AND h.source_id = sqlc.arg(source_id)::uuid AND h.until > sqlc.arg(now)::timestamptz
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))::boolean;
+
+-- name: ExtendHolds :exec
+INSERT INTO media.asset_holds (hold_id, asset_id, source, source_id, until, created_at)
+SELECT gen_random_uuid(), l.asset_id, l.source, l.source_id, sqlc.arg(until)::timestamptz, sqlc.arg(now)::timestamptz
+FROM (
+    SELECT h.asset_id, h.source, h.source_id, max(h.until) AS latest
+    FROM media.asset_holds AS h
+    WHERE h.source = sqlc.arg(source) AND h.source_id = sqlc.arg(source_id)::uuid AND h.until > sqlc.arg(now)::timestamptz
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id)
+    GROUP BY h.asset_id, h.source, h.source_id) AS l
+WHERE l.latest < sqlc.arg(until)::timestamptz;
+
+-- name: ReleaseHolds :exec
+INSERT INTO media.asset_hold_releases (hold_id, released_at)
+SELECT h.hold_id, sqlc.arg(now)::timestamptz FROM media.asset_holds AS h
+WHERE h.source = sqlc.arg(source) AND h.source_id = sqlc.arg(source_id)::uuid
+  AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id)
+ON CONFLICT (hold_id) DO NOTHING;
+
+-- name: LockHoldGate :one
+SELECT asset_id FROM media.asset_gates WHERE asset_id = sqlc.arg(asset_id) AND kind = 'HOLD' FOR UPDATE;
+
+-- name: DeleteDeadHolds :one
+WITH dead AS (
+    SELECT h.hold_id FROM media.asset_holds AS h
+    WHERE h.asset_id = sqlc.arg(asset_id)::uuid
+      AND (h.until <= sqlc.arg(now)::timestamptz OR EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))),
+gone AS (
+    DELETE FROM media.asset_hold_releases WHERE hold_id IN (SELECT hold_id FROM dead)),
+removed AS (
+    DELETE FROM media.asset_holds WHERE hold_id IN (SELECT hold_id FROM dead) RETURNING asset_id, source, source_id)
+SELECT count(*) FROM (SELECT DISTINCT asset_id, source, source_id FROM removed) AS r;
+
+-- name: DeleteHoldsOfSource :execrows
+WITH dead AS (
+    SELECT h.hold_id FROM media.asset_holds AS h
+    WHERE h.asset_id = sqlc.arg(asset_id)::uuid AND h.source = sqlc.arg(source) AND h.source_id = sqlc.arg(source_id)::uuid),
+gone AS (
+    DELETE FROM media.asset_hold_releases WHERE hold_id IN (SELECT hold_id FROM dead))
+DELETE FROM media.asset_holds WHERE hold_id IN (SELECT hold_id FROM dead);
+
+-- name: DeleteIdleHoldGate :execrows
+DELETE FROM media.asset_gates AS g
+WHERE g.asset_id = sqlc.arg(asset_id) AND g.kind = 'HOLD'
+  AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = g.asset_id);
+
+-- name: InsertDeleteGate :exec
+INSERT INTO media.asset_gates (asset_id, kind, created_at)
+SELECT a.id, 'DELETE', sqlc.arg(now)::timestamptz FROM media.assets AS a WHERE a.id = sqlc.arg(asset_id)::uuid
+ON CONFLICT (asset_id) DO NOTHING;
+
+-- name: GetGateKind :one
+SELECT kind FROM media.asset_gates WHERE asset_id = sqlc.arg(asset_id);
+
+-- name: ListAssetsWithDeadHolds :many
+SELECT DISTINCT h.asset_id FROM media.asset_holds AS h
+WHERE h.asset_id > sqlc.arg(after_id)::uuid
+  AND (h.until <= sqlc.arg(now)::timestamptz OR EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))
+ORDER BY h.asset_id
+LIMIT sqlc.arg(max_rows);
+
+-- name: ListAssetsOfHoldSource :many
+SELECT DISTINCT asset_id FROM media.asset_holds WHERE source = sqlc.arg(source) AND source_id = sqlc.arg(source_id)::uuid ORDER BY asset_id;
 
 -- name: LockDeletingAsset :one
 SELECT id FROM media.assets WHERE id = sqlc.arg(id) AND state = 'DELETING' FOR UPDATE;
 
 -- name: IsAssetHeld :one
-SELECT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = sqlc.arg(asset_id) AND h.until > sqlc.arg(now))::boolean;
+SELECT EXISTS (
+    SELECT 1 FROM media.asset_holds AS h
+    WHERE h.asset_id = sqlc.arg(asset_id) AND h.until > sqlc.arg(now)
+      AND NOT EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id))::boolean;
 
 -- name: RestoreHeldAsset :execrows
 UPDATE media.assets SET state = 'STAGED', updated_at = sqlc.arg(now) WHERE id = sqlc.arg(id) AND state = 'DELETING';

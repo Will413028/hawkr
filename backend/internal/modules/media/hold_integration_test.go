@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/hold"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -31,9 +32,16 @@ func releaseInTx(f *fixture, sourceID uuid.UUID) error {
 
 func rawHold(t *testing.T, f *fixture, assetID uuid.UUID) {
 	t.Helper()
-	_, err := f.d.Pool().Exec(t.Context(),
-		`INSERT INTO media.asset_holds (asset_id, source, source_id, until, created_at) VALUES ($1, 'test.raw', $2, $3, $4)`,
-		assetID, uuid.New(), f.clock.Now().Add(24*time.Hour), f.clock.Now())
+	ctx := t.Context()
+	if _, err := f.d.Pool().Exec(ctx, `DELETE FROM media.asset_gates WHERE asset_id = $1 AND kind = 'DELETE'`, assetID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO media.asset_gates (asset_id, kind, created_at) VALUES ($1, 'HOLD', $2) ON CONFLICT DO NOTHING`, assetID, f.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	_, err := f.d.Pool().Exec(ctx,
+		`INSERT INTO media.asset_holds (hold_id, asset_id, source, source_id, until, created_at) VALUES ($1, $2, 'test.raw', $3, $4, $5)`,
+		uuid.New(), assetID, uuid.New(), f.clock.Now().Add(24*time.Hour), f.clock.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,26 +132,44 @@ func TestExpiredHoldAllowsDeletion(t *testing.T) {
 	}
 }
 
-func TestClaimAssetsOfUploadsSkipsHeldAsset(t *testing.T) {
+func TestClaimGateRefusesHeldAssetAndTakesFreeOne(t *testing.T) {
 	f := setup(t)
 	res := uploadSecure(t, f, owner, pdfOf(3000))
 	_, assetID := secureRow(t, f, res.Token)
 	rawHold(t, f, assetID)
-	n, err := store.New(f.d.Pool()).ClaimAssetsOfUploads(t.Context(), store.ClaimAssetsOfUploadsParams{Ids: []uuid.UUID{assetID}, Now: f.clock.Now()})
-	if err != nil {
-		t.Fatal(err)
+	claim := func(id uuid.UUID) bool {
+		var won bool
+		err := f.d.InTx(t.Context(), func(ctx context.Context) error {
+			var err error
+			won, err = hold.Claim(ctx, store.New(f.d.Conn(ctx)), id, f.clock.Now())
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return won
 	}
-	if n != 0 {
-		t.Fatalf("ClaimAssetsOfUploads 認領了 %d 個被保全的資產", n)
+	if claim(assetID) {
+		t.Fatal("被保全的資產不該取得刪除閘門")
 	}
-	if got := physicalAssetState(t, f, assetID); got != "STAGED" {
-		t.Fatalf("被保全的資產物理狀態 = %s，預期 STAGED", got)
+	if n := count(t, f, `SELECT count(*) FROM media.asset_gates WHERE asset_id = $1 AND kind = 'HOLD'`, assetID); n != 1 {
+		t.Fatalf("被保全資產的保全閘門有 %d 個，預期 1", n)
 	}
 	second := uploadSecure(t, f, owner, pdfOf(3000))
 	_, freeID := secureRow(t, f, second.Token)
-	n, err = store.New(f.d.Pool()).ClaimAssetsOfUploads(t.Context(), store.ClaimAssetsOfUploadsParams{Ids: []uuid.UUID{freeID}, Now: f.clock.Now()})
-	if err != nil || n != 1 {
-		t.Fatalf("沒有保全的資產要被認領：n=%d err=%v", n, err)
+	first := claim(freeID)
+	if again := claim(freeID); !first || !again {
+		t.Fatal("沒有保全的資產要取得刪除閘門，且重複取得冪等")
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.asset_gates WHERE asset_id = $1 AND kind = 'DELETE'`, freeID); n != 1 {
+		t.Fatalf("刪除閘門有 %d 個，預期 1", n)
+	}
+	f.clock.Advance(48 * time.Hour)
+	if !claim(assetID) {
+		t.Fatal("保全到期後要能取得刪除閘門")
+	}
+	if n := count(t, f, `SELECT count(*) FROM media.asset_holds WHERE asset_id = $1`, assetID); n != 0 {
+		t.Fatalf("取得刪除閘門時要清掉到期的保全列，還有 %d 筆", n)
 	}
 }
 
@@ -514,5 +540,111 @@ func TestCopyToSecureRefusesNonPublicOrUnconfirmedSources(t *testing.T) {
 	}
 	if n := count(t, f, `SELECT count(*) FROM media.asset_copy_requests`); n != 0 {
 		t.Fatalf("被拒的請求留下 %d 筆複製請求", n)
+	}
+}
+
+func TestWorkerSkipsAnUncommittedHoldWithoutWaitingOrDeleting(t *testing.T) {
+	for _, existingGate := range []bool{false, true} {
+		name := map[bool]string{false: "新閘門", true: "已有保全閘門"}[existingGate]
+		t.Run(name, func(t *testing.T) {
+			f := setup(t)
+			a, keys := secureConfirmed(t, f)
+			if existingGate {
+				if err := holdInTx(f, a.ID, uuid.New(), f.clock.Now().Add(time.Hour)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := markDeletedInTx(f, a.ID); err != nil {
+				t.Fatal(err)
+			}
+			if existingGate {
+				f.clock.Advance(2 * time.Hour)
+			}
+			placed, release := make(chan struct{}), make(chan struct{})
+			ownerErr := make(chan error, 1)
+			go func() {
+				ownerErr <- f.d.InTx(t.Context(), func(ctx context.Context) error {
+					if err := f.m.Hold(ctx, []uuid.UUID{a.ID}, holdSource, uuid.New(), f.clock.Now().Add(24*time.Hour)); err != nil {
+						return err
+					}
+					close(placed)
+					<-release
+					return nil
+				})
+			}()
+			<-placed
+			start := time.Now()
+			n, err := f.m.ApplyDeletions(t.Context())
+			if elapsed := time.Since(start); err != nil || n != 0 || elapsed > 10*time.Second {
+				t.Fatalf("擁有者未提交保全時 ApplyDeletions = %d, %v，耗時 %v，預期跳過且不被拖住", n, err, elapsed)
+			}
+			if _, err := f.m.DeleteAssets(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if got := physicalAssetState(t, f, a.ID); got != "STAGED" || !hasAll(f, keys) || requestApplied(t, f, a.ID) {
+				t.Fatalf("擁有者未提交保全時資產 = %s，物件在 = %v，請求已套用 = %v", got, hasAll(f, keys), requestApplied(t, f, a.ID))
+			}
+			close(release)
+			if err := <-ownerErr; err != nil {
+				t.Fatal(err)
+			}
+			deleteAll(t, f)
+			if got := physicalAssetState(t, f, a.ID); got != "STAGED" || !hasAll(f, keys) || requestApplied(t, f, a.ID) {
+				t.Fatalf("保全提交之後資產 = %s，物件在 = %v，請求已套用 = %v，預期維持原狀", got, hasAll(f, keys), requestApplied(t, f, a.ID))
+			}
+			assertNoOrphanDeleting(t, f)
+		})
+	}
+}
+
+func TestGCSkipsAnUncommittedHoldOnAStagedUpload(t *testing.T) {
+	f := setup(t)
+	res := uploadSecure(t, f, owner, pdfOf(3000))
+	uploadID, assetID := secureRow(t, f, res.Token)
+	keys := chunkKeys(t, f, assetID)
+	placed, release := make(chan struct{}), make(chan struct{})
+	ownerErr := make(chan error, 1)
+	go func() {
+		ownerErr <- f.d.InTx(t.Context(), func(ctx context.Context) error {
+			if err := f.m.Hold(ctx, []uuid.UUID{assetID}, holdSource, uuid.New(), f.clock.Now().Add(100*media.UploadTTL)); err != nil {
+				return err
+			}
+			close(placed)
+			<-release
+			return nil
+		})
+	}()
+	<-placed
+	f.clock.Advance(media.UploadTTL + time.Minute)
+	start := time.Now()
+	gc, err := f.m.CollectGarbage(t.Context())
+	if elapsed := time.Since(start); err != nil || gc.Claimed != 0 || elapsed > 10*time.Second {
+		t.Fatalf("擁有者未提交保全時 GC = %+v, %v，耗時 %v，預期跳過且不被拖住", gc, err, elapsed)
+	}
+	close(release)
+	if err := <-ownerErr; err != nil {
+		t.Fatal(err)
+	}
+	gc, err = f.m.CollectGarbage(t.Context())
+	if err != nil || gc.Claimed != 0 || gc.Deleted != 0 {
+		t.Fatalf("保全提交之後 GC = %+v, %v，預期不認領", gc, err)
+	}
+	if got := uploadState(t, f, uploadID); got != "READY" || physicalAssetState(t, f, assetID) != "STAGED" || !hasAll(f, keys) {
+		t.Fatalf("暫存 = %s，資產 = %s，物件在 = %v", got, physicalAssetState(t, f, assetID), hasAll(f, keys))
+	}
+}
+
+func TestHoldAfterTheDeletionGateCommitsReturnsAssetGoneEvenWhenStateLooksStaged(t *testing.T) {
+	f := setup(t)
+	a, _ := secureConfirmed(t, f)
+	if _, err := f.d.Pool().Exec(t.Context(), `INSERT INTO media.asset_gates (asset_id, kind, created_at) VALUES ($1, 'DELETE', $2)`, a.ID, f.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	err := holdInTx(f, a.ID, uuid.New(), f.clock.Now().Add(time.Hour))
+	if !errors.Is(err, media.ErrAssetGone) {
+		t.Fatalf("刪除閘門已提交時 Hold = %v，預期 ErrAssetGone", err)
+	}
+	if n := holdsOf(t, f, a.ID); n != 0 {
+		t.Fatalf("不該留下保全列，有 %d 筆", n)
 	}
 }

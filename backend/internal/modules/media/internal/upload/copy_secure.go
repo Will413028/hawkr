@@ -164,6 +164,9 @@ func (s *Service) copyOne(ctx context.Context, r store.MediaAssetCopyRequest) er
 	}
 	won := false
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
+		}
 		q := s.q(ctx)
 		now := s.d.Now()
 		n, err := q.CompleteCopyRequest(ctx, store.CompleteCopyRequestParams{AssetID: r.AssetID, Now: &now})
@@ -178,7 +181,7 @@ func (s *Service) copyOne(ctx context.Context, r store.MediaAssetCopyRequest) er
 				return fmt.Errorf("media：記下副本的段：%w", err)
 			}
 		}
-		if _, err := q.ReleaseHolds(ctx, store.ReleaseHoldsParams{Source: model.CopySource, SourceID: r.AssetID}); err != nil {
+		if err := hold.ReleaseSource(ctx, q, model.CopySource, r.AssetID); err != nil {
 			return fmt.Errorf("media：釋放待複製保全：%w", err)
 		}
 		won = true
@@ -218,12 +221,15 @@ func (s *Service) deleteCopyObjects(ctx context.Context, keys []string) {
 
 func (s *Service) failCopy(ctx context.Context, r store.MediaAssetCopyRequest, reason string) error {
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := hold.SetLockTimeout(ctx, s.d.DB.Conn(ctx)); err != nil {
+			return err
+		}
 		q := s.q(ctx)
 		failedAt := s.d.Now()
 		if _, err := q.FailCopyRequest(ctx, store.FailCopyRequestParams{AssetID: r.AssetID, Now: &failedAt}); err != nil {
 			return fmt.Errorf("media：標記複製失敗：%w", err)
 		}
-		if _, err := q.ReleaseHolds(ctx, store.ReleaseHoldsParams{Source: model.CopySource, SourceID: r.AssetID}); err != nil {
+		if err := hold.ReleaseSource(ctx, q, model.CopySource, r.AssetID); err != nil {
 			return fmt.Errorf("media：釋放待複製保全：%w", err)
 		}
 		return nil

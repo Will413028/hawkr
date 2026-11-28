@@ -601,13 +601,10 @@ func (q *Queries) LockDeletingUpload(ctx context.Context, id uuid.UUID) (LockDel
 }
 
 const markReclaimedUploadDeleting = `-- name: MarkReclaimedUploadDeleting :one
-UPDATE media.staged_uploads AS u
+UPDATE media.staged_uploads
 SET state = 'DELETING', updated_at = $1
-WHERE u.id = $2 AND u.state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
-  AND NOT EXISTS (
-    SELECT 1 FROM media.asset_holds AS h
-    WHERE h.asset_id IN (u.asset_id, u.planned_asset_id) AND h.until > $1::timestamptz)
-RETURNING u.asset_id
+WHERE id = $2 AND state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
+RETURNING asset_id, planned_asset_id
 `
 
 type MarkReclaimedUploadDeletingParams struct {
@@ -615,11 +612,16 @@ type MarkReclaimedUploadDeletingParams struct {
 	ID  uuid.UUID
 }
 
-func (q *Queries) MarkReclaimedUploadDeleting(ctx context.Context, arg MarkReclaimedUploadDeletingParams) (*uuid.UUID, error) {
+type MarkReclaimedUploadDeletingRow struct {
+	AssetID        *uuid.UUID
+	PlannedAssetID *uuid.UUID
+}
+
+func (q *Queries) MarkReclaimedUploadDeleting(ctx context.Context, arg MarkReclaimedUploadDeletingParams) (MarkReclaimedUploadDeletingRow, error) {
 	row := q.db.QueryRow(ctx, markReclaimedUploadDeleting, arg.Now, arg.ID)
-	var asset_id *uuid.UUID
-	err := row.Scan(&asset_id)
-	return asset_id, err
+	var i MarkReclaimedUploadDeletingRow
+	err := row.Scan(&i.AssetID, &i.PlannedAssetID)
+	return i, err
 }
 
 const markSecureUploadReady = `-- name: MarkSecureUploadReady :execrows

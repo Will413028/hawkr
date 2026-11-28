@@ -1,40 +1,58 @@
 {
  "mutants": [
   {
-   "id": "apply-picked-drops-hold-condition",
+   "id": "claim-skips-delete-gate-insert",
    "stack": "go-integration",
-   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
-   "old": "\n      AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = r.asset_id AND h.until > $1::timestamptz)",
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "\tif err := q.InsertDeleteGate(ctx, store.InsertDeleteGateParams{AssetID: assetID, Now: now}); err != nil {\n\t\treturn false, fmt.Errorf(\"media：登記資產 %s 的刪除閘門：%w\", assetID, err)\n\t}\n",
    "new": "",
-   "test": "internal/modules/media ^TestApplyDeletionsSkipsHeldAsset$",
-   "why": "ApplyDeletionRequests 的 picked 不再排除有生效保全的請求：被保全的資產被推進 DELETING 並刪物件，跳過保全測試要紅。"
+   "test": "internal/modules/media ^TestWorkerSkipsAnUncommittedHoldWithoutWaitingOrDeleting$",
+   "why": "worker 認領不再登記刪除閘門，也就不再與擁有者未提交的保全閘門搶同一個唯一鍵：撞不到、不逾時，把被保全的資產推進 DELETING，並行測試要紅。"
   },
   {
-   "id": "apply-picked-hold-expiry-inverted",
+   "id": "claim-treats-hold-gate-as-won",
    "stack": "go-integration",
-   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
-   "old": "h.asset_id = r.asset_id AND h.until > $1::timestamptz)",
-   "new": "h.asset_id = r.asset_id AND h.until < $1::timestamptz)",
-   "test": "internal/modules/media ^(TestApplyDeletionsSkipsHeldAsset|TestExpiredHoldAllowsDeletion)$",
-   "why": "保全期限的比較方向反了：保全中的請求被套用（跳過保全測試紅），到期的請求反而一直被擋（到期放行測試紅）。"
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "\treturn kind == gateDelete, nil\n",
+   "new": "\treturn kind != \"\", nil\n",
+   "test": "internal/modules/media ^(TestApplyDeletionsSkipsHeldAsset|TestClaimGateRefusesHeldAssetAndTakesFreeOne|TestReclaimUploadWithHeldAssetKeepsUploadStateAndRollsBackClaim)$",
+   "why": "worker 把保全閘門也當成認領成功：有生效保全的資產被推進 DELETING 或暫存被 GC 認領，三個測試都要紅。"
   },
   {
-   "id": "claim-assets-of-uploads-drops-hold-condition",
+   "id": "hold-ignores-delete-gate",
    "stack": "go-integration",
-   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
-   "old": "\n  AND NOT EXISTS (SELECT 1 FROM media.asset_holds AS h WHERE h.asset_id = a.id AND h.until > $1::timestamptz)",
-   "new": "",
-   "test": "internal/modules/media ^TestClaimAssetsOfUploadsSkipsHeldAsset$",
-   "why": "ClaimAssetsOfUploads 不再排除有生效保全的資產：暫存逾期回收時被保全的資產被推進 DELETING，測試要紅。"
+   "file": "backend/internal/modules/media/internal/hold/hold.go",
+   "old": "\t\t\tif g.Kind == gateDelete {\n\t\t\t\treturn model.ErrAssetGone\n\t\t\t}\n",
+   "new": "\t\t\t_ = g\n",
+   "test": "internal/modules/media ^TestHoldAfterTheDeletionGateCommitsReturnsAssetGoneEvenWhenStateLooksStaged$",
+   "why": "Hold 讀到刪除閘門不再回 ErrAssetGone：已提交刪除閘門的資產上登記保全，測試要紅。"
   },
   {
-   "id": "reclaim-upload-deleting-drops-hold-condition",
+   "id": "reclaim-upload-ignores-gate-result",
    "stack": "go-integration",
-   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
-   "old": "\n  AND NOT EXISTS (\n    SELECT 1 FROM media.asset_holds AS h\n    WHERE h.asset_id IN (u.asset_id, u.planned_asset_id) AND h.until > $1::timestamptz)",
-   "new": "",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "\t\tif !clear {\n\t\t\treturn errUploadHeld\n\t\t}\n",
+   "new": "\t\t_ = clear\n",
    "test": "internal/modules/media ^TestReclaimUploadWithHeldAssetKeepsUploadStateAndRollsBackClaim$",
-   "why": "MarkReclaimedUploadDeleting 不再排除資產有生效保全的暫存列：GC 認領了被保全的暫存（Claimed 不為 0），測試要紅。"
+   "why": "GC 認領暫存時不理會閘門結果：被保全資產的暫存被認領並轉 DELETING，測試要紅。"
+  },
+  {
+   "id": "dead-holds-keep-live-ones",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+   "old": "h.asset_id = $1::uuid\n      AND (h.until <= $2::timestamptz OR",
+   "new": "h.asset_id = $1::uuid\n      AND (h.until > $2::timestamptz OR",
+   "test": "internal/modules/media ^(TestApplyDeletionsSkipsHeldAsset|TestExpiredHoldAllowsDeletion)$",
+   "why": "整理保全時清掉的是生效中的保全：被保全的資產被認領刪除（跳過保全測試紅），到期的反而清不掉（到期放行測試紅）。"
+  },
+  {
+   "id": "dead-holds-ignore-releases",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+   "old": "h.asset_id = $1::uuid\n      AND (h.until <= $2::timestamptz OR EXISTS (SELECT 1 FROM media.asset_hold_releases AS r WHERE r.hold_id = h.hold_id)))",
+   "new": "h.asset_id = $1::uuid\n      AND (h.until <= $2::timestamptz))",
+   "test": "internal/modules/media ^TestTwoHoldSourcesStackAndReleasingOneKeepsAsset$",
+   "why": "整理保全不再清已解除的保全：兩個來源都解除後資產仍被保全閘門擋住、不會刪，測試要紅。"
   },
   {
    "id": "delete-upload-drops-hold-recheck",

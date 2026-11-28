@@ -112,13 +112,10 @@ ON CONFLICT DO NOTHING
 RETURNING upload_id;
 
 -- name: MarkReclaimedUploadDeleting :one
-UPDATE media.staged_uploads AS u
+UPDATE media.staged_uploads
 SET state = 'DELETING', updated_at = sqlc.arg(now)
-WHERE u.id = sqlc.arg(id) AND u.state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
-  AND NOT EXISTS (
-    SELECT 1 FROM media.asset_holds AS h
-    WHERE h.asset_id IN (u.asset_id, u.planned_asset_id) AND h.until > sqlc.arg(now)::timestamptz)
-RETURNING u.asset_id;
+WHERE id = sqlc.arg(id) AND state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
+RETURNING asset_id, planned_asset_id;
 
 -- name: ListDeletingUploads :many
 SELECT id, tmp_key, final_key, asset_id, planned_asset_id FROM media.staged_uploads
